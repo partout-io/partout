@@ -48,6 +48,8 @@ Open `Demo.xcodeproj` and run the `PassepartoutKitDemo` target on your Mac or iO
 
 ## License
 
+Copyright (c) 2025 Davide De Rosa. All rights reserved.
+
 This project is licensed under the [MIT][license-content].
 
 ## Credits
@@ -56,11 +58,11 @@ This project is licensed under the [MIT][license-content].
 
 ### OpenVPN
 
-© Copyright 2024 OpenVPN | OpenVPN is a registered trademark of OpenVPN, Inc.
+© Copyright 2025 OpenVPN | OpenVPN is a registered trademark of OpenVPN, Inc.
 
 ### WireGuard
 
-© Copyright 2015-2024 Jason A. Donenfeld. All Rights Reserved. "WireGuard" and the "WireGuard" logo are registered trademarks of Jason A. Donenfeld.
+© Copyright 2015-2025 Jason A. Donenfeld. All Rights Reserved. "WireGuard" and the "WireGuard" logo are registered trademarks of Jason A. Donenfeld.
 
 ## Contacts
 
