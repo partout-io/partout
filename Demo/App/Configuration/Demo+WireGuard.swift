@@ -41,5 +41,5 @@ extension WireGuard {
 }
 
 private enum Constants {
-    static let demoURL = Bundle.main.url(forResource: "Files/test-protonvpn", withExtension: "wg")!
+    static let demoURL = Bundle.main.url(forResource: "Files/test-sample", withExtension: "wg")!
 }
