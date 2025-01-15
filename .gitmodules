@@ -1,0 +1,3 @@
+[submodule "Passepartout"]
+	path = Passepartout
+	url = https://github.com/passepartoutvpn/passepartout
