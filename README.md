@@ -13,6 +13,8 @@ Binary distribution for these architectures:
 - iphonesimulator
 - appletvsimulator
 
+## Installation
+
 ### Testing
 
 Download the app codebase locally:
