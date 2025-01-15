@@ -36,6 +36,12 @@ environment = .onlineDevelopment
 
 Edit `Demo/Config.xcconfig` with your developer details. You must comply with all the capabilities and entitlements in the main app and the tunnel extension target.
 
+Put your configuration files into `Demo/App/Files` with these names:
+
+- OpenVPN configuration: `test-sample.ovpn`
+- OpenVPN credentials (in two lines): `test-sample.txt`
+- WireGuard configuration: `test-sample.wg`
+
 Open `Demo.xcodeproj` and run the `PassepartoutKitDemo` target on your Mac or iOS/tvOS Simulators.
 
 ## License
