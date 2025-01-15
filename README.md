@@ -13,6 +13,31 @@ Binary distribution for these architectures:
 - iphonesimulator
 - appletvsimulator
 
+### Testing
+
+Download the app codebase locally:
+
+```
+git clone https://github.com/passepartoutvpn/passepartoutkit
+```
+
+Check out the submodule in "Passepartout" (do not recurse):
+
+```
+$ git submodule init
+$ git submodule update
+```
+
+Edit `Passepartout/Packages/PassepartoutKit-Framework/Package.swift` and set:
+
+```
+environment = .onlineDevelopment
+```
+
+Edit `Demo/Config.xcconfig` with your developer details. You must comply with all the capabilities and entitlements in the main app and the tunnel extension target.
+
+Open `Demo.xcodeproj` and run the `PassepartoutKitDemo` target on your Mac or iOS/tvOS Simulators.
+
 ## License
 
 This project is licensed under the [MIT][license-content].
