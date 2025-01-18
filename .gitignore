@@ -2,3 +2,5 @@
 *.swp
 *.pbxuser
 **/xcuserdata
+PassepartoutKit.xcframework.zip
+.build
