@@ -52,6 +52,8 @@ Copyright (c) 2025 Davide De Rosa. All rights reserved.
 
 This project is licensed under the [MIT][license-content].
 
+If you want to use this library e.g. in your proprietary VPN apps for iOS/macOS/tvOS, please [contact me privately][license-contact].
+
 ## Credits
 
 - [GenericJSON][credits-genericjson]
