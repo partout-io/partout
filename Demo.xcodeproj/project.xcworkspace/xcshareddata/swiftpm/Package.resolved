@@ -10,6 +10,15 @@
       }
     },
     {
+      "identity" : "passepartoutkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/passepartoutvpn/passepartoutkit",
+      "state" : {
+        "revision" : "b437d6d7ac8e62d19e3757f455132fa56104374a",
+        "version" : "0.99.7"
+      }
+    },
+    {
       "identity" : "wg-go-apple",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/passepartoutvpn/wg-go-apple",

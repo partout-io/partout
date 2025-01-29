@@ -30,12 +30,15 @@ import SwiftUI
 struct DemoApp: App {
     init() {
         PassepartoutConfiguration.shared.logsModules = true
-        PassepartoutConfiguration.shared.setLocalLogger(options: .init(
+        PassepartoutConfiguration.shared.setLocalLogger(
             url: Demo.Log.appURL,
-            maxNumberOfLines: Demo.Log.maxNumberOfLines,
-            maxLevel: Demo.Log.maxLevel,
+            options: .init(
+                maxLevel: Demo.Log.maxLevel,
+                maxSize: Demo.Log.maxSize,
+                maxBufferedLines: Demo.Log.maxBufferedLines
+            ),
             mapper: Demo.Log.formattedLine
-        ))
+        )
     }
 
     var body: some Scene {

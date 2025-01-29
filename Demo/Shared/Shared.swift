@@ -73,9 +73,11 @@ extension Demo {
     enum Log {
         static let tunnelURL = Demo.cachesURL.appending(component: "tunnel.log")
 
-        static let maxNumberOfLines = 2000
-
         static let maxLevel: DebugLog.Level = .info
+
+        static let maxSize: UInt64 = 10000
+
+        static let maxBufferedLines = 1000
 
         static let saveInterval = 60000
 

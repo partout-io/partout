@@ -31,12 +31,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
 
     override init() {
         PassepartoutConfiguration.shared.logsModules = true
-        PassepartoutConfiguration.shared.setLocalLogger(options: .init(
+        PassepartoutConfiguration.shared.setLocalLogger(
             url: Demo.Log.tunnelURL,
-            maxNumberOfLines: Demo.Log.maxNumberOfLines,
-            maxLevel: Demo.Log.maxLevel,
+            options: .init(
+                maxLevel: Demo.Log.maxLevel,
+                maxSize: Demo.Log.maxSize,
+                maxBufferedLines: Demo.Log.maxBufferedLines
+            ),
             mapper: Demo.Log.formattedLine
-        ))
+        )
         super.init()
     }
 
@@ -81,7 +84,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
 
 private extension PacketTunnelProvider {
     func flushLog() {
-        try? PassepartoutConfiguration.shared.saveLog()
+        PassepartoutConfiguration.shared.flushLog()
         Task {
             try? await Task.sleep(milliseconds: Demo.Log.saveInterval)
             flushLog()
