@@ -17,17 +17,16 @@ Binary distribution for these architectures:
 
 ### Testing
 
-Download the app codebase locally:
+Clone the library codebase:
 
 ```
-git clone https://github.com/passepartoutvpn/passepartoutkit
+$ git clone https://github.com/passepartoutvpn/passepartoutkit
 ```
 
-Check out the submodule in "Passepartout" (do not recurse):
+Clone the app codebase in the "Passepartout" directory (do not recurse into submodules):
 
 ```
-$ git submodule init
-$ git submodule update
+$ git clone https://github.com/passepartoutvpn/passepartout Passepartout
 ```
 
 Edit `Passepartout/Packages/PassepartoutKit-Framework/Package.swift` and set:
