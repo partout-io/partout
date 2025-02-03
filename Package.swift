@@ -19,8 +19,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "Target",
-            url: "https://github.com/passepartoutvpn/passepartoutkit/releases/download/0.99.7/PassepartoutKit.xcframework.zip",
-            checksum: "f28fa062214a31681caa780070f9a2110b86bcd15adc069afb6a728cad2300ad"
+            url: "https://github.com/passepartoutvpn/passepartoutkit/releases/download/0.99.8/PassepartoutKit.xcframework.zip",
+            checksum: "dd15564960aa4b30500cee5510d76c4361711e9a61e06ba0022f22e1ec9adcaf"
         ),
         .testTarget(
             name: "TargetTests",
