@@ -3,4 +3,6 @@
 *.pbxuser
 **/xcuserdata
 PassepartoutKit.xcframework.zip
+Passepartout
 .build
+src
