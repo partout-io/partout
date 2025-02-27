@@ -40,9 +40,6 @@ struct ContentView: View {
     private var vpn: Tunnel = .shared
 
     @State
-    private var buttonAction: ButtonAction = .connect
-
-    @State
     private var dataCount: DataCount?
 
     @State
@@ -64,9 +61,6 @@ struct ContentView: View {
             advancedSection
         }
         .navigationTitle("Passepartout")
-        .onReceive(vpn.$status) {
-            buttonAction = ButtonAction(forStatus: $0)
-        }
         .onReceive(timer) { _ in
             guard vpn.status == .active else {
                 dataCount = nil
@@ -185,6 +179,10 @@ private extension ContentView {
 // MARK: - Actions
 
 private extension ContentView {
+    var buttonAction: ButtonAction {
+        ButtonAction(forStatus: vpn.status)
+    }
+
     func onTapModule(_ module: Module) {
         var builder = profile.builder()
         if module is ConnectionModule {

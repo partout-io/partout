@@ -47,6 +47,7 @@ extension Registry {
             WireGuardModule.Implementation(
                 keyGenerator: StandardWireGuardKeyGenerator(),
                 importer: StandardWireGuardParser(),
+                validator: StandardWireGuardParser(),
                 connectionBlock: {
                     try WireGuardConnection(
                         parameters: $0,
