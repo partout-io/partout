@@ -4,8 +4,8 @@
 import PackageDescription
 
 let filename = "PassepartoutKit.xcframework.zip"
-let version = "0.99.22"
-let checksum = "ff44cd0ab1b33670c85dafff7d4e92657edfffab9bf46d3d8289c83de1670013"
+let version = "0.99.23"
+let checksum = "919ed203c3ad81d0fb9bd12d82b72af229969eaf6f02bc79fde98f12172ece2a"
 
 let package = Package(
     name: "PassepartoutKit-Binary",
