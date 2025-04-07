@@ -1,37 +1,37 @@
 //
 //  PacketTunnelProvider.swift
-//  PassepartoutKit
+//  Partout
 //
 //  Created by Davide De Rosa on 2/24/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
 //
-//  This file is part of PassepartoutKit.
+//  This file is part of Partout.
 //
-//  PassepartoutKit is free software: you can redistribute it and/or modify
+//  Partout is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation, either version 3 of the License, or
 //  (at your option) any later version.
 //
-//  PassepartoutKit is distributed in the hope that it will be useful,
+//  Partout is distributed in the hope that it will be useful,
 //  but WITHOUT ANY WARRANTY; without even the implied warranty of
 //  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 //  GNU General Public License for more details.
 //
 //  You should have received a copy of the GNU General Public License
-//  along with PassepartoutKit.  If not, see <http://www.gnu.org/licenses/>.
+//  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
 @preconcurrency import NetworkExtension
-import PassepartoutKit
+import Partout
 
 final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
     private var fwd: NEPTPForwarder?
 
     override init() {
-        PassepartoutConfiguration.shared.logsModules = true
-        PassepartoutConfiguration.shared.setLocalLogger(
+        PartoutConfiguration.shared.logsModules = true
+        PartoutConfiguration.shared.setLocalLogger(
             url: Demo.Log.tunnelURL,
             options: .init(
                 maxLevel: Demo.Log.maxLevel,
@@ -84,7 +84,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
 
 private extension PacketTunnelProvider {
     func flushLog() {
-        PassepartoutConfiguration.shared.flushLog()
+        PartoutConfiguration.shared.flushLog()
         Task {
             try? await Task.sleep(milliseconds: Demo.Log.saveInterval)
             flushLog()

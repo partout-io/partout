@@ -17,8 +17,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "0EC332C72B8A1808000B9C2F"
-               BuildableName = "PassepartoutKitDemoTunnel.appex"
-               BlueprintName = "PassepartoutKitDemoTunnel"
+               BuildableName = "PartoutDemoTunnel.appex"
+               BlueprintName = "PartoutDemoTunnel"
                ReferencedContainer = "container:Demo.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -31,8 +31,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "0E06D18E2B87629100176E1D"
-               BuildableName = "PassepartoutKitDemo.app"
-               BlueprintName = "PassepartoutKitDemo"
+               BuildableName = "PartoutDemo.app"
+               BlueprintName = "PartoutDemo"
                ReferencedContainer = "container:Demo.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -62,8 +62,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "0E06D18E2B87629100176E1D"
-            BuildableName = "PassepartoutKitDemo.app"
-            BlueprintName = "PassepartoutKitDemo"
+            BuildableName = "PartoutDemo.app"
+            BlueprintName = "PartoutDemo"
             ReferencedContainer = "container:Demo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -81,8 +81,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "0E06D18E2B87629100176E1D"
-            BuildableName = "PassepartoutKitDemo.app"
-            BlueprintName = "PassepartoutKitDemo"
+            BuildableName = "PartoutDemo.app"
+            BlueprintName = "PartoutDemo"
             ReferencedContainer = "container:Demo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

@@ -31,7 +31,7 @@ Clone the app codebase in the "Passepartout" directory (do not recurse into subm
 $ git clone https://github.com/passepartoutvpn/passepartout Passepartout
 ```
 
-Edit `Passepartout/Packages/PassepartoutKit-Framework/Package.swift` and set:
+Edit `Passepartout/Packages/Partout-Framework/Package.swift` and set:
 
 ```
 environment = .onlineDevelopment

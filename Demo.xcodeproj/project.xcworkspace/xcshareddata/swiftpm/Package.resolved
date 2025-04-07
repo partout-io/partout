@@ -5,17 +5,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/passepartoutvpn/openssl-apple",
       "state" : {
-        "revision" : "685680e3adbfccdeef84d37fc5732b0031f188c7",
-        "version" : "3.2.108"
+        "revision" : "38aa6fa15ebddc7b1ec248551325e1121580c9da",
+        "version" : "3.4.200"
       }
     },
     {
-      "identity" : "passepartoutkit",
+      "identity" : "partout",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/passepartoutvpn/passepartoutkit",
+      "location" : "https://github.com/passepartoutvpn/partout",
       "state" : {
-        "revision" : "b7541cdab7ea99f1404f401b8eea8bf68729c451",
-        "version" : "0.99.14"
+        "revision" : "246ccda2adc67df50dcd62bab52de1f0bd60bc1b",
+        "version" : "0.99.50"
       }
     },
     {
@@ -23,8 +23,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/passepartoutvpn/wg-go-apple",
       "state" : {
-        "revision" : "860e82efaf261da37483a5f51555be83e5a79ad3",
-        "version" : "0.0.20240714"
+        "revision" : "691a702cd4a1d2b5acd409040741ec123c87cf2c",
+        "version" : "0.0.20250216"
       }
     },
     {
