@@ -21,7 +21,7 @@ jobs:
         env:
           SRC_REF: ".src-ref"
           SRC_PATH: "src"
-          SRC_URL: "github.com/passepartoutvpn/passepartoutkit-source"
+          SRC_URL: "github.com/passepartoutvpn/partout-source"
         run: |
           git init $SRC_PATH
           cd $SRC_PATH
@@ -31,7 +31,7 @@ jobs:
       - uses: passepartoutvpn/action-release-binary-package@master
         with:
           script: "ci-generate.sh"
-          framework: "PassepartoutKit.xcframework"
+          framework: "Partout.xcframework"
           gpg-key: ${{ secrets.GPG_KEY }}
           gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
           prerelease: true
