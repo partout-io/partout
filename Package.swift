@@ -4,8 +4,8 @@
 import PackageDescription
 
 let filename = "Partout.xcframework.zip"
-let version = "0.99.51"
-let checksum = "9b898fadb3204b185f5929e8e176fe75a1e447a47b9e966556cacb6f001add0a"
+let version = "0.99.52"
+let checksum = "4576034afb570e0010a6d9df8294543146c123a1f7fde1aa893d002c9aaba960"
 
 let package = Package(
     name: "Partout-Binary",
