@@ -4,7 +4,7 @@
 import PackageDescription
 
 let filename = "Partout.xcframework.zip"
-let version = "0.99.53"
+let version = "0.99.54"
 let checksum = "4576034afb570e0010a6d9df8294543146c123a1f7fde1aa893d002c9aaba960"
 
 let package = Package(
@@ -16,7 +16,7 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "PassepartoutKit-Binary",
+            name: "Partout-Binary",
             targets: ["Target"]
         )
     ],
