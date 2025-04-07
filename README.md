@@ -1,9 +1,11 @@
 ![iOS 15+](https://img.shields.io/badge/ios-15+-green.svg)
 ![macOS 12+](https://img.shields.io/badge/macos-12+-green.svg)
 ![tvOS 17+](https://img.shields.io/badge/tvos-17+-green.svg)
-[![License MIT](https://img.shields.io/badge/license-MIT-lightgray.svg)](LICENSE)
+[![License GPLv3](https://img.shields.io/badge/license-GPLv3-lightgray.svg)](LICENSE)
 
-# PassepartoutKit
+[![Release](https://github.com/passepartoutvpn/partout/actions/workflows/release.yml/badge.svg)](https://github.com/passepartoutvpn/partout/actions/workflows/release.yml)
+
+# Partout
 
 A scalable framework to build modern network apps.
 
@@ -20,7 +22,7 @@ Binary distribution for these architectures:
 Clone the library codebase:
 
 ```
-$ git clone https://github.com/passepartoutvpn/passepartoutkit
+$ git clone https://github.com/passepartoutvpn/partout
 ```
 
 Clone the app codebase in the "Passepartout" directory (do not recurse into submodules):
@@ -29,7 +31,7 @@ Clone the app codebase in the "Passepartout" directory (do not recurse into subm
 $ git clone https://github.com/passepartoutvpn/passepartout Passepartout
 ```
 
-Edit `Passepartout/Packages/PassepartoutKit-Framework/Package.swift` and set:
+Edit `Passepartout/Packages/Partout-Framework/Package.swift` and set:
 
 ```
 environment = .onlineDevelopment
@@ -43,15 +45,15 @@ Put your configuration files into `Demo/App/Files` with these names:
 - OpenVPN credentials (in two lines): `test-sample.txt`
 - WireGuard configuration: `test-sample.wg`
 
-Open `Demo.xcodeproj` and run the `PassepartoutKitDemo` target on your Mac or iOS/tvOS Simulators.
+Open `Demo.xcodeproj` and run the `PartoutDemo` target on your Mac or iOS/tvOS Simulators.
 
 ## License
 
 Copyright (c) 2025 Davide De Rosa. All rights reserved.
 
-This project is licensed under the [MIT][license-content].
+This project is licensed under the [GPLv3][license-content].
 
-If you want to use this library e.g. in your proprietary VPN apps for iOS/macOS/tvOS, please [contact me privately][license-contact].
+If you want to use this library for proprietary or commercial purposes, please [contact me privately][license-contact].
 
 ## Credits
 

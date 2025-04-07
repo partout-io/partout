@@ -1,5 +1,5 @@
 import ExternalDependencies
-import PassepartoutKit
+import Partout
 import XCTest
 
 final class ExternalDependenciesTests: XCTestCase {

@@ -1,29 +1,29 @@
 //
 //  ContentView.swift
-//  PassepartoutKit
+//  Partout
 //
 //  Created by Davide De Rosa on 2/22/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
 //
-//  This file is part of PassepartoutKit.
+//  This file is part of Partout.
 //
-//  PassepartoutKit is free software: you can redistribute it and/or modify
+//  Partout is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
 //  the Free Software Foundation, either version 3 of the License, or
 //  (at your option) any later version.
 //
-//  PassepartoutKit is distributed in the hope that it will be useful,
+//  Partout is distributed in the hope that it will be useful,
 //  but WITHOUT ANY WARRANTY; without even the implied warranty of
 //  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 //  GNU General Public License for more details.
 //
 //  You should have received a copy of the GNU General Public License
-//  along with PassepartoutKit.  If not, see <http://www.gnu.org/licenses/>.
+//  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import PassepartoutKit
+import Partout
 import SwiftUI
 
 private enum ButtonAction {
@@ -86,7 +86,7 @@ private extension ContentView {
         Section {
             ForEach(profile.modules, id: \.id) { module in
                 HStack {
-                    Button(module.moduleHandler.id.name) {
+                    Button(module.moduleHandler.id.rawValue) {
                         onTapModule(module)
                     }
                     if profile.isActiveModule(withId: module.id) {
@@ -129,7 +129,7 @@ private extension ContentView {
                 }
             }
 #if !os(tvOS)
-            if profile.firstConnectionModule(ofType: OpenVPNModule.self, ifActive: true) != nil {
+            if profile.firstModule(ofType: OpenVPNModule.self, ifActive: true) != nil {
                 NavigationLink("Server configuration") {
                     serverConfigurationView
                 }
@@ -205,7 +205,7 @@ private extension ContentView {
                 switch buttonAction {
                 case .connect:
                     try await vpn.install(profile, connect: true) {
-                        "PassepartoutKitDemo: \($0.name)"
+                        "PartoutDemo: \($0.name)"
                     }
 
                 case .disconnect:
@@ -234,7 +234,7 @@ private extension ContentView {
 
     func fetchDebugLog() async throws {
         guard vpn.status != .inactive else {
-            if PassepartoutConfiguration.shared.hasLocalLogger {
+            if PartoutConfiguration.shared.hasLocalLogger {
                 debugLog = try String(contentsOf: Demo.Log.tunnelURL)
                     .split(separator: "\n")
                     .map(String.init)
