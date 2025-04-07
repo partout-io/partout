@@ -3,12 +3,12 @@
 
 import PackageDescription
 
-let filename = "PassepartoutKit.xcframework.zip"
+let filename = "Partout.xcframework.zip"
 let version = "0.99.51"
 let checksum = "9b898fadb3204b185f5929e8e176fe75a1e447a47b9e966556cacb6f001add0a"
 
 let package = Package(
-    name: "PassepartoutKit-Binary",
+    name: "Partout-Binary",
     platforms: [
         .iOS(.v15),
         .macOS(.v12),
@@ -23,7 +23,7 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "Target",
-            url: "https://github.com/passepartoutvpn/passepartoutkit/releases/download/\(version)/\(filename)",
+            url: "https://github.com/passepartoutvpn/passepartout/releases/download/\(version)/\(filename)",
             checksum: checksum
         ),
         .testTarget(
