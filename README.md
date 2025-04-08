@@ -51,7 +51,7 @@ Open `Demo.xcodeproj` and run the `PartoutDemo` target on your Mac or iOS/tvOS S
 
 Copyright (c) 2025 Davide De Rosa. All rights reserved.
 
-This project is licensed under the [GPLv3][license-content].
+This project is licensed under the [GPLv3][license-gpl]. The core package is distributed as a binary framework in [GitHub Releases][github-releases] and is licensed under the [MIT][license-mit].
 
 If you want to use this library for proprietary or commercial purposes, please [contact me privately][license-contact].
 
@@ -73,9 +73,11 @@ Twitter: [@keeshux][about-twitter]
 
 Website: [passepartoutvpn.app][about-website]
 
-[license-content]: LICENSE
+[license-gpl]: LICENSE.gpl
+[license-mit]: LICENSE.mit
 [license-contact]: mailto:license@passepartoutvpn.app
 
+[github-releases]: https://github.com/passepartoutvpn/partout/releases
 [credits-genericjson]: https://github.com/iwill/generic-json-swift
 
 [about-twitter]: https://twitter.com/keeshux
