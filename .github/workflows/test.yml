@@ -23,6 +23,9 @@ jobs:
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
           submodules: false
+      - name: Set development environment
+        run: |
+          sed -i '' "s/environment = .production/environment = .onlineDevelopment/" "Libraries/Partout-Framework/Package.swift"
       - name: Run tests
         run: |
           swift test
