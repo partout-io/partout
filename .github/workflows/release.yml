@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: passepartoutvpn/action-prepare-xcode-build@master
         with:
-          access_token: ${{ secrets.ACCESS_TOKEN }}
+          access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run tests
         run: |
           swift test
@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.ACCESS_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           submodules: true
       - uses: maxim-lobanov/setup-xcode@v1
         with:
