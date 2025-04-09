@@ -17,7 +17,7 @@ Binary distribution for these architectures:
 
 ## Installation
 
-### Testing
+### Usage
 
 Clone the library codebase:
 
@@ -30,6 +30,10 @@ without recursing into submodules, then edit `Package.swift` and set:
 ```
 environment = .onlineDevelopment
 ```
+
+Import the Swift packages under "Plugins" as needed.
+
+### Demo
 
 Edit `Demo/Config.xcconfig` with your developer details. You must comply with all the capabilities and entitlements in the main app and the tunnel extension target.
 
