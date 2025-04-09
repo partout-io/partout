@@ -34,6 +34,8 @@ environment = .onlineDevelopment
 
 Import the Swift packages under "Plugins" as needed.
 
+Beware that the public framework only supports development on your Mac or iOS/tvOS Simulators. If you want to use the library for proprietary or commercial purposes, please [contact me privately][license-contact].
+
 ### Demo
 
 Edit `Demo/Config.xcconfig` with your developer details. You must comply with all the capabilities and entitlements in the main app and the tunnel extension target.
@@ -44,15 +46,13 @@ Put your configuration files into `Demo/App/Files` with these names:
 - OpenVPN credentials (in two lines): `test-sample.txt`
 - WireGuard configuration: `test-sample.wg`
 
-Open `Demo.xcodeproj` and run the `PartoutDemo` target on your Mac or iOS/tvOS Simulators.
+Open `Demo.xcodeproj` and run the `PartoutDemo` target.
 
 ## License
 
 Copyright (c) 2025 Davide De Rosa. All rights reserved.
 
 This project is licensed under the [GPLv3][license-gpl]. The core package is distributed as a binary framework in [GitHub Releases][github-releases] and is licensed under the [MIT][license-mit].
-
-If you want to use this library for proprietary or commercial purposes, please [contact me privately][license-contact].
 
 ## Credits
 
