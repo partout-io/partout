@@ -31,8 +31,9 @@ jobs:
           swift test
       - name: Run tests (plugins)
         run: |
-          for dir in Plugins/*; do
-            if [ -d "$dir" ]; then
-              (cd "$dir" && swift test)
+          for plugin in Plugins/*; do
+            if [ -d "$plugin" ]; then
+              echo "Run tests for $plugin"
+              (cd "$plugin" && swift test)
             fi
           done
