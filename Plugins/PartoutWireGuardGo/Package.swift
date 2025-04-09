@@ -18,7 +18,7 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(path: "../Partout-Framework"),
+        .package(path: "../../Libraries/Partout-Framework"),
         .package(url: "https://github.com/passepartoutvpn/wireguard-apple", from: "1.1.2")
     ],
     targets: [

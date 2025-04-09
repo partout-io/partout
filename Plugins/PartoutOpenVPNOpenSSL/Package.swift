@@ -25,7 +25,7 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(path: "../Partout-Framework"),
+        .package(path: "../../Libraries/Partout-Framework"),
         .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
     ],
     targets: [
