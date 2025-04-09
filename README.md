@@ -52,7 +52,9 @@ Open `Demo.xcodeproj` and run the `PartoutDemo` target.
 
 Copyright (c) 2025 Davide De Rosa. All rights reserved.
 
-This project is licensed under the [GPLv3][license-gpl]. The core package is distributed as a binary framework in [GitHub Releases][github-releases] and is licensed under the [MIT][license-mit].
+The core package is distributed as a binary framework in [GitHub Releases][github-releases] and is licensed under the [MIT][license-mit].
+
+Anything else is licensed under the [GPLv3][license-gpl].
 
 ## Credits
 
