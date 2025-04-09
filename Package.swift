@@ -8,6 +8,10 @@ let environment: Environment
 //environment = .onlineDevelopment
 environment = .production
 
+let filename = "Partout.xcframework.zip"
+let version = "0.99.55"
+let checksum = "19bc43b75e5801519f964eb2582fbabc9861d7769cc9548958be377adecd55df"
+
 enum Environment {
     case localDevelopment
 
@@ -20,9 +24,7 @@ enum Environment {
         case .localDevelopment:
             return []
         case .onlineDevelopment:
-            return [
-                .package(url: "https://github.com/passepartoutvpn/partout", from: "0.99.50")
-            ]
+            return []
         case .production:
             return [
                 .package(path: "src")
@@ -50,11 +52,10 @@ enum Environment {
                 path: "Partout.xcframework.zip"
             ))
         case .onlineDevelopment:
-            targets.append(.target(
+            targets.append(.binaryTarget(
                 name: targetName,
-                dependencies: [
-                    .product(name: "Partout-Binary", package: "bin")
-                ]
+                url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(filename)",
+                checksum: checksum
             ))
         case .production:
             targets.append(.target(
@@ -64,6 +65,10 @@ enum Environment {
                 ]
             ))
         }
+        targets.append(.testTarget(
+            name: "PartoutTests",
+            dependencies: [.byName(name: targetName)]
+        ))
         return targets
     }
 }

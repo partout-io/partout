@@ -1,7 +1,7 @@
 import Partout
 import XCTest
 
-final class TargetTests: XCTestCase {
+final class PartoutTests: XCTestCase {
     func test_dummy() {
         var profile = Profile.Builder(activatingModules: true)
         profile.name = "foobar"
