@@ -3,6 +3,5 @@
 *.pbxuser
 **/xcuserdata
 Partout.xcframework*
-Passepartout
 .build
 src

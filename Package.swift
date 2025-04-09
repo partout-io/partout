@@ -8,7 +8,7 @@ let environment: Environment
 //environment = .onlineDevelopment
 environment = .production
 
-let filename = "Partout.xcframework.zip"
+let binaryFilename = "Partout.xcframework.zip"
 let version = "0.99.55"
 let checksum = "19bc43b75e5801519f964eb2582fbabc9861d7769cc9548958be377adecd55df"
 
@@ -49,12 +49,12 @@ enum Environment {
         case .localDevelopment:
             targets.append(.binaryTarget(
                 name: targetName,
-                path: "Partout.xcframework.zip"
+                path: binaryFilename
             ))
         case .onlineDevelopment:
             targets.append(.binaryTarget(
                 name: targetName,
-                url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(filename)",
+                url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(binaryFilename)",
                 checksum: checksum
             ))
         case .production:
