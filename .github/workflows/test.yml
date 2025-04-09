@@ -31,5 +31,8 @@ jobs:
           swift test
       - name: Run tests (plugins)
         run: |
-          cd Plugins/PartoutOpenVPNOpenSSL && swift test
-          cd Plugins/PartoutWireGuardGo && swift test
+          for dir in Plugins/*; do
+            if [ -d "$dir" ]; then
+              (cd "$dir" && swift test)
+            fi
+          done
