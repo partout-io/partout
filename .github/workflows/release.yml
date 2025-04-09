@@ -18,17 +18,6 @@ jobs:
         with:
           xcode-version: "16"
           submodules: true
-      - name: "Fetch source"
-        env:
-          SRC_REF: ".src-ref"
-          SRC_PATH: "src"
-          SRC_URL: "github.com/passepartoutvpn/partout-source"
-        run: |
-          git init $SRC_PATH
-          cd $SRC_PATH
-          git remote add origin https://git:${{ secrets.ACCESS_TOKEN }}@$SRC_URL
-          git fetch --depth 1 origin `cat $SRC_SHA1`
-          git checkout FETCH_HEAD
       - uses: passepartoutvpn/action-release-binary-package@master
         with:
           script: "ci-generate.sh"
