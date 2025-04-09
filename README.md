@@ -25,13 +25,7 @@ Clone the library codebase:
 $ git clone https://github.com/passepartoutvpn/partout
 ```
 
-Clone the app codebase in the "Passepartout" directory (do not recurse into submodules):
-
-```
-$ git clone https://github.com/passepartoutvpn/passepartout Passepartout
-```
-
-Edit `Passepartout/Packages/Partout-Framework/Package.swift` and set:
+without recursing into submodules, then edit `Libraries/Partout-Framework/Package.swift` and set:
 
 ```
 environment = .onlineDevelopment

@@ -1,4 +1,4 @@
-import PassepartoutKit
+import Partout
 import XCTest
 
 final class TargetTests: XCTestCase {

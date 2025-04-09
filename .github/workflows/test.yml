@@ -1,0 +1,39 @@
+name: Unit Tests
+
+on:
+  push:
+    branches:
+      - "master"
+    paths-ignore:
+      - "*.md"
+  pull_request:
+    types: [ opened, synchronize ]
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  run_tests:
+    name: Run tests
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - uses: passepartoutvpn/action-prepare-xcode-build@master
+        with:
+          access_token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: false
+      - name: Set development environment
+        run: |
+          sed -i '' "s/environment = .production/environment = .onlineDevelopment/" "Libraries/Partout-Framework/Package.swift"
+      - name: Run tests
+        run: |
+          swift test
+      - name: Run tests (plugins)
+        run: |
+          for plugin in Plugins/*; do
+            if [ -d "$plugin" ]; then
+              echo "Run tests for $plugin"
+              (cd "$plugin" && swift test)
+            fi
+          done
