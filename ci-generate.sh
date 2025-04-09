@@ -1,2 +1,2 @@
 #!/bin/bash
-Libraries/Partout-Source/scripts/create-framework.sh
+src/scripts/create-framework.sh

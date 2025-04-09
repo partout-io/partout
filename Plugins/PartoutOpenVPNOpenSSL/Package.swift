@@ -25,7 +25,7 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(path: "../../Libraries/Partout-Framework"),
+        .package(path: "../.."),
         .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
     ],
     targets: [
@@ -37,7 +37,7 @@ let package = Package(
             name: "CPartoutOpenVPNOpenSSL",
             dependencies: [
                 "CPartoutCryptoOpenSSL",
-                "Partout-Framework"
+                .product(name: "Partout-Framework", package: "partout")
             ],
             exclude: [
                 "lib/COPYING",

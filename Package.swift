@@ -3,12 +3,73 @@
 
 import PackageDescription
 
-let filename = "Partout.xcframework.zip"
-let version = "0.99.54"
-let checksum = "4576034afb570e0010a6d9df8294543146c123a1f7fde1aa893d002c9aaba960"
+let environment: Environment
+//environment = .localDevelopment
+//environment = .onlineDevelopment
+environment = .production
+
+enum Environment {
+    case localDevelopment
+
+    case onlineDevelopment
+
+    case production
+
+    var dependencies: [Package.Dependency] {
+        switch self {
+        case .localDevelopment:
+            return []
+        case .onlineDevelopment:
+            return [
+                .package(url: "https://github.com/passepartoutvpn/partout", from: "0.99.50")
+            ]
+        case .production:
+            return [
+                .package(path: "src")
+            ]
+        }
+    }
+
+    var targetName: String {
+        switch self {
+        case .localDevelopment:
+            return "LocalDevelopment"
+        case .onlineDevelopment:
+            return "OnlineDevelopment"
+        case .production:
+            return "Production"
+        }
+    }
+
+    var targets: [Target] {
+        var targets: [Target] = []
+        switch self {
+        case .localDevelopment:
+            targets.append(.binaryTarget(
+                name: targetName,
+                path: "Partout.xcframework.zip"
+            ))
+        case .onlineDevelopment:
+            targets.append(.target(
+                name: targetName,
+                dependencies: [
+                    .product(name: "Partout-Binary", package: "bin")
+                ]
+            ))
+        case .production:
+            targets.append(.target(
+                name: targetName,
+                dependencies: [
+                    .product(name: "Partout", package: "src")
+                ]
+            ))
+        }
+        return targets
+    }
+}
 
 let package = Package(
-    name: "Partout-Binary",
+    name: "Partout-Framework",
     platforms: [
         .iOS(.v15),
         .macOS(.v12),
@@ -16,19 +77,10 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "Partout-Binary",
-            targets: ["Target"]
+            name: "Partout-Framework",
+            targets: [environment.targetName]
         )
     ],
-    targets: [
-        .binaryTarget(
-            name: "Target",
-            url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(filename)",
-            checksum: checksum
-        ),
-        .testTarget(
-            name: "TargetTests",
-            dependencies: ["Target"]
-        )
-    ]
+    dependencies: environment.dependencies,
+    targets: environment.targets
 )
