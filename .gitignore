@@ -2,7 +2,7 @@
 *.swp
 *.pbxuser
 **/xcuserdata
-Partout.xcframework.zip
+Partout.xcframework*
 Passepartout
 .build
 src
