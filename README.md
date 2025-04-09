@@ -19,13 +19,14 @@ Binary distribution for these architectures:
 
 ### Usage
 
-Clone the library codebase:
+Import the library as submodule:
 
 ```
-$ git clone https://github.com/passepartoutvpn/partout
+$ git submodule add https://github.com/passepartoutvpn/partout
+$ git submodule update --init
 ```
 
-without recursing into submodules, then edit `Package.swift` and set:
+then edit `Package.swift` and set:
 
 ```
 environment = .onlineDevelopment
