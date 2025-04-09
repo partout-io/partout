@@ -3,12 +3,78 @@
 
 import PackageDescription
 
-let filename = "Partout.xcframework.zip"
-let version = "0.99.54"
-let checksum = "4576034afb570e0010a6d9df8294543146c123a1f7fde1aa893d002c9aaba960"
+let environment: Environment
+//environment = .localDevelopment
+//environment = .onlineDevelopment
+environment = .production
+
+let binaryFilename = "Partout.xcframework.zip"
+let version = "0.99.55"
+let checksum = "19bc43b75e5801519f964eb2582fbabc9861d7769cc9548958be377adecd55df"
+
+enum Environment {
+    case localDevelopment
+
+    case onlineDevelopment
+
+    case production
+
+    var dependencies: [Package.Dependency] {
+        switch self {
+        case .localDevelopment:
+            return []
+        case .onlineDevelopment:
+            return []
+        case .production:
+            return [
+                .package(path: "src")
+            ]
+        }
+    }
+
+    var targetName: String {
+        switch self {
+        case .localDevelopment:
+            return "LocalDevelopment"
+        case .onlineDevelopment:
+            return "OnlineDevelopment"
+        case .production:
+            return "Production"
+        }
+    }
+
+    var targets: [Target] {
+        var targets: [Target] = []
+        switch self {
+        case .localDevelopment:
+            targets.append(.binaryTarget(
+                name: targetName,
+                path: binaryFilename
+            ))
+        case .onlineDevelopment:
+            targets.append(.binaryTarget(
+                name: targetName,
+                url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(binaryFilename)",
+                checksum: checksum
+            ))
+        case .production:
+            targets.append(.target(
+                name: targetName,
+                dependencies: [
+                    .product(name: "Partout", package: "src")
+                ]
+            ))
+        }
+        targets.append(.testTarget(
+            name: "PartoutTests",
+            dependencies: [.byName(name: targetName)]
+        ))
+        return targets
+    }
+}
 
 let package = Package(
-    name: "Partout-Binary",
+    name: "Partout-Framework",
     platforms: [
         .iOS(.v15),
         .macOS(.v12),
@@ -16,19 +82,10 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "Partout-Binary",
-            targets: ["Target"]
+            name: "Partout-Framework",
+            targets: [environment.targetName]
         )
     ],
-    targets: [
-        .binaryTarget(
-            name: "Target",
-            url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(filename)",
-            checksum: checksum
-        ),
-        .testTarget(
-            name: "TargetTests",
-            dependencies: ["Target"]
-        )
-    ]
+    dependencies: environment.dependencies,
+    targets: environment.targets
 )

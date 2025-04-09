@@ -18,14 +18,14 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(path: "../../Libraries/Partout-Framework"),
+        .package(path: "../.."),
         .package(url: "https://github.com/passepartoutvpn/wireguard-apple", from: "1.1.2")
     ],
     targets: [
         .target(
             name: "PartoutWireGuardGo",
             dependencies: [
-                "Partout-Framework",
+                .product(name: "Partout-Framework", package: "partout"),
                 .product(name: "WireGuardKit", package: "wireguard-apple")
             ],
             resources: [

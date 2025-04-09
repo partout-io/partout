@@ -1,8 +1,7 @@
 .DS_Store
 *.swp
 *.pbxuser
+**/*.xcodeproj/project.xcworkspace
 **/xcuserdata
 Partout.xcframework*
-Passepartout
 .build
-src
