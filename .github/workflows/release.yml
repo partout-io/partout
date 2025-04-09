@@ -17,6 +17,7 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: "16"
+          submodules: true
       - name: "Fetch source"
         env:
           SRC_REF: ".src-ref"
