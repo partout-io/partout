@@ -22,6 +22,7 @@ jobs:
       - uses: passepartoutvpn/action-prepare-xcode-build@master
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
+          submodules: false
       - name: Run tests
         run: |
           swift test
