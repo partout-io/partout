@@ -9,6 +9,24 @@ on:
 
 jobs:
   run_tests:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: passepartoutvpn/action-prepare-xcode-build@master
+        with:
+          access_token: ${{ secrets.ACCESS_TOKEN }}
+      - name: Run tests
+        run: |
+          swift test
+      - name: Run tests (plugins)
+        run: |
+          for plugin in Plugins/*; do
+            if [ -d "$plugin" ]; then
+              echo "Run tests for $plugin"
+              (cd "$plugin" && swift test)
+            fi
+          done
+  publish_release:
     name: Publish release
     runs-on: macos-15
     timeout-minutes: 30
