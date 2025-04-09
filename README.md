@@ -3,6 +3,7 @@
 ![tvOS 17+](https://img.shields.io/badge/tvos-17+-green.svg)
 [![License GPLv3](https://img.shields.io/badge/license-GPLv3-lightgray.svg)](LICENSE)
 
+[![Unit Tests](https://github.com/passepartoutvpn/partout/actions/workflows/test.yml/badge.svg)](https://github.com/passepartoutvpn/partout/actions/workflows/test.yml)
 [![Release](https://github.com/passepartoutvpn/partout/actions/workflows/release.yml/badge.svg)](https://github.com/passepartoutvpn/partout/actions/workflows/release.yml)
 
 # Partout
