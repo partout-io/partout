@@ -60,7 +60,7 @@ struct ContentView: View {
             vpnSection
             advancedSection
         }
-        .navigationTitle("Passepartout")
+        .navigationTitle("Partout")
         .onReceive(timer) { _ in
             guard vpn.status == .active else {
                 dataCount = nil

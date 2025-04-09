@@ -17,15 +17,13 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(path: "../../Passepartout/Packages/Partout-Framework"),
-        .package(path: "../../Passepartout/Packages/PartoutOpenVPNOpenSSL"),
-        .package(path: "../../Passepartout/Packages/PartoutWireGuardGo")
+        .package(path: "../../Plugins/PartoutOpenVPNOpenSSL"),
+        .package(path: "../../Plugins/PartoutWireGuardGo")
     ],
     targets: [
         .target(
             name: "ExternalDependencies",
             dependencies: [
-                "Partout-Framework",
                 "PartoutOpenVPNOpenSSL",
                 "PartoutWireGuardGo"
             ]
