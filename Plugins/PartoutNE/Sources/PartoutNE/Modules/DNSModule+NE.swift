@@ -54,6 +54,9 @@ extension DNSModule: NESettingsApplying {
             dnsSettings = specificSettings
             pp_log(.ne, .info, "\t\tServers: \(servers.map(\.asSensitiveAddress))")
             pp_log(.ne, .info, "\t\tDoT hostname: \(hostname.asSensitiveAddress)")
+
+        @unknown default:
+            break
         }
 
         if dnsSettings != nil {

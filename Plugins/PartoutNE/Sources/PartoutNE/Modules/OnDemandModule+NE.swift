@@ -71,9 +71,10 @@ private extension OnDemandModule {
         switch policy {
         case .any, .excluding:
             rule = NEOnDemandRuleConnect()
-
         case .including:
             rule = NEOnDemandRuleIgnore()
+        @unknown default:
+            rule = NEOnDemandRuleConnect()
         }
         rule.interfaceTypeMatch = .any
         return rule
@@ -84,9 +85,10 @@ private extension OnDemandModule {
         switch policy {
         case .any, .excluding:
             rule = NEOnDemandRuleDisconnect()
-
         case .including:
             rule = NEOnDemandRuleConnect()
+        @unknown default:
+            rule = NEOnDemandRuleDisconnect()
         }
         rule.interfaceTypeMatch = interfaceType
         return rule

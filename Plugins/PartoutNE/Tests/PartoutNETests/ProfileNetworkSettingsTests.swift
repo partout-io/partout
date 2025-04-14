@@ -176,7 +176,7 @@ final class ProfileNetworkSettingsTests: XCTestCase {
 }
 
 private struct BogusConnectionModule: ConnectionModule {
-    func newConnection(with impl: (any ModuleImplementation)?, parameters: ConnectionParameters) async throws -> any _PartoutBase.Connection {
+    func newConnection(with impl: (any ModuleImplementation)?, parameters: ConnectionParameters) async throws -> any PartoutCore.Connection {
         fatalError()
     }
 }
