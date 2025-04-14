@@ -26,6 +26,7 @@
 import Foundation
 import PartoutCore
 import PartoutOpenVPNOpenSSL
+import PartoutNE
 import PartoutSupport
 import PartoutWireGuardGo
 

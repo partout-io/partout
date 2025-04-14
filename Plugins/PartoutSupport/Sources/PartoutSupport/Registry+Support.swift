@@ -65,8 +65,8 @@ extension Registry {
         self.init(
             allHandlers: handlers,
             allImplementations: allImplementations ?? [],
-            postDecode: Self.migratedProfile,
-            resolveModule: { module, profile in
+            postDecodeBlock: Self.migratedProfile,
+            resolvedModuleBlock: { module, profile in
                 do {
                     if let profile {
                         profile.assertSingleActiveProviderModule()
