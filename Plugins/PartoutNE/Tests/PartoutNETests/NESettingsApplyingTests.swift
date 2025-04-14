@@ -25,7 +25,7 @@
 
 import Foundation
 import NetworkExtension
-import _PartoutBase
+import PartoutCore
 import PartoutNE
 import XCTest
 

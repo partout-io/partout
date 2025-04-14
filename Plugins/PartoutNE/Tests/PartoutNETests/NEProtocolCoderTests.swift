@@ -24,7 +24,7 @@
 //
 
 import Foundation
-import _PartoutBase
+import PartoutCore
 @testable import PartoutNE
 import XCTest
 
