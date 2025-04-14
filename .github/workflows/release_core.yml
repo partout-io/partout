@@ -41,6 +41,7 @@ jobs:
         with:
           script: "ci-generate.sh"
           framework: "PartoutCore.xcframework"
+          manifest-file: "Core/Package.swift"
           gpg-key: ${{ secrets.GPG_KEY }}
           gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
           prerelease: true
