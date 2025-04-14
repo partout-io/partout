@@ -6,6 +6,7 @@ on:
       - "master"
     paths:
       - ".version"
+  workflow_dispatch:
 
 jobs:
   run_tests:
