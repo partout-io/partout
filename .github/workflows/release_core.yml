@@ -1,4 +1,4 @@
-name: Release Core Binary
+name: Core Binary Release
 
 on:
   push:
