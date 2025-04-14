@@ -26,7 +26,7 @@
 import Combine
 import Foundation
 @testable import PartoutAPI
-@testable import PartoutCore
+import PartoutCore
 import XCTest
 
 final class ProviderManagerTests: XCTestCase {
