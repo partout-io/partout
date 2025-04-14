@@ -45,7 +45,10 @@ let package = Package(
         .target(
             name: "_PartoutPlatform",
             dependencies: [
-                .target(name: "_PartoutPlatformApple", condition: .when(platforms: [.iOS, .macOS, .tvOS]))
+                .target(
+                    name: "_PartoutPlatformApple",
+                    condition: .when(platforms: [.iOS, .macOS, .tvOS])
+                )
             ],
             path: "Sources/_PartoutPlatform/Base"
         ),
