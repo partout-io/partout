@@ -53,6 +53,10 @@ let package = Package(
             name: "_PartoutPlatformApple",
             dependencies: ["PartoutNE"],
             path: "Sources/_PartoutPlatform/Apple"
+        ),
+        .testTarget(
+            name: "_PartoutTests",
+            dependencies: ["_Partout"]
         )
     ]
 )
