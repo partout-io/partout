@@ -31,7 +31,7 @@ let package = Package(
     targets: [
         .target(
             name: "CPartoutCryptoOpenSSL",
-            dependencies: ["openssl-apple",]
+            dependencies: ["openssl-apple"]
         ),
         .target(
             name: "CPartoutOpenVPNOpenSSL",

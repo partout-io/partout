@@ -4,8 +4,8 @@
 import PackageDescription
 
 let environment: Environment
-//environment = .localDevelopment
-//environment = .onlineDevelopment
+// environment = .localDevelopment
+// environment = .onlineDevelopment
 environment = .production
 
 let binaryFilename = "PartoutCore.xcframework.zip"
