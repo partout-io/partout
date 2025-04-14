@@ -35,7 +35,7 @@
 //
 
 import Foundation
-import Partout
+import PartoutCore
 
 struct PushReply {
     private let original: String

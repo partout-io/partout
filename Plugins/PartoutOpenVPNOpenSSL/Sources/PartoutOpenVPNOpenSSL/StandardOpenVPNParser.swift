@@ -25,7 +25,7 @@
 
 internal import CPartoutOpenVPNOpenSSL
 import Foundation
-import Partout
+import PartoutCore
 
 /// Provides methods to parse a ``OpenVPN/Configuration`` from an .ovpn configuration file.
 ///

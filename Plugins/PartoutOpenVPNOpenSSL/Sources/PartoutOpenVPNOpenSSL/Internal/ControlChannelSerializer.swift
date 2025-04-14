@@ -26,7 +26,7 @@
 internal import CPartoutCryptoOpenSSL
 internal import CPartoutOpenVPNOpenSSL
 import Foundation
-import Partout
+import PartoutCore
 
 protocol ControlChannelSerializer {
     func reset()

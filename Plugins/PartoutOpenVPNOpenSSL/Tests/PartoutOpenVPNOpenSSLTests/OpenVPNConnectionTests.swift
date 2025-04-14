@@ -26,7 +26,7 @@
 import Combine
 internal import CPartoutOpenVPNOpenSSL
 import Foundation
-import Partout
+import PartoutCore
 @testable import PartoutOpenVPNOpenSSL
 import XCTest
 

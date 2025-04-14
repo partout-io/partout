@@ -24,7 +24,7 @@
 //
 
 internal import CPartoutOpenVPNOpenSSL
-import Partout
+import PartoutCore
 @testable import PartoutOpenVPNOpenSSL
 import XCTest
 

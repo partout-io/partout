@@ -36,7 +36,7 @@
 
 internal import CPartoutOpenVPNOpenSSL
 import Foundation
-import Partout
+import PartoutCore
 
 extension OpenVPNCryptoProtocol {
     func configure(

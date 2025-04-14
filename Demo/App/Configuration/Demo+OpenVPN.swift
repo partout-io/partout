@@ -24,7 +24,7 @@
 //
 
 import Foundation
-import Partout
+import PartoutCore
 import PartoutOpenVPNOpenSSL
 
 extension OpenVPN {

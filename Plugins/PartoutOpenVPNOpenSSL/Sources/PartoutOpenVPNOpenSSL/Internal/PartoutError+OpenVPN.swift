@@ -24,7 +24,7 @@
 //
 
 internal import CPartoutOpenVPNOpenSSL
-import Partout
+import PartoutCore
 
 extension OpenVPNSessionError: PartoutErrorMappable {
     public var asPartoutError: PartoutError {

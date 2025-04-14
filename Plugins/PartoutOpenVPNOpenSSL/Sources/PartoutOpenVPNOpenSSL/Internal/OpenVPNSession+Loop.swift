@@ -25,7 +25,7 @@
 
 internal import CPartoutOpenVPNOpenSSL
 import Foundation
-import Partout
+import PartoutCore
 
 // TODO: #197, LINK and TUN should be able to run detached in full-duplex
 extension OpenVPNSession {

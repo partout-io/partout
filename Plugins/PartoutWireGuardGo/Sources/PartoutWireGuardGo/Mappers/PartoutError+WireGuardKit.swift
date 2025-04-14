@@ -24,7 +24,7 @@
 //
 
 import Foundation
-import Partout
+import PartoutCore
 internal import WireGuardKit
 
 // MARK: - Mapping

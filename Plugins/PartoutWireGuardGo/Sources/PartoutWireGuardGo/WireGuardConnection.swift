@@ -30,8 +30,8 @@
 
 import Combine
 import Foundation
-import NetworkExtension
-import Partout
+import NetworkExtension // FIXME: ###, this depends on Apple unnecessarily
+import PartoutCore
 import os
 internal import WireGuardKit
 internal import WireGuardKitGo
@@ -181,7 +181,7 @@ private extension WireGuardConnection {
                 pp_log(.wireguard, .error, "Lost weak reference to connection?")
                 return
             }
-            let module = NESettingsModule(fullSettings: settings)
+            let module = TransientModule(object: settings)
             let addressObject = Address(rawValue: settings.tunnelRemoteAddress)
             if addressObject == nil {
                 pp_log(.wireguard, .error, "Unable to parse remote tunnel address")

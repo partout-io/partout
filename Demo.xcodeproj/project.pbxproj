@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -14,14 +14,16 @@
 		0E179B302B8A6D2C0053163E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E179B2B2B8A6D2C0053163E /* ContentView.swift */; };
 		0E336F682B9232CD00BE7BA6 /* Demo+Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E336F662B9232CD00BE7BA6 /* Demo+Profile.swift */; };
 		0E8445A82BD8E7360019DF51 /* Files in Resources */ = {isa = PBXBuildFile; fileRef = 0E8445A72BD8E7360019DF51 /* Files */; };
+		0E9311222DABCC9700E11140 /* PartoutNetworking in Frameworks */ = {isa = PBXBuildFile; productRef = 0E9311212DABCC9700E11140 /* PartoutNetworking */; };
 		0E9CFB7B2B8B34C0009C8D82 /* Shared+App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E9CFB7A2B8B34C0009C8D82 /* Shared+App.swift */; };
-		0EA088D52D352AF5004FC100 /* ExternalDependencies in Frameworks */ = {isa = PBXBuildFile; productRef = 0EA088D42D352AF5004FC100 /* ExternalDependencies */; };
-		0EA088D72D352AF8004FC100 /* ExternalDependencies in Frameworks */ = {isa = PBXBuildFile; productRef = 0EA088D62D352AF8004FC100 /* ExternalDependencies */; };
 		0EC332CA2B8A1808000B9C2F /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0EC332C92B8A1808000B9C2F /* NetworkExtension.framework */; };
 		0EC332CD2B8A1808000B9C2F /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EC332CC2B8A1808000B9C2F /* PacketTunnelProvider.swift */; };
 		0EC332D22B8A1808000B9C2F /* PartoutDemoTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0EC332C82B8A1808000B9C2F /* PartoutDemoTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		0ED453692DABCD61002B2A5E /* Partout in Frameworks */ = {isa = PBXBuildFile; productRef = 0EE0D1B22DABC10300A914EC /* Partout */; };
+		0ED4536B2DABCD92002B2A5E /* PartoutNetworking in Frameworks */ = {isa = PBXBuildFile; productRef = 0ED4536A2DABCD92002B2A5E /* PartoutNetworking */; };
 		0ED5F8FA2BB34C8C007F8E85 /* Demo+WireGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ED5F8F92BB34C8C007F8E85 /* Demo+WireGuard.swift */; };
 		0ED5F8FF2BB3562E007F8E85 /* Shared+Tunnel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ED5F8FD2BB3561F007F8E85 /* Shared+Tunnel.swift */; };
+		0EE0D1B12DABC0FF00A914EC /* Partout in Frameworks */ = {isa = PBXBuildFile; productRef = 0EE0D1B02DABC0FF00A914EC /* Partout */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,7 +61,6 @@
 		0E8445A72BD8E7360019DF51 /* Files */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Files; sourceTree = "<group>"; };
 		0E94EE5D2B93571800588243 /* Tunnel.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Tunnel.plist; sourceTree = "<group>"; };
 		0E9CFB7A2B8B34C0009C8D82 /* Shared+App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared+App.swift"; sourceTree = "<group>"; };
-		0EA088D32D352A68004FC100 /* ExternalDependencies */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = ExternalDependencies; sourceTree = "<group>"; };
 		0EC332C82B8A1808000B9C2F /* PartoutDemoTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PartoutDemoTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		0EC332C92B8A1808000B9C2F /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 		0EC332CC2B8A1808000B9C2F /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
@@ -75,7 +76,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0EA088D72D352AF8004FC100 /* ExternalDependencies in Frameworks */,
+				0ED453692DABCD61002B2A5E /* Partout in Frameworks */,
+				0E9311222DABCC9700E11140 /* PartoutNetworking in Frameworks */,
 				0EC332CA2B8A1808000B9C2F /* NetworkExtension.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -84,7 +86,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0EA088D52D352AF5004FC100 /* ExternalDependencies in Frameworks */,
+				0ED4536B2DABCD92002B2A5E /* PartoutNetworking in Frameworks */,
+				0EE0D1B12DABC0FF00A914EC /* Partout in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -154,7 +157,6 @@
 				0E179B242B8A6D2C0053163E /* App */,
 				0E9CFB7C2B8B34CC009C8D82 /* Shared */,
 				0EC332CB2B8A1808000B9C2F /* Tunnel */,
-				0EA088D32D352A68004FC100 /* ExternalDependencies */,
 				0ED5F8FB2BB354B3007F8E85 /* Config.xcconfig */,
 			);
 			path = Demo;
@@ -216,7 +218,8 @@
 			);
 			name = PartoutDemoTunnel;
 			packageProductDependencies = (
-				0EA088D62D352AF8004FC100 /* ExternalDependencies */,
+				0EE0D1B22DABC10300A914EC /* Partout */,
+				0E9311212DABCC9700E11140 /* PartoutNetworking */,
 			);
 			productName = Tunnel;
 			productReference = 0EC332C82B8A1808000B9C2F /* PartoutDemoTunnel.appex */;
@@ -230,7 +233,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1520;
-				LastUpgradeCheck = 1610;
+				LastUpgradeCheck = 1630;
 				TargetAttributes = {
 					0E06D18E2B87629100176E1D = {
 						CreatedOnToolsVersion = 15.2;
@@ -250,6 +253,7 @@
 			);
 			mainGroup = 0E06D1862B87629100176E1D;
 			packageReferences = (
+				0E6026F82DAAFF7F009ABCED /* XCLocalSwiftPackageReference "../Partout" */,
 			);
 			productRefGroup = 0E06D1902B87629100176E1D /* Products */;
 			projectDirPath = "";
@@ -352,6 +356,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = DTDYD63ZX9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -424,6 +429,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = DTDYD63ZX9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -460,7 +466,6 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = DTDYD63ZX9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -482,6 +487,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "$(CFG_APP_ID)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator macosx";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -499,7 +505,6 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = DTDYD63ZX9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -521,6 +526,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "$(CFG_APP_ID)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator macosx";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -536,7 +542,6 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = DTDYD63ZX9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Demo/Tunnel/Tunnel.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PartoutDemoTunnel;
@@ -545,6 +550,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(CFG_TUNNEL_ID)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator macosx";
@@ -564,7 +570,6 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = DTDYD63ZX9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Demo/Tunnel/Tunnel.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = PartoutDemoTunnel;
@@ -573,6 +578,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(CFG_TUNNEL_ID)";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator macosx";
@@ -617,14 +623,33 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCSwiftPackageProductDependency section */
-		0EA088D42D352AF5004FC100 /* ExternalDependencies */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = ExternalDependencies;
+/* Begin XCLocalSwiftPackageReference section */
+		0E6026F82DAAFF7F009ABCED /* XCLocalSwiftPackageReference "../Partout" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Partout;
 		};
-		0EA088D62D352AF8004FC100 /* ExternalDependencies */ = {
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0E9311212DABCC9700E11140 /* PartoutNetworking */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = ExternalDependencies;
+			package = 0E6026F82DAAFF7F009ABCED /* XCLocalSwiftPackageReference "../Partout" */;
+			productName = PartoutNetworking;
+		};
+		0ED4536A2DABCD92002B2A5E /* PartoutNetworking */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0E6026F82DAAFF7F009ABCED /* XCLocalSwiftPackageReference "../Partout" */;
+			productName = PartoutNetworking;
+		};
+		0EE0D1B02DABC0FF00A914EC /* Partout */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0E6026F82DAAFF7F009ABCED /* XCLocalSwiftPackageReference "../Partout" */;
+			productName = Partout;
+		};
+		0EE0D1B22DABC10300A914EC /* Partout */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0E6026F82DAAFF7F009ABCED /* XCLocalSwiftPackageReference "../Partout" */;
+			productName = Partout;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

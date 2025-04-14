@@ -1,2 +1,2 @@
 #!/bin/bash
-src/scripts/create-framework.sh
+CoreSource/scripts/create-framework.sh

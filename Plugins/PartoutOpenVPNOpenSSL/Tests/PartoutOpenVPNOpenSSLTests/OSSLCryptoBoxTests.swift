@@ -26,7 +26,7 @@
 internal import CPartoutCryptoOpenSSL
 internal import CPartoutOpenVPNOpenSSL
 @testable import PartoutCryptoOpenSSL
-import Partout
+import PartoutCore
 @testable import PartoutOpenVPNOpenSSL
 import XCTest
 

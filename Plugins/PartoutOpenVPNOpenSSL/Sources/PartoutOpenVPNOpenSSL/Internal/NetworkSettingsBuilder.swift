@@ -24,7 +24,7 @@
 //
 
 import Foundation
-import Partout
+import PartoutCore
 
 /// Merges local and remote settings.
 ///
@@ -36,11 +36,6 @@ struct NetworkSettingsBuilder {
 
     /// The server options.
     let remoteOptions: OpenVPN.Configuration
-
-    init(localOptions: OpenVPN.Configuration, remoteOptions: OpenVPN.Configuration) {
-        self.localOptions = localOptions
-        self.remoteOptions = remoteOptions
-    }
 
     /// A list of `Module` mapped from ``localOptions`` and ``remoteOptions``.
     func modules() -> [Module] {

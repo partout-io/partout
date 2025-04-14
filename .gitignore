@@ -3,5 +3,5 @@
 *.pbxuser
 **/*.xcodeproj/project.xcworkspace
 **/xcuserdata
-Partout.xcframework*
+PartoutCore.xcframework*
 .build

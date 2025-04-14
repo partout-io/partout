@@ -19,15 +19,10 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Set development environment
         run: |
-          sed -i '' "s/environment = .production/environment = .onlineDevelopment/" "Package.swift"
+          sed -i '' "s/environment = .production/environment = .onlineDevelopment/" "Core/Package.swift"
       - name: Run tests
         run: |
           swift test
       - name: Run tests (plugins)
         run: |
-          for plugin in Plugins/*; do
-            if [ -d "$plugin" ]; then
-              echo "Run tests for $plugin"
-              (cd "$plugin" && swift test)
-            fi
-          done
+          scripts/test-plugins.sh

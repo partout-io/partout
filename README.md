@@ -16,6 +16,8 @@ Binary distribution for these architectures:
 - iphonesimulator
 - appletvsimulator
 
+__DISCLAIMER: the library is still undergoing deep architectural changes.__
+
 ## Installation
 
 ### Usage
@@ -27,7 +29,7 @@ $ git submodule add https://github.com/passepartoutvpn/partout
 $ git submodule update --init
 ```
 
-then edit `Package.swift` and set:
+then edit `Core/Package.swift` and set:
 
 ```
 environment = .onlineDevelopment

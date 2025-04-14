@@ -24,7 +24,7 @@
 //
 
 import Foundation
-import Partout
+import PartoutCore
 
 enum OCCPacket: UInt8 {
     case exit = 0x06
