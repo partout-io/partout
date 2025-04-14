@@ -22,12 +22,7 @@ jobs:
           swift test
       - name: Run tests (plugins)
         run: |
-          for plugin in Plugins/*; do
-            if [ -d "$plugin" ]; then
-              echo "Run tests for $plugin"
-              (cd "$plugin" && swift test)
-            fi
-          done
+          scripts/test-plugins.sh
   publish_release:
     name: Publish release
     runs-on: macos-15
@@ -44,7 +39,7 @@ jobs:
       - uses: passepartoutvpn/action-release-binary-package@master
         with:
           script: "ci-generate.sh"
-          framework: "Partout.xcframework"
+          framework: "PartoutCore.xcframework"
           gpg-key: ${{ secrets.GPG_KEY }}
           gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
           prerelease: true

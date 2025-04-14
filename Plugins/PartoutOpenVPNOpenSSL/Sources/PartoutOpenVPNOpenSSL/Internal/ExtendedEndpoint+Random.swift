@@ -24,7 +24,7 @@
 //
 
 import Foundation
-import Partout
+import PartoutCore
 
 extension ExtendedEndpoint {
     func withRandomPrefixLength(_ length: Int, prng: PRNGProtocol) -> ExtendedEndpoint {

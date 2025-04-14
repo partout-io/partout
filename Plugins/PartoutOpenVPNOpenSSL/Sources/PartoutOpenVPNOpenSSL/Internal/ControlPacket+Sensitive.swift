@@ -25,7 +25,7 @@
 
 internal import CPartoutOpenVPNOpenSSL
 import Foundation
-import Partout
+import PartoutCore
 
 extension ControlPacket: @retroactive SensitiveDebugStringConvertible {
     func debugDescription(withSensitiveData: Bool) -> String {

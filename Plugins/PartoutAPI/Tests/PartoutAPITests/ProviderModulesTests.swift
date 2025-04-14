@@ -1,0 +1,95 @@
+//
+//  ProviderModulesTests.swift
+//  Partout
+//
+//  Created by Davide De Rosa on 1/29/25.
+//  Copyright (c) 2025 Davide De Rosa. All rights reserved.
+//
+//  https://github.com/passepartoutvpn
+//
+//  This file is part of Partout.
+//
+//  Partout is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  Partout is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
+//
+
+import Foundation
+@testable import PartoutAPI
+@testable import PartoutCore
+import XCTest
+
+final class ProviderModulesTests: XCTestCase {
+    private let resourcesURL = Bundle.module.url(forResource: "Resources", withExtension: nil)
+
+    func test_givenProviderModule_whenOpenVPN_thenResolves() throws {
+        var sut = ProviderModule.Builder()
+        sut.providerId = .hideme
+        sut.providerModuleType = .openVPN
+        sut.entity = try openVPNEntity()
+
+        let module = try sut.tryBuild()
+        XCTAssertFalse(module.isFinal)
+        let resolvedModule = try OpenVPNProviderResolver().resolved(from: module)
+        XCTAssertTrue(resolvedModule.isFinal)
+        let typedModule = try XCTUnwrap(resolvedModule as? OpenVPNModule)
+
+        XCTAssertEqual(typedModule.configuration?.renegotiatesAfter, 900)
+        XCTAssertEqual(typedModule.configuration?.remotes, [
+            try .init("be-v4.hideservers.net", .init(.udp, 3000)),
+            try .init("be-v4.hideservers.net", .init(.udp, 3010)),
+            try .init("be-v4.hideservers.net", .init(.tcp, 3000)),
+            try .init("be-v4.hideservers.net", .init(.tcp, 3020))
+        ])
+    }
+
+//    func test_givenProviderModule_whenWireGuard_thenResolves() throws {
+//        var sut = ProviderModule.Builder()
+//        sut.providerId = .hideme
+//        sut.providerModuleType = .wireGuard
+//        let module = try sut.tryBuild()
+//        let resolvedModule = try module.resolvedModule(with: registry)
+//        XCTAssertTrue(resolvedModule is WireGuardModule)
+//    }
+}
+
+private extension ProviderModulesTests {
+    func openVPNEntity() throws -> ProviderEntity {
+        let presetURL = try XCTUnwrap(resourcesURL?.appendingPathComponent("preset.openvpn.json"))
+        let templateData = try Data(contentsOf: presetURL)
+
+        return ProviderEntity(
+            server: .init(
+                metadata: .init(
+                    providerId: .hideme,
+                    categoryName: "default",
+                    countryCode: "BE",
+                    otherCountryCodes: nil,
+                    area: nil
+                ),
+                serverId: "be-v4",
+                hostname: "be-v4.hideservers.net",
+                ipAddresses: nil,
+                supportedModuleTypes: [.openVPN],
+                supportedPresetIds: nil
+            ),
+            preset: .init(
+                providerId: .hideme,
+                presetId: "default",
+                description: "Default",
+                moduleType: .openVPN,
+                templateData: templateData
+            ),
+            heuristic: nil
+        )
+    }
+}

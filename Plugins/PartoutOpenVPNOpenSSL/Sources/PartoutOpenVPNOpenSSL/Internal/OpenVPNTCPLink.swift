@@ -27,7 +27,7 @@ import Combine
 internal import CPartoutCryptoOpenSSL
 internal import CPartoutOpenVPNOpenSSL
 import Foundation
-import Partout
+import PartoutCore
 
 /// Wrapper for connecting over a TCP socket.
 final class OpenVPNTCPLink {

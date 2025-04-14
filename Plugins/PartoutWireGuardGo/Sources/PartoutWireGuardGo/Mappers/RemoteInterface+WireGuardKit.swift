@@ -25,7 +25,7 @@
 
 import Foundation
 import Network
-import Partout
+import PartoutCore
 internal import WireGuardKit
 
 extension WireGuard.RemoteInterface {
@@ -48,11 +48,11 @@ extension WireGuard.RemoteInterface {
             address = nil
         }
 
-        let endpoint: Partout.Endpoint?
+        let endpoint: PartoutCore.Endpoint?
         if let address,
            let addressObject = Address(rawValue: address),
            let port = wg.endpoint?.port.rawValue {
-            endpoint = Partout.Endpoint(addressObject, port)
+            endpoint = PartoutCore.Endpoint(addressObject, port)
         } else {
             endpoint = nil
         }

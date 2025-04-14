@@ -24,7 +24,7 @@
 //
 
 import Foundation
-import Partout
+import PartoutCore
 @testable import PartoutOpenVPNOpenSSL
 import XCTest
 

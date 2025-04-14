@@ -24,8 +24,9 @@
 //
 
 import Foundation
-import Partout
+import PartoutCore
 import PartoutOpenVPNOpenSSL
+import PartoutSupport
 import PartoutWireGuardGo
 
 // MARK: - Implementations

@@ -25,7 +25,7 @@
 
 import Foundation
 import Network
-import Partout
+import PartoutCore
 internal import WireGuardKit
 
 extension Subnet {

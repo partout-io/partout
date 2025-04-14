@@ -25,7 +25,7 @@
 
 internal import CPartoutCryptoOpenSSL
 import Foundation
-import Partout
+import PartoutCore
 
 extension PRNGProtocol {
     func safeData(length: Int) -> ZeroingData {

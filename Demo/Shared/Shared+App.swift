@@ -23,7 +23,11 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Partout
+import Foundation
+import PartoutCore
+import PartoutOpenVPNOpenSSL
+import PartoutSupport
+import PartoutWireGuardGo
 
 extension Demo.Log {
     static let appURL = Demo.cachesURL.appending(component: "app.log")

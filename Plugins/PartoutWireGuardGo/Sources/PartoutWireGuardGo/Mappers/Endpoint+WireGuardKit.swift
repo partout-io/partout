@@ -24,10 +24,10 @@
 //
 
 import Foundation
-import Partout
+import PartoutCore
 internal import WireGuardKit
 
-extension Partout.Endpoint {
+extension PartoutCore.Endpoint {
     init?(wg: WireGuardKit.Endpoint) {
         guard let address = Address(rawValue: wg.host.debugDescription) else {
             return nil
@@ -51,7 +51,7 @@ extension Partout.Endpoint {
 }
 
 extension WireGuardKit.Endpoint {
-    var toEndpoint: Partout.Endpoint? {
+    var toEndpoint: PartoutCore.Endpoint? {
         .init(wg: self)
     }
 }
