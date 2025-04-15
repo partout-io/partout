@@ -30,7 +30,7 @@ import XCTest
 
 final class ZeroingDataExtensionsTests: XCTestCase {
     func test_givenPRNG_whenGenerateSafeData_thenHasGivenLength() {
-        let sut = SecureRandom()
+        let sut = SimplePRNG()
         XCTAssertEqual(sut.safeData(length: 500).length, 500)
     }
 
