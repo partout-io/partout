@@ -25,4 +25,5 @@
 
 #if canImport(_PartoutPlatformApple)
 @_exported import _PartoutPlatformApple
+public typealias JavaScriptEngine = AppleJavaScriptEngine
 #endif

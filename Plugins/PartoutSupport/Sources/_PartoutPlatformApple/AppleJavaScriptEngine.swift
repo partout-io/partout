@@ -1,5 +1,5 @@
 //
-//  JavaScriptEngine.swift
+//  AppleJavaScriptEngine.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 3/25/25.
@@ -27,13 +27,13 @@ import Foundation
 import JavaScriptCore
 import PartoutCore
 
-public final class JavaScriptEngine: ScriptingEngine {
+public final class AppleJavaScriptEngine: ScriptingEngine {
     private let engine: JSContext
 
     public init() {
         engine = JSContext()
         engine.exceptionHandler = { _, exception in
-            pp_log(.core, .error, "JavaScriptEngine: \(exception?.toString() ?? "unknown error")")
+            pp_log(.core, .error, "AppleJavaScriptEngine: \(exception?.toString() ?? "unknown error")")
         }
     }
 
