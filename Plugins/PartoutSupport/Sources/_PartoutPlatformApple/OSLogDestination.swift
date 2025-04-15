@@ -31,13 +31,13 @@ import PartoutCore
 public struct OSLogDestination: LoggerDestination {
     private static let subsystem = PartoutConfiguration.shared.identifier
 
-    private let logger: Logger
-
     public let category: LoggerCategory
 
-    public init(_ categoryName: String) {
-        category = LoggerCategory(rawValue: categoryName)
-        logger = Logger(subsystem: Self.subsystem, category: categoryName)
+    private let logger: Logger
+
+    public init(_ category: LoggerCategory) {
+        self.category = category
+        logger = Logger(subsystem: Self.subsystem, category: category.rawValue)
     }
 
     public func append(_ level: DebugLog.Level, _ msg: String) {
