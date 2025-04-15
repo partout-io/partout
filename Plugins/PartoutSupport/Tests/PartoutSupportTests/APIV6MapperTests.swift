@@ -24,8 +24,9 @@
 //
 
 import Foundation
-@testable import PartoutAPI
+import PartoutAPI
 import PartoutCore
+import PartoutSupport
 import XCTest
 
 final class APIV6MapperTests: XCTestCase {

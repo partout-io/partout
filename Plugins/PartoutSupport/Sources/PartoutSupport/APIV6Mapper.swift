@@ -24,6 +24,7 @@
 //
 
 import Foundation
+import PartoutAPI
 import PartoutCore
 
 extension API.V6 {

@@ -72,7 +72,10 @@ let package = Package(
         ),
         .testTarget(
             name: "PartoutSupportTests",
-            dependencies: ["PartoutSupport"]
+            dependencies: ["PartoutSupport"],
+            resources: [
+                .copy("Resources")
+            ]
         )
     ]
 )

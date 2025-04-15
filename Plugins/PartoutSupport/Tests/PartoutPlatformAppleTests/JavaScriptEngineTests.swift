@@ -1,5 +1,5 @@
 //
-//  JavaScriptEngineTests.swift
+//  AppleJavaScriptEngineTests.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 3/26/25.
@@ -27,9 +27,9 @@ import _PartoutPlatformApple
 import Foundation
 import XCTest
 
-final class JavaScriptEngineTests: XCTestCase {
+final class AppleJavaScriptEngineTests: XCTestCase {
     func test_givenEngine_whenInject_thenReturns() async throws {
-        let sut = JavaScriptEngine()
+        let sut = AppleJavaScriptEngine()
         sut.inject("triple", object: {
             3 * $0
         } as @convention(block) (Int) -> Int)

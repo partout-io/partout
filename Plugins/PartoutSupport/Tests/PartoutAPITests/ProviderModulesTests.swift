@@ -29,11 +29,13 @@ import PartoutCore
 import XCTest
 
 final class ProviderModulesTests: XCTestCase {
+    private let mockId = ProviderID(rawValue: "hideme")
+
     private let resourcesURL = Bundle.module.url(forResource: "Resources", withExtension: nil)
 
     func test_givenProviderModule_whenOpenVPN_thenResolves() throws {
         var sut = ProviderModule.Builder()
-        sut.providerId = .hideme
+        sut.providerId = mockId
         sut.providerModuleType = .openVPN
         sut.entity = try openVPNEntity()
 
@@ -70,7 +72,7 @@ private extension ProviderModulesTests {
         return ProviderEntity(
             server: .init(
                 metadata: .init(
-                    providerId: .hideme,
+                    providerId: mockId,
                     categoryName: "default",
                     countryCode: "BE",
                     otherCountryCodes: nil,
@@ -83,7 +85,7 @@ private extension ProviderModulesTests {
                 supportedPresetIds: nil
             ),
             preset: .init(
-                providerId: .hideme,
+                providerId: mockId,
                 presetId: "default",
                 description: "Default",
                 moduleType: .openVPN,
