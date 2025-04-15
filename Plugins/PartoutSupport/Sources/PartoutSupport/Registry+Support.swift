@@ -66,27 +66,39 @@ extension Registry {
             allHandlers: handlers,
             allImplementations: allImplementations ?? [],
             postDecodeBlock: Self.migratedProfile,
-            resolvedModuleBlock: { module, profile in
-                do {
-                    if let profile {
-                        profile.assertSingleActiveProviderModule()
-                        guard profile.isActiveModule(withId: module.id) else {
-                            return module
-                        }
-                    }
-                    guard let providerModule = module as? ProviderModule else {
-                        return module
-                    }
-                    guard let resolver = mappedResolvers[providerModule.providerModuleType] else {
-                        return module
-                    }
-                    return try resolver.resolved(from: providerModule)
-                } catch {
-                    pp_log(.core, .error, "Unable to resolve module: \(error)")
-                    throw error as? PartoutError ?? PartoutError(.Support.corruptProviderModule, error)
-                }
+            resolvedModuleBlock: {
+                try Self.resolvedModule($0, in: $1, with: mappedResolvers)
             }
         )
+    }
+}
+
+private extension Registry {
+
+    @Sendable
+    static func resolvedModule(
+        _ module: Module,
+        in profile: Profile?,
+        with resolvers: [ModuleType: ProviderModuleResolver]
+    ) throws -> Module {
+        do {
+            if let profile {
+                profile.assertSingleActiveProviderModule()
+                guard profile.isActiveModule(withId: module.id) else {
+                    return module
+                }
+            }
+            guard let providerModule = module as? ProviderModule else {
+                return module
+            }
+            guard let resolver = resolvers[providerModule.providerModuleType] else {
+                return module
+            }
+            return try resolver.resolved(from: providerModule)
+        } catch {
+            pp_log(.core, .error, "Unable to resolve module: \(error)")
+            throw error as? PartoutError ?? PartoutError(.Support.corruptProviderModule, error)
+        }
     }
 }
 
