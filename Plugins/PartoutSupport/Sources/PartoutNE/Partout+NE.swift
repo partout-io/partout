@@ -1,8 +1,8 @@
 //
-//  ZeroingDataExtensionsTests.swift
+//  Partout+NE.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/14/25.
+//  Created by Davide De Rosa on 4/3/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -25,18 +25,7 @@
 
 import Foundation
 import PartoutCore
-@testable import PartoutOpenVPNOpenSSL
-import XCTest
 
-final class ZeroingDataExtensionsTests: XCTestCase {
-    func test_givenPRNG_whenGenerateSafeData_thenHasGivenLength() {
-        let sut = SimplePRNG()
-        XCTAssertEqual(sut.safeData(length: 500).length, 500)
-    }
-
-    func test_givenZeroingData_whenAsSensitive_thenOmitsSensitiveData() throws {
-        let sut = Z(Data(hex: "12345678abcdef"))
-        XCTAssertEqual(sut.debugDescription(withSensitiveData: true), "[7 bytes, 12345678abcdef]")
-        XCTAssertEqual(sut.debugDescription(withSensitiveData: false), "[7 bytes]")
-    }
+extension LoggerCategory {
+    public static let ne = Self(rawValue: "ne")
 }

@@ -29,7 +29,7 @@ import PartoutCore
 import XCTest
 
 final class XORProcessorTests: XCTestCase {
-    private let prng = SecureRandom()
+    private let prng = SimplePRNG()
 
     private let mask = SecureData("f76dab30")!
 

@@ -1,8 +1,8 @@
 //
-//  ZeroingDataExtensionsTests.swift
+//  AppleRandomTests.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/14/25.
+//  Created by Davide De Rosa on 4/9/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,20 +23,25 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import _PartoutPlatformApple
 import Foundation
-import PartoutCore
-@testable import PartoutOpenVPNOpenSSL
 import XCTest
 
-final class ZeroingDataExtensionsTests: XCTestCase {
-    func test_givenPRNG_whenGenerateSafeData_thenHasGivenLength() {
-        let sut = SimplePRNG()
-        XCTAssertEqual(sut.safeData(length: 500).length, 500)
+final class AppleRandomTests: XCTestCase {
+    private let sut = AppleRandom()
+
+    func test_givenPRNG_whenGenerateData_thenHasGivenLength() {
+        XCTAssertEqual(sut.data(length: 123).count, 123)
     }
 
-    func test_givenZeroingData_whenAsSensitive_thenOmitsSensitiveData() throws {
-        let sut = Z(Data(hex: "12345678abcdef"))
-        XCTAssertEqual(sut.debugDescription(withSensitiveData: true), "[7 bytes, 12345678abcdef]")
-        XCTAssertEqual(sut.debugDescription(withSensitiveData: false), "[7 bytes]")
+    func test_givenPRNG_whenGenerateSuite_thenHasGivenParameters() {
+        let length = 52
+        let elements = 680
+        let suite = sut.suite(withDataLength: 52, numberOfElements: 680)
+
+        XCTAssertEqual(suite.count, elements)
+        suite.forEach {
+            XCTAssertEqual($0.count, length)
+        }
     }
 }

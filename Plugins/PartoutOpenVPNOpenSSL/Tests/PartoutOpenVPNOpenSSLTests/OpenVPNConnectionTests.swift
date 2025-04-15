@@ -274,7 +274,7 @@ final class OpenVPNConnectionTests: XCTestCase {
 // MARK: - Helpers
 
 private struct Constants {
-    private let prng = SecureRandom()
+    private let prng = SimplePRNG()
 
     private let dns = MockDNSResolver()
 

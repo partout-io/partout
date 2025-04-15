@@ -9,8 +9,8 @@ let environment: Environment
 environment = .production
 
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.72"
-let checksum = "f6006c856b6a660a4e6e54985b5c8167df94d38cd7a19306a8f5d125134173ed"
+let version = "0.99.75"
+let checksum = "29e0a5e8361130b9e893d37bcef9db169186750d00ef16aa98864e00176f4311"
 
 enum Environment {
     case localDevelopment
@@ -32,7 +32,7 @@ enum Environment {
         }
     }
 
-    var targetName: String {
+    var coreTargetName: String {
         switch self {
         case .localDevelopment:
             return "LocalDevelopment"
@@ -48,18 +48,18 @@ enum Environment {
         switch self {
         case .localDevelopment:
             targets.append(.binaryTarget(
-                name: targetName,
+                name: coreTargetName,
                 path: binaryFilename
             ))
         case .onlineDevelopment:
             targets.append(.binaryTarget(
-                name: targetName,
+                name: coreTargetName,
                 url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(binaryFilename)",
                 checksum: checksum
             ))
         case .production:
             targets.append(.target(
-                name: targetName,
+                name: coreTargetName,
                 dependencies: [
                     .product(name: "PartoutCoreSource", package: "CoreSource")
                 ]
@@ -67,7 +67,7 @@ enum Environment {
         }
         targets.append(.testTarget(
             name: "PartoutCoreTests",
-            dependencies: [.byName(name: targetName)]
+            dependencies: [.byName(name: coreTargetName)]
         ))
         return targets
     }
@@ -83,7 +83,7 @@ let package = Package(
     products: [
         .library(
             name: "PartoutCore",
-            targets: [environment.targetName]
+            targets: [environment.coreTargetName]
         )
     ],
     dependencies: environment.dependencies,

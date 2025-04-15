@@ -1,8 +1,8 @@
 //
-//  ZeroingDataExtensionsTests.swift
+//  ProviderID+Support.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/14/25.
+//  Created by Davide De Rosa on 10/7/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -24,19 +24,31 @@
 //
 
 import Foundation
+import PartoutAPI
 import PartoutCore
-@testable import PartoutOpenVPNOpenSSL
-import XCTest
 
-final class ZeroingDataExtensionsTests: XCTestCase {
-    func test_givenPRNG_whenGenerateSafeData_thenHasGivenLength() {
-        let sut = SimplePRNG()
-        XCTAssertEqual(sut.safeData(length: 500).length, 500)
-    }
+extension ProviderID {
+    public static let hideme = Self(rawValue: "hideme")
 
-    func test_givenZeroingData_whenAsSensitive_thenOmitsSensitiveData() throws {
-        let sut = Z(Data(hex: "12345678abcdef"))
-        XCTAssertEqual(sut.debugDescription(withSensitiveData: true), "[7 bytes, 12345678abcdef]")
-        XCTAssertEqual(sut.debugDescription(withSensitiveData: false), "[7 bytes]")
-    }
+    public static let ivpn = Self(rawValue: "ivpn")
+
+    public static let mullvad = Self(rawValue: "mullvad")
+
+    public static let nordvpn = Self(rawValue: "nordvpn")
+
+    public static let oeck = Self(rawValue: "oeck")
+
+    public static let pia = Self(rawValue: "pia")
+
+    public static let protonvpn = Self(rawValue: "protonvpn")
+
+    public static let surfshark = Self(rawValue: "surfshark")
+
+    public static let torguard = Self(rawValue: "torguard")
+
+    public static let tunnelbear = Self(rawValue: "tunnelbear")
+
+    public static let vyprvpn = Self(rawValue: "vyprvpn")
+
+    public static let windscribe = Self(rawValue: "windscribe")
 }

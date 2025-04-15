@@ -46,7 +46,7 @@ extension PRNGProtocol {
 
 extension SecureData {
     var zData: ZeroingData {
-        Z(innerData.toData())
+        Z(toData())
     }
 }
 
