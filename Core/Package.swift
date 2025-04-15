@@ -9,8 +9,8 @@ let environment: Environment
 environment = .production
 
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.72"
-let checksum = "f6006c856b6a660a4e6e54985b5c8167df94d38cd7a19306a8f5d125134173ed"
+let version = "0.99.75"
+let checksum = "29e0a5e8361130b9e893d37bcef9db169186750d00ef16aa98864e00176f4311"
 
 enum Environment {
     case localDevelopment
