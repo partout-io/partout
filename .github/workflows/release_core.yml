@@ -39,7 +39,7 @@ jobs:
           xcode-version: "16"
       - uses: passepartoutvpn/action-release-binary-package@master
         with:
-          script: "ci-generate.sh"
+          script: "scripts/ci-generate.sh"
           framework: "PartoutCore.xcframework"
           manifest-file: "Core/Package.swift"
           gpg-key: ${{ secrets.GPG_KEY }}
