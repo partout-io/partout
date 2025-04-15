@@ -51,20 +51,20 @@ extension Registry {
     public convenience init(
         withKnown: Bool,
         customHandlers: [ModuleHandler] = [],
-        allProviderResolvers: [ProviderModuleResolver]? = nil,
-        allImplementations: [ModuleImplementation]? = nil
+        customProviderResolvers: [ProviderModuleResolver] = [],
+        allImplementations: [ModuleImplementation] = []
     ) {
         let handlers = withKnown ? Self.knownHandlers + customHandlers : customHandlers
-        let allProviderResolvers = allProviderResolvers ?? (withKnown ? Self.knownProviderResolvers : [])
+        let resolvers = withKnown ? Self.knownProviderResolvers + customProviderResolvers : customProviderResolvers
 
-        let mappedResolvers = allProviderResolvers
+        let mappedResolvers = resolvers
             .reduce(into: [:]) {
                 $0[$1.moduleType] = $1
             }
 
         self.init(
             allHandlers: handlers,
-            allImplementations: allImplementations ?? [],
+            allImplementations: allImplementations,
             postDecodeBlock: Self.migratedProfile,
             resolvedModuleBlock: {
                 try Self.resolvedModule($0, in: $1, with: mappedResolvers)
