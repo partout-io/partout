@@ -50,7 +50,7 @@ public final class AppleJavaScriptEngine: ScriptingEngine {
                 throw PartoutError(.parsing)
             }
             guard !value.isUndefined else {
-                throw PartoutError(.javaScriptException)
+                throw PartoutError(.scriptException)
             }
             guard let data = value.toString().data(using: .utf8) else {
                 throw PartoutError(.parsing, value)

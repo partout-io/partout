@@ -73,7 +73,7 @@ extension API.V6 {
                 case .cached:
                     throw PartoutError(.cached)
                 default:
-                    throw PartoutError(.javaScriptException, result.error?.rawValue ?? "unknown")
+                    throw PartoutError(.scriptException, result.error?.rawValue ?? "unknown")
                 }
             }
             return response
