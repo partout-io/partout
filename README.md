@@ -59,6 +59,10 @@ The core package is distributed as a binary framework in [GitHub Releases][githu
 
 Anything else is licensed under the [GPLv3][license-gpl].
 
+### Contributing
+
+By contributing to this project you are agreeing to the terms stated in the [Contributor License Agreement (CLA)][contrib-cla]. For more details please see [CONTRIBUTING][contrib-readme].
+
 ## Credits
 
 - [GenericJSON][credits-genericjson]
@@ -80,6 +84,8 @@ Website: [passepartoutvpn.app][about-website]
 [license-gpl]: LICENSE.gpl
 [license-mit]: LICENSE.mit
 [license-contact]: mailto:license@passepartoutvpn.app
+[contrib-cla]: CLA.rst
+[contrib-readme]: CONTRIBUTING.md
 
 [github-releases]: https://github.com/passepartoutvpn/partout/releases
 [credits-genericjson]: https://github.com/iwill/generic-json-swift
