@@ -32,7 +32,7 @@ enum Environment {
         }
     }
 
-    var targetName: String {
+    var coreTargetName: String {
         switch self {
         case .localDevelopment:
             return "LocalDevelopment"
@@ -48,18 +48,18 @@ enum Environment {
         switch self {
         case .localDevelopment:
             targets.append(.binaryTarget(
-                name: targetName,
+                name: coreTargetName,
                 path: binaryFilename
             ))
         case .onlineDevelopment:
             targets.append(.binaryTarget(
-                name: targetName,
+                name: coreTargetName,
                 url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(binaryFilename)",
                 checksum: checksum
             ))
         case .production:
             targets.append(.target(
-                name: targetName,
+                name: coreTargetName,
                 dependencies: [
                     .product(name: "PartoutCoreSource", package: "CoreSource")
                 ]
@@ -67,7 +67,7 @@ enum Environment {
         }
         targets.append(.testTarget(
             name: "PartoutCoreTests",
-            dependencies: [.byName(name: targetName)]
+            dependencies: [.byName(name: coreTargetName)]
         ))
         return targets
     }
@@ -83,7 +83,7 @@ let package = Package(
     products: [
         .library(
             name: "PartoutCore",
-            targets: [environment.targetName]
+            targets: [environment.coreTargetName]
         )
     ],
     dependencies: environment.dependencies,

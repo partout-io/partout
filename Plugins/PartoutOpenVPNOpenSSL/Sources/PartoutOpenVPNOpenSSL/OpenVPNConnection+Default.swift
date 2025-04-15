@@ -31,16 +31,19 @@ extension OpenVPNConnection {
     public init(
         parameters: ConnectionParameters,
         module: OpenVPNModule,
+        prng: PRNGProtocol,
+        dns: DNSResolver,
         options: OpenVPN.ConnectionOptions = .init(),
         cachesURL: URL
     ) async throws {
         guard let configuration = module.configuration else {
             fatalError("Creating session without OpenVPN configuration?")
         }
-        let prng = SecureRandom()
-        let dns = SimpleDNSResolver {
-            CFDNSStrategy(hostname: $0)
-        }
+        // FIXME: ###, move to app
+//        let prng = AppleRandom()
+//        let dns = SimpleDNSResolver {
+//            CFDNSStrategy(hostname: $0)
+//        }
         let tlsFactory = { @Sendable in
             OSSLTLSBox()
         }
