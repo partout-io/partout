@@ -25,7 +25,7 @@
 
 import Foundation
 import PartoutCore
-import PartoutNE
+@testable import PartoutNE
 import XCTest
 
 final class ValueObserverTests: XCTestCase {
