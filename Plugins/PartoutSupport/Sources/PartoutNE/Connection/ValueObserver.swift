@@ -27,16 +27,16 @@ import Foundation
 import PartoutCore
 
 /// Observes KVO updates asynchronously.
-public actor ValueObserver<O> where O: NSObject {
+actor ValueObserver<O> where O: NSObject {
     private weak var subject: O?
 
     private var waitObserver: NSKeyValueObservation?
 
-    public init(_ subject: O) {
+    init(_ subject: O) {
         self.subject = subject
     }
 
-    public func waitForValue<V>(
+    func waitForValue<V>(
         on keyPath: KeyPath<O, V>,
         timeout: Int,
         onValue: @escaping (V) throws -> Bool
