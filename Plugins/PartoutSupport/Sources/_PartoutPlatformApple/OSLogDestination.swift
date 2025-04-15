@@ -65,24 +65,3 @@ private extension DebugLog.Level {
         }
     }
 }
-
-private extension OSLogType {
-    var debugLevel: DebugLog.Level {
-        switch self {
-        case .fault:
-            return .fault
-
-        case .error:
-            return .error
-
-        case .info:
-            return .info
-
-        case .debug:
-            return .debug
-
-        default:
-            return .notice
-        }
-    }
-}
