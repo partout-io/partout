@@ -1,5 +1,5 @@
 //
-//  Exports.swift
+//  Partout+Platform.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 4/15/25.
@@ -24,6 +24,9 @@
 //
 
 #if canImport(_PartoutPlatformApple)
+
 @_exported import _PartoutPlatformApple
+
 public typealias JavaScriptEngine = AppleJavaScriptEngine
+
 #endif
