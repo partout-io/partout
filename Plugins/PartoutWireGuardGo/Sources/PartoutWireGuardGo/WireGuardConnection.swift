@@ -51,6 +51,7 @@ public final class WireGuardConnection: Connection {
 
     private lazy var adapter: WireGuardAdapter = {
         WireGuardAdapter(with: delegate, backend: WireGuardBackendGo()) { logLevel, message in
+            // FIXME: ###, WireGuardGo, fix missing pp_log() extension
 //            pp_log(.wireguard, osLogLevel: logLevel.osLogLevel, message)
         }
     }()

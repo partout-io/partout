@@ -39,7 +39,7 @@ extension OpenVPNConnection {
         guard let configuration = module.configuration else {
             fatalError("Creating session without OpenVPN configuration?")
         }
-        // FIXME: ###, move to app
+        // FIXME: ###, OpenVPNOpenSSL, move implementations to app
 //        let prng = AppleRandom()
 //        let dns = SimpleDNSResolver {
 //            CFDNSStrategy(hostname: $0)
