@@ -3,6 +3,9 @@
 
 import PackageDescription
 
+let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
+let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
+
 let package = Package(
     name: "PartoutSupport",
     platforms: [
@@ -42,17 +45,25 @@ let package = Package(
             ]
         ),
         .target(
+            name: "_PartoutPlatformAndroid",
+            dependencies: ["PartoutPlatform"]
+        ),
+        .target(
             name: "_PartoutPlatformApple",
-            dependencies: [
-                "PartoutPlatform"
-            ]
+            dependencies: ["PartoutPlatform"]
+        ),
+        .target(
+            name: "_PartoutPlatformWindows",
+            dependencies: ["PartoutPlatform"]
         ),
         .target(
             name: "PartoutSupport",
             dependencies: [
                 "PartoutAPI",
-                .target(name: "PartoutNE", condition: .when(platforms: [.iOS, .macOS, .tvOS])),
-                .target(name: "_PartoutPlatformApple", condition: .when(platforms: [.iOS, .macOS, .tvOS]))
+                .target(name: "PartoutNE", condition: .when(platforms: applePlatforms)),
+                .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
+                .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
+                .target(name: "_PartoutPlatformWindows", condition: .when(platforms: [.windows]))
             ]
         ),
         .testTarget(
