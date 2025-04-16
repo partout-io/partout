@@ -51,9 +51,9 @@ extension API.V6 {
 
         private let timeout: TimeInterval
 
-        private let engine: JavaScriptEngine
+        private let engine: ScriptingEngine
 
-        init(resultURL: URL?, cache: ProviderCache?, timeout: TimeInterval, engine: JavaScriptEngine) {
+        init(resultURL: URL?, cache: ProviderCache?, timeout: TimeInterval, engine: ScriptingEngine) {
             self.resultURL = resultURL
             self.cache = cache
             self.timeout = timeout
