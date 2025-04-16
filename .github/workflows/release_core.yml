@@ -1,11 +1,6 @@
 name: Core Binary Release
 
 on:
-  push:
-    branches:
-      - "master"
-    paths:
-      - ".version"
   workflow_dispatch:
 
 jobs:
