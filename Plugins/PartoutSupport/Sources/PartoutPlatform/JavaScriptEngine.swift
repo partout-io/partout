@@ -1,8 +1,8 @@
 //
-//  Partout+Platform.swift
+//  JavaScriptEngine.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/15/25.
+//  Created by Davide De Rosa on 4/16/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(_PartoutPlatformApple)
+import Foundation
+import PartoutCore
 
-@_exported import _PartoutPlatformApple
-
-public typealias JavaScriptEngine = AppleJavaScriptEngine
-
-#endif
+public protocol JavaScriptEngine: ScriptingEngine {
+    func inject(_ name: String, object: Any)
+}

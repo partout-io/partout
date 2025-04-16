@@ -26,6 +26,10 @@
 import Foundation
 import PartoutCore
 
+#if canImport(_PartoutPlatformApple)
+@_exported import _PartoutPlatformApple
+#endif
+
 extension PartoutError.Code {
     public enum Support {
 

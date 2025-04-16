@@ -38,21 +38,21 @@ let package = Package(
         .target(
             name: "PartoutPlatform",
             dependencies: [
-                .target(name: "_PartoutPlatformApple", condition: .when(platforms: [.iOS, .macOS, .tvOS])),
-                .target(name: "PartoutNE", condition: .when(platforms: [.iOS, .macOS, .tvOS]))
+                .product(name: "PartoutCore", package: "Core"),
             ]
         ),
         .target(
             name: "_PartoutPlatformApple",
             dependencies: [
-                .product(name: "PartoutCore", package: "Core")
+                "PartoutPlatform"
             ]
         ),
         .target(
             name: "PartoutSupport",
             dependencies: [
                 "PartoutAPI",
-                "PartoutPlatform"
+                .target(name: "PartoutNE", condition: .when(platforms: [.iOS, .macOS, .tvOS])),
+                .target(name: "_PartoutPlatformApple", condition: .when(platforms: [.iOS, .macOS, .tvOS]))
             ]
         ),
         .testTarget(

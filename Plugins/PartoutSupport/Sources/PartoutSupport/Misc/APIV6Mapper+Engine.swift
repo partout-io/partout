@@ -31,7 +31,12 @@ import PartoutPlatform
 extension API.V6.Mapper {
     public convenience init(baseURL: URL, infrastructureURL: ((ProviderID) -> URL)? = nil) {
         self.init(baseURL: baseURL, infrastructureURL: infrastructureURL) {
-            API.V6.DefaultScriptExecutor(resultURL: $0, cache: $1, timeout: $2)
+            API.V6.DefaultScriptExecutor(
+                resultURL: $0,
+                cache: $1,
+                timeout: $2,
+                engine: AppleJavaScriptEngine()
+            )
         }
     }
 }
@@ -48,11 +53,11 @@ extension API.V6 {
 
         private let engine: JavaScriptEngine
 
-        init(resultURL: URL?, cache: ProviderCache?, timeout: TimeInterval) {
+        init(resultURL: URL?, cache: ProviderCache?, timeout: TimeInterval, engine: JavaScriptEngine) {
             self.resultURL = resultURL
             self.cache = cache
             self.timeout = timeout
-            engine = JavaScriptEngine()
+            self.engine = engine
 
             engine.inject("getText", object: getText as @convention(block) (String) -> Any?)
             engine.inject("getJSON", object: getJSON as @convention(block) (String) -> Any?)
