@@ -27,19 +27,6 @@ import Foundation
 import PartoutAPI
 import PartoutCore
 
-extension API.V6.Mapper {
-    public convenience init(baseURL: URL, infrastructureURL: ((ProviderID) -> URL)? = nil) {
-        self.init(baseURL: baseURL, infrastructureURL: infrastructureURL) {
-            API.V6.DefaultScriptExecutor(
-                resultURL: $0,
-                cache: $1,
-                timeout: $2,
-                engine: AppleJavaScriptEngine()
-            )
-        }
-    }
-}
-
 extension API.V6 {
     final class DefaultScriptExecutor: APIEngine.ScriptExecutor {
 
