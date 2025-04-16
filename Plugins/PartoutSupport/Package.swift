@@ -28,23 +28,13 @@ let package = Package(
             name: "PartoutAPI",
             dependencies: [
                 .product(name: "GenericJSON", package: "generic-json-swift"),
-                .product(name: "PartoutCore", package: "Core"),
-                "PartoutPlatform"
+                .product(name: "PartoutCore", package: "Core")
             ]
         ),
         .target(
             name: "PartoutNE",
             dependencies: [
                 .product(name: "PartoutCore", package: "Core")
-            ]
-        ),
-        .target(
-            name: "PartoutPlatform",
-            dependencies: [
-                .target(name: "PartoutNE", condition: .when(platforms: applePlatforms)),
-                .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
-                .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
-                .target(name: "_PartoutPlatformWindows", condition: .when(platforms: [.windows]))
             ]
         ),
         .target(
@@ -69,7 +59,10 @@ let package = Package(
             name: "PartoutSupport",
             dependencies: [
                 "PartoutAPI",
-                "PartoutPlatform"
+                .target(name: "PartoutNE", condition: .when(platforms: applePlatforms)),
+                .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
+                .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
+                .target(name: "_PartoutPlatformWindows", condition: .when(platforms: [.windows]))
             ]
         ),
         .testTarget(

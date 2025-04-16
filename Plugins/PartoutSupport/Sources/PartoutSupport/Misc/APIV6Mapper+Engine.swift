@@ -26,7 +26,6 @@
 import Foundation
 import PartoutAPI
 import PartoutCore
-import PartoutPlatform
 
 extension API.V6.Mapper {
     public convenience init(baseURL: URL, infrastructureURL: ((ProviderID) -> URL)? = nil) {
