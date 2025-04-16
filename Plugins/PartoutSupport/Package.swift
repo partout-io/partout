@@ -3,6 +3,9 @@
 
 import PackageDescription
 
+let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
+let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
+
 let package = Package(
     name: "PartoutSupport",
     platforms: [
@@ -25,8 +28,7 @@ let package = Package(
             name: "PartoutAPI",
             dependencies: [
                 .product(name: "GenericJSON", package: "generic-json-swift"),
-                .product(name: "PartoutCore", package: "Core"),
-                "PartoutPlatform"
+                .product(name: "PartoutCore", package: "Core")
             ]
         ),
         .target(
@@ -36,10 +38,9 @@ let package = Package(
             ]
         ),
         .target(
-            name: "PartoutPlatform",
+            name: "_PartoutPlatformAndroid",
             dependencies: [
-                .target(name: "_PartoutPlatformApple", condition: .when(platforms: [.iOS, .macOS, .tvOS])),
-                .target(name: "PartoutNE", condition: .when(platforms: [.iOS, .macOS, .tvOS]))
+                .product(name: "PartoutCore", package: "Core")
             ]
         ),
         .target(
@@ -49,10 +50,19 @@ let package = Package(
             ]
         ),
         .target(
+            name: "_PartoutPlatformWindows",
+            dependencies: [
+                .product(name: "PartoutCore", package: "Core")
+            ]
+        ),
+        .target(
             name: "PartoutSupport",
             dependencies: [
                 "PartoutAPI",
-                "PartoutPlatform"
+                .target(name: "PartoutNE", condition: .when(platforms: applePlatforms)),
+                .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
+                .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
+                .target(name: "_PartoutPlatformWindows", condition: .when(platforms: [.windows]))
             ]
         ),
         .testTarget(

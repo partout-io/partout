@@ -26,6 +26,19 @@
 import Foundation
 import PartoutCore
 
+#if canImport(_PartoutPlatformAndroid)
+@_exported import _PartoutPlatformAndroid
+#endif
+
+#if canImport(_PartoutPlatformApple)
+@_exported import _PartoutPlatformApple
+#endif
+
+#if canImport(_PartoutPlatformWindows)
+@_exported import _PartoutPlatformWindows
+#endif
+
+
 extension PartoutError.Code {
     public enum Support {
 
