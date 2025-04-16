@@ -26,7 +26,6 @@
 import Foundation
 import JavaScriptCore
 import PartoutCore
-import PartoutPlatform
 
 public final class AppleJavaScriptEngine: ScriptingEngine {
     private let engine: JSContext

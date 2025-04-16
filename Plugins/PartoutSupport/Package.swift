@@ -41,29 +41,35 @@ let package = Package(
         .target(
             name: "PartoutPlatform",
             dependencies: [
-                .product(name: "PartoutCore", package: "Core"),
+                .target(name: "PartoutNE", condition: .when(platforms: applePlatforms)),
+                .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
+                .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
+                .target(name: "_PartoutPlatformWindows", condition: .when(platforms: [.windows]))
             ]
         ),
         .target(
             name: "_PartoutPlatformAndroid",
-            dependencies: ["PartoutPlatform"]
+            dependencies: [
+                .product(name: "PartoutCore", package: "Core")
+            ]
         ),
         .target(
             name: "_PartoutPlatformApple",
-            dependencies: ["PartoutPlatform"]
+            dependencies: [
+                .product(name: "PartoutCore", package: "Core")
+            ]
         ),
         .target(
             name: "_PartoutPlatformWindows",
-            dependencies: ["PartoutPlatform"]
+            dependencies: [
+                .product(name: "PartoutCore", package: "Core")
+            ]
         ),
         .target(
             name: "PartoutSupport",
             dependencies: [
                 "PartoutAPI",
-                .target(name: "PartoutNE", condition: .when(platforms: applePlatforms)),
-                .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
-                .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
-                .target(name: "_PartoutPlatformWindows", condition: .when(platforms: [.windows]))
+                "PartoutPlatform"
             ]
         ),
         .testTarget(

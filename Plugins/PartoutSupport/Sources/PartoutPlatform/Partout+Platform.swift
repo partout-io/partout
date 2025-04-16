@@ -1,8 +1,8 @@
 //
-//  Partout+Support.swift
+//  Partout+Platform.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 3/29/24.
+//  Created by Davide De Rosa on 4/16/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,13 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-import PartoutCore
-
-extension PartoutError.Code {
-    public enum Support {
-
-        /// A provider module is corrupt.
-        public static let corruptProviderModule = PartoutError.Code("corruptProviderModule")
-    }
-}
+#if canImport(_PartoutPlatformApple)
+@_exported import _PartoutPlatformApple
+#endif
