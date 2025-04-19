@@ -152,7 +152,7 @@ public final class WireGuardConnection: Connection {
         pp_log(.wireguard, .info, "Stop tunnel")
         statusSubject.send(.disconnecting)
 
-        // TODO: #2, handle WireGuard adapter timeout
+        // FIXME: #30, handle WireGuard adapter timeout
 
         await withCheckedContinuation { [weak self] continuation in
             guard let self else {

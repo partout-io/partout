@@ -27,7 +27,7 @@ internal import CPartoutOpenVPNOpenSSL
 import Foundation
 import PartoutCore
 
-// TODO: #197, LINK and TUN should be able to run detached in full-duplex
+// TODO: #notes/142, LINK and TUN should be able to run detached in full-duplex
 extension OpenVPNSession {
     func loopTunnel() {
         runInActor { [weak self] in
@@ -121,7 +121,7 @@ private extension OpenVPNSession {
                     continue
                 }
 
-                // TODO: #225, make more efficient with array reference
+                // TODO: #notes/140, make more efficient with array reference
                 var dataPackets = dataPacketsByKey[key] ?? [Data]()
                 dataPackets.append(packet)
                 dataPacketsByKey[key] = dataPackets

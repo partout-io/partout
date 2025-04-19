@@ -80,7 +80,7 @@ extension Profile {
 
         if activeConnectionModule == nil {
 
-            // TODO: #314, this seems fixed in macOS 15
+            // TODO: #partout-core/314, this seems fixed in macOS 15
             // the tunnel takes several seconds to stop if
             // only DNS settings are provided. here we add some fake IP
             // settings to work around this behavior

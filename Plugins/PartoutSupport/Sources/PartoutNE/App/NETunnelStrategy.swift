@@ -99,7 +99,7 @@ extension NETunnelStrategy: TunnelObservableStrategy {
         // resulting in multiple calls to startTunnel() to then
         // call stopTunnel() after 5s with reason .superceded
         //
-        // TODO: passepartout#218, do not disconnect active tunnel on macOS
+        // TODO: #passepartout/218, do not disconnect active tunnel on macOS
         // it's not a bug, it's the intended behavior (yet poorly documented)
         // rework PTP to handle multiple calls to startTunnel()/stopTunnel() in
         // the same process
