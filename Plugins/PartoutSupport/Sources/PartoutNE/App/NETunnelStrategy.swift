@@ -164,7 +164,7 @@ extension NETunnelStrategy: TunnelObservableStrategy {
                 for await manager in stream {
                     guard !Task.isCancelled else {
                         pp_log(.ne, .debug, "Cancelled NETunnelStrategy.didSetCurrent")
-                        return
+                        break
                     }
                     let newValue = manager?.asCurrentProfile
                     guard newValue != previousValue else {
@@ -271,7 +271,7 @@ extension NETunnelStrategy: NETunnelManagerRepository {
                 for await value in managersSubject.subscribe().dropFirst() {
                     guard !Task.isCancelled else {
                         pp_log(.ne, .debug, "Cancelled NETunnelStrategy.managersStream")
-                        return
+                        break
                     }
                     continuation.yield(value)
                 }

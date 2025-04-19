@@ -66,7 +66,7 @@ extension NEObservablePath {
                 for await path in stream {
                     guard !Task.isCancelled else {
                         pp_log(.ne, .debug, "Cancelled NEObservablePath.isReachableStream")
-                        return
+                        break
                     }
                     let reachable = path.status == .satisfied
                     guard reachable != previous else {
