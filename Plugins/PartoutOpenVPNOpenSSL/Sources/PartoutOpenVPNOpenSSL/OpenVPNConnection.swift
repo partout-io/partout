@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Combine
 import Foundation
 import PartoutCore
 
@@ -91,7 +90,7 @@ public actor OpenVPNConnection {
 
         } upgradeBlock: { [weak self] in
 
-            // TODO: ###, may improve this with floating
+            // TODO: #notes/143, may improve this with floating
             pp_log(.openvpn, .notice, "Link has a better path, shut down session to reconnect")
             await self?.session.shutdown(PartoutError(.networkChanged))
 
@@ -141,8 +140,8 @@ public actor OpenVPNConnection {
 // MARK: - Connection
 
 extension OpenVPNConnection: Connection {
-    public nonisolated var statusPublisher: AnyPublisher<ConnectionStatus, Error> {
-        backend.statusPublisher
+    public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
+        backend.statusStream
     }
 
     @discardableResult

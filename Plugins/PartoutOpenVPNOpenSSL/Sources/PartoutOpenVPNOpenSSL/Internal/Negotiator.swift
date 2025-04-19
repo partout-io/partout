@@ -119,7 +119,7 @@ final class Negotiator {
         history: NegotiationHistory?,
         renegotiation: RenegotiationType?,
         link: LinkInterface,
-        channel: ControlChannel, // TODO: #196, abstract this for testing
+        channel: ControlChannel, // TODO: #29, abstract this for testing
         prng: PRNGProtocol,
         tlsFactory: @escaping () -> OpenVPNTLSProtocol,
         cryptoFactory: @escaping () -> OpenVPNCryptoProtocol,

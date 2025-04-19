@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Combine
 import Foundation
 import Network
 import PartoutCore
@@ -32,11 +31,11 @@ import PartoutCore
 public final class NEObservablePath: ReachabilityObserver {
     private let monitor: NWPathMonitor
 
-    private nonisolated let subject: CurrentValueSubject<NWPath, Never>
+    private nonisolated let subject: CurrentValueStream<NWPath>
 
     public init() {
         monitor = NWPathMonitor()
-        subject = CurrentValueSubject(monitor.currentPath)
+        subject = CurrentValueStream(monitor.currentPath)
     }
 
     public func startObserving() {
@@ -49,20 +48,35 @@ public final class NEObservablePath: ReachabilityObserver {
 }
 
 extension NEObservablePath {
-    public var publisher: AnyPublisher<NWPath, Never> {
-        subject.eraseToAnyPublisher()
+    public var stream: AsyncStream<NWPath> {
+        subject.subscribe()
     }
 
     public var isReachable: Bool {
         subject.value.status == .satisfied
     }
 
-    public var isReachablePublisher: AnyPublisher<Bool, Never> {
-        publisher
-            .map {
-                $0.status == .satisfied
+    public var isReachableStream: AsyncStream<Bool> {
+        AsyncStream { [weak self] continuation in
+            Task { [weak self] in
+                guard let self else {
+                    return
+                }
+                var previous: Bool?
+                for await path in stream {
+                    guard !Task.isCancelled else {
+                        pp_log(.ne, .debug, "Cancelled NEObservablePath.isReachableStream")
+                        break
+                    }
+                    let reachable = path.status == .satisfied
+                    guard reachable != previous else {
+                        continue
+                    }
+                    continuation.yield(reachable)
+                    previous = reachable
+                }
+                continuation.finish()
             }
-            .removeDuplicates()
-            .eraseToAnyPublisher()
+        }
     }
 }

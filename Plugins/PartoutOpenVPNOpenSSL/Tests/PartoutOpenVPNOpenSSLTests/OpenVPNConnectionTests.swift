@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Combine
 internal import CPartoutOpenVPNOpenSSL
 import Foundation
 import PartoutCore
@@ -232,10 +231,10 @@ final class OpenVPNConnectionTests: XCTestCase {
     func test_givenStartedConnection_whenUpgraded_thenDisconnectsWithNetworkChanged() async throws {
         let session = MockOpenVPNSession()
         var status: ConnectionStatus
-        let hasBetterPath = PassthroughSubject<Void, Never>()
+        let hasBetterPath = PassthroughStream<Void>()
         let factory = MockNetworkInterfaceFactory()
         factory.linkBlock = {
-            $0.hasBetterPath = hasBetterPath.eraseToAnyPublisher()
+            $0.hasBetterPath = hasBetterPath.subscribe()
         }
 
         let expInitialLink = expectation(description: "Initial link")
