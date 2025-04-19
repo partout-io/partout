@@ -112,7 +112,7 @@ extension NETCPSocket {
             .filter { $0 } // true
             .map { _ in }
             .stream()
-            .replacingError()
+            .ignoreErrors()
     }
 
     nonisolated func upgraded() -> LinkInterface {
