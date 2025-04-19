@@ -60,6 +60,7 @@ extension NEObservablePath {
         AsyncStream { [weak self] continuation in
             Task { [weak self] in
                 guard let self else {
+                    continuation.finish()
                     return
                 }
                 var previous: Bool?

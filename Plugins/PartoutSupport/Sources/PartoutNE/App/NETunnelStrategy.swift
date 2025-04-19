@@ -157,6 +157,7 @@ extension NETunnelStrategy: TunnelObservableStrategy {
         AsyncStream { [weak self] continuation in
             Task { [weak self] in
                 guard let self else {
+                    continuation.finish()
                     return
                 }
                 let stream = currentManagerSubject.subscribe().dropFirst()
@@ -266,6 +267,7 @@ extension NETunnelStrategy: NETunnelManagerRepository {
         AsyncStream { [weak self] continuation in
             Task { [weak self] in
                 guard let self else {
+                    continuation.finish()
                     return
                 }
                 for await value in managersSubject.subscribe().dropFirst() {
