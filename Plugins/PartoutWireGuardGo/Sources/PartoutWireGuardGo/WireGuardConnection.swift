@@ -88,6 +88,10 @@ public final class WireGuardConnection: Connection {
         dataCountTimer?.cancel()
         dataCountTimer = Task { [weak self] in
             while true {
+                guard !Task.isCancelled else {
+                    pp_log(.wireguard, .debug, "Cancelled WireGuardConnection.dataCountTimer")
+                    return
+                }
                 await MainActor.run {
                     self?.onDataCountTimer()
                 }
