@@ -62,17 +62,18 @@ extension NEObservablePath {
                 guard let self else {
                     return
                 }
-                var last: Bool?
+                var previous: Bool?
                 for await path in stream {
                     guard !Task.isCancelled else {
                         pp_log(.ne, .debug, "Cancelled NEObservablePath.isReachableStream")
                         return
                     }
                     let reachable = path.status == .satisfied
-                    if last != reachable {
-                        continuation.yield(reachable)
-                        last = reachable
+                    guard reachable != previous else {
+                        continue
                     }
+                    continuation.yield(reachable)
+                    previous = reachable
                 }
                 continuation.finish()
             }
