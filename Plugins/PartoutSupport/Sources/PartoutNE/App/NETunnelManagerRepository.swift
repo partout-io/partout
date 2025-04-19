@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Combine
 import Foundation
 import NetworkExtension
 import PartoutCore
@@ -43,5 +42,5 @@ public protocol NETunnelManagerRepository {
 
     func profile(from manager: NETunnelProviderManager) throws -> Profile
 
-    var managersPublisher: AnyPublisher<[Profile.ID: NETunnelProviderManager], Never> { get }
+    var managersStream: AsyncStream<[Profile.ID: NETunnelProviderManager]> { get }
 }

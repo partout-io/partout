@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Combine
 import Foundation
 import NetworkExtension
 import PartoutCore
@@ -104,13 +103,14 @@ private actor NEUDPSocket: LinkInterface {
 // MARK: LinkInterface
 
 extension NEUDPSocket {
-    nonisolated var hasBetterPath: AnyPublisher<Void, Never> {
+    nonisolated var hasBetterPath: AsyncStream<Void> {
         nwSession
             .publisher(for: \.hasBetterPath)
             .removeDuplicates()
             .filter { $0 } // true
             .map { _ in }
-            .eraseToAnyPublisher()
+            .stream()
+            .replacingError()
     }
 
     nonisolated func upgraded() -> LinkInterface {

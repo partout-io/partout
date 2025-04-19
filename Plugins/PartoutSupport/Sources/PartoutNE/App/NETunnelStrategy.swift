@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Combine
 import Foundation
 import NetworkExtension
 import PartoutCore
@@ -36,9 +35,9 @@ public actor NETunnelStrategy {
 
     private let environment: TunnelEnvironment
 
-    private nonisolated let managersSubject: CurrentValueSubject<[Profile.ID: NETunnelProviderManager], Never>
+    private nonisolated let managersSubject: CurrentValueStream<[Profile.ID: NETunnelProviderManager]>
 
-    private nonisolated let currentManagerSubject: CurrentValueSubject<NETunnelProviderManager?, Never>
+    private nonisolated let currentManagerSubject: CurrentValueStream<NETunnelProviderManager?>
 
     private var allManagers: [Profile.ID: NETunnelProviderManager] {
         didSet {
@@ -56,8 +55,8 @@ public actor NETunnelStrategy {
         self.bundleIdentifier = bundleIdentifier
         self.coder = coder
         self.environment = environment
-        managersSubject = CurrentValueSubject([:])
-        currentManagerSubject = CurrentValueSubject(nil)
+        managersSubject = CurrentValueStream([:])
+        currentManagerSubject = CurrentValueStream(nil)
         allManagers = [:]
 
         NotificationCenter.default.addObserver(
@@ -154,15 +153,23 @@ extension NETunnelStrategy: TunnelObservableStrategy {
         currentManager?.asCurrentProfile
     }
 
-    public nonisolated var didSetCurrent: AnyPublisher<TunnelCurrentProfile?, Never> {
-        currentManagerSubject
-            .dropFirst()
-            .map(\.?.asCurrentProfile)
-            .removeDuplicates()
-            .handleEvents(receiveOutput: {
-                pp_log(.ne, .debug, "NETunnelStrategy.currentProfile -> \($0.debugDescription)")
-            })
-            .eraseToAnyPublisher()
+    public nonisolated var didSetCurrent: AsyncStream<TunnelCurrentProfile?> {
+        AsyncStream { continuation in
+            Task {
+                let stream = currentManagerSubject.subscribe().dropFirst()
+                var previousValue: TunnelCurrentProfile?
+                for await manager in stream {
+                    let newValue = manager?.asCurrentProfile
+                    guard newValue != previousValue else {
+                        continue
+                    }
+                    pp_log(.ne, .debug, "NETunnelStrategy.currentProfile -> \(newValue.debugDescription)")
+                    continuation.yield(newValue)
+                    previousValue = newValue
+                }
+                continuation.finish()
+            }
+        }
     }
 }
 
@@ -248,10 +255,15 @@ extension NETunnelStrategy: NETunnelManagerRepository {
         return try coder.profile(from: proto)
     }
 
-    public nonisolated var managersPublisher: AnyPublisher<[Profile.ID: NETunnelProviderManager], Never> {
-        managersSubject
-            .dropFirst()
-            .eraseToAnyPublisher()
+    public nonisolated var managersStream: AsyncStream<[Profile.ID: NETunnelProviderManager]> {
+        AsyncStream { continuation in
+            Task {
+                for await value in managersSubject.subscribe().dropFirst() {
+                    continuation.yield(value)
+                }
+                continuation.finish()
+            }
+        }
     }
 }
 
@@ -337,7 +349,7 @@ private extension NETunnelStrategy {
             currentManagerSubject.value
         }
         set {
-            currentManagerSubject.value = newValue
+            currentManagerSubject.send(newValue)
         }
     }
 

@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Combine
 import Foundation
 import PartoutCore
 
@@ -141,8 +140,8 @@ public actor OpenVPNConnection {
 // MARK: - Connection
 
 extension OpenVPNConnection: Connection {
-    public nonisolated var statusPublisher: AnyPublisher<ConnectionStatus, Error> {
-        backend.statusPublisher
+    public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
+        backend.statusStream
     }
 
     @discardableResult

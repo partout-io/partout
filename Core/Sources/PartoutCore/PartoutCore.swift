@@ -26,4 +26,5 @@
 @_exported import _CPartoutBase
 @_exported import _PartoutBase
 @_exported import _PartoutOpenVPN
+@_exported import _PartoutStreams
 @_exported import _PartoutWireGuard

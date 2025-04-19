@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Combine
 internal import CPartoutCryptoOpenSSL
 internal import CPartoutOpenVPNOpenSSL
 import Foundation
@@ -68,7 +67,7 @@ extension OpenVPNTCPLink: LinkInterface {
         link.remoteProtocol
     }
 
-    var hasBetterPath: AnyPublisher<Void, Never> {
+    var hasBetterPath: AsyncStream<Void> {
         link.hasBetterPath
     }
 

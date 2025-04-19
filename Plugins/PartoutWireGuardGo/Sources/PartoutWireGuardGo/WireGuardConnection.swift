@@ -28,7 +28,6 @@
 //  SPDX-License-Identifier: MIT
 //  Copyright © 2018-2024 WireGuard LLC. All Rights Reserved.
 
-import Combine
 import Foundation
 import NetworkExtension // FIXME: ###, this depends on Apple unnecessarily
 import PartoutCore
@@ -37,7 +36,7 @@ internal import WireGuardKit
 internal import WireGuardKitGo
 
 public final class WireGuardConnection: Connection {
-    private let statusSubject: CurrentValueSubject<ConnectionStatus, Error>
+    private let statusSubject: CurrentValueStream<ConnectionStatus>
 
     private let moduleId: UUID
 
@@ -47,7 +46,9 @@ public final class WireGuardConnection: Connection {
 
     private let tunnelConfiguration: TunnelConfiguration
 
-    private var dataCountTimer: AnyCancellable?
+    private let dataCountTimerInterval: TimeInterval
+
+    private var dataCountTimer: Task<Void, Error>?
 
     private lazy var adapter: WireGuardAdapter = {
         WireGuardAdapter(with: delegate, backend: WireGuardBackendGo()) { logLevel, message in
@@ -61,7 +62,7 @@ public final class WireGuardConnection: Connection {
         parameters: ConnectionParameters,
         module: WireGuardModule
     ) throws {
-        statusSubject = CurrentValueSubject(.disconnected)
+        statusSubject = CurrentValueStream(.disconnected)
         moduleId = module.id
         controller = parameters.controller
         environment = parameters.environment
@@ -73,21 +74,26 @@ public final class WireGuardConnection: Connection {
         let tweakedConfiguration = try configuration.withModules(from: parameters.controller.profile)
         tunnelConfiguration = try tweakedConfiguration.toWireGuardConfiguration()
 
-        let interval = TimeInterval(parameters.options.minDataCountInterval) / 1000.0
-        dataCountTimer = Timer.publish(every: interval, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                self?.onDataCountTimer()
-            }
+        dataCountTimerInterval = TimeInterval(parameters.options.minDataCountInterval) / 1000.0
     }
 
-    public var statusPublisher: AnyPublisher<ConnectionStatus, Error> {
-        statusSubject.eraseToAnyPublisher()
+    public var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
+        statusSubject.subscribeThrowing()
     }
 
     public func start() async throws -> Bool {
         pp_log(.wireguard, .info, "Start tunnel")
         statusSubject.send(.connecting)
+
+        dataCountTimer?.cancel()
+        dataCountTimer = Task { [weak self] in
+            while true {
+                await MainActor.run {
+                    self?.onDataCountTimer()
+                }
+                try await Task.sleep(interval: dataCountTimerInterval)
+            }
+        }
 
         do {
             try await withUnsafeThrowingContinuation { [weak self] continuation in

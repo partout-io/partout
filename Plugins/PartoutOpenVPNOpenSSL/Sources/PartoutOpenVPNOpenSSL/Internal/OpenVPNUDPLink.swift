@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Combine
 import Foundation
 import PartoutCore
 
@@ -62,7 +61,7 @@ extension OpenVPNUDPLink: LinkInterface {
         link.remoteProtocol
     }
 
-    var hasBetterPath: AnyPublisher<Void, Never> {
+    var hasBetterPath: AsyncStream<Void> {
         link.hasBetterPath
     }
 
