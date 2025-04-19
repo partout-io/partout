@@ -154,11 +154,18 @@ extension NETunnelStrategy: TunnelObservableStrategy {
     }
 
     public nonisolated var didSetCurrent: AsyncStream<TunnelCurrentProfile?> {
-        AsyncStream { continuation in
-            Task {
+        AsyncStream { [weak self] continuation in
+            Task { [weak self] in
+                guard let self else {
+                    return
+                }
                 let stream = currentManagerSubject.subscribe().dropFirst()
                 var previousValue: TunnelCurrentProfile?
                 for await manager in stream {
+                    guard !Task.isCancelled else {
+                        pp_log(.ne, .debug, "Cancelled NETunnelStrategy.didSetCurrent")
+                        return
+                    }
                     let newValue = manager?.asCurrentProfile
                     guard newValue != previousValue else {
                         continue
@@ -256,9 +263,16 @@ extension NETunnelStrategy: NETunnelManagerRepository {
     }
 
     public nonisolated var managersStream: AsyncStream<[Profile.ID: NETunnelProviderManager]> {
-        AsyncStream { continuation in
-            Task {
+        AsyncStream { [weak self] continuation in
+            Task { [weak self] in
+                guard let self else {
+                    return
+                }
                 for await value in managersSubject.subscribe().dropFirst() {
+                    guard !Task.isCancelled else {
+                        pp_log(.ne, .debug, "Cancelled NETunnelStrategy.managersStream")
+                        return
+                    }
                     continuation.yield(value)
                 }
                 continuation.finish()

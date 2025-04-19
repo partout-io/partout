@@ -57,10 +57,17 @@ extension NEObservablePath {
     }
 
     public var isReachableStream: AsyncStream<Bool> {
-        AsyncStream { continuation in
-            Task {
+        AsyncStream { [weak self] continuation in
+            Task { [weak self] in
+                guard let self else {
+                    return
+                }
                 var last: Bool?
                 for await path in stream {
+                    guard !Task.isCancelled else {
+                        pp_log(.ne, .debug, "Cancelled NEObservablePath.isReachableStream")
+                        return
+                    }
                     let reachable = path.status == .satisfied
                     if last != reachable {
                         continuation.yield(reachable)
