@@ -29,7 +29,7 @@
 //  Copyright © 2018-2024 WireGuard LLC. All Rights Reserved.
 
 import Foundation
-import NetworkExtension // FIXME: ###, this depends on Apple unnecessarily
+import NetworkExtension // FIXME: #13, this depends on Apple unnecessarily
 import PartoutCore
 import os
 internal import WireGuardKit
