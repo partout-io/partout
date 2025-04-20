@@ -4,13 +4,16 @@
 import PackageDescription
 
 let environment: Environment
-// environment = .localDevelopment
-// environment = .onlineDevelopment
 environment = .production
+// environment = .localSource
+// environment = .localBinary
+// environment = .onlineBinary
 
+// PartoutCore
 let binaryFilename = "PartoutCore.xcframework.zip"
 let version = "0.99.81"
 let checksum = "ae1222ccc1503b1835d67f6ea7f6f6778adcfd3a29f28024b1339f9573d2bd36"
+let sha1 = "225c91e2d3c0637db5e06574820b487f8a4d41f8"
 
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
 let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
@@ -90,57 +93,67 @@ package.targets.append(contentsOf: [
 // MARK: CoreWrapper
 
 enum Environment {
-    case localDevelopment
-
-    case onlineDevelopment
-
     case production
+
+    case localSource
+
+    case localBinary
+
+    case onlineBinary
 
     var dependencies: [Package.Dependency] {
         switch self {
-        case .localDevelopment:
-            return []
-        case .onlineDevelopment:
-            return []
         case .production:
             return [
-//                .package(url: "CoreSource", branch: "master")
+                .package(url: "https://github.com/passepartoutvpn/partout-core", revision: sha1)
+            ]
+        case .localSource:
+            return [
                 .package(path: "CoreSource")
             ]
+        case .localBinary, .onlineBinary:
+            return []
         }
     }
 
     var coreTargetName: String {
         switch self {
-        case .localDevelopment:
-            return "PartoutCoreLocalBinary"
-        case .onlineDevelopment:
-            return "PartoutCoreOnlineBinary"
-        case .production:
+        case .production, .localSource:
             return "PartoutCore"
+        case .localBinary:
+            return "PartoutCoreLocalBinary"
+        case .onlineBinary:
+            return "PartoutCoreOnlineBinary"
         }
     }
 
     var targets: [Target] {
         var targets: [Target] = []
         switch self {
-        case .localDevelopment:
-            targets.append(.binaryTarget(
-                name: coreTargetName,
-                path: binaryFilename
-            ))
-        case .onlineDevelopment:
-            targets.append(.binaryTarget(
-                name: coreTargetName,
-                url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(binaryFilename)",
-                checksum: checksum
-            ))
         case .production:
+            targets.append(.target(
+                name: coreTargetName,
+                dependencies: [
+                    .product(name: "PartoutCoreSource", package: "partout-core")
+                ]
+            ))
+        case .localSource:
             targets.append(.target(
                 name: coreTargetName,
                 dependencies: [
                     .product(name: "PartoutCoreSource", package: "CoreSource")
                 ]
+            ))
+        case .localBinary:
+            targets.append(.binaryTarget(
+                name: coreTargetName,
+                path: binaryFilename
+            ))
+        case .onlineBinary:
+            targets.append(.binaryTarget(
+                name: coreTargetName,
+                url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(binaryFilename)",
+                checksum: checksum
             ))
         }
         targets.append(.target(
