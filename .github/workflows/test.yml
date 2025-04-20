@@ -19,7 +19,7 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Set development environment
         run: |
-          sed -i '' "s/environment = .production/environment = .onlineDevelopment/" "Core/Package.swift"
+          sed -i '' "s/environment = .production/environment = .onlineDevelopment/" "Package.swift"
       - name: Run tests
         run: |
           swift test
