@@ -14,7 +14,7 @@ let package = Package(
     products: [
         .library(
             name: "Partout",
-            targets: ["_Partout"]
+            targets: ["Partout"]
         ),
         .library(
             name: "PartoutOpenVPN",
@@ -31,27 +31,25 @@ let package = Package(
         .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200"),
         .package(url: "https://github.com/passepartoutvpn/wireguard-apple", from: "1.1.2"),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0")
-    ],
-    targets: [
-        .target(
-            name: "_Partout",
-            dependencies: [
-                "PartoutSupport"
-            ]
-        ),
-        .testTarget(
-            name: "PartoutTests",
-            dependencies: ["_Partout"]
-        )
     ]
 )
 
-// MARK: Support
+// MARK: Umbrella
 
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
 let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
 
 package.targets.append(contentsOf: [
+    .target(
+        name: "Partout",
+        dependencies: [
+            "PartoutAPI",
+            .target(name: "PartoutNE", condition: .when(platforms: applePlatforms)),
+            .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
+            .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
+            .target(name: "_PartoutPlatformWindows", condition: .when(platforms: [.windows]))
+        ]
+    ),
     .target(
         name: "PartoutAPI",
         dependencies: [
@@ -63,16 +61,6 @@ package.targets.append(contentsOf: [
         name: "PartoutNE",
         dependencies: [
             .product(name: "PartoutCore", package: "Core")
-        ]
-    ),
-    .target(
-        name: "PartoutSupport",
-        dependencies: [
-            "PartoutAPI",
-            .target(name: "PartoutNE", condition: .when(platforms: applePlatforms)),
-            .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
-            .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
-            .target(name: "_PartoutPlatformWindows", condition: .when(platforms: [.windows]))
         ]
     ),
     .target(
@@ -105,8 +93,8 @@ package.targets.append(contentsOf: [
         dependencies: ["PartoutNE"]
     ),
     .testTarget(
-        name: "PartoutSupportTests",
-        dependencies: ["PartoutSupport"],
+        name: "PartoutTests",
+        dependencies: ["Partout"],
         resources: [
             .copy("Resources")
         ]

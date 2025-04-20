@@ -1,5 +1,5 @@
 //
-//  Partout+Support.swift
+//  Partout.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 3/29/24.
@@ -24,7 +24,16 @@
 //
 
 import Foundation
-import PartoutCore
+
+// MARK: Umbrella
+
+@_exported import PartoutAPI
+@_exported import PartoutCore
+#if canImport(PartoutNE)
+@_exported import PartoutNE
+#endif
+
+// MARK: - Platform extensions
 
 #if canImport(_PartoutPlatformAndroid)
 @_exported import _PartoutPlatformAndroid
@@ -38,6 +47,7 @@ import PartoutCore
 @_exported import _PartoutPlatformWindows
 #endif
 
+// MARK: - Error codes
 
 extension PartoutError.Code {
     public enum Support {
