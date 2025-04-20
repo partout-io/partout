@@ -1,8 +1,8 @@
 //
-//  Partout+NE.swift
+//  PartoutAPI.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/3/24.
+//  Created by Davide De Rosa on 1/9/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -27,5 +27,13 @@ import Foundation
 import PartoutCore
 
 extension LoggerCategory {
-    public static let ne = Self(rawValue: "ne")
+    public static let api = Self(rawValue: "api")
+}
+
+extension PartoutError.Code {
+    public enum API {
+
+        /// A provider was chosen but the target entity is missing.
+        public static let missingProviderEntity = PartoutError.Code("missingProviderEntity")
+    }
 }
