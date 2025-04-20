@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import PartoutCore
+import Partout
 import SwiftUI
 
 @main

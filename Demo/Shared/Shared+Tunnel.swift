@@ -24,11 +24,9 @@
 //
 
 import Foundation
-import PartoutCore
-import _PartoutOpenVPNOpenSSL
-import PartoutNE
-import PartoutSupport
-import _PartoutWireGuardGo
+import Partout
+import PartoutOpenVPN
+import PartoutWireGuard
 
 // MARK: - Implementations
 

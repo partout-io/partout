@@ -24,8 +24,7 @@
 //
 
 import Foundation
-import PartoutCore
-import PartoutSupport
+import Partout
 import XCTest
 
 final class RegistryTests: XCTestCase {

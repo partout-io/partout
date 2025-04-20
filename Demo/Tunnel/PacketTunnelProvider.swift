@@ -24,8 +24,7 @@
 //
 
 @preconcurrency import NetworkExtension
-import PartoutCore
-import PartoutNE
+import Partout
 
 final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
     private var fwd: NEPTPForwarder?

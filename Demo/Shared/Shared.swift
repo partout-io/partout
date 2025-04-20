@@ -24,9 +24,8 @@
 //
 
 import Foundation
-import PartoutCore
-import PartoutNE
-import _PartoutWireGuardGo
+import Partout
+import PartoutWireGuard
 
 enum Demo {
 }

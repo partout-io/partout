@@ -24,9 +24,7 @@
 //
 
 import Foundation
-import PartoutAPI
-import PartoutCore
-import PartoutSupport
+import Partout
 import XCTest
 
 final class PartoutTests: XCTest {
