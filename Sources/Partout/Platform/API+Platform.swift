@@ -27,9 +27,24 @@ import Foundation
 import PartoutAPI
 
 #if canImport(_PartoutPlatformApple)
+
 import _PartoutPlatformApple
 
 private typealias JavaScriptEngine = AppleJavaScriptEngine
+
+#else
+
+import PartoutCore
+
+private final class JavaScriptEngine: ScriptingEngine {
+    func inject(_ name: String, object: Any) {
+    }
+
+    func execute<O>(_ script: String, after preScript: String?, returning: O.Type) async throws -> O where O: Decodable {
+        fatalError("No JavaScriptEngine implementation available on this platform")
+    }
+}
+
 #endif
 
 extension API.V6.Mapper {
