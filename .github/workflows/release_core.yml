@@ -13,9 +13,6 @@ jobs:
         with:
           access_token: ${{ secrets.ACCESS_TOKEN }}
           submodules: true
-      - name: Use local Core source
-        run: |
-          sed -i '' "s/environment = .production/environment = .localSource/" "Package.swift"
       - name: Run tests
         run: |
           swift test

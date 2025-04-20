@@ -1,3 +1,0 @@
-[submodule "CoreSource"]
-	path = CoreSource
-	url = git@github.com:passepartoutvpn/partout-core.git
