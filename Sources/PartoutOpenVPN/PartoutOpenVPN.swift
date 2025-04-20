@@ -1,5 +1,5 @@
 //
-//  PartoutCore.swift
+//  PartoutOpenVPN.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 1/10/25.
@@ -23,8 +23,4 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutBase
-@_exported import _PartoutBase_C
-@_exported import _PartoutOpenVPN
-@_exported import _PartoutStreams
-@_exported import _PartoutWireGuard
+@_exported import PartoutOpenVPNOpenSSL

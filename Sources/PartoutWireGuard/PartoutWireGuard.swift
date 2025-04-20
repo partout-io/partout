@@ -1,5 +1,5 @@
 //
-//  PartoutNetworking.swift
+//  PartoutWireGuard.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 1/10/25.
@@ -23,5 +23,4 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import PartoutOpenVPNOpenSSL
 @_exported import PartoutWireGuardGo
