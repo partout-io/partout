@@ -40,6 +40,8 @@ extension Registry {
                     try await OpenVPNConnection(
                         parameters: $0,
                         module: $1,
+                        prng: PartoutConfiguration.platform.newPRNG(),
+                        dns: PartoutConfiguration.platform.newDNSResolver(),
                         cachesURL: Demo.moduleURL(for: "OpenVPN")
                     )
                 }

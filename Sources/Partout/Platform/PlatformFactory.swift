@@ -1,5 +1,5 @@
 //
-//  APIV6Mapper+Platform.swift
+//  PlatformFactory.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 4/20/25.
@@ -24,16 +24,22 @@
 //
 
 import Foundation
+import PartoutCore
 
-extension API.V6.Mapper {
-    public convenience init(baseURL: URL, infrastructureURL: ((ProviderID) -> URL)? = nil) {
-        self.init(baseURL: baseURL, infrastructureURL: infrastructureURL) {
-            API.V6.DefaultScriptExecutor(
-                resultURL: $0,
-                cache: $1,
-                timeout: $2,
-                engine: PartoutConfiguration.platform.newScriptingEngine()
-            )
-        }
-    }
+public protocol PlatformFactory {
+    func newPRNG() -> PRNGProtocol
+
+    func newDNSResolver() -> DNSResolver
+
+    func newScriptingEngine() -> ScriptingEngine
+}
+
+extension PartoutConfiguration {
+#if canImport(_PartoutPlatformApple)
+    public static nonisolated let platform: PlatformFactory = ApplePlatformFactory()
+#elseif canImport(_PartoutPlatformWindows)
+    public static nonisolated let platform: PlatformFactory = WindowsPlatformFactory()
+#else
+    public static nonisolated let platform: PlatformFactory = UnsupportedPlatformFactory()
+#endif
 }

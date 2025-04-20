@@ -1,5 +1,5 @@
 //
-//  JavaScriptEngine.swift
+//  PlatformFactory+Apple.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 4/16/25.
@@ -23,29 +23,28 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-
 #if canImport(_PartoutPlatformApple)
 
 import _PartoutPlatformApple
-
-public typealias JavaScriptEngine = AppleJavaScriptEngine
-
-#else
-
+import Foundation
 import PartoutCore
 
-public typealias JavaScriptEngine = UnsupportedJavaScriptEngine
-
-public final class UnsupportedJavaScriptEngine: ScriptingEngine {
-    public init() {
+public struct ApplePlatformFactory: PlatformFactory {
+    init() {
     }
 
-    public func inject(_ name: String, object: Any) {
+    public func newPRNG() -> PRNGProtocol {
+        AppleRandom()
     }
 
-    public func execute<O>(_ script: String, after preScript: String?, returning: O.Type) async throws -> O where O: Decodable {
-        fatalError("No JavaScriptEngine implementation available on this platform")
+    public func newDNSResolver() -> DNSResolver {
+        SimpleDNSResolver {
+            CFDNSStrategy(hostname: $0)
+        }
+    }
+
+    public func newScriptingEngine() -> ScriptingEngine {
+        AppleJavaScriptEngine()
     }
 }
 
