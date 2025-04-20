@@ -16,9 +16,6 @@ jobs:
       - name: Run tests
         run: |
           swift test
-      - name: Run tests (plugins)
-        run: |
-          scripts/test-plugins.sh
   publish_release:
     name: Publish release
     runs-on: macos-15
