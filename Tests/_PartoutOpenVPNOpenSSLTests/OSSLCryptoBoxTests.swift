@@ -23,11 +23,11 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_ObjC
-internal import _PartoutOpenVPNOpenSSL_ObjC
 @testable import _PartoutCryptoOpenSSL
-import PartoutCore
+internal import _PartoutCryptoOpenSSL_ObjC
 @testable import _PartoutOpenVPNOpenSSL
+internal import _PartoutOpenVPNOpenSSL_ObjC
+import PartoutCore
 import XCTest
 
 final class OSSLCryptoBoxTests: XCTestCase {

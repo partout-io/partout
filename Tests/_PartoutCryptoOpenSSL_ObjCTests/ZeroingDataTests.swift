@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import _PartoutCryptoOpenSSL
 internal import _PartoutCryptoOpenSSL_ObjC
 import Foundation
-import _PartoutCryptoOpenSSL
 import XCTest
 
 final class ZeroingDataTests: XCTestCase {

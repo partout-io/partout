@@ -23,9 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-import PartoutCore
 @testable import _PartoutOpenVPNOpenSSL
+import PartoutCore
 import XCTest
 
 final class ZeroingDataExtensionsTests: XCTestCase {

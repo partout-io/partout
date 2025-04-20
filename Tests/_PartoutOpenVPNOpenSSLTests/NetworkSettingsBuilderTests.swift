@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+@testable import _PartoutOpenVPNOpenSSL
 import Foundation
 import PartoutCore
-@testable import _PartoutOpenVPNOpenSSL
 import XCTest
 
 final class NetworkSettingsBuilderTests: XCTestCase {
