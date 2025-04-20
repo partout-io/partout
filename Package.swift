@@ -3,6 +3,20 @@
 
 import PackageDescription
 
+let environment: Environment
+// environment = .localDevelopment
+// environment = .onlineDevelopment
+environment = .production
+
+let binaryFilename = "PartoutCore.xcframework.zip"
+let version = "0.99.81"
+let checksum = "ae1222ccc1503b1835d67f6ea7f6f6778adcfd3a29f28024b1339f9573d2bd36"
+
+let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
+let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
+
+// MARK: Products
+
 let package = Package(
     name: "Partout",
     defaultLocalization: "en",
@@ -17,6 +31,10 @@ let package = Package(
             targets: ["Partout"]
         ),
         .library(
+            name: "PartoutCoreWrapper",
+            targets: ["PartoutCoreWrapper"]
+        ),
+        .library(
             name: "PartoutOpenVPN",
             targets: ["PartoutOpenVPN"]
         ),
@@ -26,7 +44,6 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(path: "Core"),
         .package(url: "https://github.com/iwill/generic-json-swift", from: "2.0.0"),
         .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200"),
         .package(url: "https://github.com/passepartoutvpn/wireguard-apple", from: "1.1.2"),
@@ -34,10 +51,7 @@ let package = Package(
     ]
 )
 
-// MARK: Umbrella
-
-let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
-let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
+// MARK: - Umbrella
 
 package.targets.append(contentsOf: [
     .target(
@@ -54,37 +68,7 @@ package.targets.append(contentsOf: [
         name: "PartoutAPI",
         dependencies: [
             .product(name: "GenericJSON", package: "generic-json-swift"),
-            .product(name: "PartoutCore", package: "Core")
-        ]
-    ),
-    .target(
-        name: "PartoutNE",
-        dependencies: [
-            .product(name: "PartoutCore", package: "Core")
-        ]
-    ),
-    .target(
-        name: "_PartoutPlatformAndroid",
-        dependencies: [
-            .product(name: "PartoutCore", package: "Core")
-        ]
-    ),
-    .target(
-        name: "_PartoutPlatformApple",
-        dependencies: [
-            .product(name: "PartoutCore", package: "Core")
-        ]
-    ),
-    .target(
-        name: "_PartoutPlatformLinux",
-        dependencies: [
-            .product(name: "PartoutCore", package: "Core")
-        ]
-    ),
-    .target(
-        name: "_PartoutPlatformWindows",
-        dependencies: [
-            .product(name: "PartoutCore", package: "Core")
+            "PartoutCoreWrapper"
         ]
     ),
     .testTarget(
@@ -95,15 +79,121 @@ package.targets.append(contentsOf: [
         ]
     ),
     .testTarget(
-        name: "PartoutNETests",
-        dependencies: ["PartoutNE"]
-    ),
-    .testTarget(
         name: "PartoutTests",
         dependencies: ["Partout"],
         resources: [
             .copy("Resources")
         ]
+    )
+])
+
+// MARK: CoreWrapper
+
+enum Environment {
+    case localDevelopment
+
+    case onlineDevelopment
+
+    case production
+
+    var dependencies: [Package.Dependency] {
+        switch self {
+        case .localDevelopment:
+            return []
+        case .onlineDevelopment:
+            return []
+        case .production:
+            return [
+//                .package(url: "CoreSource", branch: "master")
+                .package(path: "CoreSource")
+            ]
+        }
+    }
+
+    var coreTargetName: String {
+        switch self {
+        case .localDevelopment:
+            return "PartoutCoreLocalBinary"
+        case .onlineDevelopment:
+            return "PartoutCoreOnlineBinary"
+        case .production:
+            return "PartoutCore"
+        }
+    }
+
+    var targets: [Target] {
+        var targets: [Target] = []
+        switch self {
+        case .localDevelopment:
+            targets.append(.binaryTarget(
+                name: coreTargetName,
+                path: binaryFilename
+            ))
+        case .onlineDevelopment:
+            targets.append(.binaryTarget(
+                name: coreTargetName,
+                url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(binaryFilename)",
+                checksum: checksum
+            ))
+        case .production:
+            targets.append(.target(
+                name: coreTargetName,
+                dependencies: [
+                    .product(name: "PartoutCoreSource", package: "CoreSource")
+                ]
+            ))
+        }
+        targets.append(.target(
+            name: "PartoutCoreWrapper",
+            dependencies: [.byName(name: coreTargetName)]
+        ))
+        targets.append(.testTarget(
+            name: "PartoutCoreWrapperTests",
+            dependencies: ["PartoutCoreWrapper"]
+        ))
+        return targets
+    }
+}
+
+package.dependencies.append(contentsOf: environment.dependencies)
+package.targets.append(contentsOf: environment.targets)
+
+// MARK: Platforms
+
+package.targets.append(contentsOf: [
+    .target(
+        name: "PartoutNE",
+        dependencies: [
+            "PartoutCoreWrapper"
+        ]
+    ),
+    .target(
+        name: "_PartoutPlatformAndroid",
+        dependencies: [
+            "PartoutCoreWrapper"
+        ]
+    ),
+    .target(
+        name: "_PartoutPlatformApple",
+        dependencies: [
+            "PartoutCoreWrapper"
+        ]
+    ),
+    .target(
+        name: "_PartoutPlatformLinux",
+        dependencies: [
+            "PartoutCoreWrapper"
+        ]
+    ),
+    .target(
+        name: "_PartoutPlatformWindows",
+        dependencies: [
+            "PartoutCoreWrapper"
+        ]
+    ),
+    .testTarget(
+        name: "PartoutNETests",
+        dependencies: ["PartoutNE"]
     ),
     .testTarget(
         name: "_PartoutPlatformAppleTests",
@@ -126,7 +216,7 @@ package.targets.append(contentsOf: [
         name: "_PartoutOpenVPNOpenSSL_ObjC",
         dependencies: [
             "_PartoutCryptoOpenSSL_ObjC",
-            .product(name: "PartoutCore", package: "Core")
+            "PartoutCoreWrapper"
         ],
         exclude: [
             "lib/COPYING",
@@ -169,7 +259,7 @@ package.targets.append(contentsOf: [
     .target(
         name: "_PartoutWireGuardGo",
         dependencies: [
-            .product(name: "PartoutCore", package: "Core"),
+            "PartoutCoreWrapper",
             .product(name: "WireGuardKit", package: "wireguard-apple")
         ],
         resources: [
