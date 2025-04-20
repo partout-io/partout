@@ -97,7 +97,7 @@ private extension Registry {
             return try resolver.resolved(from: providerModule)
         } catch {
             pp_log(.core, .error, "Unable to resolve module: \(error)")
-            throw error as? PartoutError ?? PartoutError(.Support.corruptProviderModule, error)
+            throw error as? PartoutError ?? PartoutError(.API.corruptProviderModule, error)
         }
     }
 }

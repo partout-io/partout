@@ -49,10 +49,8 @@ import Foundation
 
 // MARK: - Error codes
 
-extension PartoutError.Code {
-    public enum Support {
+extension PartoutError.Code.API {
 
-        /// A provider module is corrupt.
-        public static let corruptProviderModule = PartoutError.Code("corruptProviderModule")
-    }
+    /// A provider module is corrupt.
+    public static let corruptProviderModule = PartoutError.Code("corruptProviderModule")
 }
