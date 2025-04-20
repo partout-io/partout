@@ -101,27 +101,3 @@ private extension Registry {
         }
     }
 }
-
-private extension Profile {
-    func resolvingProviderModules(with resolvers: [ModuleType: ProviderModuleResolver]) throws -> Self {
-        do {
-            var copy = builder()
-            copy.assertSingleActiveProviderModule()
-            copy.modules = try copy.modules.map {
-                guard activeModulesIds.contains($0.id) else {
-                    return $0
-                }
-                guard let providerModule = $0 as? ProviderModule else {
-                    return $0
-                }
-                guard let resolver = resolvers[providerModule.providerModuleType] else {
-                    return $0
-                }
-                return try resolver.resolved(from: providerModule)
-            }
-            return try copy.tryBuild()
-        } catch {
-            throw error as? PartoutError ?? PartoutError(.Support.corruptProviderModule, error)
-        }
-    }
-}
