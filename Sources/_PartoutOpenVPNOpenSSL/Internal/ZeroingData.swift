@@ -1,8 +1,8 @@
 //
-//  Demo+WireGuard.swift
+//  ZeroingData.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 3/26/24.
+//  Created by Davide De Rosa on 1/8/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,23 +23,37 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutCryptoOpenSSL_ObjC
 import Foundation
-import PartoutCore
-import _PartoutWireGuardGo
 
-extension WireGuard {
-    static var demoModule: WireGuardModule {
-        do {
-            let wg = try String(contentsOf: Constants.demoURL)
-            let builder = try StandardWireGuardParser().configuration(from: wg).builder()
-            let module = WireGuardModule.Builder(configurationBuilder: builder)
-            return try module.tryBuild()
-        } catch {
-            fatalError("Unable to build: \(error)")
-        }
-    }
+func Z() -> ZeroingData {
+    ZeroingData()
 }
 
-private enum Constants {
-    static let demoURL = Bundle.main.url(forResource: "Files/test-sample", withExtension: "wg")!
+func Z(length: Int) -> ZeroingData {
+    ZeroingData(length: length)
+}
+
+func Z(bytes: UnsafePointer<UInt8>, length: Int) -> ZeroingData {
+    ZeroingData(bytes: bytes, length: length)
+}
+
+func Z(_ uint8: UInt8) -> ZeroingData {
+    ZeroingData(uInt8: uint8)
+}
+
+func Z(_ uint16: UInt16) -> ZeroingData {
+    ZeroingData(uInt16: uint16)
+}
+
+func Z(_ data: Data) -> ZeroingData {
+    ZeroingData(data: data)
+}
+
+func Z(_ data: Data, _ offset: Int, _ length: Int) -> ZeroingData {
+    ZeroingData(data: data, offset: offset, length: length)
+}
+
+func Z(_ string: String, nullTerminated: Bool) -> ZeroingData {
+    ZeroingData(string: string, nullTerminated: nullTerminated)
 }

@@ -1,8 +1,8 @@
 //
-//  Demo+WireGuard.swift
+//  PacketCode+Debug.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 3/26/24.
+//  Created by Davide De Rosa on 5/2/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,23 +23,21 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
-import PartoutCore
-import _PartoutWireGuardGo
 
-extension WireGuard {
-    static var demoModule: WireGuardModule {
-        do {
-            let wg = try String(contentsOf: Constants.demoURL)
-            let builder = try StandardWireGuardParser().configuration(from: wg).builder()
-            let module = WireGuardModule.Builder(configurationBuilder: builder)
-            return try module.tryBuild()
-        } catch {
-            fatalError("Unable to build: \(error)")
+extension PacketCode: @retroactive CustomDebugStringConvertible {
+    var debugDescription: String {
+        switch self {
+        case .softResetV1:          return "SOFT_RESET_V1"
+        case .controlV1:            return "CONTROL_V1"
+        case .ackV1:                return "ACK_V1"
+        case .dataV1:               return "DATA_V1"
+        case .hardResetClientV2:    return "HARD_RESET_CLIENT_V2"
+        case .hardResetServerV2:    return "HARD_RESET_SERVER_V2"
+        case .dataV2:               return "DATA_V2"
+        case .unknown:              return "UNKNOWN(\(rawValue))"
+        @unknown default:           return "UNKNOWN(\(rawValue))"
         }
     }
-}
-
-private enum Constants {
-    static let demoURL = Bundle.main.url(forResource: "Files/test-sample", withExtension: "wg")!
 }

@@ -1,8 +1,8 @@
 //
-//  PartoutOpenVPN.swift
+//  LZOFactoryTests.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 3/18/19.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,4 +23,12 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNOpenSSL
+internal import _PartoutOpenVPNOpenSSL_ObjC
+import XCTest
+
+final class LZOFactoryTests: XCTestCase {
+    func test_givenLibrary_whenCheckLZOSupport_thenSucceeds() {
+        XCTAssertTrue(LZOFactory.canCreate())
+        XCTAssertNotNil(LZOFactory.create())
+    }
+}

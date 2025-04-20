@@ -1,8 +1,8 @@
 //
-//  PartoutOpenVPN.swift
+//  OSSLTLSBoxTests.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 3/20/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,4 +23,15 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNOpenSSL
+internal import _PartoutOpenVPNOpenSSL_ObjC
+import XCTest
+
+final class OSSLTLSBoxTests: XCTestCase {
+    func test_givenCertificate_whenComputeMD5_thenChecksumIsCorrect() throws {
+        let sut = OSSLTLSBox()
+        let path = try XCTUnwrap(Bundle.module.path(forResource: "pia-2048", ofType: "pem"))
+        let checksum = try sut.md5(forCertificatePath: path)
+        let expected = "e2fccccaba712ccc68449b1c56427ac1"
+        XCTAssertEqual(checksum, expected)
+    }
+}

@@ -25,10 +25,10 @@
 
 import Foundation
 import PartoutCore
-import PartoutOpenVPNOpenSSL
+import _PartoutOpenVPNOpenSSL
 import PartoutNE
 import PartoutSupport
-import PartoutWireGuardGo
+import _PartoutWireGuardGo
 
 // MARK: - Implementations
 

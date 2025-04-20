@@ -26,7 +26,7 @@
 import Foundation
 import PartoutCore
 import PartoutNE
-import PartoutWireGuardGo
+import _PartoutWireGuardGo
 
 enum Demo {
 }

@@ -66,6 +66,16 @@ package.targets.append(contentsOf: [
         ]
     ),
     .target(
+        name: "PartoutSupport",
+        dependencies: [
+            "PartoutAPI",
+            .target(name: "PartoutNE", condition: .when(platforms: applePlatforms)),
+            .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
+            .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
+            .target(name: "_PartoutPlatformWindows", condition: .when(platforms: [.windows]))
+        ]
+    ),
+    .target(
         name: "_PartoutPlatformAndroid",
         dependencies: [
             .product(name: "PartoutCore", package: "Core")
@@ -83,16 +93,6 @@ package.targets.append(contentsOf: [
             .product(name: "PartoutCore", package: "Core")
         ]
     ),
-    .target(
-        name: "PartoutSupport",
-        dependencies: [
-            "PartoutAPI",
-            .target(name: "PartoutNE", condition: .when(platforms: applePlatforms)),
-            .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
-            .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
-            .target(name: "_PartoutPlatformWindows", condition: .when(platforms: [.windows]))
-        ]
-    ),
     .testTarget(
         name: "PartoutAPITests",
         dependencies: ["PartoutAPI"],
@@ -105,15 +105,15 @@ package.targets.append(contentsOf: [
         dependencies: ["PartoutNE"]
     ),
     .testTarget(
-        name: "PartoutPlatformAppleTests",
-        dependencies: ["_PartoutPlatformApple"]
-    ),
-    .testTarget(
         name: "PartoutSupportTests",
         dependencies: ["PartoutSupport"],
         resources: [
             .copy("Resources")
         ]
+    ),
+    .testTarget(
+        name: "_PartoutPlatformAppleTests",
+        dependencies: ["_PartoutPlatformApple"]
     )
 ])
 
@@ -122,16 +122,16 @@ package.targets.append(contentsOf: [
 package.targets.append(contentsOf: [
     .target(
         name: "PartoutOpenVPN",
-        dependencies: ["PartoutOpenVPNOpenSSL"]
+        dependencies: ["_PartoutOpenVPNOpenSSL"]
     ),
     .target(
-        name: "CPartoutCryptoOpenSSL",
+        name: "_PartoutCryptoOpenSSL_ObjC",
         dependencies: ["openssl-apple"]
     ),
     .target(
-        name: "CPartoutOpenVPNOpenSSL",
+        name: "_PartoutOpenVPNOpenSSL_ObjC",
         dependencies: [
-            "CPartoutCryptoOpenSSL",
+            "_PartoutCryptoOpenSSL_ObjC",
             .product(name: "PartoutCore", package: "Core")
         ],
         exclude: [
@@ -142,23 +142,23 @@ package.targets.append(contentsOf: [
         ]
     ),
     .target(
-        name: "PartoutCryptoOpenSSL",
-        dependencies: ["CPartoutCryptoOpenSSL"]
+        name: "_PartoutCryptoOpenSSL",
+        dependencies: ["_PartoutCryptoOpenSSL_ObjC"]
     ),
     .target(
-        name: "PartoutOpenVPNOpenSSL",
+        name: "_PartoutOpenVPNOpenSSL",
         dependencies: [
-            "CPartoutOpenVPNOpenSSL",
-            "PartoutCryptoOpenSSL"
+            "_PartoutCryptoOpenSSL",
+            "_PartoutOpenVPNOpenSSL_ObjC"
         ]
     ),
     .testTarget(
-        name: "CPartoutCryptoOpenSSLTests",
-        dependencies: ["PartoutCryptoOpenSSL"]
+        name: "_PartoutCryptoOpenSSL_ObjCTests",
+        dependencies: ["_PartoutCryptoOpenSSL"]
     ),
     .testTarget(
-        name: "PartoutOpenVPNOpenSSLTests",
-        dependencies: ["PartoutOpenVPNOpenSSL"],
+        name: "_PartoutOpenVPNOpenSSLTests",
+        dependencies: ["_PartoutOpenVPNOpenSSL"],
         resources: [
             .process("Resources")
         ]
@@ -170,10 +170,10 @@ package.targets.append(contentsOf: [
 package.targets.append(contentsOf: [
     .target(
         name: "PartoutWireGuard",
-        dependencies: ["PartoutWireGuardGo"]
+        dependencies: ["_PartoutWireGuardGo"]
     ),
     .target(
-        name: "PartoutWireGuardGo",
+        name: "_PartoutWireGuardGo",
         dependencies: [
             .product(name: "PartoutCore", package: "Core"),
             .product(name: "WireGuardKit", package: "wireguard-apple")
@@ -183,7 +183,7 @@ package.targets.append(contentsOf: [
         ]
     ),
     .testTarget(
-        name: "PartoutWireGuardGoTests",
-        dependencies: ["PartoutWireGuardGo"]
+        name: "_PartoutWireGuardGoTests",
+        dependencies: ["_PartoutWireGuardGo"]
     )
 ])

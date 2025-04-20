@@ -1,5 +1,5 @@
 //
-//  PartoutOpenVPN.swift
+//  OSSLTLSBox+Decrypter.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 1/10/25.
@@ -23,4 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNOpenSSL
+internal import _PartoutOpenVPNOpenSSL_ObjC
+import Foundation
+import PartoutCore
+
+extension OSSLTLSBox: @retroactive PrivateKeyDecrypter {
+}

@@ -26,9 +26,9 @@
 import Foundation
 import PartoutCore
 import PartoutNE
-import PartoutOpenVPNOpenSSL
+import _PartoutOpenVPNOpenSSL
 import PartoutSupport
-import PartoutWireGuardGo
+import _PartoutWireGuardGo
 
 extension Demo.Log {
     static let appURL = Demo.cachesURL.appending(component: "app.log")

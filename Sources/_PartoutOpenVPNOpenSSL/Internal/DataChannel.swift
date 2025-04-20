@@ -1,8 +1,8 @@
 //
-//  PartoutOpenVPN.swift
+//  DataChannel.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 5/2/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,4 +23,30 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNOpenSSL
+internal import _PartoutOpenVPNOpenSSL_ObjC
+import Foundation
+import PartoutCore
+
+final class DataChannel {
+    let key: UInt8
+
+    private let dataPath: DataPath
+
+    init(key: UInt8, dataPath: DataPath) {
+        self.key = key
+        self.dataPath = dataPath
+    }
+
+    func encrypt(packets: [Data]) throws -> [Data]? {
+        try dataPath.encryptPackets(packets, key: key)
+    }
+
+    func decrypt(packets: [Data]) throws -> [Data]? {
+        var keepAlive = false
+        let decrypted = try dataPath.decryptPackets(packets, keepAlive: &keepAlive)
+        if keepAlive {
+            pp_log(.openvpn, .debug, "Data: Received ping, do nothing")
+        }
+        return decrypted
+    }
+}
