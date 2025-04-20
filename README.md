@@ -32,7 +32,7 @@ $ git submodule update --init
 then edit `Package.swift` and set:
 
 ```
-environment = .onlineDevelopment
+environment = .onlineBinary
 ```
 
 Import the Swift packages under "Plugins" as needed.
