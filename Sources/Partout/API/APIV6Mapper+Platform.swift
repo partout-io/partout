@@ -1,8 +1,8 @@
 //
-//  API+Platform.swift
+//  APIV6Mapper+Platform.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/16/25.
+//  Created by Davide De Rosa on 4/20/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -24,28 +24,6 @@
 //
 
 import Foundation
-import PartoutAPI
-
-#if canImport(_PartoutPlatformApple)
-
-import _PartoutPlatformApple
-
-private typealias JavaScriptEngine = AppleJavaScriptEngine
-
-#else
-
-import PartoutCore
-
-private final class JavaScriptEngine: ScriptingEngine {
-    func inject(_ name: String, object: Any) {
-    }
-
-    func execute<O>(_ script: String, after preScript: String?, returning: O.Type) async throws -> O where O: Decodable {
-        fatalError("No JavaScriptEngine implementation available on this platform")
-    }
-}
-
-#endif
 
 extension API.V6.Mapper {
     public convenience init(baseURL: URL, infrastructureURL: ((ProviderID) -> URL)? = nil) {
