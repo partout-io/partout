@@ -35,11 +35,16 @@ public typealias JavaScriptEngine = AppleJavaScriptEngine
 
 import PartoutCore
 
-private final class JavaScriptEngine: ScriptingEngine {
-    func inject(_ name: String, object: Any) {
+public typealias JavaScriptEngine = UnsupportedJavaScriptEngine
+
+public final class UnsupportedJavaScriptEngine: ScriptingEngine {
+    public init() {
     }
 
-    func execute<O>(_ script: String, after preScript: String?, returning: O.Type) async throws -> O where O: Decodable {
+    public func inject(_ name: String, object: Any) {
+    }
+
+    public func execute<O>(_ script: String, after preScript: String?, returning: O.Type) async throws -> O where O: Decodable {
         fatalError("No JavaScriptEngine implementation available on this platform")
     }
 }
