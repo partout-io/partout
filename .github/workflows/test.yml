@@ -19,7 +19,7 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Use remote Core binary
         run: |
-          sed -i '' "s/environment = .production/environment = .onlineBinary/" "Package.swift"
+          sed -i '' "s/environment = .remoteSource/environment = .remoteBinary/" "Package.swift"
       - name: Run tests
         run: |
           swift test
