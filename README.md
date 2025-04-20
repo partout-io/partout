@@ -32,7 +32,7 @@ $ git submodule update --init
 then edit `Package.swift` and set:
 
 ```
-environment = .onlineBinary
+environment = .remoteBinary
 ```
 
 Beware that the public framework only supports development on your Mac or iOS/tvOS Simulators. If you want to use the library for proprietary or commercial purposes, please [contact me privately][license-contact].
