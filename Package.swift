@@ -105,7 +105,7 @@ enum Environment {
         switch self {
         case .production:
             return [
-                .package(url: "https://github.com/passepartoutvpn/partout-core", revision: sha1)
+                .package(url: "git@github.com:passepartoutvpn/partout-core.git", revision: sha1)
             ]
         case .localSource:
             return [
