@@ -105,7 +105,7 @@ package.targets.append(contentsOf: [
 switch environment {
 case .remoteSource:
     package.dependencies.append(
-        .package(url: "https://github.com/passepartoutvpn/partout-core", revision: sha1)
+        .package(url: "git@github.com:passepartoutvpn/partout-core.git", revision: sha1)
     )
     package.targets.append(.target(
         name: "PartoutCoreWrapper",
