@@ -19,8 +19,8 @@ environment = .remoteSource
 // environment = .localSource
 
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.90"
-let checksum = "e8e2ce34e432cf86f9989233c88b05faff70f5659a4eaecca76739837f471bd8"
+let version = "0.99.91"
+let checksum = "2543d3cd4ee630ecf421f9b2059e76f039b0bdec1bc319f38d346774b0885e0f"
 let sha1 = "4762e0688760a47daad0f3e689363e7f4b337fa2"
 
 // MARK: - Products
