@@ -33,7 +33,7 @@ jobs:
         with:
           script: "scripts/ci-generate.sh"
           framework: "PartoutCore.xcframework"
-          manifest-file: "Core/Package.swift"
+          manifest-file: "Package.swift"
           gpg-key: ${{ secrets.GPG_KEY }}
           gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
           prerelease: true
