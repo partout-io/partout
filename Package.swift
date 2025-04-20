@@ -11,8 +11,8 @@ environment = .production
 
 // PartoutCore
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.81"
-let checksum = "d683d23e36e98d71b224251aace922a0f2a93aabe5a772712b68542d1ed39570"
+let version = "0.99.82"
+let checksum = "555f18a074a7cc3ae2dc235350c6cb58624df0bb96af20f92256ed9382882b48"
 let sha1 = "225c91e2d3c0637db5e06574820b487f8a4d41f8"
 
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
