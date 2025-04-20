@@ -13,10 +13,10 @@ enum Environment {
     case localSource
 }
 
-let coreEnvironment: Environment
-coreEnvironment = .remoteSource
-// coreEnvironment = .remoteBinary
-// coreEnvironment = .localSource
+let environment: Environment
+environment = .remoteSource
+// environment = .remoteBinary
+// environment = .localSource
 
 let binaryFilename = "PartoutCore.xcframework.zip"
 let version = "0.99.90"
@@ -102,7 +102,7 @@ package.targets.append(contentsOf: [
     )
 ])
 
-switch coreEnvironment {
+switch environment {
 case .remoteSource:
     package.dependencies.append(
         .package(url: "https://github.com/passepartoutvpn/partout-core", revision: sha1)
