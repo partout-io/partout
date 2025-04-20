@@ -29,13 +29,11 @@ $ git submodule add https://github.com/passepartoutvpn/partout
 $ git submodule update --init
 ```
 
-then edit `Core/Package.swift` and set:
+then edit `Package.swift` and set:
 
 ```
-environment = .onlineDevelopment
+environment = .onlineBinary
 ```
-
-Import the Swift packages under "Plugins" as needed.
 
 Beware that the public framework only supports development on your Mac or iOS/tvOS Simulators. If you want to use the library for proprietary or commercial purposes, please [contact me privately][license-contact].
 

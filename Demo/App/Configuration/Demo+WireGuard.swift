@@ -24,8 +24,8 @@
 //
 
 import Foundation
-import PartoutCore
-import PartoutWireGuardGo
+import Partout
+import PartoutWireGuard
 
 extension WireGuard {
     static var demoModule: WireGuardModule {

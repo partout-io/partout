@@ -24,7 +24,7 @@
 //
 
 import Foundation
-import PartoutCore
+import Partout
 
 extension Profile {
     static let demo: Profile = {

@@ -24,8 +24,8 @@
 //
 
 import Foundation
-import PartoutCore
-import PartoutOpenVPNOpenSSL
+import Partout
+import PartoutOpenVPN
 
 extension OpenVPN {
     static var demoModule: OpenVPNModule {

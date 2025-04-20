@@ -24,11 +24,9 @@
 //
 
 import Foundation
-import PartoutCore
-import PartoutOpenVPNOpenSSL
-import PartoutNE
-import PartoutSupport
-import PartoutWireGuardGo
+import Partout
+import PartoutOpenVPN
+import PartoutWireGuard
 
 // MARK: - Implementations
 
@@ -42,6 +40,8 @@ extension Registry {
                     try await OpenVPNConnection(
                         parameters: $0,
                         module: $1,
+                        prng: PartoutConfiguration.platform.newPRNG(),
+                        dns: PartoutConfiguration.platform.newDNSResolver(),
                         cachesURL: Demo.moduleURL(for: "OpenVPN")
                     )
                 }
