@@ -76,6 +76,12 @@ package.targets.append(contentsOf: [
         ]
     ),
     .target(
+        name: "_PartoutPlatformLinux",
+        dependencies: [
+            .product(name: "PartoutCore", package: "Core")
+        ]
+    ),
+    .target(
         name: "_PartoutPlatformWindows",
         dependencies: [
             .product(name: "PartoutCore", package: "Core")
