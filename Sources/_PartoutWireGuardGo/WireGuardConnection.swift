@@ -88,11 +88,14 @@ public final class WireGuardConnection: Connection {
         dataCountTimer?.cancel()
         dataCountTimer = Task { [weak self] in
             while true {
+                guard let self else {
+                    return
+                }
                 guard !Task.isCancelled else {
                     pp_log(.wireguard, .debug, "Cancelled WireGuardConnection.dataCountTimer")
                     return
                 }
-                await MainActor.run {
+                await MainActor.run { [weak self] in
                     self?.onDataCountTimer()
                 }
                 try await Task.sleep(interval: dataCountTimerInterval)
