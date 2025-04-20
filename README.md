@@ -35,8 +35,6 @@ then edit `Package.swift` and set:
 environment = .onlineBinary
 ```
 
-Import the Swift packages under "Plugins" as needed.
-
 Beware that the public framework only supports development on your Mac or iOS/tvOS Simulators. If you want to use the library for proprietary or commercial purposes, please [contact me privately][license-contact].
 
 ### Demo
