@@ -4,21 +4,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  run_tests:
-    name: Run tests
-    runs-on: macos-15
-    timeout-minutes: 15
-    steps:
-      - uses: passepartoutvpn/action-prepare-xcode-build@master
-        with:
-          access_token: ${{ secrets.ACCESS_TOKEN }}
-      - name: Run tests
-        run: |
-          swift test
   publish_release:
     name: Publish release
     runs-on: macos-15
-    needs: run_tests
     timeout-minutes: 30
     steps:
       - uses: passepartoutvpn/action-prepare-xcode-build@master

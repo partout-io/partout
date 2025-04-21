@@ -1,0 +1,41 @@
+//
+//  WireGuardKeyGenerator.swift
+//  Partout
+//
+//  Created by Davide De Rosa on 3/25/24.
+//  Copyright (c) 2025 Davide De Rosa. All rights reserved.
+//
+//  https://github.com/passepartoutvpn
+//
+//  This file is part of Partout.
+//
+//  Partout is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  Partout is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
+//
+
+import Foundation
+
+/// Generates WireGuard keys.
+///
+/// Generates both private and public keys for use with the WireGuard protocol, required to build a ``WireGuard/Configuration``. The exchanged
+/// encoding must be Base64.
+///
+public protocol WireGuardKeyGenerator: Sendable {
+    func newPrivateKey() -> String
+
+    func privateKey(from string: String) throws -> String
+
+    func publicKey(from string: String) throws -> String
+
+    func publicKey(for privateKey: String) throws -> String
+}

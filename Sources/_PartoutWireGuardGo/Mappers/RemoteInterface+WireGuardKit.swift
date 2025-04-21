@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import _PartoutWireGuard
 import Foundation
-import Network
 import PartoutCore
 internal import WireGuardKit
 

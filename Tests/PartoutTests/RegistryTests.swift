@@ -23,6 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import _PartoutOpenVPN
+import _PartoutWireGuard
 import Foundation
 import Partout
 import XCTest
