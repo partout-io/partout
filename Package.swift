@@ -242,7 +242,7 @@ package.targets.append(contentsOf: [
     ),
     .target(
         name: "_PartoutWireGuard",
-        dependencies: ["PartoutCoreWrapper"],
+        dependencies: ["PartoutCoreWrapper"]
     ),
     .target(
         name: "_PartoutWireGuardGo",
