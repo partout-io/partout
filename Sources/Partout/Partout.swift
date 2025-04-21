@@ -33,6 +33,11 @@ import Foundation
 @_exported import PartoutNE
 #endif
 
+// MARK: - Modules
+
+@_exported import _PartoutOpenVPN
+@_exported import _PartoutWireGuard
+
 // MARK: - Platform extensions
 
 #if canImport(_PartoutPlatformAndroid)

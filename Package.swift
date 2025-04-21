@@ -70,6 +70,8 @@ package.targets.append(contentsOf: [
         name: "Partout",
         dependencies: [
             "PartoutAPI",
+            "_PartoutOpenVPN",
+            "_PartoutWireGuard",
             .target(name: "PartoutNE", condition: .when(platforms: applePlatforms)),
             .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
             .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
@@ -196,7 +198,7 @@ package.targets.append(contentsOf: [
         name: "_PartoutOpenVPNOpenSSL_ObjC",
         dependencies: [
             "_PartoutCryptoOpenSSL_ObjC",
-            "_PartoutOpenVPN"
+            "PartoutCoreWrapper"
         ],
         exclude: [
             "lib/COPYING",
@@ -213,6 +215,7 @@ package.targets.append(contentsOf: [
         name: "_PartoutOpenVPNOpenSSL",
         dependencies: [
             "_PartoutCryptoOpenSSL",
+            "_PartoutOpenVPN",
             "_PartoutOpenVPNOpenSSL_ObjC"
         ]
     ),
