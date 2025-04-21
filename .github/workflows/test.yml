@@ -17,11 +17,10 @@ jobs:
       - uses: passepartoutvpn/action-prepare-xcode-build@master
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Use remote Core binary
+      - name: Ensure remote Core binary
         run: |
-          default_env="environment = .remoteSource"
+          default_env="environment = .remoteBinary"
           grep "^$default_env$" Package.swift
-          sed -i '' "s/^${default_env}$/environment = .remoteBinary/" Package.swift
       - name: Run tests
         run: |
           swift test
