@@ -71,12 +71,23 @@ struct MockAPI: APIMapper {
     }
 }
 
-final class MockRepository: APIRepository, ObservableObject {
+#if canImport(Combine)
+import Combine
 
+extension MockRepository: ObservableObject {
+}
+#endif
+
+final class MockRepository: APIRepository {
+
+#if canImport(Combine)
     @Published
+#endif
     private(set) var providers: [Provider] = []
 
+#if canImport(Combine)
     @Published
+#endif
     private(set) var infrastructures: [ProviderID: ProviderInfrastructure] = [:]
 
     var indexPublisher: AnyPublisher<[Provider], Never> {

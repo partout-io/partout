@@ -47,13 +47,19 @@ public final class APIManager {
 
     private let repository: APIRepository
 
+#if canImport(Combine)
     @Published
+#endif
     public private(set) var providers: [Provider]
 
+#if canImport(Combine)
     @Published
+#endif
     public private(set) var cache: [ProviderID: ProviderCache]
 
+#if canImport(Combine)
     @Published
+#endif
     private var pendingServices: Set<PendingService> = []
 
     private var subscriptions: Set<AnyCancellable>
