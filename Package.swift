@@ -14,9 +14,9 @@ enum Environment {
 }
 
 let environment: Environment
-environment = .remoteSource
+// environment = .remoteSource
 // environment = .remoteBinary
-// environment = .localSource
+environment = .localSource
 
 let binaryFilename = "PartoutCore.xcframework.zip"
 let version = "0.99.91"
