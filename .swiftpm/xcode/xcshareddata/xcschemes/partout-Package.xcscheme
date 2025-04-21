@@ -152,6 +152,26 @@
                ReferencedContainer = "container:">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "_PartoutOpenVPNTests"
+               BuildableName = "_PartoutOpenVPNTests"
+               BlueprintName = "_PartoutOpenVPNTests"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "_PartoutWireGuardTests"
+               BuildableName = "_PartoutWireGuardTests"
+               BlueprintName = "_PartoutWireGuardTests"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

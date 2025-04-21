@@ -14,9 +14,9 @@ enum Environment {
 }
 
 let environment: Environment
-environment = .remoteBinary
+// environment = .remoteBinary
 // environment = .remoteSource
-// environment = .localSource
+environment = .localSource
 
 // for action-release-binary-package
 let sha1 = "c087530f1086cb6793bb3097d7ce42d4f5ba6857"
@@ -80,7 +80,9 @@ package.targets.append(contentsOf: [
         name: "PartoutAPI",
         dependencies: [
             .product(name: "GenericJSON", package: "generic-json-swift"),
-            "PartoutCoreWrapper"
+            "PartoutCoreWrapper",
+            "_PartoutOpenVPN",
+            "_PartoutWireGuard"
         ]
     ),
     .testTarget(
@@ -187,10 +189,14 @@ package.targets.append(contentsOf: [
         dependencies: ["openssl-apple"]
     ),
     .target(
+        name: "_PartoutOpenVPN",
+        dependencies: ["PartoutCoreWrapper"]
+    ),
+    .target(
         name: "_PartoutOpenVPNOpenSSL_ObjC",
         dependencies: [
             "_PartoutCryptoOpenSSL_ObjC",
-            "PartoutCoreWrapper"
+            "_PartoutOpenVPN"
         ],
         exclude: [
             "lib/COPYING",
@@ -215,6 +221,10 @@ package.targets.append(contentsOf: [
         dependencies: ["_PartoutCryptoOpenSSL"]
     ),
     .testTarget(
+        name: "_PartoutOpenVPNTests",
+        dependencies: ["_PartoutOpenVPN"]
+    ),
+    .testTarget(
         name: "_PartoutOpenVPNOpenSSLTests",
         dependencies: ["_PartoutOpenVPNOpenSSL"],
         resources: [
@@ -231,14 +241,22 @@ package.targets.append(contentsOf: [
         dependencies: ["_PartoutWireGuardGo"]
     ),
     .target(
+        name: "_PartoutWireGuard",
+        dependencies: ["PartoutCoreWrapper"],
+    ),
+    .target(
         name: "_PartoutWireGuardGo",
         dependencies: [
-            "PartoutCoreWrapper",
+            "_PartoutWireGuard",
             .product(name: "WireGuardKit", package: "wireguard-apple")
         ],
         resources: [
             .process("Resources")
         ]
+    ),
+    .testTarget(
+        name: "_PartoutWireGuardTests",
+        dependencies: ["_PartoutWireGuard"]
     ),
     .testTarget(
         name: "_PartoutWireGuardGoTests",

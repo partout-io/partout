@@ -23,6 +23,7 @@
 //  along with Passepartout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import _PartoutWireGuard
 @testable import _PartoutWireGuardGo
 import Foundation
 import PartoutCore

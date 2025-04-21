@@ -24,6 +24,7 @@
 //
 
 internal import _PartoutCryptoOpenSSL_ObjC
+import _PartoutOpenVPN
 import Foundation
 import PartoutCore
 

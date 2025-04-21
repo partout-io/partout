@@ -23,4 +23,5 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+@_exported import _PartoutOpenVPN
 @_exported import _PartoutOpenVPNOpenSSL
