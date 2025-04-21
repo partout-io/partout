@@ -22,7 +22,7 @@ __DISCLAIMER: the library is still undergoing deep architectural changes.__
 
 ### Usage
 
-Import the library as SwiftPM dependency:
+Import the library as SwiftPM dependency, for example:
 
 ```
 dependencies: [
@@ -32,7 +32,9 @@ targets: [
     .target(
         name: "MyTarget",
         dependencies: [
-            .product(name: "Partout", package: "partout")
+            .product(name: "Partout", package: "partout"),
+            .product(name: "PartoutOpenVPN", package: "partout"),
+            .product(name: "PartoutWireGuard", package: "partout")
         ]
     )
 ]
