@@ -19,7 +19,7 @@ environment = .remoteBinary
 // environment = .localSource
 
 // for action-release-binary-package
-let sha1 = "cf03882e371afa4fa1e4e78a15ac3a99a70d2c1e"
+let sha1 = "2d5fb2ef1cf07e557cfe541638469b2263323694"
 let binaryFilename = "PartoutCore.xcframework.zip"
 let version = "0.99.100"
 let checksum = "955651e7692023cffaafc52ea04f6513e8f6b40e70dff5a79b80bf3a6586230b"
