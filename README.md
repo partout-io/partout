@@ -8,7 +8,7 @@
 
 # Partout
 
-A scalable framework to build modern network apps.
+A scalable framework to build modern network configuration apps.
 
 Binary distribution for these architectures:
 
