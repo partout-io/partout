@@ -28,8 +28,15 @@ import Foundation
 import PartoutCore
 import PartoutProviders
 
+#if canImport(Combine)
+import Combine
+
+extension ProviderManager: ObservableObject {
+}
+#endif
+
 @MainActor
-public final class ProviderManager: ObservableObject {
+public final class ProviderManager {
     private let sorting: [ProviderSortField]
 
     public private(set) var moduleType: ModuleType

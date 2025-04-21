@@ -28,8 +28,15 @@ import Foundation
 import PartoutCore
 import PartoutProviders
 
+#if canImport(Combine)
+import Combine
+
+extension APIManager: ObservableObject {
+}
+#endif
+
 @MainActor
-public final class APIManager: ObservableObject {
+public final class APIManager {
     private enum PendingService: Hashable {
         case index
 
