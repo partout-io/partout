@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutBase
 @testable import _PartoutOpenVPN
+import PartoutCore
 import XCTest
 
 final class StaticKeyTests: XCTestCase {
