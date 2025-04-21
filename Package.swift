@@ -6,16 +6,16 @@ import PackageDescription
 // MARK: PartoutCore
 
 enum Environment {
-    case remoteSource
-
     case remoteBinary
+
+    case remoteSource
 
     case localSource
 }
 
 let environment: Environment
-environment = .remoteSource
-// environment = .remoteBinary
+environment = .remoteBinary
+// environment = .remoteSource
 // environment = .localSource
 
 let binaryFilename = "PartoutCore.xcframework.zip"
@@ -103,6 +103,12 @@ package.targets.append(contentsOf: [
 ])
 
 switch environment {
+case .remoteBinary:
+    package.targets.append(.binaryTarget(
+        name: "PartoutCoreWrapper",
+        url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(binaryFilename)",
+        checksum: checksum
+    ))
 case .remoteSource:
     package.dependencies.append(
         .package(url: "git@github.com:passepartoutvpn/partout-core.git", revision: sha1)
@@ -112,12 +118,6 @@ case .remoteSource:
         dependencies: [
             .product(name: "PartoutCore", package: "partout-core")
         ]
-    ))
-case .remoteBinary:
-    package.targets.append(.binaryTarget(
-        name: "PartoutCoreWrapper",
-        url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(binaryFilename)",
-        checksum: checksum
     ))
 case .localSource:
     package.dependencies.append(

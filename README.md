@@ -22,17 +22,22 @@ __DISCLAIMER: the library is still undergoing deep architectural changes.__
 
 ### Usage
 
-Import the library as submodule:
+Import the library as SwiftPM dependency, for example:
 
 ```
-$ git submodule add https://github.com/passepartoutvpn/partout
-$ git submodule update --init
-```
-
-then edit `Package.swift` and set:
-
-```
-environment = .remoteBinary
+dependencies: [
+    .package(url: "https://github.com/passepartoutvpn/partout", branch: "master")
+],
+targets: [
+    .target(
+        name: "MyTarget",
+        dependencies: [
+            .product(name: "Partout", package: "partout"),
+            .product(name: "PartoutOpenVPN", package: "partout"),
+            .product(name: "PartoutWireGuard", package: "partout")
+        ]
+    )
+]
 ```
 
 Beware that the public framework only supports development on your Mac or iOS/tvOS Simulators. If you want to use the library for proprietary or commercial purposes, please [contact me privately][license-contact].
