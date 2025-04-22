@@ -76,7 +76,8 @@ package.targets.append(contentsOf: [
             .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
             .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
             .target(name: "_PartoutPlatformWindows", condition: .when(platforms: [.windows]))
-        ]
+        ],
+        path: "Sources/Partout"
     ),
     .target(
         name: "PartoutAPI",
@@ -85,22 +86,26 @@ package.targets.append(contentsOf: [
             "PartoutCoreWrapper",
             "_PartoutOpenVPN",
             "_PartoutWireGuard"
-        ]
+        ],
+        path: "Sources/API"
     ),
     .testTarget(
         name: "PartoutAPITests",
         dependencies: ["PartoutAPI"],
+        path: "Tests/API",
         resources: [
             .copy("Resources")
         ]
     ),
     .testTarget(
         name: "PartoutCoreTests",
-        dependencies: ["PartoutCoreWrapper"]
+        dependencies: ["PartoutCoreWrapper"],
+        path: "Tests/Core"
     ),
     .testTarget(
         name: "PartoutTests",
         dependencies: ["Partout"],
+        path: "Tests/Partout",
         resources: [
             .copy("Resources")
         ]
@@ -122,7 +127,8 @@ case .remoteSource:
         name: "PartoutCoreWrapper",
         dependencies: [
             .product(name: "PartoutCore", package: "partout-core")
-        ]
+        ],
+        path: "Sources/Core"
     ))
 case .localSource:
     package.dependencies.append(
@@ -132,7 +138,8 @@ case .localSource:
         name: "PartoutCoreWrapper",
         dependencies: [
             .product(name: "PartoutCore", package: "partout-core")
-        ]
+        ],
+        path: "Sources/Core"
     ))
 }
 
@@ -143,39 +150,46 @@ package.targets.append(contentsOf: [
         name: "PartoutNE",
         dependencies: [
             "PartoutCoreWrapper"
-        ]
+        ],
+        path: "Sources/Platforms/NE"
     ),
     .target(
         name: "_PartoutPlatformAndroid",
         dependencies: [
             "PartoutCoreWrapper"
-        ]
+        ],
+        path: "Sources/Platforms/Android"
     ),
     .target(
         name: "_PartoutPlatformApple",
         dependencies: [
             "PartoutCoreWrapper"
-        ]
+        ],
+        path: "Sources/Platforms/Apple"
     ),
     .target(
         name: "_PartoutPlatformLinux",
         dependencies: [
             "PartoutCoreWrapper"
-        ]
+        ],
+        path: "Sources/Platforms/Linux"
     ),
     .target(
         name: "_PartoutPlatformWindows",
         dependencies: [
             "PartoutCoreWrapper"
-        ]
+        ],
+        path: "Sources/Platforms/Windows"
     ),
     .testTarget(
         name: "PartoutNETests",
-        dependencies: ["PartoutNE"]
+        dependencies: ["PartoutNE"],
+        path: "Tests/Platforms/NE"
     ),
     .testTarget(
         name: "_PartoutPlatformAppleTests",
-        dependencies: ["_PartoutPlatformApple"]
+        dependencies: ["_PartoutPlatformApple"],
+        path: "Tests/Platforms/Apple"
     )
 ])
 
@@ -184,32 +198,23 @@ package.targets.append(contentsOf: [
 package.targets.append(contentsOf: [
     .target(
         name: "PartoutOpenVPN",
-        dependencies: ["_PartoutOpenVPNOpenSSL"]
-    ),
-    .target(
-        name: "_PartoutCryptoOpenSSL_ObjC",
-        dependencies: ["openssl-apple"]
-    ),
-    .target(
-        name: "_PartoutOpenVPN",
-        dependencies: ["PartoutCoreWrapper"]
-    ),
-    .target(
-        name: "_PartoutOpenVPNOpenSSL_ObjC",
-        dependencies: [
-            "_PartoutCryptoOpenSSL_ObjC",
-            "PartoutCoreWrapper"
-        ],
-        exclude: [
-            "lib/COPYING",
-            "lib/Makefile",
-            "lib/README.LZO",
-            "lib/testmini.c"
-        ]
+        dependencies: ["_PartoutOpenVPNOpenSSL"],
+        path: "Sources/OpenVPN/Wrapper"
     ),
     .target(
         name: "_PartoutCryptoOpenSSL",
-        dependencies: ["_PartoutCryptoOpenSSL_ObjC"]
+        dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
+        path: "Sources/OpenVPN/CryptoOpenSSL"
+    ),
+    .target(
+        name: "_PartoutCryptoOpenSSL_ObjC",
+        dependencies: ["openssl-apple"],
+        path: "Sources/OpenVPN/CryptoOpenSSL_ObjC"
+    ),
+    .target(
+        name: "_PartoutOpenVPN",
+        dependencies: ["PartoutCoreWrapper"],
+        path: "Sources/OpenVPN/Base"
     ),
     .target(
         name: "_PartoutOpenVPNOpenSSL",
@@ -217,19 +222,37 @@ package.targets.append(contentsOf: [
             "_PartoutCryptoOpenSSL",
             "_PartoutOpenVPN",
             "_PartoutOpenVPNOpenSSL_ObjC"
+        ],
+        path: "Sources/OpenVPN/OpenVPNOpenSSL"
+    ),
+    .target(
+        name: "_PartoutOpenVPNOpenSSL_ObjC",
+        dependencies: [
+            "_PartoutCryptoOpenSSL_ObjC",
+            "PartoutCoreWrapper"
+        ],
+        path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
+        exclude: [
+            "lib/COPYING",
+            "lib/Makefile",
+            "lib/README.LZO",
+            "lib/testmini.c"
         ]
     ),
     .testTarget(
         name: "_PartoutCryptoOpenSSL_ObjCTests",
-        dependencies: ["_PartoutCryptoOpenSSL"]
+        dependencies: ["_PartoutCryptoOpenSSL"],
+        path: "Tests/OpenVPN/CryptoOpenSSL_ObjC"
     ),
     .testTarget(
         name: "_PartoutOpenVPNTests",
-        dependencies: ["_PartoutOpenVPN"]
+        dependencies: ["_PartoutOpenVPN"],
+        path: "Tests/OpenVPN/Base"
     ),
     .testTarget(
         name: "_PartoutOpenVPNOpenSSLTests",
         dependencies: ["_PartoutOpenVPNOpenSSL"],
+        path: "Tests/OpenVPN/OpenVPNOpenSSL",
         resources: [
             .process("Resources")
         ]
@@ -241,11 +264,13 @@ package.targets.append(contentsOf: [
 package.targets.append(contentsOf: [
     .target(
         name: "PartoutWireGuard",
-        dependencies: ["_PartoutWireGuardGo"]
+        dependencies: ["_PartoutWireGuardGo"],
+        path: "Sources/WireGuard/Wrapper"
     ),
     .target(
         name: "_PartoutWireGuard",
-        dependencies: ["PartoutCoreWrapper"]
+        dependencies: ["PartoutCoreWrapper"],
+        path: "Sources/WireGuard/Base"
     ),
     .target(
         name: "_PartoutWireGuardGo",
@@ -253,16 +278,19 @@ package.targets.append(contentsOf: [
             "_PartoutWireGuard",
             .product(name: "WireGuardKit", package: "wireguard-apple")
         ],
+        path: "Sources/WireGuard/WireGuardGo",
         resources: [
             .process("Resources")
         ]
     ),
     .testTarget(
         name: "_PartoutWireGuardTests",
-        dependencies: ["_PartoutWireGuard"]
+        dependencies: ["_PartoutWireGuard"],
+        path: "Tests/WireGuard/Base"
     ),
     .testTarget(
         name: "_PartoutWireGuardGoTests",
-        dependencies: ["_PartoutWireGuardGo"]
+        dependencies: ["_PartoutWireGuardGo"],
+        path: "Tests/WireGuard/WireGuardGo"
     )
 ])
