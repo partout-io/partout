@@ -3,8 +3,6 @@
 
 import PackageDescription
 
-// MARK: PartoutCore
-
 enum Environment {
     case remoteBinary
 
@@ -12,22 +10,6 @@ enum Environment {
 
     case localSource
 }
-
-let environment: Environment
-environment = .remoteBinary
-// environment = .remoteSource
-// environment = .localSource
-
-// for action-release-binary-package
-let sha1 = "2d5fb2ef1cf07e557cfe541638469b2263323694"
-let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.100"
-let checksum = "955651e7692023cffaafc52ea04f6513e8f6b40e70dff5a79b80bf3a6586230b"
-
-let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
-let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
-
-// MARK: - Products
 
 enum Area: CaseIterable {
     case api
@@ -39,7 +21,23 @@ enum Area: CaseIterable {
     case wireguard
 }
 
+let environment: Environment
+environment = .remoteBinary
+// environment = .remoteSource
+// environment = .localSource
+
 let areas: Set<Area> = Set(Area.allCases)
+
+// action-release-binary-package (PartoutCore)
+let sha1 = "2d5fb2ef1cf07e557cfe541638469b2263323694"
+let binaryFilename = "PartoutCore.xcframework.zip"
+let version = "0.99.100"
+let checksum = "955651e7692023cffaafc52ea04f6513e8f6b40e70dff5a79b80bf3a6586230b"
+
+let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
+let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
+
+// MARK: - Products
 
 let package = Package(
     name: "partout",
