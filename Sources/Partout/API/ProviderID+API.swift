@@ -23,6 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if canImport(PartoutAPI)
+
 import Foundation
 import PartoutCore
 import PartoutProviders
@@ -52,3 +54,5 @@ extension ProviderID {
 
     public static let windscribe = Self(rawValue: "windscribe")
 }
+
+#endif
