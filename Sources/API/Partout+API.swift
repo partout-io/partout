@@ -29,11 +29,3 @@ import PartoutCore
 extension LoggerCategory {
     public static let api = Self(rawValue: "api")
 }
-
-extension PartoutError.Code {
-    public enum API {
-
-        /// A provider was chosen but the target entity is missing.
-        public static let missingProviderEntity = PartoutError.Code("missingProviderEntity")
-    }
-}

@@ -26,6 +26,7 @@
 import Combine
 import Foundation
 import PartoutCore
+import PartoutProviders
 
 public typealias APIRepository = APIRepositoryReader & APIRepositoryWriter
 

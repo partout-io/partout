@@ -23,13 +23,20 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPN
-import _PartoutWireGuard
 import Foundation
 import Partout
 import XCTest
 
+#if canImport(_PartoutOpenVPN)
+import _PartoutOpenVPN
+#endif
+#if canImport(_PartoutWireGuard)
+import _PartoutWireGuard
+#endif
+
 final class RegistryTests: XCTestCase {
+
+#if canImport(_PartoutOpenVPN) && canImport(_PartoutWireGuard)
     func test_givenKnownHandlers_whenSerializeProfile_thenIsDeserialized() throws {
         let sut = Registry()
 
@@ -59,4 +66,5 @@ final class RegistryTests: XCTestCase {
         let decoded = try sut.decodedProfile(from: encoded, with: coder)
         XCTAssertEqual(profile, decoded)
     }
+#endif
 }

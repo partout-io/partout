@@ -26,6 +26,7 @@
 import Combine
 import Foundation
 import PartoutCore
+import PartoutProviders
 
 public final class InMemoryAPIRepository: APIRepositoryReader, APIRepositoryWriter {
     private let providersSubject: CurrentValueSubject<[Provider], Never>

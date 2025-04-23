@@ -1,8 +1,8 @@
 //
-//  V6Resource.swift
+//  V6Index.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 3/27/25.
+//  Created by Davide De Rosa on 11/24/19.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -24,21 +24,20 @@
 //
 
 import Foundation
+import GenericJSON
 import PartoutCore
+import PartoutProviders
 
 extension API.V6 {
-    public enum Resource {
-        case index
+    public struct Index: Decodable {
+        public struct Provider: Decodable {
+            public let id: ProviderID
 
-        case provider(ProviderID)
+            public let description: String
 
-        public var path: String {
-            switch self {
-            case .index:
-                "index.json"
-            case .provider(let id):
-                ["providers", "\(id.rawValue).js"].joined(separator: "/")
-            }
+            public let metadata: [String: JSON]
         }
+
+        public let providers: [Provider]
     }
 }

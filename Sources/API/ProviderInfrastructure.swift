@@ -1,8 +1,8 @@
 //
-//  V6Index.swift
+//  ProviderInfrastructure.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 11/24/19.
+//  Created by Davide De Rosa on 10/7/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -24,19 +24,18 @@
 //
 
 import Foundation
-import GenericJSON
-import PartoutCore
+import PartoutProviders
 
-extension API.V6 {
-    public struct Index: Decodable {
-        public struct Provider: Decodable {
-            public let id: ProviderID
+public struct ProviderInfrastructure: Decodable {
+    public let presets: [ProviderPreset]
 
-            public let description: String
+    public let servers: [ProviderServer]
 
-            public let metadata: [String: JSON]
-        }
+    public let cache: ProviderCache?
 
-        public let providers: [Provider]
+    public init(presets: [ProviderPreset], servers: [ProviderServer], cache: ProviderCache?) {
+        self.presets = presets
+        self.servers = servers
+        self.cache = cache
     }
 }

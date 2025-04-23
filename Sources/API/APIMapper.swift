@@ -24,6 +24,7 @@
 //
 
 import Foundation
+import PartoutProviders
 
 public protocol APIMapper {
     func index() async throws -> [Provider]

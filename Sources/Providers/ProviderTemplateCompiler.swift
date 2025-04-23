@@ -1,8 +1,8 @@
 //
-//  ProviderRepository.swift
+//  ProviderTemplateCompiler.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 10/7/24.
+//  Created by Davide De Rosa on 10/8/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -26,10 +26,26 @@
 import Foundation
 import PartoutCore
 
-public protocol ProviderRepository: AnyObject {
-    var providerId: ProviderID { get }
+public protocol ProviderTemplateCompiler {
+    associatedtype CompiledModule: Module
 
-    func availableOptions(for moduleType: ModuleType) async throws -> ProviderFilterOptions
+    associatedtype Options: ProviderOptions
 
-    func filteredServers(with parameters: ProviderServerParameters?) async throws -> [ProviderServer]
+    static func compiled(with id: UUID, entity: ProviderEntity, options: Options?) throws -> CompiledModule
+}
+
+extension ProviderTemplateCompiler {
+    public var moduleType: ModuleType {
+        CompiledModule.moduleHandler.id
+    }
+}
+
+extension ProviderModule {
+    public func compiled<T>(withTemplate templateType: T.Type) throws -> Module where T: ProviderTemplateCompiler {
+        guard let entity else {
+            throw PartoutError(.Providers.missingProviderEntity)
+        }
+        let options: T.Options? = options(for: providerModuleType)
+        return try T.compiled(with: id, entity: entity, options: options)
+    }
 }

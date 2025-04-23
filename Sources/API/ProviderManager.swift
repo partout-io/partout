@@ -26,6 +26,7 @@
 import Combine
 import Foundation
 import PartoutCore
+import PartoutProviders
 
 @MainActor
 public final class ProviderManager: ObservableObject {

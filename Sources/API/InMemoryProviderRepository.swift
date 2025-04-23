@@ -25,6 +25,7 @@
 
 import Foundation
 import PartoutCore
+import PartoutProviders
 
 public final class InMemoryProviderRepository: ProviderRepository {
     public let providerId: ProviderID

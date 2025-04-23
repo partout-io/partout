@@ -27,6 +27,7 @@ import Combine
 import Foundation
 @testable import PartoutAPI
 import PartoutCore
+import PartoutProviders
 
 struct MockModule: Module {
     static let moduleHandler = ModuleHandler(ModuleType("mock-module"), decoder: nil, factory: nil)

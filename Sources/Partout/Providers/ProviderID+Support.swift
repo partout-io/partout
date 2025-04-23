@@ -1,8 +1,8 @@
 //
-//  ProviderTemplateCompiler.swift
+//  ProviderID+Support.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 10/8/24.
+//  Created by Davide De Rosa on 10/7/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -25,27 +25,30 @@
 
 import Foundation
 import PartoutCore
+import PartoutProviders
 
-public protocol ProviderTemplateCompiler {
-    associatedtype CompiledModule: Module
+extension ProviderID {
+    public static let hideme = Self(rawValue: "hideme")
 
-    associatedtype Options: ProviderOptions
+    public static let ivpn = Self(rawValue: "ivpn")
 
-    static func compiled(with id: UUID, entity: ProviderEntity, options: Options?) throws -> CompiledModule
-}
+    public static let mullvad = Self(rawValue: "mullvad")
 
-extension ProviderTemplateCompiler {
-    public var moduleType: ModuleType {
-        CompiledModule.moduleHandler.id
-    }
-}
+    public static let nordvpn = Self(rawValue: "nordvpn")
 
-extension ProviderModule {
-    public func compiled<T>(withTemplate templateType: T.Type) throws -> Module where T: ProviderTemplateCompiler {
-        guard let entity else {
-            throw PartoutError(.API.missingProviderEntity)
-        }
-        let options: T.Options? = options(for: providerModuleType)
-        return try T.compiled(with: id, entity: entity, options: options)
-    }
+    public static let oeck = Self(rawValue: "oeck")
+
+    public static let pia = Self(rawValue: "pia")
+
+    public static let protonvpn = Self(rawValue: "protonvpn")
+
+    public static let surfshark = Self(rawValue: "surfshark")
+
+    public static let torguard = Self(rawValue: "torguard")
+
+    public static let tunnelbear = Self(rawValue: "tunnelbear")
+
+    public static let vyprvpn = Self(rawValue: "vyprvpn")
+
+    public static let windscribe = Self(rawValue: "windscribe")
 }

@@ -23,6 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if canImport(_PartoutOpenVPN)
+
 import _PartoutOpenVPN
 import Foundation
 import GenericJSON
@@ -249,3 +251,5 @@ private extension OpenVPNLegacyProviderHeuristic {
         }
     }
 }
+
+#endif

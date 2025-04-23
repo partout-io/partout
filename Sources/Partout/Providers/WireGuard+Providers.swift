@@ -23,6 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if canImport(_PartoutWireGuard)
+
 import _PartoutWireGuard
 import Foundation
 import PartoutCore
@@ -75,3 +77,5 @@ extension WireGuardProviderTemplate: ProviderTemplateCompiler {
         return try builder.tryBuild()
     }
 }
+
+#endif

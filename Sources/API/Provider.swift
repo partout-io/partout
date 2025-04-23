@@ -25,6 +25,7 @@
 
 import Foundation
 import PartoutCore
+import PartoutProviders
 
 public struct Provider: Identifiable, Hashable, CustomStringConvertible {
     public let id: ProviderID

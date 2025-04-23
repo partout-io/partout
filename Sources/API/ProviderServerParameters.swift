@@ -25,6 +25,7 @@
 
 import Foundation
 import PartoutCore
+import PartoutProviders
 
 public struct ProviderServerParameters {
     public var filters: ProviderFilters

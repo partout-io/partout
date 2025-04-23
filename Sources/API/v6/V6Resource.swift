@@ -1,8 +1,8 @@
 //
-//  ProviderID+Support.swift
+//  V6Resource.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 10/7/24.
+//  Created by Davide De Rosa on 3/27/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -24,31 +24,22 @@
 //
 
 import Foundation
-import PartoutAPI
 import PartoutCore
+import PartoutProviders
 
-extension ProviderID {
-    public static let hideme = Self(rawValue: "hideme")
+extension API.V6 {
+    public enum Resource {
+        case index
 
-    public static let ivpn = Self(rawValue: "ivpn")
+        case provider(ProviderID)
 
-    public static let mullvad = Self(rawValue: "mullvad")
-
-    public static let nordvpn = Self(rawValue: "nordvpn")
-
-    public static let oeck = Self(rawValue: "oeck")
-
-    public static let pia = Self(rawValue: "pia")
-
-    public static let protonvpn = Self(rawValue: "protonvpn")
-
-    public static let surfshark = Self(rawValue: "surfshark")
-
-    public static let torguard = Self(rawValue: "torguard")
-
-    public static let tunnelbear = Self(rawValue: "tunnelbear")
-
-    public static let vyprvpn = Self(rawValue: "vyprvpn")
-
-    public static let windscribe = Self(rawValue: "windscribe")
+        public var path: String {
+            switch self {
+            case .index:
+                "index.json"
+            case .provider(let id):
+                ["providers", "\(id.rawValue).js"].joined(separator: "/")
+            }
+        }
+    }
 }

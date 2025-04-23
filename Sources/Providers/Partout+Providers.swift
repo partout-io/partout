@@ -1,8 +1,8 @@
 //
-//  PartoutTests.swift
+//  Partout+Providers.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/15/25.
+//  Created by Davide De Rosa on 4/23/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -24,13 +24,12 @@
 //
 
 import Foundation
-import Partout
-import XCTest
+import PartoutCore
 
-final class PartoutTests: XCTest {
-    func test_dummy() throws {
-        let builder = Profile.Builder(name: "partout")
-        let profile = try builder.tryBuild()
-        XCTAssertEqual(profile.name, "partout")
+extension PartoutError.Code {
+    public enum Providers {
+
+        /// A provider was chosen but the target entity is missing.
+        public static let missingProviderEntity = PartoutError.Code("missingProviderEntity")
     }
 }

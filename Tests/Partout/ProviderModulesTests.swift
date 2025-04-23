@@ -23,10 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPN
 import Foundation
-@testable import PartoutAPI
-import PartoutCore
+import Partout
 import XCTest
 
 final class ProviderModulesTests: XCTestCase {
@@ -34,6 +32,7 @@ final class ProviderModulesTests: XCTestCase {
 
     private let resourcesURL = Bundle.module.url(forResource: "Resources", withExtension: nil)
 
+#if canImport(_PartoutOpenVPN)
     func test_givenProviderModule_whenOpenVPN_thenResolves() throws {
         var sut = ProviderModule.Builder()
         sut.providerId = mockId
@@ -54,7 +53,9 @@ final class ProviderModulesTests: XCTestCase {
             try .init("be-v4.hideservers.net", .init(.tcp, 3020))
         ])
     }
+#endif
 
+#if canImport(_PartoutWireGuard)
 //    func test_givenProviderModule_whenWireGuard_thenResolves() throws {
 //        var sut = ProviderModule.Builder()
 //        sut.providerId = .hideme
@@ -63,9 +64,11 @@ final class ProviderModulesTests: XCTestCase {
 //        let resolvedModule = try module.resolvedModule(with: registry)
 //        XCTAssertTrue(resolvedModule is WireGuardModule)
 //    }
+#endif
 }
 
 private extension ProviderModulesTests {
+#if canImport(_PartoutOpenVPN)
     func openVPNEntity() throws -> ProviderEntity {
         let presetURL = try XCTUnwrap(resourcesURL?.appendingPathComponent("preset.openvpn.json"))
         let templateData = try Data(contentsOf: presetURL)
@@ -95,4 +98,5 @@ private extension ProviderModulesTests {
             heuristic: nil
         )
     }
+#endif
 }

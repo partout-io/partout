@@ -63,6 +63,34 @@
                ReferencedContainer = "container:">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "PartoutAPI"
+               BuildableName = "PartoutAPI"
+               BlueprintName = "PartoutAPI"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "PartoutProviders"
+               BuildableName = "PartoutProviders"
+               BlueprintName = "PartoutProviders"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -179,6 +207,16 @@
                BlueprintIdentifier = "_PartoutPlatformAppleNETests"
                BuildableName = "_PartoutPlatformAppleNETests"
                BlueprintName = "_PartoutPlatformAppleNETests"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "PartoutProvidersTests"
+               BuildableName = "PartoutProvidersTests"
+               BlueprintName = "PartoutProvidersTests"
                ReferencedContainer = "container:">
             </BuildableReference>
          </TestableReference>

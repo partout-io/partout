@@ -1,5 +1,5 @@
 //
-//  ProviderInfrastructure.swift
+//  ProviderRepository.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 10/7/24.
@@ -24,17 +24,13 @@
 //
 
 import Foundation
+import PartoutCore
+import PartoutProviders
 
-public struct ProviderInfrastructure: Decodable {
-    public let presets: [ProviderPreset]
+public protocol ProviderRepository: AnyObject {
+    var providerId: ProviderID { get }
 
-    public let servers: [ProviderServer]
+    func availableOptions(for moduleType: ModuleType) async throws -> ProviderFilterOptions
 
-    public let cache: ProviderCache?
-
-    public init(presets: [ProviderPreset], servers: [ProviderServer], cache: ProviderCache?) {
-        self.presets = presets
-        self.servers = servers
-        self.cache = cache
-    }
+    func filteredServers(with parameters: ProviderServerParameters?) async throws -> [ProviderServer]
 }

@@ -14,9 +14,9 @@ enum Environment {
 }
 
 let environment: Environment
-environment = .remoteBinary
+ environment = .remoteBinary
 // environment = .remoteSource
-// environment = .localSource
+//environment = .localSource
 
 // for action-release-binary-package
 let sha1 = "2d5fb2ef1cf07e557cfe541638469b2263323694"
@@ -39,7 +39,7 @@ enum Area: CaseIterable {
     case wireguard
 }
 
-let areas: Set<Area> = Set(Area.allCases)
+let areas: Set<Area> = []//Set(Area.allCases)
 
 let package = Package(
     name: "partout",
@@ -57,6 +57,10 @@ let package = Package(
         .library(
             name: "PartoutCoreWrapper",
             targets: ["PartoutCoreWrapper"]
+        ),
+        .library(
+            name: "PartoutProviders",
+            targets: ["PartoutProviders"]
         )
     ]
 )
@@ -64,6 +68,7 @@ let package = Package(
 package.targets.append(contentsOf: [
     {
         var dependencies: [Target.Dependency] = [
+            .target(name: "PartoutProviders"),
             .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
             .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
             .target(name: "_PartoutPlatformAppleNE", condition: .when(platforms: applePlatforms)),
@@ -182,9 +187,30 @@ package.targets.append(contentsOf: [
     )
 ])
 
-// MARK: API
+// MARK: Providers
+
+package.targets.append(contentsOf: [
+    .target(
+        name: "PartoutProviders",
+        dependencies: ["PartoutCoreWrapper"],
+        path: "Sources/Providers"
+    ),
+    .testTarget(
+        name: "PartoutProvidersTests",
+        dependencies: ["PartoutProviders"],
+        path: "Tests/Providers"
+    )
+])
+
+// MARK: - API
 
 if areas.contains(.api) {
+    package.products.append(
+        .library(
+            name: "PartoutAPI",
+            targets: ["PartoutAPI"]
+        )
+    )
     package.dependencies.append(
         .package(url: "https://github.com/iwill/generic-json-swift", from: "2.0.0")
     )
@@ -193,9 +219,7 @@ if areas.contains(.api) {
             name: "PartoutAPI",
             dependencies: [
                 .product(name: "GenericJSON", package: "generic-json-swift"),
-                "PartoutCoreWrapper",
-                "_PartoutOpenVPN",
-                "_PartoutWireGuard"
+                "PartoutProviders"
             ],
             path: "Sources/API"
         ),
@@ -210,7 +234,7 @@ if areas.contains(.api) {
     ])
 }
 
-// MARK: - OpenVPN
+// MARK: OpenVPN
 
 if areas.contains(.openvpn) {
     package.dependencies.append(contentsOf: [
