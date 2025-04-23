@@ -1,8 +1,8 @@
 //
-//  Partout+Providers.swift
+//  WireGuard+API.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/23/25.
+//  Created by Davide De Rosa on 12/2/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,17 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if canImport(PartoutAPI) && canImport(_PartoutWireGuard)
+
+import _PartoutWireGuard
 import Foundation
 import PartoutCore
 
-extension LoggerCategory {
-    public static let providers = Self(rawValue: "providers")
-}
-
-extension PartoutError.Code {
-    public enum Providers {
-
-        /// A provider was chosen but the target entity is missing.
-        public static let missingProviderEntity = PartoutError.Code("missingProviderEntity")
-    }
-}
+#endif
