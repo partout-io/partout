@@ -23,9 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if canImport(PartoutAPI)
+
 import Foundation
-import PartoutAPI
-import PartoutCore
+import Partout
 import XCTest
 
 final class APIV6MapperTests: XCTestCase {
@@ -61,6 +62,7 @@ final class APIV6MapperTests: XCTestCase {
             XCTAssertEqual(infra.presets.count, 1)
             XCTAssertEqual(infra.servers.count, 2)
 
+#if canImport(_PartoutOpenVPN)
             try infra.presets.forEach {
                 let template = try JSONDecoder().decode(OpenVPNProviderTemplate.self, from: $0.templateData)
                 switch $0.presetId {
@@ -76,6 +78,7 @@ final class APIV6MapperTests: XCTestCase {
                     break
                 }
             }
+#endif
         } catch {
             XCTFail("Failed: \(error)")
         }
@@ -121,3 +124,5 @@ private extension APIV6MapperTests {
         )
     }
 }
+
+#endif

@@ -23,28 +23,45 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if canImport(_PartoutOpenVPN)
 import _PartoutOpenVPN
+#endif
+#if canImport(_PartoutWireGuard)
 import _PartoutWireGuard
+#endif
 import Foundation
-import PartoutAPI
 import PartoutCore
+import PartoutProviders
 
 extension Registry {
-    private static let knownHandlers = [
-        DNSModule.moduleHandler,
-        FilterModule.moduleHandler,
-        HTTPProxyModule.moduleHandler,
-        IPModule.moduleHandler,
-        OnDemandModule.moduleHandler,
-        OpenVPNModule.moduleHandler,
-        ProviderModule.moduleHandler,
-        WireGuardModule.moduleHandler
-    ]
+    private static let knownHandlers: [ModuleHandler] = {
+        var handlers: [ModuleHandler] = [
+            DNSModule.moduleHandler,
+            FilterModule.moduleHandler,
+            HTTPProxyModule.moduleHandler,
+            IPModule.moduleHandler,
+            OnDemandModule.moduleHandler,
+            ProviderModule.moduleHandler
+        ]
+#if canImport(_PartoutOpenVPN)
+        handlers.append(OpenVPNModule.moduleHandler)
+#endif
+#if canImport(_PartoutWireGuard)
+        handlers.append(WireGuardModule.moduleHandler)
+#endif
+        return handlers
+    }()
 
-    private static let knownProviderResolvers: [ProviderModuleResolver] = [
-        OpenVPNProviderResolver(),
-        WireGuardProviderResolver()
-    ]
+    private static let knownProviderResolvers: [ProviderModuleResolver] = {
+        var resolvers: [ProviderModuleResolver] = []
+#if canImport(_PartoutOpenVPN)
+        resolvers.append(OpenVPNProviderResolver())
+#endif
+#if canImport(_PartoutWireGuard)
+        resolvers.append(WireGuardProviderResolver())
+#endif
+        return resolvers
+    }()
 
     public convenience init() {
         self.init(withKnown: true)
@@ -99,7 +116,7 @@ private extension Registry {
             return try resolver.resolved(from: providerModule)
         } catch {
             pp_log(.core, .error, "Unable to resolve module: \(error)")
-            throw error as? PartoutError ?? PartoutError(.API.corruptProviderModule, error)
+            throw error as? PartoutError ?? PartoutError(.Providers.corruptProviderModule, error)
         }
     }
 }

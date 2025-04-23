@@ -28,10 +28,13 @@ import Partout
 import PartoutOpenVPN
 
 extension OpenVPN {
-    static var demoModule: OpenVPNModule {
+    static var demoModule: OpenVPNModule? {
         do {
             let parser = StandardOpenVPNParser()
-            let result = try parser.parsed(fromURL: Constants.demoURL)
+            guard let url = Constants.demoURL else {
+                return nil
+            }
+            let result = try parser.parsed(fromURL: url)
             let builder = result.configuration.builder()
             var module = OpenVPNModule.Builder(configurationBuilder: builder)
             module.credentials = Constants.demoCredentials
@@ -43,7 +46,7 @@ extension OpenVPN {
 }
 
 private enum Constants {
-    static let demoURL = Bundle.main.url(forResource: "Files/test-sample", withExtension: "ovpn")!
+    static let demoURL = Bundle.main.url(forResource: "Files/test-sample", withExtension: "ovpn")
 
     static let demoCredentials: OpenVPN.Credentials = {
 

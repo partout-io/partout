@@ -23,6 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if canImport(PartoutAPI)
+
 import Foundation
 import PartoutAPI
 import PartoutCore
@@ -226,3 +228,5 @@ private extension API.V6.DefaultScriptExecutor {
         pp_log(.api, .debug, message)
     }
 }
+
+#endif

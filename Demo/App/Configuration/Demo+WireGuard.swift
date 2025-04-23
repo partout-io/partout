@@ -28,9 +28,12 @@ import Partout
 import PartoutWireGuard
 
 extension WireGuard {
-    static var demoModule: WireGuardModule {
+    static var demoModule: WireGuardModule? {
         do {
-            let wg = try String(contentsOf: Constants.demoURL)
+            guard let url = Constants.demoURL else {
+                return nil
+            }
+            let wg = try String(contentsOf: url)
             let builder = try StandardWireGuardParser().configuration(from: wg).builder()
             let module = WireGuardModule.Builder(configurationBuilder: builder)
             return try module.tryBuild()
@@ -41,5 +44,5 @@ extension WireGuard {
 }
 
 private enum Constants {
-    static let demoURL = Bundle.main.url(forResource: "Files/test-sample", withExtension: "wg")!
+    static let demoURL = Bundle.main.url(forResource: "Files/test-sample", withExtension: "wg")
 }

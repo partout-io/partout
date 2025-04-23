@@ -1,8 +1,8 @@
 //
-//  APIV6Mapper+Platform.swift
+//  ProviderID+Support.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/20/25.
+//  Created by Davide De Rosa on 10/7/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -26,18 +26,33 @@
 #if canImport(PartoutAPI)
 
 import Foundation
+import PartoutCore
+import PartoutProviders
 
-extension API.V6.Mapper {
-    public convenience init(baseURL: URL, infrastructureURL: ((ProviderID) -> URL)? = nil) {
-        self.init(baseURL: baseURL, infrastructureURL: infrastructureURL) {
-            API.V6.DefaultScriptExecutor(
-                resultURL: $0,
-                cache: $1,
-                timeout: $2,
-                engine: PartoutConfiguration.platform.newScriptingEngine()
-            )
-        }
-    }
+extension ProviderID {
+    public static let hideme = Self(rawValue: "hideme")
+
+    public static let ivpn = Self(rawValue: "ivpn")
+
+    public static let mullvad = Self(rawValue: "mullvad")
+
+    public static let nordvpn = Self(rawValue: "nordvpn")
+
+    public static let oeck = Self(rawValue: "oeck")
+
+    public static let pia = Self(rawValue: "pia")
+
+    public static let protonvpn = Self(rawValue: "protonvpn")
+
+    public static let surfshark = Self(rawValue: "surfshark")
+
+    public static let torguard = Self(rawValue: "torguard")
+
+    public static let tunnelbear = Self(rawValue: "tunnelbear")
+
+    public static let vyprvpn = Self(rawValue: "vyprvpn")
+
+    public static let windscribe = Self(rawValue: "windscribe")
 }
 
 #endif

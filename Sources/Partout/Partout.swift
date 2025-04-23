@@ -25,20 +25,11 @@
 
 import Foundation
 
-// MARK: Umbrella
+// MARK: Core
 
-@_exported import PartoutAPI
 @_exported import PartoutCore
-#if canImport(PartoutNE)
-@_exported import PartoutNE
-#endif
 
-// MARK: - Modules
-
-@_exported import _PartoutOpenVPN
-@_exported import _PartoutWireGuard
-
-// MARK: - Platform extensions
+// MARK: - Platforms
 
 #if canImport(_PartoutPlatformAndroid)
 @_exported import _PartoutPlatformAndroid
@@ -48,14 +39,35 @@ import Foundation
 @_exported import _PartoutPlatformApple
 #endif
 
+#if canImport(_PartoutPlatformAppleNE)
+@_exported import _PartoutPlatformAppleNE
+#endif
+
 #if canImport(_PartoutPlatformWindows)
 @_exported import _PartoutPlatformWindows
 #endif
 
-// MARK: - Error codes
+// MARK: - Providers
 
-extension PartoutError.Code.API {
+@_exported import PartoutProviders
+
+extension PartoutError.Code.Providers {
 
     /// A provider module is corrupt.
     public static let corruptProviderModule = PartoutError.Code("corruptProviderModule")
 }
+
+// MARK: - API
+
+#if canImport(PartoutAPI)
+@_exported import PartoutAPI
+#endif
+
+// MARK: - Modules
+
+#if canImport(_PartoutOpenVPN)
+@_exported import _PartoutOpenVPN
+#endif
+#if canImport(_PartoutWireGuard)
+@_exported import _PartoutWireGuard
+#endif

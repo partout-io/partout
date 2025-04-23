@@ -23,15 +23,18 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if canImport(_PartoutOpenVPN)
 import _PartoutOpenVPN
+#endif
 import Foundation
-import PartoutAPI
 import PartoutCore
+import PartoutProviders
 
 extension Registry {
 
     @Sendable
     static func migratedProfile(_ profile: Profile) -> Profile? {
+#if canImport(_PartoutOpenVPN)
         do {
             switch profile.version {
             case nil:
@@ -79,5 +82,8 @@ extension Registry {
             pp_log(.core, .error, "Unable to migrate profile \(profile.id): \(error)")
             return nil
         }
+#else
+        nil
+#endif
     }
 }
