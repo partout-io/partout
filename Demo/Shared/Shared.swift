@@ -25,7 +25,6 @@
 
 import Foundation
 import Partout
-import PartoutWireGuard
 
 enum Demo {
 }
