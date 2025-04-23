@@ -39,7 +39,7 @@ enum Area: CaseIterable {
     case wireguard
 }
 
-let areas: Set<Area> = []//Set(Area.allCases)
+let areas: Set<Area> = Set(Area.allCases)
 
 let package = Package(
     name: "partout",
