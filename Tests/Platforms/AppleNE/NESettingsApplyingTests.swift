@@ -23,10 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import _PartoutPlatformAppleNE
 import Foundation
 import NetworkExtension
 import PartoutCore
-import PartoutNE
 import XCTest
 
 final class NESettingsApplyingTests: XCTestCase {

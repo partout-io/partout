@@ -78,9 +78,9 @@ if areas.contains(.documentation) {
 package.targets.append(contentsOf: [
     {
         var dependencies: [Target.Dependency] = [
-            .target(name: "PartoutNE", condition: .when(platforms: applePlatforms)),
             .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
             .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
+            .target(name: "_PartoutPlatformAppleNE", condition: .when(platforms: applePlatforms)),
             .target(name: "_PartoutPlatformLinux", condition: .when(platforms: [.linux])),
             .target(name: "_PartoutPlatformWindows", condition: .when(platforms: [.windows]))
         ]
@@ -141,13 +141,6 @@ if areas.contains(.api) {
 
 package.targets.append(contentsOf: [
     .target(
-        name: "PartoutNE",
-        dependencies: [
-            "PartoutCoreWrapper"
-        ],
-        path: "Sources/Platforms/NE"
-    ),
-    .target(
         name: "_PartoutPlatformAndroid",
         dependencies: [
             "PartoutCoreWrapper"
@@ -160,6 +153,13 @@ package.targets.append(contentsOf: [
             "PartoutCoreWrapper"
         ],
         path: "Sources/Platforms/Apple"
+    ),
+    .target(
+        name: "_PartoutPlatformAppleNE",
+        dependencies: [
+            "PartoutCoreWrapper"
+        ],
+        path: "Sources/Platforms/AppleNE"
     ),
     .target(
         name: "_PartoutPlatformLinux",
@@ -176,9 +176,9 @@ package.targets.append(contentsOf: [
         path: "Sources/Platforms/Windows"
     ),
     .testTarget(
-        name: "PartoutNETests",
-        dependencies: ["PartoutNE"],
-        path: "Tests/Platforms/NE"
+        name: "_PartoutPlatformAppleNETests",
+        dependencies: ["_PartoutPlatformAppleNE"],
+        path: "Tests/Platforms/AppleNE"
     ),
     .testTarget(
         name: "_PartoutPlatformAppleTests",

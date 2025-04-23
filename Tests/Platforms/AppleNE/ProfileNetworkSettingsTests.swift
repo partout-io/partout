@@ -23,10 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+@testable import _PartoutPlatformAppleNE
 import Foundation
 import NetworkExtension
 import PartoutCore
-@testable import PartoutNE
 import XCTest
 
 final class ProfileNetworkSettingsTests: XCTestCase {

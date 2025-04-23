@@ -172,6 +172,16 @@
                ReferencedContainer = "container:">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "_PartoutPlatformAppleNETests"
+               BuildableName = "_PartoutPlatformAppleNETests"
+               BlueprintName = "_PartoutPlatformAppleNETests"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
