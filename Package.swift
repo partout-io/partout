@@ -48,11 +48,11 @@ let package = Package(
         ),
         .library(
             name: "PartoutOpenVPN",
-            targets: ["PartoutOpenVPN"]
+            targets: ["PartoutOpenVPNWrapper"]
         ),
         .library(
             name: "PartoutWireGuard",
-            targets: ["PartoutWireGuard"]
+            targets: ["PartoutWireGuardWrapper"]
         )
     ],
     dependencies: [
@@ -197,7 +197,7 @@ package.targets.append(contentsOf: [
 
 package.targets.append(contentsOf: [
     .target(
-        name: "PartoutOpenVPN",
+        name: "PartoutOpenVPNWrapper",
         dependencies: ["_PartoutOpenVPNOpenSSL"],
         path: "Sources/OpenVPN/Wrapper"
     ),
@@ -263,7 +263,7 @@ package.targets.append(contentsOf: [
 
 package.targets.append(contentsOf: [
     .target(
-        name: "PartoutWireGuard",
+        name: "PartoutWireGuardWrapper",
         dependencies: ["_PartoutWireGuardGo"],
         path: "Sources/WireGuard/Wrapper"
     ),
