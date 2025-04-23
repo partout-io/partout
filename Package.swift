@@ -61,14 +61,6 @@ let package = Package(
     ]
 )
 
-if areas.contains(.documentation) {
-    package.dependencies.append(
-        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0")
-    )
-}
-
-// MARK: - Umbrella
-
 package.targets.append(contentsOf: [
     {
         var dependencies: [Target.Dependency] = [
@@ -102,6 +94,12 @@ package.targets.append(contentsOf: [
         ]
     )
 ])
+
+if areas.contains(.documentation) {
+    package.dependencies.append(
+        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0")
+    )
+}
 
 // MARK: Core
 
