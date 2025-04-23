@@ -61,12 +61,6 @@ let package = Package(
     ]
 )
 
-if areas.contains(.api) {
-    package.dependencies.append(
-        .package(url: "https://github.com/iwill/generic-json-swift", from: "2.0.0")
-    )
-}
-
 if areas.contains(.documentation) {
     package.dependencies.append(
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0")
@@ -100,90 +94,12 @@ package.targets.append(contentsOf: [
         )
     }(),
     .testTarget(
-        name: "PartoutCoreTests",
-        dependencies: ["PartoutCoreWrapper"],
-        path: "Tests/Core"
-    ),
-    .testTarget(
         name: "PartoutTests",
         dependencies: ["Partout"],
         path: "Tests/Partout",
         resources: [
             .copy("Resources")
         ]
-    )
-])
-
-if areas.contains(.api) {
-    package.targets.append(contentsOf: [
-        .target(
-            name: "PartoutAPI",
-            dependencies: [
-                .product(name: "GenericJSON", package: "generic-json-swift"),
-                "PartoutCoreWrapper",
-                "_PartoutOpenVPN",
-                "_PartoutWireGuard"
-            ],
-            path: "Sources/API"
-        ),
-        .testTarget(
-            name: "PartoutAPITests",
-            dependencies: ["PartoutAPI"],
-            path: "Tests/API",
-            resources: [
-                .copy("Resources")
-            ]
-        )
-    ])
-}
-
-// MARK: Platforms
-
-package.targets.append(contentsOf: [
-    .target(
-        name: "_PartoutPlatformAndroid",
-        dependencies: [
-            "PartoutCoreWrapper"
-        ],
-        path: "Sources/Platforms/Android"
-    ),
-    .target(
-        name: "_PartoutPlatformApple",
-        dependencies: [
-            "PartoutCoreWrapper"
-        ],
-        path: "Sources/Platforms/Apple"
-    ),
-    .target(
-        name: "_PartoutPlatformAppleNE",
-        dependencies: [
-            "PartoutCoreWrapper"
-        ],
-        path: "Sources/Platforms/AppleNE"
-    ),
-    .target(
-        name: "_PartoutPlatformLinux",
-        dependencies: [
-            "PartoutCoreWrapper"
-        ],
-        path: "Sources/Platforms/Linux"
-    ),
-    .target(
-        name: "_PartoutPlatformWindows",
-        dependencies: [
-            "PartoutCoreWrapper"
-        ],
-        path: "Sources/Platforms/Windows"
-    ),
-    .testTarget(
-        name: "_PartoutPlatformAppleNETests",
-        dependencies: ["_PartoutPlatformAppleNE"],
-        path: "Tests/Platforms/AppleNE"
-    ),
-    .testTarget(
-        name: "_PartoutPlatformAppleTests",
-        dependencies: ["_PartoutPlatformApple"],
-        path: "Tests/Platforms/Apple"
     )
 ])
 
@@ -218,6 +134,82 @@ case .localSource:
         ],
         path: "Sources/Core"
     ))
+}
+
+package.targets.append(
+    .testTarget(
+        name: "PartoutCoreTests",
+        dependencies: ["PartoutCoreWrapper"],
+        path: "Tests/Core"
+    )
+)
+
+// MARK: Platforms
+
+package.targets.append(contentsOf: [
+    .target(
+        name: "_PartoutPlatformAndroid",
+        dependencies: ["PartoutCoreWrapper"],
+        path: "Sources/Platforms/Android"
+    ),
+    .target(
+        name: "_PartoutPlatformApple",
+        dependencies: ["PartoutCoreWrapper"],
+        path: "Sources/Platforms/Apple"
+    ),
+    .target(
+        name: "_PartoutPlatformAppleNE",
+        dependencies: ["PartoutCoreWrapper"],
+        path: "Sources/Platforms/AppleNE"
+    ),
+    .target(
+        name: "_PartoutPlatformLinux",
+        dependencies: ["PartoutCoreWrapper"],
+        path: "Sources/Platforms/Linux"
+    ),
+    .target(
+        name: "_PartoutPlatformWindows",
+        dependencies: ["PartoutCoreWrapper"],
+        path: "Sources/Platforms/Windows"
+    ),
+    .testTarget(
+        name: "_PartoutPlatformAppleNETests",
+        dependencies: ["_PartoutPlatformAppleNE"],
+        path: "Tests/Platforms/AppleNE"
+    ),
+    .testTarget(
+        name: "_PartoutPlatformAppleTests",
+        dependencies: ["_PartoutPlatformApple"],
+        path: "Tests/Platforms/Apple"
+    )
+])
+
+// MARK: API
+
+if areas.contains(.api) {
+    package.dependencies.append(
+        .package(url: "https://github.com/iwill/generic-json-swift", from: "2.0.0")
+    )
+    package.targets.append(contentsOf: [
+        .target(
+            name: "PartoutAPI",
+            dependencies: [
+                .product(name: "GenericJSON", package: "generic-json-swift"),
+                "PartoutCoreWrapper",
+                "_PartoutOpenVPN",
+                "_PartoutWireGuard"
+            ],
+            path: "Sources/API"
+        ),
+        .testTarget(
+            name: "PartoutAPITests",
+            dependencies: ["PartoutAPI"],
+            path: "Tests/API",
+            resources: [
+                .copy("Resources")
+            ]
+        )
+    ])
 }
 
 // MARK: - OpenVPN
@@ -264,10 +256,7 @@ if areas.contains(.openvpn) {
         ),
         .target(
             name: "_PartoutOpenVPNOpenSSL_ObjC",
-            dependencies: [
-                "_PartoutCryptoOpenSSL_ObjC",
-                "PartoutCoreWrapper"
-            ],
+            dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
             path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
             exclude: [
                 "lib/COPYING",
