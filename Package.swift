@@ -14,9 +14,9 @@ enum Environment {
 }
 
 let environment: Environment
- environment = .remoteBinary
+environment = .remoteBinary
 // environment = .remoteSource
-//environment = .localSource
+// environment = .localSource
 
 // for action-release-binary-package
 let sha1 = "2d5fb2ef1cf07e557cfe541638469b2263323694"
