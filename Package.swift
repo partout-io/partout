@@ -21,6 +21,28 @@ enum Area: CaseIterable {
     case wireguard
 }
 
+enum OS {
+    case android
+
+    case apple
+
+    case linux
+
+    case windows
+
+    static var current: Self {
+#if os(Android)
+        return .android
+#elseif os(Linux)
+        return .linux
+#elseif os(Windows)
+        return .windows
+#else
+        return .apple
+#endif
+    }
+}
+
 let environment: Environment
 environment = .remoteBinary
 // environment = .remoteSource
@@ -64,30 +86,24 @@ let package = Package(
 )
 
 package.targets.append(contentsOf: [
-    {
-        var dependencies: [Target.Dependency] = [
-            .target(name: "PartoutProviders"),
-            .target(name: "_PartoutPlatformAndroid", condition: .when(platforms: [.android])),
-            .target(name: "_PartoutPlatformApple", condition: .when(platforms: applePlatforms)),
-            .target(name: "_PartoutPlatformAppleNE", condition: .when(platforms: applePlatforms)),
-            .target(name: "_PartoutPlatformLinux", condition: .when(platforms: [.linux])),
-            .target(name: "_PartoutPlatformWindows", condition: .when(platforms: [.windows]))
-        ]
-        if areas.contains(.api) {
-            dependencies.append("PartoutAPI")
-        }
-        if areas.contains(.openvpn) {
-            dependencies.append("_PartoutOpenVPN")
-        }
-        if areas.contains(.wireguard) {
-            dependencies.append("_PartoutWireGuard")
-        }
-        return .target(
-            name: "Partout",
-            dependencies: dependencies,
-            path: "Sources/Partout"
-        )
-    }(),
+    .target(
+        name: "Partout",
+        dependencies: {
+            var dependencies: [Target.Dependency] = ["PartoutProviders"]
+            dependencies.append(contentsOf: OS.current.dependencies)
+            if areas.contains(.api) {
+                dependencies.append("PartoutAPI")
+            }
+            if areas.contains(.openvpn) {
+                dependencies.append("_PartoutOpenVPN")
+            }
+            if areas.contains(.wireguard) {
+                dependencies.append("_PartoutWireGuard")
+            }
+            return dependencies
+        }(),
+        path: "Sources/Partout"
+    ),
     .testTarget(
         name: "PartoutTests",
         dependencies: ["Partout"],
@@ -147,43 +163,88 @@ package.targets.append(
 
 // MARK: Platforms
 
-package.targets.append(contentsOf: [
-    .target(
-        name: "_PartoutPlatformAndroid",
-        dependencies: ["PartoutCoreWrapper"],
-        path: "Sources/Platforms/Android"
-    ),
-    .target(
-        name: "_PartoutPlatformApple",
-        dependencies: ["PartoutCoreWrapper"],
-        path: "Sources/Platforms/Apple"
-    ),
-    .target(
-        name: "_PartoutPlatformAppleNE",
-        dependencies: ["PartoutCoreWrapper"],
-        path: "Sources/Platforms/AppleNE"
-    ),
-    .target(
-        name: "_PartoutPlatformLinux",
-        dependencies: ["PartoutCoreWrapper"],
-        path: "Sources/Platforms/Linux"
-    ),
-    .target(
-        name: "_PartoutPlatformWindows",
-        dependencies: ["PartoutCoreWrapper"],
-        path: "Sources/Platforms/Windows"
-    ),
-    .testTarget(
-        name: "_PartoutPlatformAppleNETests",
-        dependencies: ["_PartoutPlatformAppleNE"],
-        path: "Tests/Platforms/AppleNE"
-    ),
-    .testTarget(
-        name: "_PartoutPlatformAppleTests",
-        dependencies: ["_PartoutPlatformApple"],
-        path: "Tests/Platforms/Apple"
-    )
-])
+extension OS {
+    var dependencies: [Target.Dependency] {
+        switch self {
+        case .android:
+            return ["_PartoutPlatformAndroid"]
+        case .apple:
+            return [
+                "_PartoutPlatformApple",
+                "_PartoutPlatformAppleNE"
+            ]
+        case .linux:
+            return ["_PartoutPlatformLinux"]
+        case .windows:
+            return ["_PartoutPlatformWindows"]
+        }
+    }
+
+    var targets: [Target] {
+        switch self {
+        case .android:
+            return [
+                .target(
+                    name: "_PartoutPlatformAndroid",
+                    dependencies: ["PartoutCoreWrapper"],
+                    path: "Sources/Platforms/Android"
+                )
+            ]
+        case .apple:
+            return [
+                .target(
+                    name: "_PartoutPlatformApple",
+                    dependencies: ["PartoutCoreWrapper"],
+                    path: "Sources/Platforms/Apple"
+                ),
+                .target(
+                    name: "_PartoutPlatformAppleNE",
+                    dependencies: ["PartoutCoreWrapper"],
+                    path: "Sources/Platforms/AppleNE"
+                )
+            ]
+        case .linux:
+            return [
+                .target(
+                    name: "_PartoutPlatformLinux",
+                    dependencies: ["PartoutCoreWrapper"],
+                    path: "Sources/Platforms/Linux"
+                )
+            ]
+        case .windows:
+            return [
+                .target(
+                    name: "_PartoutPlatformWindows",
+                    dependencies: ["PartoutCoreWrapper"],
+                    path: "Sources/Platforms/Windows"
+                )
+            ]
+        }
+    }
+
+    var testTargets: [Target] {
+        switch self {
+        case .apple:
+            return [
+                .testTarget(
+                    name: "_PartoutPlatformAppleNETests",
+                    dependencies: ["_PartoutPlatformAppleNE"],
+                    path: "Tests/Platforms/AppleNE"
+                ),
+                .testTarget(
+                    name: "_PartoutPlatformAppleTests",
+                    dependencies: ["_PartoutPlatformApple"],
+                    path: "Tests/Platforms/Apple"
+                )
+            ]
+        default:
+            return []
+        }
+    }
+}
+
+package.targets.append(contentsOf: OS.current.targets)
+package.targets.append(contentsOf: OS.current.testTargets)
 
 // MARK: Providers
 
