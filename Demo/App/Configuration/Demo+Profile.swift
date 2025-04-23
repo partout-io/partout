@@ -36,11 +36,12 @@ extension Profile {
             var profile = Profile.Builder(id: uuid)
             profile.name = "PartoutDemo"
 
-            let ovpn = OpenVPN.demoModule
-            profile.modules.append(ovpn)
-
-            let wg = WireGuard.demoModule
-            profile.modules.append(wg)
+            if let ovpn = OpenVPN.demoModule {
+                profile.modules.append(ovpn)
+            }
+            if let wg = WireGuard.demoModule {
+                profile.modules.append(wg)
+            }
 
             var dns = DNSModule.Builder()
             dns.protocolType = .https
@@ -66,8 +67,14 @@ extension Profile {
 //            filterModule.disabledMask = [.dns]
 //            profile.modules.append(filterModule.tryBuild())
 
-            profile.activeModulesIds = [ovpn.id, dns.id, ip.id]
-//            profile.activeModulesIds = [wg.id]
+            profile.activeModulesIds = [dns.id, ip.id]
+
+            let vpnModule = profile.modules.first {
+                $0 is OpenVPNModule || $0 is WireGuardModule
+            }
+            if let vpnModule {
+                profile.activeModulesIds.insert(vpnModule.id)
+            }
 
             return try profile.tryBuild()
         } catch {
