@@ -226,10 +226,7 @@ if areas.contains(.api) {
         .testTarget(
             name: "PartoutAPITests",
             dependencies: ["PartoutAPI"],
-            path: "Tests/API",
-            resources: [
-                .copy("Resources")
-            ]
+            path: "Tests/API"
         )
     ])
 }
