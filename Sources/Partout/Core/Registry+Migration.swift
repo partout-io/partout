@@ -34,12 +34,12 @@ extension Registry {
 
     @Sendable
     static func migratedProfile(_ profile: Profile) -> Profile? {
-#if canImport(_PartoutOpenVPN)
         do {
             switch profile.version {
             case nil:
                 var builder = profile.builder(withNewId: false, forUpgrade: true)
 
+#if canImport(_PartoutOpenVPN)
                 // look for OpenVPN provider modules
                 let ovpnPairs: [(offset: Int, module: OpenVPNModule)] = profile.modules
                     .enumerated()
@@ -72,6 +72,7 @@ extension Registry {
                     builder.activeModulesIds.insert(provider.id)
                     builder.activeModulesIds.remove($0.module.id)
                 }
+#endif
 
                 // set new version at the very least
                 return try builder.tryBuild()
@@ -82,8 +83,5 @@ extension Registry {
             pp_log(.core, .error, "Unable to migrate profile \(profile.id): \(error)")
             return nil
         }
-#else
-        nil
-#endif
     }
 }
