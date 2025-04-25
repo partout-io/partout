@@ -223,7 +223,7 @@ extension NETunnelStrategy: NETunnelManagerRepository {
                     } else {
                         $0.onDemandRules = [NEOnDemandRuleConnect()]
                     }
-                    shouldEnableOnDemand = onDemandModule.isEnabled
+                    shouldEnableOnDemand = true
                 } else {
                     shouldEnableOnDemand = false
                 }
