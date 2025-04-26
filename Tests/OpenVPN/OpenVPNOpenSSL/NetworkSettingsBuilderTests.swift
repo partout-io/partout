@@ -129,6 +129,62 @@ final class NetworkSettingsBuilderTests: XCTestCase {
         XCTAssertEqual(sut.ipv6?.defaultGateway?.rawValue, "::6")
     }
 
+    func test_givenSettings_whenBuildIPModule_thenLocalRoutesUseRemoteGateway() throws {
+        var sut: IPModule
+        var remoteOptions = OpenVPN.Configuration.Builder()
+        remoteOptions.routingPolicies = [.IPv4, .IPv6]
+        remoteOptions.ipv4 = IPSettings(
+            subnet: Subnet(try XCTUnwrap(Address(rawValue: "1.1.1.1")), 16)
+        )
+        .including(
+            routes: [
+                Route(defaultWithGateway: try XCTUnwrap(Address(rawValue: "6.6.6.6")))
+            ]
+        )
+        remoteOptions.ipv6 = IPSettings(
+            subnet: Subnet(try XCTUnwrap(Address(rawValue: "1:1::1")), 72)
+        )
+        .including(
+            routes: [
+                Route(defaultWithGateway: try XCTUnwrap(Address(rawValue: "::6")))
+            ]
+        )
+        var localOptions = OpenVPN.Configuration.Builder()
+        localOptions.routes4 = [
+            Route(Subnet(rawValue: "50.50.50.50/24"), nil)
+        ]
+        localOptions.routes6 = [
+            Route(Subnet(rawValue: "50:50::50/64"), nil)
+        ]
+
+        sut = try XCTUnwrap(try builtModule(
+            ofType: IPModule.self,
+            with: remoteOptions,
+            localOptions: localOptions
+        ))
+        XCTAssertEqual(sut.ipv4?.subnet?.rawValue, "1.1.1.1/16")
+        XCTAssertEqual(sut.ipv6?.subnet?.rawValue, "1:1::1/72")
+        XCTAssertEqual(sut.ipv4?.defaultGateway?.rawValue, "6.6.6.6")
+        XCTAssertEqual(sut.ipv6?.defaultGateway?.rawValue, "::6")
+        XCTAssertEqual(sut.ipv4?.includedRoutes, [
+            Route(nil, Address(rawValue: "6.6.6.6")),
+            Route(Subnet(rawValue: "50.50.50.50/24"), Address(rawValue: "6.6.6.6"))
+        ])
+        XCTAssertEqual(sut.ipv6?.includedRoutes, [
+            Route(nil, Address(rawValue: "::6")),
+            Route(Subnet(rawValue: "50:50::50/64"), Address(rawValue: "::6"))
+        ])
+
+        remoteOptions.routingPolicies = []
+        sut = try XCTUnwrap(try builtModule(
+            ofType: IPModule.self,
+            with: remoteOptions,
+            localOptions: localOptions
+        ))
+        XCTAssertNil(sut.ipv4?.defaultGateway?.rawValue)
+        XCTAssertNil(sut.ipv6?.defaultGateway?.rawValue)
+    }
+
     // MARK: DNS
 
     func test_givenSettings_whenBuildDNSModule_thenRequiresServers() throws {
