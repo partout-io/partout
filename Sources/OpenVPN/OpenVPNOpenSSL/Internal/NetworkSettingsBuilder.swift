@@ -190,7 +190,7 @@ private extension NetworkSettingsBuilder {
         target.insert(contentsOf: ipv4.includedRoutes, at: 0)
 
         let routes: [Route] = target.compactMap { route in
-            let ipv4Route = Route(route.destination, route.gateway ?? ipv4.defaultGateway)
+            let ipv4Route = Route(route.destination, route.gateway)
             if route.destination == nil {
                 guard isIPv4Gateway, let gw = route.gateway else {
                     pp_log(.openvpn, .error, "\tIPv4: Ignored default route (not default gateway)")
@@ -216,7 +216,7 @@ private extension NetworkSettingsBuilder {
         target.insert(contentsOf: ipv6.includedRoutes, at: 0)
 
         let routes: [Route] = target.compactMap { route in
-            let ipv6Route = Route(route.destination, route.gateway ?? ipv6.defaultGateway)
+            let ipv6Route = Route(route.destination, route.gateway)
             if route.destination == nil {
                 guard isIPv6Gateway, let gw = route.gateway else {
                     pp_log(.openvpn, .error, "\tIPv6: Ignored default route (not default gateway)")
