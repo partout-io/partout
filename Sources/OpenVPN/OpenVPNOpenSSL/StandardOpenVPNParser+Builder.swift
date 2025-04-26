@@ -671,7 +671,6 @@ extension StandardOpenVPNParser.Builder {
 
             let vpnAddress4 = try Subnet(address4, "255.255.255.255")
             var includedRoutes: [Route] = []
-
             if let defaultGateway4, let defaultGw4Address = Address(rawValue: defaultGateway4) {
                 includedRoutes.append(Route(defaultWithGateway: defaultGw4Address))
             }
@@ -701,17 +700,25 @@ extension StandardOpenVPNParser.Builder {
             guard address6Components.count == 2 else {
                 throw StandardOpenVPNParserError.malformed(option: "ifconfig-ipv6 address must have a /prefix")
             }
-            guard let addressPrefix6 = Int(address6Components[1]) else {
+            guard let vpnPrefix6 = Int(address6Components[1]) else {
                 throw StandardOpenVPNParserError.malformed(option: "ifconfig-ipv6 address prefix must be a 8-bit number")
             }
 
             let address6 = address6Components[0]
             defaultGateway6 = ifconfig6Arguments[1]
 
-            builder.ipv6 = IPSettings(subnet: try Subnet(address6, addressPrefix6))
-            if let defaultGateway6, let defaultGw = Address(rawValue: defaultGateway6) {
-                builder.ipv6 = builder.ipv6?.including(routes: [Route(defaultWithGateway: defaultGw)])
+            let vpnAddress6 = try Subnet(address6, 128)
+            var includedRoutes: [Route] = []
+            if let defaultGateway6, let defaultGw6Address = Address(rawValue: defaultGateway6) {
+                includedRoutes.append(Route(defaultWithGateway: defaultGw6Address))
             }
+            if let vpnNetwork6 = vpnAddress6.address.network(with: vpnPrefix6) {
+                let vpnDestination6 = try Subnet(vpnNetwork6.rawValue, vpnPrefix6)
+                includedRoutes.append(Route(vpnDestination6, vpnAddress6.address))
+            }
+
+            builder.ipv6 = IPSettings(subnet: vpnAddress6)
+                .including(routes: includedRoutes)
         } else {
             defaultGateway6 = nil
         }
