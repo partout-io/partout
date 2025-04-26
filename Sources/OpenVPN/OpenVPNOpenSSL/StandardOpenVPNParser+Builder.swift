@@ -649,7 +649,7 @@ extension StandardOpenVPNParser.Builder {
             }
 
             let address4: String
-            let addressMask4: String
+            let vpnMask4: String?
 
             let topology = Topology(rawValue: optTopology ?? "") ?? .net30
             switch topology {
@@ -660,19 +660,27 @@ extension StandardOpenVPNParser.Builder {
                     throw StandardOpenVPNParserError.malformed(option: "route-gateway takes 1 argument")
                 }
                 address4 = ifconfig4Arguments[0]
-                addressMask4 = ifconfig4Arguments[1]
+                vpnMask4 = ifconfig4Arguments[1]
                 defaultGateway4 = gateway4Arguments[0]
 
             default:
                 address4 = ifconfig4Arguments[0]
-                addressMask4 = "255.255.255.255"
+                vpnMask4 = nil
                 defaultGateway4 = ifconfig4Arguments[1]
             }
 
-            builder.ipv4 = IPSettings(subnet: try Subnet(address4, addressMask4))
-            if let defaultGateway4, let defaultGw = Address(rawValue: defaultGateway4) {
-                builder.ipv4 = builder.ipv4?.including(routes: [Route(defaultWithGateway: defaultGw)])
+            let vpnAddress4 = try Subnet(address4, 32)
+            var includedRoutes: [Route] = []
+            if let defaultGateway4, let defaultGw4Address = Address(rawValue: defaultGateway4) {
+                includedRoutes.append(Route(defaultWithGateway: defaultGw4Address))
             }
+            if let vpnMask4, let vpnNetwork4 = vpnAddress4.address.network(with: vpnMask4) {
+                let vpnDestination4 = try Subnet(vpnNetwork4.rawValue, vpnMask4)
+                includedRoutes.append(Route(vpnDestination4, vpnAddress4.address))
+            }
+
+            builder.ipv4 = IPSettings(subnet: vpnAddress4)
+                .including(routes: includedRoutes)
         } else {
             defaultGateway4 = nil
         }
@@ -692,17 +700,25 @@ extension StandardOpenVPNParser.Builder {
             guard address6Components.count == 2 else {
                 throw StandardOpenVPNParserError.malformed(option: "ifconfig-ipv6 address must have a /prefix")
             }
-            guard let addressPrefix6 = Int(address6Components[1]) else {
+            guard let vpnPrefix6 = Int(address6Components[1]) else {
                 throw StandardOpenVPNParserError.malformed(option: "ifconfig-ipv6 address prefix must be a 8-bit number")
             }
 
             let address6 = address6Components[0]
             defaultGateway6 = ifconfig6Arguments[1]
 
-            builder.ipv6 = IPSettings(subnet: try Subnet(address6, addressPrefix6))
-            if let defaultGateway6, let defaultGw = Address(rawValue: defaultGateway6) {
-                builder.ipv6 = builder.ipv6?.including(routes: [Route(defaultWithGateway: defaultGw)])
+            let vpnAddress6 = try Subnet(address6, 128)
+            var includedRoutes: [Route] = []
+            if let defaultGateway6, let defaultGw6Address = Address(rawValue: defaultGateway6) {
+                includedRoutes.append(Route(defaultWithGateway: defaultGw6Address))
             }
+            if let vpnNetwork6 = vpnAddress6.address.network(with: vpnPrefix6) {
+                let vpnDestination6 = try Subnet(vpnNetwork6.rawValue, vpnPrefix6)
+                includedRoutes.append(Route(vpnDestination6, vpnAddress6.address))
+            }
+
+            builder.ipv6 = IPSettings(subnet: vpnAddress6)
+                .including(routes: includedRoutes)
         } else {
             defaultGateway6 = nil
         }

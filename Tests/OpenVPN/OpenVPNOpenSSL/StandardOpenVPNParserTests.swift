@@ -175,6 +175,26 @@ final class StandardOpenVPNParserTests: XCTestCase {
             _ = try? parser.parsed(fromLines: lines)
         }
     }
+
+    // MARK: Routes
+
+    func test_givenIfconfig_whenParse_thenIncludesNetworkRoutes() throws {
+        let line = "PUSH_REPLY,route-gateway 172.31.2.1,route-gateway 172.31.2.1,topology subnet,ping 10,ping-restart 120,route 192.168.41.0 255.255.255.0,route 192.168.50.0 255.255.255.0,route 192.168.42.0 255.255.255.0,route 192.168.43.0 255.255.255.0,route 192.168.44.0 255.255.255.0,route 192.168.45.0 255.255.255.0,route 192.168.70.0 255.255.255.0,route 192.168.31.0 255.255.255.0,dhcp-option DNS 192.168.41.2,dhcp-option DNS 192.168.44.11,ifconfig 172.31.2.6 255.255.255.0,ifconfig-ipv6 1234::12/10 1234::1,"
+
+        let pushReply = try XCTUnwrap(parser.pushReply(with: line))
+
+        XCTAssertEqual(pushReply.options.ipv4?.subnet, Subnet(rawValue: "172.31.2.6/32"))
+        XCTAssertEqual(pushReply.options.ipv4?.includedRoutes, [
+            Route(defaultWithGateway: Address(rawValue: "172.31.2.1")),
+            Route(Subnet(rawValue: "172.31.2.0/24"), Address(rawValue: "172.31.2.6"))
+        ])
+
+        XCTAssertEqual(pushReply.options.ipv6?.subnet, Subnet(rawValue: "1234::12/128"))
+        XCTAssertEqual(pushReply.options.ipv6?.includedRoutes, [
+            Route(defaultWithGateway: Address(rawValue: "1234::1")),
+            Route(Subnet(rawValue: "1200::/10"), Address(rawValue: "1234::12"))
+        ])
+    }
 }
 
 // MARK: - Helpers
