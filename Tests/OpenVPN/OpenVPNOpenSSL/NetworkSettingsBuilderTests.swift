@@ -168,11 +168,11 @@ final class NetworkSettingsBuilderTests: XCTestCase {
         XCTAssertEqual(sut.ipv6?.defaultGateway?.rawValue, "::6")
         XCTAssertEqual(sut.ipv4?.includedRoutes, [
             Route(nil, Address(rawValue: "6.6.6.6")),
-            Route(Subnet(rawValue: "50.50.50.50/24"), Address(rawValue: "6.6.6.6"))
+            Route(Subnet(rawValue: "50.50.50.50/24"), nil)
         ])
         XCTAssertEqual(sut.ipv6?.includedRoutes, [
             Route(nil, Address(rawValue: "::6")),
-            Route(Subnet(rawValue: "50:50::50/64"), Address(rawValue: "::6"))
+            Route(Subnet(rawValue: "50:50::50/64"), nil)
         ])
 
         remoteOptions.routingPolicies = []
