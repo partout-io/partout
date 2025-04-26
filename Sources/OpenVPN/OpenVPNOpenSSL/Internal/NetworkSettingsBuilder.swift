@@ -193,6 +193,7 @@ private extension NetworkSettingsBuilder {
             let ipv4Route = Route(route.destination, route.gateway)
             if route.destination == nil {
                 guard isIPv4Gateway, let gw = route.gateway else {
+                    pp_log(.openvpn, .error, "\tIPv4: Ignored default route (not default gateway)")
                     return nil
                 }
                 pp_log(.openvpn, .info, "\tIPv4: Set default gateway to \(gw)")
@@ -218,6 +219,7 @@ private extension NetworkSettingsBuilder {
             let ipv6Route = Route(route.destination, route.gateway)
             if route.destination == nil {
                 guard isIPv6Gateway, let gw = route.gateway else {
+                    pp_log(.openvpn, .error, "\tIPv6: Ignored default route (not default gateway)")
                     return nil
                 }
                 pp_log(.openvpn, .info, "\tIPv6: Set default gateway to \(gw)")

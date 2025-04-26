@@ -679,9 +679,7 @@ extension StandardOpenVPNParser.Builder {
 
         builder.routes4 = try optRoutes4?.compactMap { tuple in
             let subnet = try Subnet(tuple.address, tuple.netmask)
-            guard let gateway = (tuple.gateway ?? defaultGateway4).map(Address.init(rawValue:)) ?? nil else {
-                return nil
-            }
+            let gateway = (tuple.gateway ?? defaultGateway4).map(Address.init(rawValue:)) ?? nil
             return Route(subnet, gateway)
         }
 
@@ -711,9 +709,7 @@ extension StandardOpenVPNParser.Builder {
 
         builder.routes6 = try optRoutes6?.compactMap { tuple in
             let subnet = try Subnet(tuple.destination, tuple.prefix)
-            guard let gateway = (tuple.gateway ?? defaultGateway6).map(Address.init(rawValue:)) ?? nil else {
-                return nil
-            }
+            let gateway = (tuple.gateway ?? defaultGateway6).map(Address.init(rawValue:)) ?? nil
             return Route(subnet, gateway)
         }
 
