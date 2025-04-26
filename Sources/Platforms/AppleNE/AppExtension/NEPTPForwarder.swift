@@ -35,6 +35,8 @@ public actor NEPTPForwarder {
         daemon.profile
     }
 
+    public let originalProfile: Profile
+
     public init(
         provider: NEPacketTunnelProvider,
         decoder: NEProtocolDecoder,
@@ -77,6 +79,7 @@ public actor NEPTPForwarder {
             willStart: willStart
         )
         daemon = SimpleConnectionDaemon(params: params)
+        originalProfile = controller.originalProfile
     }
 
     deinit {

@@ -35,6 +35,8 @@ public final class NETunnelController: TunnelController {
 
     public let profile: Profile
 
+    public let originalProfile: Profile
+
     public init(
         provider: NEPacketTunnelProvider,
         decoder: NEProtocolDecoder,
@@ -48,8 +50,8 @@ public final class NETunnelController: TunnelController {
         self.provider = provider
         self.environment = environment
 
-        let baseProfile = try decoder.profile(from: tunnelConfiguration)
-        let profile = try registry.resolvedProfile(baseProfile)
+        originalProfile = try decoder.profile(from: tunnelConfiguration)
+        let profile = try registry.resolvedProfile(originalProfile)
         self.profile = try await willProcess?(profile) ?? profile
     }
 
