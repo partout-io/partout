@@ -669,7 +669,7 @@ extension StandardOpenVPNParser.Builder {
                 defaultGateway4 = ifconfig4Arguments[1]
             }
 
-            let vpnAddress4 = try Subnet(address4, "255.255.255.255")
+            let vpnAddress4 = try Subnet(address4, 32)
             var includedRoutes: [Route] = []
             if let defaultGateway4, let defaultGw4Address = Address(rawValue: defaultGateway4) {
                 includedRoutes.append(Route(defaultWithGateway: defaultGw4Address))
