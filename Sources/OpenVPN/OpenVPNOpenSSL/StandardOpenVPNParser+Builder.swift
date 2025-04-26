@@ -649,7 +649,7 @@ extension StandardOpenVPNParser.Builder {
             }
 
             let address4: String
-            let addressMask4: String
+            let vpnMask4: String?
 
             let topology = Topology(rawValue: optTopology ?? "") ?? .net30
             switch topology {
@@ -660,19 +660,28 @@ extension StandardOpenVPNParser.Builder {
                     throw StandardOpenVPNParserError.malformed(option: "route-gateway takes 1 argument")
                 }
                 address4 = ifconfig4Arguments[0]
-                addressMask4 = ifconfig4Arguments[1]
+                vpnMask4 = ifconfig4Arguments[1]
                 defaultGateway4 = gateway4Arguments[0]
 
             default:
                 address4 = ifconfig4Arguments[0]
-                addressMask4 = "255.255.255.255"
+                vpnMask4 = nil
                 defaultGateway4 = ifconfig4Arguments[1]
             }
 
-            builder.ipv4 = IPSettings(subnet: try Subnet(address4, addressMask4))
-            if let defaultGateway4, let defaultGw = Address(rawValue: defaultGateway4) {
-                builder.ipv4 = builder.ipv4?.including(routes: [Route(defaultWithGateway: defaultGw)])
+            let vpnAddress4 = try Subnet(address4, "255.255.255.255")
+            var includedRoutes: [Route] = []
+
+            if let defaultGateway4, let defaultGw4Address = Address(rawValue: defaultGateway4) {
+                includedRoutes.append(Route(defaultWithGateway: defaultGw4Address))
             }
+            if let vpnMask4, let vpnNetwork4 = vpnAddress4.address.network(with: vpnMask4) {
+                let vpnDestination4 = try Subnet(vpnNetwork4.rawValue, vpnMask4)
+                includedRoutes.append(Route(vpnDestination4, vpnAddress4.address))
+            }
+
+            builder.ipv4 = IPSettings(subnet: vpnAddress4)
+                .including(routes: includedRoutes)
         } else {
             defaultGateway4 = nil
         }
