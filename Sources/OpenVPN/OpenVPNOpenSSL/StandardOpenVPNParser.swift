@@ -64,6 +64,9 @@ public final class StandardOpenVPNParser {
         /// The overall parsed ``OpenVPN/Configuration``.
         public let configuration: OpenVPN.Configuration
 
+        /// The inline credentials.
+        public let credentials: OpenVPN.Credentials?
+
         /// Holds an optional `ConfigurationError` that didn't block the parser, but it would be worth taking care of.
         public let warning: StandardOpenVPNParserError?
     }
@@ -176,6 +179,7 @@ private extension StandardOpenVPNParser {
         return Result(
             url: originalURL,
             configuration: result.configuration,
+            credentials: result.credentials,
             warning: result.warning
         )
     }
@@ -196,7 +200,8 @@ extension StandardOpenVPNParser: ModuleImporter {
         do {
             let passphrase = object as? String
             let result = try parsed(fromContents: contents, passphrase: passphrase)
-            let builder = OpenVPNModule.Builder(configurationBuilder: result.configuration.builder())
+            var builder = OpenVPNModule.Builder(configurationBuilder: result.configuration.builder())
+            builder.credentials = result.credentials
             return try builder.tryBuild()
         } catch let error as StandardOpenVPNParserError {
             switch error {
