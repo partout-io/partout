@@ -536,7 +536,7 @@ extension StandardOpenVPNParser.Builder {
 // MARK: - Building
 
 extension StandardOpenVPNParser.Builder {
-    func build(isClient: Bool, passphrase: String?) throws -> (configuration: OpenVPN.Configuration, credentials: OpenVPN.Credentials?, warning: StandardOpenVPNParserError?) {
+    func build(isClient: Bool, passphrase: String?) throws -> StandardOpenVPNParser.Result {
 
         // ensure that non-nil network settings also imply non-empty
         if let array = optRoutes4 {
@@ -780,7 +780,12 @@ extension StandardOpenVPNParser.Builder {
         //
 
         let configuration = try builder.tryBuild(isClient: isClient)
-        return (configuration, optCredentials, optWarning)
+        return StandardOpenVPNParser.Result(
+            url: nil,
+            configuration: configuration,
+            credentials: optCredentials,
+            warning: optWarning
+        )
     }
 }
 
