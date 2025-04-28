@@ -41,7 +41,7 @@ extension StandardOpenVPNParser {
 
         case connectionProxy = "^\\w+-proxy"
 
-        case externalFiles = "^(ca|cert|key|tls-auth|tls-crypt) "
+        case externalFiles = "^(auth-user-pass|ca|cert|key|tls-auth|tls-crypt) "
 
         // MARK: General
 

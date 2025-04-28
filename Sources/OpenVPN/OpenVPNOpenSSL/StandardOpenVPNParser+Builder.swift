@@ -46,6 +46,7 @@ extension StandardOpenVPNParser {
         private var optKeepAliveSeconds: TimeInterval?
         private var optKeepAliveTimeoutSeconds: TimeInterval?
         private var optRenegotiateAfterSeconds: TimeInterval?
+        private var optCredentials: OpenVPN.Credentials?
         //
         private var optDefaultProto: IPSocketType?
         private var optDefaultPort: UInt16?
@@ -142,6 +143,14 @@ extension StandardOpenVPNParser.Builder {
 
             // first is opening tag
             switch blockName {
+            case "auth-user-pass":
+                guard !currentBlock.isEmpty else {
+                    break
+                }
+                let username = currentBlock[0]
+                let password = currentBlock.count > 1 ? currentBlock[1] : ""
+                optCredentials = OpenVPN.Credentials.Builder(username: username, password: password).build()
+
             case "ca":
                 optCA = OpenVPN.CryptoContainer(pem: currentBlock.joined(separator: "\n"))
 
@@ -527,7 +536,7 @@ extension StandardOpenVPNParser.Builder {
 // MARK: - Building
 
 extension StandardOpenVPNParser.Builder {
-    func build(isClient: Bool, passphrase: String?) throws -> (configuration: OpenVPN.Configuration, warning: StandardOpenVPNParserError?) {
+    func build(isClient: Bool, passphrase: String?) throws -> StandardOpenVPNParser.Result {
 
         // ensure that non-nil network settings also imply non-empty
         if let array = optRoutes4 {
@@ -771,7 +780,12 @@ extension StandardOpenVPNParser.Builder {
         //
 
         let configuration = try builder.tryBuild(isClient: isClient)
-        return (configuration, optWarning)
+        return StandardOpenVPNParser.Result(
+            url: nil,
+            configuration: configuration,
+            credentials: optCredentials,
+            warning: optWarning
+        )
     }
 }
 
