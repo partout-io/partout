@@ -69,6 +69,7 @@ By contributing to this project you are agreeing to the terms stated in the [Con
 ## Credits
 
 - [GenericJSON][credits-genericjson]
+- [Tejas Mehta][credits-tmthecoder] for the implementation of the [OpenVPN XOR patch][credits-tmthecoder-xor]
 
 ### OpenVPN
 
@@ -92,6 +93,8 @@ Website: [passepartoutvpn.app][about-website]
 
 [github-releases]: https://github.com/passepartoutvpn/partout/releases
 [credits-genericjson]: https://github.com/iwill/generic-json-swift
+[credits-tmthecoder]: https://github.com/tmthecoder
+[credits-tmthecoder-xor]: https://github.com/passepartoutvpn/tunnelkit/pull/255
 
 [about-twitter]: https://twitter.com/keeshux
 [about-website]: https://passepartoutvpn.app
