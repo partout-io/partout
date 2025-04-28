@@ -40,6 +40,6 @@ extension PartoutConfiguration {
 #elseif canImport(_PartoutPlatformWindows)
     public static nonisolated let platform: PlatformFactory = WindowsPlatformFactory()
 #else
-    public static nonisolated let platform: PlatformFactory = UnsupportedPlatformFactory()
+    public static nonisolated let platform: PlatformFactory = UnsupportedPlatformFactory.shared
 #endif
 }
