@@ -40,18 +40,18 @@ extension API.V6 {
 
         private let timeout: TimeInterval
 
-        private let engineFactory: (URL?, ProviderCache?, TimeInterval) -> APIEngine.ScriptExecutor
+        private let executorFactory: (URL?, ProviderCache?, TimeInterval) -> APIEngine.ScriptExecutor
 
         public init(
             baseURL: URL,
             infrastructureURL: ((ProviderID) -> URL)? = nil,
             timeout: TimeInterval = 10.0,
-            engineFactory: @escaping (URL?, ProviderCache?, TimeInterval) -> APIEngine.ScriptExecutor
+            executorFactory: @escaping (URL?, ProviderCache?, TimeInterval) -> APIEngine.ScriptExecutor
         ) {
             self.baseURL = baseURL
             self.infrastructureURL = infrastructureURL
             self.timeout = timeout
-            self.engineFactory = engineFactory
+            self.executorFactory = executorFactory
         }
 
         public func index() async throws -> [Provider] {
@@ -79,8 +79,8 @@ extension API.V6 {
             }
 //            let lines = script.components(separatedBy: "\n")
             let resultURL = infrastructureURL?(providerId)
-            let engine = engineFactory(resultURL, cache, timeout)
-            return try await engine.fetchInfrastructure(with: script)
+            let executor = executorFactory(resultURL, cache, timeout)
+            return try await executor.fetchInfrastructure(with: script)
         }
     }
 }

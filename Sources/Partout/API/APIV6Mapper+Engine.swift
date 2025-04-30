@@ -33,7 +33,7 @@ import PartoutAPI
 import PartoutCore
 
 extension API.V6 {
-    final class DefaultScriptExecutor: APIEngine.ScriptExecutor {
+    final class DefaultScriptExecutor {
 
         // override the URL for getText/getJSON
         private let resultURL: URL?
@@ -42,43 +42,45 @@ extension API.V6 {
 
         private let timeout: TimeInterval
 
-        private let engine: ScriptingEngine
+        private let engine: APIScriptingEngine
 
-        init(resultURL: URL?, cache: ProviderCache?, timeout: TimeInterval, engine: ScriptingEngine) {
+        init(resultURL: URL?, cache: ProviderCache?, timeout: TimeInterval, engine: APIScriptingEngine) {
             self.resultURL = resultURL
             self.cache = cache
             self.timeout = timeout
             self.engine = engine
 
-            engine.inject("getText", object: getText as @convention(block) (String) -> Any?)
-            engine.inject("getJSON", object: getJSON as @convention(block) (String) -> Any?)
-            engine.inject("jsonToBase64", object: jsonToBase64 as @convention(block) (Any) -> String?)
-            engine.inject("ipV4ToBase64", object: ipV4ToBase64 as @convention(block) (String) -> String?)
-            engine.inject("openVPNTLSWrap", object: openVPNTLSWrap as @convention(block) (String, String) -> [String: Any]?)
-            engine.inject("debug", object: debug as @convention(block) (String) -> Void)
-        }
-
-        func fetchInfrastructure(with script: String) async throws -> ProviderInfrastructure {
-            let result = try await engine.execute(
-                "JSON.stringify(getInfrastructure())",
-                after: script,
-                returning: APIEngine.ScriptResult<ProviderInfrastructure>.self
-            )
-            guard let response = result.response else {
-                switch result.error {
-                case .cached:
-                    throw PartoutError(.cached)
-                default:
-                    throw PartoutError(.scriptException, result.error?.rawValue ?? "unknown")
-                }
-            }
-            return response
+            engine.inject(from: self)
         }
     }
 }
 
-private extension API.V6.DefaultScriptExecutor {
-    final class ResultStorage: @unchecked Sendable {
+// MARK: - ScriptExecutor
+
+extension API.V6.DefaultScriptExecutor: APIEngine.ScriptExecutor {
+    func fetchInfrastructure(with script: String) async throws -> ProviderInfrastructure {
+        // FIXME: ###, coupled to JavaScript
+        let result = try await engine.execute(
+            "JSON.stringify(getInfrastructure())",
+            after: script,
+            returning: APIEngine.ScriptResult<ProviderInfrastructure>.self
+        )
+        guard let response = result.response else {
+            switch result.error {
+            case .cached:
+                throw PartoutError(.cached)
+            default:
+                throw PartoutError(.scriptException, result.error?.rawValue ?? "unknown")
+            }
+        }
+        return response
+    }
+}
+
+// MARK: - VirtualMachine
+
+extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
+    private final class ResultStorage: @unchecked Sendable {
         var textData: Data?
 
         var lastModified: Date?

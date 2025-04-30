@@ -32,6 +32,10 @@ public protocol PlatformFactory {
     func newDNSResolver() -> DNSResolver
 
     func newScriptingEngine() -> ScriptingEngine
+
+#if canImport(PartoutAPI)
+    func newAPIScriptingEngine() -> APIScriptingEngine
+#endif
 }
 
 extension PartoutConfiguration {

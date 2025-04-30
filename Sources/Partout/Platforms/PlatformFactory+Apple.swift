@@ -48,4 +48,25 @@ public struct ApplePlatformFactory: PlatformFactory {
     }
 }
 
+#if canImport(PartoutAPI)
+
+extension ApplePlatformFactory {
+    public func newAPIScriptingEngine() -> APIScriptingEngine {
+        AppleJavaScriptEngine()
+    }
+}
+
+extension AppleJavaScriptEngine: APIScriptingEngine {
+    public func inject(from vm: APIEngine.VirtualMachine) {
+        inject("getText", object: vm.getText as @convention(block) (String) -> Any?)
+        inject("getJSON", object: vm.getJSON as @convention(block) (String) -> Any?)
+        inject("jsonToBase64", object: vm.jsonToBase64 as @convention(block) (Any) -> String?)
+        inject("ipV4ToBase64", object: vm.ipV4ToBase64 as @convention(block) (String) -> String?)
+        inject("openVPNTLSWrap", object: vm.openVPNTLSWrap as @convention(block) (String, String) -> [String: Any]?)
+        inject("debug", object: vm.debug as @convention(block) (String) -> Void)
+    }
+}
+
+#endif
+
 #endif
