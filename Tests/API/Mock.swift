@@ -78,36 +78,30 @@ extension MockRepository: ObservableObject {
 #endif
 
 final class MockRepository: APIRepository {
+    private let providersSubject = CurrentValueStream<[Provider]>([])
 
-#if canImport(Combine)
-    @Published
-#endif
-    private(set) var providers: [Provider] = []
+    private let infrastructuresSubject = CurrentValueStream<[ProviderID: ProviderInfrastructure]>([:])
 
-#if canImport(Combine)
-    @Published
-#endif
-    private(set) var infrastructures: [ProviderID: ProviderInfrastructure] = [:]
-
-    var indexPublisher: AnyPublisher<[Provider], Never> {
-        $providers
-            .eraseToAnyPublisher()
+    var indexStream: AsyncStream<[Provider]> {
+        providersSubject.subscribe()
     }
 
-    var cachePublisher: AnyPublisher<[ProviderID: ProviderCache], Never> {
-        $infrastructures
+    var cacheStream: AsyncStream<[ProviderID: ProviderCache]> {
+        infrastructuresSubject
+            .subscribe()
             .map {
                 $0.compactMapValues(\.cache)
             }
-            .eraseToAnyPublisher()
     }
 
     func store(_ providers: [Provider]) async throws {
-        self.providers = providers
+        providersSubject.send(providers)
     }
 
     func store(_ infrastructure: ProviderInfrastructure, for providerId: ProviderID) async throws {
-        infrastructures[providerId] = infrastructure
+        var newValue = infrastructuresSubject.value
+        newValue[providerId] = infrastructure
+        infrastructuresSubject.send(newValue)
     }
 
     func presets(for server: ProviderServer, moduleType: ModuleType) async throws -> [ProviderPreset] {
@@ -115,7 +109,7 @@ final class MockRepository: APIRepository {
     }
 
     func providerRepository(for providerId: ProviderID) -> ProviderRepository {
-        let infra = infrastructures[providerId]
+        let infra = infrastructuresSubject.value[providerId]
         let repo = MockVPNRepository(providerId: providerId)
         repo.allServers = infra?.servers ?? []
         repo.allPresets = infra?.presets ?? []

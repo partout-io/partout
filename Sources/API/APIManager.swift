@@ -61,7 +61,7 @@ public final class APIManager {
 #endif
     private var pendingServices: Set<PendingService> = []
 
-    private var subscriptions: Set<AnyCancellable>
+    private var subscriptions: [Task<Void, Never>]
 
     public var isLoading: Bool {
         !pendingServices.isEmpty
@@ -172,20 +172,33 @@ public final class APIManager {
 
 private extension APIManager {
     func observeObjects() {
-        repository
-            .indexPublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] in
-                self?.providers = $0
-            }
-            .store(in: &subscriptions)
+        subscriptions.forEach {
+            $0.cancel()
+        }
+        subscriptions = []
 
-        repository
-            .cachePublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] in
-                self?.cache = $0
+        subscriptions.append(Task { @MainActor [weak self] in
+            guard let self else {
+                return
             }
-            .store(in: &subscriptions)
+            for await providers in repository.indexStream {
+                guard !Task.isCancelled else {
+                    return
+                }
+                self.providers = providers
+            }
+        })
+
+        subscriptions.append(Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+            for await cache in repository.cacheStream {
+                guard !Task.isCancelled else {
+                    return
+                }
+                self.cache = cache
+            }
+        })
     }
 }

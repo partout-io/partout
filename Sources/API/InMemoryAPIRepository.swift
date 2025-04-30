@@ -23,34 +23,32 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Combine
 import Foundation
 import PartoutCore
 import PartoutProviders
 
 public final class InMemoryAPIRepository: APIRepositoryReader, APIRepositoryWriter {
-    private let providersSubject: CurrentValueSubject<[Provider], Never>
+    private let providersSubject: CurrentValueStream<[Provider]>
 
-    private let infrastructuresSubject: CurrentValueSubject<[ProviderID: ProviderInfrastructure], Never>
+    private let infrastructuresSubject: CurrentValueStream<[ProviderID: ProviderInfrastructure]>
 
     public init() {
-        providersSubject = CurrentValueSubject([])
-        infrastructuresSubject = CurrentValueSubject([:])
+        providersSubject = CurrentValueStream([])
+        infrastructuresSubject = CurrentValueStream([:])
     }
 
     // MARK: ProviderRepositoryReader
 
-    public var indexPublisher: AnyPublisher<[Provider], Never> {
-        providersSubject
-            .eraseToAnyPublisher()
+    public var indexStream: AsyncStream<[Provider]> {
+        providersSubject.subscribe()
     }
 
-    public var cachePublisher: AnyPublisher<[ProviderID: ProviderCache], Never> {
+    public var cacheStream: AsyncStream<[ProviderID: ProviderCache]> {
         infrastructuresSubject
+            .subscribe()
             .map {
                 $0.compactMapValues(\.cache)
             }
-            .eraseToAnyPublisher()
     }
 
     public func presets(for server: ProviderServer, moduleType: ModuleType) async throws -> [ProviderPreset] {
@@ -90,15 +88,18 @@ public final class InMemoryAPIRepository: APIRepositoryReader, APIRepositoryWrit
                 return
             }
         }
-        infrastructuresSubject.value[providerId] = infrastructure
+        var newValue = infrastructuresSubject.value
+        newValue[providerId] = infrastructure
+        infrastructuresSubject.send(newValue)
     }
 
     public func resetCache(for providerIds: [ProviderID]?) async {
         if let providerIds {
-            infrastructuresSubject.value = infrastructuresSubject.value
+            let newValue = infrastructuresSubject.value
                 .filter {
                     !providerIds.contains($0.key)
                 }
+            infrastructuresSubject.send(newValue)
             return
         }
         infrastructuresSubject.send([:])

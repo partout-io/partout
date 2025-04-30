@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Combine
 import Foundation
 import PartoutCore
 import PartoutProviders
@@ -31,9 +30,9 @@ import PartoutProviders
 public typealias APIRepository = APIRepositoryReader & APIRepositoryWriter
 
 public protocol APIRepositoryReader {
-    var indexPublisher: AnyPublisher<[Provider], Never> { get }
+    var indexStream: AsyncStream<[Provider]> { get }
 
-    var cachePublisher: AnyPublisher<[ProviderID: ProviderCache], Never> { get }
+    var cacheStream: AsyncStream<[ProviderID: ProviderCache]> { get }
 
     func presets(for server: ProviderServer, moduleType: ModuleType) async throws -> [ProviderPreset]
 
