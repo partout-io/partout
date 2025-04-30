@@ -78,6 +78,16 @@ extension API.V6 {
 }
 
 private extension API.V6.DefaultScriptExecutor {
+    struct ResultStorage: Sendable {
+        var textData: Data?
+
+        var lastModified: Date?
+
+        var tag: String?
+
+        var isCached = false
+    }
+
     func getResult(urlString: String) -> APIEngine.GetResult {
         pp_log(.api, .info, "JS.getResult: Execute with URL: \(resultURL?.absoluteString ?? urlString)")
         guard let url = resultURL ?? URL(string: urlString) else {
@@ -103,43 +113,44 @@ private extension API.V6.DefaultScriptExecutor {
         }
 
         let semaphore = DispatchSemaphore(value: 0)
-        var textData: Data?
-        var lastModified: Date?
-        var tag: String?
-        var isCached = false
+        var resultStorage: ResultStorage?
         let task = session.dataTask(with: request) { data, response, error in
+            var storage = ResultStorage()
             if let error {
                 pp_log(.api, .error, "JS.getResult: Unable to execute: \(error)")
             } else if let httpResponse = response as? HTTPURLResponse {
                 let lastModifiedHeader = httpResponse.value(forHTTPHeaderField: "last-modified")
-                tag = httpResponse.value(forHTTPHeaderField: "etag")
+                let tag = httpResponse.value(forHTTPHeaderField: "etag")
 
                 pp_log(.api, .debug, "JS.getResult: Response: \(httpResponse)")
                 pp_log(.api, .info, "JS.getResult: HTTP \(httpResponse.statusCode)")
                 if let lastModifiedHeader {
                     pp_log(.api, .info, "JS.getResult: Last-Modified: \(lastModifiedHeader)")
-                    lastModified = lastModifiedHeader.fromRFC1123()
+                    storage.lastModified = lastModifiedHeader.fromRFC1123()
                 }
                 if let tag {
                     pp_log(.api, .info, "JS.getResult: ETag: \(tag)")
+                    storage.tag = tag
                 }
-                isCached = httpResponse.statusCode == 304
+                storage.isCached = httpResponse.statusCode == 304
             }
-            textData = data
+            storage.textData = data
+            resultStorage = storage
             semaphore.signal()
         }
         task.resume()
         semaphore.wait()
 
-        guard let textData else {
+        guard let textData = resultStorage?.textData else {
             pp_log(.api, .error, "JS.getResult: Empty response")
             return APIEngine.GetResult(.network)
         }
+        let isCached = resultStorage?.isCached == true
         pp_log(.api, .info, "JS.getResult: Success (cached: \(isCached))")
         return APIEngine.GetResult(
             textData,
-            lastModified: lastModified,
-            tag: tag,
+            lastModified: resultStorage?.lastModified,
+            tag: resultStorage?.tag,
             isCached: isCached
         )
     }
