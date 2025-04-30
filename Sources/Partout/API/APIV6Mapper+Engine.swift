@@ -78,7 +78,7 @@ extension API.V6 {
 }
 
 private extension API.V6.DefaultScriptExecutor {
-    struct ResultStorage: Sendable {
+    struct ResultStorage: @unchecked Sendable {
         var textData: Data?
 
         var lastModified: Date?
