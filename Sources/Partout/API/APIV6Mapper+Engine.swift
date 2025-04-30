@@ -113,7 +113,7 @@ private extension API.V6.DefaultScriptExecutor {
         }
 
         let semaphore = DispatchSemaphore(value: 0)
-        var storage = ResultStorage()
+        let storage = ResultStorage()
         let task = session.dataTask(with: request) { data, response, error in
             if let error {
                 pp_log(.api, .error, "JS.getResult: Unable to execute: \(error)")
