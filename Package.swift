@@ -8,6 +8,8 @@ enum Environment {
 
     case remoteSource
 
+    case localBinary
+
     case localSource
 }
 
@@ -46,6 +48,7 @@ enum OS {
 let environment: Environment
 environment = .remoteBinary
 // environment = .remoteSource
+// environment = .localBinary
 // environment = .localSource
 
 let areas: Set<Area> = Set(Area.allCases)
@@ -139,6 +142,11 @@ case .remoteSource:
             .product(name: "PartoutCore", package: "partout-core")
         ],
         path: "Sources/Core"
+    ))
+case .localBinary:
+    package.targets.append(.binaryTarget(
+        name: "PartoutCoreWrapper",
+        path: "../partout-core/PartoutCore.xcframework"
     ))
 case .localSource:
     package.dependencies.append(
