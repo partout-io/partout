@@ -59,7 +59,9 @@ extension ProviderManager {
         self.moduleType = moduleType
         self.repository = repository
         options = try await repository.availableOptions(for: moduleType)
+#if canImport(Combine)
         objectWillChange.send()
+#endif
     }
 
     public var providerId: ProviderID {

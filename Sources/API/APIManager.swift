@@ -94,7 +94,9 @@ public final class APIManager {
                 let index = try await api.index()
                 try Task.checkCancellation()
                 try await repository.store(index)
+#if canImport(Combine)
                 objectWillChange.send()
+#endif
                 return
             } catch {
                 lastError = error
@@ -125,7 +127,9 @@ public final class APIManager {
                 let infrastructure = try await api.infrastructure(for: providerId, cache: lastCache)
                 try Task.checkCancellation()
                 try await repository.store(infrastructure, for: providerId)
+#if canImport(Combine)
                 objectWillChange.send()
+#endif
                 return
             } catch {
                 if (error as? PartoutError)?.code == .cached {
