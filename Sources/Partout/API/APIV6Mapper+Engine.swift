@@ -50,6 +50,7 @@ extension API.V6 {
             self.timeout = timeout
             self.engine = engine
 
+            // inject functions from the platform-specific virtual machine
             engine.inject(from: self)
         }
     }
@@ -59,7 +60,7 @@ extension API.V6 {
 
 extension API.V6.DefaultScriptExecutor: APIEngine.ScriptExecutor {
     func fetchInfrastructure(with script: String) async throws -> ProviderInfrastructure {
-        // FIXME: ###, coupled to JavaScript
+        // TODO: #partout/54, assumes engine to be JavaScript
         let result = try await engine.execute(
             "JSON.stringify(getInfrastructure())",
             after: script,
