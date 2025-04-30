@@ -78,7 +78,7 @@ extension API.V6 {
 }
 
 private extension API.V6.DefaultScriptExecutor {
-    struct ResultStorage: @unchecked Sendable {
+    final class ResultStorage: @unchecked Sendable {
         var textData: Data?
 
         var lastModified: Date?
@@ -113,9 +113,8 @@ private extension API.V6.DefaultScriptExecutor {
         }
 
         let semaphore = DispatchSemaphore(value: 0)
-        var resultStorage: ResultStorage?
+        var storage = ResultStorage()
         let task = session.dataTask(with: request) { data, response, error in
-            var storage = ResultStorage()
             if let error {
                 pp_log(.api, .error, "JS.getResult: Unable to execute: \(error)")
             } else if let httpResponse = response as? HTTPURLResponse {
@@ -135,23 +134,21 @@ private extension API.V6.DefaultScriptExecutor {
                 storage.isCached = httpResponse.statusCode == 304
             }
             storage.textData = data
-            resultStorage = storage
             semaphore.signal()
         }
         task.resume()
         semaphore.wait()
 
-        guard let textData = resultStorage?.textData else {
+        guard let textData = storage.textData else {
             pp_log(.api, .error, "JS.getResult: Empty response")
             return APIEngine.GetResult(.network)
         }
-        let isCached = resultStorage?.isCached == true
-        pp_log(.api, .info, "JS.getResult: Success (cached: \(isCached))")
+        pp_log(.api, .info, "JS.getResult: Success (cached: \(storage.isCached))")
         return APIEngine.GetResult(
             textData,
-            lastModified: resultStorage?.lastModified,
-            tag: resultStorage?.tag,
-            isCached: isCached
+            lastModified: storage.lastModified,
+            tag: storage.tag,
+            isCached: storage.isCached
         )
     }
 
