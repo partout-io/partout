@@ -50,7 +50,7 @@ extension API.V6 {
             self.timeout = timeout
             self.engine = engine
 
-            // inject functions from the platform-specific virtual machine
+            // inject virtual machine functions in the engine-specific way
             engine.inject(from: self)
         }
     }
