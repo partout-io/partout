@@ -34,22 +34,22 @@ enum OS {
 
     static var current: Self {
 #if os(Android)
-        return .android
+        .android
 #elseif os(Linux)
-        return .linux
+        .linux
 #elseif os(Windows)
-        return .windows
+        .windows
 #else
-        return .apple
+        .apple
 #endif
     }
 }
 
 let environment: Environment
-//environment = .remoteBinary
+environment = .remoteBinary
 // environment = .remoteSource
 // environment = .localBinary
- environment = .localSource
+// environment = .localSource
 
 let areas: Set<Area> = Set(Area.allCases)
 
