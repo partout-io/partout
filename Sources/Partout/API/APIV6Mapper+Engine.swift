@@ -26,11 +26,14 @@
 #if canImport(PartoutAPI)
 
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import PartoutAPI
 import PartoutCore
 
 extension API.V6 {
-    final class DefaultScriptExecutor: APIEngine.ScriptExecutor {
+    final class DefaultScriptExecutor {
 
         // override the URL for getText/getJSON
         private let resultURL: URL?
@@ -39,42 +42,55 @@ extension API.V6 {
 
         private let timeout: TimeInterval
 
-        private let engine: ScriptingEngine
+        private let engine: APIScriptingEngine
 
-        init(resultURL: URL?, cache: ProviderCache?, timeout: TimeInterval, engine: ScriptingEngine) {
+        init(resultURL: URL?, cache: ProviderCache?, timeout: TimeInterval, engine: APIScriptingEngine) {
             self.resultURL = resultURL
             self.cache = cache
             self.timeout = timeout
             self.engine = engine
 
-            engine.inject("getText", object: getText as @convention(block) (String) -> Any?)
-            engine.inject("getJSON", object: getJSON as @convention(block) (String) -> Any?)
-            engine.inject("jsonToBase64", object: jsonToBase64 as @convention(block) (Any) -> String?)
-            engine.inject("ipV4ToBase64", object: ipV4ToBase64 as @convention(block) (String) -> String?)
-            engine.inject("openVPNTLSWrap", object: openVPNTLSWrap as @convention(block) (String, String) -> [String: Any]?)
-            engine.inject("debug", object: debug as @convention(block) (String) -> Void)
-        }
-
-        func fetchInfrastructure(with script: String) async throws -> ProviderInfrastructure {
-            let result = try await engine.execute(
-                "JSON.stringify(getInfrastructure())",
-                after: script,
-                returning: APIEngine.ScriptResult<ProviderInfrastructure>.self
-            )
-            guard let response = result.response else {
-                switch result.error {
-                case .cached:
-                    throw PartoutError(.cached)
-                default:
-                    throw PartoutError(.scriptException, result.error?.rawValue ?? "unknown")
-                }
-            }
-            return response
+            // inject virtual machine functions in the engine-specific way
+            engine.inject(from: self)
         }
     }
 }
 
-private extension API.V6.DefaultScriptExecutor {
+// MARK: - ScriptExecutor
+
+extension API.V6.DefaultScriptExecutor: APIEngine.ScriptExecutor {
+    func fetchInfrastructure(with script: String) async throws -> ProviderInfrastructure {
+        // TODO: #partout/54, assumes engine to be JavaScript
+        let result = try await engine.execute(
+            "JSON.stringify(getInfrastructure())",
+            after: script,
+            returning: APIEngine.ScriptResult<ProviderInfrastructure>.self
+        )
+        guard let response = result.response else {
+            switch result.error {
+            case .cached:
+                throw PartoutError(.cached)
+            default:
+                throw PartoutError(.scriptException, result.error?.rawValue ?? "unknown")
+            }
+        }
+        return response
+    }
+}
+
+// MARK: - VirtualMachine
+
+extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
+    private final class ResultStorage: @unchecked Sendable {
+        var textData: Data?
+
+        var lastModified: Date?
+
+        var tag: String?
+
+        var isCached = false
+    }
+
     func getResult(urlString: String) -> APIEngine.GetResult {
         pp_log(.api, .info, "JS.getResult: Execute with URL: \(resultURL?.absoluteString ?? urlString)")
         guard let url = resultURL ?? URL(string: urlString) else {
@@ -100,44 +116,42 @@ private extension API.V6.DefaultScriptExecutor {
         }
 
         let semaphore = DispatchSemaphore(value: 0)
-        var textData: Data?
-        var lastModified: Date?
-        var tag: String?
-        var isCached = false
+        let storage = ResultStorage()
         let task = session.dataTask(with: request) { data, response, error in
             if let error {
                 pp_log(.api, .error, "JS.getResult: Unable to execute: \(error)")
             } else if let httpResponse = response as? HTTPURLResponse {
                 let lastModifiedHeader = httpResponse.value(forHTTPHeaderField: "last-modified")
-                tag = httpResponse.value(forHTTPHeaderField: "etag")
+                let tag = httpResponse.value(forHTTPHeaderField: "etag")
 
                 pp_log(.api, .debug, "JS.getResult: Response: \(httpResponse)")
                 pp_log(.api, .info, "JS.getResult: HTTP \(httpResponse.statusCode)")
                 if let lastModifiedHeader {
                     pp_log(.api, .info, "JS.getResult: Last-Modified: \(lastModifiedHeader)")
-                    lastModified = lastModifiedHeader.fromRFC1123()
+                    storage.lastModified = lastModifiedHeader.fromRFC1123()
                 }
                 if let tag {
                     pp_log(.api, .info, "JS.getResult: ETag: \(tag)")
+                    storage.tag = tag
                 }
-                isCached = httpResponse.statusCode == 304
+                storage.isCached = httpResponse.statusCode == 304
             }
-            textData = data
+            storage.textData = data
             semaphore.signal()
         }
         task.resume()
         semaphore.wait()
 
-        guard let textData else {
+        guard let textData = storage.textData else {
             pp_log(.api, .error, "JS.getResult: Empty response")
             return APIEngine.GetResult(.network)
         }
-        pp_log(.api, .info, "JS.getResult: Success (cached: \(isCached))")
+        pp_log(.api, .info, "JS.getResult: Success (cached: \(storage.isCached))")
         return APIEngine.GetResult(
             textData,
-            lastModified: lastModified,
-            tag: tag,
-            isCached: isCached
+            lastModified: storage.lastModified,
+            tag: storage.tag,
+            isCached: storage.isCached
         )
     }
 

@@ -8,6 +8,8 @@ enum Environment {
 
     case remoteSource
 
+    case localBinary
+
     case localSource
 }
 
@@ -32,13 +34,13 @@ enum OS {
 
     static var current: Self {
 #if os(Android)
-        return .android
+        .android
 #elseif os(Linux)
-        return .linux
+        .linux
 #elseif os(Windows)
-        return .windows
+        .windows
 #else
-        return .apple
+        .apple
 #endif
     }
 }
@@ -46,15 +48,16 @@ enum OS {
 let environment: Environment
 environment = .remoteBinary
 // environment = .remoteSource
+// environment = .localBinary
 // environment = .localSource
 
 let areas: Set<Area> = Set(Area.allCases)
 
 // action-release-binary-package (PartoutCore)
-let sha1 = "d5f152a54d82cb7307f37e388a8b7fff06bb3a60"
+let sha1 = "881c9cd6044fdd581dab4370058dedb41a1e7535"
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.101"
-let checksum = "e7c8568d3cd35a9b7b85592b67bbfb52fd5b701739fff7150f256e1b96adfe81"
+let version = "0.99.102"
+let checksum = "30bf6a73908571241357ebc50a79e18b358028202f877f37a0397b89d33d5f32"
 
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
 let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
@@ -139,6 +142,11 @@ case .remoteSource:
             .product(name: "PartoutCore", package: "partout-core")
         ],
         path: "Sources/Core"
+    ))
+case .localBinary:
+    package.targets.append(.binaryTarget(
+        name: "PartoutCoreWrapper",
+        path: "../partout-core/PartoutCore.xcframework"
     ))
 case .localSource:
     package.dependencies.append(

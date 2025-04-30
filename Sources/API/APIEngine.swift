@@ -26,7 +26,33 @@
 import Foundation
 import PartoutCore
 
+public protocol APIScriptingEngine: ScriptingEngine {
+    func inject(from vm: APIEngine.VirtualMachine)
+}
+
 public enum APIEngine {
+    public protocol ScriptExecutor {
+        func fetchInfrastructure(with script: String) async throws -> ProviderInfrastructure
+    }
+
+    public protocol VirtualMachine {
+        func getResult(urlString: String) -> APIEngine.GetResult
+
+        func getText(urlString: String) -> [String: Any]
+
+        func getJSON(urlString: String) -> [String: Any]
+
+        func jsonToBase64(object: Any) -> String?
+
+        func ipV4ToBase64(ip: String) -> String?
+
+        func openVPNTLSWrap(strategy: String, file: String) -> [String: Any]?
+
+        func debug(message: String)
+    }
+}
+
+extension APIEngine {
     public enum ErrorCode: String, Decodable {
         case url
 
@@ -98,9 +124,5 @@ public enum APIEngine {
         public let response: T?
 
         public let error: ErrorCode?
-    }
-
-    public protocol ScriptExecutor {
-        func fetchInfrastructure(with script: String) async throws -> ProviderInfrastructure
     }
 }

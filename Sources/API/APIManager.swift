@@ -23,13 +23,19 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Combine
 import Foundation
 import PartoutCore
 import PartoutProviders
 
+#if canImport(Combine)
+import Combine
+
+extension APIManager: ObservableObject {
+}
+#endif
+
 @MainActor
-public final class APIManager: ObservableObject {
+public final class APIManager {
     private enum PendingService: Hashable {
         case index
 
@@ -40,16 +46,22 @@ public final class APIManager: ObservableObject {
 
     private let repository: APIRepository
 
+#if canImport(Combine)
     @Published
+#endif
     public private(set) var providers: [Provider]
 
+#if canImport(Combine)
     @Published
+#endif
     public private(set) var cache: [ProviderID: ProviderCache]
 
+#if canImport(Combine)
     @Published
+#endif
     private var pendingServices: Set<PendingService> = []
 
-    private var subscriptions: Set<AnyCancellable>
+    private var subscriptions: [Task<Void, Never>]
 
     public var isLoading: Bool {
         !pendingServices.isEmpty
@@ -82,7 +94,9 @@ public final class APIManager: ObservableObject {
                 let index = try await api.index()
                 try Task.checkCancellation()
                 try await repository.store(index)
+#if canImport(Combine)
                 objectWillChange.send()
+#endif
                 return
             } catch {
                 lastError = error
@@ -113,7 +127,9 @@ public final class APIManager: ObservableObject {
                 let infrastructure = try await api.infrastructure(for: providerId, cache: lastCache)
                 try Task.checkCancellation()
                 try await repository.store(infrastructure, for: providerId)
+#if canImport(Combine)
                 objectWillChange.send()
+#endif
                 return
             } catch {
                 if (error as? PartoutError)?.code == .cached {
@@ -160,20 +176,33 @@ public final class APIManager: ObservableObject {
 
 private extension APIManager {
     func observeObjects() {
-        repository
-            .indexPublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] in
-                self?.providers = $0
-            }
-            .store(in: &subscriptions)
+        subscriptions.forEach {
+            $0.cancel()
+        }
+        subscriptions = []
 
-        repository
-            .cachePublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] in
-                self?.cache = $0
+        subscriptions.append(Task { @MainActor [weak self] in
+            guard let self else {
+                return
             }
-            .store(in: &subscriptions)
+            for await providers in repository.indexStream {
+                guard !Task.isCancelled else {
+                    return
+                }
+                self.providers = providers
+            }
+        })
+
+        subscriptions.append(Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+            for await cache in repository.cacheStream {
+                guard !Task.isCancelled else {
+                    return
+                }
+                self.cache = cache
+            }
+        })
     }
 }

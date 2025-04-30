@@ -23,6 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if canImport(Combine)
+
 import Combine
 import Foundation
 @testable import PartoutAPI
@@ -83,3 +85,5 @@ private extension APIManagerTests {
         APIManager(from: [MockAPI()], repository: MockRepository())
     }
 }
+
+#endif

@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Combine
 import Foundation
 @testable import PartoutAPI
 import PartoutCore
@@ -71,33 +70,38 @@ struct MockAPI: APIMapper {
     }
 }
 
-final class MockRepository: APIRepository, ObservableObject {
+#if canImport(Combine)
+import Combine
 
-    @Published
-    private(set) var providers: [Provider] = []
+extension MockRepository: ObservableObject {
+}
+#endif
 
-    @Published
-    private(set) var infrastructures: [ProviderID: ProviderInfrastructure] = [:]
+final class MockRepository: APIRepository {
+    private let providersSubject = CurrentValueStream<[Provider]>([])
 
-    var indexPublisher: AnyPublisher<[Provider], Never> {
-        $providers
-            .eraseToAnyPublisher()
+    private let infrastructuresSubject = CurrentValueStream<[ProviderID: ProviderInfrastructure]>([:])
+
+    var indexStream: AsyncStream<[Provider]> {
+        providersSubject.subscribe()
     }
 
-    var cachePublisher: AnyPublisher<[ProviderID: ProviderCache], Never> {
-        $infrastructures
+    var cacheStream: AsyncStream<[ProviderID: ProviderCache]> {
+        infrastructuresSubject
+            .subscribe()
             .map {
                 $0.compactMapValues(\.cache)
             }
-            .eraseToAnyPublisher()
     }
 
     func store(_ providers: [Provider]) async throws {
-        self.providers = providers
+        providersSubject.send(providers)
     }
 
     func store(_ infrastructure: ProviderInfrastructure, for providerId: ProviderID) async throws {
-        infrastructures[providerId] = infrastructure
+        var newValue = infrastructuresSubject.value
+        newValue[providerId] = infrastructure
+        infrastructuresSubject.send(newValue)
     }
 
     func presets(for server: ProviderServer, moduleType: ModuleType) async throws -> [ProviderPreset] {
@@ -105,7 +109,7 @@ final class MockRepository: APIRepository, ObservableObject {
     }
 
     func providerRepository(for providerId: ProviderID) -> ProviderRepository {
-        let infra = infrastructures[providerId]
+        let infra = infrastructuresSubject.value[providerId]
         let repo = MockVPNRepository(providerId: providerId)
         repo.allServers = infra?.servers ?? []
         repo.allPresets = infra?.presets ?? []

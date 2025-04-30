@@ -34,7 +34,7 @@ extension API.V6.Mapper {
                 resultURL: $0,
                 cache: $1,
                 timeout: $2,
-                engine: PartoutConfiguration.platform.newScriptingEngine()
+                engine: PartoutConfiguration.platform.newAPIScriptingEngine()
             )
         }
     }

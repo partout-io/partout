@@ -23,13 +23,19 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Combine
 import Foundation
 import PartoutCore
 import PartoutProviders
 
+#if canImport(Combine)
+import Combine
+
+extension ProviderManager: ObservableObject {
+}
+#endif
+
 @MainActor
-public final class ProviderManager: ObservableObject {
+public final class ProviderManager {
     private let sorting: [ProviderSortField]
 
     public private(set) var moduleType: ModuleType
@@ -53,7 +59,9 @@ extension ProviderManager {
         self.moduleType = moduleType
         self.repository = repository
         options = try await repository.availableOptions(for: moduleType)
+#if canImport(Combine)
         objectWillChange.send()
+#endif
     }
 
     public var providerId: ProviderID {
