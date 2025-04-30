@@ -26,6 +26,9 @@
 #if canImport(PartoutAPI)
 
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import PartoutAPI
 import PartoutCore
 
