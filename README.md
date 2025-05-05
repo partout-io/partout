@@ -24,7 +24,7 @@ __DISCLAIMER: the library is still undergoing deep architectural changes.__
 
 Import the library as SwiftPM dependency, for example:
 
-```
+```swift
 dependencies: [
     .package(url: "https://github.com/passepartoutvpn/partout", branch: "master")
 ],
