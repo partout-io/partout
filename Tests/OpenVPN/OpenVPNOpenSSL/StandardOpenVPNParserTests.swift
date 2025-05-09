@@ -183,13 +183,13 @@ final class StandardOpenVPNParserTests: XCTestCase {
 
         let pushReply = try XCTUnwrap(parser.pushReply(with: line))
 
-        XCTAssertEqual(pushReply.options.ipv4?.subnet, Subnet(rawValue: "172.31.2.6/32"))
+        XCTAssertEqual(pushReply.options.ipv4?.subnet, Subnet(rawValue: "172.31.2.6/24"))
         XCTAssertEqual(pushReply.options.ipv4?.includedRoutes, [
             Route(defaultWithGateway: Address(rawValue: "172.31.2.1")),
             Route(Subnet(rawValue: "172.31.2.0/24"), Address(rawValue: "172.31.2.6"))
         ])
 
-        XCTAssertEqual(pushReply.options.ipv6?.subnet, Subnet(rawValue: "1234::12/128"))
+        XCTAssertEqual(pushReply.options.ipv6?.subnet, Subnet(rawValue: "1234::12/10"))
         XCTAssertEqual(pushReply.options.ipv6?.includedRoutes, [
             Route(defaultWithGateway: Address(rawValue: "1234::1")),
             Route(Subnet(rawValue: "1200::/10"), Address(rawValue: "1234::12"))
