@@ -658,7 +658,7 @@ extension StandardOpenVPNParser.Builder {
             }
 
             let address4: String
-            let vpnMask4: String?
+            let vpnMask4: String
 
             let topology = Topology(rawValue: optTopology ?? "") ?? .net30
             switch topology {
@@ -672,20 +672,23 @@ extension StandardOpenVPNParser.Builder {
                 vpnMask4 = ifconfig4Arguments[1]
                 defaultGateway4 = gateway4Arguments[0]
 
-            default:
+            case .net30:
                 address4 = ifconfig4Arguments[0]
-                vpnMask4 = nil
+                vpnMask4 = "255.255.255.252"
                 defaultGateway4 = ifconfig4Arguments[1]
+
+            case .p2p:
+                throw StandardOpenVPNParserError.unsupportedConfiguration(option: "topology p2p")
             }
 
-            let vpnAddress4 = try Subnet(address4, 32)
+            let vpnAddress4 = try Subnet(address4, vpnMask4)
             var includedRoutes: [Route] = []
             if let defaultGateway4, let defaultGw4Address = Address(rawValue: defaultGateway4) {
                 includedRoutes.append(Route(defaultWithGateway: defaultGw4Address))
             }
-            if let vpnMask4, let vpnNetwork4 = vpnAddress4.address.network(with: vpnMask4) {
+            if let vpnNetwork4 = vpnAddress4.address.network(with: vpnMask4) {
                 let vpnDestination4 = try Subnet(vpnNetwork4.rawValue, vpnMask4)
-                includedRoutes.append(Route(vpnDestination4, vpnAddress4.address))
+                includedRoutes.append(Route(vpnDestination4, nil))
             }
 
             builder.ipv4 = IPSettings(subnet: vpnAddress4)
@@ -716,14 +719,14 @@ extension StandardOpenVPNParser.Builder {
             let address6 = address6Components[0]
             defaultGateway6 = ifconfig6Arguments[1]
 
-            let vpnAddress6 = try Subnet(address6, 128)
+            let vpnAddress6 = try Subnet(address6, vpnPrefix6)
             var includedRoutes: [Route] = []
             if let defaultGateway6, let defaultGw6Address = Address(rawValue: defaultGateway6) {
                 includedRoutes.append(Route(defaultWithGateway: defaultGw6Address))
             }
             if let vpnNetwork6 = vpnAddress6.address.network(with: vpnPrefix6) {
                 let vpnDestination6 = try Subnet(vpnNetwork6.rawValue, vpnPrefix6)
-                includedRoutes.append(Route(vpnDestination6, vpnAddress6.address))
+                includedRoutes.append(Route(vpnDestination6, nil))
             }
 
             builder.ipv6 = IPSettings(subnet: vpnAddress6)
@@ -796,6 +799,7 @@ private extension StandardOpenVPNParser.Builder {
     enum Topology: String {
         case net30
 
+        @available(*, deprecated, message: "Removed in 2.5.0")
         case p2p
 
         case subnet
