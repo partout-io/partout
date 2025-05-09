@@ -688,7 +688,7 @@ extension StandardOpenVPNParser.Builder {
             }
             if let vpnNetwork4 = vpnAddress4.address.network(with: vpnMask4) {
                 let vpnDestination4 = try Subnet(vpnNetwork4.rawValue, vpnMask4)
-                includedRoutes.append(Route(vpnDestination4, vpnAddress4.address))
+                includedRoutes.append(Route(vpnDestination4, nil))
             }
 
             builder.ipv4 = IPSettings(subnet: vpnAddress4)
@@ -726,7 +726,7 @@ extension StandardOpenVPNParser.Builder {
             }
             if let vpnNetwork6 = vpnAddress6.address.network(with: vpnPrefix6) {
                 let vpnDestination6 = try Subnet(vpnNetwork6.rawValue, vpnPrefix6)
-                includedRoutes.append(Route(vpnDestination6, vpnAddress6.address))
+                includedRoutes.append(Route(vpnDestination6, nil))
             }
 
             builder.ipv6 = IPSettings(subnet: vpnAddress6)
