@@ -106,13 +106,10 @@ extension Demo {
         )
     }
 
-    static var environment: AppGroupEnvironment {
-        AppGroupEnvironment(appGroup: appGroupIdentifier)
-    }
-}
-
-extension TunnelEnvironment where Self == AppGroupEnvironment {
-    static var shared: Self {
-        Demo.environment
-    }
+    static let tunnelEnvironment: UserDefaultsEnvironment = {
+        guard let defaults = UserDefaults(suiteName: appGroupIdentifier) else {
+            fatalError("Not entitled to App Group: \(appGroupIdentifier)")
+        }
+        return UserDefaultsEnvironment(defaults: defaults)
+    }()
 }
