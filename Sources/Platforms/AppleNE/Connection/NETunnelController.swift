@@ -31,28 +31,27 @@ import PartoutCore
 public final class NETunnelController: TunnelController {
     private weak var provider: NEPacketTunnelProvider?
 
-    private let environment: TunnelEnvironment
-
     public let profile: Profile
 
     public let originalProfile: Profile
+
+    public let environment: TunnelEnvironment
 
     public init(
         provider: NEPacketTunnelProvider,
         decoder: NEProtocolDecoder,
         registry: Registry,
-        environment: TunnelEnvironment,
+        environmentFactory: @escaping (Profile.ID) -> TunnelEnvironment,
         willProcess: ((Profile) async throws -> Profile)?
     ) async throws {
         guard let tunnelConfiguration = provider.protocolConfiguration as? NETunnelProviderProtocol else {
             throw PartoutError(.decoding)
         }
         self.provider = provider
-        self.environment = environment
-
         originalProfile = try decoder.profile(from: tunnelConfiguration)
-        let profile = try registry.resolvedProfile(originalProfile)
-        self.profile = try await willProcess?(profile) ?? profile
+        let resolvedProfile = try registry.resolvedProfile(originalProfile)
+        profile = try await willProcess?(resolvedProfile) ?? resolvedProfile
+        environment = environmentFactory(profile.id)
     }
 
     public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws {
