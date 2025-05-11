@@ -60,7 +60,7 @@ extension API.V6 {
 
 extension API.V6.DefaultScriptExecutor: APIEngine.ScriptExecutor {
     func fetchInfrastructure(with script: String) async throws -> ProviderInfrastructure {
-        // TODO: #partout/54, assumes engine to be JavaScript
+        // TODO: #54/partout, assumes engine to be JavaScript
         let result = try await engine.execute(
             "JSON.stringify(getInfrastructure())",
             after: script,
