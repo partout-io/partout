@@ -1,5 +1,5 @@
 //
-//  AppGroupEnvironment.swift
+//  UserDefaultsEnvironment.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 4/1/24.
@@ -26,36 +26,30 @@
 import Foundation
 import PartoutCore
 
-/// A ``TunnelEnvironment`` that stores data to an App Group.
-public final class AppGroupEnvironment: TunnelEnvironment, @unchecked Sendable {
+/// A ``TunnelEnvironment`` that stores data to `UserDefaults`.
+public final class UserDefaultsEnvironment: TunnelEnvironment, @unchecked Sendable {
     private let defaults: UserDefaults
-
-    private let appGroup: String
 
     private let prefix: String
 
-    public init(appGroup: String, prefix: String = "") {
-        guard let defaults = UserDefaults(suiteName: appGroup) else {
-            fatalError("No access to App Group: \(appGroup)")
-        }
+    public init(defaults: UserDefaults, prefix: String = "") {
         self.defaults = defaults
-        self.appGroup = appGroup
         self.prefix = prefix
     }
 
     public func setEnvironmentValue<T>(_ value: T, forKey key: TunnelEnvironmentKey<T>) where T: Encodable {
-        let fullKey = key.rawKey(prefix: prefix)
+        let fullKey = key.keyString.rawKey(prefix: prefix)
         do {
             let data = try JSONEncoder().encode(value)
             defaults.set(data, forKey: fullKey)
-            pp_log(.core, .debug, "AppGroupEnvironment.set(\(fullKey)) -> \(value)")
+            pp_log(.core, .debug, "UserDefaultsEnvironment.set(\(fullKey)) -> \(value)")
         } catch {
             pp_log(.core, .error, "Unable to set environment key: \(fullKey) -> \(error)")
         }
     }
 
     public func environmentValue<T>(forKey key: TunnelEnvironmentKey<T>) -> T? where T: Decodable {
-        let fullKey = key.rawKey(prefix: prefix)
+        let fullKey = key.keyString.rawKey(prefix: prefix)
         do {
             guard let data = defaults.data(forKey: fullKey) else {
                 return nil
@@ -67,19 +61,41 @@ public final class AppGroupEnvironment: TunnelEnvironment, @unchecked Sendable {
         }
     }
 
-    public func removeEnvironmentValue<T>(forKey key: TunnelEnvironmentKey<T>) {
+    public func removeEnvironmentValue(forKey key: String) {
         let fullKey = key.rawKey(prefix: prefix)
         defaults.removeObject(forKey: fullKey)
-        pp_log(.core, .info, "AppGroupEnvironment.remove(\(fullKey))")
+        pp_log(.core, .debug, "UserDefaultsEnvironment.remove(\(fullKey))")
+    }
+
+    public func snapshot(excludingKeys excluded: Set<String>?) -> [String: Data] {
+        var values = defaults.dictionaryRepresentation()
+        if let excluded {
+            let mappedExcluded = excluded.map {
+                $0.rawKey(prefix: prefix)
+            }
+            values = values.filter {
+                !mappedExcluded.contains($0.key)
+            }
+        }
+        values = values.filter {
+            $0.key.hasPrefix(prefix)
+        }
+        return values.reduce(into: [:]) {
+            guard let data = $1.value as? Data else {
+                return
+            }
+            let keyBegin = $1.key.index($1.key.startIndex, offsetBy: prefix.count)
+            let unprefixedKey = $1.key[keyBegin..<$1.key.endIndex]
+            $0[String(unprefixedKey)] = data
+        }
     }
 
     public func reset() {
-        defaults.removePersistentDomain(forName: appGroup)
     }
 }
 
-private extension TunnelEnvironmentKey {
+private extension String {
     func rawKey(prefix: String) -> String {
-        [prefix, string].joined()
+        [prefix, self].joined()
     }
 }
