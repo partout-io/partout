@@ -48,8 +48,8 @@ extension Tunnel {
             bundleIdentifier: Demo.tunnelBundleIdentifier,
             coder: Demo.neProtocolCoder
         )
-        return Tunnel(strategy: strategy) { _ in
-            Demo.tunnelEnvironment
+        return Tunnel(strategy: strategy) {
+            NETunnelEnvironment(strategy: strategy, profileId: $0)
         }
 #endif
     }()
