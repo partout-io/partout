@@ -37,11 +37,15 @@ public actor NEPTPForwarder {
 
     public let originalProfile: Profile
 
+    public nonisolated var environment: TunnelEnvironment {
+        daemon.environment
+    }
+
     public init(
         provider: NEPacketTunnelProvider,
         decoder: NEProtocolDecoder,
         registry: Registry,
-        environment: TunnelEnvironment,
+        environmentFactory: @escaping (Profile.ID) -> TunnelEnvironment,
         factoryOptions: NEInterfaceFactory.Options = .init(),
         connectionOptions: ConnectionParameters.Options = .init(),
         stopDelay: Int = 2000,
@@ -55,9 +59,10 @@ public actor NEPTPForwarder {
             provider: provider,
             decoder: decoder,
             registry: registry,
-            environment: environment,
+            environmentFactory: environmentFactory,
             willProcess: willProcess
         )
+        let environment = controller.environment
         let factory = NEInterfaceFactory(provider: provider, options: factoryOptions)
         let reachability = NEObservablePath()
 
@@ -67,7 +72,7 @@ public actor NEPTPForwarder {
             environment: environment,
             options: connectionOptions
         )
-        let messageHandler = DefaultMessageHandler()
+        let messageHandler = DefaultMessageHandler(environment: environment)
 
         let params = SimpleConnectionDaemon.Parameters(
             registry: registry,
@@ -102,7 +107,7 @@ public actor NEPTPForwarder {
     }
 
     public func handleAppMessage(_ messageData: Data) async -> Data? {
-        pp_log(.ne, .notice, "Handle PTP message")
+        pp_log(.ne, .debug, "Handle PTP message")
         do {
             let input = try JSONDecoder().decode(Message.Input.self, from: messageData)
             let output = try await daemon.sendMessage(input)

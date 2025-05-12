@@ -37,17 +37,20 @@ extension Registry {
 }
 
 extension Tunnel {
-    static let shared = Tunnel(strategy: {
+    static let shared: Tunnel = {
 #if targetEnvironment(simulator)
-        FakeTunnelStrategy(
-            environment: .shared
-        )
+        let strategy = FakeTunnelStrategy()
+        return Tunnel(strategy: strategy) { _ in
+            SharedTunnelEnvironment()
+        }
 #else
-        NETunnelStrategy(
+        let strategy = NETunnelStrategy(
             bundleIdentifier: Demo.tunnelBundleIdentifier,
-            coder: Demo.neProtocolCoder,
-            environment: .shared
+            coder: Demo.neProtocolCoder
         )
+        return Tunnel(strategy: strategy) { _ in
+            Demo.tunnelEnvironment
+        }
 #endif
-    }())
+    }()
 }

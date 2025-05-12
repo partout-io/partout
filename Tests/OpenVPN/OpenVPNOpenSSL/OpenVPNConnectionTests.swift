@@ -300,7 +300,7 @@ private struct Constants {
         with session: OpenVPNSessionProtocol,
         controller: TunnelController = MockTunnelController(),
         factory: NetworkInterfaceFactory = MockNetworkInterfaceFactory(),
-        environment: TunnelEnvironment = InMemoryEnvironment()
+        environment: TunnelEnvironment = SharedTunnelEnvironment()
     ) async throws -> OpenVPNConnection {
         let impl = OpenVPNModule.Implementation(
             importer: StandardOpenVPNParser(),

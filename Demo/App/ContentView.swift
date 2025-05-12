@@ -33,6 +33,16 @@ private enum ButtonAction {
 }
 
 struct ContentView: View {
+    enum Destination: String, Hashable, Identifiable {
+        case serverConfiguration
+
+        case debugLog
+
+        var id: String {
+            rawValue
+        }
+    }
+
     @State
     private var profile: Profile = .demo
 
@@ -46,10 +56,10 @@ struct ContentView: View {
     private var isLoadingDebugLog = false
 
     @State
-    private var isDebugLogPresented = false
+    private var debugLog: [String] = []
 
     @State
-    private var debugLog: [String] = []
+    private var destination: Destination?
 
     private let timer = Timer.publish(every: 2.0, on: .main, in: .common)
         .autoconnect()
@@ -66,10 +76,16 @@ struct ContentView: View {
                 dataCount = nil
                 return
             }
-            dataCount = Demo.environment.environmentValue(forKey: TunnelEnvironmentKeys.dataCount)
+            let environment = vpn.environment(for: profile.id)
+            dataCount = environment?.environmentValue(forKey: TunnelEnvironmentKeys.dataCount)
         }
-        .sheet(isPresented: $isDebugLogPresented) {
-            debugLogView
+        .sheet(item: $destination) {
+            switch $0 {
+            case .debugLog:
+                debugLogView
+            case .serverConfiguration:
+                serverConfigurationView
+            }
         }
         .task {
             do {
@@ -130,8 +146,8 @@ private extension ContentView {
             }
 #if !os(tvOS)
             if profile.firstModule(ofType: OpenVPNModule.self, ifActive: true) != nil {
-                NavigationLink("Server configuration") {
-                    serverConfigurationView
+                Button("Server configuration") {
+                    destination = .serverConfiguration
                 }
             }
 #endif
@@ -149,15 +165,11 @@ private extension ContentView {
                     Text(entry.element)
                 }
             }
+            .monospaced()
             .navigationTitle("Debug log")
             .toolbar {
-                Button {
-                    isDebugLogPresented = false
-                } label: {
-                    Image(systemName: "xmark")
-                }
+                closeButton
             }
-            .monospaced()
 #if os(macOS)
             .frame(minWidth: 600.0, minHeight: 400.0)
 #endif
@@ -166,12 +178,25 @@ private extension ContentView {
 
 #if !os(tvOS)
     var serverConfigurationView: some View {
-        Demo.environment.environmentValue(forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
-            .map {
-                TextEditor(text: .constant(String(describing: $0)))
-                    .monospaced()
-                    .padding()
+        NavigationStack {
+            VStack {
+                vpn
+                    .environment(for: profile.id)?
+                    .environmentValue(forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
+                    .map { cfg in
+                        TextEditor(text: .constant(String(describing: cfg)))
+                            .monospaced()
+                            .padding()
+                    }
             }
+            .navigationTitle("Server configuration")
+            .toolbar {
+                closeButton
+            }
+#if os(macOS)
+            .frame(minWidth: 600.0, minHeight: 400.0)
+#endif
+        }
     }
 #endif
 }
@@ -181,6 +206,14 @@ private extension ContentView {
 private extension ContentView {
     var buttonAction: ButtonAction {
         ButtonAction(forStatus: vpn.status)
+    }
+
+    var closeButton: some View {
+        Button {
+            destination = nil
+        } label: {
+            Image(systemName: "xmark")
+        }
     }
 
     func onTapModule(_ module: Module) {
@@ -209,7 +242,7 @@ private extension ContentView {
                     }
 
                 case .disconnect:
-                    try await vpn.disconnect()
+                    try await vpn.disconnect(from: profile.id)
                 }
             } catch {
                 print("Unable to start VPN: \(error.localizedDescription)")
@@ -225,7 +258,7 @@ private extension ContentView {
             }
             do {
                 try await fetchDebugLog()
-                isDebugLogPresented = true
+                destination = .debugLog
             } catch {
                 print("Unable to fetch debug log: \(error)")
             }
@@ -245,9 +278,9 @@ private extension ContentView {
         let interval: TimeInterval = 24 * 60 * 60 // 1 day
         let message: Message.Input
 
-        message = .localLog(sinceLast: interval, maxLevel: Demo.Log.maxLevel)
+        message = .debugLog(sinceLast: interval, maxLevel: Demo.Log.maxLevel)
 
-        guard let output = try await vpn.sendMessage(message) else {
+        guard let output = try await vpn.sendMessage(message, to: profile.id) else {
             return
         }
         guard case .debugLog(let log) = output else {
@@ -283,6 +316,12 @@ private extension ButtonAction {
         case .disconnect:
             return "Disconnect"
         }
+    }
+}
+
+private extension Tunnel {
+    var status: TunnelStatus {
+        activeProfiles.first?.value.status ?? .inactive
     }
 }
 

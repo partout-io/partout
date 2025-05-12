@@ -49,7 +49,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
                 provider: self,
                 decoder: .shared,
                 registry: .shared,
-                environment: .shared
+                environmentFactory: { _ in
+                    Demo.tunnelEnvironment
+                }
             )
             try await fwd?.startTunnel(options: options)
         } catch {

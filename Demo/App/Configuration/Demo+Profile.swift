@@ -67,7 +67,7 @@ extension Profile {
 //            filterModule.disabledMask = [.dns]
 //            profile.modules.append(filterModule.tryBuild())
 
-            profile.activeModulesIds = [dns.id, ip.id]
+            profile.activeModulesIds = [dns.id]
 
             let vpnModule = profile.modules.first {
                 $0 is OpenVPNModule || $0 is WireGuardModule
