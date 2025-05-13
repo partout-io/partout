@@ -56,8 +56,8 @@ let areas: Set<Area> = Set(Area.allCases)
 // action-release-binary-package (PartoutCore)
 let sha1 = "dba21af0a4073bc98d028f7a59107f2f988cf843"
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.111"
-let checksum = "795c10f02ed6333203ba83d597be3dc413584f6fe075fac87ecc3bd5d62ba32e"
+let version = "0.99.112"
+let checksum = "f21e717c1f4fd4daa556d84a5992cc869ad735d4de7e3e9fbd864095c9868cc7"
 
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
 let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
