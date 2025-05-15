@@ -43,7 +43,7 @@ final class NESettingsApplyingTests: XCTestCase {
         let module = IPModule.Builder(ipv4: ipv4).tryBuild()
 
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
-        module.apply(to: &sut)
+        module.apply(.global, to: &sut)
 
         let settings = try XCTUnwrap(sut.ipv4Settings)
         let subnets = ipv4.subnet.map { [$0] } ?? []
@@ -81,7 +81,7 @@ final class NESettingsApplyingTests: XCTestCase {
         let module = IPModule.Builder(ipv6: ipv6).tryBuild()
 
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
-        module.apply(to: &sut)
+        module.apply(.global, to: &sut)
 
         let settings = try XCTUnwrap(sut.ipv6Settings)
         let subnets = ipv6.subnet.map { [$0] } ?? []
@@ -117,7 +117,7 @@ final class NESettingsApplyingTests: XCTestCase {
         ).tryBuild()
 
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
-        module.apply(to: &sut)
+        module.apply(.global, to: &sut)
 
         let proxySettings = try XCTUnwrap(sut.proxySettings)
         XCTAssertTrue(proxySettings.httpEnabled)
@@ -140,7 +140,7 @@ final class NESettingsApplyingTests: XCTestCase {
         ).tryBuild()
 
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
-        module.apply(to: &sut)
+        module.apply(.global, to: &sut)
 
         let dnsSettings = try XCTUnwrap(sut.dnsSettings)
         XCTAssertEqual(dnsSettings.dnsProtocol, .cleartext)
@@ -157,7 +157,7 @@ final class NESettingsApplyingTests: XCTestCase {
         ).tryBuild()
 
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
-        module.apply(to: &sut)
+        module.apply(.global, to: &sut)
 
         let dnsSettings = try XCTUnwrap(sut.dnsSettings as? NEDNSOverHTTPSSettings)
         XCTAssertEqual(dnsSettings.dnsProtocol, .HTTPS)
@@ -177,7 +177,7 @@ final class NESettingsApplyingTests: XCTestCase {
         ).tryBuild()
 
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
-        module.apply(to: &sut)
+        module.apply(.global, to: &sut)
 
         let dnsSettings = try XCTUnwrap(sut.dnsSettings as? NEDNSOverTLSSettings)
         XCTAssertEqual(dnsSettings.dnsProtocol, .TLS)
@@ -199,7 +199,7 @@ final class NESettingsApplyingTests: XCTestCase {
         let module = NESettingsModule(fullSettings: settings)
 
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
-        module.apply(to: &sut)
+        module.apply(.global, to: &sut)
 
         XCTAssertEqual(sut, settings)
     }
@@ -215,7 +215,7 @@ final class NESettingsApplyingTests: XCTestCase {
         let filterModule = FilterModule.Builder(
             disabledMask: [.ipv4, .ipv6, .dns, .proxy, .mtu]
         ).tryBuild()
-        filterModule.apply(to: &sut)
+        filterModule.apply(.global, to: &sut)
         XCTAssertNil(sut.ipv4Settings)
         XCTAssertNil(sut.ipv6Settings)
         XCTAssertNil(sut.dnsSettings)

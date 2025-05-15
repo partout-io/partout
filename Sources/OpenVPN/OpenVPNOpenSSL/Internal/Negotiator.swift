@@ -46,6 +46,8 @@ final class Negotiator {
         let onError: (UInt8, Error) async -> Void
     }
 
+    private let ctx: PartoutContext
+
     private let parser = StandardOpenVPNParser()
 
     let key: UInt8 // 3-bit
@@ -74,7 +76,7 @@ final class Negotiator {
 
     private var state: State {
         didSet {
-            pp_log(.openvpn, .info, "Negotiator: \(key) -> \(state)")
+            pp_log(ctx, .openvpn, .info, "Negotiator: \(key) -> \(state)")
         }
     }
 
@@ -95,6 +97,7 @@ final class Negotiator {
     // MARK: Init
 
     convenience init(
+        _ ctx: PartoutContext,
         link: LinkInterface,
         channel: ControlChannel,
         prng: PRNGProtocol,
@@ -103,6 +106,7 @@ final class Negotiator {
         options: Options
     ) {
         self.init(
+            ctx,
             key: 0,
             history: nil,
             renegotiation: nil,
@@ -116,6 +120,7 @@ final class Negotiator {
     }
 
     private init(
+        _ ctx: PartoutContext,
         key: UInt8,
         history: NegotiationHistory?,
         renegotiation: RenegotiationType?,
@@ -126,6 +131,7 @@ final class Negotiator {
         cryptoFactory: @escaping () -> OpenVPNCryptoProtocol,
         options: Options
     ) {
+        self.ctx = ctx
         self.key = key
         self.history = history
         self.renegotiation = renegotiation
@@ -146,11 +152,12 @@ final class Negotiator {
 
     func forRenegotiation(initiatedBy newRenegotiation: RenegotiationType) -> Negotiator {
         guard let history else {
-            pp_log(.openvpn, .error, "Negotiator has no history (not connected yet?)")
+            pp_log(ctx, .openvpn, .error, "Negotiator has no history (not connected yet?)")
             return self
         }
         let newKey = ProtocolMacros.nextKey(after: key)
         return Negotiator(
+            ctx,
             key: newKey,
             history: history,
             renegotiation: newRenegotiation,
@@ -255,14 +262,15 @@ private extension Negotiator {
             }
             do {
                 let caMD5 = try tlsBox.md5(forCertificatePath: caURL.path)
-                pp_log(.openvpn, .info, "PIA CA MD5 is: \(caMD5)")
+                pp_log(ctx, .openvpn, .info, "PIA CA MD5 is: \(caMD5)")
                 return try? PIAHardReset(
+                    ctx,
                     caMd5Digest: caMD5,
                     cipher: options.configuration.fallbackCipher,
                     digest: options.configuration.fallbackDigest
                 ).encodedData(prng: prng)
             } catch {
-                pp_log(.openvpn, .error, "PIA CA MD5 could not be computed, skip custom HARD_RESET")
+                pp_log(ctx, .openvpn, .error, "PIA CA MD5 could not be computed, skip custom HARD_RESET")
                 return nil
             }
         }
@@ -314,7 +322,7 @@ private extension Negotiator {
             return
         }
 
-        pp_log(.openvpn, .info, "TLS.ifconfig: Put plaintext (PUSH_REQUEST)")
+        pp_log(ctx, .openvpn, .info, "TLS.ifconfig: Put plaintext (PUSH_REQUEST)")
         try? tlsBox.putPlainText("PUSH_REQUEST\0")
 
         let cipherTextOut: Data
@@ -322,14 +330,14 @@ private extension Negotiator {
             cipherTextOut = try tlsBox.pullCipherText()
         } catch {
             if let nativeError = error.asNativeOpenVPNError {
-                pp_log(.openvpn, .fault, "TLS.auth: Failed pulling ciphertext: \(nativeError)")
+                pp_log(ctx, .openvpn, .fault, "TLS.auth: Failed pulling ciphertext: \(nativeError)")
                 throw nativeError
             }
-            pp_log(.openvpn, .debug, "TLS.ifconfig: Still can't pull ciphertext")
+            pp_log(ctx, .openvpn, .debug, "TLS.ifconfig: Still can't pull ciphertext")
             return
         }
 
-        pp_log(.openvpn, .info, "TLS.ifconfig: Send pulled ciphertext \(cipherTextOut.asSensitiveBytes)")
+        pp_log(ctx, .openvpn, .info, "TLS.ifconfig: Send pulled ciphertext \(cipherTextOut.asSensitiveBytes(ctx))")
         try enqueueControlPackets(code: .controlV1, key: key, payload: cipherTextOut)
 
         self.nextPushRequestDate = Date().addingTimeInterval(options.sessionOptions.pushRequestInterval)
@@ -350,20 +358,20 @@ private extension Negotiator {
         do {
             rawList = try channel.writeOutboundPackets(resendAfter: options.sessionOptions.retxInterval)
         } catch {
-            pp_log(.openvpn, .error, "Failed control packet serialization: \(error)")
+            pp_log(ctx, .openvpn, .error, "Failed control packet serialization: \(error)")
             throw error
         }
         guard !rawList.isEmpty else {
             return
         }
         for raw in rawList {
-            pp_log(.openvpn, .info, "Send control packet \(raw.asSensitiveBytes)")
+            pp_log(ctx, .openvpn, .info, "Send control packet \(raw.asSensitiveBytes(ctx))")
         }
         Task {
             do {
                 try await link.writePackets(rawList)
             } catch {
-                pp_log(.openvpn, .error, "Failed LINK write during control flush: \(error)")
+                pp_log(ctx, .openvpn, .error, "Failed LINK write during control flush: \(error)")
                 await options.onError(key, PartoutError(.linkFailure, error))
             }
         }
@@ -375,7 +383,7 @@ private extension Negotiator {
 private extension Negotiator {
     func privateHandleControlPacket(_ packet: ControlPacket) throws {
         guard packet.key == key else {
-            pp_log(.openvpn, .error, "Bad key in control packet (\(packet.key) != \(key))")
+            pp_log(ctx, .openvpn, .error, "Bad key in control packet (\(packet.key) != \(key))")
             return
         }
 
@@ -386,22 +394,22 @@ private extension Negotiator {
             }
             if packet.code == .hardResetServerV2 {
                 if isRenegotiating {
-                    pp_log(.openvpn, .error, "Sent SOFT_RESET but received HARD_RESET?")
+                    pp_log(ctx, .openvpn, .error, "Sent SOFT_RESET but received HARD_RESET?")
                 }
                 channel.setRemoteSessionId(packet.sessionId)
             }
             guard let remoteSessionId = channel.remoteSessionId else {
                 let error = OpenVPNSessionError.missingSessionId
-                pp_log(.openvpn, .fault, "No remote sessionId (never set): \(error)")
+                pp_log(ctx, .openvpn, .fault, "No remote sessionId (never set): \(error)")
                 throw error
             }
             guard packet.sessionId == remoteSessionId else {
                 let error = OpenVPNSessionError.sessionMismatch
-                pp_log(.openvpn, .fault, "Packet session mismatch (\(packet.sessionId.toHex()) != \(remoteSessionId.toHex())): \(error)")
+                pp_log(ctx, .openvpn, .fault, "Packet session mismatch (\(packet.sessionId.toHex()) != \(remoteSessionId.toHex())): \(error)")
                 throw error
             }
 
-            pp_log(.openvpn, .info, "Start TLS handshake")
+            pp_log(ctx, .openvpn, .info, "Start TLS handshake")
             state = .tls
 
             try tlsBox.configure(with: options.tlsOptions) { [weak self] error in
@@ -419,13 +427,13 @@ private extension Negotiator {
                 cipherTextOut = try tlsBox.pullCipherText()
             } catch {
                 if let nativeError = error.asNativeOpenVPNError {
-                    pp_log(.openvpn, .fault, "TLS.connect: Failed pulling ciphertext: \(nativeError)")
+                    pp_log(ctx, .openvpn, .fault, "TLS.connect: Failed pulling ciphertext: \(nativeError)")
                     throw nativeError
                 }
                 throw error
             }
 
-            pp_log(.openvpn, .info, "TLS.connect: Pulled ciphertext \(cipherTextOut.asSensitiveBytes)")
+            pp_log(ctx, .openvpn, .info, "TLS.connect: Pulled ciphertext \(cipherTextOut.asSensitiveBytes(ctx))")
             try enqueueControlPackets(code: .controlV1, key: key, payload: cipherTextOut)
 
         case .tls, .auth, .push, .connected:
@@ -434,37 +442,37 @@ private extension Negotiator {
             }
             guard let remoteSessionId = channel.remoteSessionId else {
                 let error = OpenVPNSessionError.missingSessionId
-                pp_log(.openvpn, .fault, "No remote sessionId found in packet (control packets before server HARD_RESET): \(error)")
+                pp_log(ctx, .openvpn, .fault, "No remote sessionId found in packet (control packets before server HARD_RESET): \(error)")
                 throw error
             }
             guard packet.sessionId == remoteSessionId else {
                 let error = OpenVPNSessionError.sessionMismatch
-                pp_log(.openvpn, .fault, "Packet session mismatch (\(packet.sessionId.toHex()) != \(remoteSessionId.toHex())): \(error)")
+                pp_log(ctx, .openvpn, .fault, "Packet session mismatch (\(packet.sessionId.toHex()) != \(remoteSessionId.toHex())): \(error)")
                 throw error
             }
             guard let cipherTextIn = packet.payload else {
-                pp_log(.openvpn, .error, "TLS.connect: Control packet with empty payload?")
+                pp_log(ctx, .openvpn, .error, "TLS.connect: Control packet with empty payload?")
                 return
             }
 
-            pp_log(.openvpn, .info, "TLS.connect: Put received ciphertext [\(packet.packetId)] \(cipherTextIn.asSensitiveBytes)")
+            pp_log(ctx, .openvpn, .info, "TLS.connect: Put received ciphertext [\(packet.packetId)] \(cipherTextIn.asSensitiveBytes(ctx))")
             try? tlsBox.putCipherText(cipherTextIn)
 
             let cipherTextOut: Data
             do {
                 cipherTextOut = try tlsBox.pullCipherText()
-                pp_log(.openvpn, .info, "TLS.connect: Send pulled ciphertext \(cipherTextOut.asSensitiveBytes)")
+                pp_log(ctx, .openvpn, .info, "TLS.connect: Send pulled ciphertext \(cipherTextOut.asSensitiveBytes(ctx))")
                 try enqueueControlPackets(code: .controlV1, key: key, payload: cipherTextOut)
             } catch {
                 if let nativeError = error.asNativeOpenVPNError {
-                    pp_log(.openvpn, .fault, "TLS.connect: Failed pulling ciphertext: \(nativeError)")
+                    pp_log(ctx, .openvpn, .fault, "TLS.connect: Failed pulling ciphertext: \(nativeError)")
                     throw nativeError
                 }
-                pp_log(.openvpn, .debug, "TLS.connect: No available ciphertext to pull")
+                pp_log(ctx, .openvpn, .debug, "TLS.connect: No available ciphertext to pull")
             }
 
             if state < .auth, tlsBox.isConnected() {
-                pp_log(.openvpn, .info, "TLS.connect: Handshake is complete")
+                pp_log(ctx, .openvpn, .info, "TLS.connect: Handshake is complete")
                 state = .auth
 
                 try onTLSConnect()
@@ -481,22 +489,23 @@ private extension Negotiator {
 
     func privateSendAck(for controlPacket: ControlPacket, to link: LinkInterface) async throws {
         do {
-            pp_log(.openvpn, .info, "Send ack for received packetId \(controlPacket.packetId)")
+            pp_log(ctx, .openvpn, .info, "Send ack for received packetId \(controlPacket.packetId)")
             let raw = try channel.writeAcks(
                 withKey: controlPacket.key,
                 ackPacketIds: [controlPacket.packetId],
                 ackRemoteSessionId: controlPacket.sessionId
             )
             try await link.writePackets([raw])
-            pp_log(.openvpn, .info, "Ack successfully written to LINK for packetId \(controlPacket.packetId)")
+            pp_log(ctx, .openvpn, .info, "Ack successfully written to LINK for packetId \(controlPacket.packetId)")
         } catch {
-            pp_log(.openvpn, .error, "Failed LINK write during send ack for packetId \(controlPacket.packetId): \(error)")
+            pp_log(ctx, .openvpn, .error, "Failed LINK write during send ack for packetId \(controlPacket.packetId): \(error)")
             await options.onError(key, PartoutError(.linkFailure, error))
         }
     }
 
     func onTLSConnect() throws {
         authenticator = Authenticator(
+            ctx,
             prng: prng,
             options.credentials?.username,
             history?.pushReply.options.authToken ?? options.credentials?.password
@@ -509,14 +518,14 @@ private extension Negotiator {
             cipherTextOut = try tlsBox.pullCipherText()
         } catch {
             if let nativeError = error.asNativeOpenVPNError {
-                pp_log(.openvpn, .fault, "TLS.auth: Failed pulling ciphertext: \(nativeError)")
+                pp_log(ctx, .openvpn, .fault, "TLS.auth: Failed pulling ciphertext: \(nativeError)")
                 throw nativeError
             }
-            pp_log(.openvpn, .debug, "TLS.auth: Still can't pull ciphertext")
+            pp_log(ctx, .openvpn, .debug, "TLS.auth: Still can't pull ciphertext")
             return
         }
 
-        pp_log(.openvpn, .info, "TLS.auth: Pulled ciphertext \(cipherTextOut.asSensitiveBytes)")
+        pp_log(ctx, .openvpn, .info, "TLS.auth: Pulled ciphertext \(cipherTextOut.asSensitiveBytes(ctx))")
         try enqueueControlPackets(code: .controlV1, key: key, payload: cipherTextOut)
     }
 
@@ -525,7 +534,7 @@ private extension Negotiator {
             return
         }
 
-        pp_log(.openvpn, .info, "Pulled plain control data \(data.asSensitiveBytes)")
+        pp_log(ctx, .openvpn, .info, "Pulled plain control data \(data.asSensitiveBytes(ctx))")
         authenticator.appendControlData(data)
 
         if state == .auth {
@@ -537,7 +546,7 @@ private extension Negotiator {
             guard !isRenegotiating else {
                 state = .connected
                 guard let pushReply = history?.pushReply else {
-                    pp_log(.openvpn, .fault, "Renegotiating connection without former history")
+                    pp_log(ctx, .openvpn, .fault, "Renegotiating connection without former history")
                     throw OpenVPNSessionError.assertion
                 }
                 try completeConnection(pushReply: pushReply)
@@ -549,7 +558,7 @@ private extension Negotiator {
         }
 
         for message in authenticator.parseMessages() {
-            pp_log(.openvpn, .info, "Parsed control message \(message.asSensitiveBytes)")
+            pp_log(ctx, .openvpn, .info, "Parsed control message \(message.asSensitiveBytes(ctx))")
             do {
                 try handleControlMessage(message)
             } catch {
@@ -562,14 +571,14 @@ private extension Negotiator {
     }
 
     func handleControlMessage(_ message: String) throws {
-        pp_log(.openvpn, .info, "Received control message \(message.asSensitiveBytes)")
+        pp_log(ctx, .openvpn, .info, "Received control message \(message.asSensitiveBytes(ctx))")
 
         // disconnect on authentication failure
         guard !message.hasPrefix("AUTH_FAILED") else {
 
             // XXX: retry without client options
             if authenticator?.withLocalOptions ?? false {
-                pp_log(.openvpn, .error, "Authentication failure, retry without local options")
+                pp_log(ctx, .openvpn, .error, "Authentication failure, retry without local options")
                 throw OpenVPNSessionError.badCredentialsWithLocalOptions
             }
 
@@ -578,7 +587,7 @@ private extension Negotiator {
 
         // disconnect on remote server restart (--explicit-exit-notify)
         guard !message.hasPrefix("RESTART") else {
-            pp_log(.openvpn, .info, "Disconnect due to server shutdown")
+            pp_log(ctx, .openvpn, .info, "Disconnect due to server shutdown")
             throw OpenVPNSessionError.serverShutdown
         }
 
@@ -599,7 +608,7 @@ private extension Negotiator {
                 return
             }
             reply = optionalReply
-            pp_log(.openvpn, .info, "Received PUSH_REPLY: \"\(reply)\"")
+            pp_log(ctx, .openvpn, .info, "Received PUSH_REPLY: \"\(reply)\"")
 
             if let framing = reply.options.compressionFraming, let compression = reply.options.compressionAlgorithm {
                 switch compression {
@@ -609,13 +618,13 @@ private extension Negotiator {
                 case .LZO:
                     if !LZOFactory.canCreate() {
                         let error = OpenVPNSessionError.serverCompression
-                        pp_log(.openvpn, .fault, "Server has LZO compression enabled and this was not built into the library (framing=\(framing)): \(error)")
+                        pp_log(ctx, .openvpn, .fault, "Server has LZO compression enabled and this was not built into the library (framing=\(framing)): \(error)")
                         throw error
                     }
 
                 default:
                     let error = OpenVPNSessionError.serverCompression
-                    pp_log(.openvpn, .fault, "Server has non-LZO compression enabled and this is currently unsupported (framing=\(framing)): \(error)")
+                    pp_log(ctx, .openvpn, .fault, "Server has non-LZO compression enabled and this is currently unsupported (framing=\(framing)): \(error)")
                     throw error
                 }
             }
@@ -629,7 +638,7 @@ private extension Negotiator {
             throw OpenVPNSessionError.noRouting
         }
         guard state != .connected else {
-            pp_log(.openvpn, .error, "Ignore multiple calls to complete connection")
+            pp_log(ctx, .openvpn, .error, "Ignore multiple calls to complete connection")
             return
         }
         state = .connected
@@ -639,7 +648,7 @@ private extension Negotiator {
 
 private extension Negotiator {
     func completeConnection(pushReply: PushReply) throws {
-        pp_log(.openvpn, .info, "Complete connection of key \(key)")
+        pp_log(ctx, .openvpn, .info, "Complete connection of key \(key)")
         let history = NegotiationHistory(pushReply: pushReply)
         let dataChannel = try newDataChannel(with: history)
         self.history = history
@@ -651,26 +660,26 @@ private extension Negotiator {
 
     func newDataChannel(with history: NegotiationHistory) throws -> DataChannel {
         guard let sessionId = channel.sessionId else {
-            pp_log(.openvpn, .fault, "Setting up connection without a local sessionId")
+            pp_log(ctx, .openvpn, .fault, "Setting up connection without a local sessionId")
             throw OpenVPNSessionError.assertion
         }
         guard let remoteSessionId = channel.remoteSessionId else {
-            pp_log(.openvpn, .fault, "Setting up connection without a remote sessionId")
+            pp_log(ctx, .openvpn, .fault, "Setting up connection without a remote sessionId")
             throw OpenVPNSessionError.assertion
         }
         guard let authResponse = authenticator?.response else {
-            pp_log(.openvpn, .fault, "Setting up connection without auth response")
+            pp_log(ctx, .openvpn, .fault, "Setting up connection without auth response")
             throw OpenVPNSessionError.assertion
         }
 
-        pp_log(.openvpn, .notice, "Set up encryption")
-//        pp_log(.openvpn, .info, "\tpreMaster: \(authenticator.preMaster.toHex(), privacy: .private)")
-//        pp_log(.openvpn, .info, "\trandom1: \(authenticator.random1.toHex(), privacy: .private)")
-//        pp_log(.openvpn, .info, "\trandom2: \(authenticator.random2.toHex(), privacy: .private)")
-//        pp_log(.openvpn, .info, "\tserverRandom1: \(serverRandom1.toHex(), privacy: .private)")
-//        pp_log(.openvpn, .info, "\tserverRandom2: \(serverRandom2.toHex(), privacy: .private)")
-//        pp_log(.openvpn, .info, "\tsessionId: \(sessionId.toHex())")
-//        pp_log(.openvpn, .info, "\tremoteSessionId: \(remoteSessionId.toHex())")
+        pp_log(ctx, .openvpn, .notice, "Set up encryption")
+//        pp_log(ctx, .openvpn, .info, "\tpreMaster: \(authenticator.preMaster.toHex(), privacy: .private)")
+//        pp_log(ctx, .openvpn, .info, "\trandom1: \(authenticator.random1.toHex(), privacy: .private)")
+//        pp_log(ctx, .openvpn, .info, "\trandom2: \(authenticator.random2.toHex(), privacy: .private)")
+//        pp_log(ctx, .openvpn, .info, "\tserverRandom1: \(serverRandom1.toHex(), privacy: .private)")
+//        pp_log(ctx, .openvpn, .info, "\tserverRandom2: \(serverRandom2.toHex(), privacy: .private)")
+//        pp_log(ctx, .openvpn, .info, "\tsessionId: \(sessionId.toHex())")
+//        pp_log(ctx, .openvpn, .info, "\tremoteSessionId: \(remoteSessionId.toHex())")
 
         let cryptoBox = cryptoFactory()
         try cryptoBox.configure(
@@ -694,7 +703,7 @@ private extension Negotiator {
             usesReplayProtection: Constants.usesReplayProtection
         )
 
-        return DataChannel(key: key, dataPath: dataPath)
+        return DataChannel(ctx, key: key, dataPath: dataPath)
     }
 }
 

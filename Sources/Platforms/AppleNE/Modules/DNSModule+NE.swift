@@ -28,7 +28,7 @@ import NetworkExtension
 import PartoutCore
 
 extension DNSModule: NESettingsApplying {
-    public func apply(to settings: inout NEPacketTunnelNetworkSettings) {
+    public func apply(_ ctx: PartoutContext, to settings: inout NEPacketTunnelNetworkSettings) {
         var dnsSettings: NEDNSSettings?
         let rawServers = servers.map(\.rawValue)
 
@@ -36,24 +36,24 @@ extension DNSModule: NESettingsApplying {
         case .cleartext:
             if !rawServers.isEmpty {
                 dnsSettings = NEDNSSettings(servers: rawServers)
-                pp_log(.ne, .info, "\t\tServers: \(servers.map(\.asSensitiveAddress))")
+                pp_log(ctx, .ne, .info, "\t\tServers: \(servers.map { $0.asSensitiveAddress(ctx) })")
             } else {
-                pp_log(.ne, .info, "\t\tServers: empty")
+                pp_log(ctx, .ne, .info, "\t\tServers: empty")
             }
 
         case .https(let url):
             let specificSettings = NEDNSOverHTTPSSettings(servers: rawServers)
             specificSettings.serverURL = url
             dnsSettings = specificSettings
-            pp_log(.ne, .info, "\t\tServers: \(servers.map(\.asSensitiveAddress))")
-            pp_log(.ne, .info, "\t\tDoH URL: \(url.absoluteString.asSensitiveAddress)")
+            pp_log(ctx, .ne, .info, "\t\tServers: \(servers.map { $0.asSensitiveAddress(ctx) })")
+            pp_log(ctx, .ne, .info, "\t\tDoH URL: \(url.absoluteString.asSensitiveAddress(ctx))")
 
         case .tls(let hostname):
             let specificSettings = NEDNSOverTLSSettings(servers: rawServers)
             specificSettings.serverName = hostname
             dnsSettings = specificSettings
-            pp_log(.ne, .info, "\t\tServers: \(servers.map(\.asSensitiveAddress))")
-            pp_log(.ne, .info, "\t\tDoT hostname: \(hostname.asSensitiveAddress)")
+            pp_log(ctx, .ne, .info, "\t\tServers: \(servers.map { $0.asSensitiveAddress(ctx) })")
+            pp_log(ctx, .ne, .info, "\t\tDoT hostname: \(hostname.asSensitiveAddress(ctx))")
 
         @unknown default:
             break
@@ -62,17 +62,17 @@ extension DNSModule: NESettingsApplying {
         if dnsSettings != nil {
             domainName.map {
                 dnsSettings?.domainName = $0.rawValue
-                pp_log(.ne, .info, "\t\tDomain: \($0.asSensitiveAddress)")
+                pp_log(ctx, .ne, .info, "\t\tDomain: \($0.asSensitiveAddress(ctx))")
             }
             searchDomains.map {
                 guard !$0.isEmpty else {
                     return
                 }
                 dnsSettings?.searchDomains = $0.map(\.rawValue)
-                pp_log(.ne, .info, "\t\tSearch domains: \($0.map(\.asSensitiveAddress))")
+                pp_log(ctx, .ne, .info, "\t\tSearch domains: \($0.map { $0.asSensitiveAddress(ctx) })")
             }
         } else {
-            pp_log(.ne, .info, "\t\tSkip DNS settings")
+            pp_log(ctx, .ne, .info, "\t\tSkip DNS settings")
         }
 
         settings.dnsSettings = dnsSettings

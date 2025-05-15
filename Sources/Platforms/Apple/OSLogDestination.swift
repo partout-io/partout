@@ -29,7 +29,9 @@ import PartoutCore
 
 /// Represents an OSLog logging destination.
 public struct OSLogDestination: LoggerDestination {
-    private static let subsystem = PartoutConfiguration.shared.identifier
+    private static var subsystem: String {
+        PartoutContext.identifier
+    }
 
     public let category: LoggerCategory
 

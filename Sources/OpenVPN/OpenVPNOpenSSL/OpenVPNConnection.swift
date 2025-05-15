@@ -31,6 +31,8 @@ public actor OpenVPNConnection {
 
     // MARK: Initialization
 
+    private let ctx: PartoutContext
+
     private let moduleId: UUID
 
     private let controller: TunnelController
@@ -48,12 +50,14 @@ public actor OpenVPNConnection {
     let session: OpenVPNSessionProtocol
 
     init(
+        _ ctx: PartoutContext,
         parameters: ConnectionParameters,
         module: OpenVPNModule,
         prng: PRNGProtocol,
         dns: DNSResolver,
         session: OpenVPNSessionProtocol
     ) async throws {
+        self.ctx = ctx
         moduleId = module.id
         controller = parameters.controller
         environment = parameters.environment
@@ -70,6 +74,7 @@ public actor OpenVPNConnection {
         self.configuration = try configuration.withModules(from: parameters.controller.profile)
 
         backend = CyclingConnection(
+            ctx,
             factory: parameters.factory,
             controller: controller,
             options: options,
@@ -92,7 +97,7 @@ public actor OpenVPNConnection {
         } upgradeBlock: { [weak self] in
 
             // TODO: #143/notes, may improve this with floating
-            pp_log(.openvpn, .notice, "Link has a better path, shut down session to reconnect")
+            pp_log(ctx, .openvpn, .notice, "Link has a better path, shut down session to reconnect")
             await self?.session.shutdown(PartoutError(.networkChanged))
 
         } stopBlock: { [weak self] _, timeout in
@@ -109,14 +114,14 @@ public actor OpenVPNConnection {
             let delta = 500
             var remaining = timeout
             while remaining > 0, await session.hasLink() {
-                pp_log(.openvpn, .notice, "Link active, wait \(delta) milliseconds more")
+                pp_log(ctx, .openvpn, .notice, "Link active, wait \(delta) milliseconds more")
                 try? await Task.sleep(milliseconds: delta)
                 remaining = max(0, remaining - delta)
             }
             if remaining > 0 {
-                pp_log(.openvpn, .notice, "Link shut down gracefully")
+                pp_log(ctx, .openvpn, .notice, "Link shut down gracefully")
             } else {
-                pp_log(.openvpn, .error, "Link shut down due to timeout")
+                pp_log(ctx, .openvpn, .error, "Link shut down due to timeout")
             }
         } onStatusBlock: { [weak self] status in
 
@@ -168,21 +173,25 @@ extension OpenVPNConnection: OpenVPNSessionDelegate {
     func sessionDidStart(_ session: OpenVPNSessionProtocol, remoteAddress: String, remoteProtocol: EndpointProtocol, remoteOptions: OpenVPN.Configuration) async {
         let addressObject = Address(rawValue: remoteAddress)
         if addressObject == nil {
-            pp_log(.openvpn, .error, "Unable to parse remote tunnel address")
+            pp_log(ctx, .openvpn, .error, "Unable to parse remote tunnel address")
         }
 
-        pp_log(.openvpn, .notice, "Session did start")
-        pp_log(.openvpn, .info, "\tAddress: \(remoteAddress.asSensitiveAddress)")
-        pp_log(.openvpn, .info, "\tProtocol: \(remoteProtocol)")
+        pp_log(ctx, .openvpn, .notice, "Session did start")
+        pp_log(ctx, .openvpn, .info, "\tAddress: \(remoteAddress.asSensitiveAddress(ctx))")
+        pp_log(ctx, .openvpn, .info, "\tProtocol: \(remoteProtocol)")
 
-        pp_log(.openvpn, .notice, "Local options:")
-        configuration.print(isLocal: true)
-        pp_log(.openvpn, .notice, "Remote options:")
-        remoteOptions.print(isLocal: false)
+        pp_log(ctx, .openvpn, .notice, "Local options:")
+        configuration.print(ctx, isLocal: true)
+        pp_log(ctx, .openvpn, .notice, "Remote options:")
+        remoteOptions.print(ctx, isLocal: false)
 
         environment.setEnvironmentValue(remoteOptions, forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
 
-        let builder = NetworkSettingsBuilder(localOptions: configuration, remoteOptions: remoteOptions)
+        let builder = NetworkSettingsBuilder(
+            ctx,
+            localOptions: configuration,
+            remoteOptions: remoteOptions
+        )
         builder.print()
         do {
             try await controller.setTunnelSettings(with: TunnelRemoteInfo(
@@ -199,30 +208,30 @@ extension OpenVPNConnection: OpenVPNSessionDelegate {
 
             // signal success and show the "VPN" icon
             if await backend.sendStatus(.connected) {
-                pp_log(.openvpn, .notice, "Tunnel interface is now UP")
+                pp_log(ctx, .openvpn, .notice, "Tunnel interface is now UP")
             }
         } catch {
-            pp_log(.openvpn, .error, "Unable to start tunnel: \(error)")
+            pp_log(ctx, .openvpn, .error, "Unable to start tunnel: \(error)")
             await session.shutdown(error)
         }
     }
 
     func sessionDidStop(_ session: OpenVPNSessionProtocol, withError error: Error?) async {
         if let error {
-            pp_log(.openvpn, .error, "Session did stop: \(error)")
+            pp_log(ctx, .openvpn, .error, "Session did stop: \(error)")
         } else {
-            pp_log(.openvpn, .notice, "Session did stop")
+            pp_log(ctx, .openvpn, .notice, "Session did stop")
         }
 
         // if user stopped the tunnel, let it go
         if await backend.status == .disconnecting {
-            pp_log(.openvpn, .info, "User requested disconnection")
+            pp_log(ctx, .openvpn, .info, "User requested disconnection")
             return
         }
 
         // if error is not recoverable, just fail
         if let error, !error.isOpenVPNRecoverable {
-            pp_log(.openvpn, .error, "Disconnection is not recoverable")
+            pp_log(ctx, .openvpn, .error, "Disconnection is not recoverable")
             await backend.sendError(error)
             return
         }
@@ -235,7 +244,7 @@ extension OpenVPNConnection: OpenVPNSessionDelegate {
         guard await backend.status == .connected else {
             return
         }
-        pp_log(.openvpn, .debug, "Updated data count: \(dataCount.debugDescription)")
+        pp_log(ctx, .openvpn, .debug, "Updated data count: \(dataCount.debugDescription)")
         environment.setEnvironmentValue(dataCount, forKey: TunnelEnvironmentKeys.dataCount)
     }
 }

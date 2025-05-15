@@ -28,13 +28,18 @@ import PartoutCore
 
 /// A ``TunnelEnvironment`` that stores data to `UserDefaults`.
 public final class UserDefaultsEnvironment: TunnelEnvironment, @unchecked Sendable {
+    private let profileId: Profile.ID?
+
     private let defaults: UserDefaults
 
     private let prefix: String
 
-    public init(defaults: UserDefaults, prefix: String = "") {
+    public init(profileId: Profile.ID?, defaults: UserDefaults) {
+        self.profileId = profileId
         self.defaults = defaults
-        self.prefix = prefix
+        prefix = profileId.map {
+            "\($0)."
+        } ?? ""
     }
 
     public func setEnvironmentValue<T>(_ value: T, forKey key: TunnelEnvironmentKey<T>) where T: Encodable {
@@ -42,9 +47,9 @@ public final class UserDefaultsEnvironment: TunnelEnvironment, @unchecked Sendab
         do {
             let data = try JSONEncoder().encode(value)
             defaults.set(data, forKey: fullKey)
-            pp_log(.core, .debug, "UserDefaultsEnvironment.set(\(fullKey)) -> \(value)")
+            pp_log_id(profileId, .core, .debug, "UserDefaultsEnvironment.set(\(fullKey)) -> \(value)")
         } catch {
-            pp_log(.core, .error, "Unable to set environment key: \(fullKey) -> \(error)")
+            pp_log_id(profileId, .core, .error, "Unable to set environment key: \(fullKey) -> \(error)")
         }
     }
 
@@ -56,7 +61,7 @@ public final class UserDefaultsEnvironment: TunnelEnvironment, @unchecked Sendab
             }
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
-            pp_log(.core, .error, "Unable to get environment key: \(fullKey) -> \(error)")
+            pp_log_id(profileId, .core, .error, "Unable to get environment key: \(fullKey) -> \(error)")
             return nil
         }
     }
@@ -64,7 +69,7 @@ public final class UserDefaultsEnvironment: TunnelEnvironment, @unchecked Sendab
     public func removeEnvironmentValue(forKey key: String) {
         let fullKey = key.rawKey(prefix: prefix)
         defaults.removeObject(forKey: fullKey)
-        pp_log(.core, .debug, "UserDefaultsEnvironment.remove(\(fullKey))")
+        pp_log_id(profileId, .core, .debug, "UserDefaultsEnvironment.remove(\(fullKey))")
     }
 
     public func snapshot(excludingKeys excluded: Set<String>?) -> [String: Data] {

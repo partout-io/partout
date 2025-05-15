@@ -29,8 +29,8 @@ import SwiftUI
 @main
 struct DemoApp: App {
     init() {
-        PartoutConfiguration.shared.logsModules = true
-        PartoutConfiguration.shared.setLocalLogger(
+        PartoutContext.global.logsModules = true
+        PartoutContext.global.setLocalLogger(
             url: Demo.Log.appURL,
             options: .init(
                 maxLevel: Demo.Log.maxLevel,

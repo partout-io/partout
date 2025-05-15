@@ -31,16 +31,23 @@ import PartoutCore
 ///
 /// OpenVPN settings may be set locally, but may also received from a remote server. This object merges the local and remote ``OpenVPN/Configuration`` into a digestible list of `Module`.
 struct NetworkSettingsBuilder {
+    private let ctx: PartoutContext
 
     /// The client options.
-    let localOptions: OpenVPN.Configuration
+    private let localOptions: OpenVPN.Configuration
 
     /// The server options.
-    let remoteOptions: OpenVPN.Configuration
+    private let remoteOptions: OpenVPN.Configuration
+
+    init(_ ctx: PartoutContext, localOptions: OpenVPN.Configuration, remoteOptions: OpenVPN.Configuration) {
+        self.ctx = ctx
+        self.localOptions = localOptions
+        self.remoteOptions = remoteOptions
+    }
 
     /// A list of `Module` mapped from ``localOptions`` and ``remoteOptions``.
     func modules() -> [Module] {
-        pp_log(.openvpn, .info, "Build modules from local/remote options")
+        pp_log(ctx, .openvpn, .info, "Build modules from local/remote options")
 
         return [
             ipModule,
@@ -50,21 +57,21 @@ struct NetworkSettingsBuilder {
     }
 
     func print() {
-        pp_log(.openvpn, .notice, "Negotiated options (remote overrides local)")
+        pp_log(ctx, .openvpn, .notice, "Negotiated options (remote overrides local)")
         if let negCipher = remoteOptions.cipher {
-            pp_log(.openvpn, .notice, "\tCipher: \(negCipher.rawValue)")
+            pp_log(ctx, .openvpn, .notice, "\tCipher: \(negCipher.rawValue)")
         }
         if let negFraming = remoteOptions.compressionFraming {
-            pp_log(.openvpn, .notice, "\tCompression framing: \(negFraming)")
+            pp_log(ctx, .openvpn, .notice, "\tCompression framing: \(negFraming)")
         }
         if let negCompression = remoteOptions.compressionAlgorithm {
-            pp_log(.openvpn, .notice, "\tCompression algorithm: \(negCompression)")
+            pp_log(ctx, .openvpn, .notice, "\tCompression algorithm: \(negCompression)")
         }
         if let negPing = remoteOptions.keepAliveInterval {
-            pp_log(.openvpn, .notice, "\tKeep-alive interval: \(negPing.asTimeString)")
+            pp_log(ctx, .openvpn, .notice, "\tKeep-alive interval: \(negPing.asTimeString)")
         }
         if let negPingRestart = remoteOptions.keepAliveTimeout {
-            pp_log(.openvpn, .notice, "\tKeep-alive timeout: \(negPingRestart.asTimeString)")
+            pp_log(ctx, .openvpn, .notice, "\tKeep-alive timeout: \(negPingRestart.asTimeString)")
         }
 
     }
@@ -193,12 +200,12 @@ private extension NetworkSettingsBuilder {
             let ipv4Route = Route(route.destination, route.gateway)
             if route.destination == nil {
                 guard isIPv4Gateway, let gw = route.gateway else {
-                    pp_log(.openvpn, .error, "\tIPv4: Ignored default route (not default gateway)")
+                    pp_log(ctx, .openvpn, .error, "\tIPv4: Ignored default route (not default gateway)")
                     return nil
                 }
-                pp_log(.openvpn, .info, "\tIPv4: Set default gateway to \(gw)")
+                pp_log(ctx, .openvpn, .info, "\tIPv4: Set default gateway to \(gw)")
             } else {
-                pp_log(.openvpn, .info, "\tIPv4: Add route \(route.destination?.description ?? "default") -> \(route.gateway?.description ?? "*")")
+                pp_log(ctx, .openvpn, .info, "\tIPv4: Add route \(route.destination?.description ?? "default") -> \(route.gateway?.description ?? "*")")
             }
             return ipv4Route
         }
@@ -219,12 +226,12 @@ private extension NetworkSettingsBuilder {
             let ipv6Route = Route(route.destination, route.gateway)
             if route.destination == nil {
                 guard isIPv6Gateway, let gw = route.gateway else {
-                    pp_log(.openvpn, .error, "\tIPv6: Ignored default route (not default gateway)")
+                    pp_log(ctx, .openvpn, .error, "\tIPv6: Ignored default route (not default gateway)")
                     return nil
                 }
-                pp_log(.openvpn, .info, "\tIPv6: Set default gateway to \(gw)")
+                pp_log(ctx, .openvpn, .info, "\tIPv6: Set default gateway to \(gw)")
             } else {
-                pp_log(.openvpn, .info, "\tIPv6: Add route \(route.destination?.description ?? "default") -> \(route.gateway?.description ?? "*")")
+                pp_log(ctx, .openvpn, .info, "\tIPv6: Add route \(route.destination?.description ?? "default") -> \(route.gateway?.description ?? "*")")
             }
             return ipv6Route
         }
@@ -240,31 +247,31 @@ private extension NetworkSettingsBuilder {
         let dnsServers = allDNSServers
         guard !dnsServers.isEmpty else {
             if isGateway {
-                pp_log(.openvpn, .error, "DNS: No settings provided")
+                pp_log(ctx, .openvpn, .error, "DNS: No settings provided")
             } else {
-                pp_log(.openvpn, .error, "DNS: No settings provided, use system settings")
+                pp_log(ctx, .openvpn, .error, "DNS: No settings provided, use system settings")
             }
             return nil
         }
 
-        pp_log(.openvpn, .info, "\tDNS: Set servers \(dnsServers.map(\.asSensitiveAddress))")
+        pp_log(ctx, .openvpn, .info, "\tDNS: Set servers \(dnsServers.map { $0.asSensitiveAddress(ctx) })")
         var dnsSettings = DNSModule.Builder(servers: dnsServers)
 
         if let domain = dnsDomain {
-            pp_log(.openvpn, .info, "\tDNS: Set domain: \(domain.asSensitiveAddress)")
+            pp_log(ctx, .openvpn, .info, "\tDNS: Set domain: \(domain.asSensitiveAddress(ctx))")
             dnsSettings.domainName = domain
         }
 
         let searchDomains = allDNSSearchDomains
         if !searchDomains.isEmpty {
-            pp_log(.openvpn, .info, "\tDNS: Set search domains: \(searchDomains.map(\.asSensitiveAddress))")
+            pp_log(ctx, .openvpn, .info, "\tDNS: Set search domains: \(searchDomains.map { $0.asSensitiveAddress(ctx) })")
             dnsSettings.searchDomains = searchDomains
         }
 
         do {
             return try dnsSettings.tryBuild()
         } catch {
-            pp_log(.openvpn, .error, "DNS: Unable to build settings: \(error)")
+            pp_log(ctx, .openvpn, .error, "DNS: Unable to build settings: \(error)")
             return nil
         }
     }
@@ -280,7 +287,7 @@ private extension NetworkSettingsBuilder {
             proxySettings = HTTPProxyModule.Builder()
             proxySettings?.secureAddress = httpsProxy.address.rawValue
             proxySettings?.securePort = httpsProxy.port
-            pp_log(.openvpn, .info, "\tHTTPProxy: Set HTTPS proxy \(httpsProxy.asSensitiveAddress)")
+            pp_log(ctx, .openvpn, .info, "\tHTTPProxy: Set HTTPS proxy \(httpsProxy.asSensitiveAddress(ctx))")
         }
         if let httpProxy = pullProxy ? (remoteOptions.httpProxy ?? localOptions.httpProxy) : localOptions.httpProxy {
             if proxySettings == nil {
@@ -288,14 +295,14 @@ private extension NetworkSettingsBuilder {
             }
             proxySettings?.address = httpProxy.address.rawValue
             proxySettings?.port = httpProxy.port
-            pp_log(.openvpn, .info, "\tHTTPProxy: Set HTTP proxy \(httpProxy.asSensitiveAddress)")
+            pp_log(ctx, .openvpn, .info, "\tHTTPProxy: Set HTTP proxy \(httpProxy.asSensitiveAddress(ctx))")
         }
         if let pacURL = pullProxy ? (remoteOptions.proxyAutoConfigurationURL ?? localOptions.proxyAutoConfigurationURL) : localOptions.proxyAutoConfigurationURL {
             if proxySettings == nil {
                 proxySettings = HTTPProxyModule.Builder()
             }
             proxySettings?.pacURLString = pacURL.absoluteString
-            pp_log(.openvpn, .info, "\tHTTPProxy: Set PAC \(pacURL.absoluteString.asSensitiveAddress)")
+            pp_log(ctx, .openvpn, .info, "\tHTTPProxy: Set PAC \(pacURL.absoluteString.asSensitiveAddress(ctx))")
         }
 
         // only set if there is a proxy (proxySettings set to non-nil above)
@@ -303,14 +310,14 @@ private extension NetworkSettingsBuilder {
             let bypass = allProxyBypassDomains
             if !bypass.isEmpty {
                 proxySettings?.bypassDomains = bypass
-                pp_log(.openvpn, .info, "\tHTTPProxy: Set by-pass list: \(bypass.map(\.asSensitiveAddress))")
+                pp_log(ctx, .openvpn, .info, "\tHTTPProxy: Set by-pass list: \(bypass.map { $0.asSensitiveAddress(ctx) })")
             }
         }
 
         do {
             return try proxySettings?.tryBuild()
         } catch {
-            pp_log(.openvpn, .error, "HTTPProxy: Unable to build settings: \(error)")
+            pp_log(ctx, .openvpn, .error, "HTTPProxy: Unable to build settings: \(error)")
             return nil
         }
     }

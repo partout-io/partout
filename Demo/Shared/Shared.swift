@@ -99,10 +99,11 @@ extension Demo {
 extension Demo {
     static var neProtocolCoder: KeychainNEProtocolCoder {
         KeychainNEProtocolCoder(
+            .global,
             tunnelBundleIdentifier: Demo.tunnelBundleIdentifier,
             registry: .shared,
             coder: CodableProfileCoder(),
-            keychain: AppleKeychain(group: "\(teamIdentifier).\(appGroupIdentifier)")
+            keychain: AppleKeychain(.global, group: "\(teamIdentifier).\(appGroupIdentifier)")
         )
     }
 
@@ -110,6 +111,6 @@ extension Demo {
         guard let defaults = UserDefaults(suiteName: appGroupIdentifier) else {
             fatalError("Not entitled to App Group: \(appGroupIdentifier)")
         }
-        return UserDefaultsEnvironment(defaults: defaults)
+        return UserDefaultsEnvironment(profileId: nil, defaults: defaults)
     }()
 }

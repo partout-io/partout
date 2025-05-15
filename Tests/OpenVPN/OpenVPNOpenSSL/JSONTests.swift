@@ -101,7 +101,7 @@ private extension JSONTests {
         let result = try parser.parsed(fromURL: url)
         let cfg = result.configuration
 
-        let jsonString = try XCTUnwrap(cfg.asJSON(withSensitiveData: withSensitiveData))
+        let jsonString = try XCTUnwrap(cfg.asJSON(.global, withSensitiveData: withSensitiveData))
         print(jsonString)
         let jsonData = try XCTUnwrap(jsonString.data(using: .utf8))
         let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: jsonData) as? [String: Any])

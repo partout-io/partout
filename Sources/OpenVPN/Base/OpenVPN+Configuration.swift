@@ -579,148 +579,148 @@ extension OpenVPN.Configuration {
 // MARK: - Debugging
 
 extension OpenVPN.Configuration {
-    public func print(isLocal: Bool) {
+    public func print(_ ctx: PartoutContext, isLocal: Bool) {
         if isLocal, let remotes {
-            pp_log(.openvpn, .notice, "\tRemotes: \(remotes.map(\.asSensitiveAddress))")
+            pp_log(ctx, .openvpn, .notice, "\tRemotes: \(remotes.map { $0.asSensitiveAddress(ctx) })")
         }
 
         if !isLocal {
-            pp_log(.openvpn, .notice, "\tIPv4: \(ipv4?.asSensitiveAddress ?? "not configured")")
-            pp_log(.openvpn, .notice, "\tIPv6: \(ipv6?.asSensitiveAddress ?? "not configured")")
+            pp_log(ctx, .openvpn, .notice, "\tIPv4: \(ipv4?.asSensitiveAddress(ctx) ?? "not configured")")
+            pp_log(ctx, .openvpn, .notice, "\tIPv6: \(ipv6?.asSensitiveAddress(ctx) ?? "not configured")")
         }
         if let routes4 {
-            pp_log(.openvpn, .notice, "\tRoutes (IPv4): \(routes4)")
+            pp_log(ctx, .openvpn, .notice, "\tRoutes (IPv4): \(routes4)")
         }
         if let routes6 {
-            pp_log(.openvpn, .notice, "\tRoutes (IPv6): \(routes6)")
+            pp_log(ctx, .openvpn, .notice, "\tRoutes (IPv6): \(routes6)")
         }
 
         if let cipher {
-            pp_log(.openvpn, .notice, "\tCipher: \(cipher)")
+            pp_log(ctx, .openvpn, .notice, "\tCipher: \(cipher)")
         } else if isLocal {
-            pp_log(.openvpn, .notice, "\tCipher: \(fallbackCipher)")
+            pp_log(ctx, .openvpn, .notice, "\tCipher: \(fallbackCipher)")
         }
         if let digest {
-            pp_log(.openvpn, .notice, "\tDigest: \(digest)")
+            pp_log(ctx, .openvpn, .notice, "\tDigest: \(digest)")
         } else if isLocal {
-            pp_log(.openvpn, .notice, "\tDigest: \(fallbackDigest)")
+            pp_log(ctx, .openvpn, .notice, "\tDigest: \(fallbackDigest)")
         }
         if let compressionFraming {
-            pp_log(.openvpn, .notice, "\tCompression framing: \(compressionFraming)")
+            pp_log(ctx, .openvpn, .notice, "\tCompression framing: \(compressionFraming)")
         } else if isLocal {
-            pp_log(.openvpn, .notice, "\tCompression framing: \(fallbackCompressionFraming)")
+            pp_log(ctx, .openvpn, .notice, "\tCompression framing: \(fallbackCompressionFraming)")
         }
         if let compressionAlgorithm {
-            pp_log(.openvpn, .notice, "\tCompression algorithm: \(compressionAlgorithm)")
+            pp_log(ctx, .openvpn, .notice, "\tCompression algorithm: \(compressionAlgorithm)")
         } else if isLocal {
-            pp_log(.openvpn, .notice, "\tCompression algorithm: \(fallbackCompressionAlgorithm)")
+            pp_log(ctx, .openvpn, .notice, "\tCompression algorithm: \(fallbackCompressionAlgorithm)")
         }
 
         if isLocal {
-            pp_log(.openvpn, .notice, "\tUsername authentication: \(authUserPass ?? false)")
-            pp_log(.openvpn, .notice, "\tStatic challenge: \(staticChallenge ?? false)")
+            pp_log(ctx, .openvpn, .notice, "\tUsername authentication: \(authUserPass ?? false)")
+            pp_log(ctx, .openvpn, .notice, "\tStatic challenge: \(staticChallenge ?? false)")
             if clientCertificate != nil {
-                pp_log(.openvpn, .notice, "\tClient verification: enabled")
+                pp_log(ctx, .openvpn, .notice, "\tClient verification: enabled")
             } else {
-                pp_log(.openvpn, .notice, "\tClient verification: disabled")
+                pp_log(ctx, .openvpn, .notice, "\tClient verification: disabled")
             }
             if let tlsWrap {
-                pp_log(.openvpn, .notice, "\tTLS wrapping: \(tlsWrap.strategy.rawValue)")
+                pp_log(ctx, .openvpn, .notice, "\tTLS wrapping: \(tlsWrap.strategy.rawValue)")
             } else {
-                pp_log(.openvpn, .notice, "\tTLS wrapping: disabled")
+                pp_log(ctx, .openvpn, .notice, "\tTLS wrapping: disabled")
             }
             if let tlsSecurityLevel {
-                pp_log(.openvpn, .notice, "\tTLS security level: \(tlsSecurityLevel)")
+                pp_log(ctx, .openvpn, .notice, "\tTLS security level: \(tlsSecurityLevel)")
             } else {
-                pp_log(.openvpn, .notice, "\tTLS security level: default")
+                pp_log(ctx, .openvpn, .notice, "\tTLS security level: default")
             }
         }
 
         if let keepAliveInterval, keepAliveInterval > 0 {
-            pp_log(.openvpn, .notice, "\tKeep-alive interval: \(keepAliveInterval.asTimeString)")
+            pp_log(ctx, .openvpn, .notice, "\tKeep-alive interval: \(keepAliveInterval.asTimeString)")
         } else if isLocal {
-            pp_log(.openvpn, .notice, "\tKeep-alive interval: never")
+            pp_log(ctx, .openvpn, .notice, "\tKeep-alive interval: never")
         }
         if let keepAliveTimeout, keepAliveTimeout > 0 {
-            pp_log(.openvpn, .notice, "\tKeep-alive timeout: \(keepAliveTimeout.asTimeString)")
+            pp_log(ctx, .openvpn, .notice, "\tKeep-alive timeout: \(keepAliveTimeout.asTimeString)")
         } else if isLocal {
-            pp_log(.openvpn, .notice, "\tKeep-alive timeout: never")
+            pp_log(ctx, .openvpn, .notice, "\tKeep-alive timeout: never")
         }
         if let renegotiatesAfter, renegotiatesAfter > 0 {
-            pp_log(.openvpn, .notice, "\tRenegotiation: \(renegotiatesAfter.asTimeString)")
+            pp_log(ctx, .openvpn, .notice, "\tRenegotiation: \(renegotiatesAfter.asTimeString)")
         } else if isLocal {
-            pp_log(.openvpn, .notice, "\tRenegotiation: never")
+            pp_log(ctx, .openvpn, .notice, "\tRenegotiation: never")
         }
         if checksEKU ?? false {
-            pp_log(.openvpn, .notice, "\tServer EKU verification: enabled")
+            pp_log(ctx, .openvpn, .notice, "\tServer EKU verification: enabled")
         } else if isLocal {
-            pp_log(.openvpn, .notice, "\tServer EKU verification: disabled")
+            pp_log(ctx, .openvpn, .notice, "\tServer EKU verification: disabled")
         }
         if checksSANHost ?? false {
-            pp_log(.openvpn, .notice, "\tHost SAN verification: enabled (\(sanHost?.asSensitiveAddress ?? "-"))")
+            pp_log(ctx, .openvpn, .notice, "\tHost SAN verification: enabled (\(sanHost?.asSensitiveAddress(ctx) ?? "-"))")
         } else if isLocal {
-            pp_log(.openvpn, .notice, "\tHost SAN verification: disabled")
+            pp_log(ctx, .openvpn, .notice, "\tHost SAN verification: disabled")
         }
 
         if randomizeEndpoint ?? false {
-            pp_log(.openvpn, .notice, "\tRandomize endpoint: true")
+            pp_log(ctx, .openvpn, .notice, "\tRandomize endpoint: true")
         }
         if randomizeHostnames ?? false {
-            pp_log(.openvpn, .notice, "\tRandomize hostnames: true")
+            pp_log(ctx, .openvpn, .notice, "\tRandomize hostnames: true")
         }
 
         if let routingPolicies {
-            pp_log(.openvpn, .notice, "\tGateway: \(routingPolicies.map(\.rawValue))")
+            pp_log(ctx, .openvpn, .notice, "\tGateway: \(routingPolicies.map(\.rawValue))")
         } else if isLocal {
-            pp_log(.openvpn, .notice, "\tGateway: not configured")
+            pp_log(ctx, .openvpn, .notice, "\tGateway: not configured")
         }
 
         if let dnsServers, !dnsServers.isEmpty {
-            pp_log(.openvpn, .notice, "\tDNS: \(dnsServers.map(\.asSensitiveAddress))")
+            pp_log(ctx, .openvpn, .notice, "\tDNS: \(dnsServers.map { $0.asSensitiveAddress(ctx) })")
         } else if isLocal {
-            pp_log(.openvpn, .notice, "\tDNS: not configured")
+            pp_log(ctx, .openvpn, .notice, "\tDNS: not configured")
         }
         if let dnsDomain, !dnsDomain.isEmpty {
-            pp_log(.openvpn, .notice, "\tDNS domain: \(dnsDomain.asSensitiveAddress)")
+            pp_log(ctx, .openvpn, .notice, "\tDNS domain: \(dnsDomain.asSensitiveAddress(ctx))")
         }
         if let searchDomains, !searchDomains.isEmpty {
-            pp_log(.openvpn, .notice, "\tSearch domains: \(searchDomains.map(\.asSensitiveAddress))")
+            pp_log(ctx, .openvpn, .notice, "\tSearch domains: \(searchDomains.map { $0.asSensitiveAddress(ctx) })")
         }
 
         if let httpProxy {
-            pp_log(.openvpn, .notice, "\tHTTP proxy: \(httpProxy.asSensitiveAddress)")
+            pp_log(ctx, .openvpn, .notice, "\tHTTP proxy: \(httpProxy.asSensitiveAddress(ctx))")
         }
         if let httpsProxy {
-            pp_log(.openvpn, .notice, "\tHTTPS proxy: \(httpsProxy.asSensitiveAddress)")
+            pp_log(ctx, .openvpn, .notice, "\tHTTPS proxy: \(httpsProxy.asSensitiveAddress(ctx))")
         }
         if let proxyAutoConfigurationURL {
-            pp_log(.openvpn, .notice, "\tPAC: \(proxyAutoConfigurationURL.absoluteString.asSensitiveAddress)")
+            pp_log(ctx, .openvpn, .notice, "\tPAC: \(proxyAutoConfigurationURL.absoluteString.asSensitiveAddress(ctx))")
         }
         if let proxyBypassDomains {
-            pp_log(.openvpn, .notice, "\tProxy bypass domains: \(proxyBypassDomains.map(\.asSensitiveAddress))")
+            pp_log(ctx, .openvpn, .notice, "\tProxy bypass domains: \(proxyBypassDomains.map { $0.asSensitiveAddress(ctx) })")
         }
 
         if let mtu {
-            pp_log(.openvpn, .notice, "\tMTU: \(mtu)")
+            pp_log(ctx, .openvpn, .notice, "\tMTU: \(mtu)")
         } else if isLocal {
-            pp_log(.openvpn, .notice, "\tMTU: default")
+            pp_log(ctx, .openvpn, .notice, "\tMTU: default")
         }
 
         if let xorMethod {
             switch xorMethod {
             case .obfuscate:
-                pp_log(.openvpn, .notice, "\tXOR: obfuscate")
+                pp_log(ctx, .openvpn, .notice, "\tXOR: obfuscate")
             case .reverse:
-                pp_log(.openvpn, .notice, "\tXOR: reverse")
+                pp_log(ctx, .openvpn, .notice, "\tXOR: reverse")
             case .xormask:
-                pp_log(.openvpn, .notice, "\tXOR: xormask")
+                pp_log(ctx, .openvpn, .notice, "\tXOR: xormask")
             case .xorptrpos:
-                pp_log(.openvpn, .notice, "\tXOR: xorptrpos")
+                pp_log(ctx, .openvpn, .notice, "\tXOR: xorptrpos")
             }
         }
 
         if isLocal, let noPullMask {
-            pp_log(.openvpn, .notice, "\tNot pulled: \(noPullMask.map(\.rawValue))")
+            pp_log(ctx, .openvpn, .notice, "\tNot pulled: \(noPullMask.map(\.rawValue))")
         }
     }
 }

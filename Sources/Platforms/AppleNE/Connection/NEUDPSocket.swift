@@ -33,13 +33,16 @@ public final class NEUDPObserver: LinkObserver {
         public let maxDatagrams: Int
     }
 
+    private let ctx: PartoutContext
+
     private nonisolated let nwSession: NWUDPSession
 
     private let options: Options
 
     private var observer: ValueObserver<NWUDPSession>?
 
-    public init(nwSession: NWUDPSession, options: Options) {
+    public init(_ ctx: PartoutContext, nwSession: NWUDPSession, options: Options) {
+        self.ctx = ctx
         self.nwSession = nwSession
         self.options = options
     }
@@ -49,16 +52,16 @@ public final class NEUDPObserver: LinkObserver {
         defer {
             observer = nil
         }
-        try await observer?.waitForValue(on: \.state, timeout: timeout) { state in
-            pp_log(.ne, .info, "Socket state is \(state.debugDescription)")
-
+        try await observer?.waitForValue(on: \.state, timeout: timeout) { [weak self] state in
+            guard let self else {
+                return false
+            }
+            pp_log(ctx, .ne, .info, "Socket state is \(state.debugDescription)")
             switch state {
             case .ready:
                 return true
-
             case .cancelled, .failed:
                 throw PartoutError(.linkNotActive)
-
             default:
                 return false
             }

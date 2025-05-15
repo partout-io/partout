@@ -29,7 +29,11 @@ import PartoutCore
 
 /// Implementation of a `TunnelController` via `NEPacketTunnelProvider`.
 public final class NETunnelController: TunnelController {
-    private weak var provider: NEPacketTunnelProvider?
+    private let ctx: PartoutContext
+
+    public private(set) weak var provider: NEPacketTunnelProvider?
+
+    public let registry: Registry
 
     public let profile: Profile
 
@@ -38,6 +42,7 @@ public final class NETunnelController: TunnelController {
     public let environment: TunnelEnvironment
 
     public init(
+        _ ctx: PartoutContext,
         provider: NEPacketTunnelProvider,
         decoder: NEProtocolDecoder,
         registry: Registry,
@@ -47,7 +52,9 @@ public final class NETunnelController: TunnelController {
         guard let tunnelConfiguration = provider.protocolConfiguration as? NETunnelProviderProtocol else {
             throw PartoutError(.decoding)
         }
+        self.ctx = ctx
         self.provider = provider
+        self.registry = registry
         originalProfile = try decoder.profile(from: tunnelConfiguration)
         let resolvedProfile = try registry.resolvedProfile(originalProfile)
         profile = try await willProcess?(resolvedProfile) ?? resolvedProfile
@@ -60,16 +67,16 @@ public final class NETunnelController: TunnelController {
             return
         }
         let tunnelSettings = profile.networkSettings(with: info)
-        pp_log(.ne, .info, "Commit tunnel settings: \(tunnelSettings)")
+        pp_log(ctx, .ne, .info, "Commit tunnel settings: \(tunnelSettings)")
         try await provider.setTunnelNetworkSettings(tunnelSettings)
     }
 
     public func clearTunnelSettings() async {
         do {
-            pp_log(.ne, .info, "Clear tunnel settings")
+            pp_log(ctx, .ne, .info, "Clear tunnel settings")
             try await provider?.setTunnelNetworkSettings(nil)
         } catch {
-            pp_log(.ne, .error, "Unable to clear tunnel settings: \(error)")
+            pp_log(ctx, .ne, .error, "Unable to clear tunnel settings: \(error)")
         }
     }
 
@@ -90,9 +97,9 @@ public final class NETunnelController: TunnelController {
             return
         }
         if let error {
-            pp_log(.ne, .fault, "Dispose tunnel: \(error)")
+            pp_log(ctx, .ne, .fault, "Dispose tunnel: \(error)")
         } else {
-            pp_log(.ne, .notice, "Dispose tunnel")
+            pp_log(ctx, .ne, .notice, "Dispose tunnel")
         }
         provider.cancelTunnelWithError(error)
     }
@@ -100,6 +107,6 @@ public final class NETunnelController: TunnelController {
 
 private extension NETunnelController {
     func logReleasedProvider() {
-        pp_log(.ne, .info, "NETunnelController: NEPacketTunnelProvider released")
+        pp_log(ctx, .ne, .info, "NETunnelController: NEPacketTunnelProvider released")
     }
 }

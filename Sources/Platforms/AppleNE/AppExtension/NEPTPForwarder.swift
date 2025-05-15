@@ -29,6 +29,8 @@ import PartoutCore
 
 /// Delegates behavior of a `NEPacketTunnelProvider`.
 public actor NEPTPForwarder {
+    private let ctx: PartoutContext
+
     private let daemon: SimpleConnectionDaemon
 
     public nonisolated var profile: Profile {
@@ -42,29 +44,17 @@ public actor NEPTPForwarder {
     }
 
     public init(
-        provider: NEPacketTunnelProvider,
-        decoder: NEProtocolDecoder,
-        registry: Registry,
-        environmentFactory: @escaping (Profile.ID) -> TunnelEnvironment,
+        _ ctx: PartoutContext,
+        controller: NETunnelController,
         factoryOptions: NEInterfaceFactory.Options = .init(),
         connectionOptions: ConnectionParameters.Options = .init(),
         stopDelay: Int = 2000,
         reconnectionDelay: Int = 2000,
-        willProcess: ((Profile) async throws -> Profile)? = nil,
         willStart: (@Sendable (Profile) async throws -> Void)? = nil
     ) async throws {
-
-        // NetworkExtension specifics
-        let controller = try await NETunnelController(
-            provider: provider,
-            decoder: decoder,
-            registry: registry,
-            environmentFactory: environmentFactory,
-            willProcess: willProcess
-        )
         let environment = controller.environment
-        let factory = NEInterfaceFactory(provider: provider, options: factoryOptions)
-        let reachability = NEObservablePath()
+        let factory = NEInterfaceFactory(ctx, provider: controller.provider, options: factoryOptions)
+        let reachability = NEObservablePath(ctx)
 
         let connectionParameters = ConnectionParameters(
             controller: controller,
@@ -72,10 +62,10 @@ public actor NEPTPForwarder {
             environment: environment,
             options: connectionOptions
         )
-        let messageHandler = DefaultMessageHandler(environment: environment)
+        let messageHandler = DefaultMessageHandler(ctx, environment: environment)
 
         let params = SimpleConnectionDaemon.Parameters(
-            registry: registry,
+            registry: controller.registry,
             connectionParameters: connectionParameters,
             reachability: reachability,
             messageHandler: messageHandler,
@@ -83,48 +73,50 @@ public actor NEPTPForwarder {
             reconnectionDelay: reconnectionDelay,
             willStart: willStart
         )
+
+        self.ctx = ctx
         daemon = SimpleConnectionDaemon(params: params)
         originalProfile = controller.originalProfile
     }
 
     deinit {
-        pp_log(.ne, .info, "Deinit PTP")
+        pp_log(ctx, .ne, .info, "Deinit PTP")
     }
 
     public func startTunnel(options: [String: NSObject]?) async throws {
-        pp_log(.ne, .notice, "Start PTP")
+        pp_log(ctx, .ne, .notice, "Start PTP")
         try await daemon.start()
     }
 
     public func holdTunnel() async {
-        pp_log(.ne, .notice, "Hold PTP")
+        pp_log(ctx, .ne, .notice, "Hold PTP")
         await daemon.hold()
     }
 
     public func stopTunnel(with reason: NEProviderStopReason) async {
-        pp_log(.ne, .notice, "Stop PTP, reason: \(String(describing: reason))")
+        pp_log(ctx, .ne, .notice, "Stop PTP, reason: \(String(describing: reason))")
         await daemon.stop()
     }
 
     public func handleAppMessage(_ messageData: Data) async -> Data? {
-        pp_log(.ne, .debug, "Handle PTP message")
+        pp_log(ctx, .ne, .debug, "Handle PTP message")
         do {
             let input = try JSONDecoder().decode(Message.Input.self, from: messageData)
             let output = try await daemon.sendMessage(input)
             let encodedOutput = try JSONEncoder().encode(output)
-            pp_log(.ne, .notice, "Message handled and response encoded (\(encodedOutput.asSensitiveBytes))")
+            pp_log(ctx, .ne, .notice, "Message handled and response encoded (\(encodedOutput.asSensitiveBytes(ctx))")
             return encodedOutput
         } catch {
-            pp_log(.ne, .error, "Unable to decode message: \(messageData)")
+            pp_log(ctx, .ne, .error, "Unable to decode message: \(messageData)")
             return nil
         }
     }
 
     public func sleep() async {
-        pp_log(.ne, .debug, "Device is about to sleep")
+        pp_log(ctx, .ne, .debug, "Device is about to sleep")
     }
 
     public nonisolated func wake() {
-        pp_log(.ne, .debug, "Device is about to wake up")
+        pp_log(ctx, .ne, .debug, "Device is about to wake up")
     }
 }

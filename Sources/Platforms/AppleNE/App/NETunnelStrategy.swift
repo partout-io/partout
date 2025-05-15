@@ -33,6 +33,8 @@ public actor NETunnelStrategy {
         case multiple
     }
 
+    private let ctx: PartoutContext
+
     private let bundleIdentifier: String
 
     private let coder: NEProtocolCoder
@@ -51,10 +53,12 @@ public actor NETunnelStrategy {
 
     // FIXME: #218/passepartout, support .multiple option after implementing in PTP
     public init(
+        _ ctx: PartoutContext,
         bundleIdentifier: String,
         coder: NEProtocolCoder,
 //        options: Set<Option> = []
     ) {
+        self.ctx = ctx
         self.bundleIdentifier = bundleIdentifier
         self.coder = coder
 //        self.options = options
@@ -147,10 +151,10 @@ extension NETunnelStrategy: TunnelObservableStrategy {
                 }
                 for await activeProfiles in activeProfilesStream.dropFirst() {
                     guard !Task.isCancelled else {
-                        pp_log(.ne, .debug, "Cancelled NETunnelStrategy.didUpdateActiveProfiles")
+                        pp_log(ctx, .ne, .debug, "Cancelled NETunnelStrategy.didUpdateActiveProfiles")
                         break
                     }
-                    pp_log(.ne, .debug, "NETunnelStrategy.activeProfiles -> \(activeProfiles.values.description)")
+                    pp_log(ctx, .ne, .debug, "NETunnelStrategy.activeProfiles -> \(activeProfiles.values.description)")
                     continuation.yield(activeProfiles)
                 }
                 continuation.finish()
@@ -195,7 +199,7 @@ extension NETunnelStrategy: NETunnelManagerRepository {
                 if profile.isInteractive {
                     shouldEnableOnDemand = false
                 } else if let onDemandModule = profile.firstModule(ofType: OnDemandModule.self, ifActive: true) {
-                    let rules = onDemandModule.neRules
+                    let rules = onDemandModule.neRules(self.ctx)
                     if !rules.isEmpty {
                         $0.onDemandRules = rules
                     } else {
@@ -250,7 +254,7 @@ extension NETunnelStrategy: NETunnelManagerRepository {
                 }
                 for await value in managersSubject.subscribe().dropFirst() {
                     guard !Task.isCancelled else {
-                        pp_log(.ne, .debug, "Cancelled NETunnelStrategy.managersStream")
+                        pp_log(ctx, .ne, .debug, "Cancelled NETunnelStrategy.managersStream")
                         break
                     }
                     continuation.yield(value)
@@ -273,12 +277,12 @@ private extension NETunnelStrategy {
             return
         }
 
-        pp_log(.ne, .debug, "NEVPNConfigurationChange(\(profileId)): \(notification)")
+        pp_log(ctx, .ne, .debug, "NEVPNConfigurationChange(\(profileId)): \(notification)")
         Task {
             do {
                 try await reloadAllManagers()
             } catch {
-                pp_log(.ne, .error, "Unable to reload managers: \(error)")
+                pp_log(ctx, .ne, .error, "Unable to reload managers: \(error)")
             }
         }
     }
@@ -292,8 +296,8 @@ private extension NETunnelStrategy {
             return
         }
 
-//        pp_log(.ne, .debug, "NEVPNStatusDidChange: \(notification)")
-        pp_log(.ne, .debug, "NEVPNStatus(\(profileId)) -> \(connection.status.rawValue)")
+//        pp_log(ctx, .ne, .debug, "NEVPNStatusDidChange: \(notification)")
+        pp_log(ctx, .ne, .debug, "NEVPNStatus(\(profileId)) -> \(connection.status.rawValue)")
         Task {
             await updateCurrentManagersIfNeeded(with: manager, profileId: profileId)
         }
@@ -341,14 +345,17 @@ private extension NETunnelStrategy {
                 guard status != .inactive || pair.value.isOnDemandEnabled == true else {
                     return
                 }
-                group.addTask {
-                    pp_log(.ne, .notice, "Disconnect from \(pair.key)...")
-                    do {
-                        try await self.disconnect(from: pair.key)
-                    } catch {
-                        pp_log(.ne, .error, "Unable to disconnect from \(pair.key): \(error)")
+                group.addTask { [weak self] in
+                    guard let self else {
+                        return
                     }
-                    pp_log(.ne, .notice, "Disconnection of \(pair.key) complete!")
+                    pp_log(ctx, .ne, .notice, "Disconnect from \(pair.key)...")
+                    do {
+                        try await disconnect(from: pair.key)
+                    } catch {
+                        pp_log(ctx, .ne, .error, "Unable to disconnect from \(pair.key): \(error)")
+                    }
+                    pp_log(ctx, .ne, .notice, "Disconnection of \(pair.key) complete!")
                 }
             }
         }
@@ -435,15 +442,15 @@ private extension NETunnelStrategy {
 
     func logManagers() {
         if !allManagers.isEmpty {
-            pp_log(.ne, .debug, "NETunnelStrategy.allManagers:")
+            pp_log(ctx, .ne, .debug, "NETunnelStrategy.allManagers:")
         } else {
-            pp_log(.ne, .debug, "NETunnelStrategy.allManagers: none")
+            pp_log(ctx, .ne, .debug, "NETunnelStrategy.allManagers: none")
         }
         allManagers.values.forEach {
             guard let profileId = $0.tunnelProtocol?.profileId else {
                 return
             }
-            pp_log(.ne, .debug, "\t\($0.localizedDescription ?? "")(\(profileId)): isEnabled=\($0.isEnabled), isOnDemandEnabled=\($0.isOnDemandEnabled), status=\($0.connection.status), rank=\($0.rank)")
+            pp_log(ctx, .ne, .debug, "\t\($0.localizedDescription ?? "")(\(profileId)): isEnabled=\($0.isEnabled), isOnDemandEnabled=\($0.isOnDemandEnabled), status=\($0.connection.status), rank=\($0.rank)")
         }
     }
 }

@@ -29,6 +29,8 @@ import PartoutCore
 
 /// ``NEProtocolCoder`` encoding to and from a `Keychain`.
 public struct KeychainNEProtocolCoder: NEProtocolCoder {
+    private let ctx: PartoutContext
+
     private let tunnelBundleIdentifier: String
 
     private let registry: Registry
@@ -37,7 +39,8 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
 
     private let keychain: Keychain
 
-    public init(tunnelBundleIdentifier: String, registry: Registry, coder: ProfileCoder, keychain: Keychain) {
+    public init(_ ctx: PartoutContext, tunnelBundleIdentifier: String, registry: Registry, coder: ProfileCoder, keychain: Keychain) {
+        self.ctx = ctx
         self.tunnelBundleIdentifier = tunnelBundleIdentifier
         self.registry = registry
         self.coder = coder
@@ -91,7 +94,7 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
                     keychainToRetain.append(item)
                 }
             } catch {
-                pp_log(.ne, .error, "Unable to decode profile, will delete NE manager '\($0.localizedDescription ?? "")': \(error)")
+                pp_log(ctx, .ne, .error, "Unable to decode profile, will delete NE manager '\($0.localizedDescription ?? "")': \(error)")
                 managersToRemove.append($0)
             }
         }
@@ -111,7 +114,7 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
                 }
             }
         } catch {
-            pp_log(.ne, .error, "Unable to fetch keychain items: \(error)")
+            pp_log(ctx, .ne, .error, "Unable to fetch keychain items: \(error)")
         }
     }
 }

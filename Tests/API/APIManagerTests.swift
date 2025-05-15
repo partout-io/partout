@@ -82,7 +82,7 @@ extension APIManagerTests {
 @MainActor
 private extension APIManagerTests {
     static func manager() -> APIManager {
-        APIManager(from: [MockAPI()], repository: MockRepository())
+        APIManager(.global, from: [MockAPI()], repository: MockRepository())
     }
 }
 

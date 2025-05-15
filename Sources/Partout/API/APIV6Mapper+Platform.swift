@@ -28,13 +28,18 @@
 import Foundation
 
 extension API.V6.Mapper {
-    public convenience init(baseURL: URL, infrastructureURL: ((ProviderID) -> URL)? = nil) {
-        self.init(baseURL: baseURL, infrastructureURL: infrastructureURL) {
+    public convenience init(
+        _ ctx: PartoutContext,
+        baseURL: URL,
+        infrastructureURL: ((ProviderID) -> URL)? = nil
+    ) {
+        self.init(ctx, baseURL: baseURL, infrastructureURL: infrastructureURL) {
             API.V6.DefaultScriptExecutor(
+                ctx,
                 resultURL: $0,
                 cache: $1,
                 timeout: $2,
-                engine: PartoutConfiguration.platform.newAPIScriptingEngine()
+                engine: PartoutContext.platform.newAPIScriptingEngine(ctx)
             )
         }
     }

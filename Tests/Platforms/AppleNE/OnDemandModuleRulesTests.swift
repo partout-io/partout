@@ -122,3 +122,9 @@ final class OnDemandModuleRulesTests: XCTestCase {
         }())
     }
 }
+
+private extension OnDemandModule {
+    var neRules: [NEOnDemandRule] {
+        neRules(.global)
+    }
+}

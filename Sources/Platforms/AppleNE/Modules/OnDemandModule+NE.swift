@@ -28,7 +28,7 @@ import NetworkExtension
 import PartoutCore
 
 extension OnDemandModule {
-    var neRules: [NEOnDemandRule] {
+    func neRules(_ ctx: PartoutContext) -> [NEOnDemandRule] {
         var rules: [NEOnDemandRule] = []
 
         // apply exceptions (unless .any)
@@ -37,14 +37,14 @@ extension OnDemandModule {
                 if let rule = cellularRule() {
                     rules.append(rule)
                 } else {
-                    pp_log(.ne, .info, "Not adding rule for NEOnDemandRuleInterfaceType.cellular (not compatible)")
+                    pp_log(ctx, .ne, .info, "Not adding rule for NEOnDemandRuleInterfaceType.cellular (not compatible)")
                 }
             }
             if Self.supportsEthernet, withEthernetNetwork {
                 if let rule = ethernetRule() {
                     rules.append(rule)
                 } else {
-                    pp_log(.ne, .info, "Not adding rule for NEOnDemandRuleInterfaceType.ethernet (not compatible)")
+                    pp_log(ctx, .ne, .info, "Not adding rule for NEOnDemandRuleInterfaceType.ethernet (not compatible)")
                 }
             }
             let SSIDs = Array(withSSIDs.filter { $1 }.keys)
@@ -56,9 +56,9 @@ extension OnDemandModule {
         // IMPORTANT: append fallback rule last
         rules.append(globalRule())
 
-        pp_log(.ne, .info, "On-demand rules:")
+        pp_log(ctx, .ne, .info, "On-demand rules:")
         rules.forEach {
-            pp_log(.ne, .info, "\($0)")
+            pp_log(ctx, .ne, .info, "\($0)")
         }
 
         return rules

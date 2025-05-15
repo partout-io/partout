@@ -25,8 +25,9 @@
 
 import Foundation
 import NetworkExtension
+import PartoutCore
 
 /// Able to apply its own settings to `NEPacketTunnelNetworkSettings`.
 public protocol NESettingsApplying {
-    func apply(to settings: inout NEPacketTunnelNetworkSettings)
+    func apply(_ ctx: PartoutContext, to settings: inout NEPacketTunnelNetworkSettings)
 }

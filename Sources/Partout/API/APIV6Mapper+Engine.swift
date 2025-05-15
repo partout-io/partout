@@ -34,6 +34,7 @@ import PartoutCore
 
 extension API.V6 {
     final class DefaultScriptExecutor {
+        private let ctx: PartoutContext
 
         // override the URL for getText/getJSON
         private let resultURL: URL?
@@ -44,7 +45,8 @@ extension API.V6 {
 
         private let engine: APIScriptingEngine
 
-        init(resultURL: URL?, cache: ProviderCache?, timeout: TimeInterval, engine: APIScriptingEngine) {
+        init(_ ctx: PartoutContext, resultURL: URL?, cache: ProviderCache?, timeout: TimeInterval, engine: APIScriptingEngine) {
+            self.ctx = ctx
             self.resultURL = resultURL
             self.cache = cache
             self.timeout = timeout
@@ -92,7 +94,7 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
     }
 
     func getResult(urlString: String) -> APIEngine.GetResult {
-        pp_log(.api, .info, "JS.getResult: Execute with URL: \(resultURL?.absoluteString ?? urlString)")
+        pp_log(ctx, .api, .info, "JS.getResult: Execute with URL: \(resultURL?.absoluteString ?? urlString)")
         guard let url = resultURL ?? URL(string: urlString) else {
             return APIEngine.GetResult(.url)
         }
@@ -110,28 +112,31 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
             request.setValue(tag, forHTTPHeaderField: "If-None-Match")
         }
 
-        pp_log(.api, .info, "JS.getResult: GET \(url)")
+        pp_log(ctx, .api, .info, "JS.getResult: GET \(url)")
         if let headers = request.allHTTPHeaderFields {
-            pp_log(.api, .info, "JS.getResult: Headers: \(headers)")
+            pp_log(ctx, .api, .info, "JS.getResult: Headers: \(headers)")
         }
 
         let semaphore = DispatchSemaphore(value: 0)
         let storage = ResultStorage()
-        let task = session.dataTask(with: request) { data, response, error in
+        let task = session.dataTask(with: request) { [weak self] data, response, error in
+            guard let self else {
+                return
+            }
             if let error {
-                pp_log(.api, .error, "JS.getResult: Unable to execute: \(error)")
+                pp_log(ctx, .api, .error, "JS.getResult: Unable to execute: \(error)")
             } else if let httpResponse = response as? HTTPURLResponse {
                 let lastModifiedHeader = httpResponse.value(forHTTPHeaderField: "last-modified")
                 let tag = httpResponse.value(forHTTPHeaderField: "etag")
 
-                pp_log(.api, .debug, "JS.getResult: Response: \(httpResponse)")
-                pp_log(.api, .info, "JS.getResult: HTTP \(httpResponse.statusCode)")
+                pp_log(ctx, .api, .debug, "JS.getResult: Response: \(httpResponse)")
+                pp_log(ctx, .api, .info, "JS.getResult: HTTP \(httpResponse.statusCode)")
                 if let lastModifiedHeader {
-                    pp_log(.api, .info, "JS.getResult: Last-Modified: \(lastModifiedHeader)")
+                    pp_log(ctx, .api, .info, "JS.getResult: Last-Modified: \(lastModifiedHeader)")
                     storage.lastModified = lastModifiedHeader.fromRFC1123()
                 }
                 if let tag {
-                    pp_log(.api, .info, "JS.getResult: ETag: \(tag)")
+                    pp_log(ctx, .api, .info, "JS.getResult: ETag: \(tag)")
                     storage.tag = tag
                 }
                 storage.isCached = httpResponse.statusCode == 304
@@ -143,10 +148,10 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
         semaphore.wait()
 
         guard let textData = storage.textData else {
-            pp_log(.api, .error, "JS.getResult: Empty response")
+            pp_log(ctx, .api, .error, "JS.getResult: Empty response")
             return APIEngine.GetResult(.network)
         }
-        pp_log(.api, .info, "JS.getResult: Success (cached: \(storage.isCached))")
+        pp_log(ctx, .api, .info, "JS.getResult: Success (cached: \(storage.isCached))")
         return APIEngine.GetResult(
             textData,
             lastModified: storage.lastModified,
@@ -162,11 +167,11 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
                 return APIEngine.GetResult(.cached)
             }
             guard let text = result.response as? Data else {
-                pp_log(.api, .error, "JS.getText: Response is not Data")
+                pp_log(ctx, .api, .error, "JS.getText: Response is not Data")
                 return APIEngine.GetResult(.network)
             }
             guard let string = String(data: text, encoding: .utf8) else {
-                pp_log(.api, .error, "JS.getText: Response is not String")
+                pp_log(ctx, .api, .error, "JS.getText: Response is not String")
                 return APIEngine.GetResult(.network)
             }
             return result.with(response: string)
@@ -181,14 +186,14 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
                 return APIEngine.GetResult(.cached)
             }
             guard let text = result.response as? Data else {
-                pp_log(.api, .error, "JS.getJSON: Response is not Data")
+                pp_log(ctx, .api, .error, "JS.getJSON: Response is not Data")
                 return APIEngine.GetResult(.network)
             }
             do {
                 let object = try JSONSerialization.jsonObject(with: text)
                 return result.with(response: object)
             } catch {
-                pp_log(.api, .error, "JS.getJSON: Unable to parse JSON: \(error)")
+                pp_log(ctx, .api, .error, "JS.getJSON: Unable to parse JSON: \(error)")
                 return APIEngine.GetResult(.parsing)
             }
         }()
@@ -200,7 +205,7 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
             return try JSONSerialization.data(withJSONObject: object)
                 .base64EncodedString()
         } catch {
-            pp_log(.api, .error, "JS.jsonToBase64: Unable to serialize: \(error)")
+            pp_log(ctx, .api, .error, "JS.jsonToBase64: Unable to serialize: \(error)")
             return nil
         }
     }
@@ -212,7 +217,7 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
                 UInt8($0)
             }
         guard bytes.count == 4 else {
-            pp_log(.api, .error, "JS.ipV4ToBase64: Not a IPv4 string")
+            pp_log(ctx, .api, .error, "JS.ipV4ToBase64: Not a IPv4 string")
             return nil
         }
         return Data(bytes)
@@ -226,7 +231,7 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
             .joined()
         let key = Data(hex: hex)
         guard key.count == 256 else {
-            pp_log(.api, .error, "JS.openVPNTLSWrap: Static key must be 64 bytes long")
+            pp_log(ctx, .api, .error, "JS.openVPNTLSWrap: Static key must be 64 bytes long")
             return nil
         }
         return [
@@ -239,7 +244,7 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
     }
 
     func debug(message: String) {
-        pp_log(.api, .debug, message)
+        pp_log(ctx, .api, .debug, message)
     }
 }
 
