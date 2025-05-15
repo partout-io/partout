@@ -45,9 +45,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
                 willProcess: nil
             )
 
-            let ctx = PartoutContext(controller.profile.id)
-            ctx.logsModules = true
-            ctx.setLocalLogger(
+            var ctxBuilder = PartoutContext.Builder(profileId: controller.profile.id)
+            ctxBuilder.logsModules = true
+            ctxBuilder.setLocalLogger(
                 url: Demo.Log.tunnelURL,
                 options: .init(
                     maxLevel: Demo.Log.maxLevel,
@@ -56,6 +56,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
                 ),
                 mapper: Demo.Log.formattedLine
             )
+            let ctx = ctxBuilder.build()
             self.ctx = ctx
 
             fwd = try await NEPTPForwarder(ctx, controller: controller)
