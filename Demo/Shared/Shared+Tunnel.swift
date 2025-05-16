@@ -43,7 +43,9 @@ extension Registry {
                         parameters: $0,
                         module: $1,
                         prng: PartoutContext.platform.newPRNG(ctx),
-                        dns: PartoutContext.platform.newDNSResolver(ctx),
+                        dns: SimpleDNSResolver {
+                            POSIXDNSStrategy(hostname: $0)
+                        },
                         cachesURL: Demo.moduleURL(for: "OpenVPN")
                     )
                 }
