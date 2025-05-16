@@ -104,7 +104,7 @@ public actor NEPTPForwarder {
             let input = try JSONDecoder().decode(Message.Input.self, from: messageData)
             let output = try await daemon.sendMessage(input)
             let encodedOutput = try JSONEncoder().encode(output)
-            pp_log(ctx, .ne, .notice, "Message handled and response encoded (\(encodedOutput.asSensitiveBytes(ctx))")
+            pp_log(ctx, .ne, .notice, "Message handled and response encoded (\(encodedOutput.asSensitiveBytes(ctx)))")
             return encodedOutput
         } catch {
             pp_log(ctx, .ne, .error, "Unable to decode message: \(messageData)")
