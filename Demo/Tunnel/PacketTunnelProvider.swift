@@ -41,8 +41,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
                 registry: .shared,
                 environmentFactory: { _ in
                     Demo.tunnelEnvironment
-                },
-                willProcess: nil
+                }
             )
 
             var ctxBuilder = PartoutContext.Builder(profileId: controller.profile.id)

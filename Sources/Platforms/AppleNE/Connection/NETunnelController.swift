@@ -47,7 +47,7 @@ public final class NETunnelController: TunnelController {
         decoder: NEProtocolDecoder,
         registry: Registry,
         environmentFactory: @escaping (Profile.ID) -> TunnelEnvironment,
-        willProcess: ((Profile) async throws -> Profile)?
+        willProcess: ((Profile) async throws -> Profile)? = nil
     ) async throws {
         guard let tunnelConfiguration = provider.protocolConfiguration as? NETunnelProviderProtocol else {
             throw PartoutError(.decoding)
