@@ -55,10 +55,10 @@ extension Registry {
     private static let knownProviderResolvers: [ProviderModuleResolver] = {
         var resolvers: [ProviderModuleResolver] = []
 #if canImport(_PartoutOpenVPN)
-        resolvers.append(OpenVPNProviderResolver())
+        resolvers.append(OpenVPNProviderResolver(.global))
 #endif
 #if canImport(_PartoutWireGuard)
-        resolvers.append(WireGuardProviderResolver())
+        resolvers.append(WireGuardProviderResolver(.global))
 #endif
         return resolvers
     }()
@@ -115,7 +115,7 @@ private extension Registry {
             }
             return try resolver.resolved(from: providerModule)
         } catch {
-            pp_log(.core, .error, "Unable to resolve module: \(error)")
+            pp_log_id(profile?.id, .core, .error, "Unable to resolve module: \(error)")
             throw error as? PartoutError ?? PartoutError(.Providers.corruptProviderModule, error)
         }
     }

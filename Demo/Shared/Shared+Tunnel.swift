@@ -37,11 +37,13 @@ extension Registry {
             OpenVPNModule.Implementation(
                 importer: StandardOpenVPNParser(),
                 connectionBlock: {
-                    try await OpenVPNConnection(
+                    let ctx: PartoutContext = .for($0.controller.profile.id)
+                    return try await OpenVPNConnection(
+                        ctx,
                         parameters: $0,
                         module: $1,
-                        prng: PartoutConfiguration.platform.newPRNG(),
-                        dns: PartoutConfiguration.platform.newDNSResolver(),
+                        prng: PartoutContext.platform.newPRNG(ctx),
+                        dns: PartoutContext.platform.newDNSResolver(ctx),
                         cachesURL: Demo.moduleURL(for: "OpenVPN")
                     )
                 }
@@ -51,7 +53,9 @@ extension Registry {
                 importer: StandardWireGuardParser(),
                 validator: StandardWireGuardParser(),
                 connectionBlock: {
-                    try WireGuardConnection(
+                    let ctx: PartoutContext = .for($0.controller.profile.id)
+                    return try WireGuardConnection(
+                        ctx,
                         parameters: $0,
                         module: $1
                     )

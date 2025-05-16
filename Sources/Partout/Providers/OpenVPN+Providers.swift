@@ -30,15 +30,18 @@ import Foundation
 import PartoutCore
 
 public struct OpenVPNProviderResolver: ProviderModuleResolver {
+    private let ctx: PartoutContext
+
     public var moduleType: ModuleType {
         .openVPN
     }
 
-    public init() {
+    public init(_ ctx: PartoutContext) {
+        self.ctx = ctx
     }
 
     public func resolved(from providerModule: ProviderModule) throws -> Module {
-        try providerModule.compiled(withTemplate: OpenVPNProviderTemplate.self)
+        try providerModule.compiled(ctx, withTemplate: OpenVPNProviderTemplate.self)
     }
 }
 
@@ -66,6 +69,7 @@ extension OpenVPNProviderTemplate {
 
 extension OpenVPNProviderTemplate: ProviderTemplateCompiler {
     public static func compiled(
+        _ ctx: PartoutContext,
         with id: UUID,
         entity: ProviderEntity,
         options: Options?
@@ -74,6 +78,7 @@ extension OpenVPNProviderTemplate: ProviderTemplateCompiler {
         var configurationBuilder = template.configuration.builder()
         configurationBuilder.authUserPass = true
         configurationBuilder.remotes = try template.remotes(
+            ctx,
             with: entity.server,
             excludingHostname: options?.excludingHostname == true
         )
@@ -91,7 +96,7 @@ extension OpenVPNProviderTemplate: ProviderTemplateCompiler {
 }
 
 private extension OpenVPNProviderTemplate {
-    func remotes(with server: ProviderServer, excludingHostname: Bool) throws -> [ExtendedEndpoint] {
+    func remotes(_ ctx: PartoutContext, with server: ProviderServer, excludingHostname: Bool) throws -> [ExtendedEndpoint] {
         var remotes: [ExtendedEndpoint] = []
 
         if !excludingHostname, let hostname = server.hostname {
@@ -108,7 +113,7 @@ private extension OpenVPNProviderTemplate {
             }
         }
         guard !remotes.isEmpty else {
-            pp_log(.providers, .error, "Excluding hostname but server has no ipAddresses either")
+            pp_log(ctx, .providers, .error, "Excluding hostname but server has no ipAddresses either")
             throw PartoutError(.exhaustedEndpoints)
         }
 

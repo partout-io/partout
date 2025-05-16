@@ -30,6 +30,8 @@ import PartoutCore
 
 @OpenVPNActor
 final class ControlChannel {
+    private let ctx: PartoutContext
+
     private let prng: PRNGProtocol
 
     private let serializer: ControlChannelSerializer
@@ -39,7 +41,7 @@ final class ControlChannel {
     private(set) var remoteSessionId: Data? {
         didSet {
             if let id = remoteSessionId {
-                pp_log(.openvpn, .info, "Control: Remote sessionId is \(id.toHex())")
+                pp_log(ctx, .openvpn, .info, "Control: Remote sessionId is \(id.toHex())")
             }
         }
     }
@@ -54,28 +56,35 @@ final class ControlChannel {
 
     private var sentDates: [UInt32: Date]
 
-    convenience init(prng: PRNGProtocol) {
-        self.init(prng: prng, serializer: PlainSerializer())
+    convenience init(_ ctx: PartoutContext, prng: PRNGProtocol) {
+        self.init(ctx, prng: prng, serializer: PlainSerializer(ctx))
     }
 
     convenience init(
+        _ ctx: PartoutContext,
         prng: PRNGProtocol,
         crypto: OpenVPNCryptoProtocol,
         authKey key: OpenVPN.StaticKey,
         digest: OpenVPN.Digest
     ) throws {
-        self.init(prng: prng, serializer: try AuthSerializer(with: crypto, key: key, digest: digest))
+        self.init(ctx, prng: prng, serializer: try AuthSerializer(ctx, with: crypto, key: key, digest: digest))
     }
 
     convenience init(
+        _ ctx: PartoutContext,
         prng: PRNGProtocol,
         crypto: OpenVPNCryptoProtocol,
         cryptKey key: OpenVPN.StaticKey
     ) throws {
-        self.init(prng: prng, serializer: try CryptSerializer(with: crypto, key: key))
+        self.init(ctx, prng: prng, serializer: try CryptSerializer(ctx, with: crypto, key: key))
     }
 
-    private init(prng: PRNGProtocol, serializer: ControlChannelSerializer) {
+    private init(
+        _ ctx: PartoutContext,
+        prng: PRNGProtocol,
+        serializer: ControlChannelSerializer
+    ) {
+        self.ctx = ctx
         self.prng = prng
         self.serializer = serializer
         sessionId = nil
@@ -109,13 +118,13 @@ extension ControlChannel {
     func readInboundPacket(withData data: Data, offset: Int) throws -> ControlPacket {
         do {
             let packet = try serializer.deserialize(data: data, start: offset, end: nil)
-            pp_log(.openvpn, .info, "Control: Read packet \(packet.asSensitiveBytes)")
+            pp_log(ctx, .openvpn, .info, "Control: Read packet \(packet.asSensitiveBytes(ctx))")
             if let ackIds = packet.ackIds as? [UInt32], let ackRemoteSessionId = packet.ackRemoteSessionId {
                 try readAcks(ackIds, acksRemoteSessionId: ackRemoteSessionId)
             }
             return packet
         } catch {
-            pp_log(.openvpn, .fault, "Control: Channel failure: \(error)")
+            pp_log(ctx, .openvpn, .fault, "Control: Channel failure: \(error)")
             throw error
         }
     }
@@ -151,7 +160,7 @@ extension ControlChannel {
 
     func enqueueOutboundPackets(withCode code: PacketCode, key: UInt8, payload: Data, maxPacketSize: Int) throws {
         guard let sessionId else {
-            pp_log(.openvpn, .fault, "Control: Missing sessionId, do reset(forNewSession: true) first")
+            pp_log(ctx, .openvpn, .fault, "Control: Missing sessionId, do reset(forNewSession: true) first")
             throw OpenVPNSessionError.assertion
         }
 
@@ -183,9 +192,9 @@ extension ControlChannel {
         // packet count
         let packetCount = currentPacketId.outbound - oldIdOut
         if packetCount > 1 {
-            pp_log(.openvpn, .info, "Control: Enqueued \(packetCount) packets [\(oldIdOut)-\(currentPacketId.outbound - 1)]")
+            pp_log(ctx, .openvpn, .info, "Control: Enqueued \(packetCount) packets [\(oldIdOut)-\(currentPacketId.outbound - 1)]")
         } else {
-            pp_log(.openvpn, .info, "Control: Enqueued 1 packet [\(oldIdOut)]")
+            pp_log(ctx, .openvpn, .info, "Control: Enqueued 1 packet [\(oldIdOut)]")
         }
     }
 
@@ -195,12 +204,12 @@ extension ControlChannel {
             if let sentDate = sentDates[packet.packetId] {
                 let timeAgo = -sentDate.timeIntervalSinceNow
                 guard timeAgo >= resendAfter else {
-                    pp_log(.openvpn, .info, "Control: Skip writing packet with packetId \(packet.packetId) (sent on \(sentDate), \(timeAgo) seconds ago < \(resendAfter))")
+                    pp_log(ctx, .openvpn, .info, "Control: Skip writing packet with packetId \(packet.packetId) (sent on \(sentDate), \(timeAgo) seconds ago < \(resendAfter))")
                     continue
                 }
             }
 
-            pp_log(.openvpn, .info, "Control: Write control packet \(packet.asSensitiveBytes)")
+            pp_log(ctx, .openvpn, .info, "Control: Write control packet \(packet.asSensitiveBytes(ctx))")
 
             let raw = try serializer.serialize(packet: packet)
             rawList.append(raw)
@@ -222,7 +231,7 @@ extension ControlChannel {
         }
         guard acksRemoteSessionId == sessionId else {
             let error = OpenVPNSessionError.sessionMismatch
-            pp_log(.openvpn, .fault, "Control: Ack session mismatch (\(acksRemoteSessionId.toHex()) != \(sessionId.toHex())): \(error)")
+            pp_log(ctx, .openvpn, .fault, "Control: Ack session mismatch (\(acksRemoteSessionId.toHex()) != \(sessionId.toHex())): \(error)")
             throw error
         }
 
@@ -240,7 +249,7 @@ extension ControlChannel {
             throw OpenVPNSessionError.missingSessionId
         }
         let packet = ControlPacket(key: key, sessionId: sessionId, ackIds: ackPacketIds as [NSNumber], ackRemoteSessionId: ackRemoteSessionId)
-        pp_log(.openvpn, .info, "Control: Write ack packet \(packet.asSensitiveBytes)")
+        pp_log(ctx, .openvpn, .info, "Control: Write ack packet \(packet.asSensitiveBytes(ctx))")
         return try serializer.serialize(packet: packet)
     }
 

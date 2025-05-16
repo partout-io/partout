@@ -119,6 +119,7 @@ private extension APIV6MapperTests {
             baseURL.appendingPathComponent("providers/\($0.rawValue)/fetch.json")
         }
         return API.V6.Mapper(
+            .global,
             baseURL: baseURL,
             infrastructureURL: infrastructureURL
         )

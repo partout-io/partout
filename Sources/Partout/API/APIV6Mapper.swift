@@ -34,6 +34,8 @@ import PartoutCore
 
 extension API.V6 {
     public final class Mapper: APIMapper {
+        private let ctx: PartoutContext
+
         private let baseURL: URL
 
         private let infrastructureURL: ((ProviderID) -> URL)?
@@ -43,11 +45,13 @@ extension API.V6 {
         private let executorFactory: (URL?, ProviderCache?, TimeInterval) -> APIEngine.ScriptExecutor
 
         public init(
+            _ ctx: PartoutContext,
             baseURL: URL,
             infrastructureURL: ((ProviderID) -> URL)? = nil,
             timeout: TimeInterval = 10.0,
             executorFactory: @escaping (URL?, ProviderCache?, TimeInterval) -> APIEngine.ScriptExecutor
         ) {
+            self.ctx = ctx
             self.baseURL = baseURL
             self.infrastructureURL = infrastructureURL
             self.timeout = timeout
@@ -88,7 +92,7 @@ extension API.V6 {
 private extension API.V6.Mapper {
     func data(for resource: API.V6.Resource) async throws -> Data {
         let url = baseURL.appendingPathComponent(resource.path)
-        pp_log(.api, .info, "Fetch data for \(resource): \(url)")
+        pp_log(ctx, .api, .info, "Fetch data for \(resource): \(url)")
         let cfg: URLSessionConfiguration = .default
         cfg.requestCachePolicy = .reloadRevalidatingCacheData
         cfg.urlCache = .shared
@@ -98,11 +102,11 @@ private extension API.V6.Mapper {
         do {
             let result = try await session.data(for: request)
             if URLCache.shared.cachedResponse(for: request) != nil {
-                pp_log(.api, .info, "Data was cached: \(url)")
+                pp_log(ctx, .api, .info, "Data was cached: \(url)")
             }
             return result.0
         } catch {
-            pp_log(.api, .error, "Unable to fetch data: \(url), \(error)")
+            pp_log(ctx, .api, .error, "Unable to fetch data: \(url), \(error)")
             throw error
         }
     }

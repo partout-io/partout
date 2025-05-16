@@ -363,6 +363,7 @@ private extension NetworkSettingsBuilderTests {
         localOptions: OpenVPN.Configuration.Builder? = nil
     ) throws -> NetworkSettingsBuilder {
         NetworkSettingsBuilder(
+            .global,
             localOptions: try (localOptions ?? OpenVPN.Configuration.Builder()).tryBuild(isClient: false),
             remoteOptions: try remoteOptions.tryBuild(isClient: false)
         )

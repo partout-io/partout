@@ -28,26 +28,26 @@ import NetworkExtension
 import PartoutCore
 
 extension HTTPProxyModule: NESettingsApplying {
-    public func apply(to settings: inout NEPacketTunnelNetworkSettings) {
+    public func apply(_ ctx: PartoutContext, to settings: inout NEPacketTunnelNetworkSettings) {
         let proxySettings = NEProxySettings()
 
         proxy.map {
             proxySettings.httpEnabled = true
             proxySettings.httpServer = $0.neProxy
-            pp_log(.ne, .info, "\t\tHTTP server: \($0.asSensitiveAddress)")
+            pp_log(ctx, .ne, .info, "\t\tHTTP server: \($0.asSensitiveAddress(ctx))")
         }
         secureProxy.map {
             proxySettings.httpsEnabled = true
             proxySettings.httpsServer = $0.neProxy
-            pp_log(.ne, .info, "\t\tHTTPS server: \($0.asSensitiveAddress)")
+            pp_log(ctx, .ne, .info, "\t\tHTTPS server: \($0.asSensitiveAddress(ctx))")
         }
         pacURL.map {
             proxySettings.autoProxyConfigurationEnabled = true
             proxySettings.proxyAutoConfigurationURL = $0
-            pp_log(.ne, .info, "\t\tPAC URL: \($0.absoluteString.asSensitiveAddress)")
+            pp_log(ctx, .ne, .info, "\t\tPAC URL: \($0.absoluteString.asSensitiveAddress(ctx))")
         }
         proxySettings.exceptionList = bypassDomains.map(\.rawValue)
-        pp_log(.ne, .info, "\t\tBypass domains: \(bypassDomains.map(\.asSensitiveAddress))")
+        pp_log(ctx, .ne, .info, "\t\tBypass domains: \(bypassDomains.map { $0.asSensitiveAddress(ctx) })")
 
         settings.proxySettings = proxySettings
     }

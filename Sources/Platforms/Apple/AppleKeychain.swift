@@ -39,6 +39,8 @@ import PartoutCore
 
 /// The Apple ``Keychain``.
 public final class AppleKeychain: Keychain {
+    private let ctx: PartoutContext
+
     private let accessGroup: String?
 
     /**
@@ -47,7 +49,8 @@ public final class AppleKeychain: Keychain {
      - Parameter group: An optional App Group.
      - Precondition: Proper App Group entitlements (if group is non-nil).
      **/
-    public init(group: String?) {
+    public init(_ ctx: PartoutContext, group: String?) {
+        self.ctx = ctx
         accessGroup = group
     }
 
@@ -94,7 +97,7 @@ public final class AppleKeychain: Keychain {
 
             let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
             guard status == errSecSuccess else {
-                pp_log(.core, .error, "set(password:for:label:) [update], keychain status is \(status)")
+                pp_log(ctx, .core, .error, "set(password:for:label:) [update], keychain status is \(status)")
                 throw PartoutError(.keychainAddItem)
             }
             return existingReference
@@ -113,11 +116,11 @@ public final class AppleKeychain: Keychain {
             var ref: CFTypeRef?
             let status = SecItemAdd(query as CFDictionary, &ref)
             guard status == errSecSuccess else {
-                pp_log(.core, .error, "set(password:for:label:) [add], keychain status is \(status)")
+                pp_log(ctx, .core, .error, "set(password:for:label:) [add], keychain status is \(status)")
                 throw PartoutError(.keychainAddItem)
             }
             guard let refData = ref as? Data else {
-                pp_log(.core, .error, "set(password:for:label:), result is not Data")
+                pp_log(ctx, .core, .error, "set(password:for:label:), result is not Data")
                 throw PartoutError(.decoding)
             }
             return refData
@@ -156,12 +159,12 @@ public final class AppleKeychain: Keychain {
             throw PartoutError(.keychainItemNotFound)
 
         default:
-            pp_log(.core, .error, "password(for:), keychain status is \(status)")
+            pp_log(ctx, .core, .error, "password(for:), keychain status is \(status)")
             throw PartoutError(.keychainItemNotFound, status)
         }
         guard let data = result as? Data,
               let string = String(data: data, encoding: .utf8) else {
-            pp_log(.core, .error, "password(for:), result is not Data")
+            pp_log(ctx, .core, .error, "password(for:), result is not Data")
             throw PartoutError(.decoding)
         }
         return string
@@ -188,11 +191,11 @@ public final class AppleKeychain: Keychain {
             throw PartoutError(.keychainItemNotFound)
 
         default:
-            pp_log(.core, .error, "passwordReference(for:), keychain status is \(status)")
+            pp_log(ctx, .core, .error, "passwordReference(for:), keychain status is \(status)")
             throw PartoutError(.keychainItemNotFound, status)
         }
         guard let data = result as? Data else {
-            pp_log(.core, .error, "passwordReference(for:), result is not Data")
+            pp_log(ctx, .core, .error, "passwordReference(for:), result is not Data")
             throw PartoutError(.decoding)
         }
         return data
@@ -218,11 +221,11 @@ public final class AppleKeychain: Keychain {
             throw PartoutError(.keychainItemNotFound)
 
         default:
-            pp_log(.core, .error, "allPasswordReferences(), keychain status is \(status)")
+            pp_log(ctx, .core, .error, "allPasswordReferences(), keychain status is \(status)")
             throw PartoutError(.keychainItemNotFound, status)
         }
         guard let refs = result as? [Data] else {
-            pp_log(.core, .error, "allPasswordReferences(), result is not [Data]")
+            pp_log(ctx, .core, .error, "allPasswordReferences(), result is not [Data]")
             throw PartoutError(.decoding)
         }
         return refs
@@ -246,12 +249,12 @@ public final class AppleKeychain: Keychain {
             throw PartoutError(.keychainItemNotFound)
 
         default:
-            pp_log(.core, .error, "password(forReference:), keychain status is \(status)")
+            pp_log(ctx, .core, .error, "password(forReference:), keychain status is \(status)")
             throw PartoutError(.keychainItemNotFound, status)
         }
         guard let data = result as? Data,
               let string = String(data: data, encoding: .utf8) else {
-            pp_log(.core, .error, "password(forReference:), result is not Data")
+            pp_log(ctx, .core, .error, "password(forReference:), result is not Data")
             throw PartoutError(.decoding)
         }
         return string

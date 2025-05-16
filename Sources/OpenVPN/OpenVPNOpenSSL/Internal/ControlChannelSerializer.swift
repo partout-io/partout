@@ -39,6 +39,12 @@ protocol ControlChannelSerializer {
 
 extension ControlChannel {
     final class PlainSerializer: ControlChannelSerializer {
+        private let ctx: PartoutContext
+
+        init(_ ctx: PartoutContext) {
+            self.ctx = ctx
+        }
+
         func reset() {
         }
 
@@ -60,7 +66,7 @@ extension ControlChannel {
             let key = packet[offset] & 0b111
             offset += PacketOpcodeLength
 
-            pp_log(.openvpn, .info, "Control: Try read packet with code \(code.debugDescription) and key \(key)")
+            pp_log(ctx, .openvpn, .info, "Control: Try read packet with code \(code.debugDescription) and key \(key)")
 
             guard end >= offset + PacketSessionIdLength else {
                 throw OpenVPNSessionError.controlChannel(message: "Missing sessionId")
@@ -133,6 +139,8 @@ extension ControlChannel {
 
 extension ControlChannel {
     final class AuthSerializer: ControlChannelSerializer {
+        private let ctx: PartoutContext
+
         private let encrypter: Encrypter
 
         private let decrypter: Decrypter
@@ -151,7 +159,8 @@ extension ControlChannel {
 
         private let plain: PlainSerializer
 
-        init(with crypto: OpenVPNCryptoProtocol, key: OpenVPN.StaticKey, digest: OpenVPN.Digest) throws {
+        init(_ ctx: PartoutContext, with crypto: OpenVPNCryptoProtocol, key: OpenVPN.StaticKey, digest: OpenVPN.Digest) throws {
+            self.ctx = ctx
             let cryptoOptions = OpenVPNCryptoOptions(
                 cipherAlgorithm: nil,
                 digestAlgorithm: digest.rawValue,
@@ -171,7 +180,7 @@ extension ControlChannel {
 
             currentReplayId = BidirectionalState(withResetValue: 1)
             timestamp = UInt32(Date().timeIntervalSince1970)
-            plain = PlainSerializer()
+            plain = PlainSerializer(ctx)
         }
 
         func reset() {
@@ -210,7 +219,7 @@ extension ControlChannel {
             do {
                 return try plain.deserialize(data: authPacket, start: authLength, end: nil)
             } catch {
-                pp_log(.openvpn, .fault, "Control: Channel failure: \(error)")
+                pp_log(ctx, .openvpn, .fault, "Control: Channel failure: \(error)")
                 throw error
             }
         }
@@ -219,6 +228,8 @@ extension ControlChannel {
 
 extension ControlChannel {
     final class CryptSerializer: ControlChannelSerializer {
+        private let ctx: PartoutContext
+
         private let encrypter: Encrypter
 
         private let decrypter: Decrypter
@@ -235,7 +246,8 @@ extension ControlChannel {
 
         private let plain: PlainSerializer
 
-        init(with crypto: OpenVPNCryptoProtocol, key: OpenVPN.StaticKey) throws {
+        init(_ ctx: PartoutContext, with crypto: OpenVPNCryptoProtocol, key: OpenVPN.StaticKey) throws {
+            self.ctx = ctx
             let cryptoOptions = OpenVPNCryptoOptions(
                 cipherAlgorithm: "AES-256-CTR",
                 digestAlgorithm: "SHA256",
@@ -254,7 +266,7 @@ extension ControlChannel {
 
             currentReplayId = BidirectionalState(withResetValue: 1)
             timestamp = UInt32(Date().timeIntervalSince1970)
-            plain = PlainSerializer()
+            plain = PlainSerializer(ctx)
         }
 
         func reset() {
@@ -298,7 +310,7 @@ extension ControlChannel {
             do {
                 return try plain.deserialize(data: decryptedPacket, start: 0, end: nil)
             } catch {
-                pp_log(.openvpn, .fault, "Control: Channel failure: \(error)")
+                pp_log(ctx, .openvpn, .fault, "Control: Channel failure: \(error)")
                 throw error
             }
         }

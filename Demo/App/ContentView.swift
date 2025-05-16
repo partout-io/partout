@@ -267,7 +267,7 @@ private extension ContentView {
 
     func fetchDebugLog() async throws {
         guard vpn.status != .inactive else {
-            if PartoutConfiguration.shared.hasLocalLogger {
+            if PartoutContext.global.hasLocalLogger {
                 debugLog = try String(contentsOf: Demo.Log.tunnelURL)
                     .split(separator: "\n")
                     .map(String.init)

@@ -30,6 +30,7 @@ import PartoutCore
 
 extension OpenVPNConnection {
     public init(
+        _ ctx: PartoutContext,
         parameters: ConnectionParameters,
         module: OpenVPNModule,
         prng: PRNGProtocol,
@@ -52,6 +53,7 @@ extension OpenVPNConnection {
         }
 
         let session = try await OpenVPNSession(
+            ctx,
             configuration: configuration,
             credentials: module.credentials,
             prng: prng,
@@ -62,6 +64,7 @@ extension OpenVPNConnection {
         )
 
         try await self.init(
+            ctx,
             parameters: parameters,
             module: module,
             prng: prng,

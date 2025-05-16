@@ -35,7 +35,7 @@ extension OpenVPNSession {
         Task {
             do {
                 guard let decryptedPackets = try dataChannel.decrypt(packets: packets) else {
-                    pp_log(.openvpn, .error, "Unable to decrypt packets, is SessionKey properly configured (dataPath, peerId)?")
+                    pp_log(ctx, .openvpn, .error, "Unable to decrypt packets, is SessionKey properly configured (dataPath, peerId)?")
                     return
                 }
                 guard !decryptedPackets.isEmpty else {
@@ -60,7 +60,7 @@ extension OpenVPNSession {
         Task {
             do {
                 guard let encryptedPackets = try dataChannel.encrypt(packets: packets) else {
-                    pp_log(.openvpn, .error, "Unable to encrypt packets, is SessionKey properly configured (dataPath, peerId)?")
+                    pp_log(ctx, .openvpn, .error, "Unable to encrypt packets, is SessionKey properly configured (dataPath, peerId)?")
                     return
                 }
                 guard !encryptedPackets.isEmpty else {
@@ -72,7 +72,7 @@ extension OpenVPNSession {
                 if let nativeError = error.asNativeOpenVPNError {
                     throw nativeError
                 }
-                pp_log(.openvpn, .error, "Data: Failed LINK write during send data: \(error)")
+                pp_log(ctx, .openvpn, .error, "Data: Failed LINK write during send data: \(error)")
                 await shutdown(PartoutError(.linkFailure, error))
             }
         }

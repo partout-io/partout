@@ -29,19 +29,25 @@ import PartoutCore
 
 /// Publishes updates from a `NWPathMonitor`.
 public final class NEObservablePath: ReachabilityObserver {
+    private let ctx: PartoutContext
+
     private let monitor: NWPathMonitor
 
     private nonisolated let subject: CurrentValueStream<NWPath>
 
-    public init() {
+    public init(_ ctx: PartoutContext) {
+        self.ctx = ctx
         monitor = NWPathMonitor()
         subject = CurrentValueStream(monitor.currentPath)
     }
 
     public func startObserving() {
         monitor.pathUpdateHandler = { [weak self] path in
-            pp_log(.ne, .debug, "Path updated: \(path.debugDescription)")
-            self?.subject.send(path)
+            guard let self else {
+                return
+            }
+            pp_log(ctx, .ne, .debug, "Path updated: \(path.debugDescription)")
+            subject.send(path)
         }
         monitor.start(queue: .global())
     }
@@ -66,7 +72,7 @@ extension NEObservablePath {
                 var previous: Bool?
                 for await path in stream {
                     guard !Task.isCancelled else {
-                        pp_log(.ne, .debug, "Cancelled NEObservablePath.isReachableStream")
+                        pp_log(ctx, .ne, .debug, "Cancelled NEObservablePath.isReachableStream")
                         break
                     }
                     let reachable = path.status == .satisfied

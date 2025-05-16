@@ -47,6 +47,8 @@ fileprivate extension ZeroingData {
 }
 
 final class Authenticator {
+    private let ctx: PartoutContext
+
     private var controlBuffer: ZeroingData
 
     private(set) var preMaster: ZeroingData
@@ -67,7 +69,8 @@ final class Authenticator {
 
     var sslVersion: String?
 
-    init(prng: PRNGProtocol, _ username: String?, _ password: String?) {
+    init(_ ctx: PartoutContext, prng: PRNGProtocol, _ username: String?, _ password: String?) {
+        self.ctx = ctx
         preMaster = prng.safeData(length: Constants.preMasterLength)
         random1 = prng.safeData(length: Constants.randomLength)
         random2 = prng.safeData(length: Constants.randomLength)
@@ -141,7 +144,7 @@ final class Authenticator {
         } else {
             optsString = "V0 UNDEF"
         }
-        pp_log(.openvpn, .info, "TLS.auth: Local options: \(optsString)")
+        pp_log(ctx, .openvpn, .info, "TLS.auth: Local options: \(optsString)")
         raw.appendSized(Z(optsString, nullTerminated: true))
 
         // credentials
@@ -161,7 +164,7 @@ final class Authenticator {
         let peerInfo = Constants.peerInfo(sslVersion: sslVersion, extra: extra)
         raw.appendSized(Z(peerInfo, nullTerminated: true))
 
-        pp_log(.openvpn, .info, "TLS.auth: Put plaintext \(raw.asSensitiveBytes)")
+        pp_log(ctx, .openvpn, .info, "TLS.auth: Put plaintext \(raw.asSensitiveBytes(ctx))")
 
         try into.putRawPlainText(raw.bytes, length: raw.length)
     }
@@ -202,10 +205,10 @@ final class Authenticator {
         let serverOpts = controlBuffer.withOffset(offset, length: serverOptsLength)
         offset += serverOptsLength
 
-        pp_log(.openvpn, .info, "TLS.auth: Parsed server random [\(serverRandom1.asSensitiveBytes), \(serverRandom2.asSensitiveBytes)]")
+        pp_log(ctx, .openvpn, .info, "TLS.auth: Parsed server random [\(serverRandom1.asSensitiveBytes(ctx)), \(serverRandom2.asSensitiveBytes(ctx))]")
 
         if let serverOptsString = serverOpts.nullTerminatedString(fromOffset: 0) {
-            pp_log(.openvpn, .info, "TLS.auth: Parsed server options: \"\(serverOptsString)\"")
+            pp_log(ctx, .openvpn, .info, "TLS.auth: Parsed server options: \"\(serverOptsString)\"")
         }
 
         self.serverRandom1 = serverRandom1

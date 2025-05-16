@@ -35,13 +35,16 @@ public final class NETCPObserver: LinkObserver {
         public let maxLength: Int
     }
 
+    private let ctx: PartoutContext
+
     private nonisolated let nwConnection: NWTCPConnection
 
     private let options: Options
 
     private var observer: ValueObserver<NWTCPConnection>?
 
-    public init(nwConnection: NWTCPConnection, options: Options) {
+    public init(_ ctx: PartoutContext, nwConnection: NWTCPConnection, options: Options) {
+        self.ctx = ctx
         self.nwConnection = nwConnection
         self.options = options
     }
@@ -51,16 +54,16 @@ public final class NETCPObserver: LinkObserver {
         defer {
             observer = nil
         }
-        try await observer?.waitForValue(on: \.state, timeout: timeout) { state in
-            pp_log(.ne, .info, "Socket state is \(state.debugDescription)")
-
+        try await observer?.waitForValue(on: \.state, timeout: timeout) { [weak self] state in
+            guard let self else {
+                return false
+            }
+            pp_log(ctx, .ne, .info, "Socket state is \(state.debugDescription)")
             switch state {
             case .connected:
                 return true
-
             case .cancelled, .disconnected:
                 throw PartoutError(.linkNotActive)
-
             default:
                 return false
             }

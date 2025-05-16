@@ -30,7 +30,7 @@ extension OpenVPNSession {
 
     @discardableResult
     func startNegotiation(on link: LinkInterface) throws -> Negotiator {
-        pp_log(.openvpn, .info, "Start negotiation")
+        pp_log(ctx, .openvpn, .info, "Start negotiation")
         let neg = newNegotiator(on: link)
         addNegotiator(neg)
         loopLink()
@@ -44,13 +44,13 @@ extension OpenVPNSession {
         isServerInitiated: Bool
     ) throws -> Negotiator {
         guard !negotiator.isRenegotiating else {
-            pp_log(.openvpn, .error, "Renegotiation already in progress")
+            pp_log(ctx, .openvpn, .error, "Renegotiation already in progress")
             return negotiator
         }
         if isServerInitiated {
-            pp_log(.openvpn, .notice, "Renegotiation request from server")
+            pp_log(ctx, .openvpn, .notice, "Renegotiation request from server")
         } else {
-            pp_log(.openvpn, .notice, "Renegotiation request from client")
+            pp_log(ctx, .openvpn, .notice, "Renegotiation request from client")
         }
         let neg = negotiator.forRenegotiation(initiatedBy: isServerInitiated ? .server : .client)
         addNegotiator(neg)

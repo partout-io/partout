@@ -28,11 +28,14 @@ import Foundation
 import PartoutCore
 
 final class DataChannel {
+    private let ctx: PartoutContext
+
     let key: UInt8
 
     private let dataPath: DataPath
 
-    init(key: UInt8, dataPath: DataPath) {
+    init(_ ctx: PartoutContext, key: UInt8, dataPath: DataPath) {
+        self.ctx = ctx
         self.key = key
         self.dataPath = dataPath
     }
@@ -45,7 +48,7 @@ final class DataChannel {
         var keepAlive = false
         let decrypted = try dataPath.decryptPackets(packets, keepAlive: &keepAlive)
         if keepAlive {
-            pp_log(.openvpn, .debug, "Data: Received ping, do nothing")
+            pp_log(ctx, .openvpn, .debug, "Data: Received ping, do nothing")
         }
         return decrypted
     }
