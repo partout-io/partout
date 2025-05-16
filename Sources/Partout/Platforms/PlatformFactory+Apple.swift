@@ -33,26 +33,26 @@ public struct ApplePlatformFactory: PlatformFactory {
     init() {
     }
 
-    public func newPRNG() -> PRNGProtocol {
+    public func newPRNG(_ ctx: PartoutContext) -> PRNGProtocol {
         AppleRandom()
     }
 
-    public func newDNSResolver() -> DNSResolver {
+    public func newDNSResolver(_ ctx: PartoutContext) -> DNSResolver {
         SimpleDNSResolver {
             CFDNSStrategy(hostname: $0)
         }
     }
 
-    public func newScriptingEngine() -> ScriptingEngine {
-        AppleJavaScriptEngine()
+    public func newScriptingEngine(_ ctx: PartoutContext) -> ScriptingEngine {
+        AppleJavaScriptEngine(ctx)
     }
 }
 
 #if canImport(PartoutAPI)
 
 extension ApplePlatformFactory {
-    public func newAPIScriptingEngine() -> APIScriptingEngine {
-        AppleJavaScriptEngine()
+    public func newAPIScriptingEngine(_ ctx: PartoutContext,) -> APIScriptingEngine {
+        AppleJavaScriptEngine(ctx)
     }
 }
 

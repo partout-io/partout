@@ -40,11 +40,15 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
         }
     }
 
+    private let ctx: PartoutContext
+
     private weak var provider: NEPacketTunnelProvider?
 
     private let options: Options
 
-    public init(provider: NEPacketTunnelProvider, options: Options) {
+    public init(_ ctx: PartoutContext, provider: NEPacketTunnelProvider?, options: Options) {
+        precondition(provider != nil) // weak
+        self.ctx = ctx
         self.provider = provider
         self.options = options
     }
@@ -59,6 +63,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
         case .udp:
             let impl = provider.createUDPSession(to: nwEndpoint, from: nil)
             return NEUDPObserver(
+                ctx,
                 nwSession: impl,
                 options: .init(
                     maxDatagrams: options.maxUDPDatagrams
@@ -68,6 +73,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
         case .tcp:
             let impl = provider.createTCPConnection(to: nwEndpoint, enableTLS: false, tlsParameters: nil, delegate: nil)
             return NETCPObserver(
+                ctx,
                 nwConnection: impl,
                 options: .init(
                     minLength: options.minTCPLength,
@@ -82,13 +88,13 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
             logReleasedProvider()
             return nil
         }
-        return NETunnelInterface(impl: provider.packetFlow)
+        return NETunnelInterface(ctx, impl: provider.packetFlow)
     }
 }
 
 private extension NEInterfaceFactory {
     func logReleasedProvider() {
-        pp_log(.ne, .info, "NEInterfaceFactory: NEPacketTunnelProvider released")
+        pp_log(ctx, .ne, .info, "NEInterfaceFactory: NEPacketTunnelProvider released")
     }
 }
 

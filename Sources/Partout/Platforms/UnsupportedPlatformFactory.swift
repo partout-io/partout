@@ -34,15 +34,15 @@ struct UnsupportedPlatformFactory: PlatformFactory {
     private init() {
     }
 
-    func newPRNG() -> PRNGProtocol {
+    func newPRNG(_ ctx: PartoutContext) -> PRNGProtocol {
         fatalError("newPRNG: \(message)")
     }
 
-    func newDNSResolver() -> DNSResolver {
+    func newDNSResolver(_ ctx: PartoutContext) -> DNSResolver {
         fatalError("newDNSResolver: \(message)")
     }
 
-    func newScriptingEngine() -> ScriptingEngine {
+    func newScriptingEngine(_ ctx: PartoutContext) -> ScriptingEngine {
         fatalError("newScriptingEngine: \(message)")
     }
 }
@@ -50,7 +50,7 @@ struct UnsupportedPlatformFactory: PlatformFactory {
 #if canImport(PartoutAPI)
 
 extension UnsupportedPlatformFactory {
-    public func newAPIScriptingEngine() -> APIScriptingEngine {
+    public func newAPIScriptingEngine(_ ctx: PartoutContext) -> APIScriptingEngine {
         fatalError("newAPIScriptingEngine: \(message)")
     }
 }

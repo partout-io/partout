@@ -29,7 +29,7 @@ import XCTest
 
 final class AppleJavaScriptEngineTests: XCTestCase {
     func test_givenEngine_whenInject_thenReturns() async throws {
-        let sut = AppleJavaScriptEngine()
+        let sut = AppleJavaScriptEngine(.global)
         sut.inject("triple", object: {
             3 * $0
         } as @convention(block) (Int) -> Int)

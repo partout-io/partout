@@ -45,13 +45,16 @@ struct PIAHardReset {
 
     private static let encodedFormat = "\(magic)crypto\t%@|%@\tca\t%@"
 
+    private let ctx: PartoutContext
+
     private let caMd5Digest: String
 
     private let cipherName: String
 
     private let digestName: String
 
-    init(caMd5Digest: String, cipher: OpenVPN.Cipher, digest: OpenVPN.Digest) {
+    init(_ ctx: PartoutContext, caMd5Digest: String, cipher: OpenVPN.Cipher, digest: OpenVPN.Digest) {
+        self.ctx = ctx
         self.caMd5Digest = caMd5Digest
         cipherName = cipher.rawValue.lowercased()
         digestName = digest.rawValue.lowercased()
@@ -60,7 +63,7 @@ struct PIAHardReset {
     func encodedData(prng: PRNGProtocol) throws -> Data {
         let string = String(format: PIAHardReset.encodedFormat, cipherName, digestName, caMd5Digest)
         guard let plainData = string.data(using: .ascii) else {
-            pp_log(.openvpn, .fault, "Unable to encode string to ASCII")
+            pp_log(ctx, .openvpn, .fault, "Unable to encode string to ASCII")
             throw OpenVPNSessionError.assertion
         }
         let keyBytes = prng.data(length: PIAHardReset.obfuscationKeyLength)

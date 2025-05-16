@@ -32,6 +32,7 @@ final class NEProtocolCoderTests: XCTestCase {
     func test_givenProfile_whenEncodeToProvider_thenDecodes() throws {
         let profile = try newProfile()
         let sut = ProviderNEProtocolCoder(
+            .global,
             tunnelBundleIdentifier: bundleIdentifier,
             registry: newRegistry(),
             coder: CodableProfileCoder()
@@ -48,6 +49,7 @@ final class NEProtocolCoderTests: XCTestCase {
     func test_givenProfile_whenEncodeToKeychain_thenDecodes() throws {
         let profile = try newProfile()
         let sut = KeychainNEProtocolCoder(
+            .global,
             tunnelBundleIdentifier: bundleIdentifier,
             registry: newRegistry(),
             coder: CodableProfileCoder(),

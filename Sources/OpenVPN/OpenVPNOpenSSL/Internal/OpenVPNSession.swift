@@ -43,6 +43,8 @@ final class OpenVPNSession {
 
     // MARK: Init
 
+    let ctx: PartoutContext
+
     private let configuration: OpenVPN.Configuration
 
     private let credentials: OpenVPN.Credentials?
@@ -83,13 +85,13 @@ final class OpenVPNSession {
 
     private var currentNegotiatorKey: UInt8? {
         didSet {
-            pp_log(.openvpn, .info, "Negotiator: Current key is \(currentNegotiatorKey?.description ?? "nil")")
+            pp_log(ctx, .openvpn, .info, "Negotiator: Current key is \(currentNegotiatorKey?.description ?? "nil")")
         }
     }
 
     private var currentDataChannelKey: UInt8? {
         didSet {
-            pp_log(.openvpn, .info, "Data: Current key is \(currentDataChannelKey?.description ?? "nil")")
+            pp_log(ctx, .openvpn, .info, "Data: Current key is \(currentDataChannelKey?.description ?? "nil")")
         }
     }
 
@@ -111,6 +113,7 @@ final class OpenVPNSession {
      Creates a VPN session.
 
      - Parameters:
+       - ctx: The context.
        - configuration: The `Configuration` to use for this session.
        - credentials: The optional credentials.
        - prng: The pseudo-random number generator.
@@ -122,6 +125,7 @@ final class OpenVPNSession {
      - Throws: If cryptographic or TLS initialization fails.
      */
     init(
+        _ ctx: PartoutContext,
         configuration: OpenVPN.Configuration,
         credentials: OpenVPN.Credentials?,
         prng: PRNGProtocol,
@@ -133,6 +137,7 @@ final class OpenVPNSession {
         guard let ca = configuration.ca else {
             fatalError("Configuration has no CA")
         }
+        self.ctx = ctx
         self.configuration = configuration
         self.credentials = try credentials?.forAuthentication()
         self.prng = prng
@@ -153,7 +158,11 @@ final class OpenVPNSession {
             securityLevel: configuration.tlsSecurityLevel ?? 0
         )
 
-        controlChannel = try cryptoFactory().newControlChannel(with: prng, configuration: configuration)
+        controlChannel = try cryptoFactory().newControlChannel(
+            ctx,
+            with: prng,
+            configuration: configuration
+        )
         negotiators = [:]
         dataChannels = [:]
         oldKeys = []
@@ -177,11 +186,11 @@ extension OpenVPNSession: OpenVPNSessionProtocol {
 
     func setTunnel(_ tunnel: TunnelInterface) {
         guard self.tunnel == nil else {
-            pp_log(.openvpn, .error, "Tunnel interface already set")
+            pp_log(ctx, .openvpn, .error, "Tunnel interface already set")
             return
         }
 
-        pp_log(.openvpn, .info, "Start TUN loop")
+        pp_log(ctx, .openvpn, .info, "Start TUN loop")
 
         self.tunnel = tunnel
         loopTunnel()
@@ -189,11 +198,11 @@ extension OpenVPNSession: OpenVPNSessionProtocol {
 
     func setLink(_ link: LinkInterface) async throws {
         guard self.link == nil else {
-            pp_log(.openvpn, .error, "Link interface already set")
+            pp_log(ctx, .openvpn, .error, "Link interface already set")
             return
         }
 
-        pp_log(.openvpn, .info, "Start VPN session")
+        pp_log(ctx, .openvpn, .info, "Start VPN session")
 
         self.link = link
         sessionState = .starting
@@ -207,14 +216,14 @@ extension OpenVPNSession: OpenVPNSessionProtocol {
 
     func shutdown(_ error: Error?, timeout: TimeInterval?) async {
         guard sessionState != .stopping, sessionState != .stopped else {
-            pp_log(.openvpn, .error, "Ignore stop request, stopped or already stopping")
+            pp_log(ctx, .openvpn, .error, "Ignore stop request, stopped or already stopping")
             return
         }
 
         if let error {
-            pp_log(.openvpn, .error, "Shut down with failure: \(error)")
+            pp_log(ctx, .openvpn, .error, "Shut down with failure: \(error)")
         } else {
-            pp_log(.openvpn, .info, "Shut down on request")
+            pp_log(ctx, .openvpn, .info, "Shut down on request")
         }
         sessionState = .stopping
 
@@ -223,7 +232,7 @@ extension OpenVPNSession: OpenVPNSessionProtocol {
             do {
                 try await sendExitPacket(timeout: timeout)
             } catch {
-                pp_log(.openvpn, .error, "Unable to send exit packet: \(error)")
+                pp_log(ctx, .openvpn, .error, "Unable to send exit packet: \(error)")
             }
         }
 
@@ -245,12 +254,12 @@ private extension OpenVPNSession {
             return
         }
         guard let packets = try currentDataChannel.encrypt(packets: [OCCPacket.exit.serialized()]) else {
-            pp_log(.openvpn, .error, "Encrypted to empty OCCPacket packets")
+            pp_log(ctx, .openvpn, .error, "Encrypted to empty OCCPacket packets")
             assertionFailure("Empty OCCPacket packets?")
             return
         }
 
-        pp_log(.openvpn, .info, "Send OCCPacket exit")
+        pp_log(ctx, .openvpn, .info, "Send OCCPacket exit")
 
         let timeoutMillis = Int((timeout ?? options.writeTimeout) * 1000.0)
         let timeoutTask = Task {
@@ -262,17 +271,17 @@ private extension OpenVPNSession {
             do {
                 try Task.checkCancellation()
             } catch {
-                pp_log(.openvpn, .error, "Cancelled OCCPacket: \(error)")
+                pp_log(ctx, .openvpn, .error, "Cancelled OCCPacket: \(error)")
             }
         }
         do {
             try await timeoutTask.value
         } catch {
-            pp_log(.openvpn, .info, "Cancelled OCCPacket write timeout (completed earlier): \(error)")
+            pp_log(ctx, .openvpn, .info, "Cancelled OCCPacket write timeout (completed earlier): \(error)")
         }
         writeTask.cancel()
 
-        pp_log(.openvpn, .info, "Sent OCCPacket correctly")
+        pp_log(ctx, .openvpn, .info, "Sent OCCPacket correctly")
     }
 
     func cleanup() async {
@@ -335,6 +344,7 @@ extension OpenVPNSession {
             }
         )
         return Negotiator(
+            ctx,
             link: link,
             channel: controlChannel,
             prng: prng,
@@ -345,9 +355,9 @@ extension OpenVPNSession {
     }
 
     func addNegotiator(_ negotiator: Negotiator) {
-        pp_log(.openvpn, .info, "Replace negotiator with key \(negotiator.key)")
+        pp_log(ctx, .openvpn, .info, "Replace negotiator with key \(negotiator.key)")
         negotiators[negotiator.key] = negotiator
-        pp_log(.openvpn, .info, "Negotiators: \(negotiators.keys)")
+        pp_log(ctx, .openvpn, .info, "Negotiators: \(negotiators.keys)")
         currentNegotiatorKey = negotiator.key
     }
 
@@ -356,12 +366,12 @@ extension OpenVPNSession {
         dataChannel: DataChannel,
         pushReply: PushReply
     ) {
-        pp_log(.openvpn, .info, "Negotiation succeeded, set key \(key) as current")
+        pp_log(ctx, .openvpn, .info, "Negotiation succeeded, set key \(key) as current")
 
         self.pushReply = pushReply
 
         // replace current channel with new
-        pp_log(.openvpn, .info, "Replace key \(dataChannel.key) with new data channel")
+        pp_log(ctx, .openvpn, .info, "Replace key \(dataChannel.key) with new data channel")
         dataChannels[dataChannel.key] = dataChannel
         if let currentDataChannel {
             oldKeys.append(currentDataChannel.key)
@@ -371,12 +381,12 @@ extension OpenVPNSession {
         // clean up old keys
         while oldKeys.count > 1 {
             let keyToRemove = oldKeys.removeFirst()
-            pp_log(.openvpn, .info, "Remove key \(keyToRemove) from negotiators and data channels")
+            pp_log(ctx, .openvpn, .info, "Remove key \(keyToRemove) from negotiators and data channels")
             negotiators.removeValue(forKey: keyToRemove)
             dataChannels.removeValue(forKey: keyToRemove)
         }
-        pp_log(.openvpn, .info, "Negotiators: \(negotiators.keys)")
-        pp_log(.openvpn, .info, "Data channels: \(dataChannels.keys)")
+        pp_log(ctx, .openvpn, .info, "Negotiators: \(negotiators.keys)")
+        pp_log(ctx, .openvpn, .info, "Data channels: \(dataChannels.keys)")
 
         // renegotiation stops here
         guard sessionState != .started else {
@@ -387,7 +397,7 @@ extension OpenVPNSession {
         Task {
             guard let remoteAddress = link?.remoteAddress,
                   let remoteProtocol = link?.remoteProtocol else {
-                pp_log(.openvpn, .fault, "Unable to resolve link remote address/protocol")
+                pp_log(ctx, .openvpn, .fault, "Unable to resolve link remote address/protocol")
                 await shutdown(OpenVPNSessionError.assertion)
                 return
             }
@@ -457,7 +467,7 @@ private extension OpenVPNSession {
 
     func scheduleNextPing() {
         let interval = keepAliveInterval ?? options.pingTimeoutCheckInterval
-        pp_log(.openvpn, .debug, "Schedule ping check after \(interval.asTimeString)")
+        pp_log(ctx, .openvpn, .debug, "Schedule ping check after \(interval.asTimeString)")
 
         pendingPingTask?.cancel()
         pendingPingTask = runInActor(after: interval) { [weak self] in
@@ -471,24 +481,24 @@ private extension OpenVPNSession {
 
     func ping() throws {
         guard !isStopped else {
-            pp_log(.openvpn, .debug, "Ping cancelled, session stopped")
+            pp_log(ctx, .openvpn, .debug, "Ping cancelled, session stopped")
             return
         }
         guard let link else {
-            pp_log(.openvpn, .debug, "Ping cancelled, no link")
+            pp_log(ctx, .openvpn, .debug, "Ping cancelled, no link")
             return
         }
         guard let currentDataChannel else {
-            pp_log(.openvpn, .debug, "Ping cancelled, no data channel")
+            pp_log(ctx, .openvpn, .debug, "Ping cancelled, no data channel")
             return
         }
 
-        pp_log(.openvpn, .debug, "Run ping check")
+        pp_log(ctx, .openvpn, .debug, "Run ping check")
         try checkPingTimeout()
 
         // is keep-alive enabled?
         if keepAliveInterval != nil {
-            pp_log(.openvpn, .debug, "Send ping")
+            pp_log(ctx, .openvpn, .debug, "Send ping")
             sendDataPackets(
                 [ProtocolMacros.pingString],
                 to: link,
@@ -538,6 +548,7 @@ private extension OpenVPNSession {
 @OpenVPNActor
 private extension OpenVPNCryptoProtocol {
     func newControlChannel(
+        _ ctx: PartoutContext,
         with prng: PRNGProtocol,
         configuration: OpenVPN.Configuration
     ) throws -> ControlChannel {
@@ -546,6 +557,7 @@ private extension OpenVPNCryptoProtocol {
             switch tlsWrap.strategy {
             case .auth:
                 channel = try ControlChannel(
+                    ctx,
                     prng: prng,
                     crypto: self,
                     authKey: tlsWrap.key,
@@ -554,16 +566,17 @@ private extension OpenVPNCryptoProtocol {
 
             case .crypt:
                 channel = try ControlChannel(
+                    ctx,
                     prng: prng,
                     crypto: self,
                     cryptKey: tlsWrap.key
                 )
 
             @unknown default:
-                channel = ControlChannel(prng: prng)
+                channel = ControlChannel(ctx, prng: prng)
             }
         } else {
-            channel = ControlChannel(prng: prng)
+            channel = ControlChannel(ctx, prng: prng)
         }
         return channel
     }

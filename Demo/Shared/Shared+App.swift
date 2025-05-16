@@ -45,10 +45,11 @@ extension Tunnel {
         }
 #else
         let strategy = NETunnelStrategy(
+            .global,
             bundleIdentifier: Demo.tunnelBundleIdentifier,
             coder: Demo.neProtocolCoder
         )
-        return Tunnel(strategy: strategy) { _ in
+        return Tunnel(.global, strategy: strategy) { _ in
             Demo.tunnelEnvironment
         }
 #endif

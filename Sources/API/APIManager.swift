@@ -42,6 +42,8 @@ public final class APIManager {
         case provider(ProviderID)
     }
 
+    private let ctx: PartoutContext
+
     private let apis: [APIMapper]
 
     private let repository: APIRepository
@@ -67,7 +69,8 @@ public final class APIManager {
         !pendingServices.isEmpty
     }
 
-    public init(from apis: [APIMapper], repository: APIRepository) {
+    public init(_ ctx: PartoutContext, from apis: [APIMapper], repository: APIRepository) {
+        self.ctx = ctx
         self.apis = apis
         self.repository = repository
         providers = []
@@ -80,7 +83,7 @@ public final class APIManager {
     public func fetchIndex() async throws {
         let service: PendingService = .index
         guard !pendingServices.contains(service) else {
-            pp_log(.api, .error, "Discard fetchIndex, another .index is pending")
+            pp_log(ctx, .api, .error, "Discard fetchIndex, another .index is pending")
             return
         }
         pendingServices.insert(service)
@@ -100,7 +103,7 @@ public final class APIManager {
                 return
             } catch {
                 lastError = error
-                pp_log(.api, .error, "Unable to fetch index: \(error)")
+                pp_log(ctx, .api, .error, "Unable to fetch index: \(error)")
                 try Task.checkCancellation()
             }
         }
@@ -112,7 +115,7 @@ public final class APIManager {
     public func fetchInfrastructure(for providerId: ProviderID) async throws {
         let service: PendingService = .provider(providerId)
         guard !pendingServices.contains(service) else {
-            pp_log(.api, .error, "Discard fetchProviderInfrastructure, another .provider(\(providerId)) is pending")
+            pp_log(ctx, .api, .error, "Discard fetchProviderInfrastructure, another .provider(\(providerId)) is pending")
             return
         }
         pendingServices.insert(service)
@@ -133,11 +136,11 @@ public final class APIManager {
                 return
             } catch {
                 if (error as? PartoutError)?.code == .cached {
-                    pp_log(.api, .info, "VPN infrastructure for \(providerId) is up to date")
+                    pp_log(ctx, .api, .info, "VPN infrastructure for \(providerId) is up to date")
                     return
                 }
                 lastError = error
-                pp_log(.api, .error, "Unable to fetch VPN infrastructure for \(providerId): \(error)")
+                pp_log(ctx, .api, .error, "Unable to fetch VPN infrastructure for \(providerId): \(error)")
                 try Task.checkCancellation()
             }
         }

@@ -38,7 +38,7 @@ extension ControlPacket: @retroactive SensitiveDebugStringConvertible {
             msg.append("pid: \(packetId)")
         }
         if let payload {
-            msg.append(payload.asSensitiveBytes)
+            msg.append(payload.debugDescription(withSensitiveData: withSensitiveData))
         }
         return "{\(msg.joined(separator: ", "))}"
     }

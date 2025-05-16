@@ -28,18 +28,18 @@ import NetworkExtension
 import PartoutCore
 
 extension IPModule: NESettingsApplying {
-    public func apply(to settings: inout NEPacketTunnelNetworkSettings) {
+    public func apply(_ ctx: PartoutContext, to settings: inout NEPacketTunnelNetworkSettings) {
         if let ipv4 {
             settings.ipv4Settings = settings.ipv4Settings?.merged(with: ipv4) ?? ipv4.neIPv4Settings
-            pp_log(.ne, .info, "\t\tIPv4: \(settings.ipv4Settings?.debugDescription ?? "none")")
+            pp_log(ctx, .ne, .info, "\t\tIPv4: \(settings.ipv4Settings?.debugDescription ?? "none")")
         }
         if let ipv6 {
             settings.ipv6Settings = settings.ipv6Settings?.merged(with: ipv6) ?? ipv6.neIPv6Settings
-            pp_log(.ne, .info, "\t\tIPv6: \(settings.ipv6Settings?.debugDescription ?? "none"))")
+            pp_log(ctx, .ne, .info, "\t\tIPv6: \(settings.ipv6Settings?.debugDescription ?? "none"))")
         }
         if let mtu, mtu > 0 {
             settings.mtu = mtu as NSNumber
-            pp_log(.ne, .info, "\t\tMTU: \(mtu)")
+            pp_log(ctx, .ne, .info, "\t\tMTU: \(mtu)")
         }
     }
 }

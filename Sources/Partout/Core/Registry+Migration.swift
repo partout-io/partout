@@ -80,7 +80,7 @@ extension Registry {
                 return nil
             }
         } catch {
-            pp_log(.core, .error, "Unable to migrate profile \(profile.id): \(error)")
+            pp_log_id(profile.id, .core, .error, "Unable to migrate profile \(profile.id): \(error)")
             return nil
         }
     }

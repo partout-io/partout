@@ -31,8 +31,12 @@ import PartoutCore
 extension OpenVPNSession {
     func loopTunnel() {
         runInActor { [weak self] in
-            guard let self, let tunnel else {
-                pp_log(.openvpn, .info, "Ignore read from outdated TUN")
+            guard let self else {
+                pp_log(.global, .openvpn, .debug, "Ignore TUN read from outdated OpenVPNSession")
+                return
+            }
+            guard let tunnel else {
+                pp_log(ctx, .openvpn, .debug, "Ignore read from outdated TUN")
                 return
             }
             do {
@@ -42,7 +46,7 @@ extension OpenVPNSession {
                 }
                 try receiveTunnel(packets: packets)
             } catch {
-                pp_log(.openvpn, .error, "Failed TUN read: \(error)")
+                pp_log(ctx, .openvpn, .error, "Failed TUN read: \(error)")
                 await shutdown(error)
             }
 
@@ -55,11 +59,11 @@ extension OpenVPNSession {
         link?.setReadHandler { [weak self] packets, error in
             self?.runInActor { [weak self] in
                 guard let self else {
-                    pp_log(.openvpn, .info, "Ignore read from outdated LINK")
+                    pp_log(.global, .openvpn, .debug, "Ignore LINK read from outdated OpenVPNSession")
                     return
                 }
                 if let error {
-                    pp_log(.openvpn, .error, "Failed LINK read: \(error)")
+                    pp_log(ctx, .openvpn, .error, "Failed LINK read: \(error)")
                     await shutdown(PartoutError(.linkFailure, error))
                 }
                 guard let packets, !packets.isEmpty else {
@@ -87,7 +91,7 @@ private extension OpenVPNSession {
         var dataPacketsByKey: [UInt8: [Data]] = [:]
 
         guard var negotiator = currentNegotiator else {
-            pp_log(.openvpn, .fault, "No negotiator")
+            pp_log(ctx, .openvpn, .fault, "No negotiator")
             throw OpenVPNSessionError.assertion
         }
         if negotiator.shouldRenegotiate() {
@@ -96,19 +100,19 @@ private extension OpenVPNSession {
 
         for packet in packets {
             guard let firstByte = packet.first else {
-                pp_log(.openvpn, .error, "Dropped malformed packet (missing opcode)")
+                pp_log(ctx, .openvpn, .error, "Dropped malformed packet (missing opcode)")
                 continue
             }
             let codeValue = firstByte >> 3
             guard let code = PacketCode(rawValue: codeValue) else {
-                pp_log(.openvpn, .error, "Dropped malformed packet (unknown code: \(codeValue))")
+                pp_log(ctx, .openvpn, .error, "Dropped malformed packet (unknown code: \(codeValue))")
                 continue
             }
 
             var offset = 1
             if code == .dataV2 {
                 guard packet.count >= offset + PacketPeerIdLength else {
-                    pp_log(.openvpn, .error, "Dropped malformed packet (missing peerId)")
+                    pp_log(ctx, .openvpn, .error, "Dropped malformed packet (missing peerId)")
                     continue
                 }
                 offset += PacketPeerIdLength
@@ -117,7 +121,7 @@ private extension OpenVPNSession {
             if code == .dataV1 || code == .dataV2 {
                 let key = firstByte & 0b111
                 guard hasDataChannel(for: key) else {
-                    pp_log(.openvpn, .error, "Data: Channel with key \(key) not found")
+                    pp_log(ctx, .openvpn, .error, "Data: Channel with key \(key) not found")
                     continue
                 }
 
@@ -138,7 +142,7 @@ private extension OpenVPNSession {
                 }
                 controlPacket = parsedPacket
             } catch {
-                pp_log(.openvpn, .error, "Dropped malformed packet: \(error)")
+                pp_log(ctx, .openvpn, .error, "Dropped malformed packet: \(error)")
                 continue
             }
             switch code {
@@ -161,9 +165,9 @@ private extension OpenVPNSession {
             negotiator.sendAck(for: controlPacket, to: link)
 
             let pendingInboundQueue = negotiator.enqueueInboundPacket(packet: controlPacket)
-            pp_log(.openvpn, .debug, "Pending inbound queue: \(pendingInboundQueue.map(\.packetId))")
+            pp_log(ctx, .openvpn, .debug, "Pending inbound queue: \(pendingInboundQueue.map(\.packetId))")
             for inboundPacket in pendingInboundQueue {
-                pp_log(.openvpn, .debug, "Handle packet: \(inboundPacket.packetId)")
+                pp_log(ctx, .openvpn, .debug, "Handle packet: \(inboundPacket.packetId)")
                 try negotiator.handleControlPacket(inboundPacket)
             }
         }
@@ -172,7 +176,7 @@ private extension OpenVPNSession {
         if let tunnel {
             for (key, dataPackets) in dataPacketsByKey {
                 guard let dataChannel = dataChannel(for: key) else {
-                    pp_log(.openvpn, .error, "Accounted a data packet for which the cryptographic key hadn't been found")
+                    pp_log(ctx, .openvpn, .error, "Accounted a data packet for which the cryptographic key hadn't been found")
                     continue
                 }
                 handleDataPackets(
@@ -189,7 +193,7 @@ private extension OpenVPNSession {
             return
         }
         guard let negotiator = currentNegotiator else {
-            pp_log(.openvpn, .fault, "No negotiator")
+            pp_log(ctx, .openvpn, .fault, "No negotiator")
             throw OpenVPNSessionError.assertion
         }
         guard negotiator.isConnected, let currentDataChannel else {

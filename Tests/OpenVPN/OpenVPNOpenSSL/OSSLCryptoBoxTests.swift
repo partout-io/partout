@@ -69,11 +69,13 @@ final class OSSLCryptoBoxTests: XCTestCase {
     func test_givenKeys_whenDeserializeHardResetClientV2_thenSerializationReverts() throws {
         let sut = { OSSLCryptoBox() }
         let client = try ControlChannel.AuthSerializer(
+            .global,
             with: sut(),
             key: OpenVPN.StaticKey(data: Data(hex: staticKeyHex), direction: .client),
             digest: .sha512
         )
         let server = try ControlChannel.AuthSerializer(
+            .global,
             with: sut(),
             key: OpenVPN.StaticKey(data: Data(hex: staticKeyHex), direction: .server),
             digest: .sha512
@@ -101,10 +103,12 @@ final class OSSLCryptoBoxTests: XCTestCase {
     func test_givenKeys_whenDeserializeHardResetServerV2_thenSerializationReverts() throws {
         let sut = { OSSLCryptoBox() }
         let client = try ControlChannel.CryptSerializer(
+            .global,
             with: sut(),
             key: OpenVPN.StaticKey(data: Data(hex: staticKeyHex), direction: .client)
         )
         let server = try ControlChannel.CryptSerializer(
+            .global,
             with: sut(),
             key: OpenVPN.StaticKey(data: Data(hex: staticKeyHex), direction: .server)
         )
