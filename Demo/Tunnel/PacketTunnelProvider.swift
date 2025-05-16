@@ -59,10 +59,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
                 mapper: Demo.Log.formattedLine
             )
             let ctx = ctxBuilder.build()
+            PartoutContext.register(ctx)
 
-            PartoutContext.global = ctx
             self.ctx = ctx
-
             fwd = try await NEPTPForwarder(ctx, controller: controller)
             try await fwd?.startTunnel(options: options)
         } catch {

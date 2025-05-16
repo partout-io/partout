@@ -40,7 +40,7 @@ struct DemoApp: App {
             ),
             mapper: Demo.Log.formattedLine
         )
-        PartoutContext.global = ctxBuilder.build()
+        PartoutContext.register(ctxBuilder.build())
     }
 
     var body: some Scene {
