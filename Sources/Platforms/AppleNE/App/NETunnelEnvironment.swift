@@ -80,7 +80,7 @@ private extension NETunnelEnvironment {
                     }
                     try await Task.sleep(interval: interval)
                 } catch {
-                    pp_log(.ne, .error, "Unable to fetch NE environment for \(profileId): \(error)")
+                    pp_log_id(profileId, .ne, .error, "Unable to fetch NE environment for \(profileId): \(error)")
                     return
                 }
             }
