@@ -32,11 +32,11 @@ extension OpenVPNSession {
     func loopTunnel() {
         runInActor { [weak self] in
             guard let self else {
-//                pp_log(.global, .openvpn, .debug, "Ignore read from outdated TUN")
+                pp_log(.global, .openvpn, .debug, "Ignore TUN read from outdated OpenVPNSession")
                 return
             }
             guard let tunnel else {
-                pp_log(ctx, .openvpn, .info, "Ignore read from outdated TUN")
+                pp_log(ctx, .openvpn, .debug, "Ignore read from outdated TUN")
                 return
             }
             do {
@@ -59,7 +59,7 @@ extension OpenVPNSession {
         link?.setReadHandler { [weak self] packets, error in
             self?.runInActor { [weak self] in
                 guard let self else {
-//                    pp_log(.global, .openvpn, .debug, "Ignore read from outdated LINK")
+                    pp_log(.global, .openvpn, .debug, "Ignore LINK read from outdated OpenVPNSession")
                     return
                 }
                 if let error {
