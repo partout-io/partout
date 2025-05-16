@@ -44,7 +44,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
                 }
             )
 
-            var ctxBuilder = PartoutContext.Builder(profileId: controller.profile.id)
+            var ctxBuilder = PartoutContext.Builder()
+            ctxBuilder.setLogger(OSLogDestination(.core), for: [.core])
+            ctxBuilder.setLogger(OSLogDestination(.openvpn), for: [.openvpn])
+            ctxBuilder.setLogger(OSLogDestination(.wireguard), for: [.wireguard])
             ctxBuilder.logsModules = true
             ctxBuilder.setLocalLogger(
                 url: Demo.Log.tunnelURL,
