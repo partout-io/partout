@@ -30,13 +30,13 @@ import Foundation
 import PartoutCore
 
 public struct OpenVPNProviderResolver: ProviderModuleResolver {
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     public var moduleType: ModuleType {
         .openVPN
     }
 
-    public init(_ ctx: PartoutContext) {
+    public init(_ ctx: PartoutLoggerContext) {
         self.ctx = ctx
     }
 
@@ -69,7 +69,7 @@ extension OpenVPNProviderTemplate {
 
 extension OpenVPNProviderTemplate: ProviderTemplateCompiler {
     public static func compiled(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         with id: UUID,
         entity: ProviderEntity,
         options: Options?
@@ -96,7 +96,7 @@ extension OpenVPNProviderTemplate: ProviderTemplateCompiler {
 }
 
 private extension OpenVPNProviderTemplate {
-    func remotes(_ ctx: PartoutContext, with server: ProviderServer, excludingHostname: Bool) throws -> [ExtendedEndpoint] {
+    func remotes(_ ctx: PartoutLoggerContext, with server: ProviderServer, excludingHostname: Bool) throws -> [ExtendedEndpoint] {
         var remotes: [ExtendedEndpoint] = []
 
         if !excludingHostname, let hostname = server.hostname {

@@ -29,7 +29,7 @@ import PartoutCore
 
 /// Delegates behavior of a `NEPacketTunnelProvider`.
 public actor NEPTPForwarder {
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private let daemon: SimpleConnectionDaemon
 
@@ -44,7 +44,7 @@ public actor NEPTPForwarder {
     }
 
     public init(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         controller: NETunnelController,
         factoryOptions: NEInterfaceFactory.Options = .init(),
         connectionOptions: ConnectionParameters.Options = .init(),

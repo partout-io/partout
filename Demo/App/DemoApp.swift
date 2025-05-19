@@ -29,9 +29,9 @@ import SwiftUI
 @main
 struct DemoApp: App {
     init() {
-        var ctxBuilder = PartoutContext.Builder()
-        ctxBuilder.logsModules = true
-        ctxBuilder.setLocalLogger(
+        var loggerBuilder = PartoutLogger.Builder()
+        loggerBuilder.logsModules = true
+        loggerBuilder.setLocalLogger(
             url: Demo.Log.appURL,
             options: .init(
                 maxLevel: Demo.Log.maxLevel,
@@ -40,7 +40,7 @@ struct DemoApp: App {
             ),
             mapper: Demo.Log.formattedLine
         )
-        PartoutContext.register(ctxBuilder.build())
+        PartoutLogger.register(loggerBuilder.build())
     }
 
     var body: some Scene {

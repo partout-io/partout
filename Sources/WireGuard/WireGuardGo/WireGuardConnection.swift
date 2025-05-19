@@ -30,14 +30,14 @@
 
 import _PartoutWireGuard
 import Foundation
-import NetworkExtension // FIXME: #13, this depends on Apple unnecessarily
+import NetworkExtension // TODO: #13, this depends on Apple unnecessarily
 import PartoutCore
 import os
 internal import WireGuardKit
 internal import WireGuardKitGo
 
 public final class WireGuardConnection: Connection {
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private let statusSubject: CurrentValueStream<ConnectionStatus>
 
@@ -55,14 +55,14 @@ public final class WireGuardConnection: Connection {
 
     private lazy var adapter: WireGuardAdapter = {
         WireGuardAdapter(with: delegate, backend: WireGuardBackendGo()) { [weak self] logLevel, message in
-            pp_log(self?.ctx, .wireguard, logLevel.debugLevel, message)
+            pp_log(self?.ctx ?? .global, .wireguard, logLevel.debugLevel, message)
         }
     }()
 
     private lazy var delegate: WireGuardAdapterDelegate = AdapterDelegate(ctx, connection: self)
 
     public init(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         parameters: ConnectionParameters,
         module: WireGuardModule
     ) throws {
@@ -182,11 +182,11 @@ public final class WireGuardConnection: Connection {
 
 private extension WireGuardConnection {
     final class AdapterDelegate: WireGuardAdapterDelegate {
-        private weak var ctx: PartoutContext?
+        private let ctx: PartoutLoggerContext
 
         private weak var connection: WireGuardConnection?
 
-        init(_ ctx: PartoutContext, connection: WireGuardConnection) {
+        init(_ ctx: PartoutLoggerContext, connection: WireGuardConnection) {
             self.ctx = ctx
             self.connection = connection
         }

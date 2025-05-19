@@ -28,7 +28,7 @@ import NetworkExtension
 import PartoutCore
 
 extension IPModule: NESettingsApplying {
-    public func apply(_ ctx: PartoutContext, to settings: inout NEPacketTunnelNetworkSettings) {
+    public func apply(_ ctx: PartoutLoggerContext, to settings: inout NEPacketTunnelNetworkSettings) {
         if let ipv4 {
             settings.ipv4Settings = settings.ipv4Settings?.merged(with: ipv4) ?? ipv4.neIPv4Settings
             pp_log(ctx, .ne, .info, "\t\tIPv4: \(settings.ipv4Settings?.debugDescription ?? "none")")

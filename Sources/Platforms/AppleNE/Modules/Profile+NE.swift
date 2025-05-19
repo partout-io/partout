@@ -28,8 +28,11 @@ import NetworkExtension
 import PartoutCore
 
 extension Profile {
-    func networkSettings(with info: TunnelRemoteInfo?) -> NEPacketTunnelNetworkSettings {
-        let ctx: PartoutContext = .for(id)
+    func networkSettings(
+        with info: TunnelRemoteInfo?,
+        options: NETunnelController.Options? = nil
+    ) -> NEPacketTunnelNetworkSettings {
+        let ctx = PartoutLoggerContext(id)
         let tunnelRemoteAddress = info?.address?.rawValue ?? "127.0.0.1"
         var neSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: tunnelRemoteAddress)
 
@@ -53,7 +56,7 @@ extension Profile {
 
         applicableModules.forEach {
             let moduleDescription = LoggableModule(ctx, $0)
-                .debugDescription(withSensitiveData: ctx.logsModules)
+                .debugDescription(withSensitiveData: ctx.logger.logsModules)
 
             if let applicableModule = $0 as? Module & NESettingsApplying {
                 pp_log(ctx, .ne, .info, "\t+ \(type(of: $0)): \(moduleDescription)")
@@ -99,9 +102,10 @@ extension Profile {
         if isGateway, neSettings.dnsSettings == nil {
             pp_log(ctx, .ne, .info, "\tVPN is default gateway but has no DNS settings")
 
-            if let fallbackServers = ctx.dnsFallbackServers, !fallbackServers.isEmpty {
-                pp_log(ctx, .ne, .info, "\tEnable DNS fallback: \(fallbackServers)")
-                neSettings.dnsSettings = NEDNSSettings(servers: fallbackServers)
+            if let dnsFallbackServers = options?.dnsFallbackServers,
+               !dnsFallbackServers.isEmpty {
+                pp_log(ctx, .ne, .info, "\tEnable DNS fallback: \(dnsFallbackServers)")
+                neSettings.dnsSettings = NEDNSSettings(servers: dnsFallbackServers)
             }
         }
 

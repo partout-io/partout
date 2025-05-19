@@ -29,13 +29,13 @@ import PartoutCore
 
 /// Publishes updates from a `NWPathMonitor`.
 public final class NEObservablePath: ReachabilityObserver {
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private let monitor: NWPathMonitor
 
     private nonisolated let subject: CurrentValueStream<NWPath>
 
-    public init(_ ctx: PartoutContext) {
+    public init(_ ctx: PartoutLoggerContext) {
         self.ctx = ctx
         monitor = NWPathMonitor()
         subject = CurrentValueStream(monitor.currentPath)

@@ -29,7 +29,7 @@ import PartoutCore
 
 /// ``NEProtocolCoder`` encoding to and from a `Keychain`.
 public struct KeychainNEProtocolCoder: NEProtocolCoder {
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private let tunnelBundleIdentifier: String
 
@@ -39,7 +39,7 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
 
     private let keychain: Keychain
 
-    public init(_ ctx: PartoutContext, tunnelBundleIdentifier: String, registry: Registry, coder: ProfileCoder, keychain: Keychain) {
+    public init(_ ctx: PartoutLoggerContext, tunnelBundleIdentifier: String, registry: Registry, coder: ProfileCoder, keychain: Keychain) {
         self.ctx = ctx
         self.tunnelBundleIdentifier = tunnelBundleIdentifier
         self.registry = registry

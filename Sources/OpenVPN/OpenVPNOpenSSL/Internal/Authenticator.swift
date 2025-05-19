@@ -47,7 +47,7 @@ fileprivate extension ZeroingData {
 }
 
 final class Authenticator {
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private var controlBuffer: ZeroingData
 
@@ -69,7 +69,7 @@ final class Authenticator {
 
     var sslVersion: String?
 
-    init(_ ctx: PartoutContext, prng: PRNGProtocol, _ username: String?, _ password: String?) {
+    init(_ ctx: PartoutLoggerContext, prng: PRNGProtocol, _ username: String?, _ password: String?) {
         self.ctx = ctx
         preMaster = prng.safeData(length: Constants.preMasterLength)
         random1 = prng.safeData(length: Constants.randomLength)

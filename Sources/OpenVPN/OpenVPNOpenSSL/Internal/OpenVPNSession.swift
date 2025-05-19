@@ -43,7 +43,7 @@ final class OpenVPNSession {
 
     // MARK: Init
 
-    let ctx: PartoutContext
+    let ctx: PartoutLoggerContext
 
     private let configuration: OpenVPN.Configuration
 
@@ -125,7 +125,7 @@ final class OpenVPNSession {
      - Throws: If cryptographic or TLS initialization fails.
      */
     init(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         configuration: OpenVPN.Configuration,
         credentials: OpenVPN.Credentials?,
         prng: PRNGProtocol,
@@ -548,7 +548,7 @@ private extension OpenVPNSession {
 @OpenVPNActor
 private extension OpenVPNCryptoProtocol {
     func newControlChannel(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         with prng: PRNGProtocol,
         configuration: OpenVPN.Configuration
     ) throws -> ControlChannel {

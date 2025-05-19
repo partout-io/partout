@@ -29,7 +29,7 @@ import Foundation
 
 extension API.V6.Mapper {
     public convenience init(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         baseURL: URL,
         infrastructureURL: ((ProviderID) -> URL)? = nil
     ) {
@@ -39,7 +39,7 @@ extension API.V6.Mapper {
                 resultURL: $0,
                 cache: $1,
                 timeout: $2,
-                engine: PartoutContext.platform.newAPIScriptingEngine(ctx)
+                engine: Partout.platform.newAPIScriptingEngine(ctx)
             )
         }
     }

@@ -45,7 +45,7 @@ struct PIAHardReset {
 
     private static let encodedFormat = "\(magic)crypto\t%@|%@\tca\t%@"
 
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private let caMd5Digest: String
 
@@ -53,7 +53,7 @@ struct PIAHardReset {
 
     private let digestName: String
 
-    init(_ ctx: PartoutContext, caMd5Digest: String, cipher: OpenVPN.Cipher, digest: OpenVPN.Digest) {
+    init(_ ctx: PartoutLoggerContext, caMd5Digest: String, cipher: OpenVPN.Cipher, digest: OpenVPN.Digest) {
         self.ctx = ctx
         self.caMd5Digest = caMd5Digest
         cipherName = cipher.rawValue.lowercased()

@@ -40,13 +40,13 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
         }
     }
 
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private weak var provider: NEPacketTunnelProvider?
 
     private let options: Options
 
-    public init(_ ctx: PartoutContext, provider: NEPacketTunnelProvider?, options: Options) {
+    public init(_ ctx: PartoutLoggerContext, provider: NEPacketTunnelProvider?, options: Options) {
         precondition(provider != nil) // weak
         self.ctx = ctx
         self.provider = provider

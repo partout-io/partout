@@ -28,7 +28,7 @@ import NetworkExtension
 import PartoutCore
 
 extension FilterModule: NESettingsApplying {
-    public func apply(_ ctx: PartoutContext, to settings: inout NEPacketTunnelNetworkSettings) {
+    public func apply(_ ctx: PartoutLoggerContext, to settings: inout NEPacketTunnelNetworkSettings) {
         disabledMask.forEach {
             switch $0 {
             case .ipv4:

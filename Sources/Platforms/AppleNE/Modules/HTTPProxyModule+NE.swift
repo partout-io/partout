@@ -28,7 +28,7 @@ import NetworkExtension
 import PartoutCore
 
 extension HTTPProxyModule: NESettingsApplying {
-    public func apply(_ ctx: PartoutContext, to settings: inout NEPacketTunnelNetworkSettings) {
+    public func apply(_ ctx: PartoutLoggerContext, to settings: inout NEPacketTunnelNetworkSettings) {
         let proxySettings = NEProxySettings()
 
         proxy.map {

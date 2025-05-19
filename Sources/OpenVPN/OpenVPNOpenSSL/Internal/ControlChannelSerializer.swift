@@ -39,9 +39,9 @@ protocol ControlChannelSerializer {
 
 extension ControlChannel {
     final class PlainSerializer: ControlChannelSerializer {
-        private let ctx: PartoutContext
+        private let ctx: PartoutLoggerContext
 
-        init(_ ctx: PartoutContext) {
+        init(_ ctx: PartoutLoggerContext) {
             self.ctx = ctx
         }
 
@@ -139,7 +139,7 @@ extension ControlChannel {
 
 extension ControlChannel {
     final class AuthSerializer: ControlChannelSerializer {
-        private let ctx: PartoutContext
+        private let ctx: PartoutLoggerContext
 
         private let encrypter: Encrypter
 
@@ -159,7 +159,7 @@ extension ControlChannel {
 
         private let plain: PlainSerializer
 
-        init(_ ctx: PartoutContext, with crypto: OpenVPNCryptoProtocol, key: OpenVPN.StaticKey, digest: OpenVPN.Digest) throws {
+        init(_ ctx: PartoutLoggerContext, with crypto: OpenVPNCryptoProtocol, key: OpenVPN.StaticKey, digest: OpenVPN.Digest) throws {
             self.ctx = ctx
             let cryptoOptions = OpenVPNCryptoOptions(
                 cipherAlgorithm: nil,
@@ -228,7 +228,7 @@ extension ControlChannel {
 
 extension ControlChannel {
     final class CryptSerializer: ControlChannelSerializer {
-        private let ctx: PartoutContext
+        private let ctx: PartoutLoggerContext
 
         private let encrypter: Encrypter
 
@@ -246,7 +246,7 @@ extension ControlChannel {
 
         private let plain: PlainSerializer
 
-        init(_ ctx: PartoutContext, with crypto: OpenVPNCryptoProtocol, key: OpenVPN.StaticKey) throws {
+        init(_ ctx: PartoutLoggerContext, with crypto: OpenVPNCryptoProtocol, key: OpenVPN.StaticKey) throws {
             self.ctx = ctx
             let cryptoOptions = OpenVPNCryptoOptions(
                 cipherAlgorithm: "AES-256-CTR",

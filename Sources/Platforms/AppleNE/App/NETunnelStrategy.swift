@@ -33,7 +33,7 @@ public actor NETunnelStrategy {
         case multiple
     }
 
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private let bundleIdentifier: String
 
@@ -51,9 +51,9 @@ public actor NETunnelStrategy {
 
     private var pendingSaveTask: Task<Void, Error>?
 
-    // FIXME: #218/passepartout, support .multiple option after implementing in PTP
+    // TODO: #218/passepartout, support .multiple option after implementing in PTP
     public init(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         bundleIdentifier: String,
         coder: NEProtocolCoder,
 //        options: Set<Option> = []

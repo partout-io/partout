@@ -29,9 +29,19 @@ import PartoutCore
 
 /// Implementation of a `TunnelController` via `NEPacketTunnelProvider`.
 public final class NETunnelController: TunnelController {
+    public struct Options: Sendable {
+        public var dnsFallbackServers: [String]
+
+        public init() {
+            dnsFallbackServers = []
+        }
+    }
+
     public private(set) weak var provider: NEPacketTunnelProvider?
 
     public let registry: Registry
+
+    private let options: Options
 
     public let profile: Profile
 
@@ -43,6 +53,7 @@ public final class NETunnelController: TunnelController {
         provider: NEPacketTunnelProvider,
         decoder: NEProtocolDecoder,
         registry: Registry,
+        options: Options,
         environmentFactory: @escaping (Profile.ID) -> TunnelEnvironment,
         willProcess: ((Profile) async throws -> Profile)? = nil
     ) async throws {
@@ -51,6 +62,7 @@ public final class NETunnelController: TunnelController {
         }
         self.provider = provider
         self.registry = registry
+        self.options = options
         originalProfile = try decoder.profile(from: tunnelConfiguration)
         let resolvedProfile = try registry.resolvedProfile(originalProfile)
         profile = try await willProcess?(resolvedProfile) ?? resolvedProfile
@@ -62,7 +74,7 @@ public final class NETunnelController: TunnelController {
             logReleasedProvider()
             return
         }
-        let tunnelSettings = profile.networkSettings(with: info)
+        let tunnelSettings = profile.networkSettings(with: info, options: options)
         pp_log_id(profile.id, .ne, .info, "Commit tunnel settings: \(tunnelSettings)")
         try await provider.setTunnelNetworkSettings(tunnelSettings)
     }

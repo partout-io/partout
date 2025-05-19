@@ -47,6 +47,16 @@ import Foundation
 @_exported import _PartoutPlatformWindows
 #endif
 
+extension Partout {
+#if canImport(_PartoutPlatformApple)
+    public static nonisolated let platform: PlatformFactory = ApplePlatformFactory()
+#elseif canImport(_PartoutPlatformWindows)
+    public static nonisolated let platform: PlatformFactory = WindowsPlatformFactory()
+#else
+    public static nonisolated let platform: PlatformFactory = UnsupportedPlatformFactory.shared
+#endif
+}
+
 // MARK: - Providers
 
 @_exported import PartoutProviders
