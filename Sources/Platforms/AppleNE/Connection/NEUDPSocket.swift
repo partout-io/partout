@@ -33,7 +33,7 @@ public final class NEUDPObserver: LinkObserver {
         public let maxDatagrams: Int
     }
 
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private nonisolated let nwSession: NWUDPSession
 
@@ -41,7 +41,7 @@ public final class NEUDPObserver: LinkObserver {
 
     private var observer: ValueObserver<NWUDPSession>?
 
-    public init(_ ctx: PartoutContext, nwSession: NWUDPSession, options: Options) {
+    public init(_ ctx: PartoutLoggerContext, nwSession: NWUDPSession, options: Options) {
         self.ctx = ctx
         self.nwSession = nwSession
         self.options = options

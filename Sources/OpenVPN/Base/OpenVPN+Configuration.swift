@@ -579,7 +579,7 @@ extension OpenVPN.Configuration {
 // MARK: - Debugging
 
 extension OpenVPN.Configuration {
-    public func print(_ ctx: PartoutContext, isLocal: Bool) {
+    public func print(_ ctx: PartoutLoggerContext, isLocal: Bool) {
         if isLocal, let remotes {
             pp_log(ctx, .openvpn, .notice, "\tRemotes: \(remotes.map { $0.asSensitiveAddress(ctx) })")
         }

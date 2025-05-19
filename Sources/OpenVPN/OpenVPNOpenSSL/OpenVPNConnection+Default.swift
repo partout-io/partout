@@ -30,7 +30,7 @@ import PartoutCore
 
 extension OpenVPNConnection {
     public init(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         parameters: ConnectionParameters,
         module: OpenVPNModule,
         prng: PRNGProtocol,

@@ -28,7 +28,7 @@ import NetworkExtension
 import PartoutCore
 
 extension OnDemandModule {
-    func neRules(_ ctx: PartoutContext) -> [NEOnDemandRule] {
+    func neRules(_ ctx: PartoutLoggerContext) -> [NEOnDemandRule] {
         var rules: [NEOnDemandRule] = []
 
         // apply exceptions (unless .any)

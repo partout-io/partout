@@ -28,7 +28,7 @@ import NetworkExtension
 import PartoutCore
 
 extension DNSModule: NESettingsApplying {
-    public func apply(_ ctx: PartoutContext, to settings: inout NEPacketTunnelNetworkSettings) {
+    public func apply(_ ctx: PartoutLoggerContext, to settings: inout NEPacketTunnelNetworkSettings) {
         var dnsSettings: NEDNSSettings?
         let rawServers = servers.map(\.rawValue)
 

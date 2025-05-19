@@ -27,23 +27,13 @@ import Foundation
 import PartoutCore
 
 public protocol PlatformFactory {
-    func newPRNG(_ ctx: PartoutContext) -> PRNGProtocol
+    func newPRNG(_ ctx: PartoutLoggerContext) -> PRNGProtocol
 
-    func newDNSResolver(_ ctx: PartoutContext) -> DNSResolver
+    func newDNSResolver(_ ctx: PartoutLoggerContext) -> DNSResolver
 
-    func newScriptingEngine(_ ctx: PartoutContext) -> ScriptingEngine
+    func newScriptingEngine(_ ctx: PartoutLoggerContext) -> ScriptingEngine
 
 #if canImport(PartoutAPI)
-    func newAPIScriptingEngine(_ ctx: PartoutContext) -> APIScriptingEngine
-#endif
-}
-
-extension PartoutContext {
-#if canImport(_PartoutPlatformApple)
-    public static nonisolated let platform: PlatformFactory = ApplePlatformFactory()
-#elseif canImport(_PartoutPlatformWindows)
-    public static nonisolated let platform: PlatformFactory = WindowsPlatformFactory()
-#else
-    public static nonisolated let platform: PlatformFactory = UnsupportedPlatformFactory.shared
+    func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine
 #endif
 }

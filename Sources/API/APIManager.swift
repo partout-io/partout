@@ -42,7 +42,7 @@ public final class APIManager {
         case provider(ProviderID)
     }
 
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private let apis: [APIMapper]
 
@@ -69,7 +69,7 @@ public final class APIManager {
         !pendingServices.isEmpty
     }
 
-    public init(_ ctx: PartoutContext, from apis: [APIMapper], repository: APIRepository) {
+    public init(_ ctx: PartoutLoggerContext, from apis: [APIMapper], repository: APIRepository) {
         self.ctx = ctx
         self.apis = apis
         self.repository = repository

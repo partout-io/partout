@@ -30,7 +30,7 @@ import PartoutCore
 /// Represents an OSLog logging destination.
 public struct OSLogDestination: LoggerDestination {
     private static var subsystem: String {
-        PartoutContext.identifier
+        PartoutLogger.identifier
     }
 
     public let category: LoggerCategory

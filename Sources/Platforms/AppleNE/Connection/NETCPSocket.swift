@@ -35,7 +35,7 @@ public final class NETCPObserver: LinkObserver {
         public let maxLength: Int
     }
 
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private nonisolated let nwConnection: NWTCPConnection
 
@@ -43,7 +43,7 @@ public final class NETCPObserver: LinkObserver {
 
     private var observer: ValueObserver<NWTCPConnection>?
 
-    public init(_ ctx: PartoutContext, nwConnection: NWTCPConnection, options: Options) {
+    public init(_ ctx: PartoutLoggerContext, nwConnection: NWTCPConnection, options: Options) {
         self.ctx = ctx
         self.nwConnection = nwConnection
         self.options = options

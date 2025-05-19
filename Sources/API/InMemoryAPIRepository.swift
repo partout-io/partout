@@ -28,13 +28,13 @@ import PartoutCore
 import PartoutProviders
 
 public final class InMemoryAPIRepository: APIRepositoryReader, APIRepositoryWriter {
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private let providersSubject: CurrentValueStream<[Provider]>
 
     private let infrastructuresSubject: CurrentValueStream<[ProviderID: ProviderInfrastructure]>
 
-    public init(_ ctx: PartoutContext) {
+    public init(_ ctx: PartoutLoggerContext) {
         self.ctx = ctx
         providersSubject = CurrentValueStream([])
         infrastructuresSubject = CurrentValueStream([:])

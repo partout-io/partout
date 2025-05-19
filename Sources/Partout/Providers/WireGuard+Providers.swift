@@ -30,13 +30,13 @@ import Foundation
 import PartoutCore
 
 public struct WireGuardProviderResolver: ProviderModuleResolver {
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     public var moduleType: ModuleType {
         .wireGuard
     }
 
-    public init(_ ctx: PartoutContext) {
+    public init(_ ctx: PartoutLoggerContext) {
         self.ctx = ctx
     }
 
@@ -65,7 +65,7 @@ extension WireGuardProviderTemplate: ProviderTemplateCompiler {
 
     // FIXME: #7, generate WireGuard configuration from template
     public static func compiled(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         with id: UUID,
         entity: ProviderEntity,
         options: Options?

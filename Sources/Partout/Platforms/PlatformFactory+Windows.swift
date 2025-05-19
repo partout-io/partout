@@ -33,15 +33,15 @@ public struct WindowsPlatformFactory: PlatformFactory {
     init() {
     }
 
-    public func newPRNG(_ ctx: PartoutContext) -> PRNGProtocol {
+    public func newPRNG(_ ctx: PartoutLoggerContext) -> PRNGProtocol {
         SimplePRNG()
     }
 
-    public func newDNSResolver(_ ctx: PartoutContext) -> DNSResolver {
+    public func newDNSResolver(_ ctx: PartoutLoggerContext) -> DNSResolver {
         UnsupportedPlatformFactory.shared.newDNSResolver()
     }
 
-    public func newScriptingEngine(_ ctx: PartoutContext) -> ScriptingEngine {
+    public func newScriptingEngine(_ ctx: PartoutLoggerContext) -> ScriptingEngine {
         UnsupportedPlatformFactory.shared.newScriptingEngine()
     }
 }
@@ -49,7 +49,7 @@ public struct WindowsPlatformFactory: PlatformFactory {
 #if canImport(PartoutAPI)
 
 extension WindowsPlatformFactory {
-    public func newAPIScriptingEngine(_ ctx: PartoutContext) -> APIScriptingEngine {
+    public func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine {
         UnsupportedPlatformFactory.shared.newAPIScriptingEngine()
     }
 }

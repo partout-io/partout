@@ -34,7 +34,7 @@ import PartoutCore
 
 extension API.V6 {
     public final class Mapper: APIMapper {
-        private let ctx: PartoutContext
+        private let ctx: PartoutLoggerContext
 
         private let baseURL: URL
 
@@ -45,7 +45,7 @@ extension API.V6 {
         private let executorFactory: (URL?, ProviderCache?, TimeInterval) -> APIEngine.ScriptExecutor
 
         public init(
-            _ ctx: PartoutContext,
+            _ ctx: PartoutLoggerContext,
             baseURL: URL,
             infrastructureURL: ((ProviderID) -> URL)? = nil,
             timeout: TimeInterval = 10.0,

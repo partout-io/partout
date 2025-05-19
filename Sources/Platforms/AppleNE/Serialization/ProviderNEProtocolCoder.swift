@@ -29,7 +29,7 @@ import PartoutCore
 
 /// ``NEProtocolCoder`` encoding to and from the `providerConfiguration`.
 public struct ProviderNEProtocolCoder: NEProtocolCoder {
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private let tunnelBundleIdentifier: String
 
@@ -37,7 +37,7 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
 
     private let coder: ProfileCoder
 
-    public init(_ ctx: PartoutContext, tunnelBundleIdentifier: String, registry: Registry, coder: ProfileCoder) {
+    public init(_ ctx: PartoutLoggerContext, tunnelBundleIdentifier: String, registry: Registry, coder: ProfileCoder) {
         self.ctx = ctx
         self.tunnelBundleIdentifier = tunnelBundleIdentifier
         self.registry = registry

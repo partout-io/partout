@@ -31,7 +31,7 @@ public actor OpenVPNConnection {
 
     // MARK: Initialization
 
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private let moduleId: UUID
 
@@ -50,7 +50,7 @@ public actor OpenVPNConnection {
     let session: OpenVPNSessionProtocol
 
     init(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         parameters: ConnectionParameters,
         module: OpenVPNModule,
         prng: PRNGProtocol,

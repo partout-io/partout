@@ -29,11 +29,11 @@ import PartoutCore
 
 /// Implementation of a `TunnelInterface` via `NEPacketTunnelFlow`.
 public final class NETunnelInterface: TunnelInterface {
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private weak var impl: NEPacketTunnelFlow?
 
-    public init(_ ctx: PartoutContext, impl: NEPacketTunnelFlow) {
+    public init(_ ctx: PartoutLoggerContext, impl: NEPacketTunnelFlow) {
         self.ctx = ctx
         self.impl = impl
     }

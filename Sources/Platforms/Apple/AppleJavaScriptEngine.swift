@@ -30,7 +30,7 @@ import PartoutCore
 public final class AppleJavaScriptEngine: ScriptingEngine {
     private let engine: JSContext
 
-    public init(_ ctx: PartoutContext) {
+    public init(_ ctx: PartoutLoggerContext) {
         engine = JSContext()
         engine.exceptionHandler = { _, exception in
             pp_log(ctx, .core, .error, "AppleJavaScriptEngine: \(exception?.toString() ?? "unknown error")")

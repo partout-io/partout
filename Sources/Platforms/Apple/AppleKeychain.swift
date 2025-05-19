@@ -39,7 +39,7 @@ import PartoutCore
 
 /// The Apple ``Keychain``.
 public final class AppleKeychain: Keychain {
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private let accessGroup: String?
 
@@ -49,7 +49,7 @@ public final class AppleKeychain: Keychain {
      - Parameter group: An optional App Group.
      - Precondition: Proper App Group entitlements (if group is non-nil).
      **/
-    public init(_ ctx: PartoutContext, group: String?) {
+    public init(_ ctx: PartoutLoggerContext, group: String?) {
         self.ctx = ctx
         accessGroup = group
     }

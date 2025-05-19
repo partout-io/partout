@@ -28,13 +28,13 @@ import Foundation
 import PartoutCore
 
 final class DataChannel {
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     let key: UInt8
 
     private let dataPath: DataPath
 
-    init(_ ctx: PartoutContext, key: UInt8, dataPath: DataPath) {
+    init(_ ctx: PartoutLoggerContext, key: UInt8, dataPath: DataPath) {
         self.ctx = ctx
         self.key = key
         self.dataPath = dataPath

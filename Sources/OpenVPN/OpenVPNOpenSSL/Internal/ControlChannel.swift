@@ -30,7 +30,7 @@ import PartoutCore
 
 @OpenVPNActor
 final class ControlChannel {
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private let prng: PRNGProtocol
 
@@ -56,12 +56,12 @@ final class ControlChannel {
 
     private var sentDates: [UInt32: Date]
 
-    convenience init(_ ctx: PartoutContext, prng: PRNGProtocol) {
+    convenience init(_ ctx: PartoutLoggerContext, prng: PRNGProtocol) {
         self.init(ctx, prng: prng, serializer: PlainSerializer(ctx))
     }
 
     convenience init(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         prng: PRNGProtocol,
         crypto: OpenVPNCryptoProtocol,
         authKey key: OpenVPN.StaticKey,
@@ -71,7 +71,7 @@ final class ControlChannel {
     }
 
     convenience init(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         prng: PRNGProtocol,
         crypto: OpenVPNCryptoProtocol,
         cryptKey key: OpenVPN.StaticKey
@@ -80,7 +80,7 @@ final class ControlChannel {
     }
 
     private init(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         prng: PRNGProtocol,
         serializer: ControlChannelSerializer
     ) {

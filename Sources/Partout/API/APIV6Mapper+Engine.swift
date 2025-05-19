@@ -34,7 +34,7 @@ import PartoutCore
 
 extension API.V6 {
     final class DefaultScriptExecutor {
-        private let ctx: PartoutContext
+        private let ctx: PartoutLoggerContext
 
         // override the URL for getText/getJSON
         private let resultURL: URL?
@@ -45,7 +45,7 @@ extension API.V6 {
 
         private let engine: APIScriptingEngine
 
-        init(_ ctx: PartoutContext, resultURL: URL?, cache: ProviderCache?, timeout: TimeInterval, engine: APIScriptingEngine) {
+        init(_ ctx: PartoutLoggerContext, resultURL: URL?, cache: ProviderCache?, timeout: TimeInterval, engine: APIScriptingEngine) {
             self.ctx = ctx
             self.resultURL = resultURL
             self.cache = cache

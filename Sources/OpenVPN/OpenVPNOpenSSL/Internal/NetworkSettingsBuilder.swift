@@ -31,7 +31,7 @@ import PartoutCore
 ///
 /// OpenVPN settings may be set locally, but may also received from a remote server. This object merges the local and remote ``OpenVPN/Configuration`` into a digestible list of `Module`.
 struct NetworkSettingsBuilder {
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     /// The client options.
     private let localOptions: OpenVPN.Configuration
@@ -39,7 +39,7 @@ struct NetworkSettingsBuilder {
     /// The server options.
     private let remoteOptions: OpenVPN.Configuration
 
-    init(_ ctx: PartoutContext, localOptions: OpenVPN.Configuration, remoteOptions: OpenVPN.Configuration) {
+    init(_ ctx: PartoutLoggerContext, localOptions: OpenVPN.Configuration, remoteOptions: OpenVPN.Configuration) {
         self.ctx = ctx
         self.localOptions = localOptions
         self.remoteOptions = remoteOptions

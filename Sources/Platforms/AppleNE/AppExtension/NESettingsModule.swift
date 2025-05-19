@@ -44,7 +44,7 @@ public struct NESettingsModule: Module, @unchecked Sendable {
 }
 
 extension NESettingsModule: NESettingsApplying {
-    public func apply(_ ctx: PartoutContext, to settings: inout NEPacketTunnelNetworkSettings) {
+    public func apply(_ ctx: PartoutLoggerContext, to settings: inout NEPacketTunnelNetworkSettings) {
         settings = fullSettings
     }
 }

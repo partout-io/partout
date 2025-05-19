@@ -27,7 +27,7 @@ import NetworkExtension
 import PartoutCore
 
 extension TransientModule: NESettingsApplying {
-    public func apply(_ ctx: PartoutContext, to settings: inout NEPacketTunnelNetworkSettings) {
+    public func apply(_ ctx: PartoutLoggerContext, to settings: inout NEPacketTunnelNetworkSettings) {
         guard let transientSettings = object as? NEPacketTunnelNetworkSettings else {
             pp_log(ctx, .ne, .error, "Transient settings are not NEPacketTunnelNetworkSettings, ignoring")
             return

@@ -46,7 +46,7 @@ final class Negotiator {
         let onError: (UInt8, Error) async -> Void
     }
 
-    private let ctx: PartoutContext
+    private let ctx: PartoutLoggerContext
 
     private let parser = StandardOpenVPNParser()
 
@@ -97,7 +97,7 @@ final class Negotiator {
     // MARK: Init
 
     convenience init(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         link: LinkInterface,
         channel: ControlChannel,
         prng: PRNGProtocol,
@@ -120,7 +120,7 @@ final class Negotiator {
     }
 
     private init(
-        _ ctx: PartoutContext,
+        _ ctx: PartoutLoggerContext,
         key: UInt8,
         history: NegotiationHistory?,
         renegotiation: RenegotiationType?,

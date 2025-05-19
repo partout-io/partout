@@ -27,7 +27,7 @@
 import Partout
 
 final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
-    private var ctx: PartoutContext?
+    private var ctx: PartoutLoggerContext?
 
     private var fwd: NEPTPForwarder?
 
