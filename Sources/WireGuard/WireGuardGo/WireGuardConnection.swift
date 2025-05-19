@@ -30,7 +30,7 @@
 
 import _PartoutWireGuard
 import Foundation
-import NetworkExtension // FIXME: #13, this depends on Apple unnecessarily
+import NetworkExtension // TODO: #13, this depends on Apple unnecessarily
 import PartoutCore
 import os
 internal import WireGuardKit
