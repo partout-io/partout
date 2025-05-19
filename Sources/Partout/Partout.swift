@@ -25,9 +25,6 @@
 
 import Foundation
 
-public enum Partout {
-}
-
 // MARK: Core
 
 @_exported import PartoutCore

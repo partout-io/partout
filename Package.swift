@@ -54,7 +54,7 @@ environment = .remoteBinary
 let areas: Set<Area> = Set(Area.allCases)
 
 // action-release-binary-package (PartoutCore)
-let sha1 = "7daf19f34442858c2ca0f1e33fc69901531fe093"
+let sha1 = "281e835abe87280ab1c2cc15a10f00ff4f6c95ae"
 let binaryFilename = "PartoutCore.xcframework.zip"
 let version = "0.99.117"
 let checksum = "2faf827393d08b21e99f24f7bf016a82a51372ae793e94b0bb668030224680ec"
