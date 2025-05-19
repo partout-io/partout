@@ -35,7 +35,6 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
         do {
             // NetworkExtension specifics
             let controller = try await NETunnelController(
-                .global,
                 provider: self,
                 decoder: .shared,
                 registry: .shared,
@@ -44,12 +43,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
                 }
             )
 
-            var ctxBuilder = PartoutContext.Builder()
-            ctxBuilder.setLogger(OSLogDestination(.core), for: [.core])
-            ctxBuilder.setLogger(OSLogDestination(.openvpn), for: [.openvpn])
-            ctxBuilder.setLogger(OSLogDestination(.wireguard), for: [.wireguard])
-            ctxBuilder.logsModules = true
-            ctxBuilder.setLocalLogger(
+            var loggerBuilder = PartoutLogger.Builder()
+            loggerBuilder.setDestination(OSLogDestination(.core), for: [.core])
+            loggerBuilder.setDestination(OSLogDestination(.openvpn), for: [.openvpn])
+            loggerBuilder.setDestination(OSLogDestination(.wireguard), for: [.wireguard])
+            loggerBuilder.logsModules = true
+            loggerBuilder.setLocalLogger(
                 url: Demo.Log.tunnelURL,
                 options: .init(
                     maxLevel: Demo.Log.maxLevel,
@@ -58,11 +57,13 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
                 ),
                 mapper: Demo.Log.formattedLine
             )
-            let ctx = ctxBuilder.build()
-            PartoutContext.register(ctx)
+            let logger = loggerBuilder.build()
+            PartoutLogger.register(logger)
 
+            let ctx = PartoutLoggerContext(controller.originalProfile.id)
             self.ctx = ctx
-            fwd = try await NEPTPForwarder(ctx, controller: controller)
+
+            fwd = NEPTPForwarder(ctx, controller: controller)
             try await fwd?.startTunnel(options: options)
         } catch {
             flushLog()
@@ -96,7 +97,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
 
 private extension PacketTunnelProvider {
     func flushLog() {
-        ctx?.flushLog()
+        PartoutLogger.default.flushLog()
         Task {
             try? await Task.sleep(milliseconds: Demo.Log.saveInterval)
             flushLog()
