@@ -57,8 +57,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
                 ),
                 mapper: Demo.Log.formattedLine
             )
-            let logger = loggerBuilder.build()
-            PartoutLogger.register(logger)
+            PartoutLogger.register(loggerBuilder.build())
 
             let ctx = PartoutLoggerContext(controller.originalProfile.id)
             self.ctx = ctx
