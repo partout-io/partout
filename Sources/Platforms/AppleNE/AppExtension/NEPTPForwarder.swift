@@ -49,9 +49,8 @@ public actor NEPTPForwarder {
         factoryOptions: NEInterfaceFactory.Options = .init(),
         connectionOptions: ConnectionParameters.Options = .init(),
         stopDelay: Int = 2000,
-        reconnectionDelay: Int = 2000,
-        willStart: (@Sendable (Profile) async throws -> Void)? = nil
-    ) async throws {
+        reconnectionDelay: Int = 2000
+    ) {
         let environment = controller.environment
         let factory = NEInterfaceFactory(ctx, provider: controller.provider, options: factoryOptions)
         let reachability = NEObservablePath(ctx)
@@ -70,8 +69,7 @@ public actor NEPTPForwarder {
             reachability: reachability,
             messageHandler: messageHandler,
             stopDelay: stopDelay,
-            reconnectionDelay: reconnectionDelay,
-            willStart: willStart
+            reconnectionDelay: reconnectionDelay
         )
 
         self.ctx = ctx
