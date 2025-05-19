@@ -51,7 +51,7 @@ public struct ApplePlatformFactory: PlatformFactory {
 #if canImport(PartoutAPI)
 
 extension ApplePlatformFactory {
-    public func newAPIScriptingEngine(_ ctx: PartoutLoggerContext,) -> APIScriptingEngine {
+    public func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine {
         AppleJavaScriptEngine(ctx)
     }
 }
