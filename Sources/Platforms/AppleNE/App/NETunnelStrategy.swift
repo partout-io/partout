@@ -51,7 +51,7 @@ public actor NETunnelStrategy {
 
     private var pendingSaveTask: Task<Void, Error>?
 
-    // FIXME: #218/passepartout, support .multiple option after implementing in PTP
+    // TODO: #218/passepartout, support .multiple option after implementing in PTP
     public init(
         _ ctx: PartoutLoggerContext,
         bundleIdentifier: String,
