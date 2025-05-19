@@ -30,7 +30,7 @@ import PartoutCore
 extension Profile {
     func networkSettings(
         with info: TunnelRemoteInfo?,
-        preferences: NETunnelController.Preferences? = nil
+        options: NETunnelController.Options? = nil
     ) -> NEPacketTunnelNetworkSettings {
         let ctx = PartoutLoggerContext(id)
         let tunnelRemoteAddress = info?.address?.rawValue ?? "127.0.0.1"
@@ -102,7 +102,7 @@ extension Profile {
         if isGateway, neSettings.dnsSettings == nil {
             pp_log(ctx, .ne, .info, "\tVPN is default gateway but has no DNS settings")
 
-            if let dnsFallbackServers = preferences?.dnsFallbackServers,
+            if let dnsFallbackServers = options?.dnsFallbackServers,
                !dnsFallbackServers.isEmpty {
                 pp_log(ctx, .ne, .info, "\tEnable DNS fallback: \(dnsFallbackServers)")
                 neSettings.dnsSettings = NEDNSSettings(servers: dnsFallbackServers)
