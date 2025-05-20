@@ -98,13 +98,14 @@ extension NETunnelStrategy: TunnelObservableStrategy {
     public func install(
         _ profile: Profile,
         connect: Bool,
-        options: TunnelStrategyConnectionOptions?,
+        options: Sendable?,
         title: @escaping (Profile) -> String
     ) async throws {
         if connect, !self.options.contains(.multiple) {
             await disconnectCurrentManagers()
         }
-        try await save(profile, forConnecting: connect, options: options?.values, title: title)
+        let nsOptions = options as? [String: NSObject]
+        try await save(profile, forConnecting: connect, options: nsOptions, title: title)
     }
 
     public func uninstall(profileId: Profile.ID) async throws {
