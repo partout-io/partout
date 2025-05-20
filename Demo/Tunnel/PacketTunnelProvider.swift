@@ -38,6 +38,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
                 provider: self,
                 decoder: .shared,
                 registry: .shared,
+                options: .init(),
                 environmentFactory: { _ in
                     Demo.tunnelEnvironment
                 }
