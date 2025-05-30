@@ -78,9 +78,6 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
 
     public func purge(managers: [NETunnelProviderManager]) async {
 
-        // FIXME: #11, restore purge after confirming safe migration
-        return
-
         // remove those managers (plus their keychain entry) we cannot decode a profile from
         var managersToRemove: [NETunnelProviderManager] = []
         var keychainToRetain: [Data] = []
