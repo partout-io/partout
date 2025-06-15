@@ -36,7 +36,7 @@
 
 #import <Foundation/Foundation.h>
 
-#import "Crypto.h"
+#import "CryptoMacros.h"
 #import "DataPathCrypto.h"
 
 NS_ASSUME_NONNULL_BEGIN

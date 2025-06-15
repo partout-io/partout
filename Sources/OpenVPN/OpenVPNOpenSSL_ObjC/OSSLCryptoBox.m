@@ -98,7 +98,11 @@ static const NSInteger CryptoCTRPayloadLength = PacketOpcodeLength + PacketSessi
                 return NO;
             }
             CryptoCBC *cbc = [[CryptoCBC alloc] initWithCipherName:options.cipherAlgorithm
-                                                        digestName:options.digestAlgorithm];
+                                                        digestName:options.digestAlgorithm
+                                                             error:nil];
+            if (!cbc) {
+                return NO;
+            }
 
             cbc.mappedError = ^NSError *(CryptoCBCError errorCode) {
                 switch (errorCode) {
@@ -119,7 +123,11 @@ static const NSInteger CryptoCTRPayloadLength = PacketOpcodeLength + PacketSessi
         else if ([options.cipherAlgorithm hasSuffix:@"-gcm"]) {
             CryptoAEAD *gcm = [[CryptoAEAD alloc] initWithCipherName:options.cipherAlgorithm
                                                            tagLength:CryptoAEADTagLength
-                                                            idLength:CryptoAEADIdLength];
+                                                            idLength:CryptoAEADIdLength
+                                                               error:nil];
+            if (!gcm) {
+                return NO;
+            }
 
             gcm.mappedError = ^NSError *(CryptoAEADError errorCode) {
                 switch (errorCode) {
@@ -135,7 +143,11 @@ static const NSInteger CryptoCTRPayloadLength = PacketOpcodeLength + PacketSessi
             CryptoCTR *ctr = [[CryptoCTR alloc] initWithCipherName:options.cipherAlgorithm
                                                         digestName:options.digestAlgorithm
                                                          tagLength:CryptoCTRTagLength
-                                                     payloadLength:CryptoCTRPayloadLength];
+                                                     payloadLength:CryptoCTRPayloadLength
+                                                             error:nil];
+            if (!ctr) {
+                return NO;
+            }
 
             ctr.mappedError = ^NSError *(CryptoCTRError errorCode) {
                 switch (errorCode) {
@@ -159,7 +171,12 @@ static const NSInteger CryptoCTRPayloadLength = PacketOpcodeLength + PacketSessi
         }
     }
     else {
-        CryptoCBC *cbc = [[CryptoCBC alloc] initWithCipherName:nil digestName:options.digestAlgorithm];
+        CryptoCBC *cbc = [[CryptoCBC alloc] initWithCipherName:nil
+                                                    digestName:options.digestAlgorithm
+                                                         error:nil];
+        if (!cbc) {
+            return NO;
+        }
         self.encrypter = cbc;
         self.decrypter = cbc;
     }

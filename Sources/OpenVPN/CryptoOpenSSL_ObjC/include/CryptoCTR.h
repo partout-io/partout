@@ -24,7 +24,7 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "Crypto.h"
+#import "CryptoMacros.h"
 #import "CryptoProtocols.h"
 
 NS_ASSUME_NONNULL_BEGIN
@@ -36,10 +36,11 @@ typedef NS_ENUM(NSInteger, CryptoCTRError) {
 
 @interface CryptoCTR : NSObject <Encrypter, Decrypter>
 
-- (instancetype)initWithCipherName:(nullable NSString *)cipherName
-                        digestName:(NSString *)digestName
-                         tagLength:(NSInteger)tagLength
-                     payloadLength:(NSInteger)payloadLength;
+- (nullable instancetype)initWithCipherName:(NSString *)cipherName
+                                 digestName:(NSString *)digestName
+                                  tagLength:(NSInteger)tagLength
+                              payloadLength:(NSInteger)payloadLength
+                                      error:(NSError **)error;
 
 @property (nonatomic, copy) NSError * (^mappedError)(CryptoCTRError);
 

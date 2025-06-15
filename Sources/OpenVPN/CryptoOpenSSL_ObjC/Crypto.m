@@ -23,6 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#import "Crypto.h"
+#import <Foundation/Foundation.h>
 
 NSString *const PartoutCryptoErrorDomain = @"PartoutCrypto";

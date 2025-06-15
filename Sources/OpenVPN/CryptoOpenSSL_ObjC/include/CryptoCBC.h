@@ -35,7 +35,7 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "Crypto.h"
+#import "CryptoMacros.h"
 #import "CryptoProtocols.h"
 
 NS_ASSUME_NONNULL_BEGIN
@@ -48,7 +48,9 @@ typedef NS_ENUM(NSInteger, CryptoCBCError) {
 
 @interface CryptoCBC : NSObject <Encrypter, Decrypter>
 
-- (instancetype)initWithCipherName:(nullable NSString *)cipherName digestName:(NSString *)digestName;
+- (nullable instancetype)initWithCipherName:(nullable NSString *)cipherName
+                                 digestName:(NSString *)digestName
+                                      error:(NSError **)error;
 - (int)cipherIVLength;
 
 @property (nonatomic, copy) NSError * (^mappedError)(CryptoCBCError);

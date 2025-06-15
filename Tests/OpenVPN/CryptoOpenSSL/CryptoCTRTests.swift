@@ -1,5 +1,5 @@
 //
-//  CryptoAEADTests.swift
+//  CryptoCTRTests.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 12/12/23.
@@ -24,18 +24,25 @@
 //
 
 @testable import _PartoutCryptoOpenSSL
+#if canImport(_PartoutCryptoOpenSSL_ObjC)
 internal import _PartoutCryptoOpenSSL_ObjC
+#endif
 import XCTest
 
-final class CryptoAEADTests: XCTestCase {
-    func test_givenData_whenEncrypt_thenDecrypts() {
-        let sut = CryptoAEAD(cipherName: "aes-256-gcm", tagLength: 16, idLength: 4)
-        var flags = newFlags()
+final class CryptoCTRTests: XCTestCase, CryptoFlagsProviding {
+    func test_givenData_whenEncrypt_thenDecrypts() throws {
+        let sut = try CryptoCTR(
+            cipherName: "aes-128-ctr",
+            digestName: "sha256",
+            tagLength: 32,
+            payloadLength: 128
+        )
 
         sut.configureEncryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         let encryptedData: Data
 
+        var flags = newCryptoFlags()
         do {
             encryptedData = try sut.encryptData(plainData, flags: &flags)
         } catch {
@@ -51,7 +58,7 @@ final class CryptoAEADTests: XCTestCase {
     }
 }
 
-private extension CryptoAEADTests {
+extension CryptoCTRTests {
     var cipherKey: ZeroingData {
         ZeroingData(length: 32)
     }
@@ -70,19 +77,5 @@ private extension CryptoAEADTests {
 
     var ad: [UInt8] {
         [0x00, 0x12, 0x34, 0x56]
-    }
-
-    func newFlags() -> CryptoFlags {
-        packetId.withUnsafeBufferPointer { iv in
-            ad.withUnsafeBufferPointer { ad in
-                CryptoFlags(
-                    iv: iv.baseAddress,
-                    ivLength: iv.count,
-                    ad: ad.baseAddress,
-                    adLength: ad.count,
-                    forTesting: true
-                )
-            }
-        }
     }
 }

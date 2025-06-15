@@ -24,16 +24,18 @@
 //
 
 @testable import _PartoutCryptoOpenSSL
+#if canImport(_PartoutCryptoOpenSSL_ObjC)
 internal import _PartoutCryptoOpenSSL_ObjC
+#endif
 import XCTest
 
-final class CryptoCBCTests: XCTestCase {
-    func test_givenDecrypted_whenEncryptWithoutCipher_thenEncodesWithHMAC() {
-        let sut = CryptoCBC(cipherName: nil, digestName: "sha256")
+final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
+    func test_givenDecrypted_whenEncryptWithoutCipher_thenEncodesWithHMAC() throws {
+        let sut = try CryptoCBC(cipherName: nil, digestName: "sha256")
         sut.configureEncryption(withCipherKey: nil, hmacKey: hmacKey)
 
         do {
-            var flags = newFlags()
+            var flags = newCryptoFlags()
             let returnedData = try sut.encryptData(plainData, flags: &flags)
             XCTAssertEqual(returnedData, plainHMACData)
         } catch {
@@ -41,12 +43,12 @@ final class CryptoCBCTests: XCTestCase {
         }
     }
 
-    func test_givenDecrypted_whenEncryptWithCipher_thenEncryptsWithHMAC() {
-        let sut = CryptoCBC(cipherName: "aes-128-cbc", digestName: "sha256")
+    func test_givenDecrypted_whenEncryptWithCipher_thenEncryptsWithHMAC() throws {
+        let sut = try CryptoCBC(cipherName: "aes-128-cbc", digestName: "sha256")
         sut.configureEncryption(withCipherKey: cipherKey, hmacKey: hmacKey)
 
         do {
-            var flags = newFlags()
+            var flags = newCryptoFlags()
             let returnedData = try sut.encryptData(plainData, flags: &flags)
             XCTAssertEqual(returnedData, encryptedHMACData)
         } catch {
@@ -54,12 +56,12 @@ final class CryptoCBCTests: XCTestCase {
         }
     }
 
-    func test_givenEncodedWithHMAC_thenDecodes() {
-        let sut = CryptoCBC(cipherName: nil, digestName: "sha256")
+    func test_givenEncodedWithHMAC_thenDecodes() throws {
+        let sut = try CryptoCBC(cipherName: nil, digestName: "sha256")
         sut.configureDecryption(withCipherKey: nil, hmacKey: hmacKey)
 
         do {
-            var flags = newFlags()
+            var flags = newCryptoFlags()
             let returnedData = try sut.decryptData(plainHMACData, flags: &flags)
             XCTAssertEqual(returnedData, plainData)
         } catch {
@@ -67,12 +69,12 @@ final class CryptoCBCTests: XCTestCase {
         }
     }
 
-    func test_givenEncryptedWithHMAC_thenDecrypts() {
-        let sut = CryptoCBC(cipherName: "aes-128-cbc", digestName: "sha256")
+    func test_givenEncryptedWithHMAC_thenDecrypts() throws {
+        let sut = try CryptoCBC(cipherName: "aes-128-cbc", digestName: "sha256")
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
 
         do {
-            var flags = newFlags()
+            var flags = newCryptoFlags()
             let returnedData = try sut.decryptData(encryptedHMACData, flags: &flags)
             XCTAssertEqual(returnedData, plainData)
         } catch {
@@ -80,17 +82,17 @@ final class CryptoCBCTests: XCTestCase {
         }
     }
 
-    func test_givenHMAC_thenVerifies() {
-        let sut = CryptoCBC(cipherName: nil, digestName: "sha256")
+    func test_givenHMAC_thenVerifies() throws {
+        let sut = try CryptoCBC(cipherName: nil, digestName: "sha256")
         sut.configureDecryption(withCipherKey: nil, hmacKey: hmacKey)
 
-        var flags = newFlags()
+        var flags = newCryptoFlags()
         XCTAssertNoThrow(try sut.verifyData(plainHMACData, flags: &flags))
         XCTAssertNoThrow(try sut.verifyData(encryptedHMACData, flags: &flags))
     }
 }
 
-private extension CryptoCBCTests {
+extension CryptoCBCTests {
     var cipherKey: ZeroingData {
         ZeroingData(length: 32)
     }
@@ -117,19 +119,5 @@ private extension CryptoCBCTests {
 
     var ad: [UInt8] {
         [0x00, 0x12, 0x34, 0x56]
-    }
-
-    func newFlags() -> CryptoFlags {
-        packetId.withUnsafeBufferPointer { iv in
-            ad.withUnsafeBufferPointer { ad in
-                CryptoFlags(
-                    iv: iv.baseAddress,
-                    ivLength: iv.count,
-                    ad: ad.baseAddress,
-                    adLength: ad.count,
-                    forTesting: true
-                )
-            }
-        }
     }
 }

@@ -23,7 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import _PartoutCryptoOpenSSL
 import Foundation
+import XCTest
 
 extension Data {
     init(hex: String) {
@@ -42,3 +44,34 @@ extension Data {
         self.init(data)
     }
 }
+
+protocol CryptoFlagsProviding {
+    var packetId: [UInt8] { get }
+
+    var ad: [UInt8] { get }
+}
+
+#if canImport(_PartoutCryptoOpenSSL_ObjC)
+internal import _PartoutCryptoOpenSSL_ObjC
+
+extension CryptoFlagsProviding {
+    func newCryptoFlags() -> CryptoFlags {
+        packetId.withUnsafeBufferPointer { iv in
+            ad.withUnsafeBufferPointer { ad in
+                CryptoFlags(
+                    iv: iv.baseAddress,
+                    ivLength: iv.count,
+                    ad: ad.baseAddress,
+                    adLength: ad.count,
+                    forTesting: true
+                )
+            }
+        }
+    }
+}
+#elseif canImport(_PartoutCryptoOpenSSL_C)
+internal import _PartoutCryptoOpenSSL_C
+
+// FIXME: ###
+
+#endif

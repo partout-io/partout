@@ -35,7 +35,7 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "Crypto.h"
+#import "CryptoMacros.h"
 #import "CryptoProtocols.h"
 
 NS_ASSUME_NONNULL_BEGIN
@@ -46,9 +46,10 @@ typedef NS_ENUM(NSInteger, CryptoAEADError) {
 
 @interface CryptoAEAD : NSObject <Encrypter, Decrypter>
 
-- (instancetype)initWithCipherName:(NSString *)cipherName
-                         tagLength:(NSInteger)tagLength
-                          idLength:(NSInteger)idLength;
+- (nullable instancetype)initWithCipherName:(NSString *)cipherName
+                                  tagLength:(NSInteger)tagLength
+                                   idLength:(NSInteger)idLength
+                                      error:(NSError **)error;
 
 @property (nonatomic, copy) NSError * (^mappedError)(CryptoAEADError);
 

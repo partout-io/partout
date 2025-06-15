@@ -38,8 +38,8 @@
 #import <openssl/rand.h>
 
 #import "Allocation.h"
-#import "Crypto.h"
 #import "CryptoCBC.h"
+#import "CryptoMacros.h"
 #import "ZeroingData.h"
 
 const NSInteger CryptoCBCMaxHMACLength = 100;
@@ -67,8 +67,11 @@ const NSInteger CryptoCBCMaxHMACLength = 100;
 
 @implementation CryptoCBC
 
-- (instancetype)initWithCipherName:(NSString *)cipherName digestName:(NSString *)digestName
+- (nullable instancetype)initWithCipherName:(nullable NSString *)cipherName
+                                 digestName:(NSString *)digestName
+                                      error:(NSError **)error
 {
+    NSLog(@"PartoutOpenVPN: Using CryptoCBC (legacy ObjC)");
     NSParameterAssert(!cipherName || [[cipherName uppercaseString] hasSuffix:@"CBC"]);
     NSParameterAssert(digestName);
 
@@ -79,11 +82,17 @@ const NSInteger CryptoCBCMaxHMACLength = 100;
             strncpy(self.utfCipherName, [cipherName UTF8String], [cipherName length]);
             self.cipher = EVP_get_cipherbyname(self.utfCipherName);
             NSAssert(self.cipher, @"Unknown cipher '%@'", cipherName);
+            if (!self.cipher) {
+                return nil;
+            }
         }
         self.utfDigestName = calloc([digestName length] + 1, sizeof(char));
         strncpy(self.utfDigestName, [digestName UTF8String], [digestName length]);
         self.digest = EVP_get_digestbyname(self.utfDigestName);
         NSAssert(self.digest, @"Unknown digest '%@'", digestName);
+        if (!self.digest) {
+            return nil;
+        }
 
         if (cipherName) {
             self.cipherKeyLength = EVP_CIPHER_key_length(self.cipher);

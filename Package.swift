@@ -301,6 +301,16 @@ if areas.contains(.api) {
 // MARK: OpenVPN
 
 if areas.contains(.openvpn) {
+    enum Crypto {
+        case legacy
+
+        case bridged
+
+        case native
+    }
+
+    let usedCrypto: Crypto = .legacy
+
     package.dependencies.append(contentsOf: [
         .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
     ])
@@ -308,6 +318,14 @@ if areas.contains(.openvpn) {
         .library(
             name: "PartoutOpenVPN",
             targets: ["PartoutOpenVPN"]
+        ),
+        .library(
+            name: "_PartoutCryptoOpenSSL",
+            targets: ["_PartoutCryptoOpenSSL"]
+        ),
+        .library(
+            name: "_PartoutOpenVPNOpenSSL",
+            targets: ["_PartoutOpenVPNOpenSSL"]
         )
     ])
     package.targets.append(contentsOf: [
@@ -318,13 +336,47 @@ if areas.contains(.openvpn) {
         ),
         .target(
             name: "_PartoutCryptoOpenSSL",
-            dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-            path: "Sources/OpenVPN/CryptoOpenSSL"
+            dependencies: {
+                switch usedCrypto {
+                case .legacy, .bridged:
+                    ["_PartoutCryptoOpenSSL_ObjC"]
+                case .native:
+                    ["_PartoutCryptoOpenSSL_C"]
+                }
+            }(),
+            path: "Sources/OpenVPN/CryptoOpenSSL",
+            exclude: {
+                switch usedCrypto {
+                case .legacy, .bridged:
+                    ["Swift"]
+                case .native:
+                    ["ObjC"]
+                }
+            }()
+        ),
+        .target(
+            name: "_PartoutCryptoOpenSSL_C",
+            dependencies: ["openssl-apple"],
+            path: "Sources/OpenVPN/CryptoOpenSSL_C"
         ),
         .target(
             name: "_PartoutCryptoOpenSSL_ObjC",
-            dependencies: ["openssl-apple"],
-            path: "Sources/OpenVPN/CryptoOpenSSL_ObjC"
+            dependencies: {
+                var deps: [Target.Dependency] = ["openssl-apple"]
+                if usedCrypto == .bridged {
+                    deps.append("_PartoutCryptoOpenSSL_C")
+                }
+                return deps
+            }(),
+            path: "Sources/OpenVPN/CryptoOpenSSL_ObjC",
+            exclude: {
+                switch usedCrypto {
+                case .legacy:
+                    ["bridged"]
+                case .bridged, .native:
+                    ["legacy"]
+                }
+            }()
         ),
         .target(
             name: "_PartoutOpenVPN",
@@ -342,7 +394,7 @@ if areas.contains(.openvpn) {
         ),
         .target(
             name: "_PartoutOpenVPNOpenSSL_ObjC",
-            dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
+            dependencies: ["_PartoutCryptoOpenSSL"],
             path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
             exclude: [
                 "lib/COPYING",
@@ -352,9 +404,9 @@ if areas.contains(.openvpn) {
             ]
         ),
         .testTarget(
-            name: "_PartoutCryptoOpenSSL_ObjCTests",
+            name: "_PartoutCryptoOpenSSLTests",
             dependencies: ["_PartoutCryptoOpenSSL"],
-            path: "Tests/OpenVPN/CryptoOpenSSL_ObjC"
+            path: "Tests/OpenVPN/CryptoOpenSSL"
         ),
         .testTarget(
             name: "_PartoutOpenVPNTests",

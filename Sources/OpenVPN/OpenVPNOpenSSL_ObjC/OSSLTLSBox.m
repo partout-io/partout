@@ -522,7 +522,7 @@ static BIO *create_BIO_from_PEM(NSString *pem) {
     }
 
     const int decLength = (int)BIO_ctrl_pending(output);
-    char *decKeyBytes = malloc(decLength + 1);
+    char *decKeyBytes = pp_alloc_crypto(decLength + 1);
     if (BIO_read(output, decKeyBytes, decLength) < 0) {
         BIO_free(output);
         return NULL;
