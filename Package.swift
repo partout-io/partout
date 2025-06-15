@@ -301,7 +301,7 @@ if areas.contains(.api) {
 // MARK: OpenVPN
 
 if areas.contains(.openvpn) {
-    enum Crypto {
+    enum CryptoMode {
         case legacy
 
         case bridged
@@ -309,7 +309,7 @@ if areas.contains(.openvpn) {
         case native
     }
 
-    let usedCrypto: Crypto = .legacy
+    let cryptoMode: CryptoMode = .legacy
 
     package.dependencies.append(contentsOf: [
         .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
@@ -337,7 +337,7 @@ if areas.contains(.openvpn) {
         .target(
             name: "_PartoutCryptoOpenSSL",
             dependencies: {
-                switch usedCrypto {
+                switch cryptoMode {
                 case .legacy, .bridged:
                     ["_PartoutCryptoOpenSSL_ObjC"]
                 case .native:
@@ -346,7 +346,7 @@ if areas.contains(.openvpn) {
             }(),
             path: "Sources/OpenVPN/CryptoOpenSSL",
             exclude: {
-                switch usedCrypto {
+                switch cryptoMode {
                 case .legacy, .bridged:
                     ["Swift"]
                 case .native:
@@ -363,14 +363,14 @@ if areas.contains(.openvpn) {
             name: "_PartoutCryptoOpenSSL_ObjC",
             dependencies: {
                 var deps: [Target.Dependency] = ["openssl-apple"]
-                if usedCrypto == .bridged {
+                if cryptoMode == .bridged {
                     deps.append("_PartoutCryptoOpenSSL_C")
                 }
                 return deps
             }(),
             path: "Sources/OpenVPN/CryptoOpenSSL_ObjC",
             exclude: {
-                switch usedCrypto {
+                switch cryptoMode {
                 case .legacy:
                     ["bridged"]
                 case .bridged, .native:
