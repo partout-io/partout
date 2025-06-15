@@ -72,6 +72,19 @@ extension CryptoFlagsProviding {
 #elseif canImport(_PartoutCryptoOpenSSL_C)
 internal import _PartoutCryptoOpenSSL_C
 
-// FIXME: ###
-
+extension CryptoFlagsProviding {
+    func newCryptoFlags() -> crypto_flags_t {
+        packetId.withUnsafeBufferPointer { iv in
+            ad.withUnsafeBufferPointer { ad in
+                var flags = crypto_flags_t()
+                flags.iv = iv.baseAddress
+                flags.iv_len = iv.count
+                flags.ad = ad.baseAddress
+                flags.ad_len = ad.count
+                flags.for_testing = 1
+                return flags
+            }
+        }
+    }
+}
 #endif
