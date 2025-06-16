@@ -45,29 +45,29 @@ public final class CryptoCBC: Encrypter, Decrypter {
     }
 
     public var digestLength: Int {
-        ptr.pointee.meta.digest_length
+        ptr.pointee.crypto.meta.digest_length
     }
 
     public var tagLength: Int {
-        ptr.pointee.meta.tag_length
+        ptr.pointee.crypto.meta.tag_length
     }
 
     public func encryptionCapacity(for length: Int) -> Int {
-        ptr.pointee.meta.encryption_capacity(ptr, length)
+        ptr.pointee.crypto.meta.encryption_capacity(ptr, length)
     }
 
     public func configureEncryption(withCipherKey cipherKey: ZeroingData?, hmacKey: ZeroingData?) {
         guard let hmacKey else {
             fatalError("HMAC key required")
         }
-        ptr.pointee.encrypter.configure(ptr, cipherKey?.ptr, hmacKey.ptr)
+        ptr.pointee.crypto.encrypter.configure(ptr, cipherKey?.ptr, hmacKey.ptr)
     }
 
     public func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
         var code = CryptoErrorGeneric
         var cFlags = crypto_flags_t()
         let flagsPtr = flags.pointer(to: &cFlags)
-        guard ptr.pointee.encrypter.encrypt(ptr, bytes, length, dest, destLength, flagsPtr, &code) else {
+        guard ptr.pointee.crypto.encrypter.encrypt(ptr, bytes, length, dest, destLength, flagsPtr, &code) else {
             throw mappedError(CryptoError(code))
         }
         return true
@@ -77,14 +77,14 @@ public final class CryptoCBC: Encrypter, Decrypter {
         guard let hmacKey else {
             fatalError("HMAC key required")
         }
-        ptr.pointee.decrypter.configure(ptr, cipherKey?.ptr, hmacKey.ptr)
+        ptr.pointee.crypto.decrypter.configure(ptr, cipherKey?.ptr, hmacKey.ptr)
     }
 
     public func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
         var code = CryptoErrorGeneric
         var cFlags = crypto_flags_t()
         let flagsPtr = flags.pointer(to: &cFlags)
-        guard ptr.pointee.decrypter.decrypt(ptr, bytes, length, dest, destLength, flagsPtr, &code) else {
+        guard ptr.pointee.crypto.decrypter.decrypt(ptr, bytes, length, dest, destLength, flagsPtr, &code) else {
             throw mappedError(CryptoError(code))
         }
         return true
@@ -92,7 +92,7 @@ public final class CryptoCBC: Encrypter, Decrypter {
 
     public func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int, flags: CryptoFlagsWrapper? = nil) throws -> Bool {
         var code = CryptoErrorGeneric
-        guard ptr.pointee.decrypter.verify(ptr, bytes, length, &code) else {
+        guard ptr.pointee.crypto.decrypter.verify(ptr, bytes, length, &code) else {
             throw mappedError(CryptoError(code))
         }
         return true
