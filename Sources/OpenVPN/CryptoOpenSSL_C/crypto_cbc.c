@@ -32,13 +32,15 @@
 
 #define MAX_HMAC_LENGTH 100
 
-static size_t crypto_encryption_capacity(const void *vctx, size_t input_len) {
+static
+size_t crypto_encryption_capacity(const void *vctx, size_t input_len) {
     const crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
     return pp_alloc_crypto_capacity(input_len, ctx->digest_len + ctx->cipher_iv_len);
 }
 
-static void crypto_configure_encrypt(void *vctx, const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
+static
+void crypto_configure_encrypt(void *vctx, const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
     assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
@@ -55,8 +57,9 @@ static void crypto_configure_encrypt(void *vctx, const zeroing_data_t *cipher_ke
     ctx->hmac_key_enc = zd_create_copy(hmac_key->bytes, ctx->hmac_key_len);
 }
 
-static bool crypto_encrypt(void *vctx, const uint8_t *in, size_t in_len,
-                           uint8_t *dest, size_t *dest_len, const crypto_flags_t *flags, crypto_error_t *error) {
+static
+bool crypto_encrypt(void *vctx, const uint8_t *in, size_t in_len,
+                    uint8_t *dest, size_t *dest_len, const crypto_flags_t *flags, crypto_error_t *error) {
     crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
 
@@ -93,7 +96,8 @@ static bool crypto_encrypt(void *vctx, const uint8_t *in, size_t in_len,
     CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorGeneric)
 }
 
-static void crypto_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
+static
+void crypto_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
     assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
@@ -110,9 +114,10 @@ static void crypto_configure_decrypt(void *vctx, const zeroing_data_t *cipher_ke
     ctx->hmac_key_dec = zd_create_copy(hmac_key->bytes, ctx->hmac_key_len);
 }
 
-static bool crypto_decrypt(void *vctx, const uint8_t *in, size_t in_len,
-                           uint8_t *out, size_t *out_len,
-                           const crypto_flags_t *flags, crypto_error_t *error) {
+static
+bool crypto_decrypt(void *vctx, const uint8_t *in, size_t in_len,
+                    uint8_t *out, size_t *out_len,
+                    const crypto_flags_t *flags, crypto_error_t *error) {
     crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
 
@@ -147,7 +152,8 @@ static bool crypto_decrypt(void *vctx, const uint8_t *in, size_t in_len,
     return true;
 }
 
-static bool crypto_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_t *error) {
+static
+bool crypto_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_t *error) {
     crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
 

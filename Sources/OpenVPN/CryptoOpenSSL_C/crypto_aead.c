@@ -35,8 +35,9 @@ size_t crypto_encryption_capacity(const void *vctx, size_t len) {
     return pp_alloc_crypto_capacity(len, ctx->tag_len);
 }
 
-static void crypto_configure_encrypt(void *vctx,
-                                     const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
+static
+void crypto_configure_encrypt(void *vctx,
+                              const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_aead_t *ctx = (crypto_aead_t *)vctx;
     assert(ctx);
     assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
@@ -49,9 +50,10 @@ static void crypto_configure_encrypt(void *vctx,
     memcpy(ctx->iv_enc + ctx->id_len, hmac_key->bytes, ctx->cipher_iv_len - ctx->id_len);
 }
 
-static bool crypto_encrypt(void *vctx, const uint8_t *in, size_t in_len,
-                           uint8_t *out, size_t *out_len,
-                           const crypto_flags_t *flags, crypto_error_t *error) {
+static
+bool crypto_encrypt(void *vctx, const uint8_t *in, size_t in_len,
+                    uint8_t *out, size_t *out_len,
+                    const crypto_flags_t *flags, crypto_error_t *error) {
     crypto_aead_t *ctx = (crypto_aead_t *)vctx;
     assert(ctx);
     assert(flags);
@@ -73,8 +75,9 @@ static bool crypto_encrypt(void *vctx, const uint8_t *in, size_t in_len,
     CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorGeneric)
 }
 
-static void crypto_configure_decrypt(void *vctx,
-                                     const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
+static
+void crypto_configure_decrypt(void *vctx,
+                              const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_aead_t *ctx = (crypto_aead_t *)vctx;
     assert(ctx);
     assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
@@ -87,9 +90,10 @@ static void crypto_configure_decrypt(void *vctx,
     memcpy(ctx->iv_dec + ctx->id_len, hmac_key->bytes, ctx->cipher_iv_len - ctx->id_len);
 }
 
-static bool crypto_decrypt(void *vctx, const uint8_t *in, size_t in_len,
-                           uint8_t *out, size_t *out_len,
-                           const crypto_flags_t *flags, crypto_error_t *error) {
+static
+bool crypto_decrypt(void *vctx, const uint8_t *in, size_t in_len,
+                    uint8_t *out, size_t *out_len,
+                    const crypto_flags_t *flags, crypto_error_t *error) {
     crypto_aead_t *ctx = (crypto_aead_t *)vctx;
     assert(ctx);
     assert(flags);
