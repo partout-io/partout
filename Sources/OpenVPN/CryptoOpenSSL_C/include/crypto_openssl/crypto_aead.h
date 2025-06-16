@@ -30,6 +30,8 @@
 #include "zeroing_data.h"
 
 typedef struct {
+    crypto_t crypto;
+
     const EVP_CIPHER *_Nonnull cipher;
     size_t cipher_key_len;
     size_t cipher_iv_len;
@@ -40,10 +42,6 @@ typedef struct {
     EVP_CIPHER_CTX *_Nonnull ctx_dec;
     uint8_t *_Nonnull iv_enc;
     uint8_t *_Nonnull iv_dec;
-
-    crypto_meta_t meta;
-    crypto_encrypter_t encrypter;
-    crypto_decrypter_t decrypter;
 } crypto_aead_t;
 
 crypto_aead_t *_Nullable crypto_aead_create(const char *_Nonnull cipher_name,

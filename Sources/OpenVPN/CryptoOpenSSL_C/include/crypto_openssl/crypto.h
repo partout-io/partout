@@ -111,6 +111,12 @@ typedef struct {
     crypto_capacity_t _Nonnull encryption_capacity;
 } crypto_meta_t;
 
+typedef struct {
+    crypto_meta_t meta;
+    crypto_encrypter_t encrypter;
+    crypto_decrypter_t decrypter;
+} crypto_t;
+
 #ifndef MAX
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 #endif

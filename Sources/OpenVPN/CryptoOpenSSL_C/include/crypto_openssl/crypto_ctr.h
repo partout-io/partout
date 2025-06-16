@@ -30,6 +30,8 @@
 #include "zeroing_data.h"
 
 typedef struct {
+    crypto_t crypto;
+
     const EVP_CIPHER *_Nonnull cipher;
     const EVP_MD *_Nonnull digest;
     char *_Nonnull utf_cipher_name;
@@ -48,10 +50,6 @@ typedef struct {
     zeroing_data_t *_Nonnull hmac_key_enc;
     zeroing_data_t *_Nonnull hmac_key_dec;
     uint8_t *_Nonnull buffer_hmac;
-
-    crypto_meta_t meta;
-    crypto_encrypter_t encrypter;
-    crypto_decrypter_t decrypter;
 } crypto_ctr_t;
 
 crypto_ctr_t *_Nullable crypto_ctr_create(const char *_Nonnull cipher_name,

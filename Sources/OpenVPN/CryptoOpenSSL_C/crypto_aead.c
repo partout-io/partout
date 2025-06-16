@@ -137,15 +137,15 @@ crypto_aead_t *crypto_aead_create(const char *cipher_name, size_t tag_len, size_
     ctx->iv_enc = pp_alloc_crypto(ctx->cipher_iv_len);
     ctx->iv_dec = pp_alloc_crypto(ctx->cipher_iv_len);
 
-    ctx->meta.digest_length = 0;
-    ctx->meta.tag_length = tag_len;
-    ctx->meta.encryption_capacity = crypto_encryption_capacity;
+    ctx->crypto.meta.digest_length = 0;
+    ctx->crypto.meta.tag_length = tag_len;
+    ctx->crypto.meta.encryption_capacity = crypto_encryption_capacity;
 
-    ctx->encrypter.configure = crypto_configure_encrypt;
-    ctx->encrypter.encrypt = crypto_encrypt;
-    ctx->decrypter.configure = crypto_configure_decrypt;
-    ctx->decrypter.decrypt = crypto_decrypt;
-    ctx->decrypter.verify = NULL;
+    ctx->crypto.encrypter.configure = crypto_configure_encrypt;
+    ctx->crypto.encrypter.encrypt = crypto_encrypt;
+    ctx->crypto.decrypter.configure = crypto_configure_decrypt;
+    ctx->crypto.decrypter.decrypt = crypto_decrypt;
+    ctx->crypto.decrypter.verify = NULL;
 
     return ctx;
 }
