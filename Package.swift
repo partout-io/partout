@@ -348,9 +348,9 @@ if areas.contains(.openvpn) {
             exclude: {
                 switch cryptoMode {
                 case .legacy, .bridged:
-                    ["Swift"]
+                    ["Native"]
                 case .native:
-                    ["ObjC"]
+                    ["Legacy"]
                 }
             }()
         ),

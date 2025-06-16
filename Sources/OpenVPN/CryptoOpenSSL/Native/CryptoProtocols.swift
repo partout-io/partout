@@ -1,5 +1,5 @@
 //
-//  Crypto.swift
+//  CryptoProtocols.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/14/25.
@@ -26,26 +26,11 @@
 internal import _PartoutCryptoOpenSSL_C
 import Foundation
 
-public enum CryptoError: Error {
-    case generic
+// NOTE: it doesn't matter to use Swift CryptoFlagsWrapper here. for
+// efficiency reasons, OpenVPN will use the C API directly without
+// going through Encrypter/Decrypter
 
-    case hmac
-
-    case prng
-
-    init(_ code: crypto_error_t = CryptoErrorGeneric) {
-        switch code {
-        case CryptoErrorPRNG:
-            self = .prng
-        case CryptoErrorHMAC:
-            self = .hmac
-        default:
-            self = .generic
-        }
-    }
-}
-
-protocol Crypto {
+public protocol Crypto {
     /// The digest length or 0.
     var digestLength: Int { get }
 
@@ -57,7 +42,7 @@ protocol Crypto {
     func encryptionCapacity(for length: Int) -> Int
 }
 
-protocol Encrypter: Crypto {
+public protocol Encrypter: Crypto {
     /// Configures the object.
     /// - Parameters:
     ///   - cipherKey: The cipher key data.
@@ -76,11 +61,11 @@ protocol Encrypter: Crypto {
         length: Int,
         dest: UnsafeMutablePointer<UInt8>,
         destLength: UnsafeMutablePointer<Int>,
-        flags: UnsafePointer<crypto_flags_t>?
+        flags: CryptoFlagsWrapper?
     ) throws -> Bool
 }
 
-protocol Decrypter: Crypto {
+public protocol Decrypter: Crypto {
     /// Configures the object.
     /// - Parameters:
     ///   - cipherKey: The cipher key data.
@@ -99,7 +84,7 @@ protocol Decrypter: Crypto {
         length: Int,
         dest: UnsafeMutablePointer<UInt8>,
         destLength: UnsafeMutablePointer<Int>,
-        flags: UnsafePointer<crypto_flags_t>?
+        flags: CryptoFlagsWrapper?
     ) throws -> Bool
 
     /// Verifies an encrypted buffer.
@@ -110,6 +95,6 @@ protocol Decrypter: Crypto {
     func verifyBytes(
         _ bytes: UnsafePointer<UInt8>,
         length: Int,
-        flags: UnsafePointer<crypto_flags_t>?
+        flags: CryptoFlagsWrapper?
     ) throws -> Bool
 }

@@ -1,5 +1,5 @@
 //
-//  CCryptoCBC.swift
+//  CryptoAEAD.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/14/25.
@@ -26,20 +26,21 @@
 internal import _PartoutCryptoOpenSSL_C
 import Foundation
 
-public final class CryptoCBC: Encrypter, Decrypter {
-    private let ptr: UnsafeMutablePointer<crypto_cbc_t>
+public final class CryptoAEAD: Encrypter, Decrypter {
+    private let ptr: UnsafeMutablePointer<crypto_aead_t>
 
     private let mappedError: (CryptoError) -> Error
 
     public init(
-        cipherName: String?,
-        digestName: String,
+        cipherName: String,
+        tagLength: Int,
+        idLength: Int,
         mappedError: ((CryptoError) -> Error)? = nil
     ) throws {
-        guard let ptr = crypto_cbc_create(cipherName, digestName) else {
+        guard let ptr = crypto_aead_create(cipherName, tagLength, idLength) else {
             throw CryptoError()
         }
-        NSLog("PartoutOpenVPN: Using CryptoCBC (Swift)")
+        NSLog("PartoutOpenVPN: Using CryptoAEAD (Swift)")
         self.ptr = ptr
         self.mappedError = mappedError ?? { $0 }
     }
@@ -57,44 +58,40 @@ public final class CryptoCBC: Encrypter, Decrypter {
     }
 
     public func configureEncryption(withCipherKey cipherKey: ZeroingData?, hmacKey: ZeroingData?) {
-        guard let hmacKey else {
+        guard let cipherKey, let hmacKey else {
             return
         }
-        ptr.pointee.encrypter.configure(ptr, cipherKey?.ptr, hmacKey.ptr)
+        ptr.pointee.encrypter.configure(ptr, cipherKey.ptr, hmacKey.ptr)
     }
 
-    func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: UnsafePointer<crypto_flags_t>?) throws -> Bool {
+    public func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
         var code = CryptoErrorGeneric
-        guard ptr.pointee.encrypter.encrypt(ptr, bytes, length, dest, destLength, flags, &code) else {
+        var cFlags = crypto_flags_t()
+        let flagsPtr = flags.pointer(to: &cFlags)
+        guard ptr.pointee.encrypter.encrypt(ptr, bytes, length, dest, destLength, flagsPtr, &code) else {
             throw mappedError(CryptoError(code))
         }
         return true
     }
 
     public func configureDecryption(withCipherKey cipherKey: ZeroingData?, hmacKey: ZeroingData?) {
-        guard let hmacKey else {
+        guard let cipherKey, let hmacKey else {
             return
         }
-        ptr.pointee.decrypter.configure(ptr, cipherKey?.ptr, hmacKey.ptr)
+        ptr.pointee.decrypter.configure(ptr, cipherKey.ptr, hmacKey.ptr)
     }
 
-    func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: UnsafePointer<crypto_flags_t>?) throws -> Bool {
+    public func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
         var code = CryptoErrorGeneric
-        guard ptr.pointee.decrypter.decrypt(ptr, bytes, length, dest, destLength, flags, &code) else {
+        var cFlags = crypto_flags_t()
+        let flagsPtr = flags.pointer(to: &cFlags)
+        guard ptr.pointee.decrypter.decrypt(ptr, bytes, length, dest, destLength, flagsPtr, &code) else {
             throw mappedError(CryptoError(code))
         }
         return true
     }
 
-    public func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int) throws -> Bool {
-        try verifyBytes(bytes, length: length, flags: nil)
-    }
-
-    func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int, flags: UnsafePointer<crypto_flags_t>?) throws -> Bool {
-        var code = CryptoErrorGeneric
-        guard ptr.pointee.decrypter.verify(ptr, bytes, length, &code) else {
-            throw mappedError(CryptoError(code))
-        }
-        return true
+    public func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int, flags: CryptoFlagsWrapper?) throws -> Bool {
+        fatalError("Unsupported")
     }
 }

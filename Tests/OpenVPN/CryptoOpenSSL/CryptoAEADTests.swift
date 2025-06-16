@@ -39,13 +39,13 @@ final class CryptoAEADTests: XCTestCase, CryptoFlagsProviding {
         let encryptedData: Data
 
         do {
-            encryptedData = try sut.encryptData(plainData, flags: &flags)
+            encryptedData = try sut.encryptData(plainData, flags: flags)
         } catch {
             XCTFail("Cannot encrypt: \(error)")
             return
         }
         do {
-            let returnedData = try sut.decryptData(encryptedData, flags: &flags)
+            let returnedData = try sut.decryptData(encryptedData, flags: flags)
             XCTAssertEqual(returnedData, plainData)
         } catch {
             XCTFail("Cannot decrypt: \(error)")

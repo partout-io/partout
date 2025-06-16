@@ -36,7 +36,7 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
 
         do {
             var flags = newCryptoFlags()
-            let returnedData = try sut.encryptData(plainData, flags: &flags)
+            let returnedData = try sut.encryptData(plainData, flags: flags)
             XCTAssertEqual(returnedData, plainHMACData)
         } catch {
             XCTFail("Cannot encrypt: \(error)")
@@ -49,7 +49,7 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
 
         do {
             var flags = newCryptoFlags()
-            let returnedData = try sut.encryptData(plainData, flags: &flags)
+            let returnedData = try sut.encryptData(plainData, flags: flags)
             XCTAssertEqual(returnedData, encryptedHMACData)
         } catch {
             XCTFail("Cannot encrypt: \(error)")
@@ -62,7 +62,7 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
 
         do {
             var flags = newCryptoFlags()
-            let returnedData = try sut.decryptData(plainHMACData, flags: &flags)
+            let returnedData = try sut.decryptData(plainHMACData, flags: flags)
             XCTAssertEqual(returnedData, plainData)
         } catch {
             XCTFail("Cannot decrypt: \(error)")
@@ -75,7 +75,7 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
 
         do {
             var flags = newCryptoFlags()
-            let returnedData = try sut.decryptData(encryptedHMACData, flags: &flags)
+            let returnedData = try sut.decryptData(encryptedHMACData, flags: flags)
             XCTAssertEqual(returnedData, plainData)
         } catch {
             XCTFail("Cannot decrypt: \(error)")
@@ -87,8 +87,8 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         sut.configureDecryption(withCipherKey: nil, hmacKey: hmacKey)
 
         var flags = newCryptoFlags()
-        XCTAssertNoThrow(try sut.verifyData(plainHMACData, flags: &flags))
-        XCTAssertNoThrow(try sut.verifyData(encryptedHMACData, flags: &flags))
+        XCTAssertNoThrow(try sut.verifyData(plainHMACData, flags: flags))
+        XCTAssertNoThrow(try sut.verifyData(encryptedHMACData, flags: flags))
     }
 }
 

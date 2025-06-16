@@ -65,9 +65,11 @@ public final class CryptoCTR: Encrypter, Decrypter {
         ptr.pointee.encrypter.configure(ptr, cipherKey.ptr, hmacKey.ptr)
     }
 
-    func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: UnsafePointer<crypto_flags_t>?) throws -> Bool {
+    public func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
         var code = CryptoErrorGeneric
-        guard ptr.pointee.encrypter.encrypt(ptr, bytes, length, dest, destLength, flags, &code) else {
+        var cFlags = crypto_flags_t()
+        let flagsPtr = flags.pointer(to: &cFlags)
+        guard ptr.pointee.encrypter.encrypt(ptr, bytes, length, dest, destLength, flagsPtr, &code) else {
             throw mappedError(CryptoError(code))
         }
         return true
@@ -80,19 +82,17 @@ public final class CryptoCTR: Encrypter, Decrypter {
         ptr.pointee.decrypter.configure(ptr, cipherKey.ptr, hmacKey.ptr)
     }
 
-    func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: UnsafePointer<crypto_flags_t>?) throws -> Bool {
+    public func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
         var code = CryptoErrorGeneric
-        guard ptr.pointee.decrypter.decrypt(ptr, bytes, length, dest, destLength, flags, &code) else {
+        var cFlags = crypto_flags_t()
+        let flagsPtr = flags.pointer(to: &cFlags)
+        guard ptr.pointee.decrypter.decrypt(ptr, bytes, length, dest, destLength, flagsPtr, &code) else {
             throw mappedError(CryptoError(code))
         }
         return true
     }
 
-    public func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int) throws -> Bool {
-        fatalError("Unsupported")
-    }
-
-    func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int, flags: UnsafePointer<crypto_flags_t>?) throws -> Bool {
+    public func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int, flags: CryptoFlagsWrapper?) throws -> Bool {
         fatalError("Unsupported")
     }
 }

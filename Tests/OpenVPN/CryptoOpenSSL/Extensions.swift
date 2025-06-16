@@ -51,14 +51,11 @@ protocol CryptoFlagsProviding {
     var ad: [UInt8] { get }
 }
 
-#if canImport(_PartoutCryptoOpenSSL_ObjC)
-internal import _PartoutCryptoOpenSSL_ObjC
-
 extension CryptoFlagsProviding {
-    func newCryptoFlags() -> CryptoFlags {
+    func newCryptoFlags() -> CryptoFlagsWrapper {
         packetId.withUnsafeBufferPointer { iv in
             ad.withUnsafeBufferPointer { ad in
-                CryptoFlags(
+                CryptoFlagsWrapper(
                     iv: iv.baseAddress,
                     ivLength: iv.count,
                     ad: ad.baseAddress,
@@ -69,22 +66,3 @@ extension CryptoFlagsProviding {
         }
     }
 }
-#elseif canImport(_PartoutCryptoOpenSSL_C)
-internal import _PartoutCryptoOpenSSL_C
-
-extension CryptoFlagsProviding {
-    func newCryptoFlags() -> crypto_flags_t {
-        packetId.withUnsafeBufferPointer { iv in
-            ad.withUnsafeBufferPointer { ad in
-                var flags = crypto_flags_t()
-                flags.iv = iv.baseAddress
-                flags.iv_len = iv.count
-                flags.ad = ad.baseAddress
-                flags.ad_len = ad.count
-                flags.for_testing = 1
-                return flags
-            }
-        }
-    }
-}
-#endif

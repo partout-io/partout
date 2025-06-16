@@ -44,13 +44,13 @@ final class CryptoCTRTests: XCTestCase, CryptoFlagsProviding {
 
         var flags = newCryptoFlags()
         do {
-            encryptedData = try sut.encryptData(plainData, flags: &flags)
+            encryptedData = try sut.encryptData(plainData, flags: flags)
         } catch {
             XCTFail("Cannot encrypt: \(error)")
             return
         }
         do {
-            let returnedData = try sut.decryptData(encryptedData, flags: &flags)
+            let returnedData = try sut.decryptData(encryptedData, flags: flags)
             XCTAssertEqual(returnedData, plainData)
         } catch {
             XCTFail("Cannot decrypt: \(error)")
