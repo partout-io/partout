@@ -58,7 +58,7 @@ public final class CryptoCBC: Encrypter, Decrypter {
 
     public func configureEncryption(withCipherKey cipherKey: ZeroingData?, hmacKey: ZeroingData?) {
         guard let hmacKey else {
-            return
+            fatalError("HMAC key required")
         }
         ptr.pointee.encrypter.configure(ptr, cipherKey?.ptr, hmacKey.ptr)
     }
@@ -75,7 +75,7 @@ public final class CryptoCBC: Encrypter, Decrypter {
 
     public func configureDecryption(withCipherKey cipherKey: ZeroingData?, hmacKey: ZeroingData?) {
         guard let hmacKey else {
-            return
+            fatalError("HMAC key required")
         }
         ptr.pointee.decrypter.configure(ptr, cipherKey?.ptr, hmacKey.ptr)
     }
