@@ -87,6 +87,10 @@ private extension UnsafeRawBufferPointer {
 // MARK: - Testing
 
 extension Encrypter {
+    func encryptData(_ data: Data) throws -> Data {
+        try encryptData(data, flags: nil as UnsafePointer<CryptoFlags>?)
+    }
+
     func encryptData(_ data: Data, flags: CryptoFlagsWrapper?) throws -> Data {
         var objcFlags = CryptoFlags()
         let ptr = flags.pointer(to: &objcFlags)
@@ -95,10 +99,18 @@ extension Encrypter {
 }
 
 extension Decrypter {
+    func decryptData(_ data: Data) throws -> Data {
+        try decryptData(data, flags: nil as UnsafePointer<CryptoFlags>?)
+    }
+
     func decryptData(_ data: Data, flags: CryptoFlagsWrapper?) throws -> Data {
         var objcFlags = CryptoFlags()
         let ptr = flags.pointer(to: &objcFlags)
         return try decryptData(data, flags: ptr)
+    }
+
+    func verifyData(_ data: Data) throws {
+        try verifyData(data, flags: nil as UnsafePointer<CryptoFlags>?)
     }
 
     func verifyData(_ data: Data, flags: CryptoFlagsWrapper?) throws {
