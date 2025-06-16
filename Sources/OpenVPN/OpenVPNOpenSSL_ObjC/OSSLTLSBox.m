@@ -38,7 +38,7 @@
 #import <openssl/x509v3.h>
 #import <openssl/err.h>
 
-#import "Allocation.h"
+#import "CryptoOpenSSL/Allocation.h"
 #import "Errors.h"
 #import "OSSLTLSBox.h"
 

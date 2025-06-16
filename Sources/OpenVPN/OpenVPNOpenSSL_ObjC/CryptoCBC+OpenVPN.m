@@ -37,7 +37,7 @@
 #import <Foundation/Foundation.h>
 
 #import "CryptoCBC+OpenVPN.h"
-#import "CryptoMacros.h"
+#import "CryptoOpenSSL/CryptoMacros.h"
 #import "Errors.h"
 #import "PacketMacros.h"
 

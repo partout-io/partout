@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#import "CryptoMacros.h"
+#import "CryptoOpenSSL/CryptoMacros.h"
 #import "ControlPacket.h"
 
 @implementation ControlPacket
