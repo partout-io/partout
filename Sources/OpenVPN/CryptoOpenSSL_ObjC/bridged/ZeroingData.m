@@ -24,8 +24,8 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "ZeroingData.h"
-#import "zeroing_data.h"
+#import "CryptoOpenSSL/ZeroingData.h"
+#import "crypto_openssl/zeroing_data.h"
 
 @interface ZeroingData () {
     zeroing_data_t *ptr;

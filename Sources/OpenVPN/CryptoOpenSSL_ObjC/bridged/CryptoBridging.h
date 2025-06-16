@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#import "CryptoMacros.h"
-#import "ZeroingData.h"
-#import "zeroing_data.h"
+#import "CryptoOpenSSL/CryptoMacros.h"
+#import "CryptoOpenSSL/ZeroingData.h"
+#import "crypto_openssl/zeroing_data.h"
 
 @interface ZeroingData (C)
 

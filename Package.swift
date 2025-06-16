@@ -357,7 +357,8 @@ if areas.contains(.openvpn) {
         .target(
             name: "_PartoutCryptoOpenSSL_C",
             dependencies: ["openssl-apple"],
-            path: "Sources/OpenVPN/CryptoOpenSSL_C"
+            path: "Sources/OpenVPN/CryptoOpenSSL_C",
+            publicHeadersPath: "include"
         ),
         .target(
             name: "_PartoutCryptoOpenSSL_ObjC",

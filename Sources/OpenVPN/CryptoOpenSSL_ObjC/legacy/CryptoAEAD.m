@@ -36,10 +36,10 @@
 
 #import <openssl/evp.h>
 
-#import "Allocation.h"
-#import "CryptoAEAD.h"
-#import "CryptoMacros.h"
-#import "ZeroingData.h"
+#import "CryptoOpenSSL/Allocation.h"
+#import "CryptoOpenSSL/CryptoAEAD.h"
+#import "CryptoOpenSSL/CryptoMacros.h"
+#import "CryptoOpenSSL/ZeroingData.h"
 
 @interface CryptoAEAD ()
 

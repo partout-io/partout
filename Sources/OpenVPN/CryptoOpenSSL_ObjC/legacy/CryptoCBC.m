@@ -37,10 +37,10 @@
 #import <openssl/evp.h>
 #import <openssl/rand.h>
 
-#import "Allocation.h"
-#import "CryptoCBC.h"
-#import "CryptoMacros.h"
-#import "ZeroingData.h"
+#import "CryptoOpenSSL/Allocation.h"
+#import "CryptoOpenSSL/CryptoCBC.h"
+#import "CryptoOpenSSL/CryptoMacros.h"
+#import "CryptoOpenSSL/ZeroingData.h"
 
 const NSInteger CryptoCBCMaxHMACLength = 100;
 

@@ -25,10 +25,10 @@
 
 #import <openssl/evp.h>
 
-#import "Allocation.h"
-#import "CryptoCTR.h"
-#import "CryptoMacros.h"
-#import "ZeroingData.h"
+#import "CryptoOpenSSL/Allocation.h"
+#import "CryptoOpenSSL/CryptoCTR.h"
+#import "CryptoOpenSSL/CryptoMacros.h"
+#import "CryptoOpenSSL/ZeroingData.h"
 
 @interface CryptoCTR ()
 

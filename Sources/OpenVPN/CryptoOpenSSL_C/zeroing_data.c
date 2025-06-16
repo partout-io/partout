@@ -23,10 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "allocation.h"
-#include "zeroing_data.h"
 #include <stdlib.h>
 #include <string.h>
+#include "crypto_openssl/allocation.h"
+#include "crypto_openssl/zeroing_data.h"
 
 // MARK: Creation
 

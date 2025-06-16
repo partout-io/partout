@@ -26,8 +26,8 @@
 #include <assert.h>
 #include <openssl/evp.h>
 #include <string.h>
-#include "allocation.h"
-#include "crypto_aead.h"
+#include "crypto_openssl/allocation.h"
+#include "crypto_openssl/crypto_aead.h"
 
 size_t crypto_encryption_capacity(const void *vctx, size_t len) {
     crypto_aead_t *ctx = (crypto_aead_t *)vctx;

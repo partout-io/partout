@@ -27,8 +27,8 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <string.h>
-#include "allocation.h"
-#include "crypto_cbc.h"
+#include "crypto_openssl/allocation.h"
+#include "crypto_openssl/crypto_cbc.h"
 
 #define MAX_HMAC_LENGTH 100
 
