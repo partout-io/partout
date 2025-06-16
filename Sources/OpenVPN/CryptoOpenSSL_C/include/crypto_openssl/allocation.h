@@ -41,12 +41,11 @@
 #include <stdlib.h>
 
 static inline
-void *pp_alloc_crypto(size_t size) {
+void *_Nonnull pp_alloc_crypto(size_t size) {
     void *memory = calloc(1, size);
     if (!memory) {
         fputs("pp_alloc_crypto: malloc() call failed", stderr);
         abort();
-        return NULL;
     }
     return memory;
 }

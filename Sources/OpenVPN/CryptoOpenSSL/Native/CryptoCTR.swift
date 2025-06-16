@@ -32,7 +32,7 @@ public final class CryptoCTR: Encrypter, Decrypter {
     private let mappedError: (CryptoError) -> Error
 
     public init(
-        cipherName: String?,
+        cipherName: String,
         digestName: String,
         tagLength: Int,
         payloadLength: Int,

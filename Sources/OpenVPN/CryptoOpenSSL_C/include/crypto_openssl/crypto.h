@@ -59,13 +59,13 @@ typedef enum {
 typedef struct {
 
     /// A custom initialization vector (IV).
-    const uint8_t *iv;
+    const uint8_t *_Nullable iv;
 
     /// The length of ``iv``.
     size_t iv_len;
 
     /// A custom associated data for AEAD (AD).
-    const uint8_t *ad;
+    const uint8_t *_Nullable ad;
 
     /// The length of ``ad``.
     size_t ad_len;
@@ -74,39 +74,41 @@ typedef struct {
     int for_testing;
 } crypto_flags_t;
 
-typedef void (*crypto_configure_t)(void *ctx,
-                                   const zeroing_data_t *cipher_key,
-                                   const zeroing_data_t *hmac_key);
+typedef void (*crypto_configure_t)(void *_Nonnull ctx,
+                                   const zeroing_data_t *_Nullable cipher_key,
+                                   const zeroing_data_t *_Nullable hmac_key);
 
-typedef bool (*crypto_encrypt_t)(void *ctx,
-                                 const uint8_t *in, size_t in_len,
-                                 uint8_t *out, size_t *out_len,
-                                 const crypto_flags_t *flags, crypto_error_t *error);
+typedef bool (*crypto_encrypt_t)(void *_Nonnull ctx,
+                                 const uint8_t *_Nonnull in, size_t in_len,
+                                 uint8_t *_Nonnull out, size_t *_Nonnull out_len,
+                                 const crypto_flags_t *_Nullable flags, crypto_error_t *_Nullable error);
 
-typedef bool (*crypto_decrypt_t)(void *ctx, const uint8_t *in, size_t in_len,
-                                 uint8_t *out, size_t *out_len,
-                                 const crypto_flags_t *flags, crypto_error_t *error);
+typedef bool (*crypto_decrypt_t)(void *_Nonnull ctx,
+                                 const uint8_t *_Nonnull in, size_t in_len,
+                                 uint8_t *_Nonnull out, size_t *_Nonnull out_len,
+                                 const crypto_flags_t *_Nullable flags, crypto_error_t *_Nullable error);
 
-typedef bool (*crypto_verify_t)(void *ctx, const uint8_t *in, size_t in_len,
-                                crypto_error_t *error);
+typedef bool (*crypto_verify_t)(void *_Nonnull ctx,
+                                const uint8_t *_Nonnull in, size_t in_len,
+                                crypto_error_t *_Nullable error);
 
 typedef struct {
-    crypto_configure_t configure;
-    crypto_encrypt_t encrypt;
+    crypto_configure_t _Nonnull configure;
+    crypto_encrypt_t _Nonnull encrypt;
 } crypto_encrypter_t;
 
 typedef struct {
-    crypto_configure_t configure;
-    crypto_decrypt_t decrypt;
-    crypto_verify_t verify;
+    crypto_configure_t _Nonnull configure;
+    crypto_decrypt_t _Nonnull decrypt;
+    crypto_verify_t _Nonnull verify;
 } crypto_decrypter_t;
 
-typedef size_t (*crypto_capacity_t)(const void *ctx, size_t len);
+typedef size_t (*crypto_capacity_t)(const void *_Nonnull ctx, size_t len);
 
 typedef struct {
     size_t digest_length;
     size_t tag_length;
-    crypto_capacity_t encryption_capacity;
+    crypto_capacity_t _Nonnull encryption_capacity;
 } crypto_meta_t;
 
 #ifndef MAX

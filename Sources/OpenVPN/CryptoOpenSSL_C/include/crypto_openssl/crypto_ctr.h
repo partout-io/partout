@@ -30,10 +30,10 @@
 #include "zeroing_data.h"
 
 typedef struct {
-    const EVP_CIPHER *cipher;
-    const EVP_MD *digest;
-    char *utf_cipher_name;
-    char *utf_digest_name;
+    const EVP_CIPHER *_Nonnull cipher;
+    const EVP_MD *_Nonnull digest;
+    char *_Nonnull utf_cipher_name;
+    char *_Nonnull utf_digest_name;
     size_t cipher_key_len;
     size_t cipher_iv_len;
     size_t hmac_key_len;
@@ -41,19 +41,20 @@ typedef struct {
     size_t ns_tag_len;
     size_t payload_len;
 
-    EVP_MAC *mac;
-    OSSL_PARAM *mac_params;
-    EVP_CIPHER_CTX *ctx_enc;
-    EVP_CIPHER_CTX *ctx_dec;
-    zeroing_data_t *hmac_key_enc;
-    zeroing_data_t *hmac_key_dec;
-    uint8_t *buffer_hmac;
+    EVP_MAC *_Nonnull mac;
+    OSSL_PARAM *_Nonnull mac_params;
+    EVP_CIPHER_CTX *_Nonnull ctx_enc;
+    EVP_CIPHER_CTX *_Nonnull ctx_dec;
+    zeroing_data_t *_Nonnull hmac_key_enc;
+    zeroing_data_t *_Nonnull hmac_key_dec;
+    uint8_t *_Nonnull buffer_hmac;
 
     crypto_meta_t meta;
     crypto_encrypter_t encrypter;
     crypto_decrypter_t decrypter;
 } crypto_ctr_t;
 
-crypto_ctr_t *crypto_ctr_create(const char *cipher_name, const char *digest_name,
-                                size_t tag_len, size_t payload_len);
-void crypto_ctr_free(crypto_ctr_t *ctx);
+crypto_ctr_t *_Nullable crypto_ctr_create(const char *_Nonnull cipher_name,
+                                          const char *_Nonnull digest_name,
+                                          size_t tag_len, size_t payload_len);
+void crypto_ctr_free(crypto_ctr_t *_Nonnull ctx);
