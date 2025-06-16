@@ -40,10 +40,8 @@ zeroing_data_t *zd_create(size_t length) {
 
 zeroing_data_t *zd_create_copy(const uint8_t *bytes, size_t length) {
     zeroing_data_t *zd = pp_alloc_crypto(sizeof(zeroing_data_t));
-    if (bytes) {
-        zd->bytes = pp_alloc_crypto(length);
-        memcpy(zd->bytes, bytes, length);
-    }
+    zd->bytes = pp_alloc_crypto(length);
+    memcpy(zd->bytes, bytes, length);
     zd->length = length;
     return zd;
 }
@@ -66,17 +64,14 @@ zeroing_data_t *zd_create_with_uint16(uint16_t value) {
 }
 
 zeroing_data_t *zd_create_from_data(const uint8_t *data, size_t length) {
-    if (!data || length == 0) return NULL;
     return zd_create_copy(data, length);
 }
 
 zeroing_data_t *zd_create_from_data_range(const uint8_t *data, size_t offset, size_t length) {
-    if (!data || length == 0) return NULL;
     return zd_create_copy(data + offset, length);
 }
 
 zeroing_data_t *zd_create_from_string(const char *string, bool null_terminated) {
-    if (!string) return NULL;
     size_t len = strlen(string);
     if (null_terminated) {
         return zd_create_copy((const uint8_t *)string, len + 1);
@@ -86,24 +81,19 @@ zeroing_data_t *zd_create_from_string(const char *string, bool null_terminated) 
 }
 
 void zd_free(zeroing_data_t *zd) {
-    if (zd) {
-        if (zd->bytes) {
-            bzero(zd->bytes, zd->length);
-            free(zd->bytes);
-        }
-        free(zd);
-    }
+    bzero(zd->bytes, zd->length);
+    free(zd->bytes);
+    free(zd);
 }
 
 // MARK: Copy
 
 zeroing_data_t *zd_make_copy(const zeroing_data_t *zd) {
-    if (!zd) return NULL;
     return zd_create_copy(zd->bytes, zd->length);
 }
 
 zeroing_data_t *zd_make_slice(const zeroing_data_t *zd, size_t offset, size_t length) {
-    if (!zd || offset + length > zd->length) return NULL;
+    if (offset + length > zd->length) return NULL;
 
     zeroing_data_t *slice = pp_alloc_crypto(sizeof(zeroing_data_t));
     slice->bytes = pp_alloc_crypto(length);
@@ -115,8 +105,6 @@ zeroing_data_t *zd_make_slice(const zeroing_data_t *zd, size_t offset, size_t le
 // MARK: Side effect
 
 void zd_append(zeroing_data_t *zd, const zeroing_data_t *other) {
-    if (!zd || !other) return;
-
     size_t new_len = zd->length + other->length;
     uint8_t *new_bytes = pp_alloc_crypto(new_len);
     memcpy(new_bytes, zd->bytes, zd->length);
@@ -129,7 +117,7 @@ void zd_append(zeroing_data_t *zd, const zeroing_data_t *other) {
 }
 
 void zd_truncate(zeroing_data_t *zd, size_t new_length) {
-    if (!zd || new_length > zd->length) return;
+    if (new_length > zd->length) return;
 
     uint8_t *new_bytes = pp_alloc_crypto(new_length);
     memcpy(new_bytes, zd->bytes, new_length);
@@ -142,7 +130,7 @@ void zd_truncate(zeroing_data_t *zd, size_t new_length) {
 }
 
 void zd_remove_until(zeroing_data_t *zd, size_t offset) {
-    if (!zd || offset > zd->length) return;
+    if (offset > zd->length) return;
 
     size_t new_length = zd->length - offset;
     uint8_t *new_bytes = pp_alloc_crypto(new_length);
@@ -156,14 +144,12 @@ void zd_remove_until(zeroing_data_t *zd, size_t offset) {
 }
 
 void zd_zero(zeroing_data_t *zd) {
-    if (zd && zd->bytes) {
-        bzero(zd->bytes, zd->length);
-    }
+    bzero(zd->bytes, zd->length);
 }
 
 // MARK: Accessors
 
 uint16_t zd_uint16(const zeroing_data_t *zd, size_t offset) {
-    if (!zd || offset + 2 > zd->length) return 0;
+    if (offset + 2 > zd->length) return 0;
     return zd->bytes[offset] | (zd->bytes[offset + 1] << 8);
 }

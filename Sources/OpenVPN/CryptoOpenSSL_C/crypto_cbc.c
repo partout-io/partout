@@ -49,6 +49,9 @@ static void crypto_configure_encrypt(void *vctx, const zeroing_data_t *cipher_ke
         EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1);
     }
 
+    if (ctx->hmac_key_enc) {
+        zd_free(ctx->hmac_key_enc);
+    }
     ctx->hmac_key_enc = zd_create_copy(hmac_key->bytes, ctx->hmac_key_len);
 }
 
@@ -101,6 +104,9 @@ static void crypto_configure_decrypt(void *vctx, const zeroing_data_t *cipher_ke
         EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0);
     }
 
+    if (ctx->hmac_key_dec) {
+        zd_free(ctx->hmac_key_dec);
+    }
     ctx->hmac_key_dec = zd_create_copy(hmac_key->bytes, ctx->hmac_key_len);
 }
 

@@ -27,7 +27,7 @@ internal import _PartoutCryptoOpenSSL_C
 import Foundation
 
 public final class ZeroingData {
-    private(set) var ptr: UnsafeMutablePointer<zeroing_data_t>?
+    let ptr: UnsafeMutablePointer<zeroing_data_t>
 
     private init(ptr: UnsafeMutablePointer<zeroing_data_t>) {
         self.ptr = ptr
@@ -37,7 +37,7 @@ public final class ZeroingData {
         self.ptr = zd_create(length)
     }
 
-    public init(bytes: UnsafePointer<UInt8>?, length: Int) {
+    public init(bytes: UnsafePointer<UInt8>, length: Int) {
         self.ptr = zd_create_from_data(bytes, length)
     }
 
@@ -48,19 +48,29 @@ public final class ZeroingData {
 
     public init(uInt16: UInt16) {
         var value = uInt16
-        let ptr = withUnsafeBytes(of: &value) { $0.bindMemory(to: UInt8.self).baseAddress }
-        self.ptr = zd_create_from_data(ptr, 2)
+        ptr = withUnsafeBytes(of: &value) {
+            guard let bytes = $0.bindMemory(to: UInt8.self).baseAddress else {
+                fatalError("Could not bind to memory")
+            }
+            return zd_create_from_data(bytes, 2)
+        }
     }
 
     public init(data: Data) {
-        data.withUnsafeBytes {
-            self.ptr = zd_create_from_data($0.bindMemory(to: UInt8.self).baseAddress, data.count)
+        ptr = data.withUnsafeBytes {
+            guard let bytes = $0.bindMemory(to: UInt8.self).baseAddress else {
+                fatalError("Could not bind to memory")
+            }
+            return zd_create_from_data(bytes, data.count)
         }
     }
 
     public init(data: Data, offset: Int, length: Int) {
-        data.withUnsafeBytes {
-            self.ptr = zd_create_from_data_range($0.bindMemory(to: UInt8.self).baseAddress, offset, length)
+        ptr = data.withUnsafeBytes {
+            guard let bytes = $0.bindMemory(to: UInt8.self).baseAddress else {
+                fatalError("Could not bind to memory")
+            }
+            return zd_create_from_data_range(bytes, offset, length)
         }
     }
 
@@ -114,13 +124,14 @@ extension ZeroingData {
     }
 
     public func withOffset(_ offset: Int, length: Int) -> ZeroingData {
-        ZeroingData(ptr: zd_make_slice(ptr, offset, length))
+        guard let slice = zd_make_slice(ptr, offset, length) else {
+            return ZeroingData()
+        }
+        return ZeroingData(ptr: slice)
     }
 
     public func appending(_ other: ZeroingData) -> ZeroingData {
-        guard let copy = zd_make_copy(ptr) else {
-            return ZeroingData()
-        }
+        let copy = zd_make_copy(ptr)
         zd_append(copy, other.ptr)
         return ZeroingData(ptr: copy)
     }
@@ -162,10 +173,7 @@ extension ZeroingData {
     }
 
     public func toData() -> Data {
-        guard let ptr else {
-            return Data()
-        }
-        return Data(bytes: ptr.pointee.bytes, count: ptr.pointee.length)
+        Data(bytes: ptr.pointee.bytes, count: ptr.pointee.length)
     }
 
     public func toHex() -> String {
