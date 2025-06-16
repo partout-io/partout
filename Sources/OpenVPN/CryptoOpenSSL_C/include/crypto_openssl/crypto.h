@@ -101,10 +101,12 @@ typedef struct {
     crypto_verify_t verify;
 } crypto_decrypter_t;
 
+typedef size_t (*crypto_capacity_t)(const void *ctx, size_t len);
+
 typedef struct {
     size_t digest_length;
     size_t tag_length;
-    size_t (*encryption_capacity)(const void *ctx, size_t len);
+    crypto_capacity_t encryption_capacity;
 } crypto_meta_t;
 
 #ifndef MAX

@@ -25,6 +25,8 @@
 
 import Foundation
 
+// FIXME: ###, maybe these protocols will be redundant
+
 extension Encrypter {
 
     /// Swift version of `encryptBytes`.
@@ -63,7 +65,7 @@ extension Decrypter {
     }
 }
 
-private extension UnsafeRawBufferPointer {
+extension UnsafeRawBufferPointer {
     var bytePointer: UnsafePointer<Element> {
         guard let address = bindMemory(to: Element.self).baseAddress else {
             fatalError("Cannot bind to self")

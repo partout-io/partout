@@ -80,22 +80,29 @@ public final class ZeroingData {
 // MARK: Properties
 
 extension ZeroingData {
-    public var bytes: UnsafePointer<UInt8>? {
+    public var bytes: UnsafePointer<UInt8>! {
         zd_bytes(ptr)
     }
 
-    public var mutableBytes: UnsafeMutablePointer<UInt8>? {
+    public var mutableBytes: UnsafeMutablePointer<UInt8>! {
         zd_mutable_bytes(ptr)
     }
 
     public var length: Int {
-        Int(zd_length(ptr))
+        zd_length(ptr)
     }
 }
 
 extension ZeroingData: Equatable {
     public static func == (lhs: ZeroingData, rhs: ZeroingData) -> Bool {
         zd_equals(lhs.ptr, rhs.ptr)
+    }
+
+    public func isEqual(to data: Data) -> Bool {
+        let length = data.count
+        return data.withUnsafeBytes { dataPtr in
+            zd_equals_to_data(ptr, dataPtr.bytePointer, length)
+        }
     }
 }
 
@@ -159,5 +166,16 @@ extension ZeroingData {
             return Data()
         }
         return Data(bytes: ptr.pointee.bytes, count: ptr.pointee.length)
+    }
+
+    public func toHex() -> String {
+        guard let bytes else {
+            return ""
+        }
+        var hexString = ""
+        for i in 0..<length {
+            hexString += String(format: "%02x", bytes[i])
+        }
+        return hexString
     }
 }

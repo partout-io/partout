@@ -28,6 +28,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 typedef struct {
     uint8_t *bytes;
@@ -47,10 +48,32 @@ void zd_free(zeroing_data_t *zd);
 
 // MARK: Properties
 
-const uint8_t *zd_bytes(const zeroing_data_t *zd);
-uint8_t *zd_mutable_bytes(zeroing_data_t *zd);
-size_t zd_length(const zeroing_data_t *zd);
-bool zd_equals(const zeroing_data_t *zd1, const zeroing_data_t *zd2);
+static inline
+const uint8_t *zd_bytes(const zeroing_data_t *zd) {
+    return zd ? zd->bytes : NULL;
+}
+
+static inline
+uint8_t *zd_mutable_bytes(zeroing_data_t *zd) {
+    return zd ? zd->bytes : NULL;
+}
+
+static inline
+size_t zd_length(const zeroing_data_t *zd) {
+    return zd ? zd->length : 0;
+}
+
+static inline
+bool zd_equals(const zeroing_data_t *zd1, const zeroing_data_t *zd2) {
+    if (!zd1 || !zd2) return false;
+    return (zd1->length == zd2->length) && (memcmp(zd1->bytes, zd2->bytes, zd1->length) == 0);
+}
+
+static inline
+bool zd_equals_to_data(const zeroing_data_t *zd1, const uint8_t *data, size_t length) {
+    if (!zd1 || !data) return false;
+    return (zd1->length == length) && (memcmp(zd1->bytes, data, length) == 0);
+}
 
 // MARK: Copy
 

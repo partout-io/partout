@@ -95,25 +95,6 @@ void zd_free(zeroing_data_t *zd) {
     }
 }
 
-// MARK: Properties
-
-const uint8_t *zd_bytes(const zeroing_data_t *zd) {
-    return zd ? zd->bytes : NULL;
-}
-
-uint8_t *zd_mutable_bytes(zeroing_data_t *zd) {
-    return zd ? zd->bytes : NULL;
-}
-
-size_t zd_length(const zeroing_data_t *zd) {
-    return zd ? zd->length : 0;
-}
-
-bool zd_equals(const zeroing_data_t *zd1, const zeroing_data_t *zd2) {
-    if (!zd1 || !zd2) return false;
-    return (zd1->length == zd2->length) && (memcmp(zd1->bytes, zd2->bytes, zd1->length) == 0);
-}
-
 // MARK: Copy
 
 zeroing_data_t *zd_make_copy(const zeroing_data_t *zd) {

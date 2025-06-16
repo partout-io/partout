@@ -33,7 +33,8 @@
 
 @end
 
-static inline crypto_flags_t crypto_flags_from(const CryptoFlags *flags) {
+static inline
+crypto_flags_t crypto_flags_from(const CryptoFlags *flags) {
     crypto_flags_t cf = { 0 };
     if (flags) {
         cf.ad = flags->ad;
