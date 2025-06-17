@@ -69,7 +69,7 @@ public final class CryptoCTR: Encrypter, Decrypter {
         var code = CryptoErrorGeneric
         var cFlags = crypto_flags_t()
         let flagsPtr = flags.pointer(to: &cFlags)
-        guard ptr.pointee.crypto.encrypter.encrypt(ptr, bytes, length, dest, destLength, flagsPtr, &code) else {
+        guard ptr.pointee.crypto.encrypter.encrypt(ptr, dest, destLength, bytes, length, flagsPtr, &code) else {
             throw mappedError(CryptoError(code))
         }
         return true
@@ -86,7 +86,7 @@ public final class CryptoCTR: Encrypter, Decrypter {
         var code = CryptoErrorGeneric
         var cFlags = crypto_flags_t()
         let flagsPtr = flags.pointer(to: &cFlags)
-        guard ptr.pointee.crypto.decrypter.decrypt(ptr, bytes, length, dest, destLength, flagsPtr, &code) else {
+        guard ptr.pointee.crypto.decrypter.decrypt(ptr, dest, destLength, bytes, length, flagsPtr, &code) else {
             throw mappedError(CryptoError(code))
         }
         return true

@@ -58,12 +58,14 @@ void crypto_configure_encrypt(void *vctx, const zeroing_data_t *cipher_key, cons
 }
 
 static
-bool crypto_encrypt(void *vctx, const uint8_t *in, size_t in_len,
-                    uint8_t *dest, size_t *dest_len, const crypto_flags_t *flags, crypto_error_t *error) {
+bool crypto_encrypt(void *vctx,
+                    uint8_t *dst, size_t *dst_len,
+                    const uint8_t *in, size_t in_len,
+                    const crypto_flags_t *flags, crypto_error_t *error) {
     crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
 
-    uint8_t *out_iv = dest + ctx->digest_len;
+    uint8_t *out_iv = dst + ctx->digest_len;
     uint8_t *out_encrypted = out_iv + ctx->cipher_iv_len;
     int l1 = 0, l2 = 0;
     size_t hmac_len = 0;
@@ -88,10 +90,10 @@ bool crypto_encrypt(void *vctx, const uint8_t *in, size_t in_len,
     EVP_MAC_CTX *ossl = EVP_MAC_CTX_new(ctx->mac);
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_init(ossl, ctx->hmac_key_enc->bytes, ctx->hmac_key_enc->length, ctx->mac_params);
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_update(ossl, out_iv, l1 + l2 + ctx->cipher_iv_len);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_final(ossl, dest, &hmac_len, ctx->digest_len);
+    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_final(ossl, dst, &hmac_len, ctx->digest_len);
     EVP_MAC_CTX_free(ossl);
 
-    *dest_len = l1 + l2 + ctx->cipher_iv_len + ctx->digest_len;
+    *dst_len = l1 + l2 + ctx->cipher_iv_len + ctx->digest_len;
 
     CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorGeneric)
 }
@@ -115,8 +117,9 @@ void crypto_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, cons
 }
 
 static
-bool crypto_decrypt(void *vctx, const uint8_t *in, size_t in_len,
+bool crypto_decrypt(void *vctx,
                     uint8_t *out, size_t *out_len,
+                    const uint8_t *in, size_t in_len,
                     const crypto_flags_t *flags, crypto_error_t *error) {
     crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
@@ -220,6 +223,9 @@ crypto_cbc_t *crypto_cbc_create(const char *cipher_name, const char *digest_name
 
     ctx->buffer_hmac = pp_alloc_crypto(MAX_HMAC_LENGTH);
 
+    ctx->crypto.meta.cipher_key_length = ctx->cipher_key_len;
+    ctx->crypto.meta.cipher_iv_length = ctx->cipher_iv_len;
+    ctx->crypto.meta.hmac_key_length = ctx->hmac_key_len;
     ctx->crypto.meta.digest_length = ctx->digest_len;
     ctx->crypto.meta.tag_length = 0;
     ctx->crypto.meta.encryption_capacity = crypto_encryption_capacity;

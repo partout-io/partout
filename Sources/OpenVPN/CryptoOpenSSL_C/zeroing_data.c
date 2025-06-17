@@ -33,7 +33,6 @@
 zeroing_data_t *zd_create(size_t length) {
     zeroing_data_t *zd = pp_alloc_crypto(sizeof(zeroing_data_t));
     zd->bytes = pp_alloc_crypto(length);
-    bzero(zd->bytes, length);
     zd->length = length;
     return zd;
 }
@@ -81,6 +80,7 @@ zeroing_data_t *zd_create_from_string(const char *string, bool null_terminated) 
 }
 
 void zd_free(zeroing_data_t *zd) {
+    assert(zd);
     bzero(zd->bytes, zd->length);
     free(zd->bytes);
     free(zd);
@@ -89,10 +89,12 @@ void zd_free(zeroing_data_t *zd) {
 // MARK: Copy
 
 zeroing_data_t *zd_make_copy(const zeroing_data_t *zd) {
+    assert(zd);
     return zd_create_copy(zd->bytes, zd->length);
 }
 
 zeroing_data_t *zd_make_slice(const zeroing_data_t *zd, size_t offset, size_t length) {
+    assert(zd);
     if (offset + length > zd->length) return NULL;
 
     zeroing_data_t *slice = pp_alloc_crypto(sizeof(zeroing_data_t));
@@ -105,6 +107,7 @@ zeroing_data_t *zd_make_slice(const zeroing_data_t *zd, size_t offset, size_t le
 // MARK: Side effect
 
 void zd_append(zeroing_data_t *zd, const zeroing_data_t *other) {
+    assert(zd);
     size_t new_len = zd->length + other->length;
     uint8_t *new_bytes = pp_alloc_crypto(new_len);
     memcpy(new_bytes, zd->bytes, zd->length);
@@ -117,6 +120,7 @@ void zd_append(zeroing_data_t *zd, const zeroing_data_t *other) {
 }
 
 void zd_truncate(zeroing_data_t *zd, size_t new_length) {
+    assert(zd);
     if (new_length > zd->length) return;
 
     uint8_t *new_bytes = pp_alloc_crypto(new_length);
@@ -130,6 +134,7 @@ void zd_truncate(zeroing_data_t *zd, size_t new_length) {
 }
 
 void zd_remove_until(zeroing_data_t *zd, size_t offset) {
+    assert(zd);
     if (offset > zd->length) return;
 
     size_t new_length = zd->length - offset;
@@ -144,12 +149,14 @@ void zd_remove_until(zeroing_data_t *zd, size_t offset) {
 }
 
 void zd_zero(zeroing_data_t *zd) {
+    assert(zd);
     bzero(zd->bytes, zd->length);
 }
 
 // MARK: Accessors
 
 uint16_t zd_uint16(const zeroing_data_t *zd, size_t offset) {
+    assert(zd);
     if (offset + 2 > zd->length) return 0;
     return zd->bytes[offset] | (zd->bytes[offset + 1] << 8);
 }

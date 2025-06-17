@@ -79,13 +79,13 @@ typedef void (*crypto_configure_t)(void *_Nonnull ctx,
                                    const zeroing_data_t *_Nullable hmac_key);
 
 typedef bool (*crypto_encrypt_t)(void *_Nonnull ctx,
-                                 const uint8_t *_Nonnull in, size_t in_len,
                                  uint8_t *_Nonnull out, size_t *_Nonnull out_len,
+                                 const uint8_t *_Nonnull in, size_t in_len,
                                  const crypto_flags_t *_Nullable flags, crypto_error_t *_Nullable error);
 
 typedef bool (*crypto_decrypt_t)(void *_Nonnull ctx,
-                                 const uint8_t *_Nonnull in, size_t in_len,
                                  uint8_t *_Nonnull out, size_t *_Nonnull out_len,
+                                 const uint8_t *_Nonnull in, size_t in_len,
                                  const crypto_flags_t *_Nullable flags, crypto_error_t *_Nullable error);
 
 typedef bool (*crypto_verify_t)(void *_Nonnull ctx,
@@ -105,7 +105,11 @@ typedef struct {
 
 typedef size_t (*crypto_capacity_t)(const void *_Nonnull ctx, size_t len);
 
+// FIXME: replace _length with _len for consistency
 typedef struct {
+    size_t cipher_key_length;
+    size_t cipher_iv_length;
+    size_t hmac_key_length;
     size_t digest_length;
     size_t tag_length;
     crypto_capacity_t _Nonnull encryption_capacity;
@@ -116,6 +120,8 @@ typedef struct {
     crypto_encrypter_t encrypter;
     crypto_decrypter_t decrypter;
 } crypto_t;
+
+typedef void (*crypto_free_t)(void *_Nonnull);
 
 #ifndef MAX
 #define MAX(a,b) ((a) > (b) ? (a) : (b))

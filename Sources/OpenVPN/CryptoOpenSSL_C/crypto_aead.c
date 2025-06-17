@@ -51,8 +51,9 @@ void crypto_configure_encrypt(void *vctx,
 }
 
 static
-bool crypto_encrypt(void *vctx, const uint8_t *in, size_t in_len,
+bool crypto_encrypt(void *vctx,
                     uint8_t *out, size_t *out_len,
+                    const uint8_t *in, size_t in_len,
                     const crypto_flags_t *flags, crypto_error_t *error) {
     crypto_aead_t *ctx = (crypto_aead_t *)vctx;
     assert(ctx);
@@ -91,8 +92,9 @@ void crypto_configure_decrypt(void *vctx,
 }
 
 static
-bool crypto_decrypt(void *vctx, const uint8_t *in, size_t in_len,
+bool crypto_decrypt(void *vctx,
                     uint8_t *out, size_t *out_len,
+                    const uint8_t *in, size_t in_len,
                     const crypto_flags_t *flags, crypto_error_t *error) {
     crypto_aead_t *ctx = (crypto_aead_t *)vctx;
     assert(ctx);
@@ -137,6 +139,9 @@ crypto_aead_t *crypto_aead_create(const char *cipher_name, size_t tag_len, size_
     ctx->iv_enc = pp_alloc_crypto(ctx->cipher_iv_len);
     ctx->iv_dec = pp_alloc_crypto(ctx->cipher_iv_len);
 
+    ctx->crypto.meta.cipher_key_length = ctx->cipher_key_len;
+    ctx->crypto.meta.cipher_iv_length = ctx->cipher_iv_len;
+    ctx->crypto.meta.hmac_key_length = 0;
     ctx->crypto.meta.digest_length = 0;
     ctx->crypto.meta.tag_length = tag_len;
     ctx->crypto.meta.encryption_capacity = crypto_encryption_capacity;
