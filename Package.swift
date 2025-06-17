@@ -51,7 +51,8 @@ environment = .remoteBinary
 // environment = .localBinary
 // environment = .localSource
 
-let areas: Set<Area> = Set(Area.allCases)
+let areas = Set(Area.allCases)
+    .subtracting([.documentation])
 
 // action-release-binary-package (PartoutCore)
 let sha1 = "bfac7b7f2831fa0b030e5972864e93754d825c74"
@@ -61,6 +62,12 @@ let checksum = "11afaadc343e0646be9d50ad7b2d6069ecd78105cb297d5daa036eb1207e1022
 
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
 let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
+
+let cSettings: [CSetting] = [.unsafeFlags([
+    "-Wall",
+//    "-ansi",
+    "-pedantic"
+])]
 
 // MARK: - Products
 
@@ -357,7 +364,8 @@ if areas.contains(.openvpn) {
         .target(
             name: "_PartoutCryptoOpenSSL_C",
             dependencies: ["openssl-apple"],
-            path: "Sources/OpenVPN/CryptoOpenSSL_C"
+            path: "Sources/OpenVPN/CryptoOpenSSL_C",
+            cSettings: cSettings
         ),
         .target(
             name: "_PartoutCryptoOpenSSL_ObjC",
