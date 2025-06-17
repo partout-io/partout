@@ -181,11 +181,11 @@ crypto_ctr_t *crypto_ctr_create(const char *cipher_name, const char *digest_name
 
     ctx->buffer_hmac = pp_alloc_crypto(tag_len);
 
-    ctx->crypto.meta.cipher_key_length = ctx->cipher_key_len;
-    ctx->crypto.meta.cipher_iv_length = ctx->cipher_iv_len;
-    ctx->crypto.meta.hmac_key_length = ctx->hmac_key_len;
-    ctx->crypto.meta.digest_length = ctx->ns_tag_len;
-    ctx->crypto.meta.tag_length = ctx->ns_tag_len;
+    ctx->crypto.meta.cipher_key_len = ctx->cipher_key_len;
+    ctx->crypto.meta.cipher_iv_len = ctx->cipher_iv_len;
+    ctx->crypto.meta.hmac_key_len = ctx->hmac_key_len;
+    ctx->crypto.meta.digest_len = ctx->ns_tag_len;
+    ctx->crypto.meta.tag_len = ctx->ns_tag_len;
     ctx->crypto.meta.encryption_capacity = crypto_encryption_capacity;
 
     ctx->crypto.encrypter.configure = crypto_configure_encrypt;

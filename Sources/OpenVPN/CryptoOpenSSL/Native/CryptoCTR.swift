@@ -47,11 +47,11 @@ public final class CryptoCTR: Encrypter, Decrypter {
     }
 
     public var digestLength: Int {
-        ptr.pointee.crypto.meta.digest_length
+        ptr.pointee.crypto.meta.digest_len
     }
 
     public var tagLength: Int {
-        ptr.pointee.crypto.meta.tag_length
+        ptr.pointee.crypto.meta.tag_len
     }
 
     public func encryptionCapacity(for length: Int) -> Int {

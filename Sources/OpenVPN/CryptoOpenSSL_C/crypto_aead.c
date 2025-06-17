@@ -139,11 +139,11 @@ crypto_aead_t *crypto_aead_create(const char *cipher_name, size_t tag_len, size_
     ctx->iv_enc = pp_alloc_crypto(ctx->cipher_iv_len);
     ctx->iv_dec = pp_alloc_crypto(ctx->cipher_iv_len);
 
-    ctx->crypto.meta.cipher_key_length = ctx->cipher_key_len;
-    ctx->crypto.meta.cipher_iv_length = ctx->cipher_iv_len;
-    ctx->crypto.meta.hmac_key_length = 0;
-    ctx->crypto.meta.digest_length = 0;
-    ctx->crypto.meta.tag_length = tag_len;
+    ctx->crypto.meta.cipher_key_len = ctx->cipher_key_len;
+    ctx->crypto.meta.cipher_iv_len = ctx->cipher_iv_len;
+    ctx->crypto.meta.hmac_key_len = 0;
+    ctx->crypto.meta.digest_len = 0;
+    ctx->crypto.meta.tag_len = tag_len;
     ctx->crypto.meta.encryption_capacity = crypto_encryption_capacity;
 
     ctx->crypto.encrypter.configure = crypto_configure_encrypt;

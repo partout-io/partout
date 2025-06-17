@@ -105,13 +105,12 @@ typedef struct {
 
 typedef size_t (*crypto_capacity_t)(const void *_Nonnull ctx, size_t len);
 
-// FIXME: replace _length with _len for consistency
 typedef struct {
-    size_t cipher_key_length;
-    size_t cipher_iv_length;
-    size_t hmac_key_length;
-    size_t digest_length;
-    size_t tag_length;
+    size_t cipher_key_len;
+    size_t cipher_iv_len;
+    size_t hmac_key_len;
+    size_t digest_len;
+    size_t tag_len;
     crypto_capacity_t _Nonnull encryption_capacity;
 } crypto_meta_t;
 

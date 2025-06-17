@@ -223,11 +223,11 @@ crypto_cbc_t *crypto_cbc_create(const char *cipher_name, const char *digest_name
 
     ctx->buffer_hmac = pp_alloc_crypto(MAX_HMAC_LENGTH);
 
-    ctx->crypto.meta.cipher_key_length = ctx->cipher_key_len;
-    ctx->crypto.meta.cipher_iv_length = ctx->cipher_iv_len;
-    ctx->crypto.meta.hmac_key_length = ctx->hmac_key_len;
-    ctx->crypto.meta.digest_length = ctx->digest_len;
-    ctx->crypto.meta.tag_length = 0;
+    ctx->crypto.meta.cipher_key_len = ctx->cipher_key_len;
+    ctx->crypto.meta.cipher_iv_len = ctx->cipher_iv_len;
+    ctx->crypto.meta.hmac_key_len = ctx->hmac_key_len;
+    ctx->crypto.meta.digest_len = ctx->digest_len;
+    ctx->crypto.meta.tag_len = 0;
     ctx->crypto.meta.encryption_capacity = crypto_encryption_capacity;
 
     ctx->crypto.encrypter.configure = crypto_configure_encrypt;
