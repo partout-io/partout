@@ -64,9 +64,9 @@ let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
 let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
 
 let cSettings: [CSetting] = [.unsafeFlags([
-    "-Wall",
+    "-Wall"
 //    "-ansi",
-    "-pedantic"
+//    "-pedantic"
 ])]
 
 // MARK: - Products
