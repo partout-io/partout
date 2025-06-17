@@ -1,8 +1,8 @@
 //
-//  Extensions.swift
+//  CryptoBridging.h
 //  Partout
 //
-//  Created by Davide De Rosa on 1/14/25.
+//  Created by Davide De Rosa on 6/15/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,22 +23,25 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
+#import "CryptoOpenSSL/CryptoMacros.h"
+#import "CryptoOpenSSL/ZeroingData.h"
+#import "crypto_openssl/zeroing_data.h"
 
-extension Data {
-    init(hex: String) {
-        assert(hex.count & 1 == 0)
-        var data = Data()
-        var index = hex.startIndex
-        while index < hex.endIndex {
-            let nextIndex = hex.index(index, offsetBy: 2)
-            if let byte = UInt8(hex[index..<nextIndex], radix: 16) {
-                data.append(byte)
-            } else {
-                break
-            }
-            index = nextIndex
-        }
-        self.init(data)
+@interface ZeroingData (C)
+
+- (zeroing_data_t *)ptr;
+
+@end
+
+static inline
+crypto_flags_t crypto_flags_from(const CryptoFlags *flags) {
+    crypto_flags_t cf = { 0 };
+    if (flags) {
+        cf.ad = flags->ad;
+        cf.ad_len = flags->adLength;
+        cf.iv = flags->iv;
+        cf.iv_len = flags->ivLength;
+        cf.for_testing = flags->forTesting;
     }
+    return cf;
 }

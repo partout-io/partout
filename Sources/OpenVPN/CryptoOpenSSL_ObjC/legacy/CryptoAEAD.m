@@ -36,10 +36,10 @@
 
 #import <openssl/evp.h>
 
-#import "Allocation.h"
-#import "Crypto.h"
-#import "CryptoAEAD.h"
-#import "ZeroingData.h"
+#import "CryptoOpenSSL/Allocation.h"
+#import "CryptoOpenSSL/CryptoAEAD.h"
+#import "CryptoOpenSSL/CryptoMacros.h"
+#import "CryptoOpenSSL/ZeroingData.h"
 
 @interface CryptoAEAD ()
 
@@ -59,8 +59,12 @@
 
 @implementation CryptoAEAD
 
-- (instancetype)initWithCipherName:(NSString *)cipherName tagLength:(NSInteger)tagLength idLength:(NSInteger)idLength
+- (nullable instancetype)initWithCipherName:(NSString *)cipherName
+                                  tagLength:(NSInteger)tagLength
+                                   idLength:(NSInteger)idLength
+                                      error:(NSError **)error
 {
+    NSLog(@"PartoutOpenVPN: Using CryptoAEAD (legacy ObjC)");
     NSParameterAssert([[cipherName uppercaseString] hasSuffix:@"GCM"]);
 
     self = [super init];
@@ -70,6 +74,9 @@
 
         self.cipher = EVP_get_cipherbyname([cipherName cStringUsingEncoding:NSASCIIStringEncoding]);
         NSAssert(self.cipher, @"Unknown cipher '%@'", cipherName);
+        if (!self.cipher) {
+            return nil;
+        }
 
         self.cipherKeyLength = EVP_CIPHER_key_length(self.cipher);
         self.cipherIVLength = EVP_CIPHER_iv_length(self.cipher);

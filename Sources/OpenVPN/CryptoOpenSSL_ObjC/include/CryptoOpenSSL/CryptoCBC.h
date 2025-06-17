@@ -1,5 +1,5 @@
 //
-//  CryptoAEAD.h
+//  CryptoCBC.h
 //  Partout
 //
 //  Created by Davide De Rosa on 7/6/18.
@@ -35,22 +35,25 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "Crypto.h"
+#import "CryptoMacros.h"
 #import "CryptoProtocols.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-typedef NS_ENUM(NSInteger, CryptoAEADError) {
-    CryptoAEADErrorGeneric
+typedef NS_ENUM(NSInteger, CryptoCBCError) {
+    CryptoCBCErrorGeneric,
+    CryptoCBCErrorRandomGenerator,
+    CryptoCBCErrorHMAC
 };
 
-@interface CryptoAEAD : NSObject <Encrypter, Decrypter>
+@interface CryptoCBC : NSObject <Encrypter, Decrypter>
 
-- (instancetype)initWithCipherName:(NSString *)cipherName
-                         tagLength:(NSInteger)tagLength
-                          idLength:(NSInteger)idLength;
+- (nullable instancetype)initWithCipherName:(nullable NSString *)cipherName
+                                 digestName:(NSString *)digestName
+                                      error:(NSError **)error;
+- (int)cipherIVLength;
 
-@property (nonatomic, copy) NSError * (^mappedError)(CryptoAEADError);
+@property (nonatomic, copy) NSError * (^mappedError)(CryptoCBCError);
 
 @end
 

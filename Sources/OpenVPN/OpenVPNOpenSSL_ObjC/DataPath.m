@@ -36,7 +36,7 @@
 
 #import <arpa/inet.h>
 
-#import "Allocation.h"
+#import "CryptoOpenSSL/Allocation.h"
 #import "DataPath.h"
 #import "DataPathCrypto.h"
 #import "Errors.h"

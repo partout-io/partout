@@ -1,8 +1,8 @@
 //
-//  PacketStream.h
+//  CryptoCTR.h
 //  Partout
 //
-//  Created by Davide De Rosa on 4/25/19.
+//  Created by Davide De Rosa on 9/18/18.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -24,26 +24,25 @@
 //
 
 #import <Foundation/Foundation.h>
-
-#import "XORMethodNative.h"
-#import "CryptoOpenSSL/ZeroingData.h"
+#import "CryptoMacros.h"
+#import "CryptoProtocols.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface PacketStream : NSObject
+typedef NS_ENUM(NSInteger, CryptoCTRError) {
+    CryptoCTRErrorGeneric,
+    CryptoCTRErrorHMAC
+};
 
-+ (NSArray<NSData *> *)packetsFromInboundStream:(NSData *)stream
-                                          until:(NSInteger *)until
-                                      xorMethod:(XORMethodNative)xorMethod
-                                        xorMask:(nullable ZeroingData *)xorMask;
+@interface CryptoCTR : NSObject <Encrypter, Decrypter>
 
-+ (NSData *)outboundStreamFromPacket:(NSData *)packet
-                           xorMethod:(XORMethodNative)xorMethod
-                             xorMask:(nullable ZeroingData *)xorMask;
+- (nullable instancetype)initWithCipherName:(NSString *)cipherName
+                                 digestName:(NSString *)digestName
+                                  tagLength:(NSInteger)tagLength
+                              payloadLength:(NSInteger)payloadLength
+                                      error:(NSError **)error;
 
-+ (NSData *)outboundStreamFromPackets:(NSArray<NSData *> *)packets
-                            xorMethod:(XORMethodNative)xorMethod
-                              xorMask:(nullable ZeroingData *)xorMask;
+@property (nonatomic, copy) NSError * (^mappedError)(CryptoCTRError);
 
 @end
 

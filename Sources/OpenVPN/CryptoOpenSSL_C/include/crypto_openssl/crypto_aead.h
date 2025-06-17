@@ -1,8 +1,8 @@
 //
-//  CryptoCTR.h
+//  crypto_aead.h
 //  Partout
 //
-//  Created by Davide De Rosa on 9/18/18.
+//  Created by Davide De Rosa on 6/14/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,26 +23,27 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#import <Foundation/Foundation.h>
-#import "Crypto.h"
-#import "CryptoProtocols.h"
+#pragma once
 
-NS_ASSUME_NONNULL_BEGIN
+#include <openssl/evp.h>
+#include "crypto.h"
+#include "zeroing_data.h"
 
-typedef NS_ENUM(NSInteger, CryptoCTRError) {
-    CryptoCTRErrorGeneric,
-    CryptoCTRErrorHMAC
-};
+typedef struct {
+    crypto_t crypto;
 
-@interface CryptoCTR : NSObject <Encrypter, Decrypter>
+    const EVP_CIPHER *_Nonnull cipher;
+    size_t cipher_key_len;
+    size_t cipher_iv_len;
+    size_t tag_len;
+    size_t id_len;
 
-- (instancetype)initWithCipherName:(nullable NSString *)cipherName
-                        digestName:(NSString *)digestName
-                         tagLength:(NSInteger)tagLength
-                     payloadLength:(NSInteger)payloadLength;
+    EVP_CIPHER_CTX *_Nonnull ctx_enc;
+    EVP_CIPHER_CTX *_Nonnull ctx_dec;
+    uint8_t *_Nonnull iv_enc;
+    uint8_t *_Nonnull iv_dec;
+} crypto_aead_t;
 
-@property (nonatomic, copy) NSError * (^mappedError)(CryptoCTRError);
-
-@end
-
-NS_ASSUME_NONNULL_END
+crypto_aead_t *_Nullable crypto_aead_create(const char *_Nonnull cipher_name,
+                                            size_t tag_len, size_t id_len);
+void crypto_aead_free(crypto_aead_t *_Nonnull ctx);

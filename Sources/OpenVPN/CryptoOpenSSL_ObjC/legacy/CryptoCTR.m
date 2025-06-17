@@ -25,10 +25,10 @@
 
 #import <openssl/evp.h>
 
-#import "Allocation.h"
-#import "Crypto.h"
-#import "CryptoCTR.h"
-#import "ZeroingData.h"
+#import "CryptoOpenSSL/Allocation.h"
+#import "CryptoOpenSSL/CryptoCTR.h"
+#import "CryptoOpenSSL/CryptoMacros.h"
+#import "CryptoOpenSSL/ZeroingData.h"
 
 @interface CryptoCTR ()
 
@@ -55,11 +55,13 @@
 
 @implementation CryptoCTR
 
-- (instancetype)initWithCipherName:(NSString *)cipherName
-                        digestName:(NSString *)digestName
-                         tagLength:(NSInteger)tagLength
-                     payloadLength:(NSInteger)payloadLength
+- (nullable instancetype)initWithCipherName:(NSString *)cipherName
+                                 digestName:(NSString *)digestName
+                                  tagLength:(NSInteger)tagLength
+                              payloadLength:(NSInteger)payloadLength
+                                      error:(NSError **)error
 {
+    NSLog(@"PartoutOpenVPN: Using CryptoCTR (legacy ObjC)");
     NSParameterAssert(cipherName && [[cipherName uppercaseString] hasSuffix:@"CTR"]);
     NSParameterAssert(digestName);
 
@@ -72,11 +74,17 @@
         strncpy(self.utfCipherName, [cipherName UTF8String], [cipherName length]);
         self.cipher = EVP_get_cipherbyname(self.utfCipherName);
         NSAssert(self.cipher, @"Unknown cipher '%@'", cipherName);
+        if (!self.cipher) {
+            return nil;
+        }
 
         self.utfDigestName = calloc([digestName length] + 1, sizeof(char));
         strncpy(self.utfDigestName, [digestName UTF8String], [digestName length]);
         self.digest = EVP_get_digestbyname(self.utfDigestName);
         NSAssert(self.digest, @"Unknown digest '%@'", digestName);
+        if (!self.digest) {
+            return nil;
+        }
 
         self.cipherKeyLength = EVP_CIPHER_key_length(self.cipher);
         self.cipherIVLength = EVP_CIPHER_iv_length(self.cipher);

@@ -1,8 +1,8 @@
 //
-//  CryptoCBC.h
+//  allocation.h
 //  Partout
 //
-//  Created by Davide De Rosa on 7/6/18.
+//  Created by Davide De Rosa on 3/3/17.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -34,25 +34,31 @@
 //      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#import <Foundation/Foundation.h>
-#import "Crypto.h"
-#import "CryptoProtocols.h"
+#pragma once
 
-NS_ASSUME_NONNULL_BEGIN
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-typedef NS_ENUM(NSInteger, CryptoCBCError) {
-    CryptoCBCErrorGeneric,
-    CryptoCBCErrorRandomGenerator,
-    CryptoCBCErrorHMAC
-};
+static inline
+void *_Nonnull pp_alloc_crypto(size_t size) {
+    void *memory = calloc(1, size);
+    if (!memory) {
+        fputs("pp_alloc_crypto: malloc() call failed", stderr);
+        abort();
+    }
+    return memory;
+}
 
-@interface CryptoCBC : NSObject <Encrypter, Decrypter>
+#define MAX_BLOCK_SIZE  16  // AES only, block is 128-bit
 
-- (instancetype)initWithCipherName:(nullable NSString *)cipherName digestName:(NSString *)digestName;
-- (int)cipherIVLength;
+/// - Parameters:
+///   - size: The base number of bytes.
+///   - overhead: The extra number of bytes.
+/// - Returns: The number of bytes to store a crypto buffer safely.
+static inline
+size_t pp_alloc_crypto_capacity(size_t size, size_t overhead) {
 
-@property (nonatomic, copy) NSError * (^mappedError)(CryptoCBCError);
-
-@end
-
-NS_ASSUME_NONNULL_END
+    // encryption, byte-alignment, overhead (e.g. IV, digest)
+    return 2 * size + MAX_BLOCK_SIZE + overhead;
+}
