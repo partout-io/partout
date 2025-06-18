@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable internal import _PartoutCryptoOpenSSL
+@testable internal import _PartoutCryptoOpenSSL_C
 import Foundation
 
 // NOTE: it doesn't matter to use Swift CryptoFlagsWrapper here. for
