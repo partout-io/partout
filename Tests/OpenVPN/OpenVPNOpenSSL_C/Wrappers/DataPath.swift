@@ -137,11 +137,7 @@ extension DataPath {
 //            if (self.inReplay && [self.inReplay isReplayedPacketId:packetId]) {
 //                continue;
 //            }
-            // FIXME: ###, after parse -> throw if compressed
-            // how to detect ALL compressed variants? or ensure uncompressed?
-//            guard header != DataPacketLZOCompress else {
-//                throw DataPathError.path(DataPathErrorCompression)
-//            }
+            // FIXME: ###, after parse -> throw if compressed (should be handled by dp_framing_parse_common)
 
             tuple.data.withUnsafeBytes {
                 if memcmp($0.bytePointer, DataPacketPingDataBytes(), tuple.data.count) == 0 {
