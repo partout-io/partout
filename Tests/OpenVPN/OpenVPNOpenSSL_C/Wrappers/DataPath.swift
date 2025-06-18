@@ -247,7 +247,7 @@ extension DataPath {
             guard let zd else {
                 throw DataPathError(error) ?? .generic
             }
-            return Data(bytes: zd.pointee.bytes, count: zd.pointee.length)
+            return NSData(bytesNoCopy: zd.pointee.bytes, length: zd.pointee.length) as Data
         }
     }
 
@@ -273,7 +273,7 @@ extension DataPath {
             guard let zd else {
                 throw DataPathError(error) ?? .generic
             }
-            let data = Data(bytes: zd.pointee.bytes, count: zd.pointee.length)
+            let data = NSData(bytesNoCopy: zd.pointee.bytes, length: zd.pointee.length) as Data
             return (packetId, header, data)
         }
     }
