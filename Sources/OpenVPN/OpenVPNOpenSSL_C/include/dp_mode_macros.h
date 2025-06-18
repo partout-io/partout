@@ -1,0 +1,50 @@
+//
+//  dp_mode_macros.h
+//  Partout
+//
+//  Created by Davide De Rosa on 6/16/25.
+//  Copyright (c) 2025 Davide De Rosa. All rights reserved.
+//
+//  https://github.com/passepartoutvpn
+//
+//  This file is part of Partout.
+//
+//  Partout is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  Partout is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
+//
+
+#include <stdbool.h>
+#include <stdint.h>
+#include "packet.h"
+
+#define DATA_PATH_ENCRYPT_INIT(peerId) \
+    const bool has_peer_id = (peerId != PacketPeerIdDisabled); \
+    size_t dst_header_len = PacketOpcodeLength; \
+    if (has_peer_id) { \
+        dst_header_len += PacketPeerIdLength; \
+    }
+
+#define DATA_PATH_DECRYPT_INIT(ctx) \
+    const uint8_t *ptr = ctx->src; \
+    packet_code_t code; \
+    PacketOpcodeGet(ptr, &code, NULL); \
+    uint32_t peer_id = PacketPeerIdDisabled; \
+    const bool has_peer_id = (code == PacketCodeDataV2); \
+    size_t src_header_len = PacketOpcodeLength; \
+    if (has_peer_id) { \
+        src_header_len += PacketPeerIdLength; \
+        if (ctx->src_len < src_header_len) { \
+            return false; \
+        } \
+        peer_id = PacketHeaderGetDataV2PeerId(ptr); \
+    }

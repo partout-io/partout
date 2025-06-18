@@ -133,6 +133,20 @@
                ReferencedContainer = "container:">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "_PartoutOpenVPNOpenSSL_C"
+               BuildableName = "_PartoutOpenVPNOpenSSL_C"
+               BlueprintName = "_PartoutOpenVPNOpenSSL_C"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -249,6 +263,16 @@
                BlueprintIdentifier = "_PartoutWireGuardTests"
                BuildableName = "_PartoutWireGuardTests"
                BlueprintName = "_PartoutWireGuardTests"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "_PartoutOpenVPNOpenSSL_CTests"
+               BuildableName = "_PartoutOpenVPNOpenSSL_CTests"
+               BlueprintName = "_PartoutOpenVPNOpenSSL_CTests"
                ReferencedContainer = "container:">
             </BuildableReference>
          </TestableReference>

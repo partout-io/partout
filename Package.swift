@@ -64,11 +64,11 @@ let checksum = "11afaadc343e0646be9d50ad7b2d6069ecd78105cb297d5daa036eb1207e1022
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
 let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
 
-let cSettings: [CSetting] = [.unsafeFlags([
-    "-Wall"
-//    "-ansi",
-//    "-pedantic"
-])]
+let cSettings: [CSetting] = [
+    .unsafeFlags([
+        "-Wall", "-Wextra"//, "-Werror"
+    ])
+]
 
 // MARK: - Products
 
@@ -309,17 +309,18 @@ if areas.contains(.api) {
 // MARK: OpenVPN
 
 if areas.contains(.openvpn) {
-    enum CryptoMode: String {
-        case legacy
+    enum CryptoMode: Int {
+        case legacy = 0
 
-        case bridged
+        case bridged = 1
 
-        case native
+        case native = 2
     }
 
     let cryptoMode: CryptoMode
     if let envModeString = ProcessInfo.processInfo.environment["OPENVPN_CRYPTO_MODE"],
-       let envMode = CryptoMode(rawValue: envModeString) {
+       let envModeInt = Int(envModeString),
+       let envMode = CryptoMode(rawValue: envModeInt) {
         cryptoMode = envMode
     } else {
         cryptoMode = .legacy
@@ -344,6 +345,10 @@ if areas.contains(.openvpn) {
         .library(
             name: "_PartoutOpenVPNOpenSSL",
             targets: ["_PartoutOpenVPNOpenSSL"]
+        ),
+        .library(
+            name: "_PartoutOpenVPNOpenSSL_C",
+            targets: ["_PartoutOpenVPNOpenSSL_C"]
         )
     ])
     package.targets.append(contentsOf: [
@@ -388,9 +393,22 @@ if areas.contains(.openvpn) {
             name: "_PartoutOpenVPNOpenSSL",
             dependencies: [
                 "_PartoutOpenVPN",
-                "_PartoutOpenVPNOpenSSL_ObjC"
+                {
+                    switch cryptoMode {
+                    case .legacy, .bridged:
+                        "_PartoutOpenVPNOpenSSL_ObjC"
+                    case .native:
+                        "_PartoutOpenVPNOpenSSL_C"
+                    }
+                }()
             ],
             path: "Sources/OpenVPN/OpenVPNOpenSSL"
+        ),
+        .target(
+            name: "_PartoutOpenVPNOpenSSL_C",
+            dependencies: ["_PartoutCryptoOpenSSL_C"],
+            path: "Sources/OpenVPN/OpenVPNOpenSSL_C",
+            cSettings: cSettings
         ),
         .target(
             name: "_PartoutOpenVPNOpenSSL_ObjC",
@@ -435,6 +453,14 @@ if areas.contains(.openvpn) {
             name: "_PartoutOpenVPNTests",
             dependencies: ["_PartoutOpenVPN"],
             path: "Tests/OpenVPN/Base"
+        ),
+        .testTarget(
+            name: "_PartoutOpenVPNOpenSSL_CTests",
+            dependencies: [
+                "_PartoutOpenVPNOpenSSL_C",
+                "PartoutCoreWrapper"
+            ],
+            path: "Tests/OpenVPN/OpenVPNOpenSSL_C"
         ),
         .testTarget(
             name: "_PartoutOpenVPNOpenSSLTests",
