@@ -109,12 +109,13 @@ extension DataPathTestsProtocol {
         }
 
         let decryptedPair = try sut.decrypt(packet: encrypted)
-        XCTAssertEqual(decryptedPair.0, packetId)
-        XCTAssertEqual(decryptedPair.1, assembled)
+        XCTAssertEqual(decryptedPair.packetId, packetId)
+        XCTAssertEqual(decryptedPair.data, assembled)
         print("\tpacket_id:\t", String(format: "%0x", decryptedPair.0))
         print("\tdecrypted:\t", decryptedPair.1.toHex())
 
-        let parsed = try sut.parse(decryptedPacket: decryptedPair.1)
+        var header: UInt8 = 0
+        let parsed = try sut.parse(decrypted: decryptedPair.data, header: &header)
         print("\tparsed:\t\t", parsed.toHex())
         XCTAssertEqual(parsed, payload)
     }
@@ -155,8 +156,8 @@ extension DataPathTestsProtocol {
             encrypted,
             withNewBuffer: true
         )
-        XCTAssertEqual(decryptedPair.0, packetId)
-        XCTAssertEqual(decryptedPair.1, payload)
+        XCTAssertEqual(decryptedPair.packetId, packetId)
+        XCTAssertEqual(decryptedPair.data, payload)
         print("\tpacket_id:\t", String(format: "%0x", decryptedPair.0))
         print("\tdecrypted:\t", decryptedPair.1.toHex())
     }

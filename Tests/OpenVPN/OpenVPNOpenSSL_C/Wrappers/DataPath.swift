@@ -190,98 +190,151 @@ private extension DataPath {
     }
 }
 
-// MARK: - Split
+// MARK: - Creating buffers
 
 extension DataPath {
-    func assemble(packetId: UInt32, payload: Data) -> Data {
-        let inputCount = payload.count
-        let output = zd_create(dp_mode_assemble_capacity(mode, inputCount))
+    func assemble(
+        packetId: UInt32,
+        payload: Data
+    ) -> Data {
+        let buf = zd_create(dp_mode_assemble_capacity(mode, payload.count))
         defer {
-            zd_free(output)
+            zd_free(buf)
         }
+        return assemble(packetId: packetId, payload: payload, buf: buf)
+    }
+
+    func encrypt(
+        key: UInt8,
+        packetId: UInt32,
+        assembled: Data
+    ) throws -> Data {
+        let buf = zd_create(dp_mode_encrypt_capacity(mode, assembled.count))
+        defer {
+            zd_free(buf)
+        }
+        return try encrypt(key: key, packetId: packetId, assembled: assembled, buf: buf)
+    }
+
+    func decrypt(
+        packet: Data
+    ) throws -> DecryptedPair {
+        let buf = zd_create(packet.count)
+        defer {
+            zd_free(buf)
+        }
+        return try decrypt(packet: packet, buf: buf)
+    }
+
+    func parse(
+        decrypted: Data,
+        header: inout UInt8,
+    ) throws -> Data {
+        let buf = zd_create(decrypted.count)
+        defer {
+            zd_free(buf)
+        }
+        return try parse(decrypted: decrypted, header: &header, buf: buf)
+    }
+}
+
+// MARK: - Reusing buffers
+
+// WARNING: these assume that buf holds the output! (resized externally)
+
+extension DataPath {
+    func assemble(
+        packetId: UInt32,
+        payload: Data,
+        buf: UnsafeMutablePointer<zeroing_data_t>?
+    ) -> Data {
+        let buf = buf ?? encBuffer
+        let inputCount = payload.count
         return payload.withUnsafeBytes { input in
-            let outputLength = dp_mode_assemble(
+            let outLength = dp_mode_assemble(
                 mode,
                 packetId,
-                output,
+                buf,
                 input.bytePointer,
                 inputCount
             )
-            return Data(bytes: output.pointee.bytes, count: outputLength)
+            return Data(bytes: buf.pointee.bytes, count: outLength)
         }
     }
 
-    func encrypt(key: UInt8, packetId: UInt32, assembled: Data) throws -> Data {
+    func encrypt(
+        key: UInt8,
+        packetId: UInt32,
+        assembled: Data,
+        buf: UnsafeMutablePointer<zeroing_data_t>?
+    ) throws -> Data {
+        let buf = buf ?? encBuffer
         let inputCount = assembled.count
-        let output = zd_create(dp_mode_encrypt_capacity(mode, inputCount))
-        defer {
-            zd_free(output)
-        }
         return try assembled.withUnsafeBytes { input in
             var error = dp_error_t()
-            let outputLength = dp_mode_encrypt(
+            let outLength = dp_mode_encrypt(
                 mode,
                 key,
                 packetId,
-                output,
+                buf,
                 input.bytePointer,
                 inputCount,
                 &error
             )
-            guard outputLength > 0 else {
+            guard outLength > 0 else {
                 throw DataPathError(error) ?? .generic
             }
-            return Data(bytes: output.pointee.bytes, count: outputLength)
+            return Data(bytes: buf.pointee.bytes, count: outLength)
         }
     }
 
-    func decrypt(packet: Data) throws -> DecryptedPair {
+    func decrypt(
+        packet: Data,
+        buf: UnsafeMutablePointer<zeroing_data_t>?
+    ) throws -> DecryptedPair {
+        let buf = buf ?? decBuffer
         let inputCount = packet.count
-        let output = zd_create(inputCount)
-        defer {
-            zd_free(output)
-        }
         return try packet.withUnsafeBytes { input in
             var packetId: UInt32 = 0
             var error = dp_error_t()
-            let outputLength = dp_mode_decrypt(
+            let outLength = dp_mode_decrypt(
                 mode,
-                output,
+                buf,
                 &packetId,
                 input.bytePointer,
                 inputCount,
                 &error
             )
-            guard outputLength > 0 else {
+            guard outLength > 0 else {
                 throw DataPathError(error) ?? .generic
             }
-            let data = Data(bytes: output.pointee.bytes, count: outputLength)
+            let data = Data(bytes: buf.pointee.bytes, count: outLength)
             return (packetId, data)
         }
     }
 
-    func parse(decryptedPacket: Data) throws -> Data {
-        var inputCopy = [UInt8](decryptedPacket) // FIXME: ###, copy because parsed in place
+    func parse(
+        decrypted: Data,
+        header: inout UInt8,
+        buf: UnsafeMutablePointer<zeroing_data_t>?
+    ) throws -> Data {
+        let buf = buf ?? decBuffer
+        var inputCopy = [UInt8](decrypted) // FIXME: ###, copy because parsed in place
         let inputCount = inputCopy.count
-        let output = zd_create(inputCount)
-        defer {
-            zd_free(output)
-        }
         return try inputCopy.withUnsafeMutableBytes { input in
-            var header: UInt8 = 0
             var error = dp_error_t()
-            let outputLength = dp_mode_parse(
+            let outLength = dp_mode_parse(
                 mode,
-                output,
+                buf,
                 &header,
                 input.bytePointer,
                 inputCount,
                 &error
             )
-            guard outputLength > 0 else {
+            guard outLength > 0 else {
                 throw DataPathError(error) ?? .generic
             }
-            return Data(bytes: output.pointee.bytes, count: outputLength)
+            return Data(bytes: buf.pointee.bytes, count: outLength)
         }
     }
 }
