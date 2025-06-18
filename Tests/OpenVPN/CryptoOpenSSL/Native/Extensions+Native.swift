@@ -1,5 +1,5 @@
 //
-//  CryptoProtocols+Native.swift
+//  Extensions+Native.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/16/25.
@@ -23,13 +23,39 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutCryptoOpenSSL_C
 import Foundation
 
-// FIXME: ###, maybe these protocols will be redundant
+extension CryptoFlagsWrapper {
+    init(cFlags: crypto_flags_t) {
+        iv = cFlags.iv
+        ivLength = cFlags.iv_len
+        ad = cFlags.ad
+        adLength = cFlags.ad_len
+        forTesting = cFlags.for_testing == 1
+    }
+
+    var cFlags: crypto_flags_t {
+        var flags = crypto_flags_t()
+        flags.iv = iv
+        flags.iv_len = ivLength
+        flags.ad = ad
+        flags.ad_len = adLength
+        flags.for_testing = forTesting ? 1 : 0
+        return flags
+    }
+}
+
+extension Optional where Wrapped == CryptoFlagsWrapper {
+    func pointer(to cFlags: UnsafeMutablePointer<crypto_flags_t>) -> UnsafeMutablePointer<crypto_flags_t>? {
+        map {
+            cFlags.pointee = $0.cFlags
+            return cFlags
+        }
+    }
+}
 
 extension Encrypter {
-
-    /// Swift version of `encryptBytes`.
     func encryptData(_ data: Data, flags: CryptoFlagsWrapper?) throws -> Data {
         let srcLength = data.count
         var dest: [UInt8] = Array(repeating: 0, count: srcLength + 256)
@@ -43,8 +69,6 @@ extension Encrypter {
 }
 
 extension Decrypter {
-
-    /// Swift version of `decryptBytes`.
     func decryptData(_ data: Data, flags: CryptoFlagsWrapper?) throws -> Data {
         let srcLength = data.count
         var dest: [UInt8] = Array(repeating: 0, count: srcLength + 256)
@@ -56,7 +80,6 @@ extension Decrypter {
         return Data(dest)
     }
 
-    /// Swift version of `verifyBytes`.
     func verifyData(_ data: Data, flags: CryptoFlagsWrapper?) throws {
         let srcLength = data.count
         _ = try data.withUnsafeBytes {

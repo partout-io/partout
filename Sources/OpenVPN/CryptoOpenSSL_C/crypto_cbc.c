@@ -254,7 +254,9 @@ void crypto_cbc_free(crypto_cbc_t *ctx) {
         free(ctx->buffer_hmac);
     }
 
-    free(ctx->utf_cipher_name);
+    if (ctx->utf_cipher_name) {
+        free(ctx->utf_cipher_name);
+    }
     free(ctx->utf_digest_name);
     zd_free(ctx->hmac_key_enc);
     zd_free(ctx->hmac_key_dec);

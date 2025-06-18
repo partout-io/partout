@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable import _PartoutCryptoOpenSSL
 #if canImport(_PartoutCryptoOpenSSL_ObjC)
 internal import _PartoutCryptoOpenSSL_ObjC
 #endif
@@ -32,7 +31,7 @@ import XCTest
 final class CryptoAEADTests: XCTestCase, CryptoFlagsProviding {
     func test_givenData_whenEncrypt_thenDecrypts() throws {
         let sut = try CryptoAEAD(cipherName: "aes-256-gcm", tagLength: 16, idLength: 4)
-        var flags = newCryptoFlags()
+        let flags = newCryptoFlags()
 
         sut.configureEncryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)

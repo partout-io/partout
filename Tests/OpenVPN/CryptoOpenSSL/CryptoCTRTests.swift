@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable import _PartoutCryptoOpenSSL
 #if canImport(_PartoutCryptoOpenSSL_ObjC)
 internal import _PartoutCryptoOpenSSL_ObjC
 #endif
@@ -42,7 +41,7 @@ final class CryptoCTRTests: XCTestCase, CryptoFlagsProviding {
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         let encryptedData: Data
 
-        var flags = newCryptoFlags()
+        let flags = newCryptoFlags()
         do {
             encryptedData = try sut.encryptData(plainData, flags: flags)
         } catch {

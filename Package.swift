@@ -1,6 +1,7 @@
 // swift-tools-version: 5.9
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
+import Foundation
 import PackageDescription
 
 enum Environment {
@@ -308,7 +309,7 @@ if areas.contains(.api) {
 // MARK: OpenVPN
 
 if areas.contains(.openvpn) {
-    enum CryptoMode {
+    enum CryptoMode: String {
         case legacy
 
         case bridged
@@ -316,7 +317,13 @@ if areas.contains(.openvpn) {
         case native
     }
 
-    let cryptoMode: CryptoMode = .legacy
+    let cryptoMode: CryptoMode
+    if let envModeString = ProcessInfo.processInfo.environment["OPENVPN_CRYPTO_MODE"],
+       let envMode = CryptoMode(rawValue: envModeString) {
+        cryptoMode = envMode
+    } else {
+        cryptoMode = .legacy
+    }
 
     package.dependencies.append(contentsOf: [
         .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
@@ -327,8 +334,12 @@ if areas.contains(.openvpn) {
             targets: ["PartoutOpenVPN"]
         ),
         .library(
-            name: "_PartoutCryptoOpenSSL",
-            targets: ["_PartoutCryptoOpenSSL"]
+            name: "_PartoutCryptoOpenSSL_ObjC",
+            targets: ["_PartoutCryptoOpenSSL_ObjC"]
+        ),
+        .library(
+            name: "_PartoutCryptoOpenSSL_C",
+            targets: ["_PartoutCryptoOpenSSL_C"]
         ),
         .library(
             name: "_PartoutOpenVPNOpenSSL",
@@ -342,26 +353,6 @@ if areas.contains(.openvpn) {
             path: "Sources/OpenVPN/Wrapper"
         ),
         .target(
-            name: "_PartoutCryptoOpenSSL",
-            dependencies: {
-                switch cryptoMode {
-                case .legacy, .bridged:
-                    ["_PartoutCryptoOpenSSL_ObjC"]
-                case .native:
-                    ["_PartoutCryptoOpenSSL_C"]
-                }
-            }(),
-            path: "Sources/OpenVPN/CryptoOpenSSL",
-            exclude: {
-                switch cryptoMode {
-                case .legacy, .bridged:
-                    ["Native"]
-                case .native:
-                    ["Legacy"]
-                }
-            }()
-        ),
-        .target(
             name: "_PartoutCryptoOpenSSL_C",
             dependencies: ["openssl-apple"],
             path: "Sources/OpenVPN/CryptoOpenSSL_C",
@@ -370,7 +361,9 @@ if areas.contains(.openvpn) {
         .target(
             name: "_PartoutCryptoOpenSSL_ObjC",
             dependencies: {
-                var deps: [Target.Dependency] = ["openssl-apple"]
+                var deps: [Target.Dependency] = [
+                    "openssl-apple"
+                ]
                 if cryptoMode == .bridged {
                     deps.append("_PartoutCryptoOpenSSL_C")
                 }
@@ -394,7 +387,6 @@ if areas.contains(.openvpn) {
         .target(
             name: "_PartoutOpenVPNOpenSSL",
             dependencies: [
-                "_PartoutCryptoOpenSSL",
                 "_PartoutOpenVPN",
                 "_PartoutOpenVPNOpenSSL_ObjC"
             ],
@@ -402,7 +394,15 @@ if areas.contains(.openvpn) {
         ),
         .target(
             name: "_PartoutOpenVPNOpenSSL_ObjC",
-            dependencies: ["_PartoutCryptoOpenSSL"],
+            dependencies: {
+                var deps: [Target.Dependency] = [
+                    "_PartoutCryptoOpenSSL_ObjC"
+                ]
+                if cryptoMode == .bridged {
+                    deps.append("_PartoutCryptoOpenSSL_C")
+                }
+                return deps
+            }(),
             path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
             exclude: [
                 "lib/COPYING",
@@ -413,8 +413,23 @@ if areas.contains(.openvpn) {
         ),
         .testTarget(
             name: "_PartoutCryptoOpenSSLTests",
-            dependencies: ["_PartoutCryptoOpenSSL"],
-            path: "Tests/OpenVPN/CryptoOpenSSL"
+            dependencies: {
+                switch cryptoMode {
+                case .legacy, .bridged:
+                    ["_PartoutCryptoOpenSSL_ObjC"]
+                case .native:
+                    ["_PartoutCryptoOpenSSL_C"]
+                }
+            }(),
+            path: "Tests/OpenVPN/CryptoOpenSSL",
+            exclude: {
+                switch cryptoMode {
+                case .legacy, .bridged:
+                    ["Native"]
+                case .native:
+                    ["Legacy"]
+                }
+            }()
         ),
         .testTarget(
             name: "_PartoutOpenVPNTests",

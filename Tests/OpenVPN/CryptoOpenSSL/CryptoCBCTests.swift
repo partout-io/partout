@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable import _PartoutCryptoOpenSSL
 #if canImport(_PartoutCryptoOpenSSL_ObjC)
 internal import _PartoutCryptoOpenSSL_ObjC
 #endif
@@ -35,7 +34,7 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         sut.configureEncryption(withCipherKey: nil, hmacKey: hmacKey)
 
         do {
-            var flags = newCryptoFlags()
+            let flags = newCryptoFlags()
             let returnedData = try sut.encryptData(plainData, flags: flags)
             XCTAssertEqual(returnedData, plainHMACData)
         } catch {
@@ -48,7 +47,7 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         sut.configureEncryption(withCipherKey: cipherKey, hmacKey: hmacKey)
 
         do {
-            var flags = newCryptoFlags()
+            let flags = newCryptoFlags()
             let returnedData = try sut.encryptData(plainData, flags: flags)
             XCTAssertEqual(returnedData, encryptedHMACData)
         } catch {
@@ -61,7 +60,7 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         sut.configureDecryption(withCipherKey: nil, hmacKey: hmacKey)
 
         do {
-            var flags = newCryptoFlags()
+            let flags = newCryptoFlags()
             let returnedData = try sut.decryptData(plainHMACData, flags: flags)
             XCTAssertEqual(returnedData, plainData)
         } catch {
@@ -74,7 +73,7 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
 
         do {
-            var flags = newCryptoFlags()
+            let flags = newCryptoFlags()
             let returnedData = try sut.decryptData(encryptedHMACData, flags: flags)
             XCTAssertEqual(returnedData, plainData)
         } catch {
@@ -86,7 +85,7 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         let sut = try CryptoCBC(cipherName: nil, digestName: "sha256")
         sut.configureDecryption(withCipherKey: nil, hmacKey: hmacKey)
 
-        var flags = newCryptoFlags()
+        let flags = newCryptoFlags()
         XCTAssertNoThrow(try sut.verifyData(plainHMACData, flags: flags))
         XCTAssertNoThrow(try sut.verifyData(encryptedHMACData, flags: flags))
     }
