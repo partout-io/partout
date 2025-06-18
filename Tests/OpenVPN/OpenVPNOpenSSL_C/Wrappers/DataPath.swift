@@ -32,20 +32,23 @@ import Foundation
 final class DataPath {
     private let mode: UnsafeMutablePointer<dp_mode_t>
 
-    private let maxPacketId: UInt32
-
     private let encBuffer: UnsafeMutablePointer<zeroing_data_t>
 
     private let decBuffer: UnsafeMutablePointer<zeroing_data_t>
+
+    private let maxPacketId: UInt32
+
+    private let resizeStep: Int
 
     init(mode: UnsafeMutablePointer<dp_mode_t>, peerId: UInt32) {
         self.mode = mode
         dp_mode_set_peer_id(mode, peerId)
 
         let oneKilo = 1024
-        maxPacketId = .max - 10 * UInt32(oneKilo)
         encBuffer = zd_create(64 * oneKilo)
         decBuffer = zd_create(64 * oneKilo)
+        maxPacketId = .max - 10 * UInt32(oneKilo)
+        resizeStep = 1024
 
         // FIXME: ###, replay protection
         //        if (usesReplayProtection) {
@@ -102,11 +105,11 @@ private extension DataPath {
 extension DataPath {
     func assembleAndEncrypt(_ packet: Data, key: UInt8, packetId: UInt32, withNewBuffer: Bool = false) throws -> Data {
         let buf: UnsafeMutablePointer<zeroing_data_t>
-        let bufLength = dp_mode_assemble_and_encrypt_capacity(mode, packet.count)
+        let packetCount = dp_mode_assemble_and_encrypt_capacity(mode, packet.count)
         if withNewBuffer {
-            buf = zd_create(bufLength)
+            buf = zd_create(packetCount)
         } else {
-            zd_resize(encBuffer, bufLength)
+            resize(encBuffer, for: packetCount)
             buf = encBuffer
         }
         return try assembleAndEncrypt(packet, key: key, packetId: packetId, buf: buf)
@@ -133,11 +136,11 @@ extension DataPath {
 
     func decryptAndParse(_ packet: Data, withNewBuffer: Bool = false) throws -> (UInt32, Data) {
         let buf: UnsafeMutablePointer<zeroing_data_t>
-        let bufLength = packet.count
+        let packetCount = packet.count
         if withNewBuffer {
-            buf = zd_create(bufLength)
+            buf = zd_create(packetCount)
         } else {
-            zd_resize(decBuffer, bufLength)
+            resize(decBuffer, for: packetCount)
             buf = decBuffer
         }
         return try decryptAndParse(packet, buf: buf)
@@ -161,6 +164,17 @@ extension DataPath {
             let data = Data(bytes: zd.pointee.bytes, count: zd.pointee.length)
             return (packetId, data)
         }
+    }
+}
+
+private extension DataPath {
+    func resize(_ buf: UnsafeMutablePointer<zeroing_data_t>, for count: Int) {
+        guard buf.pointee.length < count else {
+            return
+        }
+        var newCount = count + resizeStep
+        newCount -= newCount % resizeStep // align to step boundary
+        zd_resize(buf, newCount)
     }
 }
 
