@@ -38,7 +38,6 @@ typedef struct {
 } dp_framing_assemble_ctx;
 
 typedef struct {
-    compression_framing_t comp_f;
     uint8_t *_Nonnull dst_payload;
     size_t *_Nonnull dst_payload_offset;
     uint8_t *_Nonnull dst_header;

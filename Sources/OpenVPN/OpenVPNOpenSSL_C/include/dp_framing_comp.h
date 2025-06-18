@@ -46,29 +46,44 @@ bool dp_framing_parse_disabled(dp_framing_parse_ctx *_Nonnull ctx) {
 // MARK: -
 
 static
-bool dp_framing_parse_common(dp_framing_parse_ctx *_Nonnull ctx) {
+bool dp_framing_parse_v1(dp_framing_parse_ctx *_Nonnull ctx) {
     *ctx->dst_header = ctx->dst_payload[0];
-    *ctx->dst_header_len = 1;
+    *ctx->dst_payload_offset = 0;
+    *ctx->dst_header_len = 0;
 
     switch (*ctx->dst_header) {
-    case DataPacketNoCompress:
-        *ctx->dst_payload_offset = 1;
-        break;
+        case DataPacketNoCompress:
+            *ctx->dst_payload_offset = 1;
+            *ctx->dst_header_len = 1;
+            break;
 
-    case DataPacketNoCompressSwap:
-        ctx->dst_payload[0] = ctx->src[ctx->src_len - 1];
-        *ctx->dst_payload_offset = 0;
-        break;
+        case DataPacketNoCompressSwap:
+            ctx->dst_payload[0] = ctx->src[ctx->src_len - 1];
+            *ctx->dst_payload_offset = 0;
+            *ctx->dst_header_len = 1;
+            break;
 
-    case DataPacketLZOCompress:
-        if (ctx->error) {
-            ctx->error->dp_code = DataPathErrorCompression;
-            ctx->error->crypto_code = CryptoErrorNone;
-        }
-        return false;
+        case DataPacketLZOCompress:
+            if (ctx->error) {
+                ctx->error->dp_code = DataPathErrorCompression;
+                ctx->error->crypto_code = CryptoErrorNone;
+            }
+            return false;
 
-    case DataPacketV2Indicator:
-        if (ctx->comp_f == CompressionFramingCompressV2) {
+        default:
+            break;
+    }
+    return true;
+}
+
+static
+bool dp_framing_parse_v2(dp_framing_parse_ctx *_Nonnull ctx) {
+    *ctx->dst_header = ctx->dst_payload[0];
+    *ctx->dst_payload_offset = 0;
+    *ctx->dst_header_len = 0;
+
+    switch (*ctx->dst_header) {
+        case DataPacketV2Indicator:
             if (ctx->dst_payload[1] != DataPacketV2Uncompressed) {
                 if (ctx->error) {
                     ctx->error->dp_code = DataPathErrorCompression;
@@ -77,16 +92,11 @@ bool dp_framing_parse_common(dp_framing_parse_ctx *_Nonnull ctx) {
                 return false;
             }
             *ctx->dst_payload_offset = 2;
-        } else {
-            *ctx->dst_payload_offset = 0;
-            *ctx->dst_header_len = 0;
-        }
-        break;
+            *ctx->dst_header_len = 1;
+            break;
 
-    default:
-        *ctx->dst_payload_offset = 0;
-        *ctx->dst_header_len = 0;
-        break;
+        default:
+            break;
     }
     return true;
 }
@@ -100,7 +110,7 @@ void dp_framing_assemble_lzo(dp_framing_assemble_ctx *_Nonnull ctx) {
 
 static
 bool dp_framing_parse_lzo(dp_framing_parse_ctx *_Nonnull ctx) {
-    return dp_framing_parse_common(ctx);
+    return dp_framing_parse_v1(ctx);
 }
 
 static
@@ -114,7 +124,7 @@ void dp_framing_assemble_compress(dp_framing_assemble_ctx *_Nonnull ctx) {
 
 static
 bool dp_framing_parse_compress(dp_framing_parse_ctx *_Nonnull ctx) {
-    return dp_framing_parse_common(ctx);
+    return dp_framing_parse_v1(ctx);
 }
 
 static
@@ -135,5 +145,5 @@ void dp_framing_assemble_compress_v2(dp_framing_assemble_ctx *_Nonnull ctx) {
 
 static
 bool dp_framing_parse_compress_v2(dp_framing_parse_ctx *_Nonnull ctx) {
-    return dp_framing_parse_common(ctx);
+    return dp_framing_parse_v2(ctx);
 }

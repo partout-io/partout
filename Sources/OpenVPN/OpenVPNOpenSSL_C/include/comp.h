@@ -26,8 +26,8 @@
 #pragma once
 
 typedef enum {
-    CompressionFramingDisabled,
-    CompressionFramingCompLZO,
-    CompressionFramingCompress,
-    CompressionFramingCompressV2
+    CompressionFramingDisabled,     // no option
+    CompressionFramingCompLZO,      // --comp-lzo
+    CompressionFramingCompress,     // --compress stub
+    CompressionFramingCompressV2    // --compress stub-v2
 } compression_framing_t;

@@ -181,7 +181,6 @@ size_t dp_parse(void *vmode) {
     size_t payload_offset;
     size_t payload_header_len;
     dp_framing_parse_ctx parse;
-    parse.comp_f = mode->comp_f;
     parse.dst_payload = payload; // FIXME: ###, parse in place
     parse.dst_payload_offset = &payload_offset;
     parse.dst_header = ctx->dst_header;
