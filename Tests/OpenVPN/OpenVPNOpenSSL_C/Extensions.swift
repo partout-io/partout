@@ -135,7 +135,12 @@ extension DataPathTestsProtocol {
 
         print("\tpayload\t\t", payload.toHex())
 
-        let encrypted = try sut.assembleAndEncrypt(payload, key: key, packetId: packetId)
+        let encrypted = try sut.assembleAndEncrypt(
+            payload,
+            key: key,
+            packetId: packetId,
+            withNewBuffer: true
+        )
         print("\tencrypted\t", encrypted.toHex())
 
         // 4a = PacketCodeDataV2 and peer_id (1-byte)
@@ -146,7 +151,10 @@ extension DataPathTestsProtocol {
             XCTAssertTrue(assertEncrypted(encrypted))
         }
 
-        let decryptedPair = try sut.decryptAndParse(encrypted)
+        let decryptedPair = try sut.decryptAndParse(
+            encrypted,
+            withNewBuffer: true
+        )
         XCTAssertEqual(decryptedPair.0, packetId)
         XCTAssertEqual(decryptedPair.1, payload)
         print("\tpacket_id:\t", String(format: "%0x", decryptedPair.0))

@@ -110,7 +110,7 @@ extension DataPath {
         _ packet: Data,
         key: UInt8,
         packetId: UInt32,
-        withNewBuffer: Bool = false
+        withNewBuffer: Bool
     ) throws -> Data {
         let buf = withNewBuffer ? zd_create(0) : nil
         return try assembleAndEncrypt(packet, key: key, packetId: packetId, buf: buf)
@@ -118,7 +118,7 @@ extension DataPath {
 
     func decryptAndParse(
         _ packet: Data,
-        withNewBuffer: Bool = false
+        withNewBuffer: Bool
     ) throws -> (UInt32, Data) {
         let buf = withNewBuffer ? zd_create(0) : nil
         return try decryptAndParse(packet, buf: buf)
