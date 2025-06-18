@@ -36,9 +36,11 @@ final class DataPath {
 
     private let decBuffer: UnsafeMutablePointer<zeroing_data_t>
 
+    private let resizeStep: Int
+
     private let maxPacketId: UInt32
 
-    private let resizeStep: Int
+    private var outPacketId: UInt32
 
     init(mode: UnsafeMutablePointer<dp_mode_t>, peerId: UInt32) {
         self.mode = mode
@@ -47,13 +49,14 @@ final class DataPath {
         let oneKilo = 1024
         encBuffer = zd_create(64 * oneKilo)
         decBuffer = zd_create(64 * oneKilo)
-        maxPacketId = .max - 10 * UInt32(oneKilo)
         resizeStep = 1024
+        maxPacketId = .max - 10 * UInt32(oneKilo)
+        outPacketId = .zero
 
         // FIXME: ###, replay protection
-        //        if (usesReplayProtection) {
-        //            self.inReplay = [[ReplayProtector alloc] init];
-        //        }
+//        if (usesReplayProtection) {
+//            self.inReplay = [[ReplayProtector alloc] init];
+//        }
     }
 
     deinit {
@@ -103,20 +106,33 @@ private extension DataPath {
 // MARK: - Compound
 
 extension DataPath {
-    func assembleAndEncrypt(_ packet: Data, key: UInt8, packetId: UInt32, withNewBuffer: Bool = false) throws -> Data {
-        let buf: UnsafeMutablePointer<zeroing_data_t>
-        let packetCount = dp_mode_assemble_and_encrypt_capacity(mode, packet.count)
-        if withNewBuffer {
-            buf = zd_create(packetCount)
-        } else {
-            resize(encBuffer, for: packetCount)
-            buf = encBuffer
-        }
+    func assembleAndEncrypt(
+        _ packet: Data,
+        key: UInt8,
+        packetId: UInt32,
+        withNewBuffer: Bool = false
+    ) throws -> Data {
+        let buf = withNewBuffer ? zd_create(0) : nil
         return try assembleAndEncrypt(packet, key: key, packetId: packetId, buf: buf)
     }
 
-    func assembleAndEncrypt(_ packet: Data, key: UInt8, packetId: UInt32, buf: UnsafeMutablePointer<zeroing_data_t>) throws -> Data {
-        try packet.withUnsafeBytes { src in
+    func decryptAndParse(
+        _ packet: Data,
+        withNewBuffer: Bool = false
+    ) throws -> (UInt32, Data) {
+        let buf = withNewBuffer ? zd_create(0) : nil
+        return try decryptAndParse(packet, buf: buf)
+    }
+
+    func assembleAndEncrypt(
+        _ packet: Data,
+        key: UInt8,
+        packetId: UInt32,
+        buf: UnsafeMutablePointer<zeroing_data_t>?
+    ) throws -> Data {
+        let buf = buf ?? encBuffer
+        resize(buf, for: dp_mode_assemble_and_encrypt_capacity(mode, packet.count))
+        return try packet.withUnsafeBytes { src in
             var error = dp_error_t()
             let zd = dp_mode_assemble_and_encrypt(
                 mode,
@@ -134,20 +150,13 @@ extension DataPath {
         }
     }
 
-    func decryptAndParse(_ packet: Data, withNewBuffer: Bool = false) throws -> (UInt32, Data) {
-        let buf: UnsafeMutablePointer<zeroing_data_t>
-        let packetCount = packet.count
-        if withNewBuffer {
-            buf = zd_create(packetCount)
-        } else {
-            resize(decBuffer, for: packetCount)
-            buf = decBuffer
-        }
-        return try decryptAndParse(packet, buf: buf)
-    }
-
-    func decryptAndParse(_ packet: Data, buf: UnsafeMutablePointer<zeroing_data_t>) throws -> (UInt32, Data) {
-        try packet.withUnsafeBytes { src in
+    func decryptAndParse(
+        _ packet: Data,
+        buf: UnsafeMutablePointer<zeroing_data_t>?
+    ) throws -> (UInt32, Data) {
+        let buf = buf ?? decBuffer
+        resize(buf, for: packet.count)
+        return try packet.withUnsafeBytes { src in
             var packetId: UInt32 = .zero
             var error = dp_error_t()
             let zd = dp_mode_decrypt_and_parse(
