@@ -232,6 +232,7 @@ extension DataPath {
         buf: UnsafeMutablePointer<zeroing_data_t>?
     ) throws -> Data {
         let buf = buf ?? encBuffer
+        resize(buf, for: dp_mode_assemble_and_encrypt_capacity(mode, packet.count))
         return try packet.withUnsafeBytes { src in
             var error = dp_error_t()
             let zd = dp_mode_assemble_and_encrypt(
@@ -255,6 +256,7 @@ extension DataPath {
         buf: UnsafeMutablePointer<zeroing_data_t>?
     ) throws -> DecryptedTuple {
         let buf = buf ?? decBuffer
+        resize(buf, for: packet.count)
         return try packet.withUnsafeBytes { src in
             var packetId: UInt32 = .zero
             var header: UInt8 = .zero
@@ -285,6 +287,7 @@ extension DataPath {
     ) -> Data {
         let buf = buf ?? encBuffer
         let inputCount = payload.count
+        resize(buf, for: dp_mode_assemble_capacity(mode, inputCount))
         return payload.withUnsafeBytes { input in
             let outLength = dp_mode_assemble(
                 mode,
@@ -305,6 +308,7 @@ extension DataPath {
     ) throws -> Data {
         let buf = buf ?? encBuffer
         let inputCount = assembled.count
+        resize(buf, for: dp_mode_encrypt_capacity(mode, inputCount))
         return try assembled.withUnsafeBytes { input in
             var error = dp_error_t()
             let outLength = dp_mode_encrypt(
@@ -329,6 +333,7 @@ extension DataPath {
     ) throws -> (packetId: UInt32, data: Data) {
         let buf = buf ?? decBuffer
         let inputCount = packet.count
+        resize(buf, for: inputCount)
         return try packet.withUnsafeBytes { input in
             var packetId: UInt32 = 0
             var error = dp_error_t()
@@ -356,6 +361,7 @@ extension DataPath {
         let buf = buf ?? decBuffer
         var inputCopy = [UInt8](decrypted) // FIXME: ###, copy because parsed in place
         let inputCount = inputCopy.count
+        resize(buf, for: inputCount)
         return try inputCopy.withUnsafeMutableBytes { input in
             var error = dp_error_t()
             let outLength = dp_mode_parse(
