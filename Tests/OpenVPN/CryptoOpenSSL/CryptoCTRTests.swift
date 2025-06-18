@@ -42,7 +42,7 @@ final class CryptoCTRTests: XCTestCase, CryptoFlagsProviding {
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         let encryptedData: Data
 
-        var flags = newCryptoFlags()
+        let flags = newCryptoFlags()
         do {
             encryptedData = try sut.encryptData(plainData, flags: flags)
         } catch {
