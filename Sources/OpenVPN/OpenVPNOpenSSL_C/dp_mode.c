@@ -24,6 +24,7 @@
 //
 
 #include "dp_mode.h"
+#include "dp_mode_macros.h"
 #include "packet.h"
 
 dp_mode_t *dp_mode_create(crypto_t *crypto,
@@ -31,7 +32,7 @@ dp_mode_t *dp_mode_create(crypto_t *crypto,
                           const dp_mode_encrypter_t *enc,
                           const dp_mode_decrypter_t *dec,
                           compression_framing_t comp_f) {
-    puts("dp_mode_create");
+    DP_LOG("dp_mode_create");
 
     dp_mode_t *mode = pp_alloc_crypto(sizeof(dp_mode_t));
     mode->crypto = crypto;
@@ -49,7 +50,7 @@ dp_mode_t *dp_mode_create(crypto_t *crypto,
 }
 
 void dp_mode_free(dp_mode_t *mode) {
-    puts("dp_mode_free");
+    DP_LOG("dp_mode_free");
     mode->crypto_free(mode->crypto);
     free(mode);
 }

@@ -29,7 +29,7 @@
 
 static
 size_t dp_assemble(void *vmode) {
-    puts("dp_mode_ad_assemble");
+    DP_LOG("dp_mode_ad_assemble");
     const dp_mode_t *mode = vmode;
     const dp_mode_assemble_ctx *ctx = &mode->assemble_ctx;
 
@@ -56,7 +56,7 @@ size_t dp_assemble(void *vmode) {
 
 static
 size_t dp_encrypt(void *vmode) {
-    puts("dp_mode_ad_encrypt");
+    DP_LOG("dp_mode_ad_encrypt");
     const dp_mode_t *mode = vmode;
     const dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
 
@@ -108,7 +108,7 @@ size_t dp_encrypt(void *vmode) {
 
 static
 size_t dp_decrypt(void *vmode) {
-    puts("dp_mode_ad_decrypt");
+    DP_LOG("dp_mode_ad_decrypt");
     const dp_mode_t *mode = vmode;
     const dp_mode_decrypt_ctx *ctx = &mode->dec_ctx;
 
@@ -164,7 +164,7 @@ size_t dp_decrypt(void *vmode) {
 
 static
 size_t dp_parse(void *vmode) {
-    puts("dp_mode_ad_parse");
+    DP_LOG("dp_mode_ad_parse");
     const dp_mode_t *mode = vmode;
     const dp_mode_parse_ctx *ctx = &mode->parse_ctx;
 
@@ -203,7 +203,7 @@ dp_mode_t *dp_mode_ad_create(crypto_t *crypto,
                              crypto_free_t crypto_free,
                              compression_framing_t comp_f) {
 
-    puts("dp_mode_ad_create");
+    DP_LOG("dp_mode_ad_create");
 
     const dp_framing_t *frm = dp_framing(comp_f);
 

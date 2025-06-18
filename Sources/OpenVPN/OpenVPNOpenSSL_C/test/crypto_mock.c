@@ -23,6 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include "dp_mode_macros.h"
 #include "test/crypto_mock.h"
 
 static inline
@@ -40,7 +41,7 @@ static
 void mock_configure_encrypt(void *vctx,
                             const zeroing_data_t *cipher_key,
                             const zeroing_data_t *hmac_key) {
-    puts("crypto_mock_configure_encrypt");
+    DP_LOG("crypto_mock_configure_encrypt");
 }
 
 // in -> aabb(reversed)ccdd
@@ -49,7 +50,7 @@ bool mock_encrypt(void *vctx,
                   uint8_t *out, size_t *out_len,
                   const uint8_t *in, size_t in_len,
                   const crypto_flags_t *flags, crypto_error_code *error) {
-    puts("crypto_mock_encrypt");
+    DP_LOG("crypto_mock_encrypt");
     out[0] = 0xaa;
     out[1] = 0xbb;
     reverse(out + 2, in, in_len);
@@ -63,7 +64,7 @@ static
 void mock_configure_decrypt(void *vctx,
                             const zeroing_data_t *cipher_key,
                             const zeroing_data_t *hmac_key) {
-    puts("crypto_mock_configure_decrypt");
+    DP_LOG("crypto_mock_configure_decrypt");
 }
 
 // in -> reversed
@@ -72,7 +73,7 @@ bool mock_decrypt(void *vctx,
                   uint8_t *out, size_t *out_len,
                   const uint8_t *in, size_t in_len,
                   const crypto_flags_t *flags, crypto_error_code *error) {
-    puts("crypto_mock_decrypt");
+    DP_LOG("crypto_mock_decrypt");
     *out_len = in_len - 4;
     assert(in[0] == 0xaa);
     assert(in[1] == 0xbb);
@@ -84,14 +85,14 @@ bool mock_decrypt(void *vctx,
 
 static
 bool mock_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_code *error) {
-    puts("crypto_mock_verify");
+    DP_LOG("crypto_mock_verify");
     return true;
 }
 
 // MARK: -
 
 crypto_mock_t *crypto_mock_create() {
-    puts("crypto_mock_create");
+    DP_LOG("crypto_mock_create");
     crypto_mock_t *ctx = pp_alloc_crypto(sizeof(crypto_mock_t));
     ctx->crypto.encrypter.configure = mock_configure_encrypt;
     ctx->crypto.encrypter.encrypt = mock_encrypt;
@@ -106,6 +107,6 @@ crypto_mock_t *crypto_mock_create() {
 }
 
 void crypto_mock_free(crypto_mock_t *ctx) {
-    puts("crypto_mock_free");
+    DP_LOG("crypto_mock_free");
     free(ctx);
 }

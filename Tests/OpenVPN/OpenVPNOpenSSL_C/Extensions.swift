@@ -89,16 +89,16 @@ extension DataPathTestsProtocol {
         sut.configureEncryption(cipherKey: cipherKey, hmacKey: hmacKey)
         sut.configureDecryption(cipherKey: cipherKey, hmacKey: hmacKey)
 
-        print("payload\t\t", payload.toHex())
+        print("\tpayload\t\t", payload.toHex())
 
         let assembled = sut.assemble(packetId: packetId, payload: payload)
-        print("assembled\t", assembled.toHex())
+        print("\tassembled\t", assembled.toHex())
         if let assertAssembled {
             XCTAssertTrue(assertAssembled(assembled))
         }
 
         let encrypted = try sut.encrypt(key: key, packetId: packetId, assembled: assembled)
-        print("encrypted\t", encrypted.toHex())
+        print("\tencrypted\t", encrypted.toHex())
 
         // 4a = PacketCodeDataV2 and peer_id (1-byte)
         // 000001 = key (3-byte)
@@ -111,11 +111,11 @@ extension DataPathTestsProtocol {
         let decryptedPair = try sut.decrypt(packet: encrypted)
         XCTAssertEqual(decryptedPair.0, packetId)
         XCTAssertEqual(decryptedPair.1, assembled)
-        print("packet_id:\t", String(format: "%0x", decryptedPair.0))
-        print("decrypted:\t", decryptedPair.1.toHex())
+        print("\tpacket_id:\t", String(format: "%0x", decryptedPair.0))
+        print("\tdecrypted:\t", decryptedPair.1.toHex())
 
         let parsed = try sut.parse(decryptedPacket: decryptedPair.1)
-        print("parsed:\t\t", parsed.toHex())
+        print("\tparsed:\t\t", parsed.toHex())
         XCTAssertEqual(parsed, payload)
     }
 
@@ -133,10 +133,10 @@ extension DataPathTestsProtocol {
         sut.configureEncryption(cipherKey: cipherKey, hmacKey: hmacKey)
         sut.configureDecryption(cipherKey: cipherKey, hmacKey: hmacKey)
 
-        print("payload\t\t", payload.toHex())
+        print("\tpayload\t\t", payload.toHex())
 
         let encrypted = try sut.assembleAndEncrypt(payload, key: key, packetId: packetId)
-        print("encrypted\t", encrypted.toHex())
+        print("\tencrypted\t", encrypted.toHex())
 
         // 4a = PacketCodeDataV2 and peer_id (1-byte)
         // 000001 = key (3-byte)
@@ -149,7 +149,7 @@ extension DataPathTestsProtocol {
         let decryptedPair = try sut.decryptAndParse(encrypted)
         XCTAssertEqual(decryptedPair.0, packetId)
         XCTAssertEqual(decryptedPair.1, payload)
-        print("packet_id:\t", String(format: "%0x", decryptedPair.0))
-        print("decrypted:\t", decryptedPair.1.toHex())
+        print("\tpacket_id:\t", String(format: "%0x", decryptedPair.0))
+        print("\tdecrypted:\t", decryptedPair.1.toHex())
     }
 }
