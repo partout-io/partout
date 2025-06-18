@@ -24,3 +24,5 @@ jobs:
       - name: Run tests
         run: |
           swift test
+          OPENVPN_CRYPTO_MODE="bridged" swift test
+          OPENVPN_CRYPTO_MODE="native" swift test

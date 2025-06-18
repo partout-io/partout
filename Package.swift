@@ -1,6 +1,7 @@
 // swift-tools-version: 5.9
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
+import Foundation
 import PackageDescription
 
 enum Environment {
@@ -308,7 +309,7 @@ if areas.contains(.api) {
 // MARK: OpenVPN
 
 if areas.contains(.openvpn) {
-    enum CryptoMode {
+    enum CryptoMode: String {
         case legacy
 
         case bridged
@@ -316,7 +317,13 @@ if areas.contains(.openvpn) {
         case native
     }
 
-    let cryptoMode: CryptoMode = .legacy
+    let cryptoMode: CryptoMode
+    if let envModeString = ProcessInfo.processInfo.environment["OPENVPN_CRYPTO_MODE"],
+       let envMode = CryptoMode(rawValue: envModeString) {
+        cryptoMode = envMode
+    } else {
+        cryptoMode = .legacy
+    }
 
     package.dependencies.append(contentsOf: [
         .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
