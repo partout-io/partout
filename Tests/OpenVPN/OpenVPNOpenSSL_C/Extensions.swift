@@ -50,32 +50,24 @@ protocol DataPathTestsProtocol where Self: XCTestCase {
 
     var packetId: UInt32 { get }
 
-    var payload: Data { get }
-
-    var allFramings: [compression_framing_t] { get }
-
     func testReversibleEncryption(
         mode: UnsafeMutablePointer<dp_mode_t>,
+        payload: Data,
         assertAssembled: ((Data) -> Bool)?,
         assertEncrypted: ((Data) -> Bool)?
     ) throws
 
     func testReversibleCompoundEncryption(
         mode: UnsafeMutablePointer<dp_mode_t>,
+        payload: Data,
         assertEncrypted: ((Data) -> Bool)?
     ) throws
 }
 
 extension DataPathTestsProtocol {
-    var allFramings: [compression_framing_t] {[
-        CompressionFramingDisabled,
-        CompressionFramingCompLZO,
-        CompressionFramingCompress,
-        CompressionFramingCompressV2
-    ]}
-
     func testReversibleEncryption(
         mode: UnsafeMutablePointer<dp_mode_t>,
+        payload: Data,
         assertAssembled: ((Data) -> Bool)? = nil,
         assertEncrypted: ((Data) -> Bool)? = nil
     ) throws {
@@ -122,6 +114,7 @@ extension DataPathTestsProtocol {
 
     func testReversibleCompoundEncryption(
         mode: UnsafeMutablePointer<dp_mode_t>,
+        payload: Data,
         assertEncrypted: ((Data) -> Bool)? = nil
     ) throws {
         let sut = DataPath(mode: mode, peerId: peerId)

@@ -40,49 +40,63 @@ final class DataPathADTests: XCTestCase, DataPathTestsProtocol {
 
 extension DataPathADTests {
     func test_givenAD_whenEncryptMock_thenDecrypts() throws {
-        try allFramings.forEach { framing in
-            print("AD framing: \(framing)")
-            let mode = dp_mode_ad_create_mock(framing)
-            do {
-                try testReversibleEncryption(
-                    mode: mode,
-                    assertAssembled: {
-                        framing != CompressionFramingDisabled ||
-                            $0.toHex() == self.payload.toHex()
-                    },
-                    assertEncrypted: {
-                        framing != CompressionFramingDisabled ||
-                            $0.toHex() == "4a00000100001020aabb44332211ccdd"
-                    }
-                )
-                try testReversibleCompoundEncryption(
-                    mode: mode,
-                    assertEncrypted: {
-                        framing != CompressionFramingDisabled ||
-                            $0.toHex() == "4a00000100001020aabb44332211ccdd"
-                    }
-                )
-            } catch {
-                XCTFail("AD mock failed with framing: \(framing)")
-                throw error
-            }
-        }
+        try private_test_givenAD_whenEncryptMock_thenDecrypts(CompressionFramingDisabled)
+        try private_test_givenAD_whenEncryptMock_thenDecrypts(CompressionFramingCompLZO)
+        try private_test_givenAD_whenEncryptMock_thenDecrypts(CompressionFramingCompress)
+        try private_test_givenAD_whenEncryptMock_thenDecrypts(CompressionFramingCompressV2)
     }
 
     func test_givenAD_whenEncryptGCM_thenDecrypts() throws {
+        try private_test_givenAD_whenEncryptGCM_thenDecrypts(CompressionFramingDisabled)
+        try private_test_givenAD_whenEncryptGCM_thenDecrypts(CompressionFramingCompLZO)
+        try private_test_givenAD_whenEncryptGCM_thenDecrypts(CompressionFramingCompress)
+        try private_test_givenAD_whenEncryptGCM_thenDecrypts(CompressionFramingCompressV2)
+    }
+}
+
+private extension DataPathADTests {
+    func private_test_givenAD_whenEncryptMock_thenDecrypts(_ framing: compression_framing_t) throws {
+        print("AD framing: \(framing)")
+        let mode = dp_mode_ad_create_mock(framing)
+        do {
+            try testReversibleEncryption(
+                mode: mode,
+                payload: payload,
+                assertAssembled: {
+                    framing != CompressionFramingDisabled ||
+                        $0.toHex() == self.payload.toHex()
+                },
+                assertEncrypted: {
+                    framing != CompressionFramingDisabled ||
+                        $0.toHex() == "4a00000100001020aabb44332211ccdd"
+                }
+            )
+            try testReversibleCompoundEncryption(
+                mode: mode,
+                payload: payload,
+                assertEncrypted: {
+                    framing != CompressionFramingDisabled ||
+                        $0.toHex() == "4a00000100001020aabb44332211ccdd"
+                }
+            )
+        } catch {
+            XCTFail("AD mock failed with framing: \(framing)")
+            throw error
+        }
+    }
+
+    func private_test_givenAD_whenEncryptGCM_thenDecrypts(_ framing: compression_framing_t) throws {
         let cipher = "AES-128-GCM"
         let tag = 8
         let id = 8
-        try allFramings.forEach { framing in
-            print("AD framing: \(framing)")
-            do {
-                let mode = dp_mode_ad_create_aead(cipher, tag, id, framing)
-                try testReversibleEncryption(mode: mode)
-                try testReversibleCompoundEncryption(mode: mode)
-            } catch {
-                XCTFail("AD \(cipher)/\(tag)/\(id) failed with framing: \(framing)")
-                throw error
-            }
+        print("AD framing: \(framing)")
+        do {
+            let mode = dp_mode_ad_create_aead(cipher, tag, id, framing)
+            try testReversibleEncryption(mode: mode, payload: payload)
+            try testReversibleCompoundEncryption(mode: mode, payload: payload)
+        } catch {
+            XCTFail("AD \(cipher)/\(tag)/\(id) failed with framing: \(framing)")
+            throw error
         }
     }
 }
