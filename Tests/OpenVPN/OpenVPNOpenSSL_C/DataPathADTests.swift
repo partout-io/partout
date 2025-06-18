@@ -79,6 +79,7 @@ private extension DataPathADTests {
                         $0.toHex() == "4a00000100001020aabb44332211ccdd"
                 }
             )
+            try testReversibleBulkEncryption(mode: mode)
         } catch {
             XCTFail("AD mock failed with framing: \(framing)")
             throw error
@@ -94,6 +95,7 @@ private extension DataPathADTests {
             let mode = dp_mode_ad_create_aead(cipher, tag, id, framing)
             try testReversibleEncryption(mode: mode, payload: payload)
             try testReversibleCompoundEncryption(mode: mode, payload: payload)
+            try testReversibleBulkEncryption(mode: mode)
         } catch {
             XCTFail("AD \(cipher)/\(tag)/\(id) failed with framing: \(framing)")
             throw error

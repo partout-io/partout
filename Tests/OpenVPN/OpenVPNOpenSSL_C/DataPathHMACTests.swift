@@ -67,6 +67,7 @@ private extension DataPathHMACTests {
         do {
             try testReversibleEncryption(mode: mode, payload: payload)
             try testReversibleCompoundEncryption(mode: mode, payload: payload)
+            try testReversibleBulkEncryption(mode: mode)
         } catch {
             XCTFail("HMAC mock failed with framing: \(framing)")
             throw error
@@ -81,6 +82,7 @@ private extension DataPathHMACTests {
         do {
             try testReversibleEncryption(mode: mode, payload: payload)
             try testReversibleCompoundEncryption(mode: mode, payload: payload)
+            try testReversibleBulkEncryption(mode: mode)
         } catch {
             XCTFail("HMAC \(cipher ?? "none")/\(digest) failed with framing: \(framing)")
             throw error
@@ -95,6 +97,7 @@ private extension DataPathHMACTests {
         do {
             try testReversibleEncryption(mode: mode, payload: payload)
             try testReversibleCompoundEncryption(mode: mode, payload: payload)
+            try testReversibleBulkEncryption(mode: mode)
         } catch {
             XCTFail("HMAC \(cipher)/\(digest) failed with framing: \(framing)")
             throw error

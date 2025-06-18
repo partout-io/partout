@@ -49,19 +49,6 @@ protocol DataPathTestsProtocol where Self: XCTestCase {
     var key: UInt8 { get }
 
     var packetId: UInt32 { get }
-
-    func testReversibleEncryption(
-        mode: UnsafeMutablePointer<dp_mode_t>,
-        payload: Data,
-        assertAssembled: ((Data) -> Bool)?,
-        assertEncrypted: ((Data) -> Bool)?
-    ) throws
-
-    func testReversibleCompoundEncryption(
-        mode: UnsafeMutablePointer<dp_mode_t>,
-        payload: Data,
-        assertEncrypted: ((Data) -> Bool)?
-    ) throws
 }
 
 extension DataPathTestsProtocol {
@@ -154,5 +141,36 @@ extension DataPathTestsProtocol {
         print("\tpacket_id:\t", String(format: "%0x", decryptedTuple.packetId))
         print("\theader:\t", String(format: "%0x", decryptedTuple.header))
         print("\tdecrypted:\t", decryptedTuple.data.toHex())
+    }
+
+    func testReversibleBulkEncryption(mode: UnsafeMutablePointer<dp_mode_t>) throws {
+        let sut = DataPath(mode: mode, peerId: peerId)
+        let crypto = mode.pointee.crypto.assumingMemoryBound(to: crypto_t.self)
+        let cipherKeyLength = crypto.pointee.meta.cipher_key_len
+        let hmacKeyLength = crypto.pointee.meta.hmac_key_len
+
+        let cipherKey = Data(count: cipherKeyLength)
+        let hmacKey = Data(count: hmacKeyLength)
+        sut.configureEncryption(cipherKey: cipherKey, hmacKey: hmacKey)
+        sut.configureDecryption(cipherKey: cipherKey, hmacKey: hmacKey)
+
+        //
+        // N = 10 packets with:
+        //
+        // - random length in [1, N]
+        // - repeating random byte in [0, 0xff]
+        //
+        let payloads = (1...10).map {
+            Data(repeating: .random(in: 0...0xff), count: .random(in: 1...$0))
+        }
+        print("\tpayloads\t\t", payloads.map { $0.toHex() })
+
+        let encrypted = try sut.encrypt(payloads, key: key)
+        print("\tencrypted\t", encrypted.map { $0.toHex() })
+
+        let decrypted = try sut.decrypt(encrypted).packets
+        print("\tdecrypted\t", decrypted.map { $0.toHex() })
+
+        XCTAssertEqual(decrypted, payloads)
     }
 }
