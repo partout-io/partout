@@ -106,7 +106,55 @@ private extension DataPath {
     }
 }
 
-// MARK: - Compound
+// MARK: - Bulk encrypt/decrypt
+
+extension DataPath {
+    func encrypt(_ packets: [Data], key: UInt8) throws -> [Data] {
+        try packets.map {
+            outPacketId += 1
+            // FIXME: ###, after assemble -> mss_fix
+            return try assembleAndEncrypt(
+                $0,
+                key: key,
+                packetId: outPacketId,
+                buf: nil
+            )
+        }
+    }
+
+    func decrypt(_ packets: [Data]) throws -> (packets: [Data], keepAlive: Bool) {
+        var keepAlive = false
+        let list = try packets.map {
+            let tuple = try decryptAndParse(
+                $0,
+                buf: nil
+            )
+
+            guard tuple.packetId <= maxPacketId else {
+                throw DataPathError.path(DataPathErrorOverflow)
+            }
+            // FIXME: ###, after decrypt -> replay protection
+//            if (self.inReplay && [self.inReplay isReplayedPacketId:packetId]) {
+//                continue;
+//            }
+            // FIXME: ###, after parse -> throw if compressed
+            // how to detect ALL compressed variants? or ensure uncompressed?
+//            guard header != DataPacketLZOCompress else {
+//                throw DataPathError.path(DataPathErrorCompression)
+//            }
+
+            tuple.data.withUnsafeBytes {
+                if memcmp($0.bytePointer, DataPacketPingDataBytes(), tuple.data.count) == 0 {
+                    keepAlive = true
+                }
+            }
+            return tuple.data
+        }
+        return (list, keepAlive)
+    }
+}
+
+// MARK: - Creating buffers (for testing)
 
 extension DataPath {
     func assembleAndEncrypt(
@@ -126,73 +174,7 @@ extension DataPath {
         let buf = withNewBuffer ? zd_create(0) : nil
         return try decryptAndParse(packet, buf: buf)
     }
-
-    func assembleAndEncrypt(
-        _ packet: Data,
-        key: UInt8,
-        packetId: UInt32,
-        buf: UnsafeMutablePointer<zeroing_data_t>?
-    ) throws -> Data {
-        let buf = buf ?? encBuffer
-        resize(buf, for: dp_mode_assemble_and_encrypt_capacity(mode, packet.count))
-        return try packet.withUnsafeBytes { src in
-            var error = dp_error_t()
-            let zd = dp_mode_assemble_and_encrypt(
-                mode,
-                key,
-                packetId,
-                buf,
-                src.bytePointer,
-                packet.count,
-                &error
-            )
-            guard let zd else {
-                throw DataPathError(error) ?? .generic
-            }
-            return Data(bytes: zd.pointee.bytes, count: zd.pointee.length)
-        }
-    }
-
-    func decryptAndParse(
-        _ packet: Data,
-        buf: UnsafeMutablePointer<zeroing_data_t>?
-    ) throws -> DecryptedTuple {
-        let buf = buf ?? decBuffer
-        resize(buf, for: packet.count)
-        return try packet.withUnsafeBytes { src in
-            var packetId: UInt32 = .zero
-            var header: UInt8 = .zero
-            var error = dp_error_t()
-            let zd = dp_mode_decrypt_and_parse(
-                mode,
-                buf,
-                &packetId,
-                &header,
-                src.bytePointer,
-                packet.count,
-                &error
-            )
-            guard let zd else {
-                throw DataPathError(error) ?? .generic
-            }
-            let data = Data(bytes: zd.pointee.bytes, count: zd.pointee.length)
-            return (packetId, header, data)
-        }
-    }
 }
-
-private extension DataPath {
-    func resize(_ buf: UnsafeMutablePointer<zeroing_data_t>, for count: Int) {
-        guard buf.pointee.length < count else {
-            return
-        }
-        var newCount = count + resizeStep
-        newCount -= newCount % resizeStep // align to step boundary
-        zd_resize(buf, newCount)
-    }
-}
-
-// MARK: - Creating buffers
 
 extension DataPath {
     func assemble(
@@ -242,7 +224,58 @@ extension DataPath {
 
 // MARK: - Reusing buffers
 
-// WARNING: these assume that buf holds the output! (resized externally)
+extension DataPath {
+    func assembleAndEncrypt(
+        _ packet: Data,
+        key: UInt8,
+        packetId: UInt32,
+        buf: UnsafeMutablePointer<zeroing_data_t>?
+    ) throws -> Data {
+        let buf = buf ?? encBuffer
+        return try packet.withUnsafeBytes { src in
+            var error = dp_error_t()
+            let zd = dp_mode_assemble_and_encrypt(
+                mode,
+                key,
+                packetId,
+                buf,
+                src.bytePointer,
+                packet.count,
+                &error
+            )
+            guard let zd else {
+                throw DataPathError(error) ?? .generic
+            }
+            return Data(bytes: zd.pointee.bytes, count: zd.pointee.length)
+        }
+    }
+
+    func decryptAndParse(
+        _ packet: Data,
+        buf: UnsafeMutablePointer<zeroing_data_t>?
+    ) throws -> DecryptedTuple {
+        let buf = buf ?? decBuffer
+        return try packet.withUnsafeBytes { src in
+            var packetId: UInt32 = .zero
+            var header: UInt8 = .zero
+            var error = dp_error_t()
+            let zd = dp_mode_decrypt_and_parse(
+                mode,
+                buf,
+                &packetId,
+                &header,
+                src.bytePointer,
+                packet.count,
+                &error
+            )
+            guard let zd else {
+                throw DataPathError(error) ?? .generic
+            }
+            let data = Data(bytes: zd.pointee.bytes, count: zd.pointee.length)
+            return (packetId, header, data)
+        }
+    }
+}
 
 extension DataPath {
     func assemble(
@@ -338,5 +371,18 @@ extension DataPath {
             }
             return Data(bytes: buf.pointee.bytes, count: outLength)
         }
+    }
+}
+
+// MARK: -
+
+private extension DataPath {
+    func resize(_ buf: UnsafeMutablePointer<zeroing_data_t>, for count: Int) {
+        guard buf.pointee.length < count else {
+            return
+        }
+        var newCount = count + resizeStep
+        newCount -= newCount % resizeStep // align to step boundary
+        zd_resize(buf, newCount)
     }
 }

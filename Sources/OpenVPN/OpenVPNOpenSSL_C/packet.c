@@ -1,8 +1,8 @@
 //
-//  dp_error.h
+//  packet.c
 //  Partout
 //
-//  Created by Davide De Rosa on 6/17/25.
+//  Created by Davide De Rosa on 6/18/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,19 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#pragma once
+#include <stdint.h>
 
-#include "crypto_openssl/crypto.h"
-
-typedef enum {
-    DataPathErrorNone,
-    DataPathErrorCrypto,
-    DataPathErrorPeerIdMismatch,
-    DataPathErrorOverflow,
-    DataPathErrorCompression
-} dp_error_code;
-
-typedef struct {
-    dp_error_code dp_code;
-    crypto_error_code crypto_code;
-} dp_error_t;
+const uint8_t DataPacketPingData[] = {
+    0x2a, 0x18, 0x7b, 0xf3, 0x64, 0x1e, 0xb4, 0xcb,
+    0x07, 0xed, 0x2d, 0x0a, 0x98, 0x1f, 0xc7, 0x48
+};

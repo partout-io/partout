@@ -74,6 +74,16 @@ typedef enum {
 extern const uint8_t DataPacketPingData[16];
 
 static inline
+const uint8_t *_Nonnull DataPacketPingDataBytes() {
+    return DataPacketPingData;
+}
+
+static inline
+size_t DataPacketPingDataLength() {
+    return sizeof(DataPacketPingData);
+}
+
+static inline
 void PacketOpcodeGet(const uint8_t *_Nonnull from,
                      packet_code_t *_Nullable code,
                      uint8_t *_Nullable key)
