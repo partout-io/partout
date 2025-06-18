@@ -41,64 +41,60 @@ final class DataPathADTests: XCTestCase, DataPathTestsProtocol {
 extension DataPathADTests {
     func test_givenAD_whenEncryptMock_thenDecrypts() throws {
         try private_test_givenAD_whenEncryptMock_thenDecrypts(CompressionFramingDisabled)
+    }
+
+    func test_givenADCompLZO_whenEncryptMock_thenDecrypts() throws {
         try private_test_givenAD_whenEncryptMock_thenDecrypts(CompressionFramingCompLZO)
+    }
+
+    func test_givenADCompress_whenEncryptMock_thenDecrypts() throws {
         try private_test_givenAD_whenEncryptMock_thenDecrypts(CompressionFramingCompress)
+    }
+
+    func test_givenADCompressV2_whenEncryptMock_thenDecrypts() throws {
         try private_test_givenAD_whenEncryptMock_thenDecrypts(CompressionFramingCompressV2)
     }
 
     func test_givenAD_whenEncryptGCM_thenDecrypts() throws {
         try private_test_givenAD_whenEncryptGCM_thenDecrypts(CompressionFramingDisabled)
+    }
+
+    func test_givenADCompLZO_whenEncryptGCM_thenDecrypts() throws {
         try private_test_givenAD_whenEncryptGCM_thenDecrypts(CompressionFramingCompLZO)
+    }
+
+    func test_givenADCompress_whenEncryptGCM_thenDecrypts() throws {
         try private_test_givenAD_whenEncryptGCM_thenDecrypts(CompressionFramingCompress)
+    }
+
+    func test_givenADCompressV2_whenEncryptGCM_thenDecrypts() throws {
         try private_test_givenAD_whenEncryptGCM_thenDecrypts(CompressionFramingCompressV2)
     }
 }
 
 private extension DataPathADTests {
-    func private_test_givenAD_whenEncryptMock_thenDecrypts(_ framing: compression_framing_t) throws {
+    func private_test_givenAD_whenEncryptMock_thenDecrypts(
+        _ framing: compression_framing_t
+    ) throws {
         print("AD framing: \(framing)")
         let mode = dp_mode_ad_create_mock(framing)
-        do {
-            try testReversibleEncryption(
-                mode: mode,
-                payload: payload,
-                assertAssembled: {
-                    framing != CompressionFramingDisabled ||
-                        $0.toHex() == self.payload.toHex()
-                },
-                assertEncrypted: {
-                    framing != CompressionFramingDisabled ||
-                        $0.toHex() == "4a00000100001020aabb44332211ccdd"
-                }
-            )
-            try testReversibleCompoundEncryption(
-                mode: mode,
-                payload: payload,
-                assertEncrypted: {
-                    framing != CompressionFramingDisabled ||
-                        $0.toHex() == "4a00000100001020aabb44332211ccdd"
-                }
-            )
-            try testReversibleBulkEncryption(mode: mode)
-        } catch {
-            XCTFail("AD mock failed with framing: \(framing)")
-            throw error
-        }
+        try testReversibleEncryption(mode: mode, payload: payload)
+        try testReversibleCompoundEncryption(mode: mode, payload: payload)
+        try testReversibleBulkEncryption(mode: mode)
+        dp_mode_free(mode)
     }
 
-    func private_test_givenAD_whenEncryptGCM_thenDecrypts(_ framing: compression_framing_t) throws {
+    func private_test_givenAD_whenEncryptGCM_thenDecrypts(
+        _ framing: compression_framing_t
+    ) throws {
         let cipher = "AES-128-GCM"
         let tag = 8
         let id = 8
         print("AD framing: \(framing)")
-        do {
-            let mode = dp_mode_ad_create_aead(cipher, tag, id, framing)
-            try testReversibleEncryption(mode: mode, payload: payload)
-            try testReversibleCompoundEncryption(mode: mode, payload: payload)
-            try testReversibleBulkEncryption(mode: mode)
-        } catch {
-            XCTFail("AD \(cipher)/\(tag)/\(id) failed with framing: \(framing)")
-            throw error
-        }
+        let mode = dp_mode_ad_create_aead(cipher, tag, id, framing)
+        try testReversibleEncryption(mode: mode, payload: payload)
+        try testReversibleCompoundEncryption(mode: mode, payload: payload)
+        try testReversibleBulkEncryption(mode: mode)
+        dp_mode_free(mode)
     }
 }

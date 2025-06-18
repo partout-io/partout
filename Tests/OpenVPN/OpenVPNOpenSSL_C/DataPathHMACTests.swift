@@ -41,22 +41,49 @@ final class DataPathHMACTests: XCTestCase, DataPathTestsProtocol {
 extension DataPathHMACTests {
     func test_givenHMAC_whenEncryptMock_thenDecrypts() throws {
         try private_test_givenHMAC_whenEncryptMock_thenDecrypts(CompressionFramingDisabled)
+    }
+
+    func test_givenHMACCompLZO_whenEncryptMock_thenDecrypts() throws {
         try private_test_givenHMAC_whenEncryptMock_thenDecrypts(CompressionFramingCompLZO)
+    }
+
+    func test_givenHMACCompress_whenEncryptMock_thenDecrypts() throws {
         try private_test_givenHMAC_whenEncryptMock_thenDecrypts(CompressionFramingCompress)
+    }
+
+    func test_givenHMACCompressV2_whenEncryptMock_thenDecrypts() throws {
         try private_test_givenHMAC_whenEncryptMock_thenDecrypts(CompressionFramingCompressV2)
     }
 
     func test_givenHMAC_whenEncryptCBC_thenDecrypts() throws {
         try private_test_givenHMAC_whenEncryptCBC_thenDecrypts(CompressionFramingDisabled)
+    }
+
+    func test_givenHMACCompLZO_whenEncryptCBC_thenDecrypts() throws {
         try private_test_givenHMAC_whenEncryptCBC_thenDecrypts(CompressionFramingCompLZO)
+    }
+
+    func test_givenHMACCompress_whenEncryptCBC_thenDecrypts() throws {
         try private_test_givenHMAC_whenEncryptCBC_thenDecrypts(CompressionFramingCompress)
+    }
+
+    func test_givenHMACCompressV2_whenEncryptCBC_thenDecrypts() throws {
         try private_test_givenHMAC_whenEncryptCBC_thenDecrypts(CompressionFramingCompressV2)
     }
 
     func test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts() throws {
         try private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(CompressionFramingDisabled)
+    }
+
+    func test_givenHMACCompLZO_whenEncryptCBCWithSHA1_thenDecrypts() throws {
         try private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(CompressionFramingCompLZO)
+    }
+
+    func test_givenHMACCompress_whenEncryptCBCWithSHA1_thenDecrypts() throws {
         try private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(CompressionFramingCompress)
+    }
+
+    func test_givenHMACCompressV2_whenEncryptCBCWithSHA1_thenDecrypts() throws {
         try private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(CompressionFramingCompressV2)
     }
 }
@@ -64,43 +91,25 @@ extension DataPathHMACTests {
 private extension DataPathHMACTests {
     func private_test_givenHMAC_whenEncryptMock_thenDecrypts(_ framing: compression_framing_t) throws {
         let mode = dp_mode_hmac_create_mock(framing)
-        do {
-            try testReversibleEncryption(mode: mode, payload: payload)
-            try testReversibleCompoundEncryption(mode: mode, payload: payload)
-            try testReversibleBulkEncryption(mode: mode)
-        } catch {
-            XCTFail("HMAC mock failed with framing: \(framing)")
-            throw error
-        }
+        try testReversibleEncryption(mode: mode, payload: payload)
+        try testReversibleCompoundEncryption(mode: mode, payload: payload)
+        try testReversibleBulkEncryption(mode: mode)
+        dp_mode_free(mode)
     }
 
     func private_test_givenHMAC_whenEncryptCBC_thenDecrypts(_ framing: compression_framing_t) throws {
-        let cipher: String? = nil
-        let digest = "SHA1"
-        print("HMAC framing: \(framing)")
-        let mode = dp_mode_hmac_create_cbc(cipher, digest, framing)
-        do {
-            try testReversibleEncryption(mode: mode, payload: payload)
-            try testReversibleCompoundEncryption(mode: mode, payload: payload)
-            try testReversibleBulkEncryption(mode: mode)
-        } catch {
-            XCTFail("HMAC \(cipher ?? "none")/\(digest) failed with framing: \(framing)")
-            throw error
-        }
+        let mode = dp_mode_hmac_create_cbc(nil, "SHA1", framing)
+        try testReversibleEncryption(mode: mode, payload: payload)
+        try testReversibleCompoundEncryption(mode: mode, payload: payload)
+        try testReversibleBulkEncryption(mode: mode)
+        dp_mode_free(mode)
     }
 
     func private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(_ framing: compression_framing_t) throws {
-        let cipher = "AES-128-CBC"
-        let digest = "SHA1"
-        print("HMAC framing: \(framing)")
-        let mode = dp_mode_hmac_create_cbc(cipher, digest, framing)
-        do {
-            try testReversibleEncryption(mode: mode, payload: payload)
-            try testReversibleCompoundEncryption(mode: mode, payload: payload)
-            try testReversibleBulkEncryption(mode: mode)
-        } catch {
-            XCTFail("HMAC \(cipher)/\(digest) failed with framing: \(framing)")
-            throw error
-        }
+        let mode = dp_mode_hmac_create_cbc("AES-128-CBC", "SHA1", framing)
+        try testReversibleEncryption(mode: mode, payload: payload)
+        try testReversibleCompoundEncryption(mode: mode, payload: payload)
+        try testReversibleBulkEncryption(mode: mode)
+        dp_mode_free(mode)
     }
 }
