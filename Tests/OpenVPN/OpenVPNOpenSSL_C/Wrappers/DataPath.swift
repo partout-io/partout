@@ -99,10 +99,6 @@ private extension DataPath {
     }
 }
 
-// MARK: - In-place
-
-// FIXME: ###, reuse enc/dec zd buffers, resize if needed
-
 // MARK: - Compound
 
 extension DataPath {
@@ -115,7 +111,11 @@ extension DataPath {
             zd_resize(encBuffer, bufLength)
             buf = encBuffer
         }
-        return try packet.withUnsafeBytes { src in
+        return try assembleAndEncrypt(packet, key: key, packetId: packetId, buf: buf)
+    }
+
+    func assembleAndEncrypt(_ packet: Data, key: UInt8, packetId: UInt32, buf: UnsafeMutablePointer<zeroing_data_t>) throws -> Data {
+        try packet.withUnsafeBytes { src in
             var error = dp_error_t()
             let zd = dp_mode_assemble_and_encrypt(
                 mode,
@@ -142,7 +142,11 @@ extension DataPath {
             zd_resize(decBuffer, bufLength)
             buf = decBuffer
         }
-        return try packet.withUnsafeBytes { src in
+        return try decryptAndParse(packet, buf: buf)
+    }
+
+    func decryptAndParse(_ packet: Data, buf: UnsafeMutablePointer<zeroing_data_t>) throws -> (UInt32, Data) {
+        try packet.withUnsafeBytes { src in
             var packetId: UInt32 = .zero
             var error = dp_error_t()
             let zd = dp_mode_decrypt_and_parse(
@@ -162,7 +166,7 @@ extension DataPath {
     }
 }
 
-// MARK: - Atomic
+// MARK: - Split
 
 extension DataPath {
     func assemble(packetId: UInt32, payload: Data) -> Data {
