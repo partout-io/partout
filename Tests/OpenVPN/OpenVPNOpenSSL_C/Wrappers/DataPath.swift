@@ -31,7 +31,7 @@ import Foundation
 // FIXME: ###, byte-align zd enc/dec bufs
 
 final class DataPath {
-    typealias DecryptedPair = (packetId: UInt32, data: Data)
+    typealias DecryptedTuple = (packetId: UInt32, header: UInt8, data: Data)
 
     private let mode: UnsafeMutablePointer<dp_mode_t>
 
@@ -122,7 +122,7 @@ extension DataPath {
     func decryptAndParse(
         _ packet: Data,
         withNewBuffer: Bool
-    ) throws -> DecryptedPair {
+    ) throws -> DecryptedTuple {
         let buf = withNewBuffer ? zd_create(0) : nil
         return try decryptAndParse(packet, buf: buf)
     }
@@ -156,16 +156,18 @@ extension DataPath {
     func decryptAndParse(
         _ packet: Data,
         buf: UnsafeMutablePointer<zeroing_data_t>?
-    ) throws -> DecryptedPair {
+    ) throws -> DecryptedTuple {
         let buf = buf ?? decBuffer
         resize(buf, for: packet.count)
         return try packet.withUnsafeBytes { src in
             var packetId: UInt32 = .zero
+            var header: UInt8 = .zero
             var error = dp_error_t()
             let zd = dp_mode_decrypt_and_parse(
                 mode,
                 buf,
                 &packetId,
+                &header,
                 src.bytePointer,
                 packet.count,
                 &error
@@ -174,7 +176,7 @@ extension DataPath {
                 throw DataPathError(error) ?? .generic
             }
             let data = Data(bytes: zd.pointee.bytes, count: zd.pointee.length)
-            return (packetId, data)
+            return (packetId, header, data)
         }
     }
 }
@@ -218,7 +220,7 @@ extension DataPath {
 
     func decrypt(
         packet: Data
-    ) throws -> DecryptedPair {
+    ) throws -> (packetId: UInt32, data: Data) {
         let buf = zd_create(packet.count)
         defer {
             zd_free(buf)
@@ -291,7 +293,7 @@ extension DataPath {
     func decrypt(
         packet: Data,
         buf: UnsafeMutablePointer<zeroing_data_t>?
-    ) throws -> DecryptedPair {
+    ) throws -> (packetId: UInt32, data: Data) {
         let buf = buf ?? decBuffer
         let inputCount = packet.count
         return try packet.withUnsafeBytes { input in

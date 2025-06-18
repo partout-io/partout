@@ -263,6 +263,7 @@ static inline
 zeroing_data_t *_Nullable dp_mode_decrypt_and_parse(dp_mode_t *_Nonnull mode,
                                                     zeroing_data_t *_Nonnull buf,
                                                     uint32_t *_Nonnull dst_packet_id,
+                                                    uint8_t *_Nonnull dst_header,
                                                     const uint8_t *_Nonnull src,
                                                     size_t src_len,
                                                     dp_error_t *_Nullable error) {
@@ -274,9 +275,8 @@ zeroing_data_t *_Nullable dp_mode_decrypt_and_parse(dp_mode_t *_Nonnull mode,
         return NULL;
     }
     zeroing_data_t *dst = zd_create(dec_len);
-    uint8_t header;
-    const size_t dst_len = dp_mode_parse(mode, dst, &header,
-                                            buf->bytes, dec_len, error);
+    const size_t dst_len = dp_mode_parse(mode, dst, dst_header,
+                                         buf->bytes, dec_len, error);
     if (!dst_len) {
         zd_free(dst);
         return NULL;
