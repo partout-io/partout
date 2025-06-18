@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include "dp_macros.h"
 #include "dp_mode_hmac.h"
-#include "dp_mode_macros.h"
 #include "packet.h"
 
 static

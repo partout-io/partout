@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include "dp_macros.h"
 #include "dp_mode.h"
-#include "dp_mode_macros.h"
 #include "packet.h"
 
 dp_mode_t *dp_mode_create(crypto_t *crypto,

@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "dp_mode_macros.h"
+#include "dp_macros.h"
 #include "test/crypto_mock.h"
 
 static inline
