@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutCryptoOpenSSL
+internal import _PartoutCryptoOpenSSL
 import Foundation
 import XCTest
 

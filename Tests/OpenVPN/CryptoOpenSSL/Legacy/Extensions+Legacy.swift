@@ -1,8 +1,8 @@
 //
-//  Crypto+Legacy.swift
+//  Extensions+Legacy.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/16/25.
+//  Created by Davide De Rosa on 6/18/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -24,6 +24,7 @@
 //
 
 internal import _PartoutCryptoOpenSSL_ObjC
+import Foundation
 
 extension CryptoFlagsWrapper {
     init(objcFlags: CryptoFlags) {
@@ -45,11 +46,42 @@ extension CryptoFlagsWrapper {
     }
 }
 
+extension Encrypter {
+    func encryptData(_ data: Data, flags: CryptoFlagsWrapper?) throws -> Data {
+        var objcFlags = CryptoFlags()
+        let ptr = flags.pointer(to: &objcFlags)
+        return try encryptData(data, flags: ptr)
+    }
+}
+
+extension Decrypter {
+    func decryptData(_ data: Data, flags: CryptoFlagsWrapper?) throws -> Data {
+        var objcFlags = CryptoFlags()
+        let ptr = flags.pointer(to: &objcFlags)
+        return try decryptData(data, flags: ptr)
+    }
+
+    func verifyData(_ data: Data, flags: CryptoFlagsWrapper?) throws {
+        var objcFlags = CryptoFlags()
+        let ptr = flags.pointer(to: &objcFlags)
+        try verifyData(data, flags: ptr)
+    }
+}
+
 extension Optional where Wrapped == CryptoFlagsWrapper {
     func pointer(to objcFlags: UnsafeMutablePointer<CryptoFlags>) -> UnsafeMutablePointer<CryptoFlags>? {
         map {
             objcFlags.pointee = $0.objcFlags
             return objcFlags
         }
+    }
+}
+
+extension UnsafeRawBufferPointer {
+    var bytePointer: UnsafePointer<Element> {
+        guard let address = bindMemory(to: Element.self).baseAddress else {
+            fatalError("Cannot bind to self")
+        }
+        return address
     }
 }

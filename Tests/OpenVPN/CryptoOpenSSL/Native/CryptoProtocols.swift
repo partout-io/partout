@@ -23,14 +23,14 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_C
+@testable internal import _PartoutCryptoOpenSSL
 import Foundation
 
 // NOTE: it doesn't matter to use Swift CryptoFlagsWrapper here. for
 // efficiency reasons, OpenVPN will use the C API directly without
 // going through Encrypter/Decrypter
 
-public protocol Crypto {
+protocol Crypto {
     /// The digest length or 0.
     var digestLength: Int { get }
 
@@ -42,7 +42,7 @@ public protocol Crypto {
     func encryptionCapacity(for length: Int) -> Int
 }
 
-public protocol Encrypter: Crypto {
+protocol Encrypter: Crypto {
     /// Configures the object.
     /// - Parameters:
     ///   - cipherKey: The cipher key data.
@@ -65,7 +65,7 @@ public protocol Encrypter: Crypto {
     ) throws -> Bool
 }
 
-public protocol Decrypter: Crypto {
+protocol Decrypter: Crypto {
     /// Configures the object.
     /// - Parameters:
     ///   - cipherKey: The cipher key data.

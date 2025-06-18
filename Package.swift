@@ -351,15 +351,7 @@ if areas.contains(.openvpn) {
                     ["_PartoutCryptoOpenSSL_C"]
                 }
             }(),
-            path: "Sources/OpenVPN/CryptoOpenSSL",
-            exclude: {
-                switch cryptoMode {
-                case .legacy, .bridged:
-                    ["Native"]
-                case .native:
-                    ["Legacy"]
-                }
-            }()
+            path: "Sources/OpenVPN/CryptoOpenSSL"
         ),
         .target(
             name: "_PartoutCryptoOpenSSL_C",
@@ -414,7 +406,15 @@ if areas.contains(.openvpn) {
         .testTarget(
             name: "_PartoutCryptoOpenSSLTests",
             dependencies: ["_PartoutCryptoOpenSSL"],
-            path: "Tests/OpenVPN/CryptoOpenSSL"
+            path: "Tests/OpenVPN/CryptoOpenSSL",
+            exclude: {
+                switch cryptoMode {
+                case .legacy, .bridged:
+                    ["Native"]
+                case .native:
+                    ["Legacy"]
+                }
+            }()
         ),
         .testTarget(
             name: "_PartoutOpenVPNTests",

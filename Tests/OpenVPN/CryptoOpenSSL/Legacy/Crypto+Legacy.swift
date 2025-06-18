@@ -1,5 +1,5 @@
 //
-//  CryptoProtocols+Legacy.swift
+//  Crypto+Legacy.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 7/7/18.
@@ -38,8 +38,6 @@ internal import _PartoutCryptoOpenSSL_ObjC
 import Foundation
 
 extension Encrypter {
-
-    /// Swift version of `encryptBytes`.
     func encryptData(_ data: Data, flags: UnsafePointer<CryptoFlags>?) throws -> Data {
         let srcLength = data.count
         var dest: [UInt8] = Array(repeating: 0, count: srcLength + 256)
@@ -53,8 +51,6 @@ extension Encrypter {
 }
 
 extension Decrypter {
-
-    /// Swift version of `decryptBytes`.
     func decryptData(_ data: Data, flags: UnsafePointer<CryptoFlags>?) throws -> Data {
         let srcLength = data.count
         var dest: [UInt8] = Array(repeating: 0, count: srcLength + 256)
@@ -66,7 +62,6 @@ extension Decrypter {
         return Data(dest)
     }
 
-    /// Swift version of `verifyBytes`.
     func verifyData(_ data: Data, flags: UnsafePointer<CryptoFlags>?) throws {
         let srcLength = data.count
         _ = try data.withUnsafeBytes {
@@ -75,26 +70,9 @@ extension Decrypter {
     }
 }
 
-private extension UnsafeRawBufferPointer {
-    var bytePointer: UnsafePointer<Element> {
-        guard let address = bindMemory(to: Element.self).baseAddress else {
-            fatalError("Cannot bind to self")
-        }
-        return address
-    }
-}
-
-// MARK: - Testing
-
 extension Encrypter {
     func encryptData(_ data: Data) throws -> Data {
         try encryptData(data, flags: nil as UnsafePointer<CryptoFlags>?)
-    }
-
-    func encryptData(_ data: Data, flags: CryptoFlagsWrapper?) throws -> Data {
-        var objcFlags = CryptoFlags()
-        let ptr = flags.pointer(to: &objcFlags)
-        return try encryptData(data, flags: ptr)
     }
 }
 
@@ -103,19 +81,7 @@ extension Decrypter {
         try decryptData(data, flags: nil as UnsafePointer<CryptoFlags>?)
     }
 
-    func decryptData(_ data: Data, flags: CryptoFlagsWrapper?) throws -> Data {
-        var objcFlags = CryptoFlags()
-        let ptr = flags.pointer(to: &objcFlags)
-        return try decryptData(data, flags: ptr)
-    }
-
     func verifyData(_ data: Data) throws {
         try verifyData(data, flags: nil as UnsafePointer<CryptoFlags>?)
-    }
-
-    func verifyData(_ data: Data, flags: CryptoFlagsWrapper?) throws {
-        var objcFlags = CryptoFlags()
-        let ptr = flags.pointer(to: &objcFlags)
-        try verifyData(data, flags: ptr)
     }
 }

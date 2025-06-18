@@ -1,5 +1,5 @@
 //
-//  CryptoFlagsWrapper.swift
+//  CryptoError.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/16/25.
@@ -23,30 +23,23 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
+@testable internal import _PartoutCryptoOpenSSL_C
 
-public struct CryptoFlagsWrapper {
-    public let iv: UnsafePointer<UInt8>?
+enum CryptoError: Error {
+    case generic
 
-    public let ivLength: Int
+    case hmac
 
-    public let ad: UnsafePointer<UInt8>?
+    case prng
 
-    public let adLength: Int
-
-    public let forTesting: Bool
-
-    public init(
-        iv: UnsafePointer<UInt8>? = nil,
-        ivLength: Int = .zero,
-        ad: UnsafePointer<UInt8>? = nil,
-        adLength: Int = .zero,
-        forTesting: Bool
-    ) {
-        self.iv = iv
-        self.ivLength = ivLength
-        self.ad = ad
-        self.adLength = adLength
-        self.forTesting = forTesting
+    init(_ code: crypto_error_t = CryptoErrorGeneric) {
+        switch code {
+        case CryptoErrorPRNG:
+            self = .prng
+        case CryptoErrorHMAC:
+            self = .hmac
+        default:
+            self = .generic
+        }
     }
 }

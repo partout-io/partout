@@ -66,31 +66,31 @@
 
 - (int)digestLength
 {
-    return (int)ptr->meta.digest_length;
+    return (int)ptr->crypto.meta.digest_len;
 }
 
 - (int)tagLength
 {
-    return (int)ptr->meta.tag_length;
+    return (int)ptr->crypto.meta.tag_len;
 }
 
 - (NSInteger)encryptionCapacityWithLength:(NSInteger)length
 {
-    return ptr->meta.encryption_capacity(ptr, length);
+    return ptr->crypto.meta.encryption_capacity(ptr, length);
 }
 
 #pragma mark Encrypter
 
 - (void)configureEncryptionWithCipherKey:(ZeroingData *)cipherKey hmacKey:(ZeroingData *)hmacKey
 {
-    ptr->encrypter.configure(ptr, cipherKey.ptr, hmacKey.ptr);
+    ptr->crypto.encrypter.configure(ptr, cipherKey.ptr, hmacKey.ptr);
 }
 
 - (BOOL)encryptBytes:(const uint8_t *)bytes length:(NSInteger)length dest:(uint8_t *)dest destLength:(NSInteger *)destLength flags:(const CryptoFlags * _Nullable)flags error:(NSError * _Nullable __autoreleasing * _Nullable)error
 {
     crypto_flags_t cf = crypto_flags_from(flags);
     crypto_error_t code;
-    if (!ptr->encrypter.encrypt(ptr, bytes, length, dest, (size_t *)destLength, &cf, &code)) {
+    if (!ptr->crypto.encrypter.encrypt(ptr, dest, (size_t *)destLength, bytes, length, &cf, &code)) {
         if (error) {
             *error = [NSError errorWithDomain:PartoutCryptoErrorDomain code:code userInfo:nil];
         }
@@ -103,14 +103,14 @@
 
 - (void)configureDecryptionWithCipherKey:(ZeroingData *)cipherKey hmacKey:(ZeroingData *)hmacKey
 {
-    ptr->decrypter.configure(ptr, cipherKey.ptr, hmacKey.ptr);
+    ptr->crypto.decrypter.configure(ptr, cipherKey.ptr, hmacKey.ptr);
 }
 
 - (BOOL)decryptBytes:(const uint8_t *)bytes length:(NSInteger)length dest:(uint8_t *)dest destLength:(NSInteger *)destLength flags:(const CryptoFlags * _Nullable)flags error:(NSError * _Nullable __autoreleasing * _Nullable)error
 {
     crypto_flags_t cf = crypto_flags_from(flags);
     crypto_error_t code;
-    if (!ptr->decrypter.decrypt(ptr, bytes, length, dest, (size_t *)destLength, &cf, &code)) {
+    if (!ptr->crypto.decrypter.decrypt(ptr, dest, (size_t *)destLength, bytes, length, &cf, &code)) {
         if (error) {
             *error = [NSError errorWithDomain:PartoutCryptoErrorDomain code:code userInfo:nil];
         }
@@ -123,7 +123,7 @@
 {
     crypto_flags_t cf = crypto_flags_from(flags);
     crypto_error_t code;
-    if (!ptr->decrypter.verify(ptr, bytes, length, &code)) {
+    if (!ptr->crypto.decrypter.verify(ptr, bytes, length, &code)) {
         if (error) {
             *error = [NSError errorWithDomain:PartoutCryptoErrorDomain code:code userInfo:nil];
         }
