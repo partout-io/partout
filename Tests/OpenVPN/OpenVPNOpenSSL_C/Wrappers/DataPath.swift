@@ -28,8 +28,11 @@ internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 
 // FIXME: ###, do most of this in C
+// FIXME: ###, byte-align zd enc/dec bufs
 
 final class DataPath {
+    typealias DecryptedPair = (packetId: UInt32, data: Data)
+
     private let mode: UnsafeMutablePointer<dp_mode_t>
 
     private let encBuffer: UnsafeMutablePointer<zeroing_data_t>
@@ -119,7 +122,7 @@ extension DataPath {
     func decryptAndParse(
         _ packet: Data,
         withNewBuffer: Bool
-    ) throws -> (UInt32, Data) {
+    ) throws -> DecryptedPair {
         let buf = withNewBuffer ? zd_create(0) : nil
         return try decryptAndParse(packet, buf: buf)
     }
@@ -153,7 +156,7 @@ extension DataPath {
     func decryptAndParse(
         _ packet: Data,
         buf: UnsafeMutablePointer<zeroing_data_t>?
-    ) throws -> (UInt32, Data) {
+    ) throws -> DecryptedPair {
         let buf = buf ?? decBuffer
         resize(buf, for: packet.count)
         return try packet.withUnsafeBytes { src in
@@ -232,7 +235,7 @@ extension DataPath {
         }
     }
 
-    func decrypt(packet: Data) throws -> (UInt32, Data) {
+    func decrypt(packet: Data) throws -> DecryptedPair {
         let inputCount = packet.count
         let output = zd_create(inputCount)
         defer {
