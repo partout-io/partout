@@ -87,15 +87,13 @@ private extension DataPath {
                 zd_create_from_data(ptr.bytePointer, data.count)
             }
         }
-        defer {
-            if let ck {
-                zd_free(ck)
-            }
-            if let hk {
-                zd_free(hk)
-            }
-        }
         block(ck, hk)
+        if let ck {
+            zd_free(ck)
+        }
+        if let hk {
+            zd_free(hk)
+        }
     }
 }
 
