@@ -27,14 +27,14 @@
 #include <stdint.h>
 #include "packet.h"
 
-#define DATA_PATH_ENCRYPT_INIT(peerId) \
+#define DP_ENCRYPT_BEGIN(peerId) \
     const bool has_peer_id = (peerId != PacketPeerIdDisabled); \
     size_t dst_header_len = PacketOpcodeLength; \
     if (has_peer_id) { \
         dst_header_len += PacketPeerIdLength; \
     }
 
-#define DATA_PATH_DECRYPT_INIT(ctx) \
+#define DP_DECRYPT_BEGIN(ctx) \
     const uint8_t *ptr = ctx->src; \
     packet_code_t code; \
     PacketOpcodeGet(ptr, &code, NULL); \

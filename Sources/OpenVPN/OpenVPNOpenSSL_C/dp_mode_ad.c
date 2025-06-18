@@ -61,7 +61,7 @@ size_t dp_encrypt(void *vmode) {
     const dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
 
     assert(mode->enc.raw_encrypt);
-    DATA_PATH_ENCRYPT_INIT(mode->peer_id)
+    DP_ENCRYPT_BEGIN(mode->peer_id)
 
     const size_t dst_capacity = dp_mode_encrypt_capacity(mode, ctx->src_len);
     assert(ctx->dst->length >= dst_capacity);
@@ -117,7 +117,7 @@ size_t dp_decrypt(void *vmode) {
     assert(ctx->dst->length >= ctx->src_len);
     uint8_t *dst = ctx->dst->bytes;
 
-    DATA_PATH_DECRYPT_INIT(ctx)
+    DP_DECRYPT_BEGIN(ctx)
     if (ctx->src_len < src_header_len + PacketIdLength) {
         return 0;
     }

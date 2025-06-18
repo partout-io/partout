@@ -38,14 +38,14 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-#define DATA_PATH_ENCRYPT_INIT(peerId) \
+#define DP_ENCRYPT_BEGIN(peerId) \
     const BOOL hasPeerId = (peerId != PacketPeerIdDisabled); \
     int headerLength = PacketOpcodeLength; \
     if (hasPeerId) { \
         headerLength += PacketPeerIdLength; \
     }
 
-#define DATA_PATH_DECRYPT_INIT(packet) \
+#define DP_DECRYPT_BEGIN(packet) \
     const uint8_t *ptr = packet.bytes; \
     PacketCode code; \
     PacketOpcodeGet(ptr, &code, NULL); \
