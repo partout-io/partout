@@ -61,7 +61,7 @@ static
 bool crypto_encrypt(void *vctx,
                     uint8_t *dst, size_t *dst_len,
                     const uint8_t *in, size_t in_len,
-                    const crypto_flags_t *flags, crypto_error_t *error) {
+                    const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
 
@@ -120,7 +120,7 @@ static
 bool crypto_decrypt(void *vctx,
                     uint8_t *out, size_t *out_len,
                     const uint8_t *in, size_t in_len,
-                    const crypto_flags_t *flags, crypto_error_t *error) {
+                    const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
 
@@ -156,7 +156,7 @@ bool crypto_decrypt(void *vctx,
 }
 
 static
-bool crypto_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_t *error) {
+bool crypto_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_code *error) {
     crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
 

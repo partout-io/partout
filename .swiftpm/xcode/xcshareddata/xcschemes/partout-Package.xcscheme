@@ -57,20 +57,6 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "PartoutCryptoOpenSSL_C"
-               BuildableName = "PartoutCryptoOpenSSL_C"
-               BlueprintName = "PartoutCryptoOpenSSL_C"
-               ReferencedContainer = "container:">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
                BlueprintIdentifier = "PartoutOpenVPN"
                BuildableName = "PartoutOpenVPN"
                BlueprintName = "PartoutOpenVPN"
@@ -113,48 +99,6 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "PartoutCryptoOpenSSLCross"
-               BuildableName = "PartoutCryptoOpenSSLCross"
-               BlueprintName = "PartoutCryptoOpenSSLCross"
-               ReferencedContainer = "container:">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "_PartoutCryptoOpenSSL"
-               BuildableName = "_PartoutCryptoOpenSSL"
-               BlueprintName = "_PartoutCryptoOpenSSL"
-               ReferencedContainer = "container:">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "_PartoutOpenVPNOpenSSL"
-               BuildableName = "_PartoutOpenVPNOpenSSL"
-               BlueprintName = "_PartoutOpenVPNOpenSSL"
-               ReferencedContainer = "container:">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
                BlueprintIdentifier = "_PartoutCryptoOpenSSL_C"
                BuildableName = "_PartoutCryptoOpenSSL_C"
                BlueprintName = "_PartoutCryptoOpenSSL_C"
@@ -172,6 +116,20 @@
                BlueprintIdentifier = "_PartoutCryptoOpenSSL_ObjC"
                BuildableName = "_PartoutCryptoOpenSSL_ObjC"
                BlueprintName = "_PartoutCryptoOpenSSL_ObjC"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "_PartoutOpenVPNOpenSSL"
+               BuildableName = "_PartoutOpenVPNOpenSSL"
+               BlueprintName = "_PartoutOpenVPNOpenSSL"
                ReferencedContainer = "container:">
             </BuildableReference>
          </BuildActionEntry>
@@ -228,19 +186,9 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "_PartoutCryptoOpenSSL_CTests"
-               BuildableName = "_PartoutCryptoOpenSSL_CTests"
-               BlueprintName = "_PartoutCryptoOpenSSL_CTests"
-               ReferencedContainer = "container:">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "_PartoutCryptoOpenSSL_ObjCTests"
-               BuildableName = "_PartoutCryptoOpenSSL_ObjCTests"
-               BlueprintName = "_PartoutCryptoOpenSSL_ObjCTests"
+               BlueprintIdentifier = "_PartoutCryptoOpenSSLTests"
+               BuildableName = "_PartoutCryptoOpenSSLTests"
+               BlueprintName = "_PartoutCryptoOpenSSLTests"
                ReferencedContainer = "container:">
             </BuildableReference>
          </TestableReference>
@@ -301,16 +249,6 @@
                BlueprintIdentifier = "_PartoutWireGuardTests"
                BuildableName = "_PartoutWireGuardTests"
                BlueprintName = "_PartoutWireGuardTests"
-               ReferencedContainer = "container:">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "_PartoutCryptoOpenSSLTests"
-               BuildableName = "_PartoutCryptoOpenSSLTests"
-               BlueprintName = "_PartoutCryptoOpenSSLTests"
                ReferencedContainer = "container:">
             </BuildableReference>
          </TestableReference>

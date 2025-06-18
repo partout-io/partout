@@ -32,7 +32,7 @@ enum CryptoError: Error {
 
     case prng
 
-    init(_ code: crypto_error_t = CryptoErrorGeneric) {
+    init(_ code: crypto_error_code = CryptoErrorGeneric) {
         switch code {
         case CryptoErrorPRNG:
             self = .prng
