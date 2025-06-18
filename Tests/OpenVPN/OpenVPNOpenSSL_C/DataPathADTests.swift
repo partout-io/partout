@@ -72,15 +72,55 @@ extension DataPathADTests {
     }
 }
 
+extension DataPathADTests {
+    func test_givenADCompressV2_whenEncryptMockWithNoCompressSwap_thenDecrypts() throws {
+        try testFraming(CompressionFramingCompressV2) {
+            XCTAssertNoThrow(try testReversibleBulkEncryption(mode: $0, customPayloads: [
+                Data([UInt8(DataPacketNoCompressSwap)])
+            ]))
+        }
+    }
+
+    func test_givenADCompressV2_whenEncryptMockWithLZOCompress_thenDecrypts() throws {
+        try testFraming(CompressionFramingCompressV2) {
+            XCTAssertNoThrow(try testReversibleBulkEncryption(mode: $0, customPayloads: [
+                Data([UInt8(DataPacketLZOCompress)])
+            ]))
+        }
+    }
+
+    func test_givenADCompressV2_whenEncryptMockWithV2Indicator_thenDecrypts() throws {
+        try testFraming(CompressionFramingCompressV2) {
+            XCTAssertNoThrow(try testReversibleBulkEncryption(mode: $0, customPayloads: [
+                Data([UInt8(DataPacketV2Indicator)])
+            ]))
+        }
+    }
+
+    func test_givenADCompressV2_whenEncryptMockWithV2Uncompressed_thenDecrypts() throws {
+        try testFraming(CompressionFramingCompressV2) {
+            XCTAssertNoThrow(try testReversibleBulkEncryption(mode: $0, customPayloads: [
+                Data([UInt8(DataPacketV2Uncompressed)])
+            ]))
+        }
+    }
+
+    private func testFraming(_ framing: compression_framing_t, _ block: (UnsafeMutablePointer<dp_mode_t>) throws -> Void) rethrows {
+        let mode = dp_mode_ad_create_mock(framing)
+        try block(mode)
+        dp_mode_free(mode)
+    }
+}
+
 private extension DataPathADTests {
     func private_test_givenAD_whenEncryptMock_thenDecrypts(
         _ framing: compression_framing_t
     ) throws {
         print("AD framing: \(framing)")
         let mode = dp_mode_ad_create_mock(framing)
-        try testReversibleEncryption(mode: mode, payload: payload)
-        try testReversibleCompoundEncryption(mode: mode, payload: payload)
-        try testReversibleBulkEncryption(mode: mode)
+        XCTAssertNoThrow(try testReversibleEncryption(mode: mode, payload: payload))
+        XCTAssertNoThrow(try testReversibleCompoundEncryption(mode: mode, payload: payload))
+        XCTAssertNoThrow(try testReversibleBulkEncryption(mode: mode))
         dp_mode_free(mode)
     }
 
@@ -92,9 +132,9 @@ private extension DataPathADTests {
         let id = 8
         print("AD framing: \(framing)")
         let mode = dp_mode_ad_create_aead(cipher, tag, id, framing)
-        try testReversibleEncryption(mode: mode, payload: payload)
-        try testReversibleCompoundEncryption(mode: mode, payload: payload)
-        try testReversibleBulkEncryption(mode: mode)
+        XCTAssertNoThrow(try testReversibleEncryption(mode: mode, payload: payload))
+        XCTAssertNoThrow(try testReversibleCompoundEncryption(mode: mode, payload: payload))
+        XCTAssertNoThrow(try testReversibleBulkEncryption(mode: mode))
         dp_mode_free(mode)
     }
 }
