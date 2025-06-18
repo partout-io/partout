@@ -143,7 +143,10 @@ extension DataPathTestsProtocol {
         print("\tdecrypted:\t", decryptedTuple.data.toHex())
     }
 
-    func testReversibleBulkEncryption(mode: UnsafeMutablePointer<dp_mode_t>) throws {
+    func testReversibleBulkEncryption(
+        mode: UnsafeMutablePointer<dp_mode_t>,
+        customPayloads: [Data]? = nil
+    ) throws {
         let sut = DataPath(mode: mode, peerId: peerId)
         let crypto = mode.pointee.crypto.assumingMemoryBound(to: crypto_t.self)
         let cipherKeyLength = crypto.pointee.meta.cipher_key_len
@@ -160,7 +163,7 @@ extension DataPathTestsProtocol {
         // - random length in [1, N]
         // - repeating random byte in [0, 0xff]
         //
-        let payloads = (1...10).map {
+        let payloads = customPayloads ?? (1...10).map {
             Data(repeating: .random(in: 0...0xff), count: .random(in: 1...$0))
         }
         print("\tpayloads\t\t", payloads.map { $0.toHex() })
