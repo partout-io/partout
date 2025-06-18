@@ -80,7 +80,8 @@ zeroing_data_t *zd_create_from_string(const char *string, bool null_terminated) 
 }
 
 void zd_free(zeroing_data_t *zd) {
-    assert(zd);
+    if (!zd) return;
+
     bzero(zd->bytes, zd->length);
     free(zd->bytes);
     free(zd);
