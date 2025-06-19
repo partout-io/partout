@@ -188,23 +188,22 @@ dp_mode_t *dp_mode_hmac_create(crypto_t *crypto,
     DP_LOG("dp_mode_hmac_create");
 
     const dp_framing_t *frm = dp_framing(comp_f);
-
-    dp_mode_encrypter_t enc;
-    enc.raw_encrypt = NULL;
-    enc.framing_assemble = frm->assemble;
-    enc.assemble = dp_assemble;
-    enc.encrypt = dp_encrypt;
-
-    dp_mode_decrypter_t dec;
-    dec.raw_decrypt = NULL;
-    dec.framing_parse = frm->parse;
-    dec.decrypt = dp_decrypt;
-    dec.parse = dp_parse;
-
-    dp_mode_options_t opt = { 0 };
-    opt.comp_f = comp_f;
-    opt.peer_id = PacketPeerIdDisabled;
-    opt.mss_val = 0;
-
+    const dp_mode_encrypter_t enc = {
+        frm->assemble,
+        dp_assemble,
+        NULL,
+        dp_encrypt
+    };
+    const dp_mode_decrypter_t dec = {
+        frm->parse,
+        dp_parse,
+        NULL,
+        dp_decrypt
+    };
+    const dp_mode_options_t opt = {
+        comp_f,
+        PacketPeerIdDisabled,
+        0
+    };
     return dp_mode_create_opt(crypto, crypto_free, &enc, &dec, &opt);
 }
