@@ -139,7 +139,7 @@ extension DataPath {
 
             // FIXME: ###, compare in C (return .keep_alive from tuple?)
             tuple.data.withUnsafeBytes {
-                if memcmp($0.bytePointer, DataPacketPingDataBytes(), tuple.data.count) == 0 {
+                if DataPacketIsPing($0.bytePointer, tuple.data.count) {
                     keepAlive = true
                 }
             }

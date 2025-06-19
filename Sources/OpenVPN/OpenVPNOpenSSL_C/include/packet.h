@@ -74,8 +74,8 @@ typedef enum {
 extern const uint8_t DataPacketPingData[16];
 
 static inline
-const uint8_t *_Nonnull DataPacketPingDataBytes() {
-    return DataPacketPingData;
+bool DataPacketIsPing(const uint8_t *_Nonnull bytes, size_t len) {
+    return memcmp(bytes, DataPacketPingData, len) == 0;
 }
 
 static inline
