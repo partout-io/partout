@@ -121,12 +121,16 @@ typedef struct {
 } dp_mode_decrypter_t;
 
 typedef struct {
+    compression_framing_t comp_f;
+    uint32_t peer_id;
+} dp_mode_options_t;
+
+typedef struct {
     void *_Nonnull crypto;
     crypto_free_t _Nonnull crypto_free;
     dp_mode_encrypter_t enc;
     dp_mode_decrypter_t dec;
-    compression_framing_t comp_f;
-    uint32_t peer_id;
+    dp_mode_options_t opt;
 
     dp_mode_assemble_ctx assemble_ctx;
     dp_mode_encrypt_ctx enc_ctx;
@@ -134,27 +138,35 @@ typedef struct {
     dp_mode_parse_ctx parse_ctx;
 } dp_mode_t;
 
+dp_mode_t *_Nonnull dp_mode_create_opt(crypto_t *_Nonnull crypto,
+                                       crypto_free_t _Nonnull crypto_free,
+                                       const dp_mode_encrypter_t *_Nonnull enc,
+                                       const dp_mode_decrypter_t *_Nonnull dec,
+                                       const dp_mode_options_t *_Nullable opt);
+
+static inline
 dp_mode_t *_Nonnull dp_mode_create(crypto_t *_Nonnull crypto,
                                    crypto_free_t _Nonnull crypto_free,
                                    const dp_mode_encrypter_t *_Nonnull enc,
-                                   const dp_mode_decrypter_t *_Nonnull dec,
-                                   compression_framing_t comp_f);
+                                   const dp_mode_decrypter_t *_Nonnull dec) {
+    return dp_mode_create_opt(crypto, crypto_free, enc, dec, NULL);
+}
 
 void dp_mode_free(dp_mode_t * _Nonnull);
 
 static inline
 uint32_t dp_mode_peer_id(dp_mode_t *_Nonnull mode) {
-    return mode->peer_id;
+    return mode->opt.peer_id;
 }
 
 static inline
 void dp_mode_set_peer_id(dp_mode_t *_Nonnull mode, uint32_t peer_id) {
-    mode->peer_id = peer_id_masked(peer_id);
+    mode->opt.peer_id = peer_id_masked(peer_id);
 }
 
 static inline
 compression_framing_t dp_mode_framing(const dp_mode_t *_Nonnull mode) {
-    return mode->comp_f;
+    return mode->opt.comp_f;
 }
 
 static inline

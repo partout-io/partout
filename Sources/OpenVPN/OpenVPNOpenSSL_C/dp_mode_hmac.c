@@ -63,7 +63,7 @@ size_t dp_encrypt(void *vmode) {
     const dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
 
     assert(mode->enc.raw_encrypt);
-    DP_ENCRYPT_BEGIN(mode->peer_id)
+    DP_ENCRYPT_BEGIN(mode->opt.peer_id)
 
     const size_t dst_capacity = dp_mode_encrypt_capacity(mode, ctx->src_len);
     assert(ctx->dst->length >= dst_capacity);
@@ -90,7 +90,7 @@ size_t dp_encrypt(void *vmode) {
         return 0;
     }
     if (has_peer_id) {
-        PacketHeaderSetDataV2(dst, ctx->key, mode->peer_id);
+        PacketHeaderSetDataV2(dst, ctx->key, mode->opt.peer_id);
     } else {
         PacketHeaderSet(dst, PacketCodeDataV1, ctx->key, NULL);
     }
@@ -132,7 +132,7 @@ size_t dp_decrypt(void *vmode) {
         return 0;
     }
     if (has_peer_id) {
-        if (peer_id != mode->peer_id) {
+        if (peer_id != mode->opt.peer_id) {
             if (ctx->error) {
                 ctx->error->dp_code = DataPathErrorPeerIdMismatch;
                 ctx->error->crypto_code = CryptoErrorNone;
@@ -201,5 +201,9 @@ dp_mode_t *dp_mode_hmac_create(crypto_t *crypto,
     dec.decrypt = dp_decrypt;
     dec.parse = dp_parse;
 
-    return dp_mode_create(crypto, crypto_free, &enc, &dec, comp_f);
+    dp_mode_options_t opt = { 0 };
+    opt.comp_f = comp_f;
+    opt.peer_id = PacketPeerIdDisabled;
+
+    return dp_mode_create_opt(crypto, crypto_free, &enc, &dec, &opt);
 }

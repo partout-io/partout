@@ -61,7 +61,7 @@ size_t dp_encrypt(void *vmode) {
     const dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
 
     assert(mode->enc.raw_encrypt);
-    DP_ENCRYPT_BEGIN(mode->peer_id)
+    DP_ENCRYPT_BEGIN(mode->opt.peer_id)
 
     const size_t dst_capacity = dp_mode_encrypt_capacity(mode, ctx->src_len);
     assert(ctx->dst->length >= dst_capacity);
@@ -73,7 +73,7 @@ size_t dp_encrypt(void *vmode) {
     flags.iv = dst + dst_header_len;
     flags.iv_len = PacketIdLength;
     if (has_peer_id) {
-        PacketHeaderSetDataV2(dst, ctx->key, mode->peer_id);
+        PacketHeaderSetDataV2(dst, ctx->key, mode->opt.peer_id);
         flags.ad = dst;
         flags.ad_len = dst_header_len + PacketIdLength;
     }
@@ -126,7 +126,7 @@ size_t dp_decrypt(void *vmode) {
     flags.iv = ctx->src + src_header_len;
     flags.iv_len = PacketIdLength;
     if (has_peer_id) {
-        if (peer_id != mode->peer_id) {
+        if (peer_id != mode->opt.peer_id) {
             if (ctx->error) {
                 ctx->error->dp_code = DataPathErrorPeerIdMismatch;
                 ctx->error->crypto_code = CryptoErrorNone;
@@ -218,5 +218,9 @@ dp_mode_t *dp_mode_ad_create(crypto_t *crypto,
     dec.decrypt = dp_decrypt;
     dec.parse = dp_parse;
 
-    return dp_mode_create(crypto, crypto_free, &enc, &dec, comp_f);
+    dp_mode_options_t opt = { 0 };
+    opt.comp_f = comp_f;
+    opt.peer_id = PacketPeerIdDisabled;
+
+    return dp_mode_create_opt(crypto, crypto_free, &enc, &dec, &opt);
 }

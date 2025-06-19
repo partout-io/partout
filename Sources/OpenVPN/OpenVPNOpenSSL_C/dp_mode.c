@@ -27,18 +27,22 @@
 #include "dp_mode.h"
 #include "packet.h"
 
-dp_mode_t *dp_mode_create(crypto_t *crypto,
-                          crypto_free_t crypto_free,
-                          const dp_mode_encrypter_t *enc,
-                          const dp_mode_decrypter_t *dec,
-                          compression_framing_t comp_f) {
-    DP_LOG("dp_mode_create");
+dp_mode_t *dp_mode_create_opt(crypto_t *crypto,
+                              crypto_free_t crypto_free,
+                              const dp_mode_encrypter_t *enc,
+                              const dp_mode_decrypter_t *dec,
+                              const dp_mode_options_t *opt) {
+    DP_LOG("dp_mode_create_opt");
 
     dp_mode_t *mode = pp_alloc_crypto(sizeof(dp_mode_t));
     mode->crypto = crypto;
     mode->crypto_free = crypto_free;
-    mode->comp_f = comp_f;
-    mode->peer_id = PacketPeerIdDisabled;
+    if (opt) {
+        mode->opt = *opt;
+    } else {
+        mode->opt.comp_f = CompressionFramingDisabled;
+        mode->opt.peer_id = PacketPeerIdDisabled;
+    }
 
     // extend with raw crypto functions
     mode->enc = *enc;
