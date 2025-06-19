@@ -45,6 +45,13 @@ dp_mode_t *dp_mode_create_opt(crypto_t *crypto,
         mode->opt.mss_val = 0;
     }
 
+    // replay protector
+    if (mode->opt.with_replay) {
+        mode->replay = replay_create();
+    } else {
+        mode->replay = NULL;
+    }
+
     // extend with raw crypto functions
     mode->enc = *enc;
     mode->dec = *dec;
@@ -57,6 +64,9 @@ dp_mode_t *dp_mode_create_opt(crypto_t *crypto,
 void dp_mode_free(dp_mode_t *mode) {
     DP_LOG("dp_mode_free");
     mode->crypto_free(mode->crypto);
+    if (mode->replay) {
+        replay_free(mode->replay);
+    }
     free(mode);
 }
 

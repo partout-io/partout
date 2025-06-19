@@ -105,6 +105,7 @@ typedef size_t (*dp_mode_parse_t)(void *_Nonnull mode);
  */
 
 #include "packet.h"
+#include "replay.h"
 
 typedef struct {
     dp_framing_assemble_t _Nullable framing_assemble;
@@ -124,6 +125,7 @@ typedef struct {
     compression_framing_t comp_f;
     uint32_t peer_id;
     uint16_t mss_val;
+    bool with_replay;
 } dp_mode_options_t;
 
 typedef struct {
@@ -137,6 +139,8 @@ typedef struct {
     dp_mode_encrypt_ctx enc_ctx;
     dp_mode_decrypt_ctx dec_ctx;
     dp_mode_parse_ctx parse_ctx;
+
+    replay_t *_Nullable replay;
 } dp_mode_t;
 
 dp_mode_t *_Nonnull dp_mode_create_opt(crypto_t *_Nonnull crypto,
