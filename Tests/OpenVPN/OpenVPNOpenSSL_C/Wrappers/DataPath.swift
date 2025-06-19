@@ -30,7 +30,12 @@ import Foundation
 // TODO: ###, move more logic to C (replay protection, byte-aligned enc/dec zd)
 
 final class DataPath {
-    typealias DecryptedTuple = (packetId: UInt32, header: UInt8, data: Data)
+    typealias DecryptedTuple = (
+        packetId: UInt32,
+        header: UInt8,
+        isKeepAlive: Bool,
+        data: Data
+    )
 
     private let mode: UnsafeMutablePointer<dp_mode_t>
 
@@ -136,12 +141,9 @@ extension DataPath {
             guard !replay_is_replayed(replay, tuple.packetId) else {
                 return nil
             }
-
-            // FIXME: ###, compare in C (return .keep_alive from tuple?)
-            tuple.data.withUnsafeBytes {
-                if DataPacketIsPing($0.bytePointer, tuple.data.count) {
-                    keepAlive = true
-                }
+            // detect keep-alive packet (ping)
+            if tuple.isKeepAlive {
+                keepAlive = true
             }
             return tuple.data
         }
@@ -255,12 +257,14 @@ extension DataPath {
         return try packet.withUnsafeBytes { src in
             var packetId: UInt32 = .zero
             var header: UInt8 = .zero
+            var keepAlive: Bool = false
             var error = dp_error_t()
             let zd = dp_mode_decrypt_and_parse(
                 mode,
                 buf,
                 &packetId,
                 &header,
+                &keepAlive,
                 src.bytePointer,
                 packet.count,
                 &error
@@ -269,7 +273,7 @@ extension DataPath {
                 throw DataPathError(error) ?? .generic
             }
             let data = NSData(bytesNoCopy: zd.pointee.bytes, length: zd.pointee.length) as Data
-            return (packetId, header, data)
+            return (packetId, header, keepAlive, data)
         }
     }
 }

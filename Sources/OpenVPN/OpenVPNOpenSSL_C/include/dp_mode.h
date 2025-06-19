@@ -276,6 +276,7 @@ zeroing_data_t *_Nullable dp_mode_decrypt_and_parse(dp_mode_t *_Nonnull mode,
                                                     zeroing_data_t *_Nonnull buf,
                                                     uint32_t *_Nonnull dst_packet_id,
                                                     uint8_t *_Nonnull dst_header,
+                                                    bool *_Nonnull dst_keep_alive,
                                                     const uint8_t *_Nonnull src,
                                                     size_t src_len,
                                                     dp_error_t *_Nullable error) {
@@ -294,5 +295,9 @@ zeroing_data_t *_Nullable dp_mode_decrypt_and_parse(dp_mode_t *_Nonnull mode,
         return NULL;
     }
     zd_resize(dst, dst_len);
+    assert(dst->length == dst_len);
+    if (DataPacketIsPing(dst->bytes, dst->length)) {
+        *dst_keep_alive = true;
+    }
     return dst;
 }
