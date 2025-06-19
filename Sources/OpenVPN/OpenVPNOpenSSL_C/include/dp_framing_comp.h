@@ -92,7 +92,7 @@ bool dp_framing_parse_v2(dp_framing_parse_ctx *_Nonnull ctx) {
                 return false;
             }
             *ctx->dst_payload_offset = 2;
-            *ctx->dst_header_len = 1;
+            *ctx->dst_header_len = 2;
             break;
 
         default:
