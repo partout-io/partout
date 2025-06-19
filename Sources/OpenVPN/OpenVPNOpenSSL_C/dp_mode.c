@@ -42,6 +42,7 @@ dp_mode_t *dp_mode_create_opt(crypto_t *crypto,
     } else {
         mode->opt.comp_f = CompressionFramingDisabled;
         mode->opt.peer_id = PacketPeerIdDisabled;
+        mode->opt.mss_val = 0;
     }
 
     // extend with raw crypto functions

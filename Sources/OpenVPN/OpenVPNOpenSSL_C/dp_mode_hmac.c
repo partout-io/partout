@@ -204,6 +204,7 @@ dp_mode_t *dp_mode_hmac_create(crypto_t *crypto,
     dp_mode_options_t opt = { 0 };
     opt.comp_f = comp_f;
     opt.peer_id = PacketPeerIdDisabled;
+    opt.mss_val = 0;
 
     return dp_mode_create_opt(crypto, crypto_free, &enc, &dec, &opt);
 }
