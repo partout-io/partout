@@ -166,7 +166,7 @@ extension DataPathTestsProtocol {
         let payloads = customPayloads ?? (1...10).map {
             Data(repeating: .random(in: 0...0xff), count: .random(in: 1...$0))
         }
-        print("\tpayloads\t\t", payloads.map { $0.toHex() })
+        print("\tpayloads\t", payloads.map { $0.toHex() })
 
         let encrypted = try sut.encrypt(payloads, key: key)
         print("\tencrypted\t", encrypted.map { $0.toHex() })
