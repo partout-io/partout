@@ -37,11 +37,11 @@
 #include <arpa/inet.h>
 #include "mss_fix.h"
 
-const int FLAG_SYN      = 2;
-const int PROTO_TCP     = 6;
-const int OPT_END       = 0;
-const int OPT_NOP       = 1;
-const int OPT_MSS       = 2;
+static const int FLAG_SYN      = 2;
+static const int PROTO_TCP     = 6;
+static const int OPT_END       = 0;
+static const int OPT_NOP       = 1;
+static const int OPT_MSS       = 2;
 
 typedef struct {
     uint8_t hdr_len:4, ver:4, x[8], proto;
