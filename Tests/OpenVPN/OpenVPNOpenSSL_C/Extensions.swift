@@ -139,7 +139,7 @@ extension DataPathTestsProtocol {
         XCTAssertEqual(decryptedTuple.packetId, packetId)
         XCTAssertEqual(decryptedTuple.data, payload)
         print("\tpacket_id:\t", String(format: "%0x", decryptedTuple.packetId))
-        print("\theader:\t", String(format: "%0x", decryptedTuple.header))
+        print("\theader:\t\t", String(format: "%0x", decryptedTuple.header))
         print("\tdecrypted:\t", decryptedTuple.data.toHex())
     }
 
