@@ -220,8 +220,7 @@ dp_mode_t *dp_mode_ad_create(crypto_t *crypto,
     const dp_mode_options_t opt = {
         comp_f,
         PacketPeerIdDisabled,
-        0,
-        true
+        0
     };
     return dp_mode_create_opt(crypto, crypto_free, &enc, &dec, &opt);
 }
