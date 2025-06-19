@@ -75,11 +75,13 @@ typedef enum {
 
 #define peer_id_masked(pid)         (pid & 0xffffff)
 
-extern const uint8_t DataPacketPingData[16];
-
 static inline
 bool packet_is_ping(const uint8_t *_Nonnull bytes, size_t len) {
-    return memcmp(bytes, DataPacketPingData, len) == 0;
+    static const uint8_t ping[] = {
+        0x2a, 0x18, 0x7b, 0xf3, 0x64, 0x1e, 0xb4, 0xcb,
+        0x07, 0xed, 0x2d, 0x0a, 0x98, 0x1f, 0xc7, 0x48
+    };
+    return memcmp(bytes, ping, len) == 0;
 }
 
 static inline
