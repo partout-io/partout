@@ -23,6 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#pragma once
+
 #include <stdbool.h>
 #include <stdint.h>
 #include "packet.h"

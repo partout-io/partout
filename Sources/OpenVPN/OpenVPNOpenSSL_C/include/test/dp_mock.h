@@ -23,6 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#pragma once
+
 #include "crypto_mock.h"
 #include "crypto_openssl/crypto_aead.h"
 #include "crypto_openssl/crypto_cbc.h"
