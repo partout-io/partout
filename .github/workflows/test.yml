@@ -21,8 +21,12 @@ jobs:
         run: |
           default_env="environment = .remoteBinary"
           grep "^$default_env$" Package.swift
-      - name: Run tests
+      - name: Run tests (legacy)
         run: |
           OPENVPN_CRYPTO_MODE="0" swift test
+      - name: Run tests (bridged)
+        run: |
           OPENVPN_CRYPTO_MODE="1" swift test
+      - name: Run tests (native)
+        run: |
           #OPENVPN_CRYPTO_MODE="2" swift test
