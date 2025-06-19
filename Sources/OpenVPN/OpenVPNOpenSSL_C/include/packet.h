@@ -40,7 +40,7 @@
 #include <stdint.h>
 #include <string.h>
 
-// FIXME: ###, C lowercase
+// FIXME: ###, rename to lowercase, except enum cases
 
 #define peer_id_masked(pid)         (pid & 0xffffff)
 

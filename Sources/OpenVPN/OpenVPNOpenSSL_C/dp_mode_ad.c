@@ -170,7 +170,7 @@ size_t dp_parse(void *vmode) {
 
     assert(ctx->dst->length >= ctx->src_len);
 
-    const uint8_t *payload = ctx->src;
+    uint8_t *payload = ctx->src;
     size_t dst_len = ctx->src_len;// - (int)(payload - ctx->src);
     if (!mode->dec.framing_parse) {
         *ctx->dst_header = 0x00;
@@ -181,7 +181,7 @@ size_t dp_parse(void *vmode) {
     size_t payload_offset;
     size_t payload_header_len;
     dp_framing_parse_ctx parse;
-    parse.dst_payload = payload; // FIXME: ###, parse in place
+    parse.dst_payload = payload;
     parse.dst_payload_offset = &payload_offset;
     parse.dst_header = ctx->dst_header;
     parse.dst_header_len = &payload_header_len;

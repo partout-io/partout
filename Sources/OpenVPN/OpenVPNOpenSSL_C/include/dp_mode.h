@@ -70,7 +70,7 @@ typedef struct {
 typedef struct {
     zeroing_data_t *_Nonnull dst;
     uint8_t *_Nonnull dst_header;
-    const uint8_t *_Nonnull src;
+    uint8_t *_Nonnull src; // allow parse in place
     size_t src_len;
     dp_error_t *_Nullable error;
 } dp_mode_parse_ctx;
@@ -267,7 +267,7 @@ size_t dp_mode_decrypt(dp_mode_t *_Nonnull mode,
 size_t dp_mode_parse(dp_mode_t *_Nonnull mode,
                      zeroing_data_t *_Nonnull dst,
                      uint8_t *_Nonnull dst_header,
-                     const uint8_t *_Nonnull src,
+                     uint8_t *_Nonnull src,
                      size_t src_len,
                      dp_error_t *_Nullable error);
 

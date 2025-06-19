@@ -353,10 +353,12 @@ extension DataPath {
         buf: UnsafeMutablePointer<zeroing_data_t>?
     ) throws -> Data {
         let buf = buf ?? decBuffer
-        var inputCopy = [UInt8](decrypted) // FIXME: ###, copy because parsed in place
+        var inputCopy = [UInt8](decrypted) // copy because parsed in place
         let inputCount = inputCopy.count
         resize(buf, for: inputCount)
-        return try inputCopy.withUnsafeMutableBytes { input in
+
+        let decryptedOriginal = decrypted
+        let parsed = try inputCopy.withUnsafeMutableBytes { input in
             var error = dp_error_t()
             let outLength = dp_mode_parse(
                 mode,
@@ -371,6 +373,9 @@ extension DataPath {
             }
             return Data(bytes: buf.pointee.bytes, count: outLength)
         }
+        // this should never ever fail because of Swift compile checks
+        assert(decryptedOriginal == decrypted, "Parsing is done in-place, work on a copy of decrypted")
+        return parsed
     }
 }
 
