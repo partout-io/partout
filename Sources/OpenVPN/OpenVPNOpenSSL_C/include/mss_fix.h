@@ -38,4 +38,4 @@
 
 #include <stdint.h>
 
-void mss_fix(uint8_t *_Nonnull data, size_t data_len);
+void mss_fix(uint8_t *_Nonnull data, size_t data_len, uint16_t mtu);

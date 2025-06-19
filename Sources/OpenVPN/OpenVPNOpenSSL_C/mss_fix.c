@@ -42,7 +42,6 @@ const int PROTO_TCP     = 6;
 const int OPT_END       = 0;
 const int OPT_NOP       = 1;
 const int OPT_MSS       = 2;
-const int MSS_VAL       = 1250;
 
 typedef struct {
     uint8_t hdr_len:4, ver:4, x[8], proto;
@@ -69,7 +68,7 @@ void mss_update_sum(uint16_t* sum_ptr, uint16_t* val_ptr, uint16_t new_val)
     *val_ptr = htons(new_val);
 }
 
-void mss_fix(uint8_t *data, size_t data_len)
+void mss_fix(uint8_t *data, size_t data_len, uint16_t mtu)
 {
     /* XXX Prevent buffer overread */
     if (data_len < sizeof(ip_hdr_t)) {
@@ -110,10 +109,10 @@ void mss_fix(uint8_t *data, size_t data_len)
             if (i + o->size > optlen) {
                 return;
             }
-            if (ntohs(o->mss) <= MSS_VAL) {
+            if (ntohs(o->mss) <= mtu) {
                 return;
             }
-            mss_update_sum(&tcph->sum, &o->mss, MSS_VAL);
+            mss_update_sum(&tcph->sum, &o->mss, mtu);
             return;
         }
 
