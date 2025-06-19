@@ -40,9 +40,7 @@
 #include <stdint.h>
 #include <string.h>
 
-// FIXME: ###, rename to lowercase, except enum cases
-
-#define peer_id_masked(pid)         (pid & 0xffffff)
+// MARK: - Packets
 
 #define PacketOpcodeLength          ((size_t)1)
 #define PacketIdLength              ((size_t)4)
@@ -64,6 +62,8 @@ typedef enum {
     PacketCodeUnknown               = 0xff
 } packet_code_t;
 
+// MARK: - Framing
+
 #define DataPacketNoCompress        0xfa
 #define DataPacketNoCompressSwap    0xfb
 #define DataPacketLZOCompress       0x66
@@ -71,64 +71,63 @@ typedef enum {
 #define DataPacketV2Indicator       0x50
 #define DataPacketV2Uncompressed    0x00
 
+// MARK: - Macros
+
+#define peer_id_masked(pid)         (pid & 0xffffff)
+
 extern const uint8_t DataPacketPingData[16];
 
 static inline
-bool DataPacketIsPing(const uint8_t *_Nonnull bytes, size_t len) {
+bool packet_is_ping(const uint8_t *_Nonnull bytes, size_t len) {
     return memcmp(bytes, DataPacketPingData, len) == 0;
 }
 
 static inline
-size_t DataPacketPingDataLength() {
-    return sizeof(DataPacketPingData);
-}
+void packet_header_get(packet_code_t *_Nullable dst_code,
+                       uint8_t *_Nullable dst_key,
+                       const uint8_t *_Nonnull src) {
 
-static inline
-void PacketOpcodeGet(const uint8_t *_Nonnull from,
-                     packet_code_t *_Nullable code,
-                     uint8_t *_Nullable key)
-{
-    if (code) {
-        *code = (packet_code_t)(*from >> 3);
+    if (dst_code) {
+        *dst_code = (packet_code_t)(*src >> 3);
     }
-    if (key) {
-        *key = *from & 0b111;
+    if (dst_key) {
+        *dst_key = *src & 0b111;
     }
 }
 
 static inline
-int PacketHeaderSet(uint8_t *_Nonnull to,
-                    packet_code_t code,
-                    uint8_t key,
-                    const uint8_t *_Nullable sessionId)
-{
-    *(uint8_t *)to = (code << 3) | (key & 0b111);
+size_t packet_header_set(uint8_t *_Nonnull dst,
+                         packet_code_t src_code,
+                         uint8_t src_key,
+                         const uint8_t *_Nullable src_session_id) {
+
+    *(uint8_t *)dst = (src_code << 3) | (src_key & 0b111);
     int offset = PacketOpcodeLength;
-    if (sessionId) {
-        memcpy(to + offset, sessionId, PacketSessionIdLength);
+    if (src_session_id) {
+        memcpy(dst + offset, src_session_id, PacketSessionIdLength);
         offset += PacketSessionIdLength;
     }
     return offset;
 }
 
-static inline int PacketHeaderSetDataV2(uint8_t *_Nonnull to,
-                                        uint8_t key,
-                                        uint32_t peerId)
-{
-    *(uint32_t *)to = ((PacketCodeDataV2 << 3) | (key & 0b111)) | htonl(peerId & 0xffffff);
+static inline
+size_t packet_header_v2_set(uint8_t *_Nonnull dst,
+                            uint8_t src_key,
+                            uint32_t src_peer_id) {
+
+    *(uint32_t *)dst = ((PacketCodeDataV2 << 3) | (src_key & 0b111)) | htonl(peer_id_masked(src_peer_id));
     return PacketOpcodeLength + PacketPeerIdLength;
 }
 
 static inline
-int PacketHeaderGetDataV2PeerId(const uint8_t *_Nonnull from)
-{
-    return ntohl(*(const uint32_t *)from & 0xffffff00);
+uint32_t packet_header_v2_get_peer_id(const uint8_t *_Nonnull src) {
+    return ntohl(*(const uint32_t *)src & 0xffffff00);
 }
 
 #pragma mark - Utils
 
 static inline
-void PacketSwap(uint8_t *_Nonnull ptr, size_t len1, size_t len2)
+void data_swap(uint8_t *_Nonnull ptr, size_t len1, size_t len2)
 {
     // two buffers due to overlapping
     uint8_t buf1[len1];

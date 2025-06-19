@@ -73,12 +73,12 @@ size_t dp_encrypt(void *vmode) {
     flags.iv = dst + dst_header_len;
     flags.iv_len = PacketIdLength;
     if (has_peer_id) {
-        PacketHeaderSetDataV2(dst, ctx->key, mode->opt.peer_id);
+        packet_header_v2_set(dst, ctx->key, mode->opt.peer_id);
         flags.ad = dst;
         flags.ad_len = dst_header_len + PacketIdLength;
     }
     else {
-        PacketHeaderSet(dst, PacketCodeDataV1, ctx->key, NULL);
+        packet_header_set(dst, PacketCodeDataV1, ctx->key, NULL);
         flags.ad = dst + dst_header_len;
         flags.ad_len = PacketIdLength;
     }

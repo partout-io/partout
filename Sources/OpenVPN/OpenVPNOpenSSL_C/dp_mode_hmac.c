@@ -90,9 +90,9 @@ size_t dp_encrypt(void *vmode) {
         return 0;
     }
     if (has_peer_id) {
-        PacketHeaderSetDataV2(dst, ctx->key, mode->opt.peer_id);
+        packet_header_v2_set(dst, ctx->key, mode->opt.peer_id);
     } else {
-        PacketHeaderSet(dst, PacketCodeDataV1, ctx->key, NULL);
+        packet_header_set(dst, PacketCodeDataV1, ctx->key, NULL);
     }
     return dst_header_len + dst_packet_len;
 }
