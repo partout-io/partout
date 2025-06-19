@@ -681,6 +681,22 @@ private extension Negotiator {
 //        pp_log(ctx, .openvpn, .info, "\tsessionId: \(sessionId.toHex())")
 //        pp_log(ctx, .openvpn, .info, "\tremoteSessionId: \(remoteSessionId.toHex())")
 
+#if canImport(_PartoutOpenVPNOpenSSL_C)
+        let parameters = DataPathWrapper.Parameters(
+            cipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
+            digest: options.configuration.fallbackDigest,
+            compressionFraming: history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming,
+            peerId: history.pushReply.options.peerId ?? PacketPeerIdDisabled,
+            authResponse: authResponse
+        )
+        let wrapper: DataPathWrapper
+#if OPENVPN_DP_NATIVE
+        wrapper = .native(with: parameters)
+#else
+        wrapper = .legacy(with: parameters)
+#endif
+        return DataChannel(ctx, key: key, dataPath: wrapper.dataPath)
+#else
         let cryptoBox = cryptoFactory()
         try cryptoBox.configure(
             withCipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
@@ -702,8 +718,8 @@ private extension Negotiator {
             maxPackets: options.sessionOptions.maxPackets,
             usesReplayProtection: Constants.usesReplayProtection
         )
-
         return DataChannel(ctx, key: key, dataPath: dataPath)
+#endif
     }
 }
 

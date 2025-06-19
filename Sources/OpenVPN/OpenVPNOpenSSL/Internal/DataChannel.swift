@@ -23,7 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if canImport(_PartoutOpenVPNOpenSSL_ObjC)
 internal import _PartoutOpenVPNOpenSSL_ObjC
+#endif
 import Foundation
 import PartoutCore
 
@@ -32,6 +34,27 @@ final class DataChannel {
 
     let key: UInt8
 
+#if canImport(_PartoutOpenVPNOpenSSL_C)
+    private let dataPath: DataPathProtocol
+
+    init(_ ctx: PartoutLoggerContext, key: UInt8, dataPath: DataPathProtocol) {
+        self.ctx = ctx
+        self.key = key
+        self.dataPath = dataPath
+    }
+
+    func encrypt(packets: [Data]) throws -> [Data]? {
+        try dataPath.encrypt(packets, key: key)
+    }
+
+    func decrypt(packets: [Data]) throws -> [Data]? {
+        let result = try dataPath.decrypt(packets)
+        if result.keepAlive {
+            pp_log(ctx, .openvpn, .debug, "Data: Received ping, do nothing")
+        }
+        return result.packets
+    }
+#else
     private let dataPath: DataPath
 
     init(_ ctx: PartoutLoggerContext, key: UInt8, dataPath: DataPath) {
@@ -52,4 +75,5 @@ final class DataChannel {
         }
         return decrypted
     }
+#endif
 }

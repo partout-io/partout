@@ -387,7 +387,14 @@ if areas.contains(.openvpn) {
             path: "Sources/OpenVPN/OpenVPNOpenSSL",
             exclude: {
                 switch cryptoMode {
-                case .legacy, .bridgedCrypto:
+                case .legacy:
+                    [
+                        "Impl/DataPathProtocol.swift",
+                        "Impl/DataPathWrapper.swift",
+                        "Impl/Bridged",
+                        "Impl/Native"
+                    ]
+                case .bridgedCrypto:
                     ["Impl/Bridged", "Impl/Native"]
                 case .bridgedDataPath:
                     ["Impl/Legacy"]
