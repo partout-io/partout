@@ -293,7 +293,6 @@ zeroing_data_t *_Nullable dp_mode_decrypt_and_parse(dp_mode_t *_Nonnull mode,
         zd_free(dst);
         return NULL;
     }
-    // FIXME: ###, decryption: replay, compression, ping
     zd_resize(dst, dst_len);
     return dst;
 }

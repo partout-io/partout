@@ -27,8 +27,7 @@ internal import _PartoutCryptoOpenSSL_C
 internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 
-// FIXME: ###, do most of this in C
-// FIXME: ###, byte-align zd enc/dec bufs
+// TODO: ###, move more logic to C (replay protection, byte-aligned enc/dec zd)
 
 final class DataPath {
     typealias DecryptedTuple = (packetId: UInt32, header: UInt8, data: Data)
@@ -56,7 +55,6 @@ final class DataPath {
         maxPacketId = .max - 10 * UInt32(oneKilo)
         outPacketId = .zero
 
-        // FIXME: ###, replay protection
 //        if (usesReplayProtection) {
 //            self.inReplay = [[ReplayProtector alloc] init];
 //        }
