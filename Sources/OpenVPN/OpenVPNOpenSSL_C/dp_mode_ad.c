@@ -40,17 +40,16 @@ size_t dp_assemble(void *vmode) {
     size_t dst_len = ctx->src_len;
     if (!mode->enc.framing_assemble) {
         memcpy(ctx->dst, ctx->src, ctx->src_len);
-        return dst_len;
+    } else {
+        size_t packet_len_offset;
+        dp_framing_assemble_ctx assemble;
+        assemble.dst = dst;
+        assemble.dst_len_offset = &packet_len_offset;
+        assemble.src = ctx->src;
+        assemble.src_len = ctx->src_len;
+        mode->enc.framing_assemble(&assemble);
+        dst_len += packet_len_offset;
     }
-
-    size_t packet_len_offset;
-    dp_framing_assemble_ctx assemble;
-    assemble.dst = dst;
-    assemble.dst_len_offset = &packet_len_offset;
-    assemble.src = ctx->src;
-    assemble.src_len = ctx->src_len;
-    mode->enc.framing_assemble(&assemble);
-    dst_len += packet_len_offset;
     return dst_len;
 }
 
