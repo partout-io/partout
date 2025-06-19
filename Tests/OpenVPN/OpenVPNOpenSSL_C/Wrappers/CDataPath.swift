@@ -1,5 +1,5 @@
 //
-//  DataPath.swift
+//  CDataPath.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/16/25.
@@ -29,7 +29,7 @@ import Foundation
 
 // TODO: ###, move more logic to C (replay protection, byte-aligned enc/dec zd)
 
-final class DataPath {
+final class CDataPath {
     typealias DecryptedTuple = (
         packetId: UInt32,
         header: UInt8,
@@ -82,7 +82,7 @@ final class DataPath {
     }
 }
 
-private extension DataPath {
+private extension CDataPath {
     func configure(
         cipherKey: Data?,
         hmacKey: Data?,
@@ -110,7 +110,7 @@ private extension DataPath {
 
 // MARK: - Bulk encrypt/decrypt
 
-extension DataPath {
+extension CDataPath {
     func encrypt(_ packets: [Data], key: UInt8) throws -> [Data] {
         try packets.map {
             outPacketId += 1
@@ -153,7 +153,7 @@ extension DataPath {
 
 // MARK: - Creating buffers (for testing)
 
-extension DataPath {
+extension CDataPath {
     func assembleAndEncrypt(
         _ packet: Data,
         key: UInt8,
@@ -173,7 +173,7 @@ extension DataPath {
     }
 }
 
-extension DataPath {
+extension CDataPath {
     func assemble(
         packetId: UInt32,
         payload: Data
@@ -221,7 +221,7 @@ extension DataPath {
 
 // MARK: - Reusing buffers
 
-extension DataPath {
+extension CDataPath {
     func assembleAndEncrypt(
         _ packet: Data,
         key: UInt8,
@@ -278,7 +278,7 @@ extension DataPath {
     }
 }
 
-extension DataPath {
+extension CDataPath {
     func assemble(
         packetId: UInt32,
         payload: Data,
@@ -386,7 +386,7 @@ extension DataPath {
 
 // MARK: -
 
-private extension DataPath {
+private extension CDataPath {
     func resize(_ buf: UnsafeMutablePointer<zeroing_data_t>, for count: Int) {
         guard buf.pointee.length < count else {
             return

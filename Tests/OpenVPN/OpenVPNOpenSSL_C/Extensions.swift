@@ -58,7 +58,7 @@ extension DataPathTestsProtocol {
         assertAssembled: ((Data) -> Bool)? = nil,
         assertEncrypted: ((Data) -> Bool)? = nil
     ) throws {
-        let sut = DataPath(mode: mode, peerId: peerId)
+        let sut = CDataPath(mode: mode, peerId: peerId)
         let crypto = mode.pointee.crypto.assumingMemoryBound(to: crypto_t.self)
         let cipherKeyLength = crypto.pointee.meta.cipher_key_len
         let hmacKeyLength = crypto.pointee.meta.hmac_key_len
@@ -104,7 +104,7 @@ extension DataPathTestsProtocol {
         payload: Data,
         assertEncrypted: ((Data) -> Bool)? = nil
     ) throws {
-        let sut = DataPath(mode: mode, peerId: peerId)
+        let sut = CDataPath(mode: mode, peerId: peerId)
         let crypto = mode.pointee.crypto.assumingMemoryBound(to: crypto_t.self)
         let cipherKeyLength = crypto.pointee.meta.cipher_key_len
         let hmacKeyLength = crypto.pointee.meta.hmac_key_len
@@ -147,7 +147,7 @@ extension DataPathTestsProtocol {
         mode: UnsafeMutablePointer<dp_mode_t>,
         customPayloads: [Data]? = nil
     ) throws {
-        let sut = DataPath(mode: mode, peerId: peerId)
+        let sut = CDataPath(mode: mode, peerId: peerId)
         let crypto = mode.pointee.crypto.assumingMemoryBound(to: crypto_t.self)
         let cipherKeyLength = crypto.pointee.meta.cipher_key_len
         let hmacKeyLength = crypto.pointee.meta.hmac_key_len
