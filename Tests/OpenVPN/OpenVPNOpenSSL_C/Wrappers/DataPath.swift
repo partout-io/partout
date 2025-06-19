@@ -38,6 +38,8 @@ final class DataPath {
 
     private let decBuffer: UnsafeMutablePointer<zeroing_data_t>
 
+    private let replay: UnsafeMutablePointer<replay_t>
+
     private let resizeStep: Int
 
     private let maxPacketId: UInt32
@@ -51,13 +53,10 @@ final class DataPath {
         let oneKilo = 1024
         encBuffer = zd_create(64 * oneKilo)
         decBuffer = zd_create(64 * oneKilo)
+        replay = replay_create()
         resizeStep = 1024
         maxPacketId = .max - 10 * UInt32(oneKilo)
         outPacketId = .zero
-
-//        if (usesReplayProtection) {
-//            self.inReplay = [[ReplayProtector alloc] init];
-//        }
     }
 
     deinit {
@@ -121,22 +120,24 @@ extension DataPath {
 
     func decrypt(_ packets: [Data]) throws -> (packets: [Data], keepAlive: Bool) {
         var keepAlive = false
-        let list = try packets.map {
+        let list = try packets.compactMap { encrypted -> Data? in
 
             // framing will throw if compressed (handled in dp_framing_parse_*)
             let tuple = try decryptAndParse(
-                $0,
+                encrypted,
                 buf: nil
             )
 
+            // throw on packet id overflow
             guard tuple.packetId <= maxPacketId else {
                 throw DataPathError.path(DataPathErrorOverflow)
             }
-            // FIXME: ###, after decrypt -> replay protection
-//            if (self.inReplay && [self.inReplay isReplayedPacketId:packetId]) {
-//                continue;
-//            }
+            // ignore replayed packet ids
+            guard !replay_is_replayed(replay, tuple.packetId) else {
+                return nil
+            }
 
+            // FIXME: ###, compare in C (return .keep_alive from tuple?)
             tuple.data.withUnsafeBytes {
                 if memcmp($0.bytePointer, DataPacketPingDataBytes(), tuple.data.count) == 0 {
                     keepAlive = true
