@@ -49,6 +49,7 @@ size_t dp_assemble(void *vmode) {
         assemble.dst_len_offset = &packet_len_offset;
         assemble.src = ctx->src;
         assemble.src_len = ctx->src_len;
+        assemble.mss_val = mode->opt.mss_val;
         mode->enc.framing_assemble(&assemble);
         dst_len += packet_len_offset;
     }

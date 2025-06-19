@@ -112,7 +112,6 @@ extension DataPath {
     func encrypt(_ packets: [Data], key: UInt8) throws -> [Data] {
         try packets.map {
             outPacketId += 1
-            // FIXME: ###, after assemble -> mss_fix
             return try assembleAndEncrypt(
                 $0,
                 key: key,
@@ -125,6 +124,8 @@ extension DataPath {
     func decrypt(_ packets: [Data]) throws -> (packets: [Data], keepAlive: Bool) {
         var keepAlive = false
         let list = try packets.map {
+
+            // framing will throw if compressed (handled in dp_framing_parse_*)
             let tuple = try decryptAndParse(
                 $0,
                 buf: nil
@@ -137,7 +138,6 @@ extension DataPath {
 //            if (self.inReplay && [self.inReplay isReplayedPacketId:packetId]) {
 //                continue;
 //            }
-            // FIXME: ###, after parse -> throw if compressed (should be handled by dp_framing_parse_common)
 
             tuple.data.withUnsafeBytes {
                 if memcmp($0.bytePointer, DataPacketPingDataBytes(), tuple.data.count) == 0 {

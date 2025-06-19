@@ -251,7 +251,6 @@ zeroing_data_t *_Nullable dp_mode_assemble_and_encrypt(dp_mode_t *_Nonnull mode,
         zd_free(dst);
         return NULL;
     }
-    // FIXME: ###, encryption: mss_fix
     zd_resize(dst, dst_len);
     return dst;
 }

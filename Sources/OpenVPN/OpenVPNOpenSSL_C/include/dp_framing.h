@@ -35,6 +35,7 @@ typedef struct {
     size_t *_Nonnull dst_len_offset;
     const uint8_t *_Nonnull src;
     size_t src_len;
+    uint16_t mss_val;
 } dp_framing_assemble_ctx;
 
 typedef struct {
