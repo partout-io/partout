@@ -26,6 +26,7 @@
 import _PartoutOpenVPN
 internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
+import PartoutCore
 
 // FIXME: ###, wrapper supersedes OSSLCryptoBox, delete later
 
@@ -40,12 +41,18 @@ private let CryptoCTRTagLength = 32
 private let CryptoCTRPayloadLength = PacketOpcodeLength + PacketSessionIdLength + PacketReplayIdLength + PacketReplayTimestampLength
 
 extension DataPathWrapper {
-    static func native(with parameters: Parameters) throws -> DataPathWrapper {
-        NSLog("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)");
+    static func native(with parameters: Parameters, prf: Parameters.PRF, prng: PRNGProtocol) throws -> DataPathWrapper {
+        let seed = CZ(prng.safeData(length: PRNGSeedLength))
+        return try .native(with: parameters, prf: prf, seed: seed)
+    }
 
-        // make sure its initialized before seeding
-        let seed = CZ(parameters.prng.safeData(length: PRNGSeedLength))
+    static func native(with parameters: Parameters, prf: Parameters.PRF, seed: CZeroingData) throws -> DataPathWrapper {
         key_init_seed(seed.ptr)
+        return try .native(with: parameters, keys: parameters.keys(with: prf))
+    }
+
+    static func native(with parameters: Parameters, keys: Parameters.Keys) throws -> DataPathWrapper {
+        NSLog("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)");
 
         let mode: UnsafeMutablePointer<dp_mode_t>
         let cipherAlgorithm = parameters.cipher?.rawValue.uppercased()
@@ -81,7 +88,6 @@ extension DataPathWrapper {
         }
 
         let dataPath = CDataPath(mode: mode, peerId: parameters.peerId)
-        let keys = try parameters.keys()
         dataPath.configureEncryption(
             cipherKey: keys.cipher.encryptionKey.ptr,
             hmacKey: keys.digest.encryptionKey.ptr

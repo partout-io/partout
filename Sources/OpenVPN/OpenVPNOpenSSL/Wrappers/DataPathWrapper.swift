@@ -25,12 +25,9 @@
 
 import _PartoutOpenVPN
 import Foundation
-import PartoutCore
 
 final class DataPathWrapper {
     struct Parameters {
-        let prng: PRNGProtocol
-
         let cipher: OpenVPN.Cipher?
 
         let digest: OpenVPN.Digest
@@ -38,12 +35,6 @@ final class DataPathWrapper {
         let compressionFraming: OpenVPN.CompressionFraming
 
         let peerId: UInt32
-
-        let authResponse: Authenticator.Response
-
-        let sessionId: Data
-
-        let remoteSessionId: Data
     }
 
     let dataPath: DataPathTestingProtocol

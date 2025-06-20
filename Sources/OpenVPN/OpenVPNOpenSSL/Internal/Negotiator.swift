@@ -683,20 +683,21 @@ private extension Negotiator {
 
 #if canImport(_PartoutOpenVPNOpenSSL_C)
         let parameters = DataPathWrapper.Parameters(
-            prng: prng,
             cipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
             digest: options.configuration.fallbackDigest,
             compressionFraming: history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming,
-            peerId: history.pushReply.options.peerId ?? PacketPeerIdDisabled,
+            peerId: history.pushReply.options.peerId ?? PacketPeerIdDisabled
+        )
+        let prf = DataPathWrapper.Parameters.PRF(
             authResponse: authResponse,
             sessionId: sessionId,
             remoteSessionId: remoteSessionId
         )
         let wrapper: DataPathWrapper
 #if OPENVPN_DP_NATIVE
-        wrapper = try .native(with: parameters)
+        wrapper = try .native(with: parameters, prf: prf, prng: prng)
 #else
-        wrapper = .legacy(with: parameters)
+        wrapper = .legacy(with: parameters, prf: prf, prng: prng)
 #endif
         return DataChannel(ctx, key: key, dataPath: wrapper.dataPath)
 #else

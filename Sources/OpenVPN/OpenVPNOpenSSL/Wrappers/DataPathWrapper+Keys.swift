@@ -46,12 +46,20 @@ extension DataPathWrapper.Parameters {
         let digest: DigestKeys
     }
 
-    func keys() throws -> Keys {
+    struct PRF {
+        let authResponse: Authenticator.Response
+
+        let sessionId: Data
+
+        let remoteSessionId: Data
+    }
+
+    func keys(with prf: PRF) throws -> Keys {
         let masterData = try keysPRF(parameters: PRFParameters(
             label: Constants.label1,
-            secret: CZ(authResponse.preMaster),
-            clientSeed: CZ(authResponse.random1),
-            serverSeed: CZ(authResponse.serverRandom1),
+            secret: CZ(prf.authResponse.preMaster),
+            clientSeed: CZ(prf.authResponse.random1),
+            serverSeed: CZ(prf.authResponse.serverRandom1),
             clientSessionId: nil,
             serverSessionId: nil,
             size: Constants.preMasterLength
@@ -59,10 +67,10 @@ extension DataPathWrapper.Parameters {
         let keysData = try keysPRF(parameters: PRFParameters(
             label: Constants.label2,
             secret: masterData,
-            clientSeed: CZ(authResponse.random2),
-            serverSeed: CZ(authResponse.serverRandom2),
-            clientSessionId: sessionId,
-            serverSessionId: remoteSessionId,
+            clientSeed: CZ(prf.authResponse.random2),
+            serverSeed: CZ(prf.authResponse.serverRandom2),
+            clientSessionId: prf.sessionId,
+            serverSessionId: prf.remoteSessionId,
             size: Constants.keysCount * Constants.keyLength
         ))
 
