@@ -686,7 +686,7 @@ private extension Negotiator {
             cipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
             digest: options.configuration.fallbackDigest,
             compressionFraming: history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming,
-            peerId: history.pushReply.options.peerId ?? PacketPeerIdDisabled
+            peerId: history.pushReply.options.peerId
         )
         let prf = DataPathWrapper.Parameters.PRF(
             authResponse: authResponse,

@@ -28,6 +28,8 @@ internal import _PartoutOpenVPNOpenSSL_C
 enum DataPathError: Error {
     case generic
 
+    case wrapperAlgorithm
+
     case wrapperKeys
 
     case path(dp_error_code)

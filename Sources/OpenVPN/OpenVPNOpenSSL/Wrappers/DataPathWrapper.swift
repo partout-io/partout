@@ -30,11 +30,11 @@ final class DataPathWrapper {
     struct Parameters {
         let cipher: OpenVPN.Cipher?
 
-        let digest: OpenVPN.Digest
+        let digest: OpenVPN.Digest?
 
         let compressionFraming: OpenVPN.CompressionFraming
 
-        let peerId: UInt32
+        let peerId: UInt32?
     }
 
     let dataPath: DataPathTestingProtocol

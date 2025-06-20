@@ -56,7 +56,7 @@ extension DataPathWrapper {
 
         let mode: UnsafeMutablePointer<dp_mode_t>
         let cipherAlgorithm = parameters.cipher?.rawValue.uppercased()
-        let digestAlgorithm = parameters.digest.rawValue.uppercased()
+        let digestAlgorithm = parameters.digest?.rawValue.uppercased()
 
         if let cipherAlgorithm, cipherAlgorithm.hasSuffix("-GCM") {
             mode = cipherAlgorithm.withCString { cCipher in
@@ -68,6 +68,9 @@ extension DataPathWrapper {
                 )
             }
         } else {
+            guard let digestAlgorithm else {
+                throw DataPathError.wrapperAlgorithm
+            }
             mode = digestAlgorithm.withCString { cDigest in
                 if let cipherAlgorithm {
                     return cipherAlgorithm.withCString { cCipher in
@@ -94,17 +97,17 @@ extension DataPathWrapper {
 extension DataPathWrapper {
     static func nativeMock(with framing: OpenVPN.CompressionFraming, keys: Parameters.Keys) throws -> DataPathWrapper {
         let mode = dp_mode_ad_create_mock(framing.cNative)
-        return try cNative(with: mode, peerId: PacketPeerIdDisabled, keys: keys)
+        return try cNative(with: mode, peerId: nil, keys: keys)
     }
 }
 
 private extension DataPathWrapper {
     static func cNative(
         with mode: UnsafeMutablePointer<dp_mode_t>,
-        peerId: UInt32,
+        peerId: UInt32?,
         keys: Parameters.Keys
     ) throws -> DataPathWrapper {
-        let dataPath = CDataPath(mode: mode, peerId: peerId)
+        let dataPath = CDataPath(mode: mode, peerId: peerId ?? PacketPeerIdDisabled)
         dataPath.configureEncryption(
             cipherKey: keys.cipher.encryptionKey.ptr,
             hmacKey: keys.digest.encryptionKey.ptr
