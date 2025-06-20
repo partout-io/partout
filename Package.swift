@@ -312,9 +312,11 @@ if areas.contains(.openvpn) {
     enum CryptoMode: Int {
         case legacy = 0
 
-        case bridged = 1
+        case bridgedCrypto = 1
 
-        case native = 2
+        case bridgedDataPath = 2
+
+        case native = 3
     }
 
     let cryptoMode: CryptoMode
@@ -335,10 +337,6 @@ if areas.contains(.openvpn) {
             targets: ["PartoutOpenVPN"]
         ),
         .library(
-            name: "_PartoutCryptoOpenSSL_ObjC",
-            targets: ["_PartoutCryptoOpenSSL_ObjC"]
-        ),
-        .library(
             name: "_PartoutCryptoOpenSSL_C",
             targets: ["_PartoutCryptoOpenSSL_C"]
         ),
@@ -349,8 +347,9 @@ if areas.contains(.openvpn) {
         .library(
             name: "_PartoutOpenVPNOpenSSL_C",
             targets: ["_PartoutOpenVPNOpenSSL_C"]
-        )
+        ),
     ])
+
     package.targets.append(contentsOf: [
         .target(
             name: "PartoutOpenVPN",
@@ -364,44 +363,27 @@ if areas.contains(.openvpn) {
             cSettings: cSettings
         ),
         .target(
-            name: "_PartoutCryptoOpenSSL_ObjC",
-            dependencies: {
-                var deps: [Target.Dependency] = [
-                    "openssl-apple"
-                ]
-                if cryptoMode == .bridged {
-                    deps.append("_PartoutCryptoOpenSSL_C")
-                }
-                return deps
-            }(),
-            path: "Sources/OpenVPN/CryptoOpenSSL_ObjC",
-            exclude: {
-                switch cryptoMode {
-                case .legacy:
-                    ["bridged"]
-                case .bridged, .native:
-                    ["legacy"]
-                }
-            }()
-        ),
-        .target(
             name: "_PartoutOpenVPN",
             dependencies: ["PartoutCoreWrapper"],
             path: "Sources/OpenVPN/Base"
         ),
         .target(
             name: "_PartoutOpenVPNOpenSSL",
-            dependencies: [
-                "_PartoutOpenVPN",
-                {
-                    switch cryptoMode {
-                    case .legacy, .bridged:
-                        "_PartoutOpenVPNOpenSSL_ObjC"
-                    case .native:
-                        "_PartoutOpenVPNOpenSSL_C"
-                    }
-                }()
-            ],
+            dependencies: {
+                var deps: [Target.Dependency] = [
+                    "_PartoutOpenVPN"
+                ]
+                switch cryptoMode {
+                case .legacy, .bridgedCrypto:
+                    deps.append("_PartoutOpenVPNOpenSSL_ObjC")
+                case .bridgedDataPath:
+                    deps.append("_PartoutOpenVPNOpenSSL_ObjC")
+                    deps.append("_PartoutOpenVPNOpenSSL_C")
+                case .native:
+                    deps.append("_PartoutOpenVPNOpenSSL_C")
+                }
+                return deps
+            }(),
             path: "Sources/OpenVPN/OpenVPNOpenSSL"
         ),
         .target(
@@ -410,41 +392,22 @@ if areas.contains(.openvpn) {
             path: "Sources/OpenVPN/OpenVPNOpenSSL_C",
             cSettings: cSettings
         ),
-        .target(
-            name: "_PartoutOpenVPNOpenSSL_ObjC",
-            dependencies: {
-                var deps: [Target.Dependency] = [
-                    "_PartoutCryptoOpenSSL_ObjC"
-                ]
-                if cryptoMode == .bridged {
-                    deps.append("_PartoutCryptoOpenSSL_C")
-                }
-                return deps
-            }(),
-            path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
-            exclude: [
-                "lib/COPYING",
-                "lib/Makefile",
-                "lib/README.LZO",
-                "lib/testmini.c"
-            ]
-        ),
         .testTarget(
             name: "_PartoutCryptoOpenSSLTests",
             dependencies: {
                 switch cryptoMode {
-                case .legacy, .bridged:
-                    ["_PartoutCryptoOpenSSL_ObjC"]
                 case .native:
                     ["_PartoutCryptoOpenSSL_C"]
+                default:
+                    ["_PartoutCryptoOpenSSL_ObjC"]
                 }
             }(),
             path: "Tests/OpenVPN/CryptoOpenSSL",
             exclude: {
                 switch cryptoMode {
-                case .legacy, .bridged:
+                case .legacy, .bridgedCrypto:
                     ["Native"]
-                case .native:
+                case .bridgedDataPath, .native:
                     ["Legacy"]
                 }
             }()
@@ -471,6 +434,65 @@ if areas.contains(.openvpn) {
             ]
         )
     ])
+
+    // legacy ObjC crypto
+    if cryptoMode != .native {
+        package.products.append(.library(
+            name: "_PartoutCryptoOpenSSL_ObjC",
+            targets: ["_PartoutCryptoOpenSSL_ObjC"]
+        ))
+        package.targets.append(.target(
+            name: "_PartoutCryptoOpenSSL_ObjC",
+            dependencies: {
+                var deps: [Target.Dependency] = [
+                    "openssl-apple"
+                ]
+                switch cryptoMode {
+                case .legacy:
+                    break
+                case .bridgedCrypto, .bridgedDataPath:
+                    deps.append("_PartoutCryptoOpenSSL_C")
+                default:
+                    fatalError("Must not include _PartoutCryptoOpenSSL_ObjC")
+                }
+                return deps
+            }(),
+            path: "Sources/OpenVPN/CryptoOpenSSL_ObjC",
+            exclude: {
+                switch cryptoMode {
+                case .legacy:
+                    ["bridged"]
+                case .bridgedCrypto, .bridgedDataPath:
+                    ["legacy"]
+                default:
+                    fatalError("Must not include _PartoutCryptoOpenSSL_ObjC")
+                }
+            }()
+        ))
+
+        package.products.append(.library(
+            name: "_PartoutOpenVPNOpenSSL_ObjC",
+            targets: ["_PartoutOpenVPNOpenSSL_ObjC"]
+        ))
+        package.targets.append(.target(
+            name: "_PartoutOpenVPNOpenSSL_ObjC",
+            dependencies: {
+                switch cryptoMode {
+                case .legacy, .bridgedCrypto, .bridgedDataPath:
+                    ["_PartoutCryptoOpenSSL_ObjC"]
+                case .native:
+                    fatalError("Must not include _PartoutOpenVPNOpenSSL_ObjC")
+                }
+            }(),
+            path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
+            exclude: [
+                "lib/COPYING",
+                "lib/Makefile",
+                "lib/README.LZO",
+                "lib/testmini.c"
+            ]
+        ))
+    }
 }
 
 // MARK: WireGuard
