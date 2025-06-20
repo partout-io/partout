@@ -434,7 +434,7 @@ enum PartoutOpenVPN {
 
         case bridgedCrypto = 1
 
-        case wrappedDataPath = 2 // FIXME: ##, not implemented yet
+        case wrappedDataPath = 2
 
         case wrappedDataPathNative = 3
 

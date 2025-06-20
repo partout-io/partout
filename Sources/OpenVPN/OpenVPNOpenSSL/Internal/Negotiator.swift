@@ -682,6 +682,9 @@ private extension Negotiator {
 //        pp_log(ctx, .openvpn, .info, "\tremoteSessionId: \(remoteSessionId.toHex())")
 
 #if canImport(_PartoutOpenVPNOpenSSL_C)
+
+        // MARK: DataPathWrapper (Swift)
+
         let parameters = DataPathWrapper.Parameters(
             cipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
             digest: options.configuration.fallbackDigest,
@@ -693,14 +696,21 @@ private extension Negotiator {
             sessionId: sessionId,
             remoteSessionId: remoteSessionId
         )
+
         let wrapper: DataPathWrapper
 #if OPENVPN_DP_NATIVE
+        // Swift -> C
         wrapper = try .native(with: parameters, prf: prf, prng: prng)
 #else
-        wrapper = .legacy(with: parameters)
+        // Swift -> ObjC
+        wrapper = try .legacy(with: parameters, prf: prf, prng: prng)
 #endif
         return DataChannel(ctx, key: key, dataPath: wrapper.dataPath)
+
 #else
+
+        // MARK: DataPath (ObjC)
+
         let cryptoBox = cryptoFactory()
         try cryptoBox.configure(
             withCipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
@@ -709,7 +719,6 @@ private extension Negotiator {
             sessionId: sessionId,
             remoteSessionId: remoteSessionId
         )
-
         let compressionFraming = history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming
         let compressionAlgorithm = history.pushReply.options.compressionAlgorithm ?? options.configuration.compressionAlgorithm ?? .disabled
 
@@ -723,6 +732,7 @@ private extension Negotiator {
             usesReplayProtection: Constants.usesReplayProtection
         )
         return DataChannel(ctx, key: key, dataPath: dataPath)
+
 #endif
     }
 }

@@ -28,8 +28,6 @@ internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 import PartoutCore
 
-// FIXME: ###, wrapper supersedes OSSLCryptoBox, delete later
-
 private let PRNGSeedLength = 64
 
 private let CryptoAEADTagLength = 16

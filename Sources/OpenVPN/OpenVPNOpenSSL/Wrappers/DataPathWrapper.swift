@@ -26,6 +26,8 @@
 import _PartoutOpenVPN
 import Foundation
 
+// FIXME: ###, DataPathWrapper supersedes OSSLCryptoBox and cryptoFactory(), delete later
+
 final class DataPathWrapper {
     struct Parameters {
         let cipher: OpenVPN.Cipher?
