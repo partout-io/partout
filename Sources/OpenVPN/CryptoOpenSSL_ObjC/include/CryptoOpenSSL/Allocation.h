@@ -36,12 +36,12 @@
 
 #import <Foundation/Foundation.h>
 
-static inline void *_Nullable pp_alloc_crypto(size_t size) {
-    void *memory = malloc(size);
+static inline
+void *_Nonnull pp_alloc_crypto(size_t size) {
+    void *memory = calloc(1, size);
     if (!memory) {
-        NSCAssert(NO, @"pp_alloc_crypto: malloc() call failed");
+        fputs("pp_alloc_crypto: malloc() call failed", stderr);
         abort();
-        return NULL;
     }
     return memory;
 }
