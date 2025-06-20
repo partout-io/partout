@@ -146,13 +146,6 @@ extension DataPathTestsProtocol {
 }
 
 extension DataPathTestsProtocol {
-    var emptyKeys: DataPathWrapper.Parameters.Keys {
-        .init(
-            cipher: .init(encryptionKey: CZ(), decryptionKey: CZ()),
-            digest: .init(encryptionKey: CZ(), decryptionKey: CZ())
-        )
-    }
-
     func sut(
         cipher: OpenVPN.Cipher?,
         digest: OpenVPN.Digest,
@@ -167,7 +160,7 @@ extension DataPathTestsProtocol {
                     compressionFraming: framing,
                     peerId: peerId
                 ),
-                keys: emptyKeys
+                keys: nil
             ).dataPath
         } catch {
             XCTFail("Could not create sut: \(error)")

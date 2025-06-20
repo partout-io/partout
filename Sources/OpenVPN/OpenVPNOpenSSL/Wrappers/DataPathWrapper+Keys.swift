@@ -29,21 +29,15 @@ import Foundation
 
 extension DataPathWrapper.Parameters {
     struct Keys {
-        struct CipherKeys {
+        struct KeyPair {
             let encryptionKey: CZeroingData
 
             let decryptionKey: CZeroingData
         }
 
-        struct DigestKeys {
-            let encryptionKey: CZeroingData
+        let cipher: KeyPair
 
-            let decryptionKey: CZeroingData
-        }
-
-        let cipher: CipherKeys
-
-        let digest: DigestKeys
+        let digest: KeyPair
     }
 
     struct PRF {
@@ -82,14 +76,27 @@ extension DataPathWrapper.Parameters {
         }
 
         return Keys(
-            cipher: Keys.CipherKeys(
+            cipher: Keys.KeyPair(
                 encryptionKey: keysArray[0],
                 decryptionKey: keysArray[2]
             ),
-            digest: Keys.DigestKeys(
+            digest: Keys.KeyPair(
                 encryptionKey: keysArray[1],
                 decryptionKey: keysArray[3]
             )
+        )
+    }
+}
+
+extension DataPathWrapper.Parameters.Keys {
+    init(emptyWithCipherLength cipherKeyLength: Int, hmacKeyLength: Int) {
+        cipher = KeyPair(
+            encryptionKey: CZeroingData(length: cipherKeyLength),
+            decryptionKey: CZeroingData(length: cipherKeyLength)
+        )
+        digest = KeyPair(
+            encryptionKey: CZeroingData(length: hmacKeyLength),
+            decryptionKey: CZeroingData(length: hmacKeyLength)
         )
     }
 }

@@ -118,7 +118,7 @@ private extension DataPathADTests {
         _ framing: OpenVPN.CompressionFraming
     ) throws {
         print("AD framing: \(framing)")
-        let sut = try DataPathWrapper.nativeADMock(with: framing, keys: emptyKeys).dataPath
+        let sut = try DataPathWrapper.nativeADMock(with: framing).dataPath
         XCTAssertNoThrow(try testReversibleEncryption(sut: sut, payload: payload))
         XCTAssertNoThrow(try testReversibleCompoundEncryption(sut: sut, payload: payload))
         XCTAssertNoThrow(try testReversibleBulkEncryption(sut: sut))
@@ -133,14 +133,14 @@ private extension DataPathADTests {
             digest: nil,
             compressionFraming: framing,
             peerId: nil
-        ), keys: emptyKeys).dataPath
+        ), keys: nil).dataPath
         XCTAssertNoThrow(try testReversibleEncryption(sut: sut, payload: payload))
         XCTAssertNoThrow(try testReversibleCompoundEncryption(sut: sut, payload: payload))
         XCTAssertNoThrow(try testReversibleBulkEncryption(sut: sut))
     }
 
     func testMockFraming(_ framing: OpenVPN.CompressionFraming, block: (DataPathTestingProtocol) throws -> Void) throws {
-        let subject = try DataPathWrapper.nativeADMock(with: framing, keys: emptyKeys).dataPath
+        let subject = try DataPathWrapper.nativeADMock(with: framing).dataPath
         try block(subject)
     }
 }

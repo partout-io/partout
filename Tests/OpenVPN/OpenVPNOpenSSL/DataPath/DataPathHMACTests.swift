@@ -90,7 +90,7 @@ extension DataPathHMACTests {
 
 private extension DataPathHMACTests {
     func private_test_givenHMAC_whenEncryptMock_thenDecrypts(_ framing: OpenVPN.CompressionFraming) throws {
-        let sut = try DataPathWrapper.nativeHMACMock(with: framing, keys: emptyKeys).dataPath
+        let sut = try DataPathWrapper.nativeHMACMock(with: framing).dataPath
         try testReversibleEncryption(sut: sut, payload: payload)
         try testReversibleCompoundEncryption(sut: sut, payload: payload)
         try testReversibleBulkEncryption(sut: sut)
@@ -102,7 +102,7 @@ private extension DataPathHMACTests {
             digest: .sha1,
             compressionFraming: framing,
             peerId: nil
-        ), keys: emptyKeys).dataPath
+        ), keys: nil).dataPath
         try testReversibleEncryption(sut: sut, payload: payload)
         try testReversibleCompoundEncryption(sut: sut, payload: payload)
         try testReversibleBulkEncryption(sut: sut)
@@ -114,7 +114,7 @@ private extension DataPathHMACTests {
             digest: .sha1,
             compressionFraming: framing,
             peerId: nil
-        ), keys: emptyKeys).dataPath
+        ), keys: nil).dataPath
         try testReversibleEncryption(sut: sut, payload: payload)
         try testReversibleCompoundEncryption(sut: sut, payload: payload)
         try testReversibleBulkEncryption(sut: sut)
