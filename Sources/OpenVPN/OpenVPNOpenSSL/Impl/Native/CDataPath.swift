@@ -67,6 +67,7 @@ final class CDataPath {
     deinit {
         zd_free(encBuffer)
         zd_free(decBuffer)
+        dp_mode_free(mode)
     }
 
     func configureEncryption(cipherKey: UnsafePointer<zeroing_data_t>?, hmacKey: UnsafePointer<zeroing_data_t>) {
