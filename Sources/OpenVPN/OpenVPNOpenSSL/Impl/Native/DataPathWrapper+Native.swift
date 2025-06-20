@@ -87,7 +87,24 @@ extension DataPathWrapper {
             }
         }
 
-        let dataPath = CDataPath(mode: mode, peerId: parameters.peerId)
+        return try cNative(with: mode, peerId: parameters.peerId, keys: keys)
+    }
+}
+
+extension DataPathWrapper {
+    static func nativeMock(with framing: OpenVPN.CompressionFraming, keys: Parameters.Keys) throws -> DataPathWrapper {
+        let mode = dp_mode_ad_create_mock(framing.cNative)
+        return try cNative(with: mode, peerId: PacketPeerIdDisabled, keys: keys)
+    }
+}
+
+private extension DataPathWrapper {
+    static func cNative(
+        with mode: UnsafeMutablePointer<dp_mode_t>,
+        peerId: UInt32,
+        keys: Parameters.Keys
+    ) throws -> DataPathWrapper {
+        let dataPath = CDataPath(mode: mode, peerId: peerId)
         dataPath.configureEncryption(
             cipherKey: keys.cipher.encryptionKey.ptr,
             hmacKey: keys.digest.encryptionKey.ptr
@@ -99,6 +116,8 @@ extension DataPathWrapper {
         return DataPathWrapper(dataPath: dataPath)
     }
 }
+
+// MARK: -
 
 extension CDataPath: DataPathProtocol, DataPathLegacyProtocol {
     func encryptPackets(_ packets: [Data], key: UInt8) throws -> [Data] {
@@ -121,6 +140,8 @@ extension CDataPath: DataPathTestingProtocol {
         try decryptAndParse(packet, buf: nil)
     }
 }
+
+// MARK: -
 
 private extension OpenVPN.CompressionFraming {
     var cNative: compression_framing_t {
