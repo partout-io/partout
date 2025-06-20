@@ -81,7 +81,7 @@ zeroing_data_t *_Nullable zd_make_slice(const zeroing_data_t *_Nonnull zd, size_
 // MARK: Side effect
 
 void zd_append(zeroing_data_t *_Nonnull zd, const zeroing_data_t *_Nonnull other);
-void zd_truncate(zeroing_data_t *_Nonnull zd, size_t new_length);
+void zd_resize(zeroing_data_t *_Nonnull zd, size_t new_length);
 void zd_remove_until(zeroing_data_t *_Nonnull zd, size_t offset);
 void zd_zero(zeroing_data_t *_Nonnull zd);
 

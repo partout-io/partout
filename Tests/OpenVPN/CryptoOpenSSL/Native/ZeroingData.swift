@@ -145,7 +145,7 @@ extension ZeroingData {
     }
 
     public func truncate(toSize size: Int) {
-        zd_truncate(ptr, size)
+        zd_resize(ptr, size)
     }
 
     public func remove(untilOffset offset: Int) {
@@ -172,8 +172,11 @@ extension ZeroingData {
         return String(cString: bytes)
     }
 
-    public func toData() -> Data {
-        Data(bytes: ptr.pointee.bytes, count: ptr.pointee.length)
+    public func toData(until: Int? = nil) -> Data {
+        if let until {
+            precondition(until <= ptr.pointee.length)
+        }
+        return Data(bytes: ptr.pointee.bytes, count: until ?? ptr.pointee.length)
     }
 
     public func toHex() -> String {

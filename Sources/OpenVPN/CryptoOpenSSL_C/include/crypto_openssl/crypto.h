@@ -50,10 +50,11 @@ if (ret <= 0) {\
 return true;
 
 typedef enum {
+    CryptoErrorNone,
     CryptoErrorGeneric,
     CryptoErrorPRNG,
     CryptoErrorHMAC
-} crypto_error_t;
+} crypto_error_code;
 
 /// Custom flags for encryption routines.
 typedef struct {
@@ -81,16 +82,16 @@ typedef void (*crypto_configure_t)(void *_Nonnull ctx,
 typedef bool (*crypto_encrypt_t)(void *_Nonnull ctx,
                                  uint8_t *_Nonnull out, size_t *_Nonnull out_len,
                                  const uint8_t *_Nonnull in, size_t in_len,
-                                 const crypto_flags_t *_Nullable flags, crypto_error_t *_Nullable error);
+                                 const crypto_flags_t *_Nullable flags, crypto_error_code *_Nullable error);
 
 typedef bool (*crypto_decrypt_t)(void *_Nonnull ctx,
                                  uint8_t *_Nonnull out, size_t *_Nonnull out_len,
                                  const uint8_t *_Nonnull in, size_t in_len,
-                                 const crypto_flags_t *_Nullable flags, crypto_error_t *_Nullable error);
+                                 const crypto_flags_t *_Nullable flags, crypto_error_code *_Nullable error);
 
 typedef bool (*crypto_verify_t)(void *_Nonnull ctx,
                                 const uint8_t *_Nonnull in, size_t in_len,
-                                crypto_error_t *_Nullable error);
+                                crypto_error_code *_Nullable error);
 
 typedef struct {
     crypto_configure_t _Nonnull configure;

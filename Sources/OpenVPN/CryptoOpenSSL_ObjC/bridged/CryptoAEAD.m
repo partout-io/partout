@@ -85,7 +85,7 @@
 - (BOOL)encryptBytes:(const uint8_t *)bytes length:(NSInteger)length dest:(uint8_t *)dest destLength:(NSInteger *)destLength flags:(const CryptoFlags * _Nullable)flags error:(NSError * _Nullable __autoreleasing * _Nullable)error
 {
     crypto_flags_t cf = crypto_flags_from(flags);
-    crypto_error_t code;
+    crypto_error_code code;
     if (!ptr->crypto.encrypter.encrypt(ptr, dest, (size_t *)destLength, bytes, length, &cf, &code)) {
         if (error) {
             *error = [NSError errorWithDomain:PartoutCryptoErrorDomain code:code userInfo:nil];
@@ -105,7 +105,7 @@
 - (BOOL)decryptBytes:(const uint8_t *)bytes length:(NSInteger)length dest:(uint8_t *)dest destLength:(NSInteger *)destLength flags:(const CryptoFlags * _Nullable)flags error:(NSError * _Nullable __autoreleasing * _Nullable)error
 {
     crypto_flags_t cf = crypto_flags_from(flags);
-    crypto_error_t code;
+    crypto_error_code code;
     if (!ptr->crypto.decrypter.decrypt(ptr, dest, (size_t *)destLength, bytes, length, &cf, &code)) {
         if (error) {
             *error = [NSError errorWithDomain:PartoutCryptoErrorDomain code:code userInfo:nil];

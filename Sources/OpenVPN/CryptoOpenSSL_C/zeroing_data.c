@@ -120,13 +120,17 @@ void zd_append(zeroing_data_t *zd, const zeroing_data_t *other) {
     zd->length = new_len;
 }
 
-void zd_truncate(zeroing_data_t *zd, size_t new_length) {
+void zd_resize(zeroing_data_t *zd, size_t new_length) {
     assert(zd);
-    if (new_length > zd->length) return;
+    if (new_length == zd->length) return;
 
     uint8_t *new_bytes = pp_alloc_crypto(new_length);
-    memcpy(new_bytes, zd->bytes, new_length);
-
+    if (new_length < zd->length) {
+        memcpy(new_bytes, zd->bytes, new_length);
+    } else {
+        memcpy(new_bytes, zd->bytes, zd->length);
+        bzero(new_bytes + zd->length, new_length - zd->length);
+    }
     bzero(zd->bytes, zd->length);
     free(zd->bytes);
 

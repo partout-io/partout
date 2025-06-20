@@ -1,5 +1,5 @@
 //
-//  Extensions+Native.swift
+//  DataPathError.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/16/25.
@@ -23,34 +23,24 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_C
-import Foundation
+internal import _PartoutOpenVPNOpenSSL_C
 
-extension CryptoFlagsWrapper {
-    init(cFlags: crypto_flags_t) {
-        iv = cFlags.iv
-        ivLength = cFlags.iv_len
-        ad = cFlags.ad
-        adLength = cFlags.ad_len
-        forTesting = cFlags.for_testing == 1
-    }
+enum DataPathError: Error {
+    case generic
 
-    var cFlags: crypto_flags_t {
-        var flags = crypto_flags_t()
-        flags.iv = iv
-        flags.iv_len = ivLength
-        flags.ad = ad
-        flags.ad_len = adLength
-        flags.for_testing = forTesting ? 1 : 0
-        return flags
-    }
-}
+    case path(dp_error_code)
 
-extension Optional where Wrapped == CryptoFlagsWrapper {
-    func pointer(to cFlags: UnsafeMutablePointer<crypto_flags_t>) -> UnsafeMutablePointer<crypto_flags_t>? {
-        map {
-            cFlags.pointee = $0.cFlags
-            return cFlags
+    case crypto(crypto_error_code)
+
+    init?(_ error: dp_error_t) {
+        switch error.dp_code {
+        case DataPathErrorNone:
+//            assertionFailure()
+            return nil
+        case DataPathErrorCrypto:
+            self = .crypto(error.crypto_code)
+        default:
+            self = .path(error.dp_code)
         }
     }
 }

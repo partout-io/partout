@@ -44,6 +44,15 @@ extension Data {
     }
 }
 
+extension UnsafeRawBufferPointer {
+    var bytePointer: UnsafePointer<Element> {
+        guard let address = bindMemory(to: Element.self).baseAddress else {
+            fatalError("Cannot bind to self")
+        }
+        return address
+    }
+}
+
 protocol CryptoFlagsProviding {
     var packetId: [UInt8] { get }
 

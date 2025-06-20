@@ -1,8 +1,8 @@
 //
-//  CryptoError.swift
+//  replay.c
 //  Partout
 //
-//  Created by Davide De Rosa on 6/16/25.
+//  Created by Davide De Rosa on 6/19/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,23 +23,4 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable internal import _PartoutCryptoOpenSSL_C
-
-enum CryptoError: Error {
-    case generic
-
-    case hmac
-
-    case prng
-
-    init(_ code: crypto_error_code = CryptoErrorGeneric) {
-        switch code {
-        case CryptoErrorPRNG:
-            self = .prng
-        case CryptoErrorHMAC:
-            self = .hmac
-        default:
-            self = .generic
-        }
-    }
-}
+#include "replay.h"

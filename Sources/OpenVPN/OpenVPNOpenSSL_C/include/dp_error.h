@@ -1,8 +1,8 @@
 //
-//  CryptoError.swift
+//  dp_error.h
 //  Partout
 //
-//  Created by Davide De Rosa on 6/16/25.
+//  Created by Davide De Rosa on 6/17/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,23 +23,19 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable internal import _PartoutCryptoOpenSSL_C
+#pragma once
 
-enum CryptoError: Error {
-    case generic
+#include "crypto_openssl/crypto.h"
 
-    case hmac
+typedef enum {
+    DataPathErrorNone,
+    DataPathErrorCrypto,
+    DataPathErrorPeerIdMismatch,
+    DataPathErrorOverflow,
+    DataPathErrorCompression
+} dp_error_code;
 
-    case prng
-
-    init(_ code: crypto_error_code = CryptoErrorGeneric) {
-        switch code {
-        case CryptoErrorPRNG:
-            self = .prng
-        case CryptoErrorHMAC:
-            self = .hmac
-        default:
-            self = .generic
-        }
-    }
-}
+typedef struct {
+    dp_error_code dp_code;
+    crypto_error_code crypto_code;
+} dp_error_t;

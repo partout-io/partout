@@ -138,7 +138,7 @@
 {
     NSParameterAssert(size <= ptr->length);
 
-    zd_truncate(ptr, size);
+    zd_resize(ptr, size);
 }
 
 - (void)removeUntilOffset:(NSInteger)until

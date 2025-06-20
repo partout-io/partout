@@ -1,5 +1,5 @@
 //
-//  MSS.m
+//  mss_fix.c
 //  Partout
 //
 //  Created by Davide De Rosa on 2/7/17.
@@ -34,16 +34,14 @@
 //      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#import <arpa/inet.h>
-
-#import "MSS.h"
+#include <arpa/inet.h>
+#include "mss_fix.h"
 
 static const int FLAG_SYN      = 2;
 static const int PROTO_TCP     = 6;
 static const int OPT_END       = 0;
 static const int OPT_NOP       = 1;
 static const int OPT_MSS       = 2;
-static const int MSS_VAL       = 1250;
 
 typedef struct {
     uint8_t hdr_len:4, ver:4, x[8], proto;
@@ -60,7 +58,8 @@ typedef struct {
     uint16_t mss;
 } tcp_opt_t;
 
-static inline void MSSUpdateSum(uint16_t* sum_ptr, uint16_t* val_ptr, uint16_t new_val)
+static inline
+void mss_update_sum(uint16_t* sum_ptr, uint16_t* val_ptr, uint16_t new_val)
 {
     uint32_t sum = (~ntohs(*sum_ptr) & 0xffff) + (~ntohs(*val_ptr) & 0xffff) + new_val;
     sum = (sum >> 16) + (sum & 0xffff);
@@ -69,7 +68,7 @@ static inline void MSSUpdateSum(uint16_t* sum_ptr, uint16_t* val_ptr, uint16_t n
     *val_ptr = htons(new_val);
 }
 
-void MSSFix(uint8_t *data, NSInteger data_len)
+void mss_fix(uint8_t *data, size_t data_len, uint16_t mtu)
 {
     /* XXX Prevent buffer overread */
     if (data_len < sizeof(ip_hdr_t)) {
@@ -83,7 +82,7 @@ void MSSFix(uint8_t *data, NSInteger data_len)
     if (iph_size + sizeof(tcp_hdr_t) > data_len) {
         return;
     }
-    
+
     tcp_hdr_t *tcph = (tcp_hdr_t *)(data + iph_size);
     if (!(tcph->flags & FLAG_SYN)) {
         return;
@@ -110,10 +109,10 @@ void MSSFix(uint8_t *data, NSInteger data_len)
             if (i + o->size > optlen) {
                 return;
             }
-            if (ntohs(o->mss) <= MSS_VAL) {
+            if (ntohs(o->mss) <= mtu) {
                 return;
             }
-            MSSUpdateSum(&tcph->sum, &o->mss, MSS_VAL);
+            mss_update_sum(&tcph->sum, &o->mss, mtu);
             return;
         }
 
