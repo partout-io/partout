@@ -131,6 +131,7 @@ private extension DataPathWrapper.Parameters {
             out.append(try hmac(buffer, digestName, secret, chain.appending(seed)))
             chain = try hmac(buffer, digestName, secret, chain)
         }
+        zd_free(buffer)
         return out.withOffset(0, length: size)
     }
 
