@@ -1,5 +1,5 @@
 //
-//  ZeroingData.swift
+//  CZeroingData.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/14/25.
@@ -26,7 +26,7 @@
 internal import _PartoutCryptoOpenSSL_C
 import Foundation
 
-public final class ZeroingData {
+public final class CZeroingData {
     let ptr: UnsafeMutablePointer<zeroing_data_t>
 
     private init(ptr: UnsafeMutablePointer<zeroing_data_t>) {
@@ -89,7 +89,7 @@ public final class ZeroingData {
 
 // MARK: Properties
 
-extension ZeroingData {
+extension CZeroingData {
     public var bytes: UnsafePointer<UInt8>! {
         zd_bytes(ptr)
     }
@@ -103,8 +103,8 @@ extension ZeroingData {
     }
 }
 
-extension ZeroingData: Equatable {
-    public static func == (lhs: ZeroingData, rhs: ZeroingData) -> Bool {
+extension CZeroingData: Equatable {
+    public static func == (lhs: CZeroingData, rhs: CZeroingData) -> Bool {
         zd_equals(lhs.ptr, rhs.ptr)
     }
 
@@ -118,28 +118,28 @@ extension ZeroingData: Equatable {
 
 // MARK: Copy
 
-extension ZeroingData {
-    public func copy() -> ZeroingData {
-        ZeroingData(ptr: zd_make_copy(self.ptr))
+extension CZeroingData {
+    public func copy() -> CZeroingData {
+        CZeroingData(ptr: zd_make_copy(self.ptr))
     }
 
-    public func withOffset(_ offset: Int, length: Int) -> ZeroingData {
+    public func withOffset(_ offset: Int, length: Int) -> CZeroingData {
         guard let slice = zd_make_slice(ptr, offset, length) else {
-            return ZeroingData()
+            return CZeroingData()
         }
-        return ZeroingData(ptr: slice)
+        return CZeroingData(ptr: slice)
     }
 
-    public func appending(_ other: ZeroingData) -> ZeroingData {
+    public func appending(_ other: CZeroingData) -> CZeroingData {
         let copy = zd_make_copy(ptr)
         zd_append(copy, other.ptr)
-        return ZeroingData(ptr: copy)
+        return CZeroingData(ptr: copy)
     }
 }
 
 // MARK: Side effect
 
-extension ZeroingData {
+extension CZeroingData {
     public func zero() {
         zd_zero(ptr)
     }
@@ -152,14 +152,14 @@ extension ZeroingData {
         zd_remove_until(ptr, offset)
     }
 
-    public func append(_ other: ZeroingData) {
+    public func append(_ other: CZeroingData) {
         zd_append(ptr, other.ptr)
     }
 }
 
 // MARK: Accessors
 
-extension ZeroingData {
+extension CZeroingData {
     public func networkUInt16Value(fromOffset offset: Int) -> UInt16 {
         CFSwapInt16BigToHost(zd_uint16(ptr, offset))
     }
