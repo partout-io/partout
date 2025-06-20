@@ -25,9 +25,19 @@
 
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
+#include <openssl/rand.h>
 #include "keys.h"
 
 #define KeyHMACMaxLength    100
+
+bool key_init_seed(const zeroing_data_t *seed) {
+    unsigned char x[1];
+    if (RAND_bytes(x, 1) != 1) {
+        return false;
+    }
+    RAND_seed(seed->bytes, (int)seed->length);
+    return true;
+}
 
 zeroing_data_t *key_hmac_buf() {
     return zd_create(KeyHMACMaxLength);

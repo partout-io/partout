@@ -25,9 +25,12 @@
 
 import _PartoutOpenVPN
 import Foundation
+import PartoutCore
 
 final class DataPathWrapper {
     struct Parameters {
+        let prng: PRNGProtocol
+
         let cipher: OpenVPN.Cipher?
 
         let digest: OpenVPN.Digest

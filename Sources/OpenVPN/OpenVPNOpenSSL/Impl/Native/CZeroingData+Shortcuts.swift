@@ -58,6 +58,11 @@ func CZ(_ string: String, nullTerminated: Bool) -> CZeroingData {
     CZeroingData(string: string, nullTerminated: nullTerminated)
 }
 
+// to compile in full native mode
+func CZ(_ native: CZeroingData) -> CZeroingData {
+    native
+}
+
 #if canImport(_PartoutCryptoOpenSSL_ObjC)
 internal import _PartoutCryptoOpenSSL_ObjC
 

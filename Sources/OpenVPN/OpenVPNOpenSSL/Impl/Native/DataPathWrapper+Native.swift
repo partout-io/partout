@@ -29,6 +29,8 @@ import Foundation
 
 // FIXME: ###, wrapper supersedes OSSLCryptoBox, delete later
 
+private let PRNGSeedLength = 64
+
 private let CryptoAEADTagLength = 16
 
 private let CryptoAEADIdLength = PacketIdLength
@@ -40,6 +42,10 @@ private let CryptoCTRPayloadLength = PacketOpcodeLength + PacketSessionIdLength 
 extension DataPathWrapper {
     static func native(with parameters: Parameters) throws -> DataPathWrapper {
         NSLog("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)");
+
+        // make sure its initialized before seeding
+        let seed = CZ(parameters.prng.safeData(length: PRNGSeedLength))
+        key_init_seed(seed.ptr)
 
         let mode: UnsafeMutablePointer<dp_mode_t>
         let cipherAlgorithm = parameters.cipher?.rawValue.uppercased()

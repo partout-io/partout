@@ -683,6 +683,7 @@ private extension Negotiator {
 
 #if canImport(_PartoutOpenVPNOpenSSL_C)
         let parameters = DataPathWrapper.Parameters(
+            prng: prng,
             cipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
             digest: options.configuration.fallbackDigest,
             compressionFraming: history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming,

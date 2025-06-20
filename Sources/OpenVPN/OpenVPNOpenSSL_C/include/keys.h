@@ -29,6 +29,8 @@
 #include <stdint.h>
 #include "crypto_openssl/zeroing_data.h"
 
+bool key_init_seed(const zeroing_data_t *_Nonnull zd);
+
 typedef struct {
     zeroing_data_t *_Nonnull dst;
     const char *_Nonnull digest_name;
