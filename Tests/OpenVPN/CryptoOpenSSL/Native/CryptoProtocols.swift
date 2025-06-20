@@ -30,6 +30,8 @@ import Foundation
 // efficiency reasons, OpenVPN will use the C API directly without
 // going through Encrypter/Decrypter
 
+typealias ZeroingData = CZeroingData
+
 protocol Crypto {
     /// The digest length or 0.
     var digestLength: Int { get }
