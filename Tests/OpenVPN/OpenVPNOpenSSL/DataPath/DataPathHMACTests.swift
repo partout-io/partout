@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_C
-internal import _PartoutOpenVPNOpenSSL_C
+import _PartoutOpenVPN
+@testable import _PartoutOpenVPNOpenSSL
 import PartoutCore
 import XCTest
 
@@ -40,76 +40,83 @@ final class DataPathHMACTests: XCTestCase, DataPathTestsProtocol {
 
 extension DataPathHMACTests {
     func test_givenHMAC_whenEncryptMock_thenDecrypts() throws {
-        try private_test_givenHMAC_whenEncryptMock_thenDecrypts(CompressionFramingDisabled)
+        try private_test_givenHMAC_whenEncryptMock_thenDecrypts(.disabled)
     }
 
     func test_givenHMACCompLZO_whenEncryptMock_thenDecrypts() throws {
-        try private_test_givenHMAC_whenEncryptMock_thenDecrypts(CompressionFramingCompLZO)
+        try private_test_givenHMAC_whenEncryptMock_thenDecrypts(.compLZO)
     }
 
     func test_givenHMACCompress_whenEncryptMock_thenDecrypts() throws {
-        try private_test_givenHMAC_whenEncryptMock_thenDecrypts(CompressionFramingCompress)
+        try private_test_givenHMAC_whenEncryptMock_thenDecrypts(.compress)
     }
 
     func test_givenHMACCompressV2_whenEncryptMock_thenDecrypts() throws {
-        try private_test_givenHMAC_whenEncryptMock_thenDecrypts(CompressionFramingCompressV2)
+        try private_test_givenHMAC_whenEncryptMock_thenDecrypts(.compressV2)
     }
 
     func test_givenHMAC_whenEncryptCBC_thenDecrypts() throws {
-        try private_test_givenHMAC_whenEncryptCBC_thenDecrypts(CompressionFramingDisabled)
+        try private_test_givenHMAC_whenEncryptCBC_thenDecrypts(.disabled)
     }
 
     func test_givenHMACCompLZO_whenEncryptCBC_thenDecrypts() throws {
-        try private_test_givenHMAC_whenEncryptCBC_thenDecrypts(CompressionFramingCompLZO)
+        try private_test_givenHMAC_whenEncryptCBC_thenDecrypts(.compLZO)
     }
 
     func test_givenHMACCompress_whenEncryptCBC_thenDecrypts() throws {
-        try private_test_givenHMAC_whenEncryptCBC_thenDecrypts(CompressionFramingCompress)
+        try private_test_givenHMAC_whenEncryptCBC_thenDecrypts(.compress)
     }
 
     func test_givenHMACCompressV2_whenEncryptCBC_thenDecrypts() throws {
-        try private_test_givenHMAC_whenEncryptCBC_thenDecrypts(CompressionFramingCompressV2)
+        try private_test_givenHMAC_whenEncryptCBC_thenDecrypts(.compressV2)
     }
 
     func test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts() throws {
-        try private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(CompressionFramingDisabled)
+        try private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(.disabled)
     }
 
     func test_givenHMACCompLZO_whenEncryptCBCWithSHA1_thenDecrypts() throws {
-        try private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(CompressionFramingCompLZO)
+        try private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(.compLZO)
     }
 
     func test_givenHMACCompress_whenEncryptCBCWithSHA1_thenDecrypts() throws {
-        try private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(CompressionFramingCompress)
+        try private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(.compress)
     }
 
     func test_givenHMACCompressV2_whenEncryptCBCWithSHA1_thenDecrypts() throws {
-        try private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(CompressionFramingCompressV2)
+        try private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(.compressV2)
     }
 }
 
 private extension DataPathHMACTests {
-    func private_test_givenHMAC_whenEncryptMock_thenDecrypts(_ framing: compression_framing_t) throws {
-        let mode = dp_mode_hmac_create_mock(framing)
-        try testReversibleEncryption(mode: mode, payload: payload)
-        try testReversibleCompoundEncryption(mode: mode, payload: payload)
-        try testReversibleBulkEncryption(mode: mode)
-        dp_mode_free(mode)
+    func private_test_givenHMAC_whenEncryptMock_thenDecrypts(_ framing: OpenVPN.CompressionFraming) throws {
+        let sut = try DataPathWrapper.nativeHMACMock(with: framing, keys: emptyKeys).dataPath
+        try testReversibleEncryption(sut: sut, payload: payload)
+        try testReversibleCompoundEncryption(sut: sut, payload: payload)
+        try testReversibleBulkEncryption(sut: sut)
     }
 
-    func private_test_givenHMAC_whenEncryptCBC_thenDecrypts(_ framing: compression_framing_t) throws {
-        let mode = dp_mode_hmac_create_cbc(nil, "SHA1", framing)
-        try testReversibleEncryption(mode: mode, payload: payload)
-        try testReversibleCompoundEncryption(mode: mode, payload: payload)
-        try testReversibleBulkEncryption(mode: mode)
-        dp_mode_free(mode)
+    func private_test_givenHMAC_whenEncryptCBC_thenDecrypts(_ framing: OpenVPN.CompressionFraming) throws {
+        let sut = try DataPathWrapper.native(with: .init(
+            cipher: nil,
+            digest: .sha1,
+            compressionFraming: framing,
+            peerId: nil
+        ), keys: emptyKeys).dataPath
+        try testReversibleEncryption(sut: sut, payload: payload)
+        try testReversibleCompoundEncryption(sut: sut, payload: payload)
+        try testReversibleBulkEncryption(sut: sut)
     }
 
-    func private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(_ framing: compression_framing_t) throws {
-        let mode = dp_mode_hmac_create_cbc("AES-128-CBC", "SHA1", framing)
-        try testReversibleEncryption(mode: mode, payload: payload)
-        try testReversibleCompoundEncryption(mode: mode, payload: payload)
-        try testReversibleBulkEncryption(mode: mode)
-        dp_mode_free(mode)
+    func private_test_givenHMAC_whenEncryptCBCWithSHA1_thenDecrypts(_ framing: OpenVPN.CompressionFraming) throws {
+        let sut = try DataPathWrapper.native(with: .init(
+            cipher: .aes128cbc,
+            digest: .sha1,
+            compressionFraming: framing,
+            peerId: nil
+        ), keys: emptyKeys).dataPath
+        try testReversibleEncryption(sut: sut, payload: payload)
+        try testReversibleCompoundEncryption(sut: sut, payload: payload)
+        try testReversibleBulkEncryption(sut: sut)
     }
 }

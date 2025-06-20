@@ -325,7 +325,7 @@ if areas.contains(.openvpn) {
        let envMode = CryptoMode(rawValue: envModeInt) {
         cryptoMode = envMode
     } else {
-        cryptoMode = .legacy
+        cryptoMode = .bridgedDataPath
     }
 
     package.dependencies.append(contentsOf: [
@@ -441,7 +441,14 @@ if areas.contains(.openvpn) {
             name: "_PartoutOpenVPNOpenSSLTests",
             dependencies: ["_PartoutOpenVPNOpenSSL"],
             path: "Tests/OpenVPN/OpenVPNOpenSSL",
-            exclude: ["DataPath"],
+            exclude: {
+                switch cryptoMode {
+                case .legacy:
+                    ["DataPath"]
+                default:
+                    []
+                }
+            }(),
             resources: [
                 .process("Resources")
             ]

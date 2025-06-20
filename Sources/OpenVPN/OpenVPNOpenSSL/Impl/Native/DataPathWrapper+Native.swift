@@ -95,8 +95,13 @@ extension DataPathWrapper {
 }
 
 extension DataPathWrapper {
-    static func nativeMock(with framing: OpenVPN.CompressionFraming, keys: Parameters.Keys) throws -> DataPathWrapper {
+    static func nativeADMock(with framing: OpenVPN.CompressionFraming, keys: Parameters.Keys) throws -> DataPathWrapper {
         let mode = dp_mode_ad_create_mock(framing.cNative)
+        return try cNative(with: mode, peerId: nil, keys: keys)
+    }
+
+    static func nativeHMACMock(with framing: OpenVPN.CompressionFraming, keys: Parameters.Keys) throws -> DataPathWrapper {
+        let mode = dp_mode_hmac_create_mock(framing.cNative)
         return try cNative(with: mode, peerId: nil, keys: keys)
     }
 }
