@@ -687,7 +687,9 @@ private extension Negotiator {
             digest: options.configuration.fallbackDigest,
             compressionFraming: history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming,
             peerId: history.pushReply.options.peerId ?? PacketPeerIdDisabled,
-            authResponse: authResponse
+            authResponse: authResponse,
+            sessionId: sessionId,
+            remoteSessionId: remoteSessionId
         )
         let wrapper: DataPathWrapper
 #if OPENVPN_DP_NATIVE

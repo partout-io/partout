@@ -1,8 +1,8 @@
 //
-//  DataPathError.swift
+//  keys.c
 //  Partout
 //
-//  Created by Davide De Rosa on 6/16/25.
+//  Created by Davide De Rosa on 6/20/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,24 +23,30 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutOpenVPNOpenSSL_C
+#include <openssl/evp.h>
+#include <openssl/hmac.h>
+#include "keys.h"
 
-enum DataPathError: Error {
-    case generic
+#define KeyHMACMaxLength    100
 
-    case path(dp_error_code)
+zeroing_data_t *key_hmac_buf() {
+    return zd_create(KeyHMACMaxLength);
+}
 
-    case crypto(crypto_error_code)
+size_t key_hmac(key_hmac_ctx *_Nonnull ctx) {
+    assert(ctx->dst->length >= KeyHMACMaxLength);
 
-    init?(_ error: dp_error_t) {
-        switch error.dp_code {
-        case DataPathErrorNone:
-//            assertionFailure()
-            return nil
-        case DataPathErrorCrypto:
-            self = .crypto(error.crypto_code)
-        default:
-            self = .path(error.dp_code)
-        }
+    const EVP_MD *md = EVP_get_digestbyname(ctx->digest_name);
+    unsigned int dst_len = 0;
+    const bool success = HMAC(md,
+                              ctx->secret->bytes,
+                              (int)ctx->secret->length,
+                              ctx->data->bytes,
+                              ctx->data->length,
+                              ctx->dst->bytes,
+                              &dst_len) != NULL;
+    if (!success) {
+        return 0;
     }
+    return dst_len;
 }
