@@ -57,6 +57,7 @@ bool crypto_encrypt(void *vctx,
                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_aead_t *ctx = (crypto_aead_t *)vctx;
     assert(ctx);
+    assert(ctx->ctx_enc);
     assert(flags);
     assert(flags->ad_len >= ctx->id_len);
 
@@ -98,6 +99,7 @@ bool crypto_decrypt(void *vctx,
                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_aead_t *ctx = (crypto_aead_t *)vctx;
     assert(ctx);
+    assert(ctx->ctx_dec);
     assert(flags);
     assert(flags->ad_len >= ctx->id_len);
 

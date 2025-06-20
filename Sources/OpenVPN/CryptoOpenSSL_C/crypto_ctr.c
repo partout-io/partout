@@ -60,6 +60,8 @@ bool crypto_encrypt(void *vctx,
                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_ctr_t *ctx = (crypto_ctr_t *)vctx;
     assert(ctx);
+    assert(ctx->ctx_enc);
+    assert(ctx->hmac_key_enc);
     assert(flags);
 
     uint8_t *out_encrypted = out + ctx->ns_tag_len;
@@ -108,6 +110,8 @@ bool crypto_decrypt(void *vctx,
                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_ctr_t *ctx = (crypto_ctr_t *)vctx;
     assert(ctx);
+    assert(ctx->ctx_dec);
+    assert(ctx->hmac_key_dec);
     assert(flags);
 
     const uint8_t *iv = in;
