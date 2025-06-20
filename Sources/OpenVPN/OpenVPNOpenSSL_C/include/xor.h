@@ -43,9 +43,9 @@ void xor_mask(uint8_t *_Nonnull dst,
               size_t length)
 {
     assert(mask);
-    if (zd_length(mask) > 0) {
+    if (mask->length > 0) {
         for (size_t i = 0; i < length; ++i) {
-            dst[i] = src[i] ^ ((uint8_t *)(zd_bytes(mask)))[i % zd_length(mask)];
+            dst[i] = src[i] ^ ((uint8_t *)(mask->bytes))[i % mask->length];
         }
         return;
     }
