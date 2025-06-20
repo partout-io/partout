@@ -27,10 +27,64 @@ import _PartoutOpenVPN
 internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 
+// FIXME: ###, wrapper supersedes OSSLCryptoBox, delete later
+
+private let CryptoAEADTagLength = 16
+
+private let CryptoAEADIdLength = PacketIdLength
+
+private let CryptoCTRTagLength = 32
+
+private let CryptoCTRPayloadLength = PacketOpcodeLength + PacketSessionIdLength + PacketReplayIdLength + PacketReplayTimestampLength
+
 extension DataPathWrapper {
-    static func native(with parameters: Parameters) -> DataPathWrapper {
+    static func native(with parameters: Parameters) throws -> DataPathWrapper {
         NSLog("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)");
-        fatalError("FIXME: ###")
+
+        let mode: UnsafeMutablePointer<dp_mode_t>
+        let cipherAlgorithm = parameters.cipher?.rawValue.uppercased()
+        let digestAlgorithm = parameters.digest.rawValue.uppercased()
+
+        if let cipherAlgorithm, cipherAlgorithm.hasSuffix("-GCM") {
+            mode = cipherAlgorithm.withCString { cCipher in
+                dp_mode_ad_create_aead(
+                    cCipher,
+                    CryptoAEADTagLength,
+                    CryptoAEADIdLength,
+                    parameters.compressionFraming.cNative
+                )
+            }
+        } else {
+            mode = digestAlgorithm.withCString { cDigest in
+                if let cipherAlgorithm {
+                    return cipherAlgorithm.withCString { cCipher in
+                        dp_mode_hmac_create_cbc(
+                            cCipher,
+                            cDigest,
+                            parameters.compressionFraming.cNative
+                        )
+                    }
+                } else {
+                    return dp_mode_hmac_create_cbc(
+                        nil,
+                        cDigest,
+                        parameters.compressionFraming.cNative
+                    )
+                }
+            }
+        }
+
+        let dataPath = CDataPath(mode: mode, peerId: parameters.peerId)
+        let keys = try parameters.keys()
+        dataPath.configureEncryption(
+            cipherKey: keys.cipher.encryptionKey.ptr,
+            hmacKey: keys.digest.encryptionKey.ptr
+        )
+        dataPath.configureDecryption(
+            cipherKey: keys.cipher.decryptionKey.ptr,
+            hmacKey: keys.digest.decryptionKey.ptr
+        )
+        return DataPathWrapper(dataPath: dataPath)
     }
 }
 
@@ -53,5 +107,17 @@ extension CDataPath: DataPathTestingProtocol {
 
     func decryptAndParse(_ packet: Data) throws -> DataPathDecryptedAndParsedTuple {
         try decryptAndParse(packet, buf: nil)
+    }
+}
+
+private extension OpenVPN.CompressionFraming {
+    var cNative: compression_framing_t {
+        switch self {
+        case .disabled: CompressionFramingDisabled
+        case .compLZO: CompressionFramingCompLZO
+        case .compress: CompressionFramingCompress
+        case .compressV2: CompressionFramingCompressV2
+        @unknown default: CompressionFramingDisabled
+        }
     }
 }

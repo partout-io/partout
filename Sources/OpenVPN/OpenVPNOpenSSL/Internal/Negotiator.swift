@@ -693,7 +693,7 @@ private extension Negotiator {
         )
         let wrapper: DataPathWrapper
 #if OPENVPN_DP_NATIVE
-        wrapper = .native(with: parameters)
+        wrapper = try .native(with: parameters)
 #else
         wrapper = .legacy(with: parameters)
 #endif
