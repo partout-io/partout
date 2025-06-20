@@ -36,7 +36,7 @@ final class CryptoCBC: Encrypter, Decrypter {
         digestName: String,
         mappedError: ((CryptoError) -> Error)? = nil
     ) throws {
-        guard let ptr = crypto_cbc_create(cipherName, digestName) else {
+        guard let ptr = crypto_cbc_create(cipherName, digestName, nil) else {
             throw CryptoError()
         }
         NSLog("PartoutOpenVPN: Using CryptoCBC (native Swift/C)")

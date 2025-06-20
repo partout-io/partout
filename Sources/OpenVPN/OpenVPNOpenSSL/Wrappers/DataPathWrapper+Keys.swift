@@ -28,18 +28,6 @@ internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 
 extension DataPathWrapper.Parameters {
-    struct Keys {
-        struct KeyPair {
-            let encryptionKey: CZeroingData
-
-            let decryptionKey: CZeroingData
-        }
-
-        let cipher: KeyPair
-
-        let digest: KeyPair
-    }
-
     struct PRF {
         let authResponse: Authenticator.Response
 
@@ -48,7 +36,7 @@ extension DataPathWrapper.Parameters {
         let remoteSessionId: Data
     }
 
-    func keys(with prf: PRF) throws -> Keys {
+    func keys(with prf: PRF) throws -> CryptoKeys {
         let masterData = try keysPRF(parameters: PRFParameters(
             label: Constants.label1,
             secret: CZ(prf.authResponse.preMaster),
@@ -75,28 +63,15 @@ extension DataPathWrapper.Parameters {
             keysArray.append(zbuf)
         }
 
-        return Keys(
-            cipher: Keys.KeyPair(
+        return CryptoKeys(
+            cipher: CryptoKeys.KeyPair(
                 encryptionKey: keysArray[0],
                 decryptionKey: keysArray[2]
             ),
-            digest: Keys.KeyPair(
+            digest: CryptoKeys.KeyPair(
                 encryptionKey: keysArray[1],
                 decryptionKey: keysArray[3]
             )
-        )
-    }
-}
-
-extension DataPathWrapper.Parameters.Keys {
-    init(emptyWithCipherLength cipherKeyLength: Int, hmacKeyLength: Int) {
-        cipher = KeyPair(
-            encryptionKey: CZeroingData(length: cipherKeyLength),
-            decryptionKey: CZeroingData(length: cipherKeyLength)
-        )
-        digest = KeyPair(
-            encryptionKey: CZeroingData(length: hmacKeyLength),
-            decryptionKey: CZeroingData(length: hmacKeyLength)
         )
     }
 }

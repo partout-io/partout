@@ -37,13 +37,6 @@ size_t mock_capacity(const void *vctx, size_t len) {
     return 10 * len; // be ridiculously safe
 }
 
-static
-void mock_configure_encrypt(void *vctx,
-                            const zeroing_data_t *cipher_key,
-                            const zeroing_data_t *hmac_key) {
-    DP_LOG("crypto_mock_configure_encrypt");
-}
-
 // in -> aabb(reversed)ccdd
 static
 bool mock_encrypt(void *vctx,
@@ -58,13 +51,6 @@ bool mock_encrypt(void *vctx,
     out[2 + in_len + 1] = 0xdd;
     *out_len = in_len + 4;
     return true;
-}
-
-static
-void mock_configure_decrypt(void *vctx,
-                            const zeroing_data_t *cipher_key,
-                            const zeroing_data_t *hmac_key) {
-    DP_LOG("crypto_mock_configure_decrypt");
 }
 
 // in -> reversed
@@ -94,9 +80,7 @@ bool mock_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_code
 crypto_mock_t *crypto_mock_create() {
     DP_LOG("crypto_mock_create");
     crypto_mock_t *ctx = pp_alloc_crypto(sizeof(crypto_mock_t));
-    ctx->crypto.encrypter.configure = mock_configure_encrypt;
     ctx->crypto.encrypter.encrypt = mock_encrypt;
-    ctx->crypto.decrypter.configure = mock_configure_decrypt;
     ctx->crypto.decrypter.decrypt = mock_decrypt;
     ctx->crypto.decrypter.verify = mock_verify;
     ctx->crypto.meta.cipher_iv_len = 0;

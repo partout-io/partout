@@ -69,14 +69,6 @@ final class CDataPath {
         zd_free(decBuffer)
         dp_mode_free(mode)
     }
-
-    func configureEncryption(cipherKey: UnsafePointer<zeroing_data_t>?, hmacKey: UnsafePointer<zeroing_data_t>) {
-        dp_mode_configure_enc(mode, cipherKey, hmacKey)
-    }
-
-    func configureDecryption(cipherKey: UnsafePointer<zeroing_data_t>?, hmacKey: UnsafePointer<zeroing_data_t>) {
-        dp_mode_configure_dec(mode, cipherKey, hmacKey)
-    }
 }
 
 private extension CDataPath {

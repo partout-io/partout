@@ -146,25 +146,9 @@ extension DataPathTestsProtocol {
 }
 
 extension DataPathTestsProtocol {
-    func sut(
-        cipher: OpenVPN.Cipher?,
-        digest: OpenVPN.Digest,
-        framing: OpenVPN.CompressionFraming,
-        peerId: UInt32 = 0
-    ) -> DataPathTestingProtocol {
-        do {
-            return try DataPathWrapper.native(
-                with: .init(
-                    cipher: cipher,
-                    digest: digest,
-                    compressionFraming: framing,
-                    peerId: peerId
-                ),
-                keys: nil
-            ).dataPath
-        } catch {
-            XCTFail("Could not create sut: \(error)")
-            fatalError(error.localizedDescription)
-        }
+
+    // it's fine as long as they're bigger than required cipher/hmac lengths
+    func newEmptyKeys() -> CryptoKeys {
+        CryptoKeys(emptyWithCipherLength: 1024, hmacKeyLength: 1024)
     }
 }

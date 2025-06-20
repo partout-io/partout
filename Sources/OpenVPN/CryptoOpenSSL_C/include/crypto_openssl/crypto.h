@@ -56,6 +56,16 @@ typedef enum {
     CryptoErrorHMAC
 } crypto_error_code;
 
+typedef struct {
+    const zeroing_data_t *_Nonnull enc_key;
+    const zeroing_data_t *_Nonnull dec_key;
+} crypto_key_pair_t;
+
+typedef struct {
+    crypto_key_pair_t cipher;
+    crypto_key_pair_t hmac;
+} crypto_keys_t;
+
 /// Custom flags for encryption routines.
 typedef struct {
 

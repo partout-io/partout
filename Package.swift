@@ -480,9 +480,9 @@ if areas.contains(.openvpn) {
             path: "Sources/OpenVPN/CryptoOpenSSL_ObjC",
             exclude: {
                 switch cryptoMode {
-                case .legacy:
+                case .legacy, .bridgedDataPath:
                     ["bridged"]
-                case .bridgedCrypto, .bridgedDataPath:
+                case .bridgedCrypto:
                     ["legacy"]
                 default:
                     fatalError("Must not include _PartoutCryptoOpenSSL_ObjC")

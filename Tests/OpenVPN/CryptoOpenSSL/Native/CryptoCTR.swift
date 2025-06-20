@@ -38,7 +38,7 @@ final class CryptoCTR: Encrypter, Decrypter {
         payloadLength: Int,
         mappedError: ((CryptoError) -> Error)? = nil
     ) throws {
-        guard let ptr = crypto_ctr_create(cipherName, digestName, tagLength, payloadLength) else {
+        guard let ptr = crypto_ctr_create(cipherName, digestName, tagLength, payloadLength, nil) else {
             throw CryptoError()
         }
         NSLog("PartoutOpenVPN: Using CryptoCTR (native Swift/C)")

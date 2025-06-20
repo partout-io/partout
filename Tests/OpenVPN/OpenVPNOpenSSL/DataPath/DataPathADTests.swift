@@ -128,12 +128,13 @@ private extension DataPathADTests {
         _ framing: OpenVPN.CompressionFraming
     ) throws {
         print("AD framing: \(framing)")
+        let keys = newEmptyKeys()
         let sut = try DataPathWrapper.native(with: .init(
             cipher: .aes128gcm,
             digest: nil,
             compressionFraming: framing,
             peerId: nil
-        ), keys: nil).dataPath
+        ), keys: keys).dataPath
         XCTAssertNoThrow(try testReversibleEncryption(sut: sut, payload: payload))
         XCTAssertNoThrow(try testReversibleCompoundEncryption(sut: sut, payload: payload))
         XCTAssertNoThrow(try testReversibleBulkEncryption(sut: sut))

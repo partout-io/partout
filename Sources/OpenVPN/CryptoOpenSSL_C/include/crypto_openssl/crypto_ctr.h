@@ -54,5 +54,6 @@ typedef struct {
 
 crypto_ctr_t *_Nullable crypto_ctr_create(const char *_Nonnull cipher_name,
                                           const char *_Nonnull digest_name,
-                                          size_t tag_len, size_t payload_len);
+                                          size_t tag_len, size_t payload_len,
+                                          const crypto_keys_t *_Nullable keys);
 void crypto_ctr_free(crypto_ctr_t *_Nonnull ctx);

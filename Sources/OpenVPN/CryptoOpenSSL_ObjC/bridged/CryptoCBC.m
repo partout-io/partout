@@ -46,7 +46,8 @@
     self = [super init];
     if (self) {
         ptr = crypto_cbc_create([cipherName cStringUsingEncoding:NSUTF8StringEncoding],
-                                [digestName cStringUsingEncoding:NSUTF8StringEncoding]);
+                                [digestName cStringUsingEncoding:NSUTF8StringEncoding],
+                                nil);
         if (!ptr) {
             return nil;
         }

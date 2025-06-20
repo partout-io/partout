@@ -37,7 +37,7 @@ final class CryptoAEAD: Encrypter, Decrypter {
         idLength: Int,
         mappedError: ((CryptoError) -> Error)? = nil
     ) throws {
-        guard let ptr = crypto_aead_create(cipherName, tagLength, idLength) else {
+        guard let ptr = crypto_aead_create(cipherName, tagLength, idLength, nil) else {
             throw CryptoError()
         }
         NSLog("PartoutOpenVPN: Using CryptoAEAD (native Swift/C)")

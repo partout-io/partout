@@ -45,5 +45,6 @@ typedef struct {
 } crypto_aead_t;
 
 crypto_aead_t *_Nullable crypto_aead_create(const char *_Nonnull cipher_name,
-                                            size_t tag_len, size_t id_len);
+                                            size_t tag_len, size_t id_len,
+                                            const crypto_keys_t *_Nullable keys);
 void crypto_aead_free(crypto_aead_t *_Nonnull ctx);

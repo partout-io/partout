@@ -51,7 +51,7 @@ extension DataPathWrapper {
         return try .native(with: parameters, keys: parameters.keys(with: prf))
     }
 
-    static func native(with parameters: Parameters, keys: Parameters.Keys?) throws -> DataPathWrapper {
+    static func native(with parameters: Parameters, keys: CryptoKeys) throws -> DataPathWrapper {
         NSLog("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)");
 
         let mode: UnsafeMutablePointer<dp_mode_t>
@@ -59,95 +59,76 @@ extension DataPathWrapper {
         let digestAlgorithm = parameters.digest?.rawValue.uppercased()
 
         if let cipherAlgorithm, cipherAlgorithm.hasSuffix("-GCM") {
-            mode = cipherAlgorithm.withCString { cCipher in
-                dp_mode_ad_create_aead(
-                    cCipher,
-                    CryptoAEADTagLength,
-                    CryptoAEADIdLength,
-                    parameters.compressionFraming.cNative
-                )
+            mode = withUnsafePointer(to: keys.cKeys) { keys in
+                cipherAlgorithm.withCString { cCipher in
+                    dp_mode_ad_create_aead(
+                        cCipher,
+                        CryptoAEADTagLength,
+                        CryptoAEADIdLength,
+                        keys,
+                        parameters.compressionFraming.cNative
+                    )
+                }
             }
         } else {
             guard let digestAlgorithm else {
                 throw DataPathError.wrapperAlgorithm
             }
             mode = digestAlgorithm.withCString { cDigest in
-                if let cipherAlgorithm {
-                    return cipherAlgorithm.withCString { cCipher in
-                        dp_mode_hmac_create_cbc(
-                            cCipher,
+                withUnsafePointer(to: keys.cKeys) { keys in
+                    if let cipherAlgorithm {
+                        return cipherAlgorithm.withCString { cCipher in
+                            dp_mode_hmac_create_cbc(
+                                cCipher,
+                                cDigest,
+                                keys,
+                                parameters.compressionFraming.cNative
+                            )
+                        }
+                    } else {
+                        return dp_mode_hmac_create_cbc(
+                            nil,
                             cDigest,
+                            keys,
                             parameters.compressionFraming.cNative
                         )
                     }
-                } else {
-                    return dp_mode_hmac_create_cbc(
-                        nil,
-                        cDigest,
-                        parameters.compressionFraming.cNative
-                    )
                 }
             }
         }
 
-        // if provided, the encryption keys must match the cipher/digest
-        if let keys {
-            let crypto = mode.pointee.crypto.assumingMemoryBound(to: crypto_t.self)
-            let cipherKeyLength = crypto.pointee.meta.cipher_key_len
-            let hmacKeyLength = crypto.pointee.meta.hmac_key_len
+        // the encryption keys must match the cipher/digest
+        let crypto = mode.pointee.crypto.assumingMemoryBound(to: crypto_t.self)
+        let cipherKeyLength = crypto.pointee.meta.cipher_key_len
+        let hmacKeyLength = crypto.pointee.meta.hmac_key_len
 
-            assert(keys.cipher.encryptionKey.length == cipherKeyLength)
-            assert(keys.cipher.decryptionKey.length == cipherKeyLength)
-            assert(keys.digest.encryptionKey.length == hmacKeyLength)
-            assert(keys.digest.decryptionKey.length == hmacKeyLength)
-        }
+        assert(keys.cipher.encryptionKey.length >= cipherKeyLength)
+        assert(keys.cipher.decryptionKey.length >= cipherKeyLength)
+        assert(keys.digest.encryptionKey.length >= hmacKeyLength)
+        assert(keys.digest.decryptionKey.length >= hmacKeyLength)
 
-        return try cNative(with: mode, peerId: parameters.peerId, keys: keys)
+        return try cNative(with: mode, peerId: parameters.peerId)
     }
 }
 
 extension DataPathWrapper {
     static func nativeADMock(with framing: OpenVPN.CompressionFraming) throws -> DataPathWrapper {
         let mode = dp_mode_ad_create_mock(framing.cNative)
-        return try cNative(with: mode, peerId: nil, keys: nil)
+        return try cNative(with: mode, peerId: nil)
     }
 
     static func nativeHMACMock(with framing: OpenVPN.CompressionFraming) throws -> DataPathWrapper {
         let mode = dp_mode_hmac_create_mock(framing.cNative)
-        return try cNative(with: mode, peerId: nil, keys: nil)
+        return try cNative(with: mode, peerId: nil)
     }
 }
 
 private extension DataPathWrapper {
     static func cNative(
         with mode: UnsafeMutablePointer<dp_mode_t>,
-        peerId: UInt32?,
-        keys: Parameters.Keys?
+        peerId: UInt32?
     ) throws -> DataPathWrapper {
         let dataPath = CDataPath(mode: mode, peerId: peerId ?? PacketPeerIdDisabled)
-
-        // fall back to empty keys with proper lengths
-        let confKeys: Parameters.Keys
-        if let keys {
-            confKeys = keys
-        } else {
-            let crypto = mode.pointee.crypto.assumingMemoryBound(to: crypto_t.self)
-            let cipherKeyLength = crypto.pointee.meta.cipher_key_len
-            let hmacKeyLength = crypto.pointee.meta.hmac_key_len
-            confKeys = Parameters.Keys(
-                emptyWithCipherLength: cipherKeyLength,
-                hmacKeyLength: hmacKeyLength
-            )
-        }
-
-        dataPath.configureEncryption(
-            cipherKey: confKeys.cipher.encryptionKey.ptr,
-            hmacKey: confKeys.digest.encryptionKey.ptr
-        )
-        dataPath.configureDecryption(
-            cipherKey: confKeys.cipher.decryptionKey.ptr,
-            hmacKey: confKeys.digest.decryptionKey.ptr
-        )
         return DataPathWrapper(dataPath: dataPath)
     }
 }
