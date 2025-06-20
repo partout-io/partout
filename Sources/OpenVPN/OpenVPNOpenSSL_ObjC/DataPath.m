@@ -93,6 +93,8 @@
                        maxPackets:(NSInteger)maxPackets
              usesReplayProtection:(BOOL)usesReplayProtection
 {
+    NSLog(@"PartoutOpenVPN: Using DataPath (legacy ObjC)");
+
     NSParameterAssert(encrypter);
     NSParameterAssert(decrypter);
     NSParameterAssert(maxPackets > 0);

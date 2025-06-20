@@ -29,6 +29,7 @@ import Foundation
 
 extension DataPathWrapper {
     static func native(with parameters: Parameters) -> DataPathWrapper {
+        NSLog("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)");
         fatalError("FIXME: ###")
     }
 }

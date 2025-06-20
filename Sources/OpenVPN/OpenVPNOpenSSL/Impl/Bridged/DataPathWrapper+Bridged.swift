@@ -1,5 +1,5 @@
 //
-//  DataPathWrapper+Legacy.swift
+//  DataPathWrapper+Bridged.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/20/25.
@@ -27,7 +27,8 @@ import _PartoutOpenVPN
 internal import _PartoutOpenVPNOpenSSL_ObjC
 
 extension DataPathWrapper {
-    static func legacy(with parameters: Parameters) -> DataPathWrapper {
+    static func bridged(with parameters: Parameters) -> DataPathWrapper {
+        NSLog("PartoutOpenVPN: Using DataPathWrapper (bridged Swift/ObjC)");
         fatalError("FIXME: ###")
     }
 }
