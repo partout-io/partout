@@ -738,26 +738,3 @@ private extension Negotiator {
         state != .connected && elapsedSinceStart > negotiationTimeout
     }
 }
-
-private extension OpenVPN.CompressionAlgorithm {
-    var native: CompressionAlgorithm {
-        switch self {
-        case .disabled: .disabled
-        case .LZO: .LZO
-        case .other: .other
-        @unknown default: .disabled
-        }
-    }
-}
-
-private extension OpenVPN.CompressionFraming {
-    var native: CompressionFraming {
-        switch self {
-        case .disabled: .disabled
-        case .compLZO: .compLZO
-        case .compress: .compress
-        case .compressV2: .compressV2
-        @unknown default: .disabled
-        }
-    }
-}

@@ -18,9 +18,9 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "_PartoutOpenVPNOpenSSL_CTests"
-               BuildableName = "_PartoutOpenVPNOpenSSL_CTests"
-               BlueprintName = "_PartoutOpenVPNOpenSSL_CTests"
+               BlueprintIdentifier = "_PartoutOpenVPNOpenSSLTests"
+               BuildableName = "_PartoutOpenVPNOpenSSLTests"
+               BlueprintName = "_PartoutOpenVPNOpenSSLTests"
                ReferencedContainer = "container:">
             </BuildableReference>
          </TestableReference>

@@ -384,7 +384,25 @@ if areas.contains(.openvpn) {
                 }
                 return deps
             }(),
-            path: "Sources/OpenVPN/OpenVPNOpenSSL"
+            path: "Sources/OpenVPN/OpenVPNOpenSSL",
+            exclude: {
+                switch cryptoMode {
+                case .legacy, .bridgedCrypto:
+                    ["Impl/Bridged", "Impl/Native"]
+                case .bridgedDataPath:
+                    ["Impl/Legacy"]
+                case .native:
+                    ["Impl/Legacy", "Impl/Bridged"]
+                }
+            }(),
+            swiftSettings: {
+                switch cryptoMode {
+                case .legacy, .bridgedCrypto:
+                    []
+                case .bridgedDataPath, .native:
+                    [.define("OPENVPN_DP_NATIVE")]
+                }
+            }()
         ),
         .target(
             name: "_PartoutOpenVPNOpenSSL_C",
@@ -418,17 +436,10 @@ if areas.contains(.openvpn) {
             path: "Tests/OpenVPN/Base"
         ),
         .testTarget(
-            name: "_PartoutOpenVPNOpenSSL_CTests",
-            dependencies: [
-                "_PartoutOpenVPNOpenSSL_C",
-                "PartoutCoreWrapper"
-            ],
-            path: "Tests/OpenVPN/OpenVPNOpenSSL_C"
-        ),
-        .testTarget(
             name: "_PartoutOpenVPNOpenSSLTests",
             dependencies: ["_PartoutOpenVPNOpenSSL"],
             path: "Tests/OpenVPN/OpenVPNOpenSSL",
+            exclude: ["DataPath"],
             resources: [
                 .process("Resources")
             ]
