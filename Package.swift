@@ -520,7 +520,7 @@ enum PartoutOpenVPN {
                 ])
                 mainExclude.append("Impl/Legacy")
                 mainDefines = []
-                mainTestExclude = []
+                mainTestExclude = ["OSSLCryptoBoxTests.swift"]
                 cryptoLegacyDependencies.append("_PartoutCryptoOpenSSL_C")
                 cryptoLegacyExclude = ["bridged"]
                 cryptoTestDependencies = ["_PartoutCryptoOpenSSL_ObjC"]
