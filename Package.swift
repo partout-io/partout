@@ -21,6 +21,9 @@ let environment: Environment = .remoteBinary
 let areas = Set(Area.allCases)
     .subtracting([.documentation])
 
+// the OpenVPN crypto mode (ObjC -> C)
+let openVPNCryptoMode: PartoutOpenVPN.CryptoMode = .fromEnvironment("OPENVPN_CRYPTO_MODE") ?? .legacy
+
 // the global settings for C targets
 let cSettings: [CSetting] = [
     .unsafeFlags([
@@ -75,7 +78,7 @@ enum OS {
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
 let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
 
-// MARK: - Products
+// MARK: - Package
 
 let package = Package(
     name: "partout",
@@ -311,31 +314,13 @@ if areas.contains(.api) {
     ])
 }
 
-// MARK: OpenVPN
+// MARK: - OpenVPN
 
 if areas.contains(.openvpn) {
-    enum CryptoMode: Int {
-        case legacy = 0
-
-        case bridgedCrypto = 1
-
-        case bridgedDataPath = 2
-
-        case native = 3
-    }
-
-    let cryptoMode: CryptoMode
-    if let envModeString = ProcessInfo.processInfo.environment["OPENVPN_CRYPTO_MODE"],
-       let envModeInt = Int(envModeString),
-       let envMode = CryptoMode(rawValue: envModeInt) {
-        cryptoMode = envMode
-    } else {
-        cryptoMode = .legacy
-    }
-
     package.dependencies.append(contentsOf: [
         .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
     ])
+
     package.products.append(contentsOf: [
         .library(
             name: "PartoutOpenVPN",
@@ -378,7 +363,7 @@ if areas.contains(.openvpn) {
                 var deps: [Target.Dependency] = [
                     "_PartoutOpenVPN"
                 ]
-                switch cryptoMode {
+                switch openVPNCryptoMode {
                 case .legacy, .bridgedCrypto:
                     deps.append("_PartoutOpenVPNOpenSSL_ObjC")
                 case .bridgedDataPath:
@@ -391,7 +376,7 @@ if areas.contains(.openvpn) {
             }(),
             path: "Sources/OpenVPN/OpenVPNOpenSSL",
             exclude: {
-                switch cryptoMode {
+                switch openVPNCryptoMode {
                 case .legacy, .bridgedCrypto:
                     ["Impl/Bridged", "Impl/Native", "Wrappers"]
                 case .bridgedDataPath:
@@ -401,7 +386,7 @@ if areas.contains(.openvpn) {
                 }
             }(),
             swiftSettings: {
-                switch cryptoMode {
+                switch openVPNCryptoMode {
                 case .legacy, .bridgedCrypto:
                     []
                 case .bridgedDataPath, .native:
@@ -419,7 +404,7 @@ if areas.contains(.openvpn) {
         .testTarget(
             name: "_PartoutCryptoOpenSSLTests",
             dependencies: {
-                switch cryptoMode {
+                switch openVPNCryptoMode {
                 case .native:
                     ["_PartoutCryptoOpenSSL_C"]
                 default:
@@ -428,7 +413,7 @@ if areas.contains(.openvpn) {
             }(),
             path: "Tests/OpenVPN/CryptoOpenSSL",
             exclude: {
-                switch cryptoMode {
+                switch openVPNCryptoMode {
                 case .legacy, .bridgedCrypto:
                     ["Native"]
                 case .bridgedDataPath, .native:
@@ -446,7 +431,7 @@ if areas.contains(.openvpn) {
             dependencies: ["_PartoutOpenVPNOpenSSL"],
             path: "Tests/OpenVPN/OpenVPNOpenSSL",
             exclude: {
-                switch cryptoMode {
+                switch openVPNCryptoMode {
                 case .legacy, .bridgedCrypto:
                     ["DataPath"]
                 default:
@@ -460,7 +445,7 @@ if areas.contains(.openvpn) {
     ])
 
     // legacy ObjC crypto
-    if cryptoMode != .native {
+    if openVPNCryptoMode != .native {
         package.products.append(.library(
             name: "_PartoutCryptoOpenSSL_ObjC",
             targets: ["_PartoutCryptoOpenSSL_ObjC"]
@@ -471,7 +456,7 @@ if areas.contains(.openvpn) {
                 var deps: [Target.Dependency] = [
                     "openssl-apple"
                 ]
-                switch cryptoMode {
+                switch openVPNCryptoMode {
                 case .legacy:
                     break
                 case .bridgedCrypto, .bridgedDataPath:
@@ -483,7 +468,7 @@ if areas.contains(.openvpn) {
             }(),
             path: "Sources/OpenVPN/CryptoOpenSSL_ObjC",
             exclude: {
-                switch cryptoMode {
+                switch openVPNCryptoMode {
                 case .legacy, .bridgedDataPath:
                     ["bridged"]
                 case .bridgedCrypto:
@@ -501,7 +486,7 @@ if areas.contains(.openvpn) {
         package.targets.append(.target(
             name: "_PartoutOpenVPNOpenSSL_ObjC",
             dependencies: {
-                switch cryptoMode {
+                switch openVPNCryptoMode {
                 case .legacy, .bridgedCrypto, .bridgedDataPath:
                     ["_PartoutCryptoOpenSSL_ObjC"]
                 case .native:
@@ -520,7 +505,29 @@ if areas.contains(.openvpn) {
     }
 }
 
-// MARK: WireGuard
+// MARK: Structures
+
+enum PartoutOpenVPN {
+    enum CryptoMode: Int {
+        case legacy = 0
+
+        case bridgedCrypto = 1
+
+        case bridgedDataPath = 2
+
+        case native = 3
+
+        static func fromEnvironment(_ key: String) -> Self? {
+            guard let envModeString = ProcessInfo.processInfo.environment[key],
+               let envModeInt = Int(envModeString) else {
+                return nil
+            }
+            return CryptoMode(rawValue: envModeInt)
+        }
+    }
+}
+
+// MARK: - WireGuard
 
 if areas.contains(.wireguard) {
     package.dependencies.append(contentsOf: [
