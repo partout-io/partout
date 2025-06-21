@@ -50,7 +50,8 @@
         ptr = crypto_ctr_create([cipherName cStringUsingEncoding:NSUTF8StringEncoding],
                                 [digestName cStringUsingEncoding:NSUTF8StringEncoding],
                                 tagLength,
-                                payloadLength);
+                                payloadLength,
+                                nil);
         if (!ptr) {
             return nil;
         }

@@ -1,8 +1,8 @@
 //
-//  crypto_aead.h
+//  keys.h
 //  Partout
 //
-//  Created by Davide De Rosa on 6/14/25.
+//  Created by Davide De Rosa on 6/20/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -25,26 +25,18 @@
 
 #pragma once
 
-#include <openssl/evp.h>
-#include "crypto.h"
-#include "zeroing_data.h"
+#include <stdbool.h>
+#include <stdint.h>
+#include "crypto_openssl/zeroing_data.h"
+
+bool key_init_seed(const zeroing_data_t *_Nonnull zd);
 
 typedef struct {
-    crypto_t crypto;
+    zeroing_data_t *_Nonnull dst;
+    const char *_Nonnull digest_name;
+    const zeroing_data_t *_Nonnull secret;
+    const zeroing_data_t *_Nonnull data;
+} key_hmac_ctx;
 
-    const EVP_CIPHER *_Nonnull cipher;
-    size_t cipher_key_len;
-    size_t cipher_iv_len;
-    size_t tag_len;
-    size_t id_len;
-
-    EVP_CIPHER_CTX *_Nonnull ctx_enc;
-    EVP_CIPHER_CTX *_Nonnull ctx_dec;
-    uint8_t *_Nonnull iv_enc;
-    uint8_t *_Nonnull iv_dec;
-} crypto_aead_t;
-
-crypto_aead_t *_Nullable crypto_aead_create(const char *_Nonnull cipher_name,
-                                            size_t tag_len, size_t id_len,
-                                            const crypto_keys_t *_Nullable keys);
-void crypto_aead_free(crypto_aead_t *_Nonnull ctx);
+zeroing_data_t *_Nonnull key_hmac_buf();
+size_t key_hmac(key_hmac_ctx *_Nonnull ctx);

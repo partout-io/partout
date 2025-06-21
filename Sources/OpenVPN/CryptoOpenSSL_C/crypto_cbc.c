@@ -64,6 +64,8 @@ bool crypto_encrypt(void *vctx,
                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
+    assert(!ctx->cipher || ctx->ctx_enc);
+    assert(ctx->hmac_key_enc);
 
     uint8_t *out_iv = dst + ctx->digest_len;
     uint8_t *out_encrypted = out_iv + ctx->cipher_iv_len;
@@ -123,6 +125,8 @@ bool crypto_decrypt(void *vctx,
                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
+    assert(!ctx->cipher || ctx->ctx_dec);
+    assert(ctx->hmac_key_dec);
 
     const uint8_t *iv = in + ctx->digest_len;
     const uint8_t *encrypted = in + ctx->digest_len + ctx->cipher_iv_len;
@@ -178,7 +182,8 @@ bool crypto_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_co
 
 // MARK: -
 
-crypto_cbc_t *crypto_cbc_create(const char *cipher_name, const char *digest_name) {
+crypto_cbc_t *crypto_cbc_create(const char *cipher_name, const char *digest_name,
+                                const crypto_keys_t *keys) {
     assert(digest_name);
 
     const EVP_CIPHER *cipher = NULL;
@@ -235,6 +240,11 @@ crypto_cbc_t *crypto_cbc_create(const char *cipher_name, const char *digest_name
     ctx->crypto.decrypter.configure = crypto_configure_decrypt;
     ctx->crypto.decrypter.decrypt = crypto_decrypt;
     ctx->crypto.decrypter.verify = crypto_verify;
+
+    if (keys) {
+        crypto_configure_encrypt(ctx, keys->cipher.enc_key, keys->hmac.enc_key);
+        crypto_configure_decrypt(ctx, keys->cipher.dec_key, keys->hmac.dec_key);
+    }
 
     return ctx;
 }

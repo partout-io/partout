@@ -23,10 +23,17 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_C
-internal import _PartoutOpenVPNOpenSSL_C
+import _PartoutOpenVPN
+@testable import _PartoutOpenVPNOpenSSL
 import PartoutCore
 import XCTest
+
+// for non-Swift symbols like DataPacket*
+#if canImport(_PartoutOpenVPNOpenSSL_C)
+internal import _PartoutOpenVPNOpenSSL_C
+#else
+internal import _PartoutOpenVPNOpenSSL_ObjC
+#endif
 
 final class DataPathADTests: XCTestCase, DataPathTestsProtocol {
     let peerId: UInt32 = 0x01
@@ -40,101 +47,101 @@ final class DataPathADTests: XCTestCase, DataPathTestsProtocol {
 
 extension DataPathADTests {
     func test_givenAD_whenEncryptMock_thenDecrypts() throws {
-        try private_test_givenAD_whenEncryptMock_thenDecrypts(CompressionFramingDisabled)
+        try private_test_givenAD_whenEncryptMock_thenDecrypts(.disabled)
     }
 
     func test_givenADCompLZO_whenEncryptMock_thenDecrypts() throws {
-        try private_test_givenAD_whenEncryptMock_thenDecrypts(CompressionFramingCompLZO)
+        try private_test_givenAD_whenEncryptMock_thenDecrypts(.compLZO)
     }
 
     func test_givenADCompress_whenEncryptMock_thenDecrypts() throws {
-        try private_test_givenAD_whenEncryptMock_thenDecrypts(CompressionFramingCompress)
+        try private_test_givenAD_whenEncryptMock_thenDecrypts(.compress)
     }
 
     func test_givenADCompressV2_whenEncryptMock_thenDecrypts() throws {
-        try private_test_givenAD_whenEncryptMock_thenDecrypts(CompressionFramingCompressV2)
+        try private_test_givenAD_whenEncryptMock_thenDecrypts(.compressV2)
     }
 
     func test_givenAD_whenEncryptGCM_thenDecrypts() throws {
-        try private_test_givenAD_whenEncryptGCM_thenDecrypts(CompressionFramingDisabled)
+        try private_test_givenAD_whenEncryptGCM_thenDecrypts(.disabled)
     }
 
     func test_givenADCompLZO_whenEncryptGCM_thenDecrypts() throws {
-        try private_test_givenAD_whenEncryptGCM_thenDecrypts(CompressionFramingCompLZO)
+        try private_test_givenAD_whenEncryptGCM_thenDecrypts(.compLZO)
     }
 
     func test_givenADCompress_whenEncryptGCM_thenDecrypts() throws {
-        try private_test_givenAD_whenEncryptGCM_thenDecrypts(CompressionFramingCompress)
+        try private_test_givenAD_whenEncryptGCM_thenDecrypts(.compress)
     }
 
     func test_givenADCompressV2_whenEncryptGCM_thenDecrypts() throws {
-        try private_test_givenAD_whenEncryptGCM_thenDecrypts(CompressionFramingCompressV2)
+        try private_test_givenAD_whenEncryptGCM_thenDecrypts(.compressV2)
     }
 }
 
 extension DataPathADTests {
     func test_givenADCompressV2_whenEncryptMockWithNoCompressSwap_thenDecrypts() throws {
-        try testFraming(CompressionFramingCompressV2) {
-            XCTAssertNoThrow(try testReversibleBulkEncryption(mode: $0, customPayloads: [
+        try testMockFraming(.compressV2) {
+            XCTAssertNoThrow(try testReversibleBulkEncryption(sut: $0, customPayloads: [
                 Data([UInt8(DataPacketNoCompressSwap)])
             ]))
         }
     }
 
     func test_givenADCompressV2_whenEncryptMockWithLZOCompress_thenDecrypts() throws {
-        try testFraming(CompressionFramingCompressV2) {
-            XCTAssertNoThrow(try testReversibleBulkEncryption(mode: $0, customPayloads: [
+        try testMockFraming(.compressV2) {
+            XCTAssertNoThrow(try testReversibleBulkEncryption(sut: $0, customPayloads: [
                 Data([UInt8(DataPacketLZOCompress)])
             ]))
         }
     }
 
     func test_givenADCompressV2_whenEncryptMockWithV2Indicator_thenDecrypts() throws {
-        try testFraming(CompressionFramingCompressV2) {
-            XCTAssertNoThrow(try testReversibleBulkEncryption(mode: $0, customPayloads: [
+        try testMockFraming(.compressV2) {
+            XCTAssertNoThrow(try testReversibleBulkEncryption(sut: $0, customPayloads: [
                 Data([UInt8(DataPacketV2Indicator)])
             ]))
         }
     }
 
     func test_givenADCompressV2_whenEncryptMockWithV2Uncompressed_thenDecrypts() throws {
-        try testFraming(CompressionFramingCompressV2) {
-            XCTAssertNoThrow(try testReversibleBulkEncryption(mode: $0, customPayloads: [
+        try testMockFraming(.compressV2) {
+            XCTAssertNoThrow(try testReversibleBulkEncryption(sut: $0, customPayloads: [
                 Data([UInt8(DataPacketV2Uncompressed)])
             ]))
         }
-    }
-
-    private func testFraming(_ framing: compression_framing_t, _ block: (UnsafeMutablePointer<dp_mode_t>) throws -> Void) rethrows {
-        let mode = dp_mode_ad_create_mock(framing)
-        try block(mode)
-        dp_mode_free(mode)
     }
 }
 
 private extension DataPathADTests {
     func private_test_givenAD_whenEncryptMock_thenDecrypts(
-        _ framing: compression_framing_t
+        _ framing: OpenVPN.CompressionFraming
     ) throws {
         print("AD framing: \(framing)")
-        let mode = dp_mode_ad_create_mock(framing)
-        XCTAssertNoThrow(try testReversibleEncryption(mode: mode, payload: payload))
-        XCTAssertNoThrow(try testReversibleCompoundEncryption(mode: mode, payload: payload))
-        XCTAssertNoThrow(try testReversibleBulkEncryption(mode: mode))
-        dp_mode_free(mode)
+        let sut = try DataPathWrapper.nativeADMock(with: framing).dataPath
+        XCTAssertNoThrow(try testReversibleEncryption(sut: sut, payload: payload))
+        XCTAssertNoThrow(try testReversibleCompoundEncryption(sut: sut, payload: payload))
+        XCTAssertNoThrow(try testReversibleBulkEncryption(sut: sut))
     }
 
     func private_test_givenAD_whenEncryptGCM_thenDecrypts(
-        _ framing: compression_framing_t
+        _ framing: OpenVPN.CompressionFraming
     ) throws {
-        let cipher = "AES-128-GCM"
-        let tag = 8
-        let id = 8
         print("AD framing: \(framing)")
-        let mode = dp_mode_ad_create_aead(cipher, tag, id, framing)
-        XCTAssertNoThrow(try testReversibleEncryption(mode: mode, payload: payload))
-        XCTAssertNoThrow(try testReversibleCompoundEncryption(mode: mode, payload: payload))
-        XCTAssertNoThrow(try testReversibleBulkEncryption(mode: mode))
-        dp_mode_free(mode)
+        let keys = newEmptyKeys()
+        let sut = try DataPathWrapper.native(with: .init(
+            cipher: .aes128gcm,
+            digest: nil,
+            compressionFraming: framing,
+            peerId: nil
+        ), keys: keys).dataPath
+        XCTAssertNoThrow(try testReversibleEncryption(sut: sut, payload: payload))
+        XCTAssertNoThrow(try testReversibleCompoundEncryption(sut: sut, payload: payload))
+        XCTAssertNoThrow(try testReversibleBulkEncryption(sut: sut))
+    }
+
+    func testMockFraming(_ framing: OpenVPN.CompressionFraming, block: (DataPathTestingProtocol) throws -> Void) throws {
+        let subject = try DataPathWrapper.nativeADMock(with: framing).dataPath
+        try block(subject)
     }
 }

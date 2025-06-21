@@ -170,22 +170,6 @@ compression_framing_t dp_mode_framing(const dp_mode_t *_Nonnull mode) {
     return mode->opt.comp_f;
 }
 
-static inline
-void dp_mode_configure_enc(dp_mode_t *_Nonnull mode,
-                           const zeroing_data_t *_Nullable cipher_key,
-                           const zeroing_data_t *_Nullable hmac_key) {
-    crypto_t *crypto = mode->crypto;
-    crypto->encrypter.configure(crypto, cipher_key, hmac_key);
-}
-
-static inline
-void dp_mode_configure_dec(dp_mode_t *_Nonnull mode,
-                           const zeroing_data_t *_Nullable cipher_key,
-                           const zeroing_data_t *_Nullable hmac_key) {
-    crypto_t *crypto = mode->crypto;
-    crypto->decrypter.configure(crypto, cipher_key, hmac_key);
-}
-
 // MARK: - Encryption
 
 //

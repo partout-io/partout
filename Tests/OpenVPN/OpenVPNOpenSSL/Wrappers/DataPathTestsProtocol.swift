@@ -1,5 +1,5 @@
 //
-//  Extensions.swift
+//  DataPathTestsProtocol.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/17/25.
@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_C
-internal import _PartoutOpenVPNOpenSSL_C
+import _PartoutOpenVPN
+@testable import _PartoutOpenVPNOpenSSL
 import Foundation
 import XCTest
 
@@ -53,21 +53,11 @@ protocol DataPathTestsProtocol where Self: XCTestCase {
 
 extension DataPathTestsProtocol {
     func testReversibleEncryption(
-        mode: UnsafeMutablePointer<dp_mode_t>,
+        sut: DataPathTestingProtocol,
         payload: Data,
         assertAssembled: ((Data) -> Bool)? = nil,
         assertEncrypted: ((Data) -> Bool)? = nil
     ) throws {
-        let sut = CDataPath(mode: mode, peerId: peerId)
-        let crypto = mode.pointee.crypto.assumingMemoryBound(to: crypto_t.self)
-        let cipherKeyLength = crypto.pointee.meta.cipher_key_len
-        let hmacKeyLength = crypto.pointee.meta.hmac_key_len
-
-        let cipherKey = Data(count: cipherKeyLength)
-        let hmacKey = Data(count: hmacKeyLength)
-        sut.configureEncryption(cipherKey: cipherKey, hmacKey: hmacKey)
-        sut.configureDecryption(cipherKey: cipherKey, hmacKey: hmacKey)
-
         print("\tpayload\t\t", payload.toHex())
 
         let assembled = sut.assemble(packetId: packetId, payload: payload)
@@ -100,27 +90,16 @@ extension DataPathTestsProtocol {
     }
 
     func testReversibleCompoundEncryption(
-        mode: UnsafeMutablePointer<dp_mode_t>,
+        sut: DataPathTestingProtocol,
         payload: Data,
         assertEncrypted: ((Data) -> Bool)? = nil
     ) throws {
-        let sut = CDataPath(mode: mode, peerId: peerId)
-        let crypto = mode.pointee.crypto.assumingMemoryBound(to: crypto_t.self)
-        let cipherKeyLength = crypto.pointee.meta.cipher_key_len
-        let hmacKeyLength = crypto.pointee.meta.hmac_key_len
-
-        let cipherKey = Data(count: cipherKeyLength)
-        let hmacKey = Data(count: hmacKeyLength)
-        sut.configureEncryption(cipherKey: cipherKey, hmacKey: hmacKey)
-        sut.configureDecryption(cipherKey: cipherKey, hmacKey: hmacKey)
-
         print("\tpayload\t\t", payload.toHex())
 
         let encrypted = try sut.assembleAndEncrypt(
             payload,
             key: key,
-            packetId: packetId,
-            withNewBuffer: true
+            packetId: packetId
         )
         print("\tencrypted\t", encrypted.toHex())
 
@@ -132,10 +111,7 @@ extension DataPathTestsProtocol {
             XCTAssertTrue(assertEncrypted(encrypted))
         }
 
-        let decryptedTuple = try sut.decryptAndParse(
-            encrypted,
-            withNewBuffer: true
-        )
+        let decryptedTuple = try sut.decryptAndParse(encrypted)
         XCTAssertEqual(decryptedTuple.packetId, packetId)
         XCTAssertEqual(decryptedTuple.data, payload)
         print("\tpacket_id:\t", String(format: "%0x", decryptedTuple.packetId))
@@ -144,18 +120,9 @@ extension DataPathTestsProtocol {
     }
 
     func testReversibleBulkEncryption(
-        mode: UnsafeMutablePointer<dp_mode_t>,
+        sut: DataPathTestingProtocol,
         customPayloads: [Data]? = nil
     ) throws {
-        let sut = CDataPath(mode: mode, peerId: peerId)
-        let crypto = mode.pointee.crypto.assumingMemoryBound(to: crypto_t.self)
-        let cipherKeyLength = crypto.pointee.meta.cipher_key_len
-        let hmacKeyLength = crypto.pointee.meta.hmac_key_len
-
-        let cipherKey = Data(count: cipherKeyLength)
-        let hmacKey = Data(count: hmacKeyLength)
-        sut.configureEncryption(cipherKey: cipherKey, hmacKey: hmacKey)
-        sut.configureDecryption(cipherKey: cipherKey, hmacKey: hmacKey)
 
         //
         // N = 10 packets with:
@@ -175,5 +142,13 @@ extension DataPathTestsProtocol {
         print("\tdecrypted\t", decrypted.map { $0.toHex() })
 
         XCTAssertEqual(decrypted, payloads)
+    }
+}
+
+extension DataPathTestsProtocol {
+
+    // it's fine as long as they're bigger than required cipher/hmac lengths
+    func newEmptyKeys() -> CryptoKeys {
+        CryptoKeys(emptyWithCipherLength: 1024, hmacKeyLength: 1024)
     }
 }

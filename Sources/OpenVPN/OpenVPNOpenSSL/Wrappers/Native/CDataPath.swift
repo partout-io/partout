@@ -67,18 +67,7 @@ final class CDataPath {
     deinit {
         zd_free(encBuffer)
         zd_free(decBuffer)
-    }
-
-    func configureEncryption(cipherKey: Data?, hmacKey: Data?) {
-        configure(cipherKey: cipherKey, hmacKey: hmacKey) {
-            dp_mode_configure_enc(mode, $0, $1)
-        }
-    }
-
-    func configureDecryption(cipherKey: Data?, hmacKey: Data?) {
-        configure(cipherKey: cipherKey, hmacKey: hmacKey) {
-            dp_mode_configure_dec(mode, $0, $1)
-        }
+        dp_mode_free(mode)
     }
 }
 

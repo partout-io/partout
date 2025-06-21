@@ -51,5 +51,6 @@ typedef struct {
 } crypto_cbc_t;
 
 crypto_cbc_t *_Nullable crypto_cbc_create(const char *_Nullable cipher_name,
-                                          const char *_Nonnull digest_name);
+                                          const char *_Nonnull digest_name,
+                                          const crypto_keys_t *_Nullable keys);
 void crypto_cbc_free(crypto_cbc_t *_Nonnull ctx);

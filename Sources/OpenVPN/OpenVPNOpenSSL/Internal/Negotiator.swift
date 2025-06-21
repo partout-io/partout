@@ -681,6 +681,36 @@ private extension Negotiator {
 //        pp_log(ctx, .openvpn, .info, "\tsessionId: \(sessionId.toHex())")
 //        pp_log(ctx, .openvpn, .info, "\tremoteSessionId: \(remoteSessionId.toHex())")
 
+#if OPENVPN_WRAPPED
+
+        // MARK: DataPathWrapper (Swift)
+
+        let parameters = DataPathWrapper.Parameters(
+            cipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
+            digest: options.configuration.fallbackDigest,
+            compressionFraming: history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming,
+            peerId: history.pushReply.options.peerId
+        )
+        let prf = DataPathWrapper.Parameters.PRF(
+            authResponse: authResponse,
+            sessionId: sessionId,
+            remoteSessionId: remoteSessionId
+        )
+
+        let wrapper: DataPathWrapper
+#if OPENVPN_WRAPPED_NATIVE
+        // Swift -> C
+        wrapper = try .native(with: parameters, prf: prf, prng: prng)
+#else
+        // Swift -> ObjC
+        wrapper = try .legacy(with: parameters, prf: prf, prng: prng)
+#endif
+        return DataChannel(ctx, key: key, dataPath: wrapper.dataPath)
+
+#else
+
+        // MARK: DataPath (ObjC)
+
         let cryptoBox = cryptoFactory()
         try cryptoBox.configure(
             withCipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
@@ -689,7 +719,6 @@ private extension Negotiator {
             sessionId: sessionId,
             remoteSessionId: remoteSessionId
         )
-
         let compressionFraming = history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming
         let compressionAlgorithm = history.pushReply.options.compressionAlgorithm ?? options.configuration.compressionAlgorithm ?? .disabled
 
@@ -702,8 +731,9 @@ private extension Negotiator {
             maxPackets: options.sessionOptions.maxPackets,
             usesReplayProtection: Constants.usesReplayProtection
         )
-
         return DataChannel(ctx, key: key, dataPath: dataPath)
+
+#endif
     }
 }
 
@@ -736,28 +766,5 @@ private extension Negotiator {
 
     var didNegotiationTimeout: Bool {
         state != .connected && elapsedSinceStart > negotiationTimeout
-    }
-}
-
-private extension OpenVPN.CompressionAlgorithm {
-    var native: CompressionAlgorithm {
-        switch self {
-        case .disabled: .disabled
-        case .LZO: .LZO
-        case .other: .other
-        @unknown default: .disabled
-        }
-    }
-}
-
-private extension OpenVPN.CompressionFraming {
-    var native: CompressionFraming {
-        switch self {
-        case .disabled: .disabled
-        case .compLZO: .compLZO
-        case .compress: .compress
-        case .compressV2: .compressV2
-        @unknown default: .disabled
-        }
     }
 }

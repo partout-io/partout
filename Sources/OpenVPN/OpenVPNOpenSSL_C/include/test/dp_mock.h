@@ -39,8 +39,9 @@ dp_mode_t *_Nonnull dp_mode_ad_create_mock(compression_framing_t comp_f) {
 static inline
 dp_mode_t *_Nonnull dp_mode_ad_create_aead(const char *_Nonnull cipher,
                                            size_t tag_len, size_t id_len,
+                                           const crypto_keys_t *_Nullable keys,
                                            compression_framing_t comp_f) {
-    crypto_aead_t *crypto = crypto_aead_create(cipher, tag_len, id_len);
+    crypto_aead_t *crypto = crypto_aead_create(cipher, tag_len, id_len, keys);
     return dp_mode_ad_create((crypto_t *)crypto, (crypto_free_t)crypto_aead_free, comp_f);
 }
 
@@ -53,7 +54,8 @@ dp_mode_t *_Nonnull dp_mode_hmac_create_mock(compression_framing_t comp_f) {
 static inline
 dp_mode_t *_Nonnull dp_mode_hmac_create_cbc(const char *_Nullable cipher,
                                             const char *_Nonnull digest,
+                                            const crypto_keys_t *_Nullable keys,
                                             compression_framing_t comp_f) {
-    crypto_cbc_t *crypto = crypto_cbc_create(cipher, digest);
+    crypto_cbc_t *crypto = crypto_cbc_create(cipher, digest, keys);
     return dp_mode_hmac_create((crypto_t *)crypto, (crypto_free_t)crypto_cbc_free, comp_f);
 }

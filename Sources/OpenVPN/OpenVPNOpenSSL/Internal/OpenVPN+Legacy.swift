@@ -1,8 +1,8 @@
 //
-//  crypto_aead.h
+//  OpenVPN+Legacy.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/14/25.
+//  Created by Davide De Rosa on 6/20/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,28 +23,28 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#pragma once
+import _PartoutOpenVPN
+internal import _PartoutOpenVPNOpenSSL_ObjC
 
-#include <openssl/evp.h>
-#include "crypto.h"
-#include "zeroing_data.h"
+extension OpenVPN.CompressionAlgorithm {
+    var native: CompressionAlgorithm {
+        switch self {
+        case .disabled: .disabled
+        case .LZO: .LZO
+        case .other: .other
+        @unknown default: .disabled
+        }
+    }
+}
 
-typedef struct {
-    crypto_t crypto;
-
-    const EVP_CIPHER *_Nonnull cipher;
-    size_t cipher_key_len;
-    size_t cipher_iv_len;
-    size_t tag_len;
-    size_t id_len;
-
-    EVP_CIPHER_CTX *_Nonnull ctx_enc;
-    EVP_CIPHER_CTX *_Nonnull ctx_dec;
-    uint8_t *_Nonnull iv_enc;
-    uint8_t *_Nonnull iv_dec;
-} crypto_aead_t;
-
-crypto_aead_t *_Nullable crypto_aead_create(const char *_Nonnull cipher_name,
-                                            size_t tag_len, size_t id_len,
-                                            const crypto_keys_t *_Nullable keys);
-void crypto_aead_free(crypto_aead_t *_Nonnull ctx);
+extension OpenVPN.CompressionFraming {
+    var native: CompressionFraming {
+        switch self {
+        case .disabled: .disabled
+        case .compLZO: .compLZO
+        case .compress: .compress
+        case .compressV2: .compressV2
+        @unknown default: .disabled
+        }
+    }
+}

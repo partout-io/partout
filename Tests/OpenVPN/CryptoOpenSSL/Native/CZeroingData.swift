@@ -1,5 +1,5 @@
 //
-//  ZeroingData.swift
+//  CZeroingData.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/14/25.
@@ -26,27 +26,27 @@
 internal import _PartoutCryptoOpenSSL_C
 import Foundation
 
-public final class ZeroingData {
+final class CZeroingData {
     let ptr: UnsafeMutablePointer<zeroing_data_t>
 
     private init(ptr: UnsafeMutablePointer<zeroing_data_t>) {
         self.ptr = ptr
     }
 
-    public init(length: Int = 0) {
+    init(length: Int = 0) {
         self.ptr = zd_create(length)
     }
 
-    public init(bytes: UnsafePointer<UInt8>, length: Int) {
+    init(bytes: UnsafePointer<UInt8>, length: Int) {
         self.ptr = zd_create_from_data(bytes, length)
     }
 
-    public init(uInt8: UInt8) {
+    init(uInt8: UInt8) {
         var value = uInt8
         self.ptr = zd_create_from_data(&value, 1)
     }
 
-    public init(uInt16: UInt16) {
+    init(uInt16: UInt16) {
         var value = uInt16
         ptr = withUnsafeBytes(of: &value) {
             guard let bytes = $0.bindMemory(to: UInt8.self).baseAddress else {
@@ -56,7 +56,7 @@ public final class ZeroingData {
         }
     }
 
-    public init(data: Data) {
+    init(data: Data) {
         ptr = data.withUnsafeBytes {
             guard let bytes = $0.bindMemory(to: UInt8.self).baseAddress else {
                 fatalError("Could not bind to memory")
@@ -65,7 +65,7 @@ public final class ZeroingData {
         }
     }
 
-    public init(data: Data, offset: Int, length: Int) {
+    init(data: Data, offset: Int, length: Int) {
         ptr = data.withUnsafeBytes {
             guard let bytes = $0.bindMemory(to: UInt8.self).baseAddress else {
                 fatalError("Could not bind to memory")
@@ -74,7 +74,7 @@ public final class ZeroingData {
         }
     }
 
-    public init(string: String, nullTerminated: Bool) {
+    init(string: String, nullTerminated: Bool) {
         guard let cstr = string.cString(using: .utf8) else {
             ptr = zd_create(0)
             return
@@ -89,26 +89,26 @@ public final class ZeroingData {
 
 // MARK: Properties
 
-extension ZeroingData {
-    public var bytes: UnsafePointer<UInt8>! {
+extension CZeroingData {
+    var bytes: UnsafePointer<UInt8>! {
         zd_bytes(ptr)
     }
 
-    public var mutableBytes: UnsafeMutablePointer<UInt8>! {
+    var mutableBytes: UnsafeMutablePointer<UInt8>! {
         zd_mutable_bytes(ptr)
     }
 
-    public var length: Int {
+    var length: Int {
         zd_length(ptr)
     }
 }
 
-extension ZeroingData: Equatable {
-    public static func == (lhs: ZeroingData, rhs: ZeroingData) -> Bool {
+extension CZeroingData: Equatable {
+    static func == (lhs: CZeroingData, rhs: CZeroingData) -> Bool {
         zd_equals(lhs.ptr, rhs.ptr)
     }
 
-    public func isEqual(to data: Data) -> Bool {
+    func isEqual(to data: Data) -> Bool {
         let length = data.count
         return data.withUnsafeBytes { dataPtr in
             zd_equals_to_data(ptr, dataPtr.bytePointer, length)
@@ -118,53 +118,53 @@ extension ZeroingData: Equatable {
 
 // MARK: Copy
 
-extension ZeroingData {
-    public func copy() -> ZeroingData {
-        ZeroingData(ptr: zd_make_copy(self.ptr))
+extension CZeroingData {
+    func copy() -> CZeroingData {
+        CZeroingData(ptr: zd_make_copy(self.ptr))
     }
 
-    public func withOffset(_ offset: Int, length: Int) -> ZeroingData {
+    func withOffset(_ offset: Int, length: Int) -> CZeroingData {
         guard let slice = zd_make_slice(ptr, offset, length) else {
-            return ZeroingData()
+            return CZeroingData()
         }
-        return ZeroingData(ptr: slice)
+        return CZeroingData(ptr: slice)
     }
 
-    public func appending(_ other: ZeroingData) -> ZeroingData {
+    func appending(_ other: CZeroingData) -> CZeroingData {
         let copy = zd_make_copy(ptr)
         zd_append(copy, other.ptr)
-        return ZeroingData(ptr: copy)
+        return CZeroingData(ptr: copy)
     }
 }
 
 // MARK: Side effect
 
-extension ZeroingData {
-    public func zero() {
+extension CZeroingData {
+    func zero() {
         zd_zero(ptr)
     }
 
-    public func truncate(toSize size: Int) {
+    func truncate(toSize size: Int) {
         zd_resize(ptr, size)
     }
 
-    public func remove(untilOffset offset: Int) {
+    func remove(untilOffset offset: Int) {
         zd_remove_until(ptr, offset)
     }
 
-    public func append(_ other: ZeroingData) {
+    func append(_ other: CZeroingData) {
         zd_append(ptr, other.ptr)
     }
 }
 
 // MARK: Accessors
 
-extension ZeroingData {
-    public func networkUInt16Value(fromOffset offset: Int) -> UInt16 {
+extension CZeroingData {
+    func networkUInt16Value(fromOffset offset: Int) -> UInt16 {
         CFSwapInt16BigToHost(zd_uint16(ptr, offset))
     }
 
-    public func nullTerminatedString(fromOffset offset: Int) -> String? {
+    func nullTerminatedString(fromOffset offset: Int) -> String? {
         precondition(offset <= length)
         guard let bytes else {
             return nil
@@ -172,14 +172,14 @@ extension ZeroingData {
         return String(cString: bytes)
     }
 
-    public func toData(until: Int? = nil) -> Data {
+    func toData(until: Int? = nil) -> Data {
         if let until {
             precondition(until <= ptr.pointee.length)
         }
         return Data(bytes: ptr.pointee.bytes, count: until ?? ptr.pointee.length)
     }
 
-    public func toHex() -> String {
+    func toHex() -> String {
         guard let bytes else {
             return ""
         }

@@ -1,8 +1,8 @@
 //
-//  crypto_aead.h
+//  DataPathError.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/14/25.
+//  Created by Davide De Rosa on 6/16/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,28 +23,28 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#pragma once
+internal import _PartoutOpenVPNOpenSSL_C
 
-#include <openssl/evp.h>
-#include "crypto.h"
-#include "zeroing_data.h"
+enum DataPathError: Error {
+    case generic
 
-typedef struct {
-    crypto_t crypto;
+    case wrapperAlgorithm
 
-    const EVP_CIPHER *_Nonnull cipher;
-    size_t cipher_key_len;
-    size_t cipher_iv_len;
-    size_t tag_len;
-    size_t id_len;
+    case wrapperKeys
 
-    EVP_CIPHER_CTX *_Nonnull ctx_enc;
-    EVP_CIPHER_CTX *_Nonnull ctx_dec;
-    uint8_t *_Nonnull iv_enc;
-    uint8_t *_Nonnull iv_dec;
-} crypto_aead_t;
+    case path(dp_error_code)
 
-crypto_aead_t *_Nullable crypto_aead_create(const char *_Nonnull cipher_name,
-                                            size_t tag_len, size_t id_len,
-                                            const crypto_keys_t *_Nullable keys);
-void crypto_aead_free(crypto_aead_t *_Nonnull ctx);
+    case crypto(crypto_error_code)
+
+    init?(_ error: dp_error_t) {
+        switch error.dp_code {
+        case DataPathErrorNone:
+//            assertionFailure()
+            return nil
+        case DataPathErrorCrypto:
+            self = .crypto(error.crypto_code)
+        default:
+            self = .path(error.dp_code)
+        }
+    }
+}

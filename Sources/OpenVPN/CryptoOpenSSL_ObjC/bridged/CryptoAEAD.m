@@ -47,7 +47,8 @@
     if (self) {
         ptr = crypto_aead_create([cipherName cStringUsingEncoding:NSUTF8StringEncoding],
                                  tagLength,
-                                 idLength);
+                                 idLength,
+                                 nil);
         if (!ptr) {
             return nil;
         }

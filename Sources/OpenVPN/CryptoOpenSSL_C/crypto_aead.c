@@ -57,6 +57,7 @@ bool crypto_encrypt(void *vctx,
                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_aead_t *ctx = (crypto_aead_t *)vctx;
     assert(ctx);
+    assert(ctx->ctx_enc);
     assert(flags);
     assert(flags->ad_len >= ctx->id_len);
 
@@ -98,6 +99,7 @@ bool crypto_decrypt(void *vctx,
                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_aead_t *ctx = (crypto_aead_t *)vctx;
     assert(ctx);
+    assert(ctx->ctx_dec);
     assert(flags);
     assert(flags->ad_len >= ctx->id_len);
 
@@ -119,7 +121,8 @@ bool crypto_decrypt(void *vctx,
 
 // MARK: -
 
-crypto_aead_t *crypto_aead_create(const char *cipher_name, size_t tag_len, size_t id_len) {
+crypto_aead_t *crypto_aead_create(const char *cipher_name, size_t tag_len, size_t id_len,
+                                  const crypto_keys_t *keys) {
     assert(cipher_name);
 
     const EVP_CIPHER *cipher = EVP_get_cipherbyname(cipher_name);
@@ -151,6 +154,11 @@ crypto_aead_t *crypto_aead_create(const char *cipher_name, size_t tag_len, size_
     ctx->crypto.decrypter.configure = crypto_configure_decrypt;
     ctx->crypto.decrypter.decrypt = crypto_decrypt;
     ctx->crypto.decrypter.verify = NULL;
+
+    if (keys) {
+        crypto_configure_encrypt(ctx, keys->cipher.enc_key, keys->hmac.enc_key);
+        crypto_configure_decrypt(ctx, keys->cipher.dec_key, keys->hmac.dec_key);
+    }
 
     return ctx;
 }

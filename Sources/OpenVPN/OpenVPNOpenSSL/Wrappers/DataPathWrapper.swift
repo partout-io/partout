@@ -1,8 +1,8 @@
 //
-//  DataPathError.swift
+//  DataPathWrapper.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/16/25.
+//  Created by Davide De Rosa on 6/15/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,24 +23,33 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutOpenVPNOpenSSL_C
+import _PartoutOpenVPN
+import Foundation
 
-enum DataPathError: Error {
-    case generic
+// FIXME: ###, DataPathWrapper supersedes OSSLCryptoBox and cryptoFactory(), delete later
 
-    case path(dp_error_code)
+final class DataPathWrapper {
+    struct Parameters {
+        let cipher: OpenVPN.Cipher?
 
-    case crypto(crypto_error_code)
+        let digest: OpenVPN.Digest?
 
-    init?(_ error: dp_error_t) {
-        switch error.dp_code {
-        case DataPathErrorNone:
-//            assertionFailure()
-            return nil
-        case DataPathErrorCrypto:
-            self = .crypto(error.crypto_code)
-        default:
-            self = .path(error.dp_code)
-        }
+        let compressionFraming: OpenVPN.CompressionFraming
+
+        let peerId: UInt32?
+    }
+
+    let dataPath: DataPathTestingProtocol
+
+    init(dataPath: DataPathTestingProtocol) {
+        self.dataPath = dataPath
+    }
+
+    func encrypt(_ packets: [Data], key: UInt8) throws -> [Data] {
+        try dataPath.encrypt(packets, key: key)
+    }
+
+    func decrypt(_ packets: [Data]) throws -> (packets: [Data], keepAlive: Bool) {
+        try dataPath.decrypt(packets)
     }
 }
