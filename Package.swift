@@ -465,85 +465,100 @@ enum PartoutOpenVPN {
 
         let cryptoDependencies: [Target.Dependency]
 
-        let cryptoLegacyDependencies: [Target.Dependency]
-
-        let cryptoLegacyExclude: [String]
-
         let cryptoTestDependencies: [Target.Dependency]
 
         let cryptoTestExclude: [String]
 
+        let cryptoLegacyDependencies: [Target.Dependency]
+
+        let cryptoLegacyExclude: [String]
+
         init(for mode: CryptoMode) {
-            var mainDependencies: [Target.Dependency] = ["_PartoutOpenVPN"]
-            var mainExclude: [String] = []
-            let mainLegacyDependencies: [Target.Dependency] = ["_PartoutCryptoOpenSSL_ObjC"]
-            let mainLegacyExclude = [
+            let mainDependenciesBase: [Target.Dependency] = [
+                "_PartoutOpenVPN"
+            ]
+            let nativeDataPathDefine = "OPENVPN_DP_NATIVE"
+
+            // main legacy does not change
+            mainLegacyDependencies = [
+                "_PartoutCryptoOpenSSL_ObjC"
+            ]
+            mainLegacyExclude = [
                 "include/XOR.h",
                 "lib/COPYING",
                 "lib/Makefile",
                 "lib/README.LZO",
                 "lib/testmini.c"
             ]
-            let cryptoDependencies: [Target.Dependency] = ["openssl-apple"]
-            var cryptoLegacyDependencies = cryptoDependencies
-            let nativeDataPathDefine = "OPENVPN_DP_NATIVE"
-            let legacyTestFiles = [
-                "OSSLCryptoBoxTests.swift",
-                "OSSLTLSBoxTests.swift"
+
+            // native crypto has no dependencies beyond OpenSSL
+            cryptoDependencies = [
+                "openssl-apple"
             ]
 
             switch mode {
             case .legacy:
-                mainDependencies.append("_PartoutOpenVPNOpenSSL_ObjC")
-                mainExclude.append("Wrappers")
+                mainDependencies = mainDependenciesBase + [
+                    "_PartoutOpenVPNOpenSSL_ObjC"
+                ]
+                mainExclude = ["Wrappers"]
                 mainDefines = []
-                mainTestExclude = ["DataPath"]
-                cryptoLegacyExclude = ["bridged"]
+                mainTestExclude = ["Wrappers"]
                 cryptoTestDependencies = ["_PartoutCryptoOpenSSL_ObjC"]
                 cryptoTestExclude = ["Native"]
+
+                cryptoLegacyDependencies = cryptoDependencies
+                cryptoLegacyExclude = ["bridged"]
 
             case .bridgedCrypto:
-                mainDependencies.append("_PartoutOpenVPNOpenSSL_ObjC")
-                mainExclude.append("Wrappers")
+                mainDependencies = mainDependenciesBase + [
+                    "_PartoutOpenVPNOpenSSL_ObjC"
+                ]
+                mainExclude = ["Wrappers"]
                 mainDefines = []
-                mainTestExclude = ["DataPath"]
-                cryptoLegacyDependencies.append("_PartoutCryptoOpenSSL_C")
-                cryptoLegacyExclude = ["legacy"]
+                mainTestExclude = ["Wrappers"]
                 cryptoTestDependencies = ["_PartoutCryptoOpenSSL_ObjC"]
                 cryptoTestExclude = ["Native"]
 
+                cryptoLegacyDependencies = cryptoDependencies + [
+                    "_PartoutCryptoOpenSSL_C"
+                ]
+                cryptoLegacyExclude = ["legacy"]
+
             case .wrappedDataPath, .wrappedDataPathNative:
-                mainDependencies.append(contentsOf: [
+                mainDependencies = mainDependenciesBase + [
                     "_PartoutOpenVPNOpenSSL_C",
                     "_PartoutOpenVPNOpenSSL_ObjC"
-                ])
+                ]
+                mainExclude = []
                 if mode == .wrappedDataPathNative {
                     mainDefines = [nativeDataPathDefine]
                 } else {
                     mainDefines = []
                 }
-                mainTestExclude = legacyTestFiles
-                cryptoLegacyDependencies.append("_PartoutCryptoOpenSSL_C")
-                cryptoLegacyExclude = ["bridged"]
+                mainTestExclude = ["Legacy"]
                 cryptoTestDependencies = ["_PartoutCryptoOpenSSL_ObjC"]
                 cryptoTestExclude = ["Legacy"]
 
+                cryptoLegacyDependencies = cryptoDependencies + [
+                    "_PartoutCryptoOpenSSL_C"
+                ]
+                cryptoLegacyExclude = ["bridged"]
+
             case .native:
-                mainDependencies.append("_PartoutOpenVPNOpenSSL_C")
-                mainExclude.append("Wrappers/Legacy")
+                mainDependencies = mainDependenciesBase + [
+                    "_PartoutOpenVPNOpenSSL_C"
+                ]
+                mainExclude = ["Wrappers/Legacy"]
                 mainDefines = [nativeDataPathDefine]
-                mainTestExclude = legacyTestFiles
-                cryptoLegacyExclude = []
+                mainTestExclude = ["Legacy"]
                 cryptoTestDependencies = ["_PartoutCryptoOpenSSL_C"]
                 cryptoTestExclude = ["Legacy"]
-            }
 
-            self.mainDependencies = mainDependencies
-            self.mainExclude = mainExclude
-            self.mainLegacyDependencies = mainLegacyDependencies
-            self.mainLegacyExclude = mainLegacyExclude
-            self.cryptoDependencies = cryptoDependencies
-            self.cryptoLegacyDependencies = cryptoLegacyDependencies
+                // legacy targets not included, these don't matter
+                cryptoLegacyDependencies = []
+                cryptoLegacyExclude = []
+            }
         }
     }
 }
