@@ -434,9 +434,11 @@ enum PartoutOpenVPN {
 
         case bridgedCrypto = 1
 
-        case bridgedDataPath = 2
+        case bridgedDataPath = 2 // FIXME: ##, not implemented yet
 
-        case native = 3
+        case bridgedDataPathNative = 3
+
+        case native = 4
 
         static func fromEnvironment(_ key: String, fallback: Self) -> Self {
             guard let envModeString = ProcessInfo.processInfo.environment[key],
@@ -484,6 +486,7 @@ enum PartoutOpenVPN {
             ]
             let cryptoDependencies: [Target.Dependency] = ["openssl-apple"]
             var cryptoLegacyDependencies = cryptoDependencies
+            let nativeDataPathDefine = "OPENVPN_DP_NATIVE"
 
             switch mode {
             case .legacy:
@@ -513,13 +516,17 @@ enum PartoutOpenVPN {
                 cryptoTestDependencies = ["_PartoutCryptoOpenSSL_ObjC"]
                 cryptoTestExclude = ["Native"]
 
-            case .bridgedDataPath:
+            case .bridgedDataPath, .bridgedDataPathNative:
                 mainDependencies.append(contentsOf: [
                     "_PartoutOpenVPNOpenSSL_C",
                     "_PartoutOpenVPNOpenSSL_ObjC"
                 ])
                 mainExclude.append("Impl/Legacy")
-                mainDefines = []
+                if mode == .bridgedDataPathNative {
+                    mainDefines = [nativeDataPathDefine]
+                } else {
+                    mainDefines = []
+                }
                 mainTestExclude = ["OSSLCryptoBoxTests.swift"]
                 cryptoLegacyDependencies.append("_PartoutCryptoOpenSSL_C")
                 cryptoLegacyExclude = ["bridged"]
@@ -532,7 +539,7 @@ enum PartoutOpenVPN {
                     "Impl/Legacy",
                     "Impl/Bridged"
                 ])
-                mainDefines = ["OPENVPN_DP_NATIVE"]
+                mainDefines = [nativeDataPathDefine]
                 mainTestExclude = []
                 cryptoLegacyExclude = []
                 cryptoTestDependencies = ["_PartoutCryptoOpenSSL_C"]
