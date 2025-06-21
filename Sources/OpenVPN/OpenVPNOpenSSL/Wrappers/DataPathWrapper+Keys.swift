@@ -37,7 +37,7 @@ extension DataPathWrapper.Parameters {
     }
 
     func keys(with prf: PRF) throws -> CryptoKeys {
-        let masterData = try keysPRF(parameters: PRFParameters(
+        let masterData = try prfData(with: PRFInput(
             label: Constants.label1,
             secret: CZ(prf.authResponse.preMaster),
             clientSeed: CZ(prf.authResponse.random1),
@@ -46,7 +46,7 @@ extension DataPathWrapper.Parameters {
             serverSessionId: nil,
             size: Constants.preMasterLength
         ))
-        let keysData = try keysPRF(parameters: PRFParameters(
+        let keysData = try prfData(with: PRFInput(
             label: Constants.label2,
             secret: masterData,
             clientSeed: CZ(prf.authResponse.random2),
@@ -55,14 +55,12 @@ extension DataPathWrapper.Parameters {
             serverSessionId: prf.remoteSessionId,
             size: Constants.keysCount * Constants.keyLength
         ))
+        assert(keysData.length == Constants.keysCount * Constants.keyLength)
 
-        var keysArray = [CZeroingData]()
-        for i in 0..<Constants.keysCount {
-            let offset = i * Constants.keyLength
-            let zbuf = keysData.withOffset(offset, length: Constants.keyLength)
-            keysArray.append(zbuf)
+        let keysArray = (0..<Constants.keysCount).map {
+            let offset = $0 * Constants.keyLength
+            return keysData.withOffset(offset, length: Constants.keyLength)
         }
-
         return CryptoKeys(
             cipher: CryptoKeys.KeyPair(
                 encryptionKey: keysArray[0],
@@ -78,7 +76,7 @@ extension DataPathWrapper.Parameters {
 
 // MARK: - Helpers
 
-private struct PRFParameters {
+private struct PRFInput {
     let label: String
 
     let secret: CZeroingData
@@ -95,23 +93,23 @@ private struct PRFParameters {
 }
 
 private extension DataPathWrapper.Parameters {
-    func keysPRF(parameters: PRFParameters) throws -> CZeroingData {
-        let seed = CZ(parameters.label, nullTerminated: false)
-        seed.append(parameters.clientSeed)
-        seed.append(parameters.serverSeed)
-        if let csi = parameters.clientSessionId {
+    func prfData(with input: PRFInput) throws -> CZeroingData {
+        let seed = CZ(input.label, nullTerminated: false)
+        seed.append(input.clientSeed)
+        seed.append(input.serverSeed)
+        if let csi = input.clientSessionId {
             seed.append(CZ(csi))
         }
-        if let ssi = parameters.serverSessionId {
+        if let ssi = input.serverSessionId {
             seed.append(CZ(ssi))
         }
-        let len = parameters.secret.length / 2
-        let lenx = len + (parameters.secret.length & 1)
-        let secret1 = parameters.secret.withOffset(0, length: lenx)
-        let secret2 = parameters.secret.withOffset(len, length: lenx)
+        let len = input.secret.length / 2
+        let lenx = len + (input.secret.length & 1)
+        let secret1 = input.secret.withOffset(0, length: lenx)
+        let secret2 = input.secret.withOffset(len, length: lenx)
 
-        let hash1 = try keysHash("md5", secret1, seed, parameters.size)
-        let hash2 = try keysHash("sha1", secret2, seed, parameters.size)
+        let hash1 = try keysHash("md5", secret1, seed, input.size)
+        let hash2 = try keysHash("sha1", secret2, seed, input.size)
 
         let prf = CZ()
         for i in 0..<hash1.length {
