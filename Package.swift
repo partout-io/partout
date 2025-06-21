@@ -517,7 +517,6 @@ enum PartoutOpenVPN {
                     "_PartoutOpenVPNOpenSSL_C",
                     "_PartoutOpenVPNOpenSSL_ObjC"
                 ])
-                mainExclude.append("Impl/Legacy")
                 if mode == .wrappedDataPathNative {
                     mainDefines = [nativeDataPathDefine]
                 } else {
@@ -531,10 +530,7 @@ enum PartoutOpenVPN {
 
             case .native:
                 mainDependencies.append("_PartoutOpenVPNOpenSSL_C")
-                mainExclude.append(contentsOf: [
-                    "Impl/Legacy",
-                    "Impl/Bridged"
-                ])
+                mainExclude.append("Wrappers/Legacy")
                 mainDefines = [nativeDataPathDefine]
                 mainTestExclude = legacyTestFiles
                 cryptoLegacyExclude = []

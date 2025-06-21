@@ -697,7 +697,7 @@ private extension Negotiator {
 #if OPENVPN_DP_NATIVE
         wrapper = try .native(with: parameters, prf: prf, prng: prng)
 #else
-        wrapper = .bridged(with: parameters)
+        wrapper = .legacy(with: parameters)
 #endif
         return DataChannel(ctx, key: key, dataPath: wrapper.dataPath)
 #else
