@@ -495,10 +495,7 @@ enum PartoutOpenVPN {
             switch mode {
             case .legacy:
                 mainDependencies.append("_PartoutOpenVPNOpenSSL_ObjC")
-                mainExclude.append(contentsOf: [
-                    "Impl/Native",
-                    "Wrappers"
-                ])
+                mainExclude.append("Wrappers")
                 mainDefines = []
                 mainTestExclude = ["DataPath"]
                 cryptoLegacyExclude = ["bridged"]
@@ -507,10 +504,7 @@ enum PartoutOpenVPN {
 
             case .bridgedCrypto:
                 mainDependencies.append("_PartoutOpenVPNOpenSSL_ObjC")
-                mainExclude.append(contentsOf: [
-                    "Impl/Native",
-                    "Wrappers"
-                ])
+                mainExclude.append("Wrappers")
                 mainDefines = []
                 mainTestExclude = ["DataPath"]
                 cryptoLegacyDependencies.append("_PartoutCryptoOpenSSL_C")
