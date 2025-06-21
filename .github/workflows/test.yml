@@ -27,6 +27,9 @@ jobs:
       - name: Run tests (bridged crypto)
         run: |
           OPENVPN_CRYPTO_MODE="1" swift test
-      - name: Run tests (wrapped data path, native)
+      - name: Run tests (wrapped)
+        run: |
+          OPENVPN_CRYPTO_MODE="2" swift test
+      - name: Run tests (wrapped, native)
         run: |
           OPENVPN_CRYPTO_MODE="3" swift test

@@ -434,9 +434,9 @@ enum PartoutOpenVPN {
 
         case bridgedCrypto = 1
 
-        case wrappedDataPath = 2
+        case wrapped = 2
 
-        case wrappedDataPathNative = 3
+        case wrappedNative = 3
 
         case native = 4
 
@@ -477,7 +477,7 @@ enum PartoutOpenVPN {
             let mainDependenciesBase: [Target.Dependency] = [
                 "_PartoutOpenVPN"
             ]
-            let nativeDataPathDefine = "OPENVPN_DP_WRAPPED_NATIVE"
+            let nativeDataPathDefine = "OPENVPN_WRAPPED_NATIVE"
 
             // main legacy does not change
             mainLegacyDependencies = [
@@ -525,14 +525,14 @@ enum PartoutOpenVPN {
                 ]
                 cryptoLegacyExclude = ["legacy"]
 
-            case .wrappedDataPath, .wrappedDataPathNative:
+            case .wrapped, .wrappedNative:
                 mainDependencies = mainDependenciesBase + [
                     "_PartoutOpenVPNOpenSSL_C",
                     "_PartoutOpenVPNOpenSSL_ObjC"
                 ]
                 mainExclude = []
-                let baseDefines = ["OPENVPN_DP_WRAPPED"]
-                if mode == .wrappedDataPathNative {
+                let baseDefines = ["OPENVPN_WRAPPED"]
+                if mode == .wrappedNative {
                     mainDefines = baseDefines + [nativeDataPathDefine]
                 } else {
                     mainDefines = baseDefines

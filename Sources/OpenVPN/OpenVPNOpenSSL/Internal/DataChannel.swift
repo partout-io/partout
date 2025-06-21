@@ -26,7 +26,7 @@
 import Foundation
 import PartoutCore
 
-#if OPENVPN_DP_WRAPPED
+#if OPENVPN_WRAPPED
 
 final class DataChannel {
     private let ctx: PartoutLoggerContext

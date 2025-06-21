@@ -681,7 +681,7 @@ private extension Negotiator {
 //        pp_log(ctx, .openvpn, .info, "\tsessionId: \(sessionId.toHex())")
 //        pp_log(ctx, .openvpn, .info, "\tremoteSessionId: \(remoteSessionId.toHex())")
 
-#if OPENVPN_DP_WRAPPED
+#if OPENVPN_WRAPPED
 
         // MARK: DataPathWrapper (Swift)
 
@@ -698,7 +698,7 @@ private extension Negotiator {
         )
 
         let wrapper: DataPathWrapper
-#if OPENVPN_DP_WRAPPED_NATIVE
+#if OPENVPN_WRAPPED_NATIVE
         // Swift -> C
         wrapper = try .native(with: parameters, prf: prf, prng: prng)
 #else
