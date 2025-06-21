@@ -496,7 +496,6 @@ enum PartoutOpenVPN {
             case .legacy:
                 mainDependencies.append("_PartoutOpenVPNOpenSSL_ObjC")
                 mainExclude.append(contentsOf: [
-                    "Impl/Bridged",
                     "Impl/Native",
                     "Wrappers"
                 ])
@@ -509,7 +508,6 @@ enum PartoutOpenVPN {
             case .bridgedCrypto:
                 mainDependencies.append("_PartoutOpenVPNOpenSSL_ObjC")
                 mainExclude.append(contentsOf: [
-                    "Impl/Bridged",
                     "Impl/Native",
                     "Wrappers"
                 ])
