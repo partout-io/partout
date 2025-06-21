@@ -23,18 +23,16 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(_PartoutOpenVPNOpenSSL_ObjC)
-internal import _PartoutOpenVPNOpenSSL_ObjC
-#endif
 import Foundation
 import PartoutCore
+
+#if OPENVPN_DP_WRAPPED
 
 final class DataChannel {
     private let ctx: PartoutLoggerContext
 
     let key: UInt8
 
-#if canImport(_PartoutOpenVPNOpenSSL_C)
     private let dataPath: DataPathProtocol
 
     init(_ ctx: PartoutLoggerContext, key: UInt8, dataPath: DataPathProtocol) {
@@ -54,7 +52,17 @@ final class DataChannel {
         }
         return result.packets
     }
+}
+
 #else
+
+internal import _PartoutOpenVPNOpenSSL_ObjC
+
+final class DataChannel {
+    private let ctx: PartoutLoggerContext
+
+    let key: UInt8
+
     private let dataPath: DataPath
 
     init(_ ctx: PartoutLoggerContext, key: UInt8, dataPath: DataPath) {
@@ -75,5 +83,6 @@ final class DataChannel {
         }
         return decrypted
     }
-#endif
 }
+
+#endif

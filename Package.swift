@@ -477,7 +477,7 @@ enum PartoutOpenVPN {
             let mainDependenciesBase: [Target.Dependency] = [
                 "_PartoutOpenVPN"
             ]
-            let nativeDataPathDefine = "OPENVPN_DP_NATIVE"
+            let nativeDataPathDefine = "OPENVPN_DP_WRAPPED_NATIVE"
 
             // main legacy does not change
             mainLegacyDependencies = [
@@ -531,10 +531,11 @@ enum PartoutOpenVPN {
                     "_PartoutOpenVPNOpenSSL_ObjC"
                 ]
                 mainExclude = []
+                let baseDefines = ["OPENVPN_DP_WRAPPED"]
                 if mode == .wrappedDataPathNative {
-                    mainDefines = [nativeDataPathDefine]
+                    mainDefines = baseDefines + [nativeDataPathDefine]
                 } else {
-                    mainDefines = []
+                    mainDefines = baseDefines
                 }
                 mainTestExclude = ["Legacy"]
                 cryptoTestDependencies = ["_PartoutCryptoOpenSSL_ObjC"]

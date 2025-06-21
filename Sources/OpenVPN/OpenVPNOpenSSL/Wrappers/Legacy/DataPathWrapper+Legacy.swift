@@ -23,8 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(_PartoutOpenVPNOpenSSL_C)
-
 import _PartoutOpenVPN
 internal import _PartoutOpenVPNOpenSSL_ObjC
 import PartoutCore
@@ -154,5 +152,3 @@ extension DataPath: DataPathTestingProtocol {
         fatalError("FIXME: ###")
     }
 }
-
-#endif
