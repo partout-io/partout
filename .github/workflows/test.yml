@@ -19,7 +19,7 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Ensure remote Core binary
         run: |
-          default_env="environment = .remoteBinary"
+          default_env="let environment: Environment = .remoteBinary"
           grep "^$default_env$" Package.swift
       - name: Run tests (legacy)
         run: |
