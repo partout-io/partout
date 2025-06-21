@@ -47,7 +47,7 @@ static const NSInteger PacketStreamHeaderLength = sizeof(uint16_t);
         }
         NSData *packet = [stream subdataWithRange:NSMakeRange(start, packlen)];
         uint8_t* packetBytes = (uint8_t*) packet.bytes;
-        xor_memcpy(packetBytes, packet, xorMethod, xorMask, false);
+        xor_memcpy_legacy(packetBytes, packet, xorMethod, xorMask, false);
         [parsed addObject:packet];
         ni = end;
     }
@@ -66,8 +66,8 @@ static const NSInteger PacketStreamHeaderLength = sizeof(uint16_t);
     uint8_t *ptr = raw.mutableBytes;
     *(uint16_t *)ptr = CFSwapInt16HostToBig(packet.length);
     ptr += PacketStreamHeaderLength;
-    xor_memcpy(ptr, packet, xorMethod, xorMask, true);
-    
+    xor_memcpy_legacy(ptr, packet, xorMethod, xorMask, true);
+
     return raw;
 }
 
@@ -85,7 +85,7 @@ static const NSInteger PacketStreamHeaderLength = sizeof(uint16_t);
     for (NSData *packet in packets) {
         *(uint16_t *)ptr = CFSwapInt16HostToBig(packet.length);
         ptr += PacketStreamHeaderLength;
-        xor_memcpy(ptr, packet, xorMethod, xorMask, true);
+        xor_memcpy_legacy(ptr, packet, xorMethod, xorMask, true);
         ptr += packet.length;
     }
     return raw;
