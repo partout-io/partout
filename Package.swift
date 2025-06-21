@@ -408,6 +408,7 @@ if areas.contains(.openvpn) {
             name: "_PartoutOpenVPNOpenSSL_C",
             dependencies: ["_PartoutCryptoOpenSSL_C"],
             path: "Sources/OpenVPN/OpenVPNOpenSSL_C",
+            exclude: ["include/xor.h"],
             cSettings: cSettings
         ),
         .testTarget(
@@ -504,6 +505,7 @@ if areas.contains(.openvpn) {
             }(),
             path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
             exclude: [
+                "include/XOR.h",
                 "lib/COPYING",
                 "lib/Makefile",
                 "lib/README.LZO",
