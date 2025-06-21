@@ -4,6 +4,32 @@
 import Foundation
 import PackageDescription
 
+// MARK: Tuning
+
+// action-release-binary-package (PartoutCore)
+let binaryFilename = "PartoutCore.xcframework.zip"
+let version = "0.99.130"
+let checksum = "11afaadc343e0646be9d50ad7b2d6069ecd78105cb297d5daa036eb1207e1022"
+
+// to download the core soruce
+let coreSHA1 = "bfac7b7f2831fa0b030e5972864e93754d825c74"
+
+// deployment environment
+let environment: Environment = .remoteBinary
+
+// implies included targets (exclude docs until ready)
+let areas = Set(Area.allCases)
+    .subtracting([.documentation])
+
+// the global settings for C targets
+let cSettings: [CSetting] = [
+    .unsafeFlags([
+        "-Wall", "-Wextra"//, "-Werror"
+    ])
+]
+
+// MARK: - Structures
+
 enum Environment {
     case remoteBinary
 
@@ -46,29 +72,8 @@ enum OS {
     }
 }
 
-let environment: Environment
-environment = .remoteBinary
-// environment = .remoteSource
-// environment = .localBinary
-// environment = .localSource
-
-let areas = Set(Area.allCases)
-    .subtracting([.documentation])
-
-// action-release-binary-package (PartoutCore)
-let sha1 = "bfac7b7f2831fa0b030e5972864e93754d825c74"
-let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.130"
-let checksum = "11afaadc343e0646be9d50ad7b2d6069ecd78105cb297d5daa036eb1207e1022"
-
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS]
 let nonApplePlatforms: [Platform] = [.android, .linux, .windows]
-
-let cSettings: [CSetting] = [
-    .unsafeFlags([
-        "-Wall", "-Wextra"//, "-Werror"
-    ])
-]
 
 // MARK: - Products
 
@@ -142,7 +147,7 @@ case .remoteBinary:
     ))
 case .remoteSource:
     package.dependencies.append(
-        .package(url: "git@github.com:passepartoutvpn/partout-core.git", revision: sha1)
+        .package(url: "git@github.com:passepartoutvpn/partout-core.git", revision: coreSHA1)
     )
     package.targets.append(.target(
         name: "PartoutCoreWrapper",
