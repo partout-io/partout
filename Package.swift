@@ -434,9 +434,9 @@ enum PartoutOpenVPN {
 
         case bridgedCrypto = 1
 
-        case bridgedDataPath = 2 // FIXME: ##, not implemented yet
+        case wrappedDataPath = 2 // FIXME: ##, not implemented yet
 
-        case bridgedDataPathNative = 3
+        case wrappedDataPathNative = 3
 
         case native = 4
 
@@ -520,13 +520,13 @@ enum PartoutOpenVPN {
                 cryptoTestDependencies = ["_PartoutCryptoOpenSSL_ObjC"]
                 cryptoTestExclude = ["Native"]
 
-            case .bridgedDataPath, .bridgedDataPathNative:
+            case .wrappedDataPath, .wrappedDataPathNative:
                 mainDependencies.append(contentsOf: [
                     "_PartoutOpenVPNOpenSSL_C",
                     "_PartoutOpenVPNOpenSSL_ObjC"
                 ])
                 mainExclude.append("Impl/Legacy")
-                if mode == .bridgedDataPathNative {
+                if mode == .wrappedDataPathNative {
                     mainDefines = [nativeDataPathDefine]
                 } else {
                     mainDefines = []
