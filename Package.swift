@@ -487,6 +487,10 @@ enum PartoutOpenVPN {
             let cryptoDependencies: [Target.Dependency] = ["openssl-apple"]
             var cryptoLegacyDependencies = cryptoDependencies
             let nativeDataPathDefine = "OPENVPN_DP_NATIVE"
+            let legacyTestFiles = [
+                "OSSLCryptoBoxTests.swift",
+                "OSSLTLSBoxTests.swift"
+            ]
 
             switch mode {
             case .legacy:
@@ -527,7 +531,7 @@ enum PartoutOpenVPN {
                 } else {
                     mainDefines = []
                 }
-                mainTestExclude = ["OSSLCryptoBoxTests.swift"]
+                mainTestExclude = legacyTestFiles
                 cryptoLegacyDependencies.append("_PartoutCryptoOpenSSL_C")
                 cryptoLegacyExclude = ["bridged"]
                 cryptoTestDependencies = ["_PartoutCryptoOpenSSL_ObjC"]
@@ -540,7 +544,7 @@ enum PartoutOpenVPN {
                     "Impl/Bridged"
                 ])
                 mainDefines = [nativeDataPathDefine]
-                mainTestExclude = []
+                mainTestExclude = legacyTestFiles
                 cryptoLegacyExclude = []
                 cryptoTestDependencies = ["_PartoutCryptoOpenSSL_C"]
                 cryptoTestExclude = ["Legacy"]
