@@ -36,6 +36,7 @@ void reverse(uint8_t *dst, const uint8_t *src, size_t len) {
 }
 
 size_t mock_capacity(const void *vctx, size_t len) {
+    (void)vctx;
     return 10 * len; // be ridiculously safe
 }
 
@@ -45,6 +46,9 @@ bool mock_encrypt(void *vctx,
                   uint8_t *out, size_t *out_len,
                   const uint8_t *in, size_t in_len,
                   const crypto_flags_t *flags, crypto_error_code *error) {
+    (void)vctx;
+    (void)flags;
+    (void)error;
     DP_LOG("crypto_mock_encrypt");
     out[0] = 0xaa;
     out[1] = 0xbb;
@@ -61,6 +65,9 @@ bool mock_decrypt(void *vctx,
                   uint8_t *out, size_t *out_len,
                   const uint8_t *in, size_t in_len,
                   const crypto_flags_t *flags, crypto_error_code *error) {
+    (void)vctx;
+    (void)flags;
+    (void)error;
     DP_LOG("crypto_mock_decrypt");
     *out_len = in_len - 4;
     assert(in[0] == 0xaa);
@@ -73,6 +80,10 @@ bool mock_decrypt(void *vctx,
 
 static
 bool mock_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_code *error) {
+    (void)vctx;
+    (void)in;
+    (void)in_len;
+    (void)error;
     DP_LOG("crypto_mock_verify");
     return true;
 }

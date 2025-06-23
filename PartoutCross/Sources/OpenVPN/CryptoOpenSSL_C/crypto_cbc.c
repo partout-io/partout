@@ -123,6 +123,7 @@ bool crypto_decrypt(void *vctx,
                     uint8_t *out, size_t *out_len,
                     const uint8_t *in, size_t in_len,
                     const crypto_flags_t *flags, crypto_error_code *error) {
+    (void)flags;
     crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
     assert(!ctx->cipher || ctx->ctx_dec);
