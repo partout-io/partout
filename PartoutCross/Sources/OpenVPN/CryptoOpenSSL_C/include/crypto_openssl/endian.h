@@ -25,6 +25,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 #ifdef __APPLE__
 
 #include <CoreFoundation/CoreFoundation.h>
