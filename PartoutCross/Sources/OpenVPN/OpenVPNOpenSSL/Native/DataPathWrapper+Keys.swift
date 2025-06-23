@@ -23,6 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutCryptoOpenSSL_Cross
 import _PartoutOpenVPN
 internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
@@ -125,37 +126,12 @@ private extension DataPathWrapper.Parameters {
 
     func keysHash(_ digestName: String, _ secret: CZeroingData, _ seed: CZeroingData, _ size: Int) throws -> CZeroingData {
         let out = CZ()
-        let buffer = key_hmac_buf()
-        var chain = try hmac(buffer, digestName, secret, seed)
+        let buffer = CZeroingData.forHMAC()
+        var chain = try buffer.hmac(with: digestName, secret: secret, data: seed)
         while out.length < size {
-            out.append(try hmac(buffer, digestName, secret, chain.appending(seed)))
-            chain = try hmac(buffer, digestName, secret, chain)
+            out.append(try buffer.hmac(with: digestName, secret: secret, data: chain.appending(seed)))
+            chain = try buffer.hmac(with: digestName, secret: secret, data: chain)
         }
-        zd_free(buffer)
         return out.withOffset(0, length: size)
-    }
-
-    func hmac(
-        _ buf: UnsafeMutablePointer<zeroing_data_t>,
-        _ digestName: String,
-        _ secret: CZeroingData,
-        _ data: CZeroingData
-    ) throws -> CZeroingData {
-        var ctx = digestName.withCString { cDigest in
-            key_hmac_ctx(
-                dst: buf,
-                digest_name: cDigest,
-                secret: secret.ptr,
-                data: data.ptr
-            )
-        }
-        let hmacLength = key_hmac(&ctx);
-        guard hmacLength > 0 else {
-            throw DataPathError.wrapperKeys
-        }
-        return CZeroingData(
-            bytes: buf.pointee.bytes,
-            length: hmacLength
-        )
     }
 }

@@ -23,8 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutCryptoOpenSSL_Cross
 import _PartoutOpenVPN
 internal import _PartoutOpenVPNOpenSSL_C
+import Foundation
 import PartoutCore
 
 private let PRNGSeedLength = 64
@@ -44,7 +46,7 @@ extension DataPathWrapper {
     }
 
     static func native(with parameters: Parameters, prf: Parameters.PRF, seed: CZeroingData) throws -> DataPathWrapper {
-        key_init_seed(seed.ptr)
+        seed.useToInitializeKeys()
         return try .native(with: parameters, keys: parameters.keys(with: prf))
     }
 

@@ -38,5 +38,6 @@ typedef struct {
     const zeroing_data_t *_Nonnull data;
 } key_hmac_ctx;
 
-zeroing_data_t *_Nonnull key_hmac_buf();
+#define key_hmac_buf_len    (size_t)100
+
 size_t key_hmac(key_hmac_ctx *_Nonnull ctx);

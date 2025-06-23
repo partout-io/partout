@@ -23,12 +23,11 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include <assert.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/rand.h>
-#include "keys.h"
-
-#define KeyHMACMaxLength    100
+#include "crypto_openssl/keys.h"
 
 bool key_init_seed(const zeroing_data_t *seed) {
     unsigned char x[1];
@@ -39,12 +38,8 @@ bool key_init_seed(const zeroing_data_t *seed) {
     return true;
 }
 
-zeroing_data_t *key_hmac_buf() {
-    return zd_create(KeyHMACMaxLength);
-}
-
 size_t key_hmac(key_hmac_ctx *_Nonnull ctx) {
-    assert(ctx->dst->length >= KeyHMACMaxLength);
+    assert(ctx->dst->length >= key_hmac_buf_len);
 
     const EVP_MD *md = EVP_get_digestbyname(ctx->digest_name);
     unsigned int dst_len = 0;
