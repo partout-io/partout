@@ -117,7 +117,7 @@ size_t packet_header_v2_set(uint8_t *_Nonnull dst,
                             uint8_t src_key,
                             uint32_t src_peer_id) {
 
-    *(uint32_t *)dst = ((PacketCodeDataV2 << 3) | (src_key & 0b111)) | htonl(peer_id_masked(src_peer_id));
+    *(uint32_t *)dst = ((PacketCodeDataV2 << 3) | (src_key & 0b111)) | endian_htonl(peer_id_masked(src_peer_id));
     return PacketOpcodeLength + PacketPeerIdLength;
 }
 

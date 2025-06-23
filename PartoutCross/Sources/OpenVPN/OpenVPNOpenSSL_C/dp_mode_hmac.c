@@ -40,7 +40,7 @@ size_t dp_assemble(void *vmode) {
     assert(ctx->dst->length >= dst_capacity);
 
     uint8_t *dst = ctx->dst->bytes;
-    *(uint32_t *)dst = htonl(ctx->packet_id);
+    *(uint32_t *)dst = endian_htonl(ctx->packet_id);
     dst += sizeof(uint32_t);
     size_t dst_len = (size_t)(dst - ctx->dst->bytes + ctx->src_len);
     if (!mode->enc.framing_assemble) {
