@@ -1,8 +1,8 @@
 //
-//  DataChannel.swift
+//  ZeroingData+Extensions.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 5/2/24.
+//  Created by Davide De Rosa on 1/14/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,33 +23,17 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutOpenVPNOpenSSL_ObjC
-import Foundation
+internal import _PartoutCryptoOpenSSL_ObjC
 import PartoutCore
 
-final class DataChannel {
-    private let ctx: PartoutLoggerContext
-
-    let key: UInt8
-
-    private let dataPath: DataPath
-
-    init(_ ctx: PartoutLoggerContext, key: UInt8, dataPath: DataPath) {
-        self.ctx = ctx
-        self.key = key
-        self.dataPath = dataPath
+extension SecureData {
+    var zData: ZeroingData {
+        Z(toData())
     }
+}
 
-    func encrypt(packets: [Data]) throws -> [Data]? {
-        try dataPath.encryptPackets(packets, key: key)
-    }
-
-    func decrypt(packets: [Data]) throws -> [Data]? {
-        var keepAlive = false
-        let decrypted = try dataPath.decryptPackets(packets, keepAlive: &keepAlive)
-        if keepAlive {
-            pp_log(ctx, .openvpn, .debug, "Data: Received ping, do nothing")
-        }
-        return decrypted
+extension ZeroingData: @retroactive SensitiveDebugStringConvertible {
+    func debugDescription(withSensitiveData: Bool) -> String {
+        withSensitiveData ? "[\(length) bytes, \(toHex())]" : "[\(length) bytes]"
     }
 }

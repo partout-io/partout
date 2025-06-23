@@ -681,36 +681,6 @@ private extension Negotiator {
 //        pp_log(ctx, .openvpn, .info, "\tsessionId: \(sessionId.toHex())")
 //        pp_log(ctx, .openvpn, .info, "\tremoteSessionId: \(remoteSessionId.toHex())")
 
-#if OPENVPN_WRAPPED
-
-        // MARK: DataPathWrapper (Swift)
-
-        let parameters = DataPathWrapper.Parameters(
-            cipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
-            digest: options.configuration.fallbackDigest,
-            compressionFraming: history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming,
-            peerId: history.pushReply.options.peerId
-        )
-        let prf = DataPathWrapper.Parameters.PRF(
-            authResponse: authResponse,
-            sessionId: sessionId,
-            remoteSessionId: remoteSessionId
-        )
-
-        let wrapper: DataPathWrapper
-#if OPENVPN_WRAPPED_NATIVE
-        // Swift -> C
-        wrapper = try .native(with: parameters, prf: prf, prng: prng)
-#else
-        // Swift -> ObjC
-        wrapper = try .legacy(with: parameters, prf: prf, prng: prng)
-#endif
-        return DataChannel(ctx, key: key, dataPath: wrapper.dataPath)
-
-#else
-
-        // MARK: DataPath (ObjC)
-
         let cryptoBox = cryptoFactory()
         try cryptoBox.configure(
             withCipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
@@ -732,8 +702,6 @@ private extension Negotiator {
             usesReplayProtection: Constants.usesReplayProtection
         )
         return DataChannel(ctx, key: key, dataPath: dataPath)
-
-#endif
     }
 }
 

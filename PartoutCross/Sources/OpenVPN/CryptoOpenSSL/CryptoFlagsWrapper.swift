@@ -1,8 +1,8 @@
 //
-//  DataChannel.swift
+//  CryptoFlagsWrapper.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 5/2/24.
+//  Created by Davide De Rosa on 6/16/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,33 +23,30 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
-import PartoutCore
 
-final class DataChannel {
-    private let ctx: PartoutLoggerContext
+struct CryptoFlagsWrapper {
+    let iv: UnsafePointer<UInt8>?
 
-    let key: UInt8
+    let ivLength: Int
 
-    private let dataPath: DataPath
+    let ad: UnsafePointer<UInt8>?
 
-    init(_ ctx: PartoutLoggerContext, key: UInt8, dataPath: DataPath) {
-        self.ctx = ctx
-        self.key = key
-        self.dataPath = dataPath
-    }
+    let adLength: Int
 
-    func encrypt(packets: [Data]) throws -> [Data]? {
-        try dataPath.encryptPackets(packets, key: key)
-    }
+    let forTesting: Bool
 
-    func decrypt(packets: [Data]) throws -> [Data]? {
-        var keepAlive = false
-        let decrypted = try dataPath.decryptPackets(packets, keepAlive: &keepAlive)
-        if keepAlive {
-            pp_log(ctx, .openvpn, .debug, "Data: Received ping, do nothing")
-        }
-        return decrypted
+    init(
+        iv: UnsafePointer<UInt8>? = nil,
+        ivLength: Int = .zero,
+        ad: UnsafePointer<UInt8>? = nil,
+        adLength: Int = .zero,
+        forTesting: Bool
+    ) {
+        self.iv = iv
+        self.ivLength = ivLength
+        self.ad = ad
+        self.adLength = adLength
+        self.forTesting = forTesting
     }
 }

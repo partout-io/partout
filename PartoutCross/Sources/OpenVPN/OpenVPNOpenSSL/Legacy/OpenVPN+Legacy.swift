@@ -1,8 +1,8 @@
 //
-//  DataChannel.swift
+//  OpenVPN+Legacy.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 5/2/24.
+//  Created by Davide De Rosa on 6/20/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,33 +23,28 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import _PartoutOpenVPN
 internal import _PartoutOpenVPNOpenSSL_ObjC
-import Foundation
-import PartoutCore
 
-final class DataChannel {
-    private let ctx: PartoutLoggerContext
-
-    let key: UInt8
-
-    private let dataPath: DataPath
-
-    init(_ ctx: PartoutLoggerContext, key: UInt8, dataPath: DataPath) {
-        self.ctx = ctx
-        self.key = key
-        self.dataPath = dataPath
-    }
-
-    func encrypt(packets: [Data]) throws -> [Data]? {
-        try dataPath.encryptPackets(packets, key: key)
-    }
-
-    func decrypt(packets: [Data]) throws -> [Data]? {
-        var keepAlive = false
-        let decrypted = try dataPath.decryptPackets(packets, keepAlive: &keepAlive)
-        if keepAlive {
-            pp_log(ctx, .openvpn, .debug, "Data: Received ping, do nothing")
+extension OpenVPN.CompressionAlgorithm {
+    var native: CompressionAlgorithm {
+        switch self {
+        case .disabled: .disabled
+        case .LZO: .LZO
+        case .other: .other
+        @unknown default: .disabled
         }
-        return decrypted
+    }
+}
+
+extension OpenVPN.CompressionFraming {
+    var native: CompressionFraming {
+        switch self {
+        case .disabled: .disabled
+        case .compLZO: .compLZO
+        case .compress: .compress
+        case .compressV2: .compressV2
+        @unknown default: .disabled
+        }
     }
 }

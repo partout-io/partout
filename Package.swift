@@ -21,12 +21,6 @@ let environment: Environment = .remoteBinary
 let areas = Set(Area.allCases)
     .subtracting([.documentation])
 
-// the OpenVPN crypto mode (ObjC -> C)
-let openVPNCryptoMode: PartoutOpenVPN.CryptoMode = .fromEnvironment(
-    "OPENVPN_CRYPTO_MODE",
-    fallback: .legacy
-)
-
 // the global settings for C targets
 let cSettings: [CSetting] = [
     .unsafeFlags([
@@ -324,25 +318,23 @@ if areas.contains(.openvpn) {
         .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
     ])
 
-    let cfg = PartoutOpenVPN.PackageConfiguration(for: openVPNCryptoMode)
-
     package.products.append(contentsOf: [
         .library(
             name: "PartoutOpenVPN",
             targets: ["PartoutOpenVPN"]
         ),
         .library(
-            name: "_PartoutCryptoOpenSSL_C",
-            targets: ["_PartoutCryptoOpenSSL_C"]
+            name: "_PartoutOpenVPN",
+            targets: ["_PartoutOpenVPN"]
         ),
         .library(
             name: "_PartoutOpenVPNOpenSSL",
             targets: ["_PartoutOpenVPNOpenSSL"]
         ),
         .library(
-            name: "_PartoutOpenVPNOpenSSL_C",
-            targets: ["_PartoutOpenVPNOpenSSL_C"]
-        ),
+            name: "_PartoutOpenVPNOpenSSL_ObjC",
+            targets: ["_PartoutOpenVPNOpenSSL_ObjC"]
+        )
     ])
 
     package.targets.append(contentsOf: [
@@ -352,37 +344,38 @@ if areas.contains(.openvpn) {
             path: "Sources/OpenVPN/Wrapper"
         ),
         .target(
-            name: "_PartoutCryptoOpenSSL_C",
-            dependencies: cfg.cryptoDependencies,
-            path: "Sources/OpenVPN/CryptoOpenSSL_C",
-            cSettings: cSettings
-        ),
-        .target(
             name: "_PartoutOpenVPN",
             dependencies: ["PartoutCoreWrapper"],
             path: "Sources/OpenVPN/Base"
         ),
         .target(
-            name: "_PartoutOpenVPNOpenSSL",
-            dependencies: cfg.mainDependencies,
-            path: "Sources/OpenVPN/OpenVPNOpenSSL",
-            exclude: cfg.mainExclude,
-            swiftSettings: cfg.mainDefines.map {
-                .define($0)
-            }
+            name: "_PartoutCryptoOpenSSL_ObjC",
+            dependencies: ["openssl-apple"],
+            path: "Sources/OpenVPN/CryptoOpenSSL_ObjC"
         ),
         .target(
-            name: "_PartoutOpenVPNOpenSSL_C",
-            dependencies: ["_PartoutCryptoOpenSSL_C"],
-            path: "Sources/OpenVPN/OpenVPNOpenSSL_C",
-            exclude: ["include/xor.h"],
-            cSettings: cSettings
+            name: "_PartoutOpenVPNOpenSSL",
+            dependencies: [
+                "_PartoutOpenVPN",
+                "_PartoutOpenVPNOpenSSL_ObjC"
+            ],
+            path: "Sources/OpenVPN/OpenVPNOpenSSL"
+        ),
+        .target(
+            name: "_PartoutOpenVPNOpenSSL_ObjC",
+            dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
+            path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
+            exclude: [
+                "lib/COPYING",
+                "lib/Makefile",
+                "lib/README.LZO",
+                "lib/testmini.c"
+            ]
         ),
         .testTarget(
             name: "_PartoutCryptoOpenSSLTests",
-            dependencies: cfg.cryptoTestDependencies,
-            path: "Tests/OpenVPN/CryptoOpenSSL",
-            exclude: cfg.cryptoTestExclude
+            dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
+            path: "Tests/OpenVPN/CryptoOpenSSL"
         ),
         .testTarget(
             name: "_PartoutOpenVPNTests",
@@ -393,175 +386,11 @@ if areas.contains(.openvpn) {
             name: "_PartoutOpenVPNOpenSSLTests",
             dependencies: ["_PartoutOpenVPNOpenSSL"],
             path: "Tests/OpenVPN/OpenVPNOpenSSL",
-            exclude: cfg.mainTestExclude,
             resources: [
                 .process("Resources")
             ]
         )
     ])
-
-    // legacy ObjC crypto
-    if openVPNCryptoMode != .native {
-        package.products.append(.library(
-            name: "_PartoutCryptoOpenSSL_ObjC",
-            targets: ["_PartoutCryptoOpenSSL_ObjC"]
-        ))
-        package.targets.append(.target(
-            name: "_PartoutCryptoOpenSSL_ObjC",
-            dependencies: cfg.cryptoLegacyDependencies,
-            path: "Sources/OpenVPN/CryptoOpenSSL_ObjC",
-            exclude: cfg.cryptoLegacyExclude
-        ))
-
-        package.products.append(.library(
-            name: "_PartoutOpenVPNOpenSSL_ObjC",
-            targets: ["_PartoutOpenVPNOpenSSL_ObjC"]
-        ))
-        package.targets.append(.target(
-            name: "_PartoutOpenVPNOpenSSL_ObjC",
-            dependencies: cfg.mainLegacyDependencies,
-            path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
-            exclude: cfg.mainLegacyExclude
-        ))
-    }
-}
-
-// MARK: Structures
-
-enum PartoutOpenVPN {
-    enum CryptoMode: Int {
-        case legacy = 0
-
-        case bridgedCrypto = 1
-
-        case wrapped = 2
-
-        case wrappedNative = 3
-
-        case native = 4
-
-        static func fromEnvironment(_ key: String, fallback: Self) -> Self {
-            guard let envModeString = ProcessInfo.processInfo.environment[key],
-                  let envModeInt = Int(envModeString),
-                  let envMode = CryptoMode(rawValue: envModeInt) else {
-                return fallback
-            }
-            return envMode
-        }
-    }
-
-    struct PackageConfiguration {
-        let mainDependencies: [Target.Dependency]
-
-        let mainExclude: [String]
-
-        let mainDefines: [String]
-
-        let mainTestExclude: [String]
-
-        let mainLegacyDependencies: [Target.Dependency]
-
-        let mainLegacyExclude: [String]
-
-        let cryptoDependencies: [Target.Dependency]
-
-        let cryptoTestDependencies: [Target.Dependency]
-
-        let cryptoTestExclude: [String]
-
-        let cryptoLegacyDependencies: [Target.Dependency]
-
-        let cryptoLegacyExclude: [String]
-
-        init(for mode: CryptoMode) {
-            let mainDependenciesBase: [Target.Dependency] = [
-                "_PartoutOpenVPN"
-            ]
-            let nativeDataPathDefine = "OPENVPN_WRAPPED_NATIVE"
-
-            // main legacy does not change
-            mainLegacyDependencies = [
-                "_PartoutCryptoOpenSSL_ObjC"
-            ]
-            mainLegacyExclude = [
-                "include/XOR.h",
-                "lib/COPYING",
-                "lib/Makefile",
-                "lib/README.LZO",
-                "lib/testmini.c"
-            ]
-
-            // native crypto has no dependencies beyond OpenSSL
-            cryptoDependencies = [
-                "openssl-apple"
-            ]
-
-            switch mode {
-            case .legacy:
-                mainDependencies = mainDependenciesBase + [
-                    "_PartoutOpenVPNOpenSSL_ObjC"
-                ]
-                mainExclude = ["Wrappers"]
-                mainDefines = []
-                mainTestExclude = ["Wrappers"]
-                cryptoTestDependencies = ["_PartoutCryptoOpenSSL_ObjC"]
-                cryptoTestExclude = ["Native"]
-
-                cryptoLegacyDependencies = cryptoDependencies
-                cryptoLegacyExclude = ["bridged"]
-
-            case .bridgedCrypto:
-                mainDependencies = mainDependenciesBase + [
-                    "_PartoutOpenVPNOpenSSL_ObjC"
-                ]
-                mainExclude = ["Wrappers"]
-                mainDefines = []
-                mainTestExclude = ["Wrappers"]
-                cryptoTestDependencies = ["_PartoutCryptoOpenSSL_ObjC"]
-                cryptoTestExclude = ["Native"]
-
-                cryptoLegacyDependencies = cryptoDependencies + [
-                    "_PartoutCryptoOpenSSL_C"
-                ]
-                cryptoLegacyExclude = ["legacy"]
-
-            case .wrapped, .wrappedNative:
-                mainDependencies = mainDependenciesBase + [
-                    "_PartoutOpenVPNOpenSSL_C",
-                    "_PartoutOpenVPNOpenSSL_ObjC"
-                ]
-                mainExclude = []
-                let baseDefines = ["OPENVPN_WRAPPED"]
-                if mode == .wrappedNative {
-                    mainDefines = baseDefines + [nativeDataPathDefine]
-                } else {
-                    mainDefines = baseDefines
-                }
-                mainTestExclude = ["Legacy"]
-                cryptoTestDependencies = ["_PartoutCryptoOpenSSL_ObjC"]
-                cryptoTestExclude = ["Legacy"]
-
-                cryptoLegacyDependencies = cryptoDependencies + [
-                    "_PartoutCryptoOpenSSL_C"
-                ]
-                cryptoLegacyExclude = ["bridged"]
-
-            case .native:
-                mainDependencies = mainDependenciesBase + [
-                    "_PartoutOpenVPNOpenSSL_C"
-                ]
-                mainExclude = ["Wrappers/Legacy"]
-                mainDefines = [nativeDataPathDefine]
-                mainTestExclude = ["Legacy"]
-                cryptoTestDependencies = ["_PartoutCryptoOpenSSL_C"]
-                cryptoTestExclude = ["Legacy"]
-
-                // legacy targets not included, these don't matter
-                cryptoLegacyDependencies = []
-                cryptoLegacyExclude = []
-            }
-        }
-    }
 }
 
 // MARK: - WireGuard

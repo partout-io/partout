@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_ObjC
+@testable internal import _PartoutCryptoOpenSSL_Cross
 import Foundation
 import XCTest
 

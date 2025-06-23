@@ -29,19 +29,21 @@ import Foundation
 
 extension DataPathWrapper.Parameters {
     struct PRF {
-        let authResponse: Authenticator.Response
+        let handshake: Handshake
 
         let sessionId: Data
 
         let remoteSessionId: Data
     }
+}
 
+extension DataPathWrapper.Parameters {
     func keys(with prf: PRF) throws -> CryptoKeys {
         let masterData = try prfData(with: PRFInput(
             label: Constants.label1,
-            secret: CZ(prf.authResponse.preMaster),
-            clientSeed: CZ(prf.authResponse.random1),
-            serverSeed: CZ(prf.authResponse.serverRandom1),
+            secret: CZ(prf.handshake.preMaster),
+            clientSeed: CZ(prf.handshake.random1),
+            serverSeed: CZ(prf.handshake.serverRandom1),
             clientSessionId: nil,
             serverSessionId: nil,
             size: Constants.preMasterLength
@@ -49,8 +51,8 @@ extension DataPathWrapper.Parameters {
         let keysData = try prfData(with: PRFInput(
             label: Constants.label2,
             secret: masterData,
-            clientSeed: CZ(prf.authResponse.random2),
-            serverSeed: CZ(prf.authResponse.serverRandom2),
+            clientSeed: CZ(prf.handshake.random2),
+            serverSeed: CZ(prf.handshake.serverRandom2),
             clientSessionId: prf.sessionId,
             serverSessionId: prf.remoteSessionId,
             size: Constants.keysCount * Constants.keyLength

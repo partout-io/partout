@@ -45,13 +45,13 @@ extension DataPathWrapper {
         }
 
         let seed = prng.safeData(length: PRNGSeedLength)
-        guard let cryptoBox = OSSLCryptoBox(seed: seed) else {
+        guard let cryptoBox = OSSLCryptoBox(seed: Z(seed.toData())) else {
             fatalError("Unable to create OSSLCryptoBox")
         }
         try cryptoBox.configure(
             withCipher: cipher,
             digest: digest,
-            auth: prf.authResponse,
+            handshake: prf.handshake,
             sessionId: prf.sessionId,
             remoteSessionId: prf.remoteSessionId
         )

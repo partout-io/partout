@@ -1,5 +1,5 @@
 //
-//  CryptoCTRTests.swift
+//  CryptoAEADTests.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 12/12/23.
@@ -23,23 +23,18 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_ObjC
+@testable internal import _PartoutCryptoOpenSSL_Cross
 import XCTest
 
-final class CryptoCTRTests: XCTestCase, CryptoFlagsProviding {
+final class CryptoAEADTests: XCTestCase, CryptoFlagsProviding {
     func test_givenData_whenEncrypt_thenDecrypts() throws {
-        let sut = try CryptoCTR(
-            cipherName: "aes-128-ctr",
-            digestName: "sha256",
-            tagLength: 32,
-            payloadLength: 128
-        )
+        let sut = try CryptoAEAD(cipherName: "aes-256-gcm", tagLength: 16, idLength: 4)
+        let flags = newCryptoFlags()
 
         sut.configureEncryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         let encryptedData: Data
 
-        let flags = newCryptoFlags()
         do {
             encryptedData = try sut.encryptData(plainData, flags: flags)
         } catch {
@@ -55,7 +50,7 @@ final class CryptoCTRTests: XCTestCase, CryptoFlagsProviding {
     }
 }
 
-extension CryptoCTRTests {
+extension CryptoAEADTests {
     var cipherKey: ZeroingData {
         ZeroingData(length: 32)
     }

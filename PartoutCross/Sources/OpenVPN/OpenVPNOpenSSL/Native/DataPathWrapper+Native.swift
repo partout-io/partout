@@ -25,7 +25,6 @@
 
 import _PartoutOpenVPN
 internal import _PartoutOpenVPNOpenSSL_C
-import Foundation
 import PartoutCore
 
 private let PRNGSeedLength = 64
@@ -40,7 +39,7 @@ private let CryptoCTRPayloadLength = PacketOpcodeLength + PacketSessionIdLength 
 
 extension DataPathWrapper {
     static func native(with parameters: Parameters, prf: Parameters.PRF, prng: PRNGProtocol) throws -> DataPathWrapper {
-        let seed = CZ(prng.safeData(length: PRNGSeedLength))
+        let seed = prng.safeData(length: PRNGSeedLength)
         return try .native(with: parameters, prf: prf, seed: seed)
     }
 
@@ -50,7 +49,7 @@ extension DataPathWrapper {
     }
 
     static func native(with parameters: Parameters, keys: CryptoKeys) throws -> DataPathWrapper {
-        NSLog("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)");
+        print("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)");
 
         let mode: UnsafeMutablePointer<dp_mode_t>
         let cipherAlgorithm = parameters.cipher?.rawValue.uppercased()

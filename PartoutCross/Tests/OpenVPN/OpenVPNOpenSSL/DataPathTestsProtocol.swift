@@ -24,7 +24,7 @@
 //
 
 import _PartoutOpenVPN
-@testable import _PartoutOpenVPNOpenSSL
+@testable import _PartoutOpenVPNOpenSSL_Cross
 import Foundation
 import XCTest
 
