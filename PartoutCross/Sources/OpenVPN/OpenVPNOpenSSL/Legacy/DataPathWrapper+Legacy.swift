@@ -92,27 +92,29 @@ extension DataPath: DataPathTestingProtocol {
     // MARK: DataPathEncrypter
 
     func assemble(packetId: UInt32, payload: Data) -> Data {
-        let zd = CZeroingData(length: Self.zdSize)
-        var length = 0
-        encrypter().assembleDataPacket(
-            assemblePayloadBlock(),
-            packetId: packetId,
-            payload: payload,
-            into: zd.ptr.pointee.bytes,
-            length: &length
-        )
-        return zd.toData(until: length)
+        fatalError("FIXME: ###")
+//        let zd = CZeroingData(length: Self.zdSize)
+//        var length = 0
+//        encrypter().assembleDataPacket(
+//            assemblePayloadBlock(),
+//            packetId: packetId,
+//            payload: payload,
+//            into: zd.ptr.pointee.bytes,
+//            length: &length
+//        )
+//        return zd.toData(until: length)
     }
 
     func encrypt(key: UInt8, packetId: UInt32, assembled: Data) throws -> Data {
-        try assembled.withUnsafeBytes { bytes in
-            try encrypter().encryptedDataPacket(
-                withKey: key,
-                packetId: packetId,
-                packetBytes: bytes.bytePointer,
-                packetLength: assembled.count
-            )
-        }
+        fatalError("FIXME: ###")
+//        try assembled.withUnsafeBytes { bytes in
+//            try encrypter().encryptedDataPacket(
+//                withKey: key,
+//                packetId: packetId,
+//                packetBytes: bytes.bytePointer,
+//                packetLength: assembled.count
+//            )
+//        }
     }
 
     func assembleAndEncrypt(_ packet: Data, key: UInt8, packetId: UInt32) throws -> Data {
@@ -122,30 +124,32 @@ extension DataPath: DataPathTestingProtocol {
     // MARK: DataPathDecrypter
 
     func decrypt(packet: Data) throws -> DataPathDecryptedTuple {
-        let zd = CZeroingData(length: Self.zdSize)
-        return try packet.withUnsafeBytes { bytes in
-            var length = 0
-            var packetId: UInt32 = 0
-            try decrypter().decryptDataPacket(
-                packet,
-                into: zd.ptr.pointee.bytes,
-                length: &length,
-                packetId: &packetId
-            )
-            let data = zd.toData(until: length)
-            return (packetId, data)
-        }
+        fatalError("FIXME: ###")
+//        let zd = CZeroingData(length: Self.zdSize)
+//        return try packet.withUnsafeBytes { bytes in
+//            var length = 0
+//            var packetId: UInt32 = 0
+//            try decrypter().decryptDataPacket(
+//                packet,
+//                into: zd.ptr.pointee.bytes,
+//                length: &length,
+//                packetId: &packetId
+//            )
+//            let data = zd.toData(until: length)
+//            return (packetId, data)
+//        }
     }
 
     func parse(decrypted: Data, header: inout UInt8) throws -> Data {
-        let zd = CZeroingData(length: Self.zdSize)
-        var header: UInt8 = 0
-        return try decrypter().parsePayload(
-            parsePayloadBlock(),
-            compressionHeader: &header,
-            packetBytes: zd.ptr.pointee.bytes,
-            packetLength: decrypted.count
-        )
+        fatalError("FIXME: ###")
+//        let zd = CZeroingData(length: Self.zdSize)
+//        var header: UInt8 = 0
+//        return try decrypter().parsePayload(
+//            parsePayloadBlock(),
+//            compressionHeader: &header,
+//            packetBytes: zd.ptr.pointee.bytes,
+//            packetLength: decrypted.count
+//        )
     }
 
     func decryptAndParse(_ packet: Data) throws -> DataPathDecryptedAndParsedTuple {
