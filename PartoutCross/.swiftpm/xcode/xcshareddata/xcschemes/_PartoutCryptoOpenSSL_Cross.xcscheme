@@ -15,9 +15,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "PartoutProviders"
-               BuildableName = "PartoutProviders"
-               BlueprintName = "PartoutProviders"
+               BlueprintIdentifier = "_PartoutCryptoOpenSSL_Cross"
+               BuildableName = "_PartoutCryptoOpenSSL_Cross"
+               BlueprintName = "_PartoutCryptoOpenSSL_Cross"
                ReferencedContainer = "container:">
             </BuildableReference>
          </BuildActionEntry>
@@ -50,9 +50,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "PartoutProviders"
-            BuildableName = "PartoutProviders"
-            BlueprintName = "PartoutProviders"
+            BlueprintIdentifier = "_PartoutCryptoOpenSSL_Cross"
+            BuildableName = "_PartoutCryptoOpenSSL_Cross"
+            BlueprintName = "_PartoutCryptoOpenSSL_Cross"
             ReferencedContainer = "container:">
          </BuildableReference>
       </MacroExpansion>
