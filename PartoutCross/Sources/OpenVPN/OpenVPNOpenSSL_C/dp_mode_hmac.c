@@ -73,7 +73,7 @@ size_t dp_encrypt(void *vmode) {
     uint8_t *dst = ctx->dst->bytes;
 
     // skip header bytes
-    size_t dst_packet_len = UINT_MAX;
+    size_t dst_packet_len = UINT32_MAX;
     crypto_error_code enc_error;
     const bool success = mode->enc.raw_encrypt(mode->crypto,
                                                dst + dst_header_len,
@@ -118,7 +118,7 @@ size_t dp_decrypt(void *vmode) {
     }
 
     // skip header = (code, key)
-    size_t dst_len = UINT_MAX;
+    size_t dst_len = UINT32_MAX;
     crypto_error_code dec_error;
     const bool success = mode->dec.raw_decrypt(mode->crypto,
                                                dst,
