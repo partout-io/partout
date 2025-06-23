@@ -330,6 +330,10 @@ if areas.contains(.openvpn) {
         .library(
             name: "_PartoutOpenVPNOpenSSL",
             targets: ["_PartoutOpenVPNOpenSSL"]
+        ),
+        .library(
+            name: "_PartoutOpenVPNOpenSSL_ObjC",
+            targets: ["_PartoutOpenVPNOpenSSL_ObjC"]
         )
     ])
 

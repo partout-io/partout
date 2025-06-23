@@ -24,12 +24,7 @@
 //
 
 internal import _PartoutCryptoOpenSSL_ObjC
-import Foundation
-<<<<<<<< HEAD:Cross/OpenVPNCross/Sources/OpenVPN/OpenVPNOpenSSL/Legacy/ZeroingData+Extensions.swift
 import PartoutCore
-========
-import XCTest
->>>>>>>> master:Tests/OpenVPN/CryptoOpenSSL/Extensions.swift
 
 extension SecureData {
     var zData: ZeroingData {
@@ -40,36 +35,5 @@ extension SecureData {
 extension ZeroingData: @retroactive SensitiveDebugStringConvertible {
     func debugDescription(withSensitiveData: Bool) -> String {
         withSensitiveData ? "[\(length) bytes, \(toHex())]" : "[\(length) bytes]"
-    }
-}
-
-extension UnsafeRawBufferPointer {
-    var bytePointer: UnsafePointer<Element> {
-        guard let address = bindMemory(to: Element.self).baseAddress else {
-            fatalError("Cannot bind to self")
-        }
-        return address
-    }
-}
-
-protocol CryptoFlagsProviding {
-    var packetId: [UInt8] { get }
-
-    var ad: [UInt8] { get }
-}
-
-extension CryptoFlagsProviding {
-    func newCryptoFlags() -> CryptoFlagsWrapper {
-        packetId.withUnsafeBufferPointer { iv in
-            ad.withUnsafeBufferPointer { ad in
-                CryptoFlagsWrapper(
-                    iv: iv.baseAddress,
-                    ivLength: iv.count,
-                    ad: ad.baseAddress,
-                    adLength: ad.count,
-                    forTesting: true
-                )
-            }
-        }
     }
 }
