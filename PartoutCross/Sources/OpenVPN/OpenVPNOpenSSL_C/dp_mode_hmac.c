@@ -23,6 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include <assert.h>
+#include <stdint.h>
+#include "crypto_openssl/endian.h"
 #include "dp_macros.h"
 #include "dp_mode_hmac.h"
 #include "packet.h"
@@ -140,7 +143,7 @@ size_t dp_decrypt(void *vmode) {
             return 0;
         }
     }
-    *ctx->dst_packet_id = ntohl(*(uint32_t *)ctx->dst->bytes);
+    *ctx->dst_packet_id = endian_ntohl(*(uint32_t *)ctx->dst->bytes);
     return dst_len;
 }
 

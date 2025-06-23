@@ -36,9 +36,9 @@
 
 #pragma once
 
-#include <arpa/inet.h>
 #include <stdint.h>
 #include <string.h>
+#include "crypto_openssl/endian.h"
 
 // MARK: - Packets
 
@@ -123,7 +123,7 @@ size_t packet_header_v2_set(uint8_t *_Nonnull dst,
 
 static inline
 uint32_t packet_header_v2_get_peer_id(const uint8_t *_Nonnull src) {
-    return ntohl(*(const uint32_t *)src & 0xffffff00);
+    return endian_ntohl(*(const uint32_t *)src & 0xffffff00);
 }
 
 #pragma mark - Utils
