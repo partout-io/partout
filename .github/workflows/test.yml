@@ -36,3 +36,7 @@ jobs:
         run: |
           export OPENVPN_CRYPTO_MODE="3"
           cd Cross/OpenVPNCross && swift test
+      - name: "OpenVPN: Test native Swift/C"
+        run: |
+          export OPENVPN_CRYPTO_MODE="4"
+          cd Cross/OpenVPNCross && swift test
