@@ -25,8 +25,8 @@
 
 #pragma once
 
-#include "crypto_openssl/crypto_aead.h"
-#include "crypto_openssl/crypto_cbc.h"
+#include "crypto/crypto_aead.h"
+#include "crypto/crypto_cbc.h"
 #include "openvpn/dp_mode_ad.h"
 #include "openvpn/test/crypto_mock.h"
 

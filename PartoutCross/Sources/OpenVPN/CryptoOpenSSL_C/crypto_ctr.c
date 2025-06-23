@@ -26,8 +26,8 @@
 #include <assert.h>
 #include <openssl/evp.h>
 #include <string.h>
-#include "crypto_openssl/allocation.h"
-#include "crypto_openssl/crypto_ctr.h"
+#include "crypto/allocation.h"
+#include "crypto/crypto_ctr.h"
 
 static
 size_t crypto_encryption_capacity(const void *vctx, size_t len) {

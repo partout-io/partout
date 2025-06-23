@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "crypto_openssl/allocation.h"
+#include "crypto/allocation.h"
 #include "openvpn/dp_macros.h"
 #include "openvpn/dp_mode.h"
 #include "openvpn/packet.h"

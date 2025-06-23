@@ -38,7 +38,7 @@
 
 #include <stdint.h>
 #include <string.h>
-#include "crypto_openssl/endian.h"
+#include "crypto/endian.h"
 
 // MARK: - Packets
 

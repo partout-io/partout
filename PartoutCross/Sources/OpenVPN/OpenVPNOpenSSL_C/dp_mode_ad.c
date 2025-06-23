@@ -24,7 +24,7 @@
 //
 
 #include <assert.h>
-#include "crypto_openssl/endian.h"
+#include "crypto/endian.h"
 #include "openvpn/dp_macros.h"
 #include "openvpn/dp_mode_ad.h"
 #include "openvpn/packet.h"

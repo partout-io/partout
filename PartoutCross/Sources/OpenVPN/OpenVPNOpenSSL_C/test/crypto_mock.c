@@ -24,7 +24,7 @@
 //
 
 #include <assert.h>
-#include "crypto_openssl/allocation.h"
+#include "crypto/allocation.h"
 #include "openvpn/dp_macros.h"
 #include "openvpn/test/crypto_mock.h"
 

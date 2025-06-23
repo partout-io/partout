@@ -25,8 +25,8 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "crypto_openssl/allocation.h"
-#include "crypto_openssl/zeroing_data.h"
+#include "crypto/allocation.h"
+#include "crypto/zeroing_data.h"
 
 // FIXME: ##, drop dup of zd_create_copy
 // FIXME: ##, make zd inline

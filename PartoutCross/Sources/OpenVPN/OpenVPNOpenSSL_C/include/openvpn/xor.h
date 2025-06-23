@@ -26,7 +26,7 @@
 #pragma once
 
 #include <string.h>
-#include "crypto_openssl/zeroing_data.h"
+#include "crypto/zeroing_data.h"
 
 typedef enum {
     XORMethodNone,

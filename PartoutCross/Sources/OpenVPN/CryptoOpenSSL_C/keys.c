@@ -27,7 +27,7 @@
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/rand.h>
-#include "crypto_openssl/keys.h"
+#include "crypto/keys.h"
 
 bool key_init_seed(const zeroing_data_t *seed) {
     unsigned char x[1];

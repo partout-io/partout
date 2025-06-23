@@ -27,7 +27,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "crypto_openssl/crypto.h"
+#include "crypto/crypto.h"
 #include "openvpn/comp.h"
 #include "openvpn/dp_framing.h"
 

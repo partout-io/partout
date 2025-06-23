@@ -25,7 +25,7 @@
 
 #pragma once
 
-#include "crypto_openssl/crypto.h"
+#include "crypto/crypto.h"
 
 typedef enum {
     DataPathErrorNone,
