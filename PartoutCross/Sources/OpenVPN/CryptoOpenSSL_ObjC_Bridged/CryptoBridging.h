@@ -25,7 +25,7 @@
 
 #import "CryptoOpenSSL/CryptoMacros.h"
 #import "CryptoOpenSSL/ZeroingData.h"
-#import "crypto_openssl/zeroing_data.h"
+#import "crypto/zeroing_data.h"
 
 @interface ZeroingData (C)
 
