@@ -52,6 +52,12 @@ let package = Package(
     ]
 )
 
+// MARK: Targets (common)
+
+package.dependencies.append(contentsOf: [
+    .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
+])
+
 if cryptoMode != .bridgedCrypto {
     package.dependencies.append(contentsOf: [
         .package(path: "../.."), // "partout"
@@ -81,11 +87,15 @@ if cryptoMode != .bridgedCrypto {
     ])
 }
 
-// MARK: Targets
-
-package.dependencies.append(contentsOf: [
-    .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
+package.targets.append(contentsOf: [
+    .testTarget(
+        name: "_PartoutCryptoOpenSSL_CrossTests",
+        dependencies: [.target(name: cryptoUmbrella)],
+        path: "Tests/OpenVPN/CryptoOpenSSL"
+    )
 ])
+
+// MARK: Targets (specific)
 
 switch cryptoMode {
 case .bridgedCrypto:
@@ -170,14 +180,6 @@ case .native:
         )
     ])
 }
-
-package.targets.append(contentsOf: [
-    .testTarget(
-        name: "_PartoutCryptoOpenSSL_CrossTests",
-        dependencies: [.target(name: cryptoUmbrella)],
-        path: "Tests/OpenVPN/CryptoOpenSSL"
-    )
-])
 
 // MARK: Structures
 
