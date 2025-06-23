@@ -23,9 +23,40 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
+
+#if OPENVPN_WRAPPED
+
+final class DataChannel {
+    private let ctx: PartoutLoggerContext
+
+    let key: UInt8
+
+    private let dataPath: DataPathProtocol
+
+    init(_ ctx: PartoutLoggerContext, key: UInt8, dataPath: DataPathProtocol) {
+        self.ctx = ctx
+        self.key = key
+        self.dataPath = dataPath
+    }
+
+    func encrypt(packets: [Data]) throws -> [Data]? {
+        try dataPath.encrypt(packets, key: key)
+    }
+
+    func decrypt(packets: [Data]) throws -> [Data]? {
+        let result = try dataPath.decrypt(packets)
+        if result.keepAlive {
+            pp_log(ctx, .openvpn, .debug, "Data: Received ping, do nothing")
+        }
+        return result.packets
+    }
+}
+
+#else
+
+internal import _PartoutOpenVPNOpenSSL_ObjC
 
 final class DataChannel {
     private let ctx: PartoutLoggerContext
@@ -53,3 +84,5 @@ final class DataChannel {
         return decrypted
     }
 }
+
+#endif

@@ -26,7 +26,7 @@
 #import <Foundation/Foundation.h>
 
 #import "XORMethodNative.h"
-#import "ZeroingData.h"
+#import "CryptoOpenSSL/ZeroingData.h"
 
 NS_ASSUME_NONNULL_BEGIN
 

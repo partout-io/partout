@@ -1,8 +1,8 @@
 //
-//  CryptoCTR.h
+//  OpenVPN+Legacy.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 9/18/18.
+//  Created by Davide De Rosa on 6/20/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,26 +23,28 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#import <Foundation/Foundation.h>
-#import "Crypto.h"
-#import "CryptoProtocols.h"
+import _PartoutOpenVPN
+internal import _PartoutOpenVPNOpenSSL_ObjC
 
-NS_ASSUME_NONNULL_BEGIN
+extension OpenVPN.CompressionAlgorithm {
+    var native: CompressionAlgorithm {
+        switch self {
+        case .disabled: .disabled
+        case .LZO: .LZO
+        case .other: .other
+        @unknown default: .disabled
+        }
+    }
+}
 
-typedef NS_ENUM(NSInteger, CryptoCTRError) {
-    CryptoCTRErrorGeneric,
-    CryptoCTRErrorHMAC
-};
-
-@interface CryptoCTR : NSObject <Encrypter, Decrypter>
-
-- (instancetype)initWithCipherName:(nullable NSString *)cipherName
-                        digestName:(NSString *)digestName
-                         tagLength:(NSInteger)tagLength
-                     payloadLength:(NSInteger)payloadLength;
-
-@property (nonatomic, copy) NSError * (^mappedError)(CryptoCTRError);
-
-@end
-
-NS_ASSUME_NONNULL_END
+extension OpenVPN.CompressionFraming {
+    var native: CompressionFraming {
+        switch self {
+        case .disabled: .disabled
+        case .compLZO: .compLZO
+        case .compress: .compress
+        case .compressV2: .compressV2
+        @unknown default: .disabled
+        }
+    }
+}

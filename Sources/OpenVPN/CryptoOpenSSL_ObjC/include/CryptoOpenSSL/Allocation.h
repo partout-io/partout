@@ -1,8 +1,8 @@
 //
-//  CryptoAEAD.h
+//  Allocation.h
 //  Partout
 //
-//  Created by Davide De Rosa on 7/6/18.
+//  Created by Davide De Rosa on 3/3/17.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -35,23 +35,25 @@
 //
 
 #import <Foundation/Foundation.h>
-#import "Crypto.h"
-#import "CryptoProtocols.h"
 
-NS_ASSUME_NONNULL_BEGIN
+static inline
+void *_Nonnull pp_alloc_crypto(size_t size) {
+    void *memory = calloc(1, size);
+    if (!memory) {
+        fputs("pp_alloc_crypto: malloc() call failed", stderr);
+        abort();
+    }
+    return memory;
+}
 
-typedef NS_ENUM(NSInteger, CryptoAEADError) {
-    CryptoAEADErrorGeneric
-};
+#define MAX_BLOCK_SIZE  16  // AES only, block is 128-bit
 
-@interface CryptoAEAD : NSObject <Encrypter, Decrypter>
+/// - Parameters:
+///   - size: The base number of bytes.
+///   - overhead: The extra number of bytes.
+/// - Returns: The number of bytes to store a crypto buffer safely.
+static inline size_t pp_alloc_crypto_capacity(size_t size, size_t overhead) {
 
-- (instancetype)initWithCipherName:(NSString *)cipherName
-                         tagLength:(NSInteger)tagLength
-                          idLength:(NSInteger)idLength;
-
-@property (nonatomic, copy) NSError * (^mappedError)(CryptoAEADError);
-
-@end
-
-NS_ASSUME_NONNULL_END
+    // encryption, byte-alignment, overhead (e.g. IV, digest)
+    return 2 * size + MAX_BLOCK_SIZE + overhead;
+}

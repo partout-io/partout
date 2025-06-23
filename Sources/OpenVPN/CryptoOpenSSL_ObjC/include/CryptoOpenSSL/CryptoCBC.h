@@ -1,8 +1,8 @@
 //
-//  Crypto+Extensions.swift
+//  CryptoCBC.h
 //  Partout
 //
-//  Created by Davide De Rosa on 7/7/18.
+//  Created by Davide De Rosa on 7/6/18.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -34,52 +34,27 @@
 //      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-internal import _PartoutCryptoOpenSSL_ObjC
-import Foundation
+#import <Foundation/Foundation.h>
+#import "CryptoMacros.h"
+#import "CryptoProtocols.h"
 
-extension Encrypter {
+NS_ASSUME_NONNULL_BEGIN
 
-    /// Swift version of `encryptBytes`.
-    func encryptData(_ data: Data, flags: UnsafePointer<CryptoFlags>?) throws -> Data {
-        let srcLength = data.count
-        var dest: [UInt8] = Array(repeating: 0, count: srcLength + 256)
-        var destLength = 0
-        try data.withUnsafeBytes {
-            try encryptBytes($0.bytePointer, length: srcLength, dest: &dest, destLength: &destLength, flags: flags)
-        }
-        dest.removeSubrange(destLength..<dest.count)
-        return Data(dest)
-    }
-}
+typedef NS_ENUM(NSInteger, CryptoCBCError) {
+    CryptoCBCErrorGeneric,
+    CryptoCBCErrorRandomGenerator,
+    CryptoCBCErrorHMAC
+};
 
-extension Decrypter {
+@interface CryptoCBC : NSObject <Encrypter, Decrypter>
 
-    /// Swift version of `decryptBytes`.
-    func decryptData(_ data: Data, flags: UnsafePointer<CryptoFlags>?) throws -> Data {
-        let srcLength = data.count
-        var dest: [UInt8] = Array(repeating: 0, count: srcLength + 256)
-        var destLength = 0
-        try data.withUnsafeBytes {
-            try decryptBytes($0.bytePointer, length: srcLength, dest: &dest, destLength: &destLength, flags: flags)
-        }
-        dest.removeSubrange(destLength..<dest.count)
-        return Data(dest)
-    }
+- (nullable instancetype)initWithCipherName:(nullable NSString *)cipherName
+                                 digestName:(NSString *)digestName
+                                      error:(NSError **)error;
+- (int)cipherIVLength;
 
-    /// Swift version of `verifyBytes`.
-    func verifyData(_ data: Data, flags: UnsafePointer<CryptoFlags>?) throws {
-        let srcLength = data.count
-        try data.withUnsafeBytes {
-            try verifyBytes($0.bytePointer, length: srcLength, flags: flags)
-        }
-    }
-}
+@property (nonatomic, copy) NSError * (^mappedError)(CryptoCBCError);
 
-private extension UnsafeRawBufferPointer {
-    var bytePointer: UnsafePointer<Element> {
-        guard let address = bindMemory(to: Element.self).baseAddress else {
-            fatalError("Cannot bind to self")
-        }
-        return address
-    }
-}
+@end
+
+NS_ASSUME_NONNULL_END

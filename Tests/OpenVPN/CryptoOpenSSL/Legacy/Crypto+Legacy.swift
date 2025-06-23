@@ -1,8 +1,8 @@
 //
-//  CryptoCBC.h
+//  Crypto+Legacy.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 7/6/18.
+//  Created by Davide De Rosa on 7/7/18.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -34,25 +34,54 @@
 //      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#import <Foundation/Foundation.h>
-#import "Crypto.h"
-#import "CryptoProtocols.h"
+internal import _PartoutCryptoOpenSSL_ObjC
+import Foundation
 
-NS_ASSUME_NONNULL_BEGIN
+extension Encrypter {
+    func encryptData(_ data: Data, flags: UnsafePointer<CryptoFlags>?) throws -> Data {
+        let srcLength = data.count
+        var dest: [UInt8] = Array(repeating: 0, count: srcLength + 256)
+        var destLength = 0
+        _ = try data.withUnsafeBytes {
+            try encryptBytes($0.bytePointer, length: srcLength, dest: &dest, destLength: &destLength, flags: flags)
+        }
+        dest.removeSubrange(destLength..<dest.count)
+        return Data(dest)
+    }
+}
 
-typedef NS_ENUM(NSInteger, CryptoCBCError) {
-    CryptoCBCErrorGeneric,
-    CryptoCBCErrorRandomGenerator,
-    CryptoCBCErrorHMAC
-};
+extension Decrypter {
+    func decryptData(_ data: Data, flags: UnsafePointer<CryptoFlags>?) throws -> Data {
+        let srcLength = data.count
+        var dest: [UInt8] = Array(repeating: 0, count: srcLength + 256)
+        var destLength = 0
+        _ = try data.withUnsafeBytes {
+            try decryptBytes($0.bytePointer, length: srcLength, dest: &dest, destLength: &destLength, flags: flags)
+        }
+        dest.removeSubrange(destLength..<dest.count)
+        return Data(dest)
+    }
 
-@interface CryptoCBC : NSObject <Encrypter, Decrypter>
+    func verifyData(_ data: Data, flags: UnsafePointer<CryptoFlags>?) throws {
+        let srcLength = data.count
+        _ = try data.withUnsafeBytes {
+            try verifyBytes($0.bytePointer, length: srcLength, flags: flags)
+        }
+    }
+}
 
-- (instancetype)initWithCipherName:(nullable NSString *)cipherName digestName:(NSString *)digestName;
-- (int)cipherIVLength;
+extension Encrypter {
+    func encryptData(_ data: Data) throws -> Data {
+        try encryptData(data, flags: nil as UnsafePointer<CryptoFlags>?)
+    }
+}
 
-@property (nonatomic, copy) NSError * (^mappedError)(CryptoCBCError);
+extension Decrypter {
+    func decryptData(_ data: Data) throws -> Data {
+        try decryptData(data, flags: nil as UnsafePointer<CryptoFlags>?)
+    }
 
-@end
-
-NS_ASSUME_NONNULL_END
+    func verifyData(_ data: Data) throws {
+        try verifyData(data, flags: nil as UnsafePointer<CryptoFlags>?)
+    }
+}

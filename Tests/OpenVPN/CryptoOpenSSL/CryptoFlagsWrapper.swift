@@ -1,8 +1,8 @@
 //
-//  Crypto.m
+//  CryptoFlagsWrapper.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 6/16/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,6 +23,30 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#import <Foundation/Foundation.h>
+import Foundation
 
-NSString *const PartoutCryptoErrorDomain = @"PartoutCrypto";
+struct CryptoFlagsWrapper {
+    let iv: UnsafePointer<UInt8>?
+
+    let ivLength: Int
+
+    let ad: UnsafePointer<UInt8>?
+
+    let adLength: Int
+
+    let forTesting: Bool
+
+    init(
+        iv: UnsafePointer<UInt8>? = nil,
+        ivLength: Int = .zero,
+        ad: UnsafePointer<UInt8>? = nil,
+        adLength: Int = .zero,
+        forTesting: Bool
+    ) {
+        self.iv = iv
+        self.ivLength = ivLength
+        self.ad = ad
+        self.adLength = adLength
+        self.forTesting = forTesting
+    }
+}

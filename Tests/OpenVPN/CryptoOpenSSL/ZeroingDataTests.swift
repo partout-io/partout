@@ -2,7 +2,7 @@
 //  ZeroingDataTests.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/9/24.
+//  Created by Davide De Rosa on 6/14/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,8 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutCryptoOpenSSL
+#if canImport(_PartoutCryptoOpenSSL_ObjC)
 internal import _PartoutCryptoOpenSSL_ObjC
+#endif
 import Foundation
 import XCTest
 

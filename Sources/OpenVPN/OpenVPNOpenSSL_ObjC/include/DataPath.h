@@ -41,6 +41,7 @@
 
 #import "CompressionAlgorithm.h"
 #import "CompressionFraming.h"
+#import "DataPathCrypto.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -60,6 +61,13 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (nullable NSArray<NSData *> *)encryptPackets:(NSArray<NSData *> *)packets key:(uint8_t)key error:(NSError **)error;
 - (nullable NSArray<NSData *> *)decryptPackets:(NSArray<NSData *> *)packets keepAlive:(nullable bool *)keepAlive error:(NSError **)error;
+
+// MARK: Testing
+
+- (id<DataPathEncrypter>)encrypter;
+- (id<DataPathDecrypter>)decrypter;
+- (DataPathAssembleBlock)assemblePayloadBlock;
+- (DataPathParseBlock)parsePayloadBlock;
 
 @end
 

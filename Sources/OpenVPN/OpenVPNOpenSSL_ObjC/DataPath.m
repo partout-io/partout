@@ -36,7 +36,7 @@
 
 #import <arpa/inet.h>
 
-#import "Allocation.h"
+#import "CryptoOpenSSL/Allocation.h"
 #import "DataPath.h"
 #import "DataPathCrypto.h"
 #import "Errors.h"
@@ -93,6 +93,8 @@
                        maxPackets:(NSInteger)maxPackets
              usesReplayProtection:(BOOL)usesReplayProtection
 {
+    NSLog(@"PartoutOpenVPN: Using DataPath (legacy ObjC)");
+
     NSParameterAssert(encrypter);
     NSParameterAssert(decrypter);
     NSParameterAssert(maxPackets > 0);

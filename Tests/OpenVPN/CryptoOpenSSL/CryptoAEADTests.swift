@@ -23,27 +23,28 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable import _PartoutCryptoOpenSSL
+#if canImport(_PartoutCryptoOpenSSL_ObjC)
 internal import _PartoutCryptoOpenSSL_ObjC
+#endif
 import XCTest
 
-final class CryptoAEADTests: XCTestCase {
-    func test_givenData_whenEncrypt_thenDecrypts() {
-        let sut = CryptoAEAD(cipherName: "aes-256-gcm", tagLength: 16, idLength: 4)
-        var flags = newFlags()
+final class CryptoAEADTests: XCTestCase, CryptoFlagsProviding {
+    func test_givenData_whenEncrypt_thenDecrypts() throws {
+        let sut = try CryptoAEAD(cipherName: "aes-256-gcm", tagLength: 16, idLength: 4)
+        let flags = newCryptoFlags()
 
         sut.configureEncryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         let encryptedData: Data
 
         do {
-            encryptedData = try sut.encryptData(plainData, flags: &flags)
+            encryptedData = try sut.encryptData(plainData, flags: flags)
         } catch {
             XCTFail("Cannot encrypt: \(error)")
             return
         }
         do {
-            let returnedData = try sut.decryptData(encryptedData, flags: &flags)
+            let returnedData = try sut.decryptData(encryptedData, flags: flags)
             XCTAssertEqual(returnedData, plainData)
         } catch {
             XCTFail("Cannot decrypt: \(error)")
@@ -51,7 +52,7 @@ final class CryptoAEADTests: XCTestCase {
     }
 }
 
-private extension CryptoAEADTests {
+extension CryptoAEADTests {
     var cipherKey: ZeroingData {
         ZeroingData(length: 32)
     }
@@ -70,19 +71,5 @@ private extension CryptoAEADTests {
 
     var ad: [UInt8] {
         [0x00, 0x12, 0x34, 0x56]
-    }
-
-    func newFlags() -> CryptoFlags {
-        packetId.withUnsafeBufferPointer { iv in
-            ad.withUnsafeBufferPointer { ad in
-                CryptoFlags(
-                    iv: iv.baseAddress,
-                    ivLength: iv.count,
-                    ad: ad.baseAddress,
-                    adLength: ad.count,
-                    forTesting: true
-                )
-            }
-        }
     }
 }

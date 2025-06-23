@@ -1,8 +1,8 @@
 //
-//  Allocation.h
+//  Crypto+Legacy.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 3/3/17.
+//  Created by Davide De Rosa on 7/7/18.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -34,26 +34,54 @@
 //      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#import <Foundation/Foundation.h>
+internal import _PartoutCryptoOpenSSL_ObjC
+import Foundation
 
-static inline void *_Nullable pp_alloc_crypto(size_t size) {
-    void *memory = malloc(size);
-    if (!memory) {
-        NSCAssert(NO, @"pp_alloc_crypto: malloc() call failed");
-        abort();
-        return NULL;
+extension Encrypter {
+    func encryptData(_ data: Data, flags: UnsafePointer<CryptoFlags>?) throws -> Data {
+        let srcLength = data.count
+        var dest: [UInt8] = Array(repeating: 0, count: srcLength + 256)
+        var destLength = 0
+        _ = try data.withUnsafeBytes {
+            try encryptBytes($0.bytePointer, length: srcLength, dest: &dest, destLength: &destLength, flags: flags)
+        }
+        dest.removeSubrange(destLength..<dest.count)
+        return Data(dest)
     }
-    return memory;
 }
 
-#define MAX_BLOCK_SIZE  16  // AES only, block is 128-bit
+extension Decrypter {
+    func decryptData(_ data: Data, flags: UnsafePointer<CryptoFlags>?) throws -> Data {
+        let srcLength = data.count
+        var dest: [UInt8] = Array(repeating: 0, count: srcLength + 256)
+        var destLength = 0
+        _ = try data.withUnsafeBytes {
+            try decryptBytes($0.bytePointer, length: srcLength, dest: &dest, destLength: &destLength, flags: flags)
+        }
+        dest.removeSubrange(destLength..<dest.count)
+        return Data(dest)
+    }
 
-/// - Parameters:
-///   - size: The base number of bytes.
-///   - overhead: The extra number of bytes.
-/// - Returns: The number of bytes to store a crypto buffer safely.
-static inline size_t pp_alloc_crypto_capacity(size_t size, size_t overhead) {
+    func verifyData(_ data: Data, flags: UnsafePointer<CryptoFlags>?) throws {
+        let srcLength = data.count
+        _ = try data.withUnsafeBytes {
+            try verifyBytes($0.bytePointer, length: srcLength, flags: flags)
+        }
+    }
+}
 
-    // encryption, byte-alignment, overhead (e.g. IV, digest)
-    return 2 * size + MAX_BLOCK_SIZE + overhead;
+extension Encrypter {
+    func encryptData(_ data: Data) throws -> Data {
+        try encryptData(data, flags: nil as UnsafePointer<CryptoFlags>?)
+    }
+}
+
+extension Decrypter {
+    func decryptData(_ data: Data) throws -> Data {
+        try decryptData(data, flags: nil as UnsafePointer<CryptoFlags>?)
+    }
+
+    func verifyData(_ data: Data) throws {
+        try verifyData(data, flags: nil as UnsafePointer<CryptoFlags>?)
+    }
 }

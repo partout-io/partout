@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable import _PartoutCryptoOpenSSL
 internal import _PartoutCryptoOpenSSL_ObjC
 import _PartoutOpenVPN
 @testable import _PartoutOpenVPNOpenSSL
@@ -57,7 +56,7 @@ final class OSSLCryptoBoxTests: XCTestCase {
         let subject = Data(hex: "000000015b96c94738858fe14742fdae400000000000")
         let data = hmac + subject
 
-        XCTAssertNoThrow(try sut.decrypter().verifyData(data, flags: nil))
+        XCTAssertNoThrow(try sut.decrypter().verifyData(data))
     }
 
 //    38 // HARD_RESET
@@ -139,8 +138,8 @@ final class OSSLCryptoBoxTests: XCTestCase {
         let (client, server) = clientServer("aes-128-cbc", "sha256")
 
         let plain = Data(hex: "00112233445566778899")
-        let encrypted = try client.encrypter().encryptData(plain, flags: nil)
-        let decrypted = try server.decrypter().decryptData(encrypted, flags: nil)
+        let encrypted = try client.encrypter().encryptData(plain)
+        let decrypted = try server.decrypter().decryptData(encrypted)
         XCTAssertEqual(plain, decrypted)
     }
 
@@ -148,8 +147,8 @@ final class OSSLCryptoBoxTests: XCTestCase {
         let (client, server) = clientServer(nil, "sha256")
 
         let plain = Data(hex: "00112233445566778899")
-        let encrypted = try client.encrypter().encryptData(plain, flags: nil)
-        XCTAssertNoThrow(try server.decrypter().verifyData(encrypted, flags: nil))
+        let encrypted = try client.encrypter().encryptData(plain)
+        XCTAssertNoThrow(try server.decrypter().verifyData(encrypted))
     }
 
     func test_givenClientServer_whenEncryptGCM_thenDecrypts() throws {
