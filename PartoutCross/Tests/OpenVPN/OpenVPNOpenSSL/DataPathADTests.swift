@@ -25,7 +25,6 @@
 
 import _PartoutOpenVPN
 @testable import _PartoutOpenVPNOpenSSL_Cross
-import PartoutCore
 import XCTest
 
 // for non-Swift symbols like DataPacket*
