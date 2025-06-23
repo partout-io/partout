@@ -50,8 +50,6 @@ void *_Nonnull pp_alloc_crypto(size_t size) {
     return memory;
 }
 
-#define MAX_BLOCK_SIZE  16  // AES only, block is 128-bit
-
 /// - Parameters:
 ///   - size: The base number of bytes.
 ///   - overhead: The extra number of bytes.
@@ -59,6 +57,20 @@ void *_Nonnull pp_alloc_crypto(size_t size) {
 static inline
 size_t pp_alloc_crypto_capacity(size_t size, size_t overhead) {
 
+#define MAX_BLOCK_SIZE 16  // AES only, block is 128-bit
+
     // encryption, byte-alignment, overhead (e.g. IV, digest)
     return 2 * size + MAX_BLOCK_SIZE + overhead;
 }
+
+#ifdef bzero
+#define pp_zero bzero
+#else
+#define pp_zero(ptr, count) memset(ptr, 0, count)
+#endif
+
+#ifdef _WIN32
+#define pp_dup _strdup
+#else
+#define pp_dup strdup
+#endif

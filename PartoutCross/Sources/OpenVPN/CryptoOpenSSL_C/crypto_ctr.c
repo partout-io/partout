@@ -164,12 +164,12 @@ crypto_ctr_t *crypto_ctr_create(const char *cipher_name, const char *digest_name
     }
 
     ctx->cipher = cipher;
-    ctx->utf_cipher_name = strdup(cipher_name);
+    ctx->utf_cipher_name = pp_dup(cipher_name);
     ctx->cipher_key_len = EVP_CIPHER_key_length(ctx->cipher);
     ctx->cipher_iv_len = EVP_CIPHER_iv_length(ctx->cipher);
 
     ctx->digest = digest;
-    ctx->utf_digest_name = strdup(digest_name);
+    ctx->utf_digest_name = pp_dup(digest_name);
     // as seen in OpenVPN's crypto_openssl.c:md_kt_size()
     ctx->hmac_key_len = EVP_MD_size(ctx->digest);
 
@@ -215,7 +215,7 @@ void crypto_ctr_free(crypto_ctr_t *ctx) {
 
     EVP_MAC_free(ctx->mac);
     free(ctx->mac_params);
-    bzero(ctx->buffer_hmac, ctx->ns_tag_len);
+    pp_zero(ctx->buffer_hmac, ctx->ns_tag_len);
     free(ctx->buffer_hmac);
 
     free(ctx->utf_cipher_name);

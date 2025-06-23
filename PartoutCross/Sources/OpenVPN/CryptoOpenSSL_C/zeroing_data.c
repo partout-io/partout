@@ -82,7 +82,7 @@ zeroing_data_t *zd_create_from_string(const char *string, bool null_terminated) 
 void zd_free(zeroing_data_t *zd) {
     if (!zd) return;
 
-    bzero(zd->bytes, zd->length);
+    pp_zero(zd->bytes, zd->length);
     free(zd->bytes);
     free(zd);
 }
@@ -114,7 +114,7 @@ void zd_append(zeroing_data_t *zd, const zeroing_data_t *other) {
     memcpy(new_bytes, zd->bytes, zd->length);
     memcpy(new_bytes + zd->length, other->bytes, other->length);
 
-    bzero(zd->bytes, zd->length);
+    pp_zero(zd->bytes, zd->length);
     free(zd->bytes);
     zd->bytes = new_bytes;
     zd->length = new_len;
@@ -129,9 +129,9 @@ void zd_resize(zeroing_data_t *zd, size_t new_length) {
         memcpy(new_bytes, zd->bytes, new_length);
     } else {
         memcpy(new_bytes, zd->bytes, zd->length);
-        bzero(new_bytes + zd->length, new_length - zd->length);
+        pp_zero(new_bytes + zd->length, new_length - zd->length);
     }
-    bzero(zd->bytes, zd->length);
+    pp_zero(zd->bytes, zd->length);
     free(zd->bytes);
 
     zd->bytes = new_bytes;
@@ -146,7 +146,7 @@ void zd_remove_until(zeroing_data_t *zd, size_t offset) {
     uint8_t *new_bytes = pp_alloc_crypto(new_length);
     memcpy(new_bytes, zd->bytes + offset, new_length);
 
-    bzero(zd->bytes, zd->length);
+    pp_zero(zd->bytes, zd->length);
     free(zd->bytes);
 
     zd->bytes = new_bytes;
@@ -155,7 +155,7 @@ void zd_remove_until(zeroing_data_t *zd, size_t offset) {
 
 void zd_zero(zeroing_data_t *zd) {
     assert(zd);
-    bzero(zd->bytes, zd->length);
+    pp_zero(zd->bytes, zd->length);
 }
 
 // MARK: Accessors
