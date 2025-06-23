@@ -681,8 +681,6 @@ private extension Negotiator {
 //        pp_log(ctx, .openvpn, .info, "\tsessionId: \(sessionId.toHex())")
 //        pp_log(ctx, .openvpn, .info, "\tremoteSessionId: \(remoteSessionId.toHex())")
 
-        // MARK: DataPath (ObjC)
-
         let cryptoBox = cryptoFactory()
         try cryptoBox.configure(
             withCipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,

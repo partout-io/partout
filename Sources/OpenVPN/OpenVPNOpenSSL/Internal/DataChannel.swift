@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
-internal import _PartoutOpenVPNOpenSSL_ObjC
 
 final class DataChannel {
     private let ctx: PartoutLoggerContext
