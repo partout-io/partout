@@ -25,10 +25,10 @@
 
 #pragma once
 
-#include "crypto_mock.h"
-#include "crypto_openssl/crypto_aead.h"
-#include "crypto_openssl/crypto_cbc.h"
-#include "dp_mode_ad.h"
+#include "crypto/crypto_aead.h"
+#include "crypto/crypto_cbc.h"
+#include "openvpn/dp_mode_ad.h"
+#include "openvpn/test/crypto_mock.h"
 
 static inline
 dp_mode_t *_Nonnull dp_mode_ad_create_mock(compression_framing_t comp_f) {

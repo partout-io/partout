@@ -1,8 +1,8 @@
 //
-//  keys.h
+//  prng.h
 //  Partout
 //
-//  Created by Davide De Rosa on 6/20/25.
+//  Created by Davide De Rosa on 6/23/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,20 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#pragma once
-
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
-#include "crypto_openssl/zeroing_data.h"
 
-bool key_init_seed(const zeroing_data_t *_Nonnull zd);
-
-typedef struct {
-    zeroing_data_t *_Nonnull dst;
-    const char *_Nonnull digest_name;
-    const zeroing_data_t *_Nonnull secret;
-    const zeroing_data_t *_Nonnull data;
-} key_hmac_ctx;
-
-zeroing_data_t *_Nonnull key_hmac_buf();
-size_t key_hmac(key_hmac_ctx *_Nonnull ctx);
+bool prng_do(uint8_t *_Nonnull dst, size_t len);

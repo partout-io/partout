@@ -26,7 +26,7 @@
 #import "CryptoBridging.h"
 #import "CryptoOpenSSL/CryptoAEAD.h"
 #import "CryptoOpenSSL/ZeroingData.h"
-#import "crypto_openssl/crypto_aead.h"
+#import "crypto/crypto_aead.h"
 
 @interface CryptoAEAD () {
     crypto_aead_t *ptr;

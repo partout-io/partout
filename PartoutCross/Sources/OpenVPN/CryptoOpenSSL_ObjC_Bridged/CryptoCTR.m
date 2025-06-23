@@ -26,7 +26,7 @@
 #import "CryptoBridging.h"
 #import "CryptoOpenSSL/CryptoCTR.h"
 #import "CryptoOpenSSL/ZeroingData.h"
-#import "crypto_openssl/crypto_ctr.h"
+#import "crypto/crypto_ctr.h"
 
 @interface CryptoCTR () {
     crypto_ctr_t *ptr;

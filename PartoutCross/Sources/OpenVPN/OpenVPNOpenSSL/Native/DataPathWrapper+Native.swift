@@ -23,8 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPN
+internal import _PartoutCryptoOpenSSL_Cross
+import _PartoutOpenVPNCore
 internal import _PartoutOpenVPNOpenSSL_C
+import Foundation
 import PartoutCore
 
 private let PRNGSeedLength = 64
@@ -44,7 +46,7 @@ extension DataPathWrapper {
     }
 
     static func native(with parameters: Parameters, prf: Parameters.PRF, seed: CZeroingData) throws -> DataPathWrapper {
-        key_init_seed(seed.ptr)
+        seed.useToInitializeKeys()
         return try .native(with: parameters, keys: parameters.keys(with: prf))
     }
 
@@ -54,9 +56,10 @@ extension DataPathWrapper {
         let mode: UnsafeMutablePointer<dp_mode_t>
         let cipherAlgorithm = parameters.cipher?.rawValue.uppercased()
         let digestAlgorithm = parameters.digest?.rawValue.uppercased()
+        let keysBridge = CryptoKeysBridge(keys: keys)
 
         if let cipherAlgorithm, cipherAlgorithm.hasSuffix("-GCM") {
-            mode = withUnsafePointer(to: keys.cKeys) { keys in
+            mode = withUnsafePointer(to: keysBridge.cKeys) { keys in
                 cipherAlgorithm.withCString { cCipher in
                     dp_mode_ad_create_aead(
                         cCipher,
@@ -72,7 +75,7 @@ extension DataPathWrapper {
                 throw DataPathError.wrapperAlgorithm
             }
             mode = digestAlgorithm.withCString { cDigest in
-                withUnsafePointer(to: keys.cKeys) { keys in
+                withUnsafePointer(to: keysBridge.cKeys) { keys in
                     if let cipherAlgorithm {
                         return cipherAlgorithm.withCString { cCipher in
                             dp_mode_hmac_create_cbc(

@@ -26,7 +26,7 @@
 #import "CryptoBridging.h"
 #import "CryptoOpenSSL/CryptoCBC.h"
 #import "CryptoOpenSSL/ZeroingData.h"
-#import "crypto_openssl/crypto_cbc.h"
+#import "crypto/crypto_cbc.h"
 
 @interface CryptoCBC () {
     crypto_cbc_t *ptr;

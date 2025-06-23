@@ -18,8 +18,15 @@ let coreSHA1 = "bfac7b7f2831fa0b030e5972864e93754d825c74"
 let environment: Environment = .remoteBinary
 
 // implies included targets (exclude docs until ready)
-let areas = Set(Area.allCases)
-    .subtracting([.documentation])
+let areas = {
+    var included = Set(Area.allCases)
+    included.remove(.documentation) // until ready
+#if os(Windows) || os(Linux)
+    included.remove(.openvpnApple)
+    included.remove(.wireguardApple)
+#endif
+    return included
+}()
 
 // the global settings for C targets
 let cSettings: [CSetting] = [
@@ -47,7 +54,11 @@ enum Area: CaseIterable {
 
     case openvpn
 
+    case openvpnApple
+
     case wireguard
+
+    case wireguardApple
 }
 
 enum OS {
@@ -111,10 +122,10 @@ package.targets.append(contentsOf: [
                 dependencies.append("PartoutAPI")
             }
             if areas.contains(.openvpn) {
-                dependencies.append("_PartoutOpenVPN")
+                dependencies.append("_PartoutOpenVPNCore")
             }
             if areas.contains(.wireguard) {
-                dependencies.append("_PartoutWireGuard")
+                dependencies.append("_PartoutWireGuardCore")
             }
             return dependencies
         }(),
@@ -314,128 +325,144 @@ if areas.contains(.api) {
 // MARK: - OpenVPN
 
 if areas.contains(.openvpn) {
-    package.dependencies.append(contentsOf: [
-        .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
-    ])
-
     package.products.append(contentsOf: [
         .library(
-            name: "PartoutOpenVPN",
-            targets: ["PartoutOpenVPN"]
-        ),
-        .library(
-            name: "_PartoutOpenVPN",
-            targets: ["_PartoutOpenVPN"]
-        ),
-        .library(
-            name: "_PartoutOpenVPNOpenSSL",
-            targets: ["_PartoutOpenVPNOpenSSL"]
-        ),
-        .library(
-            name: "_PartoutOpenVPNOpenSSL_ObjC",
-            targets: ["_PartoutOpenVPNOpenSSL_ObjC"]
+            name: "_PartoutOpenVPNCore",
+            targets: ["_PartoutOpenVPNCore"]
+        )
+    ])
+    package.targets.append(contentsOf: [
+        .target(
+            name: "_PartoutOpenVPNCore",
+            dependencies: ["PartoutCoreWrapper"],
+            path: "Sources/OpenVPN/Core"
         )
     ])
 
-    package.targets.append(contentsOf: [
-        .target(
-            name: "PartoutOpenVPN",
-            dependencies: ["_PartoutOpenVPNOpenSSL"],
-            path: "Sources/OpenVPN/Wrapper"
-        ),
-        .target(
-            name: "_PartoutOpenVPN",
-            dependencies: ["PartoutCoreWrapper"],
-            path: "Sources/OpenVPN/Base"
-        ),
-        .target(
-            name: "_PartoutCryptoOpenSSL_ObjC",
-            dependencies: ["openssl-apple"],
-            path: "Sources/OpenVPN/CryptoOpenSSL_ObjC"
-        ),
-        .target(
-            name: "_PartoutOpenVPNOpenSSL",
-            dependencies: [
-                "_PartoutOpenVPN",
-                "_PartoutOpenVPNOpenSSL_ObjC"
-            ],
-            path: "Sources/OpenVPN/OpenVPNOpenSSL"
-        ),
-        .target(
-            name: "_PartoutOpenVPNOpenSSL_ObjC",
-            dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-            path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
-            exclude: [
-                "lib/COPYING",
-                "lib/Makefile",
-                "lib/README.LZO",
-                "lib/testmini.c"
-            ]
-        ),
-        .testTarget(
-            name: "_PartoutCryptoOpenSSLTests",
-            dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-            path: "Tests/OpenVPN/CryptoOpenSSL"
-        ),
-        .testTarget(
-            name: "_PartoutOpenVPNTests",
-            dependencies: ["_PartoutOpenVPN"],
-            path: "Tests/OpenVPN/Base"
-        ),
-        .testTarget(
-            name: "_PartoutOpenVPNOpenSSLTests",
-            dependencies: ["_PartoutOpenVPNOpenSSL"],
-            path: "Tests/OpenVPN/OpenVPNOpenSSL",
-            resources: [
-                .process("Resources")
-            ]
-        )
-    ])
+    if areas.contains(.openvpnApple) {
+        package.dependencies.append(contentsOf: [
+            .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
+        ])
+        package.products.append(contentsOf: [
+            .library(
+                name: "PartoutOpenVPN",
+                targets: ["PartoutOpenVPN"]
+            ),
+            .library(
+                name: "_PartoutOpenVPNOpenSSL",
+                targets: ["_PartoutOpenVPNOpenSSL"]
+            ),
+            .library(
+                name: "_PartoutOpenVPNOpenSSL_ObjC",
+                targets: ["_PartoutOpenVPNOpenSSL_ObjC"]
+            )
+        ])
+        package.targets.append(contentsOf: [
+            .target(
+                name: "PartoutOpenVPN",
+                dependencies: ["_PartoutOpenVPNOpenSSL"],
+                path: "Sources/OpenVPN/Wrapper"
+            ),
+            .target(
+                name: "_PartoutCryptoOpenSSL_ObjC",
+                dependencies: ["openssl-apple"],
+                path: "Sources/OpenVPN/CryptoOpenSSL_ObjC"
+            ),
+            .target(
+                name: "_PartoutOpenVPNOpenSSL",
+                dependencies: [
+                    "_PartoutOpenVPNCore",
+                    "_PartoutOpenVPNOpenSSL_ObjC"
+                ],
+                path: "Sources/OpenVPN/OpenVPNOpenSSL"
+            ),
+            .target(
+                name: "_PartoutOpenVPNOpenSSL_ObjC",
+                dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
+                path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
+                exclude: [
+                    "lib/COPYING",
+                    "lib/Makefile",
+                    "lib/README.LZO",
+                    "lib/testmini.c"
+                ]
+            ),
+            .testTarget(
+                name: "_PartoutCryptoOpenSSLTests",
+                dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
+                path: "Tests/OpenVPN/CryptoOpenSSL"
+            ),
+            .testTarget(
+                name: "_PartoutOpenVPNTests",
+                dependencies: ["_PartoutOpenVPNCore"],
+                path: "Tests/OpenVPN/Core"
+            ),
+            .testTarget(
+                name: "_PartoutOpenVPNOpenSSLTests",
+                dependencies: ["_PartoutOpenVPNOpenSSL"],
+                path: "Tests/OpenVPN/OpenVPNOpenSSL",
+                resources: [
+                    .process("Resources")
+                ]
+            )
+        ])
+    }
 }
 
 // MARK: - WireGuard
 
 if areas.contains(.wireguard) {
-    package.dependencies.append(contentsOf: [
-        .package(url: "https://github.com/passepartoutvpn/wireguard-apple", from: "1.1.2")
-    ])
     package.products.append(contentsOf: [
         .library(
-            name: "PartoutWireGuard",
-            targets: ["PartoutWireGuard"]
+            name: "_PartoutWireGuardCore",
+            targets: ["_PartoutWireGuardCore"]
         )
     ])
     package.targets.append(contentsOf: [
         .target(
-            name: "PartoutWireGuard",
-            dependencies: ["_PartoutWireGuardGo"],
-            path: "Sources/WireGuard/Wrapper"
-        ),
-        .target(
-            name: "_PartoutWireGuard",
+            name: "_PartoutWireGuardCore",
             dependencies: ["PartoutCoreWrapper"],
-            path: "Sources/WireGuard/Base"
-        ),
-        .target(
-            name: "_PartoutWireGuardGo",
-            dependencies: [
-                "_PartoutWireGuard",
-                .product(name: "WireGuardKit", package: "wireguard-apple")
-            ],
-            path: "Sources/WireGuard/WireGuardGo",
-            resources: [
-                .process("Resources")
-            ]
-        ),
-        .testTarget(
-            name: "_PartoutWireGuardTests",
-            dependencies: ["_PartoutWireGuard"],
-            path: "Tests/WireGuard/Base"
-        ),
-        .testTarget(
-            name: "_PartoutWireGuardGoTests",
-            dependencies: ["_PartoutWireGuardGo"],
-            path: "Tests/WireGuard/WireGuardGo"
+            path: "Sources/WireGuard/Core"
         )
     ])
+
+    if areas.contains(.wireguardApple) {
+        package.dependencies.append(contentsOf: [
+            .package(url: "https://github.com/passepartoutvpn/wireguard-apple", from: "1.1.2")
+        ])
+        package.products.append(contentsOf: [
+            .library(
+                name: "PartoutWireGuard",
+                targets: ["PartoutWireGuard"]
+            )
+        ])
+        package.targets.append(contentsOf: [
+            .target(
+                name: "PartoutWireGuard",
+                dependencies: ["_PartoutWireGuardGo"],
+                path: "Sources/WireGuard/Wrapper"
+            ),
+            .target(
+                name: "_PartoutWireGuardGo",
+                dependencies: [
+                    "_PartoutWireGuardCore",
+                    .product(name: "WireGuardKit", package: "wireguard-apple")
+                ],
+                path: "Sources/WireGuard/WireGuardGo",
+                resources: [
+                    .process("Resources")
+                ]
+            ),
+            .testTarget(
+                name: "_PartoutWireGuardTests",
+                dependencies: ["_PartoutWireGuardCore"],
+                path: "Tests/WireGuard/Core"
+            ),
+            .testTarget(
+                name: "_PartoutWireGuardGoTests",
+                dependencies: ["_PartoutWireGuardGo"],
+                path: "Tests/WireGuard/WireGuardGo"
+            )
+        ])
+    }
 }

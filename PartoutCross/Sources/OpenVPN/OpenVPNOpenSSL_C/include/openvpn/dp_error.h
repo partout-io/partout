@@ -1,8 +1,8 @@
 //
-//  dp_mode_hmac.h
+//  dp_error.h
 //  Partout
 //
-//  Created by Davide De Rosa on 6/16/25.
+//  Created by Davide De Rosa on 6/17/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -25,9 +25,17 @@
 
 #pragma once
 
-#include "dp_mode.h"
+#include "crypto/crypto.h"
 
-// WARNING: retains crypto
-dp_mode_t *_Nonnull dp_mode_hmac_create(crypto_t *_Nonnull crypto,
-                                        crypto_free_t _Nonnull crypto_free,
-                                        compression_framing_t comp_f);
+typedef enum {
+    DataPathErrorNone,
+    DataPathErrorCrypto,
+    DataPathErrorPeerIdMismatch,
+    DataPathErrorOverflow,
+    DataPathErrorCompression
+} dp_error_code;
+
+typedef struct {
+    dp_error_code dp_code;
+    crypto_error_code crypto_code;
+} dp_error_t;

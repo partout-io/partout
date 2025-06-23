@@ -27,8 +27,8 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <string.h>
-#include "crypto_openssl/allocation.h"
-#include "crypto_openssl/crypto_cbc.h"
+#include "crypto/allocation.h"
+#include "crypto/crypto_cbc.h"
 
 #define MAX_HMAC_LENGTH 100
 
@@ -123,6 +123,7 @@ bool crypto_decrypt(void *vctx,
                     uint8_t *out, size_t *out_len,
                     const uint8_t *in, size_t in_len,
                     const crypto_flags_t *flags, crypto_error_code *error) {
+    (void)flags;
     crypto_cbc_t *ctx = (crypto_cbc_t *)vctx;
     assert(ctx);
     assert(!ctx->cipher || ctx->ctx_dec);
@@ -205,13 +206,13 @@ crypto_cbc_t *crypto_cbc_create(const char *cipher_name, const char *digest_name
 
     if (cipher_name) {
         ctx->cipher = cipher;
-        ctx->utf_cipher_name = strdup(cipher_name);
+        ctx->utf_cipher_name = pp_dup(cipher_name);
         ctx->cipher_key_len = EVP_CIPHER_key_length(ctx->cipher);
         ctx->cipher_iv_len = EVP_CIPHER_iv_length(ctx->cipher);
     }
 
     ctx->digest = digest;
-    ctx->utf_digest_name = strdup(digest_name);
+    ctx->utf_digest_name = pp_dup(digest_name);
     // as seen in OpenVPN's crypto_openssl.c:md_kt_size()
     ctx->hmac_key_len = EVP_MD_size(ctx->digest);
     ctx->digest_len = ctx->hmac_key_len;
@@ -260,7 +261,7 @@ void crypto_cbc_free(crypto_cbc_t *ctx) {
     EVP_MAC_free(ctx->mac);
     free(ctx->mac_params);
     if (ctx->buffer_hmac) {
-        bzero(ctx->buffer_hmac, MAX_HMAC_LENGTH);
+        pp_zero(ctx->buffer_hmac, MAX_HMAC_LENGTH);
         free(ctx->buffer_hmac);
     }
 

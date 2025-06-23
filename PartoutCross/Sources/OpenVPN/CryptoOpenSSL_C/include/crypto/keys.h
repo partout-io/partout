@@ -1,8 +1,8 @@
 //
-//  DataPathWrapper.swift
+//  keys.h
 //  Partout
 //
-//  Created by Davide De Rosa on 6/15/25.
+//  Created by Davide De Rosa on 6/20/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,33 +23,21 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
-import Foundation
+#pragma once
 
-// FIXME: ###, DataPathWrapper supersedes OSSLCryptoBox and cryptoFactory(), delete later
+#include <stdbool.h>
+#include <stdint.h>
+#include "crypto/zeroing_data.h"
 
-final class DataPathWrapper {
-    struct Parameters {
-        let cipher: OpenVPN.Cipher?
+bool key_init_seed(const zeroing_data_t *_Nonnull zd);
 
-        let digest: OpenVPN.Digest?
+typedef struct {
+    zeroing_data_t *_Nonnull dst;
+    const char *_Nonnull digest_name;
+    const zeroing_data_t *_Nonnull secret;
+    const zeroing_data_t *_Nonnull data;
+} key_hmac_ctx;
 
-        let compressionFraming: OpenVPN.CompressionFraming
+#define key_hmac_buf_len    (size_t)100
 
-        let peerId: UInt32?
-    }
-
-    let dataPath: DataPathTestingProtocol
-
-    init(dataPath: DataPathTestingProtocol) {
-        self.dataPath = dataPath
-    }
-
-    func encrypt(_ packets: [Data], key: UInt8) throws -> [Data] {
-        try dataPath.encrypt(packets, key: key)
-    }
-
-    func decrypt(_ packets: [Data]) throws -> (packets: [Data], keepAlive: Bool) {
-        try dataPath.decrypt(packets)
-    }
-}
+size_t key_hmac(key_hmac_ctx *_Nonnull ctx);

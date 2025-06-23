@@ -26,8 +26,8 @@
 #include <assert.h>
 #include <openssl/evp.h>
 #include <string.h>
-#include "crypto_openssl/allocation.h"
-#include "crypto_openssl/crypto_aead.h"
+#include "crypto/allocation.h"
+#include "crypto/crypto_aead.h"
 
 size_t crypto_encryption_capacity(const void *vctx, size_t len) {
     crypto_aead_t *ctx = (crypto_aead_t *)vctx;
@@ -46,7 +46,7 @@ void crypto_configure_encrypt(void *vctx,
     EVP_CIPHER_CTX_reset(ctx->ctx_enc);
     EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1);
 
-    bzero(ctx->iv_enc, ctx->id_len);
+    pp_zero(ctx->iv_enc, ctx->id_len);
     memcpy(ctx->iv_enc + ctx->id_len, hmac_key->bytes, ctx->cipher_iv_len - ctx->id_len);
 }
 
@@ -88,7 +88,7 @@ void crypto_configure_decrypt(void *vctx,
     EVP_CIPHER_CTX_reset(ctx->ctx_dec);
     EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0);
 
-    bzero(ctx->iv_dec, ctx->id_len);
+    pp_zero(ctx->iv_dec, ctx->id_len);
     memcpy(ctx->iv_dec + ctx->id_len, hmac_key->bytes, ctx->cipher_iv_len - ctx->id_len);
 }
 
@@ -169,8 +169,8 @@ void crypto_aead_free(crypto_aead_t *ctx) {
     EVP_CIPHER_CTX_free(ctx->ctx_enc);
     EVP_CIPHER_CTX_free(ctx->ctx_dec);
 
-    bzero(ctx->iv_enc, ctx->cipher_iv_len);
-    bzero(ctx->iv_dec, ctx->cipher_iv_len);
+    pp_zero(ctx->iv_enc, ctx->cipher_iv_len);
+    pp_zero(ctx->iv_dec, ctx->cipher_iv_len);
     free(ctx->iv_enc);
     free(ctx->iv_dec);
     free(ctx);

@@ -23,20 +23,18 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutCryptoOpenSSL_Cross
+internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 import PartoutCore
 
 extension PRNGProtocol {
     func safeData(length: Int) -> CZeroingData {
         precondition(length > 0)
-        let randomBytes = UnsafeMutablePointer<UInt8>.allocate(capacity: length)
-        defer {
-            bzero(randomBytes, length)
-            randomBytes.deallocate()
+        let randomData = CZ(length: length)
+        guard prng_do(randomData.mutableBytes, length) else {
+            fatalError("random_do() failed")
         }
-        guard SecRandomCopyBytes(kSecRandomDefault, length, randomBytes) == errSecSuccess else {
-            fatalError("SecRandomCopyBytes failed")
-        }
-        return CZ(bytes: randomBytes, length: length)
+        return randomData
     }
 }

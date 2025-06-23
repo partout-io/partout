@@ -23,9 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPN
 @testable import _PartoutOpenVPNOpenSSL_Cross
-import Foundation
 import XCTest
 
 /*

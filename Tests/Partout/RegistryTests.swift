@@ -28,10 +28,10 @@ import Partout
 import XCTest
 
 #if canImport(_PartoutOpenVPN)
-import _PartoutOpenVPN
+import _PartoutOpenVPNCore
 #endif
 #if canImport(_PartoutWireGuard)
-import _PartoutWireGuard
+import _PartoutWireGuardCore
 #endif
 
 final class RegistryTests: XCTestCase {

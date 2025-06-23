@@ -76,8 +76,8 @@ extension PartoutError.Code.Providers {
 // MARK: - Modules
 
 #if canImport(_PartoutOpenVPN)
-@_exported import _PartoutOpenVPN
+@_exported import _PartoutOpenVPNCore
 #endif
 #if canImport(_PartoutWireGuard)
-@_exported import _PartoutWireGuard
+@_exported import _PartoutWireGuardCore
 #endif

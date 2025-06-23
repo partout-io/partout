@@ -24,10 +24,10 @@
 //
 
 #if canImport(_PartoutOpenVPN)
-import _PartoutOpenVPN
+import _PartoutOpenVPNCore
 #endif
 #if canImport(_PartoutWireGuard)
-import _PartoutWireGuard
+import _PartoutWireGuardCore
 #endif
 import Foundation
 import PartoutCore

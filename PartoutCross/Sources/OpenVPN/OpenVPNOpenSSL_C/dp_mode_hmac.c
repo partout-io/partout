@@ -23,9 +23,12 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "dp_macros.h"
-#include "dp_mode_hmac.h"
-#include "packet.h"
+#include <assert.h>
+#include <stdint.h>
+#include "crypto/endian.h"
+#include "openvpn/dp_macros.h"
+#include "openvpn/dp_mode_hmac.h"
+#include "openvpn/packet.h"
 
 static
 size_t dp_assemble(void *vmode) {
@@ -37,7 +40,7 @@ size_t dp_assemble(void *vmode) {
     assert(ctx->dst->length >= dst_capacity);
 
     uint8_t *dst = ctx->dst->bytes;
-    *(uint32_t *)dst = htonl(ctx->packet_id);
+    *(uint32_t *)dst = endian_htonl(ctx->packet_id);
     dst += sizeof(uint32_t);
     size_t dst_len = (size_t)(dst - ctx->dst->bytes + ctx->src_len);
     if (!mode->enc.framing_assemble) {
@@ -70,7 +73,7 @@ size_t dp_encrypt(void *vmode) {
     uint8_t *dst = ctx->dst->bytes;
 
     // skip header bytes
-    size_t dst_packet_len = UINT_MAX;
+    size_t dst_packet_len = UINT32_MAX;
     crypto_error_code enc_error;
     const bool success = mode->enc.raw_encrypt(mode->crypto,
                                                dst + dst_header_len,
@@ -115,7 +118,7 @@ size_t dp_decrypt(void *vmode) {
     }
 
     // skip header = (code, key)
-    size_t dst_len = UINT_MAX;
+    size_t dst_len = UINT32_MAX;
     crypto_error_code dec_error;
     const bool success = mode->dec.raw_decrypt(mode->crypto,
                                                dst,
@@ -140,7 +143,7 @@ size_t dp_decrypt(void *vmode) {
             return 0;
         }
     }
-    *ctx->dst_packet_id = ntohl(*(uint32_t *)ctx->dst->bytes);
+    *ctx->dst_packet_id = endian_ntohl(*(uint32_t *)ctx->dst->bytes);
     return dst_len;
 }
 

@@ -36,9 +36,9 @@
 
 #pragma once
 
-#include <arpa/inet.h>
 #include <stdint.h>
 #include <string.h>
+#include "crypto/endian.h"
 
 // MARK: - Packets
 
@@ -117,13 +117,13 @@ size_t packet_header_v2_set(uint8_t *_Nonnull dst,
                             uint8_t src_key,
                             uint32_t src_peer_id) {
 
-    *(uint32_t *)dst = ((PacketCodeDataV2 << 3) | (src_key & 0b111)) | htonl(peer_id_masked(src_peer_id));
+    *(uint32_t *)dst = ((PacketCodeDataV2 << 3) | (src_key & 0b111)) | endian_htonl(peer_id_masked(src_peer_id));
     return PacketOpcodeLength + PacketPeerIdLength;
 }
 
 static inline
 uint32_t packet_header_v2_get_peer_id(const uint8_t *_Nonnull src) {
-    return ntohl(*(const uint32_t *)src & 0xffffff00);
+    return endian_ntohl(*(const uint32_t *)src & 0xffffff00);
 }
 
 #pragma mark - Utils

@@ -24,6 +24,7 @@
 //
 
 internal import _PartoutCryptoOpenSSL_C
+internal import _PartoutCryptoOpenSSL_Cross
 import Foundation
 
 struct CryptoKeys {
@@ -51,17 +52,45 @@ extension CryptoKeys {
     }
 }
 
-extension CryptoKeys {
+final class CryptoKeysBridge {
+    private let cipherEncKey: UnsafeMutablePointer<zeroing_data_t>
+
+    private let cipherDecKey: UnsafeMutablePointer<zeroing_data_t>
+
+    private let hmacEncKey: UnsafeMutablePointer<zeroing_data_t>
+
+    private let hmacDecKey: UnsafeMutablePointer<zeroing_data_t>
+
+    init(keys: CryptoKeys) {
+        cipherEncKey = keys.cipher.encryptionKey.unsafeCopy()
+        cipherDecKey = keys.cipher.decryptionKey.unsafeCopy()
+        hmacEncKey = keys.digest.encryptionKey.unsafeCopy()
+        hmacDecKey = keys.digest.decryptionKey.unsafeCopy()
+    }
+
+    deinit {
+        zd_free(cipherEncKey)
+        zd_free(cipherDecKey)
+        zd_free(hmacEncKey)
+        zd_free(hmacDecKey)
+    }
+
     var cKeys: crypto_keys_t {
         crypto_keys_t(
             cipher: crypto_key_pair_t(
-                enc_key: cipher.encryptionKey.ptr,
-                dec_key: cipher.decryptionKey.ptr
+                enc_key: cipherEncKey,
+                dec_key: cipherDecKey
             ),
             hmac: crypto_key_pair_t(
-                enc_key: digest.encryptionKey.ptr,
-                dec_key: digest.decryptionKey.ptr
+                enc_key: hmacEncKey,
+                dec_key: hmacDecKey
             )
         )
+    }
+}
+
+private extension CZeroingData {
+    func unsafeCopy() -> UnsafeMutablePointer<zeroing_data_t> {
+        zd_create_copy(bytes, length)
     }
 }

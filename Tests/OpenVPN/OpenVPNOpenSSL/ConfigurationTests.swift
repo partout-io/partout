@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPN
+import _PartoutOpenVPNCore
 @testable import _PartoutOpenVPNOpenSSL
 import PartoutCore
 import XCTest
