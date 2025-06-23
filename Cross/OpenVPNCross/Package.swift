@@ -67,6 +67,12 @@ if cryptoMode != .bridgedCrypto {
         ),
     ])
     package.targets.append(contentsOf: [
+        .target(
+            name: "_PartoutOpenVPNOpenSSL_C",
+            dependencies: ["_PartoutCryptoOpenSSL_C"],
+            path: "Sources/OpenVPN/OpenVPNOpenSSL_C",
+            cSettings: cSettings
+        ),
         .testTarget(
             name: "_PartoutOpenVPNOpenSSL_CrossTests",
             dependencies: [.target(name: mainUmbrella)],
@@ -124,12 +130,6 @@ case .wrapped, .wrappedNative:
             name: "_PartoutCryptoOpenSSL_C",
             dependencies: ["openssl-apple"],
             path: "Sources/OpenVPN/CryptoOpenSSL_C",
-            cSettings: cSettings
-        ),
-        .target(
-            name: "_PartoutOpenVPNOpenSSL_C",
-            dependencies: ["_PartoutCryptoOpenSSL_C"],
-            path: "Sources/OpenVPN/OpenVPNOpenSSL_C",
             cSettings: cSettings
         ),
         .target(
