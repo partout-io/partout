@@ -31,10 +31,13 @@ jobs:
     steps:
       - name: Test bridged ObjC
         run: |
-          OPENVPN_CRYPTO_MODE="1" cd Cross/OpenVPNCross && swift test
+          export OPENVPN_CRYPTO_MODE="1"
+          cd Cross/OpenVPNCross && swift test
       - name: Test wrapped Swift/ObjC
         run: |
-          OPENVPN_CRYPTO_MODE="2" cd Cross/OpenVPNCross && swift test
+          export OPENVPN_CRYPTO_MODE="2"
+          cd Cross/OpenVPNCross && swift test
       - name: Test wrapped Swift/C
         run: |
-          OPENVPN_CRYPTO_MODE="3" cd Cross/OpenVPNCross && swift test
+          export OPENVPN_CRYPTO_MODE="3"
+          cd Cross/OpenVPNCross && swift test
