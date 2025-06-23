@@ -21,23 +21,18 @@ jobs:
         run: |
           default_env="let environment: Environment = .remoteBinary"
           grep "^$default_env$" Package.swift
-      - name: Run tests (legacy)
+      - name: Run tests
         run: |
           swift test
-  run_openvpn_tests:
-    name: Run OpenVPN cross tests
-    runs-on: macos-15
-    timeout-minutes: 10
-    steps:
-      - name: Test bridged ObjC
+      - name: "OpenVPN: Test bridged ObjC"
         run: |
           export OPENVPN_CRYPTO_MODE="1"
           cd Cross/OpenVPNCross && swift test
-      - name: Test wrapped Swift/ObjC
+      - name: "OpenVPN: Test wrapped Swift/ObjC"
         run: |
           export OPENVPN_CRYPTO_MODE="2"
           cd Cross/OpenVPNCross && swift test
-      - name: Test wrapped Swift/C
+      - name: "OpenVPN: Test wrapped Swift/C"
         run: |
           export OPENVPN_CRYPTO_MODE="3"
           cd Cross/OpenVPNCross && swift test
