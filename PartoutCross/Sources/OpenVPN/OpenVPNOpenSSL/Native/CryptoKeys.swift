@@ -24,6 +24,7 @@
 //
 
 internal import _PartoutCryptoOpenSSL_C
+internal import _PartoutCryptoOpenSSL_Cross
 import Foundation
 
 struct CryptoKeys {

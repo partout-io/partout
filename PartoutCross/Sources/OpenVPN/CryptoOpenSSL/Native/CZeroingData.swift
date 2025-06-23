@@ -26,27 +26,27 @@
 internal import _PartoutCryptoOpenSSL_C
 import Foundation
 
-final class CZeroingData {
+public final class CZeroingData {
     let ptr: UnsafeMutablePointer<zeroing_data_t>
 
     private init(ptr: UnsafeMutablePointer<zeroing_data_t>) {
         self.ptr = ptr
     }
 
-    init(length: Int = 0) {
+    public init(length: Int = 0) {
         self.ptr = zd_create(length)
     }
 
-    init(bytes: UnsafePointer<UInt8>, length: Int) {
+    public init(bytes: UnsafePointer<UInt8>, length: Int) {
         self.ptr = zd_create_from_data(bytes, length)
     }
 
-    init(uInt8: UInt8) {
+    public init(uInt8: UInt8) {
         var value = uInt8
         self.ptr = zd_create_from_data(&value, 1)
     }
 
-    init(uInt16: UInt16) {
+    public init(uInt16: UInt16) {
         var value = uInt16
         ptr = withUnsafeBytes(of: &value) {
             guard let bytes = $0.bindMemory(to: UInt8.self).baseAddress else {
@@ -56,7 +56,7 @@ final class CZeroingData {
         }
     }
 
-    init(data: Data) {
+    public init(data: Data) {
         ptr = data.withUnsafeBytes {
             guard let bytes = $0.bindMemory(to: UInt8.self).baseAddress else {
                 fatalError("Could not bind to memory")
@@ -65,7 +65,7 @@ final class CZeroingData {
         }
     }
 
-    init(data: Data, offset: Int, length: Int) {
+    public init(data: Data, offset: Int, length: Int) {
         ptr = data.withUnsafeBytes {
             guard let bytes = $0.bindMemory(to: UInt8.self).baseAddress else {
                 fatalError("Could not bind to memory")
@@ -74,7 +74,7 @@ final class CZeroingData {
         }
     }
 
-    init(string: String, nullTerminated: Bool) {
+    public init(string: String, nullTerminated: Bool) {
         guard let cstr = string.cString(using: .utf8) else {
             ptr = zd_create(0)
             return
@@ -90,25 +90,25 @@ final class CZeroingData {
 // MARK: Properties
 
 extension CZeroingData {
-    var bytes: UnsafePointer<UInt8>! {
+    public var bytes: UnsafePointer<UInt8>! {
         zd_bytes(ptr)
     }
 
-    var mutableBytes: UnsafeMutablePointer<UInt8>! {
+    public var mutableBytes: UnsafeMutablePointer<UInt8>! {
         zd_mutable_bytes(ptr)
     }
 
-    var length: Int {
+    public var length: Int {
         zd_length(ptr)
     }
 }
 
 extension CZeroingData: Equatable {
-    static func == (lhs: CZeroingData, rhs: CZeroingData) -> Bool {
+    public static func == (lhs: CZeroingData, rhs: CZeroingData) -> Bool {
         zd_equals(lhs.ptr, rhs.ptr)
     }
 
-    func isEqual(to data: Data) -> Bool {
+    public func isEqual(to data: Data) -> Bool {
         let length = data.count
         return data.withUnsafeBytes { dataPtr in
             zd_equals_to_data(ptr, dataPtr.bytePointer, length)
@@ -119,18 +119,18 @@ extension CZeroingData: Equatable {
 // MARK: Copy
 
 extension CZeroingData {
-    func copy() -> CZeroingData {
+    public func copy() -> CZeroingData {
         CZeroingData(ptr: zd_make_copy(self.ptr))
     }
 
-    func withOffset(_ offset: Int, length: Int) -> CZeroingData {
+    public func withOffset(_ offset: Int, length: Int) -> CZeroingData {
         guard let slice = zd_make_slice(ptr, offset, length) else {
             return CZeroingData()
         }
         return CZeroingData(ptr: slice)
     }
 
-    func appending(_ other: CZeroingData) -> CZeroingData {
+    public func appending(_ other: CZeroingData) -> CZeroingData {
         let copy = zd_make_copy(ptr)
         zd_append(copy, other.ptr)
         return CZeroingData(ptr: copy)
@@ -140,19 +140,19 @@ extension CZeroingData {
 // MARK: Side effect
 
 extension CZeroingData {
-    func zero() {
+    public func zero() {
         zd_zero(ptr)
     }
 
-    func truncate(toSize size: Int) {
+    public func truncate(toSize size: Int) {
         zd_resize(ptr, size)
     }
 
-    func remove(untilOffset offset: Int) {
+    public func remove(untilOffset offset: Int) {
         zd_remove_until(ptr, offset)
     }
 
-    func append(_ other: CZeroingData) {
+    public func append(_ other: CZeroingData) {
         zd_append(ptr, other.ptr)
     }
 }
@@ -160,11 +160,11 @@ extension CZeroingData {
 // MARK: Accessors
 
 extension CZeroingData {
-    func networkUInt16Value(fromOffset offset: Int) -> UInt16 {
-        CFSwapInt16BigToHost(zd_uint16(ptr, offset))
+    public func networkUInt16Value(fromOffset offset: Int) -> UInt16 {
+        endian_ntohs(zd_uint16(ptr, offset))
     }
 
-    func nullTerminatedString(fromOffset offset: Int) -> String? {
+    public func nullTerminatedString(fromOffset offset: Int) -> String? {
         precondition(offset <= length)
         guard let bytes else {
             return nil
@@ -172,14 +172,14 @@ extension CZeroingData {
         return String(cString: bytes)
     }
 
-    func toData(until: Int? = nil) -> Data {
+    public func toData(until: Int? = nil) -> Data {
         if let until {
             precondition(until <= ptr.pointee.length)
         }
         return Data(bytes: ptr.pointee.bytes, count: until ?? ptr.pointee.length)
     }
 
-    func toHex() -> String {
+    public func toHex() -> String {
         guard let bytes else {
             return ""
         }

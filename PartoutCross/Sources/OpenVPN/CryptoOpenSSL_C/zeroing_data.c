@@ -28,6 +28,9 @@
 #include "crypto_openssl/allocation.h"
 #include "crypto_openssl/zeroing_data.h"
 
+// FIXME: ##, drop dup of zd_create_copy
+// FIXME: ##, make zd inline
+
 // MARK: Creation
 
 zeroing_data_t *zd_create(size_t length) {
