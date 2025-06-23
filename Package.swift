@@ -335,7 +335,7 @@ if areas.contains(.openvpn) {
         .target(
             name: "_PartoutOpenVPNCore",
             dependencies: ["PartoutCoreWrapper"],
-            path: "Sources/OpenVPN/Base"
+            path: "Sources/OpenVPN/Core"
         )
     ])
 
@@ -395,7 +395,7 @@ if areas.contains(.openvpn) {
             .testTarget(
                 name: "_PartoutOpenVPNTests",
                 dependencies: ["_PartoutOpenVPNCore"],
-                path: "Tests/OpenVPN/Base"
+                path: "Tests/OpenVPN/Core"
             ),
             .testTarget(
                 name: "_PartoutOpenVPNOpenSSLTests",
@@ -422,7 +422,7 @@ if areas.contains(.wireguard) {
         .target(
             name: "_PartoutWireGuardCore",
             dependencies: ["PartoutCoreWrapper"],
-            path: "Sources/WireGuard/Base"
+            path: "Sources/WireGuard/Core"
         )
     ])
 
@@ -456,7 +456,7 @@ if areas.contains(.wireguard) {
             .testTarget(
                 name: "_PartoutWireGuardTests",
                 dependencies: ["_PartoutWireGuardCore"],
-                path: "Tests/WireGuard/Base"
+                path: "Tests/WireGuard/Core"
             ),
             .testTarget(
                 name: "_PartoutWireGuardGoTests",
