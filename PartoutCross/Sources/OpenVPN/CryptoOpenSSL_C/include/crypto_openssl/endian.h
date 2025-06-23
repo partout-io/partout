@@ -23,6 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#pragma once
+
 #ifdef __APPLE__
 
 #include <CoreFoundation/CoreFoundation.h>
