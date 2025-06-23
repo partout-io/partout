@@ -10,6 +10,9 @@ let package = Package(
         .iOS(.v15),
         .macOS(.v12),
         .tvOS(.v17)
+    ],
+    dependencies: [
+        .package(path: "..") // "partout"
     ]
 )
 
@@ -18,7 +21,7 @@ let areas: Set<CrossArea> = Set(CrossArea.allCases)
 // the OpenVPN crypto mode (ObjC -> C)
 let openVPNCryptoMode: OpenVPNCryptoMode = .fromEnvironment(
     "OPENVPN_CRYPTO_MODE",
-    fallback: .bridgedCrypto
+    fallback: .native
 )
 
 enum CrossArea: CaseIterable {
@@ -67,14 +70,26 @@ if areas.contains(.openvpn) {
         )
     ])
 
+    // TODO: experimental, still local
+    let opensslPackage: String
+#if os(Windows)
+    opensslPackage = "openssl-windows"
+    package.dependencies.append(contentsOf: [
+        .package(path: "../../\(opensslPackage)")
+    ])
+#elseif os(Linux)
+    opensslPackage = "openssl-linux"
+    package.dependencies.append(contentsOf: [
+        .package(path: "../../\(opensslPackage)")
+    ])
+#else
+    opensslPackage = "openssl-apple"
     package.dependencies.append(contentsOf: [
         .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
     ])
+#endif
 
     if openVPNCryptoMode != .bridgedCrypto {
-        package.dependencies.append(contentsOf: [
-            .package(path: ".."), // "partout"
-        ])
         package.products.append(contentsOf: [
             .library(
                 name: mainUmbrella,
@@ -103,7 +118,7 @@ if areas.contains(.openvpn) {
     package.targets.append(contentsOf: [
         .testTarget(
             name: "_PartoutCryptoOpenSSL_CrossTests",
-            dependencies: [.target(name: cryptoUmbrella)],
+            dependencies: [cryptoUmbrella.asTargetDependency],
             path: "Tests/OpenVPN/CryptoOpenSSL"
         )
     ])
@@ -121,16 +136,13 @@ if areas.contains(.openvpn) {
         package.targets.append(contentsOf: [
             .target(
                 name: cryptoUmbrella,
-                dependencies: [
-                    "_PartoutCryptoOpenSSL_C",
-                    "_PartoutCryptoOpenSSL_ObjC_Bridged"
-                ],
+                dependencies: ["_PartoutCryptoOpenSSL_ObjC_Bridged"],
                 path: "Sources/OpenVPN/CryptoOpenSSL",
                 exclude: ["Native"]
             ),
             .target(
                 name: "_PartoutCryptoOpenSSL_C",
-                dependencies: ["openssl-apple"],
+                dependencies: [opensslPackage.asProductDependency],
                 path: "Sources/OpenVPN/CryptoOpenSSL_C",
                 cSettings: cSettings
             ),
@@ -151,13 +163,14 @@ if areas.contains(.openvpn) {
             ),
             .target(
                 name: "_PartoutCryptoOpenSSL_C",
-                dependencies: ["openssl-apple"],
+                dependencies: [opensslPackage.asProductDependency],
                 path: "Sources/OpenVPN/CryptoOpenSSL_C",
                 cSettings: cSettings
             ),
             .target(
                 name: mainUmbrella,
                 dependencies: [
+                    cryptoUmbrella.asTargetDependency,
                     "_PartoutOpenVPNOpenSSL_C",
                     .product(name: "_PartoutOpenVPN", package: "partout"),
                     .product(name: "_PartoutOpenVPNOpenSSL_ObjC", package: "partout")
@@ -177,13 +190,14 @@ if areas.contains(.openvpn) {
             ),
             .target(
                 name: "_PartoutCryptoOpenSSL_C",
-                dependencies: ["openssl-apple"],
+                dependencies: [opensslPackage.asProductDependency],
                 path: "Sources/OpenVPN/CryptoOpenSSL_C",
                 cSettings: cSettings
             ),
             .target(
                 name: mainUmbrella,
                 dependencies: [
+                    cryptoUmbrella.asTargetDependency,
                     "_PartoutOpenVPNOpenSSL_C",
                     .product(name: "_PartoutOpenVPN", package: "partout")
                 ],
@@ -215,3 +229,15 @@ enum OpenVPNCryptoMode: Int {
 }
 
 // MARK: - WireGuard
+
+// MARK: -
+
+private extension String {
+    var asTargetDependency: Target.Dependency {
+        .target(name: self)
+    }
+
+    var asProductDependency: Target.Dependency {
+        .product(name: self, package: self)
+    }
+}
