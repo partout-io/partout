@@ -159,12 +159,6 @@ case .native:
             cSettings: cSettings
         ),
         .target(
-            name: "_PartoutOpenVPNOpenSSL_C",
-            dependencies: ["_PartoutCryptoOpenSSL_C"],
-            path: "Sources/OpenVPN/OpenVPNOpenSSL_C",
-            cSettings: cSettings
-        ),
-        .target(
             name: mainUmbrella,
             dependencies: [
                 "_PartoutOpenVPNOpenSSL_C",
