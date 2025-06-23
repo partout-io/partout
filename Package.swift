@@ -1,6 +1,7 @@
 // swift-tools-version: 5.9
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
+import Foundation
 import PackageDescription
 
 // MARK: Tuning
@@ -327,16 +328,8 @@ if areas.contains(.openvpn) {
             targets: ["_PartoutOpenVPN"]
         ),
         .library(
-            name: "_PartoutCryptoOpenSSL_ObjC",
-            targets: ["_PartoutCryptoOpenSSL_ObjC"]
-        ),
-        .library(
             name: "_PartoutOpenVPNOpenSSL",
             targets: ["_PartoutOpenVPNOpenSSL"]
-        ),
-        .library(
-            name: "_PartoutOpenVPNOpenSSL_ObjC",
-            targets: ["_PartoutOpenVPNOpenSSL_ObjC"]
         )
     ])
 
@@ -367,13 +360,7 @@ if areas.contains(.openvpn) {
         .target(
             name: "_PartoutOpenVPNOpenSSL_ObjC",
             dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-            path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
-            exclude: [
-                "lib/COPYING",
-                "lib/Makefile",
-                "lib/README.LZO",
-                "lib/testmini.c"
-            ]
+            path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC"
         ),
         .testTarget(
             name: "_PartoutCryptoOpenSSLTests",

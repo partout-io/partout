@@ -21,7 +21,7 @@ jobs:
         run: |
           default_env="let environment: Environment = .remoteBinary"
           grep "^$default_env$" Package.swift
-      - name: Run tests
+      - name: Run tests (legacy)
         run: |
           swift test
   run_openvpn_tests:
