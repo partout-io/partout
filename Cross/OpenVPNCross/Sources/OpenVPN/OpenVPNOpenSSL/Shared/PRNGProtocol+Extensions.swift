@@ -27,7 +27,7 @@ import Foundation
 import PartoutCore
 
 extension PRNGProtocol {
-    func safeData(length: Int) -> Data {
+    func safeData(length: Int) -> CZeroingData {
         precondition(length > 0)
         let randomBytes = UnsafeMutablePointer<UInt8>.allocate(capacity: length)
         defer {
@@ -37,6 +37,6 @@ extension PRNGProtocol {
         guard SecRandomCopyBytes(kSecRandomDefault, length, randomBytes) == errSecSuccess else {
             fatalError("SecRandomCopyBytes failed")
         }
-        return Data(bytes: randomBytes, count: length)
+        return CZ(bytes: randomBytes, length: length)
     }
 }

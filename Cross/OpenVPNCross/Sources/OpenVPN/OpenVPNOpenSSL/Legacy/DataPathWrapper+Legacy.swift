@@ -45,7 +45,7 @@ extension DataPathWrapper {
         }
 
         let seed = prng.safeData(length: PRNGSeedLength)
-        guard let cryptoBox = OSSLCryptoBox(seed: Z(seed)) else {
+        guard let cryptoBox = OSSLCryptoBox(seed: Z(seed.toData())) else {
             fatalError("Unable to create OSSLCryptoBox")
         }
         try cryptoBox.configure(

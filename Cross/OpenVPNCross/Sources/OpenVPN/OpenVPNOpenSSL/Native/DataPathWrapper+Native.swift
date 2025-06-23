@@ -39,7 +39,7 @@ private let CryptoCTRPayloadLength = PacketOpcodeLength + PacketSessionIdLength 
 
 extension DataPathWrapper {
     static func native(with parameters: Parameters, prf: Parameters.PRF, prng: PRNGProtocol) throws -> DataPathWrapper {
-        let seed = CZ(prng.safeData(length: PRNGSeedLength))
+        let seed = prng.safeData(length: PRNGSeedLength)
         return try .native(with: parameters, prf: prf, seed: seed)
     }
 
