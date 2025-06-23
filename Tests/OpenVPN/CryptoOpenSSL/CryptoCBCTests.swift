@@ -23,9 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(_PartoutCryptoOpenSSL_ObjC)
 internal import _PartoutCryptoOpenSSL_ObjC
-#endif
 import XCTest
 
 final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
