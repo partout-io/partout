@@ -30,16 +30,14 @@ import PartoutCore
 extension PRNGProtocol {
     func safeData(length: Int) -> ZeroingData {
         precondition(length > 0)
-        let randomBytes = UnsafeMutablePointer<UInt8>.allocate(capacity: length)
+        let randomBytes = pp_alloc_crypto(length)
         defer {
             bzero(randomBytes, length)
-            randomBytes.deallocate()
+            free(randomBytes)
         }
-
         guard SecRandomCopyBytes(kSecRandomDefault, length, randomBytes) == errSecSuccess else {
             fatalError("SecRandomCopyBytes failed")
         }
-
         return Z(Data(bytes: randomBytes, count: length))
     }
 }
