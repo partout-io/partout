@@ -364,7 +364,13 @@ if areas.contains(.openvpn) {
         .target(
             name: "_PartoutOpenVPNOpenSSL_ObjC",
             dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-            path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC"
+            path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
+            exclude: [
+                "lib/COPYING",
+                "lib/Makefile",
+                "lib/README.LZO",
+                "lib/testmini.c"
+            ]
         ),
         .testTarget(
             name: "_PartoutCryptoOpenSSLTests",
