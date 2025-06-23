@@ -36,8 +36,10 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 #include "crypto_openssl/allocation.h"
+#include "crypto_openssl/crypto.h"
 
 typedef struct {
     uint32_t highest_pid;

@@ -23,6 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include "crypto_openssl/allocation.h"
 #include "dp_macros.h"
 #include "dp_mode.h"
 #include "packet.h"

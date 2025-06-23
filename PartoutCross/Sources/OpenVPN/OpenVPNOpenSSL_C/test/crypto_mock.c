@@ -23,6 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#include <assert.h>
+#include "crypto_openssl/allocation.h"
 #include "dp_macros.h"
 #include "test/crypto_mock.h"
 
