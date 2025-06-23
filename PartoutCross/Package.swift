@@ -7,6 +7,25 @@ import PackageDescription
 let cryptoUmbrella = "_PartoutCryptoOpenSSL_Cross"
 let mainUmbrella = "_PartoutOpenVPNOpenSSL_Cross"
 
+let package = Package(
+    name: "PartoutCross",
+    platforms: [
+        .iOS(.v15),
+        .macOS(.v12),
+        .tvOS(.v17)
+    ],
+    products: [
+        .library(
+            name: cryptoUmbrella,
+            targets: [cryptoUmbrella]
+        ),
+        .library(
+            name: "_PartoutCryptoOpenSSL_C",
+            targets: ["_PartoutCryptoOpenSSL_C"]
+        )
+    ]
+)
+
 // the OpenVPN crypto mode (ObjC -> C)
 let cryptoMode: CryptoMode = .fromEnvironment(
     "OPENVPN_CRYPTO_MODE",
@@ -33,25 +52,6 @@ let wrappedSwiftSettings: [SwiftSetting] = {
     }
 }()
 
-let package = Package(
-    name: "OpenVPNCross",
-    platforms: [
-        .iOS(.v15),
-        .macOS(.v12),
-        .tvOS(.v17)
-    ],
-    products: [
-        .library(
-            name: cryptoUmbrella,
-            targets: [cryptoUmbrella]
-        ),
-        .library(
-            name: "_PartoutCryptoOpenSSL_C",
-            targets: ["_PartoutCryptoOpenSSL_C"]
-        )
-    ]
-)
-
 // MARK: Targets (common)
 
 package.dependencies.append(contentsOf: [
@@ -60,7 +60,7 @@ package.dependencies.append(contentsOf: [
 
 if cryptoMode != .bridgedCrypto {
     package.dependencies.append(contentsOf: [
-        .package(path: "../.."), // "partout"
+        .package(path: ".."), // "partout"
     ])
     package.products.append(contentsOf: [
         .library(
