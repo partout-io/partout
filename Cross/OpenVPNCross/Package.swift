@@ -10,7 +10,7 @@ let mainUmbrella = "_PartoutOpenVPNOpenSSL_Cross"
 // the OpenVPN crypto mode (ObjC -> C)
 let cryptoMode: CryptoMode = .fromEnvironment(
     "OPENVPN_CRYPTO_MODE",
-    fallback: .wrapped
+    fallback: .bridgedCrypto
 )
 
 // the global settings for C targets
@@ -48,7 +48,15 @@ let package = Package(
         .library(
             name: "_PartoutCryptoOpenSSL_C",
             targets: ["_PartoutCryptoOpenSSL_C"]
-        ),
+        )
+    ]
+)
+
+if cryptoMode != .bridgedCrypto {
+    package.dependencies.append(contentsOf: [
+        .package(path: "../.."), // "partout"
+    ])
+    package.products.append(contentsOf: [
         .library(
             name: mainUmbrella,
             targets: [mainUmbrella]
@@ -56,14 +64,20 @@ let package = Package(
         .library(
             name: "_PartoutOpenVPNOpenSSL_C",
             targets: ["_PartoutOpenVPNOpenSSL_C"]
+        ),
+    ])
+    package.targets.append(contentsOf: [
+        .testTarget(
+            name: "_PartoutOpenVPNOpenSSL_CrossTests",
+            dependencies: [.target(name: mainUmbrella)],
+            path: "Tests/OpenVPN/OpenVPNOpenSSL"
         )
-    ]
-)
+    ])
+}
 
 // MARK: Targets
 
 package.dependencies.append(contentsOf: [
-    .package(path: "../.."), // "partout"
     .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
 ])
 
@@ -95,24 +109,6 @@ case .bridgedCrypto:
             name: "_PartoutCryptoOpenSSL_ObjC_Bridged",
             dependencies: ["_PartoutCryptoOpenSSL_C"],
             path: "Sources/OpenVPN/CryptoOpenSSL_ObjC_Bridged"
-        ),
-        .target(
-            name: "_PartoutOpenVPNOpenSSL_C",
-            dependencies: ["_PartoutCryptoOpenSSL_C"],
-            path: "Sources/OpenVPN/OpenVPNOpenSSL_C",
-            cSettings: cSettings
-        ),
-        .target(
-            name: mainUmbrella,
-            dependencies: [
-                .product(name: "_PartoutOpenVPN", package: "partout"),
-                .product(name: "_PartoutOpenVPNOpenSSL_ObjC", package: "partout")
-            ],
-            path: "Sources/OpenVPN/OpenVPNOpenSSL",
-            exclude: [
-                "Legacy",
-                "Native"
-            ]
         )
     ])
 
@@ -188,15 +184,6 @@ package.targets.append(contentsOf: [
         path: "Tests/OpenVPN/CryptoOpenSSL"
     )
 ])
-if cryptoMode != .bridgedCrypto {
-    package.targets.append(contentsOf: [
-        .testTarget(
-            name: "_PartoutOpenVPNOpenSSL_CrossTests",
-            dependencies: [.target(name: mainUmbrella)],
-            path: "Tests/OpenVPN/OpenVPNOpenSSL"
-        )
-    ])
-}
 
 // MARK: Structures
 
