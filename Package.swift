@@ -122,10 +122,10 @@ package.targets.append(contentsOf: [
                 dependencies.append("PartoutAPI")
             }
             if areas.contains(.openvpn) {
-                dependencies.append("_PartoutOpenVPN")
+                dependencies.append("_PartoutOpenVPNCore")
             }
             if areas.contains(.wireguard) {
-                dependencies.append("_PartoutWireGuard")
+                dependencies.append("_PartoutWireGuardCore")
             }
             return dependencies
         }(),
@@ -327,13 +327,13 @@ if areas.contains(.api) {
 if areas.contains(.openvpn) {
     package.products.append(contentsOf: [
         .library(
-            name: "_PartoutOpenVPN",
-            targets: ["_PartoutOpenVPN"]
+            name: "_PartoutOpenVPNCore",
+            targets: ["_PartoutOpenVPNCore"]
         )
     ])
     package.targets.append(contentsOf: [
         .target(
-            name: "_PartoutOpenVPN",
+            name: "_PartoutOpenVPNCore",
             dependencies: ["PartoutCoreWrapper"],
             path: "Sources/OpenVPN/Base"
         )
@@ -371,7 +371,7 @@ if areas.contains(.openvpn) {
             .target(
                 name: "_PartoutOpenVPNOpenSSL",
                 dependencies: [
-                    "_PartoutOpenVPN",
+                    "_PartoutOpenVPNCore",
                     "_PartoutOpenVPNOpenSSL_ObjC"
                 ],
                 path: "Sources/OpenVPN/OpenVPNOpenSSL"
@@ -394,7 +394,7 @@ if areas.contains(.openvpn) {
             ),
             .testTarget(
                 name: "_PartoutOpenVPNTests",
-                dependencies: ["_PartoutOpenVPN"],
+                dependencies: ["_PartoutOpenVPNCore"],
                 path: "Tests/OpenVPN/Base"
             ),
             .testTarget(
@@ -414,13 +414,13 @@ if areas.contains(.openvpn) {
 if areas.contains(.wireguard) {
     package.products.append(contentsOf: [
         .library(
-            name: "_PartoutWireGuard",
-            targets: ["_PartoutWireGuard"]
+            name: "_PartoutWireGuardCore",
+            targets: ["_PartoutWireGuardCore"]
         )
     ])
     package.targets.append(contentsOf: [
         .target(
-            name: "_PartoutWireGuard",
+            name: "_PartoutWireGuardCore",
             dependencies: ["PartoutCoreWrapper"],
             path: "Sources/WireGuard/Base"
         )
@@ -445,7 +445,7 @@ if areas.contains(.wireguard) {
             .target(
                 name: "_PartoutWireGuardGo",
                 dependencies: [
-                    "_PartoutWireGuard",
+                    "_PartoutWireGuardCore",
                     .product(name: "WireGuardKit", package: "wireguard-apple")
                 ],
                 path: "Sources/WireGuard/WireGuardGo",
@@ -455,7 +455,7 @@ if areas.contains(.wireguard) {
             ),
             .testTarget(
                 name: "_PartoutWireGuardTests",
-                dependencies: ["_PartoutWireGuard"],
+                dependencies: ["_PartoutWireGuardCore"],
                 path: "Tests/WireGuard/Base"
             ),
             .testTarget(

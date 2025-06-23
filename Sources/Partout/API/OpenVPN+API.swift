@@ -25,7 +25,7 @@
 
 #if canImport(PartoutAPI) && canImport(_PartoutOpenVPN)
 
-import _PartoutOpenVPN
+import _PartoutOpenVPNCore
 import Foundation
 import GenericJSON
 import PartoutCore

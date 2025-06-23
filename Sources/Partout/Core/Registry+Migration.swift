@@ -24,7 +24,7 @@
 //
 
 #if canImport(_PartoutOpenVPN)
-import _PartoutOpenVPN
+import _PartoutOpenVPNCore
 #endif
 import Foundation
 import PartoutCore

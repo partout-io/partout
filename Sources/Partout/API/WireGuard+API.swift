@@ -25,7 +25,7 @@
 
 #if canImport(PartoutAPI) && canImport(_PartoutWireGuard)
 
-import _PartoutWireGuard
+import _PartoutWireGuardCore
 import Foundation
 import PartoutCore
 

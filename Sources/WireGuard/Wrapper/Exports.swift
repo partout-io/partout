@@ -23,5 +23,5 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutWireGuard
+@_exported import _PartoutWireGuardCore
 @_exported import _PartoutWireGuardGo

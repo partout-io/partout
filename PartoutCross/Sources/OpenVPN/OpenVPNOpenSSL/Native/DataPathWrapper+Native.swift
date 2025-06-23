@@ -24,7 +24,7 @@
 //
 
 internal import _PartoutCryptoOpenSSL_Cross
-import _PartoutOpenVPN
+import _PartoutOpenVPNCore
 internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 import PartoutCore

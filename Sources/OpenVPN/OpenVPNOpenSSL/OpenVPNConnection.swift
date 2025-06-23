@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPN
+import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
 
