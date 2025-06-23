@@ -25,8 +25,8 @@
 
 #include <assert.h>
 #include "crypto_openssl/allocation.h"
-#include "dp_macros.h"
-#include "test/crypto_mock.h"
+#include "openvpn/dp_macros.h"
+#include "openvpn/test/crypto_mock.h"
 
 static inline
 void reverse(uint8_t *dst, const uint8_t *src, size_t len) {

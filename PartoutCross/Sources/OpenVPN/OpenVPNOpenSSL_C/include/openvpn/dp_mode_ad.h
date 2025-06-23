@@ -25,7 +25,7 @@
 
 #pragma once
 
-#include "dp_mode.h"
+#include "openvpn/dp_mode.h"
 
 // WARNING: retains crypto
 dp_mode_t *_Nonnull dp_mode_ad_create(crypto_t *_Nonnull crypto,

@@ -27,9 +27,9 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "comp.h"
 #include "crypto_openssl/crypto.h"
-#include "dp_framing.h"
+#include "openvpn/comp.h"
+#include "openvpn/dp_framing.h"
 
 // MARK: Outbound
 
@@ -104,7 +104,7 @@ typedef size_t (*dp_mode_parse_t)(void *_Nonnull mode);
  data transfer at this time.
  */
 
-#include "packet.h"
+#include "openvpn/packet.h"
 
 typedef struct {
     dp_framing_assemble_t _Nullable framing_assemble;

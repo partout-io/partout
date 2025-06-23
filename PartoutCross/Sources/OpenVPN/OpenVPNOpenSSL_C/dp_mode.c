@@ -24,9 +24,9 @@
 //
 
 #include "crypto_openssl/allocation.h"
-#include "dp_macros.h"
-#include "dp_mode.h"
-#include "packet.h"
+#include "openvpn/dp_macros.h"
+#include "openvpn/dp_mode.h"
+#include "openvpn/packet.h"
 
 dp_mode_t *dp_mode_create_opt(crypto_t *crypto,
                               crypto_free_t crypto_free,

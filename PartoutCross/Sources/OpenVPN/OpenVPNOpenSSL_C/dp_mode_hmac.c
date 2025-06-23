@@ -26,9 +26,9 @@
 #include <assert.h>
 #include <stdint.h>
 #include "crypto_openssl/endian.h"
-#include "dp_macros.h"
-#include "dp_mode_hmac.h"
-#include "packet.h"
+#include "openvpn/dp_macros.h"
+#include "openvpn/dp_mode_hmac.h"
+#include "openvpn/packet.h"
 
 static
 size_t dp_assemble(void *vmode) {

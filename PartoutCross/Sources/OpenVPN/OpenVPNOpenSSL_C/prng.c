@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "prng.h"
+#include "openvpn/prng.h"
 
 #ifdef __APPLE__
 #include <Security/Security.h>

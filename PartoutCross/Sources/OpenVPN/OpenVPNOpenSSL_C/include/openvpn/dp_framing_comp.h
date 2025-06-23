@@ -26,9 +26,9 @@
 #pragma once
 
 #include <string.h>
-#include "dp_framing.h"
-#include "mss_fix.h"
-#include "packet.h"
+#include "openvpn/dp_framing.h"
+#include "openvpn/mss_fix.h"
+#include "openvpn/packet.h"
 
 static
 void dp_framing_assemble_disabled(dp_framing_assemble_ctx *_Nonnull ctx) {

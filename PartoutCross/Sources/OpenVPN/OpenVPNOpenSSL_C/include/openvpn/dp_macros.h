@@ -28,7 +28,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include "packet.h"
+#include "openvpn/packet.h"
 
 #define DP_ENCRYPT_BEGIN(peerId) \
     const bool has_peer_id = (peerId != PacketPeerIdDisabled); \

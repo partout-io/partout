@@ -27,8 +27,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "comp.h"
-#include "dp_error.h"
+#include "openvpn/comp.h"
+#include "openvpn/dp_error.h"
 
 typedef struct {
     uint8_t *_Nonnull dst;

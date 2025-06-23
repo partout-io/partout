@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "dp_framing_comp.h"
+#include "openvpn/dp_framing_comp.h"
 
 static const dp_framing_t comp_disabled = {
     dp_framing_assemble_disabled,
