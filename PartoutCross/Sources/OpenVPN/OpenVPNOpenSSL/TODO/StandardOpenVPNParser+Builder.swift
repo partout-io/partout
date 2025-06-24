@@ -202,7 +202,7 @@ extension StandardOpenVPNParser.Builder {
         case .compLZO:
             optCompressionFraming = .compLZO
 
-            // XXX: assume LZO always included
+            // FIXME: ###, LZO not included
 //            if LZOFactory.canCreate() {
                 let arg = components.last
                 optCompressionAlgorithm = (arg == "no") ? .disabled : .LZO
@@ -220,7 +220,7 @@ extension StandardOpenVPNParser.Builder {
         case .compress:
             optCompressionFraming = .compress
 
-            // XXX: assume LZO always included
+            // FIXME: ###, LZO not included
 //            if !LZOFactory.canCreate() {
 //                guard components.isEmpty else {
 //                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)

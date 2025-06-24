@@ -26,12 +26,12 @@
 internal import _PartoutCryptoOpenSSL_C
 import Foundation
 
-final class CryptoAEAD: Encrypter, Decrypter {
+public final class CryptoAEAD: Encrypter, Decrypter {
     private let ptr: UnsafeMutablePointer<crypto_aead_t>
 
     private let mappedError: (CryptoError) -> Error
 
-    init(
+    public init(
         cipherName: String,
         tagLength: Int,
         idLength: Int,
@@ -45,26 +45,18 @@ final class CryptoAEAD: Encrypter, Decrypter {
         self.mappedError = mappedError ?? { $0 }
     }
 
-    var digestLength: Int {
-        ptr.pointee.crypto.meta.digest_len
-    }
-
-    var tagLength: Int {
-        ptr.pointee.crypto.meta.tag_len
-    }
-
-    func encryptionCapacity(for length: Int) -> Int {
+    public func encryptionCapacity(for length: Int) -> Int {
         ptr.pointee.crypto.meta.encryption_capacity(ptr, length)
     }
 
-    func configureEncryption(withCipherKey cipherKey: ZeroingData?, hmacKey: ZeroingData?) {
+    public func configureEncryption(withCipherKey cipherKey: CZeroingData?, hmacKey: CZeroingData?) {
         guard let cipherKey, let hmacKey else {
             return
         }
         ptr.pointee.crypto.encrypter.configure(ptr, cipherKey.ptr, hmacKey.ptr)
     }
 
-    func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
+    public func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
         var code = CryptoErrorGeneric
         var cFlags = crypto_flags_t()
         let flagsPtr = flags.pointer(to: &cFlags)
@@ -74,14 +66,14 @@ final class CryptoAEAD: Encrypter, Decrypter {
         return true
     }
 
-    func configureDecryption(withCipherKey cipherKey: ZeroingData?, hmacKey: ZeroingData?) {
+    public func configureDecryption(withCipherKey cipherKey: CZeroingData?, hmacKey: CZeroingData?) {
         guard let cipherKey, let hmacKey else {
             return
         }
         ptr.pointee.crypto.decrypter.configure(ptr, cipherKey.ptr, hmacKey.ptr)
     }
 
-    func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
+    public func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
         var code = CryptoErrorGeneric
         var cFlags = crypto_flags_t()
         let flagsPtr = flags.pointer(to: &cFlags)
@@ -91,7 +83,7 @@ final class CryptoAEAD: Encrypter, Decrypter {
         return true
     }
 
-    func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int, flags: CryptoFlagsWrapper?) throws -> Bool {
+    public func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int, flags: CryptoFlagsWrapper?) throws -> Bool {
         fatalError("Unsupported")
     }
 }

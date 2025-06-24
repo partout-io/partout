@@ -90,12 +90,12 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
 }
 
 extension CryptoCBCTests {
-    var cipherKey: ZeroingData {
-        ZeroingData(length: 32)
+    var cipherKey: CZeroingData {
+        CZeroingData(length: 32)
     }
 
-    var hmacKey: ZeroingData {
-        ZeroingData(length: 32)
+    var hmacKey: CZeroingData {
+        CZeroingData(length: 32)
     }
 
     var plainData: Data {

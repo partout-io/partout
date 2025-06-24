@@ -139,3 +139,12 @@ void data_swap(uint8_t *_Nonnull ptr, size_t len1, size_t len2)
     memcpy(ptr, buf2, len2);
     memcpy(ptr + len2, buf1, len1);
 }
+
+static inline
+void data_swap_copy(uint8_t *_Nonnull dst, const uint8_t *_Nonnull src, size_t src_len, size_t len1, size_t len2) {
+    assert(src_len >= len1 + len2);//, @"src is smaller than expected");
+    memcpy(dst, src + len1, len2);
+    memcpy(dst + len2, src, len1);
+    const size_t preamble_len = len1 + len2;
+    memcpy(dst + preamble_len, src + preamble_len, src_len - preamble_len);
+}

@@ -24,7 +24,6 @@
 //
 
 import _PartoutOpenVPNCore
-internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
@@ -41,24 +40,12 @@ extension OpenVPNConnection {
         guard let configuration = module.configuration else {
             fatalError("Creating session without OpenVPN configuration?")
         }
-        let tlsFactory = { @Sendable in
-            OSSLTLSBox()
-        }
-        let cryptoFactory = { @Sendable in
-            let seed = prng.safeData(length: 64)
-            guard let box = OSSLCryptoBox(seed: seed) else {
-                fatalError("Unable to create OSSLCryptoBox")
-            }
-            return box
-        }
 
         let session = try await OpenVPNSession(
             ctx,
             configuration: configuration,
             credentials: module.credentials,
             prng: prng,
-            tlsFactory: tlsFactory,
-            cryptoFactory: cryptoFactory,
             cachesURL: cachesURL,
             options: options
         )

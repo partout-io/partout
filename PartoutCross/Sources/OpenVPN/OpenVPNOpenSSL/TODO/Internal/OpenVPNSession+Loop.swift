@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutOpenVPNOpenSSL_ObjC
+internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 import PartoutCore
 

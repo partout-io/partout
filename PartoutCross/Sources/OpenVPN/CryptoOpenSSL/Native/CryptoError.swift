@@ -25,7 +25,7 @@
 
 @testable internal import _PartoutCryptoOpenSSL_C
 
-enum CryptoError: Error {
+public enum CryptoError: Error {
     case generic
 
     case hmac

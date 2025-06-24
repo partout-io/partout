@@ -1,8 +1,8 @@
 //
-//  OpenVPN+Legacy.swift
+//  OpenVPNTLSProtocol.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/20/25.
+//  Created by Davide De Rosa on 6/15/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,28 +23,31 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
-internal import _PartoutOpenVPNOpenSSL_ObjC
+import Foundation
 
-extension OpenVPN.CompressionAlgorithm {
-    var native: CompressionAlgorithm {
-        switch self {
-        case .disabled: .disabled
-        case .LZO: .LZO
-        case .other: .other
-        @unknown default: .disabled
-        }
-    }
+// FIXME: ###
+public struct OpenVPNTLSOptions {
+    public static let defaultBufferLength = 16384
+
+    public static let defaultSecurityLevel = 0
+
+    public var bufferLength = Self.defaultBufferLength
+
+    public let caURL: URL
+
+    public var clientCertificatePEM: String?
+
+    public var clientKeyPEM: String?
+
+    public let checksEKU: Bool
+
+    public let checksSANHost: Bool
+
+    public var hostname: String?
+
+    public let securityLevel: Int
 }
 
-extension OpenVPN.CompressionFraming {
-    var native: CompressionFraming {
-        switch self {
-        case .disabled: .disabled
-        case .compLZO: .compLZO
-        case .compress: .compress
-        case .compressV2: .compressV2
-        @unknown default: .disabled
-        }
-    }
+// FIXME: ###
+public protocol OpenVPNTLSProtocol {
 }

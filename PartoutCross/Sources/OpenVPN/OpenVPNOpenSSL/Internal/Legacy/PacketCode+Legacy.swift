@@ -1,8 +1,8 @@
 //
-//  Empty.swift
+//  PacketCode+Legacy.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/23/25.
+//  Created by Davide De Rosa on 5/2/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,4 +23,21 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
+
+extension PacketCode: @retroactive CustomDebugStringConvertible {
+    var debugDescription: String {
+        switch self {
+        case .softResetV1:          return "SOFT_RESET_V1"
+        case .controlV1:            return "CONTROL_V1"
+        case .ackV1:                return "ACK_V1"
+        case .dataV1:               return "DATA_V1"
+        case .hardResetClientV2:    return "HARD_RESET_CLIENT_V2"
+        case .hardResetServerV2:    return "HARD_RESET_SERVER_V2"
+        case .dataV2:               return "DATA_V2"
+        case .unknown:              return "UNKNOWN(\(rawValue))"
+        @unknown default:           return "UNKNOWN(\(rawValue))"
+        }
+    }
+}

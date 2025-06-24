@@ -23,7 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_ObjC
+internal import _PartoutCryptoOpenSSL_C
+internal import _PartoutCryptoOpenSSL_Cross
 import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
@@ -59,7 +60,7 @@ struct XORProcessor {
     func processPacket(_ packet: Data, outbound: Bool) -> Data {
         switch method {
         case .xormask(let mask):
-            return Self.xormask(packet: packet, mask: mask.zData)
+            return Self.xormask(packet: packet, mask: mask.czData)
 
         case .xorptrpos:
             return Self.xorptrpos(packet: packet)
@@ -69,9 +70,9 @@ struct XORProcessor {
 
         case .obfuscate(let mask):
             if outbound {
-                return Self.xormask(packet: Self.xorptrpos(packet: Self.reverse(packet: Self.xorptrpos(packet: packet))), mask: mask.zData)
+                return Self.xormask(packet: Self.xorptrpos(packet: Self.reverse(packet: Self.xorptrpos(packet: packet))), mask: mask.czData)
             } else {
-                return Self.xorptrpos(packet: Self.reverse(packet: Self.xorptrpos(packet: Self.xormask(packet: packet, mask: mask.zData))))
+                return Self.xorptrpos(packet: Self.reverse(packet: Self.xorptrpos(packet: Self.xormask(packet: packet, mask: mask.czData))))
             }
 
         @unknown default:
@@ -81,7 +82,7 @@ struct XORProcessor {
 }
 
 extension XORProcessor {
-    private static func xormask(packet: Data, mask: ZeroingData) -> Data {
+    private static func xormask(packet: Data, mask: CZeroingData) -> Data {
         Data(packet.enumerated().map { (index, byte) in
             byte ^ mask.bytes[index % mask.length]
         })

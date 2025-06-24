@@ -1,8 +1,8 @@
 //
-//  ZeroingData+Extensions.swift
+//  ControlPacket+Legacy.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/14/25.
+//  Created by Davide De Rosa on 5/2/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,33 +23,23 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_ObjC
+internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
-extension PRNGProtocol {
-    func safeData(length: Int) -> ZeroingData {
-        precondition(length > 0)
-        let randomBytes = pp_alloc_crypto(length)
-        defer {
-            bzero(randomBytes, length)
-            free(randomBytes)
-        }
-        guard SecRandomCopyBytes(kSecRandomDefault, length, randomBytes) == errSecSuccess else {
-            fatalError("SecRandomCopyBytes failed")
-        }
-        return Z(Data(bytes: randomBytes, count: length))
-    }
-}
-
-extension SecureData {
-    var zData: ZeroingData {
-        Z(toData())
-    }
-}
-
-extension ZeroingData: @retroactive SensitiveDebugStringConvertible {
+extension ControlPacket: @retroactive SensitiveDebugStringConvertible {
     func debugDescription(withSensitiveData: Bool) -> String {
-        withSensitiveData ? "[\(length) bytes, \(toHex())]" : "[\(length) bytes]"
+        var msg: [String] = ["\(code) | \(key)"]
+        msg.append("sid: \(sessionId.toHex())")
+        if let ackIds = ackIds, let ackRemoteSessionId = ackRemoteSessionId {
+            msg.append("acks: {\(ackIds), \(ackRemoteSessionId.toHex())}")
+        }
+        if !isAck {
+            msg.append("pid: \(packetId)")
+        }
+        if let payload {
+            msg.append(payload.debugDescription(withSensitiveData: withSensitiveData))
+        }
+        return "{\(msg.joined(separator: ", "))}"
     }
 }

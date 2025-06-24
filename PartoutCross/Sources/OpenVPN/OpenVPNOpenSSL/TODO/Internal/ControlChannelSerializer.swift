@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_ObjC
+internal import _PartoutCryptoOpenSSL_Cross
 import _PartoutOpenVPNCore
-internal import _PartoutOpenVPNOpenSSL_ObjC
+internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 import PartoutCore
 
@@ -159,22 +159,29 @@ extension ControlChannel {
 
         private let plain: PlainSerializer
 
-        init(_ ctx: PartoutLoggerContext, with crypto: OpenVPNCryptoProtocol, key: OpenVPN.StaticKey, digest: OpenVPN.Digest) throws {
+        init(
+            _ ctx: PartoutLoggerContext,
+            digest: OpenVPN.Digest,
+            key: OpenVPN.StaticKey
+        ) throws {
             self.ctx = ctx
-            let cryptoOptions = OpenVPNCryptoOptions(
-                cipherAlgorithm: nil,
-                digestAlgorithm: digest.rawValue,
-                cipherEncKey: nil,
-                cipherDecKey: nil,
-                hmacEncKey: key.hmacSendKey.zData,
-                hmacDecKey: key.hmacReceiveKey.zData
-            )
-            try crypto.configure(with: cryptoOptions)
-            encrypter = crypto.encrypter()
-            decrypter = crypto.decrypter()
+            // FIXME: ##, use crypto_cbc
+//            let cryptoOptions = OpenVPNCryptoOptions(
+//                cipherAlgorithm: nil,
+//                digestAlgorithm: digest.rawValue,
+//                cipherEncKey: nil,
+//                cipherDecKey: nil,
+//                hmacEncKey: key.hmacSendKey.zData,
+//                hmacDecKey: key.hmacReceiveKey.zData
+//            )
+//            try crypto.configure(with: cryptoOptions)
+//            encrypter = crypto.encrypter()
+//            decrypter = crypto.decrypter()
+            fatalError()
 
             prefixLength = PacketOpcodeLength + PacketSessionIdLength
-            hmacLength = crypto.digestLength()
+            // FIXME: ##, read from crypto_t
+//            hmacLength = crypto.digestLength()
             authLength = hmacLength + PacketReplayIdLength + PacketReplayTimestampLength
             preambleLength = prefixLength + authLength
 
@@ -208,10 +215,11 @@ extension ControlChannel {
             // needs a copy for swapping
             var authPacket = packet
             let authCount = authPacket.count
-            try authPacket.withUnsafeMutableBytes {
-                let ptr = $0.bytePointer
-                PacketSwapCopy(ptr, packet, prefixLength, authLength)
-                try decrypter.verifyBytes(ptr, length: authCount, flags: nil)
+            try authPacket.withUnsafeMutableBytes { dst in
+                try packet.withUnsafeBytes { src in
+                    data_swap_copy(dst.bytePointer, src.bytePointer, packet.count, prefixLength, authLength)
+                    _ = try decrypter.verifyBytes(dst.bytePointer, length: authCount, flags: nil)
+                }
             }
 
             // XXX: validate replay packet id
@@ -246,23 +254,26 @@ extension ControlChannel {
 
         private let plain: PlainSerializer
 
-        init(_ ctx: PartoutLoggerContext, with crypto: OpenVPNCryptoProtocol, key: OpenVPN.StaticKey) throws {
+        // FIXME: ##, use crypto_ctr
+        init(_ ctx: PartoutLoggerContext, withKey key: OpenVPN.StaticKey) throws {
             self.ctx = ctx
-            let cryptoOptions = OpenVPNCryptoOptions(
-                cipherAlgorithm: "AES-256-CTR",
-                digestAlgorithm: "SHA256",
-                cipherEncKey: key.cipherEncryptKey.zData,
-                cipherDecKey: key.cipherDecryptKey.zData,
-                hmacEncKey: key.hmacSendKey.zData,
-                hmacDecKey: key.hmacReceiveKey.zData
-            )
-            try crypto.configure(with: cryptoOptions)
-            encrypter = crypto.encrypter()
-            decrypter = crypto.decrypter()
+//            let cryptoOptions = OpenVPNCryptoOptions(
+//                cipherAlgorithm: "AES-256-CTR",
+//                digestAlgorithm: "SHA256",
+//                cipherEncKey: key.cipherEncryptKey.zData,
+//                cipherDecKey: key.cipherDecryptKey.zData,
+//                hmacEncKey: key.hmacSendKey.zData,
+//                hmacDecKey: key.hmacReceiveKey.zData
+//            )
+//            try crypto.configure(with: cryptoOptions)
+//            encrypter = crypto.encrypter()
+//            decrypter = crypto.decrypter()
+            fatalError()
 
             headerLength = PacketOpcodeLength + PacketSessionIdLength
             adLength = headerLength + PacketReplayIdLength + PacketReplayTimestampLength
-            tagLength = crypto.tagLength()
+            // FIXME: ##, read from crypto_t
+//            tagLength = crypto.tagLength()
 
             currentReplayId = BidirectionalState(withResetValue: 1)
             timestamp = UInt32(Date().timeIntervalSince1970)
@@ -292,14 +303,14 @@ extension ControlChannel {
             }
 
             let encryptedCount = packet.count - adLength
-            var decryptedPacket = Data(count: decrypter.encryptionCapacity(withLength: encryptedCount))
+            var decryptedPacket = Data(count: decrypter.encryptionCapacity(for: encryptedCount))
             var decryptedCount = 0
             try packet.withUnsafeBytes {
                 let src = $0.bytePointer
-                var flags = CryptoFlags(iv: nil, ivLength: 0, ad: src, adLength: adLength, forTesting: false)
+                var flags = CryptoFlagsWrapper(iv: nil, ivLength: 0, ad: src, adLength: adLength, forTesting: false)
                 try decryptedPacket.withUnsafeMutableBytes {
                     let dest = $0.bytePointer
-                    try decrypter.decryptBytes(src + flags.adLength, length: encryptedCount, dest: dest + headerLength, destLength: &decryptedCount, flags: &flags)
+                    _ = try decrypter.decryptBytes(src + flags.adLength, length: encryptedCount, dest: dest + headerLength, destLength: &decryptedCount, flags: flags)
                     memcpy(dest, src, headerLength)
                 }
             }

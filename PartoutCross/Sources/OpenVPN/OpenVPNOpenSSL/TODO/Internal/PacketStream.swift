@@ -1,8 +1,8 @@
 //
-//  ZeroingData.swift
+//  PacketStream.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/8/25.
+//  Created by Davide De Rosa on 6/15/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,37 +23,37 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_ObjC
+internal import _PartoutCryptoOpenSSL_Cross
 import Foundation
 
-func Z() -> ZeroingData {
-    ZeroingData()
-}
+final class PacketStream {
 
-func Z(length: Int) -> ZeroingData {
-    ZeroingData(length: length)
-}
+    // FIXME: ###
+    static func packets(
+        fromInboundStream stream: Data,
+        until: inout Int,
+        xorMethod: XORMethodNative,
+        xorMask: CZeroingData?
+    ) -> [Data] {
+        fatalError()
+    }
 
-func Z(bytes: UnsafePointer<UInt8>, length: Int) -> ZeroingData {
-    ZeroingData(bytes: bytes, length: length)
-}
+    // FIXME: ###
+    static func outboundStream(
+        fromPacket packet: Data,
+        xorMethod: XORMethodNative,
+        xorMask: CZeroingData?
+    ) -> Data {
+        fatalError()
+    }
 
-func Z(_ uint8: UInt8) -> ZeroingData {
-    ZeroingData(uInt8: uint8)
-}
+    // FIXME: ###
+    static func outboundStream(
+        fromPackets packets: [Data],
+        xorMethod: XORMethodNative,
+        xorMask: CZeroingData?
+    ) -> Data {
+        fatalError()
+    }
 
-func Z(_ uint16: UInt16) -> ZeroingData {
-    ZeroingData(uInt16: uint16)
-}
-
-func Z(_ data: Data) -> ZeroingData {
-    ZeroingData(data: data)
-}
-
-func Z(_ data: Data, _ offset: Int, _ length: Int) -> ZeroingData {
-    ZeroingData(data: data, offset: offset, length: length)
-}
-
-func Z(_ string: String, nullTerminated: Bool) -> ZeroingData {
-    ZeroingData(string: string, nullTerminated: nullTerminated)
 }

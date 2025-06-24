@@ -25,18 +25,18 @@
 
 import Foundation
 
-struct CryptoFlagsWrapper {
-    let iv: UnsafePointer<UInt8>?
+public struct CryptoFlagsWrapper {
+    public let iv: UnsafePointer<UInt8>?
 
-    let ivLength: Int
+    public let ivLength: Int
 
-    let ad: UnsafePointer<UInt8>?
+    public let ad: UnsafePointer<UInt8>?
 
-    let adLength: Int
+    public let adLength: Int
 
-    let forTesting: Bool
+    public let forTesting: Bool
 
-    init(
+    public init(
         iv: UnsafePointer<UInt8>? = nil,
         ivLength: Int = .zero,
         ad: UnsafePointer<UInt8>? = nil,

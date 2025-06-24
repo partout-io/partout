@@ -21,7 +21,7 @@ let areas: Set<CrossArea> = Set(CrossArea.allCases)
 // the OpenVPN crypto mode (ObjC -> C)
 let openVPNCryptoMode: OpenVPNCryptoMode = .fromEnvironment(
     "OPENVPN_CRYPTO_MODE",
-    fallback: .native
+    fallback: .wrapped
 )
 
 enum CrossArea: CaseIterable {
@@ -42,7 +42,7 @@ if areas.contains(.openvpn) {
     ]
 
     let wrappedSwiftSettings: [SwiftSetting] = {
-        var defines: [String] = ["OPENVPN_WRAPPED"]
+        var defines: [String] = []
         switch openVPNCryptoMode {
         case .wrappedNative, .native:
             defines.append("OPENVPN_WRAPPED_NATIVE")
@@ -176,6 +176,7 @@ if areas.contains(.openvpn) {
                     .product(name: "_PartoutOpenVPNOpenSSL_ObjC", package: "partout")
                 ],
                 path: "Sources/OpenVPN/OpenVPNOpenSSL",
+                exclude: ["TODO"],
                 swiftSettings: wrappedSwiftSettings
             )
         ])
@@ -202,7 +203,7 @@ if areas.contains(.openvpn) {
                     .product(name: "_PartoutOpenVPNCore", package: "partout")
                 ],
                 path: "Sources/OpenVPN/OpenVPNOpenSSL",
-                exclude: ["Internal/Legacy"],
+                exclude: ["Internal/Legacy", "TODO"],
                 swiftSettings: wrappedSwiftSettings
             )
         ])

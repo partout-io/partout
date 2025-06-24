@@ -24,7 +24,6 @@
 //
 
 import _PartoutOpenVPNCore
-internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
@@ -50,10 +49,6 @@ final class OpenVPNSession {
     private let credentials: OpenVPN.Credentials?
 
     private let prng: PRNGProtocol
-
-    private let tlsFactory: () -> OpenVPNTLSProtocol
-
-    private let cryptoFactory: () -> OpenVPNCryptoProtocol
 
     private let caURL: URL
 
@@ -117,8 +112,6 @@ final class OpenVPNSession {
        - configuration: The `Configuration` to use for this session.
        - credentials: The optional credentials.
        - prng: The pseudo-random number generator.
-       - tlsFactory: The TLS implementation.
-       - cryptoFactory: The cryptographic implementation.
        - cachesURL: The URL of the folder where to store cache files.
        - options: Options for fine-tuning.
      - Precondition: `configuration.ca` must be non-nil.
@@ -129,8 +122,6 @@ final class OpenVPNSession {
         configuration: OpenVPN.Configuration,
         credentials: OpenVPN.Credentials?,
         prng: PRNGProtocol,
-        tlsFactory: @escaping @Sendable () -> OpenVPNTLSProtocol,
-        cryptoFactory: @escaping @Sendable () -> OpenVPNCryptoProtocol,
         cachesURL: URL,
         options: OpenVPN.ConnectionOptions = .init()
     ) throws {
@@ -141,14 +132,12 @@ final class OpenVPNSession {
         self.configuration = configuration
         self.credentials = try credentials?.forAuthentication()
         self.prng = prng
-        self.tlsFactory = tlsFactory
-        self.cryptoFactory = cryptoFactory
         caURL = cachesURL.appendingPathComponent(Caches.ca)
         self.options = options
 
         try ca.write(to: caURL)
         tlsOptions = OpenVPNTLSOptions(
-            bufferLength: OpenVPNTLSOptionsDefaultBufferLength,
+            bufferLength: 0,// FIXME: ##, OpenVPNTLSOptionsDefaultBufferLength,
             caURL: caURL,
             clientCertificatePEM: configuration.clientCertificate?.pem,
             clientKeyPEM: configuration.clientKey?.pem,
@@ -158,11 +147,13 @@ final class OpenVPNSession {
             securityLevel: configuration.tlsSecurityLevel ?? 0
         )
 
-        controlChannel = try cryptoFactory().newControlChannel(
-            ctx,
-            with: prng,
-            configuration: configuration
-        )
+        // FIXME: ##, cryptoFactory
+        fatalError("cryptoFactory")
+//        controlChannel = try cryptoFactory().newControlChannel(
+//            ctx,
+//            with: prng,
+//            configuration: configuration
+//        )
         negotiators = [:]
         dataChannels = [:]
         oldKeys = []
@@ -348,8 +339,6 @@ extension OpenVPNSession {
             link: link,
             channel: controlChannel,
             prng: prng,
-            tlsFactory: tlsFactory,
-            cryptoFactory: cryptoFactory,
             options: negOptions
         )
     }
@@ -545,39 +534,40 @@ private extension OpenVPNSession {
     }
 }
 
-@OpenVPNActor
-private extension OpenVPNCryptoProtocol {
-    func newControlChannel(
-        _ ctx: PartoutLoggerContext,
-        with prng: PRNGProtocol,
-        configuration: OpenVPN.Configuration
-    ) throws -> ControlChannel {
-        let channel: ControlChannel
-        if let tlsWrap = configuration.tlsWrap {
-            switch tlsWrap.strategy {
-            case .auth:
-                channel = try ControlChannel(
-                    ctx,
-                    prng: prng,
-                    crypto: self,
-                    authKey: tlsWrap.key,
-                    digest: configuration.fallbackDigest
-                )
-
-            case .crypt:
-                channel = try ControlChannel(
-                    ctx,
-                    prng: prng,
-                    crypto: self,
-                    cryptKey: tlsWrap.key
-                )
-
-            @unknown default:
-                channel = ControlChannel(ctx, prng: prng)
-            }
-        } else {
-            channel = ControlChannel(ctx, prng: prng)
-        }
-        return channel
-    }
-}
+// FIXME: ##, cryptoFactory
+//@OpenVPNActor
+//private extension OpenVPNCryptoProtocol {
+//    func newControlChannel(
+//        _ ctx: PartoutLoggerContext,
+//        with prng: PRNGProtocol,
+//        configuration: OpenVPN.Configuration
+//    ) throws -> ControlChannel {
+//        let channel: ControlChannel
+//        if let tlsWrap = configuration.tlsWrap {
+//            switch tlsWrap.strategy {
+//            case .auth:
+//                channel = try ControlChannel(
+//                    ctx,
+//                    prng: prng,
+//                    crypto: self,
+//                    authKey: tlsWrap.key,
+//                    digest: configuration.fallbackDigest
+//                )
+//
+//            case .crypt:
+//                channel = try ControlChannel(
+//                    ctx,
+//                    prng: prng,
+//                    crypto: self,
+//                    cryptKey: tlsWrap.key
+//                )
+//
+//            @unknown default:
+//                channel = ControlChannel(ctx, prng: prng)
+//            }
+//        } else {
+//            channel = ControlChannel(ctx, prng: prng)
+//        }
+//        return channel
+//    }
+//}

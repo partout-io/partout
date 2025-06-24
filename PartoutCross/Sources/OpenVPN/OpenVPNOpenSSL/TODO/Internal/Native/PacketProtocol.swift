@@ -1,8 +1,8 @@
 //
-//  ControlPacket+Sensitive.swift
+//  PacketProtocol.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 5/2/24.
+//  Created by Davide De Rosa on 6/15/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,23 +23,12 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutOpenVPNOpenSSL_ObjC
-import Foundation
-import PartoutCore
+protocol PacketProtocol {
+    var packetId: UInt32 { get }
+}
 
-extension ControlPacket: @retroactive SensitiveDebugStringConvertible {
-    func debugDescription(withSensitiveData: Bool) -> String {
-        var msg: [String] = ["\(code) | \(key)"]
-        msg.append("sid: \(sessionId.toHex())")
-        if let ackIds = ackIds, let ackRemoteSessionId = ackRemoteSessionId {
-            msg.append("acks: {\(ackIds), \(ackRemoteSessionId.toHex())}")
-        }
-        if !isAck {
-            msg.append("pid: \(packetId)")
-        }
-        if let payload {
-            msg.append(payload.debugDescription(withSensitiveData: withSensitiveData))
-        }
-        return "{\(msg.joined(separator: ", "))}"
+extension PacketProtocol {
+    static func < (lhs: Self, rhs: Self) -> Bool {
+        lhs.packetId < rhs.packetId
     }
 }

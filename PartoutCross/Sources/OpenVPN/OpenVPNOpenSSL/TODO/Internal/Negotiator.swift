@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
+import _PartoutOpenVPN
 internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
@@ -681,27 +681,27 @@ private extension Negotiator {
 //        pp_log(ctx, .openvpn, .info, "\tsessionId: \(sessionId.toHex())")
 //        pp_log(ctx, .openvpn, .info, "\tremoteSessionId: \(remoteSessionId.toHex())")
 
-        let cryptoBox = cryptoFactory()
-        try cryptoBox.configure(
-            withCipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
+        let parameters = DataPathWrapper.Parameters(
+            cipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
             digest: options.configuration.fallbackDigest,
-            auth: authResponse,
+            compressionFraming: history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming,
+            peerId: history.pushReply.options.peerId
+        )
+        let prf = DataPathWrapper.Parameters.PRF(
+            authResponse: authResponse,
             sessionId: sessionId,
             remoteSessionId: remoteSessionId
         )
-        let compressionFraming = history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming
-        let compressionAlgorithm = history.pushReply.options.compressionAlgorithm ?? options.configuration.compressionAlgorithm ?? .disabled
 
-        let dataPath = DataPath(
-            encrypter: cryptoBox.encrypter(),
-            decrypter: cryptoBox.decrypter(),
-            peerId: history.pushReply.options.peerId ?? PacketPeerIdDisabled,
-            compressionFraming: compressionFraming.native,
-            compressionAlgorithm: compressionAlgorithm.native,
-            maxPackets: options.sessionOptions.maxPackets,
-            usesReplayProtection: Constants.usesReplayProtection
-        )
-        return DataChannel(ctx, key: key, dataPath: dataPath)
+        let wrapper: DataPathWrapper
+#if OPENVPN_WRAPPED_NATIVE
+        // Swift -> C
+        wrapper = try .native(with: parameters, prf: prf, prng: prng)
+#else
+        // Swift -> ObjC
+        wrapper = try .legacy(with: parameters, prf: prf, prng: prng)
+#endif
+        return DataChannel(ctx, key: key, dataPath: wrapper.dataPath)
     }
 }
 
