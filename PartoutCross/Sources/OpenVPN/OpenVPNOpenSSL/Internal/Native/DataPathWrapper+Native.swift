@@ -69,7 +69,7 @@ extension DataPathWrapper {
             }
         } else {
             guard let digestAlgorithm else {
-                throw DataPathError.wrapperAlgorithm
+                throw DataPathError.algorithm
             }
             mode = digestAlgorithm.withCString { cDigest in
                 withUnsafePointer(to: keysBridge.cKeys) { keys in

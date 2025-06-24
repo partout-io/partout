@@ -124,7 +124,7 @@ extension CDataPath {
 
             // throw on packet id overflow
             guard tuple.packetId <= maxPacketId else {
-                throw DataPathError.path(DataPathErrorOverflow)
+                throw DataPathError.overflow
             }
             // ignore replayed packet ids
             guard !replay_is_replayed(replay, tuple.packetId) else {
@@ -231,7 +231,7 @@ extension CDataPath {
                 &error
             )
             guard let zd else {
-                throw DataPathError(error) ?? .generic
+                throw DataPathError(error, asserting: true)
             }
             return Data(zeroing: zd)
         }
@@ -259,7 +259,7 @@ extension CDataPath {
                 &error
             )
             guard let zd else {
-                throw DataPathError(error) ?? .generic
+                throw DataPathError(error, asserting: true)
             }
             let data = Data(zeroing: zd)
             return (packetId, header, keepAlive, data)
@@ -309,7 +309,7 @@ extension CDataPath {
                 &error
             )
             guard outLength > 0 else {
-                throw DataPathError(error) ?? .generic
+                throw DataPathError(error, asserting: true)
             }
             return Data(bytes: buf.pointee.bytes, count: outLength)
         }
@@ -334,7 +334,7 @@ extension CDataPath {
                 &error
             )
             guard outLength > 0 else {
-                throw DataPathError(error) ?? .generic
+                throw DataPathError(error, asserting: true)
             }
             let data = Data(bytes: buf.pointee.bytes, count: outLength)
             return (packetId, data)
@@ -363,7 +363,7 @@ extension CDataPath {
                 &error
             )
             guard outLength > 0 else {
-                throw DataPathError(error) ?? .generic
+                throw DataPathError(error, asserting: true)
             }
             return Data(bytes: buf.pointee.bytes, count: outLength)
         }

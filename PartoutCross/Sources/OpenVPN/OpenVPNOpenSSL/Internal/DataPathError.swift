@@ -23,28 +23,39 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutCryptoOpenSSL_Cross
 internal import _PartoutOpenVPNOpenSSL_C
 
 enum DataPathError: Error {
-    case generic
+    case algorithm
 
-    case wrapperAlgorithm
+    case peerIdMismatch
 
-    case wrapperKeys
+    case overflow
 
-    case path(dp_error_code)
+    case compression
 
     case crypto(crypto_error_code)
 
-    init?(_ error: dp_error_t) {
+    case unknown
+
+    init(_ error: dp_error_t, asserting: Bool) {
         switch error.dp_code {
         case DataPathErrorNone:
-//            assertionFailure()
-            return nil
+            if asserting {
+                assertionFailure()
+            }
+            self = .unknown
+        case DataPathErrorPeerIdMismatch:
+            self = .peerIdMismatch
+        case DataPathErrorOverflow:
+            self = .overflow
+        case DataPathErrorCompression:
+            self = .compression
         case DataPathErrorCrypto:
             self = .crypto(error.crypto_code)
         default:
-            self = .path(error.dp_code)
+            self = .unknown
         }
     }
 }
