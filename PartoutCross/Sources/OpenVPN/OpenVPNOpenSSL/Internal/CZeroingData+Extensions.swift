@@ -33,7 +33,7 @@ extension SecureData {
     }
 }
 
-extension CZeroingData {
+extension CZeroingData: SensitiveDebugStringConvertible {
     func debugDescription(withSensitiveData: Bool) -> String {
         withSensitiveData ? "[\(length) bytes, \(toHex())]" : "[\(length) bytes]"
     }

@@ -1,5 +1,5 @@
 //
-//  ProtocolMacros.swift
+//  Constants+ProtocolMacros.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 2/8/17.
@@ -37,16 +37,18 @@
 import Foundation
 import PartoutCore
 
-enum ProtocolMacros {
+extension Constants {
+    enum ProtocolMacros {
 
-    // UInt32(0) + UInt8(KeyMethod = 2)
-    static let tlsPrefix = Data(hex: "0000000002")
+        // UInt32(0) + UInt8(KeyMethod = 2)
+        static let tlsPrefix = Data(hex: "0000000002")
 
-    private static let numberOfKeys = UInt8(8) // 3-bit
+        private static let numberOfKeys = UInt8(8) // 3-bit
 
-    static func nextKey(after currentKey: UInt8) -> UInt8 {
-        max(1, (currentKey + 1) % numberOfKeys)
+        static func nextKey(after currentKey: UInt8) -> UInt8 {
+            max(1, (currentKey + 1) % numberOfKeys)
+        }
+
+        static let pingString = Data(hex: "2a187bf3641eb4cb07ed2d0a981fc748")
     }
-
-    static let pingString = Data(hex: "2a187bf3641eb4cb07ed2d0a981fc748")
 }
