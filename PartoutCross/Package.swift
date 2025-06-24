@@ -202,7 +202,7 @@ if areas.contains(.openvpn) {
                     .product(name: "_PartoutOpenVPNCore", package: "partout")
                 ],
                 path: "Sources/OpenVPN/OpenVPNOpenSSL",
-                exclude: ["Legacy"],
+                exclude: ["Internal/Legacy"],
                 swiftSettings: wrappedSwiftSettings
             )
         ])
