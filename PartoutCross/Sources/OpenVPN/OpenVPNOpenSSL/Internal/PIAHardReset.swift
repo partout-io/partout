@@ -1,8 +1,8 @@
 //
-//  Constants.swift
+//  PIAHardReset.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 5/19/19.
+//  Created by Davide De Rosa on 10/18/18.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -34,69 +34,47 @@
 //      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-internal import _PartoutOpenVPNOpenSSL_ObjC
+import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
 
-struct Constants {
+struct PIAHardReset {
+    private static let obfuscationKeyLength = 3
 
-    // MARK: Session
+    private static let magic = "53eo0rk92gxic98p1asgl5auh59r1vp4lmry1e3chzi100qntd"
 
-    static let usesReplayProtection = true
+    private static let encodedFormat = "\(magic)crypto\t%@|%@\tca\t%@"
 
-    static let maxPacketSize = 1000
+    private let ctx: PartoutLoggerContext
 
-    // MARK: Authentication
+    private let caMd5Digest: String
 
-    static func peerInfo(sslVersion: String? = nil, withPlatform: Bool = true, extra: [String: String]? = nil) -> String {
-        let uiVersion = Partout.versionIdentifier
-        var info = [
-            "IV_VER=2.4",
-            "IV_UI_VER=\(uiVersion)",
-            "IV_PROTO=2",
-            "IV_NCP=2",
-            "IV_LZO_STUB=1"
-        ]
-        info.append("IV_LZO=0")
-        // XXX: always do --push-peer-info
-        // however, MAC is inaccessible and IFAD is deprecated, skip IV_HWADDR
-//            if pushPeerInfo {
-        if let sslVersion {
-            info.append("IV_SSL=\(sslVersion)")
-        }
-        if withPlatform {
-            let platform: String
-            let platformVersion = ProcessInfo.processInfo.operatingSystemVersion
-#if os(iOS)
-            platform = "ios"
-#elseif os(tvOS)
-            platform = "tvos"
-#else
-            platform = "mac"
-#endif
-            info.append("IV_PLAT=\(platform)")
-            info.append("IV_PLAT_VER=\(platformVersion.majorVersion).\(platformVersion.minorVersion)")
-        }
-        if let extra {
-            info.append(contentsOf: extra.map {
-                "\($0)=\($1)"
-            })
-        }
-        info.append("")
-        return info.joined(separator: "\n")
+    private let cipherName: String
+
+    private let digestName: String
+
+    init(_ ctx: PartoutLoggerContext, caMd5Digest: String, cipher: OpenVPN.Cipher, digest: OpenVPN.Digest) {
+        self.ctx = ctx
+        self.caMd5Digest = caMd5Digest
+        cipherName = cipher.rawValue.lowercased()
+        digestName = digest.rawValue.lowercased()
     }
 
-    static let randomLength = 32
+    func encodedData(prng: PRNGProtocol) throws -> Data {
+        let string = String(format: PIAHardReset.encodedFormat, cipherName, digestName, caMd5Digest)
+        guard let plainData = string.data(using: .ascii) else {
+            pp_log(ctx, .openvpn, .fault, "Unable to encode string to ASCII")
+            throw OpenVPNSessionError.assertion
+        }
+        let keyBytes = prng.data(length: PIAHardReset.obfuscationKeyLength)
 
-    // MARK: Keys
+        var encodedData = Data(keyBytes)
+        for (i, b) in plainData.enumerated() {
+            let keyChar = keyBytes[i % keyBytes.count]
+            let xorredB = b ^ keyChar
 
-    static let label1 = "OpenVPN master secret"
-
-    static let label2 = "OpenVPN key expansion"
-
-    static let preMasterLength = 48
-
-    static let keyLength = 64
-
-    static let keysCount = 4
+            encodedData.append(xorredB)
+        }
+        return encodedData
+    }
 }

@@ -1,8 +1,8 @@
 //
-//  Constants.swift
+//  PushReply.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 5/19/19.
+//  Created by Davide De Rosa on 7/25/18.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -34,69 +34,52 @@
 //      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-internal import _PartoutOpenVPNOpenSSL_ObjC
+import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
 
-struct Constants {
+struct PushReply {
+    private let original: String
 
-    // MARK: Session
+    let options: OpenVPN.Configuration
 
-    static let usesReplayProtection = true
-
-    static let maxPacketSize = 1000
-
-    // MARK: Authentication
-
-    static func peerInfo(sslVersion: String? = nil, withPlatform: Bool = true, extra: [String: String]? = nil) -> String {
-        let uiVersion = Partout.versionIdentifier
-        var info = [
-            "IV_VER=2.4",
-            "IV_UI_VER=\(uiVersion)",
-            "IV_PROTO=2",
-            "IV_NCP=2",
-            "IV_LZO_STUB=1"
-        ]
-        info.append("IV_LZO=0")
-        // XXX: always do --push-peer-info
-        // however, MAC is inaccessible and IFAD is deprecated, skip IV_HWADDR
-//            if pushPeerInfo {
-        if let sslVersion {
-            info.append("IV_SSL=\(sslVersion)")
-        }
-        if withPlatform {
-            let platform: String
-            let platformVersion = ProcessInfo.processInfo.operatingSystemVersion
-#if os(iOS)
-            platform = "ios"
-#elseif os(tvOS)
-            platform = "tvos"
-#else
-            platform = "mac"
-#endif
-            info.append("IV_PLAT=\(platform)")
-            info.append("IV_PLAT_VER=\(platformVersion.majorVersion).\(platformVersion.minorVersion)")
-        }
-        if let extra {
-            info.append(contentsOf: extra.map {
-                "\($0)=\($1)"
-            })
-        }
-        info.append("")
-        return info.joined(separator: "\n")
+    fileprivate init(original: String, options: OpenVPN.Configuration) {
+        self.original = original
+        self.options = options
     }
+}
 
-    static let randomLength = 32
+extension PushReply: CustomStringConvertible {
+    var description: String {
+        let stripped = NSMutableString(string: original)
+        let rx = NSRegularExpression(StandardOpenVPNParser.Option.authToken.rawValue)
+        rx.replaceMatches(
+            in: stripped,
+            options: [],
+            range: NSRange(location: 0, length: stripped.length),
+            withTemplate: "auth-token"
+        )
+        return stripped as String
+    }
+}
 
-    // MARK: Keys
+extension StandardOpenVPNParser {
+    private static let prefix = "PUSH_REPLY,"
 
-    static let label1 = "OpenVPN master secret"
+    func pushReply(with message: String) throws -> PushReply? {
+        guard message.hasPrefix(Self.prefix) else {
+            return nil
+        }
+        guard let prefixIndex = message.range(of: Self.prefix)?.lowerBound else {
+            return nil
+        }
+        guard !message.contains("push-continuation 2") else {
+            throw StandardOpenVPNParserError.continuationPushReply
+        }
+        let original = String(message[prefixIndex...])
+        let lines = original.components(separatedBy: ",")
+        let options = try parsed(fromLines: lines).configuration
 
-    static let label2 = "OpenVPN key expansion"
-
-    static let preMasterLength = 48
-
-    static let keyLength = 64
-
-    static let keysCount = 4
+        return PushReply(original: original, options: options)
+    }
 }
