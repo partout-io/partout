@@ -92,19 +92,19 @@ struct XORProcessor {
         switch method {
         case .xormask(let mask):
             dst.withUnsafeMutableBytes { dst in
-                xor_mask(dst.bytePointer, dstLength, mask.bytes, mask.length)
+                obf_xor_mask(dst.bytePointer, dstLength, mask.bytes, mask.length)
             }
         case .xorptrpos:
             dst.withUnsafeMutableBytes { dst in
-                xor_ptrpos(dst.bytePointer, dstLength)
+                obf_xor_ptrpos(dst.bytePointer, dstLength)
             }
         case .reverse:
             dst.withUnsafeMutableBytes { dst in
-                xor_reverse(dst.bytePointer, dstLength)
+                obf_reverse(dst.bytePointer, dstLength)
             }
         case .obfuscate(let mask):
             dst.withUnsafeMutableBytes { dst in
-                xor_obfuscate(
+                obf_xor_obfuscate(
                     dst.bytePointer,
                     dstLength,
                     mask.bytes,
