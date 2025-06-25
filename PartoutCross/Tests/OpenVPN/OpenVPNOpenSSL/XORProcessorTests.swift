@@ -30,11 +30,13 @@ import XCTest
 final class XORProcessorTests: XCTestCase {
     private let prng = SimplePRNG()
 
+    private let rndLength = 237
+
     private let mask = SecureData("f76dab30")!
 
     func test_givenProcessor_whenMask_thenIsExpected() {
         let sut = XORProcessor(method: .xormask(mask: mask))
-        let data = prng.data(length: 10)
+        let data = prng.data(length: rndLength)
         let maskData = mask.czData
         let processed = sut.processPacket(data, direction: .inbound)
         print(data.toHex())
@@ -46,7 +48,7 @@ final class XORProcessorTests: XCTestCase {
 
     func test_givenProcessor_whenPtrPos_thenIsExpected() {
         let sut = XORProcessor(method: .xorptrpos)
-        let data = prng.data(length: 10)
+        let data = prng.data(length: rndLength)
         let processed = sut.processPacket(data, direction: .inbound)
         print(data.toHex())
         print(processed.toHex())
@@ -112,22 +114,22 @@ final class XORProcessorTests: XCTestCase {
 
     func test_givenProcessor_whenMask_thenIsReversible() {
         let sut = XORProcessor(method: .xormask(mask: mask))
-        sut.assertReversible(prng.data(length: 1000))
+        sut.assertReversible(prng.data(length: rndLength))
     }
 
     func test_givenProcessor_whenPtrPos_thenIsReversible() {
         let sut = XORProcessor(method: .xorptrpos)
-        sut.assertReversible(prng.data(length: 1000))
+        sut.assertReversible(prng.data(length: rndLength))
     }
 
     func test_givenProcessor_whenReverse_thenIsReversible() {
         let sut = XORProcessor(method: .reverse)
-        sut.assertReversible(prng.data(length: 1000))
+        sut.assertReversible(prng.data(length: rndLength))
     }
 
     func test_givenProcessor_whenObfuscate_thenIsReversible() {
         let sut = XORProcessor(method: .obfuscate(mask: mask))
-        sut.assertReversible(prng.data(length: 1000))
+        sut.assertReversible(prng.data(length: rndLength))
     }
 
     // FIXME: ##, test XOR in PacketStream
