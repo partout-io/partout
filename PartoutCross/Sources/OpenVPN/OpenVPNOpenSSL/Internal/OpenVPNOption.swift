@@ -1,5 +1,5 @@
 //
-//  StandardOpenVPNParser+Option.swift
+//  OpenVPNOption.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 11/30/24.
@@ -23,9 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import _PartoutOpenVPNCore
 import Foundation
 
-extension StandardOpenVPNParser {
+extension OpenVPN {
     enum Option: String, CaseIterable {
 
         // MARK: Continuation
@@ -135,7 +136,7 @@ extension StandardOpenVPNParser {
     }
 }
 
-extension StandardOpenVPNParser.Option {
+extension OpenVPN.Option {
     var isServerOnly: Bool {
         switch self {
         case .authToken, .peerId:

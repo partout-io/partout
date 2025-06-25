@@ -73,7 +73,7 @@ public final class StandardOpenVPNParser {
     /// The decrypter for private keys.
     private let decrypter: PrivateKeyDecrypter?
 
-    private let rxOptions: [(option: Option, rx: NSRegularExpression)] = Option.allCases.compactMap {
+    private let rxOptions: [(option: OpenVPN.Option, rx: NSRegularExpression)] = OpenVPN.Option.allCases.compactMap {
         do {
             let rx = try $0.regularExpression()
             return ($0, rx)
@@ -224,7 +224,7 @@ extension StandardOpenVPNParser: ModuleImporter {
 private extension StandardOpenVPNParser {
     func enumerateOptions(
         in line: String,
-        completion: (_ option: Option, _ components: [String]) throws -> Void
+        completion: (_ option: OpenVPN.Option, _ components: [String]) throws -> Void
     ) throws -> Bool {
         assert(rxOptions.first?.option == .continuation)
         for pair in rxOptions {

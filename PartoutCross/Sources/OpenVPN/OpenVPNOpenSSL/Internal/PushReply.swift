@@ -52,7 +52,7 @@ struct PushReply {
 extension PushReply: CustomStringConvertible {
     var description: String {
         let stripped = NSMutableString(string: original)
-        let rx = NSRegularExpression(StandardOpenVPNParser.Option.authToken.rawValue)
+        let rx = NSRegularExpression(OpenVPN.Option.authToken.rawValue)
         rx.replaceMatches(
             in: stripped,
             options: [],

@@ -94,7 +94,7 @@ extension StandardOpenVPNParser {
 extension StandardOpenVPNParser.Builder {
 
     @inlinable
-    mutating func putOption(_ option: StandardOpenVPNParser.Option, line: String, components: [String]) throws {
+    mutating func putOption(_ option: OpenVPN.Option, line: String, components: [String]) throws {
         switch option {
 
             // MARK: Unsupported
