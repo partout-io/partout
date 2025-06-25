@@ -38,7 +38,7 @@ final class ObfuscatorTests: XCTestCase {
     // MARK: - Raw
 
     func test_givenProcessor_whenMask_thenIsExpected() {
-        let sut = Obfuscator(method: .xormask(mask: mask))
+        let sut = Obfuscator(method: .xormask(mask))
         let data = prng.data(length: rndLength)
         let maskData = mask.czData
         let processed = sut.processPacket(data, direction: .inbound)
@@ -88,7 +88,7 @@ final class ObfuscatorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenObfuscateOutbound_thenIsExpected() {
-        let sut = Obfuscator(method: .obfuscate(mask: mask))
+        let sut = Obfuscator(method: .obfuscate(mask))
         let data = Data(hex: "832ae7598dfa0378bc19")
         let processed = sut.processPacket(data, direction: .outbound)
         let expected = Data(hex: "e52680106098bc658b15")
@@ -105,7 +105,7 @@ final class ObfuscatorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenObfuscateInbound_thenIsExpected() {
-        let sut = Obfuscator(method: .obfuscate(mask: mask))
+        let sut = Obfuscator(method: .obfuscate(mask))
         let data = Data(hex: "e52680106098bc658b15")
         let processed = sut.processPacket(data, direction: .inbound)
         let expected = Data(hex: "832ae7598dfa0378bc19")
@@ -116,7 +116,7 @@ final class ObfuscatorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenMask_thenIsReversible() {
-        let sut = Obfuscator(method: .xormask(mask: mask))
+        let sut = Obfuscator(method: .xormask(mask))
         sut.assertReversible(prng.data(length: rndLength))
     }
 
@@ -131,7 +131,7 @@ final class ObfuscatorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenObfuscate_thenIsReversible() {
-        let sut = Obfuscator(method: .obfuscate(mask: mask))
+        let sut = Obfuscator(method: .obfuscate(mask))
         sut.assertReversible(prng.data(length: rndLength))
     }
 
@@ -192,10 +192,10 @@ final class ObfuscatorTests: XCTestCase {
     func test_givenPacketStream_whenProcess_thenIsReversible() {
         let sut = prng.data(length: 10000)
         assertReversibleStream(sut, method: nil)
-        assertReversibleStream(sut, method: .xormask(mask: mask))
+        assertReversibleStream(sut, method: .xormask(mask))
         assertReversibleStream(sut, method: .xorptrpos)
         assertReversibleStream(sut, method: .reverse)
-        assertReversibleStream(sut, method: .obfuscate(mask: mask))
+        assertReversibleStream(sut, method: .obfuscate(mask))
     }
 }
 
