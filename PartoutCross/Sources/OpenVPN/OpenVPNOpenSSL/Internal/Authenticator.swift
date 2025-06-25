@@ -103,7 +103,7 @@ final class Authenticator {
     // MARK: Authentication request
 
     func putAuth(into tls: TLSProtocol, options: OpenVPN.Configuration) throws {
-        let raw = CZ(Constants.ProtocolMacros.tlsPrefix)
+        let raw = CZ(Constants.tlsPrefix)
 
         // local keys
         raw.append(preMaster)
@@ -175,7 +175,7 @@ final class Authenticator {
     }
 
     func parseAuthReply() throws -> Bool {
-        let prefixLength = Constants.ProtocolMacros.tlsPrefix.count
+        let prefixLength = Constants.tlsPrefix.count
 
         // TLS prefix + random (x2) + opts length [+ opts]
         guard controlBuffer.length >= prefixLength + 2 * Constants.randomLength + 2 else {
@@ -183,11 +183,11 @@ final class Authenticator {
         }
 
         let prefix = controlBuffer.withOffset(0, length: prefixLength)
-        guard prefix.isEqual(to: Constants.ProtocolMacros.tlsPrefix) else {
+        guard prefix.isEqual(to: Constants.tlsPrefix) else {
             throw OpenVPNSessionError.wrongControlDataPrefix
         }
 
-        var offset = Constants.ProtocolMacros.tlsPrefix.count
+        var offset = Constants.tlsPrefix.count
 
         let serverRandom1 = controlBuffer.withOffset(offset, length: Constants.randomLength)
         offset += Constants.randomLength

@@ -59,7 +59,6 @@ struct Constants {
         info.append("IV_LZO=0")
         // XXX: always do --push-peer-info
         // however, MAC is inaccessible and IFAD is deprecated, skip IV_HWADDR
-//            if pushPeerInfo {
         if let sslVersion {
             info.append("IV_SSL=\(sslVersion)")
         }
@@ -98,4 +97,17 @@ struct Constants {
     static let keyLength = 64
 
     static let keysCount = 4
+
+    // MARK: Protocol
+
+    // UInt32(0) + UInt8(KeyMethod = 2)
+    static let tlsPrefix = Data(hex: "0000000002")
+
+    private static let numberOfKeys = UInt8(8) // 3-bit
+
+    static func nextKey(after currentKey: UInt8) -> UInt8 {
+        max(1, (currentKey + 1) % numberOfKeys)
+    }
+
+    static let pingString = Data(hex: "2a187bf3641eb4cb07ed2d0a981fc748")
 }
