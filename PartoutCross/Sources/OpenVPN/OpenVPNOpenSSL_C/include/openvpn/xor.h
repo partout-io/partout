@@ -66,11 +66,16 @@ void xor_ptrpos_copy(uint8_t *_Nonnull dst,
     }
 }
 
+// FIXME: ##, this does not XOR, change functions xor_ prefix to something else
+// first byte as-is, [1..n-1] reversed
 static inline
 void xor_reverse_copy(uint8_t *_Nonnull dst,
                       const uint8_t *_Nonnull src,
                       size_t src_len) {
 
+    if (src_len <= 2) {
+        return;
+    }
     size_t start = 1;
     size_t end = src_len - 1;
     uint8_t temp = 0;
