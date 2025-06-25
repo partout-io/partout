@@ -24,16 +24,40 @@
 //
 
 internal import _PartoutCryptoOpenSSL_ObjC
+internal import _PartoutOpenVPNOpenSSL_ObjC
 import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
 
 /// Processes data packets according to a XOR method.
 struct XORProcessor {
-    private let method: OpenVPN.XORMethod
+    private enum RawMethod {
+        case xormask(mask: ZeroingData)
+
+        case xorptrpos
+
+        case reverse
+
+        case obfuscate(mask: ZeroingData)
+
+        init(_ method: OpenVPN.XORMethod) {
+            switch method {
+            case .xormask(let mask):
+                self = .xormask(mask: mask.zData)
+            case .xorptrpos:
+                self = .xorptrpos
+            case .reverse:
+                self = .reverse
+            case .obfuscate(let mask):
+                self = .obfuscate(mask: mask.zData)
+            }
+        }
+    }
+
+    private let method: RawMethod
 
     init(method: OpenVPN.XORMethod) {
-        self.method = method
+        self.method = RawMethod(method)
     }
 
     /**
@@ -59,7 +83,7 @@ struct XORProcessor {
     func processPacket(_ packet: Data, outbound: Bool) -> Data {
         switch method {
         case .xormask(let mask):
-            return Self.xormask(packet: packet, mask: mask.zData)
+            return Self.xormask(packet: packet, mask: mask)
 
         case .xorptrpos:
             return Self.xorptrpos(packet: packet)
@@ -68,11 +92,7 @@ struct XORProcessor {
             return Self.reverse(packet: packet)
 
         case .obfuscate(let mask):
-            if outbound {
-                return Self.xormask(packet: Self.xorptrpos(packet: Self.reverse(packet: Self.xorptrpos(packet: packet))), mask: mask.zData)
-            } else {
-                return Self.xorptrpos(packet: Self.reverse(packet: Self.xorptrpos(packet: Self.xormask(packet: packet, mask: mask.zData))))
-            }
+            return Self.obfuscate(packet: packet, mask: mask, outbound: outbound)
 
         @unknown default:
             return packet
@@ -80,20 +100,40 @@ struct XORProcessor {
     }
 }
 
-extension XORProcessor {
-    private static func xormask(packet: Data, mask: ZeroingData) -> Data {
-        Data(packet.enumerated().map { (index, byte) in
-            byte ^ mask.bytes[index % mask.length]
-        })
+private extension XORProcessor {
+    static func xormask(packet: Data, mask: ZeroingData) -> Data {
+        var dst = [UInt8](packet)
+        let dstLength = dst.count
+        dst.withUnsafeMutableBytes { dst in
+            xor_mask_legacy(dst.bytePointer, dst.bytePointer, dstLength, mask)
+        }
+        return Data(dst)
     }
 
-    private static func xorptrpos(packet: Data) -> Data {
-        Data(packet.enumerated().map { (index, byte) in
-            byte ^ UInt8(truncatingIfNeeded: index &+ 1)
-        })
+    static func xorptrpos(packet: Data) -> Data {
+        var dst = [UInt8](packet)
+        let dstLength = dst.count
+        dst.withUnsafeMutableBytes { dst in
+            xor_ptrpos_legacy(dst.bytePointer, dst.bytePointer, dstLength)
+        }
+        return Data(dst)
     }
 
-    private static func reverse(packet: Data) -> Data {
-        Data(([UInt8](packet))[0..<1] + ([UInt8](packet)[1...]).reversed())
+    static func reverse(packet: Data) -> Data {
+        var dst = [UInt8](packet)
+        let dstLength = dst.count
+        dst.withUnsafeMutableBytes { dst in
+            xor_reverse_legacy(dst.bytePointer, dst.bytePointer, dstLength)
+        }
+        return Data(dst)
+    }
+
+    static func obfuscate(packet: Data, mask: ZeroingData, outbound: Bool) -> Data {
+        var dst = [UInt8](packet)
+        let dstLength = dst.count
+        dst.withUnsafeMutableBytes { dst in
+            xor_obfuscate_legacy(dst.bytePointer, dst.bytePointer, dstLength, mask, outbound)
+        }
+        return Data(dst)
     }
 }
