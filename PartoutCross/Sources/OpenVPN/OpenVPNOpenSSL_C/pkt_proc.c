@@ -30,32 +30,32 @@
 // MARK: - Pointers
 
 static inline
-void alg_plain(const obf_alg_ctx *ctx) {
+void alg_plain(const pkt_proc_alg_ctx *ctx) {
     assert(ctx);
     memcpy(ctx->dst + ctx->dst_offset, ctx->src + ctx->src_offset, ctx->src_len);
 }
 
 static
-void alg_xor_mask(const obf_alg_ctx *ctx) {
+void alg_xor_mask(const pkt_proc_alg_ctx *ctx) {
     assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
     obf_xor_mask(ctx->dst + ctx->dst_offset, ctx->src_len, ctx->mask, ctx->mask_len);
 }
 
 static
-void alg_xor_ptrpos(const obf_alg_ctx *ctx) {
+void alg_xor_ptrpos(const pkt_proc_alg_ctx *ctx) {
     alg_plain(ctx);
     obf_xor_ptrpos(ctx->dst + ctx->dst_offset, ctx->src_len);
 }
 
 static
-void alg_reverse(const obf_alg_ctx *ctx) {
+void alg_reverse(const pkt_proc_alg_ctx *ctx) {
     alg_plain(ctx);
     obf_reverse(ctx->dst + ctx->dst_offset, ctx->src_len);
 }
 
 static
-void alg_xor_obfuscate_in(const obf_alg_ctx *ctx) {
+void alg_xor_obfuscate_in(const pkt_proc_alg_ctx *ctx) {
     assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
     obf_xor_obfuscate(ctx->dst + ctx->dst_offset,
@@ -65,7 +65,7 @@ void alg_xor_obfuscate_in(const obf_alg_ctx *ctx) {
 }
 
 static
-void alg_xor_obfuscate_out(const obf_alg_ctx *ctx) {
+void alg_xor_obfuscate_out(const pkt_proc_alg_ctx *ctx) {
     assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
     obf_xor_obfuscate(ctx->dst + ctx->dst_offset,
@@ -76,39 +76,39 @@ void alg_xor_obfuscate_out(const obf_alg_ctx *ctx) {
 
 // MARK: - Obfuscator
 
-obf_t *obf_create(obf_method method, const uint8_t *mask, size_t mask_len) {
-    obf_t *obf = pp_alloc_crypto(sizeof(obf_t));
-    obf->mask = NULL;
+pkt_proc_t *pkt_proc_create(pkt_proc_method method, const uint8_t *mask, size_t mask_len) {
+    pkt_proc_t *proc = pp_alloc_crypto(sizeof(pkt_proc_t));
+    proc->mask = NULL;
     switch (method) {
-        case OBFMethodNone:
-            obf->recv = alg_plain;
-            obf->send = alg_plain;
+        case PktProcMethodNone:
+            proc->recv = alg_plain;
+            proc->send = alg_plain;
             break;
-        case OBFMethodXORMask:
-            obf->recv = alg_xor_mask;
-            obf->send = alg_xor_mask;
-            obf->mask = zd_create_copy(mask, mask_len);
+        case PktProcMethodXORMask:
+            proc->recv = alg_xor_mask;
+            proc->send = alg_xor_mask;
+            proc->mask = zd_create_copy(mask, mask_len);
             break;
-        case OBFMethodXORPtrPos:
-            obf->recv = alg_xor_ptrpos;
-            obf->send = alg_xor_ptrpos;
+        case PktProcMethodXORPtrPos:
+            proc->recv = alg_xor_ptrpos;
+            proc->send = alg_xor_ptrpos;
             break;
-        case OBFMethodReverse:
-            obf->recv = alg_reverse;
-            obf->send = alg_reverse;
+        case PktProcMethodReverse:
+            proc->recv = alg_reverse;
+            proc->send = alg_reverse;
             break;
-        case OBFMethodXORObfuscate:
-            obf->recv = alg_xor_obfuscate_in;
-            obf->send = alg_xor_obfuscate_out;
-            obf->mask = zd_create_copy(mask, mask_len);
+        case PktProcMethodXORObfuscate:
+            proc->recv = alg_xor_obfuscate_in;
+            proc->send = alg_xor_obfuscate_out;
+            proc->mask = zd_create_copy(mask, mask_len);
             break;
     }
-    return obf;
+    return proc;
 }
 
-void obf_free(obf_t *obf) {
-    if (obf->mask) {
-        zd_free(obf->mask);
+void pkt_proc_free(pkt_proc_t *proc) {
+    if (proc->mask) {
+        zd_free(proc->mask);
     }
-    free(obf);
+    free(proc);
 }

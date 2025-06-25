@@ -37,29 +37,29 @@ final class PacketProcessor {
         case inbound
     }
 
-    private let obf: UnsafeMutablePointer<obf_t>
+    private let proc: UnsafeMutablePointer<pkt_proc_t>
 
     init(method: OpenVPN.ObfuscationMethod?) {
         switch method {
         case .xormask(let mask):
-            obf = mask.toData().withUnsafeBytes { maskPtr in
-                obf_create(OBFMethodXORMask, maskPtr.bytePointer, mask.count)
+            proc = mask.toData().withUnsafeBytes { maskPtr in
+                pkt_proc_create(PktProcMethodXORMask, maskPtr.bytePointer, mask.count)
             }
         case .xorptrpos:
-            obf = obf_create(OBFMethodXORPtrPos, nil, 0)
+            proc = pkt_proc_create(PktProcMethodXORPtrPos, nil, 0)
         case .reverse:
-            obf = obf_create(OBFMethodReverse, nil, 0)
+            proc = pkt_proc_create(PktProcMethodReverse, nil, 0)
         case .obfuscate(let mask):
-            obf = mask.toData().withUnsafeBytes { maskPtr in
-                obf_create(OBFMethodXORObfuscate, maskPtr.bytePointer, mask.count)
+            proc = mask.toData().withUnsafeBytes { maskPtr in
+                pkt_proc_create(PktProcMethodXORObfuscate, maskPtr.bytePointer, mask.count)
             }
         default:
-            obf = obf_create(OBFMethodNone, nil, 0)
+            proc = pkt_proc_create(PktProcMethodNone, nil, 0)
         }
     }
 
     deinit {
-        obf_free(obf)
+        pkt_proc_free(proc)
     }
 
     /**
@@ -88,9 +88,9 @@ final class PacketProcessor {
             dst.withUnsafeMutableBytes { dst in
                 switch direction {
                 case .inbound:
-                    obf_recv(obf, dst.bytePointer, src.bytePointer, packet.count)
+                    pkt_proc_recv(proc, dst.bytePointer, src.bytePointer, packet.count)
                 case .outbound:
-                    obf_send(obf, dst.bytePointer, src.bytePointer, packet.count)
+                    pkt_proc_send(proc, dst.bytePointer, src.bytePointer, packet.count)
                 }
             }
         }
@@ -103,8 +103,8 @@ final class PacketProcessor {
             until = 0
             while true {
                 var rcvd = 0
-                let zd = obf_stream_recv(
-                    obf,
+                let zd = pkt_proc_stream_recv(
+                    proc,
                     src.bytePointer.advanced(by: until),
                     stream.count - until,
                     &rcvd
@@ -121,10 +121,10 @@ final class PacketProcessor {
     }
 
     func stream(fromPacket packet: Data) -> Data {
-        let dst = zd_create(obf_stream_send_bufsize(1, packet.count))
+        let dst = zd_create(pkt_proc_stream_send_bufsize(1, packet.count))
         _ = packet.withUnsafeBytes { src in
-            obf_stream_send(
-                obf,
+            pkt_proc_stream_send(
+                proc,
                 dst, 0,
                 src.bytePointer, packet.count
             )
@@ -133,12 +133,12 @@ final class PacketProcessor {
     }
 
     func stream(fromPackets packets: [Data]) -> Data {
-        let dst = zd_create(obf_stream_send_bufsize(Int32(packets.count), packets.flatCount))
+        let dst = zd_create(pkt_proc_stream_send_bufsize(Int32(packets.count), packets.flatCount))
         var dstOffset = 0
         for packet in packets {
             packet.withUnsafeBytes { src in
-                dstOffset = obf_stream_send(
-                    obf,
+                dstOffset = pkt_proc_stream_send(
+                    proc,
                     dst, dstOffset,
                     src.bytePointer, packet.count
                 )
