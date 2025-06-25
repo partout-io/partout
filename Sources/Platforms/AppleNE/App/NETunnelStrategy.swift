@@ -55,7 +55,7 @@ public actor NETunnelStrategy {
     public init(
         _ ctx: PartoutLoggerContext,
         bundleIdentifier: String,
-        coder: NEProtocolCoder,
+        coder: NEProtocolCoder
 //        options: Set<Option> = []
     ) {
         self.ctx = ctx
