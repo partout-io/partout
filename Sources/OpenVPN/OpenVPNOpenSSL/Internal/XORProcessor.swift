@@ -83,57 +83,39 @@ struct XORProcessor {
     func processPacket(_ packet: Data, outbound: Bool) -> Data {
         switch method {
         case .xormask(let mask):
-            return Self.xormask(packet: packet, mask: mask)
+            var dst = [UInt8](packet)
+            let dstLength = dst.count
+            dst.withUnsafeMutableBytes { dst in
+                xor_mask_legacy(dst.bytePointer, dst.bytePointer, dstLength, mask)
+            }
+            return Data(dst)
 
         case .xorptrpos:
-            return Self.xorptrpos(packet: packet)
+            var dst = [UInt8](packet)
+            let dstLength = dst.count
+            dst.withUnsafeMutableBytes { dst in
+                xor_ptrpos_legacy(dst.bytePointer, dst.bytePointer, dstLength)
+            }
+            return Data(dst)
 
         case .reverse:
-            return Self.reverse(packet: packet)
+            var dst = [UInt8](packet)
+            let dstLength = dst.count
+            dst.withUnsafeMutableBytes { dst in
+                xor_reverse_legacy(dst.bytePointer, dst.bytePointer, dstLength)
+            }
+            return Data(dst)
 
         case .obfuscate(let mask):
-            return Self.obfuscate(packet: packet, mask: mask, outbound: outbound)
+            var dst = [UInt8](packet)
+            let dstLength = dst.count
+            dst.withUnsafeMutableBytes { dst in
+                xor_obfuscate_legacy(dst.bytePointer, dst.bytePointer, dstLength, mask, outbound)
+            }
+            return Data(dst)
 
         @unknown default:
             return packet
         }
-    }
-}
-
-private extension XORProcessor {
-    static func xormask(packet: Data, mask: ZeroingData) -> Data {
-        var dst = [UInt8](packet)
-        let dstLength = dst.count
-        dst.withUnsafeMutableBytes { dst in
-            xor_mask_legacy(dst.bytePointer, dst.bytePointer, dstLength, mask)
-        }
-        return Data(dst)
-    }
-
-    static func xorptrpos(packet: Data) -> Data {
-        var dst = [UInt8](packet)
-        let dstLength = dst.count
-        dst.withUnsafeMutableBytes { dst in
-            xor_ptrpos_legacy(dst.bytePointer, dst.bytePointer, dstLength)
-        }
-        return Data(dst)
-    }
-
-    static func reverse(packet: Data) -> Data {
-        var dst = [UInt8](packet)
-        let dstLength = dst.count
-        dst.withUnsafeMutableBytes { dst in
-            xor_reverse_legacy(dst.bytePointer, dst.bytePointer, dstLength)
-        }
-        return Data(dst)
-    }
-
-    static func obfuscate(packet: Data, mask: ZeroingData, outbound: Bool) -> Data {
-        var dst = [UInt8](packet)
-        let dstLength = dst.count
-        dst.withUnsafeMutableBytes { dst in
-            xor_obfuscate_legacy(dst.bytePointer, dst.bytePointer, dstLength, mask, outbound)
-        }
-        return Data(dst)
     }
 }
