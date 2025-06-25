@@ -62,7 +62,7 @@ void xor_ptrpos_copy(uint8_t *_Nonnull dst,
                      size_t src_len) {
 
     for (size_t i = 0; i < src_len; ++i) {
-        dst[i] = src[i] ^ (i + 1);
+        dst[i] = src[i] ^ ((i + 1) & 0xff);
     }
 }
 
