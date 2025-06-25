@@ -25,8 +25,8 @@
 
 #pragma once
 
+#include <stdint.h>
 #include <string.h>
-#include "crypto/zeroing_data.h"
 
 typedef enum {
     XORMethodNone,
@@ -36,39 +36,43 @@ typedef enum {
     XORMethodObfuscate
 } xor_method_t;
 
+// WARNING: assume dst to be able to hold src_len
+
+// TODO: ##, make more efficient by XOR-ing 4-8 bytes per loop
+
 static inline
-void xor_mask(uint8_t *_Nonnull dst,
-              const uint8_t *_Nonnull src,
-              zeroing_data_t *_Nonnull mask,
-              size_t length)
-{
-    assert(mask);
-    if (mask->length > 0) {
-        for (size_t i = 0; i < length; ++i) {
-            dst[i] = src[i] ^ ((uint8_t *)(mask->bytes))[i % mask->length];
-        }
+void xor_mask_copy(uint8_t *_Nonnull dst,
+                   const uint8_t *_Nonnull src,
+                   size_t src_len,
+                   const uint8_t *_Nonnull mask,
+                   size_t mask_len) {
+
+    assert(mask && mask_len > 0);
+    if (mask_len == 0) {
         return;
     }
-    memcpy(dst, src, length);
+    for (size_t i = 0; i < src_len; ++i) {
+        dst[i] = src[i] ^ mask[i % mask_len];
+    }
 }
 
 static inline
-void xor_ptrpos(uint8_t *_Nonnull dst,
-                const uint8_t *_Nonnull src,
-                size_t length)
-{
-    for (size_t i = 0; i < length; ++i) {
+void xor_ptrpos_copy(uint8_t *_Nonnull dst,
+                     const uint8_t *_Nonnull src,
+                     size_t src_len) {
+
+    for (size_t i = 0; i < src_len; ++i) {
         dst[i] = src[i] ^ (i + 1);
     }
 }
 
 static inline
-void xor_reverse(uint8_t *_Nonnull dst,
-                 const uint8_t *_Nonnull src,
-                 size_t length)
-{
+void xor_reverse_copy(uint8_t *_Nonnull dst,
+                      const uint8_t *_Nonnull src,
+                      size_t src_len) {
+
     size_t start = 1;
-    size_t end = length - 1;
+    size_t end = src_len - 1;
     uint8_t temp = 0;
     dst[0] = src[0];
     while (start < end) {
@@ -84,38 +88,83 @@ void xor_reverse(uint8_t *_Nonnull dst,
 }
 
 static inline
+void xor_obfuscate_copy(uint8_t *_Nonnull dst,
+                        const uint8_t *_Nonnull src,
+                        size_t src_len,
+                        const uint8_t *_Nonnull mask,
+                        size_t mask_len,
+                        bool outbound)
+{
+    if (outbound) {
+        xor_ptrpos_copy(dst, src, src_len);
+        xor_reverse_copy(dst, dst, src_len);
+        xor_ptrpos_copy(dst, dst, src_len);
+        xor_mask_copy(dst, dst, src_len, mask, mask_len);
+    } else {
+        xor_mask_copy(dst, src, src_len, mask, mask_len);
+        xor_ptrpos_copy(dst, dst, src_len);
+        xor_reverse_copy(dst, dst, src_len);
+        xor_ptrpos_copy(dst, dst, src_len);
+    }
+}
+
+// MARK: - In-place
+
+static inline
+void xor_mask(uint8_t *_Nonnull dst,
+              size_t dst_len,
+              const uint8_t *_Nonnull mask,
+              size_t mask_len) {
+
+    xor_mask_copy(dst, dst, dst_len, mask, mask_len);
+}
+
+static inline
+void xor_ptrpos(uint8_t *_Nonnull dst, size_t dst_len) {
+    xor_ptrpos_copy(dst, dst, dst_len);
+}
+
+static inline
+void xor_reverse(uint8_t *_Nonnull dst, size_t dst_len) {
+    xor_reverse_copy(dst, dst, dst_len);
+}
+
+static inline
+void xor_obfuscate(uint8_t *_Nonnull dst,
+                   size_t dst_len,
+                   const uint8_t *_Nonnull mask,
+                   size_t mask_len,
+                   bool outbound) {
+
+    xor_obfuscate_copy(dst, dst, dst_len, mask, mask_len, outbound);
+}
+
+// MARK: - Generic
+
+static inline
 void xor_memcpy(uint8_t *_Nonnull dst,
                 const uint8_t *_Nonnull src,
-                const size_t src_len,
+                size_t src_len,
                 xor_method_t method,
-                zeroing_data_t *_Nullable mask, bool outbound)
-{
-    const uint8_t *source = (uint8_t *)src;
+                const uint8_t *_Nonnull mask,
+                size_t mask_len,
+                bool outbound) {
+
     switch (method) {
         case XORMethodNone:
-            memcpy(dst, source, src_len);
+            memcpy(dst, src, src_len);
             break;
         case XORMethodMask:
-            xor_mask(dst, source, mask, src_len);
+            xor_mask_copy(dst, src, src_len, mask, mask_len);
             break;
         case XORMethodPtrPos:
-            xor_ptrpos(dst, source, src_len);
+            xor_ptrpos_copy(dst, src, src_len);
             break;
         case XORMethodReverse:
-            xor_reverse(dst, source, src_len);
+            xor_reverse_copy(dst, src, src_len);
             break;
         case XORMethodObfuscate:
-            if (outbound) {
-                xor_ptrpos(dst, source, src_len);
-                xor_reverse(dst, dst, src_len);
-                xor_ptrpos(dst, dst, src_len);
-                xor_mask(dst, dst, mask, src_len);
-            } else {
-                xor_mask(dst, source, mask, src_len);
-                xor_ptrpos(dst, dst, src_len);
-                xor_reverse(dst, dst, src_len);
-                xor_ptrpos(dst, dst, src_len);
-            }
+            xor_obfuscate_copy(dst, src, src_len, mask, mask_len, outbound);
             break;
     }
 }
