@@ -31,6 +31,12 @@ import PartoutCore
 
 /// Processes data packets according to a XOR method.
 struct XORProcessor {
+    enum Direction {
+        case outbound
+
+        case inbound
+    }
+
     private enum RawMethod {
         case xormask(mask: CZeroingData)
 
@@ -67,9 +73,9 @@ struct XORProcessor {
      - Parameter outbound: Set `true` if packets are outbound, `false` otherwise.
      - Returns: The array of packets after XOR processing.
      **/
-    func processPackets(_ packets: [Data], outbound: Bool) -> [Data] {
+    func processPackets(_ packets: [Data], direction: Direction) -> [Data] {
         packets.map {
-            processPacket($0, outbound: outbound)
+            processPacket($0, direction: direction)
         }
     }
 
@@ -77,10 +83,10 @@ struct XORProcessor {
      Returns a data packet processed according to the XOR method.
 
      - Parameter packet: The packet.
-     - Parameter outbound: Set `true` if packet is outbound, `false` otherwise.
+     - Parameter direction: The direction of the packet.
      - Returns: The packet after XOR processing.
      **/
-    func processPacket(_ packet: Data, outbound: Bool) -> Data {
+    func processPacket(_ packet: Data, direction: Direction) -> Data {
         var dst = [UInt8](packet)
         let dstLength = dst.count
         switch method {
@@ -98,7 +104,13 @@ struct XORProcessor {
             }
         case .obfuscate(let mask):
             dst.withUnsafeMutableBytes { dst in
-                xor_obfuscate(dst.bytePointer, dstLength, mask.bytes, mask.length, outbound)
+                xor_obfuscate(
+                    dst.bytePointer,
+                    dstLength,
+                    mask.bytes,
+                    mask.length,
+                    direction == .outbound
+                )
             }
         @unknown default:
             assertionFailure("Unhandled XOR method: \(method)")

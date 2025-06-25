@@ -36,7 +36,7 @@ final class XORProcessorTests: XCTestCase {
         let sut = XORProcessor(method: .xormask(mask: mask))
         let data = prng.data(length: 10)
         let maskData = mask.czData
-        let processed = sut.processPacket(data, outbound: false)
+        let processed = sut.processPacket(data, direction: .inbound)
         print(data.toHex())
         print(processed.toHex())
         for (i, byte) in processed.enumerated() {
@@ -47,7 +47,7 @@ final class XORProcessorTests: XCTestCase {
     func test_givenProcessor_whenPtrPos_thenIsExpected() {
         let sut = XORProcessor(method: .xorptrpos)
         let data = prng.data(length: 10)
-        let processed = sut.processPacket(data, outbound: false)
+        let processed = sut.processPacket(data, direction: .inbound)
         print(data.toHex())
         print(processed.toHex())
         for (i, byte) in processed.enumerated() {
@@ -58,7 +58,7 @@ final class XORProcessorTests: XCTestCase {
     func test_givenProcessor_whenReverse_thenIsExpected() {
         let sut = XORProcessor(method: .reverse)
         var data = prng.data(length: 10)
-        var processed = sut.processPacket(data, outbound: false)
+        var processed = sut.processPacket(data, direction: .inbound)
         print(data.toHex())
         print(processed.toHex())
 
@@ -85,7 +85,7 @@ final class XORProcessorTests: XCTestCase {
     func test_givenProcessor_whenObfuscateOutbound_thenIsExpected() {
         let sut = XORProcessor(method: .obfuscate(mask: mask))
         let data = Data(hex: "832ae7598dfa0378bc19")
-        let processed = sut.processPacket(data, outbound: true)
+        let processed = sut.processPacket(data, direction: .outbound)
         let expected = Data(hex: "e52680106098bc658b15")
 
         // original = "832ae7598dfa0378bc19"
@@ -102,7 +102,7 @@ final class XORProcessorTests: XCTestCase {
     func test_givenProcessor_whenObfuscateInbound_thenIsExpected() {
         let sut = XORProcessor(method: .obfuscate(mask: mask))
         let data = Data(hex: "e52680106098bc658b15")
-        let processed = sut.processPacket(data, outbound: false)
+        let processed = sut.processPacket(data, direction: .inbound)
         let expected = Data(hex: "832ae7598dfa0378bc19")
 
         print(data.toHex())
@@ -145,8 +145,8 @@ final class XORProcessorTests: XCTestCase {
 
 private extension XORProcessor {
     func assertReversible(_ data: Data) {
-        let xorred = processPacket(data, outbound: true)
-        XCTAssertEqual(processPacket(xorred, outbound: false), data)
+        let xorred = processPacket(data, direction: .outbound)
+        XCTAssertEqual(processPacket(xorred, direction: .inbound), data)
     }
 }
 
