@@ -115,26 +115,6 @@ final class PacketProcessorTests: XCTestCase {
         XCTAssertEqual(processed, expected)
     }
 
-    func test_givenProcessor_whenMask_thenIsReversible() {
-        let sut = PacketProcessor(method: .xormask(mask: mask))
-        sut.assertReversible(prng.data(length: rndLength))
-    }
-
-    func test_givenProcessor_whenPtrPos_thenIsReversible() {
-        let sut = PacketProcessor(method: .xorptrpos)
-        sut.assertReversible(prng.data(length: rndLength))
-    }
-
-    func test_givenProcessor_whenReverse_thenIsReversible() {
-        let sut = PacketProcessor(method: .reverse)
-        sut.assertReversible(prng.data(length: rndLength))
-    }
-
-    func test_givenProcessor_whenObfuscate_thenIsReversible() {
-        let sut = PacketProcessor(method: .obfuscate(mask: mask))
-        sut.assertReversible(prng.data(length: rndLength))
-    }
-
     // MARK: - Streams
 
     func test_givenProcessor_whenSendSinglePacketStream_thenIsExpected() {
@@ -269,15 +249,40 @@ final class PacketProcessorTests: XCTestCase {
         XCTAssertEqual(bytes.count, 0)
     }
 
-    // MARK: - Streams (reversibility)
+    // MARK: - Reversibility
+
+    func test_givenProcessor_whenMask_thenIsReversible() {
+        let sut = PacketProcessor(method: .xormask(mask: mask))
+        sut.assertReversible(prng.data(length: rndLength))
+    }
+
+    func test_givenProcessor_whenPtrPos_thenIsReversible() {
+        let sut = PacketProcessor(method: .xorptrpos)
+        sut.assertReversible(prng.data(length: rndLength))
+    }
+
+    func test_givenProcessor_whenReverse_thenIsReversible() {
+        let sut = PacketProcessor(method: .reverse)
+        sut.assertReversible(prng.data(length: rndLength))
+    }
+
+    func test_givenProcessor_whenObfuscate_thenIsReversible() {
+        let sut = PacketProcessor(method: .obfuscate(mask: mask))
+        sut.assertReversible(prng.data(length: rndLength))
+    }
 
     func test_givenStream_whenProcess_thenIsReversible() {
         let sut = prng.data(length: 10000)
-        assertReversibleStream(sut, method: nil)
-        assertReversibleStream(sut, method: .xormask(mask: mask))
-        assertReversibleStream(sut, method: .xorptrpos)
-        assertReversibleStream(sut, method: .reverse)
-        assertReversibleStream(sut, method: .obfuscate(mask: mask))
+        PacketProcessor(method: nil)
+            .assertReversibleStream(sut)
+        PacketProcessor(method: .xormask(mask: mask))
+            .assertReversibleStream(sut)
+        PacketProcessor(method: .xorptrpos)
+            .assertReversibleStream(sut)
+        PacketProcessor(method: .reverse)
+            .assertReversibleStream(sut)
+        PacketProcessor(method: .obfuscate(mask: mask))
+            .assertReversibleStream(sut)
     }
 }
 
@@ -288,20 +293,19 @@ private extension PacketProcessor {
         let xorred = processPacket(data, direction: .outbound)
         XCTAssertEqual(processPacket(xorred, direction: .inbound), data)
     }
+
+    func assertReversibleStream(_ data: Data) {
+        var until = 0
+        let outStream = stream(fromPacket: data)
+        let inStream = packets(fromStream: outStream, until: &until)
+        let originalData = Data(inStream.joined())
+        XCTAssertEqual(data.toHex(), originalData.toHex())
+    }
 }
 
 private extension PacketProcessorTests {
     func stream(from bytes: [UInt8], until: inout Int) -> [Data] {
         PacketProcessor(method: nil)
             .packets(fromStream: Data(bytes), until: &until)
-    }
-
-    func assertReversibleStream(_ data: Data, method: OpenVPN.ObfuscationMethod?) {
-        let sut = PacketProcessor(method: method)
-        var until = 0
-        let outStream = sut.stream(fromPacket: data)
-        let inStream = sut.packets(fromStream: outStream, until: &until)
-        let originalData = Data(inStream.joined())
-        XCTAssertEqual(data.toHex(), originalData.toHex())
     }
 }
