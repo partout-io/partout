@@ -87,7 +87,7 @@ pkt_proc_t *pkt_proc_create(pkt_proc_method method, const uint8_t *mask, size_t 
         case PktProcMethodXORMask:
             proc->recv = alg_xor_mask;
             proc->send = alg_xor_mask;
-            proc->mask = zd_create_copy(mask, mask_len);
+            proc->mask = zd_create_from_data(mask, mask_len);
             break;
         case PktProcMethodXORPtrPos:
             proc->recv = alg_xor_ptrpos;
@@ -100,7 +100,7 @@ pkt_proc_t *pkt_proc_create(pkt_proc_method method, const uint8_t *mask, size_t 
         case PktProcMethodXORObfuscate:
             proc->recv = alg_xor_obfuscate_in;
             proc->send = alg_xor_obfuscate_out;
-            proc->mask = zd_create_copy(mask, mask_len);
+            proc->mask = zd_create_from_data(mask, mask_len);
             break;
     }
     return proc;

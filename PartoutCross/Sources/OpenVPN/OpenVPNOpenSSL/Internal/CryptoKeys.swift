@@ -91,6 +91,6 @@ final class CryptoKeysBridge {
 
 private extension CZeroingData {
     func unsafeCopy() -> UnsafeMutablePointer<zeroing_data_t> {
-        zd_create_copy(bytes, length)
+        zd_create_from_data(bytes, length)
     }
 }

@@ -54,7 +54,7 @@ void crypto_configure_encrypt(void *vctx, const zeroing_data_t *cipher_key, cons
     if (ctx->hmac_key_enc) {
         zd_free(ctx->hmac_key_enc);
     }
-    ctx->hmac_key_enc = zd_create_copy(hmac_key->bytes, ctx->hmac_key_len);
+    ctx->hmac_key_enc = zd_create_from_data(hmac_key->bytes, ctx->hmac_key_len);
 }
 
 static
@@ -115,7 +115,7 @@ void crypto_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, cons
     if (ctx->hmac_key_dec) {
         zd_free(ctx->hmac_key_dec);
     }
-    ctx->hmac_key_dec = zd_create_copy(hmac_key->bytes, ctx->hmac_key_len);
+    ctx->hmac_key_dec = zd_create_from_data(hmac_key->bytes, ctx->hmac_key_len);
 }
 
 static
