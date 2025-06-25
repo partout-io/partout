@@ -271,7 +271,7 @@ extension OpenVPN {
         public let noPullMask: [PullMask]?
 
         /// - Seealso: `Configuration.Builder.xorMethod`
-        public let xorMethod: XORMethod?
+        public let xorMethod: ObfuscationMethod?
 
         // MARK: Shortcuts
 
@@ -440,7 +440,7 @@ extension OpenVPN.Configuration {
         // MARK: Extra
 
         /// The method to follow in regards to the XOR patch.
-        public var xorMethod: OpenVPN.XORMethod?
+        public var xorMethod: OpenVPN.ObfuscationMethod?
 
         /**
          Creates a `Configuration.Builder`.

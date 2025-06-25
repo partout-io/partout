@@ -77,7 +77,7 @@ extension StandardOpenVPNParser {
         private var optRedirectGateway: Set<RedirectGateway>?
         private var optRouteNoPull: Bool?
         //
-        private var optXorMethod: OpenVPN.XORMethod?
+        private var optXorMethod: OpenVPN.ObfuscationMethod?
 
         private var optWarning: StandardOpenVPNParserError?
         private var currentBlockName: String?

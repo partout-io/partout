@@ -1,5 +1,5 @@
 //
-//  XORMethodNative.swift
+//  ObfuscationMethodNative.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/15/25.
@@ -26,7 +26,7 @@
 import Foundation
 
 // FIXME: ###, xor_method_t
-enum XORMethodNative: Int {
+enum ObfuscationMethodNative: Int {
     case none
 
     case mask

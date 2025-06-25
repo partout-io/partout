@@ -32,7 +32,7 @@ final class PacketStream {
     static func packets(
         fromInboundStream stream: Data,
         until: inout Int,
-        xorMethod: XORMethodNative,
+        xorMethod: ObfuscationMethodNative,
         xorMask: CZeroingData?
     ) -> [Data] {
         fatalError()
@@ -41,7 +41,7 @@ final class PacketStream {
     // FIXME: ###
     static func outboundStream(
         fromPacket packet: Data,
-        xorMethod: XORMethodNative,
+        xorMethod: ObfuscationMethodNative,
         xorMask: CZeroingData?
     ) -> Data {
         fatalError()
@@ -50,7 +50,7 @@ final class PacketStream {
     // FIXME: ###
     static func outboundStream(
         fromPackets packets: [Data],
-        xorMethod: XORMethodNative,
+        xorMethod: ObfuscationMethodNative,
         xorMask: CZeroingData?
     ) -> Data {
         fatalError()

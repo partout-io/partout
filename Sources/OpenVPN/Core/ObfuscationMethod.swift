@@ -1,5 +1,5 @@
 //
-//  XORMethod.swift
+//  ObfuscationMethod.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 11/4/22.
@@ -29,7 +29,7 @@ import PartoutCore
 extension OpenVPN {
 
     /// The obfuscation method.
-    public enum XORMethod: Hashable, Codable, Sendable {
+    public enum ObfuscationMethod: Hashable, Codable, Sendable {
 
         /// XORs the bytes in each buffer with the given mask.
         case xormask(mask: SecureData)

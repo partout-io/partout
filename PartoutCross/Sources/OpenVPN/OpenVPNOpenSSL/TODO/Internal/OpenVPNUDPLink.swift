@@ -31,17 +31,17 @@ import PartoutCore
 final class OpenVPNUDPLink {
     private let link: LinkInterface
 
-    private let xor: XORProcessor?
+    private let xor: Obfuscator?
 
     /// - Parameters:
     ///   - link: The underlying socket.
     ///   - xorMethod: The optional XOR method.
-    convenience init(link: LinkInterface, xorMethod: OpenVPN.XORMethod?) {
+    convenience init(link: LinkInterface, xorMethod: OpenVPN.ObfuscationMethod?) {
         precondition(link.linkType.plainType == .udp)
-        self.init(link: link, xor: xorMethod.map(XORProcessor.init(method:)))
+        self.init(link: link, xor: xorMethod.map(Obfuscator.init(method:)))
     }
 
-    init(link: LinkInterface, xor: XORProcessor?) {
+    init(link: LinkInterface, xor: Obfuscator?) {
         self.link = link
         self.xor = xor
     }

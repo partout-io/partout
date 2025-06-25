@@ -1,5 +1,5 @@
 //
-//  XORProcessorTests.swift
+//  ObfuscatorTests.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 11/4/22.
@@ -27,7 +27,7 @@
 import PartoutCore
 import XCTest
 
-final class XORProcessorTests: XCTestCase {
+final class ObfuscatorTests: XCTestCase {
     private let prng = SimplePRNG()
 
     private let rndLength = 237
@@ -35,7 +35,7 @@ final class XORProcessorTests: XCTestCase {
     private let mask = SecureData("f76dab30")!
 
     func test_givenProcessor_whenMask_thenIsExpected() {
-        let sut = XORProcessor(method: .xormask(mask: mask))
+        let sut = Obfuscator(method: .xormask(mask: mask))
         let data = prng.data(length: rndLength)
         let maskData = mask.czData
         let processed = sut.processPacket(data, direction: .inbound)
@@ -47,7 +47,7 @@ final class XORProcessorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenPtrPos_thenIsExpected() {
-        let sut = XORProcessor(method: .xorptrpos)
+        let sut = Obfuscator(method: .xorptrpos)
         let data = prng.data(length: rndLength)
         let processed = sut.processPacket(data, direction: .inbound)
         print(data.toHex())
@@ -58,7 +58,7 @@ final class XORProcessorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenReverse_thenIsExpected() {
-        let sut = XORProcessor(method: .reverse)
+        let sut = Obfuscator(method: .reverse)
         var data = prng.data(length: 10)
         var processed = sut.processPacket(data, direction: .inbound)
         print(data.toHex())
@@ -85,7 +85,7 @@ final class XORProcessorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenObfuscateOutbound_thenIsExpected() {
-        let sut = XORProcessor(method: .obfuscate(mask: mask))
+        let sut = Obfuscator(method: .obfuscate(mask: mask))
         let data = Data(hex: "832ae7598dfa0378bc19")
         let processed = sut.processPacket(data, direction: .outbound)
         let expected = Data(hex: "e52680106098bc658b15")
@@ -102,7 +102,7 @@ final class XORProcessorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenObfuscateInbound_thenIsExpected() {
-        let sut = XORProcessor(method: .obfuscate(mask: mask))
+        let sut = Obfuscator(method: .obfuscate(mask: mask))
         let data = Data(hex: "e52680106098bc658b15")
         let processed = sut.processPacket(data, direction: .inbound)
         let expected = Data(hex: "832ae7598dfa0378bc19")
@@ -113,22 +113,22 @@ final class XORProcessorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenMask_thenIsReversible() {
-        let sut = XORProcessor(method: .xormask(mask: mask))
+        let sut = Obfuscator(method: .xormask(mask: mask))
         sut.assertReversible(prng.data(length: rndLength))
     }
 
     func test_givenProcessor_whenPtrPos_thenIsReversible() {
-        let sut = XORProcessor(method: .xorptrpos)
+        let sut = Obfuscator(method: .xorptrpos)
         sut.assertReversible(prng.data(length: rndLength))
     }
 
     func test_givenProcessor_whenReverse_thenIsReversible() {
-        let sut = XORProcessor(method: .reverse)
+        let sut = Obfuscator(method: .reverse)
         sut.assertReversible(prng.data(length: rndLength))
     }
 
     func test_givenProcessor_whenObfuscate_thenIsReversible() {
-        let sut = XORProcessor(method: .obfuscate(mask: mask))
+        let sut = Obfuscator(method: .obfuscate(mask: mask))
         sut.assertReversible(prng.data(length: rndLength))
     }
 
@@ -145,7 +145,7 @@ final class XORProcessorTests: XCTestCase {
 
 // MARK: - Helpers
 
-private extension XORProcessor {
+private extension Obfuscator {
     func assertReversible(_ data: Data) {
         let xorred = processPacket(data, direction: .outbound)
         XCTAssertEqual(processPacket(xorred, direction: .inbound), data)
@@ -154,7 +154,7 @@ private extension XORProcessor {
 
 // FIXME: ##, test XOR in PacketStream
 //private extension PacketStream {
-//    static func assertReversible(_ data: Data, method: XORMethodNative, mask: SecureData? = nil) {
+//    static func assertReversible(_ data: Data, method: ObfuscationMethodNative, mask: SecureData? = nil) {
 //        var until = 0
 //        let outStream = PacketStream.outboundStream(fromPacket: data, xorMethod: method, xorMask: mask?.zData)
 //        let inStream = PacketStream.packets(fromInboundStream: outStream, until: &until, xorMethod: method, xorMask: mask?.zData)

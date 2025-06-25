@@ -1,5 +1,5 @@
 //
-//  XORProcessor.swift
+//  Obfuscator.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 11/4/22.
@@ -29,8 +29,8 @@ internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 import PartoutCore
 
-/// Processes data packets according to a XOR method.
-struct XORProcessor {
+/// Processes data packets according to an obfuscation method.
+struct Obfuscator {
     enum Direction {
         case outbound
 
@@ -46,7 +46,7 @@ struct XORProcessor {
 
         case obfuscate(mask: CZeroingData)
 
-        init(_ method: OpenVPN.XORMethod) {
+        init(_ method: OpenVPN.ObfuscationMethod) {
             switch method {
             case .xormask(let mask):
                 self = .xormask(mask: mask.czData)
@@ -62,7 +62,7 @@ struct XORProcessor {
 
     private let method: RawMethod
 
-    init(method: OpenVPN.XORMethod) {
+    init(method: OpenVPN.ObfuscationMethod) {
         self.method = RawMethod(method)
     }
 
