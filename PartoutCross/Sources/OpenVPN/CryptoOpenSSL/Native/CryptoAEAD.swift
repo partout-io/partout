@@ -57,7 +57,7 @@ public final class CryptoAEAD: Encrypter, Decrypter {
     }
 
     public func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
-        var code = CryptoErrorGeneric
+        var code = CryptoErrorEncryption
         var cFlags = crypto_flags_t()
         let flagsPtr = flags.pointer(to: &cFlags)
         guard ptr.pointee.crypto.encrypter.encrypt(ptr, dest, destLength, bytes, length, flagsPtr, &code) else {
@@ -74,7 +74,7 @@ public final class CryptoAEAD: Encrypter, Decrypter {
     }
 
     public func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
-        var code = CryptoErrorGeneric
+        var code = CryptoErrorEncryption
         var cFlags = crypto_flags_t()
         let flagsPtr = flags.pointer(to: &cFlags)
         guard ptr.pointee.crypto.decrypter.decrypt(ptr, dest, destLength, bytes, length, flagsPtr, &code) else {

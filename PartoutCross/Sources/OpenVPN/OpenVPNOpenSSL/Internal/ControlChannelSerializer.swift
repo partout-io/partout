@@ -1,8 +1,8 @@
 //
-//  CryptoError.swift
+//  ControlChannelSerializer.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/16/25.
+//  Created by Davide De Rosa on 9/10/18.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,25 +23,16 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable internal import _PartoutCryptoOpenSSL_C
+import Foundation
 
-public enum CryptoError: Error {
-    case creation
+// FIXME: ###, remove after porting ControlChannel
+enum ControlChannel {
+}
 
-    case encryption
+protocol ControlChannelSerializer {
+    func reset()
 
-    case hmac
+    func serialize(packet: ControlPacket) throws -> Data
 
-    case prng
-
-    init(_ code: crypto_error_code = CryptoErrorEncryption) {
-        switch code {
-        case CryptoErrorPRNG:
-            self = .prng
-        case CryptoErrorHMAC:
-            self = .hmac
-        default:
-            self = .encryption
-        }
-    }
+    func deserialize(data: Data, start: Int, end: Int?) throws -> ControlPacket
 }

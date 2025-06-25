@@ -35,10 +35,6 @@ private let CryptoAEADTagLength = 16
 
 private let CryptoAEADIdLength = PacketIdLength
 
-private let CryptoCTRTagLength = 32
-
-private let CryptoCTRPayloadLength = PacketOpcodeLength + PacketSessionIdLength + PacketReplayIdLength + PacketReplayTimestampLength
-
 extension DataPathWrapper {
     static func native(with parameters: Parameters, prf: Parameters.PRF, prng: PRNGProtocol) throws -> DataPathWrapper {
         let seed = prng.safeData(length: PRNGSeedLength)

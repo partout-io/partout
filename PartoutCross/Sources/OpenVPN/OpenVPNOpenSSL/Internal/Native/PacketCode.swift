@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 
-// FIXME: ###, packet_code_t, look into something like NS_ENUM but in C
 enum PacketCode: UInt8 {
     case softResetV1           = 0x03
     case controlV1             = 0x04
@@ -35,6 +35,21 @@ enum PacketCode: UInt8 {
     case hardResetServerV2     = 0x08
     case dataV2                = 0x09
     case unknown               = 0xff
+}
+
+extension PacketCode {
+    var native: packet_code {
+        switch self {
+        case .softResetV1:          PacketCodeSoftResetV1
+        case .controlV1:            PacketCodeControlV1
+        case .ackV1:                PacketCodeAckV1
+        case .dataV1:               PacketCodeDataV1
+        case .hardResetClientV2:    PacketCodeHardResetClientV2
+        case .hardResetServerV2:    PacketCodeHardResetServerV2
+        case .dataV2:               PacketCodeDataV2
+        case .unknown:              PacketCodeUnknown
+        }
+    }
 }
 
 extension PacketCode: CustomDebugStringConvertible {

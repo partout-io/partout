@@ -67,7 +67,7 @@ final class ControlChannel {
         authKey key: OpenVPN.StaticKey,
         digest: OpenVPN.Digest
     ) throws {
-        self.init(ctx, prng: prng, serializer: try AuthSerializer(ctx, with: crypto, key: key, digest: digest))
+        self.init(ctx, prng: prng, serializer: try AuthSerializer(ctx, digest: digest, key: key))
     }
 
     convenience init(
@@ -76,7 +76,7 @@ final class ControlChannel {
         crypto: OpenVPNCryptoProtocol,
         cryptKey key: OpenVPN.StaticKey
     ) throws {
-        self.init(ctx, prng: prng, serializer: try CryptSerializer(ctx, with: crypto, key: key))
+        self.init(ctx, prng: prng, serializer: try CryptSerializer(ctx, key: key))
     }
 
     private init(
@@ -174,8 +174,8 @@ extension ControlChannel {
             let packet = ControlPacket(
                 code: code,
                 key: key,
-                sessionId: sessionId,
                 packetId: currentPacketId.outbound,
+                sessionId: sessionId,
                 payload: subPayloadData,
                 ackIds: nil,
                 ackRemoteSessionId: nil
@@ -253,7 +253,7 @@ extension ControlChannel {
         return try serializer.serialize(packet: packet)
     }
 
-    func currentControlData(withTLS tls: OpenVPNTLSProtocol) throws -> ZeroingData {
+    func currentControlData(withTLS tls: TLSProtocol) throws -> CZeroingData {
         var length = 0
         try tls.pullRawPlainText(plainBuffer.mutableBytes, length: &length)
         return plainBuffer.withOffset(0, length: length)
