@@ -1,5 +1,5 @@
 //
-//  Obfuscator.swift
+//  PacketProcessor.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 11/4/22.
@@ -29,10 +29,8 @@ internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 import PartoutCore
 
-// FIXME: ##, rename to PacketProcessor or Transformer
-
 /// Processes data packets according to an obfuscation method.
-final class Obfuscator {
+final class PacketProcessor {
     enum Direction {
         case outbound
 

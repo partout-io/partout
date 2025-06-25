@@ -112,7 +112,7 @@ final class ObfuscatorStreamTests: XCTestCase {
 
 private extension ObfuscatorStreamTests {
     func stream(from bytes: [UInt8], until: inout Int) -> [Data] {
-        Obfuscator(method: nil)
+        PacketProcessor(method: nil)
             .packets(fromStream: Data(bytes), until: &until)
     }
 }

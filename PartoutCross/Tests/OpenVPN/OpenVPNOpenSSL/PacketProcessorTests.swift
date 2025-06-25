@@ -1,5 +1,5 @@
 //
-//  ObfuscatorTests.swift
+//  PacketProcessorTests.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 11/4/22.
@@ -28,7 +28,7 @@ import _PartoutOpenVPNCore
 import PartoutCore
 import XCTest
 
-final class ObfuscatorTests: XCTestCase {
+final class PacketProcessorTests: XCTestCase {
     private let prng = SimplePRNG()
 
     private let rndLength = 237
@@ -38,7 +38,7 @@ final class ObfuscatorTests: XCTestCase {
     // MARK: - Raw
 
     func test_givenProcessor_whenMask_thenIsExpected() {
-        let sut = Obfuscator(method: .xormask(mask))
+        let sut = PacketProcessor(method: .xormask(mask))
         let data = prng.data(length: rndLength)
         let maskData = mask.czData
         let processed = sut.processPacket(data, direction: .inbound)
@@ -50,7 +50,7 @@ final class ObfuscatorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenPtrPos_thenIsExpected() {
-        let sut = Obfuscator(method: .xorptrpos)
+        let sut = PacketProcessor(method: .xorptrpos)
         let data = prng.data(length: rndLength)
         let processed = sut.processPacket(data, direction: .inbound)
         print(data.toHex())
@@ -61,7 +61,7 @@ final class ObfuscatorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenReverse_thenIsExpected() {
-        let sut = Obfuscator(method: .reverse)
+        let sut = PacketProcessor(method: .reverse)
         var data = prng.data(length: 10)
         var processed = sut.processPacket(data, direction: .inbound)
         print(data.toHex())
@@ -88,7 +88,7 @@ final class ObfuscatorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenObfuscateOutbound_thenIsExpected() {
-        let sut = Obfuscator(method: .obfuscate(mask))
+        let sut = PacketProcessor(method: .obfuscate(mask))
         let data = Data(hex: "832ae7598dfa0378bc19")
         let processed = sut.processPacket(data, direction: .outbound)
         let expected = Data(hex: "e52680106098bc658b15")
@@ -105,7 +105,7 @@ final class ObfuscatorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenObfuscateInbound_thenIsExpected() {
-        let sut = Obfuscator(method: .obfuscate(mask))
+        let sut = PacketProcessor(method: .obfuscate(mask))
         let data = Data(hex: "e52680106098bc658b15")
         let processed = sut.processPacket(data, direction: .inbound)
         let expected = Data(hex: "832ae7598dfa0378bc19")
@@ -116,29 +116,29 @@ final class ObfuscatorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenMask_thenIsReversible() {
-        let sut = Obfuscator(method: .xormask(mask))
+        let sut = PacketProcessor(method: .xormask(mask))
         sut.assertReversible(prng.data(length: rndLength))
     }
 
     func test_givenProcessor_whenPtrPos_thenIsReversible() {
-        let sut = Obfuscator(method: .xorptrpos)
+        let sut = PacketProcessor(method: .xorptrpos)
         sut.assertReversible(prng.data(length: rndLength))
     }
 
     func test_givenProcessor_whenReverse_thenIsReversible() {
-        let sut = Obfuscator(method: .reverse)
+        let sut = PacketProcessor(method: .reverse)
         sut.assertReversible(prng.data(length: rndLength))
     }
 
     func test_givenProcessor_whenObfuscate_thenIsReversible() {
-        let sut = Obfuscator(method: .obfuscate(mask))
+        let sut = PacketProcessor(method: .obfuscate(mask))
         sut.assertReversible(prng.data(length: rndLength))
     }
 
     // MARK: - Streams
 
     func test_givenProcessor_whenSendSinglePacketStream_thenIsExpected() {
-        let sut = Obfuscator(method: nil)
+        let sut = PacketProcessor(method: nil)
         let packet = Data(hex: "1122334455")
         let expected = Data(hex: "00051122334455")
         let processed = sut.stream(fromPacket: packet)
@@ -148,7 +148,7 @@ final class ObfuscatorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenSendMultiplePacketsStream_thenIsExpected() {
-        let sut = Obfuscator(method: nil)
+        let sut = PacketProcessor(method: nil)
         let packets = [Data](repeating: Data(hex: "1122334455"), count: 3)
         let expected = Data(hex: "000511223344550005112233445500051122334455")
         let processed = sut.stream(fromPackets: packets)
@@ -158,7 +158,7 @@ final class ObfuscatorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenReceiveStream_thenIsExpected() {
-        let sut = Obfuscator(method: nil)
+        let sut = PacketProcessor(method: nil)
         let stream = Data(hex: "000511223344550005112233445500051122334455")
         let expected = [Data](repeating: Data(hex: "1122334455"), count: 3)
         var until = 0
@@ -170,7 +170,7 @@ final class ObfuscatorTests: XCTestCase {
     }
 
     func test_givenProcessor_whenReceivePartialStream_thenIsExpected() {
-        let sut = Obfuscator(method: nil)
+        let sut = PacketProcessor(method: nil)
         let stream1 = Data(hex: "000511223344550005112233")
         let stream2 = Data(hex: "445500051122334455")
         let expected = [Data](repeating: Data(hex: "1122334455"), count: 3)
@@ -201,16 +201,16 @@ final class ObfuscatorTests: XCTestCase {
 
 // MARK: - Helpers
 
-private extension Obfuscator {
+private extension PacketProcessor {
     func assertReversible(_ data: Data) {
         let xorred = processPacket(data, direction: .outbound)
         XCTAssertEqual(processPacket(xorred, direction: .inbound), data)
     }
 }
 
-private extension ObfuscatorTests {
+private extension PacketProcessorTests {
     func assertReversibleStream(_ data: Data, method: OpenVPN.ObfuscationMethod?) {
-        let sut = Obfuscator(method: method)
+        let sut = PacketProcessor(method: method)
         var until = 0
         let outStream = sut.stream(fromPacket: data)
         let inStream = sut.packets(fromStream: outStream, until: &until)
