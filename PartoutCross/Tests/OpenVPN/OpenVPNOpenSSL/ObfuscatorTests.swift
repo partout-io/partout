@@ -23,6 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import _PartoutOpenVPNCore
 @testable internal import _PartoutOpenVPNOpenSSL_Cross
 import PartoutCore
 import XCTest
@@ -33,6 +34,8 @@ final class ObfuscatorTests: XCTestCase {
     private let rndLength = 237
 
     private let mask = SecureData("f76dab30")!
+
+    // MARK: - Raw
 
     func test_givenProcessor_whenMask_thenIsExpected() {
         let sut = Obfuscator(method: .xormask(mask: mask))
@@ -132,15 +135,68 @@ final class ObfuscatorTests: XCTestCase {
         sut.assertReversible(prng.data(length: rndLength))
     }
 
-    // FIXME: ##, test XOR in PacketStream
-//    func test_givenPacketStream_whenXORthenIsReversible() {
-//        let sut = prng.data(length: 10000)
-//        PacketStream.assertReversible(sut, method: .none)
-//        PacketStream.assertReversible(sut, method: .mask, mask: mask)
-//        PacketStream.assertReversible(sut, method: .ptrPos)
-//        PacketStream.assertReversible(sut, method: .reverse)
-//        PacketStream.assertReversible(sut, method: .obfuscate, mask: mask)
-//    }
+    // MARK: - Streams
+
+    func test_givenProcessor_whenSendSinglePacketStream_thenIsExpected() {
+        let sut = Obfuscator(method: nil)
+        let packet = Data(hex: "1122334455")
+        let expected = Data(hex: "00051122334455")
+        let processed = sut.stream(fromPacket: packet)
+        print(processed.toHex())
+        print(expected.toHex())
+        XCTAssertEqual(processed, expected)
+    }
+
+    func test_givenProcessor_whenSendMultiplePacketsStream_thenIsExpected() {
+        let sut = Obfuscator(method: nil)
+        let packets = [Data](repeating: Data(hex: "1122334455"), count: 3)
+        let expected = Data(hex: "000511223344550005112233445500051122334455")
+        let processed = sut.stream(fromPackets: packets)
+        print(processed.toHex())
+        print(expected.toHex())
+        XCTAssertEqual(processed, expected)
+    }
+
+    func test_givenProcessor_whenReceiveStream_thenIsExpected() {
+        let sut = Obfuscator(method: nil)
+        let stream = Data(hex: "000511223344550005112233445500051122334455")
+        let expected = [Data](repeating: Data(hex: "1122334455"), count: 3)
+        var until = 0
+        let processed = sut.packets(fromStream: stream, until: &until)
+        print(processed.map { $0.toHex() })
+        print(expected.map { $0.toHex() })
+        XCTAssertEqual(processed, expected)
+        XCTAssertEqual(until, stream.count)
+    }
+
+    func test_givenProcessor_whenReceivePartialStream_thenIsExpected() {
+        let sut = Obfuscator(method: nil)
+        let stream1 = Data(hex: "000511223344550005112233")
+        let stream2 = Data(hex: "445500051122334455")
+        let expected = [Data](repeating: Data(hex: "1122334455"), count: 3)
+
+        var until = 0
+        let processed1 = sut.packets(fromStream: stream1, until: &until)
+        XCTAssertEqual(until, 7)
+
+        let stream1Plus2 = stream1.subdata(offset: until, count: stream1.count - until) + stream2
+        let processed2 = sut.packets(fromStream: stream1Plus2, until: &until)
+        XCTAssertEqual(until, stream1Plus2.count)
+
+        let processed = processed1 + processed2
+        print(processed.map { $0.toHex() })
+        print(expected.map { $0.toHex() })
+        XCTAssertEqual(processed, expected)
+    }
+
+    func test_givenPacketStream_whenProcess_thenIsReversible() {
+        let sut = prng.data(length: 10000)
+        assertReversibleStream(sut, method: nil)
+        assertReversibleStream(sut, method: .xormask(mask: mask))
+        assertReversibleStream(sut, method: .xorptrpos)
+        assertReversibleStream(sut, method: .reverse)
+        assertReversibleStream(sut, method: .obfuscate(mask: mask))
+    }
 }
 
 // MARK: - Helpers
@@ -152,13 +208,13 @@ private extension Obfuscator {
     }
 }
 
-// FIXME: ##, test XOR in PacketStream
-//private extension PacketStream {
-//    static func assertReversible(_ data: Data, method: ObfuscationMethodNative, mask: SecureData? = nil) {
-//        var until = 0
-//        let outStream = PacketStream.outboundStream(fromPacket: data, xorMethod: method, xorMask: mask?.zData)
-//        let inStream = PacketStream.packets(fromInboundStream: outStream, until: &until, xorMethod: method, xorMask: mask?.zData)
-//        let originalData = Data(inStream.joined())
-//        XCTAssertEqual(data.toHex(), originalData.toHex())
-//    }
-//}
+private extension ObfuscatorTests {
+    func assertReversibleStream(_ data: Data, method: OpenVPN.ObfuscationMethod?) {
+        let sut = Obfuscator(method: method)
+        var until = 0
+        let outStream = sut.stream(fromPacket: data)
+        let inStream = sut.packets(fromStream: outStream, until: &until)
+        let originalData = Data(inStream.joined())
+        XCTAssertEqual(data.toHex(), originalData.toHex())
+    }
+}

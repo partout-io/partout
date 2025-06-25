@@ -94,7 +94,7 @@ void obf_xor_obfuscate(uint8_t *_Nonnull dst,
 
 // MARK: - Pointers
 
-static
+static inline
 void alg_plain(const obf_alg_ctx *ctx) {
     assert(ctx);
     memcpy(ctx->dst + ctx->dst_offset, ctx->src + ctx->src_offset, ctx->src_len);
@@ -139,7 +139,7 @@ void alg_xor_obfuscate_out(const obf_alg_ctx *ctx) {
                       true);
 }
 
-// MARK: -
+// MARK: - Obfuscator
 
 obf_t *obf_create(obf_method method, const uint8_t *mask, size_t mask_len) {
     obf_t *obf = pp_alloc_crypto(sizeof(obf_t));

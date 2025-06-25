@@ -29,6 +29,8 @@ internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 import PartoutCore
 
+// FIXME: ##, rename to PacketProcessor or Transformer
+
 /// Processes data packets according to an obfuscation method.
 final class Obfuscator {
     enum Direction {
@@ -95,5 +97,55 @@ final class Obfuscator {
             }
         }
         return Data(dst)
+    }
+
+    func packets(fromStream stream: Data, until: inout Int) -> [Data] {
+        stream.withUnsafeBytes { src in
+            var packets: [Data] = []
+            until = 0
+            while true {
+                var rcvd = 0
+                let zd = obf_stream_recv(
+                    obf,
+                    src.bytePointer.advanced(by: until),
+                    stream.count - until,
+                    &rcvd
+                )
+                guard let zd else {
+                    break
+                }
+                let packet = NSData(bytesNoCopy: zd.pointee.bytes, length: zd.pointee.length) as Data
+                packets.append(packet)
+                until += rcvd
+            }
+            return packets
+        }
+    }
+
+    func stream(fromPacket packet: Data) -> Data {
+        let dst = zd_create(obf_stream_send_bufsize(1, packet.count))
+        _ = packet.withUnsafeBytes { src in
+            obf_stream_send(
+                obf,
+                dst, 0,
+                src.bytePointer, packet.count
+            )
+        }
+        return NSData(bytesNoCopy: dst.pointee.bytes, length: dst.pointee.length) as Data
+    }
+
+    func stream(fromPackets packets: [Data]) -> Data {
+        let dst = zd_create(obf_stream_send_bufsize(Int32(packets.count), packets.flatCount))
+        var dstOffset = 0
+        for packet in packets {
+            packet.withUnsafeBytes { src in
+                dstOffset = obf_stream_send(
+                    obf,
+                    dst, dstOffset,
+                    src.bytePointer, packet.count
+                )
+            }
+        }
+        return NSData(bytesNoCopy: dst.pointee.bytes, length: dst.pointee.length) as Data
     }
 }
