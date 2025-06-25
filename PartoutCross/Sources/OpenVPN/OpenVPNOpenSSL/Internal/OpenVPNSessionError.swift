@@ -93,6 +93,6 @@ enum OpenVPNSessionError: Error {
     /// Programming errors.
     case assertion
 
-    /// Errors from the C layer, see `OpenVPNErrorCode`.
-    case native(code: OpenVPNErrorCode)
+    /// Errors from the internal layer.
+    case `internal`(OpenVPNErrorCode)
 }

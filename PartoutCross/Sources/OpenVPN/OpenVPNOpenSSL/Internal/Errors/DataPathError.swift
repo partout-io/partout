@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_Cross
 internal import _PartoutOpenVPNOpenSSL_C
 
 enum DataPathError: Error {
@@ -31,33 +30,22 @@ enum DataPathError: Error {
 
     case algorithm
 
-    case peerIdMismatch
-
     case overflow
+}
 
-    case compression
+struct CDataPathError: Error {
+    let code: dp_error_code
 
-    case crypto(crypto_error_code)
-
-    case unknown
-
-    init(_ error: dp_error_t, asserting: Bool) {
-        switch error.dp_code {
-        case DataPathErrorNone:
-            if asserting {
-                assertionFailure()
-            }
-            self = .unknown
-        case DataPathErrorPeerIdMismatch:
-            self = .peerIdMismatch
-        case DataPathErrorOverflow:
-            self = .overflow
-        case DataPathErrorCompression:
-            self = .compression
-        case DataPathErrorCrypto:
-            self = .crypto(error.crypto_code)
-        default:
-            self = .unknown
+    static func error(for err: dp_error_t) -> Error {
+        if err.dp_code == DataPathErrorCrypto {
+            return CCryptoError(err.crypto_code)
+        } else {
+            return CDataPathError(err.dp_code)
         }
+    }
+
+    private init(_ code: dp_error_code) {
+        precondition(code != DataPathErrorNone)
+        self.code = code
     }
 }

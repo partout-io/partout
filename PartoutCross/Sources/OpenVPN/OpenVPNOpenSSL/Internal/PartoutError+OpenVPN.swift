@@ -47,7 +47,7 @@ extension OpenVPNSessionError: PartoutErrorMappable {
         case .noRouting:
             return .OpenVPN.noRouting
 
-        case .native(let code):
+        case .internal(let code):
             switch code {
             case .cryptoRandomGenerator, .cryptoEncryption, .cryptoHMAC:
                 return .crypto
@@ -66,11 +66,12 @@ extension OpenVPNSessionError: PartoutErrorMappable {
                 return .OpenVPN.compressionMismatch
 
             default:
-                return .OpenVPN.connectionFailure
+                break
             }
 
         default:
-            return .OpenVPN.connectionFailure
+            break
         }
+        return .OpenVPN.connectionFailure
     }
 }

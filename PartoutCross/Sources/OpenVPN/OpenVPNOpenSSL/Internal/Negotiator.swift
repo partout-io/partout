@@ -320,12 +320,10 @@ private extension Negotiator {
         let cipherTextOut: Data
         do {
             cipherTextOut = try tls.pullCipherText()
+        } catch let cError as CCryptoError {
+            pp_log(ctx, .openvpn, .fault, "TLS.auth: Failed pulling ciphertext: \(cError)")
+            throw cError
         } catch {
-            // FIXME: ###, try replace .asNativeOpenVPNError with "catch as OpenVPNSessionError.native()"
-            if let nativeError = error.asNativeOpenVPNError {
-                pp_log(ctx, .openvpn, .fault, "TLS.auth: Failed pulling ciphertext: \(nativeError)")
-                throw nativeError
-            }
             pp_log(ctx, .openvpn, .debug, "TLS.ifconfig: Still can't pull ciphertext")
             return
         }
@@ -409,11 +407,10 @@ private extension Negotiator {
             let cipherTextOut: Data
             do {
                 cipherTextOut = try tls.pullCipherText()
+            } catch let cError as CCryptoError {
+                pp_log(ctx, .openvpn, .fault, "TLS.connect: Failed pulling ciphertext: \(cError)")
+                throw cError
             } catch {
-                if let nativeError = error.asNativeOpenVPNError {
-                    pp_log(ctx, .openvpn, .fault, "TLS.connect: Failed pulling ciphertext: \(nativeError)")
-                    throw nativeError
-                }
                 throw error
             }
 
@@ -447,11 +444,10 @@ private extension Negotiator {
                 cipherTextOut = try tls.pullCipherText()
                 pp_log(ctx, .openvpn, .info, "TLS.connect: Send pulled ciphertext \(cipherTextOut.asSensitiveBytes(ctx))")
                 try enqueueControlPackets(code: .controlV1, key: key, payload: cipherTextOut)
+            } catch let cError as CCryptoError {
+                pp_log(ctx, .openvpn, .fault, "TLS.connect: Failed pulling ciphertext: \(cError)")
+                throw cError
             } catch {
-                if let nativeError = error.asNativeOpenVPNError {
-                    pp_log(ctx, .openvpn, .fault, "TLS.connect: Failed pulling ciphertext: \(nativeError)")
-                    throw nativeError
-                }
                 pp_log(ctx, .openvpn, .debug, "TLS.connect: No available ciphertext to pull")
             }
 
@@ -500,11 +496,10 @@ private extension Negotiator {
         let cipherTextOut: Data
         do {
             cipherTextOut = try tls.pullCipherText()
+        } catch let cError as CCryptoError {
+            pp_log(ctx, .openvpn, .fault, "TLS.auth: Failed pulling ciphertext: \(cError.code)")
+            throw cError
         } catch {
-            if let nativeError = error.asNativeOpenVPNError {
-                pp_log(ctx, .openvpn, .fault, "TLS.auth: Failed pulling ciphertext: \(nativeError)")
-                throw nativeError
-            }
             pp_log(ctx, .openvpn, .debug, "TLS.auth: Still can't pull ciphertext")
             return
         }

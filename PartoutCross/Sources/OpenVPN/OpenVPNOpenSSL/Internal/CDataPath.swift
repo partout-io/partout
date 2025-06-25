@@ -231,7 +231,7 @@ extension CDataPath {
                 &error
             )
             guard let zd else {
-                throw DataPathError(error, asserting: true)
+                throw CDataPathError.error(for: error)
             }
             return Data(zeroing: zd)
         }
@@ -259,7 +259,7 @@ extension CDataPath {
                 &error
             )
             guard let zd else {
-                throw DataPathError(error, asserting: true)
+                throw CDataPathError.error(for: error)
             }
             let data = Data(zeroing: zd)
             return (packetId, header, keepAlive, data)
@@ -309,7 +309,7 @@ extension CDataPath {
                 &error
             )
             guard outLength > 0 else {
-                throw DataPathError(error, asserting: true)
+                throw CDataPathError.error(for: error)
             }
             return Data(bytes: buf.pointee.bytes, count: outLength)
         }
@@ -334,7 +334,7 @@ extension CDataPath {
                 &error
             )
             guard outLength > 0 else {
-                throw DataPathError(error, asserting: true)
+                throw CDataPathError.error(for: error)
             }
             let data = Data(bytes: buf.pointee.bytes, count: outLength)
             return (packetId, data)
@@ -363,7 +363,7 @@ extension CDataPath {
                 &error
             )
             guard outLength > 0 else {
-                throw DataPathError(error, asserting: true)
+                throw CDataPathError.error(for: error)
             }
             return Data(bytes: buf.pointee.bytes, count: outLength)
         }

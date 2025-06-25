@@ -30,7 +30,6 @@
 typedef enum {
     DataPathErrorNone,
     DataPathErrorPeerIdMismatch,
-    DataPathErrorOverflow,
     DataPathErrorCompression,
     DataPathErrorCrypto
 } dp_error_code;

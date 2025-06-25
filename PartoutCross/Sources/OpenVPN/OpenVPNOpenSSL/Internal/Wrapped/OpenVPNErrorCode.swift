@@ -59,10 +59,3 @@ extension OpenVPNErrorCode: CustomDebugStringConvertible {
     }
 }
 #endif
-
-// FIXME: ###, map C errors to OpenVPNErrorCode
-extension Error {
-    var asNativeOpenVPNError: Error? {
-        fatalError()
-    }
-}

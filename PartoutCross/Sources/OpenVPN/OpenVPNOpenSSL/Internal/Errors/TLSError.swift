@@ -1,8 +1,8 @@
 //
-//  CryptoError.swift
+//  TLSError.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/16/25.
+//  Created by Davide De Rosa on 6/26/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,29 +23,15 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable internal import _PartoutCryptoOpenSSL_C
+internal import _PartoutOpenVPNOpenSSL_C
 
-enum CryptoError: Error {
-    case creation
+// FIXME: ###
+typealias tls_error_code = Int
 
-    case encryption
+struct CTLSError: Error {
+    let code: tls_error_code
 
-    case hmac
-
-    case prng
-
-    case unknown
-
-    init(_ code: crypto_error_code) {
-        switch code {
-        case CryptoErrorEncryption:
-            self = .encryption
-        case CryptoErrorPRNG:
-            self = .prng
-        case CryptoErrorHMAC:
-            self = .hmac
-        default:
-            self = .unknown
-        }
+    init(_ code: tls_error_code) {
+        self.code = code
     }
 }

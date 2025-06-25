@@ -134,9 +134,7 @@ extension ControlChannel {
                         authCount,
                         &dec_error
                     ) else {
-                        // FIXME: ###, map enc_error to CryptoError
-//                        throw CryptoError(dec_error)
-                        throw CryptoError.encryption
+                        throw CCryptoError(dec_error)
                     }
                 }
             }
