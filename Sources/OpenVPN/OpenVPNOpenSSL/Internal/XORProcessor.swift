@@ -81,41 +81,29 @@ struct XORProcessor {
      - Returns: The packet after XOR processing.
      **/
     func processPacket(_ packet: Data, outbound: Bool) -> Data {
+        var dst = [UInt8](packet)
+        let dstLength = dst.count
         switch method {
         case .xormask(let mask):
-            var dst = [UInt8](packet)
-            let dstLength = dst.count
             dst.withUnsafeMutableBytes { dst in
                 xor_mask_legacy(dst.bytePointer, dst.bytePointer, dstLength, mask)
             }
-            return Data(dst)
-
         case .xorptrpos:
-            var dst = [UInt8](packet)
-            let dstLength = dst.count
             dst.withUnsafeMutableBytes { dst in
                 xor_ptrpos_legacy(dst.bytePointer, dst.bytePointer, dstLength)
             }
-            return Data(dst)
-
         case .reverse:
-            var dst = [UInt8](packet)
-            let dstLength = dst.count
             dst.withUnsafeMutableBytes { dst in
                 xor_reverse_legacy(dst.bytePointer, dst.bytePointer, dstLength)
             }
-            return Data(dst)
-
         case .obfuscate(let mask):
-            var dst = [UInt8](packet)
-            let dstLength = dst.count
             dst.withUnsafeMutableBytes { dst in
                 xor_obfuscate_legacy(dst.bytePointer, dst.bytePointer, dstLength, mask, outbound)
             }
-            return Data(dst)
-
         @unknown default:
-            return packet
+            assertionFailure("Unhandled XOR method: \(method)")
+            break
         }
+        return Data(dst)
     }
 }
