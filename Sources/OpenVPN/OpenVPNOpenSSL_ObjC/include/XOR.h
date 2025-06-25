@@ -46,7 +46,7 @@ static inline
 void xor_ptrpos_legacy(uint8_t *dst, const uint8_t *src, size_t srcLength)
 {
     for (size_t i = 0; i < srcLength; ++i) {
-        dst[i] = src[i] ^ (i + 1);
+        dst[i] = src[i] ^ ((i + 1) & 0xff);
     }
 }
 
