@@ -25,79 +25,68 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include "crypto/zeroing_data.h"
 
 typedef enum {
     OBFMethodNone,
-    OBFMethodMask,
-    OBFMethodPtrPos,
+    OBFMethodXORMask,
+    OBFMethodXORPtrPos,
     OBFMethodReverse,
-    OBFMethodObfuscate
-} obf_method_t;
+    OBFMethodXORObfuscate
+} obf_method;
 
-// WARNING: assume dst to be able to hold src_len
+typedef struct {
+    uint8_t *_Nonnull dst;
+    size_t dst_offset;
+    const uint8_t *_Nonnull src;
+    size_t src_offset;
+    size_t src_len;
+    const uint8_t *_Nullable mask;
+    size_t mask_len;
+} obf_alg_ctx;
 
-// TODO: ##, make more efficient by XOR-ing 4-8 bytes per loop
+typedef void (*obf_algorithm)(const obf_alg_ctx *_Nonnull);
+
+typedef struct {
+    zeroing_data_t *_Nullable mask;
+    obf_algorithm _Nonnull recv; // loop until 0
+    obf_algorithm _Nonnull send;
+} obf_t;
+
+obf_t *_Nonnull obf_create(obf_method method,
+                           const uint8_t *_Nullable mask,
+                           size_t mask_len);
+void obf_free(obf_t *_Nonnull obf);
 
 static inline
-void obf_xor_mask(uint8_t *_Nonnull dst,
-                  size_t dst_len,
-                  const uint8_t *_Nonnull mask,
-                  size_t mask_len) {
+void obf_recv(const obf_t *_Nonnull obf,
+              uint8_t *_Nonnull dst,
+              const uint8_t *_Nonnull src,
+              size_t src_len) {
 
-    assert(mask && mask_len > 0);
-    if (mask_len == 0) {
-        return;
-    }
-    for (size_t i = 0; i < dst_len; ++i) {
-        dst[i] ^= mask[i % mask_len];
-    }
+    const obf_alg_ctx ctx = {
+        dst, 0,
+        src, 0, src_len,
+        obf->mask ? obf->mask->bytes : NULL,
+        obf->mask ? obf->mask->length : 0
+    };
+    obf->recv(&ctx);
 }
 
 static inline
-void obf_xor_ptrpos(uint8_t *_Nonnull dst, size_t dst_len) {
+void obf_send(const obf_t *_Nonnull obf,
+              uint8_t *_Nonnull dst,
+              const uint8_t *_Nonnull src,
+              size_t src_len) {
 
-    for (size_t i = 0; i < dst_len; ++i) {
-        dst[i] ^= ((i + 1) & 0xff);
-    }
-}
-
-// first byte as-is, [1..n-1] reversed
-static inline
-void obf_reverse(uint8_t *_Nonnull dst, size_t dst_len) {
-
-    if (dst_len <= 2) {
-        return;
-    }
-    size_t start = 1;
-    size_t end = dst_len - 1;
-    uint8_t temp = 0;
-    while (start < end) {
-        temp = dst[start];
-        dst[start] = dst[end];
-        dst[end] = temp;
-        start++;
-        end--;
-    }
-}
-
-static inline
-void obf_xor_obfuscate(uint8_t *_Nonnull dst,
-                       size_t dst_len,
-                       const uint8_t *_Nonnull mask,
-                       size_t mask_len,
-                       bool outbound)
-{
-    if (outbound) {
-        obf_xor_ptrpos(dst, dst_len);
-        obf_reverse(dst, dst_len);
-        obf_xor_ptrpos(dst, dst_len);
-        obf_xor_mask(dst, dst_len, mask, mask_len);
-    } else {
-        obf_xor_mask(dst, dst_len, mask, mask_len);
-        obf_xor_ptrpos(dst, dst_len);
-        obf_reverse(dst, dst_len);
-        obf_xor_ptrpos(dst, dst_len);
-    }
+    const obf_alg_ctx ctx = {
+        dst, 0,
+        src, 0, src_len,
+        obf->mask ? obf->mask->bytes : NULL,
+        obf->mask ? obf->mask->length : 0
+    };
+    obf->send(&ctx);
 }

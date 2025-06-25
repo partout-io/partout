@@ -30,40 +30,36 @@ import Foundation
 import PartoutCore
 
 /// Processes data packets according to an obfuscation method.
-struct Obfuscator {
+final class Obfuscator {
     enum Direction {
         case outbound
 
         case inbound
     }
 
-    private enum RawMethod {
-        case xormask(mask: CZeroingData)
+    private let obf: UnsafeMutablePointer<obf_t>
 
-        case xorptrpos
-
-        case reverse
-
-        case obfuscate(mask: CZeroingData)
-
-        init(_ method: OpenVPN.ObfuscationMethod) {
-            switch method {
-            case .xormask(let mask):
-                self = .xormask(mask: mask.czData)
-            case .xorptrpos:
-                self = .xorptrpos
-            case .reverse:
-                self = .reverse
-            case .obfuscate(let mask):
-                self = .obfuscate(mask: mask.czData)
+    init(method: OpenVPN.ObfuscationMethod?) {
+        switch method {
+        case .xormask(let mask):
+            obf = mask.toData().withUnsafeBytes { maskPtr in
+                obf_create(OBFMethodXORMask, maskPtr.bytePointer, mask.count)
             }
+        case .xorptrpos:
+            obf = obf_create(OBFMethodXORPtrPos, nil, 0)
+        case .reverse:
+            obf = obf_create(OBFMethodReverse, nil, 0)
+        case .obfuscate(let mask):
+            obf = mask.toData().withUnsafeBytes { maskPtr in
+                obf_create(OBFMethodXORObfuscate, maskPtr.bytePointer, mask.count)
+            }
+        default:
+            obf = obf_create(OBFMethodNone, nil, 0)
         }
     }
 
-    private let method: RawMethod
-
-    init(method: OpenVPN.ObfuscationMethod) {
-        self.method = RawMethod(method)
+    deinit {
+        obf_free(obf)
     }
 
     /**
@@ -87,34 +83,16 @@ struct Obfuscator {
      - Returns: The packet after XOR processing.
      **/
     func processPacket(_ packet: Data, direction: Direction) -> Data {
-        var dst = [UInt8](packet)
-        let dstLength = dst.count
-        switch method {
-        case .xormask(let mask):
+        var dst = [UInt8](repeating: 0, count: packet.count)
+        packet.withUnsafeBytes { src in
             dst.withUnsafeMutableBytes { dst in
-                obf_xor_mask(dst.bytePointer, dstLength, mask.bytes, mask.length)
+                switch direction {
+                case .inbound:
+                    obf_recv(obf, dst.bytePointer, src.bytePointer, packet.count)
+                case .outbound:
+                    obf_send(obf, dst.bytePointer, src.bytePointer, packet.count)
+                }
             }
-        case .xorptrpos:
-            dst.withUnsafeMutableBytes { dst in
-                obf_xor_ptrpos(dst.bytePointer, dstLength)
-            }
-        case .reverse:
-            dst.withUnsafeMutableBytes { dst in
-                obf_reverse(dst.bytePointer, dstLength)
-            }
-        case .obfuscate(let mask):
-            dst.withUnsafeMutableBytes { dst in
-                obf_xor_obfuscate(
-                    dst.bytePointer,
-                    dstLength,
-                    mask.bytes,
-                    mask.length,
-                    direction == .outbound
-                )
-            }
-        @unknown default:
-            assertionFailure("Unhandled XOR method: \(method)")
-            break
         }
         return Data(dst)
     }
