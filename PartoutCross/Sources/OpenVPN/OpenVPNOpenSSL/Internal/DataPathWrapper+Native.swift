@@ -102,10 +102,14 @@ extension DataPathWrapper {
         let cipherKeyLength = crypto.pointee.meta.cipher_key_len
         let hmacKeyLength = crypto.pointee.meta.hmac_key_len
 
-        assert(keys.cipher.encryptionKey.length >= cipherKeyLength)
-        assert(keys.cipher.decryptionKey.length >= cipherKeyLength)
-        assert(keys.digest.encryptionKey.length >= hmacKeyLength)
-        assert(keys.digest.decryptionKey.length >= hmacKeyLength)
+        if let cipher = keys.cipher {
+            assert(cipher.encryptionKey.length >= cipherKeyLength)
+            assert(cipher.decryptionKey.length >= cipherKeyLength)
+        }
+        if let digest = keys.digest {
+            assert(digest.encryptionKey.length >= hmacKeyLength)
+            assert(digest.decryptionKey.length >= hmacKeyLength)
+        }
 
         return try cNative(with: mode, peerId: parameters.peerId)
     }

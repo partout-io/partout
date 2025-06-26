@@ -34,9 +34,9 @@ struct CryptoKeys {
         let decryptionKey: CZeroingData
     }
 
-    let cipher: KeyPair
+    let cipher: KeyPair?
 
-    let digest: KeyPair
+    let digest: KeyPair?
 }
 
 extension CryptoKeys {
@@ -62,10 +62,10 @@ final class CryptoKeysBridge {
     private let hmacDecKey: UnsafeMutablePointer<zeroing_data_t>
 
     init(keys: CryptoKeys) {
-        cipherEncKey = keys.cipher.encryptionKey.unsafeCopy()
-        cipherDecKey = keys.cipher.decryptionKey.unsafeCopy()
-        hmacEncKey = keys.digest.encryptionKey.unsafeCopy()
-        hmacDecKey = keys.digest.decryptionKey.unsafeCopy()
+        cipherEncKey = (keys.cipher?.encryptionKey).unsafeCopy()
+        cipherDecKey = (keys.cipher?.decryptionKey).unsafeCopy()
+        hmacEncKey = (keys.digest?.encryptionKey).unsafeCopy()
+        hmacDecKey = (keys.digest?.decryptionKey).unsafeCopy()
     }
 
     deinit {
@@ -89,8 +89,11 @@ final class CryptoKeysBridge {
     }
 }
 
-private extension CZeroingData {
+private extension Optional<CZeroingData> {
     func unsafeCopy() -> UnsafeMutablePointer<zeroing_data_t> {
-        zd_create_from_data(bytes, length)
+        guard let self else {
+            return zd_create(0)
+        }
+        return zd_create_from_data(self.bytes, self.length)
     }
 }
