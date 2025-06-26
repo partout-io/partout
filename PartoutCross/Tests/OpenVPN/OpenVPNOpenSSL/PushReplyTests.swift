@@ -124,25 +124,15 @@ final class PushReplyTests: XCTestCase {
         XCTAssertEqual(reply?.options.compressionFraming, .compLZO)
         XCTAssertEqual(reply?.options.compressionAlgorithm, .disabled)
 
-        reply = try parser.pushReply(with: msg.appending(",comp-lzo"))
-        reply?.debug()
-        XCTAssertEqual(reply?.options.compressionFraming, .compLZO)
-        XCTAssertEqual(reply?.options.compressionAlgorithm, .LZO)
-
-        reply = try parser.pushReply(with: msg.appending(",comp-lzo yes"))
-        reply?.debug()
-        XCTAssertEqual(reply?.options.compressionFraming, .compLZO)
-        XCTAssertEqual(reply?.options.compressionAlgorithm, .LZO)
+        XCTAssertThrowsError(try parser.pushReply(with: msg.appending(",comp-lzo")))
+        XCTAssertThrowsError(try parser.pushReply(with: msg.appending(",comp-lzo yes")))
 
         reply = try parser.pushReply(with: msg.appending(",compress"))
         reply?.debug()
         XCTAssertEqual(reply?.options.compressionFraming, .compress)
         XCTAssertEqual(reply?.options.compressionAlgorithm, .disabled)
 
-        reply = try parser.pushReply(with: msg.appending(",compress lz4"))
-        reply?.debug()
-        XCTAssertEqual(reply?.options.compressionFraming, .compress)
-        XCTAssertEqual(reply?.options.compressionAlgorithm, .other)
+        XCTAssertThrowsError(try parser.pushReply(with: msg.appending(",compress lz4")))
     }
 
     func test_givenMessage_whenNCP_thenIsHandled() throws {
