@@ -112,7 +112,7 @@ final class PacketProcessor {
                 guard let zd else {
                     break
                 }
-                let packet = NSData(bytesNoCopy: zd.pointee.bytes, length: zd.pointee.length) as Data
+                let packet = Data(zeroing: zd)
                 packets.append(packet)
                 until += rcvd
             }
@@ -129,7 +129,7 @@ final class PacketProcessor {
                 src.bytePointer, packet.count
             )
         }
-        return NSData(bytesNoCopy: dst.pointee.bytes, length: dst.pointee.length) as Data
+        return Data(zeroing: dst)
     }
 
     func stream(fromPackets packets: [Data]) -> Data {
@@ -144,6 +144,6 @@ final class PacketProcessor {
                 )
             }
         }
-        return NSData(bytesNoCopy: dst.pointee.bytes, length: dst.pointee.length) as Data
+        return Data(zeroing: dst)
     }
 }

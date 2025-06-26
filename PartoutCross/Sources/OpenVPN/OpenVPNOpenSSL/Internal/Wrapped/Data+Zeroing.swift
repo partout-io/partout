@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  Data+Zeroing.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/23/25.
+//  Created by Davide De Rosa on 6/26/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,4 +23,19 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutCryptoOpenSSL_ObjC_Bridged
+internal import _PartoutCryptoOpenSSL_C
+import Foundation
+
+extension Data {
+    init(zeroing zd: UnsafeMutablePointer<zeroing_data_t>) {
+        let count = zd.pointee.length
+        self.init(
+            bytesNoCopy: zd.pointee.bytes,
+            count: count,
+            deallocator: .custom { ptr, count in
+                bzero(ptr, count)
+                free(ptr)
+            }
+        )
+    }
+}
