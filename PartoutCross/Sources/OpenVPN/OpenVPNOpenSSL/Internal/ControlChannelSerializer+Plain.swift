@@ -124,8 +124,8 @@ extension ControlChannel {
             return CControlPacket(
                 code: code,
                 key: key,
-                packetId: packetId,
                 sessionId: sessionId,
+                packetId: packetId,
                 payload: payload,
                 ackIds: ackIds,
                 ackRemoteSessionId: ackRemoteSessionId

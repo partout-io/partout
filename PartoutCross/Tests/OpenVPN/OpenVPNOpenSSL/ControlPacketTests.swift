@@ -24,22 +24,17 @@
 //
 
 @testable internal import _PartoutOpenVPNOpenSSL_Cross
-#if canImport(_PartoutOpenVPNOpenSSL_ObjC)
-internal import _PartoutOpenVPNOpenSSL_ObjC
-#else
-internal import _PartoutOpenVPNOpenSSL_C
-#endif
 import XCTest
 
 final class ControlPacketTests: XCTestCase {
     func test_givenControlPacket_whenSerialize_thenIsExpected() {
         let id: UInt32 = 0x1456
-        let code: PacketCode = .controlV1
+        let code: CPacketCode = .controlV1
         let key: UInt8 = 3
         let sessionId = Data(hex: "1122334455667788")
         let payload = Data(hex: "932748238742397591704891")
 
-        let serialized = ControlPacket(
+        let serialized = CControlPacket(
             code: code,
             key: key,
             sessionId: sessionId,
@@ -62,12 +57,7 @@ final class ControlPacketTests: XCTestCase {
         let sessionId = Data(hex: "1122334455667788")
         let remoteSessionId = Data(hex: "a639328cbf03490e")
 
-#if canImport(_PartoutOpenVPNOpenSSL_ObjC)
-        let castAcks = acks as [NSNumber]
-#else
-        let castAcks = acks
-#endif
-        let serialized = ControlPacket(key: key, sessionId: sessionId, ackIds: castAcks, ackRemoteSessionId: remoteSessionId).serialized()
+        let serialized = CControlPacket(key: key, sessionId: sessionId, ackIds: acks, ackRemoteSessionId: remoteSessionId).serialized()
         let expected = Data(hex: "2b112233445566778805000000aa000000bb000000cc000000dd000000eea639328cbf03490e")
 
         print(serialized)

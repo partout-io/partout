@@ -36,11 +36,11 @@ final class CControlPacket {
         pkt.pointee.key
     }
 
+    let sessionId: Data
+
     var packetId: UInt32 {
         pkt.pointee.packet_id
     }
-
-    let sessionId: Data
 
     let payload: Data?
 
@@ -49,8 +49,8 @@ final class CControlPacket {
     let ackRemoteSessionId: Data?
 
     init(
-        code: CPacketCode, key: UInt8, packetId: UInt32,
-        sessionId: Data, payload: Data?,
+        code: CPacketCode, key: UInt8, sessionId: Data,
+        packetId: UInt32, payload: Data?,
         ackIds: [UInt32]?, ackRemoteSessionId: Data?
     ) {
         let pkt = ctrl_pkt_create(
@@ -88,8 +88,8 @@ final class CControlPacket {
         self.init(
             code: .ackV1,
             key: key,
-            packetId: .max,
             sessionId: sessionId,
+            packetId: .max,
             payload: nil,
             ackIds: ackIds,
             ackRemoteSessionId: ackRemoteSessionId
