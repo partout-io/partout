@@ -29,6 +29,8 @@
 #include <openssl/rand.h>
 #include "crypto/keys.h"
 
+#define KeyHMACMaxLength    (size_t)128
+
 bool key_init_seed(const zeroing_data_t *seed) {
     unsigned char x[1];
     if (RAND_bytes(x, 1) != 1) {
@@ -38,8 +40,12 @@ bool key_init_seed(const zeroing_data_t *seed) {
     return true;
 }
 
-size_t key_hmac(key_hmac_ctx *_Nonnull ctx) {
-    assert(ctx->dst->length >= key_hmac_buf_len);
+zeroing_data_t *key_hmac_create() {
+    return zd_create(KeyHMACMaxLength);
+}
+
+size_t key_hmac_do(key_hmac_ctx *ctx) {
+    assert(ctx->dst->length >= KeyHMACMaxLength);
 
     const EVP_MD *md = EVP_get_digestbyname(ctx->digest_name);
     unsigned int dst_len = 0;
