@@ -84,7 +84,7 @@ bool crypto_encrypt(void *vctx,
 
     *out_len = ctx->ns_tag_len + l1 + l2;
 
-    CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorGeneric)
+    CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorEncryption)
 }
 
 static
@@ -139,7 +139,7 @@ bool crypto_decrypt(void *vctx,
         CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorHMAC)
     }
 
-    CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorGeneric)
+    CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorEncryption)
 }
 
 // MARK: -

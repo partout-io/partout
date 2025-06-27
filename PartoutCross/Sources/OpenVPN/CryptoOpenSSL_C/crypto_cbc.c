@@ -97,7 +97,7 @@ bool crypto_encrypt(void *vctx,
 
     *dst_len = l1 + l2 + ctx->cipher_iv_len + ctx->digest_len;
 
-    CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorGeneric)
+    CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorEncryption)
 }
 
 static
@@ -178,7 +178,7 @@ bool crypto_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_co
         CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorHMAC)
     }
 
-    CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorGeneric)
+    CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorEncryption)
 }
 
 // MARK: -

@@ -24,15 +24,9 @@
 //
 
 import _PartoutOpenVPNCore
+internal import _PartoutOpenVPNOpenSSL_C
 @testable internal import _PartoutOpenVPNOpenSSL_Cross
 import XCTest
-
-// for non-Swift symbols like DataPacket*
-#if canImport(_PartoutOpenVPNOpenSSL_C)
-internal import _PartoutOpenVPNOpenSSL_C
-#else
-internal import _PartoutOpenVPNOpenSSL_ObjC
-#endif
 
 final class DataPathADTests: XCTestCase, DataPathTestsProtocol {
     let peerId: UInt32 = 0x01

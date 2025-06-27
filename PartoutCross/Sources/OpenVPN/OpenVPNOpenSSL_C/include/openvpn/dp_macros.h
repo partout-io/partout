@@ -39,7 +39,7 @@
 
 #define DP_DECRYPT_BEGIN(ctx) \
     const uint8_t *ptr = ctx->src; \
-    packet_code_t code; \
+    packet_code code; \
     packet_header_get(&code, NULL, ptr); \
     uint32_t peer_id = PacketPeerIdDisabled; \
     const bool has_peer_id = (code == PacketCodeDataV2); \

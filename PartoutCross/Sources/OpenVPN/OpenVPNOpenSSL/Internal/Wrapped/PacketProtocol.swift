@@ -1,8 +1,8 @@
 //
-//  CryptoError.swift
+//  PacketProtocol.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/16/25.
+//  Created by Davide De Rosa on 6/15/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,25 +23,16 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable internal import _PartoutCryptoOpenSSL_C
+#if canImport(_PartoutOpenVPNOpenSSL_ObjC)
+internal import _PartoutOpenVPNOpenSSL_ObjC
+#else
+protocol PacketProtocol {
+    var packetId: UInt32 { get }
+}
 
-public enum CryptoError: Error {
-    case creation
-
-    case encryption
-
-    case hmac
-
-    case prng
-
-    init(_ code: crypto_error_code = CryptoErrorEncryption) {
-        switch code {
-        case CryptoErrorPRNG:
-            self = .prng
-        case CryptoErrorHMAC:
-            self = .hmac
-        default:
-            self = .encryption
-        }
+extension PacketProtocol {
+    static func < (lhs: Self, rhs: Self) -> Bool {
+        lhs.packetId < rhs.packetId
     }
 }
+#endif

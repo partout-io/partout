@@ -329,6 +329,7 @@ private extension Negotiator {
         do {
             cipherTextOut = try tlsBox.pullCipherText()
         } catch {
+            // FIXME: ###, try replace .asNativeOpenVPNError with "catch as OpenVPNSessionError.native()"
             if let nativeError = error.asNativeOpenVPNError {
                 pp_log(ctx, .openvpn, .fault, "TLS.auth: Failed pulling ciphertext: \(nativeError)")
                 throw nativeError

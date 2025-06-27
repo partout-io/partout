@@ -1,8 +1,8 @@
 //
-//  PacketProtocol.swift
+//  ControlChannelSerializer.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/15/25.
+//  Created by Davide De Rosa on 9/10/18.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,12 +23,16 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-protocol PacketProtocol {
-    var packetId: UInt32 { get }
+import Foundation
+
+// FIXME: ###, remove after porting ControlChannel
+enum ControlChannel {
 }
 
-extension PacketProtocol {
-    static func < (lhs: Self, rhs: Self) -> Bool {
-        lhs.packetId < rhs.packetId
-    }
+protocol ControlChannelSerializer {
+    func reset()
+
+    func serialize(packet: CControlPacket) throws -> Data
+
+    func deserialize(data: Data, start: Int, end: Int?) throws -> CControlPacket
 }

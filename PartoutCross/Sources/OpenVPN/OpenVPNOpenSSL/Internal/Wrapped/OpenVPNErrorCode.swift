@@ -23,8 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-
+#if canImport(_PartoutOpenVPNOpenSSL_ObjC)
+internal import _PartoutOpenVPNOpenSSL_ObjC
+#else
 enum OpenVPNErrorCode: Int {
     case cryptoRandomGenerator       = 101
     case cryptoHMAC                  = 102
@@ -58,3 +59,4 @@ extension Error {
         fatalError()
     }
 }
+#endif
