@@ -26,13 +26,13 @@
 import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
+import PartoutPlatform
 
 extension OpenVPNConnection {
     public init(
         _ ctx: PartoutLoggerContext,
         parameters: ConnectionParameters,
         module: OpenVPNModule,
-        dns: DNSResolver,
         cachesURL: URL,
         options: OpenVPN.ConnectionOptions = .init()
     ) async throws {
@@ -40,8 +40,9 @@ extension OpenVPNConnection {
             fatalError("Creating session without OpenVPN configuration?")
         }
 
-        // TODO: ###, make it part of PartoutPlatform later
+        // TODO: ###, make this PRNG part of PartoutPlatform later
         let prng = PlatformPRNG()
+        let dns = Partout.platform.newDNSResolver(ctx)
 
         // native: Swift/C
         // legacy: Swift/ObjC

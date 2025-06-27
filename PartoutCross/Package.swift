@@ -172,6 +172,7 @@ if areas.contains(.openvpn) {
                 dependencies: [
                     cryptoUmbrella.asTargetDependency,
                     "_PartoutOpenVPNOpenSSL_C",
+                    .product(name: "PartoutPlatform", package: "partout"),
                     .product(name: "_PartoutOpenVPNCore", package: "partout"),
                     .product(name: "_PartoutOpenVPNOpenSSL_ObjC", package: "partout")
                 ],
@@ -199,6 +200,7 @@ if areas.contains(.openvpn) {
                 dependencies: [
                     cryptoUmbrella.asTargetDependency,
                     "_PartoutOpenVPNOpenSSL_C",
+                    .product(name: "PartoutPlatform", package: "partout"),
                     .product(name: "_PartoutOpenVPNCore", package: "partout")
                 ],
                 path: "Sources/OpenVPN/OpenVPNOpenSSL",
