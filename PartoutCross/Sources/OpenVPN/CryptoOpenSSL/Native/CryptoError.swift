@@ -32,16 +32,12 @@ enum CryptoError: Error {
 
     case hmac
 
-    case prng
-
     case unknown
 
     init(_ code: crypto_error_code) {
         switch code {
         case CryptoErrorEncryption:
             self = .encryption
-        case CryptoErrorPRNG:
-            self = .prng
         case CryptoErrorHMAC:
             self = .hmac
         default:

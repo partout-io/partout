@@ -64,8 +64,6 @@ private extension OpenVPNSessionError {
                     return .cryptoEncryption
                 case CryptoErrorHMAC:
                     return .cryptoHMAC
-                case CryptoErrorPRNG:
-                    return .cryptoRandomGenerator
                 default:
                     assertionFailure("Crypto error with unknown error code: \(cryptoError.code)")
                 }
