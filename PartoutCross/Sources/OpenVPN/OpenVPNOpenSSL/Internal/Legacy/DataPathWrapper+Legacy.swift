@@ -65,7 +65,7 @@ extension DataPathWrapper {
             encrypter: cryptoBox.encrypter().dataPathEncrypter(),
             decrypter: cryptoBox.decrypter().dataPathDecrypter(),
             peerId: parameters.peerId ?? PacketPeerIdDisabled,
-            compressionFraming: compressionFraming.native,
+            compressionFraming: compressionFraming.legacyNative,
             compressionAlgorithm: .disabled,
             maxPackets: DataPathMaxPackets,
             usesReplayProtection: Constants.usesReplayProtection

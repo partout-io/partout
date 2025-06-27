@@ -1,5 +1,5 @@
 //
-//  OpenVPN+Legacy.swift
+//  OpenVPN+Extensions.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/20/25.
@@ -26,19 +26,8 @@
 import _PartoutOpenVPNCore
 internal import _PartoutOpenVPNOpenSSL_ObjC
 
-extension OpenVPN.CompressionAlgorithm {
-    var native: CompressionAlgorithm {
-        switch self {
-        case .disabled: .disabled
-        case .LZO: .LZO
-        case .other: .other
-        @unknown default: .disabled
-        }
-    }
-}
-
 extension OpenVPN.CompressionFraming {
-    var native: CompressionFraming {
+    var legacyNative: CompressionFraming {
         switch self {
         case .disabled: .disabled
         case .compLZO: .compLZO

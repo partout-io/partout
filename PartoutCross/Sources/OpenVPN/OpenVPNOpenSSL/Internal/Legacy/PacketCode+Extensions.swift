@@ -1,5 +1,5 @@
 //
-//  PacketCode+Legacy.swift
+//  PacketCode+Extensions.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 5/2/24.
@@ -24,7 +24,6 @@
 //
 
 internal import _PartoutOpenVPNOpenSSL_ObjC
-import Foundation
 
 extension PacketCode: @retroactive CustomDebugStringConvertible {
     var debugDescription: String {
