@@ -26,9 +26,14 @@
 internal import _PartoutCryptoOpenSSL_Cross
 import Foundation
 
-// FIXME: ###, beware of optionals in Negotiator, confusion between caught/ignored errors (it seems that only .native(code) errors are unrecoverable)
 protocol TLSProtocol {
+    func caMD5() throws -> String
+
     func start() throws
+
+    func isConnected() -> Bool
+
+    // FIXME: ###, beware of optionals in Negotiator (try?), confusion between caught/ignored errors (it seems that only .native(code) errors are unrecoverable)
 
     func putPlainText(_ text: String) throws
 
@@ -36,9 +41,7 @@ protocol TLSProtocol {
 
     func putCipherText(_ data: Data) throws
 
-    func pullCipherText() throws -> Data?
+    func pullRawPlainText(_ data: CZeroingData) throws -> Int
 
-    // cipher text is then "put into" a network socket
-
-    func isConnected() -> Bool
+    func pullCipherText() throws -> Data
 }

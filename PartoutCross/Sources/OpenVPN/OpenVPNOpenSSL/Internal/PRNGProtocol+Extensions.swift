@@ -29,6 +29,8 @@ import Foundation
 import PartoutCore
 
 extension PRNGProtocol {
+
+    // FIXME: ###, this method discard the underlying implementation completely
     func safeData(length: Int) -> CZeroingData {
         precondition(length > 0)
         let randomData = CZ(length: length)

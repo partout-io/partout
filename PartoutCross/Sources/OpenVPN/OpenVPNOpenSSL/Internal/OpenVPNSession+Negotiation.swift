@@ -31,7 +31,7 @@ extension OpenVPNSession {
     @discardableResult
     func startNegotiation(on link: LinkInterface) throws -> Negotiator {
         pp_log(ctx, .openvpn, .info, "Start negotiation")
-        let neg = newNegotiator(on: link)
+        let neg = try newNegotiator(on: link)
         addNegotiator(neg)
         loopLink()
         try neg.start()

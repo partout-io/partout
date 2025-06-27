@@ -34,7 +34,7 @@ private let DataPathMaxPackets = 100
 extension DataPathWrapper {
     static func legacy(
         with parameters: Parameters,
-        prf: Parameters.PRF,
+        prf: PRF,
         prng: PRNGProtocol
     ) throws -> DataPathWrapper {
         NSLog("PartoutOpenVPN: Using DataPathWrapper (legacy Swift/ObjC)");
@@ -48,18 +48,22 @@ extension DataPathWrapper {
         guard let cryptoBox = OSSLCryptoBox(seed: Z(seed.toData())) else {
             fatalError("Unable to create OSSLCryptoBox")
         }
+        let keys = try parameters.keys(with: prf)
         try cryptoBox.configure(
-            withCipher: cipher,
-            digest: digest,
-            handshake: prf.handshake,
-            sessionId: prf.sessionId,
-            remoteSessionId: prf.remoteSessionId
+            with: OpenVPNCryptoOptions(
+                cipherAlgorithm: cipher.rawValue,
+                digestAlgorithm: digest.rawValue,
+                cipherEncKey: keys.cipher.map { Z($0.encryptionKey.toData()) },
+                cipherDecKey: keys.cipher.map { Z($0.decryptionKey.toData()) },
+                hmacEncKey: keys.digest.map { Z($0.encryptionKey.toData()) },
+                hmacDecKey: keys.digest.map { Z($0.decryptionKey.toData()) }
+            )
         )
 
         let compressionFraming = parameters.compressionFraming
         let dataPath = DataPath(
-            encrypter: cryptoBox.encrypter(),
-            decrypter: cryptoBox.decrypter(),
+            encrypter: cryptoBox.encrypter().dataPathEncrypter(),
+            decrypter: cryptoBox.decrypter().dataPathDecrypter(),
             peerId: parameters.peerId ?? PacketPeerIdDisabled,
             compressionFraming: compressionFraming.native,
             compressionAlgorithm: .disabled,

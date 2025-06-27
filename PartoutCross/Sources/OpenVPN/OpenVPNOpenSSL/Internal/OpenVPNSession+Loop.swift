@@ -133,7 +133,7 @@ private extension OpenVPNSession {
                 continue
             }
 
-            let controlPacket: ControlPacket
+            let controlPacket: CControlPacket
             do {
                 let parsedPacket = try negotiator.readInboundPacket(withData: packet, offset: 0)
                 negotiator.handleAcks()

@@ -36,3 +36,6 @@ extension PacketProtocol {
     }
 }
 #endif
+
+extension CControlPacket: PacketProtocol {
+}

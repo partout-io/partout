@@ -28,7 +28,7 @@ import _PartoutOpenVPNCore
 internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 
-extension DataPathWrapper.Parameters {
+extension DataPathWrapper {
     struct PRF {
         let handshake: Handshake
 
@@ -39,7 +39,7 @@ extension DataPathWrapper.Parameters {
 }
 
 extension DataPathWrapper.Parameters {
-    func keys(with prf: PRF) throws -> CryptoKeys {
+    func keys(with prf: DataPathWrapper.PRF) throws -> CryptoKeys {
         let masterData = try prfData(with: PRFInput(
             label: Constants.label1,
             secret: CZ(prf.handshake.preMaster),

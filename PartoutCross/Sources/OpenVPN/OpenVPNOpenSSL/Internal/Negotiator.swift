@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutCryptoOpenSSL_Cross
 import _PartoutOpenVPNCore
-internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
@@ -38,8 +38,6 @@ final class Negotiator {
         let withLocalOptions: Bool
 
         let sessionOptions: OpenVPN.ConnectionOptions
-
-        let tlsOptions: OpenVPNTLSOptions
 
         let onConnected: (UInt8, DataChannel, PushReply) async -> Void
 
@@ -62,9 +60,9 @@ final class Negotiator {
 
     private let prng: PRNGProtocol
 
-    private let tlsFactory: () -> OpenVPNTLSProtocol
+    private let tls: TLSProtocol
 
-    private let cryptoFactory: () -> OpenVPNCryptoProtocol
+    private let dpFactory: DataPathFactory
 
     private let options: Options
 
@@ -80,11 +78,9 @@ final class Negotiator {
         }
     }
 
-    private let tlsBox: OpenVPNTLSProtocol
-
     private var expectedPacketId: UInt32
 
-    private var pendingPackets: [UInt32: ControlPacket]
+    private var pendingPackets: [UInt32: CControlPacket]
 
     private var authenticator: Authenticator?
 
@@ -101,8 +97,8 @@ final class Negotiator {
         link: LinkInterface,
         channel: ControlChannel,
         prng: PRNGProtocol,
-        tlsFactory: @escaping () -> OpenVPNTLSProtocol,
-        cryptoFactory: @escaping () -> OpenVPNCryptoProtocol,
+        tls: TLSProtocol,
+        dpFactory: @escaping DataPathFactory,
         options: Options
     ) {
         self.init(
@@ -113,8 +109,8 @@ final class Negotiator {
             link: link,
             channel: channel,
             prng: prng,
-            tlsFactory: tlsFactory,
-            cryptoFactory: cryptoFactory,
+            tls: tls,
+            dpFactory: dpFactory,
             options: options
         )
     }
@@ -127,8 +123,8 @@ final class Negotiator {
         link: LinkInterface,
         channel: ControlChannel, // TODO: #29, abstract this for testing
         prng: PRNGProtocol,
-        tlsFactory: @escaping () -> OpenVPNTLSProtocol,
-        cryptoFactory: @escaping () -> OpenVPNCryptoProtocol,
+        tls: TLSProtocol,
+        dpFactory: @escaping DataPathFactory,
         options: Options
     ) {
         self.ctx = ctx
@@ -138,14 +134,13 @@ final class Negotiator {
         self.link = link
         self.channel = channel
         self.prng = prng
-        self.tlsFactory = tlsFactory
-        self.cryptoFactory = cryptoFactory
+        self.tls = tls
+        self.dpFactory = dpFactory
         self.options = options
 
         startTime = Date()
         negotiationTimeout = renegotiation != nil ? options.sessionOptions.softNegotiationTimeout : options.sessionOptions.negotiationTimeout
         state = .idle
-        tlsBox = tlsFactory()
         expectedPacketId = 0
         pendingPackets = [:]
     }
@@ -155,7 +150,7 @@ final class Negotiator {
             pp_log(ctx, .openvpn, .error, "Negotiator has no history (not connected yet?)")
             return self
         }
-        let newKey = ProtocolMacros.nextKey(after: key)
+        let newKey = Constants.nextKey(after: key)
         return Negotiator(
             ctx,
             key: newKey,
@@ -164,8 +159,8 @@ final class Negotiator {
             link: link,
             channel: channel,
             prng: prng,
-            tlsFactory: tlsFactory,
-            cryptoFactory: cryptoFactory,
+            tls: tls,
+            dpFactory: dpFactory,
             options: options
         )
     }
@@ -204,15 +199,15 @@ extension Negotiator {
         checkNegotiationTask?.cancel()
     }
 
-    func readInboundPacket(withData packet: Data, offset: Int) throws -> ControlPacket {
+    func readInboundPacket(withData packet: Data, offset: Int) throws -> CControlPacket {
         try channel.readInboundPacket(withData: packet, offset: 0)
     }
 
-    func enqueueInboundPacket(packet controlPacket: ControlPacket) -> [ControlPacket] {
+    func enqueueInboundPacket(packet controlPacket: CControlPacket) -> [CControlPacket] {
         channel.enqueueInboundPacket(packet: controlPacket)
     }
 
-    func handleControlPacket(_ packet: ControlPacket) throws {
+    func handleControlPacket(_ packet: CControlPacket) throws {
         guard packet.packetId >= expectedPacketId else {
             return
         }
@@ -235,7 +230,7 @@ extension Negotiator {
         //
     }
 
-    func sendAck(for controlPacket: ControlPacket, to link: LinkInterface) {
+    func sendAck(for controlPacket: CControlPacket, to link: LinkInterface) {
         Task {
             try await privateSendAck(for: controlPacket, to: link)
         }
@@ -257,11 +252,8 @@ extension Negotiator {
 private extension Negotiator {
     func hardResetPayload() -> Data? {
         if options.configuration.usesPIAPatches ?? false {
-            guard let caURL = tlsBox.options()?.caURL() else {
-                return nil
-            }
             do {
-                let caMD5 = try tlsBox.md5(forCertificatePath: caURL.path)
+                let caMD5 = try tls.caMD5()
                 pp_log(ctx, .openvpn, .info, "PIA CA MD5 is: \(caMD5)")
                 return try? PIAHardReset(
                     ctx,
@@ -323,11 +315,11 @@ private extension Negotiator {
         }
 
         pp_log(ctx, .openvpn, .info, "TLS.ifconfig: Put plaintext (PUSH_REQUEST)")
-        try? tlsBox.putPlainText("PUSH_REQUEST\0")
+        try? tls.putPlainText("PUSH_REQUEST\0")
 
         let cipherTextOut: Data
         do {
-            cipherTextOut = try tlsBox.pullCipherText()
+            cipherTextOut = try tls.pullCipherText()
         } catch {
             // FIXME: ###, try replace .asNativeOpenVPNError with "catch as OpenVPNSessionError.native()"
             if let nativeError = error.asNativeOpenVPNError {
@@ -344,7 +336,7 @@ private extension Negotiator {
         self.nextPushRequestDate = Date().addingTimeInterval(options.sessionOptions.pushRequestInterval)
     }
 
-    func enqueueControlPackets(code: PacketCode, key: UInt8, payload: Data) throws {
+    func enqueueControlPackets(code: CPacketCode, key: UInt8, payload: Data) throws {
         try channel.enqueueOutboundPackets(
             withCode: code,
             key: key,
@@ -382,7 +374,7 @@ private extension Negotiator {
 // MARK: - Inbound
 
 private extension Negotiator {
-    func privateHandleControlPacket(_ packet: ControlPacket) throws {
+    func privateHandleControlPacket(_ packet: CControlPacket) throws {
         guard packet.key == key else {
             pp_log(ctx, .openvpn, .error, "Bad key in control packet (\(packet.key) != \(key))")
             return
@@ -412,20 +404,11 @@ private extension Negotiator {
 
             pp_log(ctx, .openvpn, .info, "Start TLS handshake")
             state = .tls
-
-            try tlsBox.configure(with: options.tlsOptions) { [weak self] error in
-                guard let self else {
-                    return
-                }
-                Task {
-                    await self.options.onError(self.key, error)
-                }
-            }
-            try tlsBox.start()
+            try tls.start()
 
             let cipherTextOut: Data
             do {
-                cipherTextOut = try tlsBox.pullCipherText()
+                cipherTextOut = try tls.pullCipherText()
             } catch {
                 if let nativeError = error.asNativeOpenVPNError {
                     pp_log(ctx, .openvpn, .fault, "TLS.connect: Failed pulling ciphertext: \(nativeError)")
@@ -457,11 +440,11 @@ private extension Negotiator {
             }
 
             pp_log(ctx, .openvpn, .info, "TLS.connect: Put received ciphertext [\(packet.packetId)] \(cipherTextIn.asSensitiveBytes(ctx))")
-            try? tlsBox.putCipherText(cipherTextIn)
+            try? tls.putCipherText(cipherTextIn)
 
             let cipherTextOut: Data
             do {
-                cipherTextOut = try tlsBox.pullCipherText()
+                cipherTextOut = try tls.pullCipherText()
                 pp_log(ctx, .openvpn, .info, "TLS.connect: Send pulled ciphertext \(cipherTextOut.asSensitiveBytes(ctx))")
                 try enqueueControlPackets(code: .controlV1, key: key, payload: cipherTextOut)
             } catch {
@@ -472,7 +455,7 @@ private extension Negotiator {
                 pp_log(ctx, .openvpn, .debug, "TLS.connect: No available ciphertext to pull")
             }
 
-            if state < .auth, tlsBox.isConnected() {
+            if state < .auth, tls.isConnected() {
                 pp_log(ctx, .openvpn, .info, "TLS.connect: Handshake is complete")
                 state = .auth
 
@@ -480,7 +463,7 @@ private extension Negotiator {
             }
             do {
                 while true {
-                    let controlData = try channel.currentControlData(withTLS: tlsBox)
+                    let controlData = try channel.currentControlData(withTLS: tls)
                     try handleControlData(controlData)
                 }
             } catch {
@@ -488,7 +471,7 @@ private extension Negotiator {
         }
     }
 
-    func privateSendAck(for controlPacket: ControlPacket, to link: LinkInterface) async throws {
+    func privateSendAck(for controlPacket: CControlPacket, to link: LinkInterface) async throws {
         do {
             pp_log(ctx, .openvpn, .info, "Send ack for received packetId \(controlPacket.packetId)")
             let raw = try channel.writeAcks(
@@ -512,11 +495,11 @@ private extension Negotiator {
             history?.pushReply.options.authToken ?? options.credentials?.password
         )
         authenticator?.withLocalOptions = options.withLocalOptions
-        try authenticator?.putAuth(into: tlsBox, options: options.configuration)
+        try authenticator?.putAuth(into: tls, options: options.configuration)
 
         let cipherTextOut: Data
         do {
-            cipherTextOut = try tlsBox.pullCipherText()
+            cipherTextOut = try tls.pullCipherText()
         } catch {
             if let nativeError = error.asNativeOpenVPNError {
                 pp_log(ctx, .openvpn, .fault, "TLS.auth: Failed pulling ciphertext: \(nativeError)")
@@ -530,7 +513,7 @@ private extension Negotiator {
         try enqueueControlPackets(code: .controlV1, key: key, payload: cipherTextOut)
     }
 
-    func handleControlData(_ data: ZeroingData) throws {
+    func handleControlData(_ data: CZeroingData) throws {
         guard let authenticator else {
             return
         }
@@ -615,17 +598,9 @@ private extension Negotiator {
                 switch compression {
                 case .disabled:
                     break
-
-                case .LZO:
-                    if !LZOFactory.canCreate() {
-                        let error = OpenVPNSessionError.serverCompression
-                        pp_log(ctx, .openvpn, .fault, "Server has LZO compression enabled and this was not built into the library (framing=\(framing)): \(error)")
-                        throw error
-                    }
-
                 default:
                     let error = OpenVPNSessionError.serverCompression
-                    pp_log(ctx, .openvpn, .fault, "Server has non-LZO compression enabled and this is currently unsupported (framing=\(framing)): \(error)")
+                    pp_log(ctx, .openvpn, .fault, "Server has compression enabled (\(compression)) and this is not supported (framing=\(framing)): \(error)")
                     throw error
                 }
             }
@@ -668,7 +643,7 @@ private extension Negotiator {
             pp_log(ctx, .openvpn, .fault, "Setting up connection without a remote sessionId")
             throw OpenVPNSessionError.assertion
         }
-        guard let authResponse = authenticator?.response else {
+        guard let handshake = authenticator?.response else {
             pp_log(ctx, .openvpn, .fault, "Setting up connection without auth response")
             throw OpenVPNSessionError.assertion
         }
@@ -682,26 +657,18 @@ private extension Negotiator {
 //        pp_log(ctx, .openvpn, .info, "\tsessionId: \(sessionId.toHex())")
 //        pp_log(ctx, .openvpn, .info, "\tremoteSessionId: \(remoteSessionId.toHex())")
 
-        let cryptoBox = cryptoFactory()
-        try cryptoBox.configure(
-            withCipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
+        let parameters = DataPathWrapper.Parameters(
+            cipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
             digest: options.configuration.fallbackDigest,
-            auth: authResponse,
+            compressionFraming: history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming,
+            peerId: history.pushReply.options.peerId,
+        )
+        let prf = DataPathWrapper.PRF(
+            handshake: handshake,
             sessionId: sessionId,
             remoteSessionId: remoteSessionId
         )
-        let compressionFraming = history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming
-        let compressionAlgorithm = history.pushReply.options.compressionAlgorithm ?? options.configuration.compressionAlgorithm ?? .disabled
-
-        let dataPath = DataPath(
-            encrypter: cryptoBox.encrypter(),
-            decrypter: cryptoBox.decrypter(),
-            peerId: history.pushReply.options.peerId ?? PacketPeerIdDisabled,
-            compressionFraming: compressionFraming.native,
-            compressionAlgorithm: compressionAlgorithm.native,
-            maxPackets: options.sessionOptions.maxPackets,
-            usesReplayProtection: Constants.usesReplayProtection
-        )
+        let dataPath = try dpFactory(parameters, prf, prng)
         return DataChannel(ctx, key: key, dataPath: dataPath)
     }
 }

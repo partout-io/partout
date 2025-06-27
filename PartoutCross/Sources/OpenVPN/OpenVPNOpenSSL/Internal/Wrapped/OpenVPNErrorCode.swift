@@ -52,6 +52,7 @@ extension OpenVPNErrorCode: CustomDebugStringConvertible {
         rawValue.description
     }
 }
+#endif
 
 // FIXME: ###, map C errors to OpenVPNErrorCode
 extension Error {
@@ -59,4 +60,3 @@ extension Error {
         fatalError()
     }
 }
-#endif

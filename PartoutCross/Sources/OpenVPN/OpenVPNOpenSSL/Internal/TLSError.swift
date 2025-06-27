@@ -1,8 +1,8 @@
 //
-//  OpenVPNTLSProtocol.swift
+//  TLSError.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/15/25.
+//  Created by Davide De Rosa on 6/26/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,31 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-
-// FIXME: ###
-public struct OpenVPNTLSOptions {
-    public static let defaultBufferLength = 16384
-
-    public static let defaultSecurityLevel = 0
-
-    public var bufferLength = Self.defaultBufferLength
-
-    public let caURL: URL
-
-    public var clientCertificatePEM: String?
-
-    public var clientKeyPEM: String?
-
-    public let checksEKU: Bool
-
-    public let checksSANHost: Bool
-
-    public var hostname: String?
-
-    public let securityLevel: Int
-}
-
-// FIXME: ###
-public protocol OpenVPNTLSProtocol {
+// FIXME: ###, map TLSError
+enum TLSError: Error {
+    case fixme
 }
