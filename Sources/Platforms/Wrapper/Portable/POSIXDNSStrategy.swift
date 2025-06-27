@@ -87,20 +87,25 @@ private extension POSIXDNSStrategy {
             guard let addr = info.ai_addr else {
                 continue
             }
-            let hostLength = socklen_t(info.ai_addrlen)
+            let addrLength = socklen_t(info.ai_addrlen)
             var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+#if os(Windows)
+            let hostBufLength = DWORD(hostBuffer.count)
+#else
+            let hostBufLength = socklen_t(hostBuffer.count)
+#endif
             let result = getnameinfo(
                 addr,
-                hostLength,
+                addrLength,
                 &hostBuffer,
-                socklen_t(hostBuffer.count),
+                hostBufLength,
                 nil,
                 0,
                 NI_NUMERICHOST
             )
             if result == 0 {
                 let address = String(cString: hostBuffer)
-                records.append(DNSRecord(address: address, isIPv6: hostLength == 128))
+                records.append(DNSRecord(address: address, isIPv6: addrLength == 128))
             }
             currentPointer = info.ai_next
         }
