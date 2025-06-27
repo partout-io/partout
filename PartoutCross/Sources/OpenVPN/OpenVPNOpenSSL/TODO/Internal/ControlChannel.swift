@@ -23,9 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_Cross
 import _PartoutOpenVPNCore
-internal import _PartoutOpenVPNOpenSSL_C
+internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
@@ -53,7 +52,7 @@ final class ControlChannel {
 
     private var pendingAcks: Set<UInt32>
 
-    private var plainBuffer: CZeroingData
+    private var plainBuffer: ZeroingData
 
     private var sentDates: [UInt32: Date]
 
@@ -64,22 +63,20 @@ final class ControlChannel {
     convenience init(
         _ ctx: PartoutLoggerContext,
         prng: PRNGProtocol,
+        crypto: OpenVPNCryptoProtocol,
         authKey key: OpenVPN.StaticKey,
         digest: OpenVPN.Digest
     ) throws {
-        // FIXME: ##, cryptoFactory
-        fatalError("")
-//        self.init(ctx, prng: prng, serializer: try AuthSerializer(ctx, with: crypto, key: key, digest: digest))
+        self.init(ctx, prng: prng, serializer: try AuthSerializer(ctx, with: crypto, key: key, digest: digest))
     }
 
     convenience init(
         _ ctx: PartoutLoggerContext,
         prng: PRNGProtocol,
+        crypto: OpenVPNCryptoProtocol,
         cryptKey key: OpenVPN.StaticKey
     ) throws {
-        // FIXME: ##, cryptoFactory
-        fatalError("")
-//        self.init(ctx, prng: prng, serializer: try CryptSerializer(ctx, with: crypto, key: key))
+        self.init(ctx, prng: prng, serializer: try CryptSerializer(ctx, with: crypto, key: key))
     }
 
     private init(
@@ -95,7 +92,7 @@ final class ControlChannel {
         queue = BidirectionalState(withResetValue: [])
         currentPacketId = BidirectionalState(withResetValue: 0)
         pendingAcks = []
-        plainBuffer = CZ(length: 0)// FIXME: ##, OpenVPNTLSOptionsDefaultBufferLength)
+        plainBuffer = Z(length: OpenVPNTLSOptionsDefaultBufferLength)
         sentDates = [:]
     }
 }
@@ -122,15 +119,9 @@ extension ControlChannel {
         do {
             let packet = try serializer.deserialize(data: data, start: offset, end: nil)
             pp_log(ctx, .openvpn, .info, "Control: Read packet \(packet.asSensitiveBytes(ctx))")
-#if canImport(_PartoutOpenVPNOpenSSL_ObjC)
             if let ackIds = packet.ackIds as? [UInt32], let ackRemoteSessionId = packet.ackRemoteSessionId {
                 try readAcks(ackIds, acksRemoteSessionId: ackRemoteSessionId)
             }
-#else
-            if let ackIds = packet.ackIds, let ackRemoteSessionId = packet.ackRemoteSessionId {
-                try readAcks(ackIds, acksRemoteSessionId: ackRemoteSessionId)
-            }
-#endif
             return packet
         } catch {
             pp_log(ctx, .openvpn, .fault, "Control: Channel failure: \(error)")
@@ -257,20 +248,14 @@ extension ControlChannel {
         guard let sessionId = sessionId else {
             throw OpenVPNSessionError.missingSessionId
         }
-#if canImport(_PartoutOpenVPNOpenSSL_ObjC)
         let packet = ControlPacket(key: key, sessionId: sessionId, ackIds: ackPacketIds as [NSNumber], ackRemoteSessionId: ackRemoteSessionId)
-#else
-        let packet = ControlPacket(key: key, sessionId: sessionId, ackIds: ackPacketIds, ackRemoteSessionId: ackRemoteSessionId)
-#endif
         pp_log(ctx, .openvpn, .info, "Control: Write ack packet \(packet.asSensitiveBytes(ctx))")
         return try serializer.serialize(packet: packet)
     }
 
-    // FIXME: ##, tlsFactory
-    func currentControlData(withTLS tls: OpenVPNTLSProtocol) throws -> CZeroingData {
-        fatalError()
-//        var length = 0
-//        try tls.pullRawPlainText(plainBuffer.mutableBytes, length: &length)
-//        return plainBuffer.withOffset(0, length: length)
+    func currentControlData(withTLS tls: OpenVPNTLSProtocol) throws -> ZeroingData {
+        var length = 0
+        try tls.pullRawPlainText(plainBuffer.mutableBytes, length: &length)
+        return plainBuffer.withOffset(0, length: length)
     }
 }

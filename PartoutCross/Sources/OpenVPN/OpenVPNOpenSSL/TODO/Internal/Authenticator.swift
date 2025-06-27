@@ -34,14 +34,14 @@
 //      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-internal import _PartoutCryptoOpenSSL_Cross
 import _PartoutOpenVPNCore
+internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
-fileprivate extension CZeroingData {
-    func appendSized(_ buf: CZeroingData) {
-        append(CZ(UInt16(buf.length).bigEndian))
+fileprivate extension ZeroingData {
+    func appendSized(_ buf: ZeroingData) {
+        append(Z(UInt16(buf.length).bigEndian))
         append(buf)
     }
 }
@@ -49,21 +49,21 @@ fileprivate extension CZeroingData {
 final class Authenticator {
     private let ctx: PartoutLoggerContext
 
-    private var controlBuffer: CZeroingData
+    private var controlBuffer: ZeroingData
 
-    private(set) var preMaster: CZeroingData
+    private(set) var preMaster: ZeroingData
 
-    private(set) var random1: CZeroingData
+    private(set) var random1: ZeroingData
 
-    private(set) var random2: CZeroingData
+    private(set) var random2: ZeroingData
 
-    private(set) var serverRandom1: CZeroingData?
+    private(set) var serverRandom1: ZeroingData?
 
-    private(set) var serverRandom2: CZeroingData?
+    private(set) var serverRandom2: ZeroingData?
 
-    private(set) var username: CZeroingData?
+    private(set) var username: ZeroingData?
 
-    private(set) var password: CZeroingData?
+    private(set) var password: ZeroingData?
 
     var withLocalOptions: Bool
 
@@ -77,8 +77,8 @@ final class Authenticator {
 
         // XXX: not 100% secure, can't erase input username/password
         if let username = username, let password = password {
-            self.username = CZ(username, nullTerminated: true)
-            self.password = CZ(password, nullTerminated: true)
+            self.username = Z(username, nullTerminated: true)
+            self.password = Z(password, nullTerminated: true)
         } else {
             self.username = nil
             self.password = nil
@@ -86,7 +86,7 @@ final class Authenticator {
 
         withLocalOptions = true
 
-        controlBuffer = CZ()
+        controlBuffer = Z()
     }
 
     func reset() {
@@ -103,7 +103,7 @@ final class Authenticator {
     // MARK: Authentication request
 
     func putAuth(into: OpenVPNTLSProtocol, options: OpenVPN.Configuration) throws {
-        let raw = CZ(ProtocolMacros.tlsPrefix)
+        let raw = Z(ProtocolMacros.tlsPrefix)
 
         // local keys
         raw.append(preMaster)
@@ -145,15 +145,15 @@ final class Authenticator {
             optsString = "V0 UNDEF"
         }
         pp_log(ctx, .openvpn, .info, "TLS.auth: Local options: \(optsString)")
-        raw.appendSized(CZ(optsString, nullTerminated: true))
+        raw.appendSized(Z(optsString, nullTerminated: true))
 
         // credentials
         if let username = username, let password = password {
             raw.appendSized(username)
             raw.appendSized(password)
         } else {
-            raw.append(CZ(UInt16(0)))
-            raw.append(CZ(UInt16(0)))
+            raw.append(Z(UInt16(0)))
+            raw.append(Z(UInt16(0)))
         }
 
         // peer info
@@ -162,17 +162,16 @@ final class Authenticator {
             extra["IV_CIPHERS"] = dataCiphers.map(\.rawValue).joined(separator: ":")
         }
         let peerInfo = Constants.peerInfo(sslVersion: sslVersion, extra: extra)
-        raw.appendSized(CZ(peerInfo, nullTerminated: true))
+        raw.appendSized(Z(peerInfo, nullTerminated: true))
 
         pp_log(ctx, .openvpn, .info, "TLS.auth: Put plaintext \(raw.asSensitiveBytes(ctx))")
 
-        // FIXME: ##, tlsBox
-//        try into.putRawPlainText(raw.bytes, length: raw.length)
+        try into.putRawPlainText(raw.bytes, length: raw.length)
     }
 
     // MARK: Server replies
 
-    func appendControlData(_ data: CZeroingData) {
+    func appendControlData(_ data: ZeroingData) {
         controlBuffer.append(data)
     }
 
@@ -238,16 +237,30 @@ final class Authenticator {
 
     // MARK: Response
 
-    var response: Handshake? {
+    var response: Response? {
         guard let serverRandom1, let serverRandom2 else {
             return nil
         }
-        return Handshake(
+        return Response(
             preMaster: preMaster,
             random1: random1,
             random2: random2,
             serverRandom1: serverRandom1,
             serverRandom2: serverRandom2
         )
+    }
+}
+
+extension Authenticator {
+    struct Response {
+        let preMaster: ZeroingData
+
+        let random1: ZeroingData
+
+        let random2: ZeroingData
+
+        let serverRandom1: ZeroingData
+
+        let serverRandom2: ZeroingData
     }
 }

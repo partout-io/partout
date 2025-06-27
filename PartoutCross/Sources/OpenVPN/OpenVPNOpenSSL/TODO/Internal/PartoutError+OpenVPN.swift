@@ -23,6 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutOpenVPNOpenSSL_ObjC
 import PartoutCore
 
 extension OpenVPNSessionError: PartoutErrorMappable {
@@ -72,5 +73,13 @@ extension OpenVPNSessionError: PartoutErrorMappable {
         default:
             return .OpenVPN.connectionFailure
         }
+    }
+}
+
+// MARK: - Debugging
+
+extension OpenVPNErrorCode: @retroactive CustomDebugStringConvertible {
+    var debugDescription: String {
+        rawValue.description
     }
 }

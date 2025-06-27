@@ -24,6 +24,7 @@
 //
 
 import _PartoutOpenVPNCore
+internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 

@@ -23,8 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_Cross
+internal import _PartoutCryptoOpenSSL_ObjC
 import _PartoutOpenVPNCore
+internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
@@ -34,7 +35,7 @@ final class OpenVPNTCPLink {
 
     private let xorMethod: OpenVPN.XORMethod?
 
-    private let xorMask: CZeroingData?
+    private let xorMask: ZeroingData?
 
     // WARNING: not thread-safe, only use in setReadHandler()
     private var buffer: Data
@@ -47,7 +48,7 @@ final class OpenVPNTCPLink {
 
         self.link = link
         self.xorMethod = xorMethod
-        xorMask = xorMethod?.mask?.czData
+        xorMask = xorMethod?.mask?.zData
         buffer = Data(capacity: 1024 * 1024)
     }
 }
