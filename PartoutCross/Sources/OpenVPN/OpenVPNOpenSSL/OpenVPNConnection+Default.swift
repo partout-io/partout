@@ -34,20 +34,38 @@ extension OpenVPNConnection {
         module: OpenVPNModule,
         prng: PRNGProtocol,
         dns: DNSResolver,
-        options: OpenVPN.ConnectionOptions = .init(),
-        cachesURL: URL
+        cachesURL: URL,
+        options: OpenVPN.ConnectionOptions = .init()
     ) async throws {
         guard let configuration = module.configuration else {
             fatalError("Creating session without OpenVPN configuration?")
         }
 
+        // native: Swift/C
+        // legacy: Swift/ObjC
         let session = try await OpenVPNSession(
             ctx,
             configuration: configuration,
             credentials: module.credentials,
             prng: prng,
             cachesURL: cachesURL,
-            options: options
+            options: options,
+            tlsFactory: {
+#if OPENVPN_WRAPPED_NATIVE
+                try TLSWrapper.native(with: $0).tls
+#else
+                try TLSWrapper.legacy(with: $0).tls
+#endif
+            },
+            dpFactory: {
+                let wrapper: DataPathWrapper
+#if OPENVPN_WRAPPED_NATIVE
+                wrapper = try .native(with: $0, prf: $1, prng: $2)
+#else
+                wrapper = try .legacy(with: $0, prf: $1, prng: $2)
+#endif
+                return wrapper.dataPath
+            }
         )
 
         try await self.init(

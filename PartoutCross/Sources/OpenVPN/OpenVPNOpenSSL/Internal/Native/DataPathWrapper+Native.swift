@@ -36,14 +36,15 @@ private let CryptoAEADTagLength = 16
 private let CryptoAEADIdLength = PacketIdLength
 
 extension DataPathWrapper {
-    static func native(with parameters: Parameters, prf: Parameters.PRF, prng: PRNGProtocol) throws -> DataPathWrapper {
+    static func native(with parameters: Parameters, prf: CryptoKeys.PRF, prng: PRNGProtocol) throws -> DataPathWrapper {
         let seed = prng.safeData(length: PRNGSeedLength)
         return try .native(with: parameters, prf: prf, seed: seed)
     }
 
-    static func native(with parameters: Parameters, prf: Parameters.PRF, seed: CZeroingData) throws -> DataPathWrapper {
+    static func native(with parameters: Parameters, prf: CryptoKeys.PRF, seed: CZeroingData) throws -> DataPathWrapper {
         seed.useToInitializeKeys()
-        return try .native(with: parameters, keys: parameters.keys(with: prf))
+        let keys = try CryptoKeys(withPRF: prf)
+        return try .native(with: parameters, keys: keys)
     }
 
     static func native(with parameters: Parameters, keys: CryptoKeys) throws -> DataPathWrapper {

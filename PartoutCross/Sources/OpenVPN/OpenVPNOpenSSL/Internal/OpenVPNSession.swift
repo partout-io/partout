@@ -24,7 +24,6 @@
 //
 
 import _PartoutOpenVPNCore
-internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
@@ -51,15 +50,13 @@ final class OpenVPNSession {
 
     private let prng: PRNGProtocol
 
-    private let tlsFactory: () -> OpenVPNTLSProtocol
-
-    private let cryptoFactory: () -> OpenVPNCryptoProtocol
-
-    private let caURL: URL
+    let cachesURL: URL
 
     let options: OpenVPN.ConnectionOptions
 
-    let tlsOptions: OpenVPNTLSOptions
+    private let tlsFactory: TLSFactory
+
+    private let dpFactory: DataPathFactory
 
     // MARK: Persistent state
 
@@ -129,36 +126,21 @@ final class OpenVPNSession {
         configuration: OpenVPN.Configuration,
         credentials: OpenVPN.Credentials?,
         prng: PRNGProtocol,
-        tlsFactory: @escaping @Sendable () -> OpenVPNTLSProtocol,
-        cryptoFactory: @escaping @Sendable () -> OpenVPNCryptoProtocol,
         cachesURL: URL,
-        options: OpenVPN.ConnectionOptions = .init()
+        options: OpenVPN.ConnectionOptions = .init(),
+        tlsFactory: @escaping TLSFactory,
+        dpFactory: @escaping DataPathFactory
     ) throws {
-        guard let ca = configuration.ca else {
-            fatalError("Configuration has no CA")
-        }
         self.ctx = ctx
         self.configuration = configuration
         self.credentials = try credentials?.forAuthentication()
         self.prng = prng
-        self.tlsFactory = tlsFactory
-        self.cryptoFactory = cryptoFactory
-        caURL = cachesURL.appendingPathComponent(Caches.ca)
+        self.cachesURL = cachesURL
         self.options = options
+        self.tlsFactory = tlsFactory
+        self.dpFactory = dpFactory
 
-        try ca.write(to: caURL)
-        tlsOptions = OpenVPNTLSOptions(
-            bufferLength: OpenVPNTLSOptionsDefaultBufferLength,
-            caURL: caURL,
-            clientCertificatePEM: configuration.clientCertificate?.pem,
-            clientKeyPEM: configuration.clientKey?.pem,
-            checksEKU: configuration.checksEKU ?? false,
-            checksSANHost: configuration.checksSANHost ?? false,
-            hostname: configuration.sanHost,
-            securityLevel: configuration.tlsSecurityLevel ?? 0
-        )
-
-        controlChannel = try cryptoFactory().newControlChannel(
+        controlChannel = try Self.newControlChannel(
             ctx,
             with: prng,
             configuration: configuration
@@ -170,10 +152,6 @@ final class OpenVPNSession {
         sessionState = .stopped
         withLocalOptions = true
         dataCount = BidirectionalState(withResetValue: 0)
-    }
-
-    deinit {
-        try? FileManager.default.removeItem(at: caURL)
     }
 }
 
@@ -325,13 +303,12 @@ extension OpenVPNSession {
         return dataChannels[key]
     }
 
-    func newNegotiator(on link: LinkInterface) -> Negotiator {
+    func newNegotiator(on link: LinkInterface) throws -> Negotiator {
         let negOptions = Negotiator.Options(
             configuration: configuration,
             credentials: credentials,
             withLocalOptions: withLocalOptions,
             sessionOptions: options,
-            tlsOptions: tlsOptions,
             onConnected: { [weak self] key, dataChannel, pushReply in
                 self?.didNegotiate(
                     key: key,
@@ -343,13 +320,18 @@ extension OpenVPNSession {
                 await self?.shutdown(error)
             }
         )
+        let tlsParameters = TLSWrapper.Parameters(
+            cachesURL: cachesURL,
+            cfg: configuration
+        )
+        let tls = try tlsFactory(tlsParameters)
         return Negotiator(
             ctx,
             link: link,
             channel: controlChannel,
             prng: prng,
-            tlsFactory: tlsFactory,
-            cryptoFactory: cryptoFactory,
+            tls: tls,
+            dpFactory: dpFactory,
             options: negOptions
         )
     }
@@ -461,10 +443,6 @@ extension OpenVPNSession {
 // MARK: - Helpers
 
 private extension OpenVPNSession {
-    enum Caches {
-        static let ca = "ca.pem"
-    }
-
     func scheduleNextPing() {
         let interval = keepAliveInterval ?? options.pingTimeoutCheckInterval
         pp_log(ctx, .openvpn, .debug, "Schedule ping check after \(interval.asTimeString)")
@@ -500,7 +478,7 @@ private extension OpenVPNSession {
         if keepAliveInterval != nil {
             pp_log(ctx, .openvpn, .debug, "Send ping")
             sendDataPackets(
-                [ProtocolMacros.pingString],
+                [Constants.pingString],
                 to: link,
                 dataChannel: currentDataChannel
             )
@@ -545,9 +523,8 @@ private extension OpenVPNSession {
     }
 }
 
-@OpenVPNActor
-private extension OpenVPNCryptoProtocol {
-    func newControlChannel(
+private extension OpenVPNSession {
+    static func newControlChannel(
         _ ctx: PartoutLoggerContext,
         with prng: PRNGProtocol,
         configuration: OpenVPN.Configuration
@@ -559,7 +536,6 @@ private extension OpenVPNCryptoProtocol {
                 channel = try ControlChannel(
                     ctx,
                     prng: prng,
-                    crypto: self,
                     authKey: tlsWrap.key,
                     digest: configuration.fallbackDigest
                 )
@@ -568,7 +544,6 @@ private extension OpenVPNCryptoProtocol {
                 channel = try ControlChannel(
                     ctx,
                     prng: prng,
-                    crypto: self,
                     cryptKey: tlsWrap.key
                 )
 

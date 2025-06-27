@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutOpenVPNOpenSSL_ObjC
+internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 import PartoutCore
 
@@ -104,7 +104,7 @@ private extension OpenVPNSession {
                 continue
             }
             let codeValue = firstByte >> 3
-            guard let code = PacketCode(rawValue: codeValue) else {
+            guard let code = CPacketCode(rawValue: codeValue) else {
                 pp_log(ctx, .openvpn, .error, "Dropped malformed packet (unknown code: \(codeValue))")
                 continue
             }
@@ -133,7 +133,7 @@ private extension OpenVPNSession {
                 continue
             }
 
-            let controlPacket: ControlPacket
+            let controlPacket: CControlPacket
             do {
                 let parsedPacket = try negotiator.readInboundPacket(withData: packet, offset: 0)
                 negotiator.handleAcks()

@@ -88,7 +88,7 @@ public actor OpenVPNConnection {
         let hooks = CyclingConnection.Hooks(dns: dns) { newLink in
 
             // wrap new link into a specific OpenVPN link
-            newLink.openVPNLink(xorMethod: configuration.xorMethod)
+            newLink.openVPNLink(method: configuration.xorMethod)
 
         } startBlock: { [weak self] newLink in
 
@@ -313,13 +313,13 @@ private extension OpenVPNConnection {
 }
 
 private extension LinkInterface {
-    func openVPNLink(xorMethod: OpenVPN.ObfuscationMethod?) -> LinkInterface {
+    func openVPNLink(method: OpenVPN.ObfuscationMethod?) -> LinkInterface {
         switch linkType.plainType {
         case .udp:
-            return OpenVPNUDPLink(link: self, xorMethod: xorMethod)
+            return OpenVPNUDPLink(link: self, method: method)
 
         case .tcp:
-            return OpenVPNTCPLink(link: self, xorMethod: xorMethod)
+            return OpenVPNTCPLink(link: self, method: method)
         }
     }
 }

@@ -25,10 +25,6 @@
 
 import Foundation
 
-// FIXME: ###, remove after porting ControlChannel
-enum ControlChannel {
-}
-
 protocol ControlChannelSerializer {
     func reset()
 

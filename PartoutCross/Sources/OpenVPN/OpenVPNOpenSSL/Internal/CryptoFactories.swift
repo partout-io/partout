@@ -1,8 +1,8 @@
 //
-//  DataPathWrapper.swift
+//  CryptoFactories.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/15/25.
+//  Created by Davide De Rosa on 6/26/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,31 +23,12 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
-import Foundation
+import PartoutCore
 
-final class DataPathWrapper {
-    struct Parameters {
-        let cipher: OpenVPN.Cipher?
+typealias TLSFactory = @Sendable (TLSWrapper.Parameters) throws -> TLSProtocol
 
-        let digest: OpenVPN.Digest?
-
-        let compressionFraming: OpenVPN.CompressionFraming
-
-        let peerId: UInt32?
-    }
-
-    let dataPath: DataPathTestingProtocol
-
-    init(dataPath: DataPathTestingProtocol) {
-        self.dataPath = dataPath
-    }
-
-    func encrypt(_ packets: [Data], key: UInt8) throws -> [Data] {
-        try dataPath.encrypt(packets, key: key)
-    }
-
-    func decrypt(_ packets: [Data]) throws -> (packets: [Data], keepAlive: Bool) {
-        try dataPath.decrypt(packets)
-    }
-}
+typealias DataPathFactory = @Sendable (
+    DataPathWrapper.Parameters,
+    CryptoKeys.PRF,
+    PRNGProtocol
+) throws -> DataPathProtocol

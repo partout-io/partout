@@ -1,8 +1,8 @@
 //
-//  DataPathWrapper.swift
+//  PacketCode+Extensions.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/15/25.
+//  Created by Davide De Rosa on 5/2/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,31 +23,20 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
-import Foundation
+internal import _PartoutOpenVPNOpenSSL_ObjC
 
-final class DataPathWrapper {
-    struct Parameters {
-        let cipher: OpenVPN.Cipher?
-
-        let digest: OpenVPN.Digest?
-
-        let compressionFraming: OpenVPN.CompressionFraming
-
-        let peerId: UInt32?
-    }
-
-    let dataPath: DataPathTestingProtocol
-
-    init(dataPath: DataPathTestingProtocol) {
-        self.dataPath = dataPath
-    }
-
-    func encrypt(_ packets: [Data], key: UInt8) throws -> [Data] {
-        try dataPath.encrypt(packets, key: key)
-    }
-
-    func decrypt(_ packets: [Data]) throws -> (packets: [Data], keepAlive: Bool) {
-        try dataPath.decrypt(packets)
+extension PacketCode: @retroactive CustomDebugStringConvertible {
+    var debugDescription: String {
+        switch self {
+        case .softResetV1:          return "SOFT_RESET_V1"
+        case .controlV1:            return "CONTROL_V1"
+        case .ackV1:                return "ACK_V1"
+        case .dataV1:               return "DATA_V1"
+        case .hardResetClientV2:    return "HARD_RESET_CLIENT_V2"
+        case .hardResetServerV2:    return "HARD_RESET_SERVER_V2"
+        case .dataV2:               return "DATA_V2"
+        case .unknown:              return "UNKNOWN(\(rawValue))"
+        @unknown default:           return "UNKNOWN(\(rawValue))"
+        }
     }
 }

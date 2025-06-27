@@ -1,5 +1,5 @@
 //
-//  ControlPacket+Legacy.swift
+//  ControlPacket+Extensions.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 5/2/24.
