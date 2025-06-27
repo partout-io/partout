@@ -43,6 +43,8 @@ extension OpenVPNSession {
                 }
                 reportInboundDataCount(decryptedPackets.flatCount)
                 try await tunnel.writePackets(decryptedPackets)
+            } catch let cError as CCryptoError {
+                throw cError
             } catch let cError as CDataPathError {
                 throw cError
             } catch {
@@ -67,6 +69,8 @@ extension OpenVPNSession {
                 }
                 reportOutboundDataCount(encryptedPackets.flatCount)
                 try await link.writePackets(encryptedPackets)
+            } catch let cError as CCryptoError {
+                throw cError
             } catch let cError as CDataPathError {
                 throw cError
             } catch {
