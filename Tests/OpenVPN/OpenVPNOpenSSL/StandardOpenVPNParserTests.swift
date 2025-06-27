@@ -136,7 +136,7 @@ final class StandardOpenVPNParserTests: XCTestCase {
         XCTAssertEqual(file.configuration.authUserPass, true)
 
         let mask = Data("this-is-a-mask".utf8)
-        XCTAssertEqual(file.configuration.xorMethod, .obfuscate(SecureData(mask)))
+        XCTAssertEqual(file.configuration.xorMethod, .obfuscate(mask: SecureData(mask)))
 
         XCTAssertTrue(file.configuration.ca?.pem.hasPrefix("-----BEGIN CERTIFICATE-----") ?? false)
         XCTAssertEqual(file.configuration.tlsWrap?.strategy, .auth)
@@ -151,7 +151,7 @@ final class StandardOpenVPNParserTests: XCTestCase {
 
         let cfg = try parser.parsed(fromLines: ["scramble xormask F"])
         XCTAssertNil(cfg.warning)
-        XCTAssertEqual(cfg.configuration.xorMethod, .xormask(singleMask))
+        XCTAssertEqual(cfg.configuration.xorMethod, .xormask(mask: singleMask))
 
         let cfg2 = try parser.parsed(fromLines: ["scramble reverse"])
         XCTAssertNil(cfg.warning)
@@ -163,7 +163,7 @@ final class StandardOpenVPNParserTests: XCTestCase {
 
         let cfg4 = try parser.parsed(fromLines: ["scramble obfuscate FFFF"])
         XCTAssertNil(cfg.warning)
-        XCTAssertEqual(cfg4.configuration.xorMethod, .obfuscate(multiMask))
+        XCTAssertEqual(cfg4.configuration.xorMethod, .obfuscate(mask: multiMask))
     }
 
     func test_givenMessage_whenParse_thenIsFastEnough() throws {

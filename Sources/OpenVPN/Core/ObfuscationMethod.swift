@@ -32,7 +32,7 @@ extension OpenVPN {
     public enum ObfuscationMethod: Hashable, Codable, Sendable {
 
         /// XORs the bytes in each buffer with the given mask.
-        case xormask(_ mask: SecureData)
+        case xormask(mask: SecureData)
 
         /// XORs each byte with its position in the packet.
         case xorptrpos
@@ -41,7 +41,7 @@ extension OpenVPN {
         case reverse
 
         /// Performs several of the above steps (xormask -> xorptrpos -> reverse -> xorptrpos).
-        case obfuscate(_ mask: SecureData)
+        case obfuscate(mask: SecureData)
 
         /// The optionally associated mask.
         public var mask: SecureData? {
