@@ -41,12 +41,6 @@ extension OpenVPNSessionError {
     }
 }
 
-extension Error {
-    var asOpenVPNSessionError: OpenVPNSessionError? {
-        OpenVPNSessionError(rawError: self)
-    }
-}
-
 private extension OpenVPNSessionError {
     init(rawError: Error) {
         let code: OpenVPNErrorCode = {
