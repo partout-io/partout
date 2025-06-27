@@ -25,6 +25,12 @@
 
 #if canImport(_PartoutOpenVPNOpenSSL_ObjC)
 internal import _PartoutOpenVPNOpenSSL_ObjC
+
+extension OpenVPNErrorCode: @retroactive CustomDebugStringConvertible {
+    var debugDescription: String {
+        rawValue.description
+    }
+}
 #else
 enum OpenVPNErrorCode: Int {
     case cryptoRandomGenerator       = 101
