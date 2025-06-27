@@ -30,13 +30,7 @@ import PartoutCore
 final class CControlPacket {
     let pkt: UnsafeMutablePointer<ctrl_pkt_t>
 
-    var code: CPacketCode {
-        guard let code = CPacketCode(rawValue: UInt8(pkt.pointee.code.rawValue)) else {
-            assertionFailure("Unmapped packet code: \(pkt.pointee.code.rawValue)")
-            return .unknown
-        }
-        return code
-    }
+    let code: CPacketCode
 
     var key: UInt8 {
         pkt.pointee.key
@@ -46,34 +40,20 @@ final class CControlPacket {
         pkt.pointee.packet_id
     }
 
-    var sessionId: Data {
-        Data(bytesNoCopy: pkt.pointee.session_id, count: _PartoutOpenVPNOpenSSL_C.PacketSessionIdLength, deallocator: .none)
-    }
+    let sessionId: Data
 
-    var payload: Data? {
-        pkt.pointee.payload.map {
-            Data(bytesNoCopy: $0, count: pkt.pointee.payload_len, deallocator: .none)
-        }
-    }
+    let payload: Data?
 
-    var ackIds: [UInt32]? {
-        pkt.pointee.ack_ids.map {
-            Array(UnsafeBufferPointer(start: $0, count: pkt.pointee.ack_ids_len))
-        }
-    }
+    let ackIds: [UInt32]?
 
-    var ackRemoteSessionId: Data? {
-        pkt.pointee.payload.map {
-            Data(bytesNoCopy: $0, count: pkt.pointee.payload_len, deallocator: .none)
-        }
-    }
+    let ackRemoteSessionId: Data?
 
     init(
         code: CPacketCode, key: UInt8, packetId: UInt32,
         sessionId: Data, payload: Data?,
         ackIds: [UInt32]?, ackRemoteSessionId: Data?
     ) {
-        pkt = ctrl_pkt_create(
+        let pkt = ctrl_pkt_create(
             code.native,
             key,
             packetId,
@@ -84,6 +64,19 @@ final class CControlPacket {
             ackIds?.count ?? 0,
             ackRemoteSessionId.map { [UInt8]($0) } ?? nil
         )
+
+        self.pkt = pkt
+        self.code = code
+        self.sessionId = Data(bytesNoCopy: pkt.pointee.session_id, count: _PartoutOpenVPNOpenSSL_C.PacketSessionIdLength, deallocator: .none)
+        self.payload = pkt.pointee.payload.map {
+            Data(bytesNoCopy: $0, count: pkt.pointee.payload_len, deallocator: .none)
+        }
+        self.ackIds = pkt.pointee.ack_ids.map {
+            Array(UnsafeBufferPointer(start: $0, count: pkt.pointee.ack_ids_len))
+        }
+        self.ackRemoteSessionId = pkt.pointee.payload.map {
+            Data(bytesNoCopy: $0, count: pkt.pointee.payload_len, deallocator: .none)
+        }
     }
 
     convenience init(

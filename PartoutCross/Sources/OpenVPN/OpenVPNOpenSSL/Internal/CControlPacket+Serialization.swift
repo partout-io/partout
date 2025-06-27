@@ -97,7 +97,7 @@ private extension CControlPacket {
             var enc_error = CryptoErrorNone
             let written = function(dst.bytePointer, pkt, &alg, &enc_error)
             guard written > 0 else {
-                // FIXME: ##, map crypto_error_code to CryptoError
+                // FIXME: ###, map crypto_error_code to CryptoError
 //                throw CryptoError(enc_error)
                 throw CryptoError.encryption
             }
