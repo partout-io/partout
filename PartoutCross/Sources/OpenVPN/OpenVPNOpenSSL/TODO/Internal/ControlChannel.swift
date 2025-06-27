@@ -174,8 +174,8 @@ extension ControlChannel {
             let packet = ControlPacket(
                 code: code,
                 key: key,
-                packetId: currentPacketId.outbound,
                 sessionId: sessionId,
+                packetId: currentPacketId.outbound,
                 payload: subPayloadData,
                 ackIds: nil,
                 ackRemoteSessionId: nil
