@@ -52,7 +52,7 @@ extension OpenVPNErrorCode: CustomDebugStringConvertible {
     }
 }
 
-// FIXME: ##, C errors
+// FIXME: ###, map C errors to OpenVPNErrorCode
 extension Error {
     var asNativeOpenVPNError: Error? {
         fatalError()
