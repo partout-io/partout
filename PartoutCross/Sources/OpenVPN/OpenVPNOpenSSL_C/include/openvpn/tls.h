@@ -25,8 +25,10 @@
 
 #pragma once
 
+#include <openssl/ssl.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include "crypto/zeroing_data.h"
 
 typedef enum {
     TLSErrorNone,
