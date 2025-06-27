@@ -26,6 +26,8 @@
 #if canImport(PartoutAPI)
 
 import Foundation
+import PartoutAPI
+import PartoutPlatform
 
 extension API.V6.Mapper {
     public convenience init(
@@ -39,10 +41,33 @@ extension API.V6.Mapper {
                 resultURL: $0,
                 cache: $1,
                 timeout: $2,
-                engine: Partout.platform.newAPIScriptingEngine(ctx)
+                engine: newAPIScriptingEngine(ctx)
             )
         }
     }
 }
+
+#if canImport(_PartoutPlatformApple)
+
+private func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine {
+    AppleJavaScriptEngine(ctx)
+}
+
+extension AppleJavaScriptEngine: APIScriptingEngine {
+    public func inject(from vm: APIEngine.VirtualMachine) {
+        inject("getText", object: vm.getText as @convention(block) (String) -> Any?)
+        inject("getJSON", object: vm.getJSON as @convention(block) (String) -> Any?)
+        inject("jsonToBase64", object: vm.jsonToBase64 as @convention(block) (Any) -> String?)
+        inject("ipV4ToBase64", object: vm.ipV4ToBase64 as @convention(block) (String) -> String?)
+        inject("openVPNTLSWrap", object: vm.openVPNTLSWrap as @convention(block) (String, String) -> [String: Any]?)
+        inject("debug", object: vm.debug as @convention(block) (String) -> Void)
+    }
+}
+
+#else
+
+// TODO: ###, APIScriptingEngine on non-Apple
+
+#endif
 
 #endif

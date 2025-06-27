@@ -1,8 +1,8 @@
 //
-//  Partout.swift
+//  Exports.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 3/29/24.
+//  Created by Davide De Rosa on 6/27/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,33 +23,30 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
+import PartoutCore
 
-// MARK: Core
+#if canImport(_PartoutPlatformAndroid)
+@_exported import _PartoutPlatformAndroid
+#endif
 
-@_exported import PartoutCore
+#if canImport(_PartoutPlatformApple)
+@_exported import _PartoutPlatformApple
+#endif
 
-// MARK: - Providers
+#if canImport(_PartoutPlatformAppleNE)
+@_exported import _PartoutPlatformAppleNE
+#endif
 
-@_exported import PartoutProviders
+#if canImport(_PartoutPlatformWindows)
+@_exported import _PartoutPlatformWindows
+#endif
 
-extension PartoutError.Code.Providers {
-
-    /// A provider module is corrupt.
-    public static let corruptProviderModule = PartoutError.Code("corruptProviderModule")
+extension Partout {
+#if canImport(_PartoutPlatformApple)
+    public static nonisolated let platform: PlatformFactory = ApplePlatformFactory()
+#elseif canImport(_PartoutPlatformWindows)
+    public static nonisolated let platform: PlatformFactory = WindowsPlatformFactory()
+#else
+    public static nonisolated let platform: PlatformFactory = UnsupportedPlatformFactory.shared
+#endif
 }
-
-// MARK: - API
-
-#if canImport(PartoutAPI)
-@_exported import PartoutAPI
-#endif
-
-// MARK: - Modules
-
-#if canImport(_PartoutOpenVPN)
-@_exported import _PartoutOpenVPNCore
-#endif
-#if canImport(_PartoutWireGuard)
-@_exported import _PartoutWireGuardCore
-#endif
