@@ -1,5 +1,5 @@
 //
-//  ObfuscatorStreamTests.swift
+//  PacketProcessorStreamTests.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 7/7/18.
@@ -26,7 +26,7 @@
 @testable internal import _PartoutOpenVPNOpenSSL_Cross
 import XCTest
 
-final class ObfuscatorStreamTests: XCTestCase {
+final class PacketProcessorStreamTests: XCTestCase {
     func test_givenStream_whenHandlePackets_thenIsReassembled() {
         var bytes: [UInt8] = []
         var until: Int = 0
@@ -110,7 +110,7 @@ final class ObfuscatorStreamTests: XCTestCase {
 
 // MARK: - Helpers
 
-private extension ObfuscatorStreamTests {
+private extension PacketProcessorStreamTests {
     func stream(from bytes: [UInt8], until: inout Int) -> [Data] {
         PacketProcessor(method: nil)
             .packets(fromStream: Data(bytes), until: &until)
