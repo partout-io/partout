@@ -51,6 +51,7 @@ enum OpenVPNErrorCode: Int {
     case dataPathOverflow            = 301
     case dataPathPeerIdMismatch      = 302
     case dataPathCompression         = 303
+    case unknown                     = 999
 }
 
 extension OpenVPNErrorCode: CustomDebugStringConvertible {
