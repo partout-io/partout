@@ -110,7 +110,10 @@ if areas.contains(.openvpn) {
             .testTarget(
                 name: "_PartoutOpenVPNOpenSSL_CrossTests",
                 dependencies: [.target(name: mainUmbrella)],
-                path: "Tests/OpenVPN/OpenVPNOpenSSL"
+                path: "Tests/OpenVPN/OpenVPNOpenSSL",
+                resources: [
+                    .process("Resources")
+                ]
             )
         ])
     }

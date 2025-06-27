@@ -31,7 +31,7 @@ extension CZeroingData {
     }
 
     public static func forHMAC() -> CZeroingData {
-        CZeroingData(length: key_hmac_buf_len)
+        CZeroingData(ptr: key_hmac_create())
     }
 
     public func hmac(
@@ -47,7 +47,7 @@ extension CZeroingData {
                 data: data.ptr
             )
         }
-        let hmacLength = key_hmac(&ctx);
+        let hmacLength = key_hmac_do(&ctx);
         guard hmacLength > 0 else {
             throw CryptoError.hmac
         }

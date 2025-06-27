@@ -72,7 +72,7 @@ public final class StandardOpenVPNParser {
     }
 
     /// The decrypter for private keys.
-    private let decrypter: PrivateKeyDecrypter?
+    private let decrypter: KeyDecrypter?
 
     private let rxOptions: [(option: Option, rx: NSRegularExpression)] = Option.allCases.compactMap {
         do {
@@ -84,7 +84,7 @@ public final class StandardOpenVPNParser {
         }
     }
 
-    public init(decrypter: PrivateKeyDecrypter? = nil) {
+    public init(decrypter: KeyDecrypter? = nil) {
         self.decrypter = decrypter ?? OSSLTLSBox()
     }
 

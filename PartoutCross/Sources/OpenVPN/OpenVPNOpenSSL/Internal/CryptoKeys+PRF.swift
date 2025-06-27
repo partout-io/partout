@@ -109,14 +109,13 @@ private extension CryptoKeys {
         let secret1 = input.secret.withOffset(0, length: lenx)
         let secret2 = input.secret.withOffset(len, length: lenx)
 
-        let hash1 = try keysHash("md5", secret1, seed, input.size)
-        let hash2 = try keysHash("sha1", secret2, seed, input.size)
+        let hash1 = try keysHash("MD5", secret1, seed, input.size)
+        let hash2 = try keysHash("SHA1", secret2, seed, input.size)
 
         let prf = CZ()
         for i in 0..<hash1.length {
             let h1 = hash1.bytes[i]
             let h2 = hash2.bytes[i]
-
             prf.append(CZ(h1 ^ h2))
         }
         return prf

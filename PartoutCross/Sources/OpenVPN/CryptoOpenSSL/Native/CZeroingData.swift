@@ -29,7 +29,7 @@ import Foundation
 public final class CZeroingData {
     let ptr: UnsafeMutablePointer<zeroing_data_t>
 
-    private init(ptr: UnsafeMutablePointer<zeroing_data_t>) {
+    init(ptr: UnsafeMutablePointer<zeroing_data_t>) {
         self.ptr = ptr
     }
 

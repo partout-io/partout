@@ -477,43 +477,43 @@ static BIO *create_BIO_from_PEM(NSString *pem) {
     return isValid;
 }
 
-#pragma mark PrivateKeyDecrypter
+#pragma mark KeyDecrypter
 
-- (NSString *)decryptedPrivateKeyFromPath:(NSString *)path passphrase:(NSString *)passphrase error:(NSError * _Nullable __autoreleasing *)error
+- (NSString *)decryptedKeyFromPath:(NSString *)path passphrase:(NSString *)passphrase error:(NSError * _Nullable __autoreleasing *)error
 {
     BIO *bio;
     if (!(bio = BIO_new_file([path cStringUsingEncoding:NSASCIIStringEncoding], "r"))) {
         return NULL;
     }
-    NSString *ret = [self decryptedPrivateKeyFromBIO:bio passphrase:passphrase error:error];
+    NSString *ret = [self decryptedKeyFromBIO:bio passphrase:passphrase error:error];
     BIO_free(bio);
     return ret;
 }
 
-- (NSString *)decryptedPrivateKeyFromPEM:(NSString *)pem passphrase:(NSString *)passphrase error:(NSError * _Nullable __autoreleasing *)error
+- (NSString *)decryptedKeyFromPEM:(NSString *)pem passphrase:(NSString *)passphrase error:(NSError * _Nullable __autoreleasing *)error
 {
     BIO *bio;
     if (!(bio = BIO_new_mem_buf([pem cStringUsingEncoding:NSASCIIStringEncoding], (int)[pem length]))) {
         return NULL;
     }
-    NSString *ret = [self decryptedPrivateKeyFromBIO:bio passphrase:passphrase error:error];
+    NSString *ret = [self decryptedKeyFromBIO:bio passphrase:passphrase error:error];
     BIO_free(bio);
     return ret;
 }
 
-- (NSString *)decryptedPrivateKeyFromBIO:(BIO *)bio passphrase:(NSString *)passphrase error:(NSError * _Nullable __autoreleasing *)error
+- (NSString *)decryptedKeyFromBIO:(BIO *)bio passphrase:(NSString *)passphrase error:(NSError * _Nullable __autoreleasing *)error
 {
     EVP_PKEY *evpKey;
     if (!(evpKey = PEM_read_bio_PrivateKey(bio, NULL, NULL, (void *)passphrase.UTF8String))) {
         return NULL;
     }
 
-    NSString *ret = [self decryptedKeyFromPrivateKey:evpKey error:error];
+    NSString *ret = [self decryptedKeyFromKey:evpKey error:error];
     EVP_PKEY_free(evpKey);
     return ret;
 }
 
-- (NSString *)decryptedKeyFromPrivateKey:(EVP_PKEY *)evpKey error:(NSError * _Nullable __autoreleasing *)error
+- (NSString *)decryptedKeyFromKey:(EVP_PKEY *)evpKey error:(NSError * _Nullable __autoreleasing *)error
 {
     BIO *output = BIO_new(BIO_s_mem());
     if (!PEM_write_bio_PrivateKey(output, evpKey, NULL, NULL, 0, NULL, NULL)) {
