@@ -33,7 +33,7 @@ extension Data {
             bytesNoCopy: zd.pointee.bytes,
             count: count,
             deallocator: .custom { ptr, count in
-                bzero(ptr, count)
+                pp_zero(ptr, count)
                 free(ptr)
             }
         )
