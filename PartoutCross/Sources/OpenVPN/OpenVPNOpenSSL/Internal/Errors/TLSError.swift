@@ -25,6 +25,9 @@
 
 internal import _PartoutOpenVPNOpenSSL_C
 
+// FIXME: ###
+typealias tls_error_code = Int
+
 struct CTLSError: Error {
     let code: tls_error_code
 

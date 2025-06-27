@@ -84,14 +84,6 @@ private extension OpenVPNSessionError {
                     assertionFailure("Data path error with unknown error code: \(dpError.code)")
                 }
             }
-            // CTLSError
-            // FIXME: ###, map CTLSError
-            else if let tlsError = rawError as? CTLSError {
-                switch tlsError.code {
-                default:
-                    fatalError()
-                }
-            }
             return .unknown
         }()
         self = .internal(code)
