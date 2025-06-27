@@ -25,7 +25,9 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
+#include "crypto/crypto.h"
 #include "openvpn/packet.h"
 
 typedef struct {

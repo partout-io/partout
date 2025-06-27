@@ -23,7 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "crypto/endian.h"
+#include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include "crypto/allocation.h"
 #include "openvpn/obf.h"
 #include "openvpn/pkt_proc.h"
 
