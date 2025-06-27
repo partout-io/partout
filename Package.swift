@@ -124,9 +124,6 @@ package.targets.append(contentsOf: [
                 "PartoutPlatform",
                 "PartoutProviders"
             ]
-            if areas.contains(.api) {
-                dependencies.append("PartoutAPI")
-            }
             if areas.contains(.openvpn) {
                 dependencies.append("_PartoutOpenVPNCore")
             }
@@ -139,7 +136,13 @@ package.targets.append(contentsOf: [
     ),
     .target(
         name: "PartoutPlatform",
-        dependencies: OS.current.dependencies,
+        dependencies: {
+            var dependencies = OS.current.dependencies
+            if areas.contains(.api) {
+                dependencies.append("PartoutAPI")
+            }
+            return dependencies
+        }(),
         path: "Sources/Platforms/Wrapper"
     ),
     .testTarget(
