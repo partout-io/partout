@@ -50,7 +50,7 @@ extension DataPathWrapper {
     static func native(with parameters: Parameters, keys: CryptoKeys) throws -> DataPathWrapper {
         print("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)");
 
-        let mode: UnsafeMutablePointer<dp_mode_t>
+        let mode: UnsafeMutablePointer<dp_mode_t>?
         let cipherAlgorithm = parameters.cipher?.rawValue.uppercased()
         let digestAlgorithm = parameters.digest?.rawValue.uppercased()
         let keysBridge = CryptoKeysBridge(keys: keys)
@@ -94,6 +94,10 @@ extension DataPathWrapper {
             }
         }
 
+        guard let mode else {
+            throw DataPathError.creation
+        }
+
         // the encryption keys must match the cipher/digest
         let crypto = mode.pointee.crypto.assumingMemoryBound(to: crypto_t.self)
         let cipherKeyLength = crypto.pointee.meta.cipher_key_len
@@ -107,20 +111,19 @@ extension DataPathWrapper {
             assert(digest.encryptionKey.length >= hmacKeyLength)
             assert(digest.decryptionKey.length >= hmacKeyLength)
         }
-
-        return try cNative(with: mode, peerId: parameters.peerId)
+        return cNative(with: mode, peerId: parameters.peerId)
     }
 }
 
 extension DataPathWrapper {
-    static func nativeADMock(with framing: OpenVPN.CompressionFraming) throws -> DataPathWrapper {
+    static func nativeADMock(with framing: OpenVPN.CompressionFraming) -> DataPathWrapper {
         let mode = dp_mode_ad_create_mock(framing.cNative)
-        return try cNative(with: mode, peerId: nil)
+        return cNative(with: mode, peerId: nil)
     }
 
-    static func nativeHMACMock(with framing: OpenVPN.CompressionFraming) throws -> DataPathWrapper {
+    static func nativeHMACMock(with framing: OpenVPN.CompressionFraming) -> DataPathWrapper {
         let mode = dp_mode_hmac_create_mock(framing.cNative)
-        return try cNative(with: mode, peerId: nil)
+        return cNative(with: mode, peerId: nil)
     }
 }
 
@@ -128,7 +131,7 @@ private extension DataPathWrapper {
     static func cNative(
         with mode: UnsafeMutablePointer<dp_mode_t>,
         peerId: UInt32?
-    ) throws -> DataPathWrapper {
+    ) -> DataPathWrapper {
         let dataPath = CDataPath(mode: mode, peerId: peerId ?? PacketPeerIdDisabled)
         return DataPathWrapper(dataPath: dataPath)
     }

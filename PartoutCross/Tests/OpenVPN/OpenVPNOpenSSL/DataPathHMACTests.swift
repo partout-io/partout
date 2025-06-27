@@ -89,7 +89,7 @@ extension DataPathHMACTests {
 
 private extension DataPathHMACTests {
     func private_test_givenHMAC_whenEncryptMock_thenDecrypts(_ framing: OpenVPN.CompressionFraming) throws {
-        let sut = try DataPathWrapper.nativeHMACMock(with: framing).dataPath
+        let sut = DataPathWrapper.nativeHMACMock(with: framing).dataPath
         try testReversibleEncryption(sut: sut, payload: payload)
         try testReversibleCompoundEncryption(sut: sut, payload: payload)
         try testReversibleBulkEncryption(sut: sut)

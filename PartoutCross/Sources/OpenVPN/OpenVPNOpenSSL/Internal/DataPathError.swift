@@ -27,6 +27,8 @@ internal import _PartoutCryptoOpenSSL_Cross
 internal import _PartoutOpenVPNOpenSSL_C
 
 enum DataPathError: Error {
+    case creation
+
     case algorithm
 
     case peerIdMismatch
