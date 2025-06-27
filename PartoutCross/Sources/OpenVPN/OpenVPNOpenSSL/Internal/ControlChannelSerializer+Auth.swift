@@ -89,11 +89,11 @@ extension ControlChannel {
         func reset() {
         }
 
-        func serialize(packet: ControlPacket) throws -> Data {
+        func serialize(packet: CControlPacket) throws -> Data {
             return try serialize(packet: packet, timestamp: timestamp)
         }
 
-        func serialize(packet: ControlPacket, timestamp: UInt32) throws -> Data {
+        func serialize(packet: CControlPacket, timestamp: UInt32) throws -> Data {
             let data = try withUnsafeMutablePointer(to: &cbc.pointee.crypto) {
                 try packet.serialized(
                     withAuthenticator: $0,
@@ -106,7 +106,7 @@ extension ControlChannel {
         }
 
         // XXX: start/end are ignored, parses whole packet
-        func deserialize(data packet: Data, start: Int, end: Int?) throws -> ControlPacket {
+        func deserialize(data packet: Data, start: Int, end: Int?) throws -> CControlPacket {
             let end = packet.count
 
             // data starts with (prefix=(header + sessionId) + auth=(hmac + replayId))

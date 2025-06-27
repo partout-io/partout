@@ -40,11 +40,11 @@ extension ControlChannel {
         func reset() {
         }
 
-        func serialize(packet: ControlPacket) throws -> Data {
+        func serialize(packet: CControlPacket) throws -> Data {
             return packet.serialized()
         }
 
-        func deserialize(data packet: Data, start: Int, end: Int?) throws -> ControlPacket {
+        func deserialize(data packet: Data, start: Int, end: Int?) throws -> CControlPacket {
             var offset = start
             let end = end ?? packet.count
 
@@ -52,7 +52,7 @@ extension ControlChannel {
                 throw OpenVPNSessionError.controlChannel(message: "Missing opcode")
             }
             let codeValue = packet[offset] >> 3
-            guard let code = PacketCode(rawValue: codeValue) else {
+            guard let code = CPacketCode(rawValue: codeValue) else {
                 throw OpenVPNSessionError.controlChannel(message: "Unknown code: \(codeValue))")
             }
             let key = packet[offset] & 0b111
@@ -102,7 +102,7 @@ extension ControlChannel {
                 guard let ackRemoteSessionId = ackRemoteSessionId else {
                     throw OpenVPNSessionError.controlChannel(message: "Ack packet without remoteSessionId")
                 }
-                return ControlPacket(
+                return CControlPacket(
                     key: key,
                     sessionId: sessionId,
                     ackIds: ackIds,
@@ -121,7 +121,7 @@ extension ControlChannel {
                 payload = packet.subdata(in: offset..<end)
             }
 
-            return ControlPacket(
+            return CControlPacket(
                 code: code,
                 key: key,
                 packetId: packetId,

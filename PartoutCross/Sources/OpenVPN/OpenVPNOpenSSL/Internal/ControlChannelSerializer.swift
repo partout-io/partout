@@ -32,7 +32,7 @@ enum ControlChannel {
 protocol ControlChannelSerializer {
     func reset()
 
-    func serialize(packet: ControlPacket) throws -> Data
+    func serialize(packet: CControlPacket) throws -> Data
 
-    func deserialize(data: Data, start: Int, end: Int?) throws -> ControlPacket
+    func deserialize(data: Data, start: Int, end: Int?) throws -> CControlPacket
 }

@@ -23,6 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if canImport(_PartoutOpenVPNOpenSSL_ObjC)
+internal import _PartoutOpenVPNOpenSSL_ObjC
+#else
 protocol PacketProtocol {
     var packetId: UInt32 { get }
 }
@@ -32,3 +35,4 @@ extension PacketProtocol {
         lhs.packetId < rhs.packetId
     }
 }
+#endif

@@ -1,5 +1,5 @@
 //
-//  ControlPacket.swift
+//  CControlPacket.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/15/25.
@@ -27,11 +27,11 @@ internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 import PartoutCore
 
-final class ControlPacket: PacketProtocol {
+final class CControlPacket {
     let pkt: UnsafeMutablePointer<ctrl_pkt_t>
 
-    var code: PacketCode {
-        guard let code = PacketCode(rawValue: UInt8(pkt.pointee.code.rawValue)) else {
+    var code: CPacketCode {
+        guard let code = CPacketCode(rawValue: UInt8(pkt.pointee.code.rawValue)) else {
             assertionFailure("Unmapped packet code: \(pkt.pointee.code.rawValue)")
             return .unknown
         }
@@ -47,7 +47,7 @@ final class ControlPacket: PacketProtocol {
     }
 
     var sessionId: Data {
-        Data(bytesNoCopy: pkt.pointee.session_id, count: PacketSessionIdLength, deallocator: .none)
+        Data(bytesNoCopy: pkt.pointee.session_id, count: _PartoutOpenVPNOpenSSL_C.PacketSessionIdLength, deallocator: .none)
     }
 
     var payload: Data? {
@@ -69,7 +69,7 @@ final class ControlPacket: PacketProtocol {
     }
 
     init(
-        code: PacketCode, key: UInt8, packetId: UInt32,
+        code: CPacketCode, key: UInt8, packetId: UInt32,
         sessionId: Data, payload: Data?,
         ackIds: [UInt32]?, ackRemoteSessionId: Data?
     ) {
@@ -112,7 +112,7 @@ final class ControlPacket: PacketProtocol {
     }
 }
 
-extension ControlPacket: SensitiveDebugStringConvertible {
+extension CControlPacket: SensitiveDebugStringConvertible {
     func debugDescription(withSensitiveData: Bool) -> String {
         var msg: [String] = ["\(code) | \(key)"]
         msg.append("sid: \(sessionId.toHex())")

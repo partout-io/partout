@@ -42,8 +42,8 @@ final class ControlPacketTests: XCTestCase {
         let serialized = ControlPacket(
             code: code,
             key: key,
-            packetId: id,
             sessionId: sessionId,
+            packetId: id,
             payload: payload,
             ackIds: nil,
             ackRemoteSessionId: nil
@@ -62,7 +62,12 @@ final class ControlPacketTests: XCTestCase {
         let sessionId = Data(hex: "1122334455667788")
         let remoteSessionId = Data(hex: "a639328cbf03490e")
 
-        let serialized = ControlPacket(key: key, sessionId: sessionId, ackIds: acks, ackRemoteSessionId: remoteSessionId).serialized()
+#if canImport(_PartoutOpenVPNOpenSSL_ObjC)
+        let castAcks = acks as [NSNumber]
+#else
+        let castAcks = acks
+#endif
+        let serialized = ControlPacket(key: key, sessionId: sessionId, ackIds: castAcks, ackRemoteSessionId: remoteSessionId).serialized()
         let expected = Data(hex: "2b112233445566778805000000aa000000bb000000cc000000dd000000eea639328cbf03490e")
 
         print(serialized)

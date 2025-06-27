@@ -1,5 +1,5 @@
 //
-//  ControlPacket+Serialization.swift
+//  CControlPacket+Serialization.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/25/25.
@@ -27,7 +27,7 @@ internal import _PartoutCryptoOpenSSL_Cross
 internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 
-extension ControlPacket {
+extension CControlPacket {
     func serialized() -> Data {
         let capacity = ctrl_pkt_capacity(pkt)
         var dst = Data(count: capacity)
@@ -74,7 +74,7 @@ extension ControlPacket {
     }
 }
 
-private extension ControlPacket {
+private extension CControlPacket {
     typealias SerializationFunction = (
         _ dst: UnsafeMutablePointer<UInt8>,
         _ pkt: UnsafePointer<ctrl_pkt_t>,
