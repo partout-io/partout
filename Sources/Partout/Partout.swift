@@ -29,34 +29,6 @@ import Foundation
 
 @_exported import PartoutCore
 
-// MARK: - Platforms
-
-#if canImport(_PartoutPlatformAndroid)
-@_exported import _PartoutPlatformAndroid
-#endif
-
-#if canImport(_PartoutPlatformApple)
-@_exported import _PartoutPlatformApple
-#endif
-
-#if canImport(_PartoutPlatformAppleNE)
-@_exported import _PartoutPlatformAppleNE
-#endif
-
-#if canImport(_PartoutPlatformWindows)
-@_exported import _PartoutPlatformWindows
-#endif
-
-extension Partout {
-#if canImport(_PartoutPlatformApple)
-    public static nonisolated let platform: PlatformFactory = ApplePlatformFactory()
-#elseif canImport(_PartoutPlatformWindows)
-    public static nonisolated let platform: PlatformFactory = WindowsPlatformFactory()
-#else
-    public static nonisolated let platform: PlatformFactory = UnsupportedPlatformFactory.shared
-#endif
-}
-
 // MARK: - Providers
 
 @_exported import PartoutProviders

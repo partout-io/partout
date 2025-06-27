@@ -49,6 +49,7 @@ public struct ApplePlatformFactory: PlatformFactory {
 }
 
 #if canImport(PartoutAPI)
+import PartoutAPI
 
 extension ApplePlatformFactory {
     public func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine {

@@ -1,8 +1,8 @@
 //
-//  PlatformFactory.swift
+//  Exports.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/20/25.
+//  Created by Davide De Rosa on 6/27/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,17 +23,30 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
 import PartoutCore
 
-public protocol PlatformFactory {
-    func newPRNG(_ ctx: PartoutLoggerContext) -> PRNGProtocol
+#if canImport(_PartoutPlatformAndroid)
+@_exported import _PartoutPlatformAndroid
+#endif
 
-    func newDNSResolver(_ ctx: PartoutLoggerContext) -> DNSResolver
+#if canImport(_PartoutPlatformApple)
+@_exported import _PartoutPlatformApple
+#endif
 
-    func newScriptingEngine(_ ctx: PartoutLoggerContext) -> ScriptingEngine
+#if canImport(_PartoutPlatformAppleNE)
+@_exported import _PartoutPlatformAppleNE
+#endif
 
-#if canImport(PartoutAPI)
-    func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine
+#if canImport(_PartoutPlatformWindows)
+@_exported import _PartoutPlatformWindows
+#endif
+
+extension Partout {
+#if canImport(_PartoutPlatformApple)
+    public static nonisolated let platform: PlatformFactory = ApplePlatformFactory()
+#elseif canImport(_PartoutPlatformWindows)
+    public static nonisolated let platform: PlatformFactory = WindowsPlatformFactory()
+#else
+    public static nonisolated let platform: PlatformFactory = UnsupportedPlatformFactory.shared
 #endif
 }

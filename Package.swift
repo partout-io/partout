@@ -106,6 +106,10 @@ let package = Package(
             targets: ["PartoutCoreWrapper"]
         ),
         .library(
+            name: "PartoutPlatform",
+            targets: ["PartoutPlatform"]
+        ),
+        .library(
             name: "PartoutProviders",
             targets: ["PartoutProviders"]
         )
@@ -116,8 +120,10 @@ package.targets.append(contentsOf: [
     .target(
         name: "Partout",
         dependencies: {
-            var dependencies: [Target.Dependency] = ["PartoutProviders"]
-            dependencies.append(contentsOf: OS.current.dependencies)
+            var dependencies: [Target.Dependency] = [
+                "PartoutPlatform",
+                "PartoutProviders"
+            ]
             if areas.contains(.api) {
                 dependencies.append("PartoutAPI")
             }
@@ -130,6 +136,11 @@ package.targets.append(contentsOf: [
             return dependencies
         }(),
         path: "Sources/Partout"
+    ),
+    .target(
+        name: "PartoutPlatform",
+        dependencies: OS.current.dependencies,
+        path: "Sources/Platforms/Wrapper"
     ),
     .testTarget(
         name: "PartoutTests",

@@ -1,5 +1,5 @@
 //
-//  APIV6Mapper+Platform.swift
+//  UnsupportedPlatformFactory.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 4/20/25.
@@ -23,26 +23,36 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(PartoutAPI)
-
 import Foundation
-import PartoutPlatform
+import PartoutCore
 
-extension API.V6.Mapper {
-    public convenience init(
-        _ ctx: PartoutLoggerContext,
-        baseURL: URL,
-        infrastructureURL: ((ProviderID) -> URL)? = nil
-    ) {
-        self.init(ctx, baseURL: baseURL, infrastructureURL: infrastructureURL) {
-            API.V6.DefaultScriptExecutor(
-                ctx,
-                resultURL: $0,
-                cache: $1,
-                timeout: $2,
-                engine: Partout.platform.newAPIScriptingEngine(ctx)
-            )
-        }
+struct UnsupportedPlatformFactory: PlatformFactory {
+    static let shared = UnsupportedPlatformFactory()
+
+    private let message = "Unsupported implementation on this platform"
+
+    private init() {
+    }
+
+    func newPRNG(_ ctx: PartoutLoggerContext) -> PRNGProtocol {
+        fatalError("newPRNG: \(message)")
+    }
+
+    func newDNSResolver(_ ctx: PartoutLoggerContext) -> DNSResolver {
+        fatalError("newDNSResolver: \(message)")
+    }
+
+    func newScriptingEngine(_ ctx: PartoutLoggerContext) -> ScriptingEngine {
+        fatalError("newScriptingEngine: \(message)")
+    }
+}
+
+#if canImport(PartoutAPI)
+import PartoutAPI
+
+extension UnsupportedPlatformFactory {
+    public func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine {
+        fatalError("newAPIScriptingEngine: \(message)")
     }
 }
 

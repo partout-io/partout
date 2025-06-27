@@ -1,8 +1,8 @@
 //
-//  UnsupportedPlatformFactory.swift
+//  PlatformFactory+Windows.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/20/25.
+//  Created by Davide De Rosa on 4/16/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,36 +23,38 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if canImport(_PartoutPlatformWindows)
+
+import _PartoutPlatformWindows
 import Foundation
 import PartoutCore
 
-struct UnsupportedPlatformFactory: PlatformFactory {
-    static let shared = UnsupportedPlatformFactory()
-
-    private let message = "Unsupported implementation on this platform"
-
-    private init() {
+public struct WindowsPlatformFactory: PlatformFactory {
+    init() {
     }
 
-    func newPRNG(_ ctx: PartoutLoggerContext) -> PRNGProtocol {
-        fatalError("newPRNG: \(message)")
+    public func newPRNG(_ ctx: PartoutLoggerContext) -> PRNGProtocol {
+        SimplePRNG()
     }
 
-    func newDNSResolver(_ ctx: PartoutLoggerContext) -> DNSResolver {
-        fatalError("newDNSResolver: \(message)")
+    public func newDNSResolver(_ ctx: PartoutLoggerContext) -> DNSResolver {
+        UnsupportedPlatformFactory.shared.newDNSResolver()
     }
 
-    func newScriptingEngine(_ ctx: PartoutLoggerContext) -> ScriptingEngine {
-        fatalError("newScriptingEngine: \(message)")
+    public func newScriptingEngine(_ ctx: PartoutLoggerContext) -> ScriptingEngine {
+        UnsupportedPlatformFactory.shared.newScriptingEngine()
     }
 }
 
 #if canImport(PartoutAPI)
+import PartoutAPI
 
-extension UnsupportedPlatformFactory {
+extension WindowsPlatformFactory {
     public func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine {
-        fatalError("newAPIScriptingEngine: \(message)")
+        UnsupportedPlatformFactory.shared.newAPIScriptingEngine()
     }
 }
+
+#endif
 
 #endif
