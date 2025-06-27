@@ -29,6 +29,6 @@ typealias TLSFactory = @Sendable (TLSWrapper.Parameters) throws -> TLSProtocol
 
 typealias DataPathFactory = @Sendable (
     DataPathWrapper.Parameters,
-    DataPathWrapper.PRF,
+    CryptoKeys.PRF,
     PRNGProtocol
 ) throws -> DataPathProtocol

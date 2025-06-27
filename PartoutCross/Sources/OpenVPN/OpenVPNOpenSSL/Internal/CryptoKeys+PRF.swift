@@ -1,5 +1,5 @@
 //
-//  DataPathWrapper+Keys.swift
+//  CryptoKeys+PRF.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/20/25.
@@ -28,7 +28,7 @@ import _PartoutOpenVPNCore
 internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 
-extension DataPathWrapper {
+extension CryptoKeys {
     struct PRF {
         let handshake: Handshake
 
@@ -36,11 +36,9 @@ extension DataPathWrapper {
 
         let remoteSessionId: Data
     }
-}
 
-extension DataPathWrapper.Parameters {
-    func keys(with prf: DataPathWrapper.PRF) throws -> CryptoKeys {
-        let masterData = try prfData(with: PRFInput(
+    init(withPRF prf: PRF) throws {
+        let masterData = try Self.prfData(with: PRFInput(
             label: Constants.label1,
             secret: CZ(prf.handshake.preMaster),
             clientSeed: CZ(prf.handshake.random1),
@@ -49,7 +47,7 @@ extension DataPathWrapper.Parameters {
             serverSessionId: nil,
             size: Constants.preMasterLength
         ))
-        let keysData = try prfData(with: PRFInput(
+        let keysData = try Self.prfData(with: PRFInput(
             label: Constants.label2,
             secret: masterData,
             clientSeed: CZ(prf.handshake.random2),
@@ -64,7 +62,7 @@ extension DataPathWrapper.Parameters {
             let offset = $0 * Constants.keyLength
             return keysData.withOffset(offset, length: Constants.keyLength)
         }
-        return CryptoKeys(
+        self.init(
             cipher: CryptoKeys.KeyPair(
                 encryptionKey: keysArray[0],
                 decryptionKey: keysArray[2]
@@ -95,8 +93,8 @@ private struct PRFInput {
     let size: Int
 }
 
-private extension DataPathWrapper.Parameters {
-    func prfData(with input: PRFInput) throws -> CZeroingData {
+private extension CryptoKeys {
+    static func prfData(with input: PRFInput) throws -> CZeroingData {
         let seed = CZ(input.label, nullTerminated: false)
         seed.append(input.clientSeed)
         seed.append(input.serverSeed)
@@ -124,7 +122,7 @@ private extension DataPathWrapper.Parameters {
         return prf
     }
 
-    func keysHash(_ digestName: String, _ secret: CZeroingData, _ seed: CZeroingData, _ size: Int) throws -> CZeroingData {
+    static func keysHash(_ digestName: String, _ secret: CZeroingData, _ seed: CZeroingData, _ size: Int) throws -> CZeroingData {
         let out = CZ()
         let buffer = CZeroingData.forHMAC()
         var chain = try buffer.hmac(with: digestName, secret: secret, data: seed)

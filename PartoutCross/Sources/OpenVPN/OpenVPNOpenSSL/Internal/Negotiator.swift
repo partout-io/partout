@@ -663,7 +663,7 @@ private extension Negotiator {
             compressionFraming: history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming,
             peerId: history.pushReply.options.peerId,
         )
-        let prf = DataPathWrapper.PRF(
+        let prf = CryptoKeys.PRF(
             handshake: handshake,
             sessionId: sessionId,
             remoteSessionId: remoteSessionId
