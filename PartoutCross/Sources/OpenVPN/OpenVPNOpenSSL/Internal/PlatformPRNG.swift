@@ -1,5 +1,5 @@
 //
-//  PRNGProtocol+Extensions.swift
+//  PlatformPRNG.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 1/14/25.
@@ -23,20 +23,22 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_Cross
+internal import _PartoutCryptoOpenSSL_C
 internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 import PartoutCore
 
-extension PRNGProtocol {
+final class PlatformPRNG: PRNGProtocol {
+    func uint32() -> UInt32 {
+        fatalError("Not supported")
+    }
 
-    // FIXME: ###, this method discard the underlying implementation completely
-    func safeData(length: Int) -> CZeroingData {
+    func data(length: Int) -> Data {
         precondition(length > 0)
-        let randomData = CZ(length: length)
-        guard prng_do(randomData.mutableBytes, length) else {
-            fatalError("random_do() failed")
+        let randomData = zd_create(length)
+        guard prng_do(randomData.pointee.bytes, length) else {
+            fatalError("prng_do() failed")
         }
-        return randomData
+        return Data(zeroing: randomData)
     }
 }

@@ -44,8 +44,8 @@ extension DataPathWrapper {
             fatalError("Legacy OSSLCryptoBox requires both cipher/digest")
         }
 
-        let seed = prng.safeData(length: PRNGSeedLength)
-        guard let cryptoBox = OSSLCryptoBox(seed: Z(seed.toData())) else {
+        let seed = prng.data(length: PRNGSeedLength)
+        guard let cryptoBox = OSSLCryptoBox(seed: Z(seed)) else {
             fatalError("Unable to create OSSLCryptoBox")
         }
         let keys = try CryptoKeys(withPRF: prf)

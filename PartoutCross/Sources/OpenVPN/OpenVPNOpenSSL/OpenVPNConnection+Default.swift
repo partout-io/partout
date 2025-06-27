@@ -32,7 +32,6 @@ extension OpenVPNConnection {
         _ ctx: PartoutLoggerContext,
         parameters: ConnectionParameters,
         module: OpenVPNModule,
-        prng: PRNGProtocol,
         dns: DNSResolver,
         cachesURL: URL,
         options: OpenVPN.ConnectionOptions = .init()
@@ -40,6 +39,8 @@ extension OpenVPNConnection {
         guard let configuration = module.configuration else {
             fatalError("Creating session without OpenVPN configuration?")
         }
+
+        let prng = PlatformPRNG()
 
         // native: Swift/C
         // legacy: Swift/ObjC

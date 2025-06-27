@@ -71,9 +71,9 @@ final class Authenticator {
 
     init(_ ctx: PartoutLoggerContext, prng: PRNGProtocol, _ username: String?, _ password: String?) {
         self.ctx = ctx
-        preMaster = prng.safeData(length: Constants.preMasterLength)
-        random1 = prng.safeData(length: Constants.randomLength)
-        random2 = prng.safeData(length: Constants.randomLength)
+        preMaster = CZ(prng.data(length: Constants.preMasterLength))
+        random1 = CZ(prng.data(length: Constants.randomLength))
+        random2 = CZ(prng.data(length: Constants.randomLength))
 
         // XXX: not 100% secure, can't erase input username/password
         if let username = username, let password = password {
