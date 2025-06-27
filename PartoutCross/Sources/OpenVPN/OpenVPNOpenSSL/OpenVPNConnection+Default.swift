@@ -40,6 +40,7 @@ extension OpenVPNConnection {
             fatalError("Creating session without OpenVPN configuration?")
         }
 
+        // TODO: ###, make it part of PartoutPlatform later
         let prng = PlatformPRNG()
 
         // native: Swift/C
