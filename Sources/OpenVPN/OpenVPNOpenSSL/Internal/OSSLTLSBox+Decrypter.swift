@@ -25,7 +25,7 @@
 
 internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
-import PartoutCore
+import _PartoutOpenVPNCore
 
-extension OSSLTLSBox: @retroactive PrivateKeyDecrypter {
+extension OSSLTLSBox: KeyDecrypter {
 }

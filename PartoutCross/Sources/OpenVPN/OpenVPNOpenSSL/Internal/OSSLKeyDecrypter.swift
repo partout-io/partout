@@ -1,5 +1,5 @@
 //
-//  OSSLPrivateKeyDecrypter.swift
+//  OSSLKeyDecrypter.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/27/25.
@@ -27,8 +27,8 @@ import _PartoutOpenVPNCore
 internal import _PartoutOpenVPNOpenSSL_C
 import PartoutCore
 
-final class OSSLPrivateKeyDecrypter: PrivateKeyDecrypter, Sendable {
-    func decryptedPrivateKey(fromPEM pem: String, passphrase: String) throws -> String {
+final class OSSLKeyDecrypter: KeyDecrypter, Sendable {
+    func decryptedKey(fromPEM pem: String, passphrase: String) throws -> String {
         let buf = pem.withCString { cPEM in
             passphrase.withCString { cPassphrase in
                 key_decrypted_from_pem(cPEM, passphrase)
@@ -43,7 +43,7 @@ final class OSSLPrivateKeyDecrypter: PrivateKeyDecrypter, Sendable {
         return str
     }
 
-    func decryptedPrivateKey(fromPath path: String, passphrase: String) throws -> String {
+    func decryptedKey(fromPath path: String, passphrase: String) throws -> String {
         let buf = path.withCString { cPath in
             passphrase.withCString { cPassphrase in
                 key_decrypted_from_path(cPath, passphrase)

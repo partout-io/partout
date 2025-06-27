@@ -1,5 +1,5 @@
 //
-//  PrivateKeyDecrypterTests.swift
+//  KeyDecrypterTests.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/27/25.
@@ -26,39 +26,39 @@
 @testable internal import _PartoutOpenVPNOpenSSL_Cross
 import XCTest
 
-final class PrivateKeyDecrypterTests: XCTestCase {
+final class KeyDecrypterTests: XCTestCase {
     func test_givenPKCS1_whenParse_thenFails() throws {
         let sut = newDecrypter()
         let path = try path(withName: "tunnelbear.enc.1.key")
-        XCTAssertThrowsError(try sut.decryptedPrivateKey(fromPath: path, passphrase: ""))
+        XCTAssertThrowsError(try sut.decryptedKey(fromPath: path, passphrase: ""))
     }
 
     func test_givenPKCS1_whenParseWithPassphrase_thenSucceeds() throws {
         let sut = newDecrypter()
         let expected = try String(contentsOfFile: path(withName: "tunnelbear.key"))
         let path = try path(withName: "tunnelbear.enc.1.key")
-        let pem = try sut.decryptedPrivateKey(fromPath: path, passphrase: "foobar")
+        let pem = try sut.decryptedKey(fromPath: path, passphrase: "foobar")
         XCTAssertEqual(pem, expected)
     }
 
     func test_givenPKCS8_whenParse_thenFails() throws {
         let sut = newDecrypter()
         let path = try path(withName: "tunnelbear.enc.8.key")
-        XCTAssertThrowsError(try sut.decryptedPrivateKey(fromPath: path, passphrase: ""))
+        XCTAssertThrowsError(try sut.decryptedKey(fromPath: path, passphrase: ""))
     }
 
     func test_givenPKCS8_whenParseWithPassphrase_thenSucceeds() throws {
         let sut = newDecrypter()
         let expected = try String(contentsOfFile: path(withName: "tunnelbear.key"))
         let path = try path(withName: "tunnelbear.enc.8.key")
-        let pem = try sut.decryptedPrivateKey(fromPath: path, passphrase: "foobar")
+        let pem = try sut.decryptedKey(fromPath: path, passphrase: "foobar")
         XCTAssertEqual(pem, expected)
     }
 }
 
-private extension PrivateKeyDecrypterTests {
-    func newDecrypter() -> OSSLPrivateKeyDecrypter {
-        OSSLPrivateKeyDecrypter()
+private extension KeyDecrypterTests {
+    func newDecrypter() -> OSSLKeyDecrypter {
+        OSSLKeyDecrypter()
     }
 
     func path(withName name: String) throws -> String {

@@ -1,5 +1,5 @@
 //
-//  PrivateKeyDecrypter.swift
+//  KeyDecrypter.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/27/25.
@@ -25,6 +25,6 @@
 
 import Foundation
 
-public protocol PrivateKeyDecrypter {
-    func decryptedPrivateKey(fromPEM pem: String, passphrase: String) throws -> String
+public protocol KeyDecrypter: Sendable {
+    func decryptedKey(fromPEM pem: String, passphrase: String) throws -> String
 }
