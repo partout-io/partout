@@ -1,5 +1,5 @@
 //
-//  PlatformFactory+Windows.swift
+//  PlatformFactory+Linux.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 4/16/25.
@@ -23,13 +23,13 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(_PartoutPlatformWindows)
+#if canImport(_PartoutPlatformLinux)
 
-import _PartoutPlatformWindows
+import _PartoutPlatformLinux
 import Foundation
 import PartoutCore
 
-public struct WindowsPlatformFactory: PlatformFactory {
+public struct LinuxPlatformFactory: PlatformFactory {
     init() {
     }
 
@@ -38,7 +38,9 @@ public struct WindowsPlatformFactory: PlatformFactory {
     }
 
     public func newDNSResolver(_ ctx: PartoutLoggerContext) -> DNSResolver {
-        UnsupportedPlatformFactory.shared.newDNSResolver(ctx)
+        SimpleDNSResolver {
+            POSIXDNSStrategy(hostname: $0)
+        }
     }
 
     public func newScriptingEngine(_ ctx: PartoutLoggerContext) -> ScriptingEngine {

@@ -66,7 +66,10 @@ extension AppleJavaScriptEngine: APIScriptingEngine {
 
 #else
 
-// TODO: ###, APIScriptingEngine on non-Apple
+private func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine {
+    // TODO: ###, APIScriptingEngine on non-Apple
+    fatalError("Unsupported platform")
+}
 
 #endif
 
