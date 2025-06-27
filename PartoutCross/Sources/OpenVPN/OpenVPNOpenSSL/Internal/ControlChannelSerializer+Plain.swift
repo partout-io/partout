@@ -1,5 +1,5 @@
 //
-//  ControlChannelSerializer.swift
+//  ControlChannelSerializer+Plain.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 9/10/18.
