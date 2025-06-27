@@ -151,3 +151,18 @@ extension ControlChannel {
         }
     }
 }
+
+private extension CControlPacket {
+    func serialized(
+        withAuthenticator crypto: UnsafeMutablePointer<crypto_t>,
+        replayId: UInt32,
+        timestamp: UInt32
+    ) throws -> Data {
+        try serialized(
+            with: crypto,
+            replayId: replayId,
+            timestamp: timestamp,
+            function: ctrl_pkt_serialize_auth
+        )
+    }
+}

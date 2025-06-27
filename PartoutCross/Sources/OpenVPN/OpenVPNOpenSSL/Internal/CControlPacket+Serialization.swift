@@ -28,6 +28,13 @@ internal import _PartoutOpenVPNOpenSSL_C
 import Foundation
 
 extension CControlPacket {
+    typealias SerializationFunction = (
+        _ dst: UnsafeMutablePointer<UInt8>,
+        _ pkt: UnsafePointer<ctrl_pkt_t>,
+        _ alg: UnsafeMutablePointer<ctrl_pkt_alg>,
+        _ error: UnsafeMutablePointer<crypto_error_code>
+    ) -> Int
+
     func serialized() -> Data {
         let capacity = ctrl_pkt_capacity(pkt)
         var dst = Data(count: capacity)
@@ -46,41 +53,6 @@ extension CControlPacket {
         }
         return dst.subdata(in: 0..<written)
     }
-
-    func serialized(
-        withAuthenticator crypto: UnsafeMutablePointer<crypto_t>,
-        replayId: UInt32,
-        timestamp: UInt32
-    ) throws -> Data {
-        try serialized(
-            with: crypto,
-            replayId: replayId,
-            timestamp: timestamp,
-            function: ctrl_pkt_serialize_auth
-        )
-    }
-
-    func serialized(
-        withEncrypter crypto: UnsafeMutablePointer<crypto_t>,
-        replayId: UInt32,
-        timestamp: UInt32
-    ) throws -> Data {
-        try serialized(
-            with: crypto,
-            replayId: replayId,
-            timestamp: timestamp,
-            function: ctrl_pkt_serialize_crypt
-        )
-    }
-}
-
-private extension CControlPacket {
-    typealias SerializationFunction = (
-        _ dst: UnsafeMutablePointer<UInt8>,
-        _ pkt: UnsafePointer<ctrl_pkt_t>,
-        _ alg: UnsafeMutablePointer<ctrl_pkt_alg>,
-        _ error: UnsafeMutablePointer<crypto_error_code>
-    ) -> Int
 
     func serialized(
         with crypto: UnsafeMutablePointer<crypto_t>,
