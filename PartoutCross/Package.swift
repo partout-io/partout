@@ -18,7 +18,7 @@ let areas: Set<CrossArea> = Set(CrossArea.allCases)
 // the OpenVPN crypto mode (ObjC -> C)
 let openVPNCryptoMode: OpenVPNCryptoMode = .fromEnvironment(
     "OPENVPN_CRYPTO_MODE",
-    fallback: .wrapped
+    fallback: .native
 )
 
 enum CrossArea: CaseIterable {
