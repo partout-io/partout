@@ -26,7 +26,7 @@
 internal import _PartoutCryptoOpenSSL_Cross
 import Foundation
 
-// FIXME: ###, beware of optionals in Negotiator, confusion between caught/ignored errors
+// FIXME: ###, beware of optionals in Negotiator, confusion between caught/ignored errors (it seems that only .native(code) errors are unrecoverable)
 protocol TLSProtocol {
     func start() throws
 

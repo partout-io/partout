@@ -28,7 +28,7 @@
 #include "crypto/allocation.h"
 #include "crypto/zeroing_data.h"
 
-// FIXME: ##, make zd inline
+// TODO: ###, make zd inline
 
 // MARK: Creation
 
