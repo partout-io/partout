@@ -222,7 +222,10 @@ extension OpenVPNSession: OpenVPNSessionProtocol {
             withLocalOptions = false
         }
 
-        await delegate?.sessionDidStop(self, withError: error)
+        await delegate?.sessionDidStop(
+            self,
+            withError: error.map(OpenVPNSessionError.init) ?? error
+        )
     }
 }
 
