@@ -77,7 +77,7 @@ extension StandardOpenVPNParser {
         private var optRedirectGateway: Set<RedirectGateway>?
         private var optRouteNoPull: Bool?
         //
-        private var optXorMethod: OpenVPN.XORMethod?
+        private var optXorMethod: OpenVPN.ObfuscationMethod?
 
         private var optWarning: StandardOpenVPNParserError?
         private var currentBlockName: String?
@@ -506,7 +506,7 @@ extension StandardOpenVPNParser.Builder {
             switch components[1] {
             case "xormask":
                 if components.count > 2, let mask = SecureData(components[2]) {
-                    optXorMethod = .xormask(mask: mask)
+                    optXorMethod = .xormask(mask)
                 }
 
             case "xorptrpos":
@@ -517,7 +517,7 @@ extension StandardOpenVPNParser.Builder {
 
             case "obfuscate":
                 if components.count > 2, let mask = SecureData(components[2]) {
-                    optXorMethod = .obfuscate(mask: mask)
+                    optXorMethod = .obfuscate(mask)
                 }
 
             default:

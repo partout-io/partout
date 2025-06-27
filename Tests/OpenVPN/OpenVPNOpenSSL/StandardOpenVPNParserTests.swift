@@ -136,7 +136,7 @@ final class StandardOpenVPNParserTests: XCTestCase {
         XCTAssertEqual(file.configuration.authUserPass, true)
 
         let mask = Data("this-is-a-mask".utf8)
-        XCTAssertEqual(file.configuration.xorMethod, .obfuscate(mask: SecureData(mask)))
+        XCTAssertEqual(file.configuration.xorMethod, .obfuscate(SecureData(mask)))
 
         XCTAssertTrue(file.configuration.ca?.pem.hasPrefix("-----BEGIN CERTIFICATE-----") ?? false)
         XCTAssertEqual(file.configuration.tlsWrap?.strategy, .auth)
@@ -151,19 +151,19 @@ final class StandardOpenVPNParserTests: XCTestCase {
 
         let cfg = try parser.parsed(fromLines: ["scramble xormask F"])
         XCTAssertNil(cfg.warning)
-        XCTAssertEqual(cfg.configuration.xorMethod, OpenVPN.XORMethod.xormask(mask: singleMask))
+        XCTAssertEqual(cfg.configuration.xorMethod, .xormask(singleMask))
 
         let cfg2 = try parser.parsed(fromLines: ["scramble reverse"])
         XCTAssertNil(cfg.warning)
-        XCTAssertEqual(cfg2.configuration.xorMethod, OpenVPN.XORMethod.reverse)
+        XCTAssertEqual(cfg2.configuration.xorMethod, .reverse)
 
         let cfg3 = try parser.parsed(fromLines: ["scramble xorptrpos"])
         XCTAssertNil(cfg.warning)
-        XCTAssertEqual(cfg3.configuration.xorMethod, OpenVPN.XORMethod.xorptrpos)
+        XCTAssertEqual(cfg3.configuration.xorMethod, .xorptrpos)
 
         let cfg4 = try parser.parsed(fromLines: ["scramble obfuscate FFFF"])
         XCTAssertNil(cfg.warning)
-        XCTAssertEqual(cfg4.configuration.xorMethod, OpenVPN.XORMethod.obfuscate(mask: multiMask))
+        XCTAssertEqual(cfg4.configuration.xorMethod, .obfuscate(multiMask))
     }
 
     func test_givenMessage_whenParse_thenIsFastEnough() throws {
