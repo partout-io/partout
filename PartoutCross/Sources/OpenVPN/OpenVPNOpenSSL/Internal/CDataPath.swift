@@ -233,7 +233,7 @@ extension CDataPath {
             guard let zd else {
                 throw DataPathError(error) ?? .generic
             }
-            return NSData(bytesNoCopy: zd.pointee.bytes, length: zd.pointee.length) as Data
+            return Data(zeroing: zd)
         }
     }
 
@@ -261,7 +261,7 @@ extension CDataPath {
             guard let zd else {
                 throw DataPathError(error) ?? .generic
             }
-            let data = NSData(bytesNoCopy: zd.pointee.bytes, length: zd.pointee.length) as Data
+            let data = Data(zeroing: zd)
             return (packetId, header, keepAlive, data)
         }
     }

@@ -1,8 +1,8 @@
 //
-//  XORMethodNative.swift
+//  Data+Zeroing.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/15/25.
+//  Created by Davide De Rosa on 6/26/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,17 +23,19 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutCryptoOpenSSL_C
 import Foundation
 
-// FIXME: ###, xor_method_t
-enum XORMethodNative: Int {
-    case none
-
-    case mask
-
-    case ptrPos
-
-    case reverse
-
-    case obfuscate
+extension Data {
+    init(zeroing zd: UnsafeMutablePointer<zeroing_data_t>) {
+        let count = zd.pointee.length
+        self.init(
+            bytesNoCopy: zd.pointee.bytes,
+            count: count,
+            deallocator: .custom { ptr, count in
+                bzero(ptr, count)
+                free(ptr)
+            }
+        )
+    }
 }

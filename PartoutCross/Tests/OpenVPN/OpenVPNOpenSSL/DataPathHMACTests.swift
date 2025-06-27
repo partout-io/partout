@@ -24,7 +24,7 @@
 //
 
 import _PartoutOpenVPNCore
-@testable import _PartoutOpenVPNOpenSSL_Cross
+@testable internal import _PartoutOpenVPNOpenSSL_Cross
 import XCTest
 
 final class DataPathHMACTests: XCTestCase, DataPathTestsProtocol {

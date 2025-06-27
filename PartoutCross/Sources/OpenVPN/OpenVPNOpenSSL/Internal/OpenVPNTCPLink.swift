@@ -23,9 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_ObjC
 import _PartoutOpenVPNCore
-internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
@@ -33,22 +31,22 @@ import PartoutCore
 final class OpenVPNTCPLink {
     private let link: LinkInterface
 
-    private let xorMethod: OpenVPN.XORMethod?
-
-    private let xorMask: ZeroingData?
+    private let proc: PacketProcessor
 
     // WARNING: not thread-safe, only use in setReadHandler()
     private var buffer: Data
 
     /// - Parameters:
     ///   - link: The underlying socket.
-    ///   - xorMethod: The optional XOR method.
-    init(link: LinkInterface, xorMethod: OpenVPN.XORMethod?) {
+    ///   - method: The optional obfuscation method.
+    convenience init(link: LinkInterface, method: OpenVPN.ObfuscationMethod?) {
         precondition(link.linkType.plainType == .tcp)
+        self.init(link: link, proc: PacketProcessor(method: method))
+    }
 
+    init(link: LinkInterface, proc: PacketProcessor) {
         self.link = link
-        self.xorMethod = xorMethod
-        xorMask = xorMethod?.mask?.zData
+        self.proc = proc
         buffer = Data(capacity: 1024 * 1024)
     }
 }
@@ -73,7 +71,7 @@ extension OpenVPNTCPLink: LinkInterface {
     }
 
     func upgraded() -> LinkInterface {
-        OpenVPNTCPLink(link: link.upgraded(), xorMethod: xorMethod)
+        OpenVPNTCPLink(link: link.upgraded(), proc: proc)
     }
 
     func shutdown() {
@@ -96,12 +94,7 @@ extension OpenVPNTCPLink {
 
             buffer += packets.joined()
             var until = 0
-            let processedPackets = PacketStream.packets(
-                fromInboundStream: buffer,
-                until: &until,
-                xorMethod: self.xorMethod?.native ?? .none,
-                xorMask: self.xorMask
-            )
+            let processedPackets = proc.packets(fromStream: buffer, until: &until)
             buffer = buffer.subdata(in: until..<buffer.count)
 
             handler(processedPackets, error)
@@ -109,32 +102,7 @@ extension OpenVPNTCPLink {
     }
 
     func writePackets(_ packets: [Data]) async throws {
-        let stream = PacketStream.outboundStream(
-            fromPackets: packets,
-            xorMethod: xorMethod?.native ?? .none,
-            xorMask: xorMask
-        )
+        let stream = proc.stream(fromPackets: packets)
         try await link.writePackets([stream])
-    }
-}
-
-private extension OpenVPN.XORMethod {
-    var native: XORMethodNative {
-        switch self {
-        case .xormask:
-            return .mask
-
-        case .xorptrpos:
-            return .ptrPos
-
-        case .reverse:
-            return .reverse
-
-        case .obfuscate:
-            return .obfuscate
-
-        @unknown default:
-            return .mask
-        }
     }
 }

@@ -36,7 +36,7 @@ final class OpenVPNUDPLink {
     /// - Parameters:
     ///   - link: The underlying socket.
     ///   - xorMethod: The optional XOR method.
-    convenience init(link: LinkInterface, xorMethod: OpenVPN.XORMethod?) {
+    convenience init(link: LinkInterface, xorMethod: OpenVPN.ObfuscationMethod?) {
         precondition(link.linkType.plainType == .udp)
         self.init(link: link, xor: xorMethod.map(XORProcessor.init(method:)))
     }

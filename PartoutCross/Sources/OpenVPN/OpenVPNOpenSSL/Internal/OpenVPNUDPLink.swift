@@ -31,19 +31,19 @@ import PartoutCore
 final class OpenVPNUDPLink {
     private let link: LinkInterface
 
-    private let xor: XORProcessor?
+    private let proc: PacketProcessor?
 
     /// - Parameters:
     ///   - link: The underlying socket.
-    ///   - xorMethod: The optional XOR method.
-    convenience init(link: LinkInterface, xorMethod: OpenVPN.XORMethod?) {
+    ///   - method: The optional obfuscation method.
+    convenience init(link: LinkInterface, xorMethod: OpenVPN.ObfuscationMethod?) {
         precondition(link.linkType.plainType == .udp)
-        self.init(link: link, xor: xorMethod.map(XORProcessor.init(method:)))
+        self.init(link: link, proc: xorMethod.map(PacketProcessor.init(method:)))
     }
 
-    init(link: LinkInterface, xor: XORProcessor?) {
+    init(link: LinkInterface, proc: PacketProcessor?) {
         self.link = link
-        self.xor = xor
+        self.proc = proc
     }
 }
 
@@ -67,7 +67,7 @@ extension OpenVPNUDPLink: LinkInterface {
     }
 
     func upgraded() -> LinkInterface {
-        OpenVPNUDPLink(link: link.upgraded(), xor: xor)
+        OpenVPNUDPLink(link: link.upgraded(), proc: proc)
     }
 
     func shutdown() {
@@ -83,8 +83,8 @@ extension OpenVPNUDPLink {
             guard let self, let packets, !packets.isEmpty else {
                 return
             }
-            if let xor {
-                let processedPackets = xor.processPackets(packets, outbound: false)
+            if let proc {
+                let processedPackets = proc.processPackets(packets, direction: .inbound)
                 handler(processedPackets, error)
                 return
             }
@@ -97,8 +97,8 @@ extension OpenVPNUDPLink {
             assertionFailure("Writing empty packets?")
             return
         }
-        if let xor {
-            let processedPackets = xor.processPackets(packets, outbound: true)
+        if let proc {
+            let processedPackets = proc.processPackets(packets, direction: .outbound)
             try await link.writePackets(processedPackets)
             return
         }
