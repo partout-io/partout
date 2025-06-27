@@ -23,41 +23,18 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoOpenSSL_ObjC
-internal import _PartoutOpenVPNOpenSSL_ObjC
+internal import _PartoutCryptoOpenSSL_C
+internal import _PartoutCryptoOpenSSL_Cross
 import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
 
 /// Processes data packets according to a XOR method.
 struct XORProcessor {
-    private enum RawMethod {
-        case xormask(mask: ZeroingData)
-
-        case xorptrpos
-
-        case reverse
-
-        case obfuscate(mask: ZeroingData)
-
-        init(_ method: OpenVPN.XORMethod) {
-            switch method {
-            case .xormask(let mask):
-                self = .xormask(mask: mask.zData)
-            case .xorptrpos:
-                self = .xorptrpos
-            case .reverse:
-                self = .reverse
-            case .obfuscate(let mask):
-                self = .obfuscate(mask: mask.zData)
-            }
-        }
-    }
-
-    private let method: RawMethod
+    private let method: OpenVPN.XORMethod
 
     init(method: OpenVPN.XORMethod) {
-        self.method = RawMethod(method)
+        self.method = method
     }
 
     /**
@@ -81,29 +58,43 @@ struct XORProcessor {
      - Returns: The packet after XOR processing.
      **/
     func processPacket(_ packet: Data, outbound: Bool) -> Data {
-        var dst = [UInt8](packet)
-        let dstLength = dst.count
         switch method {
         case .xormask(let mask):
-            dst.withUnsafeMutableBytes { dst in
-                xor_mask_legacy(dst.bytePointer, dst.bytePointer, dstLength, mask)
-            }
+            return Self.xormask(packet: packet, mask: mask.czData)
+
         case .xorptrpos:
-            dst.withUnsafeMutableBytes { dst in
-                xor_ptrpos_legacy(dst.bytePointer, dst.bytePointer, dstLength)
-            }
+            return Self.xorptrpos(packet: packet)
+
         case .reverse:
-            dst.withUnsafeMutableBytes { dst in
-                xor_reverse_legacy(dst.bytePointer, dst.bytePointer, dstLength)
-            }
+            return Self.reverse(packet: packet)
+
         case .obfuscate(let mask):
-            dst.withUnsafeMutableBytes { dst in
-                xor_obfuscate_legacy(dst.bytePointer, dst.bytePointer, dstLength, mask, outbound)
+            if outbound {
+                return Self.xormask(packet: Self.xorptrpos(packet: Self.reverse(packet: Self.xorptrpos(packet: packet))), mask: mask.czData)
+            } else {
+                return Self.xorptrpos(packet: Self.reverse(packet: Self.xorptrpos(packet: Self.xormask(packet: packet, mask: mask.czData))))
             }
+
         @unknown default:
-            assertionFailure("Unhandled XOR method: \(method)")
-            break
+            return packet
         }
-        return Data(dst)
+    }
+}
+
+extension XORProcessor {
+    private static func xormask(packet: Data, mask: CZeroingData) -> Data {
+        Data(packet.enumerated().map { (index, byte) in
+            byte ^ mask.bytes[index % mask.length]
+        })
+    }
+
+    private static func xorptrpos(packet: Data) -> Data {
+        Data(packet.enumerated().map { (index, byte) in
+            byte ^ UInt8(truncatingIfNeeded: index &+ 1)
+        })
+    }
+
+    private static func reverse(packet: Data) -> Data {
+        Data(([UInt8](packet))[0..<1] + ([UInt8](packet)[1...]).reversed())
     }
 }
