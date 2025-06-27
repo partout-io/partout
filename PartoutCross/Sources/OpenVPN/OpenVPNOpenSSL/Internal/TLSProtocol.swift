@@ -1,8 +1,8 @@
 //
-//  CZeroingData+Extensions.swift
+//  TLSProtocol.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/14/25.
+//  Created by Davide De Rosa on 6/24/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -25,16 +25,20 @@
 
 internal import _PartoutCryptoOpenSSL_Cross
 import Foundation
-import PartoutCore
 
-extension SecureData {
-    var czData: CZeroingData {
-        CZ(toData())
-    }
-}
+// FIXME: ###, beware of optionals in Negotiator, confusion between caught/ignored errors (it seems that only .native(code) errors are unrecoverable)
+protocol TLSProtocol {
+    func start() throws
 
-extension CZeroingData: SensitiveDebugStringConvertible {
-    func debugDescription(withSensitiveData: Bool) -> String {
-        withSensitiveData ? "[\(length) bytes, \(toHex())]" : "[\(length) bytes]"
-    }
+    func putPlainText(_ text: String) throws
+
+    func putRawPlainText(_ text: CZeroingData) throws -> Int
+
+    func putCipherText(_ data: Data) throws
+
+    func pullCipherText() throws -> Data?
+
+    // cipher text is then "put into" a network socket
+
+    func isConnected() -> Bool
 }
