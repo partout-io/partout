@@ -477,7 +477,7 @@ static BIO *create_BIO_from_PEM(NSString *pem) {
     return isValid;
 }
 
-#pragma mark PrivateKeyDecrypter
+#pragma mark KeyDecrypter
 
 - (NSString *)decryptedKeyFromPath:(NSString *)path passphrase:(NSString *)passphrase error:(NSError * _Nullable __autoreleasing *)error
 {
