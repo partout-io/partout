@@ -32,7 +32,7 @@ protocol TLSProtocol {
 
     func putPlainText(_ text: String) throws
 
-    func putRawPlainText(_ text: CZeroingData) throws -> Int
+    func putRawPlainText(_ text: CZeroingData) throws
 
     func putCipherText(_ data: Data) throws
 
