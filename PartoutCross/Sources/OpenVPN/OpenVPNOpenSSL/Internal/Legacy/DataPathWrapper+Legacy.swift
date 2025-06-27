@@ -34,7 +34,7 @@ private let DataPathMaxPackets = 100
 extension DataPathWrapper {
     static func legacy(
         with parameters: Parameters,
-        prf: PRF,
+        prf: CryptoKeys.PRF,
         prng: PRNGProtocol
     ) throws -> DataPathWrapper {
         NSLog("PartoutOpenVPN: Using DataPathWrapper (legacy Swift/ObjC)");
@@ -48,7 +48,7 @@ extension DataPathWrapper {
         guard let cryptoBox = OSSLCryptoBox(seed: Z(seed.toData())) else {
             fatalError("Unable to create OSSLCryptoBox")
         }
-        let keys = try parameters.keys(with: prf)
+        let keys = try CryptoKeys(withPRF: prf)
         try cryptoBox.configure(
             with: OpenVPNCryptoOptions(
                 cipherAlgorithm: cipher.rawValue,
