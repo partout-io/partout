@@ -51,6 +51,7 @@ enum OpenVPNErrorCode: Int {
     case dataPathOverflow            = 301
     case dataPathPeerIdMismatch      = 302
     case dataPathCompression         = 303
+    case unknown                     = 999
 }
 
 extension OpenVPNErrorCode: CustomDebugStringConvertible {
@@ -59,10 +60,3 @@ extension OpenVPNErrorCode: CustomDebugStringConvertible {
     }
 }
 #endif
-
-// FIXME: ###, map C errors to OpenVPNErrorCode
-extension Error {
-    var asNativeOpenVPNError: Error? {
-        fatalError()
-    }
-}

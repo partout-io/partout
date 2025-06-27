@@ -93,6 +93,6 @@ enum OpenVPNSessionError: Error {
     /// Programming errors.
     case assertion
 
-    /// NSError from the Objective-C layer, see `CPartoutOpenVPN`.
-    case native(code: OpenVPNErrorCode)
+    /// Errors from the internal layer.
+    case `internal`(OpenVPNErrorCode)
 }

@@ -26,25 +26,26 @@
 internal import _PartoutOpenVPNOpenSSL_C
 
 enum DataPathError: Error {
-    case generic
+    case creation
 
-    case wrapperAlgorithm
+    case algorithm
 
-    case wrapperKeys
+    case overflow
+}
 
-    case path(dp_error_code)
+struct CDataPathError: Error {
+    let code: dp_error_code
 
-    case crypto(crypto_error_code)
-
-    init?(_ error: dp_error_t) {
-        switch error.dp_code {
-        case DataPathErrorNone:
-//            assertionFailure()
-            return nil
-        case DataPathErrorCrypto:
-            self = .crypto(error.crypto_code)
-        default:
-            self = .path(error.dp_code)
+    static func error(for err: dp_error_t) -> Error {
+        if err.dp_code == DataPathErrorCrypto {
+            return CCryptoError(err.crypto_code)
+        } else {
+            return CDataPathError(err.dp_code)
         }
+    }
+
+    private init(_ code: dp_error_code) {
+        precondition(code != DataPathErrorNone)
+        self.code = code
     }
 }

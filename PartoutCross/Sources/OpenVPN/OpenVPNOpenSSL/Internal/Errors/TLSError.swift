@@ -1,8 +1,8 @@
 //
-//  dp_error.h
+//  TLSError.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/17/25.
+//  Created by Davide De Rosa on 6/26/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,18 +23,15 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#pragma once
+internal import _PartoutOpenVPNOpenSSL_C
 
-#include "crypto/crypto.h"
+// FIXME: ###
+typealias tls_error_code = Int
 
-typedef enum {
-    DataPathErrorNone,
-    DataPathErrorPeerIdMismatch,
-    DataPathErrorCompression,
-    DataPathErrorCrypto
-} dp_error_code;
+struct CTLSError: Error {
+    let code: tls_error_code
 
-typedef struct {
-    dp_error_code dp_code;
-    crypto_error_code crypto_code;
-} dp_error_t;
+    init(_ code: tls_error_code) {
+        self.code = code
+    }
+}
