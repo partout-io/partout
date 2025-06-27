@@ -40,3 +40,9 @@ typedef struct {
 
 zeroing_data_t *_Nonnull key_hmac_create();
 size_t key_hmac_do(key_hmac_ctx *_Nonnull ctx);
+
+char *_Nullable key_decrypted_from_path(const char *_Nonnull path,
+                                        const char *_Nonnull passphrase);
+
+char *_Nullable key_decrypted_from_pem(const char *_Nonnull pem,
+                                       const char *_Nonnull passphrase);
