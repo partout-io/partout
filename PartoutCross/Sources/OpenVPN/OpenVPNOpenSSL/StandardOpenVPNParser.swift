@@ -71,7 +71,7 @@ public final class StandardOpenVPNParser {
     }
 
     /// The decrypter for private keys.
-    private let decrypter: PrivateKeyDecrypter?
+    private let decrypter: PrivateKeyDecrypter
 
     private let rxOptions: [(option: OpenVPN.Option, rx: NSRegularExpression)] = OpenVPN.Option.allCases.compactMap {
         do {
@@ -84,9 +84,7 @@ public final class StandardOpenVPNParser {
     }
 
     public init(decrypter: PrivateKeyDecrypter? = nil) {
-        // FIXME: ###, decrypter hardcoded to OSSLTLSBox
-//        self.decrypter = decrypter ?? OSSLTLSBox()
-        self.decrypter = decrypter
+        self.decrypter = decrypter ?? OSSLPrivateKeyDecrypter()
     }
 
     /// Parses a configuration from a .ovpn file.
