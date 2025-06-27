@@ -46,15 +46,4 @@ public struct WindowsPlatformFactory: PlatformFactory {
     }
 }
 
-#if canImport(PartoutAPI)
-import PartoutAPI
-
-extension WindowsPlatformFactory {
-    public func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine {
-        UnsupportedPlatformFactory.shared.newAPIScriptingEngine()
-    }
-}
-
-#endif
-
 #endif

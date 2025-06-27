@@ -24,9 +24,6 @@
 //
 
 import Foundation
-#if canImport(PartoutAPI)
-import PartoutAPI
-#endif
 import PartoutCore
 
 public protocol PlatformFactory {
@@ -35,8 +32,4 @@ public protocol PlatformFactory {
     func newDNSResolver(_ ctx: PartoutLoggerContext) -> DNSResolver
 
     func newScriptingEngine(_ ctx: PartoutLoggerContext) -> ScriptingEngine
-
-#if canImport(PartoutAPI)
-    func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine
-#endif
 }

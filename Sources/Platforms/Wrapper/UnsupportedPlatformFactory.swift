@@ -46,14 +46,3 @@ struct UnsupportedPlatformFactory: PlatformFactory {
         fatalError("newScriptingEngine: \(message)")
     }
 }
-
-#if canImport(PartoutAPI)
-import PartoutAPI
-
-extension UnsupportedPlatformFactory {
-    public func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine {
-        fatalError("newAPIScriptingEngine: \(message)")
-    }
-}
-
-#endif
