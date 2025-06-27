@@ -24,7 +24,6 @@
 //
 
 import _PartoutOpenVPNCore
-internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
@@ -85,7 +84,9 @@ public final class StandardOpenVPNParser {
     }
 
     public init(decrypter: PrivateKeyDecrypter? = nil) {
-        self.decrypter = decrypter ?? OSSLTLSBox()
+        // FIXME: ###, decrypter hardcoded to OSSLTLSBox
+//        self.decrypter = decrypter ?? OSSLTLSBox()
+        self.decrypter = decrypter
     }
 
     /// Parses a configuration from a .ovpn file.
