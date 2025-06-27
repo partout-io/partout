@@ -96,9 +96,10 @@ extension ControlChannel {
         func serialize(packet: CControlPacket, timestamp: UInt32) throws -> Data {
             let data = try withUnsafeMutablePointer(to: &cbc.pointee.crypto) {
                 try packet.serialized(
-                    withAuthenticator: $0,
+                    with: $0,
                     replayId: currentReplayId.outbound,
-                    timestamp: timestamp
+                    timestamp: timestamp,
+                    function: ctrl_pkt_serialize_auth
                 )
             }
             currentReplayId.outbound += 1
@@ -149,20 +150,5 @@ extension ControlChannel {
                 throw error
             }
         }
-    }
-}
-
-private extension CControlPacket {
-    func serialized(
-        withAuthenticator crypto: UnsafeMutablePointer<crypto_t>,
-        replayId: UInt32,
-        timestamp: UInt32
-    ) throws -> Data {
-        try serialized(
-            with: crypto,
-            replayId: replayId,
-            timestamp: timestamp,
-            function: ctrl_pkt_serialize_auth
-        )
     }
 }
