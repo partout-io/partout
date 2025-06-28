@@ -24,7 +24,6 @@
 //
 
 import Foundation
-import XCTest
 
 extension Data {
     init(hex: String) {
