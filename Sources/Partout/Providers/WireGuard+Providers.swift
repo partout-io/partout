@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(_PartoutWireGuard)
+#if canImport(_PartoutWireGuardCore)
 
 import _PartoutWireGuardCore
 import Foundation

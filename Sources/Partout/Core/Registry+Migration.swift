@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(_PartoutOpenVPN)
+#if canImport(_PartoutOpenVPNCore)
 import _PartoutOpenVPNCore
 #endif
 import Foundation
@@ -39,7 +39,7 @@ extension Registry {
             case nil:
                 var builder = profile.builder(withNewId: false, forUpgrade: true)
 
-#if canImport(_PartoutOpenVPN)
+#if canImport(_PartoutOpenVPNCore)
                 // look for OpenVPN provider modules
                 let ovpnPairs: [(offset: Int, module: OpenVPNModule)] = profile.modules
                     .enumerated()
