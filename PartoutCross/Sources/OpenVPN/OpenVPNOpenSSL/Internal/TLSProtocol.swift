@@ -27,8 +27,6 @@ internal import _PartoutCryptoOpenSSL_Cross
 import Foundation
 
 protocol TLSProtocol {
-    func caMD5() throws -> String
-
     func start() throws
 
     func isConnected() -> Bool
@@ -37,11 +35,13 @@ protocol TLSProtocol {
 
     func putPlainText(_ text: String) throws
 
-    func putRawPlainText(_ text: CZeroingData) throws
+    func putRawPlainText(_ text: Data) throws
 
     func putCipherText(_ data: Data) throws
 
-    func pullRawPlainText(_ data: CZeroingData) throws -> Int
+    func pullPlainText() throws -> Data
 
     func pullCipherText() throws -> Data
+
+    func caMD5() throws -> String
 }
