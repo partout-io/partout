@@ -18,7 +18,7 @@ let areas: Set<CrossArea> = Set(CrossArea.allCases)
 // the OpenVPN crypto mode (ObjC -> C)
 let openVPNCryptoMode: OpenVPNCryptoMode = .fromEnvironment(
     "OPENVPN_CRYPTO_MODE",
-    fallback: .wrapped
+    fallback: .native
 )
 
 enum CrossArea: CaseIterable {
@@ -92,6 +92,10 @@ if areas.contains(.openvpn) {
         ])
         package.products.append(contentsOf: [
             .library(
+                name: "PartoutOpenVPNCross",
+                targets: ["PartoutOpenVPNCross"]
+            ),
+            .library(
                 name: mainUmbrella,
                 targets: [mainUmbrella]
             ),
@@ -101,6 +105,11 @@ if areas.contains(.openvpn) {
             ),
         ])
         package.targets.append(contentsOf: [
+            .target(
+                name: "PartoutOpenVPNCross",
+                dependencies: [mainUmbrella.asTargetDependency],
+                path: "Sources/OpenVPN/Wrapper"
+            ),
             .target(
                 name: "_PartoutOpenVPNOpenSSL_C",
                 dependencies: ["_PartoutCryptoOpenSSL_C"],
@@ -234,6 +243,25 @@ enum OpenVPNCryptoMode: Int {
 }
 
 // MARK: - WireGuard
+
+// TODO: ###, cross WireGuard is still 1:1 to base package
+if areas.contains(.wireguard) {
+    package.products.append(contentsOf: [
+        .library(
+            name: "PartoutWireGuardCross",
+            targets: ["_PartoutWireGuardGo_Cross"]
+        )
+    ])
+    package.targets.append(contentsOf: [
+        .target(
+            name: "_PartoutWireGuardGo_Cross",
+            dependencies: [
+                .product(name: "PartoutWireGuard", package: "partout")
+            ],
+            path: "Sources/WireGuard/WireGuardGo"
+        )
+    ])
+}
 
 // MARK: -
 
