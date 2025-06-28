@@ -249,10 +249,15 @@ if areas.contains(.wireguard) {
     package.products.append(contentsOf: [
         .library(
             name: "PartoutWireGuardCross",
-            targets: ["_PartoutWireGuardGo_Cross"]
+            targets: ["PartoutWireGuardCross"]
         )
     ])
     package.targets.append(contentsOf: [
+        .target(
+            name: "PartoutWireGuardCross",
+            dependencies: ["_PartoutWireGuardGo_Cross"],
+            path: "Sources/WireGuard/Wrapper"
+        ),
         .target(
             name: "_PartoutWireGuardGo_Cross",
             dependencies: [

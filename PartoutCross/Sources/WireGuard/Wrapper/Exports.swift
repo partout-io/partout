@@ -24,3 +24,4 @@
 //
 
 @_exported import _PartoutWireGuardCore
+@_exported import _PartoutWireGuardGo_Cross
