@@ -55,7 +55,7 @@ extension OpenVPNSessionError: PartoutErrorMappable {
             case .cryptoAlgorithm:
                 return .OpenVPN.unsupportedAlgorithm
 
-            case .tlscaRead, .tlscaUse, .tlscaPeerVerification,
+            case .tlscaUse, .tlscaPeerVerification,
                     .tlsClientCertificateRead, .tlsClientCertificateUse,
                     .tlsClientKeyRead, .tlsClientKeyUse,
                     .tlsServerCertificate, .tlsServerEKU, .tlsServerHost,

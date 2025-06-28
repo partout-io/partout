@@ -25,13 +25,23 @@
 
 internal import _PartoutOpenVPNOpenSSL_C
 
-// FIXME: ###
-typealias tls_error_code = Int
+enum TLSError: Error {
+    case missingCA
+
+    case start
+
+    case peerVerification
+
+    case noData
+
+    case encryption
+}
 
 struct CTLSError: Error {
     let code: tls_error_code
 
     init(_ code: tls_error_code) {
+        precondition(code != TLSErrorNone)
         self.code = code
     }
 }

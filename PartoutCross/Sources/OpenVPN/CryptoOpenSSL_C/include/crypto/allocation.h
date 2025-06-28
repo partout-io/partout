@@ -73,8 +73,16 @@ void pp_zero(void *_Nonnull ptr, size_t count) {
 #endif
 }
 
+static inline
+char *_Nonnull pp_dup(const char *_Nonnull str) {
 #ifdef _WIN32
-#define pp_dup _strdup
+    char *ptr = _strdup(str);
 #else
-#define pp_dup strdup
+    char *ptr = strdup(str);
 #endif
+    if (!ptr) {
+        fputs("pp_dup: strdup() call failed", stderr);
+        abort();
+    }
+    return ptr;
+}

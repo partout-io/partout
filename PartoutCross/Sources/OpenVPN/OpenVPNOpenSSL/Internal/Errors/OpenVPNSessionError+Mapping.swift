@@ -84,6 +84,31 @@ private extension OpenVPNSessionError {
                     assertionFailure("Data path error with unknown error code: \(dpError.code)")
                 }
             }
+            // CTLSError
+            else if let tlsError = rawError as? CTLSError {
+                switch tlsError.code {
+                case TLSErrorCAUse:
+                    return .tlscaUse
+                case TLSErrorCAPeerVerification:
+                    return .tlscaPeerVerification
+                case TLSErrorClientCertificateRead:
+                    return .tlsClientCertificateRead
+                case TLSErrorClientCertificateUse:
+                    return .tlsClientCertificateUse
+                case TLSErrorClientKeyRead:
+                    return .tlsClientKeyRead
+                case TLSErrorClientKeyUse:
+                    return .tlsClientKeyUse
+                case TLSErrorHandshake:
+                    return .tlsHandshake
+                case TLSErrorServerEKU:
+                    return .tlsServerEKU
+                case TLSErrorServerHost:
+                    return .tlsServerHost
+                default:
+                    fatalError()
+                }
+            }
             return .unknown
         }()
         self = .internal(code)

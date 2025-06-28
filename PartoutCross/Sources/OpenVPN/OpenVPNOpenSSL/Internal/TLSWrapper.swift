@@ -26,49 +26,22 @@
 import _PartoutOpenVPNCore
 import Foundation
 
-// FIXME: ###, port OSSLTLSBox (legacy) and tls.h (native)
+extension Notification.Name {
+    static let tlsDidFailVerificationNotification = Notification.Name("TLSDidFailVerificationNotification")
+}
 
 final class TLSWrapper {
     struct Parameters {
         let cachesURL: URL
 
         let cfg: OpenVPN.Configuration
+
+        let onVerificationFailure: () -> Void
     }
 
     let tls: TLSProtocol
 
     init(tls: TLSProtocol) {
         self.tls = tls
-
-//        static let defaultBufferLength = 16384
-//
-//        static let defaultSecurityLevel = 0
-//
-//        var bufferLength = Self.defaultBufferLength
-//
-//        guard let ca = configuration.ca else {
-//            fatalError("Configuration has no CA")
-//        }
-//        caURL = cachesURL.appendingPathComponent(Caches.ca)
-//        try ca.write(to: caURL)
-//
-//        tlsOptions = OpenVPNTLSOptions(
-//            bufferLength: OpenVPNTLSOptionsDefaultBufferLength,
-//            caURL: caURL,
-//            clientCertificatePEM: configuration.clientCertificate?.pem,
-//            clientKeyPEM: configuration.clientKey?.pem,
-//            checksEKU: configuration.checksEKU ?? false,
-//            checksSANHost: configuration.checksSANHost ?? false,
-//            hostname: configuration.sanHost,
-//            securityLevel: configuration.tlsSecurityLevel ?? 0
-//        )
-//            guard let caURL = tls.options()?.caURL() else {
-//                return nil
-//            }
-//            let caMD5 = try tls.md5(forCertificatePath: caURL.path)
     }
-
-//    deinit {
-//        try? FileManager.default.removeItem(at: caURL)
-//    }
 }
