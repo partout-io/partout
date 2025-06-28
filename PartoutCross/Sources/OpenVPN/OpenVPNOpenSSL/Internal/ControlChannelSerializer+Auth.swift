@@ -64,8 +64,10 @@ extension ControlChannel {
                         decryptionKey: key.hmacReceiveKey.czData
                     )
                 )
-                var cKeys = CryptoKeysBridge(keys: keys).cKeys
-                return crypto_cbc_create(nil, digest.rawValue, &cKeys)
+                let keysBridge = CryptoKeysBridge(keys: keys)
+                return withUnsafePointer(to: keysBridge.cKeys) {
+                    crypto_cbc_create(nil, digest.rawValue, $0)
+                }
             }
             guard let cbc else {
                 throw CryptoError.creation

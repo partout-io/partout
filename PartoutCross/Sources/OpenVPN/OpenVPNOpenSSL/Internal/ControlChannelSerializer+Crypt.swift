@@ -65,14 +65,16 @@ extension ControlChannel {
                         decryptionKey: key.hmacReceiveKey.czData
                     )
                 )
-                var cKeys = CryptoKeysBridge(keys: keys).cKeys
-                return crypto_ctr_create(
-                    "AES-256-CTR",
-                    "SHA256",
-                    CryptoCTRTagLength,
-                    CryptoCTRPayloadLength,
-                    &cKeys
-                )
+                let keysBridge = CryptoKeysBridge(keys: keys)
+                return withUnsafePointer(to: keysBridge.cKeys) {
+                    crypto_ctr_create(
+                        "AES-256-CTR",
+                        "SHA256",
+                        CryptoCTRTagLength,
+                        CryptoCTRPayloadLength,
+                        $0
+                    )
+                }
             }()
             guard let ctr else {
                 throw CryptoError.creation
