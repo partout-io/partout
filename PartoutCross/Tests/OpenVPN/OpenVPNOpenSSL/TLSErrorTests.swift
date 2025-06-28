@@ -30,6 +30,7 @@ import XCTest
 final class TLSErrorTests: XCTestCase {
     let cachesURL = FileManager.default.temporaryDirectory
 
+#if canImport(_PartoutOpenVPNOpenSSL_ObjC)
     func test_givenTLS_whenCAMD5_thenIsExpected() throws {
         let params = emptyParameters()
         let native = try TLSWrapper.native(with: params)
@@ -40,6 +41,7 @@ final class TLSErrorTests: XCTestCase {
         print(legacyMD5)
         XCTAssertEqual(nativeMD5, legacyMD5)
     }
+#endif
 }
 
 private extension TLSErrorTests {
