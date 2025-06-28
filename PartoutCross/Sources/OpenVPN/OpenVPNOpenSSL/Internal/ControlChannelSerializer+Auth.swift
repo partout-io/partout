@@ -65,7 +65,7 @@ extension ControlChannel {
                     )
                 )
                 let keysBridge = CryptoKeysBridge(keys: keys)
-                return withUnsafePointer(to: keysBridge.cKeys) {
+                return keysBridge.withUnsafeKeys {
                     crypto_cbc_create(nil, digest.rawValue, $0)
                 }
             }

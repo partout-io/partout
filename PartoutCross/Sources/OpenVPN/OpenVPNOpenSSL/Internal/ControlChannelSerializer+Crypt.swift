@@ -66,7 +66,7 @@ extension ControlChannel {
                     )
                 )
                 let keysBridge = CryptoKeysBridge(keys: keys)
-                return withUnsafePointer(to: keysBridge.cKeys) {
+                return keysBridge.withUnsafeKeys {
                     crypto_ctr_create(
                         "AES-256-CTR",
                         "SHA256",

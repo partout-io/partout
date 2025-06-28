@@ -56,7 +56,7 @@ extension DataPathWrapper {
         let keysBridge = CryptoKeysBridge(keys: keys)
 
         if let cipherAlgorithm, cipherAlgorithm.hasSuffix("-GCM") {
-            mode = withUnsafePointer(to: keysBridge.cKeys) { keys in
+            mode = keysBridge.withUnsafeKeys { keys in
                 cipherAlgorithm.withCString { cCipher in
                     dp_mode_ad_create_aead(
                         cCipher,
@@ -72,7 +72,7 @@ extension DataPathWrapper {
                 throw DataPathError.algorithm
             }
             mode = digestAlgorithm.withCString { cDigest in
-                withUnsafePointer(to: keysBridge.cKeys) { keys in
+                keysBridge.withUnsafeKeys { keys in
                     if let cipherAlgorithm {
                         return cipherAlgorithm.withCString { cCipher in
                             dp_mode_hmac_create_cbc(
