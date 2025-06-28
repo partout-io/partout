@@ -56,13 +56,10 @@ if areas.contains(.openvpn) {
 
     // MARK: OpenVPN (common)
 
-    let cryptoUmbrella = "_PartoutCryptoOpenSSL_Cross"
-    let mainUmbrella = "_PartoutOpenVPNOpenSSL_Cross"
-
     package.products.append(contentsOf: [
         .library(
-            name: cryptoUmbrella,
-            targets: [cryptoUmbrella]
+            name: "_PartoutCryptoOpenSSL_Cross",
+            targets: ["_PartoutCryptoOpenSSL_Cross"]
         ),
         .library(
             name: "_PartoutCryptoOpenSSL_C",
@@ -96,8 +93,8 @@ if areas.contains(.openvpn) {
                 targets: ["PartoutOpenVPNCross"]
             ),
             .library(
-                name: mainUmbrella,
-                targets: [mainUmbrella]
+                name: "_PartoutOpenVPNOpenSSL_Cross",
+                targets: ["_PartoutOpenVPNOpenSSL_Cross"]
             ),
             .library(
                 name: "_PartoutOpenVPNOpenSSL_C",
@@ -107,7 +104,7 @@ if areas.contains(.openvpn) {
         package.targets.append(contentsOf: [
             .target(
                 name: "PartoutOpenVPNCross",
-                dependencies: [mainUmbrella.asTargetDependency],
+                dependencies: ["_PartoutOpenVPNOpenSSL_Cross"],
                 path: "Sources/OpenVPN/Wrapper"
             ),
             .target(
@@ -118,7 +115,7 @@ if areas.contains(.openvpn) {
             ),
             .testTarget(
                 name: "_PartoutOpenVPNOpenSSL_CrossTests",
-                dependencies: [mainUmbrella.asTargetDependency],
+                dependencies: ["_PartoutOpenVPNOpenSSL_Cross"],
                 path: "Tests/OpenVPN/OpenVPNOpenSSL",
                 resources: [
                     .process("Resources")
@@ -130,7 +127,7 @@ if areas.contains(.openvpn) {
     package.targets.append(contentsOf: [
         .testTarget(
             name: "_PartoutCryptoOpenSSL_CrossTests",
-            dependencies: [cryptoUmbrella.asTargetDependency],
+            dependencies: ["_PartoutCryptoOpenSSL_Cross"],
             path: "Tests/OpenVPN/CryptoOpenSSL"
         )
     ])
@@ -147,7 +144,7 @@ if areas.contains(.openvpn) {
         ])
         package.targets.append(contentsOf: [
             .target(
-                name: cryptoUmbrella,
+                name: "_PartoutCryptoOpenSSL_Cross",
                 dependencies: ["_PartoutCryptoOpenSSL_ObjC_Bridged"],
                 path: "Sources/OpenVPN/CryptoOpenSSL",
                 exclude: ["Native"]
@@ -168,7 +165,7 @@ if areas.contains(.openvpn) {
     case .wrapped, .wrappedNative:
         package.targets.append(contentsOf: [
             .target(
-                name: cryptoUmbrella,
+                name: "_PartoutCryptoOpenSSL_Cross",
                 dependencies: ["_PartoutCryptoOpenSSL_C"],
                 path: "Sources/OpenVPN/CryptoOpenSSL",
                 exclude: ["Bridged"]
@@ -180,9 +177,9 @@ if areas.contains(.openvpn) {
                 cSettings: cSettings
             ),
             .target(
-                name: mainUmbrella,
+                name: "_PartoutOpenVPNOpenSSL_Cross",
                 dependencies: [
-                    cryptoUmbrella.asTargetDependency,
+                    "_PartoutCryptoOpenSSL_Cross",
                     "_PartoutOpenVPNOpenSSL_C",
                     .product(name: "PartoutPlatform", package: "partout"),
                     .product(name: "_PartoutOpenVPNCore", package: "partout"),
@@ -196,7 +193,7 @@ if areas.contains(.openvpn) {
     case .native:
         package.targets.append(contentsOf: [
             .target(
-                name: cryptoUmbrella,
+                name: "_PartoutCryptoOpenSSL_Cross",
                 dependencies: ["_PartoutCryptoOpenSSL_C"],
                 path: "Sources/OpenVPN/CryptoOpenSSL",
                 exclude: ["Bridged"]
@@ -208,9 +205,9 @@ if areas.contains(.openvpn) {
                 cSettings: cSettings
             ),
             .target(
-                name: mainUmbrella,
+                name: "_PartoutOpenVPNOpenSSL_Cross",
                 dependencies: [
-                    cryptoUmbrella.asTargetDependency,
+                    "_PartoutCryptoOpenSSL_Cross",
                     "_PartoutOpenVPNOpenSSL_C",
                     .product(name: "PartoutPlatform", package: "partout"),
                     .product(name: "_PartoutOpenVPNCore", package: "partout")
