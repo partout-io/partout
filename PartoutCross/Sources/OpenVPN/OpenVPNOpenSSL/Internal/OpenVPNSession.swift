@@ -325,7 +325,12 @@ extension OpenVPNSession {
         )
         let tlsParameters = TLSWrapper.Parameters(
             cachesURL: cachesURL,
-            cfg: configuration
+            cfg: configuration,
+            onVerificationFailure: { [weak self] in
+                Task {
+                    await self?.shutdown(TLSError.peerVerification)
+                }
+            }
         )
         let tls = try tlsFactory(tlsParameters)
         return Negotiator(

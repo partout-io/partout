@@ -256,7 +256,6 @@ extension ControlChannel {
     }
 
     func currentControlData(withTLS tls: TLSProtocol) throws -> CZeroingData {
-        let pulled = try tls.pullRawPlainText(plainBuffer)
-        return plainBuffer.withOffset(0, length: pulled)
+        CZ(try tls.pullPlainText())
     }
 }

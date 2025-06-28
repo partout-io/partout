@@ -37,7 +37,6 @@ enum OpenVPNErrorCode: Int {
     case cryptoHMAC                  = 102
     case cryptoEncryption            = 103
     case cryptoAlgorithm             = 104
-    case tlscaRead                   = 201
     case tlscaUse                    = 202
     case tlscaPeerVerification       = 203
     case tlsClientCertificateRead    = 204

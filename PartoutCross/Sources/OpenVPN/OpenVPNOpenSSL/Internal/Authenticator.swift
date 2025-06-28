@@ -165,7 +165,7 @@ final class Authenticator {
         raw.appendSized(CZ(peerInfo, nullTerminated: true))
 
         pp_log(ctx, .openvpn, .info, "TLS.auth: Put plaintext \(raw.asSensitiveBytes(ctx))")
-        try tls.putRawPlainText(raw)
+        try tls.putRawPlainText(raw.toData())
     }
 
     // MARK: Server replies
