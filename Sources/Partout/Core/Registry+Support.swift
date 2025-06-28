@@ -23,10 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(_PartoutOpenVPN)
+#if canImport(_PartoutOpenVPNCore)
 import _PartoutOpenVPNCore
 #endif
-#if canImport(_PartoutWireGuard)
+#if canImport(_PartoutWireGuardCore)
 import _PartoutWireGuardCore
 #endif
 import Foundation
@@ -43,10 +43,10 @@ extension Registry {
             OnDemandModule.moduleHandler,
             ProviderModule.moduleHandler
         ]
-#if canImport(_PartoutOpenVPN)
+#if canImport(_PartoutOpenVPNCore)
         handlers.append(OpenVPNModule.moduleHandler)
 #endif
-#if canImport(_PartoutWireGuard)
+#if canImport(_PartoutWireGuardCore)
         handlers.append(WireGuardModule.moduleHandler)
 #endif
         return handlers
@@ -54,10 +54,10 @@ extension Registry {
 
     private static let knownProviderResolvers: [ProviderModuleResolver] = {
         var resolvers: [ProviderModuleResolver] = []
-#if canImport(_PartoutOpenVPN)
+#if canImport(_PartoutOpenVPNCore)
         resolvers.append(OpenVPNProviderResolver(.global))
 #endif
-#if canImport(_PartoutWireGuard)
+#if canImport(_PartoutWireGuardCore)
         resolvers.append(WireGuardProviderResolver(.global))
 #endif
         return resolvers

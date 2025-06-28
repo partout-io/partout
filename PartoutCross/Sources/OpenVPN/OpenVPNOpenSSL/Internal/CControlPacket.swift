@@ -74,8 +74,8 @@ final class CControlPacket {
         self.ackIds = pkt.pointee.ack_ids.map {
             Array(UnsafeBufferPointer(start: $0, count: pkt.pointee.ack_ids_len))
         }
-        self.ackRemoteSessionId = pkt.pointee.payload.map {
-            Data(bytesNoCopy: $0, count: pkt.pointee.payload_len, deallocator: .none)
+        self.ackRemoteSessionId = pkt.pointee.ack_remote_session_id.map {
+            Data(bytesNoCopy: $0, count: _PartoutOpenVPNOpenSSL_C.PacketSessionIdLength, deallocator: .none)
         }
     }
 

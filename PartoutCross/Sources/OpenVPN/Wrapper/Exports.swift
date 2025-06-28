@@ -1,8 +1,8 @@
 //
-//  WireGuard+API.swift
+//  Exports.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 12/2/24.
+//  Created by Davide De Rosa on 6/28/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,5 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(PartoutAPI) && canImport(_PartoutWireGuardCore)
-
-import _PartoutWireGuardCore
-import Foundation
-import PartoutCore
-
-#endif
+@_exported import _PartoutOpenVPNCore
+@_exported import _PartoutOpenVPNOpenSSL_Cross
