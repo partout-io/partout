@@ -48,7 +48,7 @@ extension DataPathWrapper {
     }
 
     static func native(with parameters: Parameters, keys: CryptoKeys) throws -> DataPathWrapper {
-        print("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)");
+        NSLog("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)");
 
         let mode: UnsafeMutablePointer<dp_mode_t>?
         let cipherAlgorithm = parameters.cipher?.rawValue.uppercased()
