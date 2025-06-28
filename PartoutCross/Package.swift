@@ -268,10 +268,6 @@ if areas.contains(.wireguard) {
 // MARK: -
 
 private extension String {
-    var asTargetDependency: Target.Dependency {
-        .target(name: self)
-    }
-
     var asProductDependency: Target.Dependency {
         .product(name: self, package: self)
     }
