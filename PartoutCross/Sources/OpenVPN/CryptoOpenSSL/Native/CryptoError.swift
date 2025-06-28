@@ -26,20 +26,22 @@
 @testable internal import _PartoutCryptoOpenSSL_C
 
 enum CryptoError: Error {
-    case generic
+    case creation
+
+    case encryption
 
     case hmac
 
-    case prng
+    case unknown
 
-    init(_ code: crypto_error_code = CryptoErrorGeneric) {
+    init(_ code: crypto_error_code) {
         switch code {
-        case CryptoErrorPRNG:
-            self = .prng
+        case CryptoErrorEncryption:
+            self = .encryption
         case CryptoErrorHMAC:
             self = .hmac
         default:
-            self = .generic
+            self = .unknown
         }
     }
 }

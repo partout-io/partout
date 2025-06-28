@@ -33,7 +33,7 @@ import PartoutCore
 final class OpenVPNTCPLink {
     private let link: LinkInterface
 
-    private let xorMethod: OpenVPN.XORMethod?
+    private let xorMethod: OpenVPN.ObfuscationMethod?
 
     private let xorMask: ZeroingData?
 
@@ -43,7 +43,7 @@ final class OpenVPNTCPLink {
     /// - Parameters:
     ///   - link: The underlying socket.
     ///   - xorMethod: The optional XOR method.
-    init(link: LinkInterface, xorMethod: OpenVPN.XORMethod?) {
+    init(link: LinkInterface, xorMethod: OpenVPN.ObfuscationMethod?) {
         precondition(link.linkType.plainType == .tcp)
 
         self.link = link
@@ -118,7 +118,7 @@ extension OpenVPNTCPLink {
     }
 }
 
-private extension OpenVPN.XORMethod {
+private extension OpenVPN.ObfuscationMethod {
     var native: XORMethodNative {
         switch self {
         case .xormask:

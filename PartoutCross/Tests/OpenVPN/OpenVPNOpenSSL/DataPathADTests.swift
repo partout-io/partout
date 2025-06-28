@@ -24,15 +24,9 @@
 //
 
 import _PartoutOpenVPNCore
-@testable import _PartoutOpenVPNOpenSSL_Cross
-import XCTest
-
-// for non-Swift symbols like DataPacket*
-#if canImport(_PartoutOpenVPNOpenSSL_C)
 internal import _PartoutOpenVPNOpenSSL_C
-#else
-internal import _PartoutOpenVPNOpenSSL_ObjC
-#endif
+@testable internal import _PartoutOpenVPNOpenSSL_Cross
+import XCTest
 
 final class DataPathADTests: XCTestCase, DataPathTestsProtocol {
     let peerId: UInt32 = 0x01
@@ -117,7 +111,7 @@ private extension DataPathADTests {
         _ framing: OpenVPN.CompressionFraming
     ) throws {
         print("AD framing: \(framing)")
-        let sut = try DataPathWrapper.nativeADMock(with: framing).dataPath
+        let sut = DataPathWrapper.nativeADMock(with: framing).dataPath
         XCTAssertNoThrow(try testReversibleEncryption(sut: sut, payload: payload))
         XCTAssertNoThrow(try testReversibleCompoundEncryption(sut: sut, payload: payload))
         XCTAssertNoThrow(try testReversibleBulkEncryption(sut: sut))
@@ -140,7 +134,7 @@ private extension DataPathADTests {
     }
 
     func testMockFraming(_ framing: OpenVPN.CompressionFraming, block: (DataPathTestingProtocol) throws -> Void) throws {
-        let subject = try DataPathWrapper.nativeADMock(with: framing).dataPath
+        let subject = DataPathWrapper.nativeADMock(with: framing).dataPath
         try block(subject)
     }
 }

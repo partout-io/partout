@@ -64,8 +64,8 @@ extension OpenVPN {
             try pem.write(to: url, atomically: true, encoding: .ascii)
         }
 
-        public func decrypted(with decrypter: PrivateKeyDecrypter, passphrase: String) throws -> CryptoContainer {
-            let decryptedPEM = try decrypter.decryptedPrivateKey(fromPEM: pem, passphrase: passphrase)
+        public func decrypted(with decrypter: KeyDecrypter, passphrase: String) throws -> CryptoContainer {
+            let decryptedPEM = try decrypter.decryptedKey(fromPEM: pem, passphrase: passphrase)
             return CryptoContainer(pem: decryptedPEM)
         }
     }

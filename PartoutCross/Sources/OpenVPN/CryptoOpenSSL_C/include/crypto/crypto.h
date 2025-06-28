@@ -51,8 +51,7 @@ return true;
 
 typedef enum {
     CryptoErrorNone,
-    CryptoErrorGeneric,
-    CryptoErrorPRNG,
+    CryptoErrorEncryption,
     CryptoErrorHMAC
 } crypto_error_code;
 

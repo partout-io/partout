@@ -26,8 +26,12 @@
 #include <assert.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
+#include <openssl/pem.h>
 #include <openssl/rand.h>
+#include "crypto/allocation.h"
 #include "crypto/keys.h"
+
+#define KeyHMACMaxLength    (size_t)128
 
 bool key_init_seed(const zeroing_data_t *seed) {
     unsigned char x[1];
@@ -38,8 +42,12 @@ bool key_init_seed(const zeroing_data_t *seed) {
     return true;
 }
 
-size_t key_hmac(key_hmac_ctx *_Nonnull ctx) {
-    assert(ctx->dst->length >= key_hmac_buf_len);
+zeroing_data_t *key_hmac_create() {
+    return zd_create(KeyHMACMaxLength);
+}
+
+size_t key_hmac_do(key_hmac_ctx *ctx) {
+    assert(ctx->dst->length >= KeyHMACMaxLength);
 
     const EVP_MD *md = EVP_get_digestbyname(ctx->digest_name);
     unsigned int dst_len = 0;
@@ -54,4 +62,57 @@ size_t key_hmac(key_hmac_ctx *_Nonnull ctx) {
         return 0;
     }
     return dst_len;
+}
+
+// MARK: -
+
+static
+char *key_decrypted_from_pkey(const EVP_PKEY *_Nonnull key) {
+    BIO *output = BIO_new(BIO_s_mem());
+    if (!PEM_write_bio_PrivateKey(output, key, NULL, NULL, 0, NULL, NULL)) {
+        BIO_free(output);
+        return NULL;
+    }
+
+    size_t dec_len = BIO_ctrl_pending(output);
+    char *dec_bytes = pp_alloc_crypto(dec_len + 1);
+    if (BIO_read(output, dec_bytes, (int)dec_len) < 0) {
+        BIO_free(output);
+        return NULL;
+    }
+    BIO_free(output);
+
+    dec_bytes[dec_len] = '\0';
+    return dec_bytes;
+}
+
+static
+char *key_decrypted_from_bio(BIO *_Nonnull bio, const char *_Nonnull passphrase) {
+    EVP_PKEY *key;
+    if (!(key = PEM_read_bio_PrivateKey(bio, NULL, NULL, (void *)passphrase))) {
+        return NULL;
+    }
+    char *ret = key_decrypted_from_pkey(key);
+    EVP_PKEY_free(key);
+    return ret;
+}
+
+char *key_decrypted_from_path(const char *path, const char *passphrase) {
+    BIO *bio;
+    if (!(bio = BIO_new_file(path, "r"))) {
+        return NULL;
+    }
+    char *ret = key_decrypted_from_bio(bio, passphrase);
+    BIO_free(bio);
+    return ret;
+}
+
+char *key_decrypted_from_pem(const char *pem, const char *passphrase) {
+    BIO *bio;
+    if (!(bio = BIO_new_mem_buf(pem, (int)strlen(pem)))) {
+        return NULL;
+    }
+    char *ret = key_decrypted_from_bio(bio, passphrase);
+    BIO_free(bio);
+    return ret;
 }

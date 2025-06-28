@@ -36,6 +36,7 @@
 
 #pragma once
 
+#include <assert.h>
 #include <stdint.h>
 #include <string.h>
 #include "crypto/endian.h"
@@ -60,7 +61,7 @@ typedef enum {
     PacketCodeHardResetServerV2     = 0x08,
     PacketCodeDataV2                = 0x09,
     PacketCodeUnknown               = 0xff
-} packet_code_t;
+} packet_code;
 
 // MARK: - Framing
 
@@ -85,12 +86,12 @@ bool packet_is_ping(const uint8_t *_Nonnull bytes, size_t len) {
 }
 
 static inline
-void packet_header_get(packet_code_t *_Nullable dst_code,
+void packet_header_get(packet_code *_Nullable dst_code,
                        uint8_t *_Nullable dst_key,
                        const uint8_t *_Nonnull src) {
 
     if (dst_code) {
-        *dst_code = (packet_code_t)(*src >> 3);
+        *dst_code = (packet_code)(*src >> 3);
     }
     if (dst_key) {
         *dst_key = *src & 0b111;
@@ -99,7 +100,7 @@ void packet_header_get(packet_code_t *_Nullable dst_code,
 
 static inline
 size_t packet_header_set(uint8_t *_Nonnull dst,
-                         packet_code_t src_code,
+                         packet_code src_code,
                          uint8_t src_key,
                          const uint8_t *_Nullable src_session_id) {
 
@@ -138,4 +139,13 @@ void data_swap(uint8_t *_Nonnull ptr, size_t len1, size_t len2)
     memcpy(buf2, ptr + len1, len2);
     memcpy(ptr, buf2, len2);
     memcpy(ptr + len2, buf1, len1);
+}
+
+static inline
+void data_swap_copy(uint8_t *_Nonnull dst, const uint8_t *_Nonnull src, size_t src_len, size_t len1, size_t len2) {
+    assert(src_len >= len1 + len2);//, @"src is smaller than expected");
+    memcpy(dst, src + len1, len2);
+    memcpy(dst + len2, src, len1);
+    const size_t preamble_len = len1 + len2;
+    memcpy(dst + preamble_len, src + preamble_len, src_len - preamble_len);
 }

@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import _PartoutOpenVPNCore
 internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
-import PartoutCore
 
-extension OSSLTLSBox: @retroactive PrivateKeyDecrypter {
+extension OSSLTLSBox: KeyDecrypter {
 }

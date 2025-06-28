@@ -313,7 +313,7 @@ private extension OpenVPNConnection {
 }
 
 private extension LinkInterface {
-    func openVPNLink(xorMethod: OpenVPN.XORMethod?) -> LinkInterface {
+    func openVPNLink(xorMethod: OpenVPN.ObfuscationMethod?) -> LinkInterface {
         switch linkType.plainType {
         case .udp:
             return OpenVPNUDPLink(link: self, xorMethod: xorMethod)

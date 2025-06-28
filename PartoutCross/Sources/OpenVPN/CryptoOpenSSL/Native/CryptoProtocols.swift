@@ -30,26 +30,18 @@ import Foundation
 // efficiency reasons, OpenVPN will use the C API directly without
 // going through Encrypter/Decrypter
 
-typealias ZeroingData = CZeroingData
-
-protocol Crypto {
-    /// The digest length or 0.
-    var digestLength: Int { get }
-
-    /// The tag length or 0.
-    var tagLength: Int { get }
-
-    /// The preferred encryption capacity.
+public protocol Crypto {
+    /// The preferred capacity for storing encrypted data.
     /// - Parameter length: The number of bytes to encrypt.
     func encryptionCapacity(for length: Int) -> Int
 }
 
-protocol Encrypter: Crypto {
+public protocol Encrypter: Crypto {
     /// Configures the object.
     /// - Parameters:
     ///   - cipherKey: The cipher key data.
     ///   - hmacKey: The HMAC key data.
-    func configureEncryption(withCipherKey cipherKey: ZeroingData?, hmacKey: ZeroingData?)
+    func configureEncryption(withCipherKey cipherKey: CZeroingData?, hmacKey: CZeroingData?)
 
     /// Encrypts a buffer.
     /// - Parameters:
@@ -67,12 +59,12 @@ protocol Encrypter: Crypto {
     ) throws -> Bool
 }
 
-protocol Decrypter: Crypto {
+public protocol Decrypter: Crypto {
     /// Configures the object.
     /// - Parameters:
     ///   - cipherKey: The cipher key data.
     ///   - hmacKey: The HMAC key data.
-    func configureDecryption(withCipherKey cipherKey: ZeroingData?, hmacKey: ZeroingData?)
+    func configureDecryption(withCipherKey cipherKey: CZeroingData?, hmacKey: CZeroingData?)
 
     /// Decrypts a buffer.
     /// - Parameters:

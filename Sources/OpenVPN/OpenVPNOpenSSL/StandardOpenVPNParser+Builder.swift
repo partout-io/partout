@@ -29,7 +29,7 @@ import PartoutCore
 
 extension StandardOpenVPNParser {
     struct Builder {
-        private let decrypter: PrivateKeyDecrypter?
+        private let decrypter: KeyDecrypter?
 
         private var optDataCiphers: [OpenVPN.Cipher]?
         private var optDataCiphersFallback: OpenVPN.Cipher?
@@ -77,13 +77,13 @@ extension StandardOpenVPNParser {
         private var optRedirectGateway: Set<RedirectGateway>?
         private var optRouteNoPull: Bool?
         //
-        private var optXorMethod: OpenVPN.XORMethod?
+        private var optXorMethod: OpenVPN.ObfuscationMethod?
 
         private var optWarning: StandardOpenVPNParserError?
         private var currentBlockName: String?
         private var currentBlock: [String] = []
 
-        init(decrypter: PrivateKeyDecrypter?) {
+        init(decrypter: KeyDecrypter?) {
             self.decrypter = decrypter
         }
     }

@@ -39,6 +39,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static inline
 void *_Nonnull pp_alloc_crypto(size_t size) {
@@ -63,14 +64,25 @@ size_t pp_alloc_crypto_capacity(size_t size, size_t overhead) {
     return 2 * size + MAX_BLOCK_SIZE + overhead;
 }
 
+static inline
+void pp_zero(void *_Nonnull ptr, size_t count) {
 #ifdef bzero
-#define pp_zero bzero
+    bzero(ptr, count);
 #else
-#define pp_zero(ptr, count) memset(ptr, 0, count)
+    memset(ptr, 0, count);
 #endif
+}
 
+static inline
+char *_Nonnull pp_dup(const char *_Nonnull str) {
 #ifdef _WIN32
-#define pp_dup _strdup
+    char *ptr = _strdup(str);
 #else
-#define pp_dup strdup
+    char *ptr = strdup(str);
 #endif
+    if (!ptr) {
+        fputs("pp_dup: strdup() call failed", stderr);
+        abort();
+    }
+    return ptr;
+}

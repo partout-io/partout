@@ -26,74 +26,62 @@
 internal import _PartoutCryptoOpenSSL_C
 import Foundation
 
-final class CryptoCBC: Encrypter, Decrypter {
+public final class CryptoCBC: Encrypter, Decrypter {
     private let ptr: UnsafeMutablePointer<crypto_cbc_t>
 
-    private let mappedError: (CryptoError) -> Error
-
-    init(
+    public init(
         cipherName: String?,
-        digestName: String,
-        mappedError: ((CryptoError) -> Error)? = nil
+        digestName: String
     ) throws {
         guard let ptr = crypto_cbc_create(cipherName, digestName, nil) else {
-            throw CryptoError()
+            throw CryptoError.creation
         }
         NSLog("PartoutOpenVPN: Using CryptoCBC (native Swift/C)")
         self.ptr = ptr
-        self.mappedError = mappedError ?? { $0 }
     }
 
-    var digestLength: Int {
-        ptr.pointee.crypto.meta.digest_len
-    }
-
-    var tagLength: Int {
-        ptr.pointee.crypto.meta.tag_len
-    }
-
-    func encryptionCapacity(for length: Int) -> Int {
+    public func encryptionCapacity(for length: Int) -> Int {
         ptr.pointee.crypto.meta.encryption_capacity(ptr, length)
     }
 
-    func configureEncryption(withCipherKey cipherKey: ZeroingData?, hmacKey: ZeroingData?) {
+    public func configureEncryption(withCipherKey cipherKey: CZeroingData?, hmacKey: CZeroingData?) {
         guard let hmacKey else {
             fatalError("HMAC key required")
         }
         ptr.pointee.crypto.encrypter.configure(ptr, cipherKey?.ptr, hmacKey.ptr)
     }
 
-    func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
-        var code = CryptoErrorGeneric
+    public func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
+        var code = CryptoErrorNone
         var cFlags = crypto_flags_t()
         let flagsPtr = flags.pointer(to: &cFlags)
         guard ptr.pointee.crypto.encrypter.encrypt(ptr, dest, destLength, bytes, length, flagsPtr, &code) else {
-            throw mappedError(CryptoError(code))
+            throw CryptoError(code)
         }
         return true
     }
 
-    func configureDecryption(withCipherKey cipherKey: ZeroingData?, hmacKey: ZeroingData?) {
+    public func configureDecryption(withCipherKey cipherKey: CZeroingData?, hmacKey: CZeroingData?) {
         guard let hmacKey else {
             fatalError("HMAC key required")
         }
         ptr.pointee.crypto.decrypter.configure(ptr, cipherKey?.ptr, hmacKey.ptr)
     }
 
-    func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
-        var code = CryptoErrorGeneric
+    public func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
+        var code = CryptoErrorNone
         var cFlags = crypto_flags_t()
         let flagsPtr = flags.pointer(to: &cFlags)
         guard ptr.pointee.crypto.decrypter.decrypt(ptr, dest, destLength, bytes, length, flagsPtr, &code) else {
-            throw mappedError(CryptoError(code))
+            throw CryptoError(code)
         }
         return true
     }
 
-    func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int, flags: CryptoFlagsWrapper? = nil) throws -> Bool {
-        var code = CryptoErrorGeneric
+    public func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int, flags: CryptoFlagsWrapper? = nil) throws -> Bool {
+        var code = CryptoErrorNone
         guard ptr.pointee.crypto.decrypter.verify(ptr, bytes, length, &code) else {
-            throw mappedError(CryptoError(code))
+            throw CryptoError(code)
         }
         return true
     }

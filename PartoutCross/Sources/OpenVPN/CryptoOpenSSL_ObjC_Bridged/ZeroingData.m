@@ -51,7 +51,7 @@
 - (instancetype)initWithBytes:(const uint8_t *)bytes length:(NSInteger)length
 {
     if ((self = [super init])) {
-        ptr = zd_create_copy(bytes, length);
+        ptr = zd_create_from_data(bytes, length);
     }
     return self;
 }
@@ -156,7 +156,7 @@
 - (ZeroingData *)appendingData:(ZeroingData *)other
 {
     ZeroingData *copy = [[ZeroingData alloc] init];
-    copy->ptr = zd_create_copy(ptr->bytes, ptr->length);
+    copy->ptr = zd_create_from_data(ptr->bytes, ptr->length);
     zd_append(copy->ptr, other->ptr);
     return copy;
 }

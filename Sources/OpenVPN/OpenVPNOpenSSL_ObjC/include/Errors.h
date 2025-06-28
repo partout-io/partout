@@ -57,7 +57,8 @@ typedef NS_ENUM(NSInteger, OpenVPNErrorCode) {
     OpenVPNErrorCodeTLSServerHost               = 213,
     OpenVPNErrorCodeDataPathOverflow            = 301,
     OpenVPNErrorCodeDataPathPeerIdMismatch      = 302,
-    OpenVPNErrorCodeDataPathCompression         = 303
+    OpenVPNErrorCodeDataPathCompression         = 303,
+    OpenVPNErrorCodeUnknown                     = 999
 };
 
 static inline NSError *OpenVPNErrorWithCode(OpenVPNErrorCode code) {

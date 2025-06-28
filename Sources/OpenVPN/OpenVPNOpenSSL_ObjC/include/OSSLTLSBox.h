@@ -43,8 +43,8 @@ NS_ASSUME_NONNULL_BEGIN
 // WARNING: not thread-safe
 @interface OSSLTLSBox : NSObject <OpenVPNTLSProtocol>
 
-- (nullable NSString *)decryptedPrivateKeyFromPath:(NSString *)path passphrase:(NSString *)passphrase error:(NSError * _Nullable __autoreleasing *)error;
-- (nullable NSString *)decryptedPrivateKeyFromPEM:(NSString *)pem passphrase:(NSString *)passphrase error:(NSError * _Nullable __autoreleasing *)error;
+- (nullable NSString *)decryptedKeyFromPath:(NSString *)path passphrase:(NSString *)passphrase error:(NSError * _Nullable __autoreleasing *)error;
+- (nullable NSString *)decryptedKeyFromPEM:(NSString *)pem passphrase:(NSString *)passphrase error:(NSError * _Nullable __autoreleasing *)error;
 
 @end
 

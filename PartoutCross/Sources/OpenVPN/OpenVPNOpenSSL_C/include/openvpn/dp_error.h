@@ -29,10 +29,9 @@
 
 typedef enum {
     DataPathErrorNone,
-    DataPathErrorCrypto,
     DataPathErrorPeerIdMismatch,
-    DataPathErrorOverflow,
-    DataPathErrorCompression
+    DataPathErrorCompression,
+    DataPathErrorCrypto
 } dp_error_code;
 
 typedef struct {

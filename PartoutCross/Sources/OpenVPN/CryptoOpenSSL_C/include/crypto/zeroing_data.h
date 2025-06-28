@@ -38,7 +38,6 @@ typedef struct {
 // MARK: Creation
 
 zeroing_data_t *_Nonnull zd_create(size_t length);
-zeroing_data_t *_Nonnull zd_create_copy(const uint8_t *_Nonnull bytes, size_t length);
 zeroing_data_t *_Nonnull zd_create_with_uint8(uint8_t value);
 zeroing_data_t *_Nonnull zd_create_with_uint16(uint16_t value);
 zeroing_data_t *_Nonnull zd_create_from_data(const uint8_t *_Nonnull data, size_t length);

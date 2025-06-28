@@ -40,7 +40,7 @@ struct XORProcessor {
 
         case obfuscate(mask: ZeroingData)
 
-        init(_ method: OpenVPN.XORMethod) {
+        init(_ method: OpenVPN.ObfuscationMethod) {
             switch method {
             case .xormask(let mask):
                 self = .xormask(mask: mask.zData)
@@ -56,7 +56,7 @@ struct XORProcessor {
 
     private let method: RawMethod
 
-    init(method: OpenVPN.XORMethod) {
+    init(method: OpenVPN.ObfuscationMethod) {
         self.method = RawMethod(method)
     }
 

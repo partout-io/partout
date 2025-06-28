@@ -36,6 +36,8 @@
 
 import Foundation
 
+typealias CZeroingData = ZeroingData
+
 extension Encrypter {
     func encryptData(_ data: Data, flags: UnsafePointer<CryptoFlags>?) throws -> Data {
         let srcLength = data.count

@@ -28,8 +28,7 @@
 #include "crypto/allocation.h"
 #include "crypto/zeroing_data.h"
 
-// FIXME: ##, drop dup of zd_create_copy
-// FIXME: ##, make zd inline
+// TODO: ###, make zd inline
 
 // MARK: Creation
 

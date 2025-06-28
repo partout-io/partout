@@ -38,11 +38,11 @@ public struct WindowsPlatformFactory: PlatformFactory {
     }
 
     public func newDNSResolver(_ ctx: PartoutLoggerContext) -> DNSResolver {
-        UnsupportedPlatformFactory.shared.newDNSResolver()
+        UnsupportedPlatformFactory.shared.newDNSResolver(ctx)
     }
 
     public func newScriptingEngine(_ ctx: PartoutLoggerContext) -> ScriptingEngine {
-        UnsupportedPlatformFactory.shared.newScriptingEngine()
+        UnsupportedPlatformFactory.shared.newScriptingEngine(ctx)
     }
 }
 

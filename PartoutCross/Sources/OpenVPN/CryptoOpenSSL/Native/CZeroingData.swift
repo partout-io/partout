@@ -29,7 +29,7 @@ import Foundation
 public final class CZeroingData {
     let ptr: UnsafeMutablePointer<zeroing_data_t>
 
-    private init(ptr: UnsafeMutablePointer<zeroing_data_t>) {
+    init(ptr: UnsafeMutablePointer<zeroing_data_t>) {
         self.ptr = ptr
     }
 
@@ -165,11 +165,21 @@ extension CZeroingData {
     }
 
     public func nullTerminatedString(fromOffset offset: Int) -> String? {
-        precondition(offset <= length)
-        guard let bytes else {
+        var nullOffset: Int?
+        var i = offset
+        while i < length {
+            if bytes[i] == 0 {
+                nullOffset = i
+                break
+            }
+            i += 1
+        }
+        guard let nullOffset else {
             return nil
         }
-        return String(cString: bytes)
+        let stringLength = nullOffset - offset
+        let data = Data(bytes: bytes, count: stringLength)
+        return String(data: data, encoding: .utf8)
     }
 
     public func toData(until: Int? = nil) -> Data {
