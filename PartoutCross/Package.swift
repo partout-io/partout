@@ -11,6 +11,9 @@ let package = Package(
         .macOS(.v12),
         .tvOS(.v17)
     ],
+    dependencies: [
+        .package(path: "..") // "partout"
+    ]
 )
 
 let areas: Set<CrossArea> = Set(CrossArea.allCases)
@@ -87,9 +90,6 @@ if areas.contains(.openvpn) {
 #endif
 
     if openVPNCryptoMode != .bridgedCrypto {
-        package.dependencies.append(contentsOf: [
-            .package(path: "..") // "partout"
-        ])
         package.products.append(contentsOf: [
             .library(
                 name: "PartoutOpenVPNCross",
