@@ -62,7 +62,7 @@ final class APIV6MapperTests: XCTestCase {
             XCTAssertEqual(infra.presets.count, 1)
             XCTAssertEqual(infra.servers.count, 2)
 
-#if canImport(_PartoutOpenVPN)
+#if canImport(_PartoutOpenVPNCore)
             try infra.presets.forEach {
                 let template = try JSONDecoder().decode(OpenVPNProviderTemplate.self, from: $0.templateData)
                 switch $0.presetId {
