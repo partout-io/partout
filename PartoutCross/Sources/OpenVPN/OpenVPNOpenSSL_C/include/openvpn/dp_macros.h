@@ -52,7 +52,7 @@
         peer_id = packet_header_v2_get_peer_id(ptr); \
     }
 
-#ifdef DEBUG
+#ifdef OPENVPN_DP_DEBUG
 #define DP_LOG(msg)         fprintf(stderr, "%s\n", msg)
 #define DP_LOG_F(fmt, ...)  fprintf(stderr, fmt, __VA_ARGS__)
 #else

@@ -36,6 +36,7 @@ if areas.contains(.openvpn) {
 
     // the global settings for C targets
     let cSettings: [CSetting] = [
+//        .define("OPENVPN_DP_DEBUG"),
         .unsafeFlags([
             "-Wall", "-Wextra"//, "-Werror"
         ])
