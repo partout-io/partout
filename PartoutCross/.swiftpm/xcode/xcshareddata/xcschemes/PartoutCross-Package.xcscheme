@@ -120,6 +120,16 @@
                ReferencedContainer = "container:">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "_PartoutWireGuardGo_CrossTests"
+               BuildableName = "_PartoutWireGuardGo_CrossTests"
+               BlueprintName = "_PartoutWireGuardGo_CrossTests"
+               ReferencedContainer = "container:">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

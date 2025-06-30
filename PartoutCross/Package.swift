@@ -272,6 +272,11 @@ if areas.contains(.wireguard) {
                 .product(name: "_PartoutWireGuardCore", package: "partout")
             ],
             path: "Sources/WireGuard/WireGuardGo"
+        ),
+        .testTarget(
+            name: "_PartoutWireGuardGo_CrossTests",
+            dependencies: ["_PartoutWireGuardGo_Cross"],
+            path: "Tests/WireGuard/WireGuardGo"
         )
     ])
 }
