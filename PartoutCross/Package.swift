@@ -250,6 +250,9 @@ enum OpenVPNCryptoMode: Int {
 
 // TODO: ###, cross WireGuard is still 1:1 to base package
 if areas.contains(.wireguard) {
+    package.dependencies.append(contentsOf: [
+        .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.20250630")
+    ])
     package.products.append(contentsOf: [
         .library(
             name: "PartoutWireGuardCross",
@@ -265,7 +268,8 @@ if areas.contains(.wireguard) {
         .target(
             name: "_PartoutWireGuardGo_Cross",
             dependencies: [
-                .product(name: "PartoutWireGuard", package: "partout")
+                "wg-go-apple",
+                .product(name: "_PartoutWireGuardCore", package: "partout")
             ],
             path: "Sources/WireGuard/WireGuardGo"
         )
