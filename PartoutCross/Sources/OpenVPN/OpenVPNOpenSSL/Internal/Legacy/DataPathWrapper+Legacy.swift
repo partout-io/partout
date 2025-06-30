@@ -37,22 +37,25 @@ extension DataPathWrapper {
         prf: CryptoKeys.PRF,
         prng: PRNGProtocol
     ) throws -> DataPathWrapper {
-        NSLog("PartoutOpenVPN: Using DataPathWrapper (legacy Swift/ObjC)");
+        let keys = try CryptoKeys(withPRF: prf)
+        return try .legacy(with: parameters, keys: keys, prng: prng)
+    }
 
-        guard let cipher = parameters.cipher,
-              let digest = parameters.digest else {
-            fatalError("Legacy OSSLCryptoBox requires both cipher/digest")
-        }
+    static func legacy(
+        with parameters: Parameters,
+        keys: CryptoKeys,
+        prng: PRNGProtocol
+    ) throws -> DataPathWrapper {
+        NSLog("PartoutOpenVPN: Using DataPathWrapper (legacy Swift/ObjC)");
 
         let seed = prng.data(length: PRNGSeedLength)
         guard let cryptoBox = OSSLCryptoBox(seed: Z(seed)) else {
             fatalError("Unable to create OSSLCryptoBox")
         }
-        let keys = try CryptoKeys(withPRF: prf)
         try cryptoBox.configure(
             with: OpenVPNCryptoOptions(
-                cipherAlgorithm: cipher.rawValue,
-                digestAlgorithm: digest.rawValue,
+                cipherAlgorithm: parameters.cipher?.rawValue,
+                digestAlgorithm: parameters.digest?.rawValue,
                 cipherEncKey: keys.cipher.map { Z($0.encryptionKey.toData()) },
                 cipherDecKey: keys.cipher.map { Z($0.decryptionKey.toData()) },
                 hmacEncKey: keys.digest.map { Z($0.encryptionKey.toData()) },
