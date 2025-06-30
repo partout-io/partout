@@ -352,7 +352,7 @@ if areas.contains(.openvpn) {
 
     if areas.contains(.openvpnApple) {
         package.dependencies.append(contentsOf: [
-            .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.4.200")
+            .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.5.101")
         ])
         package.products.append(contentsOf: [
             .library(
@@ -439,7 +439,7 @@ if areas.contains(.wireguard) {
 
     if areas.contains(.wireguardApple) {
         package.dependencies.append(contentsOf: [
-            .package(url: "https://github.com/passepartoutvpn/wireguard-apple", from: "1.1.2")
+            .package(url: "https://github.com/passepartoutvpn/wireguard-apple", from: "1.1.3")
         ])
         package.products.append(contentsOf: [
             .library(
