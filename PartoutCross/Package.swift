@@ -118,6 +118,9 @@ if areas.contains(.openvpn) {
                 name: "_PartoutOpenVPNOpenSSL_CrossTests",
                 dependencies: ["_PartoutOpenVPNOpenSSL_Cross"],
                 path: "Tests/OpenVPN/OpenVPNOpenSSL",
+                exclude: [
+                    "DataPathPerformanceTests.swift"
+                ],
                 resources: [
                     .process("Resources")
                 ]
@@ -129,7 +132,10 @@ if areas.contains(.openvpn) {
         .testTarget(
             name: "_PartoutCryptoOpenSSL_CrossTests",
             dependencies: ["_PartoutCryptoOpenSSL_Cross"],
-            path: "Tests/OpenVPN/CryptoOpenSSL"
+            path: "Tests/OpenVPN/CryptoOpenSSL",
+            exclude: [
+                "CryptoPerformanceTests.swift"
+            ]
         )
     ])
 
