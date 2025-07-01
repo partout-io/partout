@@ -383,7 +383,8 @@ if areas.contains(.openvpn) {
                 name: "_PartoutOpenVPNOpenSSL",
                 dependencies: [
                     "_PartoutOpenVPNCore",
-                    "_PartoutOpenVPNOpenSSL_ObjC"
+                    "_PartoutOpenVPNOpenSSL_ObjC",
+                    "_PartoutOpenVPNOpenSSL_Cross"
                 ],
                 path: "Sources/OpenVPN/OpenVPNOpenSSL"
             ),
@@ -414,6 +415,39 @@ if areas.contains(.openvpn) {
                 path: "Tests/OpenVPN/OpenVPNOpenSSL",
                 resources: [
                     .process("Resources")
+                ]
+            )
+        ])
+
+        // experimental
+        package.targets.append(contentsOf: [
+            .target(
+                name: "_PartoutCryptoOpenSSL_Cross",
+                dependencies: ["_PartoutCryptoOpenSSL_C"],
+                path: "PartoutCross/Sources/OpenVPN/CryptoOpenSSL",
+                exclude: ["Bridged"]
+            ),
+            .target(
+                name: "_PartoutCryptoOpenSSL_C",
+                dependencies: ["openssl-apple"],
+                path: "PartoutCross/Sources/OpenVPN/CryptoOpenSSL_C"
+            ),
+            .target(
+                name: "_PartoutOpenVPNOpenSSL_C",
+                dependencies: ["_PartoutCryptoOpenSSL_C"],
+                path: "PartoutCross/Sources/OpenVPN/OpenVPNOpenSSL_C"
+            ),
+            .target(
+                name: "_PartoutOpenVPNOpenSSL_Cross",
+                dependencies: [
+                    "_PartoutCryptoOpenSSL_Cross",
+                    "_PartoutOpenVPNCore",
+                    "_PartoutOpenVPNOpenSSL_C"
+                ],
+                path: "PartoutCross/Sources/OpenVPN/OpenVPNOpenSSL",
+                exclude: ["Internal/Legacy"],
+                swiftSettings: [
+                    .define("OPENVPN_WRAPPED_NATIVE")
                 ]
             )
         ])
