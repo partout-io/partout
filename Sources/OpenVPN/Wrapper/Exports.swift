@@ -25,4 +25,4 @@
 
 @_exported import _PartoutOpenVPNCore
 @_exported import _PartoutOpenVPNOpenSSL
-@_exported import _PartoutOpenVPNOpenSSL_Exp
+@_exported import _PartoutOpenVPNOpenSSL_Cross

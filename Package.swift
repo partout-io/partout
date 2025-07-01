@@ -383,8 +383,8 @@ if areas.contains(.openvpn) {
                 name: "_PartoutOpenVPNOpenSSL",
                 dependencies: [
                     "_PartoutOpenVPNCore",
-                    "_PartoutOpenVPNOpenSSL_Exp",
-                    "_PartoutOpenVPNOpenSSL_ObjC"
+                    "_PartoutOpenVPNOpenSSL_ObjC",
+                    "_PartoutOpenVPNOpenSSL_Cross"
                 ],
                 path: "Sources/OpenVPN/OpenVPNOpenSSL"
             ),
@@ -422,27 +422,27 @@ if areas.contains(.openvpn) {
         // experimental
         package.targets.append(contentsOf: [
             .target(
-                name: "_PartoutCryptoOpenSSL_Exp",
-                dependencies: ["_PartoutCryptoOpenSSL_ExpC"],
+                name: "_PartoutCryptoOpenSSL_Cross",
+                dependencies: ["_PartoutCryptoOpenSSL_C"],
                 path: "PartoutCross/Sources/OpenVPN/CryptoOpenSSL",
                 exclude: ["Bridged"]
             ),
             .target(
-                name: "_PartoutCryptoOpenSSL_ExpC",
+                name: "_PartoutCryptoOpenSSL_C",
                 dependencies: ["openssl-apple"],
                 path: "PartoutCross/Sources/OpenVPN/CryptoOpenSSL_C"
             ),
             .target(
-                name: "_PartoutOpenVPNOpenSSL_ExpC",
-                dependencies: ["_PartoutCryptoOpenSSL_ExpC"],
+                name: "_PartoutOpenVPNOpenSSL_C",
+                dependencies: ["_PartoutCryptoOpenSSL_C"],
                 path: "PartoutCross/Sources/OpenVPN/OpenVPNOpenSSL_C"
             ),
             .target(
-                name: "_PartoutOpenVPNOpenSSL_Exp",
+                name: "_PartoutOpenVPNOpenSSL_Cross",
                 dependencies: [
-                    "_PartoutCryptoOpenSSL_Exp",
+                    "_PartoutCryptoOpenSSL_Cross",
                     "_PartoutOpenVPNCore",
-                    "_PartoutOpenVPNOpenSSL_ExpC",
+                    "_PartoutOpenVPNOpenSSL_C",
                     "PartoutPlatform"
                 ],
                 path: "PartoutCross/Sources/OpenVPN/OpenVPNOpenSSL",
