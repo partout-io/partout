@@ -88,12 +88,6 @@ void tls_channel_options_free(tls_channel_options *_Nonnull opt) {
 }
 
 tls_channel_t *tls_channel_create(const tls_channel_options *opt, tls_error_code *error) {
-    // FIXME: ###, delete puts
-    puts(opt->ca_path);
-    puts(opt->cert_pem);
-    puts(opt->key_pem);
-    puts(opt->hostname);
-
     SSL_CTX *ssl_ctx = SSL_CTX_new(TLS_client_method());
     SSL_CTX_set_options(ssl_ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION);
     SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER, tls_channel_verify_peer);
