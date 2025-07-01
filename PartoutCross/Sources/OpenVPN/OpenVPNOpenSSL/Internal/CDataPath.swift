@@ -133,6 +133,7 @@ extension CDataPath {
             // detect keep-alive packet (ping)
             if tuple.isKeepAlive {
                 keepAlive = true
+                return nil
             }
             return tuple.data
         }
