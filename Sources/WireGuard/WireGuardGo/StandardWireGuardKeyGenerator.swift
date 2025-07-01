@@ -26,7 +26,6 @@
 import _PartoutWireGuardCore
 import Foundation
 import PartoutCore
-internal import WireGuardKit
 
 public final class StandardWireGuardKeyGenerator: WireGuardKeyGenerator {
     public init() {

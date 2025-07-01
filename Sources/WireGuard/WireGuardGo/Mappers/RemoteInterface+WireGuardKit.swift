@@ -26,7 +26,6 @@
 import _PartoutWireGuardCore
 import Foundation
 import PartoutCore
-internal import WireGuardKit
 
 extension WireGuard.RemoteInterface {
     init(wg: PeerConfiguration) throws {

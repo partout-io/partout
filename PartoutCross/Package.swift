@@ -26,8 +26,6 @@ let openVPNCryptoMode: OpenVPNCryptoMode = .fromEnvironment(
 
 enum CrossArea: CaseIterable {
     case openvpn
-
-    case wireguard
 }
 
 // MARK: - OpenVPN
@@ -244,46 +242,6 @@ enum OpenVPNCryptoMode: Int {
         }
         return envMode
     }
-}
-
-// MARK: - WireGuard
-
-if areas.contains(.wireguard) {
-    package.dependencies.append(contentsOf: [
-        .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.20250630")
-    ])
-    package.products.append(contentsOf: [
-        .library(
-            name: "PartoutWireGuardCross",
-            targets: ["PartoutWireGuardCross"]
-        )
-    ])
-    package.targets.append(contentsOf: [
-        .target(
-            name: "PartoutWireGuardCross",
-            dependencies: ["_PartoutWireGuardGo_Cross"],
-            path: "Sources/WireGuard/Wrapper"
-        ),
-        .target(
-            name: "_PartoutWireGuardC",
-            path: "Sources/WireGuard/WireGuardC",
-            publicHeadersPath: "."
-        ),
-        .target(
-            name: "_PartoutWireGuardGo_Cross",
-            dependencies: [
-                "wg-go-apple",
-                "_PartoutWireGuardC",
-                .product(name: "_PartoutWireGuardCore", package: "partout")
-            ],
-            path: "Sources/WireGuard/WireGuardGo"
-        ),
-        .testTarget(
-            name: "_PartoutWireGuardGo_CrossTests",
-            dependencies: ["_PartoutWireGuardGo_Cross"],
-            path: "Tests/WireGuard/WireGuardGo"
-        )
-    ])
 }
 
 // MARK: -

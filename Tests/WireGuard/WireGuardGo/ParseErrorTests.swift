@@ -25,7 +25,6 @@
 
 @testable import _PartoutWireGuardGo
 import PartoutCore
-internal import WireGuardKit
 import XCTest
 
 final class ParseErrorTests: XCTestCase {

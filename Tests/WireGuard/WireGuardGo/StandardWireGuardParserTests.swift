@@ -26,7 +26,6 @@
 import _PartoutWireGuardCore
 @testable import _PartoutWireGuardGo
 import PartoutCore
-@testable internal import WireGuardKit
 import XCTest
 
 final class StandardWireGuardParserTests: XCTestCase {

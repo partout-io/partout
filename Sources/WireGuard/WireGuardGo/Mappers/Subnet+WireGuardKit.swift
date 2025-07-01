@@ -26,7 +26,6 @@
 import Foundation
 import Network
 import PartoutCore
-internal import WireGuardKit
 
 extension Subnet {
     init?(wg: IPAddressRange) {

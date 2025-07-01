@@ -27,7 +27,6 @@ import _PartoutWireGuardCore
 @testable import _PartoutWireGuardGo
 import Foundation
 import PartoutCore
-internal import WireGuardKit
 import XCTest
 
 final class MappersTests: XCTestCase {
@@ -41,7 +40,7 @@ final class MappersTests: XCTestCase {
             ("1:2:3::4", 10000)
         ]
         for (i, raw) in sut.enumerated() {
-            let wg = try XCTUnwrap(WireGuardKit.Endpoint(from: raw))
+            let wg = try XCTUnwrap(Endpoint(from: raw))
             let kit = try XCTUnwrap(PartoutCore.Endpoint(wg: wg))
             try XCTAssertEqual(wg, kit.toWireGuardEndpoint(), "Index \(i) failed")
 

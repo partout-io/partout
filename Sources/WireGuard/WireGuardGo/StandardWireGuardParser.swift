@@ -26,7 +26,6 @@
 import _PartoutWireGuardCore
 import Foundation
 import PartoutCore
-internal import WireGuardKit
 
 /// Parses WireGuard configurations in `wg-quick` format.
 public final class StandardWireGuardParser {
