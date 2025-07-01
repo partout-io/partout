@@ -442,7 +442,8 @@ if areas.contains(.openvpn) {
                 dependencies: [
                     "_PartoutCryptoOpenSSL_Cross",
                     "_PartoutOpenVPNCore",
-                    "_PartoutOpenVPNOpenSSL_C"
+                    "_PartoutOpenVPNOpenSSL_C",
+                    "PartoutPlatform"
                 ],
                 path: "PartoutCross/Sources/OpenVPN/OpenVPNOpenSSL",
                 exclude: ["Internal/Legacy"],
