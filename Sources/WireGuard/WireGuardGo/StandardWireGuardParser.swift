@@ -26,7 +26,6 @@
 import _PartoutWireGuardCore
 import Foundation
 import PartoutCore
-internal import WireGuardKit
 
 /// Parses WireGuard configurations in `wg-quick` format.
 public final class StandardWireGuardParser {
@@ -54,7 +53,7 @@ extension StandardWireGuardParser: ModuleImporter {
             let cfg = try configuration(from: contents)
             let builder = WireGuardModule.Builder(configurationBuilder: cfg.builder())
             return try builder.tryBuild()
-        } catch TunnelConfiguration.ParseError.invalidLine {
+        } catch WireGuardParseError.invalidLine {
             throw PartoutError(.unknownImportedModule)
         } catch {
             throw PartoutError(.parsing, error)

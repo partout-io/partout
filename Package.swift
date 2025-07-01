@@ -439,7 +439,7 @@ if areas.contains(.wireguard) {
 
     if areas.contains(.wireguardApple) {
         package.dependencies.append(contentsOf: [
-            .package(url: "https://github.com/passepartoutvpn/wireguard-apple", from: "1.1.3")
+            .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.20250630")
         ])
         package.products.append(contentsOf: [
             .library(
@@ -454,15 +454,18 @@ if areas.contains(.wireguard) {
                 path: "Sources/WireGuard/Wrapper"
             ),
             .target(
+                name: "_PartoutWireGuardC",
+                path: "Sources/WireGuard/WireGuardC",
+                publicHeadersPath: "."
+            ),
+            .target(
                 name: "_PartoutWireGuardGo",
                 dependencies: [
+                    "_PartoutWireGuardC",
                     "_PartoutWireGuardCore",
-                    .product(name: "WireGuardKit", package: "wireguard-apple")
+                    "wg-go-apple"
                 ],
                 path: "Sources/WireGuard/WireGuardGo",
-                resources: [
-                    .process("Resources")
-                ]
             ),
             .testTarget(
                 name: "_PartoutWireGuardTests",

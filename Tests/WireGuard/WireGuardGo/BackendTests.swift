@@ -1,8 +1,8 @@
 //
-//  Subnet+WireGuardKit.swift
+//  BackendTests.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 3/25/24.
+//  Created by Davide De Rosa on 6/30/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,29 +23,17 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-import Network
-import PartoutCore
+import _PartoutWireGuardGo
+import wg_go
+import XCTest
 
-extension Subnet {
-    init?(wg: IPAddressRange) {
-        guard let ipAddress = wg.address.rawValue.asIPAddress,
-              let address = Address(rawValue: ipAddress) else {
-            return nil
-        }
-        self.init(address, Int(wg.networkPrefixLength))
-    }
-
-    func toWireGuardRange() throws -> IPAddressRange {
-        guard let wg = IPAddressRange(from: "\(address)/\(prefixLength)") else {
-            throw PartoutError(.parsing)
-        }
-        return wg
-    }
-}
-
-extension IPAddressRange {
-    var toSubnet: Subnet? {
-        .init(wg: self)
+final class BackendTests: XCTestCase {
+    func test_givenBackend_whenGetVersion_thenIsExpected() throws {
+        let version = "f333402"
+        let versionGo = String(cString: try XCTUnwrap(wgVersion()))
+        let versionSwift = try XCTUnwrap(WireGuardBackendGo().version())
+        XCTAssertEqual(versionGo, versionSwift)
+        XCTAssertEqual(versionGo, version)
+        print("WireGuard version: \(version)")
     }
 }

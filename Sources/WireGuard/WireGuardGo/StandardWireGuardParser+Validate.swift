@@ -26,7 +26,6 @@
 import _PartoutWireGuardCore
 import Foundation
 import PartoutCore
-internal import WireGuardKit
 
 extension StandardWireGuardParser: ModuleBuilderValidator {
     public func validate(_ builder: any ModuleBuilder) throws {

@@ -23,27 +23,21 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable import _PartoutWireGuardGo
+@testable import _PartoutWireGuardCore
 import PartoutCore
-internal import WireGuardKit
 import XCTest
 
 final class ParseErrorTests: XCTestCase {
     func test_givenParseError_whenMap_thenReturnsAsReason() throws {
-        let sut = TunnelConfiguration.ParseError.noInterface
+        let sut = WireGuardParseError.noInterface
         let mapped = sut.asPartoutError
-        XCTAssertTrue(mapped.reason is TunnelConfiguration.ParseError)
-        let reason = try XCTUnwrap(mapped.reason as? TunnelConfiguration.ParseError)
+        XCTAssertTrue(mapped.reason is WireGuardParseError)
+        let reason = try XCTUnwrap(mapped.reason as? WireGuardParseError)
         switch reason {
         case .noInterface:
             break
         default:
             XCTFail("Mapped to different error: \(reason)")
         }
-    }
-
-    func test_givenLocalizable_whenParseError_thenReturnsLocalizedString() {
-        let sut = TunnelConfiguration.ParseError.noInterface
-        XCTAssertEqual(sut.localizedDescription, "Configuration must have an ‘Interface’ section.")
     }
 }
