@@ -6,4 +6,4 @@
 PartoutCore
 PartoutCore.xcframework*
 .build
-.swiftpm/xcode
+**/.swiftpm/xcode
