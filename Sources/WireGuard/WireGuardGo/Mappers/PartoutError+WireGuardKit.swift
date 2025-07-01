@@ -23,6 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import _PartoutWireGuardCore
 import Foundation
 import PartoutCore
 
@@ -34,8 +35,8 @@ extension WireGuardConnectionError: PartoutErrorMappable {
     }
 }
 
-extension TunnelConfiguration.ParseError: PartoutErrorMappable {
-    var asPartoutError: PartoutError {
+extension WireGuardParseError: PartoutErrorMappable {
+    public var asPartoutError: PartoutError {
         PartoutError(.parsing, self)
     }
 }

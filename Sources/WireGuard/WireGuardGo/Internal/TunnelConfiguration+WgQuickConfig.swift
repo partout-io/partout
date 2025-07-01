@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright © 2018-2021 WireGuard LLC. All Rights Reserved.
 
+import _PartoutWireGuardCore
 import Foundation
 
 extension TunnelConfiguration {
@@ -9,30 +10,6 @@ extension TunnelConfiguration {
         case inInterfaceSection
         case inPeerSection
         case notInASection
-    }
-
-    enum ParseError: Error {
-        case invalidLine(String.SubSequence)
-        case noInterface
-        case multipleInterfaces
-        case interfaceHasNoPrivateKey
-        case interfaceHasInvalidPrivateKey(String)
-        case interfaceHasInvalidListenPort(String)
-        case interfaceHasInvalidAddress(String)
-        case interfaceHasInvalidDNS(String)
-        case interfaceHasInvalidMTU(String)
-        case interfaceHasUnrecognizedKey(String)
-        case peerHasNoPublicKey
-        case peerHasInvalidPublicKey(String)
-        case peerHasInvalidPreSharedKey(String)
-        case peerHasInvalidAllowedIP(String)
-        case peerHasInvalidEndpoint(String)
-        case peerHasInvalidPersistentKeepAlive(String)
-        case peerHasInvalidTransferBytes(String)
-        case peerHasInvalidLastHandshakeTime(String)
-        case peerHasUnrecognizedKey(String)
-        case multiplePeersWithSamePublicKey
-        case multipleEntriesForKey(String)
     }
 
     convenience init(fromWgQuickConfig wgQuickConfig: String, called name: String? = nil) throws {
@@ -66,7 +43,7 @@ extension TunnelConfiguration {
                         if keysWithMultipleEntriesAllowed.contains(key) {
                             attributes[key] = presentValue + "," + value
                         } else {
-                            throw ParseError.multipleEntriesForKey(keyWithCase)
+                            throw WireGuardParseError.multipleEntriesForKey(keyWithCase)
                         }
                     } else {
                         attributes[key] = value
@@ -75,15 +52,15 @@ extension TunnelConfiguration {
                     let peerSectionKeys: Set<String> = ["publickey", "presharedkey", "allowedips", "endpoint", "persistentkeepalive"]
                     if parserState == .inInterfaceSection {
                         guard interfaceSectionKeys.contains(key) else {
-                            throw ParseError.interfaceHasUnrecognizedKey(keyWithCase)
+                            throw WireGuardParseError.interfaceHasUnrecognizedKey(keyWithCase)
                         }
                     } else if parserState == .inPeerSection {
                         guard peerSectionKeys.contains(key) else {
-                            throw ParseError.peerHasUnrecognizedKey(keyWithCase)
+                            throw WireGuardParseError.peerHasUnrecognizedKey(keyWithCase)
                         }
                     }
                 } else if lowercasedLine != "[interface]" && lowercasedLine != "[peer]" {
-                    throw ParseError.invalidLine(line)
+                    throw WireGuardParseError.invalidLine(line)
                 }
             }
 
@@ -93,7 +70,7 @@ extension TunnelConfiguration {
                 // Previous section has ended; process the attributes collected so far
                 if parserState == .inInterfaceSection {
                     let interface = try TunnelConfiguration.collate(interfaceAttributes: attributes)
-                    guard interfaceConfiguration == nil else { throw ParseError.multipleInterfaces }
+                    guard interfaceConfiguration == nil else { throw WireGuardParseError.multipleInterfaces }
                     interfaceConfiguration = interface
                 } else if parserState == .inPeerSection {
                     let peer = try TunnelConfiguration.collate(peerAttributes: attributes)
@@ -113,13 +90,13 @@ extension TunnelConfiguration {
         let peerPublicKeysArray = peerConfigurations.map(\.publicKey)
         let peerPublicKeysSet = Set<PublicKey>(peerPublicKeysArray)
         if peerPublicKeysArray.count != peerPublicKeysSet.count {
-            throw ParseError.multiplePeersWithSamePublicKey
+            throw WireGuardParseError.multiplePeersWithSamePublicKey
         }
 
         if let interfaceConfiguration = interfaceConfiguration {
             self.init(name: name, interface: interfaceConfiguration, peers: peerConfigurations)
         } else {
-            throw ParseError.noInterface
+            throw WireGuardParseError.noInterface
         }
     }
 
@@ -166,15 +143,15 @@ extension TunnelConfiguration {
 
     private static func collate(interfaceAttributes attributes: [String: String]) throws -> InterfaceConfiguration {
         guard let privateKeyString = attributes["privatekey"] else {
-            throw ParseError.interfaceHasNoPrivateKey
+            throw WireGuardParseError.interfaceHasNoPrivateKey
         }
         guard let privateKey = PrivateKey(base64Key: privateKeyString) else {
-            throw ParseError.interfaceHasInvalidPrivateKey(privateKeyString)
+            throw WireGuardParseError.interfaceHasInvalidPrivateKey(privateKeyString)
         }
         var interface = InterfaceConfiguration(privateKey: privateKey)
         if let listenPortString = attributes["listenport"] {
             guard let listenPort = UInt16(listenPortString) else {
-                throw ParseError.interfaceHasInvalidListenPort(listenPortString)
+                throw WireGuardParseError.interfaceHasInvalidListenPort(listenPortString)
             }
             interface.listenPort = listenPort
         }
@@ -182,7 +159,7 @@ extension TunnelConfiguration {
             var addresses = [IPAddressRange]()
             for addressString in addressesString.splitToArray(trimmingCharacters: .whitespacesAndNewlines) {
                 guard let address = IPAddressRange(from: addressString) else {
-                    throw ParseError.interfaceHasInvalidAddress(addressString)
+                    throw WireGuardParseError.interfaceHasInvalidAddress(addressString)
                 }
                 addresses.append(address)
             }
@@ -203,7 +180,7 @@ extension TunnelConfiguration {
         }
         if let mtuString = attributes["mtu"] {
             guard let mtu = UInt16(mtuString) else {
-                throw ParseError.interfaceHasInvalidMTU(mtuString)
+                throw WireGuardParseError.interfaceHasInvalidMTU(mtuString)
             }
             interface.mtu = mtu
         }
@@ -212,15 +189,15 @@ extension TunnelConfiguration {
 
     private static func collate(peerAttributes attributes: [String: String]) throws -> PeerConfiguration {
         guard let publicKeyString = attributes["publickey"] else {
-            throw ParseError.peerHasNoPublicKey
+            throw WireGuardParseError.peerHasNoPublicKey
         }
         guard let publicKey = PublicKey(base64Key: publicKeyString) else {
-            throw ParseError.peerHasInvalidPublicKey(publicKeyString)
+            throw WireGuardParseError.peerHasInvalidPublicKey(publicKeyString)
         }
         var peer = PeerConfiguration(publicKey: publicKey)
         if let preSharedKeyString = attributes["presharedkey"] {
             guard let preSharedKey = PreSharedKey(base64Key: preSharedKeyString) else {
-                throw ParseError.peerHasInvalidPreSharedKey(preSharedKeyString)
+                throw WireGuardParseError.peerHasInvalidPreSharedKey(preSharedKeyString)
             }
             peer.preSharedKey = preSharedKey
         }
@@ -228,7 +205,7 @@ extension TunnelConfiguration {
             var allowedIPs = [IPAddressRange]()
             for allowedIPString in allowedIPsString.splitToArray(trimmingCharacters: .whitespacesAndNewlines) {
                 guard let allowedIP = IPAddressRange(from: allowedIPString) else {
-                    throw ParseError.peerHasInvalidAllowedIP(allowedIPString)
+                    throw WireGuardParseError.peerHasInvalidAllowedIP(allowedIPString)
                 }
                 allowedIPs.append(allowedIP)
             }
@@ -236,13 +213,13 @@ extension TunnelConfiguration {
         }
         if let endpointString = attributes["endpoint"] {
             guard let endpoint = Endpoint(from: endpointString) else {
-                throw ParseError.peerHasInvalidEndpoint(endpointString)
+                throw WireGuardParseError.peerHasInvalidEndpoint(endpointString)
             }
             peer.endpoint = endpoint
         }
         if let persistentKeepAliveString = attributes["persistentkeepalive"] {
             guard let persistentKeepAlive = UInt16(persistentKeepAliveString) else {
-                throw ParseError.peerHasInvalidPersistentKeepAlive(persistentKeepAliveString)
+                throw WireGuardParseError.peerHasInvalidPersistentKeepAlive(persistentKeepAliveString)
             }
             peer.persistentKeepAlive = persistentKeepAlive
         }

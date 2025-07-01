@@ -203,13 +203,13 @@ private extension StandardWireGuardParserTests {
         XCTFail("Must fail")
     }
 
-    func assertParseError(_ error: Error, _ block: (TunnelConfiguration.ParseError) -> Void) {
+    func assertParseError(_ error: Error, _ block: (WireGuardParseError) -> Void) {
         NSLog("Thrown: \(error.localizedDescription)")
         guard let ppError = error as? PartoutError else {
             XCTFail("Not a PartoutError")
             return
         }
-        guard let parseError = ppError.reason as? TunnelConfiguration.ParseError else {
+        guard let parseError = ppError.reason as? WireGuardParseError else {
             XCTFail("Not a TunnelConfiguration.ParseError")
             return
         }
