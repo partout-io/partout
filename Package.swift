@@ -466,10 +466,6 @@ if areas.contains(.wireguard) {
                     "wg-go-apple"
                 ],
                 path: "Sources/WireGuard/WireGuardGo",
-                // FIXME: ###, move WG strings to Passepartout
-//                resources: [
-//                    .process("Resources")
-//                ]
             ),
             .testTarget(
                 name: "_PartoutWireGuardTests",
