@@ -459,7 +459,13 @@ if areas.contains(.openvpn) {
                 "PartoutPlatform"
             ],
             path: "Sources/OpenVPN/OpenVPNOpenSSL_Cross",
-            exclude: ["Internal/Legacy"],
+            exclude: {
+                var list: [String] = ["Internal/Legacy"]
+#if !os(Windows) && !os(Linux)
+                list.append("StandardOpenVPNParser+Default.swift")
+#endif
+                return list
+            }(),
             swiftSettings: [
                 .define("OPENVPN_WRAPPED_NATIVE")
             ]
