@@ -28,6 +28,7 @@ import PartoutCore
 
 extension StandardOpenVPNParser {
     struct Builder {
+        private let supportsCompression: Bool
         private let decrypter: KeyDecrypter?
 
         private var optDataCiphers: [OpenVPN.Cipher]?
@@ -82,7 +83,8 @@ extension StandardOpenVPNParser {
         private var currentBlockName: String?
         private var currentBlock: [String] = []
 
-        init(decrypter: KeyDecrypter?) {
+        init(supportsCompression: Bool, decrypter: KeyDecrypter?) {
+            self.supportsCompression = supportsCompression
             self.decrypter = decrypter
         }
     }
@@ -93,7 +95,7 @@ extension StandardOpenVPNParser {
 extension StandardOpenVPNParser.Builder {
 
     @inlinable
-    mutating func putOption(_ option: StandardOpenVPNParser.Option, line: String, components: [String]) throws {
+    mutating func putOption(_ option: OpenVPN.Option, line: String, components: [String]) throws {
         switch option {
 
             // MARK: Unsupported
@@ -201,49 +203,45 @@ extension StandardOpenVPNParser.Builder {
         case .compLZO:
             optCompressionFraming = .compLZO
 
-            // XXX: assume LZO always included
-//            if LZOFactory.canCreate() {
+            if supportsCompression {
+                // XXX: assume LZO always included
                 let arg = components.last
                 optCompressionAlgorithm = (arg == "no") ? .disabled : .LZO
-//            } else {
-//                guard components.count > 1 else {
-//                    optWarning = optWarning ?? .unsupportedConfiguration(option: line)
-//                    break
-//                }
-//                let arg = components[1]
-//                guard arg == "no" else {
-//                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
-//                }
-//            }
+            } else {
+                guard components.count > 1, components[1] == "no" else {
+                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
+                }
+                optCompressionAlgorithm = .disabled
+            }
 
         case .compress:
             optCompressionFraming = .compress
 
-            // XXX: assume LZO always included
-//            if !LZOFactory.canCreate() {
-//                guard components.isEmpty else {
-//                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
-//                }
-//            } else {
-                if components.count == 2, let arg = components.last {
-                    switch arg {
-                    case "lzo":
-                        optCompressionAlgorithm = .LZO
-
-                    case "stub":
-                        optCompressionAlgorithm = .disabled
-
-                    case "stub-v2":
-                        optCompressionFraming = .compressV2
-                        optCompressionAlgorithm = .disabled
-
-                    default:
-                        optCompressionAlgorithm = .other
+                // XXX: assume LZO always included
+            if components.count == 2, let arg = components.last {
+                switch arg {
+                case "lzo":
+                    guard supportsCompression else {
+                        throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
                     }
-                } else {
+                    optCompressionAlgorithm = .LZO
+
+                case "stub":
                     optCompressionAlgorithm = .disabled
+
+                case "stub-v2":
+                    optCompressionFraming = .compressV2
+                    optCompressionAlgorithm = .disabled
+
+                default:
+                    guard supportsCompression else {
+                        throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
+                    }
+                    optCompressionAlgorithm = .other
                 }
-//            }
+            } else {
+                optCompressionAlgorithm = .disabled
+            }
 
         case .keyDirection:
             guard components.count == 2, let arg = components.last,

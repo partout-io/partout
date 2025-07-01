@@ -69,10 +69,12 @@ public final class StandardOpenVPNParser {
         public let warning: StandardOpenVPNParserError?
     }
 
+    private let supportsCompression: Bool
+
     /// The decrypter for private keys.
     private let decrypter: KeyDecrypter?
 
-    private let rxOptions: [(option: Option, rx: NSRegularExpression)] = Option.allCases.compactMap {
+    private let rxOptions: [(option: OpenVPN.Option, rx: NSRegularExpression)] = OpenVPN.Option.allCases.compactMap {
         do {
             let rx = try $0.regularExpression()
             return ($0, rx)
@@ -82,7 +84,8 @@ public final class StandardOpenVPNParser {
         }
     }
 
-    public init(decrypter: KeyDecrypter) {
+    public init(supportsCompression: Bool = true, decrypter: KeyDecrypter?) {
+        self.supportsCompression = supportsCompression
         self.decrypter = decrypter
     }
 
@@ -158,7 +161,7 @@ private extension StandardOpenVPNParser {
         passphrase: String? = nil,
         originalURL: URL? = nil
     ) throws -> Result {
-        var builder = Builder(decrypter: decrypter)
+        var builder = Builder(supportsCompression: supportsCompression, decrypter: decrypter)
         var isUnknown = true
         for line in lines {
             let found = try enumerateOptions(in: line) {
@@ -221,7 +224,7 @@ extension StandardOpenVPNParser: ModuleImporter {
 private extension StandardOpenVPNParser {
     func enumerateOptions(
         in line: String,
-        completion: @escaping (_ option: Option, _ components: [String]) throws -> Void
+        completion: @escaping (_ option: OpenVPN.Option, _ components: [String]) throws -> Void
     ) throws -> Bool {
         assert(rxOptions.first?.option == .continuation)
         for pair in rxOptions {

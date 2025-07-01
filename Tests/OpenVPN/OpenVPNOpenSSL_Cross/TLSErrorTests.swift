@@ -48,7 +48,7 @@ private extension TLSErrorTests {
     func newConfiguration() -> OpenVPN.Configuration {
         do {
             let url = try XCTUnwrap(Bundle.module.url(forResource: "tunnelbear", withExtension: "ovpn"))
-            return try StandardOpenVPNParser()
+            return try StandardOpenVPNParser(decrypter: OSSLKeyDecrypter())
                 .parsed(fromURL: url, passphrase: "foobar")
                 .configuration
         } catch {
