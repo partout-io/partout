@@ -23,6 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+@testable import _PartoutOpenVPNCore
 @testable import _PartoutOpenVPNOpenSSL
 import PartoutCore
 import XCTest

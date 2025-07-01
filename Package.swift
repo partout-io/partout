@@ -22,7 +22,6 @@ let areas = {
     var included = Set(Area.allCases)
     included.remove(.documentation) // until ready
 #if os(Windows) || os(Linux)
-    included.remove(.openvpnApple)
     included.remove(.wireguardApple)
 #endif
     return included
@@ -53,8 +52,6 @@ enum Area: CaseIterable {
     case documentation
 
     case openvpn
-
-    case openvpnApple
 
     case wireguard
 
@@ -336,126 +333,157 @@ if areas.contains(.api) {
 // MARK: - OpenVPN
 
 if areas.contains(.openvpn) {
+    let mainTarget: String
+    let opensslPackage: String
+
+    // FIXME: ###, push openssl-* to remote repositories
+#if os(Windows)
+    mainTarget = "_PartoutOpenVPNOpenSSL_Cross"
+    opensslPackage = "openssl-windows"
+    package.dependencies.append(contentsOf: [
+        .package(path: "../\(opensslPackage)")
+    ])
+#elseif os(Linux)
+    mainTarget = "_PartoutOpenVPNOpenSSL_Cross"
+    opensslPackage = "openssl-linux"
+    package.dependencies.append(contentsOf: [
+        .package(path: "../\(opensslPackage)")
+    ])
+#else
+    mainTarget = "_PartoutOpenVPNOpenSSL"
+    opensslPackage = "openssl-apple"
+    package.dependencies.append(contentsOf: [
+        .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.5.101")
+    ])
+#endif
+
     package.products.append(contentsOf: [
+        .library(
+            name: "PartoutOpenVPN",
+            targets: ["PartoutOpenVPN"]
+        ),
         .library(
             name: "_PartoutOpenVPNCore",
             targets: ["_PartoutOpenVPNCore"]
+        ),
+        .library(
+            name: "_PartoutOpenVPNOpenSSL",
+            targets: [mainTarget]
         )
     ])
     package.targets.append(contentsOf: [
         .target(
+            name: "PartoutOpenVPN",
+            dependencies: [mainTarget.asTargetDependency],
+            path: "Sources/OpenVPN/Wrapper"
+        ),
+        .target(
             name: "_PartoutOpenVPNCore",
             dependencies: ["PartoutCoreWrapper"],
             path: "Sources/OpenVPN/Core"
+        ),
+        .testTarget(
+            name: "_PartoutOpenVPNTests",
+            dependencies: ["_PartoutOpenVPNCore"],
+            path: "Tests/OpenVPN/Core"
         )
     ])
 
-    if areas.contains(.openvpnApple) {
-        package.dependencies.append(contentsOf: [
-            .package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.5.101")
-        ])
-        package.products.append(contentsOf: [
-            .library(
-                name: "PartoutOpenVPN",
-                targets: ["PartoutOpenVPN"]
-            ),
-            .library(
-                name: "_PartoutOpenVPNOpenSSL",
-                targets: ["_PartoutOpenVPNOpenSSL"]
-            ),
-            .library(
-                name: "_PartoutOpenVPNOpenSSL_ObjC",
-                targets: ["_PartoutOpenVPNOpenSSL_ObjC"]
-            )
-        ])
-        package.targets.append(contentsOf: [
-            .target(
-                name: "PartoutOpenVPN",
-                dependencies: ["_PartoutOpenVPNOpenSSL"],
-                path: "Sources/OpenVPN/Wrapper"
-            ),
-            .target(
-                name: "_PartoutCryptoOpenSSL_ObjC",
-                dependencies: ["openssl-apple"],
-                path: "Sources/OpenVPN/CryptoOpenSSL_ObjC"
-            ),
-            .target(
-                name: "_PartoutOpenVPNOpenSSL",
-                dependencies: [
-                    "_PartoutOpenVPNCore",
-                    "_PartoutOpenVPNOpenSSL_ObjC",
-                    "_PartoutOpenVPNOpenSSL_Cross"
-                ],
-                path: "Sources/OpenVPN/OpenVPNOpenSSL"
-            ),
-            .target(
-                name: "_PartoutOpenVPNOpenSSL_ObjC",
-                dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-                path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
-                exclude: [
-                    "lib/COPYING",
-                    "lib/Makefile",
-                    "lib/README.LZO",
-                    "lib/testmini.c"
-                ]
-            ),
-            .testTarget(
-                name: "_PartoutCryptoOpenSSLTests",
-                dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-                path: "Tests/OpenVPN/CryptoOpenSSL"
-            ),
-            .testTarget(
-                name: "_PartoutOpenVPNTests",
-                dependencies: ["_PartoutOpenVPNCore"],
-                path: "Tests/OpenVPN/Core"
-            ),
-            .testTarget(
-                name: "_PartoutOpenVPNOpenSSLTests",
-                dependencies: ["_PartoutOpenVPNOpenSSL"],
-                path: "Tests/OpenVPN/OpenVPNOpenSSL",
-                resources: [
-                    .process("Resources")
-                ]
-            )
-        ])
+#if !os(Windows) && !os(Linux)
+    package.targets.append(contentsOf: [
+        .target(
+            name: "_PartoutCryptoOpenSSL_ObjC",
+            dependencies: [opensslPackage.asProductDependency],
+            path: "Sources/OpenVPN/CryptoOpenSSL_ObjC"
+        ),
+        .target(
+            name: "_PartoutOpenVPNOpenSSL",
+            dependencies: [
+                "_PartoutOpenVPNCore",
+                "_PartoutOpenVPNOpenSSL_Cross",
+                "_PartoutOpenVPNOpenSSL_ObjC"
+            ],
+            path: "Sources/OpenVPN/OpenVPNOpenSSL"
+        ),
+        .target(
+            name: "_PartoutOpenVPNOpenSSL_ObjC",
+            dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
+            path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
+            exclude: [
+                "lib/COPYING",
+                "lib/Makefile",
+                "lib/README.LZO",
+                "lib/testmini.c"
+            ]
+        ),
+        .testTarget(
+            name: "_PartoutCryptoOpenSSLTests",
+            dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
+            path: "Tests/OpenVPN/CryptoOpenSSL"
+        ),
+        .testTarget(
+            name: "_PartoutOpenVPNOpenSSLTests",
+            dependencies: ["_PartoutOpenVPNOpenSSL"],
+            path: "Tests/OpenVPN/OpenVPNOpenSSL",
+            resources: [
+                .process("Resources")
+            ]
+        )
+    ])
+#endif
 
-        // experimental
-        package.targets.append(contentsOf: [
-            .target(
-                name: "_PartoutCryptoOpenSSL_Cross",
-                dependencies: ["_PartoutCryptoOpenSSL_C"],
-                path: "PartoutCross/Sources/OpenVPN/CryptoOpenSSL",
-                exclude: ["Bridged"]
-            ),
-            .target(
-                name: "_PartoutCryptoOpenSSL_C",
-                dependencies: ["openssl-apple"],
-                path: "PartoutCross/Sources/OpenVPN/CryptoOpenSSL_C"
-            ),
-            .target(
-                name: "_PartoutOpenVPNOpenSSL_C",
-                dependencies: ["_PartoutCryptoOpenSSL_C"],
-                path: "PartoutCross/Sources/OpenVPN/OpenVPNOpenSSL_C"
-            ),
-            .target(
-                name: "_PartoutOpenVPNOpenSSL_Cross",
-                dependencies: [
-                    "_PartoutCryptoOpenSSL_Cross",
-                    "_PartoutOpenVPNCore",
-                    "_PartoutOpenVPNOpenSSL_C",
-                    "PartoutPlatform"
-                ],
-                path: "PartoutCross/Sources/OpenVPN/OpenVPNOpenSSL",
-                exclude: [
-                    "Internal/Legacy",
-                    "PartoutError+OpenVPN.swift" // conflict
-                ],
-                swiftSettings: [
-                    .define("OPENVPN_WRAPPED_NATIVE")
-                ]
-            )
-        ])
-    }
+    // cross-platform (experimental)
+    package.targets.append(contentsOf: [
+        .target(
+            name: "_PartoutCryptoOpenSSL_C",
+            dependencies: [opensslPackage.asProductDependency],
+            path: "Sources/OpenVPN/CryptoOpenSSL_C"
+        ),
+        .target(
+            name: "_PartoutCryptoOpenSSL_Cross",
+            dependencies: ["_PartoutCryptoOpenSSL_C"],
+            path: "Sources/OpenVPN/CryptoOpenSSL_Cross",
+            exclude: ["Bridged"]
+        ),
+        .target(
+            name: "_PartoutOpenVPNOpenSSL_C",
+            dependencies: ["_PartoutCryptoOpenSSL_C"],
+            path: "Sources/OpenVPN/OpenVPNOpenSSL_C"
+        ),
+        .target(
+            name: "_PartoutOpenVPNOpenSSL_Cross",
+            dependencies: [
+                "_PartoutCryptoOpenSSL_Cross",
+                "_PartoutOpenVPNCore",
+                "_PartoutOpenVPNOpenSSL_C",
+                "PartoutPlatform"
+            ],
+            path: "Sources/OpenVPN/OpenVPNOpenSSL_Cross",
+            exclude: ["Internal/Legacy"],
+            swiftSettings: [
+                .define("OPENVPN_WRAPPED_NATIVE")
+            ]
+        ),
+        .testTarget(
+            name: "_PartoutCryptoOpenSSL_CrossTests",
+            dependencies: ["_PartoutCryptoOpenSSL_Cross"],
+            path: "Tests/OpenVPN/CryptoOpenSSL_Cross",
+            exclude: [
+                "CryptoPerformanceTests.swift"
+            ]
+        ),
+        .testTarget(
+            name: "_PartoutOpenVPNOpenSSL_CrossTests",
+            dependencies: ["_PartoutOpenVPNOpenSSL_Cross"],
+            path: "Tests/OpenVPN/OpenVPNOpenSSL_Cross",
+            exclude: [
+                "DataPathPerformanceTests.swift"
+            ],
+            resources: [
+                .process("Resources")
+            ]
+        )
+    ])
 }
 
 // MARK: - WireGuard
@@ -516,5 +544,17 @@ if areas.contains(.wireguard) {
                 path: "Tests/WireGuard/WireGuardGo"
             )
         ])
+    }
+}
+
+// MARK: -
+
+private extension String {
+    var asTargetDependency: Target.Dependency {
+        .target(name: self)
+    }
+
+    var asProductDependency: Target.Dependency {
+        .product(name: self, package: self)
     }
 }

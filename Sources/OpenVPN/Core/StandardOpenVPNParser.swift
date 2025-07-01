@@ -221,7 +221,7 @@ extension StandardOpenVPNParser: ModuleImporter {
 private extension StandardOpenVPNParser {
     func enumerateOptions(
         in line: String,
-        completion: (_ option: Option, _ components: [String]) throws -> Void
+        completion: @escaping (_ option: Option, _ components: [String]) throws -> Void
     ) throws -> Bool {
         assert(rxOptions.first?.option == .continuation)
         for pair in rxOptions {
@@ -244,7 +244,7 @@ private extension StandardOpenVPNParser {
 }
 
 extension NSRegularExpression {
-    func enumerateSpacedComponents(in string: String, using block: ([String]) -> Void) -> Bool {
+    func enumerateSpacedComponents(in string: String, using block: @escaping ([String]) -> Void) -> Bool {
         var found = false
         enumerateMatches(
             in: string,
