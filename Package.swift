@@ -446,7 +446,10 @@ if areas.contains(.openvpn) {
                     "PartoutPlatform"
                 ],
                 path: "PartoutCross/Sources/OpenVPN/OpenVPNOpenSSL",
-                exclude: ["Internal/Legacy"],
+                exclude: [
+                    "Internal/Legacy",
+                    "PartoutError+OpenVPN.swift" // conflict
+                ],
                 swiftSettings: [
                     .define("OPENVPN_WRAPPED_NATIVE")
                 ]
