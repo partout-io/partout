@@ -1,5 +1,5 @@
 //
-//  BasicTests.swift
+//  BackendTests.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/30/25.
@@ -23,12 +23,17 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import _PartoutWireGuardGo_Cross
 import wg_go
 import XCTest
 
-final class BasicTests: XCTestCase {
-    func test_asd() throws {
-        let version = try XCTUnwrap(wgVersion())
+final class BackendTests: XCTestCase {
+    func test_givenBackend_whenGetVersion_thenIsExpected() throws {
+        let version = "f333402"
+        let versionGo = String(cString: try XCTUnwrap(wgVersion()))
+        let versionSwift = try XCTUnwrap(WireGuardBackendGo().version())
+        XCTAssertEqual(versionGo, versionSwift)
+        XCTAssertEqual(versionGo, version)
         print("WireGuard version: \(version)")
     }
 }
