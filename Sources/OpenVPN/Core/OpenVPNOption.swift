@@ -23,11 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
 import Foundation
 
 extension OpenVPN {
-    enum Option: String, CaseIterable {
+    public enum Option: String, CaseIterable {
 
         // MARK: Continuation
 
@@ -129,10 +128,12 @@ extension OpenVPN {
         // MARK: Extra
 
         case xorInfo = "^scramble +(xormask|xorptrpos|reverse|obfuscate)[\\s]?([^\\s]+)?"
+    }
+}
 
-        func regularExpression() throws -> NSRegularExpression {
-            try NSRegularExpression(pattern: rawValue)
-        }
+extension OpenVPN.Option {
+    public func regularExpression() throws -> NSRegularExpression {
+        try NSRegularExpression(pattern: rawValue)
     }
 }
 

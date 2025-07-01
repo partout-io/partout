@@ -23,8 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
-internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
@@ -84,8 +82,8 @@ public final class StandardOpenVPNParser {
         }
     }
 
-    public init(decrypter: KeyDecrypter? = nil) {
-        self.decrypter = decrypter ?? OSSLTLSBox()
+    public init(decrypter: KeyDecrypter) {
+        self.decrypter = decrypter
     }
 
     /// Parses a configuration from a .ovpn file.
