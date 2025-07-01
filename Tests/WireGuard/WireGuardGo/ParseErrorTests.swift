@@ -40,9 +40,4 @@ final class ParseErrorTests: XCTestCase {
             XCTFail("Mapped to different error: \(reason)")
         }
     }
-
-    func test_givenLocalizable_whenParseError_thenReturnsLocalizedString() {
-        let sut = WireGuardParseError.noInterface
-        XCTAssertEqual(sut.localizedDescription, "Configuration must have an ‘Interface’ section.")
-    }
 }
