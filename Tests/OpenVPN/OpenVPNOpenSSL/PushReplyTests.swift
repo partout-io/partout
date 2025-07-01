@@ -140,10 +140,7 @@ final class PushReplyTests: XCTestCase {
         XCTAssertEqual(reply?.options.compressionFraming, .compress)
         XCTAssertEqual(reply?.options.compressionAlgorithm, .disabled)
 
-        reply = try parser.pushReply(with: msg.appending(",compress lz4"))
-        reply?.debug()
-        XCTAssertEqual(reply?.options.compressionFraming, .compress)
-        XCTAssertEqual(reply?.options.compressionAlgorithm, .other)
+        XCTAssertThrowsError(try parser.pushReply(with: msg.appending(",compress lz4")))
     }
 
     func test_givenMessage_whenNCP_thenIsHandled() throws {
