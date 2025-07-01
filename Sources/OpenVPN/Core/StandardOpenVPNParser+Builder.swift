@@ -232,10 +232,7 @@ extension StandardOpenVPNParser.Builder {
                     optCompressionAlgorithm = .disabled
 
                 default:
-                    guard supportsLZO else {
-                        throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
-                    }
-                    optCompressionAlgorithm = .other
+                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
                 }
             } else {
                 optCompressionAlgorithm = .disabled
