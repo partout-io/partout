@@ -29,7 +29,7 @@ import PartoutCore
 import XCTest
 
 final class PushReplyTests: XCTestCase {
-    private let parser = StandardOpenVPNParser(supportsCompression: false, decrypter: nil)
+    private let parser = StandardOpenVPNParser(supportsLZO: false, decrypter: nil)
 
     func test_givenMessage_whenNoOptions_thenHasNoFallbackValues() throws {
         let msg = "PUSH_REPLY,redirect-gateway def1"

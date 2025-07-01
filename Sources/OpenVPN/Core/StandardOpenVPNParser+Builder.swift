@@ -28,7 +28,7 @@ import PartoutCore
 
 extension StandardOpenVPNParser {
     struct Builder {
-        private let supportsCompression: Bool
+        private let supportsLZO: Bool
         private let decrypter: KeyDecrypter?
 
         private var optDataCiphers: [OpenVPN.Cipher]?
@@ -83,8 +83,8 @@ extension StandardOpenVPNParser {
         private var currentBlockName: String?
         private var currentBlock: [String] = []
 
-        init(supportsCompression: Bool, decrypter: KeyDecrypter?) {
-            self.supportsCompression = supportsCompression
+        init(supportsLZO: Bool, decrypter: KeyDecrypter?) {
+            self.supportsLZO = supportsLZO
             self.decrypter = decrypter
         }
     }
@@ -203,8 +203,7 @@ extension StandardOpenVPNParser.Builder {
         case .compLZO:
             optCompressionFraming = .compLZO
 
-            if supportsCompression {
-                // XXX: assume LZO always included
+            if supportsLZO {
                 let arg = components.last
                 optCompressionAlgorithm = (arg == "no") ? .disabled : .LZO
             } else {
@@ -217,11 +216,10 @@ extension StandardOpenVPNParser.Builder {
         case .compress:
             optCompressionFraming = .compress
 
-                // XXX: assume LZO always included
             if components.count == 2, let arg = components.last {
                 switch arg {
                 case "lzo":
-                    guard supportsCompression else {
+                    guard supportsLZO else {
                         throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
                     }
                     optCompressionAlgorithm = .LZO
@@ -234,7 +232,7 @@ extension StandardOpenVPNParser.Builder {
                     optCompressionAlgorithm = .disabled
 
                 default:
-                    guard supportsCompression else {
+                    guard supportsLZO else {
                         throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
                     }
                     optCompressionAlgorithm = .other

@@ -69,7 +69,7 @@ public final class StandardOpenVPNParser {
         public let warning: StandardOpenVPNParserError?
     }
 
-    private let supportsCompression: Bool
+    private let supportsLZO: Bool
 
     /// The decrypter for private keys.
     private let decrypter: KeyDecrypter?
@@ -84,8 +84,8 @@ public final class StandardOpenVPNParser {
         }
     }
 
-    public init(supportsCompression: Bool = true, decrypter: KeyDecrypter?) {
-        self.supportsCompression = supportsCompression
+    public init(supportsLZO: Bool = true, decrypter: KeyDecrypter?) {
+        self.supportsLZO = supportsLZO
         self.decrypter = decrypter
     }
 
@@ -161,7 +161,7 @@ private extension StandardOpenVPNParser {
         passphrase: String? = nil,
         originalURL: URL? = nil
     ) throws -> Result {
-        var builder = Builder(supportsCompression: supportsCompression, decrypter: decrypter)
+        var builder = Builder(supportsLZO: supportsLZO, decrypter: decrypter)
         var isUnknown = true
         for line in lines {
             let found = try enumerateOptions(in: line) {

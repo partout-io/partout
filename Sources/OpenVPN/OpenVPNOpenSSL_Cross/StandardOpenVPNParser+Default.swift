@@ -28,6 +28,6 @@ internal import _PartoutOpenVPNOpenSSL_C
 
 extension StandardOpenVPNParser {
     public convenience init() {
-        self.init(supportsCompression: false, decrypter: OSSLKeyDecrypter())
+        self.init(supportsLZO: false, decrypter: OSSLKeyDecrypter())
     }
 }
