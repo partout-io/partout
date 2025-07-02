@@ -1,8 +1,8 @@
 //
-//  CryptoMacros.m
+//  StandardOpenVPNParser+Default.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/23/25.
+//  Created by Davide De Rosa on 7/1/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,6 +23,11 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#import <Foundation/Foundation.h>
+import _PartoutOpenVPNCore
+internal import _PartoutOpenVPNOpenSSL_C
 
-NSString *const PartoutCryptoErrorDomain = @"PartoutCryptoErrorDomain";
+extension StandardOpenVPNParser {
+    public convenience init() {
+        self.init(supportsLZO: false, decrypter: OSSLKeyDecrypter())
+    }
+}

@@ -1,5 +1,5 @@
 //
-//  OpenVPNConnection+Options.swift
+//  OpenVPN+ConnectionOptions.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 1/13/25.
@@ -23,13 +23,11 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
 import Foundation
-import PartoutCore
 
 extension OpenVPN {
 
-    /// The options for ``OpenVPNSession``. Intervals are expressed in seconds.
+    /// Intervals are expressed in seconds.
     public struct ConnectionOptions: Sendable {
         public var maxPackets: Int = 100
 

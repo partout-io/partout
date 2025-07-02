@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNOpenSSL
+import _PartoutOpenVPNCore
 internal import _PartoutOpenVPNOpenSSL_ObjC
 import XCTest
 

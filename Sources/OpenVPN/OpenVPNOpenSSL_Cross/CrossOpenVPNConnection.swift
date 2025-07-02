@@ -1,5 +1,5 @@
 //
-//  OpenVPNConnection.swift
+//  CrossOpenVPNConnection.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 3/15/24.
@@ -26,8 +26,9 @@
 import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
+import PartoutPlatform
 
-public actor OpenVPNConnection {
+public actor CrossOpenVPNConnection {
 
     // MARK: Initialization
 
@@ -49,7 +50,59 @@ public actor OpenVPNConnection {
 
     let session: OpenVPNSessionProtocol
 
-    init(
+    public init(
+        _ ctx: PartoutLoggerContext,
+        parameters: ConnectionParameters,
+        module: OpenVPNModule,
+        cachesURL: URL,
+        options: OpenVPN.ConnectionOptions = .init()
+    ) async throws {
+        guard let configuration = module.configuration else {
+            fatalError("Creating session without OpenVPN configuration?")
+        }
+
+        // TODO: ###, make this PRNG part of PartoutPlatform later
+        let prng = PlatformPRNG()
+        let dns = Partout.platform.newDNSResolver(ctx)
+
+        // native: Swift/C
+        // legacy: Swift/ObjC
+        let session = try await OpenVPNSession(
+            ctx,
+            configuration: configuration,
+            credentials: module.credentials,
+            prng: prng,
+            cachesURL: cachesURL,
+            options: options,
+            tlsFactory: {
+#if OPENVPN_WRAPPED_NATIVE
+                try TLSWrapper.native(with: $0).tls
+#else
+                try TLSWrapper.legacy(with: $0).tls
+#endif
+            },
+            dpFactory: {
+                let wrapper: DataPathWrapper
+#if OPENVPN_WRAPPED_NATIVE
+                wrapper = try .native(with: $0, prf: $1, prng: $2)
+#else
+                wrapper = try .legacy(with: $0, prf: $1, prng: $2)
+#endif
+                return wrapper.dataPath
+            }
+        )
+
+        try await self.init(
+            ctx,
+            parameters: parameters,
+            module: module,
+            prng: prng,
+            dns: dns,
+            session: session
+        )
+    }
+
+    private init(
         _ ctx: PartoutLoggerContext,
         parameters: ConnectionParameters,
         module: OpenVPNModule,
@@ -145,7 +198,7 @@ public actor OpenVPNConnection {
 
 // MARK: - Connection
 
-extension OpenVPNConnection: Connection {
+extension CrossOpenVPNConnection: Connection {
     public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
         backend.statusStream
     }
@@ -169,7 +222,7 @@ extension OpenVPNConnection: Connection {
 
 // MARK: - OpenVPNSessionDelegate
 
-extension OpenVPNConnection: OpenVPNSessionDelegate {
+extension CrossOpenVPNConnection: OpenVPNSessionDelegate {
     func sessionDidStart(_ session: OpenVPNSessionProtocol, remoteAddress: String, remoteProtocol: EndpointProtocol, remoteOptions: OpenVPN.Configuration) async {
         let addressObject = Address(rawValue: remoteAddress)
         if addressObject == nil {
@@ -291,7 +344,7 @@ private extension IPModule {
     }
 }
 
-private extension OpenVPNConnection {
+private extension CrossOpenVPNConnection {
     nonisolated func onStatus(_ connectionStatus: ConnectionStatus) {
         switch connectionStatus {
         case .connected:

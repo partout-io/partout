@@ -23,12 +23,12 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
 
 extension StandardOpenVPNParser {
     struct Builder {
+        private let supportsLZO: Bool
         private let decrypter: KeyDecrypter?
 
         private var optDataCiphers: [OpenVPN.Cipher]?
@@ -83,7 +83,8 @@ extension StandardOpenVPNParser {
         private var currentBlockName: String?
         private var currentBlock: [String] = []
 
-        init(decrypter: KeyDecrypter?) {
+        init(supportsLZO: Bool, decrypter: KeyDecrypter?) {
+            self.supportsLZO = supportsLZO
             self.decrypter = decrypter
         }
     }
@@ -202,16 +203,27 @@ extension StandardOpenVPNParser.Builder {
         case .compLZO:
             optCompressionFraming = .compLZO
 
-            guard components.count > 1, components[1] == "no" else {
-                throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
+            if supportsLZO {
+                let arg = components.last
+                optCompressionAlgorithm = (arg == "no") ? .disabled : .LZO
+            } else {
+                guard components.count > 1, components[1] == "no" else {
+                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
+                }
+                optCompressionAlgorithm = .disabled
             }
-            optCompressionAlgorithm = .disabled
 
         case .compress:
             optCompressionFraming = .compress
 
             if components.count == 2, let arg = components.last {
                 switch arg {
+                case "lzo":
+                    guard supportsLZO else {
+                        throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
+                    }
+                    optCompressionAlgorithm = .LZO
+
                 case "stub":
                     optCompressionAlgorithm = .disabled
 

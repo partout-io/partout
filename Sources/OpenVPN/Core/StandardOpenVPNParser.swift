@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
 
@@ -70,8 +69,10 @@ public final class StandardOpenVPNParser {
         public let warning: StandardOpenVPNParserError?
     }
 
+    private let supportsLZO: Bool
+
     /// The decrypter for private keys.
-    private let decrypter: KeyDecrypter
+    private let decrypter: KeyDecrypter?
 
     private let rxOptions: [(option: OpenVPN.Option, rx: NSRegularExpression)] = OpenVPN.Option.allCases.compactMap {
         do {
@@ -83,8 +84,9 @@ public final class StandardOpenVPNParser {
         }
     }
 
-    public init(decrypter: KeyDecrypter? = nil) {
-        self.decrypter = decrypter ?? OSSLKeyDecrypter()
+    public init(supportsLZO: Bool = true, decrypter: KeyDecrypter?) {
+        self.supportsLZO = supportsLZO
+        self.decrypter = decrypter
     }
 
     /// Parses a configuration from a .ovpn file.
@@ -159,7 +161,7 @@ private extension StandardOpenVPNParser {
         passphrase: String? = nil,
         originalURL: URL? = nil
     ) throws -> Result {
-        var builder = Builder(decrypter: decrypter)
+        var builder = Builder(supportsLZO: supportsLZO, decrypter: decrypter)
         var isUnknown = true
         for line in lines {
             let found = try enumerateOptions(in: line) {

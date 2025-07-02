@@ -23,12 +23,13 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+@testable import _PartoutOpenVPNCore
 @testable internal import _PartoutOpenVPNOpenSSL_Cross
 import PartoutCore
 import XCTest
 
 final class PushReplyTests: XCTestCase {
-    private let parser = StandardOpenVPNParser()
+    private let parser = StandardOpenVPNParser(supportsLZO: false, decrypter: nil)
 
     func test_givenMessage_whenNoOptions_thenHasNoFallbackValues() throws {
         let msg = "PUSH_REPLY,redirect-gateway def1"

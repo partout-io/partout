@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
+@testable import _PartoutOpenVPNCore
 @testable import _PartoutOpenVPNOpenSSL
 import PartoutCore
 import XCTest
@@ -32,7 +32,7 @@ final class StandardOpenVPNParserTests: XCTestCase {
     private let parser = StandardOpenVPNParser()
 
     func test_givenOption_whenEnumerateComponents_thenAreParsedCorrectly() throws {
-        let sut = try StandardOpenVPNParser.Option.remote.regularExpression()
+        let sut = try OpenVPN.Option.remote.regularExpression()
         _ = sut.enumerateSpacedComponents(in: "remote    one.two.com   12345   tcp") {
             XCTAssertEqual($0, ["remote", "one.two.com", "12345", "tcp"])
         }

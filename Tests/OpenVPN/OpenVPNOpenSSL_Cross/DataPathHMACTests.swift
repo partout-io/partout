@@ -27,6 +27,7 @@ import _PartoutOpenVPNCore
 @testable internal import _PartoutOpenVPNOpenSSL_Cross
 import XCTest
 
+// FIXME: ###, random failures, unsafe crypto flags or programming errors?
 final class DataPathHMACTests: XCTestCase, DataPathTestsProtocol {
     let peerId: UInt32 = 0x01
 

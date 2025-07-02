@@ -24,4 +24,9 @@
 //
 
 @_exported import _PartoutOpenVPNCore
+#if canImport(_PartoutOpenVPNOpenSSL)
 @_exported import _PartoutOpenVPNOpenSSL
+#endif
+#if canImport(_PartoutOpenVPNOpenSSL_Cross)
+@_exported import _PartoutOpenVPNOpenSSL_Cross
+#endif

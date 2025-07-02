@@ -31,8 +31,6 @@ protocol TLSProtocol {
 
     func isConnected() -> Bool
 
-    // FIXME: ###, beware of optionals in Negotiator (try?), confusion between caught/ignored errors (it seems that only .native(code) errors are unrecoverable)
-
     func putPlainText(_ text: String) throws
 
     func putRawPlainText(_ text: Data) throws
