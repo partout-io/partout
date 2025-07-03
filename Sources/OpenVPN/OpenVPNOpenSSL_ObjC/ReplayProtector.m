@@ -37,7 +37,7 @@
 #import "CryptoOpenSSL/Allocation.h"
 #import "ReplayProtector.h"
 
-@import PartoutCryptoOpenSSL_ObjC;
+@import _PartoutCryptoOpenSSL_ObjC;
 
 #define HIDDEN_WINSIZE          128
 #define BITMAP_LEN              (HIDDEN_WINSIZE / 32)

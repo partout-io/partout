@@ -42,7 +42,7 @@
 #import "Errors.h"
 #import "OSSLTLSBox.h"
 
-@import PartoutCryptoOpenSSL_ObjC;
+@import _PartoutCryptoOpenSSL_ObjC;
 
 static NSString *const TLSBoxPeerVerificationErrorNotification = @"TLSBoxPeerVerificationErrorNotification";
 

@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable internal import PartoutCryptoOpenSSL_ObjC
+@testable internal import _PartoutCryptoOpenSSL_ObjC
 import XCTest
 
 final class CryptoPerformanceTests: XCTestCase {

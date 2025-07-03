@@ -26,7 +26,7 @@
 #import <Foundation/Foundation.h>
 #import "CryptoProvider.h"
 
-@import PartoutCryptoOpenSSL_ObjC;
+@import _PartoutCryptoOpenSSL_ObjC;
 
 NS_ASSUME_NONNULL_BEGIN
 

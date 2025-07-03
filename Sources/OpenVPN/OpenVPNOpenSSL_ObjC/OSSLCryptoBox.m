@@ -45,7 +45,7 @@
 #import "Errors.h"
 #import "PacketMacros.h"
 
-@import PartoutCryptoOpenSSL_ObjC;
+@import _PartoutCryptoOpenSSL_ObjC;
 
 static const NSInteger CryptoAEADTagLength = 16;
 static const NSInteger CryptoAEADIdLength = PacketIdLength;

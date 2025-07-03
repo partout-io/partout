@@ -356,13 +356,13 @@ vendors.forEach {
 
             package.targets.append(contentsOf: [
                 .target(
-                    name: "PartoutCryptoOpenSSL_ObjC",
+                    name: "_PartoutCryptoOpenSSL_ObjC",
                     dependencies: [openSSLTarget],
                     path: "Sources/Crypto/OpenSSL_ObjC"
                 ),
                 .testTarget(
-                    name: "PartoutCryptoOpenSSL_ObjCTests",
-                    dependencies: ["PartoutCryptoOpenSSL_ObjC"],
+                    name: "_PartoutCryptoOpenSSL_ObjCTests",
+                    dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
                     path: "Tests/Crypto/OpenSSL_ObjC"
                 )
             ])
@@ -446,7 +446,7 @@ if areas.contains(.openvpn) {
         ),
         .target(
             name: "_PartoutOpenVPNOpenSSL_ObjC",
-            dependencies: ["PartoutCryptoOpenSSL_ObjC"],
+            dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
             path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
             exclude: [
                 "lib/COPYING",

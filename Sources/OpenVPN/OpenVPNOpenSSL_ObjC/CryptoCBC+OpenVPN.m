@@ -41,7 +41,7 @@
 #import "Errors.h"
 #import "PacketMacros.h"
 
-@import PartoutCryptoOpenSSL_ObjC;
+@import _PartoutCryptoOpenSSL_ObjC;
 
 @implementation CryptoCBC (OpenVPN)
 

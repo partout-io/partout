@@ -63,8 +63,8 @@ func CZ(_ native: CZeroingData) -> CZeroingData {
     native
 }
 
-#if canImport(PartoutCryptoOpenSSL_ObjC)
-internal import PartoutCryptoOpenSSL_ObjC
+#if canImport(_PartoutCryptoOpenSSL_ObjC)
+internal import _PartoutCryptoOpenSSL_ObjC
 
 private extension CZeroingData {
     convenience init(_ legacy: ZeroingData) {
