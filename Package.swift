@@ -22,7 +22,7 @@ let areas = {
     var included = Set(Area.allCases)
     included.remove(.documentation) // until ready
 #if os(Windows) || os(Linux)
-    included.remove(.wireguard)
+    included.remove(.wireGuard)
 #endif
     return included
 }()
@@ -61,15 +61,15 @@ enum Area: CaseIterable {
 
     case documentation
 
-    case openvpn
+    case openVPN
 
-    case wireguard
+    case wireGuard
 
     var requirements: Set<Feature> {
         switch self {
-        case .openvpn:
+        case .openVPN:
             return [.crypto, .tls]
-        case .wireguard:
+        case .wireGuard:
             return [.wgBackend]
         default:
             return []
@@ -181,10 +181,10 @@ package.targets.append(contentsOf: [
             if areas.contains(.api) {
                 dependencies.append("PartoutAPI")
             }
-            if areas.contains(.openvpn) {
+            if areas.contains(.openVPN) {
                 dependencies.append("_PartoutOpenVPNCore")
             }
-            if areas.contains(.wireguard) {
+            if areas.contains(.wireGuard) {
                 dependencies.append("_PartoutWireGuardCore")
             }
             return dependencies
@@ -397,7 +397,7 @@ package.targets.append(contentsOf: [
 
 // MARK: - OpenVPN
 
-if areas.contains(.openvpn) {
+if areas.contains(.openVPN) {
     let mainTarget: String
 #if os(Windows) || os(Linux)
     mainTarget = "_PartoutOpenVPN_Cross"
@@ -470,7 +470,7 @@ if areas.contains(.openvpn) {
     package.targets.append(contentsOf: [
         .target(
             name: "_PartoutOpenVPN_C",
-            // FIXME: ###, pick by vendor (.crypto + .tls => .openvpn)
+            // FIXME: ###, pick by vendor (.crypto + .tls => .openVPN)
             dependencies: ["_PartoutCryptoOpenSSL_C"],
             path: "Sources/OpenVPN/OpenVPN_C"
         ),
@@ -509,7 +509,7 @@ if areas.contains(.openvpn) {
 
 // MARK: WireGuard
 
-if areas.contains(.wireguard) {
+if areas.contains(.wireGuard) {
     guard let backendTarget = vendors.firstSupporting(.wgBackend)?.target else {
         fatalError("WireGuard requires 3rd-party backend")
     }
