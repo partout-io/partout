@@ -37,18 +37,6 @@ static const char *const TLSBoxServerEKU = "TLS Web Server Authentication";
 
 static int tls_channel_ex_data_idx = -1;
 
-struct tls_channel_options {
-    int sec_level;
-    size_t buf_len;
-    bool eku;
-    bool san_host;
-    const char *_Nonnull ca_path;
-    const char *_Nullable cert_pem;
-    const char *_Nullable key_pem;
-    const char *_Nullable hostname;
-    void (*_Nonnull on_verify_failure)();
-};
-
 struct tls_channel_t {
     const tls_channel_options *_Nonnull opt;
     bool is_connected;
@@ -78,39 +66,6 @@ int tls_channel_verify_peer(int ok, X509_STORE_CTX *_Nonnull ctx) {
 }
 
 // MARK: -
-
-tls_channel_options *_Nonnull tls_channel_options_create(int sec_level,
-                                                         size_t buf_len,
-                                                         bool eku,
-                                                         bool san_host,
-                                                         const char *_Nonnull ca_path,
-                                                         const char *_Nullable cert_pem,
-                                                         const char *_Nullable key_pem,
-                                                         const char *_Nullable hostname,
-                                                         void (*_Nonnull on_verify_failure)()) {
-
-    assert(ca_path && on_verify_failure);
-
-    tls_channel_options *opt = pp_alloc_crypto(sizeof(tls_channel_options));
-    opt->sec_level = sec_level;
-    opt->buf_len = buf_len;
-    opt->eku = eku;
-    opt->san_host = san_host;
-    opt->ca_path = pp_dup(ca_path);
-    opt->cert_pem = cert_pem ? pp_dup(cert_pem) : NULL;
-    opt->key_pem = key_pem ? pp_dup(key_pem) : NULL;
-    opt->hostname = hostname ? pp_dup(hostname) : NULL;
-    opt->on_verify_failure = on_verify_failure;
-    return opt;
-}
-
-void tls_channel_options_free(tls_channel_options *_Nonnull opt) {
-    free((char *)opt->ca_path);
-    free((char *)opt->cert_pem);
-    free((char *)opt->key_pem);
-    free((char *)opt->hostname);
-    free(opt);
-}
 
 tls_channel_ctx tls_channel_create(const tls_channel_options *opt, tls_error_code *error) {
     SSL_CTX *ssl_ctx = SSL_CTX_new(TLS_client_method());

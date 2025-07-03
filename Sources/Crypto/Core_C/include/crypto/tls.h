@@ -43,7 +43,18 @@ typedef enum {
     TLSErrorServerHost
 } tls_error_code;
 
-typedef struct tls_channel_options tls_channel_options;
+typedef struct {
+    int sec_level;
+    size_t buf_len;
+    bool eku;
+    bool san_host;
+    const char *_Nonnull ca_path;
+    const char *_Nullable cert_pem;
+    const char *_Nullable key_pem;
+    const char *_Nullable hostname;
+    void (*_Nonnull on_verify_failure)();
+} tls_channel_options;
+
 typedef struct tls_channel_t tls_channel_t;
 typedef struct tls_channel_t *tls_channel_ctx;
 
