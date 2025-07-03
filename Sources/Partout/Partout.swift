@@ -28,7 +28,6 @@ import Foundation
 // MARK: Core
 
 @_exported import PartoutCore
-@_exported import PartoutPlatform
 
 // MARK: - Providers
 

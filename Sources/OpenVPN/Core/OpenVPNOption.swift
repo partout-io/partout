@@ -26,7 +26,7 @@
 import Foundation
 
 extension OpenVPN {
-    public enum Option: String, CaseIterable {
+    public enum Option: String, CaseIterable, Sendable {
 
         // MARK: Continuation
 

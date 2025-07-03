@@ -45,7 +45,7 @@
 #import "PacketMacros.h"
 #import "ReplayProtector.h"
 
-@import _PartoutCryptoOpenSSL_ObjC;
+@import PartoutCryptoOpenSSL_ObjC;
 
 #define DataPathByteAlignment   16
 

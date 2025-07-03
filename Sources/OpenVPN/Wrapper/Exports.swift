@@ -27,6 +27,6 @@
 #if canImport(_PartoutOpenVPNOpenSSL)
 @_exported import _PartoutOpenVPNOpenSSL
 #endif
-#if canImport(_PartoutOpenVPNOpenSSL_Cross)
-@_exported import _PartoutOpenVPNOpenSSL_Cross
+#if canImport(_PartoutOpenVPN_Cross)
+@_exported import _PartoutOpenVPN_Cross
 #endif
