@@ -31,12 +31,13 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         let sut = try CryptoCBC(cipherName: nil, digestName: "sha256")
         sut.configureEncryption(withCipherKey: nil, hmacKey: hmacKey)
 
-        do {
-            let flags = newCryptoFlags()
-            let returnedData = try sut.encryptData(plainData, flags: flags)
-            XCTAssertEqual(returnedData, plainHMACData)
-        } catch {
-            XCTFail("Cannot encrypt: \(error)")
+        withCryptoFlags { flags in
+            do {
+                let returnedData = try sut.encryptData(self.plainData, flags: flags)
+                XCTAssertEqual(returnedData, self.plainHMACData)
+            } catch {
+                XCTFail("Cannot encrypt: \(error)")
+            }
         }
     }
 
@@ -44,12 +45,13 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         let sut = try CryptoCBC(cipherName: "aes-128-cbc", digestName: "sha256")
         sut.configureEncryption(withCipherKey: cipherKey, hmacKey: hmacKey)
 
-        do {
-            let flags = newCryptoFlags()
-            let returnedData = try sut.encryptData(plainData, flags: flags)
-            XCTAssertEqual(returnedData, encryptedHMACData)
-        } catch {
-            XCTFail("Cannot encrypt: \(error)")
+        withCryptoFlags { flags in
+            do {
+                let returnedData = try sut.encryptData(self.plainData, flags: flags)
+                XCTAssertEqual(returnedData, self.encryptedHMACData)
+            } catch {
+                XCTFail("Cannot encrypt: \(error)")
+            }
         }
     }
 
@@ -57,12 +59,13 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         let sut = try CryptoCBC(cipherName: nil, digestName: "sha256")
         sut.configureDecryption(withCipherKey: nil, hmacKey: hmacKey)
 
-        do {
-            let flags = newCryptoFlags()
-            let returnedData = try sut.decryptData(plainHMACData, flags: flags)
-            XCTAssertEqual(returnedData, plainData)
-        } catch {
-            XCTFail("Cannot decrypt: \(error)")
+        withCryptoFlags { flags in
+            do {
+                let returnedData = try sut.decryptData(self.plainHMACData, flags: flags)
+                XCTAssertEqual(returnedData, self.plainData)
+            } catch {
+                XCTFail("Cannot decrypt: \(error)")
+            }
         }
     }
 
@@ -70,12 +73,13 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         let sut = try CryptoCBC(cipherName: "aes-128-cbc", digestName: "sha256")
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
 
-        do {
-            let flags = newCryptoFlags()
-            let returnedData = try sut.decryptData(encryptedHMACData, flags: flags)
-            XCTAssertEqual(returnedData, plainData)
-        } catch {
-            XCTFail("Cannot decrypt: \(error)")
+        withCryptoFlags { flags in
+            do {
+                let returnedData = try sut.decryptData(self.encryptedHMACData, flags: flags)
+                XCTAssertEqual(returnedData, self.plainData)
+            } catch {
+                XCTFail("Cannot decrypt: \(error)")
+            }
         }
     }
 
@@ -83,9 +87,10 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         let sut = try CryptoCBC(cipherName: nil, digestName: "sha256")
         sut.configureDecryption(withCipherKey: nil, hmacKey: hmacKey)
 
-        let flags = newCryptoFlags()
-        XCTAssertNoThrow(try sut.verifyData(plainHMACData, flags: flags))
-        XCTAssertNoThrow(try sut.verifyData(encryptedHMACData, flags: flags))
+        try withCryptoFlags { flags in
+            XCTAssertNoThrow(try sut.verifyData(self.plainHMACData, flags: flags))
+            XCTAssertNoThrow(try sut.verifyData(self.encryptedHMACData, flags: flags))
+        }
     }
 }
 

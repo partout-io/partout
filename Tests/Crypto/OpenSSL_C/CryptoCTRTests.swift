@@ -34,23 +34,23 @@ final class CryptoCTRTests: XCTestCase, CryptoFlagsProviding {
             tagLength: 32,
             payloadLength: 128
         )
-
         sut.configureEncryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
-        let encryptedData: Data
 
-        let flags = newCryptoFlags()
-        do {
-            encryptedData = try sut.encryptData(plainData, flags: flags)
-        } catch {
-            XCTFail("Cannot encrypt: \(error)")
-            return
-        }
-        do {
-            let returnedData = try sut.decryptData(encryptedData, flags: flags)
-            XCTAssertEqual(returnedData, plainData)
-        } catch {
-            XCTFail("Cannot decrypt: \(error)")
+        withCryptoFlags { flags in
+            let encryptedData: Data
+            do {
+                encryptedData = try sut.encryptData(self.plainData, flags: flags)
+            } catch {
+                XCTFail("Cannot encrypt: \(error)")
+                return
+            }
+            do {
+                let returnedData = try sut.decryptData(encryptedData, flags: flags)
+                XCTAssertEqual(returnedData, self.plainData)
+            } catch {
+                XCTFail("Cannot decrypt: \(error)")
+            }
         }
     }
 }

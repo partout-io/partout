@@ -59,16 +59,17 @@ protocol CryptoFlagsProviding {
 }
 
 extension CryptoFlagsProviding {
-    func newCryptoFlags() -> CryptoFlagsWrapper {
-        packetId.withUnsafeBufferPointer { iv in
-            ad.withUnsafeBufferPointer { ad in
-                CryptoFlagsWrapper(
+    nonisolated func withCryptoFlags(_ block: @escaping (CryptoFlagsWrapper) throws -> Void) rethrows {
+        try packetId.withUnsafeBufferPointer { iv in
+            try ad.withUnsafeBufferPointer { ad in
+                let flags = CryptoFlagsWrapper(
                     iv: iv.baseAddress,
                     ivLength: iv.count,
                     ad: ad.baseAddress,
                     adLength: ad.count,
                     forTesting: true
                 )
+                try block(flags)
             }
         }
     }
