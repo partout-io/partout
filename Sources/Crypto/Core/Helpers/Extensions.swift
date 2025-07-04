@@ -41,6 +41,14 @@ extension Data {
         }
         self.init(data)
     }
+
+    public func toHex() -> String {
+        var hexString = ""
+        for i in 0..<count {
+            hexString += String(format: "%02x", self[i])
+        }
+        return hexString
+    }
 }
 
 extension UnsafeRawBufferPointer {
