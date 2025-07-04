@@ -53,3 +53,12 @@ extension PartoutError.Code.Providers {
 #if canImport(_PartoutWireGuardCore)
 @_exported import _PartoutWireGuardCore
 #endif
+
+// MARK: - Vendors
+
+@_exported import _PartoutVendorsPortable
+
+#if canImport(_PartoutVendorsApple)
+@_exported import _PartoutVendorsApple
+@_exported import _PartoutVendorsAppleNE
+#endif

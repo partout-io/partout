@@ -42,7 +42,7 @@ extension Data {
         self.init(data)
     }
 
-    public func toHex() -> String {
+    func toHex() -> String {
         var hexString = ""
         for i in 0..<count {
             hexString += String(format: "%02x", self[i])
@@ -57,28 +57,5 @@ extension UnsafeRawBufferPointer {
             fatalError("Cannot bind to self")
         }
         return address
-    }
-}
-
-protocol CryptoFlagsProviding {
-    var packetId: [UInt8] { get }
-
-    var ad: [UInt8] { get }
-}
-
-extension CryptoFlagsProviding {
-    nonisolated func withCryptoFlags(_ block: @escaping (CryptoFlagsWrapper) throws -> Void) rethrows {
-        try packetId.withUnsafeBufferPointer { iv in
-            try ad.withUnsafeBufferPointer { ad in
-                let flags = CryptoFlagsWrapper(
-                    iv: iv.baseAddress,
-                    ivLength: iv.count,
-                    ad: ad.baseAddress,
-                    adLength: ad.count,
-                    forTesting: true
-                )
-                try block(flags)
-            }
-        }
     }
 }
