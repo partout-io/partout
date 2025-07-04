@@ -189,7 +189,9 @@ package.targets.append(contentsOf: [
     .target(
         name: "Partout",
         dependencies: {
-            var dependencies: [Target.Dependency] = ["PartoutProviders"]
+            var dependencies: [Target.Dependency] = []
+            dependencies.append("PartoutProviders")
+            dependencies.append("_PartoutVendorsPortable")
             if vendors.contains(.apple) {
                 dependencies.append("_PartoutVendorsApple")
             }
