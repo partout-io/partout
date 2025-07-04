@@ -121,10 +121,25 @@ enum Vendor: CaseIterable {
         }
     }
 
+    var wrapperTargetName: String? {
+        switch self {
+        case .openSSLApple, .openSSLShared:
+            return "_PartoutCryptoOpenSSL_C"
+        case .windowsCNG:
+            return "_PartoutCryptoCGN_C"
+        default:
+            return nil
+        }
+    }
+
     var features: Set<Feature> {
         switch self {
-        case .appleCrypto, .openSSLApple, .openSSLShared, .windowsCNG:
+        case .appleCrypto:
+            return [.crypto]
+        case .openSSLApple, .openSSLShared:
             return [.crypto, .tls]
+        case .windowsCNG:
+            return [.crypto]
         case .wgAppleGo, .wgLinuxKernel, .wgWindowsNT:
             return [.wgBackend]
         default:
@@ -313,7 +328,7 @@ vendors.forEach {
 
     case .openSSLApple, .openSSLShared:
         guard let openSSLTarget = $0.target else {
-            fatalError("OpenSSL does not provide any target")
+            fatalError("Missing target for vendor \($0)")
         }
 
         // system shared
@@ -350,10 +365,10 @@ vendors.forEach {
             )
         ])
 
-        // legacy (ObjC)
         if $0 == .openSSLApple {
             package.dependencies.append(.package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.5.101"))
 
+            // legacy (ObjC)
             package.targets.append(contentsOf: [
                 .target(
                     name: "_PartoutCryptoOpenSSL_ObjC",
@@ -466,12 +481,28 @@ if areas.contains(.openVPN) {
     ])
 #endif
 
+    guard let cryptoVendor = vendors.firstSupporting(.crypto) else {
+        fatalError("Missing vendor for OpenVPN crypto")
+    }
+    guard let tlsVendor = vendors.firstSupporting(.tls) else {
+        fatalError("Missing vendor for OpenVPN TLS")
+    }
+
+    // merge required targets
+    let backendTargetNames = Set([
+        cryptoVendor.wrapperTargetName,
+        tlsVendor.wrapperTargetName
+    ].compactMap { $0 })
+    guard !backendTargetNames.isEmpty else {
+        fatalError("Missing required targets for OpenVPN")
+    }
+    let backendTargets = backendTargetNames.map(\.asTargetDependency)
+
     // cross-platform (experimental)
     package.targets.append(contentsOf: [
         .target(
             name: "_PartoutOpenVPN_C",
-            // FIXME: ###, pick by vendor (.crypto + .tls => .openVPN)
-            dependencies: ["_PartoutCryptoOpenSSL_C"],
+            dependencies: backendTargets,
             path: "Sources/OpenVPN/OpenVPN_C"
         ),
         .target(
@@ -510,8 +541,11 @@ if areas.contains(.openVPN) {
 // MARK: WireGuard
 
 if areas.contains(.wireGuard) {
-    guard let backendTarget = vendors.firstSupporting(.wgBackend)?.target else {
-        fatalError("WireGuard requires 3rd-party backend")
+    guard let backendVendor = vendors.firstSupporting(.wgBackend) else {
+        fatalError("Missing vendor for WireGuard backend")
+    }
+    guard let backendTarget = backendVendor.target else {
+        fatalError("Missing target for vendor \(backendVendor)")
     }
 
     package.products.append(contentsOf: [
