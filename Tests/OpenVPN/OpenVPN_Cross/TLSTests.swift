@@ -48,9 +48,7 @@ struct TLSTests {
 
 private extension TLSTests {
     func newConfiguration() throws -> OpenVPN.Configuration {
-        guard let url = Bundle.module.url(forResource: "tunnelbear", withExtension: "ovpn") else {
-            fatalError("Unable to find test configuration")
-        }
+        let url = try #require(Bundle.module.url(forResource: "tunnelbear", withExtension: "ovpn"))
         return try StandardOpenVPNParser(decrypter: OSSLKeyDecrypter())
             .parsed(fromURL: url, passphrase: "foobar")
             .configuration

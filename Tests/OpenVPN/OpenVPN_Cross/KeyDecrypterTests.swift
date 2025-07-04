@@ -77,9 +77,6 @@ private extension KeyDecrypterTests {
     }
 
     func path(withName name: String) throws -> String {
-        guard let file = Bundle.module.path(forResource: name, ofType: nil) else {
-            fatalError("Unable to find path for \(name)")
-        }
-        return file
+        try #require(Bundle.module.path(forResource: name, ofType: nil))
     }
 }
