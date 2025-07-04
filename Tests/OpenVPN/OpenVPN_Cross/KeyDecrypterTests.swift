@@ -24,35 +24,50 @@
 //
 
 @testable internal import _PartoutOpenVPN_Cross
-import XCTest
+import Foundation
+import Testing
 
-final class KeyDecrypterTests: XCTestCase {
-    func test_givenPKCS1_whenParse_thenFails() throws {
+struct KeyDecrypterTests {
+    @Test
+    func givenPKCS1_whenParse_thenFails() throws {
         let sut = newDecrypter()
         let path = try path(withName: "tunnelbear.enc.1.key")
-        XCTAssertThrowsError(try sut.decryptedKey(fromPath: path, passphrase: ""))
+        do {
+            _ = try sut.decryptedKey(fromPath: path, passphrase: "")
+            #expect(Bool(false))
+        } catch {
+            //
+        }
     }
 
-    func test_givenPKCS1_whenParseWithPassphrase_thenSucceeds() throws {
+    @Test
+    func givenPKCS1_whenParseWithPassphrase_thenSucceeds() throws {
         let sut = newDecrypter()
         let expected = try String(contentsOfFile: path(withName: "tunnelbear.key"))
         let path = try path(withName: "tunnelbear.enc.1.key")
         let pem = try sut.decryptedKey(fromPath: path, passphrase: "foobar")
-        XCTAssertEqual(pem, expected)
+        #expect(pem == expected)
     }
 
-    func test_givenPKCS8_whenParse_thenFails() throws {
+    @Test
+    func givenPKCS8_whenParse_thenFails() throws {
         let sut = newDecrypter()
         let path = try path(withName: "tunnelbear.enc.8.key")
-        XCTAssertThrowsError(try sut.decryptedKey(fromPath: path, passphrase: ""))
+        do {
+            _ = try sut.decryptedKey(fromPath: path, passphrase: "")
+            #expect(Bool(false))
+        } catch {
+            //
+        }
     }
 
-    func test_givenPKCS8_whenParseWithPassphrase_thenSucceeds() throws {
+    @Test
+    func givenPKCS8_whenParseWithPassphrase_thenSucceeds() throws {
         let sut = newDecrypter()
         let expected = try String(contentsOfFile: path(withName: "tunnelbear.key"))
         let path = try path(withName: "tunnelbear.enc.8.key")
         let pem = try sut.decryptedKey(fromPath: path, passphrase: "foobar")
-        XCTAssertEqual(pem, expected)
+        #expect(pem == expected)
     }
 }
 
@@ -62,6 +77,6 @@ private extension KeyDecrypterTests {
     }
 
     func path(withName name: String) throws -> String {
-        try XCTUnwrap(Bundle.module.path(forResource: name, ofType: nil))
+        try #require(Bundle.module.path(forResource: name, ofType: nil))
     }
 }

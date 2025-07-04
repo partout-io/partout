@@ -24,10 +24,12 @@
 //
 
 @testable internal import _PartoutOpenVPN_Cross
-import XCTest
+import Foundation
+import Testing
 
-final class ControlPacketTests: XCTestCase {
-    func test_givenControlPacket_whenSerialize_thenIsExpected() {
+struct ControlPacketTests {
+    @Test
+    func givenControlPacket_whenSerialize_thenIsExpected() {
         let id: UInt32 = 0x1456
         let code: CPacketCode = .controlV1
         let key: UInt8 = 3
@@ -48,21 +50,27 @@ final class ControlPacketTests: XCTestCase {
         print(serialized.toHex())
         print(expected.toHex())
 
-        XCTAssertEqual(serialized.toHex(), expected.toHex())
+        #expect(serialized.toHex() == expected.toHex())
     }
 
-    func test_givenAckPacket_whenSerialize_thenIsExpected() {
+    @Test
+    func givenAckPacket_whenSerialize_thenIsExpected() {
         let acks: [UInt32] = [0xaa, 0xbb, 0xcc, 0xdd, 0xee]
         let key: UInt8 = 3
         let sessionId = Data(hex: "1122334455667788")
         let remoteSessionId = Data(hex: "a639328cbf03490e")
 
-        let serialized = CControlPacket(key: key, sessionId: sessionId, ackIds: acks, ackRemoteSessionId: remoteSessionId).serialized()
+        let serialized = CControlPacket(
+            key: key,
+            sessionId: sessionId,
+            ackIds: acks,
+            ackRemoteSessionId: remoteSessionId
+        ).serialized()
         let expected = Data(hex: "2b112233445566778805000000aa000000bb000000cc000000dd000000eea639328cbf03490e")
 
         print(serialized)
         print(expected)
 
-        XCTAssertEqual(serialized.toHex(), expected.toHex())
+        #expect(serialized.toHex() == expected.toHex())
     }
 }

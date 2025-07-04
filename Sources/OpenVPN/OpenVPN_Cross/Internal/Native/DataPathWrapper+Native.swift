@@ -163,7 +163,7 @@ extension CDataPath: DataPathTestingProtocol {
 
 // MARK: -
 
-private extension OpenVPN.CompressionFraming {
+extension OpenVPN.CompressionFraming {
     var cNative: compression_framing_t {
         switch self {
         case .disabled: CompressionFramingDisabled

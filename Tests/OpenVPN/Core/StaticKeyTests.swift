@@ -25,26 +25,28 @@
 
 @testable import _PartoutOpenVPNCore
 import PartoutCore
-import XCTest
+import Testing
 
-final class StaticKeyTests: XCTestCase {
-    func test_givenHex_whenBidirectional_thenSameSendReceiveKey() {
+struct StaticKeyTests {
+    @Test
+    func givenHex_whenBidirectional_thenSameSendReceiveKey() {
         let expected = Data(hex: "cf55d863fcbe314df5f0b45dbe974d9bde33ef5b4803c3985531c6c23ca6906d6cd028efc8585d1b9e71003566bd7891b9cc9212bcba510109922eed87f5c8e6")
         let key = OpenVPN.StaticKey(file: content, direction: nil)
-        XCTAssertNotNil(key)
+        #expect(key != nil)
 
-        XCTAssertEqual(key?.hmacSendKey, SecureData(expected))
-        XCTAssertEqual(key?.hmacReceiveKey, SecureData(expected))
+        #expect(key?.hmacSendKey == SecureData(expected))
+        #expect(key?.hmacReceiveKey == SecureData(expected))
     }
 
-    func test_givenHex_whenClient_thenKeysAreExpected() {
+    @Test
+    func givenHex_whenClient_thenKeysAreExpected() {
         let send = Data(hex: "778a6b35a124e700920879f1d003ba93dccdb953cdf32bea03f365760b0ed8002098d4ce20d045b45a83a8432cc737677aed27125592a7148d25c87fdbe0a3f6")
         let receive = Data(hex: "cf55d863fcbe314df5f0b45dbe974d9bde33ef5b4803c3985531c6c23ca6906d6cd028efc8585d1b9e71003566bd7891b9cc9212bcba510109922eed87f5c8e6")
         let key = OpenVPN.StaticKey(file: content, direction: .client)
-        XCTAssertNotNil(key)
+        #expect(key != nil)
 
-        XCTAssertEqual(key?.hmacSendKey, SecureData(send))
-        XCTAssertEqual(key?.hmacReceiveKey, SecureData(receive))
+        #expect(key?.hmacSendKey == SecureData(send))
+        #expect(key?.hmacReceiveKey == SecureData(receive))
     }
 }
 

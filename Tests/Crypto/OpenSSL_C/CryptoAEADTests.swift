@@ -24,43 +24,39 @@
 //
 
 @testable internal import _PartoutCryptoCore
-import XCTest
+import Foundation
+import Testing
 
-final class CryptoAEADTests: XCTestCase, CryptoFlagsProviding {
-    let plainData = Data(hex: "00112233ffddaa")
+private let plainData = Data(hex: "00112233ffddaa")
+private let expectedEncryptedData = Data(hex: "6c56b501472aae003fe988286ea3e72454d1dda1c2fd6c")
+private let cipherKey = CZeroingData(length: 32)
+private let hmacKey = CZeroingData(length: 32)
+private let flags = CryptoFlags(
+    packetId: [0x56, 0x34, 0x12, 0x00],
+    ad: [0x00, 0x12, 0x34, 0x56]
+)
 
-    let expectedEncryptedData = Data(hex: "6c56b501472aae003fe988286ea3e72454d1dda1c2fd6c")
-
-    let cipherKey = CZeroingData(length: 32)
-
-    let hmacKey = CZeroingData(length: 32)
-
-    let packetId: [UInt8] = [0x56, 0x34, 0x12, 0x00]
-
-    let ad: [UInt8] = [0x00, 0x12, 0x34, 0x56]
-
-    func test_givenData_whenEncrypt_thenDecrypts() throws {
-        let sut = try CryptoAEAD(cipherName: "aes-256-gcm", tagLength: 16, idLength: 4)
+struct CryptoAEADTests {
+    @Test(arguments: [
+        ("aes-256-gcm", 16, 4)
+    ])
+    func givenData_whenEncrypt_thenDecrypts(cipherName: String, tagLength: Int, idLength: Int) throws {
+        let sut = try CryptoAEAD(
+            cipherName: cipherName,
+            tagLength: tagLength,
+            idLength: idLength
+        )
         sut.configureEncryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
 
-        withCryptoFlags { flags in
-            let encryptedData: Data
-            do {
-                encryptedData = try sut.encryptData(self.plainData, flags: flags)
-                print("encrypted: \(encryptedData.toHex())")
-                print("expected : \(self.expectedEncryptedData.toHex())")
-                XCTAssertEqual(encryptedData, self.expectedEncryptedData)
-            } catch {
-                XCTFail("Cannot encrypt: \(error)")
-                return
-            }
-            do {
-                let returnedData = try sut.decryptData(encryptedData, flags: flags)
-                XCTAssertEqual(returnedData, self.plainData)
-            } catch {
-                XCTFail("Cannot decrypt: \(error)")
-            }
+        try flags.withUnsafeFlags { flags in
+            let encryptedData = try sut.encryptData(plainData, flags: flags)
+            print("encrypted: \(encryptedData.toHex())")
+            print("expected : \(expectedEncryptedData.toHex())")
+            #expect(encryptedData == expectedEncryptedData)
+
+            let returnedData = try sut.decryptData(encryptedData, flags: flags)
+            #expect(returnedData == plainData)
         }
     }
 }
