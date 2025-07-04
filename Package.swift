@@ -126,7 +126,7 @@ enum Vendor: CaseIterable {
         case .openSSLApple, .openSSLShared:
             return "_PartoutCryptoOpenSSL_C"
         case .windowsCNG:
-            return "_PartoutCryptoCGN_C"
+            return "_PartoutCryptoCNG_C"
         default:
             return nil
         }
