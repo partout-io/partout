@@ -90,30 +90,22 @@ struct PacketProcessorTests {
 //        }
     }
 
-    @Test
-    func givenProcessor_whenObfuscateOutbound_thenIsExpected() {
+    //
+    // original = "832ae7598dfa0378bc19"
+    // ptrpos   = "8228e45d88fc0470b513"
+    // reverse  = "8213b57004fc885de428"
+    // ptrpos   = "8311b67401fa8f55ed22"
+    // mask     = "e52680106098bc658b15"
+    //
+    @Test(arguments: [
+        ("832ae7598dfa0378bc19", "e52680106098bc658b15", PacketProcessor.Direction.outbound),
+        ("e52680106098bc658b15", "832ae7598dfa0378bc19", .inbound)
+    ])
+    func givenProcessor_whenObfuscate_thenIsExpected(input: String, output: String, direction: PacketProcessor.Direction) {
         let sut = PacketProcessor(method: .obfuscate(mask: mask))
-        let data = Data(hex: "832ae7598dfa0378bc19")
-        let processed = sut.processPacket(data, direction: .outbound)
-        let expected = Data(hex: "e52680106098bc658b15")
-
-        // original = "832ae7598dfa0378bc19"
-        // ptrpos   = "8228e45d88fc0470b513"
-        // reverse  = "8213b57004fc885de428"
-        // ptrpos   = "8311b67401fa8f55ed22"
-        // mask     = "e52680106098bc658b15"
-
-        print(data.toHex())
-        print(processed.toHex())
-        #expect(processed == expected)
-    }
-
-    @Test
-    func givenProcessor_whenObfuscateInbound_thenIsExpected() {
-        let sut = PacketProcessor(method: .obfuscate(mask: mask))
-        let data = Data(hex: "e52680106098bc658b15")
-        let processed = sut.processPacket(data, direction: .inbound)
-        let expected = Data(hex: "832ae7598dfa0378bc19")
+        let data = Data(hex: input)
+        let processed = sut.processPacket(data, direction: direction)
+        let expected = Data(hex: output)
 
         print(data.toHex())
         print(processed.toHex())
