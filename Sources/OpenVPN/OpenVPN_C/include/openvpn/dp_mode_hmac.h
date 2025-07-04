@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  dp_mode_hmac.h
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 6/16/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,11 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNCore
-#if canImport(_PartoutOpenVPNOpenSSL)
-@_exported import _PartoutOpenVPNOpenSSL
-#endif
-#if canImport(_PartoutOpenVPN_Cross)
-@_exported import _PartoutOpenVPN_Cross
-#endif
+#pragma once
+
+#include "openvpn/dp_mode.h"
+
+// WARNING: retains crypto
+dp_mode_t *_Nonnull dp_mode_hmac_create(crypto_ctx _Nonnull crypto,
+                                        crypto_free_fn _Nonnull crypto_free,
+                                        compression_framing_t comp_f);

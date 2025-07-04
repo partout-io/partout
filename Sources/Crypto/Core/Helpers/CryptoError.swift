@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  CryptoError.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 6/16/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,18 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNCore
-#if canImport(_PartoutOpenVPNOpenSSL)
-@_exported import _PartoutOpenVPNOpenSSL
-#endif
-#if canImport(_PartoutOpenVPN_Cross)
-@_exported import _PartoutOpenVPN_Cross
-#endif
+import _PartoutCryptoCore_C
+
+enum CryptoError: Error {
+    case creation
+
+    case openssl(crypto_error_code)
+
+    init(_ code: crypto_error_code? = nil) {
+        guard let code else {
+            self = .creation
+            return
+        }
+        self = .openssl(code)
+    }
+}

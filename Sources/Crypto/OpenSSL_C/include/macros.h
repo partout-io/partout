@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  macros.h
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 7/3/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,15 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNCore
-#if canImport(_PartoutOpenVPNOpenSSL)
-@_exported import _PartoutOpenVPNOpenSSL
-#endif
-#if canImport(_PartoutOpenVPN_Cross)
-@_exported import _PartoutOpenVPN_Cross
-#endif
+#pragma once
+
+#define CRYPTO_OPENSSL_SUCCESS(ret) (ret > 0)
+#define CRYPTO_OPENSSL_TRACK_STATUS(ret) if (ret > 0) ret =
+#define CRYPTO_OPENSSL_RETURN_STATUS(ret, raised)\
+if (ret <= 0) {\
+    if (error) {\
+        *error = raised;\
+    }\
+    return false;\
+}\
+return true;

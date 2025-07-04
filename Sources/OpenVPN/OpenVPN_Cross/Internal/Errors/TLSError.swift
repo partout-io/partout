@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  TLSError.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 6/26/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,25 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNCore
-#if canImport(_PartoutOpenVPNOpenSSL)
-@_exported import _PartoutOpenVPNOpenSSL
-#endif
-#if canImport(_PartoutOpenVPN_Cross)
-@_exported import _PartoutOpenVPN_Cross
-#endif
+internal import _PartoutOpenVPN_C
+
+enum TLSError: Error {
+    case missingCA
+
+    case start
+
+    case peerVerification
+
+    case noData
+
+    case encryption
+}
+
+struct CTLSError: Error {
+    let code: tls_error_code
+
+    init(_ code: tls_error_code) {
+        precondition(code != TLSErrorNone)
+        self.code = code
+    }
+}

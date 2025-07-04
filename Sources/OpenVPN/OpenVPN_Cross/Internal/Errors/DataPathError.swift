@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  DataPathError.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 6/16/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,29 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNCore
-#if canImport(_PartoutOpenVPNOpenSSL)
-@_exported import _PartoutOpenVPNOpenSSL
-#endif
-#if canImport(_PartoutOpenVPN_Cross)
-@_exported import _PartoutOpenVPN_Cross
-#endif
+internal import _PartoutOpenVPN_C
+
+enum DataPathError: Error {
+    case creation
+
+    case algorithm
+
+    case overflow
+}
+
+struct CDataPathError: Error {
+    let code: dp_error_code
+
+    static func error(for err: dp_error_t) -> Error {
+        if err.dp_code == DataPathErrorCrypto {
+            return CCryptoError(err.crypto_code)
+        } else {
+            return CDataPathError(err.dp_code)
+        }
+    }
+
+    private init(_ code: dp_error_code) {
+        precondition(code != DataPathErrorNone)
+        self.code = code
+    }
+}

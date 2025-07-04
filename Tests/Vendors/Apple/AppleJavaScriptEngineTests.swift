@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  AppleJavaScriptEngineTests.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 3/26/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,19 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNCore
-#if canImport(_PartoutOpenVPNOpenSSL)
-@_exported import _PartoutOpenVPNOpenSSL
-#endif
-#if canImport(_PartoutOpenVPN_Cross)
-@_exported import _PartoutOpenVPN_Cross
-#endif
+import _PartoutVendorsApple
+import Foundation
+import XCTest
+
+final class AppleJavaScriptEngineTests: XCTestCase {
+    func test_givenEngine_whenInject_thenReturns() async throws {
+        let sut = AppleJavaScriptEngine(.global)
+        sut.inject("triple", object: {
+            3 * $0
+        } as @convention(block) (Int) -> Int)
+        let result = try await sut.execute("""
+triple(40);
+""", after: nil, returning: Int.self)
+        XCTAssertEqual(result, 120)
+    }
+}

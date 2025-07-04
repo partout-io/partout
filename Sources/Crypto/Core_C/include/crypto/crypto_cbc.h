@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  crypto_cbc.h
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 6/14/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,12 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNCore
-#if canImport(_PartoutOpenVPNOpenSSL)
-@_exported import _PartoutOpenVPNOpenSSL
-#endif
-#if canImport(_PartoutOpenVPN_Cross)
-@_exported import _PartoutOpenVPN_Cross
-#endif
+#pragma once
+
+#include "crypto.h"
+#include "crypto/zeroing_data.h"
+
+crypto_ctx _Nullable crypto_cbc_create(const char *_Nullable cipher_name,
+                                       const char *_Nonnull digest_name,
+                                       const crypto_keys_t *_Nullable keys);
+void crypto_cbc_free(crypto_ctx _Nonnull ctx);

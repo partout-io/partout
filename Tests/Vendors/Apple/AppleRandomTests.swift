@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  AppleRandomTests.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 4/9/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,25 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNCore
-#if canImport(_PartoutOpenVPNOpenSSL)
-@_exported import _PartoutOpenVPNOpenSSL
-#endif
-#if canImport(_PartoutOpenVPN_Cross)
-@_exported import _PartoutOpenVPN_Cross
-#endif
+import _PartoutVendorsApple
+import Foundation
+import XCTest
+
+final class AppleRandomTests: XCTestCase {
+    private let sut = AppleRandom()
+
+    func test_givenPRNG_whenGenerateData_thenHasGivenLength() {
+        XCTAssertEqual(sut.data(length: 123).count, 123)
+    }
+
+    func test_givenPRNG_whenGenerateSuite_thenHasGivenParameters() {
+        let length = 52
+        let elements = 680
+        let suite = sut.suite(withDataLength: 52, numberOfElements: 680)
+
+        XCTAssertEqual(suite.count, elements)
+        suite.forEach {
+            XCTAssertEqual($0.count, length)
+        }
+    }
+}

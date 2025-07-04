@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  PlatformPRNG.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 1/14/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,26 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNCore
-#if canImport(_PartoutOpenVPNOpenSSL)
-@_exported import _PartoutOpenVPNOpenSSL
-#endif
-#if canImport(_PartoutOpenVPN_Cross)
-@_exported import _PartoutOpenVPN_Cross
-#endif
+import _PartoutCryptoCore
+import _PartoutCryptoCore_C
+import _PartoutVendorsPortable_C
+import Foundation
+import PartoutCore
+
+public final class PlatformPRNG: PRNGProtocol {
+    public init() {
+    }
+
+    public func uint32() -> UInt32 {
+        fatalError("Not supported")
+    }
+
+    public func data(length: Int) -> Data {
+        precondition(length > 0)
+        let randomData = zd_create(length)
+        guard prng_do(randomData.pointee.bytes, length) else {
+            fatalError("prng_do() failed")
+        }
+        return Data(zeroing: randomData)
+    }
+}

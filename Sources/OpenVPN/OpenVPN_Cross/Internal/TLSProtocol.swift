@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  TLSProtocol.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 6/24/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,23 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNCore
-#if canImport(_PartoutOpenVPNOpenSSL)
-@_exported import _PartoutOpenVPNOpenSSL
-#endif
-#if canImport(_PartoutOpenVPN_Cross)
-@_exported import _PartoutOpenVPN_Cross
-#endif
+internal import _PartoutCryptoCore
+import Foundation
+
+protocol TLSProtocol {
+    func start() throws
+
+    func isConnected() -> Bool
+
+    func putPlainText(_ text: String) throws
+
+    func putRawPlainText(_ text: Data) throws
+
+    func putCipherText(_ data: Data) throws
+
+    func pullPlainText() throws -> Data
+
+    func pullCipherText() throws -> Data
+
+    func caMD5() throws -> String
+}

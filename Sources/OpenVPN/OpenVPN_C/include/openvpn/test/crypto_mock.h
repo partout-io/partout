@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  crypto_mock.h
 //  Partout
 //
-//  Created by Davide De Rosa on 1/10/25.
+//  Created by Davide De Rosa on 6/16/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,13 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNCore
-#if canImport(_PartoutOpenVPNOpenSSL)
-@_exported import _PartoutOpenVPNOpenSSL
-#endif
-#if canImport(_PartoutOpenVPN_Cross)
-@_exported import _PartoutOpenVPN_Cross
-#endif
+#pragma once
+
+#include "crypto/crypto.h"
+
+typedef struct {
+    crypto_t crypto;
+} crypto_mock_t;
+
+crypto_ctx _Nonnull crypto_mock_create();
+void crypto_mock_free(crypto_ctx _Nonnull ctx);
