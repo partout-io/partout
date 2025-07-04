@@ -1,5 +1,5 @@
 //
-//  TLSErrorTests.swift
+//  TLSTests.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/28/25.
@@ -25,41 +25,41 @@
 
 import _PartoutOpenVPNCore
 @testable internal import _PartoutOpenVPN_Cross
-import XCTest
+import Foundation
+import Testing
 
-final class TLSErrorTests: XCTestCase {
+struct TLSTests {
     let cachesURL = FileManager.default.temporaryDirectory
 
 #if canImport(_PartoutOpenVPNOpenSSL_ObjC)
-    func test_givenTLS_whenCAMD5_thenIsExpected() throws {
-        let params = emptyParameters()
+    @Test
+    func givenTLS_whenCAMD5_thenIsExpected() throws {
+        let params = try emptyParameters()
         let native = try TLSWrapper.native(with: params)
         let legacy = try TLSWrapper.legacy(with: params)
         let nativeMD5 = try native.tls.caMD5()
         let legacyMD5 = try legacy.tls.caMD5()
         print(nativeMD5)
         print(legacyMD5)
-        XCTAssertEqual(nativeMD5, legacyMD5)
+        #expect(nativeMD5 == legacyMD5)
     }
 #endif
 }
 
-private extension TLSErrorTests {
-    func newConfiguration() -> OpenVPN.Configuration {
-        do {
-            let url = try XCTUnwrap(Bundle.module.url(forResource: "tunnelbear", withExtension: "ovpn"))
-            return try StandardOpenVPNParser(decrypter: OSSLKeyDecrypter())
-                .parsed(fromURL: url, passphrase: "foobar")
-                .configuration
-        } catch {
+private extension TLSTests {
+    func newConfiguration() throws -> OpenVPN.Configuration {
+        guard let url = Bundle.module.url(forResource: "tunnelbear", withExtension: "ovpn") else {
             fatalError("Unable to find test configuration")
         }
+        return try StandardOpenVPNParser(decrypter: OSSLKeyDecrypter())
+            .parsed(fromURL: url, passphrase: "foobar")
+            .configuration
     }
 
-    func emptyParameters() -> TLSWrapper.Parameters {
+    func emptyParameters() throws -> TLSWrapper.Parameters {
         TLSWrapper.Parameters(
             cachesURL: cachesURL,
-            cfg: newConfiguration(),
+            cfg: try newConfiguration(),
             onVerificationFailure: {}
         )
     }
