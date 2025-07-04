@@ -36,7 +36,7 @@ struct KeyDecrypterTests {
             _ = try sut.decryptedKey(fromPath: path, passphrase: "")
             #expect(Bool(false))
         } catch {
-            #expect(Bool(true))
+            //
         }
     }
 
@@ -57,7 +57,7 @@ struct KeyDecrypterTests {
             _ = try sut.decryptedKey(fromPath: path, passphrase: "")
             #expect(Bool(false))
         } catch {
-            #expect(Bool(true))
+            //
         }
     }
 
