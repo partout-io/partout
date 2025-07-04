@@ -27,47 +27,40 @@
 import XCTest
 
 final class CryptoAEADTests: XCTestCase, CryptoFlagsProviding {
+    let plainData = Data(hex: "00112233ffddaa")
+
+    let expectedEncryptedData = Data(hex: "6c56b501472aae003fe988286ea3e72454d1dda1c2fd6c")
+
+    let cipherKey = CZeroingData(length: 32)
+
+    let hmacKey = CZeroingData(length: 32)
+
+    let packetId: [UInt8] = [0x56, 0x34, 0x12, 0x00]
+
+    let ad: [UInt8] = [0x00, 0x12, 0x34, 0x56]
+
     func test_givenData_whenEncrypt_thenDecrypts() throws {
         let sut = try CryptoAEAD(cipherName: "aes-256-gcm", tagLength: 16, idLength: 4)
-        let flags = newCryptoFlags()
-
         sut.configureEncryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
-        let encryptedData: Data
 
-        do {
-            encryptedData = try sut.encryptData(plainData, flags: flags)
-        } catch {
-            XCTFail("Cannot encrypt: \(error)")
-            return
+        withCryptoFlags { flags in
+            let encryptedData: Data
+            do {
+                encryptedData = try sut.encryptData(self.plainData, flags: flags)
+                print("encrypted: \(encryptedData.toHex())")
+                print("expected : \(self.expectedEncryptedData.toHex())")
+                XCTAssertEqual(encryptedData, self.expectedEncryptedData)
+            } catch {
+                XCTFail("Cannot encrypt: \(error)")
+                return
+            }
+            do {
+                let returnedData = try sut.decryptData(encryptedData, flags: flags)
+                XCTAssertEqual(returnedData, self.plainData)
+            } catch {
+                XCTFail("Cannot decrypt: \(error)")
+            }
         }
-        do {
-            let returnedData = try sut.decryptData(encryptedData, flags: flags)
-            XCTAssertEqual(returnedData, plainData)
-        } catch {
-            XCTFail("Cannot decrypt: \(error)")
-        }
-    }
-}
-
-extension CryptoAEADTests {
-    var cipherKey: CZeroingData {
-        CZeroingData(length: 32)
-    }
-
-    var hmacKey: CZeroingData {
-        CZeroingData(length: 32)
-    }
-
-    var plainData: Data {
-        Data(hex: "00112233ffddaa")
-    }
-
-    var packetId: [UInt8] {
-        [0x56, 0x34, 0x12, 0x00]
-    }
-
-    var ad: [UInt8] {
-        [0x00, 0x12, 0x34, 0x56]
     }
 }

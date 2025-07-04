@@ -28,7 +28,6 @@ internal import _PartoutOpenVPN_C
 @testable internal import _PartoutOpenVPN_Cross
 import XCTest
 
-// FIXME: ###, random failures, unsafe crypto flags or programming errors?
 final class DataPathADTests: XCTestCase, DataPathTestsProtocol {
     let peerId: UInt32 = 0x01
 

@@ -48,14 +48,14 @@ extension API.V6.Mapper {
 
 #if canImport(_PartoutVendorsApple)
 
-internal import _PartoutVendorsApple
+import _PartoutVendorsApple
 
 private func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine {
     AppleJavaScriptEngine(ctx)
 }
 
 extension AppleJavaScriptEngine: APIScriptingEngine {
-    func inject(from vm: APIEngine.VirtualMachine) {
+    public func inject(from vm: APIEngine.VirtualMachine) {
         inject("getText", object: vm.getText as @convention(block) (String) -> Any?)
         inject("getJSON", object: vm.getJSON as @convention(block) (String) -> Any?)
         inject("jsonToBase64", object: vm.jsonToBase64 as @convention(block) (Any) -> String?)

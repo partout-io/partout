@@ -106,7 +106,7 @@ enum Vendor: CaseIterable {
     // TODO: ###, crypto/TLS on Windows
     case windowsCNG
 
-    var target: Target.Dependency? {
+    var dependency: Target.Dependency? {
         switch self {
         case .apple:
             return "_PartoutVendorsApple"
@@ -121,7 +121,7 @@ enum Vendor: CaseIterable {
         }
     }
 
-    var wrapperTargetName: String? {
+    var wrapperTarget: String? {
         switch self {
         case .openSSLApple, .openSSLShared:
             return "_PartoutCryptoOpenSSL_C"
@@ -189,7 +189,9 @@ package.targets.append(contentsOf: [
     .target(
         name: "Partout",
         dependencies: {
-            var dependencies: [Target.Dependency] = ["PartoutProviders"]
+            var dependencies: [Target.Dependency] = []
+            dependencies.append("PartoutProviders")
+            dependencies.append("_PartoutVendorsPortable")
             if vendors.contains(.apple) {
                 dependencies.append("_PartoutVendorsApple")
             }
@@ -327,7 +329,7 @@ vendors.forEach {
         ])
 
     case .openSSLApple, .openSSLShared:
-        guard let openSSLTarget = $0.target else {
+        guard let openSSLDependency = $0.dependency else {
             fatalError("Missing target for vendor \($0)")
         }
 
@@ -351,7 +353,7 @@ vendors.forEach {
                 name: "_PartoutCryptoOpenSSL_C",
                 dependencies: [
                     "_PartoutCryptoCore",
-                    openSSLTarget
+                    openSSLDependency
                 ],
                 path: "Sources/Crypto/OpenSSL_C"
             ),
@@ -372,7 +374,7 @@ vendors.forEach {
             package.targets.append(contentsOf: [
                 .target(
                     name: "_PartoutCryptoOpenSSL_ObjC",
-                    dependencies: [openSSLTarget],
+                    dependencies: [openSSLDependency],
                     path: "Sources/Crypto/OpenSSL_ObjC"
                 ),
                 .testTarget(
@@ -489,14 +491,14 @@ if areas.contains(.openVPN) {
     }
 
     // merge required targets
-    let backendTargetNames = Set([
-        cryptoVendor.wrapperTargetName,
-        tlsVendor.wrapperTargetName
+    let backendDependencyTargets = Set([
+        cryptoVendor.wrapperTarget,
+        tlsVendor.wrapperTarget
     ].compactMap { $0 })
-    guard !backendTargetNames.isEmpty else {
+    guard !backendDependencyTargets.isEmpty else {
         fatalError("Missing required targets for OpenVPN")
     }
-    let backendTargets = backendTargetNames.map(\.asTargetDependency)
+    let backendTargets = backendDependencyTargets.map(\.asTargetDependency)
 
     // cross-platform (experimental)
     package.targets.append(contentsOf: [
@@ -544,7 +546,7 @@ if areas.contains(.wireGuard) {
     guard let backendVendor = vendors.firstSupporting(.wgBackend) else {
         fatalError("Missing vendor for WireGuard backend")
     }
-    guard let backendTarget = backendVendor.target else {
+    guard let backendDependency = backendVendor.dependency else {
         fatalError("Missing target for vendor \(backendVendor)")
     }
 
@@ -579,7 +581,7 @@ if areas.contains(.wireGuard) {
             dependencies: [
                 "_PartoutWireGuardC",
                 "_PartoutWireGuardCore",
-                backendTarget
+                backendDependency
             ],
             path: "Sources/WireGuard/WireGuardGo",
         ),

@@ -1,8 +1,8 @@
 //
-//  Extensions+Native.swift
+//  CryptoFlagsProviding.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 6/16/25.
+//  Created by Davide De Rosa on 1/14/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,33 +23,27 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutCryptoCore_C
+@testable internal import _PartoutCryptoCore
 
-extension CryptoFlagsWrapper {
-    init(cFlags: crypto_flags_t) {
-        iv = cFlags.iv
-        ivLength = cFlags.iv_len
-        ad = cFlags.ad
-        adLength = cFlags.ad_len
-        forTesting = cFlags.for_testing == 1
-    }
+protocol CryptoFlagsProviding {
+    var packetId: [UInt8] { get }
 
-    var cFlags: crypto_flags_t {
-        var flags = crypto_flags_t()
-        flags.iv = iv
-        flags.iv_len = ivLength
-        flags.ad = ad
-        flags.ad_len = adLength
-        flags.for_testing = forTesting ? 1 : 0
-        return flags
-    }
+    var ad: [UInt8] { get }
 }
 
-extension Optional where Wrapped == CryptoFlagsWrapper {
-    func pointer(to cFlags: UnsafeMutablePointer<crypto_flags_t>) -> UnsafeMutablePointer<crypto_flags_t>? {
-        map {
-            cFlags.pointee = $0.cFlags
-            return cFlags
+extension CryptoFlagsProviding {
+    nonisolated func withCryptoFlags(_ block: @escaping (CryptoFlagsWrapper) throws -> Void) rethrows {
+        try packetId.withUnsafeBufferPointer { iv in
+            try ad.withUnsafeBufferPointer { ad in
+                let flags = CryptoFlagsWrapper(
+                    iv: iv.baseAddress,
+                    ivLength: iv.count,
+                    ad: ad.baseAddress,
+                    adLength: ad.count,
+                    forTesting: true
+                )
+                try block(flags)
+            }
         }
     }
 }

@@ -45,6 +45,14 @@ typedef struct {
     uint8_t *_Nonnull iv_dec;
 } crypto_aead_ctx;
 
+static inline
+void local_prepare_iv(const void *vctx, uint8_t *_Nonnull iv, const zeroing_data_t *_Nonnull hmac_key) {
+    crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
+    assert(ctx);
+    bzero(iv, ctx->id_len);
+    memcpy(iv + ctx->id_len, hmac_key->bytes, ctx->cipher_iv_len - ctx->id_len);
+}
+
 size_t local_encryption_capacity(const void *vctx, size_t len) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
     assert(ctx);
@@ -62,8 +70,7 @@ void local_configure_encrypt(void *vctx,
     EVP_CIPHER_CTX_reset(ctx->ctx_enc);
     EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1);
 
-    pp_zero(ctx->iv_enc, ctx->id_len);
-    memcpy(ctx->iv_enc + ctx->id_len, hmac_key->bytes, ctx->cipher_iv_len - ctx->id_len);
+    local_prepare_iv(ctx, ctx->iv_enc, hmac_key);
 }
 
 static
@@ -104,8 +111,7 @@ void local_configure_decrypt(void *vctx,
     EVP_CIPHER_CTX_reset(ctx->ctx_dec);
     EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0);
 
-    pp_zero(ctx->iv_dec, ctx->id_len);
-    memcpy(ctx->iv_dec + ctx->id_len, hmac_key->bytes, ctx->cipher_iv_len - ctx->id_len);
+    local_prepare_iv(ctx, ctx->iv_dec, hmac_key);
 }
 
 static
