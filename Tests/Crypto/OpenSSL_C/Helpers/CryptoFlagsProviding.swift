@@ -25,14 +25,14 @@
 
 @testable internal import _PartoutCryptoCore
 
-protocol CryptoFlagsProviding {
-    var packetId: [UInt8] { get }
+struct CryptoFlags {
+    let packetId: [UInt8]
 
-    var ad: [UInt8] { get }
+    let ad: [UInt8]
 }
 
-extension CryptoFlagsProviding {
-    nonisolated func withCryptoFlags(_ block: @escaping (CryptoFlagsWrapper) throws -> Void) rethrows {
+extension CryptoFlags {
+    func withUnsafeFlags( _ block: @escaping (CryptoFlagsWrapper) throws -> Void) rethrows {
         try packetId.withUnsafeBufferPointer { iv in
             try ad.withUnsafeBufferPointer { ad in
                 let flags = CryptoFlagsWrapper(
