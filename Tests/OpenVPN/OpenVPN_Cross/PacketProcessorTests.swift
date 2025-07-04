@@ -25,6 +25,7 @@
 
 import _PartoutOpenVPNCore
 @testable internal import _PartoutOpenVPN_Cross
+import Foundation
 import PartoutCore
 import Testing
 

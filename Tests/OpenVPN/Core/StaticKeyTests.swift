@@ -24,6 +24,7 @@
 //
 
 @testable import _PartoutOpenVPNCore
+import Foundation
 import PartoutCore
 import Testing
 
