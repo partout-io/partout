@@ -89,6 +89,7 @@ bool local_encrypt(void *vctx,
     assert(!ctx->cipher || ctx->ctx_enc);
     assert(ctx->hmac_key_enc);
 
+    // output = [-digest-|-iv-|-payload-]
     uint8_t *out_iv = dst + ctx->digest_len;
     uint8_t *out_encrypted = out_iv + ctx->cipher_iv_len;
     int l1 = 0, l2 = 0;
