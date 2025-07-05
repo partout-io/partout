@@ -103,8 +103,11 @@ enum Vendor: CaseIterable {
     // TODO: ###, WireGuard on Windows
     case wgWindowsNT
 
-    // TODO: ###, crypto/TLS on Windows
+    // TODO: ###, crypto on Windows
     case windowsCNG
+
+    // TODO: ###, TLS on Windows
+    case windowsSchannel
 
     var dependency: Target.Dependency? {
         switch self {
@@ -116,6 +119,8 @@ enum Vendor: CaseIterable {
             return "_PartoutVendorsOpenSSL"
         case .wgAppleGo:
             return "wg-go-apple"
+        case .windowsCNG:
+            return "_PartoutCryptoCNG_C"
         default:
             return nil
         }
@@ -134,12 +139,10 @@ enum Vendor: CaseIterable {
 
     var features: Set<Feature> {
         switch self {
-        case .appleCrypto:
+        case .appleCrypto, .windowsCNG:
             return [.crypto]
         case .openSSLApple, .openSSLShared:
             return [.crypto, .tls]
-        case .windowsCNG:
-            return [.crypto]
         case .wgAppleGo, .wgLinuxKernel, .wgWindowsNT:
             return [.wgBackend]
         default:
@@ -387,6 +390,24 @@ vendors.forEach {
 
     case .wgAppleGo:
         package.dependencies.append(.package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.20250630"))
+
+    case .windowsCNG:
+        package.targets.append(contentsOf: [
+            .target(
+                name: "_PartoutCryptoCNG_C",
+                dependencies: ["_PartoutCryptoCore"],
+                path: "Sources/Crypto/CNG_C",
+                publicHeadersPath: "."
+            ),
+            .testTarget(
+                name: "_PartoutCryptoCNG_CTests",
+                dependencies: ["_PartoutCryptoCNG_C"],
+                path: "Tests/Crypto/CNG_C",
+                exclude: [
+                    "CryptoPerformanceTests.swift"
+                ]
+            )
+        ])
 
     default:
         break
