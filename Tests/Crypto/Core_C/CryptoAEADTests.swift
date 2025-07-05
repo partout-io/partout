@@ -27,8 +27,8 @@
 import Foundation
 import Testing
 
-private let plainData = Data(hex: "00112233ffddaa")
-private let expectedEncryptedData = Data(hex: "6c56b501472aae003fe988286ea3e72454d1dda1c2fd6c")
+private let plainHex = "00112233ffddaa"
+private let expectedEncryptedHex = "6c56b501472aae003fe988286ea3e72454d1dda1c2fd6c"
 private let cipherKey = CZeroingData(length: 32)
 private let hmacKey = CZeroingData(length: 32)
 private let flags = CryptoFlags(
@@ -50,13 +50,13 @@ struct CryptoAEADTests {
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
 
         try flags.withUnsafeFlags { flags in
-            let encryptedData = try sut.encryptData(plainData, flags: flags)
+            let encryptedData = try sut.encryptData(Data(hex: plainHex), flags: flags)
             print("encrypted: \(encryptedData.toHex())")
-            print("expected : \(expectedEncryptedData.toHex())")
-            #expect(encryptedData == expectedEncryptedData)
+            print("expected : \(expectedEncryptedHex)")
+            #expect(encryptedData.toHex() == expectedEncryptedHex)
 
             let returnedData = try sut.decryptData(encryptedData, flags: flags)
-            #expect(returnedData == plainData)
+            #expect(returnedData.toHex() == plainHex)
         }
     }
 }

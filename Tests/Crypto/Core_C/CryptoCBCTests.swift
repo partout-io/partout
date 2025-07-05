@@ -27,9 +27,9 @@
 import Foundation
 import Testing
 
-private let plainData = Data(hex: "00112233ffddaa")
-private let plainHMACData = Data(hex: "8dd324c81ca32f52e4aa1aa35139deba799a68460e80b0e5ac8bceb043edf6e500112233ffddaa")
-private let encryptedHMACData = Data(hex: "fea3fe87ee68eb21c697e62d3c29f7bea2f5b457d9a7fa66291322fc9c2fe6f700000000000000000000000000000000ebe197e706c3c5dcad026f4e3af1048b")
+private let plainHex = "00112233ffddaa"
+private let plainHMACHex = "8dd324c81ca32f52e4aa1aa35139deba799a68460e80b0e5ac8bceb043edf6e500112233ffddaa"
+private let encryptedHMACHex = "fea3fe87ee68eb21c697e62d3c29f7bea2f5b457d9a7fa66291322fc9c2fe6f700000000000000000000000000000000ebe197e706c3c5dcad026f4e3af1048b"
 private let cipherKey = CZeroingData(length: 32)
 private let hmacKey = CZeroingData(length: 32)
 private let flags = CryptoFlags(
@@ -39,49 +39,49 @@ private let flags = CryptoFlags(
 
 struct CryptoCBCTests {
     @Test(arguments: [
-        (nil, "sha256", plainHMACData),
-        ("aes-128-cbc", "sha256", encryptedHMACData)
+        (nil as String?, "sha256", plainHMACHex),
+        ("aes-128-cbc", "sha256", encryptedHMACHex)
     ])
-    func givenDecrypted_whenEncrypt_thenEncodes(cipherName: String?, digestName: String, expected: Data) throws {
+    func givenDecrypted_whenEncrypt_thenIsExpected(cipherName: String?, digestName: String, expected: String) throws {
         let sut = try CryptoCBC(cipherName: cipherName, digestName: digestName)
         sut.configureEncryption(withCipherKey: cipherName != nil ? cipherKey : nil, hmacKey: hmacKey)
 
         let id = "\(cipherName ?? "nil"):\(digestName)"
         try flags.withUnsafeFlags { flags in
-            let returnedData = try sut.encryptData(plainData, flags: flags)
-            print("\(id):plain   : \(returnedData.toHex())")
-            print("\(id):expected: \(expected.toHex())")
-            #expect(returnedData == expected)
+            let returnedData = try sut.encryptData(Data(hex: plainHex), flags: flags)
+            NSLog("\(id):encrypted: \(returnedData.toHex())")
+            NSLog("\(id):expected : \(expected)")
+            #expect(returnedData.toHex() == expected)
         }
     }
 
     @Test(arguments: [
-        (nil, "sha256", plainHMACData, plainData),
-        ("aes-128-cbc", "sha256", encryptedHMACData, plainData)
+        (nil as String?, "sha256", plainHMACHex, plainHex),
+        ("aes-128-cbc", "sha256", encryptedHMACHex, plainHex)
     ])
-    func givenEncryptedWithHMAC_thenDecrypts(cipherName: String?, digestName: String, encrypted: Data, expected: Data) throws {
+    func givenEncryptedWithHMAC_whenDecrypt_thenIsExpected(cipherName: String?, digestName: String, encrypted: String, expected: String) throws {
         let sut = try CryptoCBC(cipherName: cipherName, digestName: digestName)
         sut.configureDecryption(withCipherKey: cipherName != nil ? cipherKey : nil, hmacKey: hmacKey)
 
         let id = "\(cipherName ?? "nil"):\(digestName)"
         try flags.withUnsafeFlags { flags in
-            let returnedData = try sut.decryptData(encrypted, flags: flags)
-            print("\(id):decoded : \(returnedData.toHex())")
-            print("\(id):expected: \(expected.toHex())")
-            #expect(returnedData == expected)
+            let returnedData = try sut.decryptData(Data(hex: encrypted), flags: flags)
+            print("\(id):decrypted : \(returnedData.toHex())")
+            print("\(id):expected : \(expected)")
+            #expect(returnedData.toHex() == expected)
         }
     }
 
     @Test(arguments: [
-        ("sha256", plainHMACData),
-        ("sha256", encryptedHMACData)
+        ("sha256", plainHMACHex),
+        ("sha256", encryptedHMACHex)
     ])
-    func givenHMAC_thenVerifies(digestName: String, encrypted: Data) throws {
+    func givenHMAC_whenVerify_thenSucceeds(digestName: String, encrypted: String) throws {
         let sut = try CryptoCBC(cipherName: nil, digestName: digestName)
         sut.configureDecryption(withCipherKey: nil, hmacKey: hmacKey)
 
         try flags.withUnsafeFlags { flags in
-            try sut.verifyData(encrypted, flags: flags)
+            try sut.verifyData(Data(hex: encrypted), flags: flags)
         }
     }
 }

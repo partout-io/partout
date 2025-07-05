@@ -30,7 +30,7 @@ let areas = {
 // external packages
 let vendors: [Vendor]
 #if os(Windows)
-vendors = [.windowsCNG]
+vendors = [.windowsCrypto]
 #elseif os(Linux)
 vendors = [.openSSLShared]
 #else
@@ -101,11 +101,8 @@ enum Vendor: CaseIterable {
     // TODO: ###, WireGuard on Windows
     case wgWindowsNT
 
-    // TODO: ###, crypto on Windows
-    case windowsCNG
-
-    // TODO: ###, TLS on Windows
-    case windowsSchannel
+    // TODO: ###, crypto/TLS on Windows
+    case windowsCrypto
 
     var dependency: Target.Dependency? {
         switch self {
@@ -117,8 +114,8 @@ enum Vendor: CaseIterable {
             return "_PartoutVendorsOpenSSL"
         case .wgAppleGo:
             return "wg-go-apple"
-        case .windowsCNG:
-            return "_PartoutCryptoCNG_C"
+        case .windowsCrypto:
+            return "_PartoutCryptoWindows_C"
         default:
             return nil
         }
@@ -128,8 +125,8 @@ enum Vendor: CaseIterable {
         switch self {
         case .openSSLApple, .openSSLShared:
             return "_PartoutCryptoOpenSSL_C"
-        case .windowsCNG:
-            return "_PartoutCryptoCNG_C"
+        case .windowsCrypto:
+            return "_PartoutCryptoWindows_C"
         default:
             return nil
         }
@@ -139,7 +136,7 @@ enum Vendor: CaseIterable {
         switch self {
         case .appleCrypto,
             .openSSLApple, .openSSLShared,
-            .windowsCNG:
+            .windowsCrypto:
             return [.crypto]
         case .wgAppleGo, .wgLinuxKernel, .wgWindowsNT:
             return [.wgBackend]
@@ -331,7 +328,7 @@ vendors.forEach {
 
     case .openSSLApple, .openSSLShared:
         guard let openSSLDependency = $0.dependency else {
-            fatalError("Missing target for vendor \($0)")
+            fatalError("Missing dependency target for vendor \($0)")
         }
 
         // system shared
@@ -381,12 +378,12 @@ vendors.forEach {
     case .wgAppleGo:
         package.dependencies.append(.package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.20250630"))
 
-    case .windowsCNG:
+    case .windowsCrypto:
         package.targets.append(contentsOf: [
             .target(
-                name: "_PartoutCryptoCNG_C",
+                name: "_PartoutCryptoWindows_C",
                 dependencies: ["_PartoutCryptoCore"],
-                path: "Sources/Crypto/CNG_C",
+                path: "Sources/Crypto/Windows_C",
                 publicHeadersPath: "."
             )
         ])
@@ -565,7 +562,7 @@ if areas.contains(.wireGuard) {
         fatalError("Missing vendor for WireGuard backend")
     }
     guard let backendDependency = backendVendor.dependency else {
-        fatalError("Missing target for vendor \(backendVendor)")
+        fatalError("Missing dependency target for vendor \(backendVendor)")
     }
 
     package.products.append(contentsOf: [
