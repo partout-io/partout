@@ -68,7 +68,7 @@ enum Area: CaseIterable {
     var requirements: Set<Feature> {
         switch self {
         case .openVPN:
-            return [.crypto, .tls]
+            return [.crypto]
         case .wireGuard:
             return [.wgBackend]
         default:
@@ -79,8 +79,6 @@ enum Area: CaseIterable {
 
 enum Feature {
     case crypto
-
-    case tls
 
     case wgBackend
 }
@@ -139,10 +137,10 @@ enum Vendor: CaseIterable {
 
     var features: Set<Feature> {
         switch self {
-        case .appleCrypto, .windowsCNG:
+        case .appleCrypto,
+            .openSSLApple, .openSSLShared,
+            .windowsCNG:
             return [.crypto]
-        case .openSSLApple, .openSSLShared:
-            return [.crypto, .tls]
         case .wgAppleGo, .wgLinuxKernel, .wgWindowsNT:
             return [.wgBackend]
         default:
@@ -359,14 +357,6 @@ vendors.forEach {
                     openSSLDependency
                 ],
                 path: "Sources/Crypto/OpenSSL_C"
-            ),
-            .testTarget(
-                name: "_PartoutCryptoOpenSSL_CTests",
-                dependencies: ["_PartoutCryptoOpenSSL_C"],
-                path: "Tests/Crypto/OpenSSL_C",
-                exclude: [
-                    "CryptoPerformanceTests.swift"
-                ]
             )
         ])
 
@@ -398,14 +388,6 @@ vendors.forEach {
                 dependencies: ["_PartoutCryptoCore"],
                 path: "Sources/Crypto/CNG_C",
                 publicHeadersPath: "."
-            ),
-            .testTarget(
-                name: "_PartoutCryptoCNG_CTests",
-                dependencies: ["_PartoutCryptoCNG_C"],
-                path: "Tests/Crypto/CNG_C",
-                exclude: [
-                    "CryptoPerformanceTests.swift"
-                ]
             )
         ])
 
@@ -425,13 +407,32 @@ package.targets.append(contentsOf: [
     .target(
         name: "_PartoutCryptoCore_C",
         path: "Sources/Crypto/Core_C"
-    ),
-    .testTarget(
-        name: "_PartoutCryptoCoreTests",
-        dependencies: ["_PartoutCryptoCore"],
-        path: "Tests/Crypto/Core"
     )
 ])
+
+if let cryptoVendor = vendors.firstSupporting(.crypto) {
+    guard let wrapperTarget = cryptoVendor.wrapperTarget else {
+        fatalError("Missing wrapper target for crypto vendor \(cryptoVendor)")
+    }
+    package.targets.append(contentsOf: [
+        .testTarget(
+            name: "_PartoutCryptoCoreTests",
+            dependencies: ["_PartoutCryptoCore"],
+            path: "Tests/Crypto/Core"
+        ),
+        .testTarget(
+            name: "_PartoutCryptoCore_CTests",
+            dependencies: [
+                "_PartoutCryptoCore",
+                wrapperTarget.asTargetDependency
+            ],
+            path: "Tests/Crypto/Core_C",
+            exclude: [
+                "CryptoPerformanceTests.swift"
+            ]
+        )
+    ])
+}
 
 // MARK: - OpenVPN
 
@@ -507,14 +508,10 @@ if areas.contains(.openVPN) {
     guard let cryptoVendor = vendors.firstSupporting(.crypto) else {
         fatalError("Missing vendor for OpenVPN crypto")
     }
-    guard let tlsVendor = vendors.firstSupporting(.tls) else {
-        fatalError("Missing vendor for OpenVPN TLS")
-    }
 
     // merge required targets
     let backendDependencyTargets = Set([
         cryptoVendor.wrapperTarget,
-        tlsVendor.wrapperTarget
     ].compactMap { $0 })
     guard !backendDependencyTargets.isEmpty else {
         fatalError("Missing required targets for OpenVPN")
