@@ -23,6 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+@testable internal import _PartoutCryptoCore
 import _PartoutCryptoCore_C
 import Foundation
 
