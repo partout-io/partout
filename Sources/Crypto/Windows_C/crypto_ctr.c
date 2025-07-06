@@ -111,9 +111,10 @@ bool local_encrypt(void *vctx,
     uint8_t counter[32] = {0};
     uint8_t ecb_out[32] = {0};
     size_t offset = 0;
+    NTSTATUS status;
 
     // HMAC (SHA256)
-    NTSTATUS status = BCryptOpenAlgorithmProvider(
+    status = BCryptOpenAlgorithmProvider(
         &ctx->hAlgHmac,
         // FIXME: ###, hardcoded, and set hAlgMac only once in configure!!!
         BCRYPT_SHA256_ALGORITHM,
@@ -210,12 +211,13 @@ bool local_decrypt(void *vctx,
     uint8_t counter[32] = {0};
     uint8_t ecb_out[32] = {0};
     size_t offset = 0;
+    NTSTATUS status;
 
     // CTR mode using ECB primitive
     memcpy(counter, iv, block_size);
     for (size_t b = 0; b < nblocks; ++b) {
         ULONG ecb_len = 0;
-        NTSTATUS status = BCryptEncrypt(
+        status = BCryptEncrypt(
             ctx->hKeyDec,
             counter, (ULONG)block_size,
             NULL,
@@ -235,7 +237,7 @@ bool local_decrypt(void *vctx,
     *out_len = enc_len;
 
     // HMAC verify
-    NTSTATUS status = BCryptOpenAlgorithmProvider(
+    status = BCryptOpenAlgorithmProvider(
         &ctx->hAlgHmac,
         // FIXME: ###, hardcoded, and set hAlgMac only once in configure!!!
         BCRYPT_SHA256_ALGORITHM,
