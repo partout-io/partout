@@ -383,8 +383,7 @@ vendors.forEach {
             .target(
                 name: "_PartoutCryptoWindows_C",
                 dependencies: ["_PartoutCryptoCore"],
-                path: "Sources/Crypto/Windows_C",
-                publicHeadersPath: "."
+                path: "Sources/Crypto/Windows_C"
             )
         ])
 
