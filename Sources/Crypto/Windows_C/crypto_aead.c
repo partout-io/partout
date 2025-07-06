@@ -29,6 +29,7 @@
 #include <string.h>
 #include "crypto/allocation.h"
 #include "crypto/crypto_aead.h"
+#include "macros.h"
 
 #pragma comment(lib, "bcrypt.lib")
 
@@ -74,7 +75,7 @@ void local_configure_encrypt(void *vctx,
         (ULONG)ctx->cipher_key_len,
         0
     );
-    assert(status == 0);
+    assert(CRYPTO_CNG_SUCCESS(status));
     memset(ctx->iv_enc, 0, ctx->id_len);
     memcpy(ctx->iv_enc + ctx->id_len, hmac_key->bytes, ctx->cipher_iv_len - ctx->id_len);
 }
@@ -90,6 +91,7 @@ size_t local_encrypt(void *vctx,
     assert(flags);
     assert(flags->ad_len >= ctx->id_len);
 
+    NTSTATUS status;
     ULONG cbResult = 0;
     UCHAR tag[16] = {0};
     BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
@@ -102,7 +104,7 @@ size_t local_encrypt(void *vctx,
     authInfo.pbTag = tag;
     authInfo.cbTag = (ULONG)ctx->tag_len;
 
-    NTSTATUS status = BCryptEncrypt(
+    CRYPTO_CNG_TRACK_STATUS(status) BCryptEncrypt(
         ctx->hKeyEnc,
         (PUCHAR)in, (ULONG)in_len,
         &authInfo,
@@ -111,10 +113,8 @@ size_t local_encrypt(void *vctx,
         &cbResult,
         0
     );
-    if (status != 0) {
-        if (error) *error = CryptoErrorEncryption;
-        return 0;
-    }
+    CRYPTO_CNG_RETURN_IF_FAILED(status, CryptoErrorEncryption)
+
     memcpy(out, tag, ctx->tag_len);
     const size_t out_len = ctx->tag_len + cbResult;
     return out_len;
@@ -140,7 +140,7 @@ void local_configure_decrypt(void *vctx,
         (ULONG)ctx->cipher_key_len,
         0
     );
-    assert(status == 0);
+    assert(CRYPTO_CNG_SUCCESS(status));
     memset(ctx->iv_dec, 0, ctx->id_len);
     memcpy(ctx->iv_dec + ctx->id_len, hmac_key->bytes, ctx->cipher_iv_len - ctx->id_len);
 }
@@ -156,6 +156,7 @@ size_t local_decrypt(void *vctx,
     assert(flags);
     assert(flags->ad_len >= ctx->id_len);
 
+    NTSTATUS status;
     ULONG cbResult = 0;
     BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
     BCRYPT_INIT_AUTH_MODE_INFO(authInfo);
@@ -167,7 +168,7 @@ size_t local_decrypt(void *vctx,
     authInfo.pbTag = (PUCHAR)in;
     authInfo.cbTag = (ULONG)ctx->tag_len;
 
-    NTSTATUS status = BCryptDecrypt(
+    CRYPTO_CNG_TRACK_STATUS(status) BCryptDecrypt(
         ctx->hKeyDec,
         (PUCHAR)(in + ctx->tag_len), (ULONG)(in_len - ctx->tag_len),
         &authInfo,
@@ -176,10 +177,8 @@ size_t local_decrypt(void *vctx,
         &cbResult,
         0
     );
-    if (status != 0) {
-        if (error) *error = CryptoErrorEncryption;
-        return 0;
-    }
+    CRYPTO_CNG_RETURN_IF_FAILED(status, CryptoErrorEncryption)
+
     const size_t out_len = cbResult;
     return out_len;
 }
@@ -210,21 +209,21 @@ crypto_ctx crypto_aead_create(const char *cipher_name, size_t tag_len, size_t id
     ctx->iv_enc = pp_alloc_crypto(ctx->cipher_iv_len);
     ctx->iv_dec = pp_alloc_crypto(ctx->cipher_iv_len);
 
-    NTSTATUS status = BCryptOpenAlgorithmProvider(
+    NTSTATUS status;
+    CRYPTO_CNG_TRACK_STATUS(status) BCryptOpenAlgorithmProvider(
         &ctx->hAlg,
         BCRYPT_AES_ALGORITHM,
         NULL,
         0
     );
-    assert(status == 0);
-    status = BCryptSetProperty(
+    CRYPTO_CNG_TRACK_STATUS(status) BCryptSetProperty(
         ctx->hAlg,
         BCRYPT_CHAINING_MODE,
         (PUCHAR)BCRYPT_CHAIN_MODE_GCM,
         (ULONG)sizeof(BCRYPT_CHAIN_MODE_GCM),
         0
     );
-    assert(status == 0);
+    CRYPTO_CNG_CLOSE_IF_FAILED(status, ctx->hAlg)
 
     ctx->crypto.meta.cipher_key_len = ctx->cipher_key_len;
     ctx->crypto.meta.cipher_iv_len = ctx->cipher_iv_len;
