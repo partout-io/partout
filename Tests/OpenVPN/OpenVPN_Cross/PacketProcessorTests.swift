@@ -47,7 +47,7 @@ struct PacketProcessorTests {
         print(data.toHex())
         print(processed.toHex())
         for (i, byte) in processed.enumerated() {
-            #expect(byte == data[i] ^ maskData.bytes[i % maskData.length])
+            #expect(byte == data[i] ^ maskData.bytes[i % maskData.count])
         }
     }
 

@@ -33,11 +33,6 @@ public final class CZeroingData {
         self.ptr = ptr
     }
 
-    @available(*, deprecated, renamed: "init(count:)")
-    public init(length: Int) {
-        ptr = zd_create(length)
-    }
-
     public init(count: Int) {
         ptr = zd_create(count)
     }
@@ -101,11 +96,6 @@ extension CZeroingData {
 
     public var mutableBytes: UnsafeMutablePointer<UInt8>! {
         zd_mutable_bytes(ptr)
-    }
-
-    @available(*, deprecated, renamed: "count")
-    public var length: Int {
-        zd_length(ptr)
     }
 
     public var count: Int {
