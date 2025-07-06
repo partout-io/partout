@@ -88,7 +88,8 @@ void local_configure_encrypt(void *vctx,
     ctx->hmac_key_enc = zd_create_from_data(hmac_key->bytes, ctx->hmac_key_len);
 }
 
-static void ctr_increment(uint8_t *counter, size_t len) {
+static inline
+void ctr_increment(uint8_t *counter, size_t len) {
     for (int i = (int)len - 1; i >= 0; --i) {
         if (++counter[i] != 0) break;
     }
