@@ -34,19 +34,54 @@
 //      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
+internal import _PartoutOpenVPN_C
 import Foundation
 import PartoutCore
 
 struct Constants {
+    enum Keys {
+        static let label1 = "OpenVPN master secret"
 
-    // MARK: Session
+        static let label2 = "OpenVPN key expansion"
 
-    static let usesReplayProtection = true
+        static let randomLength = 32
 
-    static let maxPacketSize = 1000
+        static let preMasterLength = 48
 
-    // MARK: Authentication
+        static let keyLength = 64
 
+        static let keysCount = 4
+    }
+
+    enum ControlChannel {
+        static let maxPacketSize = 1000
+
+        // UInt32(0) + UInt8(KeyMethod = 2)
+        static let tlsPrefix = Data(hex: "0000000002")
+
+        private static let numberOfKeys = UInt8(8) // 3-bit
+
+        static func nextKey(after currentKey: UInt8) -> UInt8 {
+            max(1, (currentKey + 1) % numberOfKeys)
+        }
+
+        static let ctrTagLength = 32
+
+        static let ctrPayloadLength = PacketOpcodeLength + PacketSessionIdLength + PacketReplayIdLength + PacketReplayTimestampLength
+    }
+
+    enum DataChannel {
+        static let prngSeedLength = 64
+
+        static let aeadTagLength = 16
+
+        static let aeadIdLength = PacketIdLength
+
+        static let pingString = Data(hex: "2a187bf3641eb4cb07ed2d0a981fc748")
+    }
+}
+
+extension Constants.ControlChannel {
     static func peerInfo(sslVersion: String? = nil, withPlatform: Bool = true, extra: [String: String]? = nil) -> String {
         let uiVersion = Partout.versionIdentifier
         var info = [
@@ -83,31 +118,4 @@ struct Constants {
         info.append("")
         return info.joined(separator: "\n")
     }
-
-    static let randomLength = 32
-
-    // MARK: Keys
-
-    static let label1 = "OpenVPN master secret"
-
-    static let label2 = "OpenVPN key expansion"
-
-    static let preMasterLength = 48
-
-    static let keyLength = 64
-
-    static let keysCount = 4
-
-    // MARK: Protocol
-
-    // UInt32(0) + UInt8(KeyMethod = 2)
-    static let tlsPrefix = Data(hex: "0000000002")
-
-    private static let numberOfKeys = UInt8(8) // 3-bit
-
-    static func nextKey(after currentKey: UInt8) -> UInt8 {
-        max(1, (currentKey + 1) % numberOfKeys)
-    }
-
-    static let pingString = Data(hex: "2a187bf3641eb4cb07ed2d0a981fc748")
 }

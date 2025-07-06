@@ -71,9 +71,9 @@ final class Authenticator {
 
     init(_ ctx: PartoutLoggerContext, prng: PRNGProtocol, _ username: String?, _ password: String?) {
         self.ctx = ctx
-        preMaster = CZ(prng.data(length: Constants.preMasterLength))
-        random1 = CZ(prng.data(length: Constants.randomLength))
-        random2 = CZ(prng.data(length: Constants.randomLength))
+        preMaster = CZ(prng.data(length: Constants.Keys.preMasterLength))
+        random1 = CZ(prng.data(length: Constants.Keys.randomLength))
+        random2 = CZ(prng.data(length: Constants.Keys.randomLength))
 
         // XXX: not 100% secure, can't erase input username/password
         if let username = username, let password = password {
@@ -103,7 +103,7 @@ final class Authenticator {
     // MARK: Authentication request
 
     func putAuth(into tls: TLSProtocol, options: OpenVPN.Configuration) throws {
-        let raw = CZ(Constants.tlsPrefix)
+        let raw = CZ(Constants.ControlChannel.tlsPrefix)
 
         // local keys
         raw.append(preMaster)
@@ -161,7 +161,7 @@ final class Authenticator {
         if let dataCiphers = options.dataCiphers {
             extra["IV_CIPHERS"] = dataCiphers.map(\.rawValue).joined(separator: ":")
         }
-        let peerInfo = Constants.peerInfo(sslVersion: sslVersion, extra: extra)
+        let peerInfo = Constants.ControlChannel.peerInfo(sslVersion: sslVersion, extra: extra)
         raw.appendSized(CZ(peerInfo, nullTerminated: true))
 
         pp_log(ctx, .openvpn, .info, "TLS.auth: Put plaintext \(raw.asSensitiveBytes(ctx))")
@@ -175,25 +175,25 @@ final class Authenticator {
     }
 
     func parseAuthReply() throws -> Bool {
-        let prefixLength = Constants.tlsPrefix.count
+        let prefixLength = Constants.ControlChannel.tlsPrefix.count
 
         // TLS prefix + random (x2) + opts length [+ opts]
-        guard controlBuffer.count >= prefixLength + 2 * Constants.randomLength + 2 else {
+        guard controlBuffer.count >= prefixLength + 2 * Constants.Keys.randomLength + 2 else {
             return false
         }
 
         let prefix = controlBuffer.withOffset(0, length: prefixLength)
-        guard prefix.isEqual(to: Constants.tlsPrefix) else {
+        guard prefix.isEqual(to: Constants.ControlChannel.tlsPrefix) else {
             throw OpenVPNSessionError.wrongControlDataPrefix
         }
 
-        var offset = Constants.tlsPrefix.count
+        var offset = Constants.ControlChannel.tlsPrefix.count
 
-        let serverRandom1 = controlBuffer.withOffset(offset, length: Constants.randomLength)
-        offset += Constants.randomLength
+        let serverRandom1 = controlBuffer.withOffset(offset, length: Constants.Keys.randomLength)
+        offset += Constants.Keys.randomLength
 
-        let serverRandom2 = controlBuffer.withOffset(offset, length: Constants.randomLength)
-        offset += Constants.randomLength
+        let serverRandom2 = controlBuffer.withOffset(offset, length: Constants.Keys.randomLength)
+        offset += Constants.Keys.randomLength
 
         let serverOptsLength = Int(controlBuffer.networkUInt16Value(fromOffset: offset))
         offset += 2

@@ -150,7 +150,7 @@ final class Negotiator {
             pp_log(ctx, .openvpn, .error, "Negotiator has no history (not connected yet?)")
             return self
         }
-        let newKey = Constants.nextKey(after: key)
+        let newKey = Constants.ControlChannel.nextKey(after: key)
         return Negotiator(
             ctx,
             key: newKey,
@@ -339,7 +339,7 @@ private extension Negotiator {
             withCode: code,
             key: key,
             payload: payload,
-            maxPacketSize: Constants.maxPacketSize
+            maxPacketSize: Constants.ControlChannel.maxPacketSize
         )
         try flushControlQueue()
     }

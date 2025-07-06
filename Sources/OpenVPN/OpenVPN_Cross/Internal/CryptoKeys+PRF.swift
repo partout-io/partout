@@ -39,28 +39,28 @@ extension CryptoKeys {
 
     init(withPRF prf: PRF) throws {
         let masterData = try Self.prfData(with: PRFInput(
-            label: Constants.label1,
+            label: Constants.Keys.label1,
             secret: CZ(prf.handshake.preMaster),
             clientSeed: CZ(prf.handshake.random1),
             serverSeed: CZ(prf.handshake.serverRandom1),
             clientSessionId: nil,
             serverSessionId: nil,
-            size: Constants.preMasterLength
+            size: Constants.Keys.preMasterLength
         ))
         let keysData = try Self.prfData(with: PRFInput(
-            label: Constants.label2,
+            label: Constants.Keys.label2,
             secret: masterData,
             clientSeed: CZ(prf.handshake.random2),
             serverSeed: CZ(prf.handshake.serverRandom2),
             clientSessionId: prf.sessionId,
             serverSessionId: prf.remoteSessionId,
-            size: Constants.keysCount * Constants.keyLength
+            size: Constants.Keys.keysCount * Constants.Keys.keyLength
         ))
-        assert(keysData.count == Constants.keysCount * Constants.keyLength)
+        assert(keysData.count == Constants.Keys.keysCount * Constants.Keys.keyLength)
 
-        let keysArray = (0..<Constants.keysCount).map {
-            let offset = $0 * Constants.keyLength
-            return keysData.withOffset(offset, length: Constants.keyLength)
+        let keysArray = (0..<Constants.Keys.keysCount).map {
+            let offset = $0 * Constants.Keys.keyLength
+            return keysData.withOffset(offset, length: Constants.Keys.keyLength)
         }
         self.init(
             cipher: CryptoKeys.KeyPair(
