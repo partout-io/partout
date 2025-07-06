@@ -42,8 +42,8 @@ public final class CZeroingData {
         ptr = zd_create(count)
     }
 
-    public init(bytes: UnsafePointer<UInt8>, length: Int) {
-        ptr = zd_create_from_data(bytes, length)
+    public init(bytes: UnsafePointer<UInt8>, count: Int) {
+        ptr = zd_create_from_data(bytes, count)
     }
 
     public init(uInt8: UInt8) {
@@ -70,12 +70,12 @@ public final class CZeroingData {
         }
     }
 
-    public init(data: Data, offset: Int, length: Int) {
+    public init(data: Data, offset: Int, count: Int) {
         ptr = data.withUnsafeBytes {
             guard let bytes = $0.bindMemory(to: UInt8.self).baseAddress else {
                 fatalError("Could not bind to memory")
             }
-            return zd_create_from_data_range(bytes, offset, length)
+            return zd_create_from_data_range(bytes, offset, count)
         }
     }
 

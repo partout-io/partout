@@ -33,8 +33,8 @@ public func CZ(count: Int) -> CZeroingData {
     CZeroingData(count: count)
 }
 
-public func CZ(bytes: UnsafePointer<UInt8>, length: Int) -> CZeroingData {
-    CZeroingData(bytes: bytes, length: length)
+public func CZ(bytes: UnsafePointer<UInt8>, count: Int) -> CZeroingData {
+    CZeroingData(bytes: bytes, count: count)
 }
 
 public func CZ(_ uint8: UInt8) -> CZeroingData {
@@ -49,8 +49,8 @@ public func CZ(_ data: Data) -> CZeroingData {
     CZeroingData(data: data)
 }
 
-public func CZ(_ data: Data, _ offset: Int, _ length: Int) -> CZeroingData {
-    CZeroingData(data: data, offset: offset, length: length)
+public func CZ(_ data: Data, _ offset: Int, _ count: Int) -> CZeroingData {
+    CZeroingData(data: data, offset: offset, count: count)
 }
 
 public func CZ(_ string: String, nullTerminated: Bool) -> CZeroingData {
