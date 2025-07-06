@@ -29,6 +29,7 @@
 #include <string.h>
 #include "crypto/allocation.h"
 #include "crypto/crypto_cbc.h"
+#include "macros.h"
 
 #pragma comment(lib, "bcrypt.lib")
 
@@ -83,7 +84,7 @@ void local_configure_encrypt(void *vctx, const zeroing_data_t *cipher_key, const
             (ULONG)ctx->cipher_key_len,
             0
         );
-        assert(BCRYPT_SUCCESS(status));
+        assert(CRYPTO_CNG_SUCCESS(status));
     }
 
     if (ctx->hmac_key_enc) {
@@ -110,7 +111,14 @@ size_t local_encrypt(void *vctx,
 
     if (ctx->hAlgCipher) {
         if (!flags || !flags->for_testing) {
-            if (!BCRYPT_SUCCESS(BCryptGenRandom(NULL, out_iv, (ULONG)ctx->cipher_iv_len, BCRYPT_USE_SYSTEM_PREFERRED_RNG))) {
+            if (!CRYPTO_CNG_SUCCESS(
+                BCryptGenRandom(
+                    NULL,
+                    out_iv,
+                    (ULONG)ctx->cipher_iv_len,
+                    BCRYPT_USE_SYSTEM_PREFERRED_RNG
+                )
+            )) {
                 return 0;
             }
         }
@@ -118,7 +126,7 @@ size_t local_encrypt(void *vctx,
         // do NOT use out_iv directly because BCryptEncrypt has side-effect
         memcpy(ctx->buffer_iv, out_iv, ctx->cipher_iv_len);
 
-        status = BCryptEncrypt(
+        CRYPTO_CNG_TRACK_STATUS(status) BCryptEncrypt(
             ctx->hKeyEnc,
             (PUCHAR)in, (ULONG)in_len,
             NULL,
@@ -127,30 +135,25 @@ size_t local_encrypt(void *vctx,
             &enc_len,
             BCRYPT_BLOCK_PADDING
         );
-        if (!BCRYPT_SUCCESS(status)) {
-            if (error) *error = CryptoErrorEncryption;
-            return 0;
-        }
+        CRYPTO_CNG_RETURN_IF_FAILED(status, CryptoErrorEncryption)
     } else {
         assert(out_encrypted == out_iv);
         memcpy(out_encrypted, in, in_len);
         enc_len = in_len;
     }
 
-    status = BCryptCreateHash(
+    CRYPTO_CNG_TRACK_STATUS(status) BCryptCreateHash(
         ctx->hAlgHmac,
         &ctx->hHmacEnc,
         NULL, 0,
         ctx->hmac_key_enc->bytes, (ULONG)ctx->hmac_key_len,
         0
     );
-    assert(BCRYPT_SUCCESS(status));
-    status = BCryptHashData(ctx->hHmacEnc, out_iv, (ULONG)(enc_len + ctx->cipher_iv_len), 0);
-    assert(BCRYPT_SUCCESS(status));
-    status = BCryptFinishHash(ctx->hHmacEnc, out, (ULONG)ctx->digest_len, 0);
-    assert(BCRYPT_SUCCESS(status));
+    CRYPTO_CNG_TRACK_STATUS(status) BCryptHashData(ctx->hHmacEnc, out_iv, (ULONG)(enc_len + ctx->cipher_iv_len), 0);
+    CRYPTO_CNG_TRACK_STATUS(status) BCryptFinishHash(ctx->hHmacEnc, out, (ULONG)ctx->digest_len, 0);
     BCryptDestroyHash(ctx->hHmacEnc);
     ctx->hHmacEnc = NULL;
+    CRYPTO_CNG_RETURN_IF_FAILED(status, CryptoErrorEncryption)
 
     const size_t out_len = enc_len + ctx->cipher_iv_len + ctx->digest_len;
     return out_len;
@@ -175,7 +178,7 @@ void local_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const
             (ULONG)ctx->cipher_key_len,
             0
         );
-        assert(BCRYPT_SUCCESS(status));
+        assert(CRYPTO_CNG_SUCCESS(status));
     }
 
     if (ctx->hmac_key_dec) {
@@ -200,20 +203,19 @@ size_t local_decrypt(void *vctx,
     size_t hmac_len = 0;
 
     // HMAC verify
-    NTSTATUS status = BCryptCreateHash(
+    NTSTATUS status;
+    CRYPTO_CNG_TRACK_STATUS(status) BCryptCreateHash(
         ctx->hAlgHmac,
         &ctx->hHmacDec,
         NULL, 0,
         ctx->hmac_key_dec->bytes, (ULONG)ctx->hmac_key_len,
         0
     );
-    assert(BCRYPT_SUCCESS(status));
-    status = BCryptHashData(ctx->hHmacDec, (PUCHAR)(in + ctx->digest_len), (ULONG)(in_len - ctx->digest_len), 0);
-    assert(BCRYPT_SUCCESS(status));
-    status = BCryptFinishHash(ctx->hHmacDec, ctx->buffer_hmac, (ULONG)ctx->digest_len, 0);
-    assert(BCRYPT_SUCCESS(status));
+    CRYPTO_CNG_TRACK_STATUS(status) BCryptHashData(ctx->hHmacDec, (PUCHAR)(in + ctx->digest_len), (ULONG)(in_len - ctx->digest_len), 0);
+    CRYPTO_CNG_TRACK_STATUS(status) BCryptFinishHash(ctx->hHmacDec, ctx->buffer_hmac, (ULONG)ctx->digest_len, 0);
     BCryptDestroyHash(ctx->hHmacDec);
     ctx->hHmacDec = NULL;
+    CRYPTO_CNG_RETURN_IF_FAILED(status, CryptoErrorEncryption)
 
     if (memcmp(ctx->buffer_hmac, in, ctx->digest_len) != 0) {
         if (error) *error = CryptoErrorHMAC;
@@ -223,7 +225,7 @@ size_t local_decrypt(void *vctx,
     ULONG out_len = 0;
     if (ctx->hAlgCipher) {
         // Decrypt with CNG padding
-        status = BCryptDecrypt(
+        CRYPTO_CNG_TRACK_STATUS(status) BCryptDecrypt(
             ctx->hKeyDec,
             (PUCHAR)encrypted, (ULONG)(in_len - ctx->digest_len - ctx->cipher_iv_len),
             NULL,
@@ -232,10 +234,7 @@ size_t local_decrypt(void *vctx,
             &out_len,
             BCRYPT_BLOCK_PADDING
         );
-        if (!BCRYPT_SUCCESS(status)) {
-            if (error) *error = CryptoErrorEncryption;
-            return 0;
-        }
+        CRYPTO_CNG_RETURN_IF_FAILED(status, CryptoErrorEncryption)
     } else {
         memcpy(out, in + ctx->digest_len, in_len - ctx->digest_len);
         out_len = in_len - ctx->digest_len;
@@ -248,20 +247,20 @@ bool local_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_cod
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
     assert(ctx);
     size_t hmac_len = 0;
-    NTSTATUS status = BCryptCreateHash(
+    NTSTATUS status;
+
+    CRYPTO_CNG_TRACK_STATUS(status) BCryptCreateHash(
         ctx->hAlgHmac,
         &ctx->hHmacDec,
         NULL, 0,
         ctx->hmac_key_dec->bytes, (ULONG)ctx->hmac_key_len,
         0
     );
-    assert(BCRYPT_SUCCESS(status));
-    status = BCryptHashData(ctx->hHmacDec, (PUCHAR)(in + ctx->digest_len), (ULONG)(in_len - ctx->digest_len), 0);
-    assert(BCRYPT_SUCCESS(status));
-    status = BCryptFinishHash(ctx->hHmacDec, ctx->buffer_hmac, (ULONG)ctx->digest_len, 0);
-    assert(BCRYPT_SUCCESS(status));
+    CRYPTO_CNG_TRACK_STATUS(status) BCryptHashData(ctx->hHmacDec, (PUCHAR)(in + ctx->digest_len), (ULONG)(in_len - ctx->digest_len), 0);
+    CRYPTO_CNG_TRACK_STATUS(status) BCryptFinishHash(ctx->hHmacDec, ctx->buffer_hmac, (ULONG)ctx->digest_len, 0);
     BCryptDestroyHash(ctx->hHmacDec);
     ctx->hHmacDec = NULL;
+    CRYPTO_CNG_RETURN_IF_FAILED(status, CryptoErrorEncryption)
 
     if (memcmp(ctx->buffer_hmac, in, ctx->digest_len) != 0) {
         if (error) *error = CryptoErrorHMAC;
@@ -327,31 +326,30 @@ crypto_ctx crypto_cbc_create(const char *cipher_name, const char *digest_name,
 
     NTSTATUS status;
     if (cipher_name) {
-        status = BCryptOpenAlgorithmProvider(
+        CRYPTO_CNG_TRACK_STATUS(status) BCryptOpenAlgorithmProvider(
             &ctx->hAlgCipher,
             BCRYPT_AES_ALGORITHM,
             NULL,
             0
         );
-        assert(BCRYPT_SUCCESS(status));
-        status = BCryptSetProperty(
+        CRYPTO_CNG_TRACK_STATUS(status) BCryptSetProperty(
             ctx->hAlgCipher,
             BCRYPT_CHAINING_MODE,
             (PUCHAR)BCRYPT_CHAIN_MODE_CBC,
             (ULONG)sizeof(BCRYPT_CHAIN_MODE_CBC),
             0
         );
-        assert(BCRYPT_SUCCESS(status));
+        CRYPTO_CNG_CLOSE_IF_FAILED(status, ctx->hAlgCipher)
     } else {
         ctx->hAlgCipher = NULL;
     }
-    status = BCryptOpenAlgorithmProvider(
+    CRYPTO_CNG_TRACK_STATUS(status) BCryptOpenAlgorithmProvider(
         &ctx->hAlgHmac,
         hmac_alg_id,
         NULL,
         BCRYPT_ALG_HANDLE_HMAC_FLAG
     );
-    assert(BCRYPT_SUCCESS(status));
+    CRYPTO_CNG_CLOSE_IF_FAILED(status, ctx->hAlgCipher)
 
     ctx->crypto.meta.cipher_key_len = ctx->cipher_key_len;
     ctx->crypto.meta.cipher_iv_len = ctx->cipher_iv_len;
