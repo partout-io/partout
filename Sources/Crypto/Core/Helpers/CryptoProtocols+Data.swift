@@ -26,34 +26,33 @@
 import Foundation
 
 extension Encrypter {
-    func encryptData(_ data: Data, flags: CryptoFlagsWrapper?) throws -> Data {
-        let srcLength = data.count
-        var dest: [UInt8] = Array(repeating: 0, count: srcLength + 256)
-        var destLength = 0
-        _ = try data.withUnsafeBytes {
-            try encryptBytes($0.bytePointer, length: srcLength, dest: &dest, destLength: &destLength, flags: flags)
-        }
-        dest.removeSubrange(destLength..<dest.count)
-        return Data(dest)
+    func encryptData(_ data: CZeroingData, flags: CryptoFlagsWrapper?) throws -> CZeroingData {
+        let dest = CZeroingData(count: data.count + 256)
+        let destLength = try encryptBytes(
+            data.bytes,
+            length: data.count,
+            dest: dest,
+            flags: flags
+        )
+        dest.resize(toSize: destLength)
+        return dest
     }
 }
 
 extension Decrypter {
-    func decryptData(_ data: Data, flags: CryptoFlagsWrapper?) throws -> Data {
-        let srcLength = data.count
-        var dest: [UInt8] = Array(repeating: 0, count: srcLength + 256)
-        var destLength = 0
-        _ = try data.withUnsafeBytes {
-            try decryptBytes($0.bytePointer, length: srcLength, dest: &dest, destLength: &destLength, flags: flags)
-        }
-        dest.removeSubrange(destLength..<dest.count)
-        return Data(dest)
+    func decryptData(_ data: CZeroingData, flags: CryptoFlagsWrapper?) throws -> CZeroingData {
+        let dest = CZeroingData(count: data.count + 256)
+        let destLength = try decryptBytes(
+            data.bytes,
+            length: data.count,
+            dest: dest,
+            flags: flags
+        )
+        dest.resize(toSize: destLength)
+        return dest
     }
 
-    func verifyData(_ data: Data, flags: CryptoFlagsWrapper?) throws {
-        let srcLength = data.count
-        _ = try data.withUnsafeBytes {
-            try verifyBytes($0.bytePointer, length: srcLength, flags: flags)
-        }
+    func verifyData(_ data: CZeroingData, flags: CryptoFlagsWrapper?) throws {
+        _ = try verifyBytes(data.bytes, length: data.count, flags: flags)
     }
 }

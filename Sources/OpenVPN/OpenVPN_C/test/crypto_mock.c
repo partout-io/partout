@@ -42,10 +42,10 @@ size_t mock_capacity(const void *vctx, size_t len) {
 
 // in -> aabb(reversed)ccdd
 static
-bool mock_encrypt(void *vctx,
-                  uint8_t *out, size_t *out_len,
-                  const uint8_t *in, size_t in_len,
-                  const crypto_flags_t *flags, crypto_error_code *error) {
+size_t mock_encrypt(void *vctx,
+                    uint8_t *out, size_t out_buf_len,
+                    const uint8_t *in, size_t in_len,
+                    const crypto_flags_t *flags, crypto_error_code *error) {
     (void)vctx;
     (void)flags;
     (void)error;
@@ -55,27 +55,27 @@ bool mock_encrypt(void *vctx,
     reverse(out + 2, in, in_len);
     out[2 + in_len] = 0xcc;
     out[2 + in_len + 1] = 0xdd;
-    *out_len = in_len + 4;
-    return true;
+    const size_t out_len = in_len + 4;
+    return out_len;
 }
 
 // in -> reversed
 static
-bool mock_decrypt(void *vctx,
-                  uint8_t *out, size_t *out_len,
-                  const uint8_t *in, size_t in_len,
-                  const crypto_flags_t *flags, crypto_error_code *error) {
+size_t mock_decrypt(void *vctx,
+                    uint8_t *out, size_t out_buf_len,
+                    const uint8_t *in, size_t in_len,
+                    const crypto_flags_t *flags, crypto_error_code *error) {
     (void)vctx;
     (void)flags;
     (void)error;
     DP_LOG("crypto_mock_decrypt");
-    *out_len = in_len - 4;
+    size_t out_len = in_len - 4;
     assert(in[0] == 0xaa);
     assert(in[1] == 0xbb);
-    reverse(out, in + 2, *out_len);
-    assert(in[2 + *out_len] == 0xcc);
-    assert(in[2 + *out_len + 1] == 0xdd);
-    return true;
+    reverse(out, in + 2, out_len);
+    assert(in[2 + out_len] == 0xcc);
+    assert(in[2 + out_len + 1] == 0xdd);
+    return out_len;
 }
 
 static

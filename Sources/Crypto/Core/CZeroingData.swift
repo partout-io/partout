@@ -34,7 +34,7 @@ public final class CZeroingData {
     }
 
     @available(*, deprecated, renamed: "init(count:)")
-    public init(length: Int = 0) {
+    public init(length: Int) {
         ptr = zd_create(length)
     }
 
@@ -135,7 +135,7 @@ extension CZeroingData {
 
     public func withOffset(_ offset: Int, length: Int) -> CZeroingData {
         guard let slice = zd_make_slice(ptr, offset, length) else {
-            return CZeroingData()
+            return CZeroingData(count: 0)
         }
         return CZeroingData(ptr: slice)
     }
@@ -177,7 +177,7 @@ extension CZeroingData {
     public func nullTerminatedString(fromOffset offset: Int) -> String? {
         var nullOffset: Int?
         var i = offset
-        while i < length {
+        while i < count {
             if bytes[i] == 0 {
                 nullOffset = i
                 break
@@ -204,7 +204,7 @@ extension CZeroingData {
             return ""
         }
         var hexString = ""
-        for i in 0..<length {
+        for i in 0..<count {
             hexString += String(format: "%02x", bytes[i])
         }
         return hexString

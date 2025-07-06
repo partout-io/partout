@@ -29,8 +29,8 @@ import Testing
 
 private let plainHex = "00112233ffddaa"
 private let expectedEncryptedHex = "2743c16b105670b350b6a5062224a0b691fb184c6d14dc0f39eed86aa04a1ca06b79108c65ed66"
-private let cipherKey = CZeroingData(length: 32)
-private let hmacKey = CZeroingData(length: 32)
+private let cipherKey = CZeroingData(count: 32)
+private let hmacKey = CZeroingData(count: 32)
 private let flags = CryptoFlags(
     packetId: [0x56, 0x34, 0x12, 0x00],
     ad: [0x00, 0x12, 0x34, 0x56]
@@ -41,8 +41,8 @@ struct CryptoCTRTests {
         ("aes-128-ctr", "sha256", 32, 128)
     ])
     func givenData_whenEncrypt_thenDecrypts(cipherName: String, digestName: String, tagLength: Int, payloadLength: Int) throws {
-        let sut = try CryptoCTR(
-            cipherName: cipherName,
+        let sut = try CryptoWrapper(
+            withCTRCipherName: cipherName,
             digestName: digestName,
             tagLength: tagLength,
             payloadLength: payloadLength
@@ -51,7 +51,7 @@ struct CryptoCTRTests {
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
 
         try flags.withUnsafeFlags { flags in
-            let encryptedData = try sut.encryptData(Data(hex: plainHex), flags: flags)
+            let encryptedData = try sut.encryptData(CZX(plainHex), flags: flags)
             print("encrypted: \(encryptedData.toHex())")
             print("expected : \(expectedEncryptedHex)")
             #expect(encryptedData.toHex() == expectedEncryptedHex)

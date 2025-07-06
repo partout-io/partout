@@ -73,19 +73,18 @@ size_t dp_encrypt(void *vmode) {
     uint8_t *dst = ctx->dst->bytes;
 
     // skip header bytes
-    size_t dst_packet_len = UINT32_MAX;
     crypto_error_code enc_error;
-    const bool success = mode->enc.raw_encrypt(mode->crypto,
-                                               dst + dst_header_len,
-                                               &dst_packet_len,
-                                               ctx->src,
-                                               ctx->src_len,
-                                               NULL,
-                                               &enc_error);
+    const size_t dst_packet_len = mode->enc.raw_encrypt(mode->crypto,
+                                                        dst + dst_header_len,
+                                                        ctx->dst->length - dst_header_len,
+                                                        ctx->src,
+                                                        ctx->src_len,
+                                                        NULL,
+                                                        &enc_error);
 
     assert(dst_packet_len <= dst_capacity);//, @"Did not allocate enough bytes for payload");
 
-    if (!success) {
+    if (!dst_packet_len) {
         if (ctx->error) {
             ctx->error->dp_code = DataPathErrorCrypto;
             ctx->error->crypto_code = enc_error;
@@ -118,16 +117,15 @@ size_t dp_decrypt(void *vmode) {
     }
 
     // skip header = (code, key)
-    size_t dst_len = UINT32_MAX;
     crypto_error_code dec_error;
-    const bool success = mode->dec.raw_decrypt(mode->crypto,
-                                               dst,
-                                               &dst_len,
-                                               ctx->src + src_header_len,
-                                               (int)(ctx->src_len - src_header_len),
-                                               NULL,
-    &dec_error);
-    if (!success) {
+    const size_t dst_len = mode->dec.raw_decrypt(mode->crypto,
+                                                 dst,
+                                                 ctx->dst->length,
+                                                 ctx->src + src_header_len,
+                                                 (int)(ctx->src_len - src_header_len),
+                                                 NULL,
+                                                 &dec_error);
+    if (!dst_len) {
         if (ctx->error) {
             ctx->error->dp_code = DataPathErrorCrypto;
             ctx->error->crypto_code = dec_error;

@@ -80,17 +80,17 @@ void local_configure_encrypt(void *vctx, const zeroing_data_t *cipher_key, const
 }
 
 static
-bool local_encrypt(void *vctx,
-                   uint8_t *dst, size_t *dst_len,
-                   const uint8_t *in, size_t in_len,
-                   const crypto_flags_t *flags, crypto_error_code *error) {
+size_t local_encrypt(void *vctx,
+                     uint8_t *out, size_t out_buf_len,
+                     const uint8_t *in, size_t in_len,
+                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
     assert(ctx);
     assert(!ctx->cipher || ctx->ctx_enc);
     assert(ctx->hmac_key_enc);
 
     // output = [-digest-|-iv-|-payload-]
-    uint8_t *out_iv = dst + ctx->digest_len;
+    uint8_t *out_iv = out + ctx->digest_len;
     uint8_t *out_encrypted = out_iv + ctx->cipher_iv_len;
     int l1 = 0, l2 = 0;
     size_t hmac_len = 0;
@@ -102,7 +102,6 @@ bool local_encrypt(void *vctx,
                 return false;
             }
         }
-
         CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherInit(ctx->ctx_enc, NULL, NULL, out_iv, -1);
         CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherUpdate(ctx->ctx_enc, out_encrypted, &l1, in, (int)in_len);
         CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherFinal_ex(ctx->ctx_enc, out_encrypted + l1, &l2);
@@ -115,12 +114,12 @@ bool local_encrypt(void *vctx,
     EVP_MAC_CTX *ossl = EVP_MAC_CTX_new(ctx->mac);
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_init(ossl, ctx->hmac_key_enc->bytes, ctx->hmac_key_enc->length, ctx->mac_params);
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_update(ossl, out_iv, l1 + l2 + ctx->cipher_iv_len);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_final(ossl, dst, &hmac_len, ctx->digest_len);
+    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_final(ossl, out, &hmac_len, ctx->digest_len);
     EVP_MAC_CTX_free(ossl);
 
-    *dst_len = l1 + l2 + ctx->cipher_iv_len + ctx->digest_len;
+    const size_t out_len = l1 + l2 + ctx->cipher_iv_len + ctx->digest_len;
 
-    CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorEncryption)
+    CRYPTO_OPENSSL_RETURN_LENGTH(code, out_len, CryptoErrorEncryption)
 }
 
 static
@@ -142,10 +141,10 @@ void local_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const
 }
 
 static
-bool local_decrypt(void *vctx,
-                   uint8_t *out, size_t *out_len,
-                   const uint8_t *in, size_t in_len,
-                   const crypto_flags_t *flags, crypto_error_code *error) {
+size_t local_decrypt(void *vctx,
+                     uint8_t *out, size_t out_buf_len,
+                     const uint8_t *in, size_t in_len,
+                     const crypto_flags_t *flags, crypto_error_code *error) {
     (void)flags;
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
     assert(ctx);
@@ -167,20 +166,18 @@ bool local_decrypt(void *vctx,
         CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorHMAC)
     }
 
+    size_t out_len = 0;
     if (ctx->cipher) {
         CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherInit(ctx->ctx_dec, NULL, NULL, iv, -1);
         CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherUpdate(ctx->ctx_dec, out, (int *)&l1, encrypted, (int)(in_len - ctx->digest_len - ctx->cipher_iv_len));
         CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherFinal_ex(ctx->ctx_dec, out + l1, (int *)&l2);
-
-        *out_len = l1 + l2;
+        out_len = l1 + l2;
     } else {
         l2 = (int)in_len - l1;
         memcpy(out, in + l1, l2);
-
-        *out_len = l2;
+        out_len = l2;
     }
-
-    return true;
+    CRYPTO_OPENSSL_RETURN_LENGTH(code, out_len, CryptoErrorEncryption)
 }
 
 static

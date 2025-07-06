@@ -26,11 +26,7 @@
 import Foundation
 
 public func CZ() -> CZeroingData {
-    CZeroingData()
-}
-
-public func CZ(length: Int) -> CZeroingData {
-    CZeroingData(length: length)
+    CZeroingData(count: 0)
 }
 
 public func CZ(count: Int) -> CZeroingData {
@@ -61,7 +57,11 @@ public func CZ(_ string: String, nullTerminated: Bool) -> CZeroingData {
     CZeroingData(string: string, nullTerminated: nullTerminated)
 }
 
-// to compile in full native mode
 public func CZ(_ native: CZeroingData) -> CZeroingData {
     native
+}
+
+// TODO: ###, drop middle Data
+public func CZX(_ hex: String) -> CZeroingData {
+    CZ(Data(hex: hex))
 }

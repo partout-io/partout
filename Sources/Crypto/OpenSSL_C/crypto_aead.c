@@ -74,10 +74,11 @@ void local_configure_encrypt(void *vctx,
 }
 
 static
-bool local_encrypt(void *vctx,
-                   uint8_t *out, size_t *out_len,
-                   const uint8_t *in, size_t in_len,
-                   const crypto_flags_t *flags, crypto_error_code *error) {
+size_t local_encrypt(void *vctx,
+                     uint8_t *out, size_t out_buf_len,
+                     const uint8_t *in, size_t in_len,
+                     const crypto_flags_t *flags,
+                     crypto_error_code *error) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
     assert(ctx);
     assert(ctx->ctx_enc);
@@ -95,9 +96,9 @@ bool local_encrypt(void *vctx,
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherFinal_ex(ossl, out + ctx->tag_len + l1, &l2);
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_GET_TAG, (int)ctx->tag_len, out);
 
-    *out_len = ctx->tag_len + l1 + l2;
+    const size_t out_len = ctx->tag_len + l1 + l2;
 
-    CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorEncryption)
+    CRYPTO_OPENSSL_RETURN_LENGTH(code, out_len, CryptoErrorEncryption)
 }
 
 static
@@ -115,10 +116,11 @@ void local_configure_decrypt(void *vctx,
 }
 
 static
-bool local_decrypt(void *vctx,
-                   uint8_t *out, size_t *out_len,
-                   const uint8_t *in, size_t in_len,
-                   const crypto_flags_t *flags, crypto_error_code *error) {
+size_t local_decrypt(void *vctx,
+                     uint8_t *out, size_t out_buf_len,
+                     const uint8_t *in, size_t in_len,
+                     const crypto_flags_t *flags,
+                     crypto_error_code *error) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
     assert(ctx);
     assert(ctx->ctx_dec);
@@ -136,9 +138,9 @@ bool local_decrypt(void *vctx,
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherUpdate(ossl, out, &l1, in + ctx->tag_len, (int)(in_len - ctx->tag_len));
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherFinal_ex(ossl, out + l1, &l2);
 
-    *out_len = l1 + l2;
+    const size_t out_len = l1 + l2;
 
-    CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorEncryption)
+    CRYPTO_OPENSSL_RETURN_LENGTH(code, out_len, CryptoErrorEncryption)
 }
 
 // MARK: -

@@ -78,10 +78,10 @@ void local_configure_encrypt(void *vctx,
 }
 
 static
-bool local_encrypt(void *vctx,
-                   uint8_t *out, size_t *out_len,
-                   const uint8_t *in, size_t in_len,
-                   const crypto_flags_t *flags, crypto_error_code *error) {
+size_t local_encrypt(void *vctx,
+                     uint8_t *out, size_t out_buf_len,
+                     const uint8_t *in, size_t in_len,
+                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
     assert(ctx);
     assert(ctx->ctx_enc);
@@ -106,9 +106,9 @@ bool local_encrypt(void *vctx,
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherUpdate(ctx->ctx_enc, out_encrypted, &l1, in, (int)in_len);
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherFinal_ex(ctx->ctx_enc, out_encrypted + l1, &l2);
 
-    *out_len = ctx->ns_tag_len + l1 + l2;
+    const size_t out_len = ctx->ns_tag_len + l1 + l2;
 
-    CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorEncryption)
+    CRYPTO_OPENSSL_RETURN_LENGTH(code, out_len, CryptoErrorEncryption)
 }
 
 static
@@ -128,10 +128,10 @@ void local_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const
 }
 
 static
-bool local_decrypt(void *vctx,
-                   uint8_t *out, size_t *out_len,
-                   const uint8_t *in, size_t in_len,
-                   const crypto_flags_t *flags, crypto_error_code *error) {
+size_t local_decrypt(void *vctx,
+                     uint8_t *out, size_t out_buf_len,
+                     const uint8_t *in, size_t in_len,
+                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
     assert(ctx);
     assert(ctx->ctx_dec);
@@ -148,12 +148,12 @@ bool local_decrypt(void *vctx,
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherUpdate(ctx->ctx_dec, out, &l1, encrypted, (int)(in_len - ctx->ns_tag_len));
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherFinal_ex(ctx->ctx_dec, out + l1, &l2);
 
-    *out_len = l1 + l2;
+    const size_t out_len = l1 + l2;
 
     EVP_MAC_CTX *ossl = EVP_MAC_CTX_new(ctx->mac);
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_init(ossl, ctx->hmac_key_dec->bytes, ctx->hmac_key_dec->length, ctx->mac_params);
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_update(ossl, flags->ad, flags->ad_len);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_update(ossl, out, *out_len);
+    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_update(ossl, out, out_len);
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_final(ossl, ctx->buffer_hmac, &l3, ctx->ns_tag_len);
     EVP_MAC_CTX_free(ossl);
 
@@ -163,7 +163,7 @@ bool local_decrypt(void *vctx,
         CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorHMAC)
     }
 
-    CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorEncryption)
+    CRYPTO_OPENSSL_RETURN_LENGTH(code, out_len, CryptoErrorEncryption)
 }
 
 // MARK: -

@@ -1,5 +1,5 @@
 //
-//  CryptoAEAD.swift
+//  CryptoWrapper.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/14/25.
@@ -27,11 +27,13 @@
 internal import _PartoutCryptoCore_C
 import Foundation
 
-final class CryptoAEAD: Encrypter, Decrypter {
+final class CryptoWrapper: Encrypter, Decrypter {
     private let ptr: crypto_ctx
 
+    private let free_fn: crypto_free_fn
+
     init(
-        cipherName: String,
+        withAEADCipherName cipherName: String,
         tagLength: Int,
         idLength: Int
     ) throws {
@@ -40,10 +42,37 @@ final class CryptoAEAD: Encrypter, Decrypter {
         }
         NSLog("PartoutOpenVPN: Using CryptoAEAD (native Swift/C)")
         self.ptr = ptr
+        free_fn = crypto_aead_free
+    }
+
+    init(
+        withCBCCipherName cipherName: String?,
+        digestName: String
+    ) throws {
+        guard let ptr = crypto_cbc_create(cipherName, digestName, nil) else {
+            throw CryptoError()
+        }
+        NSLog("PartoutOpenVPN: Using CryptoCBC (native Swift/C)")
+        self.ptr = ptr
+        free_fn = crypto_cbc_free
+    }
+
+    init(
+        withCTRCipherName cipherName: String,
+        digestName: String,
+        tagLength: Int,
+        payloadLength: Int
+    ) throws {
+        guard let ptr = crypto_ctr_create(cipherName, digestName, tagLength, payloadLength, nil) else {
+            throw CryptoError()
+        }
+        NSLog("PartoutOpenVPN: Using CryptoCTR (native Swift/C)")
+        self.ptr = ptr
+        free_fn = crypto_ctr_free
     }
 
     deinit {
-        crypto_aead_free(ptr)
+        free_fn(ptr)
     }
 
     func encryptionCapacity(for length: Int) -> Int {
@@ -51,40 +80,40 @@ final class CryptoAEAD: Encrypter, Decrypter {
     }
 
     func configureEncryption(withCipherKey cipherKey: CZeroingData?, hmacKey: CZeroingData?) {
-        guard let cipherKey, let hmacKey else {
-            return
-        }
-        crypto_configure_encrypt(ptr, cipherKey.ptr, hmacKey.ptr)
+        crypto_configure_encrypt(ptr, cipherKey?.ptr, hmacKey?.ptr)
     }
 
-    func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
+    func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: CZeroingData, flags: CryptoFlagsWrapper?) throws -> Int {
         var code = CryptoErrorNone
         var cFlags = crypto_flags_t()
         let flagsPtr = flags.pointer(to: &cFlags)
-        guard crypto_encrypt(ptr, dest, destLength, bytes, length, flagsPtr, &code) else {
+        let destLength = crypto_encrypt(ptr, dest.mutableBytes, dest.count, bytes, length, flagsPtr, &code)
+        guard destLength > 0 else {
             throw CryptoError(code)
         }
-        return true
+        return destLength
     }
 
     func configureDecryption(withCipherKey cipherKey: CZeroingData?, hmacKey: CZeroingData?) {
-        guard let cipherKey, let hmacKey else {
-            return
-        }
-        crypto_configure_decrypt(ptr, cipherKey.ptr, hmacKey.ptr)
+        crypto_configure_decrypt(ptr, cipherKey?.ptr, hmacKey?.ptr)
     }
 
-    func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: UnsafeMutablePointer<UInt8>, destLength: UnsafeMutablePointer<Int>, flags: CryptoFlagsWrapper?) throws -> Bool {
+    func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: CZeroingData, flags: CryptoFlagsWrapper?) throws -> Int {
         var code = CryptoErrorNone
         var cFlags = crypto_flags_t()
         let flagsPtr = flags.pointer(to: &cFlags)
-        guard crypto_decrypt(ptr, dest, destLength, bytes, length, flagsPtr, &code) else {
+        let destLength = crypto_decrypt(ptr, dest.mutableBytes, dest.count, bytes, length, flagsPtr, &code)
+        guard destLength > 0 else {
             throw CryptoError(code)
         }
-        return true
+        return destLength
     }
 
     func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int, flags: CryptoFlagsWrapper?) throws -> Bool {
-        fatalError("Unsupported")
+        var code = CryptoErrorNone
+        guard crypto_verify(ptr, bytes, length, &code) else {
+            throw CryptoError(code)
+        }
+        return true
     }
 }
