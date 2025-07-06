@@ -80,10 +80,10 @@ void local_configure_encrypt(void *vctx,
 }
 
 static
-bool local_encrypt(void *vctx,
-                   uint8_t *out, size_t *out_len,
-                   const uint8_t *in, size_t in_len,
-                   const crypto_flags_t *flags, crypto_error_code *error) {
+size_t local_encrypt(void *vctx,
+                     uint8_t *out, size_t out_buf_len,
+                     const uint8_t *in, size_t in_len,
+                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
     assert(ctx);
     assert(ctx->hKeyEnc);
@@ -107,17 +107,17 @@ bool local_encrypt(void *vctx,
         (PUCHAR)in, (ULONG)in_len,
         &authInfo,
         NULL, 0,
-        out + ctx->tag_len, (ULONG)(*out_len - ctx->tag_len),
+        out + ctx->tag_len, (ULONG)(out_buf_len - ctx->tag_len),
         &cbResult,
         0
     );
     if (status != 0) {
         if (error) *error = CryptoErrorEncryption;
-        return false;
+        return 0;
     }
     memcpy(out, tag, ctx->tag_len);
-    *out_len = ctx->tag_len + cbResult;
-    return true;
+    const size_t out_len = ctx->tag_len + cbResult;
+    return out_len;
 }
 
 static
@@ -146,10 +146,10 @@ void local_configure_decrypt(void *vctx,
 }
 
 static
-bool local_decrypt(void *vctx,
-                   uint8_t *out, size_t *out_len,
-                   const uint8_t *in, size_t in_len,
-                   const crypto_flags_t *flags, crypto_error_code *error) {
+size_t local_decrypt(void *vctx,
+                     uint8_t *out, size_t out_buf_len,
+                     const uint8_t *in, size_t in_len,
+                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
     assert(ctx);
     assert(ctx->hKeyDec);
@@ -172,16 +172,16 @@ bool local_decrypt(void *vctx,
         (PUCHAR)(in + ctx->tag_len), (ULONG)(in_len - ctx->tag_len),
         &authInfo,
         NULL, 0,
-        out, 1000, // FIXME: ###, unknown buf length (ULONG)(*out_len),
+        out, out_buf_len,
         &cbResult,
         0
     );
     if (status != 0) {
         if (error) *error = CryptoErrorEncryption;
-        return false;
+        return 0;
     }
-    *out_len = cbResult;
-    return true;
+    const size_t out_len = cbResult;
+    return out_len;
 }
 
 // MARK: -

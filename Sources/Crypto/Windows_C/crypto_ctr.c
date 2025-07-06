@@ -96,10 +96,10 @@ void ctr_increment(uint8_t *counter, size_t len) {
 }
 
 static
-bool local_encrypt(void *vctx,
-                   uint8_t *out, size_t *out_len,
-                   const uint8_t *in, size_t in_len,
-                   const crypto_flags_t *flags, crypto_error_code *error) {
+size_t local_encrypt(void *vctx,
+                     uint8_t *out, size_t out_buf_len,
+                     const uint8_t *in, size_t in_len,
+                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
     assert(ctx);
     assert(ctx->hKeyEnc);
@@ -161,8 +161,8 @@ bool local_encrypt(void *vctx,
         offset += chunk;
         ctr_increment(counter, block_size);
     }
-    *out_len = ctx->ns_tag_len + in_len;
-    return true;
+    const size_t out_len = ctx->ns_tag_len + in_len;
+    return out_len;
 }
 
 static
@@ -193,10 +193,10 @@ void local_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const
 }
 
 static
-bool local_decrypt(void *vctx,
-                   uint8_t *out, size_t *out_len,
-                   const uint8_t *in, size_t in_len,
-                   const crypto_flags_t *flags, crypto_error_code *error) {
+size_t local_decrypt(void *vctx,
+                     uint8_t *out, size_t out_buf_len,
+                     const uint8_t *in, size_t in_len,
+                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
     assert(ctx);
     assert(ctx->hKeyDec);
@@ -234,7 +234,8 @@ bool local_decrypt(void *vctx,
         offset += chunk;
         ctr_increment(counter, block_size);
     }
-    *out_len = enc_len;
+
+    size_t out_len = enc_len;
 
     // HMAC verify
     status = BCryptOpenAlgorithmProvider(
@@ -254,7 +255,7 @@ bool local_decrypt(void *vctx,
     assert(BCRYPT_SUCCESS(status));
     status = BCryptHashData(ctx->hHmacDec, (PUCHAR)flags->ad, (ULONG)flags->ad_len, 0);
     assert(BCRYPT_SUCCESS(status));
-    status = BCryptHashData(ctx->hHmacDec, out, (ULONG)(*out_len), 0);
+    status = BCryptHashData(ctx->hHmacDec, out, out_len, 0);
     assert(BCRYPT_SUCCESS(status));
     status = BCryptFinishHash(ctx->hHmacDec, ctx->buffer_hmac, (ULONG)ctx->ns_tag_len, 0);
     assert(BCRYPT_SUCCESS(status));
@@ -264,10 +265,9 @@ bool local_decrypt(void *vctx,
 
     if (memcmp(ctx->buffer_hmac, in, ctx->ns_tag_len) != 0) {
         if (error) *error = CryptoErrorHMAC;
-        return false;
+        return 0;
     }
-
-    return true;
+    return out_len;
 }
 
 // MARK: -

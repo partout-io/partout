@@ -91,39 +91,29 @@ void local_configure_encrypt(void *vctx, const zeroing_data_t *cipher_key, const
 }
 
 static
-bool local_encrypt(void *vctx,
-                   uint8_t *dst, size_t *dst_len,
-                   const uint8_t *in, size_t in_len,
-                   const crypto_flags_t *flags, crypto_error_code *error) {
+size_t local_encrypt(void *vctx,
+                     uint8_t *out, size_t out_buf_len,
+                     const uint8_t *in, size_t in_len,
+                     const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
     assert(ctx);
-    //assert(ctx->hKeyEnc);
     assert(ctx->hmac_key_enc);
 
-    fprintf(stderr, "cipher_iv_len: %tu\n", ctx->cipher_iv_len);
-    fprintf(stderr, "digest_len: %tu\n", ctx->digest_len);
-    fprintf(stderr, "in_len: %tu\n", in_len);
-
-    uint8_t *out_iv = dst + ctx->digest_len;
+    uint8_t *out_iv = out + ctx->digest_len;
     uint8_t *out_encrypted = out_iv + ctx->cipher_iv_len;
     ULONG enc_len = 0;
     size_t hmac_len = 0;
 
-    fprintf(stderr, "dst\t= %p\n", dst);
-    fprintf(stderr, "out_iv\t= %p\n", out_iv);
-    fprintf(stderr, "out_encrypted\t= %p\n", out_encrypted);
-
     NTSTATUS status;
 
-    // Generate IV
     if (ctx->hAlgCipher) {
         if (!flags || !flags->for_testing) {
             if (!BCRYPT_SUCCESS(BCryptGenRandom(NULL, out_iv, (ULONG)ctx->cipher_iv_len, BCRYPT_USE_SYSTEM_PREFERRED_RNG))) {
-                return false;
+                return 0;
             }
         }
 
-        char buf[16];
+        UCHAR buf[16];
         memcpy(buf, out_iv, ctx->cipher_iv_len);
         status = BCryptEncrypt(
             ctx->hKeyEnc,
@@ -131,22 +121,19 @@ bool local_encrypt(void *vctx,
             NULL,
             //out_iv, (ULONG)ctx->cipher_iv_len,
             buf, (ULONG)ctx->cipher_iv_len, // FIXME: ###, copy IV to buf (function has side effect)
-            out_encrypted, 1000, // FIXME: ###, outbut buffer length is unknown
+            out_encrypted, out_buf_len - (out_encrypted - out),
             &enc_len,
             BCRYPT_BLOCK_PADDING
         );
         if (!BCRYPT_SUCCESS(status)) {
             if (error) *error = CryptoErrorEncryption;
-            return false;
+            return 0;
         }
     } else {
         assert(out_encrypted == out_iv);
         memcpy(out_encrypted, in, in_len);
         enc_len = in_len;
     }
-
-    fprintf(stderr, "enc_len: %tu\n", enc_len);
-    // FIXME: ###, copy iv to out_iv now
 
     status = BCryptCreateHash(
         ctx->hAlgHmac,
@@ -158,13 +145,13 @@ bool local_encrypt(void *vctx,
     assert(BCRYPT_SUCCESS(status));
     status = BCryptHashData(ctx->hHmacEnc, out_iv, (ULONG)(enc_len + ctx->cipher_iv_len), 0);
     assert(BCRYPT_SUCCESS(status));
-    status = BCryptFinishHash(ctx->hHmacEnc, dst, (ULONG)ctx->digest_len, 0);
+    status = BCryptFinishHash(ctx->hHmacEnc, out, (ULONG)ctx->digest_len, 0);
     assert(BCRYPT_SUCCESS(status));
     BCryptDestroyHash(ctx->hHmacEnc);
     ctx->hHmacEnc = NULL;
 
-    *dst_len = enc_len + ctx->cipher_iv_len + ctx->digest_len;
-    return true;
+    const size_t out_len = enc_len + ctx->cipher_iv_len + ctx->digest_len;
+    return out_len;
 }
 
 static
@@ -196,10 +183,10 @@ void local_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const
 }
 
 static
-bool local_decrypt(void *vctx,
-                   uint8_t *out, size_t *out_len,
-                   const uint8_t *in, size_t in_len,
-                   const crypto_flags_t *flags, crypto_error_code *error) {
+size_t local_decrypt(void *vctx,
+                     uint8_t *out, size_t out_buf_len,
+                     const uint8_t *in, size_t in_len,
+                     const crypto_flags_t *flags, crypto_error_code *error) {
     (void)flags;
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
     assert(ctx);
@@ -228,9 +215,10 @@ bool local_decrypt(void *vctx,
 
     if (memcmp(ctx->buffer_hmac, in, ctx->digest_len) != 0) {
         if (error) *error = CryptoErrorHMAC;
-        return false;
+        return 0;
     }
 
+    ULONG out_len = 0;
     if (ctx->hAlgCipher) {
         // Decrypt with CNG padding
         status = BCryptDecrypt(
@@ -238,20 +226,19 @@ bool local_decrypt(void *vctx,
             (PUCHAR)encrypted, (ULONG)(in_len - ctx->digest_len - ctx->cipher_iv_len),
             NULL,
             (PUCHAR)iv, (ULONG)ctx->cipher_iv_len,
-            out, 1000, // FIXME: ###, unknown (ULONG)(*out_len),
-            &dec_len,
+            out, out_buf_len,
+            &out_len,
             BCRYPT_BLOCK_PADDING
         );
         if (!BCRYPT_SUCCESS(status)) {
             if (error) *error = CryptoErrorEncryption;
-            return false;
+            return 0;
         }
     } else {
         memcpy(out, in + ctx->digest_len, in_len - ctx->digest_len);
-        dec_len = in_len - ctx->digest_len;
+        out_len = in_len - ctx->digest_len;
     }
-    *out_len = dec_len;
-    return true;
+    return out_len;
 }
 
 static

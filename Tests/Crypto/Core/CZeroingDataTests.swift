@@ -59,7 +59,7 @@ final class CZeroingDataTests: XCTestCase {
         let data = Data(hex: "438ac4729847fb3975345983")
         let sut = CZeroingData(data: data)
 
-        sut.truncate(toSize: 5)
+        sut.resize(toSize: 5)
         XCTAssertEqual(sut.length, 5)
         XCTAssertEqual(sut.toData(), data.subdata(in: 0..<5))
     }
@@ -99,7 +99,7 @@ final class CZeroingDataTests: XCTestCase {
     }
 
     func test_givenData_whenManipulate_thenDataIsExpected() {
-        let z1 = CZeroingData()
+        let z1 = CZeroingData(count: 0)
         z1.append(CZeroingData(data: Data(hex: "12345678")))
         z1.append(CZeroingData(data: Data(hex: "abcdef")))
         let z2 = z1.withOffset(2, length: 3) // 5678ab
