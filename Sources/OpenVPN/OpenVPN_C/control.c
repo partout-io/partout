@@ -146,6 +146,7 @@ size_t ctrl_pkt_serialize(uint8_t *_Nonnull dst, const ctrl_pkt_t *_Nonnull pkt)
 // MARK: - Auth
 
 size_t ctrl_pkt_serialize_auth(uint8_t *dst,
+                               size_t dst_buf_len,
                                const ctrl_pkt_t *pkt,
                                ctrl_pkt_alg *alg,
                                crypto_error_code *error) {
@@ -161,8 +162,14 @@ size_t ctrl_pkt_serialize_auth(uint8_t *dst,
     ptr += ctrl_pkt_serialize(ptr, pkt);
 
     const size_t subject_len = ptr - subject;
-    size_t dst_len;
-    if (!crypto_encrypt(alg->crypto, dst, &dst_len, subject, subject_len, NULL, error)) {
+    const size_t dst_len = crypto_encrypt(alg->crypto,
+                                          dst,
+                                          dst_buf_len,
+                                          subject,
+                                          subject_len,
+                                          NULL,
+                                          error);
+    if (!dst_len) {
         return 0;
     }
     assert(dst_len == digest_len + subject_len);//, @"Encrypted packet size != (Digest + Subject)");
@@ -173,6 +180,7 @@ size_t ctrl_pkt_serialize_auth(uint8_t *dst,
 // MARK: - Crypt
 
 size_t ctrl_pkt_serialize_crypt(uint8_t *dst,
+                                size_t dst_buf_len,
                                 const ctrl_pkt_t *pkt,
                                 ctrl_pkt_alg *alg,
                                 crypto_error_code *error) {
@@ -190,8 +198,14 @@ size_t ctrl_pkt_serialize_crypt(uint8_t *dst,
     const size_t raw_capacity = ctrl_pkt_raw_capacity(pkt);
     zeroing_data_t *msg = zd_create(raw_capacity);
     ctrl_pkt_serialize(msg->bytes, pkt);
-    size_t enc_msg_len;
-    if (!crypto_encrypt(alg->crypto, dst + ad_len, &enc_msg_len, msg->bytes, msg->length, &flags, error)) {
+    const size_t enc_msg_len = crypto_encrypt(alg->crypto,
+                                              dst + ad_len,
+                                              dst_buf_len - ad_len,
+                                              msg->bytes,
+                                              msg->length,
+                                              &flags,
+                                              error);
+    if (!enc_msg_len) {
         zd_free(msg);
         return 0;
     }

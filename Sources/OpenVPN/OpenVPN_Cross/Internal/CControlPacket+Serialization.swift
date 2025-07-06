@@ -30,6 +30,7 @@ import Foundation
 extension CControlPacket {
     typealias SerializationFunction = (
         _ dst: UnsafeMutablePointer<UInt8>,
+        _ dstLength: Int,
         _ pkt: UnsafePointer<ctrl_pkt_t>,
         _ alg: UnsafeMutablePointer<ctrl_pkt_alg>,
         _ error: UnsafeMutablePointer<crypto_error_code>
@@ -67,7 +68,7 @@ extension CControlPacket {
         var dst = Data(count: capacity)
         let written = try dst.withUnsafeMutableBytes { dst in
             var enc_error = CryptoErrorNone
-            let written = function(dst.bytePointer, pkt, &alg, &enc_error)
+            let written = function(dst.bytePointer, capacity, pkt, &alg, &enc_error)
             guard written > 0 else {
                 throw CCryptoError(enc_error)
             }

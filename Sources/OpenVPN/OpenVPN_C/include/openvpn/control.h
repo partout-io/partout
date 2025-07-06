@@ -64,11 +64,13 @@ size_t ctrl_pkt_capacity_alg(const ctrl_pkt_t *_Nonnull pkt, const ctrl_pkt_alg 
 size_t ctrl_pkt_serialize(uint8_t *_Nonnull dst, const ctrl_pkt_t *_Nonnull pkt);
 
 size_t ctrl_pkt_serialize_auth(uint8_t *_Nonnull dst,
+                               size_t dst_buf_len,
                                const ctrl_pkt_t *_Nonnull pkt,
                                ctrl_pkt_alg *_Nullable alg,
                                crypto_error_code *_Nullable error);
 
 size_t ctrl_pkt_serialize_crypt(uint8_t *_Nonnull dst,
+                                size_t dst_buf_len,
                                 const ctrl_pkt_t *_Nonnull pkt,
                                 ctrl_pkt_alg *_Nullable alg,
                                 crypto_error_code *_Nullable error);
