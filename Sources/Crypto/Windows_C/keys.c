@@ -26,7 +26,7 @@
 #include "crypto/allocation.h"
 #include "crypto/keys.h"
 
-// FIXME: ###, port to Windows CNG
+// FIXME: #101, port to Windows CNG
 
 #define KeyHMACMaxLength    (size_t)128
 

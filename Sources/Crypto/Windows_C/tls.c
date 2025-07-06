@@ -26,7 +26,7 @@
 #include "crypto/allocation.h"
 #include "crypto/tls.h"
 
-// FIXME: ###, port to Windows Schannel
+// FIXME: #108, port to Windows Schannel
 
 //static const char *const TLSBoxClientEKU = "TLS Web Client Authentication";
 static const char *const TLSBoxServerEKU = "TLS Web Server Authentication";
