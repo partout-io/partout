@@ -32,6 +32,7 @@
 
 #pragma comment(lib, "bcrypt.lib")
 
+#define IVMaxLength (size_t)16
 #define HMACMaxLength (size_t)128
 
 typedef struct {
@@ -52,7 +53,8 @@ typedef struct {
     uint8_t *_Nonnull utf_digest_name;
     zeroing_data_t *_Nonnull hmac_key_enc;
     zeroing_data_t *_Nonnull hmac_key_dec;
-    uint8_t *_Nonnull buffer_hmac;
+    UCHAR buffer_iv[IVMaxLength];
+    UCHAR buffer_hmac[HMACMaxLength];
 } crypto_cbc_ctx;
 
 static
@@ -113,14 +115,14 @@ size_t local_encrypt(void *vctx,
             }
         }
 
-        UCHAR buf[16];
-        memcpy(buf, out_iv, ctx->cipher_iv_len);
+        // do NOT use out_iv directly because BCryptEncrypt has side-effect
+        memcpy(ctx->buffer_iv, out_iv, ctx->cipher_iv_len);
+
         status = BCryptEncrypt(
             ctx->hKeyEnc,
             (PUCHAR)in, (ULONG)in_len,
             NULL,
-            //out_iv, (ULONG)ctx->cipher_iv_len,
-            buf, (ULONG)ctx->cipher_iv_len, // FIXME: ###, copy IV to buf (function has side effect)
+            ctx->buffer_iv, (ULONG)ctx->cipher_iv_len,
             out_encrypted, out_buf_len - (out_encrypted - out),
             &enc_len,
             BCRYPT_BLOCK_PADDING
@@ -322,7 +324,6 @@ crypto_ctx crypto_cbc_create(const char *cipher_name, const char *digest_name,
     ctx->hKeyDec = NULL;
     ctx->hHmacEnc = NULL;
     ctx->hHmacDec = NULL;
-    ctx->buffer_hmac = pp_alloc_crypto(HMACMaxLength);
 
     NTSTATUS status;
     if (cipher_name) {
@@ -381,10 +382,8 @@ void crypto_cbc_free(crypto_ctx vctx) {
     if (ctx->hKeyDec) BCryptDestroyKey(ctx->hKeyDec);
     if (ctx->hAlgCipher) BCryptCloseAlgorithmProvider(ctx->hAlgCipher, 0);
     if (ctx->hAlgHmac) BCryptCloseAlgorithmProvider(ctx->hAlgHmac, 0);
-    if (ctx->buffer_hmac) {
-        pp_zero(ctx->buffer_hmac, HMACMaxLength);
-        free(ctx->buffer_hmac);
-    }
+    pp_zero(ctx->buffer_iv, sizeof(ctx->buffer_iv));
+    pp_zero(ctx->buffer_hmac, sizeof(ctx->buffer_hmac));
     zd_free(ctx->hmac_key_enc);
     zd_free(ctx->hmac_key_dec);
     free(ctx);
