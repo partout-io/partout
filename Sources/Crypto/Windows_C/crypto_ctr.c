@@ -116,7 +116,6 @@ bool local_encrypt(void *vctx,
     // HMAC (SHA256)
     status = BCryptOpenAlgorithmProvider(
         &ctx->hAlgHmac,
-        // FIXME: ###, hardcoded, and set hAlgMac only once in configure!!!
         BCRYPT_SHA256_ALGORITHM,
         NULL,
         BCRYPT_ALG_HANDLE_HMAC_FLAG
@@ -239,7 +238,6 @@ bool local_decrypt(void *vctx,
     // HMAC verify
     status = BCryptOpenAlgorithmProvider(
         &ctx->hAlgHmac,
-        // FIXME: ###, hardcoded, and set hAlgMac only once in configure!!!
         BCRYPT_SHA256_ALGORITHM,
         NULL,
         BCRYPT_ALG_HANDLE_HMAC_FLAG

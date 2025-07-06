@@ -116,7 +116,6 @@ bool local_encrypt(void *vctx,
     NTSTATUS status;
 
     // Generate IV
-    // FIXME: ###, cipher can be NULL
     if (ctx->hAlgCipher) {
         if (!flags || !flags->for_testing) {
             if (!BCRYPT_SUCCESS(BCryptGenRandom(NULL, out_iv, (ULONG)ctx->cipher_iv_len, BCRYPT_USE_SYSTEM_PREFERRED_RNG))) {
