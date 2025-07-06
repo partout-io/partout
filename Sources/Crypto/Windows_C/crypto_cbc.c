@@ -32,7 +32,7 @@
 
 #pragma comment(lib, "bcrypt.lib")
 
-#define MAX_HMAC_LENGTH 100
+#define HMACMaxLength (size_t)128
 
 typedef struct {
     crypto_t crypto;
@@ -336,7 +336,7 @@ crypto_ctx crypto_cbc_create(const char *cipher_name, const char *digest_name,
     ctx->hKeyDec = NULL;
     ctx->hHmacEnc = NULL;
     ctx->hHmacDec = NULL;
-    ctx->buffer_hmac = pp_alloc_crypto(MAX_HMAC_LENGTH);
+    ctx->buffer_hmac = pp_alloc_crypto(HMACMaxLength);
 
     NTSTATUS status;
     if (cipher_name) {
@@ -396,7 +396,7 @@ void crypto_cbc_free(crypto_ctx vctx) {
     if (ctx->hAlgCipher) BCryptCloseAlgorithmProvider(ctx->hAlgCipher, 0);
     if (ctx->hAlgHmac) BCryptCloseAlgorithmProvider(ctx->hAlgHmac, 0);
     if (ctx->buffer_hmac) {
-        pp_zero(ctx->buffer_hmac, MAX_HMAC_LENGTH);
+        pp_zero(ctx->buffer_hmac, HMACMaxLength);
         free(ctx->buffer_hmac);
     }
     zd_free(ctx->hmac_key_enc);

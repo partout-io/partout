@@ -31,7 +31,7 @@
 #include "crypto/crypto_cbc.h"
 #include "macros.h"
 
-#define MAX_HMAC_LENGTH 100
+#define HMACMaxLength (size_t)128
 
 typedef struct {
     crypto_t crypto;
@@ -250,7 +250,7 @@ crypto_ctx crypto_cbc_create(const char *cipher_name, const char *digest_name,
     ctx->mac_params[0] = OSSL_PARAM_construct_utf8_string("digest", ctx->utf_digest_name, 0);
     ctx->mac_params[1] = OSSL_PARAM_construct_end();
 
-    ctx->buffer_hmac = pp_alloc_crypto(MAX_HMAC_LENGTH);
+    ctx->buffer_hmac = pp_alloc_crypto(HMACMaxLength);
 
     ctx->crypto.meta.cipher_key_len = ctx->cipher_key_len;
     ctx->crypto.meta.cipher_iv_len = ctx->cipher_iv_len;
@@ -285,7 +285,7 @@ void crypto_cbc_free(crypto_ctx vctx) {
     EVP_MAC_free(ctx->mac);
     free(ctx->mac_params);
     if (ctx->buffer_hmac) {
-        pp_zero(ctx->buffer_hmac, MAX_HMAC_LENGTH);
+        pp_zero(ctx->buffer_hmac, HMACMaxLength);
         free(ctx->buffer_hmac);
     }
 
