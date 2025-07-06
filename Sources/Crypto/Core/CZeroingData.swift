@@ -33,17 +33,22 @@ public final class CZeroingData {
         self.ptr = ptr
     }
 
+    @available(*, deprecated, renamed: "init(count:)")
     public init(length: Int = 0) {
-        self.ptr = zd_create(length)
+        ptr = zd_create(length)
+    }
+
+    public init(count: Int) {
+        ptr = zd_create(count)
     }
 
     public init(bytes: UnsafePointer<UInt8>, length: Int) {
-        self.ptr = zd_create_from_data(bytes, length)
+        ptr = zd_create_from_data(bytes, length)
     }
 
     public init(uInt8: UInt8) {
         var value = uInt8
-        self.ptr = zd_create_from_data(&value, 1)
+        ptr = zd_create_from_data(&value, 1)
     }
 
     public init(uInt16: UInt16) {
@@ -79,7 +84,7 @@ public final class CZeroingData {
             ptr = zd_create(0)
             return
         }
-        self.ptr = zd_create_from_string(cstr, nullTerminated)
+        ptr = zd_create_from_string(cstr, nullTerminated)
     }
 
     deinit {
@@ -98,7 +103,12 @@ extension CZeroingData {
         zd_mutable_bytes(ptr)
     }
 
+    @available(*, deprecated, renamed: "count")
     public var length: Int {
+        zd_length(ptr)
+    }
+
+    public var count: Int {
         zd_length(ptr)
     }
 }
@@ -120,7 +130,7 @@ extension CZeroingData: Equatable {
 
 extension CZeroingData {
     public func copy() -> CZeroingData {
-        CZeroingData(ptr: zd_make_copy(self.ptr))
+        CZeroingData(ptr: zd_make_copy(ptr))
     }
 
     public func withOffset(_ offset: Int, length: Int) -> CZeroingData {
@@ -144,7 +154,7 @@ extension CZeroingData {
         zd_zero(ptr)
     }
 
-    public func truncate(toSize size: Int) {
+    public func resize(toSize size: Int) {
         zd_resize(ptr, size)
     }
 
