@@ -23,8 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable internal import _PartoutCryptoCore
-internal import _PartoutCryptoCore_C
+import _PartoutCryptoCore_C
 import Foundation
 
 final class CryptoWrapper: Encrypter, Decrypter {
