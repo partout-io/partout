@@ -35,19 +35,14 @@
 typedef struct {
     crypto_t crypto;
 
+    // cipher
     BCRYPT_ALG_HANDLE hAlgCipher;
-    BCRYPT_ALG_HANDLE hAlgHmac;
     BCRYPT_KEY_HANDLE hKeyEnc;
     BCRYPT_KEY_HANDLE hKeyDec;
-    BCRYPT_HASH_HANDLE hHmacEnc;
-    BCRYPT_HASH_HANDLE hHmacDec;
-    size_t cipher_key_len;
-    size_t cipher_iv_len;
-    size_t hmac_key_len;
-
     size_t ns_tag_len;
     size_t payload_len;
 
+    // HMAC
     zeroing_data_t *_Nonnull hmac_key_enc;
     zeroing_data_t *_Nonnull hmac_key_dec;
     uint8_t *_Nonnull buffer_hmac;
@@ -72,27 +67,25 @@ void local_configure_encrypt(void *vctx,
                              const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
     pp_assert(ctx);
-    pp_assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
-    pp_assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
+    pp_assert(hmac_key && hmac_key->length >= ctx->crypto.meta.hmac_key_len);
+    pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
 
     if (ctx->hKeyEnc) {
         BCryptDestroyKey(ctx->hKeyEnc);
         ctx->hKeyEnc = NULL;
     }
-    NTSTATUS status = BCryptGenerateSymmetricKey(
+    CRYPTO_ASSERT(BCryptGenerateSymmetricKey(
         ctx->hAlgCipher,
         &ctx->hKeyEnc,
         NULL, 0,
         (PUCHAR)cipher_key->bytes,
-        (ULONG)ctx->cipher_key_len,
+        (ULONG)ctx->crypto.meta.cipher_key_len,
         0
-    );
-    pp_assert(CRYPTO_CNG_SUCCESS(status));
-
+    ))
     if (ctx->hmac_key_enc) {
         zd_free(ctx->hmac_key_enc);
     }
-    ctx->hmac_key_enc = zd_create_from_data(hmac_key->bytes, ctx->hmac_key_len);
+    ctx->hmac_key_enc = zd_create_from_data(hmac_key->bytes, ctx->crypto.meta.hmac_key_len);
 }
 
 static
@@ -107,40 +100,39 @@ size_t local_encrypt(void *vctx,
     pp_assert(flags);
 
     uint8_t *out_encrypted = out + ctx->ns_tag_len;
-    size_t block_size = ctx->cipher_iv_len;
+    size_t block_size = ctx->crypto.meta.cipher_iv_len;
     size_t nblocks = (in_len + block_size - 1) / block_size;
     uint8_t counter[32] = {0};
     uint8_t ecb_out[32] = {0};
     size_t offset = 0;
-    NTSTATUS status;
 
     // HMAC (SHA256)
-    CRYPTO_CNG_TRACK_STATUS(status) BCryptOpenAlgorithmProvider(
-        &ctx->hAlgHmac,
+    BCRYPT_ALG_HANDLE hAlgHmac = NULL;
+    BCRYPT_HASH_HANDLE hHmac = NULL;
+    CRYPTO_CHECK_MAC_ALG(BCryptOpenAlgorithmProvider(
+        &hAlgHmac,
         BCRYPT_SHA256_ALGORITHM,
         NULL,
         BCRYPT_ALG_HANDLE_HMAC_FLAG
-    );
-    CRYPTO_CNG_TRACK_STATUS(status) BCryptCreateHash(
-        ctx->hAlgHmac,
-        &ctx->hHmacEnc,
+    ))
+    CRYPTO_CHECK_MAC_ALG(BCryptCreateHash(
+        hAlgHmac,
+        &hHmac,
         NULL, 0,
-        ctx->hmac_key_enc->bytes, (ULONG)ctx->hmac_key_len,
+        ctx->hmac_key_enc->bytes, (ULONG)ctx->crypto.meta.hmac_key_len,
         0
-    );
-    CRYPTO_CNG_TRACK_STATUS(status) BCryptHashData(ctx->hHmacEnc, (PUCHAR)flags->ad, (ULONG)flags->ad_len, 0);
-    CRYPTO_CNG_TRACK_STATUS(status) BCryptHashData(ctx->hHmacEnc, (PUCHAR)in, (ULONG)in_len, 0);
-    CRYPTO_CNG_TRACK_STATUS(status) BCryptFinishHash(ctx->hHmacEnc, out, (ULONG)ctx->ns_tag_len, 0);
-    BCryptDestroyHash(ctx->hHmacEnc);
-    ctx->hHmacEnc = NULL;
-    BCryptCloseAlgorithmProvider(ctx->hAlgHmac, 0);
-    CRYPTO_CNG_RETURN_IF_FAILED(status, CryptoErrorEncryption)
+    ))
+    CRYPTO_CHECK_MAC_ALG(BCryptHashData(hHmac, (PUCHAR)flags->ad, (ULONG)flags->ad_len, 0))
+    CRYPTO_CHECK_MAC_ALG(BCryptHashData(hHmac, (PUCHAR)in, (ULONG)in_len, 0))
+    CRYPTO_CHECK_MAC_ALG(BCryptFinishHash(hHmac, out, (ULONG)ctx->ns_tag_len, 0))
+    BCryptDestroyHash(hHmac);
+    BCryptCloseAlgorithmProvider(hAlgHmac, 0);
 
     // CTR mode using ECB primitive
     memcpy(counter, out, block_size); // Use tag as IV/counter
     for (size_t b = 0; b < nblocks; ++b) {
         ULONG ecb_len = 0;
-        CRYPTO_CNG_TRACK_STATUS(status) BCryptEncrypt(
+        CRYPTO_CHECK(BCryptEncrypt(
             ctx->hKeyEnc,
             counter, (ULONG)block_size,
             NULL,
@@ -148,8 +140,7 @@ size_t local_encrypt(void *vctx,
             ecb_out, (ULONG)block_size,
             &ecb_len,
             0
-        );
-        CRYPTO_CNG_RETURN_IF_FAILED(status, CryptoErrorEncryption)
+        ))
         size_t chunk = (in_len - offset > block_size) ? block_size : (in_len - offset);
         for (size_t i = 0; i < chunk; ++i) {
             out_encrypted[offset + i] = in[offset + i] ^ ecb_out[i];
@@ -165,27 +156,25 @@ static
 void local_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
     pp_assert(ctx);
-    pp_assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
-    pp_assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
+    pp_assert(hmac_key && hmac_key->length >= ctx->crypto.meta.hmac_key_len);
+    pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
 
     if (ctx->hKeyDec) {
         BCryptDestroyKey(ctx->hKeyDec);
         ctx->hKeyDec = NULL;
     }
-    NTSTATUS status = BCryptGenerateSymmetricKey(
+    CRYPTO_ASSERT(BCryptGenerateSymmetricKey(
         ctx->hAlgCipher,
         &ctx->hKeyDec,
         NULL, 0,
         (PUCHAR)cipher_key->bytes,
-        (ULONG)ctx->cipher_key_len,
+        (ULONG)ctx->crypto.meta.cipher_key_len,
         0
-    );
-    pp_assert(CRYPTO_CNG_SUCCESS(status));
-
+    ))
     if (ctx->hmac_key_dec) {
         zd_free(ctx->hmac_key_dec);
     }
-    ctx->hmac_key_dec = zd_create_from_data(hmac_key->bytes, ctx->hmac_key_len);
+    ctx->hmac_key_dec = zd_create_from_data(hmac_key->bytes, ctx->crypto.meta.hmac_key_len);
 }
 
 static
@@ -202,18 +191,17 @@ size_t local_decrypt(void *vctx,
     const uint8_t *iv = in;
     const uint8_t *encrypted = in + ctx->ns_tag_len;
     size_t enc_len = in_len - ctx->ns_tag_len;
-    size_t block_size = ctx->cipher_iv_len;
+    size_t block_size = ctx->crypto.meta.cipher_iv_len;
     size_t nblocks = (enc_len + block_size - 1) / block_size;
     uint8_t counter[32] = {0};
     uint8_t ecb_out[32] = {0};
     size_t offset = 0;
-    NTSTATUS status;
 
     // CTR mode using ECB primitive
     memcpy(counter, iv, block_size);
     for (size_t b = 0; b < nblocks; ++b) {
         ULONG ecb_len = 0;
-        CRYPTO_CNG_TRACK_STATUS(status) BCryptEncrypt(
+        CRYPTO_CHECK(BCryptEncrypt(
             ctx->hKeyDec,
             counter, (ULONG)block_size,
             NULL,
@@ -221,8 +209,7 @@ size_t local_decrypt(void *vctx,
             ecb_out, (ULONG)block_size,
             &ecb_len,
             0
-        );
-        CRYPTO_CNG_RETURN_IF_FAILED(status, CryptoErrorEncryption)
+        ))
         size_t chunk = (enc_len - offset > block_size) ? block_size : (enc_len - offset);
         for (size_t i = 0; i < chunk; ++i) {
             out[offset + i] = encrypted[offset + i] ^ ecb_out[i];
@@ -234,26 +221,26 @@ size_t local_decrypt(void *vctx,
     size_t out_len = enc_len;
 
     // HMAC verify
-    CRYPTO_CNG_TRACK_STATUS(status) BCryptOpenAlgorithmProvider(
-        &ctx->hAlgHmac,
+    BCRYPT_ALG_HANDLE hAlgHmac = NULL;
+    BCRYPT_HASH_HANDLE hHmac = NULL;
+    CRYPTO_CHECK_MAC_ALG(BCryptOpenAlgorithmProvider(
+        &hAlgHmac,
         BCRYPT_SHA256_ALGORITHM,
         NULL,
         BCRYPT_ALG_HANDLE_HMAC_FLAG
-    );
-    CRYPTO_CNG_TRACK_STATUS(status) BCryptCreateHash(
-        ctx->hAlgHmac,
-        &ctx->hHmacDec,
+    ))
+    CRYPTO_CHECK_MAC_ALG(BCryptCreateHash(
+        hAlgHmac,
+        &hHmac,
         NULL, 0,
-        ctx->hmac_key_dec->bytes, (ULONG)ctx->hmac_key_len,
+        ctx->hmac_key_dec->bytes, (ULONG)ctx->crypto.meta.hmac_key_len,
         0
-    );
-    CRYPTO_CNG_TRACK_STATUS(status) BCryptHashData(ctx->hHmacDec, (PUCHAR)flags->ad, (ULONG)flags->ad_len, 0);
-    CRYPTO_CNG_TRACK_STATUS(status) BCryptHashData(ctx->hHmacDec, out, out_len, 0);
-    CRYPTO_CNG_TRACK_STATUS(status) BCryptFinishHash(ctx->hHmacDec, ctx->buffer_hmac, (ULONG)ctx->ns_tag_len, 0);
-    BCryptDestroyHash(ctx->hHmacDec);
-    ctx->hHmacDec = NULL;
-    BCryptCloseAlgorithmProvider(ctx->hAlgHmac, 0);
-    CRYPTO_CNG_RETURN_IF_FAILED(status, CryptoErrorEncryption)
+    ))
+    CRYPTO_CHECK_MAC_ALG(BCryptHashData(hHmac, (PUCHAR)flags->ad, (ULONG)flags->ad_len, 0))
+    CRYPTO_CHECK_MAC_ALG(BCryptHashData(hHmac, out, out_len, 0))
+    CRYPTO_CHECK_MAC_ALG(BCryptFinishHash(hHmac, ctx->buffer_hmac, (ULONG)ctx->ns_tag_len, 0))
+    BCryptDestroyHash(hHmac);
+    BCryptCloseAlgorithmProvider(hAlgHmac, 0);
 
     if (memcmp(ctx->buffer_hmac, in, ctx->ns_tag_len) != 0) {
         if (error) *error = CryptoErrorHMAC;
@@ -269,7 +256,7 @@ crypto_ctx crypto_ctr_create(const char *cipher_name, const char *digest_name,
                              const crypto_keys_t *keys) {
     pp_assert(cipher_name && digest_name);
 
-    // Only AES-CTR and HMAC-SHA256 supported
+    // only AES-CTR and HMAC-SHA256 supported
     if (_stricmp(cipher_name, "AES-128-CTR")) {
         return NULL;
     }
@@ -278,38 +265,27 @@ crypto_ctx crypto_ctr_create(const char *cipher_name, const char *digest_name,
     }
 
     crypto_ctr_ctx *ctx = pp_alloc_crypto(sizeof(crypto_ctr_ctx));
-    if (!ctx) {
-        return NULL;
-    }
 
-    ctx->cipher_key_len = 16; // AES-128
-    ctx->cipher_iv_len = 16;  // AES block size
-    ctx->hmac_key_len = 32;   // SHA256 output size
-
-    ctx->ns_tag_len = tag_len;
-    ctx->payload_len = payload_len;
-
-    ctx->hKeyEnc = NULL;
-    ctx->hKeyDec = NULL;
-    ctx->hHmacEnc = NULL;
-    ctx->hHmacDec = NULL;
-    ctx->buffer_hmac = pp_alloc_crypto(tag_len);
-
-    NTSTATUS status = BCryptOpenAlgorithmProvider(
+    // no chaining mode, use ECB for manual CTR
+    CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
         &ctx->hAlgCipher,
         BCRYPT_AES_ALGORITHM,
         NULL,
         0
-    );
-    CRYPTO_CNG_CLOSE_IF_FAILED(status, NULL);
-    // No chaining mode set: use ECB for manual CTR
+    ));
 
-    ctx->crypto.meta.cipher_key_len = ctx->cipher_key_len;
-    ctx->crypto.meta.cipher_iv_len = ctx->cipher_iv_len;
-    ctx->crypto.meta.hmac_key_len = ctx->hmac_key_len;
-    ctx->crypto.meta.digest_len = ctx->ns_tag_len;
-    ctx->crypto.meta.tag_len = ctx->ns_tag_len;
+    // no longer fails
+
+    ctx->buffer_hmac = pp_alloc_crypto(tag_len);
+
+    ctx->crypto.meta.cipher_key_len = 16; // AES-128
+    ctx->crypto.meta.cipher_iv_len = 16;  // AES block size
+    ctx->crypto.meta.hmac_key_len = 32;   // SHA256 output size
+    ctx->crypto.meta.digest_len = tag_len;
+    ctx->crypto.meta.tag_len = tag_len;
     ctx->crypto.meta.encryption_capacity = local_encryption_capacity;
+    ctx->ns_tag_len = tag_len;
+    ctx->payload_len = payload_len;
 
     ctx->crypto.encrypter.configure = local_configure_encrypt;
     ctx->crypto.encrypter.encrypt = local_encrypt;
@@ -323,6 +299,11 @@ crypto_ctx crypto_ctr_create(const char *cipher_name, const char *digest_name,
     }
 
     return (crypto_ctx)ctx;
+
+failure:
+    if (ctx->hAlgCipher) BCryptCloseAlgorithmProvider(ctx->hAlgCipher, 0);
+    free(ctx);
+    return NULL;
 }
 
 void crypto_ctr_free(crypto_ctx vctx) {
@@ -331,12 +312,12 @@ void crypto_ctr_free(crypto_ctx vctx) {
 
     if (ctx->hKeyEnc) BCryptDestroyKey(ctx->hKeyEnc);
     if (ctx->hKeyDec) BCryptDestroyKey(ctx->hKeyDec);
-    if (ctx->hAlgCipher) BCryptCloseAlgorithmProvider(ctx->hAlgCipher, 0);
-    if (ctx->buffer_hmac) {
-        pp_zero(ctx->buffer_hmac, ctx->ns_tag_len);
-        free(ctx->buffer_hmac);
-    }
-    zd_free(ctx->hmac_key_enc);
-    zd_free(ctx->hmac_key_dec);
+    if (ctx->hmac_key_enc) zd_free(ctx->hmac_key_enc);
+    if (ctx->hmac_key_dec) zd_free(ctx->hmac_key_dec);
+
+    BCryptCloseAlgorithmProvider(ctx->hAlgCipher, 0);
+    pp_zero(ctx->buffer_hmac, ctx->ns_tag_len);
+    free(ctx->buffer_hmac);
+
     free(ctx);
 } 
