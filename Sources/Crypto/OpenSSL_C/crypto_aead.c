@@ -48,14 +48,14 @@ typedef struct {
 static inline
 void local_prepare_iv(const void *vctx, uint8_t *_Nonnull iv, const zeroing_data_t *_Nonnull hmac_key) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
+    pp_assert(ctx);
     bzero(iv, ctx->id_len);
     memcpy(iv + ctx->id_len, hmac_key->bytes, ctx->cipher_iv_len - ctx->id_len);
 }
 
 size_t local_encryption_capacity(const void *vctx, size_t len) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
+    pp_assert(ctx);
     return pp_alloc_crypto_capacity(len, ctx->tag_len);
 }
 
@@ -63,9 +63,9 @@ static
 void local_configure_encrypt(void *vctx,
                              const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
-    assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
-    assert(hmac_key);
+    pp_assert(ctx);
+    pp_assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
+    pp_assert(hmac_key);
 
     EVP_CIPHER_CTX_reset(ctx->ctx_enc);
     EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1);
@@ -80,10 +80,10 @@ size_t local_encrypt(void *vctx,
                      const crypto_flags_t *flags,
                      crypto_error_code *error) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
-    assert(ctx->ctx_enc);
-    assert(flags);
-    assert(flags->ad_len >= ctx->id_len);
+    pp_assert(ctx);
+    pp_assert(ctx->ctx_enc);
+    pp_assert(flags);
+    pp_assert(flags->ad_len >= ctx->id_len);
 
     EVP_CIPHER_CTX *ossl = ctx->ctx_enc;
     int l1 = 0, l2 = 0, tmp = 0, code = 1;
@@ -105,9 +105,9 @@ static
 void local_configure_decrypt(void *vctx,
                              const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
-    assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
-    assert(hmac_key);
+    pp_assert(ctx);
+    pp_assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
+    pp_assert(hmac_key);
 
     EVP_CIPHER_CTX_reset(ctx->ctx_dec);
     EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0);
@@ -122,10 +122,10 @@ size_t local_decrypt(void *vctx,
                      const crypto_flags_t *flags,
                      crypto_error_code *error) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
-    assert(ctx->ctx_dec);
-    assert(flags);
-    assert(flags->ad_len >= ctx->id_len);
+    pp_assert(ctx);
+    pp_assert(ctx->ctx_dec);
+    pp_assert(flags);
+    pp_assert(flags->ad_len >= ctx->id_len);
 
     EVP_CIPHER_CTX *ossl = ctx->ctx_dec;
     int l1 = 0, l2 = 0, tmp = 0, code = 1;
@@ -147,7 +147,7 @@ size_t local_decrypt(void *vctx,
 
 crypto_ctx crypto_aead_create(const char *cipher_name, size_t tag_len, size_t id_len,
                               const crypto_keys_t *keys) {
-    assert(cipher_name);
+    pp_assert(cipher_name);
 
     const EVP_CIPHER *cipher = EVP_get_cipherbyname(cipher_name);
     if (!cipher) {

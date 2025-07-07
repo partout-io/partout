@@ -37,7 +37,7 @@ size_t dp_assemble(void *vmode) {
     const dp_mode_assemble_ctx *ctx = &mode->assemble_ctx;
 
     const size_t dst_capacity = dp_mode_assemble_capacity(mode, ctx->src_len);
-    assert(ctx->dst->length >= dst_capacity);
+    pp_assert(ctx->dst->length >= dst_capacity);
 
     uint8_t *dst = ctx->dst->bytes;
     *(uint32_t *)dst = endian_htonl(ctx->packet_id);
@@ -65,11 +65,11 @@ size_t dp_encrypt(void *vmode) {
     const dp_mode_t *mode = vmode;
     const dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
 
-    assert(mode->enc.raw_encrypt);
+    pp_assert(mode->enc.raw_encrypt);
     DP_ENCRYPT_BEGIN(mode->opt.peer_id)
 
     const size_t dst_capacity = dp_mode_encrypt_capacity(mode, ctx->src_len);
-    assert(ctx->dst->length >= dst_capacity);
+    pp_assert(ctx->dst->length >= dst_capacity);
     uint8_t *dst = ctx->dst->bytes;
 
     // skip header bytes
@@ -82,7 +82,7 @@ size_t dp_encrypt(void *vmode) {
                                                         NULL,
                                                         &enc_error);
 
-    assert(dst_packet_len <= dst_capacity);//, @"Did not allocate enough bytes for payload");
+    pp_assert(dst_packet_len <= dst_capacity);//, @"Did not allocate enough bytes for payload");
 
     if (!dst_packet_len) {
         if (ctx->error) {
@@ -105,9 +105,9 @@ size_t dp_decrypt(void *vmode) {
     const dp_mode_t *mode = vmode;
     const dp_mode_decrypt_ctx *ctx = &mode->dec_ctx;
 
-    assert(mode->dec.raw_decrypt);
-    assert(ctx->src_len > 0);//, @"Decrypting an empty packet, how did it get this far?");
-    assert(ctx->dst->length >= ctx->src_len);
+    pp_assert(mode->dec.raw_decrypt);
+    pp_assert(ctx->src_len > 0);//, @"Decrypting an empty packet, how did it get this far?");
+    pp_assert(ctx->dst->length >= ctx->src_len);
     uint8_t *dst = ctx->dst->bytes;
 
     DP_DECRYPT_BEGIN(ctx)
@@ -151,7 +151,7 @@ size_t dp_parse(void *vmode) {
     const dp_mode_t *mode = vmode;
     const dp_mode_parse_ctx *ctx = &mode->parse_ctx;
 
-    assert(ctx->dst->length >= ctx->src_len);
+    pp_assert(ctx->dst->length >= ctx->src_len);
 
     uint8_t *payload = ctx->src;
     payload += sizeof(uint32_t); // packet id

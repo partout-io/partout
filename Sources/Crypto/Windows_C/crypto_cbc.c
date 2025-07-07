@@ -61,15 +61,15 @@ typedef struct {
 static
 size_t local_encryption_capacity(const void *vctx, size_t input_len) {
     const crypto_cbc_ctx *ctx = (const crypto_cbc_ctx *)vctx;
-    assert(ctx);
+    pp_assert(ctx);
     return pp_alloc_crypto_capacity(input_len, ctx->digest_len + ctx->cipher_iv_len);
 }
 
 static
 void local_configure_encrypt(void *vctx, const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
-    assert(ctx);
-    assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
+    pp_assert(ctx);
+    pp_assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
 
     if (ctx->hKeyEnc) {
         BCryptDestroyKey(ctx->hKeyEnc);
@@ -84,7 +84,7 @@ void local_configure_encrypt(void *vctx, const zeroing_data_t *cipher_key, const
             (ULONG)ctx->cipher_key_len,
             0
         );
-        assert(CRYPTO_CNG_SUCCESS(status));
+        pp_assert(CRYPTO_CNG_SUCCESS(status));
     }
 
     if (ctx->hmac_key_enc) {
@@ -99,8 +99,8 @@ size_t local_encrypt(void *vctx,
                      const uint8_t *in, size_t in_len,
                      const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
-    assert(ctx);
-    assert(ctx->hmac_key_enc);
+    pp_assert(ctx);
+    pp_assert(ctx->hmac_key_enc);
 
     uint8_t *out_iv = out + ctx->digest_len;
     uint8_t *out_encrypted = out_iv + ctx->cipher_iv_len;
@@ -137,7 +137,7 @@ size_t local_encrypt(void *vctx,
         );
         CRYPTO_CNG_RETURN_IF_FAILED(status, CryptoErrorEncryption)
     } else {
-        assert(out_encrypted == out_iv);
+        pp_assert(out_encrypted == out_iv);
         memcpy(out_encrypted, in, in_len);
         enc_len = in_len;
     }
@@ -162,8 +162,8 @@ size_t local_encrypt(void *vctx,
 static
 void local_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
-    assert(ctx);
-    assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
+    pp_assert(ctx);
+    pp_assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
 
     if (ctx->hKeyDec) {
         BCryptDestroyKey(ctx->hKeyDec);
@@ -178,7 +178,7 @@ void local_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const
             (ULONG)ctx->cipher_key_len,
             0
         );
-        assert(CRYPTO_CNG_SUCCESS(status));
+        pp_assert(CRYPTO_CNG_SUCCESS(status));
     }
 
     if (ctx->hmac_key_dec) {
@@ -194,8 +194,8 @@ size_t local_decrypt(void *vctx,
                      const crypto_flags_t *flags, crypto_error_code *error) {
     (void)flags;
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
-    assert(ctx);
-    assert(ctx->hmac_key_dec);
+    pp_assert(ctx);
+    pp_assert(ctx->hmac_key_dec);
 
     const uint8_t *iv = in + ctx->digest_len;
     const uint8_t *encrypted = in + ctx->digest_len + ctx->cipher_iv_len;
@@ -245,7 +245,7 @@ size_t local_decrypt(void *vctx,
 static
 bool local_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_code *error) {
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
-    assert(ctx);
+    pp_assert(ctx);
     size_t hmac_len = 0;
     NTSTATUS status;
 
@@ -273,7 +273,7 @@ bool local_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_cod
 
 crypto_ctx crypto_cbc_create(const char *cipher_name, const char *digest_name,
                              const crypto_keys_t *keys) {
-    assert(digest_name);
+    pp_assert(digest_name);
 
     size_t cipher_key_len;
     size_t cipher_iv_len;

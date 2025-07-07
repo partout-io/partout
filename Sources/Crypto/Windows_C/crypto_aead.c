@@ -51,7 +51,7 @@ typedef struct {
 
 size_t local_encryption_capacity(const void *vctx, size_t len) {
     const crypto_aead_ctx *ctx = (const crypto_aead_ctx *)vctx;
-    assert(ctx);
+    pp_assert(ctx);
     return pp_alloc_crypto_capacity(len, ctx->tag_len);
 }
 
@@ -59,9 +59,9 @@ static
 void local_configure_encrypt(void *vctx,
                              const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
-    assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
-    assert(hmac_key);
+    pp_assert(ctx);
+    pp_assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
+    pp_assert(hmac_key);
 
     if (ctx->hKeyEnc) {
         BCryptDestroyKey(ctx->hKeyEnc);
@@ -75,7 +75,7 @@ void local_configure_encrypt(void *vctx,
         (ULONG)ctx->cipher_key_len,
         0
     );
-    assert(CRYPTO_CNG_SUCCESS(status));
+    pp_assert(CRYPTO_CNG_SUCCESS(status));
     memset(ctx->iv_enc, 0, ctx->id_len);
     memcpy(ctx->iv_enc + ctx->id_len, hmac_key->bytes, ctx->cipher_iv_len - ctx->id_len);
 }
@@ -86,10 +86,10 @@ size_t local_encrypt(void *vctx,
                      const uint8_t *in, size_t in_len,
                      const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
-    assert(ctx->hKeyEnc);
-    assert(flags);
-    assert(flags->ad_len >= ctx->id_len);
+    pp_assert(ctx);
+    pp_assert(ctx->hKeyEnc);
+    pp_assert(flags);
+    pp_assert(flags->ad_len >= ctx->id_len);
 
     NTSTATUS status;
     ULONG cbResult = 0;
@@ -124,9 +124,9 @@ static
 void local_configure_decrypt(void *vctx,
                              const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
-    assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
-    assert(hmac_key);
+    pp_assert(ctx);
+    pp_assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
+    pp_assert(hmac_key);
 
     if (ctx->hKeyDec) {
         BCryptDestroyKey(ctx->hKeyDec);
@@ -140,7 +140,7 @@ void local_configure_decrypt(void *vctx,
         (ULONG)ctx->cipher_key_len,
         0
     );
-    assert(CRYPTO_CNG_SUCCESS(status));
+    pp_assert(CRYPTO_CNG_SUCCESS(status));
     memset(ctx->iv_dec, 0, ctx->id_len);
     memcpy(ctx->iv_dec + ctx->id_len, hmac_key->bytes, ctx->cipher_iv_len - ctx->id_len);
 }
@@ -151,10 +151,10 @@ size_t local_decrypt(void *vctx,
                      const uint8_t *in, size_t in_len,
                      const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
-    assert(ctx->hKeyDec);
-    assert(flags);
-    assert(flags->ad_len >= ctx->id_len);
+    pp_assert(ctx);
+    pp_assert(ctx->hKeyDec);
+    pp_assert(flags);
+    pp_assert(flags->ad_len >= ctx->id_len);
 
     NTSTATUS status;
     ULONG cbResult = 0;
@@ -187,7 +187,7 @@ size_t local_decrypt(void *vctx,
 
 crypto_ctx crypto_aead_create(const char *cipher_name, size_t tag_len, size_t id_len,
                               const crypto_keys_t *keys) {
-    assert(cipher_name);
+    pp_assert(cipher_name);
 
     size_t cipher_key_len;
     if (!_stricmp(cipher_name, "AES-128-GCM")) {

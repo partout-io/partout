@@ -56,7 +56,7 @@ typedef struct {
 static
 size_t local_encryption_capacity(const void *vctx, size_t len) {
     const crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
-    assert(ctx);
+    pp_assert(ctx);
     return pp_alloc_crypto_capacity(len, ctx->payload_len + ctx->ns_tag_len);
 }
 
@@ -64,9 +64,9 @@ static
 void local_configure_encrypt(void *vctx,
                              const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
-    assert(ctx);
-    assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
-    assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
+    pp_assert(ctx);
+    pp_assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
+    pp_assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
 
     EVP_CIPHER_CTX_reset(ctx->ctx_enc);
     EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1);
@@ -83,10 +83,10 @@ size_t local_encrypt(void *vctx,
                      const uint8_t *in, size_t in_len,
                      const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
-    assert(ctx);
-    assert(ctx->ctx_enc);
-    assert(ctx->hmac_key_enc);
-    assert(flags);
+    pp_assert(ctx);
+    pp_assert(ctx->ctx_enc);
+    pp_assert(ctx->hmac_key_enc);
+    pp_assert(flags);
 
     uint8_t *out_encrypted = out + ctx->ns_tag_len;
     int l1 = 0, l2 = 0;
@@ -100,7 +100,7 @@ size_t local_encrypt(void *vctx,
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_final(ossl, out, &l3, ctx->ns_tag_len);
     EVP_MAC_CTX_free(ossl);
 
-    assert(l3 == ctx->ns_tag_len);
+    pp_assert(l3 == ctx->ns_tag_len);
 
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherInit(ctx->ctx_enc, NULL, NULL, out, -1);
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherUpdate(ctx->ctx_enc, out_encrypted, &l1, in, (int)in_len);
@@ -114,9 +114,9 @@ size_t local_encrypt(void *vctx,
 static
 void local_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
-    assert(ctx);
-    assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
-    assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
+    pp_assert(ctx);
+    pp_assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
+    pp_assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
 
     EVP_CIPHER_CTX_reset(ctx->ctx_dec);
     EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0);
@@ -133,10 +133,10 @@ size_t local_decrypt(void *vctx,
                      const uint8_t *in, size_t in_len,
                      const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
-    assert(ctx);
-    assert(ctx->ctx_dec);
-    assert(ctx->hmac_key_dec);
-    assert(flags);
+    pp_assert(ctx);
+    pp_assert(ctx->ctx_dec);
+    pp_assert(ctx->hmac_key_dec);
+    pp_assert(flags);
 
     const uint8_t *iv = in;
     const uint8_t *encrypted = in + ctx->ns_tag_len;
@@ -157,7 +157,7 @@ size_t local_decrypt(void *vctx,
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_final(ossl, ctx->buffer_hmac, &l3, ctx->ns_tag_len);
     EVP_MAC_CTX_free(ossl);
 
-    assert(l3 == ctx->ns_tag_len);
+    pp_assert(l3 == ctx->ns_tag_len);
 
     if (CRYPTO_OPENSSL_SUCCESS(code) && CRYPTO_memcmp(ctx->buffer_hmac, in, ctx->ns_tag_len) != 0) {
         CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorHMAC)
@@ -171,7 +171,7 @@ size_t local_decrypt(void *vctx,
 crypto_ctx crypto_ctr_create(const char *cipher_name, const char *digest_name,
                              size_t tag_len, size_t payload_len,
                              const crypto_keys_t *keys) {
-    assert(cipher_name && digest_name);
+    pp_assert(cipher_name && digest_name);
 
     const EVP_CIPHER *cipher = EVP_get_cipherbyname(cipher_name);
     if (!cipher) {

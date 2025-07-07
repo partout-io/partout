@@ -222,7 +222,7 @@ zeroing_data_t *_Nullable dp_mode_assemble_and_encrypt(dp_mode_t *_Nonnull mode,
                                                        size_t src_len,
                                                        dp_error_t *_Nullable error) {
 
-    assert(buf->length >= dp_mode_assemble_and_encrypt_capacity(mode, src_len));
+    pp_assert(buf->length >= dp_mode_assemble_and_encrypt_capacity(mode, src_len));
     const size_t asm_len = dp_mode_assemble(mode, packet_id, buf,
                                             src, src_len);
     if (!asm_len) {
@@ -265,7 +265,7 @@ zeroing_data_t *_Nullable dp_mode_decrypt_and_parse(dp_mode_t *_Nonnull mode,
                                                     size_t src_len,
                                                     dp_error_t *_Nullable error) {
 
-    assert(buf->length >= src_len);
+    pp_assert(buf->length >= src_len);
     const size_t dec_len = dp_mode_decrypt(mode, buf, dst_packet_id,
                                            src, src_len, error);
     if (!dec_len) {
@@ -279,7 +279,7 @@ zeroing_data_t *_Nullable dp_mode_decrypt_and_parse(dp_mode_t *_Nonnull mode,
         return NULL;
     }
     zd_resize(dst, dst_len);
-    assert(dst->length == dst_len);
+    pp_assert(dst->length == dst_len);
     if (packet_is_ping(dst->bytes, dst->length)) {
         *dst_keep_alive = true;
     }

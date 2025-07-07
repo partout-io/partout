@@ -37,7 +37,7 @@ tls_channel_options *_Nonnull tls_channel_options_create(int sec_level,
                                                          const char *_Nullable hostname,
                                                          void (*_Nonnull on_verify_failure)()) {
 
-    assert(ca_path && on_verify_failure);
+    pp_assert(ca_path && on_verify_failure);
 
     tls_channel_options *opt = pp_alloc_crypto(sizeof(tls_channel_options));
     opt->sec_level = sec_level;

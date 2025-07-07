@@ -57,18 +57,18 @@ typedef struct {
 static
 size_t local_encryption_capacity(const void *vctx, size_t input_len) {
     const crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
-    assert(ctx);
+    pp_assert(ctx);
     return pp_alloc_crypto_capacity(input_len, ctx->digest_len + ctx->cipher_iv_len);
 }
 
 static
 void local_configure_encrypt(void *vctx, const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
-    assert(ctx);
-    assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
+    pp_assert(ctx);
+    pp_assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
 
     if (ctx->cipher) {
-        assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
+        pp_assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
         EVP_CIPHER_CTX_reset(ctx->ctx_enc);
         EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1);
     }
@@ -85,9 +85,9 @@ size_t local_encrypt(void *vctx,
                      const uint8_t *in, size_t in_len,
                      const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
-    assert(ctx);
-    assert(!ctx->cipher || ctx->ctx_enc);
-    assert(ctx->hmac_key_enc);
+    pp_assert(ctx);
+    pp_assert(!ctx->cipher || ctx->ctx_enc);
+    pp_assert(ctx->hmac_key_enc);
 
     // output = [-digest-|-iv-|-payload-]
     uint8_t *out_iv = out + ctx->digest_len;
@@ -106,7 +106,7 @@ size_t local_encrypt(void *vctx,
         CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherUpdate(ctx->ctx_enc, out_encrypted, &l1, in, (int)in_len);
         CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherFinal_ex(ctx->ctx_enc, out_encrypted + l1, &l2);
     } else {
-        assert(out_encrypted == out_iv);
+        pp_assert(out_encrypted == out_iv);
         memcpy(out_encrypted, in, in_len);
         l1 = (int)in_len;
     }
@@ -125,11 +125,11 @@ size_t local_encrypt(void *vctx,
 static
 void local_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
-    assert(ctx);
-    assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
+    pp_assert(ctx);
+    pp_assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
 
     if (ctx->cipher) {
-        assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
+        pp_assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
         EVP_CIPHER_CTX_reset(ctx->ctx_dec);
         EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0);
     }
@@ -147,9 +147,9 @@ size_t local_decrypt(void *vctx,
                      const crypto_flags_t *flags, crypto_error_code *error) {
     (void)flags;
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
-    assert(ctx);
-    assert(!ctx->cipher || ctx->ctx_dec);
-    assert(ctx->hmac_key_dec);
+    pp_assert(ctx);
+    pp_assert(!ctx->cipher || ctx->ctx_dec);
+    pp_assert(ctx->hmac_key_dec);
 
     const uint8_t *iv = in + ctx->digest_len;
     const uint8_t *encrypted = in + ctx->digest_len + ctx->cipher_iv_len;
@@ -183,7 +183,7 @@ size_t local_decrypt(void *vctx,
 static
 bool local_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_code *error) {
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
-    assert(ctx);
+    pp_assert(ctx);
 
     size_t l1 = 0;
     int code = 1;
@@ -205,7 +205,7 @@ bool local_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_cod
 
 crypto_ctx crypto_cbc_create(const char *cipher_name, const char *digest_name,
                              const crypto_keys_t *keys) {
-    assert(digest_name);
+    pp_assert(digest_name);
 
     const EVP_CIPHER *cipher = NULL;
     if (cipher_name) {

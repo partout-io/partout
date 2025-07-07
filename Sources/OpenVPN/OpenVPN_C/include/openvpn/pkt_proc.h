@@ -146,7 +146,7 @@ size_t pkt_proc_stream_send(const void *_Nonnull vproc,
                             size_t src_len) {
 
     const size_t buf_len = pkt_proc_stream_header_len + src_len;
-    assert(dst->length >= dst_offset + buf_len);
+    pp_assert(dst->length >= dst_offset + buf_len);
 
     uint8_t *ptr = dst->bytes + dst_offset;
     *(uint16_t *)ptr = endian_htons(src_len);

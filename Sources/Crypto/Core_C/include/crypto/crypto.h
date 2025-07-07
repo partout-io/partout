@@ -169,7 +169,7 @@ bool crypto_verify(crypto_ctx _Nonnull ctx,
                    const uint8_t *_Nonnull in, size_t in_len,
                    crypto_error_code *_Nullable error) {
 
-    assert(ctx->base.decrypter.verify);
+    pp_assert(ctx->base.decrypter.verify);
     return ctx->base.decrypter.verify(&ctx->base, in, in_len, error);
 }
 

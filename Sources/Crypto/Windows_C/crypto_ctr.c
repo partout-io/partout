@@ -64,7 +64,7 @@ void ctr_increment(uint8_t *counter, size_t len) {
 static
 size_t local_encryption_capacity(const void *vctx, size_t len) {
     const crypto_ctr_ctx *ctx = (const crypto_ctr_ctx *)vctx;
-    assert(ctx);
+    pp_assert(ctx);
     return pp_alloc_crypto_capacity(len, ctx->payload_len + ctx->ns_tag_len);
 }
 
@@ -72,9 +72,9 @@ static
 void local_configure_encrypt(void *vctx,
                              const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
-    assert(ctx);
-    assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
-    assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
+    pp_assert(ctx);
+    pp_assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
+    pp_assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
 
     if (ctx->hKeyEnc) {
         BCryptDestroyKey(ctx->hKeyEnc);
@@ -88,7 +88,7 @@ void local_configure_encrypt(void *vctx,
         (ULONG)ctx->cipher_key_len,
         0
     );
-    assert(CRYPTO_CNG_SUCCESS(status));
+    pp_assert(CRYPTO_CNG_SUCCESS(status));
 
     if (ctx->hmac_key_enc) {
         zd_free(ctx->hmac_key_enc);
@@ -102,10 +102,10 @@ size_t local_encrypt(void *vctx,
                      const uint8_t *in, size_t in_len,
                      const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
-    assert(ctx);
-    assert(ctx->hKeyEnc);
-    assert(ctx->hmac_key_enc);
-    assert(flags);
+    pp_assert(ctx);
+    pp_assert(ctx->hKeyEnc);
+    pp_assert(ctx->hmac_key_enc);
+    pp_assert(flags);
 
     uint8_t *out_encrypted = out + ctx->ns_tag_len;
     size_t block_size = ctx->cipher_iv_len;
@@ -165,9 +165,9 @@ size_t local_encrypt(void *vctx,
 static
 void local_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
-    assert(ctx);
-    assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
-    assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
+    pp_assert(ctx);
+    pp_assert(hmac_key && hmac_key->length >= ctx->hmac_key_len);
+    pp_assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
 
     if (ctx->hKeyDec) {
         BCryptDestroyKey(ctx->hKeyDec);
@@ -181,7 +181,7 @@ void local_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const
         (ULONG)ctx->cipher_key_len,
         0
     );
-    assert(CRYPTO_CNG_SUCCESS(status));
+    pp_assert(CRYPTO_CNG_SUCCESS(status));
 
     if (ctx->hmac_key_dec) {
         zd_free(ctx->hmac_key_dec);
@@ -195,10 +195,10 @@ size_t local_decrypt(void *vctx,
                      const uint8_t *in, size_t in_len,
                      const crypto_flags_t *flags, crypto_error_code *error) {
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
-    assert(ctx);
-    assert(ctx->hKeyDec);
-    assert(ctx->hmac_key_dec);
-    assert(flags);
+    pp_assert(ctx);
+    pp_assert(ctx->hKeyDec);
+    pp_assert(ctx->hmac_key_dec);
+    pp_assert(flags);
 
     const uint8_t *iv = in;
     const uint8_t *encrypted = in + ctx->ns_tag_len;
@@ -268,7 +268,7 @@ size_t local_decrypt(void *vctx,
 crypto_ctx crypto_ctr_create(const char *cipher_name, const char *digest_name,
                              size_t tag_len, size_t payload_len,
                              const crypto_keys_t *keys) {
-    assert(cipher_name && digest_name);
+    pp_assert(cipher_name && digest_name);
 
     // Only AES-CTR and HMAC-SHA256 supported
     if (_stricmp(cipher_name, "AES-128-CTR")) {

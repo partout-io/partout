@@ -240,7 +240,7 @@ zeroing_data_t *_Nullable tls_channel_pull_cipher(tls_channel_ctx _Nonnull tls,
             return NULL;
         }
         if (tls->opt->san_host) {
-            assert(tls->opt->hostname);
+            pp_assert(tls->opt->hostname);
             if (!tls_channel_verify_ssl_san_host(tls->ssl, tls->opt->hostname)) {
                 if (error) {
                     *error = TLSErrorServerHost;
@@ -330,7 +330,7 @@ char *tls_channel_ca_md5(const tls_channel_ctx tls) {
     X509_digest(cert, alg, md, &len);
     X509_free(cert);
     fclose(pem);
-    assert(len == sizeof(md));//, @"Unexpected MD5 size (%d != %lu)", len, sizeof(md));
+    pp_assert(len == sizeof(md));//, @"Unexpected MD5 size (%d != %lu)", len, sizeof(md));
 
     char *hex = pp_alloc_crypto(2 * sizeof(md) + 1);
     char *ptr = hex;

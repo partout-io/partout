@@ -49,7 +49,7 @@ ctrl_pkt_t *_Nonnull ctrl_pkt_create(packet_code code, uint8_t key, uint32_t pac
         pkt->payload_len = 0;
     }
     if (ack_ids) {
-        assert(ack_remote_session_id);
+        pp_assert(ack_remote_session_id);
         const size_t ack_len = ack_ids_len * sizeof(uint32_t);
         pkt->ack_ids = pp_alloc_crypto(ack_len);
         pkt->ack_ids_len = ack_ids_len;
@@ -91,7 +91,7 @@ size_t ctrl_pkt_is_ack(const ctrl_pkt_t *pkt) {
 static inline
 size_t ctrl_pkt_raw_capacity(const ctrl_pkt_t *pkt) {
     const bool is_ack = ctrl_pkt_is_ack(pkt);
-    assert(!is_ack || pkt->ack_ids);//, @"Ack packet must provide positive ackLength");
+    pp_assert(!is_ack || pkt->ack_ids);//, @"Ack packet must provide positive ackLength");
     size_t n = PacketAckLengthLength;
     if (pkt->ack_ids) {
         n += pkt->ack_ids_len * PacketIdLength + PacketSessionIdLength;
@@ -125,7 +125,7 @@ size_t ctrl_pkt_serialize(uint8_t *_Nonnull dst, const ctrl_pkt_t *_Nonnull pkt)
             *(uint32_t *)ptr = endian_htonl(ack_id);
             ptr += PacketIdLength;
         }
-        assert(pkt->ack_remote_session_id);
+        pp_assert(pkt->ack_remote_session_id);
         memcpy(ptr, pkt->ack_remote_session_id, PacketSessionIdLength);
         ptr += PacketSessionIdLength;
     } else {
@@ -172,7 +172,7 @@ size_t ctrl_pkt_serialize_auth(uint8_t *dst,
     if (!dst_len) {
         return 0;
     }
-    assert(dst_len == digest_len + subject_len);//, @"Encrypted packet size != (Digest + Subject)");
+    pp_assert(dst_len == digest_len + subject_len);//, @"Encrypted packet size != (Digest + Subject)");
     data_swap(dst, digest_len + PacketReplayIdLength + PacketReplayTimestampLength, PacketOpcodeLength + PacketSessionIdLength);
     return dst_len;
 }

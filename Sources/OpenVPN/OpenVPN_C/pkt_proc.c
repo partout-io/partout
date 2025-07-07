@@ -34,13 +34,13 @@
 
 static inline
 void alg_plain(const pkt_proc_alg_ctx *ctx) {
-    assert(ctx);
+    pp_assert(ctx);
     memcpy(ctx->dst + ctx->dst_offset, ctx->src + ctx->src_offset, ctx->src_len);
 }
 
 static
 void alg_xor_mask(const pkt_proc_alg_ctx *ctx) {
-    assert(ctx->mask && ctx->mask_len);
+    pp_assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
     obf_xor_mask(ctx->dst + ctx->dst_offset, ctx->src_len, ctx->mask, ctx->mask_len);
 }
@@ -59,7 +59,7 @@ void alg_reverse(const pkt_proc_alg_ctx *ctx) {
 
 static
 void alg_xor_obfuscate_in(const pkt_proc_alg_ctx *ctx) {
-    assert(ctx->mask && ctx->mask_len);
+    pp_assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
     obf_xor_obfuscate(ctx->dst + ctx->dst_offset,
                       ctx->src_len,
@@ -69,7 +69,7 @@ void alg_xor_obfuscate_in(const pkt_proc_alg_ctx *ctx) {
 
 static
 void alg_xor_obfuscate_out(const pkt_proc_alg_ctx *ctx) {
-    assert(ctx->mask && ctx->mask_len);
+    pp_assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
     obf_xor_obfuscate(ctx->dst + ctx->dst_offset,
                       ctx->src_len,
