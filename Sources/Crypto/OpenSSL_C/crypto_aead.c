@@ -82,17 +82,19 @@ size_t local_encrypt(void *vctx,
     pp_assert(flags->ad_len >= ctx->id_len);
 
     EVP_CIPHER_CTX *ossl = ctx->ctx_enc;
-    int l1 = 0, l2 = 0, tmp = 0, code = 1;
+    int aad_len = 0;
+    int ciphertext_len = 0;
+    int final_len = 0;
 
     memcpy(ctx->iv_enc, flags->iv, (size_t)MIN(flags->iv_len, ctx->crypto.meta.cipher_iv_len));
 
     CRYPTO_CHECK(EVP_CipherInit(ossl, NULL, NULL, ctx->iv_enc, -1))
-    CRYPTO_CHECK(EVP_CipherUpdate(ossl, NULL, &tmp, flags->ad, (int)flags->ad_len))
-    CRYPTO_CHECK(EVP_CipherUpdate(ossl, out + ctx->crypto.meta.tag_len, &l1, in, (int)in_len))
-    CRYPTO_CHECK(EVP_CipherFinal_ex(ossl, out + ctx->crypto.meta.tag_len + l1, &l2))
+    CRYPTO_CHECK(EVP_CipherUpdate(ossl, NULL, &aad_len, flags->ad, (int)flags->ad_len))
+    CRYPTO_CHECK(EVP_CipherUpdate(ossl, out + ctx->crypto.meta.tag_len, &ciphertext_len, in, (int)in_len))
+    CRYPTO_CHECK(EVP_CipherFinal_ex(ossl, out + ctx->crypto.meta.tag_len + ciphertext_len, &final_len))
     CRYPTO_CHECK(EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_GET_TAG, (int)ctx->crypto.meta.tag_len, out))
 
-    const size_t out_len = ctx->crypto.meta.tag_len + l1 + l2;
+    const size_t out_len = ctx->crypto.meta.tag_len + ciphertext_len + final_len;
     return out_len;
 }
 
@@ -122,17 +124,19 @@ size_t local_decrypt(void *vctx,
     pp_assert(flags->ad_len >= ctx->id_len);
 
     EVP_CIPHER_CTX *ossl = ctx->ctx_dec;
-    int l1 = 0, l2 = 0, tmp = 0, code = 1;
+    int aad_len = 0;
+    int plaintext_len = 0;
+    int final_len = 0;
 
     memcpy(ctx->iv_dec, flags->iv, (size_t)MIN(flags->iv_len, ctx->crypto.meta.cipher_iv_len));
 
     CRYPTO_CHECK(EVP_CipherInit(ossl, NULL, NULL, ctx->iv_dec, -1))
     CRYPTO_CHECK(EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_SET_TAG, (int)ctx->crypto.meta.tag_len, (void *)in))
-    CRYPTO_CHECK(EVP_CipherUpdate(ossl, NULL, &tmp, flags->ad, (int)flags->ad_len))
-    CRYPTO_CHECK(EVP_CipherUpdate(ossl, out, &l1, in + ctx->crypto.meta.tag_len, (int)(in_len - ctx->crypto.meta.tag_len)))
-    CRYPTO_CHECK(EVP_CipherFinal_ex(ossl, out + l1, &l2))
+    CRYPTO_CHECK(EVP_CipherUpdate(ossl, NULL, &aad_len, flags->ad, (int)flags->ad_len))
+    CRYPTO_CHECK(EVP_CipherUpdate(ossl, out, &plaintext_len, in + ctx->crypto.meta.tag_len, (int)(in_len - ctx->crypto.meta.tag_len)))
+    CRYPTO_CHECK(EVP_CipherFinal_ex(ossl, out + plaintext_len, &final_len))
 
-    const size_t out_len = l1 + l2;
+    const size_t out_len = plaintext_len + final_len;
     return out_len;
 }
 
