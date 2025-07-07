@@ -36,15 +36,15 @@ extension CZeroingData {
         secret: CZeroingData,
         data: CZeroingData
     ) throws -> CZeroingData {
-        var ctx = digestName.withCString { cDigest in
-            key_hmac_ctx(
+        let hmacLength = digestName.withCString { cDigest in
+            var ctx = key_hmac_ctx(
                 dst: ptr,
                 digest_name: cDigest,
                 secret: secret.ptr,
                 data: data.ptr
             )
+            return key_hmac_do(&ctx)
         }
-        let hmacLength = key_hmac_do(&ctx);
         guard hmacLength > 0 else {
             throw CryptoError.hmac
         }
