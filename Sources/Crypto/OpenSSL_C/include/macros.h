@@ -25,10 +25,7 @@
 
 #pragma once
 
-#define CRYPTO_SET_ERROR(code)\
-if (error) {\
-    *error = code;\
-}
+#define CRYPTO_ASSERT(code) pp_assert(code > 0);
 
 #define CRYPTO_CHECK(code)\
 if (code <= 0) {\
@@ -45,4 +42,9 @@ if (code <= 0) {\
     }\
     EVP_MAC_CTX_free(mac);\
     return 0;\
+}
+
+#define CRYPTO_SET_ERROR(code)\
+if (error) {\
+    *error = code;\
 }

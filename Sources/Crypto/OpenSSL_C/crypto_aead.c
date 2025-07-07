@@ -64,9 +64,8 @@ void local_configure_encrypt(void *vctx,
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
     pp_assert(hmac_key);
 
-    EVP_CIPHER_CTX_reset(ctx->ctx_enc);
-    EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1);
-
+    CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_enc))
+    CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1))
     local_prepare_iv(ctx, ctx->iv_enc, hmac_key);
 }
 
@@ -105,9 +104,8 @@ void local_configure_decrypt(void *vctx,
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
     pp_assert(hmac_key);
 
-    EVP_CIPHER_CTX_reset(ctx->ctx_dec);
-    EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0);
-
+    CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_dec))
+    CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0))
     local_prepare_iv(ctx, ctx->iv_dec, hmac_key);
 }
 

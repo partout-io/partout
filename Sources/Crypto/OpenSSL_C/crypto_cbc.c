@@ -67,10 +67,9 @@ void local_configure_encrypt(void *vctx, const zeroing_data_t *cipher_key, const
 
     if (ctx->cipher) {
         pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
-        EVP_CIPHER_CTX_reset(ctx->ctx_enc);
-        EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1);
+        CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_enc))
+        CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1))
     }
-
     if (ctx->hmac_key_enc) {
         zd_free(ctx->hmac_key_enc);
     }
@@ -127,10 +126,9 @@ void local_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const
 
     if (ctx->cipher) {
         pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
-        EVP_CIPHER_CTX_reset(ctx->ctx_dec);
-        EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0);
+        CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_dec))
+        CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0))
     }
-
     if (ctx->hmac_key_dec) {
         zd_free(ctx->hmac_key_dec);
     }
