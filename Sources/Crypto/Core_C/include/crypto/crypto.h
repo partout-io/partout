@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "crypto/allocation.h"
 #include "crypto/zeroing_data.h"
 
 typedef enum {
