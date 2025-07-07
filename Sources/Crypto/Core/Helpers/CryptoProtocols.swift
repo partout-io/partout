@@ -45,15 +45,13 @@ protocol Encrypter: Crypto {
     ///   - bytes: Bytes to encrypt.
     ///   - length: The number of bytes.
     ///   - dest: The destination buffer.
-    ///   - destLength: The number of bytes written to `dest`.
     ///   - flags: The optional encryption flags.
     func encryptBytes(
         _ bytes: UnsafePointer<UInt8>,
         length: Int,
-        dest: UnsafeMutablePointer<UInt8>,
-        destLength: UnsafeMutablePointer<Int>,
+        dest: CZeroingData,
         flags: CryptoFlagsWrapper?
-    ) throws -> Bool
+    ) throws -> Int
 }
 
 protocol Decrypter: Crypto {
@@ -68,15 +66,13 @@ protocol Decrypter: Crypto {
     ///   - bytes: Bytes to decrypt.
     ///   - length: The number of bytes.
     ///   - dest: The destination buffer.
-    ///   - destLength: The number of bytes written to `dest`.
     ///   - flags: The optional encryption flags.
     func decryptBytes(
         _ bytes: UnsafePointer<UInt8>,
         length: Int,
-        dest: UnsafeMutablePointer<UInt8>,
-        destLength: UnsafeMutablePointer<Int>,
+        dest: CZeroingData,
         flags: CryptoFlagsWrapper?
-    ) throws -> Bool
+    ) throws -> Int
 
     /// Verifies an encrypted buffer.
     /// - Parameters:

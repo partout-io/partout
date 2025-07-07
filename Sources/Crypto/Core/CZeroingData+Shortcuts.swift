@@ -23,56 +23,45 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoCore
 import Foundation
 
-func CZ() -> CZeroingData {
-    CZeroingData()
+public func CZ() -> CZeroingData {
+    CZeroingData(count: 0)
 }
 
-func CZ(length: Int) -> CZeroingData {
-    CZeroingData(length: length)
+public func CZ(count: Int) -> CZeroingData {
+    CZeroingData(count: count)
 }
 
-func CZ(bytes: UnsafePointer<UInt8>, length: Int) -> CZeroingData {
-    CZeroingData(bytes: bytes, length: length)
+public func CZ(bytes: UnsafePointer<UInt8>, count: Int) -> CZeroingData {
+    CZeroingData(bytes: bytes, count: count)
 }
 
-func CZ(_ uint8: UInt8) -> CZeroingData {
+public func CZ(_ uint8: UInt8) -> CZeroingData {
     CZeroingData(uInt8: uint8)
 }
 
-func CZ(_ uint16: UInt16) -> CZeroingData {
+public func CZ(_ uint16: UInt16) -> CZeroingData {
     CZeroingData(uInt16: uint16)
 }
 
-func CZ(_ data: Data) -> CZeroingData {
+public func CZ(_ data: Data) -> CZeroingData {
     CZeroingData(data: data)
 }
 
-func CZ(_ data: Data, _ offset: Int, _ length: Int) -> CZeroingData {
-    CZeroingData(data: data, offset: offset, length: length)
+public func CZ(_ data: Data, _ offset: Int, _ count: Int) -> CZeroingData {
+    CZeroingData(data: data, offset: offset, count: count)
 }
 
-func CZ(_ string: String, nullTerminated: Bool) -> CZeroingData {
+public func CZ(_ string: String, nullTerminated: Bool) -> CZeroingData {
     CZeroingData(string: string, nullTerminated: nullTerminated)
 }
 
-// to compile in full native mode
-func CZ(_ native: CZeroingData) -> CZeroingData {
+public func CZ(_ native: CZeroingData) -> CZeroingData {
     native
 }
 
-#if canImport(_PartoutCryptoOpenSSL_ObjC)
-internal import _PartoutCryptoOpenSSL_ObjC
-
-private extension CZeroingData {
-    convenience init(_ legacy: ZeroingData) {
-        self.init(bytes: legacy.bytes, length: legacy.length)
-    }
+// TODO: ###, drop middle Data
+public func CZX(_ hex: String) -> CZeroingData {
+    CZ(Data(hex: hex))
 }
-
-func CZ(_ legacy: ZeroingData) -> CZeroingData {
-    CZeroingData(legacy)
-}
-#endif

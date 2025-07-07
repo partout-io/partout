@@ -25,13 +25,24 @@
 
 #pragma once
 
-#define CRYPTO_OPENSSL_SUCCESS(ret) (ret > 0)
-#define CRYPTO_OPENSSL_TRACK_STATUS(ret) if (ret > 0) ret =
-#define CRYPTO_OPENSSL_RETURN_STATUS(ret, raised)\
-if (ret <= 0) {\
+#define CRYPTO_OPENSSL_SUCCESS(code) (code > 0)
+
+#define CRYPTO_OPENSSL_TRACK_STATUS(code) if (code > 0) code =
+
+#define CRYPTO_OPENSSL_RETURN_STATUS(code, raised)\
+if (code <= 0) {\
     if (error) {\
         *error = raised;\
     }\
     return false;\
 }\
 return true;
+
+#define CRYPTO_OPENSSL_RETURN_LENGTH(code, length, raised)\
+if (code <= 0 || length == 0) {\
+    if (error) {\
+        *error = raised;\
+    }\
+    return 0;\
+}\
+return length;

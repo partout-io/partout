@@ -42,12 +42,12 @@ struct CryptoKeys {
 extension CryptoKeys {
     init(emptyWithCipherLength cipherKeyLength: Int, hmacKeyLength: Int) {
         cipher = KeyPair(
-            encryptionKey: CZeroingData(length: cipherKeyLength),
-            decryptionKey: CZeroingData(length: cipherKeyLength)
+            encryptionKey: CZeroingData(count: cipherKeyLength),
+            decryptionKey: CZeroingData(count: cipherKeyLength)
         )
         digest = KeyPair(
-            encryptionKey: CZeroingData(length: hmacKeyLength),
-            decryptionKey: CZeroingData(length: hmacKeyLength)
+            encryptionKey: CZeroingData(count: hmacKeyLength),
+            decryptionKey: CZeroingData(count: hmacKeyLength)
         )
     }
 }
@@ -100,6 +100,6 @@ private extension Optional<CZeroingData> {
         guard let self else {
             return zd_create(0)
         }
-        return zd_create_from_data(self.bytes, self.length)
+        return zd_create_from_data(self.bytes, self.count)
     }
 }

@@ -94,7 +94,7 @@ final class ControlChannel {
         queue = BidirectionalState(withResetValue: [])
         currentPacketId = BidirectionalState(withResetValue: 0)
         pendingAcks = []
-        plainBuffer = CZ(length: 16 * 1024)
+        plainBuffer = CZ(count: 16 * 1024)
         sentDates = [:]
     }
 }

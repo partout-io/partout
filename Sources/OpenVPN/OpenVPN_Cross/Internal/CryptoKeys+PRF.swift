@@ -56,7 +56,7 @@ extension CryptoKeys {
             serverSessionId: prf.remoteSessionId,
             size: Constants.keysCount * Constants.keyLength
         ))
-        assert(keysData.length == Constants.keysCount * Constants.keyLength)
+        assert(keysData.count == Constants.keysCount * Constants.keyLength)
 
         let keysArray = (0..<Constants.keysCount).map {
             let offset = $0 * Constants.keyLength
@@ -104,8 +104,8 @@ private extension CryptoKeys {
         if let ssi = input.serverSessionId {
             seed.append(CZ(ssi))
         }
-        let len = input.secret.length / 2
-        let lenx = len + (input.secret.length & 1)
+        let len = input.secret.count / 2
+        let lenx = len + (input.secret.count & 1)
         let secret1 = input.secret.withOffset(0, length: lenx)
         let secret2 = input.secret.withOffset(len, length: lenx)
 
@@ -113,7 +113,7 @@ private extension CryptoKeys {
         let hash2 = try keysHash("SHA1", secret2, seed, input.size)
 
         let prf = CZ()
-        for i in 0..<hash1.length {
+        for i in 0..<hash1.count {
             let h1 = hash1.bytes[i]
             let h2 = hash2.bytes[i]
             prf.append(CZ(h1 ^ h2))
@@ -125,7 +125,7 @@ private extension CryptoKeys {
         let out = CZ()
         let buffer = CZeroingData.forHMAC()
         var chain = try buffer.hmac(with: digestName, secret: secret, data: seed)
-        while out.length < size {
+        while out.count < size {
             out.append(try buffer.hmac(with: digestName, secret: secret, data: chain.appending(seed)))
             chain = try buffer.hmac(with: digestName, secret: secret, data: chain)
         }

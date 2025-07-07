@@ -1,8 +1,8 @@
 //
-//  CZeroingData+Extensions.swift
+//  macros.h
 //  Partout
 //
-//  Created by Davide De Rosa on 1/14/25.
+//  Created by Davide De Rosa on 7/3/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,18 +23,24 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoCore
-import Foundation
-import PartoutCore
+#pragma once
 
-extension SecureData {
-    var czData: CZeroingData {
-        CZ(toData())
-    }
+#define CRYPTO_CNG_SUCCESS(status) (BCRYPT_SUCCESS(status))
+
+#define CRYPTO_CNG_TRACK_STATUS(status) if (BCRYPT_SUCCESS(status)) status =
+
+#define CRYPTO_CNG_CLOSE_IF_FAILED(status, hAlg)\
+if (!BCRYPT_SUCCESS(status)) {\
+    if (hAlg) {\
+        BCryptCloseAlgorithmProvider(hAlg, 0);\
+    }\
+    return NULL;\
 }
 
-extension CZeroingData: SensitiveDebugStringConvertible {
-    func debugDescription(withSensitiveData: Bool) -> String {
-        withSensitiveData ? "[\(count) bytes, \(toHex())]" : "[\(count) bytes]"
-    }
+#define CRYPTO_CNG_RETURN_IF_FAILED(status, raised)\
+if (!BCRYPT_SUCCESS(status)) {\
+    if (error) {\
+        *error = raised;\
+    }\
+    return 0;\
 }

@@ -1,8 +1,8 @@
 //
-//  CZeroingData+Extensions.swift
+//  keys.c
 //  Partout
 //
-//  Created by Davide De Rosa on 1/14/25.
+//  Created by Davide De Rosa on 7/3/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,18 +23,31 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoCore
-import Foundation
-import PartoutCore
+#include "crypto/allocation.h"
+#include "crypto/keys.h"
 
-extension SecureData {
-    var czData: CZeroingData {
-        CZ(toData())
-    }
+// FIXME: #101, port to Windows CNG
+
+#define KeyHMACMaxLength    (size_t)128
+
+bool key_init_seed(const zeroing_data_t *seed) {
+    return true;
 }
 
-extension CZeroingData: SensitiveDebugStringConvertible {
-    func debugDescription(withSensitiveData: Bool) -> String {
-        withSensitiveData ? "[\(count) bytes, \(toHex())]" : "[\(count) bytes]"
-    }
+zeroing_data_t *key_hmac_create() {
+    return zd_create(KeyHMACMaxLength);
+}
+
+size_t key_hmac_do(key_hmac_ctx *ctx) {
+    return 0;
+}
+
+// MARK: -
+
+char *key_decrypted_from_path(const char *path, const char *passphrase) {
+    return NULL;
+}
+
+char *key_decrypted_from_pem(const char *pem, const char *passphrase) {
+    return NULL;
 }

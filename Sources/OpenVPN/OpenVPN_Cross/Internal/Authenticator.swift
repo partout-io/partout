@@ -41,7 +41,7 @@ import PartoutCore
 
 fileprivate extension CZeroingData {
     func appendSized(_ buf: CZeroingData) {
-        append(CZ(UInt16(buf.length).bigEndian))
+        append(CZ(UInt16(buf.count).bigEndian))
         append(buf)
     }
 }
@@ -178,7 +178,7 @@ final class Authenticator {
         let prefixLength = Constants.tlsPrefix.count
 
         // TLS prefix + random (x2) + opts length [+ opts]
-        guard controlBuffer.length >= prefixLength + 2 * Constants.randomLength + 2 else {
+        guard controlBuffer.count >= prefixLength + 2 * Constants.randomLength + 2 else {
             return false
         }
 
@@ -198,7 +198,7 @@ final class Authenticator {
         let serverOptsLength = Int(controlBuffer.networkUInt16Value(fromOffset: offset))
         offset += 2
 
-        guard controlBuffer.length >= offset + serverOptsLength else {
+        guard controlBuffer.count >= offset + serverOptsLength else {
             return false
         }
         let serverOpts = controlBuffer.withOffset(offset, length: serverOptsLength)

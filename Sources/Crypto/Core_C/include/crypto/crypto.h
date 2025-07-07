@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include <assert.h>
 #include "crypto/zeroing_data.h"
 
 typedef enum {
@@ -66,15 +67,17 @@ typedef void (*crypto_configure_fn)(void *_Nonnull ctx,
                                     const zeroing_data_t *_Nullable cipher_key,
                                     const zeroing_data_t *_Nullable hmac_key);
 
-typedef bool (*crypto_encrypt_fn)(void *_Nonnull ctx,
-                                  uint8_t *_Nonnull out, size_t *_Nonnull out_len,
-                                  const uint8_t *_Nonnull in, size_t in_len,
-                                  const crypto_flags_t *_Nullable flags, crypto_error_code *_Nullable error);
+typedef size_t (*crypto_encrypt_fn)(void *_Nonnull ctx,
+                                    uint8_t *_Nonnull out, size_t out_buf_len,
+                                    const uint8_t *_Nonnull in, size_t in_len,
+                                    const crypto_flags_t *_Nullable flags,
+                                    crypto_error_code *_Nullable error);
 
-typedef bool (*crypto_decrypt_fn)(void *_Nonnull ctx,
-                                  uint8_t *_Nonnull out, size_t *_Nonnull out_len,
-                                  const uint8_t *_Nonnull in, size_t in_len,
-                                  const crypto_flags_t *_Nullable flags, crypto_error_code *_Nullable error);
+typedef size_t (*crypto_decrypt_fn)(void *_Nonnull ctx,
+                                    uint8_t *_Nonnull out, size_t out_buf_len,
+                                    const uint8_t *_Nonnull in, size_t in_len,
+                                    const crypto_flags_t *_Nullable flags,
+                                    crypto_error_code *_Nullable error);
 
 typedef bool (*crypto_verify_fn)(void *_Nonnull ctx,
                                  const uint8_t *_Nonnull in, size_t in_len,
@@ -136,12 +139,12 @@ void crypto_configure_encrypt(crypto_ctx _Nonnull ctx,
 }
 
 static inline
-bool crypto_encrypt(crypto_ctx _Nonnull ctx,
-                    uint8_t *_Nonnull out, size_t *_Nonnull out_len,
-                    const uint8_t *_Nonnull in, size_t in_len,
-                    const crypto_flags_t *_Nullable flags, crypto_error_code *_Nullable error) {
+size_t crypto_encrypt(crypto_ctx _Nonnull ctx,
+                      uint8_t *_Nonnull out, size_t out_buf_len,
+                      const uint8_t *_Nonnull in, size_t in_len,
+                      const crypto_flags_t *_Nullable flags, crypto_error_code *_Nullable error) {
 
-    return ctx->base.encrypter.encrypt(&ctx->base, out, out_len, in, in_len, flags, error);
+    return ctx->base.encrypter.encrypt(&ctx->base, out, out_buf_len, in, in_len, flags, error);
 }
 
 static inline
@@ -153,12 +156,12 @@ void crypto_configure_decrypt(crypto_ctx _Nonnull ctx,
 }
 
 static inline
-bool crypto_decrypt(crypto_ctx _Nonnull ctx,
-                    uint8_t *_Nonnull out, size_t *_Nonnull out_len,
-                    const uint8_t *_Nonnull in, size_t in_len,
-                    const crypto_flags_t *_Nullable flags, crypto_error_code *_Nullable error) {
+size_t crypto_decrypt(crypto_ctx _Nonnull ctx,
+                      uint8_t *_Nonnull out, size_t out_buf_len,
+                      const uint8_t *_Nonnull in, size_t in_len,
+                      const crypto_flags_t *_Nullable flags, crypto_error_code *_Nullable error) {
 
-    return ctx->base.decrypter.decrypt(&ctx->base, out, out_len, in, in_len, flags, error);
+    return ctx->base.decrypter.decrypt(&ctx->base, out, out_buf_len, in, in_len, flags, error);
 }
 
 static inline
@@ -166,6 +169,7 @@ bool crypto_verify(crypto_ctx _Nonnull ctx,
                    const uint8_t *_Nonnull in, size_t in_len,
                    crypto_error_code *_Nullable error) {
 
+    assert(ctx->base.decrypter.verify);
     return ctx->base.decrypter.verify(&ctx->base, in, in_len, error);
 }
 

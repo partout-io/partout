@@ -28,14 +28,14 @@ import XCTest
 
 final class CZeroingDataTests: XCTestCase {
     func test_givenInput_whenInit_thenReturnsExpected() {
-        XCTAssertEqual(CZeroingData(length: 123).length, 123)
-        XCTAssertEqual(CZeroingData(bytes: [0x11, 0x22, 0x33, 0x44, 0x55], length: 3).length, 3)
-        XCTAssertEqual(CZeroingData(uInt8: UInt8(78)).length, 1)
-        XCTAssertEqual(CZeroingData(uInt16: UInt16(4756)).length, 2)
-        XCTAssertEqual(CZeroingData(data: Data(count: 12)).length, 12)
-        XCTAssertEqual(CZeroingData(data: Data(count: 12), offset: 3, length: 7).length, 7)
-        XCTAssertEqual(CZeroingData(string: "hello", nullTerminated: false).length, 5)
-        XCTAssertEqual(CZeroingData(string: "hello", nullTerminated: true).length, 6)
+        XCTAssertEqual(CZeroingData(count: 123).count, 123)
+        XCTAssertEqual(CZeroingData(bytes: [0x11, 0x22, 0x33, 0x44, 0x55], count: 3).count, 3)
+        XCTAssertEqual(CZeroingData(uInt8: UInt8(78)).count, 1)
+        XCTAssertEqual(CZeroingData(uInt16: UInt16(4756)).count, 2)
+        XCTAssertEqual(CZeroingData(data: Data(count: 12)).count, 12)
+        XCTAssertEqual(CZeroingData(data: Data(count: 12), offset: 3, count: 7).count, 7)
+        XCTAssertEqual(CZeroingData(string: "hello", nullTerminated: false).count, 5)
+        XCTAssertEqual(CZeroingData(string: "hello", nullTerminated: true).count, 6)
     }
 
     func test_givenData_whenOffset_thenReturnsExpected() {
@@ -59,8 +59,8 @@ final class CZeroingDataTests: XCTestCase {
         let data = Data(hex: "438ac4729847fb3975345983")
         let sut = CZeroingData(data: data)
 
-        sut.truncate(toSize: 5)
-        XCTAssertEqual(sut.length, 5)
+        sut.resize(toSize: 5)
+        XCTAssertEqual(sut.count, 5)
         XCTAssertEqual(sut.toData(), data.subdata(in: 0..<5))
     }
 
@@ -69,7 +69,7 @@ final class CZeroingDataTests: XCTestCase {
         let sut = CZeroingData(data: data)
 
         sut.remove(untilOffset: 5)
-        XCTAssertEqual(sut.length, data.count - 5)
+        XCTAssertEqual(sut.count, data.count - 5)
         XCTAssertEqual(sut.toData(), data.subdata(in: 5..<data.count))
     }
 
@@ -78,7 +78,7 @@ final class CZeroingDataTests: XCTestCase {
         let sut = CZeroingData(data: data)
 
         sut.zero()
-        XCTAssertEqual(sut.length, data.count)
+        XCTAssertEqual(sut.count, data.count)
         XCTAssertEqual(sut.toData(), Data(repeating: 0, count: data.count))
     }
 
@@ -92,14 +92,14 @@ final class CZeroingDataTests: XCTestCase {
         XCTAssertEqual(other, other.copy())
         XCTAssertEqual(sut.copy(), other.copy())
 
-        sut.append(CZeroingData(length: 1))
+        sut.append(CZeroingData(count: 1))
         XCTAssertNotEqual(sut, other)
-        other.append(CZeroingData(length: 1))
+        other.append(CZeroingData(count: 1))
         XCTAssertEqual(sut, other)
     }
 
     func test_givenData_whenManipulate_thenDataIsExpected() {
-        let z1 = CZeroingData()
+        let z1 = CZeroingData(count: 0)
         z1.append(CZeroingData(data: Data(hex: "12345678")))
         z1.append(CZeroingData(data: Data(hex: "abcdef")))
         let z2 = z1.withOffset(2, length: 3) // 5678ab

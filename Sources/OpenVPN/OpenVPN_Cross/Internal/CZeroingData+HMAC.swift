@@ -50,7 +50,7 @@ extension CZeroingData {
         }
         return CZeroingData(
             bytes: ptr.pointee.bytes,
-            length: hmacLength
+            count: hmacLength
         )
     }
 }

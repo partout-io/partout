@@ -129,21 +129,23 @@ extension ControlChannel {
                     ad_len: adLength,
                     for_testing: 0
                 )
+                let dstBufCount = decryptedPacket.count
                 try decryptedPacket.withUnsafeMutableBytes {
-                    let dest = $0.bytePointer
+                    let dst = $0.bytePointer
                     var dec_error = CryptoErrorNone
-                    guard crypto_decrypt(
+                    decryptedCount = crypto_decrypt(
                         ctr,
-                        dest + headerLength,
-                        &decryptedCount,
+                        dst + headerLength,
+                        dstBufCount - headerLength,
                         src + flags.ad_len,
                         encryptedCount,
                         &flags,
                         &dec_error
-                    ) else {
+                    )
+                    guard decryptedCount > 0 else {
                         throw CCryptoError(dec_error)
                     }
-                    memcpy(dest, src, headerLength)
+                    memcpy(dst, src, headerLength)
                 }
             }
             decryptedPacket.count = headerLength + decryptedCount
