@@ -35,12 +35,12 @@ if (code <= 0) {\
     return 0;\
 }
 
-#define CRYPTO_CHECK_MAC(mac, code)\
+#define CRYPTO_CHECK_MAC(code)\
 if (code <= 0) {\
     if (error) {\
         *error = CryptoErrorHMAC;\
     }\
-    EVP_MAC_CTX_free(mac);\
+    EVP_MAC_CTX_free(mac_ctx);\
     return 0;\
 }
 

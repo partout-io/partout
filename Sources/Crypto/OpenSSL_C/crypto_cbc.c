@@ -109,9 +109,9 @@ size_t local_encrypt(void *vctx,
     }
 
     EVP_MAC_CTX *mac_ctx = EVP_MAC_CTX_new(ctx->mac);
-    CRYPTO_CHECK_MAC(mac_ctx, EVP_MAC_init(mac_ctx, ctx->hmac_key_enc->bytes, ctx->hmac_key_enc->length, ctx->mac_params))
-    CRYPTO_CHECK_MAC(mac_ctx, EVP_MAC_update(mac_ctx, out_iv, ciphertext_len + final_len + ctx->crypto.meta.cipher_iv_len))
-    CRYPTO_CHECK_MAC(mac_ctx, EVP_MAC_final(mac_ctx, out, &mac_len, ctx->crypto.meta.digest_len))
+    CRYPTO_CHECK_MAC(EVP_MAC_init(mac_ctx, ctx->hmac_key_enc->bytes, ctx->hmac_key_enc->length, ctx->mac_params))
+    CRYPTO_CHECK_MAC(EVP_MAC_update(mac_ctx, out_iv, ciphertext_len + final_len + ctx->crypto.meta.cipher_iv_len))
+    CRYPTO_CHECK_MAC(EVP_MAC_final(mac_ctx, out, &mac_len, ctx->crypto.meta.digest_len))
     EVP_MAC_CTX_free(mac_ctx);
 
     const size_t out_len = ciphertext_len + final_len + ctx->crypto.meta.cipher_iv_len + ctx->crypto.meta.digest_len;
@@ -151,9 +151,9 @@ size_t local_decrypt(void *vctx,
     size_t mac_len = 0;
 
     EVP_MAC_CTX *mac_ctx = EVP_MAC_CTX_new(ctx->mac);
-    CRYPTO_CHECK_MAC(mac_ctx, EVP_MAC_init(mac_ctx, ctx->hmac_key_dec->bytes, ctx->hmac_key_dec->length, ctx->mac_params))
-    CRYPTO_CHECK_MAC(mac_ctx, EVP_MAC_update(mac_ctx, in + ctx->crypto.meta.digest_len, in_len - ctx->crypto.meta.digest_len))
-    CRYPTO_CHECK_MAC(mac_ctx, EVP_MAC_final(mac_ctx, ctx->buffer_hmac, &mac_len, ctx->crypto.meta.digest_len))
+    CRYPTO_CHECK_MAC(EVP_MAC_init(mac_ctx, ctx->hmac_key_dec->bytes, ctx->hmac_key_dec->length, ctx->mac_params))
+    CRYPTO_CHECK_MAC(EVP_MAC_update(mac_ctx, in + ctx->crypto.meta.digest_len, in_len - ctx->crypto.meta.digest_len))
+    CRYPTO_CHECK_MAC(EVP_MAC_final(mac_ctx, ctx->buffer_hmac, &mac_len, ctx->crypto.meta.digest_len))
     EVP_MAC_CTX_free(mac_ctx);
 
     pp_assert(mac_len == ctx->crypto.meta.digest_len);
@@ -184,9 +184,9 @@ bool local_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_cod
 
     size_t mac_len = 0;
     EVP_MAC_CTX *mac_ctx = EVP_MAC_CTX_new(ctx->mac);
-    CRYPTO_CHECK_MAC(mac_ctx, EVP_MAC_init(mac_ctx, ctx->hmac_key_dec->bytes, ctx->hmac_key_dec->length, ctx->mac_params))
-    CRYPTO_CHECK_MAC(mac_ctx, EVP_MAC_update(mac_ctx, in + ctx->crypto.meta.digest_len, in_len - ctx->crypto.meta.digest_len))
-    CRYPTO_CHECK_MAC(mac_ctx, EVP_MAC_final(mac_ctx, ctx->buffer_hmac, &mac_len, ctx->crypto.meta.digest_len))
+    CRYPTO_CHECK_MAC(EVP_MAC_init(mac_ctx, ctx->hmac_key_dec->bytes, ctx->hmac_key_dec->length, ctx->mac_params))
+    CRYPTO_CHECK_MAC(EVP_MAC_update(mac_ctx, in + ctx->crypto.meta.digest_len, in_len - ctx->crypto.meta.digest_len))
+    CRYPTO_CHECK_MAC(EVP_MAC_final(mac_ctx, ctx->buffer_hmac, &mac_len, ctx->crypto.meta.digest_len))
     EVP_MAC_CTX_free(mac_ctx);
 
     pp_assert(mac_len == ctx->crypto.meta.digest_len);
