@@ -94,21 +94,20 @@ size_t local_encrypt(void *vctx,
     int code = 1;
 
     EVP_MAC_CTX *ossl = EVP_MAC_CTX_new(ctx->mac);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_init(ossl, ctx->hmac_key_enc->bytes, ctx->hmac_key_enc->length, ctx->mac_params);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_update(ossl, flags->ad, flags->ad_len);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_update(ossl, in, in_len);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_final(ossl, out, &l3, ctx->ns_tag_len);
+    CRYPTO_CHECK_MAC(ossl, EVP_MAC_init(ossl, ctx->hmac_key_enc->bytes, ctx->hmac_key_enc->length, ctx->mac_params))
+    CRYPTO_CHECK_MAC(ossl, EVP_MAC_update(ossl, flags->ad, flags->ad_len))
+    CRYPTO_CHECK_MAC(ossl, EVP_MAC_update(ossl, in, in_len))
+    CRYPTO_CHECK_MAC(ossl, EVP_MAC_final(ossl, out, &l3, ctx->ns_tag_len))
     EVP_MAC_CTX_free(ossl);
 
     pp_assert(l3 == ctx->ns_tag_len);
 
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherInit(ctx->ctx_enc, NULL, NULL, out, -1);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherUpdate(ctx->ctx_enc, out_encrypted, &l1, in, (int)in_len);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherFinal_ex(ctx->ctx_enc, out_encrypted + l1, &l2);
+    CRYPTO_CHECK(EVP_CipherInit(ctx->ctx_enc, NULL, NULL, out, -1))
+    CRYPTO_CHECK(EVP_CipherUpdate(ctx->ctx_enc, out_encrypted, &l1, in, (int)in_len))
+    CRYPTO_CHECK(EVP_CipherFinal_ex(ctx->ctx_enc, out_encrypted + l1, &l2))
 
     const size_t out_len = ctx->ns_tag_len + l1 + l2;
-
-    CRYPTO_OPENSSL_RETURN_LENGTH(code, out_len, CryptoErrorEncryption)
+    return out_len;
 }
 
 static
@@ -144,26 +143,26 @@ size_t local_decrypt(void *vctx,
     size_t l3 = 0;
     int code = 1;
 
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherInit(ctx->ctx_dec, NULL, NULL, iv, -1);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherUpdate(ctx->ctx_dec, out, &l1, encrypted, (int)(in_len - ctx->ns_tag_len));
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherFinal_ex(ctx->ctx_dec, out + l1, &l2);
+    CRYPTO_CHECK(EVP_CipherInit(ctx->ctx_dec, NULL, NULL, iv, -1))
+    CRYPTO_CHECK(EVP_CipherUpdate(ctx->ctx_dec, out, &l1, encrypted, (int)(in_len - ctx->ns_tag_len)))
+    CRYPTO_CHECK(EVP_CipherFinal_ex(ctx->ctx_dec, out + l1, &l2))
 
     const size_t out_len = l1 + l2;
 
     EVP_MAC_CTX *ossl = EVP_MAC_CTX_new(ctx->mac);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_init(ossl, ctx->hmac_key_dec->bytes, ctx->hmac_key_dec->length, ctx->mac_params);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_update(ossl, flags->ad, flags->ad_len);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_update(ossl, out, out_len);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_MAC_final(ossl, ctx->buffer_hmac, &l3, ctx->ns_tag_len);
+    CRYPTO_CHECK_MAC(ossl, EVP_MAC_init(ossl, ctx->hmac_key_dec->bytes, ctx->hmac_key_dec->length, ctx->mac_params))
+    CRYPTO_CHECK_MAC(ossl, EVP_MAC_update(ossl, flags->ad, flags->ad_len))
+    CRYPTO_CHECK_MAC(ossl, EVP_MAC_update(ossl, out, out_len))
+    CRYPTO_CHECK_MAC(ossl, EVP_MAC_final(ossl, ctx->buffer_hmac, &l3, ctx->ns_tag_len))
     EVP_MAC_CTX_free(ossl);
 
     pp_assert(l3 == ctx->ns_tag_len);
 
-    if (CRYPTO_OPENSSL_SUCCESS(code) && CRYPTO_memcmp(ctx->buffer_hmac, in, ctx->ns_tag_len) != 0) {
-        CRYPTO_OPENSSL_RETURN_STATUS(code, CryptoErrorHMAC)
+    if (CRYPTO_memcmp(ctx->buffer_hmac, in, ctx->ns_tag_len) != 0) {
+        CRYPTO_SET_ERROR(CryptoErrorHMAC)
+        return 0;
     }
-
-    CRYPTO_OPENSSL_RETURN_LENGTH(code, out_len, CryptoErrorEncryption)
+    return out_len;
 }
 
 // MARK: -

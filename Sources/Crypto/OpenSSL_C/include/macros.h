@@ -25,24 +25,24 @@
 
 #pragma once
 
-#define CRYPTO_OPENSSL_SUCCESS(code) (code > 0)
+#define CRYPTO_SET_ERROR(code)\
+if (error) {\
+    *error = code;\
+}
 
-#define CRYPTO_OPENSSL_TRACK_STATUS(code) if (code > 0) code =
-
-#define CRYPTO_OPENSSL_RETURN_STATUS(code, raised)\
+#define CRYPTO_CHECK(code)\
 if (code <= 0) {\
     if (error) {\
-        *error = raised;\
-    }\
-    return false;\
-}\
-return true;
-
-#define CRYPTO_OPENSSL_RETURN_LENGTH(code, length, raised)\
-if (code <= 0 || length == 0) {\
-    if (error) {\
-        *error = raised;\
+        *error = CryptoErrorEncryption;\
     }\
     return 0;\
-}\
-return length;
+}
+
+#define CRYPTO_CHECK_MAC(mac, code)\
+if (code <= 0) {\
+    if (error) {\
+        *error = CryptoErrorHMAC;\
+    }\
+    EVP_MAC_CTX_free(mac);\
+    return 0;\
+}
