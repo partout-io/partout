@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include <assert.h>
 #include "crypto/endian.h"
 #include "openvpn/dp_macros.h"
 #include "openvpn/dp_mode_ad.h"

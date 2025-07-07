@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include <assert.h>
 #include "crypto/allocation.h"
 #include "openvpn/dp_macros.h"
 #include "openvpn/test/crypto_mock.h"

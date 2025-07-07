@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include <assert.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <string.h>

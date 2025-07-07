@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include <assert.h>
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
 #include <openssl/x509v3.h>

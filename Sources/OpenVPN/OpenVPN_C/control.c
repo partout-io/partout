@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include <assert.h>
 #include <string.h>
 #include "crypto/allocation.h"
 #include "openvpn/control.h"
