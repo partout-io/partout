@@ -369,7 +369,7 @@ extension CDataPath {
             return Data(bytes: buf.pointee.bytes, count: outLength)
         }
         // this should never ever fail because of Swift compile checks
-        assert(decryptedOriginal == decrypted)//, "Parsing is done in-place, work on a copy of decrypted")
+        assert(decryptedOriginal == decrypted, "Parsing is done in-place, work on a copy of decrypted")
         return parsed
     }
 }
