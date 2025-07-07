@@ -50,6 +50,9 @@ size_t key_hmac_do(key_hmac_ctx *ctx) {
     assert(ctx->dst->length >= KeyHMACMaxLength);
 
     const EVP_MD *md = EVP_get_digestbyname(ctx->digest_name);
+    if (!md) {
+        return 0;
+    }
     unsigned int dst_len = 0;
     const bool success = HMAC(md,
                               ctx->secret->bytes,
