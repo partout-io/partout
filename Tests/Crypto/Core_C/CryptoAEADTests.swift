@@ -32,7 +32,7 @@ private let expectedEncryptedHex = "6c56b501472aae003fe988286ea3e72454d1dda1c2fd
 private let cipherKey = CZeroingData(count: 32)
 private let hmacKey = CZeroingData(count: 32)
 private let flags = CryptoFlags(
-    packetId: [0x56, 0x34, 0x12, 0x00],
+    iv: [0x56, 0x34, 0x12, 0x00],
     ad: [0x00, 0x12, 0x34, 0x56]
 )
 

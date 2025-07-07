@@ -32,10 +32,7 @@ private let plainHMACHex = "8dd324c81ca32f52e4aa1aa35139deba799a68460e80b0e5ac8b
 private let encryptedHMACHex = "fea3fe87ee68eb21c697e62d3c29f7bea2f5b457d9a7fa66291322fc9c2fe6f700000000000000000000000000000000ebe197e706c3c5dcad026f4e3af1048b"
 private let cipherKey = CZeroingData(count: 32)
 private let hmacKey = CZeroingData(count: 32)
-private let flags = CryptoFlags(
-    packetId: [0x56, 0x34, 0x12, 0x00],
-    ad: [0x00, 0x12, 0x34, 0x56]
-)
+private let flags = CryptoFlags()
 
 struct CryptoCBCTests {
     @Test(arguments: [
