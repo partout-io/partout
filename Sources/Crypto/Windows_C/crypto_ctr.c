@@ -243,7 +243,7 @@ size_t local_decrypt(void *vctx,
     BCryptCloseAlgorithmProvider(hAlgHmac, 0);
 
     if (memcmp(ctx->buffer_hmac, in, ctx->ns_tag_len) != 0) {
-        if (error) *error = CryptoErrorHMAC;
+        CRYPTO_SET_ERROR(CryptoErrorHMAC)
         return 0;
     }
     return out_len;
