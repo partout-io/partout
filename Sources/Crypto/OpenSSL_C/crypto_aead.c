@@ -162,15 +162,15 @@ crypto_ctx crypto_aead_create(const char *cipher_name,
 
     // no longer fails
 
-    ctx->iv_enc = pp_alloc_crypto(ctx->crypto.meta.cipher_iv_len);
-    ctx->iv_dec = pp_alloc_crypto(ctx->crypto.meta.cipher_iv_len);
-
     ctx->crypto.meta.cipher_key_len = EVP_CIPHER_key_length(ctx->cipher);
     ctx->crypto.meta.cipher_iv_len = EVP_CIPHER_iv_length(ctx->cipher);
     ctx->crypto.meta.hmac_key_len = 0;
     ctx->crypto.meta.digest_len = 0;
     ctx->crypto.meta.tag_len = tag_len;
     ctx->crypto.meta.encryption_capacity = local_encryption_capacity;
+
+    ctx->iv_enc = pp_alloc_crypto(ctx->crypto.meta.cipher_iv_len);
+    ctx->iv_dec = pp_alloc_crypto(ctx->crypto.meta.cipher_iv_len);
     ctx->id_len = id_len;
 
     ctx->crypto.encrypter.configure = local_configure_encrypt;
