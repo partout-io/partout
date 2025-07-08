@@ -42,7 +42,7 @@ extension Registry {
                         ctx,
                         parameters: $0,
                         module: $1,
-                        prng: Partout.platform.newPRNG(ctx),
+                        prng: SimplePRNG(),
                         dns: SimpleDNSResolver {
                             POSIXDNSStrategy(hostname: $0)
                         },
