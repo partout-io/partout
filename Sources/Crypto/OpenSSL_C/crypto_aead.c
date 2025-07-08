@@ -81,19 +81,21 @@ size_t local_encrypt(void *vctx,
     pp_assert(flags->ad_len >= ctx->id_len);
 
     EVP_CIPHER_CTX *ossl = ctx->ctx_enc;
+    const size_t cipher_iv_len = ctx->crypto.meta.cipher_iv_len;
+    const size_t tag_len = ctx->crypto.meta.tag_len;
     int aad_len = 0;
     int ciphertext_len = 0;
     int final_len = 0;
 
-    memcpy(ctx->iv_enc, flags->iv, (size_t)MIN(flags->iv_len, ctx->crypto.meta.cipher_iv_len));
+    memcpy(ctx->iv_enc, flags->iv, (size_t)MIN(flags->iv_len, cipher_iv_len));
 
     CRYPTO_CHECK(EVP_CipherInit(ossl, NULL, NULL, ctx->iv_enc, -1))
     CRYPTO_CHECK(EVP_CipherUpdate(ossl, NULL, &aad_len, flags->ad, (int)flags->ad_len))
-    CRYPTO_CHECK(EVP_CipherUpdate(ossl, out + ctx->crypto.meta.tag_len, &ciphertext_len, in, (int)in_len))
-    CRYPTO_CHECK(EVP_CipherFinal_ex(ossl, out + ctx->crypto.meta.tag_len + ciphertext_len, &final_len))
-    CRYPTO_CHECK(EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_GET_TAG, (int)ctx->crypto.meta.tag_len, out))
+    CRYPTO_CHECK(EVP_CipherUpdate(ossl, out + tag_len, &ciphertext_len, in, (int)in_len))
+    CRYPTO_CHECK(EVP_CipherFinal_ex(ossl, out + tag_len + ciphertext_len, &final_len))
+    CRYPTO_CHECK(EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_GET_TAG, (int)tag_len, out))
 
-    const size_t out_len = ctx->crypto.meta.tag_len + ciphertext_len + final_len;
+    const size_t out_len = tag_len + ciphertext_len + final_len;
     return out_len;
 }
 
@@ -123,16 +125,18 @@ size_t local_decrypt(void *vctx,
     pp_assert(flags->ad_len >= ctx->id_len);
 
     EVP_CIPHER_CTX *ossl = ctx->ctx_dec;
+    const size_t cipher_iv_len = ctx->crypto.meta.cipher_iv_len;
+    const size_t tag_len = ctx->crypto.meta.tag_len;
     int aad_len = 0;
     int plaintext_len = 0;
     int final_len = 0;
 
-    memcpy(ctx->iv_dec, flags->iv, (size_t)MIN(flags->iv_len, ctx->crypto.meta.cipher_iv_len));
+    memcpy(ctx->iv_dec, flags->iv, (size_t)MIN(flags->iv_len, cipher_iv_len));
 
     CRYPTO_CHECK(EVP_CipherInit(ossl, NULL, NULL, ctx->iv_dec, -1))
-    CRYPTO_CHECK(EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_SET_TAG, (int)ctx->crypto.meta.tag_len, (void *)in))
+    CRYPTO_CHECK(EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_SET_TAG, (int)tag_len, (void *)in))
     CRYPTO_CHECK(EVP_CipherUpdate(ossl, NULL, &aad_len, flags->ad, (int)flags->ad_len))
-    CRYPTO_CHECK(EVP_CipherUpdate(ossl, out, &plaintext_len, in + ctx->crypto.meta.tag_len, (int)(in_len - ctx->crypto.meta.tag_len)))
+    CRYPTO_CHECK(EVP_CipherUpdate(ossl, out, &plaintext_len, in + tag_len, (int)(in_len - tag_len)))
     CRYPTO_CHECK(EVP_CipherFinal_ex(ossl, out + plaintext_len, &final_len))
 
     const size_t out_len = plaintext_len + final_len;
