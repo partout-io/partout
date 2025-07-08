@@ -93,8 +93,11 @@ size_t local_encrypt(void *vctx,
     pp_assert(ctx);
     pp_assert(ctx->hmac_key_enc);
 
-    uint8_t *out_iv = out + ctx->crypto.meta.digest_len;
-    uint8_t *out_encrypted = out_iv + ctx->crypto.meta.cipher_iv_len;
+    const size_t cipher_iv_len = ctx->crypto.meta.cipher_iv_len;
+    const size_t digest_len = ctx->crypto.meta.digest_len;
+    const size_t hmac_key_len = ctx->crypto.meta.hmac_key_len;
+    uint8_t *out_iv = out + digest_len;
+    uint8_t *out_encrypted = out_iv + cipher_iv_len;
     ULONG enc_len = 0;
     size_t hmac_len = 0;
 
@@ -103,19 +106,19 @@ size_t local_encrypt(void *vctx,
             CRYPTO_CHECK(BCryptGenRandom(
                 NULL,
                 out_iv,
-                (ULONG)ctx->crypto.meta.cipher_iv_len,
+                (ULONG)cipher_iv_len,
                 BCRYPT_USE_SYSTEM_PREFERRED_RNG
             ))
         }
 
         // do NOT use out_iv directly because BCryptEncrypt has side-effect
-        memcpy(ctx->buffer_iv, out_iv, ctx->crypto.meta.cipher_iv_len);
+        memcpy(ctx->buffer_iv, out_iv, cipher_iv_len);
 
         CRYPTO_CHECK(BCryptEncrypt(
             ctx->hKeyEnc,
             (PUCHAR)in, (ULONG)in_len,
             NULL,
-            ctx->buffer_iv, (ULONG)ctx->crypto.meta.cipher_iv_len,
+            ctx->buffer_iv, (ULONG)cipher_iv_len,
             out_encrypted, out_buf_len - (out_encrypted - out),
             &enc_len,
             BCRYPT_BLOCK_PADDING
@@ -131,14 +134,14 @@ size_t local_encrypt(void *vctx,
         ctx->hAlgHmac,
         &hHmac,
         NULL, 0,
-        ctx->hmac_key_enc->bytes, (ULONG)ctx->crypto.meta.hmac_key_len,
+        ctx->hmac_key_enc->bytes, (ULONG)hmac_key_len,
         0
     ))
-    CRYPTO_CHECK_MAC(BCryptHashData(hHmac, out_iv, (ULONG)(enc_len + ctx->crypto.meta.cipher_iv_len), 0))
-    CRYPTO_CHECK_MAC(BCryptFinishHash(hHmac, out, (ULONG)ctx->crypto.meta.digest_len, 0))
+    CRYPTO_CHECK_MAC(BCryptHashData(hHmac, out_iv, (ULONG)(enc_len + cipher_iv_len), 0))
+    CRYPTO_CHECK_MAC(BCryptFinishHash(hHmac, out, (ULONG)digest_len, 0))
     BCryptDestroyHash(hHmac);
 
-    const size_t out_len = enc_len + ctx->crypto.meta.cipher_iv_len + ctx->crypto.meta.digest_len;
+    const size_t out_len = enc_len + cipher_iv_len + digest_len;
     return out_len;
 }
 
@@ -178,8 +181,11 @@ size_t local_decrypt(void *vctx,
     pp_assert(ctx);
     pp_assert(ctx->hmac_key_dec);
 
-    const uint8_t *iv = in + ctx->crypto.meta.digest_len;
-    const uint8_t *encrypted = in + ctx->crypto.meta.digest_len + ctx->crypto.meta.cipher_iv_len;
+    const size_t cipher_iv_len = ctx->crypto.meta.cipher_iv_len;
+    const size_t digest_len = ctx->crypto.meta.digest_len;
+    const size_t hmac_key_len = ctx->crypto.meta.hmac_key_len;
+    const uint8_t *iv = in + digest_len;
+    const uint8_t *encrypted = in + digest_len + cipher_iv_len;
     ULONG dec_len = 0;
     size_t hmac_len = 0;
 
@@ -188,14 +194,14 @@ size_t local_decrypt(void *vctx,
         ctx->hAlgHmac,
         &hHmac,
         NULL, 0,
-        ctx->hmac_key_dec->bytes, (ULONG)ctx->crypto.meta.hmac_key_len,
+        ctx->hmac_key_dec->bytes, (ULONG)hmac_key_len,
         0
     ))
-    CRYPTO_CHECK(BCryptHashData(hHmac, (PUCHAR)(in + ctx->crypto.meta.digest_len), (ULONG)(in_len - ctx->crypto.meta.digest_len), 0))
-    CRYPTO_CHECK(BCryptFinishHash(hHmac, ctx->buffer_hmac, (ULONG)ctx->crypto.meta.digest_len, 0))
+    CRYPTO_CHECK(BCryptHashData(hHmac, (PUCHAR)(in + digest_len), (ULONG)(in_len - digest_len), 0))
+    CRYPTO_CHECK(BCryptFinishHash(hHmac, ctx->buffer_hmac, (ULONG)digest_len, 0))
     BCryptDestroyHash(hHmac);
 
-    if (memcmp(ctx->buffer_hmac, in, ctx->crypto.meta.digest_len) != 0) {
+    if (memcmp(ctx->buffer_hmac, in, digest_len) != 0) {
         CRYPTO_SET_ERROR(CryptoErrorHMAC)
         return 0;
     }
@@ -204,16 +210,16 @@ size_t local_decrypt(void *vctx,
     if (ctx->hAlgCipher) {
         CRYPTO_CHECK(BCryptDecrypt(
             ctx->hKeyDec,
-            (PUCHAR)encrypted, (ULONG)(in_len - ctx->crypto.meta.digest_len - ctx->crypto.meta.cipher_iv_len),
+            (PUCHAR)encrypted, (ULONG)(in_len - digest_len - cipher_iv_len),
             NULL,
-            (PUCHAR)iv, (ULONG)ctx->crypto.meta.cipher_iv_len,
+            (PUCHAR)iv, (ULONG)cipher_iv_len,
             out, out_buf_len,
             &out_len,
             BCRYPT_BLOCK_PADDING
         ))
     } else {
-        memcpy(out, in + ctx->crypto.meta.digest_len, in_len - ctx->crypto.meta.digest_len);
-        out_len = in_len - ctx->crypto.meta.digest_len;
+        memcpy(out, in + digest_len, in_len - digest_len);
+        out_len = in_len - digest_len;
     }
     return out_len;
 }
@@ -224,19 +230,21 @@ bool local_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_cod
     pp_assert(ctx);
     size_t hmac_len = 0;
 
+    const size_t digest_len = ctx->crypto.meta.digest_len;
+    const size_t hmac_key_len = ctx->crypto.meta.hmac_key_len;
     BCRYPT_HASH_HANDLE hHmac = NULL;
     CRYPTO_CHECK_MAC(BCryptCreateHash(
         ctx->hAlgHmac,
         &hHmac,
         NULL, 0,
-        ctx->hmac_key_dec->bytes, (ULONG)ctx->crypto.meta.hmac_key_len,
+        ctx->hmac_key_dec->bytes, (ULONG)hmac_key_len,
         0
     ))
-    CRYPTO_CHECK_MAC(BCryptHashData(hHmac, (PUCHAR)(in + ctx->crypto.meta.digest_len), (ULONG)(in_len - ctx->crypto.meta.digest_len), 0))
-    CRYPTO_CHECK_MAC(BCryptFinishHash(hHmac, ctx->buffer_hmac, (ULONG)ctx->crypto.meta.digest_len, 0))
+    CRYPTO_CHECK_MAC(BCryptHashData(hHmac, (PUCHAR)(in + digest_len), (ULONG)(in_len - digest_len), 0))
+    CRYPTO_CHECK_MAC(BCryptFinishHash(hHmac, ctx->buffer_hmac, (ULONG)digest_len, 0))
     BCryptDestroyHash(hHmac);
 
-    if (memcmp(ctx->buffer_hmac, in, ctx->crypto.meta.digest_len) != 0) {
+    if (memcmp(ctx->buffer_hmac, in, digest_len) != 0) {
         CRYPTO_SET_ERROR(CryptoErrorHMAC)
         return false;
     }

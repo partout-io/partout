@@ -86,31 +86,33 @@ size_t local_encrypt(void *vctx,
     pp_assert(flags);
     pp_assert(flags->ad_len >= ctx->id_len);
 
+    const size_t cipher_iv_len = ctx->crypto.meta.cipher_iv_len;
+    const size_t tag_len = ctx->crypto.meta.tag_len;
     ULONG cbResult = 0;
     BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
 
     BCRYPT_INIT_AUTH_MODE_INFO(authInfo);
-    memcpy(ctx->iv_enc, flags->iv, (size_t)MIN(flags->iv_len, ctx->crypto.meta.cipher_iv_len));
+    memcpy(ctx->iv_enc, flags->iv, (size_t)MIN(flags->iv_len, cipher_iv_len));
     authInfo.pbNonce = ctx->iv_enc;
-    authInfo.cbNonce = (ULONG)ctx->crypto.meta.cipher_iv_len;
+    authInfo.cbNonce = (ULONG)cipher_iv_len;
     authInfo.pbAuthData = (PUCHAR)flags->ad;
     authInfo.cbAuthData = (ULONG)flags->ad_len;
     authInfo.pbTag = ctx->tag;
-    authInfo.cbTag = (ULONG)ctx->crypto.meta.tag_len;
+    authInfo.cbTag = (ULONG)tag_len;
 
     CRYPTO_CHECK(BCryptEncrypt(
         ctx->hKeyEnc,
         (PUCHAR)in, (ULONG)in_len,
         &authInfo,
         NULL, 0,
-        out + ctx->crypto.meta.tag_len,
-        (ULONG)(out_buf_len - ctx->crypto.meta.tag_len),
+        out + tag_len,
+        (ULONG)(out_buf_len - tag_len),
         &cbResult,
         0
     ))
-    memcpy(out, ctx->tag, ctx->crypto.meta.tag_len);
+    memcpy(out, ctx->tag, tag_len);
 
-    const size_t out_len = ctx->crypto.meta.tag_len + cbResult;
+    const size_t out_len = tag_len + cbResult;
     return out_len;
 }
 
@@ -149,22 +151,24 @@ size_t local_decrypt(void *vctx,
     pp_assert(flags);
     pp_assert(flags->ad_len >= ctx->id_len);
 
+    const size_t cipher_iv_len = ctx->crypto.meta.cipher_iv_len;
+    const size_t tag_len = ctx->crypto.meta.tag_len;
     ULONG cbResult = 0;
     BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO authInfo;
 
     BCRYPT_INIT_AUTH_MODE_INFO(authInfo);
-    memcpy(ctx->iv_dec, flags->iv, (size_t)MIN(flags->iv_len, ctx->crypto.meta.cipher_iv_len));
+    memcpy(ctx->iv_dec, flags->iv, (size_t)MIN(flags->iv_len, cipher_iv_len));
     authInfo.pbNonce = ctx->iv_dec;
-    authInfo.cbNonce = (ULONG)ctx->crypto.meta.cipher_iv_len;
+    authInfo.cbNonce = (ULONG)cipher_iv_len;
     authInfo.pbAuthData = (PUCHAR)flags->ad;
     authInfo.cbAuthData = (ULONG)flags->ad_len;
     authInfo.pbTag = (PUCHAR)in;
-    authInfo.cbTag = (ULONG)ctx->crypto.meta.tag_len;
+    authInfo.cbTag = (ULONG)tag_len;
 
     CRYPTO_CHECK(BCryptDecrypt(
         ctx->hKeyDec,
-        (PUCHAR)(in + ctx->crypto.meta.tag_len),
-        (ULONG)(in_len - ctx->crypto.meta.tag_len),
+        (PUCHAR)(in + tag_len),
+        (ULONG)(in_len - tag_len),
         &authInfo,
         NULL, 0,
         out, out_buf_len,
