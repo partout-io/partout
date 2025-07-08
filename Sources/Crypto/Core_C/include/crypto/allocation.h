@@ -37,9 +37,15 @@
 #pragma once
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static inline
+void pp_assert(bool condition) {
+    assert(condition);
+}
 
 static inline
 void *_Nonnull pp_alloc_crypto(size_t size) {

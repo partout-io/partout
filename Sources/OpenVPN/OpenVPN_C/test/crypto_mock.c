@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include <assert.h>
 #include "crypto/allocation.h"
 #include "openvpn/dp_macros.h"
 #include "openvpn/test/crypto_mock.h"
@@ -70,11 +69,11 @@ size_t mock_decrypt(void *vctx,
     (void)error;
     DP_LOG("crypto_mock_decrypt");
     size_t out_len = in_len - 4;
-    assert(in[0] == 0xaa);
-    assert(in[1] == 0xbb);
+    pp_assert(in[0] == 0xaa);
+    pp_assert(in[1] == 0xbb);
     reverse(out, in + 2, out_len);
-    assert(in[2 + out_len] == 0xcc);
-    assert(in[2 + out_len + 1] == 0xdd);
+    pp_assert(in[2 + out_len] == 0xcc);
+    pp_assert(in[2 + out_len + 1] == 0xdd);
     return out_len;
 }
 

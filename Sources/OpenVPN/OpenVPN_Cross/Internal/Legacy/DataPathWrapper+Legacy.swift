@@ -27,10 +27,6 @@ import _PartoutOpenVPNCore
 internal import _PartoutOpenVPNOpenSSL_ObjC
 import PartoutCore
 
-private let PRNGSeedLength = 64
-
-private let DataPathMaxPackets = 100
-
 extension DataPathWrapper {
     static func legacy(
         with parameters: Parameters,
@@ -70,7 +66,7 @@ extension DataPathWrapper {
             peerId: parameters.peerId ?? PacketPeerIdDisabled,
             compressionFraming: compressionFraming.legacyNative,
             compressionAlgorithm: .disabled,
-            maxPackets: DataPathMaxPackets,
+            maxPackets: 100,
             usesReplayProtection: Constants.usesReplayProtection
         )
         return DataPathWrapper(dataPath: dataPath)

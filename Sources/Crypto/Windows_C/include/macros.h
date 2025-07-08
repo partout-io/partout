@@ -25,22 +25,30 @@
 
 #pragma once
 
-#define CRYPTO_CNG_SUCCESS(status) (BCRYPT_SUCCESS(status))
+#define CRYPTO_ASSERT(ntstatus) pp_assert(BCRYPT_SUCCESS(ntstatus));
 
-#define CRYPTO_CNG_TRACK_STATUS(status) if (BCRYPT_SUCCESS(status)) status =
+#define CRYPTO_CHECK_CREATE(ntstatus) if (!BCRYPT_SUCCESS(ntstatus)) goto failure;
 
-#define CRYPTO_CNG_CLOSE_IF_FAILED(status, hAlg)\
-if (!BCRYPT_SUCCESS(status)) {\
-    if (hAlg) {\
-        BCryptCloseAlgorithmProvider(hAlg, 0);\
-    }\
-    return NULL;\
-}
-
-#define CRYPTO_CNG_RETURN_IF_FAILED(status, raised)\
-if (!BCRYPT_SUCCESS(status)) {\
-    if (error) {\
-        *error = raised;\
-    }\
+#define CRYPTO_CHECK(ntstatus)\
+if (!BCRYPT_SUCCESS(ntstatus)) {\
+    if (error) *error = CryptoErrorEncryption;\
     return 0;\
 }
+
+#define CRYPTO_CHECK_MAC(ntstatus)\
+if (!BCRYPT_SUCCESS(ntstatus)) {\
+    if (error) *error = CryptoErrorHMAC;\
+    if (hHmac) BCryptDestroyHash(hHmac);\
+    return 0;\
+}
+
+#define CRYPTO_CHECK_MAC_ALG(ntstatus)\
+if (!BCRYPT_SUCCESS(ntstatus)) {\
+    if (error) *error = CryptoErrorHMAC;\
+    if (hHmac) BCryptDestroyHash(hHmac);\
+    if (hAlgHmac) BCryptCloseAlgorithmProvider(hAlgHmac, 0);\
+    return 0;\
+}
+
+#define CRYPTO_SET_ERROR(crypto_code)\
+if (error) *error = crypto_code;\

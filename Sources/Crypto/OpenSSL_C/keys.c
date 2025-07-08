@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include <assert.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/pem.h>
@@ -47,7 +46,7 @@ zeroing_data_t *key_hmac_create() {
 }
 
 size_t key_hmac_do(key_hmac_ctx *ctx) {
-    assert(ctx->dst->length >= KeyHMACMaxLength);
+    pp_assert(ctx->dst->length >= KeyHMACMaxLength);
 
     const EVP_MD *md = EVP_get_digestbyname(ctx->digest_name);
     if (!md) {

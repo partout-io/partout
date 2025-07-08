@@ -29,15 +29,9 @@ internal import _PartoutOpenVPN_C
 import Foundation
 import PartoutCore
 
-private let PRNGSeedLength = 64
-
-private let CryptoAEADTagLength = 16
-
-private let CryptoAEADIdLength = PacketIdLength
-
 extension DataPathWrapper {
     static func native(with parameters: Parameters, prf: CryptoKeys.PRF, prng: PRNGProtocol) throws -> DataPathWrapper {
-        let seed = prng.data(length: PRNGSeedLength)
+        let seed = prng.data(length: Constants.DataChannel.prngSeedLength)
         return try .native(with: parameters, prf: prf, seed: CZ(seed))
     }
 
@@ -60,8 +54,8 @@ extension DataPathWrapper {
                 cipherAlgorithm.withCString { cCipher in
                     dp_mode_ad_create_aead(
                         cCipher,
-                        CryptoAEADTagLength,
-                        CryptoAEADIdLength,
+                        Constants.DataChannel.aeadTagLength,
+                        Constants.DataChannel.aeadIdLength,
                         keys,
                         parameters.compressionFraming.cNative
                     )

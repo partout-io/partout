@@ -29,10 +29,6 @@ internal import _PartoutOpenVPN_C
 import Foundation
 import PartoutCore
 
-private let CryptoCTRTagLength = 32
-
-private let CryptoCTRPayloadLength = PacketOpcodeLength + PacketSessionIdLength + PacketReplayIdLength + PacketReplayTimestampLength
-
 extension ControlChannel {
     final class CryptSerializer: ControlChannelSerializer {
         private let ctx: PartoutLoggerContext
@@ -70,8 +66,8 @@ extension ControlChannel {
                     crypto_ctr_create(
                         "AES-256-CTR",
                         "SHA256",
-                        CryptoCTRTagLength,
-                        CryptoCTRPayloadLength,
+                        Constants.ControlChannel.ctrTagLength,
+                        Constants.ControlChannel.ctrPayloadLength,
                         $0
                     )
                 }

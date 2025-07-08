@@ -25,24 +25,20 @@
 
 #pragma once
 
-#define CRYPTO_OPENSSL_SUCCESS(code) (code > 0)
+#define CRYPTO_ASSERT(ossl_code) pp_assert(ossl_code > 0);
 
-#define CRYPTO_OPENSSL_TRACK_STATUS(code) if (code > 0) code =
-
-#define CRYPTO_OPENSSL_RETURN_STATUS(code, raised)\
-if (code <= 0) {\
-    if (error) {\
-        *error = raised;\
-    }\
-    return false;\
-}\
-return true;
-
-#define CRYPTO_OPENSSL_RETURN_LENGTH(code, length, raised)\
-if (code <= 0 || length == 0) {\
-    if (error) {\
-        *error = raised;\
-    }\
+#define CRYPTO_CHECK(ossl_code)\
+if (ossl_code <= 0) {\
+    if (error) *error = CryptoErrorEncryption;\
     return 0;\
-}\
-return length;
+}
+
+#define CRYPTO_CHECK_MAC(ossl_code)\
+if (ossl_code <= 0) {\
+    if (error) *error = CryptoErrorHMAC;\
+    EVP_MAC_CTX_free(mac_ctx);\
+    return 0;\
+}
+
+#define CRYPTO_SET_ERROR(crypto_code)\
+if (error) *error = crypto_code;\

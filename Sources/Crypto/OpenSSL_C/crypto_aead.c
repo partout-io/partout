@@ -23,7 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include <assert.h>
 #include <openssl/evp.h>
 #include <string.h>
 #include "crypto/allocation.h"
@@ -33,43 +32,39 @@
 typedef struct {
     crypto_t crypto;
 
+    // cipher
     const EVP_CIPHER *_Nonnull cipher;
-    size_t cipher_key_len;
-    size_t cipher_iv_len;
-    size_t tag_len;
-    size_t id_len;
-
     EVP_CIPHER_CTX *_Nonnull ctx_enc;
     EVP_CIPHER_CTX *_Nonnull ctx_dec;
     uint8_t *_Nonnull iv_enc;
     uint8_t *_Nonnull iv_dec;
+    size_t id_len;
 } crypto_aead_ctx;
 
 static inline
 void local_prepare_iv(const void *vctx, uint8_t *_Nonnull iv, const zeroing_data_t *_Nonnull hmac_key) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
+    pp_assert(ctx);
     bzero(iv, ctx->id_len);
-    memcpy(iv + ctx->id_len, hmac_key->bytes, ctx->cipher_iv_len - ctx->id_len);
+    memcpy(iv + ctx->id_len, hmac_key->bytes, ctx->crypto.meta.cipher_iv_len - ctx->id_len);
 }
 
 size_t local_encryption_capacity(const void *vctx, size_t len) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
-    return pp_alloc_crypto_capacity(len, ctx->tag_len);
+    pp_assert(ctx);
+    return pp_alloc_crypto_capacity(len, ctx->crypto.meta.tag_len);
 }
 
 static
 void local_configure_encrypt(void *vctx,
                              const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
-    assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
-    assert(hmac_key);
+    pp_assert(ctx);
+    pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
+    pp_assert(hmac_key);
 
-    EVP_CIPHER_CTX_reset(ctx->ctx_enc);
-    EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1);
-
+    CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_enc))
+    CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1))
     local_prepare_iv(ctx, ctx->iv_enc, hmac_key);
 }
 
@@ -80,38 +75,40 @@ size_t local_encrypt(void *vctx,
                      const crypto_flags_t *flags,
                      crypto_error_code *error) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
-    assert(ctx->ctx_enc);
-    assert(flags);
-    assert(flags->ad_len >= ctx->id_len);
+    pp_assert(ctx);
+    pp_assert(ctx->ctx_enc);
+    pp_assert(flags);
+    pp_assert(flags->ad_len >= ctx->id_len);
 
     EVP_CIPHER_CTX *ossl = ctx->ctx_enc;
-    int l1 = 0, l2 = 0, tmp = 0, code = 1;
+    const size_t cipher_iv_len = ctx->crypto.meta.cipher_iv_len;
+    const size_t tag_len = ctx->crypto.meta.tag_len;
+    int aad_len = 0;
+    int ciphertext_len = 0;
+    int final_len = 0;
 
-    memcpy(ctx->iv_enc, flags->iv, (size_t)MIN(flags->iv_len, ctx->cipher_iv_len));
+    memcpy(ctx->iv_enc, flags->iv, (size_t)MIN(flags->iv_len, cipher_iv_len));
 
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherInit(ossl, NULL, NULL, ctx->iv_enc, -1);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherUpdate(ossl, NULL, &tmp, flags->ad, (int)flags->ad_len);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherUpdate(ossl, out + ctx->tag_len, &l1, in, (int)in_len);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherFinal_ex(ossl, out + ctx->tag_len + l1, &l2);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_GET_TAG, (int)ctx->tag_len, out);
+    CRYPTO_CHECK(EVP_CipherInit(ossl, NULL, NULL, ctx->iv_enc, -1))
+    CRYPTO_CHECK(EVP_CipherUpdate(ossl, NULL, &aad_len, flags->ad, (int)flags->ad_len))
+    CRYPTO_CHECK(EVP_CipherUpdate(ossl, out + tag_len, &ciphertext_len, in, (int)in_len))
+    CRYPTO_CHECK(EVP_CipherFinal_ex(ossl, out + tag_len + ciphertext_len, &final_len))
+    CRYPTO_CHECK(EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_GET_TAG, (int)tag_len, out))
 
-    const size_t out_len = ctx->tag_len + l1 + l2;
-
-    CRYPTO_OPENSSL_RETURN_LENGTH(code, out_len, CryptoErrorEncryption)
+    const size_t out_len = tag_len + ciphertext_len + final_len;
+    return out_len;
 }
 
 static
 void local_configure_decrypt(void *vctx,
                              const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
-    assert(cipher_key && cipher_key->length >= ctx->cipher_key_len);
-    assert(hmac_key);
+    pp_assert(ctx);
+    pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
+    pp_assert(hmac_key);
 
-    EVP_CIPHER_CTX_reset(ctx->ctx_dec);
-    EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0);
-
+    CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_dec))
+    CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0))
     local_prepare_iv(ctx, ctx->iv_dec, hmac_key);
 }
 
@@ -122,56 +119,63 @@ size_t local_decrypt(void *vctx,
                      const crypto_flags_t *flags,
                      crypto_error_code *error) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
-    assert(ctx);
-    assert(ctx->ctx_dec);
-    assert(flags);
-    assert(flags->ad_len >= ctx->id_len);
+    pp_assert(ctx);
+    pp_assert(ctx->ctx_dec);
+    pp_assert(flags);
+    pp_assert(flags->ad_len >= ctx->id_len);
 
     EVP_CIPHER_CTX *ossl = ctx->ctx_dec;
-    int l1 = 0, l2 = 0, tmp = 0, code = 1;
+    const size_t cipher_iv_len = ctx->crypto.meta.cipher_iv_len;
+    const size_t tag_len = ctx->crypto.meta.tag_len;
+    int aad_len = 0;
+    int plaintext_len = 0;
+    int final_len = 0;
 
-    memcpy(ctx->iv_dec, flags->iv, (size_t)MIN(flags->iv_len, ctx->cipher_iv_len));
+    memcpy(ctx->iv_dec, flags->iv, (size_t)MIN(flags->iv_len, cipher_iv_len));
 
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherInit(ossl, NULL, NULL, ctx->iv_dec, -1);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_SET_TAG, (int)ctx->tag_len, (void *)in);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherUpdate(ossl, NULL, &tmp, flags->ad, (int)flags->ad_len);
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherUpdate(ossl, out, &l1, in + ctx->tag_len, (int)(in_len - ctx->tag_len));
-    CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherFinal_ex(ossl, out + l1, &l2);
+    CRYPTO_CHECK(EVP_CipherInit(ossl, NULL, NULL, ctx->iv_dec, -1))
+    CRYPTO_CHECK(EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_SET_TAG, (int)tag_len, (void *)in))
+    CRYPTO_CHECK(EVP_CipherUpdate(ossl, NULL, &aad_len, flags->ad, (int)flags->ad_len))
+    CRYPTO_CHECK(EVP_CipherUpdate(ossl, out, &plaintext_len, in + tag_len, (int)(in_len - tag_len)))
+    CRYPTO_CHECK(EVP_CipherFinal_ex(ossl, out + plaintext_len, &final_len))
 
-    const size_t out_len = l1 + l2;
-
-    CRYPTO_OPENSSL_RETURN_LENGTH(code, out_len, CryptoErrorEncryption)
+    const size_t out_len = plaintext_len + final_len;
+    return out_len;
 }
 
 // MARK: -
 
-crypto_ctx crypto_aead_create(const char *cipher_name, size_t tag_len, size_t id_len,
+crypto_ctx crypto_aead_create(const char *cipher_name,
+                              size_t tag_len, size_t id_len,
                               const crypto_keys_t *keys) {
-    assert(cipher_name);
-
-    const EVP_CIPHER *cipher = EVP_get_cipherbyname(cipher_name);
-    if (!cipher) {
-        return NULL;
-    }
+    pp_assert(cipher_name);
 
     crypto_aead_ctx *ctx = pp_alloc_crypto(sizeof(crypto_aead_ctx));
-    ctx->cipher = cipher;
-    ctx->tag_len = tag_len;
-    ctx->id_len = id_len;
-    ctx->cipher_key_len = EVP_CIPHER_key_length(cipher);
-    ctx->cipher_iv_len = EVP_CIPHER_iv_length(cipher);
-
+    ctx->cipher = EVP_get_cipherbyname(cipher_name);
+    if (!ctx->cipher) {
+        goto failure;
+    }
     ctx->ctx_enc = EVP_CIPHER_CTX_new();
+    if (!ctx->ctx_enc) {
+        goto failure;
+    }
     ctx->ctx_dec = EVP_CIPHER_CTX_new();
-    ctx->iv_enc = pp_alloc_crypto(ctx->cipher_iv_len);
-    ctx->iv_dec = pp_alloc_crypto(ctx->cipher_iv_len);
+    if (!ctx->ctx_dec) {
+        goto failure;
+    }
 
-    ctx->crypto.meta.cipher_key_len = ctx->cipher_key_len;
-    ctx->crypto.meta.cipher_iv_len = ctx->cipher_iv_len;
+    // no longer fails
+
+    ctx->crypto.meta.cipher_key_len = EVP_CIPHER_key_length(ctx->cipher);
+    ctx->crypto.meta.cipher_iv_len = EVP_CIPHER_iv_length(ctx->cipher);
     ctx->crypto.meta.hmac_key_len = 0;
     ctx->crypto.meta.digest_len = 0;
     ctx->crypto.meta.tag_len = tag_len;
     ctx->crypto.meta.encryption_capacity = local_encryption_capacity;
+
+    ctx->iv_enc = pp_alloc_crypto(ctx->crypto.meta.cipher_iv_len);
+    ctx->iv_dec = pp_alloc_crypto(ctx->crypto.meta.cipher_iv_len);
+    ctx->id_len = id_len;
 
     ctx->crypto.encrypter.configure = local_configure_encrypt;
     ctx->crypto.encrypter.encrypt = local_encrypt;
@@ -185,6 +189,12 @@ crypto_ctx crypto_aead_create(const char *cipher_name, size_t tag_len, size_t id
     }
 
     return (crypto_ctx)ctx;
+
+failure:
+    if (ctx->ctx_enc) EVP_CIPHER_CTX_free(ctx->ctx_enc);
+    if (ctx->ctx_dec) EVP_CIPHER_CTX_free(ctx->ctx_dec);
+    free(ctx);
+    return NULL;
 }
 
 void crypto_aead_free(crypto_ctx vctx) {
@@ -193,9 +203,8 @@ void crypto_aead_free(crypto_ctx vctx) {
 
     EVP_CIPHER_CTX_free(ctx->ctx_enc);
     EVP_CIPHER_CTX_free(ctx->ctx_dec);
-
-    pp_zero(ctx->iv_enc, ctx->cipher_iv_len);
-    pp_zero(ctx->iv_dec, ctx->cipher_iv_len);
+    pp_zero(ctx->iv_enc, ctx->crypto.meta.cipher_iv_len);
+    pp_zero(ctx->iv_dec, ctx->crypto.meta.cipher_iv_len);
     free(ctx->iv_enc);
     free(ctx->iv_dec);
     free(ctx);

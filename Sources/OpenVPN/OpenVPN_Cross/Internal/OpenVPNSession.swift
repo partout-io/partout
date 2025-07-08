@@ -486,7 +486,7 @@ private extension OpenVPNSession {
         if keepAliveInterval != nil {
             pp_log(ctx, .openvpn, .debug, "Send ping")
             sendDataPackets(
-                [Constants.pingString],
+                [Constants.DataChannel.pingString],
                 to: link,
                 dataChannel: currentDataChannel
             )

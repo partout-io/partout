@@ -37,7 +37,7 @@ void obf_xor_mask(uint8_t *_Nonnull dst,
                   const uint8_t *_Nonnull mask,
                   size_t mask_len) {
 
-    assert(mask && mask_len > 0);
+    pp_assert(mask && mask_len > 0);
     if (mask_len == 0) {
         return;
     }
