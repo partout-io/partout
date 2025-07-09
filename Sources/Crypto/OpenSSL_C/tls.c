@@ -305,12 +305,11 @@ char *tls_channel_ca_md5(const tls_channel_ctx tls) {
 
     FILE *pem = fopen(tls->opt->ca_path, "r");
     if (!pem) {
-        return NULL;
+        goto failure;
     }
     X509 *cert = PEM_read_X509(pem, NULL, NULL, NULL);
     if (!cert) {
-        fclose(pem);
-        return NULL;
+        goto failure;
     }
     X509_digest(cert, alg, md, &len);
     X509_free(cert);
@@ -324,6 +323,10 @@ char *tls_channel_ca_md5(const tls_channel_ctx tls) {
     }
     *ptr = '\0';
     return hex;
+
+failure:
+    if (pem) fclose(pem);
+    return NULL;
 }
 
 // MARK: - Verifications
@@ -331,7 +334,7 @@ char *tls_channel_ca_md5(const tls_channel_ctx tls) {
 bool tls_channel_verify_ssl_eku(SSL *_Nonnull ssl) {
     X509 *cert = SSL_get1_peer_certificate(ssl);
     if (!cert) {
-        return false;
+        goto failure;
     }
 
     // don't be afraid of saving some time:
@@ -340,19 +343,16 @@ bool tls_channel_verify_ssl_eku(SSL *_Nonnull ssl) {
     //
     const int ext_index = X509_get_ext_by_NID(cert, NID_ext_key_usage, -1);
     if (ext_index < 0) {
-        X509_free(cert);
-        return false;
+        goto failure;
     }
     X509_EXTENSION *ext = X509_get_ext(cert, ext_index);
     if (!ext) {
-        X509_free(cert);
-        return false;
+        goto failure;
     }
 
     EXTENDED_KEY_USAGE *eku = X509V3_EXT_d2i(ext);
     if (!eku) {
-        X509_free(cert);
-        return false;
+        goto failure;
     }
     const int num = (int)sk_ASN1_OBJECT_num(eku);
     char buffer[100];
@@ -371,31 +371,32 @@ bool tls_channel_verify_ssl_eku(SSL *_Nonnull ssl) {
     X509_free(cert);
 
     return is_valid;
+
+failure:
+    if (cert) X509_free(cert);
+    return false;
 }
 
 bool tls_channel_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hostname) {
-    X509 *cert = SSL_get1_peer_certificate(ssl);
-    if (!cert) {
-        return false;
-    }
-
     GENERAL_NAMES* names = NULL;
+    X509 *cert = NULL;
     unsigned char* utf8 = NULL;
+
+    cert = SSL_get1_peer_certificate(ssl);
+    if (!cert) {
+        goto failure;
+    }
     names = X509_get_ext_d2i(cert, NID_subject_alt_name, 0, 0);
     if (!names) {
-        X509_free(cert);
-        return false;
+        goto failure;
     }
-
-    int i = 0, count = (int)sk_GENERAL_NAME_num(names);
+    const int count = (int)sk_GENERAL_NAME_num(names);
     if (!count) {
-        X509_free(cert);
-        GENERAL_NAMES_free(names);
-        return false;
+        goto failure;
     }
-    bool is_valid = false;
 
-    for (i = 0; i < count; ++i) {
+    bool is_valid = false;
+    for (int i = 0; i < count; ++i) {
         GENERAL_NAME* entry = sk_GENERAL_NAME_value(names, i);
         if (!entry) {
             continue;
@@ -418,21 +419,19 @@ bool tls_channel_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hos
         }
 
         if (utf8 && len1 && len2 && (len1 == len2) && strcmp((const char *)utf8, hostname) == 0) {
+            OPENSSL_free(utf8);
+            utf8 = NULL;
             is_valid = true;
             break;
         }
 
-        OPENSSL_free(utf8);
-        utf8 = NULL;
     }
-
+    GENERAL_NAMES_free(names);
     X509_free(cert);
-
-    if (names) {
-        GENERAL_NAMES_free(names);
-    }
-    if (utf8) {
-        OPENSSL_free(utf8);
-    }
     return is_valid;
+
+failure:
+    if (names) GENERAL_NAMES_free(names);
+    if (cert) X509_free(cert);
+    return false;
 }
