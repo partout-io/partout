@@ -410,8 +410,6 @@ private extension Negotiator {
             } catch let cError as CTLSError {
                 pp_log(ctx, .openvpn, .fault, "TLS.connect: Failed pulling ciphertext: \(cError.code)")
                 throw cError
-            } catch {
-                throw error
             }
 
             pp_log(ctx, .openvpn, .info, "TLS.connect: Pulled ciphertext \(cipherTextOut.asSensitiveBytes(ctx))")
