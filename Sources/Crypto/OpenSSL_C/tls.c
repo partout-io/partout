@@ -146,9 +146,6 @@ failure:
 void tls_channel_free(tls_channel_ctx tls) {
     if (!tls) return;
 
-    if (tls->ssl) {
-        SSL_free(tls->ssl);
-    }
     // DO NOT FREE these due to use in BIO_set_ssl() macro
 //    if (self.bioCipherTextIn) {
 //        BIO_free(self.bioCipherTextIn);
@@ -158,6 +155,9 @@ void tls_channel_free(tls_channel_ctx tls) {
 //    }
     if (tls->bio_plain) {
         BIO_free_all(tls->bio_plain);
+    }
+    if (tls->ssl) {
+        SSL_free(tls->ssl);
     }
 
     pp_zero(tls->buf_cipher, tls->opt->buf_len);
@@ -333,7 +333,6 @@ failure:
 
 bool tls_channel_verify_ssl_eku(SSL *_Nonnull ssl) {
     X509 *cert = NULL;
-    X509_EXTENSION *ext = NULL;
     EXTENDED_KEY_USAGE *eku = NULL;
 
     cert = SSL_get1_peer_certificate(ssl);
@@ -349,7 +348,7 @@ bool tls_channel_verify_ssl_eku(SSL *_Nonnull ssl) {
     if (ext_index < 0) {
         goto failure;
     }
-    ext = X509_get_ext(cert, ext_index);
+    X509_EXTENSION *ext = X509_get_ext(cert, ext_index);
     if (!ext) {
         goto failure;
     }
@@ -371,21 +370,18 @@ bool tls_channel_verify_ssl_eku(SSL *_Nonnull ssl) {
         }
     }
     EXTENDED_KEY_USAGE_free(eku);
-    X509_EXTENSION_free(ext);
     X509_free(cert);
     return is_valid;
 
 failure:
     if (eku) EXTENDED_KEY_USAGE_free(eku);
-    if (ext) X509_EXTENSION_free(ext);
     if (cert) X509_free(cert);
     return false;
 }
 
 bool tls_channel_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hostname) {
     X509 *cert = NULL;
-    GENERAL_NAMES* names = NULL;
-    unsigned char* utf8 = NULL;
+    GENERAL_NAMES *names = NULL;
 
     cert = SSL_get1_peer_certificate(ssl);
     if (!cert) {
@@ -403,40 +399,33 @@ bool tls_channel_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hos
     bool is_valid = false;
     for (int i = 0; i < count; ++i) {
         GENERAL_NAME* entry = sk_GENERAL_NAME_value(names, i);
-        if (!entry) {
+        if (!entry || entry->type != GEN_DNS) {
             continue;
         }
-        if (GEN_DNS != entry->type) {
+        unsigned char *ns_name = NULL;
+        const int len1 = ASN1_STRING_to_UTF8(&ns_name, entry->d.dNSName);
+        if (!ns_name) {
             continue;
         }
-
-        int len1 = 0, len2 = -1;
-        len1 = ASN1_STRING_to_UTF8(&utf8, entry->d.dNSName);
-        if (!utf8) {
-            continue;
-        }
-        len2 = (int)strlen((const char *)utf8);
-
+        const int len2 = (int)strlen((const char *)ns_name);
         if (len1 != len2) {
-            OPENSSL_free(utf8);
-            utf8 = NULL;
+            OPENSSL_free(ns_name);
+            ns_name = NULL;
             continue;
         }
-
-        if (utf8 && len1 && len2 && (len1 == len2) && strcmp((const char *)utf8, hostname) == 0) {
-            OPENSSL_free(utf8);
-            utf8 = NULL;
+        if (ns_name && len1 && len2 && (len1 == len2) && strcmp((const char *)ns_name, hostname) == 0) {
+            OPENSSL_free(ns_name);
+            ns_name = NULL;
             is_valid = true;
             break;
         }
-
     }
+
     GENERAL_NAMES_free(names);
     X509_free(cert);
     return is_valid;
 
 failure:
-    if (utf8) free(utf8);
     if (names) GENERAL_NAMES_free(names);
     if (cert) X509_free(cert);
     return false;
