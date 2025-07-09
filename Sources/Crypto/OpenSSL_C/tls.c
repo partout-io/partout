@@ -40,6 +40,7 @@ struct tls_channel_t {
     const tls_channel_options *_Nonnull opt;
     bool is_connected;
     SSL_CTX *_Nonnull ssl_ctx;
+
     SSL *_Nonnull ssl;
     BIO *_Nonnull bio_plain;
     BIO *_Nonnull bio_cipher_in;
@@ -147,20 +148,8 @@ tls_channel_ctx tls_channel_create(const tls_channel_options *opt, tls_error_cod
     tls->opt = opt;
     tls->buf_len = tls->opt->buf_len;
     tls->ssl_ctx = ssl_ctx;
-    tls->ssl = SSL_new(ssl_ctx);
-    tls->bio_plain = BIO_new(BIO_f_ssl());
-    tls->bio_cipher_in = BIO_new(BIO_s_mem());
-    tls->bio_cipher_out = BIO_new(BIO_s_mem());
     tls->buf_cipher = pp_alloc_crypto(tls->buf_len);
     tls->buf_plain = pp_alloc_crypto(tls->buf_len);
-
-    SSL_set_connect_state(tls->ssl);
-    SSL_set_bio(tls->ssl, tls->bio_cipher_in, tls->bio_cipher_out);
-    BIO_set_ssl(tls->bio_plain, tls->ssl, BIO_NOCLOSE);
-
-    // attach custom object
-    SSL_set_ex_data(tls->ssl, tls_channel_ex_data_idx, tls);
-
     return tls;
 }
 
@@ -209,6 +198,32 @@ void tls_channel_free(tls_channel_ctx tls) {
 }
 
 bool tls_channel_start(tls_channel_ctx _Nonnull tls) {
+    if (tls->bio_plain) {
+        BIO_free_all(tls->bio_plain);
+        tls->bio_plain = NULL;
+        tls->bio_cipher_in = NULL;
+        tls->bio_cipher_out = NULL;
+    }
+    if (tls->ssl) {
+        SSL_free(tls->ssl);
+        tls->ssl = NULL;
+    }
+    pp_zero(tls->buf_cipher, tls->opt->buf_len);
+    pp_zero(tls->buf_plain, tls->opt->buf_len);
+    tls->is_connected = false;
+
+    tls->ssl = SSL_new(tls->ssl_ctx);
+    tls->bio_plain = BIO_new(BIO_f_ssl());
+    tls->bio_cipher_in = BIO_new(BIO_s_mem());
+    tls->bio_cipher_out = BIO_new(BIO_s_mem());
+
+    SSL_set_connect_state(tls->ssl);
+    SSL_set_bio(tls->ssl, tls->bio_cipher_in, tls->bio_cipher_out);
+    BIO_set_ssl(tls->bio_plain, tls->ssl, BIO_NOCLOSE);
+
+    // attach custom object
+    SSL_set_ex_data(tls->ssl, tls_channel_ex_data_idx, tls);
+
     return SSL_do_handshake(tls->ssl);
 }
 
