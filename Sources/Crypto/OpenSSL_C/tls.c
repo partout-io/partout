@@ -123,6 +123,8 @@ tls_channel_ctx tls_channel_create(const tls_channel_options *opt, tls_error_cod
         }
     }
 
+    // no longer fails
+
     tls_channel_ctx tls = pp_alloc_crypto(sizeof(tls_channel_t));
     tls->opt = opt;
     tls->buf_len = tls->opt->buf_len;
