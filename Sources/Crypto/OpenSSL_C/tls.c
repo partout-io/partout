@@ -332,7 +332,11 @@ failure:
 // MARK: - Verifications
 
 bool tls_channel_verify_ssl_eku(SSL *_Nonnull ssl) {
-    X509 *cert = SSL_get1_peer_certificate(ssl);
+    X509 *cert = NULL;
+    X509_EXTENSION *ext = NULL;
+    EXTENDED_KEY_USAGE *eku = NULL;
+
+    cert = SSL_get1_peer_certificate(ssl);
     if (!cert) {
         goto failure;
     }
@@ -345,19 +349,18 @@ bool tls_channel_verify_ssl_eku(SSL *_Nonnull ssl) {
     if (ext_index < 0) {
         goto failure;
     }
-    X509_EXTENSION *ext = X509_get_ext(cert, ext_index);
+    ext = X509_get_ext(cert, ext_index);
     if (!ext) {
         goto failure;
     }
-
-    EXTENDED_KEY_USAGE *eku = X509V3_EXT_d2i(ext);
+    eku = X509V3_EXT_d2i(ext);
     if (!eku) {
         goto failure;
     }
+
     const int num = (int)sk_ASN1_OBJECT_num(eku);
     char buffer[100];
     bool is_valid = false;
-
     for (int i = 0; i < num; ++i) {
         OBJ_obj2txt(buffer, sizeof(buffer), sk_ASN1_OBJECT_value(eku, i), 1); // get OID
         const char *oid = OBJ_nid2ln(OBJ_obj2nid(sk_ASN1_OBJECT_value(eku, i)));
@@ -368,18 +371,20 @@ bool tls_channel_verify_ssl_eku(SSL *_Nonnull ssl) {
         }
     }
     EXTENDED_KEY_USAGE_free(eku);
+    X509_EXTENSION_free(ext);
     X509_free(cert);
-
     return is_valid;
 
 failure:
+    if (eku) EXTENDED_KEY_USAGE_free(eku);
+    if (ext) X509_EXTENSION_free(ext);
     if (cert) X509_free(cert);
     return false;
 }
 
 bool tls_channel_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hostname) {
-    GENERAL_NAMES* names = NULL;
     X509 *cert = NULL;
+    GENERAL_NAMES* names = NULL;
     unsigned char* utf8 = NULL;
 
     cert = SSL_get1_peer_certificate(ssl);
@@ -431,6 +436,7 @@ bool tls_channel_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hos
     return is_valid;
 
 failure:
+    if (utf8) free(utf8);
     if (names) GENERAL_NAMES_free(names);
     if (cert) X509_free(cert);
     return false;
