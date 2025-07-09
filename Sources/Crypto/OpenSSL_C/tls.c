@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include "crypto/allocation.h"
 #include "crypto/tls.h"
+#include "macros.h"
 
 //static const char *const TLSBoxClientEKU = "TLS Web Client Authentication";
 static const char *const TLSBoxServerEKU = "TLS Web Server Authentication";
@@ -69,78 +70,56 @@ int tls_channel_verify_peer(int ok, X509_STORE_CTX *_Nonnull ctx) {
 
 tls_channel_ctx tls_channel_create(const tls_channel_options *opt, tls_error_code *error) {
     SSL_CTX *ssl_ctx = SSL_CTX_new(TLS_client_method());
+    X509 *cert = NULL;
+    BIO *cert_bio = NULL;
+    EVP_PKEY *pkey = NULL;
+    BIO *pkey_bio = NULL;
+
     SSL_CTX_set_options(ssl_ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION);
     SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER, tls_channel_verify_peer);
     SSL_CTX_set_security_level(ssl_ctx, opt->sec_level);
 
     if (opt->ca_path) {
         if (!SSL_CTX_load_verify_locations(ssl_ctx, opt->ca_path, NULL)) {
-            ERR_print_errors_fp(stdout);
-            if (error) {
-                *error = TLSErrorCAUse;
-            }
-            SSL_CTX_free(ssl_ctx);
-            return NULL;
+            CRYPTO_SET_ERROR(TLSErrorCAUse)
+            goto failure;
         }
     }
-
     if (opt->cert_pem) {
-        BIO *bio = create_BIO_from_PEM(opt->cert_pem);
-        if (!bio) {
-            if (error) {
-                *error = TLSErrorClientCertificateRead;
-            }
-            SSL_CTX_free(ssl_ctx);
-            return NULL;
+        cert_bio = create_BIO_from_PEM(opt->cert_pem);
+        if (!cert_bio) {
+            CRYPTO_SET_ERROR(TLSErrorClientCertificateRead)
+            goto failure;
         }
-        X509 *cert = PEM_read_bio_X509(bio, NULL, NULL, NULL);
-        BIO_free(bio);
+        cert = PEM_read_bio_X509(cert_bio, NULL, NULL, NULL);
         if (!cert) {
-            if (error) {
-                *error = TLSErrorClientCertificateRead;
-            }
-            SSL_CTX_free(ssl_ctx);
-            return NULL;
+            CRYPTO_SET_ERROR(TLSErrorClientCertificateRead)
+            goto failure;
         }
         if (!SSL_CTX_use_certificate(ssl_ctx, cert)) {
-            ERR_print_errors_fp(stdout);
-            if (error) {
-                *error = TLSErrorClientCertificateUse;
-            }
-            X509_free(cert);
-            SSL_CTX_free(ssl_ctx);
-            return NULL;
+            CRYPTO_SET_ERROR(TLSErrorClientCertificateUse)
+            goto failure;
         }
         X509_free(cert);
+        BIO_free(cert_bio);
 
         if (opt->key_pem) {
-            BIO *bio = create_BIO_from_PEM(opt->key_pem);
-            if (!bio) {
-                if (error) {
-                    *error = TLSErrorClientKeyRead;
-                }
-                SSL_CTX_free(ssl_ctx);
-                return NULL;
+            pkey_bio = create_BIO_from_PEM(opt->key_pem);
+            if (!pkey_bio) {
+                CRYPTO_SET_ERROR(TLSErrorClientKeyRead)
+                goto failure;
             }
-            EVP_PKEY *pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
-            BIO_free(bio);
+            pkey = PEM_read_bio_PrivateKey(pkey_bio, NULL, NULL, NULL);
             if (!pkey) {
-                if (error) {
-                    *error = TLSErrorClientKeyRead;
-                }
-                SSL_CTX_free(ssl_ctx);
-                return NULL;
+                CRYPTO_SET_ERROR(TLSErrorClientKeyRead)
+                goto failure;
             }
             if (!SSL_CTX_use_PrivateKey(ssl_ctx, pkey)) {
-                ERR_print_errors_fp(stdout);
-                if (error) {
-                    *error = TLSErrorClientKeyUse;
-                }
-                EVP_PKEY_free(pkey);
-                SSL_CTX_free(ssl_ctx);
-                return NULL;
+                CRYPTO_SET_ERROR(TLSErrorClientKeyUse)
+                goto failure;
             }
             EVP_PKEY_free(pkey);
+            BIO_free(pkey_bio);
         }
     }
 
@@ -151,50 +130,40 @@ tls_channel_ctx tls_channel_create(const tls_channel_options *opt, tls_error_cod
     tls->buf_cipher = pp_alloc_crypto(tls->buf_len);
     tls->buf_plain = pp_alloc_crypto(tls->buf_len);
     return tls;
+
+failure:
+    ERR_print_errors_fp(stdout);
+    SSL_CTX_free(ssl_ctx);
+    if (cert) X509_free(cert);
+    if (cert_bio) BIO_free(cert_bio);
+    if (pkey) EVP_PKEY_free(pkey);
+    if (pkey_bio) BIO_free(pkey_bio);
+    return NULL;
 }
 
 void tls_channel_free(tls_channel_ctx tls) {
     if (!tls) return;
 
-    if (tls->ssl_ctx) {
-        SSL_CTX_free(tls->ssl_ctx);
-        tls->ssl_ctx = NULL;
-    }
     if (tls->ssl) {
         SSL_free(tls->ssl);
-        tls->ssl = NULL;
     }
-
     // DO NOT FREE these due to use in BIO_set_ssl() macro
 //    if (self.bioCipherTextIn) {
 //        BIO_free(self.bioCipherTextIn);
-//        self.bioCipherTextIn = NULL;
 //    }
 //    if (self.bioCipherTextOut) {
 //        BIO_free(self.bioCipherTextOut);
-//        self.bioCipherTextOut = NULL;
 //    }
     if (tls->bio_plain) {
         BIO_free_all(tls->bio_plain);
-        tls->bio_plain = NULL;
     }
 
-    if (tls->buf_cipher) {
-        pp_zero(tls->buf_cipher, tls->opt->buf_len);
-        free(tls->buf_cipher);
-        tls->buf_cipher = NULL;
-    }
-    if (tls->buf_plain) {
-        pp_zero(tls->buf_plain, tls->opt->buf_len);
-        free(tls->buf_plain);
-        tls->buf_plain = NULL;
-    }
-    tls->is_connected = false;
-
-    if (tls->opt) {
-        tls_channel_options_free((tls_channel_options *)tls->opt);
-        tls->opt = NULL;
-    }
+    pp_zero(tls->buf_cipher, tls->opt->buf_len);
+    free(tls->buf_cipher);
+    pp_zero(tls->buf_plain, tls->opt->buf_len);
+    free(tls->buf_plain);
+    tls_channel_options_free((tls_channel_options *)tls->opt);
+    SSL_CTX_free(tls->ssl_ctx);
 }
 
 bool tls_channel_start(tls_channel_ctx _Nonnull tls) {
