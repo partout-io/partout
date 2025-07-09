@@ -39,16 +39,16 @@ static int tls_channel_ex_data_idx = -1;
 
 struct tls_channel_t {
     const tls_channel_options *_Nonnull opt;
-    bool is_connected;
     SSL_CTX *_Nonnull ssl_ctx;
+    size_t buf_len;
+    uint8_t *_Nonnull buf_cipher;
+    uint8_t *_Nonnull buf_plain;
 
     SSL *_Nonnull ssl;
     BIO *_Nonnull bio_plain;
     BIO *_Nonnull bio_cipher_in;
     BIO *_Nonnull bio_cipher_out;
-    uint8_t *_Nonnull buf_cipher;
-    uint8_t *_Nonnull buf_plain;
-    size_t buf_len;
+    bool is_connected;
 };
 
 static
@@ -127,8 +127,8 @@ tls_channel_ctx tls_channel_create(const tls_channel_options *opt, tls_error_cod
 
     tls_channel_ctx tls = pp_alloc_crypto(sizeof(tls_channel_t));
     tls->opt = opt;
-    tls->buf_len = tls->opt->buf_len;
     tls->ssl_ctx = ssl_ctx;
+    tls->buf_len = tls->opt->buf_len;
     tls->buf_cipher = pp_alloc_crypto(tls->buf_len);
     tls->buf_plain = pp_alloc_crypto(tls->buf_len);
     return tls;
@@ -161,8 +161,8 @@ void tls_channel_free(tls_channel_ctx tls) {
     }
 
     pp_zero(tls->buf_cipher, tls->opt->buf_len);
-    free(tls->buf_cipher);
     pp_zero(tls->buf_plain, tls->opt->buf_len);
+    free(tls->buf_cipher);
     free(tls->buf_plain);
     tls_channel_options_free((tls_channel_options *)tls->opt);
     SSL_CTX_free(tls->ssl_ctx);
