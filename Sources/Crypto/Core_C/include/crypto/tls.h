@@ -70,6 +70,7 @@ tls_channel_options *_Nonnull tls_channel_options_create(int sec_level,
 
 void tls_channel_options_free(tls_channel_options *_Nonnull opt);
 
+// "opt" ownership is transferred and released on free
 tls_channel_ctx _Nullable tls_channel_create(const tls_channel_options *_Nonnull opt,
                                             tls_error_code *_Nonnull error);
 void tls_channel_free(tls_channel_ctx _Nonnull tls);

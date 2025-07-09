@@ -139,6 +139,8 @@ typedef struct {
     dp_mode_parse_ctx parse_ctx;
 } dp_mode_t;
 
+// "crypto" is owned and released on free
+
 dp_mode_t *_Nonnull dp_mode_create_opt(crypto_ctx _Nonnull crypto,
                                        crypto_free_fn _Nonnull crypto_free,
                                        const dp_mode_encrypter_t *_Nonnull enc,
