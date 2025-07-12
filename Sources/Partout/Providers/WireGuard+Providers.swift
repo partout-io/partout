@@ -56,27 +56,27 @@ public struct WireGuardProviderTemplate: Hashable, Codable, Sendable {
     }
 }
 
-public struct WireGuardProviderAuth: Hashable, Codable, Sendable {
+public struct WireGuardProviderSession: Hashable, Codable, Sendable {
     public struct Peer: Hashable, Codable, Sendable {
-        public let privateKey: String
+        public let clientId: String
+
+        public let creationDate: Date
 
         public let addresses: [String]
 
-        public init(privateKey: String, addresses: [String]) {
-            self.privateKey = privateKey
+        public init(clientId: String, creationDate: Date, addresses: [String]) {
+            self.clientId = clientId
+            self.creationDate = creationDate
             self.addresses = addresses
         }
     }
 
-    public let token: ProviderToken
+    public let privateKey: String
 
-    public let clientId: String
+    public let peer: Peer?
 
-    public let peer: Peer
-
-    public init(token: ProviderToken, clientId: String, peer: Peer) {
-        self.token = token
-        self.clientId = clientId
+    public init(privateKey: String, peer: Peer?) {
+        self.privateKey = privateKey
         self.peer = peer
     }
 }
@@ -85,10 +85,10 @@ extension WireGuardProviderTemplate {
     public struct Options: ProviderOptions {
         public var credentials: ProviderCredentials?
 
-        public var deviceKeys: [String: String]?
+        public var token: ProviderToken?
 
-        // device id -> auth
-        public var deviceAuths: [String: WireGuardProviderAuth]?
+        // device id -> session
+        public var sessions: [String: WireGuardProviderSession]?
 
         public init() {
         }
@@ -107,10 +107,13 @@ extension WireGuardProviderTemplate: ProviderTemplateCompiler {
     ) throws -> WireGuardModule {
         let template = try entity.preset.template(ofType: WireGuardProviderTemplate.self)
         var configurationBuilder = template.builder()
-        guard let peer = options?.deviceAuths?[deviceId]?.peer else {
-            throw PartoutError(.Providers.missingProviderOption, "auth.peer")
+        guard let session = options?.sessions?[deviceId] else {
+            throw PartoutError(.Providers.missingProviderOption, "session")
         }
-        configurationBuilder.interface.privateKey = peer.privateKey
+        guard let peer = session.peer else {
+            throw PartoutError(.Providers.missingProviderOption, "session.peer")
+        }
+        configurationBuilder.interface.privateKey = session.privateKey
         configurationBuilder.interface.addresses = peer.addresses
 
         var builder = WireGuardModule.Builder(id: moduleId)
