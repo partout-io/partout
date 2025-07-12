@@ -40,8 +40,12 @@ public struct WireGuardProviderResolver: ProviderModuleResolver {
         self.ctx = ctx
     }
 
-    public func resolved(from providerModule: ProviderModule) throws -> Module {
-        try providerModule.compiled(ctx, withTemplate: WireGuardProviderTemplate.self)
+    public func resolved(from providerModule: ProviderModule, deviceId: String) throws -> Module {
+        try providerModule.compiled(
+            ctx,
+            withTemplate: WireGuardProviderTemplate.self,
+            onDevice: deviceId
+        )
     }
 }
 
@@ -52,9 +56,25 @@ public struct WireGuardProviderTemplate: Hashable, Codable, Sendable {
     }
 }
 
+public struct WireGuardProviderAuth: Identifiable, Hashable, Codable, Sendable {
+    public let id: String
+
+    public let key: String
+
+    public let addresses: [String]
+
+    public init(id: String, key: String, addresses: [String]) {
+        self.id = id
+        self.key = key
+        self.addresses = addresses
+    }
+}
+
 extension WireGuardProviderTemplate {
     public struct Options: ProviderOptions {
-        public var privateKey: String?
+
+        // device id -> auth
+        public var deviceAuth: [String: WireGuardProviderAuth]?
 
         public init() {
         }
@@ -66,17 +86,20 @@ extension WireGuardProviderTemplate: ProviderTemplateCompiler {
     // TODO: #7, generate WireGuard configuration from template
     public static func compiled(
         _ ctx: PartoutLoggerContext,
-        with id: UUID,
+        deviceId: String,
+        moduleId: UUID,
         entity: ProviderEntity,
         options: Options?
     ) throws -> WireGuardModule {
         let template = try entity.preset.template(ofType: WireGuardProviderTemplate.self)
         var configurationBuilder = template.builder()
-        if let privateKey = options?.privateKey {
-            configurationBuilder.interface.privateKey = privateKey
+        guard let auth = options?.deviceAuth?[deviceId] else {
+            throw PartoutError(.Providers.missingProviderOption, "auth")
         }
+        configurationBuilder.interface.privateKey = auth.key
+        configurationBuilder.interface.addresses = auth.addresses
 
-        var builder = WireGuardModule.Builder()
+        var builder = WireGuardModule.Builder(id: moduleId)
         builder.configurationBuilder = configurationBuilder
         return try builder.tryBuild()
     }

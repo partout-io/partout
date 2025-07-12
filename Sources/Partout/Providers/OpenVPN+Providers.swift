@@ -40,8 +40,12 @@ public struct OpenVPNProviderResolver: ProviderModuleResolver {
         self.ctx = ctx
     }
 
-    public func resolved(from providerModule: ProviderModule) throws -> Module {
-        try providerModule.compiled(ctx, withTemplate: OpenVPNProviderTemplate.self)
+    public func resolved(from providerModule: ProviderModule, deviceId: String) throws -> Module {
+        try providerModule.compiled(
+            ctx,
+            withTemplate: OpenVPNProviderTemplate.self,
+            onDevice: deviceId
+        )
     }
 }
 
@@ -70,7 +74,8 @@ extension OpenVPNProviderTemplate {
 extension OpenVPNProviderTemplate: ProviderTemplateCompiler {
     public static func compiled(
         _ ctx: PartoutLoggerContext,
-        with id: UUID,
+        deviceId: String,
+        moduleId: UUID,
         entity: ProviderEntity,
         options: Options?
     ) throws -> OpenVPNModule {
@@ -86,7 +91,7 @@ extension OpenVPNProviderTemplate: ProviderTemplateCompiler {
         // enforce default gateway
         configurationBuilder.routingPolicies = [.IPv4, .IPv6]
 
-        var builder = OpenVPNModule.Builder(id: id)
+        var builder = OpenVPNModule.Builder(id: moduleId)
         builder.configurationBuilder = configurationBuilder
         if let credentials = options?.credentials {
             builder.credentials = credentials
