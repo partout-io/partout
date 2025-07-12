@@ -57,17 +57,6 @@ public struct WireGuardProviderTemplate: Hashable, Codable, Sendable {
 }
 
 public struct WireGuardProviderAuth: Hashable, Codable, Sendable {
-    public struct Token: Hashable, Codable, Sendable {
-        public let accessToken: String
-
-        public let expiryDate: Date
-
-        public init(accessToken: String, expiryDate: Date) {
-            self.accessToken = accessToken
-            self.expiryDate = expiryDate
-        }
-    }
-
     public struct Peer: Identifiable, Hashable, Codable, Sendable {
         public let id: String
 
@@ -82,11 +71,11 @@ public struct WireGuardProviderAuth: Hashable, Codable, Sendable {
         }
     }
 
-    public let token: Token?
+    public let token: ProviderToken?
 
     public let peer: Peer?
 
-    public init(token: Token?, peer: Peer?) {
+    public init(token: ProviderToken?, peer: Peer?) {
         self.token = token
         self.peer = peer
     }
