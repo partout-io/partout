@@ -56,17 +56,39 @@ public struct WireGuardProviderTemplate: Hashable, Codable, Sendable {
     }
 }
 
-public struct WireGuardProviderAuth: Identifiable, Hashable, Codable, Sendable {
-    public let id: String
+public struct WireGuardProviderAuth: Hashable, Codable, Sendable {
+    public struct Token: Hashable, Codable, Sendable {
+        public let accessToken: String
 
-    public let key: String
+        public let expiryDate: Date
 
-    public let addresses: [String]
+        public init(accessToken: String, expiryDate: Date) {
+            self.accessToken = accessToken
+            self.expiryDate = expiryDate
+        }
+    }
 
-    public init(id: String, key: String, addresses: [String]) {
-        self.id = id
-        self.key = key
-        self.addresses = addresses
+    public struct Peer: Identifiable, Hashable, Codable, Sendable {
+        public let id: String
+
+        public let privateKey: String
+
+        public let addresses: [String]
+
+        public init(id: String, privateKey: String, addresses: [String]) {
+            self.id = id
+            self.privateKey = privateKey
+            self.addresses = addresses
+        }
+    }
+
+    public let token: Token?
+
+    public let peer: Peer?
+
+    public init(token: Token?, peer: Peer?) {
+        self.token = token
+        self.peer = peer
     }
 }
 
@@ -93,11 +115,11 @@ extension WireGuardProviderTemplate: ProviderTemplateCompiler {
     ) throws -> WireGuardModule {
         let template = try entity.preset.template(ofType: WireGuardProviderTemplate.self)
         var configurationBuilder = template.builder()
-        guard let auth = options?.deviceAuth?[deviceId] else {
-            throw PartoutError(.Providers.missingProviderOption, "auth")
+        guard let peer = options?.deviceAuth?[deviceId]?.peer else {
+            throw PartoutError(.Providers.missingProviderOption, "auth.peer")
         }
-        configurationBuilder.interface.privateKey = auth.key
-        configurationBuilder.interface.addresses = auth.addresses
+        configurationBuilder.interface.privateKey = peer.privateKey
+        configurationBuilder.interface.addresses = peer.addresses
 
         var builder = WireGuardModule.Builder(id: moduleId)
         builder.configurationBuilder = configurationBuilder
