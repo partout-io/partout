@@ -73,15 +73,19 @@ public struct WireGuardProviderSession: Hashable, Codable, Sendable {
 
     public let privateKey: String
 
+    public let publicKey: String
+
     public let peer: Peer?
 
-    public init(privateKey: String, peer: Peer?) {
+    public init(privateKey: String, publicKey: String, peer: Peer?) {
         self.privateKey = privateKey
+        self.publicKey = publicKey // convenient
         self.peer = peer
     }
 
-    public init(keyGenerator: WireGuardKeyGenerator) {
+    public init(keyGenerator: WireGuardKeyGenerator) throws {
         privateKey = keyGenerator.newPrivateKey()
+        publicKey = try keyGenerator.publicKey(for: privateKey)
         peer = nil
     }
 }

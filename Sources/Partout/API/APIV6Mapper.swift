@@ -101,7 +101,7 @@ extension API.V6 {
                 }
                 // FIXME: ###, execute authentication script with options and return module updated with the new options (device peer info)
 
-                // input: credentials, token
+                // input: credentials, token, pvtkey -> pubkey
                 options.token           // auth with this if not expired
                 options.credentials     // auth with this otherwise
 
