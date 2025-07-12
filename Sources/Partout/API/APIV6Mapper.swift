@@ -77,7 +77,7 @@ extension API.V6 {
         }
 
         public func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure {
-            let data = try await data(for: .provider(providerId))
+            let data = try await data(for: .providerInfrastructure(providerId))
             guard let script = String(data: data, encoding: .utf8) else {
                 throw PartoutError(.notFound)
             }
@@ -90,12 +90,17 @@ extension API.V6 {
             switch providerModule.providerModuleType {
             case .wireGuard:
                 guard let options: WireGuardProviderTemplate.Options = providerModule.options(for: .wireGuard) else {
-                    throw PartoutError(.authentication)
+                    throw PartoutError(.Providers.missingProviderOption)
                 }
                 guard let session = options.sessions?[deviceId] else {
+                    throw PartoutError(.Providers.missingProviderOption)
+                }
+
+                // FIXME: ###, execute authentication script with options and return module updated with the new options (device peer info)
+                let data = try await data(for: .providerAuth(providerModule.providerId))
+                guard let script = String(data: data, encoding: .utf8) else {
                     throw PartoutError(.notFound)
                 }
-                // FIXME: ###, execute authentication script with options and return module updated with the new options (device peer info)
 
                 // input: credentials, token, pvtkey -> pubkey
                 options.token           // auth with this if not expired
