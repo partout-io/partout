@@ -81,10 +81,26 @@ extension API.V6 {
             guard let script = String(data: data, encoding: .utf8) else {
                 throw PartoutError(.notFound)
             }
-//            let lines = script.components(separatedBy: "\n")
             let resultURL = infrastructureURL?(providerId)
             let executor = executorFactory(resultURL, cache, timeout)
             return try await executor.fetchInfrastructure(with: script)
+        }
+
+        public func authenticate(
+            _ providerModule: ProviderModule,
+            forType moduleType: ModuleType,
+            on deviceId: String
+        ) async throws -> ProviderModule {
+            switch moduleType {
+            case .wireGuard:
+                guard let options: WireGuardProviderTemplate.Options = providerModule.options(for: .wireGuard) else {
+                    throw PartoutError(.authentication)
+                }
+                // FIXME: ###, execute authentication script with options and return module updated with the new options (device peer info)
+                return providerModule
+            default:
+                fatalError("Authentication not supported for module type \(moduleType)")
+            }
         }
     }
 }

@@ -1,8 +1,8 @@
 //
-//  APIMapper.swift
+//  ProviderCredentials.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 10/7/24.
+//  Created by Davide De Rosa on 7/12/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,17 +23,15 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import PartoutCore
-import PartoutProviders
+import Foundation
 
-public protocol APIMapper {
-    func index() async throws -> [Provider]
+public struct ProviderCredentials: Hashable, Codable, Sendable {
+    public let username: String
 
-    func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure
+    public let password: String?
 
-    func authenticate(
-        _ providerModule: ProviderModule,
-        forType moduleType: ModuleType,
-        on deviceId: String
-    ) async throws -> ProviderModule
+    public init(username: String, password: String?) {
+        self.username = username
+        self.password = password
+    }
 }

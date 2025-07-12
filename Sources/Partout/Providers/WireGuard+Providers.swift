@@ -57,32 +57,33 @@ public struct WireGuardProviderTemplate: Hashable, Codable, Sendable {
 }
 
 public struct WireGuardProviderAuth: Hashable, Codable, Sendable {
-    public struct Peer: Identifiable, Hashable, Codable, Sendable {
-        public let id: String
-
+    public struct Peer: Hashable, Codable, Sendable {
         public let privateKey: String
 
         public let addresses: [String]
 
-        public init(id: String, privateKey: String, addresses: [String]) {
-            self.id = id
+        public init(privateKey: String, addresses: [String]) {
             self.privateKey = privateKey
             self.addresses = addresses
         }
     }
 
-    public let token: ProviderToken?
+    public let token: ProviderToken
 
-    public let peer: Peer?
+    public let clientId: String
 
-    public init(token: ProviderToken?, peer: Peer?) {
+    public let peer: Peer
+
+    public init(token: ProviderToken, clientId: String, peer: Peer) {
         self.token = token
+        self.clientId = clientId
         self.peer = peer
     }
 }
 
 extension WireGuardProviderTemplate {
     public struct Options: ProviderOptions {
+        public var credentials: ProviderCredentials?
 
         // device id -> auth
         public var deviceAuth: [String: WireGuardProviderAuth]?

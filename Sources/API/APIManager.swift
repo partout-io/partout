@@ -112,6 +112,17 @@ public final class APIManager {
         }
     }
 
+    public func authenticate(
+        _ providerModule: ProviderModule,
+        forType moduleType: ModuleType,
+        on deviceId: String
+    ) async throws -> ProviderModule {
+        guard let api = apis.first else {
+            throw PartoutError(.authentication)
+        }
+        return try await api.authenticate(providerModule, forType: moduleType, on: deviceId)
+    }
+
     public func fetchInfrastructure(for providerId: ProviderID) async throws {
         let service: PendingService = .provider(providerId)
         guard !pendingServices.contains(service) else {
