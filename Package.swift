@@ -370,7 +370,10 @@ vendors.forEach {
                 .testTarget(
                     name: "_PartoutCryptoOpenSSL_ObjCTests",
                     dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-                    path: "Tests/Crypto/OpenSSL_ObjC"
+                    path: "Tests/Crypto/OpenSSL_ObjC",
+                    exclude: [
+                        "CryptoPerformanceTests.swift"
+                    ]
                 )
             ])
         }
