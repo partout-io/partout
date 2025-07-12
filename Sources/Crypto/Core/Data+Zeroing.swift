@@ -32,9 +32,8 @@ extension Data {
         self.init(
             bytesNoCopy: zd.pointee.bytes,
             count: count,
-            deallocator: .custom { ptr, count in
-                pp_zero(ptr, count)
-                free(ptr)
+            deallocator: .custom { _, _ in
+                zd_free(zd)
             }
         )
     }
