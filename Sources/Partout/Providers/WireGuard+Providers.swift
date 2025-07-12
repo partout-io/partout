@@ -85,8 +85,10 @@ extension WireGuardProviderTemplate {
     public struct Options: ProviderOptions {
         public var credentials: ProviderCredentials?
 
+        public var deviceKeys: [String: String]?
+
         // device id -> auth
-        public var deviceAuth: [String: WireGuardProviderAuth]?
+        public var deviceAuths: [String: WireGuardProviderAuth]?
 
         public init() {
         }
@@ -105,7 +107,7 @@ extension WireGuardProviderTemplate: ProviderTemplateCompiler {
     ) throws -> WireGuardModule {
         let template = try entity.preset.template(ofType: WireGuardProviderTemplate.self)
         var configurationBuilder = template.builder()
-        guard let peer = options?.deviceAuth?[deviceId]?.peer else {
+        guard let peer = options?.deviceAuths?[deviceId]?.peer else {
             throw PartoutError(.Providers.missingProviderOption, "auth.peer")
         }
         configurationBuilder.interface.privateKey = peer.privateKey

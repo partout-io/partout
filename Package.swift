@@ -15,7 +15,7 @@ let checksum = "e4de8046bd70a812439cee514e970cd305918801d75f482679d836e300a3e5a3
 let coreSHA1 = "532f80d0b8f0a1fc70d8670a04c010d019867f0b"
 
 // deployment environment
-let environment: Environment = .remoteBinary
+let environment: Environment = .localSource
 
 // implies included targets (exclude docs until ready)
 let areas = {
