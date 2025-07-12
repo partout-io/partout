@@ -31,9 +31,5 @@ public protocol APIMapper {
 
     func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure
 
-    func authenticate(
-        _ providerModule: ProviderModule,
-        forType moduleType: ModuleType,
-        on deviceId: String
-    ) async throws -> ProviderModule
+    func authenticate(_ providerModule: ProviderModule, on deviceId: String) async throws -> ProviderModule
 }

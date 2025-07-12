@@ -86,12 +86,8 @@ extension API.V6 {
             return try await executor.fetchInfrastructure(with: script)
         }
 
-        public func authenticate(
-            _ providerModule: ProviderModule,
-            forType moduleType: ModuleType,
-            on deviceId: String
-        ) async throws -> ProviderModule {
-            switch moduleType {
+        public func authenticate(_ providerModule: ProviderModule, on deviceId: String) async throws -> ProviderModule {
+            switch providerModule.providerModuleType {
             case .wireGuard:
                 guard let options: WireGuardProviderTemplate.Options = providerModule.options(for: .wireGuard) else {
                     throw PartoutError(.authentication)
@@ -111,7 +107,7 @@ extension API.V6 {
 
                 return providerModule
             default:
-                fatalError("Authentication not supported for module type \(moduleType)")
+                fatalError("Authentication not supported for module type \(providerModule.providerModuleType)")
             }
         }
     }
