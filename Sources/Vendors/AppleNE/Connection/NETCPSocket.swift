@@ -109,13 +109,8 @@ private actor NETCPSocket: LinkInterface {
 
 extension NETCPSocket {
     nonisolated var hasBetterPath: AsyncStream<Void> {
-        nwConnection
-            .publisher(for: \.hasBetterPath)
-            .removeDuplicates()
-            .filter { $0 } // true
+        stream(for: \.hasBetterPath, of: nwConnection) { $0 }
             .map { _ in }
-            .stream()
-            .ignoreErrors()
     }
 
     nonisolated func upgraded() -> LinkInterface {
