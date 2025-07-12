@@ -65,9 +65,10 @@ final class CDataPath {
     }
 
     deinit {
+        replay_free(replay)
+        dp_mode_free(mode)
         zd_free(encBuffer)
         zd_free(decBuffer)
-        dp_mode_free(mode)
     }
 }
 
