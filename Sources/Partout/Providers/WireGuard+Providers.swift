@@ -79,6 +79,11 @@ public struct WireGuardProviderSession: Hashable, Codable, Sendable {
         self.privateKey = privateKey
         self.peer = peer
     }
+
+    public init(keyGenerator: WireGuardKeyGenerator) {
+        privateKey = keyGenerator.newPrivateKey()
+        peer = nil
+    }
 }
 
 extension WireGuardProviderTemplate {
