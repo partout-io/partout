@@ -96,7 +96,19 @@ extension API.V6 {
                 guard let options: WireGuardProviderTemplate.Options = providerModule.options(for: .wireGuard) else {
                     throw PartoutError(.authentication)
                 }
+                guard let session = options.sessions?[deviceId] else {
+                    throw PartoutError(.notFound)
+                }
                 // FIXME: ###, execute authentication script with options and return module updated with the new options (device peer info)
+
+                // input: credentials, token
+                options.token           // auth with this if not expired
+                options.credentials     // auth with this otherwise
+
+                // output: token, peer
+                let peer = WireGuardProviderSession.Peer(clientId: "", creationDate: Date(), addresses: [])
+                let newSession = WireGuardProviderSession(privateKey: session.privateKey, peer: peer)
+
                 return providerModule
             default:
                 fatalError("Authentication not supported for module type \(moduleType)")
