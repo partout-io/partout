@@ -107,7 +107,7 @@ extension API.V6 {
 
                 // output: token, peer
                 let peer = WireGuardProviderSession.Peer(clientId: "", creationDate: Date(), addresses: [])
-                let newSession = WireGuardProviderSession(privateKey: session.privateKey, peer: peer)
+                let newSession = session.with(peer: peer)
 
                 return providerModule
             default:

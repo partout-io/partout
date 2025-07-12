@@ -75,18 +75,18 @@ public struct WireGuardProviderSession: Hashable, Codable, Sendable {
 
     public let publicKey: String
 
-    public let peer: Peer?
-
-    public init(privateKey: String, publicKey: String, peer: Peer?) {
-        self.privateKey = privateKey
-        self.publicKey = publicKey // convenient
-        self.peer = peer
-    }
+    public private(set) var peer: Peer?
 
     public init(keyGenerator: WireGuardKeyGenerator) throws {
         privateKey = keyGenerator.newPrivateKey()
         publicKey = try keyGenerator.publicKey(for: privateKey)
         peer = nil
+    }
+
+    public func with(peer: Peer) -> Self {
+        var newSession = self
+        newSession.peer = peer
+        return newSession
     }
 }
 
