@@ -77,7 +77,7 @@ function authenticate(module, deviceId) {
 
     // 1. authenticate
     var token = options.token;
-    if (options.token && options.token.expiryDate > now) {
+    if (token) {// FIXME: ###, check expiry && token.expiryDate > now) {
         // go ahead
     } else if (options.credentials) {
         const body = jsonToBase64({
@@ -89,13 +89,11 @@ function authenticate(module, deviceId) {
         if (json.error) {
             return defaultResponse;
         }
-        debug(`>>> OLE!!! ${json.response}`);
-//        result.access_token;
-//        result.expiry;
-
-        // access_token, expiry
-//        token = response
-        return defaultResponse;
+        debug(`>>> CREDENTIALS!!! ${json.response}`);
+        token = {
+            accessToken: json.response.access_token,
+            expiryDate: json.response.expiry
+        };
     } else {
         return {
             error: "auth"
@@ -103,6 +101,7 @@ function authenticate(module, deviceId) {
     }
 
     // 2. get list of devices to look up own pubkey
+    debug(`>>> TOKEN!!! ${JSON.stringify(token)}`);
 
     // 3.1. POST if new
 //    const keyUrl = "https://api.mullvad.net/accounts/v1/devices";

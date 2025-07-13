@@ -74,6 +74,7 @@ struct APIV6MapperTests {
         builder.providerModuleType = .wireGuard
         var options = WireGuardProviderOptions()
         options.credentials = ProviderCredentials(username: "9224174482959994", password: nil)
+        options.token = ProviderToken(accessToken: "mva_f5ed0b1927f3e085c0cd7d486b53f7e179196c1a500e51d0223e9fb771401512", expiryDate: .distantFuture)
         options.sessions = [deviceId: session]
         try builder.setOptions(options, for: .wireGuard)
         let module = try builder.tryBuild()
