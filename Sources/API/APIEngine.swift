@@ -39,7 +39,12 @@ public enum APIEngine {
     }
 
     public protocol VirtualMachine {
-        func getResult(method: String, urlString: String, body: String?) -> APIEngine.GetResult
+        func getResult(
+            method: String,
+            urlString: String,
+            headers: [String: String]?,
+            body: String?
+        ) -> APIEngine.GetResult
 
         func getText(urlString: String) -> [String: Any]
 
@@ -59,7 +64,7 @@ public enum APIEngine {
 
 extension APIEngine.VirtualMachine {
     public func getResult(urlString: String) -> APIEngine.GetResult {
-        getResult(method: "GET", urlString: urlString, body: nil)
+        getResult(method: "GET", urlString: urlString, headers: nil, body: nil)
     }
 }
 

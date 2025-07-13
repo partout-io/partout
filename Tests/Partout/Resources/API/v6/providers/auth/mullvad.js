@@ -80,18 +80,23 @@ function authenticate(module, deviceId) {
     if (options.token && options.token.expiryDate > now) {
         // go ahead
     } else if (options.credentials) {
-        const body = {
+        const body = jsonToBase64({
             "account_number": options.credentials.username
-        };
-//        const result = getResult("POST", "https://api.mullvad.net/auth/v1/token");
-//        if (!result) {
-//            return defaultResponse;
-//        }
+        });
+        debug(`>>> body: ${body}`);
+        const headers = {"Content-type": "application/json"};
+        const result = getResult("POST", "https://api.mullvad.net/auth/v1/token", headers, body);
+        if (!result) {
+            return defaultResponse;
+        }
+        debug(">>> OLE!!!");
+        debug(result);
 //        result.access_token;
 //        result.expiry;
 
         // access_token, expiry
 //        token = response
+        return defaultResponse;
     } else {
         return {
             error: "auth"

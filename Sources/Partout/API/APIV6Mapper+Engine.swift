@@ -121,7 +121,12 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
         var isCached = false
     }
 
-    func getResult(method: String, urlString: String, body: String?) -> APIEngine.GetResult {
+    func getResult(
+        method: String,
+        urlString: String,
+        headers: [String: String]?,
+        body: String?
+    ) -> APIEngine.GetResult {
         pp_log(ctx, .api, .info, "JS.getResult: Execute with URL: \(resultURL?.absoluteString ?? urlString)")
         guard let url = resultURL ?? URL(string: urlString) else {
             return APIEngine.GetResult(.url)
@@ -134,6 +139,7 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
 
         var request = URLRequest(url: url)
         request.httpMethod = method
+        request.allHTTPHeaderFields = headers
         request.httpBody = body.map {
             Data(base64Encoded: $0)
         } ?? nil
@@ -144,7 +150,7 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
             request.setValue(tag, forHTTPHeaderField: "If-None-Match")
         }
 
-        pp_log(ctx, .api, .info, "JS.getResult: GET \(url)")
+        pp_log(ctx, .api, .info, "JS.getResult: \(method) \(url)")
         if let headers = request.allHTTPHeaderFields {
             pp_log(ctx, .api, .info, "JS.getResult: Headers: \(headers)")
         }
