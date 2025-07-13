@@ -160,6 +160,12 @@ function authenticate(module, deviceId) {
         const body = jsonToBase64({
             "pubkey": session.publicKey
         });
+
+        // WARNING: fails with 400 if:
+        //
+        // - pubkey is used by another device
+        // - pubkey is used by a device that was recently deleted
+        //
         const json = getResult("POST", `${baseURL}/accounts/v1/devices`, headers, body);
         if (json.status != 201) {
             return defaultResponse;

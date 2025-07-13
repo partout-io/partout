@@ -65,9 +65,10 @@ struct APIV6MapperTests {
         let sut = try Self.apiV6()
 
         let deviceId = "abcdef"
-        let privateKey = "4kJmcDZL7KfGUhLInakA3qpJc7n1wMSzMJjNK1k2Tk4="
-        let publicKey = "9r0AvpoeZcVmj1RQFd0zH+lUiePgLz3qY6hxWGG4k1I="
-        let peer = WireGuardProviderStorage.Peer(id: "c66e7455-f1cb-4764-8a70-092702bb3659", creationDate: Date(), addresses: [])
+        let privateKey = "UeVgIb/ahgZxjULgOdnxCeEVBhl9MLp3nwr2HSk3o3o="
+        let publicKey = "zP42rU3Df+Ac2q+bnF5VaabU+N3+U7E8XBXfKiI1rGI="
+
+        let peer = WireGuardProviderStorage.Peer(id: "f4c2bb4d-c1bb-44bb-8052-cf9359cbb76a", creationDate: Date(), addresses: [])
         let session = WireGuardProviderStorage.Session(privateKey: privateKey, publicKey: publicKey)
             .with(peer: peer)
 
