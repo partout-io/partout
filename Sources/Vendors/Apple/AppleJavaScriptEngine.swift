@@ -55,7 +55,6 @@ public final class AppleJavaScriptEngine: ScriptingEngine {
             guard let data = value.toString().data(using: .utf8) else {
                 throw PartoutError(.parsing, value)
             }
-            print(">>> \(value.toString())")
             return try JSONDecoder().decode(O.self, from: data)
         }.value
     }

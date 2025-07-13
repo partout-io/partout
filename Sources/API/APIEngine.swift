@@ -57,6 +57,8 @@ public enum APIEngine {
 
 extension APIEngine {
     public enum ErrorCode: String, Decodable {
+        case auth
+
         case url
 
         case cached
