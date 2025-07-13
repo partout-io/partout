@@ -24,14 +24,15 @@
 
 /*
  options = {
-    credentials: {},
-    token: null,
+    credentials: { username, password },
+    token: { accessToken, expiryDate },
     sessions: {
         device1: {
             privateKey: "",
             publicKey: "",
             peer: {
-                clientId: "",
+                id: "",
+                creationDate: ...,
                 addresses: []
             }
         },
