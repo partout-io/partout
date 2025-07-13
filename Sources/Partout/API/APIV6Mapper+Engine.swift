@@ -124,8 +124,8 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
     func getResult(
         method: String,
         urlString: String,
-        headers: [String: String]?,
-        body: String?
+        headers: [String: String],
+        body: String
     ) -> [String: Any] {
         let textResult = {
             let result = sendRequest(method: method, urlString: urlString, headers: headers, body: body)
@@ -143,12 +143,12 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
     }
 
     func getText(urlString: String) -> [String: Any] {
-        getResult(method: "GET", urlString: urlString, headers: nil, body: nil)
+        getResult(method: "GET", urlString: urlString, headers: [:], body: "")
     }
 
     func getJSON(urlString: String) -> [String: Any] {
         let jsonResult = {
-            let result = sendRequest(method: "GET", urlString: urlString, headers: nil, body: nil)
+            let result = sendRequest(method: "GET", urlString: urlString, headers: [:], body: "")
             if result.isCached {
                 return APIEngine.GetResult(.cached)
             }
@@ -231,8 +231,8 @@ private extension API.V6.DefaultScriptExecutor {
     func sendRequest(
         method: String,
         urlString: String,
-        headers: [String: String]?,
-        body: String?
+        headers: [String: String],
+        body: String
     ) -> APIEngine.GetResult {
         pp_log(ctx, .api, .info, "JS.getResult: Execute with URL: \(resultURL?.absoluteString ?? urlString)")
         guard let url = resultURL ?? URL(string: urlString) else {
@@ -247,7 +247,7 @@ private extension API.V6.DefaultScriptExecutor {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.allHTTPHeaderFields = headers
-        if let body {
+        if !body.isEmpty {
             request.httpBody = Data(base64Encoded: body)
         }
         if let lastUpdate = cache?.lastUpdate {

@@ -42,8 +42,8 @@ public enum APIEngine {
         func getResult(
             method: String,
             urlString: String,
-            headers: [String: String]?,
-            body: String?
+            headers: [String: String],
+            body: String
         ) -> [String: Any]
 
         func getText(urlString: String) -> [String: Any]

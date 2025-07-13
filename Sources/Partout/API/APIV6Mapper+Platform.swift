@@ -56,7 +56,7 @@ private func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingE
 
 extension AppleJavaScriptEngine: APIScriptingEngine {
     public func inject(from vm: APIEngine.VirtualMachine) {
-        inject("getResult", object: vm.getResult as @convention(block) (String, String, [String: String]?, String?) -> Any?)
+        inject("getResult", object: vm.getResult as @convention(block) (String, String, [String: String], String) -> Any?)
         inject("getText", object: vm.getText as @convention(block) (String) -> Any?)
         inject("getJSON", object: vm.getJSON as @convention(block) (String) -> Any?)
         inject("jsonFromBase64", object: vm.jsonFromBase64 as @convention(block) (String) -> Any?)

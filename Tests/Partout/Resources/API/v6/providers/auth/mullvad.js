@@ -111,7 +111,7 @@ function authenticate(module, deviceId) {
     debug(`>>> headers: ${JSON.stringify(headers)}`);
 
     // get list of devices
-    const json = getResult("GET", `${baseURL}/accounts/v1/devices`, headers);
+    const json = getResult("GET", `${baseURL}/accounts/v1/devices`, headers, "");
     if (json.error) {
         return defaultResponse;
     }
@@ -160,6 +160,7 @@ function authenticate(module, deviceId) {
         const body = jsonToBase64({
             "pubkey": session.publicKey
         });
+        debug(`>>> creating: ${body}`);
         const json = getResult("POST", `${baseURL}/accounts/v1/devices`, headers, body);
         if (json.error) {
             return defaultResponse;
