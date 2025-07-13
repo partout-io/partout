@@ -47,18 +47,22 @@
 //function authenticate(credentials, token, session) {
 function authenticate(module, deviceId) {
     const wgType = "WireGuard";
+    // FIXME: ###, how to shortcut return N times?
     const defaultResponse = {
         response: module
     };
-
     if (module.providerModuleType != wgType) {
         return defaultResponse;
     }
+    debug(`${JSON.stringify(module)}`);
     const encodedOptions = module.moduleOptions[wgType];
+    debug(`>>> allOptions: ${module.moduleOptions}`);
     if (!encodedOptions) {
         return defaultResponse;
     }
-    const options = jsonFromBase64(module.moduleOptions[wgType]);
+    debug(`>>> encodedOptions: ${encodedOptions}`);
+    const options = jsonFromBase64(encodedOptions);
+    debug(`>>> wgOptions: ${JSON.stringify(options)}`);
     if (!options) {
         return defaultResponse;
     }
@@ -66,6 +70,8 @@ function authenticate(module, deviceId) {
     if (!session) {
         return defaultResponse;
     }
+
+    debug(options);
 
     // 1. authenticate
     var token = options.token;
@@ -75,7 +81,14 @@ function authenticate(module, deviceId) {
         const body = {
             "account_number": options.credentials.username
         };
-        // https://api.mullvad.net/auth/v1/token
+//        const result = getResult("POST", "https://api.mullvad.net/auth/v1/token");
+//        if (!result) {
+//            return defaultResponse;
+//        }
+//        result.access_token;
+//        result.expiry;
+
+        // access_token, expiry
 //        token = response
     } else {
         return {
