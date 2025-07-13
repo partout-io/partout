@@ -83,9 +83,7 @@ struct APIV6MapperTests {
         let module = try builder.tryBuild()
 
         let newModule = try await sut.authenticate(module, on: deviceId)
-        guard let newStorage: WireGuardProviderStorage = newModule.options(for: .wireGuard) else {
-            fatalError()
-        }
+        let newStorage: WireGuardProviderStorage? = try newModule.options(for: .wireGuard)
         print(">>> newStorage: \(newStorage)")
     }
 
@@ -125,7 +123,7 @@ struct APIV6MapperTests {
     func givenGetResult_whenHasCache_thenReturnsProviderCache() throws {
         let date = Date()
         let tag = "12345"
-        let sut = APIEngine.GetResult("", lastModified: date, tag: tag)
+        let sut = APIEngine.GetResult("", status: nil, lastModified: date, tag: tag)
 
         let object = try #require(sut.serialized()["cache"])
         let data = try JSONSerialization.data(withJSONObject: object)

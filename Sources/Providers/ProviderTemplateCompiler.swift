@@ -55,7 +55,7 @@ extension ProviderModule {
         guard let entity else {
             throw PartoutError(.Providers.missingProviderEntity)
         }
-        let options: T.Options? = options(for: providerModuleType)
+        let options: T.Options? = try options(for: providerModuleType)
         return try T.compiled(
             ctx,
             deviceId: deviceId,

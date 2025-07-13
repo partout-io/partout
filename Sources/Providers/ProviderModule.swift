@@ -63,8 +63,8 @@ public struct ProviderModule: Module, BuildableType, Hashable, Codable {
         false
     }
 
-    public func options<O>(for moduleType: ModuleType) -> O? where O: ProviderOptions {
-        moduleOptions?.options(for: moduleType)
+    public func options<O>(for moduleType: ModuleType) throws -> O? where O: ProviderOptions {
+        try moduleOptions?.options(for: moduleType)
     }
 
     public func builder() -> Builder {
@@ -116,8 +116,8 @@ extension ProviderModule {
             self.entity = entity
         }
 
-        public func options<O>(for moduleType: ModuleType) -> O? where O: ProviderOptions {
-            moduleOptions?.options(for: moduleType)
+        public func options<O>(for moduleType: ModuleType) throws -> O? where O: ProviderOptions {
+            try moduleOptions?.options(for: moduleType)
         }
 
         public mutating func setOptions<O>(_ options: O, for moduleType: ModuleType) throws where O: ProviderOptions {
@@ -173,16 +173,11 @@ extension ProviderModule {
             try container.encode(rawMap)
         }
 
-        func options<O>(for moduleType: ModuleType) -> O? where O: ProviderOptions {
+        func options<O>(for moduleType: ModuleType) throws -> O? where O: ProviderOptions {
             guard let data = map[moduleType] else {
                 return nil
             }
-            do {
-                return try JSONDecoder().decode(O.self, from: data)
-            } catch {
-                pp_log_g(.providers, .error, "Unable to decode options: \(error)")
-                return nil
-            }
+            return try JSONDecoder().decode(O.self, from: data)
         }
     }
 }

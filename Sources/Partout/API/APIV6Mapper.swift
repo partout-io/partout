@@ -79,10 +79,10 @@ extension API.V6 {
         public func authenticate(_ module: ProviderModule, on deviceId: String) async throws -> ProviderModule {
             switch module.providerModuleType {
             case .wireGuard:
-                guard let options: WireGuardProviderTemplate.Options = module.options(for: .wireGuard) else {
+                guard let options: WireGuardProviderTemplate.Options = try module.options(for: .wireGuard) else {
                     throw PartoutError(.Providers.missingProviderOption)
                 }
-                guard let session = options.sessions?[deviceId] else {
+                guard options.sessions?[deviceId] != nil else {
                     throw PartoutError(.Providers.missingProviderOption)
                 }
                 let data = try await data(for: .providerAuth(module.providerId))
