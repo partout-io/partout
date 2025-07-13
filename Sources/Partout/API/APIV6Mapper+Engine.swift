@@ -74,18 +74,19 @@ extension API.V6.DefaultScriptExecutor: APIEngine.ScriptExecutor {
 //                return providerModule
 
     func authenticate(_ module: ProviderModule, on deviceId: String, with script: String) async throws -> ProviderModule {
-        engine.inject("module", object: module)
-        engine.inject("deviceId", object: deviceId)
+        let moduleData = try JSONEncoder().encode(module)
+        guard let moduleJSON = String(data: moduleData, encoding: .utf8) else {
+            throw PartoutError(.encoding)
+        }
         let result = try await engine.execute(
-            "JSON.stringify(authenticate())",
+            "JSON.stringify(authenticate(JSON.parse('\(moduleJSON)'), '\(deviceId)'))",
             after: script,
-            returning: APIEngine.ScriptResult<String>.self
+            returning: APIEngine.ScriptResult<ProviderModule>.self
         )
         guard let response = result.response else {
             throw PartoutError(.scriptException, result.error?.rawValue ?? "unknown")
         }
-        // FIXME: ###
-        fatalError()
+        return response
     }
 
     func fetchInfrastructure(with script: String) async throws -> ProviderInfrastructure {
