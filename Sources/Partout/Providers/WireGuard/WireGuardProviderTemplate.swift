@@ -44,7 +44,7 @@ extension WireGuardProviderTemplate: ProviderTemplateCompiler {
         deviceId: String,
         moduleId: UUID,
         entity: ProviderEntity,
-        options: WireGuardProviderOptions?
+        options: WireGuardProviderStorage?
     ) throws -> WireGuardModule {
         let template = try entity.preset.template(ofType: WireGuardProviderTemplate.self)
         var configurationBuilder = template.builder()

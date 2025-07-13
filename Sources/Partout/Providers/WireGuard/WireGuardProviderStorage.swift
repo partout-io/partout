@@ -1,5 +1,5 @@
 //
-//  WireGuard+Providers.swift
+//  WireGuardProviderStorage.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 12/2/24.
@@ -29,7 +29,7 @@ import _PartoutWireGuardCore
 import Foundation
 import PartoutCore
 
-public struct WireGuardProviderOptions: ProviderOptions {
+public struct WireGuardProviderStorage: ProviderOptions {
     public var credentials: ProviderCredentials?
 
     public var token: ProviderToken?

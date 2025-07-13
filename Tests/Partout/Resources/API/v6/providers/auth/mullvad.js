@@ -114,10 +114,13 @@ function authenticate(module, deviceId) {
     const devices = JSON.parse(json.response);
     debug(`>>> devices: ${devices}`);
 
+    // look up own device
+
     // look up own pubkey
     const existing = devices.find(d => d.pubkey == session.publicKey);
     if (existing) {
-        // PUT if existing
+        // read if existing
+        // FIXME: ###, PUT to renew
 //        const keyUrl = `${baseURL}/accounts/v1/devices/${session.deviceId}/pubkey`;
         debug(`>>> existing: ${JSON.stringify(existing)}`);
         let peer = {
@@ -134,7 +137,7 @@ function authenticate(module, deviceId) {
         debug(`>>> peer: ${JSON.stringify(session.peer)}`);
     }
     else {
-        // POST if new
+        // FIXME: ###, POST if new
 //        const keyUrl = `${baseURL}/accounts/v1/devices`;
     }
 
