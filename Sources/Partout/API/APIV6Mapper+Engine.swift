@@ -286,6 +286,8 @@ private extension API.V6.DefaultScriptExecutor {
             }
             if let error {
                 pp_log(ctx, .api, .error, "JS.getResult: Unable to execute: \(error)")
+
+                // FIXME: ###, error info is lost in GetResult, only assumes error if no data
             } else if let httpResponse = response as? HTTPURLResponse {
                 let lastModifiedHeader = httpResponse.value(forHTTPHeaderField: "last-modified")
                 let tag = httpResponse.value(forHTTPHeaderField: "etag")
