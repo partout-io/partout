@@ -121,7 +121,7 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
         var isCached = false
     }
 
-    func getResult(method: String, urlString: String, body: Data?) -> APIEngine.GetResult {
+    func getResult(method: String, urlString: String, body: String?) -> APIEngine.GetResult {
         pp_log(ctx, .api, .info, "JS.getResult: Execute with URL: \(resultURL?.absoluteString ?? urlString)")
         guard let url = resultURL ?? URL(string: urlString) else {
             return APIEngine.GetResult(.url)
@@ -134,7 +134,9 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
 
         var request = URLRequest(url: url)
         request.httpMethod = method
-        request.httpBody = body
+        request.httpBody = body.map {
+            Data(base64Encoded: $0)
+        } ?? nil
         if let lastUpdate = cache?.lastUpdate {
             request.setValue(lastUpdate.toRFC1123(), forHTTPHeaderField: "If-Modified-Since")
         }

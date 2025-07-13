@@ -39,7 +39,7 @@ public enum APIEngine {
     }
 
     public protocol VirtualMachine {
-        func getResult(method: String, urlString: String, body: Data?) -> APIEngine.GetResult
+        func getResult(method: String, urlString: String, body: String?) -> APIEngine.GetResult
 
         func getText(urlString: String) -> [String: Any]
 
