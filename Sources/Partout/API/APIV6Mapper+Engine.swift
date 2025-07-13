@@ -259,7 +259,14 @@ private extension API.V6.DefaultScriptExecutor {
 
         pp_log(ctx, .api, .info, "JS.getResult: \(method) \(url)")
         if let headers = request.allHTTPHeaderFields {
-            pp_log(ctx, .api, .info, "JS.getResult: Headers: \(headers)")
+            let redactedHeaders = headers.map {
+                if $0.key.lowercased() == "authorization" {
+                    return ($0.key, "<redacted>")
+                } else {
+                    return ($0.key, $0.value)
+                }
+            }
+            pp_log(ctx, .api, .info, "JS.getResult: Headers: \(redactedHeaders)")
         }
 
         let semaphore = DispatchSemaphore(value: 0)
