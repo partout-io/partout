@@ -41,7 +41,7 @@ public struct ProviderModule: Module, BuildableType, Hashable, Codable {
 
     public let providerModuleType: ModuleType
 
-    public let moduleOptions: [ModuleType: Data]?
+    public let moduleOptions: CodableOptions?
 
     public let entity: ProviderEntity?
 
@@ -49,7 +49,7 @@ public struct ProviderModule: Module, BuildableType, Hashable, Codable {
         id: UUID,
         providerId: ProviderID,
         providerModuleType: ModuleType,
-        moduleOptions: [ModuleType: Data]?,
+        moduleOptions: CodableOptions?,
         entity: ProviderEntity?
     ) {
         self.id = id
@@ -94,7 +94,7 @@ extension ProviderModule {
             }
         }
 
-        public var moduleOptions: [ModuleType: Data]?
+        public var moduleOptions: CodableOptions?
 
         public var entity: ProviderEntity?
 
@@ -106,7 +106,7 @@ extension ProviderModule {
             id: UUID = UUID(),
             providerId: ProviderID? = nil,
             providerModuleType: ModuleType? = nil,
-            moduleOptions: [ModuleType: Data]? = nil,
+            moduleOptions: CodableOptions? = nil,
             entity: ProviderEntity? = nil
         ) {
             self.id = id
@@ -123,9 +123,9 @@ extension ProviderModule {
         public mutating func setOptions<O>(_ options: O, for moduleType: ModuleType) throws where O: ProviderOptions {
             let encoded = try JSONEncoder().encode(options)
             if moduleOptions == nil {
-                moduleOptions = [moduleType: encoded]
+                moduleOptions = CodableOptions(map: [moduleType: encoded])
             } else {
-                moduleOptions?[moduleType] = encoded
+                moduleOptions?.map[moduleType] = encoded
             }
         }
 
@@ -140,6 +140,44 @@ extension ProviderModule {
                 moduleOptions: moduleOptions,
                 entity: entity
             )
+        }
+    }
+}
+
+extension ProviderModule {
+    public struct CodableOptions: Hashable, Codable, Sendable {
+        public var map: [ModuleType: Data]
+
+        public init(map: [ModuleType: Data] = [:]) {
+            self.map = map
+        }
+
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            do {
+                let rawMap = try container.decode([String: Data].self)
+                map = rawMap.reduce(into: [:]) {
+                    $0[ModuleType($1.key)] = $1.value
+                }
+            } catch {
+                // legacy
+                map = try container.decode([ModuleType: Data].self)
+            }
+        }
+
+        public func encode(to encoder: any Encoder) throws {
+            let rawMap: [String: Data] = map.reduce(into: [:]) {
+                $0[$1.key.id] = $1.value
+            }
+            var container = encoder.singleValueContainer()
+            try container.encode(rawMap)
+        }
+
+        func options<O>(for moduleType: ModuleType) -> O? where O: ProviderOptions {
+            guard let data = map[moduleType] else {
+                return nil
+            }
+            return try? JSONDecoder().decode(O.self, from: data)
         }
     }
 }
@@ -163,13 +201,4 @@ public protocol ProviderModuleResolver: Sendable {
     var moduleType: ModuleType { get }
 
     func resolved(from providerModule: ProviderModule, deviceId: String) throws -> Module
-}
-
-private extension Dictionary where Key == ModuleType, Value == Data {
-    func options<O>(for moduleType: ModuleType) -> O? where O: ProviderOptions {
-        guard let data = self[moduleType] else {
-            return nil
-        }
-        return try? JSONDecoder().decode(O.self, from: data)
-    }
 }
