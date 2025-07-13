@@ -121,6 +121,9 @@ extension APIEngine {
             var map: [String: Any] = [:]
             if let response {
                 map["response"] = response
+                if let status {
+                    map["status"] = status
+                }
 
                 // follow ProviderCache
                 var cache: [String: Any] = [:]
