@@ -127,26 +127,23 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
         headers: [String: String]?,
         body: String?
     ) -> [String: Any] {
-        sendRequest(method: method, urlString: urlString, headers: headers, body: body).serialized()
-    }
-
-    func getText(urlString: String) -> [String: Any] {
         let textResult = {
-            let result = sendRequest(method: "GET", urlString: urlString, headers: nil, body: nil)
-            if result.isCached {
-                return APIEngine.GetResult(.cached)
-            }
+            let result = sendRequest(method: method, urlString: urlString, headers: headers, body: body)
             guard let text = result.response as? Data else {
-                pp_log(ctx, .api, .error, "JS.getText: Response is not Data")
+                pp_log(ctx, .api, .error, "JS.getResult: Response is not Data")
                 return APIEngine.GetResult(.network)
             }
             guard let string = String(data: text, encoding: .utf8) else {
-                pp_log(ctx, .api, .error, "JS.getText: Response is not String")
+                pp_log(ctx, .api, .error, "JS.getResult: Response is not String")
                 return APIEngine.GetResult(.network)
             }
             return result.with(response: string)
         }()
         return textResult.serialized()
+    }
+
+    func getText(urlString: String) -> [String: Any] {
+        getResult(method: "GET", urlString: urlString, headers: nil, body: nil)
     }
 
     func getJSON(urlString: String) -> [String: Any] {

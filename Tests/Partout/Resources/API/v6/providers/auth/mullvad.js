@@ -85,12 +85,11 @@ function authenticate(module, deviceId) {
         });
         debug(`>>> body: ${body}`);
         const headers = {"Content-type": "application/json"};
-        const result = getResult("POST", "https://api.mullvad.net/auth/v1/token", headers, body);
-        if (!result) {
+        const json = getResult("POST", "https://api.mullvad.net/auth/v1/token", headers, body);
+        if (json.error) {
             return defaultResponse;
         }
-        debug(">>> OLE!!!");
-        debug(result);
+        debug(`>>> OLE!!! ${json.response}`);
 //        result.access_token;
 //        result.expiry;
 
