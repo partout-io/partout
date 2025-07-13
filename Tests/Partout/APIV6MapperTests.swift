@@ -76,7 +76,8 @@ struct APIV6MapperTests {
         builder.providerModuleType = .wireGuard
         var storage = WireGuardProviderStorage()
         storage.credentials = ProviderCredentials(username: "9224174482959994", password: nil)
-        storage.token = ProviderToken(accessToken: "mva_f5ed0b1927f3e085c0cd7d486b53f7e179196c1a500e51d0223e9fb771401512", expiryDate: Date(timeIntervalSinceReferenceDate: 774142713.0))
+        let expiry = ISO8601DateFormatter().date(from: "2025-07-14T14:37:33+00:00")!
+        storage.token = ProviderToken(accessToken: "mva_cac085a4c31248566d4689d497327a8f18bb9e9bc71bd8ee9437362dc639be00", expiryDate: expiry)
         storage.sessions = [deviceId: session]
         try builder.setOptions(storage, for: .wireGuard)
         let module = try builder.tryBuild()

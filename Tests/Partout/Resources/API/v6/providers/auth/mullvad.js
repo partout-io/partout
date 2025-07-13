@@ -79,9 +79,11 @@ function authenticate(module, deviceId) {
 
     // check token expiry
     if (storage.token) {
-        let expiry = new Date(timestampToISO(storage.token.expiryDate));
+        const expiry = new Date(timestampToISO(storage.token.expiryDate));
+        const now = new Date();
         debug(`>>> expiry: ${expiry}`);
-        if (expiry > Date()) {
+        debug(`>>> now: ${now}`);
+        if (expiry > now) {
             debug(`>>> token is valid`);
         } else {
             debug(`>>> token is expired`);
@@ -96,16 +98,17 @@ function authenticate(module, deviceId) {
         const body = jsonToBase64({
             "account_number": storage.credentials.username
         });
-        debug(`>>> body: ${body}`);
+//        debug(`>>> body: ${body}`);
         const headers = {"Content-Type": "application/json"};
         const json = getResult("POST", `${baseURL}/auth/v1/token`, headers, body);
         if (json.error) {
             return defaultResponse;
         }
         debug(`>>> CREDENTIALS!!! ${json.response}`);
+        const response = JSON.parse(json.response);
         storage.token = {
-            accessToken: json.response.access_token,
-            expiryDate: json.response.expiry
+            accessToken: response.access_token,
+            expiryDate: timestampFromISO(response.expiry)
         };
     } else {
         return {
