@@ -1,8 +1,8 @@
 //
-//  mullvad.js
+//  OpenVPNProviderResolver.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 7/13/25.
+//  Created by Davide De Rosa on 12/2/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,30 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-func authenticate(module, deviceId) {
-    debug(module);
-    debug(deviceId);
-    return {
-        response: module
-    };
+#if canImport(_PartoutOpenVPNCore)
+
+import _PartoutOpenVPNCore
+import Foundation
+import PartoutCore
+
+public struct OpenVPNProviderResolver: ProviderModuleResolver {
+    private let ctx: PartoutLoggerContext
+
+    public var moduleType: ModuleType {
+        .openVPN
+    }
+
+    public init(_ ctx: PartoutLoggerContext) {
+        self.ctx = ctx
+    }
+
+    public func resolved(from providerModule: ProviderModule, deviceId: String) throws -> Module {
+        try providerModule.compiled(
+            ctx,
+            withTemplate: OpenVPNProviderTemplate.self,
+            onDevice: deviceId
+        )
+    }
 }
+
+#endif

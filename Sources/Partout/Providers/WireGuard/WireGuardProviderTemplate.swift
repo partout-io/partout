@@ -1,5 +1,5 @@
 //
-//  WireGuard+Providers.swift
+//  WireGuardProviderTemplate.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 12/2/24.
@@ -29,83 +29,10 @@ import _PartoutWireGuardCore
 import Foundation
 import PartoutCore
 
-public struct WireGuardProviderResolver: ProviderModuleResolver {
-    private let ctx: PartoutLoggerContext
-
-    public var moduleType: ModuleType {
-        .wireGuard
-    }
-
-    public init(_ ctx: PartoutLoggerContext) {
-        self.ctx = ctx
-    }
-
-    public func resolved(from providerModule: ProviderModule, deviceId: String) throws -> Module {
-        try providerModule.compiled(
-            ctx,
-            withTemplate: WireGuardProviderTemplate.self,
-            onDevice: deviceId
-        )
-    }
-}
-
 // TODO: #7, generate WireGuard configuration from template
 public struct WireGuardProviderTemplate: Hashable, Codable, Sendable {
     public func builder() -> WireGuard.Configuration.Builder {
         fatalError("TODO: define WireGuard template for providers")
-    }
-}
-
-public struct WireGuardProviderSession: Hashable, Codable, Sendable {
-    public struct Peer: Hashable, Codable, Sendable {
-        public let clientId: String
-
-        public let creationDate: Date
-
-        public let addresses: [String]
-
-        public init(clientId: String, creationDate: Date, addresses: [String]) {
-            self.clientId = clientId
-            self.creationDate = creationDate
-            self.addresses = addresses
-        }
-    }
-
-    public let privateKey: String
-
-    public let publicKey: String
-
-    public private(set) var peer: Peer?
-
-    init(privateKey: String, publicKey: String) {
-        self.privateKey = privateKey
-        self.publicKey = publicKey
-    }
-
-    public init(keyGenerator: WireGuardKeyGenerator) throws {
-        privateKey = keyGenerator.newPrivateKey()
-        publicKey = try keyGenerator.publicKey(for: privateKey)
-        peer = nil
-    }
-
-    public func with(peer: Peer) -> Self {
-        var newSession = self
-        newSession.peer = peer
-        return newSession
-    }
-}
-
-extension WireGuardProviderTemplate {
-    public struct Options: ProviderOptions {
-        public var credentials: ProviderCredentials?
-
-        public var token: ProviderToken?
-
-        // device id -> session
-        public var sessions: [String: WireGuardProviderSession]?
-
-        public init() {
-        }
     }
 }
 
@@ -117,7 +44,7 @@ extension WireGuardProviderTemplate: ProviderTemplateCompiler {
         deviceId: String,
         moduleId: UUID,
         entity: ProviderEntity,
-        options: Options?
+        options: WireGuardProviderOptions?
     ) throws -> WireGuardModule {
         let template = try entity.preset.template(ofType: WireGuardProviderTemplate.self)
         var configurationBuilder = template.builder()
