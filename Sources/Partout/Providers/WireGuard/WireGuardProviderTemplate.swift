@@ -29,7 +29,7 @@ import _PartoutWireGuardCore
 import Foundation
 import PartoutCore
 
-// TODO: #7, generate WireGuard configuration from template
+// FIXME: #7, generate WireGuard configuration from template
 public struct WireGuardProviderTemplate: Hashable, Codable, Sendable {
     public func builder() -> WireGuard.Configuration.Builder {
         fatalError("TODO: define WireGuard template for providers")
@@ -38,7 +38,7 @@ public struct WireGuardProviderTemplate: Hashable, Codable, Sendable {
 
 extension WireGuardProviderTemplate: ProviderTemplateCompiler {
 
-    // TODO: #7, generate WireGuard configuration from template
+    // FIXME: #7, generate WireGuard configuration from template
     public static func compiled(
         _ ctx: PartoutLoggerContext,
         deviceId: String,

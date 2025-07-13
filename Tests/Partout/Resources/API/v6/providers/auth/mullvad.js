@@ -80,7 +80,12 @@ function authenticate(module, deviceId) {
     // authenticate
     // FIXME: ###, check token expiration (token.expiryDate > now, 1 day, beware of Apple/UNIX timestamp)
     if (storage.token) {
-        // go ahead
+        let expiry = new Date(timestampToISO(storage.token.expiryDate));
+        debug(`>>> expiry: ${expiry}`);
+        if (expiry > Date()) {
+            // go ahead
+            debug(`>>> token is valid`);
+        }
     } else if (storage.credentials) {
         const body = jsonToBase64({
             "account_number": storage.credentials.username
