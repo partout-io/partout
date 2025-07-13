@@ -63,28 +63,27 @@ function authenticate(module, deviceId) {
     if (!rawOptions) {
         return defaultResponse;
     }
-    const options = jsonFromBase64(rawOptions);
-    debug(`>>> options: ${JSON.stringify(options)}`);
-    if (!options) {
+    const storage = jsonFromBase64(rawOptions);
+    debug(`>>> storage: ${JSON.stringify(storage)}`);
+    if (!storage) {
         return defaultResponse;
     }
-    const session = options.sessions[deviceId];
+    const session = storage.sessions[deviceId];
     if (!session) {
         return defaultResponse;
     }
 
     debug("OLE!");
-    debug(JSON.stringify(options));
+    debug(JSON.stringify(storage));
     debug(JSON.stringify(session));
 
     // authenticate
-    var token = options.token;
     // FIXME: ###, check token expiration (token.expiryDate > now, 1 day, beware of Apple/UNIX timestamp)
-    if (token) {
+    if (storage.token) {
         // go ahead
-    } else if (options.credentials) {
+    } else if (storage.credentials) {
         const body = jsonToBase64({
-            "account_number": options.credentials.username
+            "account_number": storage.credentials.username
         });
         debug(`>>> body: ${body}`);
         const headers = {"Content-Type": "application/json"};
@@ -93,7 +92,7 @@ function authenticate(module, deviceId) {
             return defaultResponse;
         }
         debug(`>>> CREDENTIALS!!! ${json.response}`);
-        token = {
+        storage.token = {
             accessToken: json.response.access_token,
             expiryDate: json.response.expiry
         };
@@ -105,7 +104,7 @@ function authenticate(module, deviceId) {
 
     // authenticate with token from now on
     const headers = {
-        "Authorization": `Bearer ${token.accessToken}`,
+        "Authorization": `Bearer ${storage.token.accessToken}`,
         "Content-Type": "application/json"
     };
     debug(`>>> headers: ${JSON.stringify(headers)}`);
@@ -140,15 +139,15 @@ function authenticate(module, deviceId) {
             debug(">>> pubkey is up-to-date")
         }
 
-        let peer = {
+        const peer = {
             creationDate: myDevice.created,
             addresses: []
         };
-        if (existing.ipv4_address) {
-            peer.addresses.push(existing.ipv4_address);
+        if (myDevice.ipv4_address) {
+            peer.addresses.push(myDevice.ipv4_address);
         }
-        if (existing.ipv6_address) {
-            peer.addresses.push(existing.ipv6_address);
+        if (myDevice.ipv6_address) {
+            peer.addresses.push(myDevice.ipv6_address);
         }
         session.id = myDevice.id;
         session.peer = peer;
@@ -167,7 +166,13 @@ function authenticate(module, deviceId) {
         myDevice = json.response;
     }
 
+    storage.sessions[deviceId] = session;
+    debug(`>>> storage: ${JSON.stringify(storage)}`);
+
     const newModule = module;
+    newModule.moduleOptions[wgType] = jsonToBase64(storage);
+    debug(`>>> module: ${JSON.stringify(module)}`);
+    debug(`>>> newModule: ${JSON.stringify(newModule)}`);
     return {
         response: newModule
     };
