@@ -77,6 +77,11 @@ public struct WireGuardProviderSession: Hashable, Codable, Sendable {
 
     public private(set) var peer: Peer?
 
+    init(privateKey: String, publicKey: String) {
+        self.privateKey = privateKey
+        self.publicKey = publicKey
+    }
+
     public init(keyGenerator: WireGuardKeyGenerator) throws {
         privateKey = keyGenerator.newPrivateKey()
         publicKey = try keyGenerator.publicKey(for: privateKey)

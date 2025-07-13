@@ -26,7 +26,7 @@
 #if canImport(PartoutAPI)
 
 import Foundation
-import Partout
+@testable import Partout
 import Testing
 
 struct APIV6MapperTests {
@@ -54,7 +54,30 @@ struct APIV6MapperTests {
         ])
     }
 
-    // MARK: Providers
+    // MARK: Authentication
+
+    @Test
+    func whenAuthMullvad_thenSucceeds() async throws {
+        let sut = try Self.apiV6()
+
+        let deviceId = "abcdef"
+        let privateKey = "wIp3b6VUCwRd092+IgsXy7HYJjlu6rdrwo6KiwW3PUc="
+        let publicKey = "SpH1IYd7nWSsDFvChqK7SeZZE0KHCDKiUDDQjdK3aEY="
+        let session = WireGuardProviderSession(privateKey: privateKey, publicKey: publicKey)
+
+        var builder = ProviderModule.Builder()
+        builder.providerId = .mullvad
+        builder.providerModuleType = .wireGuard
+        var options = WireGuardProviderTemplate.Options()
+        options.credentials = ProviderCredentials(username: "9224174482959994", password: nil)
+        options.sessions = [deviceId: session]
+        try builder.setOptions(options, for: .wireGuard)
+        let module = try builder.tryBuild()
+
+        let newModule = try await sut.authenticate(module, on: deviceId)
+    }
+
+    // MARK: Infrastructures
 
     @Test
     func whenFetchHideMe_thenReturnsInfrastructure() async throws {

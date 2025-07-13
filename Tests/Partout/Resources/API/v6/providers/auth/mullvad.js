@@ -1,8 +1,8 @@
 //
-//  APIMapper.swift
+//  Empty.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 10/7/24.
+//  Created by Davide De Rosa on 7/13/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,13 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import PartoutCore
-import PartoutProviders
-
-public protocol APIMapper {
-    func index() async throws -> [Provider]
-
-    func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure
-
-    func authenticate(_ module: ProviderModule, on deviceId: String) async throws -> ProviderModule
+func authenticate(module, deviceId) {
+    console.log(JSON.stringify(module));
+    console.log(deviceId);
 }
