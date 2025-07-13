@@ -154,9 +154,16 @@ function authenticate(module, deviceId) {
         session.peer = peer;
         debug(`>>> session: ${JSON.stringify(session)}`);
     }
+    // register new device
     else {
-        // FIXME: ###, POST if new
-//        const keyUrl = `${baseURL}/accounts/v1/devices`;
+        const body = jsonToBase64({
+            "pubkey": session.publicKey
+        });
+        const json = getResult("POST", `${baseURL}/accounts/v1/devices`, headers, body);
+        if (json.error) {
+            return defaultResponse;
+        }
+        myDevice = json.response;
     }
 
     const newModule = module;
