@@ -45,6 +45,8 @@ public enum APIEngine {
 
         func getJSON(urlString: String) -> [String: Any]
 
+        func jsonFromBase64(string: String) -> Any?
+
         func jsonToBase64(object: Any) -> String?
 
         func ipV4ToBase64(ip: String) -> String?

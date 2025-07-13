@@ -230,6 +230,18 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
         return jsonResult.serialized()
     }
 
+    func jsonFromBase64(string: String) -> Any? {
+        do {
+            guard let data = Data(base64Encoded: string) else {
+                return nil
+            }
+            return try JSONSerialization.jsonObject(with: data)
+        } catch {
+            pp_log(ctx, .api, .error, "JS.jsonFromBase64: Unable to serialize: \(error)")
+            return nil
+        }
+    }
+
     func jsonToBase64(object: Any) -> String? {
         do {
             return try JSONSerialization.data(withJSONObject: object)
