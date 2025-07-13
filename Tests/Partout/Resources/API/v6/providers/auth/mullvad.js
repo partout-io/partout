@@ -55,14 +55,14 @@ function authenticate(module, deviceId) {
         return defaultResponse;
     }
     debug(`${JSON.stringify(module)}`);
-    const encodedOptions = module.moduleOptions[wgType];
     debug(`>>> allOptions: ${module.moduleOptions}`);
-    if (!encodedOptions) {
+    const rawOptions = module.moduleOptions[wgType];
+    debug(`>>> rawOptions: ${rawOptions}`);
+    if (!rawOptions) {
         return defaultResponse;
     }
-    debug(`>>> encodedOptions: ${encodedOptions}`);
-    const options = jsonFromBase64(encodedOptions);
-    debug(`>>> wgOptions: ${JSON.stringify(options)}`);
+    const options = jsonFromBase64(rawOptions);
+    debug(`>>> options: ${JSON.stringify(options)}`);
     if (!options) {
         return defaultResponse;
     }
@@ -71,7 +71,9 @@ function authenticate(module, deviceId) {
         return defaultResponse;
     }
 
-    debug(options);
+    debug("OLE!");
+    debug(JSON.stringify(options));
+    debug(JSON.stringify(session));
 
     // 1. authenticate
     var token = options.token;
