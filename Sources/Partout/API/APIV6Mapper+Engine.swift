@@ -189,6 +189,14 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
         }
     }
 
+    func timestampFromISO(isoString: String) -> Int {
+        Int(ISO8601DateFormatter().date(from: isoString)?.timeIntervalSinceReferenceDate ?? 0)
+    }
+
+    func timestampToISO(timestamp: Int) -> String {
+        ISO8601DateFormatter().string(from: Date(timeIntervalSinceReferenceDate: TimeInterval(timestamp)))
+    }
+
     func ipV4ToBase64(ip: String) -> String? {
         let bytes = ip
             .split(separator: ".")

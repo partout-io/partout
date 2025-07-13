@@ -119,7 +119,7 @@ function authenticate(module, deviceId) {
     debug(`>>> pubkey: ${session.publicKey}`);
 
     // look up own device
-    const myDevice = devices.find(d => d.id == session.peer.id);
+    let myDevice = devices.find(d => d.id == session.peer.id);
     if (myDevice) {
         debug(`>>> myDevice: ${JSON.stringify(myDevice)}`);
 
@@ -138,20 +138,6 @@ function authenticate(module, deviceId) {
         else {
             debug(">>> pubkey is up-to-date")
         }
-
-        const peer = {
-            creationDate: myDevice.created,
-            addresses: []
-        };
-        if (myDevice.ipv4_address) {
-            peer.addresses.push(myDevice.ipv4_address);
-        }
-        if (myDevice.ipv6_address) {
-            peer.addresses.push(myDevice.ipv6_address);
-        }
-        session.id = myDevice.id;
-        session.peer = peer;
-        debug(`>>> session: ${JSON.stringify(session)}`);
     }
     // register new device
     else {
@@ -166,6 +152,20 @@ function authenticate(module, deviceId) {
         myDevice = json.response;
     }
 
+    // update storage
+    const peer = {
+        id: myDevice.id,
+        creationDate: timestampFromISO(myDevice.created),
+        addresses: []
+    };
+    if (myDevice.ipv4_address) {
+        peer.addresses.push(myDevice.ipv4_address);
+    }
+    if (myDevice.ipv6_address) {
+        peer.addresses.push(myDevice.ipv6_address);
+    }
+    session.peer = peer;
+    debug(`>>> session: ${JSON.stringify(session)}`);
     storage.sessions[deviceId] = session;
     debug(`>>> storage: ${JSON.stringify(storage)}`);
 

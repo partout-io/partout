@@ -177,7 +177,12 @@ extension ProviderModule {
             guard let data = map[moduleType] else {
                 return nil
             }
-            return try? JSONDecoder().decode(O.self, from: data)
+            do {
+                return try JSONDecoder().decode(O.self, from: data)
+            } catch {
+                pp_log_g(.providers, .error, "Unable to decode options: \(error)")
+                return nil
+            }
         }
     }
 }

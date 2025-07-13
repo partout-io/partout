@@ -54,6 +54,10 @@ public enum APIEngine {
 
         func jsonToBase64(object: Any) -> String?
 
+        func timestampFromISO(isoString: String) -> Int
+
+        func timestampToISO(timestamp: Int) -> String
+
         func ipV4ToBase64(ip: String) -> String?
 
         func openVPNTLSWrap(strategy: String, file: String) -> [String: Any]?

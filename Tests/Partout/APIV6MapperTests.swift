@@ -82,8 +82,10 @@ struct APIV6MapperTests {
         let module = try builder.tryBuild()
 
         let newModule = try await sut.authenticate(module, on: deviceId)
-        let newStorage: WireGuardProviderStorage? = newModule.options(for: .wireGuard)
-        print(">>> newStorage: \(newStorage!)")
+        guard let newStorage: WireGuardProviderStorage = newModule.options(for: .wireGuard) else {
+            fatalError()
+        }
+        print(">>> newStorage: \(newStorage)")
     }
 
     // MARK: Infrastructures
