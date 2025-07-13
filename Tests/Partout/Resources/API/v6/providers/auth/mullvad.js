@@ -44,6 +44,8 @@
  session = { privateKey, publicKey, peer: { clientId, addresses } }
  */
 
+const baseURL = "https://api.mullvad.net/";
+
 //function authenticate(credentials, token, session) {
 function authenticate(module, deviceId) {
     const wgType = "WireGuard";
@@ -85,7 +87,7 @@ function authenticate(module, deviceId) {
         });
         debug(`>>> body: ${body}`);
         const headers = {"Content-type": "application/json"};
-        const json = getResult("POST", "https://api.mullvad.net/auth/v1/token", headers, body);
+        const json = getResult("POST", `${baseURL}/auth/v1/token`, headers, body);
         if (json.error) {
             return defaultResponse;
         }
@@ -104,17 +106,17 @@ function authenticate(module, deviceId) {
     debug(`>>> TOKEN!!! ${JSON.stringify(token)}`);
     const headers = {"Authorization": `Bearer ${token.accessToken}`};
     debug(`>>> headers: ${JSON.stringify(headers)}`);
-    const json = getResult("GET", "https://api.mullvad.net/accounts/v1/devices", headers);
+    const json = getResult("GET", `${baseURL}/accounts/v1/devices`, headers);
     if (json.error) {
         return defaultResponse;
     }
     debug(`>>> devices: ${json.response}`);
 
     // 3.2. POST if new
-//    const keyUrl = "https://api.mullvad.net/accounts/v1/devices";
+//    const keyUrl = `${baseURL}/accounts/v1/devices`;
 
     // 3.3. PUT if existing
-//    const keyUrl = "https://api.mullvad.net/accounts/v1/devices/${session.deviceId}/pubkey";
+//    const keyUrl = `${baseURL}/accounts/v1/devices/${session.deviceId}/pubkey`;
 
     const newModule = module;
     return {
