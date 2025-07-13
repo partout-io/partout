@@ -58,6 +58,10 @@ struct APIV6MapperTests {
 
     @Test
     func whenAuthMullvad_thenSucceeds() async throws {
+        var logger = PartoutLogger.Builder()
+        logger.setDestination(OSLogDestination(.api), for: [.api])
+        PartoutLogger.register(logger.build())
+
         let sut = try Self.apiV6()
 
         let deviceId = "abcdef"
