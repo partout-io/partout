@@ -44,7 +44,7 @@
  session = { privateKey, publicKey, peer: { clientId, addresses } }
  */
 
-const baseURL = "https://api.mullvad.net/";
+const baseURL = "https://api.mullvad.net";
 
 //function authenticate(credentials, token, session) {
 function authenticate(module, deviceId) {
@@ -77,9 +77,10 @@ function authenticate(module, deviceId) {
     debug(JSON.stringify(options));
     debug(JSON.stringify(session));
 
-    // 1. authenticate
+    // authenticate
     var token = options.token;
-    if (token) {// FIXME: ###, check expiry && token.expiryDate > now) {
+    // FIXME: ###, check token expiration (token.expiryDate > now, beware of Apple/UNIX timestamp)
+    if (token) {
         // go ahead
     } else if (options.credentials) {
         const body = jsonToBase64({
@@ -102,7 +103,7 @@ function authenticate(module, deviceId) {
         }
     }
 
-    // 2. get list of devices to look up own pubkey
+    // get list of devices
     debug(`>>> TOKEN!!! ${JSON.stringify(token)}`);
     const headers = {"Authorization": `Bearer ${token.accessToken}`};
     debug(`>>> headers: ${JSON.stringify(headers)}`);
@@ -110,13 +111,32 @@ function authenticate(module, deviceId) {
     if (json.error) {
         return defaultResponse;
     }
-    debug(`>>> devices: ${json.response}`);
+    const devices = JSON.parse(json.response);
+    debug(`>>> devices: ${devices}`);
 
-    // 3.2. POST if new
-//    const keyUrl = `${baseURL}/accounts/v1/devices`;
-
-    // 3.3. PUT if existing
-//    const keyUrl = `${baseURL}/accounts/v1/devices/${session.deviceId}/pubkey`;
+    // look up own pubkey
+    const existing = devices.find(d => d.pubkey == session.publicKey);
+    if (existing) {
+        // PUT if existing
+//        const keyUrl = `${baseURL}/accounts/v1/devices/${session.deviceId}/pubkey`;
+        debug(`>>> existing: ${JSON.stringify(existing)}`);
+        let peer = {
+            creationDate: existing.created,
+            addresses: []
+        };
+        if (existing.ipv4_address) {
+            peer.addresses.push(existing.ipv4_address);
+        }
+        if (existing.ipv6_address) {
+            peer.addresses.push(existing.ipv6_address);
+        }
+        session.peer = peer;
+        debug(`>>> peer: ${JSON.stringify(session.peer)}`);
+    }
+    else {
+        // POST if new
+//        const keyUrl = `${baseURL}/accounts/v1/devices`;
+    }
 
     const newModule = module;
     return {
