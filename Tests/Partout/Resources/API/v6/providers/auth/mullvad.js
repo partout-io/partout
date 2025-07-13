@@ -156,6 +156,7 @@ function authenticate(module, deviceId) {
     }
     // register new device
     else {
+        debug(`>>> device does not exist`);
         const body = jsonToBase64({
             "pubkey": session.publicKey
         });
