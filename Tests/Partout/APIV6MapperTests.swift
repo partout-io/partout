@@ -66,17 +66,17 @@ struct APIV6MapperTests {
 
         let deviceId = "abcdef"
         let privateKey = "wIp3b6VUCwRd092+IgsXy7HYJjlu6rdrwo6KiwW3PUc="
-        let publicKey = "Y3aQ0i+CuUM2WDZS73mW/g9I78/nb7E/iSb8dJqbjXo=" // fake, non-matching
+        let publicKey = "i10Sb5BTHmnYRGGBtNa5bxONCpMPQVX9bh3JLQCM+xA=" // fake, non-matching
         let session = WireGuardProviderSession(privateKey: privateKey, publicKey: publicKey)
 
         var builder = ProviderModule.Builder()
         builder.providerId = .mullvad
         builder.providerModuleType = .wireGuard
-        var options = WireGuardProviderOptions()
-        options.credentials = ProviderCredentials(username: "9224174482959994", password: nil)
-        options.token = ProviderToken(accessToken: "mva_f5ed0b1927f3e085c0cd7d486b53f7e179196c1a500e51d0223e9fb771401512", expiryDate: .distantFuture)
-        options.sessions = [deviceId: session]
-        try builder.setOptions(options, for: .wireGuard)
+        var storage = WireGuardProviderStorage()
+        storage.credentials = ProviderCredentials(username: "9224174482959994", password: nil)
+        storage.token = ProviderToken(accessToken: "mva_f5ed0b1927f3e085c0cd7d486b53f7e179196c1a500e51d0223e9fb771401512", expiryDate: .distantFuture)
+        storage.sessions = [deviceId: session]
+        try builder.setOptions(storage, for: .wireGuard)
         let module = try builder.tryBuild()
 
         let newModule = try await sut.authenticate(module, on: deviceId)

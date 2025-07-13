@@ -79,7 +79,7 @@ function authenticate(module, deviceId) {
 
     // authenticate
     var token = options.token;
-    // FIXME: ###, check token expiration (token.expiryDate > now, beware of Apple/UNIX timestamp)
+    // FIXME: ###, check token expiration (token.expiryDate > now, 1 day, beware of Apple/UNIX timestamp)
     if (token) {
         // go ahead
     } else if (options.credentials) {
@@ -112,9 +112,10 @@ function authenticate(module, deviceId) {
         return defaultResponse;
     }
     const devices = JSON.parse(json.response);
-    debug(`>>> devices: ${devices}`);
+    debug(`>>> devices: ${json.response}`);
 
     // look up own device
+    debug(`>>> pubkey: ${session.publicKey}`);
 
     // look up own pubkey
     const existing = devices.find(d => d.pubkey == session.publicKey);
