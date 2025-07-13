@@ -126,81 +126,13 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
         urlString: String,
         headers: [String: String]?,
         body: String?
-    ) -> APIEngine.GetResult {
-        pp_log(ctx, .api, .info, "JS.getResult: Execute with URL: \(resultURL?.absoluteString ?? urlString)")
-        guard let url = resultURL ?? URL(string: urlString) else {
-            return APIEngine.GetResult(.url)
-        }
-
-        // use external caching (e.g. Core Data)
-        let cfg: URLSessionConfiguration = .ephemeral
-        cfg.timeoutIntervalForRequest = timeout
-        let session = URLSession(configuration: cfg)
-
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.allHTTPHeaderFields = headers
-        request.httpBody = body.map {
-            Data(base64Encoded: $0)
-        } ?? nil
-        if let lastUpdate = cache?.lastUpdate {
-            request.setValue(lastUpdate.toRFC1123(), forHTTPHeaderField: "If-Modified-Since")
-        }
-        if let tag = cache?.tag {
-            request.setValue(tag, forHTTPHeaderField: "If-None-Match")
-        }
-
-        pp_log(ctx, .api, .info, "JS.getResult: \(method) \(url)")
-        if let headers = request.allHTTPHeaderFields {
-            pp_log(ctx, .api, .info, "JS.getResult: Headers: \(headers)")
-        }
-
-        let semaphore = DispatchSemaphore(value: 0)
-        let storage = ResultStorage()
-        let task = session.dataTask(with: request) { [weak self] data, response, error in
-            guard let self else {
-                return
-            }
-            if let error {
-                pp_log(ctx, .api, .error, "JS.getResult: Unable to execute: \(error)")
-            } else if let httpResponse = response as? HTTPURLResponse {
-                let lastModifiedHeader = httpResponse.value(forHTTPHeaderField: "last-modified")
-                let tag = httpResponse.value(forHTTPHeaderField: "etag")
-
-                pp_log(ctx, .api, .debug, "JS.getResult: Response: \(httpResponse)")
-                pp_log(ctx, .api, .info, "JS.getResult: HTTP \(httpResponse.statusCode)")
-                if let lastModifiedHeader {
-                    pp_log(ctx, .api, .info, "JS.getResult: Last-Modified: \(lastModifiedHeader)")
-                    storage.lastModified = lastModifiedHeader.fromRFC1123()
-                }
-                if let tag {
-                    pp_log(ctx, .api, .info, "JS.getResult: ETag: \(tag)")
-                    storage.tag = tag
-                }
-                storage.isCached = httpResponse.statusCode == 304
-            }
-            storage.textData = data
-            semaphore.signal()
-        }
-        task.resume()
-        semaphore.wait()
-
-        guard let textData = storage.textData else {
-            pp_log(ctx, .api, .error, "JS.getResult: Empty response")
-            return APIEngine.GetResult(.network)
-        }
-        pp_log(ctx, .api, .info, "JS.getResult: Success (cached: \(storage.isCached))")
-        return APIEngine.GetResult(
-            textData,
-            lastModified: storage.lastModified,
-            tag: storage.tag,
-            isCached: storage.isCached
-        )
+    ) -> [String: Any] {
+        sendRequest(method: method, urlString: urlString, headers: headers, body: body).serialized()
     }
 
     func getText(urlString: String) -> [String: Any] {
         let textResult = {
-            let result = getResult(urlString: urlString)
+            let result = sendRequest(method: "GET", urlString: urlString, headers: nil, body: nil)
             if result.isCached {
                 return APIEngine.GetResult(.cached)
             }
@@ -219,7 +151,7 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
 
     func getJSON(urlString: String) -> [String: Any] {
         let jsonResult = {
-            let result = getResult(urlString: urlString)
+            let result = sendRequest(method: "GET", urlString: urlString, headers: nil, body: nil)
             if result.isCached {
                 return APIEngine.GetResult(.cached)
             }
@@ -295,6 +227,85 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
 
     func debug(message: String) {
         pp_log(ctx, .api, .debug, message)
+    }
+}
+
+private extension API.V6.DefaultScriptExecutor {
+    func sendRequest(
+        method: String,
+        urlString: String,
+        headers: [String: String]?,
+        body: String?
+    ) -> APIEngine.GetResult {
+        pp_log(ctx, .api, .info, "JS.getResult: Execute with URL: \(resultURL?.absoluteString ?? urlString)")
+        guard let url = resultURL ?? URL(string: urlString) else {
+            return APIEngine.GetResult(.url)
+        }
+
+        // use external caching (e.g. Core Data)
+        let cfg: URLSessionConfiguration = .ephemeral
+        cfg.timeoutIntervalForRequest = timeout
+        let session = URLSession(configuration: cfg)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.allHTTPHeaderFields = headers
+        request.httpBody = body.map {
+            Data(base64Encoded: $0)
+        } ?? nil
+        if let lastUpdate = cache?.lastUpdate {
+            request.setValue(lastUpdate.toRFC1123(), forHTTPHeaderField: "If-Modified-Since")
+        }
+        if let tag = cache?.tag {
+            request.setValue(tag, forHTTPHeaderField: "If-None-Match")
+        }
+
+        pp_log(ctx, .api, .info, "JS.getResult: \(method) \(url)")
+        if let headers = request.allHTTPHeaderFields {
+            pp_log(ctx, .api, .info, "JS.getResult: Headers: \(headers)")
+        }
+
+        let semaphore = DispatchSemaphore(value: 0)
+        let storage = ResultStorage()
+        let task = session.dataTask(with: request) { [weak self] data, response, error in
+            guard let self else {
+                return
+            }
+            if let error {
+                pp_log(ctx, .api, .error, "JS.getResult: Unable to execute: \(error)")
+            } else if let httpResponse = response as? HTTPURLResponse {
+                let lastModifiedHeader = httpResponse.value(forHTTPHeaderField: "last-modified")
+                let tag = httpResponse.value(forHTTPHeaderField: "etag")
+
+                pp_log(ctx, .api, .debug, "JS.getResult: Response: \(httpResponse)")
+                pp_log(ctx, .api, .info, "JS.getResult: HTTP \(httpResponse.statusCode)")
+                if let lastModifiedHeader {
+                    pp_log(ctx, .api, .info, "JS.getResult: Last-Modified: \(lastModifiedHeader)")
+                    storage.lastModified = lastModifiedHeader.fromRFC1123()
+                }
+                if let tag {
+                    pp_log(ctx, .api, .info, "JS.getResult: ETag: \(tag)")
+                    storage.tag = tag
+                }
+                storage.isCached = httpResponse.statusCode == 304
+            }
+            storage.textData = data
+            semaphore.signal()
+        }
+        task.resume()
+        semaphore.wait()
+
+        guard let textData = storage.textData else {
+            pp_log(ctx, .api, .error, "JS.getResult: Empty response")
+            return APIEngine.GetResult(.network)
+        }
+        pp_log(ctx, .api, .info, "JS.getResult: Success (cached: \(storage.isCached))")
+        return APIEngine.GetResult(
+            textData,
+            lastModified: storage.lastModified,
+            tag: storage.tag,
+            isCached: storage.isCached
+        )
     }
 }
 

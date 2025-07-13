@@ -44,7 +44,7 @@ public enum APIEngine {
             urlString: String,
             headers: [String: String]?,
             body: String?
-        ) -> APIEngine.GetResult
+        ) -> [String: Any]
 
         func getText(urlString: String) -> [String: Any]
 
@@ -59,12 +59,6 @@ public enum APIEngine {
         func openVPNTLSWrap(strategy: String, file: String) -> [String: Any]?
 
         func debug(message: String)
-    }
-}
-
-extension APIEngine.VirtualMachine {
-    public func getResult(urlString: String) -> APIEngine.GetResult {
-        getResult(method: "GET", urlString: urlString, headers: nil, body: nil)
     }
 }
 
