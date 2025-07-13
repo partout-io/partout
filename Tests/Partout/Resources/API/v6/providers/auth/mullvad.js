@@ -101,7 +101,7 @@ function authenticate(module, deviceId) {
 //        debug(`>>> body: ${body}`);
         const headers = {"Content-Type": "application/json"};
         const json = getResult("POST", `${baseURL}/auth/v1/token`, headers, body);
-        if (json.error) {
+        if (json.status != 200) {
             return defaultResponse;
         }
         debug(`>>> CREDENTIALS!!! ${json.response}`);
@@ -125,7 +125,7 @@ function authenticate(module, deviceId) {
 
     // get list of devices
     const json = getResult("GET", `${baseURL}/accounts/v1/devices`, headers, "");
-    if (json.error) {
+    if (json.status != 200) {
         return defaultResponse;
     }
     const devices = JSON.parse(json.response);
@@ -143,10 +143,10 @@ function authenticate(module, deviceId) {
                 "pubkey": session.publicKey
             });
             const json = getResult("PUT", `${baseURL}/accounts/v1/devices/${myDevice.id}/pubkey`, headers, body);
-            if (json.error) {
+            if (json.status != 200) {
                 return defaultResponse;
             }
-            myDevice = json.response;
+            myDevice = JSON.parse(json.response);
         }
         // key is up-to-date, refresh local
         else {
@@ -160,7 +160,7 @@ function authenticate(module, deviceId) {
             "pubkey": session.publicKey
         });
         const json = getResult("POST", `${baseURL}/accounts/v1/devices`, headers, body);
-        if (json.error) {
+        if (json.status != 201) {
             return defaultResponse;
         }
         myDevice = json.response;

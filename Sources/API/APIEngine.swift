@@ -83,6 +83,8 @@ extension APIEngine {
     public struct GetResult {
         public private(set) var response: Any?
 
+        public let status: Int?
+
         public let lastModified: Date?
 
         public let tag: String?
@@ -91,8 +93,9 @@ extension APIEngine {
 
         public let error: ErrorCode?
 
-        public init(_ response: Any, lastModified: Date?, tag: String?, isCached: Bool = false) {
+        public init(_ response: Any, status: Int?, lastModified: Date?, tag: String?, isCached: Bool = false) {
             self.response = response
+            self.status = status
             self.lastModified = lastModified
             self.tag = tag
             self.isCached = isCached
@@ -101,6 +104,7 @@ extension APIEngine {
 
         public init(_ error: ErrorCode) {
             response = nil
+            status = nil
             lastModified = nil
             tag = nil
             isCached = false

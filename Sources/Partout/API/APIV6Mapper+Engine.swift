@@ -279,6 +279,7 @@ private extension API.V6.DefaultScriptExecutor {
 
         let semaphore = DispatchSemaphore(value: 0)
         let storage = ResultStorage()
+        var status: Int?
         let task = session.dataTask(with: request) { [weak self] data, response, error in
             guard let self else {
                 return
@@ -299,6 +300,7 @@ private extension API.V6.DefaultScriptExecutor {
                     pp_log(ctx, .api, .info, "JS.getResult: ETag: \(tag)")
                     storage.tag = tag
                 }
+                status = httpResponse.statusCode
                 storage.isCached = httpResponse.statusCode == 304
             }
             storage.textData = data
@@ -314,6 +316,7 @@ private extension API.V6.DefaultScriptExecutor {
         pp_log(ctx, .api, .info, "JS.getResult: Success (cached: \(storage.isCached))")
         return APIEngine.GetResult(
             textData,
+            status: status,
             lastModified: storage.lastModified,
             tag: storage.tag,
             isCached: storage.isCached
