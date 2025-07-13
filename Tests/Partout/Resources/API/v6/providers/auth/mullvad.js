@@ -87,7 +87,7 @@ function authenticate(module, deviceId) {
             "account_number": options.credentials.username
         });
         debug(`>>> body: ${body}`);
-        const headers = {"Content-type": "application/json"};
+        const headers = {"Content-Type": "application/json"};
         const json = getResult("POST", `${baseURL}/auth/v1/token`, headers, body);
         if (json.error) {
             return defaultResponse;
@@ -106,7 +106,7 @@ function authenticate(module, deviceId) {
     // authenticate with token from now on
     const headers = {
         "Authorization": `Bearer ${token.accessToken}`,
-        "Content-type": "application/json"
+        "Content-Type": "application/json"
     };
     debug(`>>> headers: ${JSON.stringify(headers)}`);
 
@@ -160,7 +160,6 @@ function authenticate(module, deviceId) {
         const body = jsonToBase64({
             "pubkey": session.publicKey
         });
-        debug(`>>> creating: ${body}`);
         const json = getResult("POST", `${baseURL}/accounts/v1/devices`, headers, body);
         if (json.error) {
             return defaultResponse;
