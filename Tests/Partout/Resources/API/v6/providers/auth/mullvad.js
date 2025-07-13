@@ -103,29 +103,45 @@ function authenticate(module, deviceId) {
         }
     }
 
-    // get list of devices
-    debug(`>>> TOKEN!!! ${JSON.stringify(token)}`);
-    const headers = {"Authorization": `Bearer ${token.accessToken}`};
+    // authenticate with token from now on
+    const headers = {
+        "Authorization": `Bearer ${token.accessToken}`,
+        "Content-type": "application/json"
+    };
     debug(`>>> headers: ${JSON.stringify(headers)}`);
+
+    // get list of devices
     const json = getResult("GET", `${baseURL}/accounts/v1/devices`, headers);
     if (json.error) {
         return defaultResponse;
     }
     const devices = JSON.parse(json.response);
     debug(`>>> devices: ${json.response}`);
-
-    // look up own device
     debug(`>>> pubkey: ${session.publicKey}`);
 
-    // look up own pubkey
-    const existing = devices.find(d => d.pubkey == session.publicKey);
-    if (existing) {
-        // read if existing
-        // FIXME: ###, PUT to renew
-//        const keyUrl = `${baseURL}/accounts/v1/devices/${session.deviceId}/pubkey`;
-        debug(`>>> existing: ${JSON.stringify(existing)}`);
+    // look up own device
+    const myDevice = devices.find(d => d.id == session.peer.id);
+    if (myDevice) {
+        debug(`>>> myDevice: ${JSON.stringify(myDevice)}`);
+
+        // key differs, update remote
+        if (myDevice.pubkey != session.publicKey) {
+            const body = jsonToBase64({
+                "pubkey": session.publicKey
+            });
+            const json = getResult("PUT", `${baseURL}/accounts/v1/devices/${myDevice.id}/pubkey`, headers, body);
+            if (json.error) {
+                return defaultResponse;
+            }
+            myDevice = json.response;
+        }
+        // key is up-to-date, refresh local
+        else {
+            debug(">>> pubkey is up-to-date")
+        }
+
         let peer = {
-            creationDate: existing.created,
+            creationDate: myDevice.created,
             addresses: []
         };
         if (existing.ipv4_address) {
@@ -134,9 +150,9 @@ function authenticate(module, deviceId) {
         if (existing.ipv6_address) {
             peer.addresses.push(existing.ipv6_address);
         }
-        session.clientId
+        session.id = myDevice.id;
         session.peer = peer;
-        debug(`>>> peer: ${JSON.stringify(session.peer)}`);
+        debug(`>>> session: ${JSON.stringify(session)}`);
     }
     else {
         // FIXME: ###, POST if new
