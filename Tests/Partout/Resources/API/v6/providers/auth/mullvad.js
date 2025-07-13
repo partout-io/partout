@@ -134,7 +134,7 @@ function authenticate(module, deviceId) {
     debug(`>>> pubkey: ${session.publicKey}`);
 
     // look up own device
-    let myDevice = devices.find(d => d.id == session.peer.id);
+    let myDevice = devices.find(d => session.peer && d.id == session.peer.id);
     if (myDevice) {
         debug(`>>> myDevice: ${JSON.stringify(myDevice)}`);
 
@@ -164,7 +164,7 @@ function authenticate(module, deviceId) {
         if (json.status != 201) {
             return defaultResponse;
         }
-        myDevice = json.response;
+        myDevice = JSON.parse(json.response);
     }
 
     // update storage
