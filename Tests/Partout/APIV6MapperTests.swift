@@ -27,17 +27,18 @@
 
 import Foundation
 import Partout
-import XCTest
+import Testing
 
-final class APIV6MapperTests: XCTestCase {
+struct APIV6MapperTests {
 
     // MARK: Index
 
-    func test_givenAPI_whenFetchIndex_thenReturnsProviders() async throws {
+    @Test
+    func whenFetchIndex_thenReturnsProviders() async throws {
         let sut = try Self.apiV6()
         let index = try await sut.index()
-        XCTAssertEqual(index.count, 12)
-        XCTAssertEqual(index.map(\.description), [
+        #expect(index.count == 12)
+        #expect(index.map(\.description) == [
             "Hide.me",
             "IVPN",
             "Mullvad",
@@ -55,20 +56,21 @@ final class APIV6MapperTests: XCTestCase {
 
     // MARK: Providers
 
-    func test_givenAPI_whenFetchHideMe_thenReturnsInfrastructure() async throws {
+    @Test
+    func whenFetchHideMe_thenReturnsInfrastructure() async throws {
         let sut = try Self.apiV6()
         do {
             let infra = try await sut.infrastructure(for: .hideme, cache: nil)
-            XCTAssertEqual(infra.presets.count, 1)
-            XCTAssertEqual(infra.servers.count, 2)
+            #expect(infra.presets.count == 1)
+            #expect(infra.servers.count == 2)
 
 #if canImport(_PartoutOpenVPNCore)
             try infra.presets.forEach {
                 let template = try JSONDecoder().decode(OpenVPNProviderTemplate.self, from: $0.templateData)
                 switch $0.presetId {
                 case "default":
-                    XCTAssertEqual(template.configuration.cipher, .aes256cbc)
-                    XCTAssertEqual(template.endpoints.map(\.rawValue), [
+                    #expect(template.configuration.cipher == .aes256cbc)
+                    #expect(template.endpoints.map(\.rawValue) == [
                         "UDP:3000", "UDP:3010", "UDP:3020", "UDP:3030", "UDP:3040", "UDP:3050",
                         "UDP:3060", "UDP:3070", "UDP:3080", "UDP:3090", "UDP:3100",
                         "TCP:3000", "TCP:3010", "TCP:3020", "TCP:3030", "TCP:3040", "TCP:3050",
@@ -80,26 +82,27 @@ final class APIV6MapperTests: XCTestCase {
             }
 #endif
         } catch {
-            XCTFail("Failed: \(error)")
+            #expect(Bool(false), "Failed: \(error)")
         }
     }
 
-    func test_givenGetResult_whenHasCache_thenReturnsProviderCache() throws {
+    @Test
+    func givenGetResult_whenHasCache_thenReturnsProviderCache() throws {
         let date = Date()
         let tag = "12345"
         let sut = APIEngine.GetResult("", lastModified: date, tag: tag)
 
-        let object = try XCTUnwrap(sut.serialized()["cache"])
+        let object = try #require(sut.serialized()["cache"])
         let data = try JSONSerialization.data(withJSONObject: object)
         let cache = try JSONDecoder().decode(ProviderCache.self, from: data)
 
-        XCTAssertEqual(cache.lastUpdate, date)
-        XCTAssertEqual(cache.tag, tag)
+        #expect(cache.lastUpdate == date)
+        #expect(cache.tag == tag)
     }
 
     // MARK: -
 
-    func test_measureFetchProvider() async throws {
+    func measureFetchProvider() async throws {
         let sut = try Self.apiV6()
         let begin = Date()
         for _ in 0..<1000 {
