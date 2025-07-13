@@ -247,9 +247,9 @@ private extension API.V6.DefaultScriptExecutor {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.allHTTPHeaderFields = headers
-        request.httpBody = body.map {
-            Data(base64Encoded: $0)
-        } ?? nil
+        if let body {
+            request.httpBody = Data(base64Encoded: body)
+        }
         if let lastUpdate = cache?.lastUpdate {
             request.setValue(lastUpdate.toRFC1123(), forHTTPHeaderField: "If-Modified-Since")
         }

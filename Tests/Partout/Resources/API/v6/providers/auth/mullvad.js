@@ -102,11 +102,18 @@ function authenticate(module, deviceId) {
 
     // 2. get list of devices to look up own pubkey
     debug(`>>> TOKEN!!! ${JSON.stringify(token)}`);
+    const headers = {"Authorization": `Bearer ${token.accessToken}`};
+    debug(`>>> headers: ${JSON.stringify(headers)}`);
+    const json = getResult("GET", "https://api.mullvad.net/accounts/v1/devices", headers);
+    if (json.error) {
+        return defaultResponse;
+    }
+    debug(`>>> devices: ${json.response}`);
 
-    // 3.1. POST if new
+    // 3.2. POST if new
 //    const keyUrl = "https://api.mullvad.net/accounts/v1/devices";
 
-    // 3.2. PUT if existing
+    // 3.3. PUT if existing
 //    const keyUrl = "https://api.mullvad.net/accounts/v1/devices/${session.deviceId}/pubkey";
 
     const newModule = module;
