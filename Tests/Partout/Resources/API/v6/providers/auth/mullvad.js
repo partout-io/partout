@@ -47,7 +47,7 @@
 //function authenticate(credentials, token, session) {
 function authenticate(module, deviceId) {
     const wgType = "WireGuard";
-    // FIXME: ###, how to shortcut return N times?
+    // FIXME: ###, how to mimic goto failure?
     const defaultResponse = {
         response: module
     };
