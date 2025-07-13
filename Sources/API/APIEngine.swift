@@ -25,6 +25,7 @@
 
 import Foundation
 import PartoutCore
+import PartoutProviders
 
 public protocol APIScriptingEngine: ScriptingEngine {
     func inject(from vm: APIEngine.VirtualMachine)
@@ -32,6 +33,8 @@ public protocol APIScriptingEngine: ScriptingEngine {
 
 public enum APIEngine {
     public protocol ScriptExecutor {
+        func authenticate(_ module: ProviderModule, on deviceId: String, with script: String) async throws -> ProviderModule
+
         func fetchInfrastructure(with script: String) async throws -> ProviderInfrastructure
     }
 

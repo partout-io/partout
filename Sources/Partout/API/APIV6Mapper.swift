@@ -86,10 +86,10 @@ extension API.V6 {
             return try await executor.fetchInfrastructure(with: script)
         }
 
-        public func authenticate(_ providerModule: ProviderModule, on deviceId: String) async throws -> ProviderModule {
-            switch providerModule.providerModuleType {
+        public func authenticate(_ module: ProviderModule, on deviceId: String) async throws -> ProviderModule {
+            switch module.providerModuleType {
             case .wireGuard:
-                guard let options: WireGuardProviderTemplate.Options = providerModule.options(for: .wireGuard) else {
+                guard let options: WireGuardProviderTemplate.Options = module.options(for: .wireGuard) else {
                     throw PartoutError(.Providers.missingProviderOption)
                 }
                 guard let session = options.sessions?[deviceId] else {
@@ -97,22 +97,24 @@ extension API.V6 {
                 }
 
                 // FIXME: ###, execute authentication script with options and return module updated with the new options (device peer info)
-                let data = try await data(for: .providerAuth(providerModule.providerId))
+                let data = try await data(for: .providerAuth(module.providerId))
                 guard let script = String(data: data, encoding: .utf8) else {
                     throw PartoutError(.notFound)
                 }
+                let executor = executorFactory(nil, nil, timeout)
+                return try await executor.authenticate(module, on: deviceId, with: script)
 
-                // input: credentials, token, pvtkey -> pubkey
-                options.token           // auth with this if not expired
-                options.credentials     // auth with this otherwise
-
-                // output: token, peer
-                let peer = WireGuardProviderSession.Peer(clientId: "", creationDate: Date(), addresses: [])
-                let newSession = session.with(peer: peer)
-
-                return providerModule
+//                // input: credentials, token, pvtkey -> pubkey
+//                options.token           // auth with this if not expired
+//                options.credentials     // auth with this otherwise
+//
+//                // output: token, peer
+//                let peer = WireGuardProviderSession.Peer(clientId: "", creationDate: Date(), addresses: [])
+//                let newSession = session.with(peer: peer)
+//
+//                return providerModule
             default:
-                fatalError("Authentication not supported for module type \(providerModule.providerModuleType)")
+                fatalError("Authentication not supported for module type \(module.providerModuleType)")
             }
         }
     }

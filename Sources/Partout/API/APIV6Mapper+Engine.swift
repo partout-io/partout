@@ -61,6 +61,18 @@ extension API.V6 {
 // MARK: - ScriptExecutor
 
 extension API.V6.DefaultScriptExecutor: APIEngine.ScriptExecutor {
+    func authenticate(_ module: ProviderModule, on deviceId: String, with script: String) async throws -> ProviderModule {
+        let result = try await engine.execute(
+            "JSON.stringify(authenticate())",
+            after: script,
+            returning: APIEngine.ScriptResult<ProviderModule>.self
+        )
+        guard let response = result.response else {
+            throw PartoutError(.scriptException, result.error?.rawValue ?? "unknown")
+        }
+        return response
+    }
+
     func fetchInfrastructure(with script: String) async throws -> ProviderInfrastructure {
         // TODO: #54/partout, assumes engine to be JavaScript
         let result = try await engine.execute(
