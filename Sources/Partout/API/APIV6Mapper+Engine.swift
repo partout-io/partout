@@ -61,6 +61,18 @@ extension API.V6 {
 // MARK: - ScriptExecutor
 
 extension API.V6.DefaultScriptExecutor: APIEngine.ScriptExecutor {
+
+    // FIXME: ###, execute authentication script with options and return module updated with the new options (device peer info)
+//                // input: credentials, token, pvtkey -> pubkey
+//                options.token           // auth with this if not expired
+//                options.credentials     // auth with this otherwise
+//
+//                // output: token, peer
+//                let peer = WireGuardProviderSession.Peer(clientId: "", creationDate: Date(), addresses: [])
+//                let newSession = session.with(peer: peer)
+//
+//                return providerModule
+
     func authenticate(_ module: ProviderModule, on deviceId: String, with script: String) async throws -> ProviderModule {
         let result = try await engine.execute(
             "JSON.stringify(authenticate())",

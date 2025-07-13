@@ -76,16 +76,6 @@ extension API.V6 {
                 }
         }
 
-        public func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure {
-            let data = try await data(for: .providerInfrastructure(providerId))
-            guard let script = String(data: data, encoding: .utf8) else {
-                throw PartoutError(.notFound)
-            }
-            let resultURL = infrastructureURL?(providerId)
-            let executor = executorFactory(resultURL, cache, timeout)
-            return try await executor.fetchInfrastructure(with: script)
-        }
-
         public func authenticate(_ module: ProviderModule, on deviceId: String) async throws -> ProviderModule {
             switch module.providerModuleType {
             case .wireGuard:
@@ -95,27 +85,25 @@ extension API.V6 {
                 guard let session = options.sessions?[deviceId] else {
                     throw PartoutError(.Providers.missingProviderOption)
                 }
-
-                // FIXME: ###, execute authentication script with options and return module updated with the new options (device peer info)
                 let data = try await data(for: .providerAuth(module.providerId))
                 guard let script = String(data: data, encoding: .utf8) else {
                     throw PartoutError(.notFound)
                 }
                 let executor = executorFactory(nil, nil, timeout)
                 return try await executor.authenticate(module, on: deviceId, with: script)
-
-//                // input: credentials, token, pvtkey -> pubkey
-//                options.token           // auth with this if not expired
-//                options.credentials     // auth with this otherwise
-//
-//                // output: token, peer
-//                let peer = WireGuardProviderSession.Peer(clientId: "", creationDate: Date(), addresses: [])
-//                let newSession = session.with(peer: peer)
-//
-//                return providerModule
             default:
                 fatalError("Authentication not supported for module type \(module.providerModuleType)")
             }
+        }
+
+        public func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure {
+            let data = try await data(for: .providerInfrastructure(providerId))
+            guard let script = String(data: data, encoding: .utf8) else {
+                throw PartoutError(.notFound)
+            }
+            let resultURL = infrastructureURL?(providerId)
+            let executor = executorFactory(resultURL, cache, timeout)
+            return try await executor.fetchInfrastructure(with: script)
         }
     }
 }

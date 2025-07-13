@@ -112,12 +112,12 @@ public final class APIManager {
         }
     }
 
-    public func authenticate(_ providerModule: ProviderModule, on deviceId: String) async throws -> ProviderModule {
+    public func authenticate(_ module: ProviderModule, on deviceId: String) async throws -> ProviderModule {
         guard let api = apis.first else {
             throw PartoutError(.authentication)
         }
-        pp_log(ctx, .api, .info, "Authenticating with \(providerModule.providerId) for \(providerModule.providerModuleType)")
-        return try await api.authenticate(providerModule, on: deviceId)
+        pp_log(ctx, .api, .info, "Authenticating with \(module.providerId) for \(module.providerModuleType)")
+        return try await api.authenticate(module, on: deviceId)
     }
 
     public func fetchInfrastructure(for providerId: ProviderID) async throws {
