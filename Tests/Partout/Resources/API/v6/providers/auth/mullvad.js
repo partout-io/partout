@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-func authenticate(module, deviceId) {
+function authenticate(module, deviceId) {
     debug(module);
     debug(deviceId);
     return {

@@ -68,7 +68,7 @@ struct APIV6MapperTests {
         var builder = ProviderModule.Builder()
         builder.providerId = .mullvad
         builder.providerModuleType = .wireGuard
-        var options = WireGuardProviderTemplate.Options()
+        var options = WireGuardProviderOptions()
         options.credentials = ProviderCredentials(username: "9224174482959994", password: nil)
         options.sessions = [deviceId: session]
         try builder.setOptions(options, for: .wireGuard)
