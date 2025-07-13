@@ -35,48 +35,50 @@ public struct WireGuardProviderStorage: ProviderOptions {
     public var token: ProviderToken?
 
     // device id -> session
-    public var sessions: [String: WireGuardProviderSession]?
+    public var sessions: [String: Session]?
 
     public init() {
     }
 }
 
-public struct WireGuardProviderSession: Hashable, Codable, Sendable {
-    public struct Peer: Hashable, Codable, Sendable {
-        public let clientId: String
+extension WireGuardProviderStorage {
+    public struct Session: Hashable, Codable, Sendable {
+        public let privateKey: String
+
+        public let publicKey: String
+
+        public private(set) var peer: Peer?
+
+        init(privateKey: String, publicKey: String) {
+            self.privateKey = privateKey
+            self.publicKey = publicKey
+        }
+
+        public init(keyGenerator: WireGuardKeyGenerator) throws {
+            privateKey = keyGenerator.newPrivateKey()
+            publicKey = try keyGenerator.publicKey(for: privateKey)
+            peer = nil
+        }
+
+        public func with(peer: Peer) -> Self {
+            var newSession = self
+            newSession.peer = peer
+            return newSession
+        }
+    }
+
+    public struct Peer: Identifiable, Hashable, Codable, Sendable {
+        public let id: String
 
         public let creationDate: Date
 
         public let addresses: [String]
 
-        public init(clientId: String, creationDate: Date, addresses: [String]) {
-            self.clientId = clientId
+        public init(id: String, creationDate: Date, addresses: [String]) {
+            self.id = id
             self.creationDate = creationDate
             self.addresses = addresses
         }
-    }
-
-    public let privateKey: String
-
-    public let publicKey: String
-
-    public private(set) var peer: Peer?
-
-    init(privateKey: String, publicKey: String) {
-        self.privateKey = privateKey
-        self.publicKey = publicKey
-    }
-
-    public init(keyGenerator: WireGuardKeyGenerator) throws {
-        privateKey = keyGenerator.newPrivateKey()
-        publicKey = try keyGenerator.publicKey(for: privateKey)
-        peer = nil
-    }
-
-    public func with(peer: Peer) -> Self {
-        var newSession = self
-        newSession.peer = peer
-        return newSession
     }
 }
 

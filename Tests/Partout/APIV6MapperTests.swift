@@ -67,7 +67,7 @@ struct APIV6MapperTests {
         let deviceId = "abcdef"
         let privateKey = "wIp3b6VUCwRd092+IgsXy7HYJjlu6rdrwo6KiwW3PUc="
         let publicKey = "i10Sb5BTHmnYRGGBtNa5bxONCpMPQVX9bh3JLQCM+xA=" // fake, non-matching
-        let session = WireGuardProviderSession(privateKey: privateKey, publicKey: publicKey)
+        let session = WireGuardProviderStorage.Session(privateKey: privateKey, publicKey: publicKey)
 
         var builder = ProviderModule.Builder()
         builder.providerId = .mullvad

@@ -134,6 +134,7 @@ function authenticate(module, deviceId) {
         if (existing.ipv6_address) {
             peer.addresses.push(existing.ipv6_address);
         }
+        session.clientId
         session.peer = peer;
         debug(`>>> peer: ${JSON.stringify(session.peer)}`);
     }
