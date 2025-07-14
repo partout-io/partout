@@ -57,7 +57,13 @@ extension WireGuardProviderStorage {
             peer = nil
         }
 
-        public func with(peer: Peer?) -> Self {
+        public func renewed(with keyGenerator: WireGuardKeyGenerator) throws -> Self {
+            var newSession = try Self(keyGenerator: keyGenerator)
+            newSession.peer = peer
+            return newSession
+        }
+
+        func with(peer: Peer?) -> Self {
             var newSession = self
             newSession.peer = peer
             return newSession
