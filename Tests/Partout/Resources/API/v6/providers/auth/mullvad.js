@@ -23,9 +23,13 @@
 //
 
 /*
+ module = {
+    authentication: {
+        credentials: { username, password },
+        token: { accessToken, expiryDate }
+    }
+ }
  options = {
-    credentials: { username, password },
-    token: { accessToken, expiryDate },
     sessions: {
         device1: {
             privateKey: "",
@@ -39,9 +43,6 @@
         device2: { ... }
     }
  }
-
- credentials = { username, password }
- token = { accessToken, expiryDate }
  session = { privateKey, publicKey, peer: { clientId, addresses } }
  */
 
@@ -58,6 +59,11 @@ function authenticate(module, deviceId) {
         return defaultResponse;
     }
     debug(`${JSON.stringify(module)}`);
+
+    const auth = module.authentication;
+    if (!auth) {
+        return defaultResponse;
+    }
     debug(`>>> allOptions: ${module.moduleOptions}`);
     const rawOptions = module.moduleOptions[wgType];
     debug(`>>> rawOptions: ${rawOptions}`);
@@ -75,12 +81,13 @@ function authenticate(module, deviceId) {
     }
 
     debug("OLE!");
+    debug(JSON.stringify(auth));
     debug(JSON.stringify(storage));
     debug(JSON.stringify(session));
 
     // check token expiry
-    if (storage.token) {
-        const expiry = new Date(timestampToISO(storage.token.expiryDate));
+    if (auth.token) {
+        const expiry = new Date(timestampToISO(auth.token.expiryDate));
         const now = new Date();
         debug(`>>> expiry: ${expiry}`);
         debug(`>>> now: ${now}`);
@@ -88,16 +95,16 @@ function authenticate(module, deviceId) {
             debug(`>>> token is valid`);
         } else {
             debug(`>>> token is expired`);
-            delete storage.token;
+            delete auth.token;
         }
     }
 
     // authenticate if needed
-    if (storage.token) {
+    if (auth.token) {
         // go ahead
-    } else if (storage.credentials) {
+    } else if (auth.credentials) {
         const body = jsonToBase64({
-            "account_number": storage.credentials.username
+            "account_number": auth.credentials.username
         });
 //        debug(`>>> body: ${body}`);
         const headers = {"Content-Type": "application/json"};
@@ -107,7 +114,7 @@ function authenticate(module, deviceId) {
         }
         debug(`>>> CREDENTIALS!!! ${json.response}`);
         const response = JSON.parse(json.response);
-        storage.token = {
+        auth.token = {
             accessToken: response.access_token,
             expiryDate: timestampFromISO(response.expiry)
         };
@@ -119,7 +126,7 @@ function authenticate(module, deviceId) {
 
     // authenticate with token from now on
     const headers = {
-        "Authorization": `Bearer ${storage.token.accessToken}`,
+        "Authorization": `Bearer ${auth.token.accessToken}`,
         "Content-Type": "application/json"
     };
     debug(`>>> headers: ${JSON.stringify(headers)}`);
@@ -191,6 +198,7 @@ function authenticate(module, deviceId) {
     debug(`>>> storage: ${JSON.stringify(storage)}`);
 
     const newModule = module;
+    newModule.auth = auth;
     newModule.moduleOptions[wgType] = jsonToBase64(storage);
     debug(`>>> module: ${JSON.stringify(module)}`);
     debug(`>>> newModule: ${JSON.stringify(newModule)}`);

@@ -30,9 +30,6 @@ import Foundation
 import PartoutCore
 
 public struct WireGuardProviderStorage: ProviderOptions {
-    public var credentials: ProviderCredentials?
-
-    public var token: ProviderToken?
 
     // device id -> session
     public var sessions: [String: Session]?

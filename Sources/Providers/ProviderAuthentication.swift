@@ -52,4 +52,7 @@ public struct ProviderAuthentication: Hashable, Codable, Sendable {
     public var credentials: Credentials?
 
     public var token: Token?
+
+    public init() {
+    }
 }
