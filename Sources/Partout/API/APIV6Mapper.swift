@@ -82,11 +82,11 @@ extension API.V6 {
                 guard let auth = module.authentication, !auth.isEmpty else {
                     throw PartoutError(.authentication)
                 }
-                guard let options: WireGuardProviderTemplate.Options = try module.options(for: .wireGuard) else {
+                guard let storage: WireGuardProviderStorage = try module.options(for: .wireGuard) else {
                     throw PartoutError(.Providers.missingProviderOption)
                 }
                 // it contains the keys to register
-                guard options.sessions?[deviceId] != nil else {
+                guard storage.sessions?[deviceId] != nil else {
                     throw PartoutError(.Providers.missingProviderOption)
                 }
                 let data = try await data(for: .providerAuth(module.providerId))
