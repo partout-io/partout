@@ -27,7 +27,7 @@ import Foundation
 import PartoutCore
 
 extension OpenVPNModule {
-    public struct Implementation: ModuleImplementation, Sendable {
+    public final class Implementation: ModuleImplementation, Sendable {
         public let moduleHandlerId: ModuleType = .openVPN
 
         public let importer: ModuleImporter
