@@ -31,17 +31,13 @@ extension API.V6 {
     public enum Resource {
         case index
 
-        case providerAuth(ProviderID)
-
-        case providerInfrastructure(ProviderID)
+        case provider(ProviderID)
 
         public var path: String {
             switch self {
             case .index:
                 "index.json"
-            case .providerAuth(let id):
-                "providers/auth/\(id.rawValue).js"
-            case .providerInfrastructure(let id):
+            case .provider(let id):
                 "providers/\(id.rawValue).js"
             }
         }

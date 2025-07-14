@@ -89,7 +89,7 @@ extension API.V6 {
                 guard storage.sessions?[deviceId] != nil else {
                     throw PartoutError(.Providers.missingProviderOption)
                 }
-                let data = try await data(for: .providerAuth(module.providerId))
+                let data = try await data(for: .provider(module.providerId))
                 guard let script = String(data: data, encoding: .utf8) else {
                     throw PartoutError(.notFound)
                 }
@@ -101,7 +101,7 @@ extension API.V6 {
         }
 
         public func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure {
-            let data = try await data(for: .providerInfrastructure(providerId))
+            let data = try await data(for: .provider(providerId))
             guard let script = String(data: data, encoding: .utf8) else {
                 throw PartoutError(.notFound)
             }

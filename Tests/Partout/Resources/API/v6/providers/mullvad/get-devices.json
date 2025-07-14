@@ -1,0 +1,32 @@
+[
+    {
+        "id": "c66e7455-f1cb-4764-8a70-092702bb3659",
+        "name": "glad gecko",
+        "pubkey": "9r0AvpoeZcVmj1RQFd0zH+lUiePgLz3qY6hxWGG4k1I=",
+        "hijack_dns": false,
+        "created": "2025-03-10T17:56:20+00:00",
+        "ipv4_address": "10.151.203.7/32",
+        "ipv6_address": "fc00:bbbb:bbbb:bb01:d:0:17:cb07/128",
+        "ports": []
+    },
+    {
+        "id": "3c87d20f-35a5-4057-aac1-abc05d622da9",
+        "name": "stable clam",
+        "pubkey": "ju8CsgEHeK79NTwzdlfPpGWzEhWqHLSPbCXlagwAwU8=",
+        "hijack_dns": true,
+        "created": "2025-03-24T23:21:50+00:00",
+        "ipv4_address": "10.65.220.127/32",
+        "ipv6_address": "fc00:bbbb:bbbb:bb01::2:dc7e/128",
+        "ports": []
+    },
+    {
+        "id": "f4c2bb4d-c1bb-44bb-8052-cf9359cbb76a",
+        "name": "snug imp",
+        "pubkey": "zP42rU3Df+Ac2q+bnF5VaabU+N3+U7E8XBXfKiI1rGI=",
+        "hijack_dns": true,
+        "created": "2025-07-13T15:18:44+00:00",
+        "ipv4_address": "10.75.157.228/32",
+        "ipv6_address": "fc00:bbbb:bbbb:bb01::c:9de3/128",
+        "ports": []
+    }
+]

@@ -1,0 +1,10 @@
+{
+    "id": "c66e7455-f1cb-4764-8a70-092702bb3659",
+    "name": "glad gecko",
+    "pubkey": "Y3aQ0i+CuUM2WDZS73mW/g9I78/nb7E/iSb8dJqbjXo=",
+    "hijack_dns": false,
+    "created": "2025-03-10T17:56:20+00:00",
+    "ipv4_address": "10.152.87.0/32",
+    "ipv6_address": "fc00:bbbb:bbbb:bb01:d:0:18:5700/128",
+    "ports": []
+}
