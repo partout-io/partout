@@ -64,10 +64,11 @@ extension Registry {
     }()
 
     public convenience init() {
-        self.init(withKnown: true)
+        self.init(deviceId: "", withKnown: true)
     }
 
     public convenience init(
+        deviceId: String,
         withKnown: Bool,
         customHandlers: [ModuleHandler] = [],
         customProviderResolvers: [ProviderModuleResolver] = [],
@@ -82,11 +83,12 @@ extension Registry {
             }
 
         self.init(
+            deviceId: deviceId,
             allHandlers: handlers,
             allImplementations: allImplementations,
             postDecodeBlock: Self.migratedProfile,
             resolvedModuleBlock: {
-                try Self.resolvedModule($0, in: $1, with: mappedResolvers)
+                try Self.resolvedModule($1, in: $2, with: mappedResolvers, on: $0)
             }
         )
     }
@@ -98,7 +100,8 @@ private extension Registry {
     static func resolvedModule(
         _ module: Module,
         in profile: Profile?,
-        with resolvers: [ModuleType: ProviderModuleResolver]
+        with resolvers: [ModuleType: ProviderModuleResolver],
+        on deviceId: String
     ) throws -> Module {
         do {
             if let profile {
@@ -113,7 +116,7 @@ private extension Registry {
             guard let resolver = resolvers[providerModule.providerModuleType] else {
                 return module
             }
-            return try resolver.resolved(from: providerModule)
+            return try resolver.resolved(from: providerModule, on: deviceId)
         } catch {
             pp_log_id(profile?.id, .core, .error, "Unable to resolve module: \(error)")
             throw error as? PartoutError ?? PartoutError(.Providers.corruptProviderModule, error)

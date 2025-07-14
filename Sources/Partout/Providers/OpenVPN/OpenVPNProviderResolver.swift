@@ -1,8 +1,8 @@
 //
-//  Partout+API.swift
+//  OpenVPNProviderResolver.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/9/25.
+//  Created by Davide De Rosa on 12/2/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,17 +23,30 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if canImport(_PartoutOpenVPNCore)
+
+import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
 
-extension LoggerCategory {
-    public static let api = Self(rawValue: "api")
-}
+public struct OpenVPNProviderResolver: ProviderModuleResolver {
+    private let ctx: PartoutLoggerContext
 
-extension PartoutError.Code {
-    public enum API {
+    public var moduleType: ModuleType {
+        .openVPN
+    }
 
-        /// The API engine encountered an error.
-        public static let engineError = PartoutError.Code("API.engineError")
+    public init(_ ctx: PartoutLoggerContext) {
+        self.ctx = ctx
+    }
+
+    public func resolved(from providerModule: ProviderModule, on deviceId: String) throws -> Module {
+        try providerModule.compiled(
+            ctx,
+            withTemplate: OpenVPNProviderTemplate.self,
+            onDevice: deviceId
+        )
     }
 }
+
+#endif

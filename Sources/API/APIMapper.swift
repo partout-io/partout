@@ -23,11 +23,13 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
+import PartoutCore
 import PartoutProviders
 
 public protocol APIMapper {
     func index() async throws -> [Provider]
+
+    func authenticate(_ module: ProviderModule, on deviceId: String) async throws -> ProviderModule
 
     func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure
 }

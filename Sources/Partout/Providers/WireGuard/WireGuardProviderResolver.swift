@@ -1,8 +1,8 @@
 //
-//  Partout+API.swift
+//  WireGuardProviderResolver.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/9/25.
+//  Created by Davide De Rosa on 12/2/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,17 +23,29 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
+#if canImport(_PartoutWireGuardCore)
+
+import _PartoutWireGuardCore
 import PartoutCore
 
-extension LoggerCategory {
-    public static let api = Self(rawValue: "api")
-}
+public struct WireGuardProviderResolver: ProviderModuleResolver {
+    private let ctx: PartoutLoggerContext
 
-extension PartoutError.Code {
-    public enum API {
+    public var moduleType: ModuleType {
+        .wireGuard
+    }
 
-        /// The API engine encountered an error.
-        public static let engineError = PartoutError.Code("API.engineError")
+    public init(_ ctx: PartoutLoggerContext) {
+        self.ctx = ctx
+    }
+
+    public func resolved(from providerModule: ProviderModule, on deviceId: String) throws -> Module {
+        try providerModule.compiled(
+            ctx,
+            withTemplate: WireGuardProviderTemplate.self,
+            onDevice: deviceId
+        )
     }
 }
+
+#endif

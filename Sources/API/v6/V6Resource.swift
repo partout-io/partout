@@ -38,7 +38,7 @@ extension API.V6 {
             case .index:
                 "index.json"
             case .provider(let id):
-                ["providers", "\(id.rawValue).js"].joined(separator: "/")
+                "providers/\(id.rawValue).js"
             }
         }
     }

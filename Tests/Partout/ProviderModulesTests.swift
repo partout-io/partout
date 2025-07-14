@@ -41,7 +41,7 @@ final class ProviderModulesTests: XCTestCase {
 
         let module = try sut.tryBuild()
         XCTAssertFalse(module.isFinal)
-        let resolvedModule = try OpenVPNProviderResolver(.global).resolved(from: module)
+        let resolvedModule = try OpenVPNProviderResolver(.global).resolved(from: module, on: "")
         XCTAssertTrue(resolvedModule.isFinal)
         let typedModule = try XCTUnwrap(resolvedModule as? OpenVPNModule)
 

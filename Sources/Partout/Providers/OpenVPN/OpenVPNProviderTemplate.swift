@@ -1,5 +1,5 @@
 //
-//  OpenVPN+Providers.swift
+//  OpenVPNProviderTemplate.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 12/2/24.
@@ -27,23 +27,6 @@
 
 import _PartoutOpenVPNCore
 import Foundation
-import PartoutCore
-
-public struct OpenVPNProviderResolver: ProviderModuleResolver {
-    private let ctx: PartoutLoggerContext
-
-    public var moduleType: ModuleType {
-        .openVPN
-    }
-
-    public init(_ ctx: PartoutLoggerContext) {
-        self.ctx = ctx
-    }
-
-    public func resolved(from providerModule: ProviderModule) throws -> Module {
-        try providerModule.compiled(ctx, withTemplate: OpenVPNProviderTemplate.self)
-    }
-}
 
 public struct OpenVPNProviderTemplate: Codable, Sendable {
     public let configuration: OpenVPN.Configuration
@@ -70,7 +53,8 @@ extension OpenVPNProviderTemplate {
 extension OpenVPNProviderTemplate: ProviderTemplateCompiler {
     public static func compiled(
         _ ctx: PartoutLoggerContext,
-        with id: UUID,
+        deviceId: String,
+        moduleId: UUID,
         entity: ProviderEntity,
         options: Options?
     ) throws -> OpenVPNModule {
@@ -86,7 +70,7 @@ extension OpenVPNProviderTemplate: ProviderTemplateCompiler {
         // enforce default gateway
         configurationBuilder.routingPolicies = [.IPv4, .IPv6]
 
-        var builder = OpenVPNModule.Builder(id: id)
+        var builder = OpenVPNModule.Builder(id: moduleId)
         builder.configurationBuilder = configurationBuilder
         if let credentials = options?.credentials {
             builder.credentials = credentials
@@ -118,66 +102,6 @@ private extension OpenVPNProviderTemplate {
         }
 
         return remotes
-    }
-}
-
-// MARK: - Legacy
-
-extension OpenVPNLegacyProviderEntity {
-    public func upgraded() throws -> ProviderEntity {
-        ProviderEntity(
-            server: server.upgraded(),
-            preset: try preset.upgraded(),
-            heuristic: heuristic?.upgraded()
-        )
-    }
-}
-
-private extension OpenVPNLegacyProviderServer {
-    func upgraded() -> ProviderServer {
-        ProviderServer(
-            metadata: ProviderServer.Metadata(
-                providerId: ProviderID(rawValue: metadata.providerId.rawValue),
-                categoryName: metadata.categoryName,
-                countryCode: metadata.countryCode,
-                otherCountryCodes: metadata.otherCountryCodes,
-                area: metadata.area
-            ),
-            serverId: metadata.serverId,
-            hostname: hostname,
-            ipAddresses: ipAddresses,
-            supportedModuleTypes: [.openVPN],
-            supportedPresetIds: metadata.supportedPresetIds
-        )
-    }
-}
-
-private extension OpenVPNLegacyProviderPreset {
-    func upgraded() throws -> ProviderPreset {
-        let newTemplate = OpenVPNProviderTemplate(configuration: template, endpoints: endpoints)
-        let newTemplateData = try JSONEncoder().encode(newTemplate)
-        return ProviderPreset(
-            providerId: ProviderID(rawValue: providerId.rawValue),
-            presetId: presetId,
-            description: description,
-            moduleType: .openVPN,
-            templateData: newTemplateData
-        )
-    }
-}
-
-private extension OpenVPNLegacyProviderHeuristic {
-    func upgraded() -> ProviderHeuristic? {
-        switch self {
-        case .sameCountry(let countryCode):
-            return .sameCountry(countryCode)
-
-        case .sameRegion(let region):
-            return .sameRegion(ProviderRegion(
-                countryCode: region.countryCode,
-                area: region.area
-            ))
-        }
     }
 }
 
