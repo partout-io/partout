@@ -177,6 +177,31 @@ extension ProviderModule {
 }
 
 extension ProviderModule {
+    public func checkCompatible(with otherModule: Module, activeIds: Set<UUID>) throws {
+        precondition(otherModule.id != id)
+        if !isMutuallyExclusive {
+            return
+        }
+        guard !(otherModule is Self) else {
+            throw PartoutError(.incompatibleModules, [self, otherModule])
+        }
+        guard (otherModule as? ProviderModule)?.providerModuleType != moduleHandler.id else {
+            throw PartoutError(.incompatibleModules, [self, otherModule])
+        }
+    }
+}
+
+// MARK: - Resolver
+
+public protocol ProviderModuleResolver: Sendable {
+    var moduleType: ModuleType { get }
+
+    func resolved(from providerModule: ProviderModule, deviceId: String) throws -> Module
+}
+
+// MARK: - Options
+
+extension ProviderModule {
     public struct CodableOptions: Hashable, Codable, Sendable {
         public var map: [ModuleType: Data]
 
@@ -212,25 +237,4 @@ extension ProviderModule {
             return try JSONDecoder().decode(O.self, from: data)
         }
     }
-}
-
-extension ProviderModule {
-    public func checkCompatible(with otherModule: Module, activeIds: Set<UUID>) throws {
-        precondition(otherModule.id != id)
-        if !isMutuallyExclusive {
-            return
-        }
-        guard !(otherModule is Self) else {
-            throw PartoutError(.incompatibleModules, [self, otherModule])
-        }
-        guard (otherModule as? ProviderModule)?.providerModuleType != moduleHandler.id else {
-            throw PartoutError(.incompatibleModules, [self, otherModule])
-        }
-    }
-}
-
-public protocol ProviderModuleResolver: Sendable {
-    var moduleType: ModuleType { get }
-
-    func resolved(from providerModule: ProviderModule, deviceId: String) throws -> Module
 }
