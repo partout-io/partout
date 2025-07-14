@@ -8,8 +8,8 @@ import PackageDescription
 
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.141"
-let checksum = "4ad8758a7450f0b3e1b48d3f66930ebd5657d5cdc74cddaa5ca3cdc4794c32ad"
+let version = "0.99.142"
+let checksum = "f101ac460d29e699ece34ee3bd384febe84e16cd9f579fcaed39692a909ec0cf"
 
 // to download the core soruce
 let coreSHA1 = "06a335170d366a67c58fdd78e403761ca12bc093"
