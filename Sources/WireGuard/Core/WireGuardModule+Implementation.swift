@@ -27,7 +27,7 @@ import Foundation
 import PartoutCore
 
 extension WireGuardModule {
-    public struct Implementation: ModuleImplementation, Sendable {
+    public final class Implementation: ModuleImplementation, Sendable {
         public let moduleHandlerId: ModuleType = .wireGuard
 
         public let keyGenerator: WireGuardKeyGenerator
