@@ -74,6 +74,7 @@ public struct ProviderModule: Module, BuildableType, Hashable, Codable {
             id: id,
             providerId: providerId,
             providerModuleType: providerModuleType,
+            authentication: authentication,
             moduleOptions: moduleOptions,
             entity: entity
         )
