@@ -28,11 +28,11 @@ import Foundation
 // treat as a "C union"
 public struct ProviderAuthentication: Hashable, Codable, Sendable {
     public struct Credentials: Hashable, Codable, Sendable {
-        public let username: String
+        public var username: String
 
-        public let password: String?
+        public var password: String
 
-        public init(username: String, password: String?) {
+        public init(username: String = "", password: String = "") {
             self.username = username
             self.password = password
         }
