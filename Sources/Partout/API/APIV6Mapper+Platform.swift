@@ -49,6 +49,7 @@ extension API.V6.Mapper {
 #if canImport(_PartoutVendorsApple)
 
 import _PartoutVendorsApple
+import JavaScriptCore
 
 private func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine {
     AppleJavaScriptEngine(ctx)
@@ -56,12 +57,31 @@ private func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingE
 
 extension AppleJavaScriptEngine: APIScriptingEngine {
     public func inject(from vm: APIEngine.VirtualMachine) {
+        let getResultBlock: @convention(block) (JSValue, JSValue, JSValue, JSValue) -> Any? = {
+            guard let method = $0.toString() else {
+                assertionFailure("Missing method")
+                return nil
+            }
+            guard let urlString = $1.toString() else {
+                assertionFailure("Missing URL")
+                return nil
+            }
+            let headers = !$2.isUndefined ? ($2.toObject() as? [String: String]) : nil
+            let body = !$3.isUndefined ? $3.toString() : nil
+            return vm.getResult(method: method, urlString: urlString, headers: headers, body: body)
+        }
+        inject("getResult", object: getResultBlock)
         inject("getText", object: vm.getText as @convention(block) (String) -> Any?)
         inject("getJSON", object: vm.getJSON as @convention(block) (String) -> Any?)
+        inject("jsonFromBase64", object: vm.jsonFromBase64 as @convention(block) (String) -> Any?)
         inject("jsonToBase64", object: vm.jsonToBase64 as @convention(block) (Any) -> String?)
+        inject("timestampFromISO", object: vm.timestampFromISO as @convention(block) (String) -> Int)
+        inject("timestampToISO", object: vm.timestampToISO as @convention(block) (Int) -> String)
         inject("ipV4ToBase64", object: vm.ipV4ToBase64 as @convention(block) (String) -> String?)
         inject("openVPNTLSWrap", object: vm.openVPNTLSWrap as @convention(block) (String, String) -> [String: Any]?)
         inject("debug", object: vm.debug as @convention(block) (String) -> Void)
+        inject("ppErrorResponse", object: vm.errorResponse as @convention(block) (String) -> [String: Any])
+        inject("ppHTTPErrorResponse", object: vm.httpErrorResponse as @convention(block) (Int, String) -> [String: Any])
     }
 }
 

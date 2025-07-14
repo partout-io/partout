@@ -30,6 +30,7 @@ import Foundation
 import GenericJSON
 import PartoutCore
 
+// FIXME: passepartout#507, ridiculously complex
 extension OpenVPNModule: ProviderCustomizationSupporting {
     public static let providerCustomizationType = OpenVPN.ProviderCustomization.self
 }

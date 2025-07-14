@@ -60,7 +60,36 @@ extension API.V6 {
 
 // MARK: - ScriptExecutor
 
+private enum ErrorMessage {
+    static let cached = "cached"
+
+    static let invalidURL = "invalidURL"
+
+    static let notData = "notData"
+
+    static let notString = "notString"
+}
+
 extension API.V6.DefaultScriptExecutor: APIEngine.ScriptExecutor {
+    func authenticate(_ module: ProviderModule, on deviceId: String, with script: String) async throws -> ProviderModule {
+        let moduleData = try JSONEncoder().encode(module)
+        guard let moduleJSON = String(data: moduleData, encoding: .utf8) else {
+            throw PartoutError(.encoding)
+        }
+        let result = try await engine.execute(
+            "JSON.stringify(authenticate(JSON.parse('\(moduleJSON)'), '\(deviceId)'))",
+            after: script,
+            returning: APIEngine.ScriptResult<ProviderModule>.self
+        )
+        if let error = result.error {
+            throw PartoutError(.scriptException, error)
+        }
+        guard let response = result.response else {
+            throw PartoutError(.scriptException, result.error ?? "unknown")
+        }
+        return response
+    }
+
     func fetchInfrastructure(with script: String) async throws -> ProviderInfrastructure {
         // TODO: #54/partout, assumes engine to be JavaScript
         let result = try await engine.execute(
@@ -70,10 +99,10 @@ extension API.V6.DefaultScriptExecutor: APIEngine.ScriptExecutor {
         )
         guard let response = result.response else {
             switch result.error {
-            case .cached:
+            case ErrorMessage.cached:
                 throw PartoutError(.cached)
             default:
-                throw PartoutError(.scriptException, result.error?.rawValue ?? "unknown")
+                throw PartoutError(.scriptException, result.error ?? "unknown")
             }
         }
         return response
@@ -93,111 +122,62 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
         var isCached = false
     }
 
-    func getResult(urlString: String) -> APIEngine.GetResult {
-        pp_log(ctx, .api, .info, "JS.getResult: Execute with URL: \(resultURL?.absoluteString ?? urlString)")
-        guard let url = resultURL ?? URL(string: urlString) else {
-            return APIEngine.GetResult(.url)
-        }
-
-        // use external caching (e.g. Core Data)
-        let cfg: URLSessionConfiguration = .ephemeral
-        cfg.timeoutIntervalForRequest = timeout
-        let session = URLSession(configuration: cfg)
-
-        var request = URLRequest(url: url)
-        if let lastUpdate = cache?.lastUpdate {
-            request.setValue(lastUpdate.toRFC1123(), forHTTPHeaderField: "If-Modified-Since")
-        }
-        if let tag = cache?.tag {
-            request.setValue(tag, forHTTPHeaderField: "If-None-Match")
-        }
-
-        pp_log(ctx, .api, .info, "JS.getResult: GET \(url)")
-        if let headers = request.allHTTPHeaderFields {
-            pp_log(ctx, .api, .info, "JS.getResult: Headers: \(headers)")
-        }
-
-        let semaphore = DispatchSemaphore(value: 0)
-        let storage = ResultStorage()
-        let task = session.dataTask(with: request) { [weak self] data, response, error in
-            guard let self else {
-                return
-            }
-            if let error {
-                pp_log(ctx, .api, .error, "JS.getResult: Unable to execute: \(error)")
-            } else if let httpResponse = response as? HTTPURLResponse {
-                let lastModifiedHeader = httpResponse.value(forHTTPHeaderField: "last-modified")
-                let tag = httpResponse.value(forHTTPHeaderField: "etag")
-
-                pp_log(ctx, .api, .debug, "JS.getResult: Response: \(httpResponse)")
-                pp_log(ctx, .api, .info, "JS.getResult: HTTP \(httpResponse.statusCode)")
-                if let lastModifiedHeader {
-                    pp_log(ctx, .api, .info, "JS.getResult: Last-Modified: \(lastModifiedHeader)")
-                    storage.lastModified = lastModifiedHeader.fromRFC1123()
-                }
-                if let tag {
-                    pp_log(ctx, .api, .info, "JS.getResult: ETag: \(tag)")
-                    storage.tag = tag
-                }
-                storage.isCached = httpResponse.statusCode == 304
-            }
-            storage.textData = data
-            semaphore.signal()
-        }
-        task.resume()
-        semaphore.wait()
-
-        guard let textData = storage.textData else {
-            pp_log(ctx, .api, .error, "JS.getResult: Empty response")
-            return APIEngine.GetResult(.network)
-        }
-        pp_log(ctx, .api, .info, "JS.getResult: Success (cached: \(storage.isCached))")
-        return APIEngine.GetResult(
-            textData,
-            lastModified: storage.lastModified,
-            tag: storage.tag,
-            isCached: storage.isCached
-        )
-    }
-
-    func getText(urlString: String) -> [String: Any] {
+    func getResult(
+        method: String,
+        urlString: String,
+        headers: [String: String]?,
+        body: String?
+    ) -> [String: Any] {
         let textResult = {
-            let result = getResult(urlString: urlString)
-            if result.isCached {
-                return APIEngine.GetResult(.cached)
-            }
+            let result = sendRequest(method: method, urlString: urlString, headers: headers, body: body)
             guard let text = result.response as? Data else {
-                pp_log(ctx, .api, .error, "JS.getText: Response is not Data")
-                return APIEngine.GetResult(.network)
+                pp_log(ctx, .api, .error, "JS.getResult: Response is not Data")
+                return APIEngine.GetResult(ErrorMessage.notData)
             }
             guard let string = String(data: text, encoding: .utf8) else {
-                pp_log(ctx, .api, .error, "JS.getText: Response is not String")
-                return APIEngine.GetResult(.network)
+                pp_log(ctx, .api, .error, "JS.getResult: Response is not String")
+                return APIEngine.GetResult(ErrorMessage.notString)
             }
             return result.with(response: string)
         }()
         return textResult.serialized()
     }
 
+    func getText(urlString: String) -> [String: Any] {
+        getResult(method: "GET", urlString: urlString, headers: [:], body: "")
+    }
+
     func getJSON(urlString: String) -> [String: Any] {
         let jsonResult = {
-            let result = getResult(urlString: urlString)
+            let result = sendRequest(method: "GET", urlString: urlString, headers: [:], body: "")
             if result.isCached {
-                return APIEngine.GetResult(.cached)
+                return APIEngine.GetResult(ErrorMessage.cached)
             }
             guard let text = result.response as? Data else {
                 pp_log(ctx, .api, .error, "JS.getJSON: Response is not Data")
-                return APIEngine.GetResult(.network)
+                return APIEngine.GetResult(ErrorMessage.notData)
             }
             do {
                 let object = try JSONSerialization.jsonObject(with: text)
                 return result.with(response: object)
             } catch {
                 pp_log(ctx, .api, .error, "JS.getJSON: Unable to parse JSON: \(error)")
-                return APIEngine.GetResult(.parsing)
+                return APIEngine.GetResult(error.localizedDescription)
             }
         }()
         return jsonResult.serialized()
+    }
+
+    func jsonFromBase64(string: String) -> Any? {
+        do {
+            guard let data = Data(base64Encoded: string) else {
+                return nil
+            }
+            return try JSONSerialization.jsonObject(with: data)
+        } catch {
+            pp_log(ctx, .api, .error, "JS.jsonFromBase64: Unable to serialize: \(error)")
+            return nil
+        }
     }
 
     func jsonToBase64(object: Any) -> String? {
@@ -208,6 +188,14 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
             pp_log(ctx, .api, .error, "JS.jsonToBase64: Unable to serialize: \(error)")
             return nil
         }
+    }
+
+    func timestampFromISO(isoString: String) -> Int {
+        Int(ISO8601DateFormatter().date(from: isoString)?.timeIntervalSinceReferenceDate ?? 0)
+    }
+
+    func timestampToISO(timestamp: Int) -> String {
+        ISO8601DateFormatter().string(from: Date(timeIntervalSinceReferenceDate: TimeInterval(timestamp)))
     }
 
     func ipV4ToBase64(ip: String) -> String? {
@@ -245,6 +233,98 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
 
     func debug(message: String) {
         pp_log(ctx, .api, .debug, message)
+    }
+
+    func errorResponse(message: String) -> [String: Any] {
+        ["error": message]
+    }
+}
+
+private extension API.V6.DefaultScriptExecutor {
+    func sendRequest(
+        method: String,
+        urlString: String,
+        headers: [String: String]?,
+        body: String?
+    ) -> APIEngine.GetResult {
+        pp_log(ctx, .api, .info, "JS.getResult: \(method) \(resultURL?.absoluteString ?? urlString)")
+        guard let url = resultURL ?? URL(string: urlString) else {
+            return APIEngine.GetResult(ErrorMessage.invalidURL)
+        }
+
+        // use external caching (e.g. Core Data)
+        let cfg: URLSessionConfiguration = .ephemeral
+        cfg.timeoutIntervalForRequest = timeout
+        let session = URLSession(configuration: cfg)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.allHTTPHeaderFields = headers
+        if let body {
+            request.httpBody = Data(base64Encoded: body)
+        }
+        if let lastUpdate = cache?.lastUpdate {
+            request.setValue(lastUpdate.toRFC1123(), forHTTPHeaderField: "If-Modified-Since")
+        }
+        if let tag = cache?.tag {
+            request.setValue(tag, forHTTPHeaderField: "If-None-Match")
+        }
+
+        if let headers = request.allHTTPHeaderFields {
+            let redactedHeaders = headers.map {
+                if $0.key.lowercased() == "authorization" {
+                    return ($0.key, "<redacted>")
+                } else {
+                    return ($0.key, $0.value)
+                }
+            }
+            pp_log(ctx, .api, .info, "JS.getResult: Headers: \(redactedHeaders)")
+        }
+
+        let semaphore = DispatchSemaphore(value: 0)
+        let storage = ResultStorage()
+        var status: Int?
+        let task = session.dataTask(with: request) { [weak self] data, response, error in
+            guard let self else {
+                return
+            }
+            if let error {
+                pp_log(ctx, .api, .error, "JS.getResult: Unable to execute: \(error)")
+            } else if let httpResponse = response as? HTTPURLResponse {
+                let lastModifiedHeader = httpResponse.value(forHTTPHeaderField: "last-modified")
+                let tag = httpResponse.value(forHTTPHeaderField: "etag")
+
+                pp_log(ctx, .api, .debug, "JS.getResult: Response: \(httpResponse)")
+                pp_log(ctx, .api, .info, "JS.getResult: HTTP \(httpResponse.statusCode)")
+                if let lastModifiedHeader {
+                    pp_log(ctx, .api, .info, "JS.getResult: Last-Modified: \(lastModifiedHeader)")
+                    storage.lastModified = lastModifiedHeader.fromRFC1123()
+                }
+                if let tag {
+                    pp_log(ctx, .api, .info, "JS.getResult: ETag: \(tag)")
+                    storage.tag = tag
+                }
+                status = httpResponse.statusCode
+                storage.isCached = httpResponse.statusCode == 304
+            }
+            storage.textData = data
+            semaphore.signal()
+        }
+        task.resume()
+        semaphore.wait()
+
+        guard let textData = storage.textData else {
+            pp_log(ctx, .api, .error, "JS.getResult: Empty response")
+            return APIEngine.GetResult(ErrorMessage.notData)
+        }
+        pp_log(ctx, .api, .info, "JS.getResult: Success (cached: \(storage.isCached))")
+        return APIEngine.GetResult(
+            textData,
+            status: status,
+            lastModified: storage.lastModified,
+            tag: storage.tag,
+            isCached: storage.isCached
+        )
     }
 }
 

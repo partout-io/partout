@@ -76,12 +76,35 @@ extension API.V6 {
                 }
         }
 
+        public func authenticate(_ module: ProviderModule, on deviceId: String) async throws -> ProviderModule {
+            switch module.providerModuleType {
+            case .wireGuard:
+                guard let auth = module.authentication, !auth.isEmpty else {
+                    throw PartoutError(.authentication)
+                }
+                guard let storage: WireGuardProviderStorage = try module.options(for: .wireGuard) else {
+                    throw PartoutError(.Providers.missingProviderOption)
+                }
+                // it contains the keys to register
+                guard storage.sessions?[deviceId] != nil else {
+                    throw PartoutError(.Providers.missingProviderOption)
+                }
+                let data = try await data(for: .provider(module.providerId))
+                guard let script = String(data: data, encoding: .utf8) else {
+                    throw PartoutError(.notFound)
+                }
+                let executor = executorFactory(nil, nil, timeout)
+                return try await executor.authenticate(module, on: deviceId, with: script)
+            default:
+                fatalError("Authentication not supported for module type \(module.providerModuleType)")
+            }
+        }
+
         public func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure {
             let data = try await data(for: .provider(providerId))
             guard let script = String(data: data, encoding: .utf8) else {
                 throw PartoutError(.notFound)
             }
-//            let lines = script.components(separatedBy: "\n")
             let resultURL = infrastructureURL?(providerId)
             let executor = executorFactory(resultURL, cache, timeout)
             return try await executor.fetchInfrastructure(with: script)
