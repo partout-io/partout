@@ -25,6 +25,7 @@
 
 import Foundation
 import PartoutCore
+import PartoutProviders
 
 public protocol APIScriptingEngine: ScriptingEngine {
     func inject(from vm: APIEngine.VirtualMachine)
@@ -32,40 +33,58 @@ public protocol APIScriptingEngine: ScriptingEngine {
 
 public enum APIEngine {
     public protocol ScriptExecutor {
+        func authenticate(_ module: ProviderModule, on deviceId: String, with script: String) async throws -> ProviderModule
+
         func fetchInfrastructure(with script: String) async throws -> ProviderInfrastructure
     }
 
     public protocol VirtualMachine {
-        func getResult(urlString: String) -> APIEngine.GetResult
+        func getResult(
+            method: String,
+            urlString: String,
+            headers: [String: String]?,
+            body: String?
+        ) -> [String: Any]
 
         func getText(urlString: String) -> [String: Any]
 
         func getJSON(urlString: String) -> [String: Any]
 
+        func jsonFromBase64(string: String) -> Any?
+
         func jsonToBase64(object: Any) -> String?
+
+        func timestampFromISO(isoString: String) -> Int
+
+        func timestampToISO(timestamp: Int) -> String
 
         func ipV4ToBase64(ip: String) -> String?
 
         func openVPNTLSWrap(strategy: String, file: String) -> [String: Any]?
 
         func debug(message: String)
+
+        func errorResponse(message: String) -> [String: Any]
+    }
+}
+
+extension APIEngine.VirtualMachine {
+    public func httpErrorResponse(status: Int, urlString: String) -> [String: Any] {
+        errorResponse(message: "HTTP \(status) \(urlString)")
     }
 }
 
 extension APIEngine {
-    public enum ErrorCode: String, Decodable {
-        case url
-
-        case cached
-
-        case network
-
-        case parsing
-    }
 
     // Swift -> JS
     public struct GetResult {
         public private(set) var response: Any?
+
+        public let error: String?
+
+        // extra
+
+        public let status: Int?
 
         public let lastModified: Date?
 
@@ -73,22 +92,24 @@ extension APIEngine {
 
         public let isCached: Bool
 
-        public let error: ErrorCode?
-
-        public init(_ response: Any, lastModified: Date?, tag: String?, isCached: Bool = false) {
+        public init(_ response: Any, status: Int?, lastModified: Date?, tag: String?, isCached: Bool = false) {
             self.response = response
+            error = nil
+
+            self.status = status
             self.lastModified = lastModified
             self.tag = tag
             self.isCached = isCached
-            error = nil
         }
 
-        public init(_ error: ErrorCode) {
+        public init(_ error: String) {
             response = nil
+            self.error = error
+
+            status = nil
             lastModified = nil
             tag = nil
             isCached = false
-            self.error = error
         }
 
         public func with(response: Any) -> Self {
@@ -101,6 +122,9 @@ extension APIEngine {
             var map: [String: Any] = [:]
             if let response {
                 map["response"] = response
+                if let status {
+                    map["status"] = status
+                }
 
                 // follow ProviderCache
                 var cache: [String: Any] = [:]
@@ -113,7 +137,7 @@ extension APIEngine {
                 map["isCached"] = isCached
             }
             if let error {
-                map["error"] = error.rawValue
+                map["error"] = error
             }
             return map
         }
@@ -123,6 +147,6 @@ extension APIEngine {
     public struct ScriptResult<T>: Decodable where T: Decodable {
         public let response: T?
 
-        public let error: ErrorCode?
+        public let error: String?
     }
 }

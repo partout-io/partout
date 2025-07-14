@@ -26,6 +26,7 @@
 import Foundation
 import PartoutCore
 
+// FIXME: passepartout#507, ridiculously complex
 public protocol ProviderCustomizationSupporting {
     associatedtype ProviderCustomization: UserInfoCodable
 
