@@ -198,7 +198,7 @@ function authenticate(module, deviceId) {
     debug(`>>> storage: ${JSON.stringify(storage)}`);
 
     const newModule = module;
-    newModule.auth = auth;
+    newModule.authentication = auth;
     newModule.moduleOptions[wgType] = jsonToBase64(storage);
     debug(`>>> module: ${JSON.stringify(module)}`);
     debug(`>>> newModule: ${JSON.stringify(newModule)}`);
