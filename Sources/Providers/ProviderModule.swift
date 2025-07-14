@@ -96,7 +96,31 @@ extension ProviderModule {
             }
         }
 
-        public var authentication: ProviderAuthentication?
+        public var credentials: ProviderAuthentication.Credentials? {
+            get {
+                authentication?.credentials
+            }
+            set {
+                if authentication == nil {
+                    authentication = ProviderAuthentication()
+                }
+                authentication?.credentials = newValue
+            }
+        }
+
+        public var token: ProviderAuthentication.Token? {
+            get {
+                authentication?.token
+            }
+            set {
+                if authentication == nil {
+                    authentication = ProviderAuthentication()
+                }
+                authentication?.token = newValue
+            }
+        }
+
+        private var authentication: ProviderAuthentication?
 
         private var moduleOptions: CodableOptions?
 
