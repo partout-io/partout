@@ -144,12 +144,12 @@ extension API.V6.DefaultScriptExecutor: APIEngine.VirtualMachine {
     }
 
     func getText(urlString: String) -> [String: Any] {
-        getResult(method: "GET", urlString: urlString, headers: [:], body: "")
+        getResult(method: "GET", urlString: urlString, headers: nil, body: nil)
     }
 
     func getJSON(urlString: String) -> [String: Any] {
         let jsonResult = {
-            let result = sendRequest(method: "GET", urlString: urlString, headers: [:], body: "")
+            let result = sendRequest(method: "GET", urlString: urlString, headers: nil, body: nil)
             if result.isCached {
                 return APIEngine.GetResult(ErrorMessage.cached)
             }
