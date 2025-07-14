@@ -88,7 +88,7 @@ extension Registry {
             allImplementations: allImplementations,
             postDecodeBlock: Self.migratedProfile,
             resolvedModuleBlock: {
-                try Self.resolvedModule($0, in: $1, with: mappedResolvers, on: deviceId)
+                try Self.resolvedModule($1, in: $2, with: mappedResolvers, on: $0)
             }
         )
     }
@@ -116,7 +116,7 @@ private extension Registry {
             guard let resolver = resolvers[providerModule.providerModuleType] else {
                 return module
             }
-            return try resolver.resolved(from: providerModule, deviceId: deviceId)
+            return try resolver.resolved(from: providerModule, on: deviceId)
         } catch {
             pp_log_id(profile?.id, .core, .error, "Unable to resolve module: \(error)")
             throw error as? PartoutError ?? PartoutError(.Providers.corruptProviderModule, error)

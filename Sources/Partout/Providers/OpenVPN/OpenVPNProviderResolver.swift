@@ -40,7 +40,7 @@ public struct OpenVPNProviderResolver: ProviderModuleResolver {
         self.ctx = ctx
     }
 
-    public func resolved(from providerModule: ProviderModule, deviceId: String) throws -> Module {
+    public func resolved(from providerModule: ProviderModule, on deviceId: String) throws -> Module {
         try providerModule.compiled(
             ctx,
             withTemplate: OpenVPNProviderTemplate.self,
