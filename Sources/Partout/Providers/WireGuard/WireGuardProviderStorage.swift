@@ -57,7 +57,7 @@ extension WireGuardProviderStorage {
             peer = nil
         }
 
-        public func with(peer: Peer) -> Self {
+        public func with(peer: Peer?) -> Self {
             var newSession = self
             newSession.peer = peer
             return newSession
