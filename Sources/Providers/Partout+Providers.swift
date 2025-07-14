@@ -34,9 +34,9 @@ extension PartoutError.Code {
     public enum Providers {
 
         /// A provider was chosen but the target entity is missing.
-        public static let missingProviderEntity = PartoutError.Code("missingProviderEntity")
+        public static let missingProviderEntity = PartoutError.Code("Providers.missingProviderEntity")
 
         /// A provider was chosen but a required option is missing.
-        public static let missingProviderOption = PartoutError.Code("missingProviderOption")
+        public static let missingProviderOption = PartoutError.Code("Providers.missingProviderOption")
     }
 }
