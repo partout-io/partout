@@ -53,7 +53,7 @@ extension ProviderModule {
         onDevice deviceId: String
     ) throws -> Module where T: ProviderTemplateCompiler {
         guard let entity else {
-            throw PartoutError(.Providers.missingProviderEntity)
+            throw PartoutError(.Providers.missingEntity)
         }
         let options: T.Options? = try options(for: providerModuleType)
         return try T.compiled(

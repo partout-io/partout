@@ -83,11 +83,11 @@ extension API.V6 {
                     throw PartoutError(.authentication)
                 }
                 guard let storage: WireGuardProviderStorage = try module.options(for: .wireGuard) else {
-                    throw PartoutError(.Providers.missingProviderOption)
+                    throw PartoutError(.Providers.missingOption)
                 }
                 // it contains the keys to register
                 guard storage.sessions?[deviceId] != nil else {
-                    throw PartoutError(.Providers.missingProviderOption)
+                    throw PartoutError(.Providers.missingOption)
                 }
                 let data = try await data(for: .provider(module.providerId))
                 guard let script = String(data: data, encoding: .utf8) else {

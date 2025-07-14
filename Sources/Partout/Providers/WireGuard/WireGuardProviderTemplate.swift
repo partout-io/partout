@@ -49,10 +49,10 @@ extension WireGuardProviderTemplate: ProviderTemplateCompiler {
         let template = try entity.preset.template(ofType: WireGuardProviderTemplate.self)
         var configurationBuilder = template.builder()
         guard let session = options?.sessions?[deviceId] else {
-            throw PartoutError(.Providers.missingProviderOption, "session")
+            throw PartoutError(.Providers.missingOption, "session")
         }
         guard let peer = session.peer else {
-            throw PartoutError(.Providers.missingProviderOption, "session.peer")
+            throw PartoutError(.Providers.missingOption, "session.peer")
         }
         configurationBuilder.interface.privateKey = session.privateKey
         configurationBuilder.interface.addresses = peer.addresses
