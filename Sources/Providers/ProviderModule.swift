@@ -37,11 +37,11 @@ public struct ProviderModule: Module, BuildableType, Hashable, Codable {
 
     public let providerId: ProviderID
 
-//    public let authentication: ProviderAuthentication
-
     public let providerModuleType: ModuleType
 
-    public let moduleOptions: CodableOptions?
+    public let authentication: ProviderAuthentication?
+
+    private let moduleOptions: CodableOptions?
 
     public let entity: ProviderEntity?
 
@@ -49,12 +49,14 @@ public struct ProviderModule: Module, BuildableType, Hashable, Codable {
         id: UUID,
         providerId: ProviderID,
         providerModuleType: ModuleType,
+        authentication: ProviderAuthentication?,
         moduleOptions: CodableOptions?,
         entity: ProviderEntity?
     ) {
         self.id = id
         self.providerId = providerId
         self.providerModuleType = providerModuleType
+        self.authentication = authentication
         self.moduleOptions = moduleOptions
         self.entity = entity
     }
@@ -94,7 +96,9 @@ extension ProviderModule {
             }
         }
 
-        public var moduleOptions: CodableOptions?
+        public var authentication: ProviderAuthentication?
+
+        private var moduleOptions: CodableOptions?
 
         public var entity: ProviderEntity?
 
@@ -106,12 +110,14 @@ extension ProviderModule {
             id: UUID = UUID(),
             providerId: ProviderID? = nil,
             providerModuleType: ModuleType? = nil,
+            authentication: ProviderAuthentication? = nil,
             moduleOptions: CodableOptions? = nil,
             entity: ProviderEntity? = nil
         ) {
             self.id = id
             self.providerId = providerId
             self.providerModuleType = providerModuleType
+            self.authentication = authentication
             self.moduleOptions = moduleOptions
             self.entity = entity
         }
@@ -137,6 +143,7 @@ extension ProviderModule {
                 id: id,
                 providerId: providerId,
                 providerModuleType: providerModuleType,
+                authentication: authentication,
                 moduleOptions: moduleOptions,
                 entity: entity
             )

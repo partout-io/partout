@@ -25,13 +25,31 @@
 
 import Foundation
 
-public struct ProviderToken: Hashable, Codable, Sendable {
-    public let accessToken: String
+// treat as a "C union"
+public struct ProviderAuthentication: Hashable, Codable, Sendable {
+    public struct Credentials: Hashable, Codable, Sendable {
+        public let username: String
 
-    public let expiryDate: Date
+        public let password: String?
 
-    public init(accessToken: String, expiryDate: Date) {
-        self.accessToken = accessToken
-        self.expiryDate = expiryDate
+        public init(username: String, password: String?) {
+            self.username = username
+            self.password = password
+        }
     }
+
+    public struct Token: Hashable, Codable, Sendable {
+        public let accessToken: String
+
+        public let expiryDate: Date
+
+        public init(accessToken: String, expiryDate: Date) {
+            self.accessToken = accessToken
+            self.expiryDate = expiryDate
+        }
+    }
+
+    public var credentials: Credentials?
+
+    public var token: Token?
 }
