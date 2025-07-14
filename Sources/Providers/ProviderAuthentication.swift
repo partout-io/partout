@@ -55,4 +55,8 @@ public struct ProviderAuthentication: Hashable, Codable, Sendable {
 
     public init() {
     }
+
+    public var isEmpty: Bool {
+        credentials == nil && token == nil
+    }
 }

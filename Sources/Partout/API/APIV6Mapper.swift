@@ -79,9 +79,13 @@ extension API.V6 {
         public func authenticate(_ module: ProviderModule, on deviceId: String) async throws -> ProviderModule {
             switch module.providerModuleType {
             case .wireGuard:
+                guard let auth = module.authentication, !auth.isEmpty else {
+                    throw PartoutError(.authentication)
+                }
                 guard let options: WireGuardProviderTemplate.Options = try module.options(for: .wireGuard) else {
                     throw PartoutError(.Providers.missingProviderOption)
                 }
+                // it contains the keys to register
                 guard options.sessions?[deviceId] != nil else {
                     throw PartoutError(.Providers.missingProviderOption)
                 }
