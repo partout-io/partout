@@ -71,14 +71,14 @@ struct APIV6MapperTests {
         let privateKey = "UeVgIb/ahgZxjULgOdnxCeEVBhl9MLp3nwr2HSk3o3o="
         let publicKey = "zP42rU3Df+Ac2q+bnF5VaabU+N3+U7E8XBXfKiI1rGI="
 
-        let peer = WireGuardProviderStorage.Peer(id: "f4c2bb4d-c1bb-44bb-8052-cf9359cbb76a", creationDate: Date(), addresses: [])
+        let peer = WireGuardProviderStorage.Peer(id: "ff59cbeb-5822-4da4-ac97-e748d2fb290c", creationDate: Date(), addresses: [])
         let session = WireGuardProviderStorage.Session(privateKey: privateKey, publicKey: publicKey)
             .with(peer: peer)
 
         var builder = ProviderModule.Builder()
         builder.providerId = .mullvad
         builder.providerModuleType = .wireGuard
-        builder.credentials = ProviderAuthentication.Credentials(username: username, password: nil)
+        builder.credentials = ProviderAuthentication.Credentials(username: username, password: "")
         builder.token = ProviderAuthentication.Token(accessToken: accessToken, expiryDate: expiry)
 
         var storage = WireGuardProviderStorage()
