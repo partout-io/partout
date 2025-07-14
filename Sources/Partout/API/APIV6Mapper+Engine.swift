@@ -61,13 +61,15 @@ extension API.V6 {
 // MARK: - ScriptExecutor
 
 private enum ErrorMessage {
-    static let cached = "cached"
+    static let enginePrefix = "engine"
 
-    static let invalidURL = "invalidURL"
+    static let cached = "\(enginePrefix).cached"
 
-    static let notData = "notData"
+    static let invalidURL = "\(enginePrefix).invalidURL"
 
-    static let notString = "notString"
+    static let notData = "\(enginePrefix).notData"
+
+    static let notString = "\(enginePrefix).notString"
 }
 
 extension API.V6.DefaultScriptExecutor: APIEngine.ScriptExecutor {
@@ -82,7 +84,14 @@ extension API.V6.DefaultScriptExecutor: APIEngine.ScriptExecutor {
             returning: APIEngine.ScriptResult<ProviderModule>.self
         )
         if let error = result.error {
-            throw PartoutError(.scriptException, error)
+            // local error
+            if error.hasPrefix(ErrorMessage.enginePrefix) {
+                throw PartoutError(.API.engineError, error)
+            }
+            // script error
+            else {
+                throw PartoutError(.scriptException, error)
+            }
         }
         guard let response = result.response else {
             throw PartoutError(.scriptException, result.error ?? "unknown")
