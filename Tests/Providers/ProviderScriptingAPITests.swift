@@ -59,4 +59,13 @@ struct ProviderScriptingAPITests {
         let map = sut.getText(urlString: "doesntmatter", headers: nil)
         #expect(map["response"] as? String == "mapped content\n")
     }
+
+    @Test(arguments: [
+        (1752562800, "Tue, 15 Jul 2025 07:00:00 GMT"),
+        (1698907632, "Thu, 2 Nov 2023 06:47:12 GMT")
+    ])
+    func givenTimestamp_whenGetRFC1123_thenIsExpected(timestamp: Timestamp, rfc: String) {
+        #expect(timestamp.toRFC1123() == rfc)
+        #expect(rfc.fromRFC1123() == timestamp)
+    }
 }
