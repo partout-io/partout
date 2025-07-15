@@ -177,6 +177,10 @@ let package = Package(
             targets: ["_PartoutCryptoCore"]
         ),
         .library(
+            name: "PartoutProviders",
+            targets: ["PartoutProviders"]
+        ),
+        .library(
             name: "PartoutVendorsPortable",
             targets: ["_PartoutVendorsPortable"]
         )
@@ -270,7 +274,10 @@ package.targets.append(contentsOf: [
     .testTarget(
         name: "PartoutProvidersTests",
         dependencies: ["PartoutProviders"],
-        path: "Tests/Providers"
+        path: "Tests/Providers",
+        resources: [
+            .process("Resources")
+        ]
     )
 ])
 

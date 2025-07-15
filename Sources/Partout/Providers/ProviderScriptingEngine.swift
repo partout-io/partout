@@ -1,8 +1,8 @@
 //
-//  Date+RFC1123.swift
+//  ProviderScriptingEngine.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 3/29/25.
+//  Created by Davide De Rosa on 7/15/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,24 +23,23 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
+import PartoutProviders
 
-private let rfc1123: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    formatter.timeZone = TimeZone(abbreviation: "GMT")
-    formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss z"
-    return formatter
-}()
-
-extension Date {
-    func toRFC1123() -> String {
-        rfc1123.string(from: self)
-    }
+protocol ProviderScriptingEngine: ScriptingEngine {
+    func inject(from engine: ProviderScriptingAPI)
 }
 
-extension String {
-    func fromRFC1123() -> Date? {
-        rfc1123.date(from: self)
+// inject ProviderEngine functions into the ScriptingEngine
+// available on the current platform
+extension ProviderScriptingAPI {
+    func newScriptingEngine(_ ctx: PartoutLoggerContext) -> ScriptingEngine {
+        let engine: ProviderScriptingEngine
+#if canImport(_PartoutVendorsApple)
+        engine = AppleJavaScriptEngine(ctx)
+#else
+        fatalError("Unsupported platform")
+#endif
+        engine.inject(from: self)
+        return engine
     }
 }

@@ -1,8 +1,8 @@
 //
-//  ProviderCache.swift
+//  Timestamp+RFC1123.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/2/25.
+//  Created by Davide De Rosa on 3/29/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -25,13 +25,26 @@
 
 import Foundation
 
-public struct ProviderCache: Hashable, Codable, Sendable {
-    public let lastUpdate: Date?
+private let rfc1123: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(abbreviation: "GMT")
+    formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss z"
+    return formatter
+}()
 
-    public let tag: String?
+extension Timestamp {
+    public func toRFC1123() -> String {
+        rfc1123.string(from: Date(
+            timeIntervalSince1970: TimeInterval(self))
+        )
+    }
+}
 
-    public init(lastUpdate: Date?, tag: String?) {
-        self.lastUpdate = lastUpdate
-        self.tag = tag
+extension String {
+    public func fromRFC1123() -> Timestamp? {
+        rfc1123.date(from: self).map {
+            UInt32($0.timeIntervalSince1970)
+        }
     }
 }

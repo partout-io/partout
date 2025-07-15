@@ -35,6 +35,8 @@ struct APIV6MapperTests {
 
     @Test
     func whenFetchIndex_thenReturnsProviders() async throws {
+        setUpLogging()
+
         let sut = try Self.apiV6()
         let index = try await sut.index()
         #expect(index.count == 12)
@@ -56,13 +58,38 @@ struct APIV6MapperTests {
 
     // MARK: Infrastructures
 
-    @Test
-    func givenHideMe_whenFetchInfrastructure_thenReturns() async throws {
-        let sut = try Self.apiV6()
+    @Test(arguments: [
+        HideMeFetchInput(
+            cache: nil,
+            presetsCount: 1,
+            serversCount: 2,
+            isCached: false
+        ),
+//        HideMeFetchInput(
+//            cache: nil,
+//            presetsCount: 1,
+//            serversCount: 99,
+//            isCached: false,
+//            withMapper: false
+//        ),
+//        HideMeFetchInput(
+//            cache: ProviderCache(lastUpdate: nil, tag: "\\\"0103dd09364f346ff8a8c2b9d5285b5d\\\""),
+//            presetsCount: 1,
+//            serversCount: 99,
+//            isCached: true,
+//            withMapper: false
+//        )
+    ])
+    func givenHideMe_whenFetchInfrastructure_thenReturns(input: HideMeFetchInput) async throws {
+        setUpLogging()
+
+        let sut = try Self.apiV6(requestMapper: input.withMapper ? {
+            hidemeFetchRequestMapper(urlString: $1)
+        } : nil)
         do {
-            let infra = try await sut.infrastructure(for: .hideme, cache: nil)
-            #expect(infra.presets.count == 1)
-            #expect(infra.servers.count == 2)
+            let infra = try await sut.infrastructure(for: .hideme, cache: input.cache)
+            #expect(infra.presets.count == input.presetsCount)
+            #expect(infra.servers.count == input.serversCount)
 
 #if canImport(_PartoutOpenVPNCore)
             try infra.presets.forEach {
@@ -81,26 +108,72 @@ struct APIV6MapperTests {
                 }
             }
 #endif
+        } catch let error as PartoutError {
+            if input.isCached {
+                #expect(error.code == .cached)
+            } else {
+                #expect(Bool(false), "Failed: \(error)")
+            }
         } catch {
             #expect(Bool(false), "Failed: \(error)")
         }
     }
+}
 
-    @Test
-    func givenGetResult_whenHasCache_thenReturnsProviderCache() throws {
-        let date = Date()
-        let tag = "12345"
-        let sut = APIEngine.GetResult("", status: nil, lastModified: date, tag: tag)
+// MARK: - Request mappers
 
-        let object = try #require(sut.serialized()["cache"])
-        let data = try JSONSerialization.data(withJSONObject: object)
-        let cache = try JSONDecoder().decode(ProviderCache.self, from: data)
+extension APIV6MapperTests {
+    struct HideMeFetchInput {
+        let cache: ProviderCache?
 
-        #expect(cache.lastUpdate == date)
-        #expect(cache.tag == tag)
+        let presetsCount: Int
+
+        let serversCount: Int
+
+        let isCached: Bool
+
+        var withMapper = true
     }
 
-    // MARK: -
+    func hidemeFetchRequestMapper(urlString: String) -> (Int, Data) {
+        guard let url = Bundle.module.url(forResource: "Resources/JSON/hideme/fetch", withExtension: "json") else {
+            fatalError("Unable to find fetch.json")
+        }
+        do {
+            let data = try Data(contentsOf: url)
+            return (200, data)
+        } catch {
+            fatalError("Unable to read JSON contents: \(error)")
+        }
+    }
+}
+
+// MARK: - Helpers
+
+private extension APIV6MapperTests {
+    static func apiV6(requestMapper: ((String, String) -> (Int, Data))? = nil) throws -> APIMapper {
+        let root = "Resources/API/v6"
+        guard let baseURL = Bundle.module.url(forResource: root, withExtension: nil) else {
+            fatalError("Could not find resource path")
+        }
+        return API.V6.Mapper(
+            .global,
+            baseURL: baseURL,
+            timeout: 3.0,
+            api: DefaultProviderScriptingAPI(
+                .global,
+                timeout: 3.0,
+                requestMapper: requestMapper
+            )
+        )
+    }
+
+    func setUpLogging() {
+        var logger = PartoutLogger.Builder()
+        logger.setDestination(OSLogDestination(.api), for: [.api])
+        logger.setDestination(OSLogDestination(.providers), for: [.providers])
+        PartoutLogger.register(logger.build())
+    }
 
     func measureFetchProvider() async throws {
         let sut = try Self.apiV6()
@@ -109,23 +182,6 @@ struct APIV6MapperTests {
             _ = try await sut.infrastructure(for: .hideme, cache: nil)
         }
         print("Elapsed: \(-begin.timeIntervalSinceNow)")
-    }
-}
-
-private extension APIV6MapperTests {
-    static func apiV6() throws -> APIMapper {
-        let root = "Resources/API/v6"
-        guard let baseURL = Bundle.module.url(forResource: root, withExtension: nil) else {
-            fatalError("Could not find resource path")
-        }
-        let infrastructureURL: (ProviderID) -> URL = {
-            baseURL.appendingPathComponent("providers/\($0.rawValue)/fetch.json")
-        }
-        return API.V6.Mapper(
-            .global,
-            baseURL: baseURL,
-            infrastructureURL: infrastructureURL
-        )
     }
 }
 

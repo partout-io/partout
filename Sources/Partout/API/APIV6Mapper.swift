@@ -38,24 +38,24 @@ extension API.V6 {
 
         private let baseURL: URL
 
-        private let infrastructureURL: ((ProviderID) -> URL)?
-
         private let timeout: TimeInterval
 
-        private let executorFactory: (URL?, ProviderCache?, TimeInterval) -> APIEngine.ScriptExecutor
+        private let api: ProviderScriptingAPI
+
+        private let engineFactory: (ProviderScriptingAPI) -> ScriptingEngine
 
         public init(
             _ ctx: PartoutLoggerContext,
             baseURL: URL,
-            infrastructureURL: ((ProviderID) -> URL)? = nil,
             timeout: TimeInterval = 10.0,
-            executorFactory: @escaping (URL?, ProviderCache?, TimeInterval) -> APIEngine.ScriptExecutor
+            api: ProviderScriptingAPI,
+            engineFactory: @escaping (ProviderScriptingAPI) -> ScriptingEngine
         ) {
             self.ctx = ctx
             self.baseURL = baseURL
-            self.infrastructureURL = infrastructureURL
             self.timeout = timeout
-            self.executorFactory = executorFactory
+            self.api = api
+            self.engineFactory = engineFactory
         }
 
         public func index() async throws -> [Provider] {
@@ -79,40 +79,99 @@ extension API.V6 {
         public func authenticate(_ module: ProviderModule, on deviceId: String) async throws -> ProviderModule {
             switch module.providerModuleType {
             case .wireGuard:
+
+                // preconditions (also check in script)
                 guard let auth = module.authentication, !auth.isEmpty else {
                     throw PartoutError(.authentication)
                 }
                 guard let storage: WireGuardProviderStorage = try module.options(for: .wireGuard) else {
                     throw PartoutError(.Providers.missingOption)
                 }
-                // it contains the keys to register
                 guard storage.sessions?[deviceId] != nil else {
                     throw PartoutError(.Providers.missingOption)
                 }
-                let data = try await data(for: .provider(module.providerId))
-                guard let script = String(data: data, encoding: .utf8) else {
-                    throw PartoutError(.notFound)
-                }
-                let executor = executorFactory(nil, nil, timeout)
-                return try await executor.authenticate(module, on: deviceId, with: script)
+
+                let script = try await script(for: .provider(module.providerId))
+                let engine = engineFactory(api)
+                return try await engine.authenticate(module, on: deviceId, with: script)
             default:
-                fatalError("Authentication not supported for module type \(module.providerModuleType)")
+                assertionFailure("Authentication not supported for module type \(module.providerModuleType)")
+                return module
             }
         }
 
         public func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure {
-            let data = try await data(for: .provider(providerId))
-            guard let script = String(data: data, encoding: .utf8) else {
-                throw PartoutError(.notFound)
-            }
-            let resultURL = infrastructureURL?(providerId)
-            let executor = executorFactory(resultURL, cache, timeout)
-            return try await executor.fetchInfrastructure(with: script)
+            let script = try await script(for: .provider(providerId))
+            let engine = engineFactory(api)
+            return try await engine.fetchInfrastructure(with: script, cache: cache)
         }
     }
 }
 
+// MARK: - Engine
+
+// TODO: #54/partout, assumes engine to be JavaScript
+extension ScriptingEngine {
+    func authenticate(_ module: ProviderModule, on deviceId: String, with script: String) async throws -> ProviderModule {
+        let moduleData = try JSONEncoder().encode(module)
+        guard let moduleJSON = String(data: moduleData, encoding: .utf8) else {
+            throw PartoutError(.encoding)
+        }
+        let result = try await execute(
+            "JSON.stringify(authenticate(JSON.parse('\(moduleJSON)'), '\(deviceId)'))",
+            after: script,
+            returning: ScriptResult<ProviderModule>.self
+        )
+        if let error = result.error {
+            throw PartoutError(.scriptException, error)
+        }
+        guard let response = result.response else {
+            throw PartoutError(.scriptException, result.error ?? "unknown")
+        }
+        return response
+    }
+
+    func fetchInfrastructure(with script: String, cache: ProviderCache?) async throws -> ProviderInfrastructure {
+        var headers: [String: String] = [:]
+        if let lastUpdate = cache?.lastUpdate {
+            headers["If-Modified-Since"] = lastUpdate.toRFC1123()
+        }
+        if let tag = cache?.tag {
+            headers["If-None-Match"] = tag
+        }
+        let headersData = try JSONEncoder().encode(headers)
+        guard let headersJSON = String(data: headersData, encoding: .utf8) else {
+            throw PartoutError(.encoding)
+        }
+        let result = try await execute(
+            "JSON.stringify(getInfrastructure(JSON.parse('\(headersJSON)')))",
+            after: script,
+            returning: ScriptResult<ProviderInfrastructure>.self
+        )
+        guard let response = result.response else {
+            if let error = result.error {
+                throw PartoutError(.scriptException, error)
+            }
+            // XXX: empty response without error = cached response
+            else {
+                throw PartoutError(.cached)
+            }
+        }
+        return response
+    }
+}
+
+// MARK: - Helpers
+
 private extension API.V6.Mapper {
+    func script(for resource: API.V6.Resource) async throws -> String {
+        let data = try await data(for: resource)
+        guard let script = String(data: data, encoding: .utf8) else {
+            throw PartoutError(.notFound)
+        }
+        return script
+    }
+
     func data(for resource: API.V6.Resource) async throws -> Data {
         let url = baseURL.appendingPathComponent(resource.path)
         pp_log(ctx, .api, .info, "Fetch data for \(resource): \(url)")
@@ -133,6 +192,13 @@ private extension API.V6.Mapper {
             throw error
         }
     }
+}
+
+// JS -> Swift
+private struct ScriptResult<T>: Decodable where T: Decodable {
+    let response: T?
+
+    let error: String?
 }
 
 #endif

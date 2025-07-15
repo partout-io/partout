@@ -119,7 +119,7 @@ private extension Registry {
             return try resolver.resolved(from: providerModule, on: deviceId)
         } catch {
             pp_log_id(profile?.id, .core, .error, "Unable to resolve module: \(error)")
-            throw error as? PartoutError ?? PartoutError(.Providers.corruptProviderModule, error)
+            throw error as? PartoutError ?? PartoutError(.Providers.corruptModule, error)
         }
     }
 }
