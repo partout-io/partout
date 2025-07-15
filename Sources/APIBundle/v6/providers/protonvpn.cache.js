@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure() {
+function getInfrastructure(headers) {
     const providerId = "protonvpn";
     const openVPN = {
         moduleType: "OpenVPN",
@@ -34,7 +34,7 @@ function getInfrastructure() {
 
     const url = "https://api.protonvpn.ch/vpn/logicals";
     const query = "Tier=0&Tier=1&Tier=2&WithEntriesForProtocols=OpenVPN,WireGuard";
-    const json = getJSON(url + "?" + query);
+    const json = api.getJSON(url + "?" + query, headers);
     if (json.error) {
         return json;
     }
@@ -209,8 +209,8 @@ aeb893d9a96d1f15519bb3c4dcb40ee3
 16672ea16c012664f8a9f11255518deb
 `;
 
-    const tlsAuth = openVPNTLSWrap("auth", tlsAuthKey);
-    const tlsCrypt = openVPNTLSWrap("crypt", tlsAuthKey);
+    const tlsAuth = api.openVPNTLSWrap("auth", tlsAuthKey);
+    const tlsCrypt = api.openVPNTLSWrap("crypt", tlsAuthKey);
 
     const cfg = {
         cipher: "AES-256-CBC",
@@ -232,7 +232,7 @@ aeb893d9a96d1f15519bb3c4dcb40ee3
         presetId: presetIds.auth,
         description: "Default (--tls-auth)",
         moduleType: moduleType,
-        templateData: jsonToBase64({
+        templateData: api.jsonToBase64({
             configuration: authCfg,
             endpoints: endpoints,
         })
@@ -244,7 +244,7 @@ aeb893d9a96d1f15519bb3c4dcb40ee3
         presetId: presetIds.crypt,
         description: "Crypt (--tls-crypt)",
         moduleType: moduleType,
-        templateData: jsonToBase64({
+        templateData: api.jsonToBase64({
             configuration: cryptCfg,
             endpoints: endpoints,
         })

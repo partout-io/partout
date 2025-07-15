@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure() {
+function getInfrastructure(headers) {
     const providerId = "surfshark";
     const openVPN = {
         moduleType: "OpenVPN",
@@ -31,7 +31,7 @@ function getInfrastructure() {
         }
     };
 
-    const json = getJSON("https://api.surfshark.com/v5/server/clusters");
+    const json = api.getJSON("https://api.surfshark.com/v5/server/clusters", headers);
     if (json.error) {
         return json;
     }
@@ -140,7 +140,7 @@ b260f4b45dec3285875589c97d3087c9
 134d3a3aa2f904512e85aa2dc2202498
 `;
 
-    const tlsWrap = openVPNTLSWrap("auth", tlsAuthKey);
+    const tlsWrap = api.openVPNTLSWrap("auth", tlsAuthKey);
 
     const cfg = {
         ca: ca,
@@ -159,7 +159,7 @@ b260f4b45dec3285875589c97d3087c9
         presetId: presetIds.recommended,
         description: "Default",
         moduleType: moduleType,
-        templateData: jsonToBase64({
+        templateData: api.jsonToBase64({
             configuration: cfg,
             endpoints: ["UDP:1194", "TCP:1443"]
         })

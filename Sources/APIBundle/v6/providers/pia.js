@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure() {
+function getInfrastructure(headers) {
     const providerId = "pia";
     const openVPN = {
         moduleType: "OpenVPN",
@@ -31,7 +31,7 @@ function getInfrastructure() {
         }
     };
 
-    const raw = getText("https://serverlist.piaservers.net/vpninfo/servers/v6");
+    const raw = api.getText("https://serverlist.piaservers.net/vpninfo/servers/v6");
     let json = null;
     try {
         if (!raw.response) {
@@ -155,7 +155,7 @@ iyd1Fzx0yujuiXDROLhISLQDRjVVAvawrAtLZWYK31bY7KlezPlQnl/D9Asxe85l
         presetId: presetIds.recommended,
         description: "Default",
         moduleType: moduleType,
-        templateData: jsonToBase64({
+        templateData: api.jsonToBase64({
             configuration: cfg,
             endpoints: ep
         })

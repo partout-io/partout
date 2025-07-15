@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure() {
+function getInfrastructure(headers) {
     const providerId = "oeck";
     const openVPN = {
         moduleType: "OpenVPN",
@@ -32,7 +32,7 @@ function getInfrastructure() {
         }
     };
 
-    const json = getJSON("https://www.oeck.com/oeck-servers.json");
+    const json = api.getJSON("https://www.oeck.com/oeck-servers.json", headers);
     if (json.error) {
         return json;
     }
@@ -229,7 +229,7 @@ b46d25416d608cc549e571dfffe64532
 7f5dd208a85a1af6a25dede651b809fe
 `;
 
-    const tlsWrap = openVPNTLSWrap("auth", tlsAuthKey);
+    const tlsWrap = api.openVPNTLSWrap("auth", tlsAuthKey);
 
     const cfg = {
         ca: ca,
@@ -254,7 +254,7 @@ b46d25416d608cc549e571dfffe64532
         presetId: presetIds.cfg128,
         description: "128-bit",
         moduleType: moduleType,
-        templateData: jsonToBase64({
+        templateData: api.jsonToBase64({
             configuration: cfg128,
             endpoints: [
                 "UDP:1196",
@@ -268,7 +268,7 @@ b46d25416d608cc549e571dfffe64532
         presetId: presetIds.cfg256,
         description: "256-bit",
         moduleType: moduleType,
-        templateData: jsonToBase64({
+        templateData: api.jsonToBase64({
             configuration: cfg256,
             endpoints: [
                 "UDP:1194",

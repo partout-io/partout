@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure() {
+function getInfrastructure(headers) {
     const providerId = "hideme";
     const openVPN = {
         moduleType: "OpenVPN",
@@ -31,7 +31,7 @@ function getInfrastructure() {
         }
     };
 
-    const json = api.getJSON("https://api.hide.me/v1/external/passepartout");
+    const json = api.getJSON("https://api.hide.me/v1/external/passepartout", headers);
     if (json.error) {
         return json;
     }

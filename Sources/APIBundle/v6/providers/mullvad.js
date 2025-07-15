@@ -22,7 +22,9 @@
 // SOFTWARE.
 //
 
-function getInfrastructure() {
+const baseURL = "https://api.mullvad.net";
+
+function getInfrastructure(headers) {
     const providerId = "mullvad";
     const openVPN = {
         moduleType: "OpenVPN",
@@ -32,7 +34,7 @@ function getInfrastructure() {
         }
     };
 
-    const json = api.getJSON(`${baseURL}/app/v1/relays`);
+    const json = api.getJSON(`${baseURL}/app/v1/relays`, headers);
     if (json.error) {
         return json;
     }

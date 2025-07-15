@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure() {
+function getInfrastructure(headers) {
     const providerId = "nordvpn";
     const openVPN = {
         moduleType: "OpenVPN",
@@ -32,7 +32,7 @@ function getInfrastructure() {
         }
     };
 
-    const json = getJSON("https://api.nordvpn.com/v2/servers?limit=0");
+    const json = api.getJSON("https://api.nordvpn.com/v2/servers?limit=0", headers);
     if (json.error) {
         return json;
     }
@@ -152,7 +152,7 @@ a196c9de96012090e333519ae18d3509
 3f8a56ddb2e64eb67adfc9b337157ff4
 `;
 
-    const tlsWrap = openVPNTLSWrap("auth", tlsAuthKey);
+    const tlsWrap = api.openVPNTLSWrap("auth", tlsAuthKey);
 
     const cfg = {
         ca: ca,
@@ -171,7 +171,7 @@ a196c9de96012090e333519ae18d3509
         presetId: presetIds.basic,
         description: "Default",
         moduleType: moduleType,
-        templateData: jsonToBase64({
+        templateData: api.jsonToBase64({
             configuration: cfg,
             endpoints: [
                 "UDP:1194"
@@ -183,7 +183,7 @@ a196c9de96012090e333519ae18d3509
         presetId: presetIds.double,
         description: "Double VPN",
         moduleType: moduleType,
-        templateData: jsonToBase64({
+        templateData: api.jsonToBase64({
             configuration: cfg,
             endpoints: [
                 "TCP:443"

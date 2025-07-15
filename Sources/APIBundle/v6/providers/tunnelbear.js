@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure() {
+function getInfrastructure(headers) {
     const providerId = "tunnelbear";
     const openVPN = {
         moduleType: "OpenVPN",
@@ -99,7 +99,7 @@ eg==
         presetId: presetIds.recommended,
         description: "Default",
         moduleType: moduleType,
-        templateData: jsonToBase64({
+        templateData: api.jsonToBase64({
             configuration: cfg,
             endpoints: [
                 "UDP:443",

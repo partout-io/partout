@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure() {
+function getInfrastructure(headers) {
     const providerId = "vyprvpn";
     const openVPN = {
         moduleType: "OpenVPN",
@@ -203,7 +203,7 @@ rgAx9j9a+dMLfe1vP5t6GQj5
         presetId: presetIds.recommended,
         description: "Default",
         moduleType: moduleType,
-        templateData: jsonToBase64({
+        templateData: api.jsonToBase64({
             configuration: cfg,
             endpoints: [
                 "UDP:443"

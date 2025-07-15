@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure() {
+function getInfrastructure(headers) {
     const providerId = "ivpn";
     const openVPN = {
         moduleType: "OpenVPN",
@@ -31,7 +31,7 @@ function getInfrastructure() {
         }
     };
 
-    const json = getJSON("https://api.ivpn.net/v5/servers.json");
+    const json = api.getJSON("https://api.ivpn.net/v5/servers.json", headers);
     if (json.error) {
         return json;
     }
@@ -148,7 +148,7 @@ d76170ffd904d8291071e96efc3fb777
 ffe737b98916dd15ef6235dee4266d3b
 `;
 
-    const tlsWrap = openVPNTLSWrap("auth", tlsAuthKey);
+    const tlsWrap = api.openVPNTLSWrap("auth", tlsAuthKey);
 
     const cfg = {
         ca: ca,

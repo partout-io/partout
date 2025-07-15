@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure() {
+function getInfrastructure(headers) {
     const providerId = "windscribe";
     const openVPN = {
         moduleType: "OpenVPN",
@@ -209,7 +209,7 @@ c5c4a1874685429046a424c026db672e
 eade34972586b31c6ce7e395f4b478cb
 `;
 
-    const tlsWrap = openVPNTLSWrap("auth", tlsAuthKey);
+    const tlsWrap = api.openVPNTLSWrap("auth", tlsAuthKey);
 
     const cfg = {
         ca: ca,
@@ -226,7 +226,7 @@ eade34972586b31c6ce7e395f4b478cb
         presetId: presetIds.recommended,
         description: "Default",
         moduleType: moduleType,
-        templateData: jsonToBase64({
+        templateData: api.jsonToBase64({
             configuration: cfg,
             endpoints: [
                 "UDP:443",

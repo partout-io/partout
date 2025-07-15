@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure() {
+function getInfrastructure(headers) {
     const providerId = "torguard";
     const openVPN = {
         moduleType: "OpenVPN",
@@ -187,7 +187,7 @@ c183f65da5d3c9001a8cbdb96c793d93
 38d938bd0597c426b0e440434f2c451f
 `;
 
-    const tlsWrap = openVPNTLSWrap("crypt", tlsAuthKey);
+    const tlsWrap = api.openVPNTLSWrap("crypt", tlsAuthKey);
 
     const cfg = {
         ca: ca,
@@ -212,7 +212,7 @@ c183f65da5d3c9001a8cbdb96c793d93
         presetId: presetIds.basic,
         description: "Basic",
         moduleType: moduleType,
-        templateData: jsonToBase64({
+        templateData: api.jsonToBase64({
             configuration: cfgBasic,
             endpoints: [
                 "UDP:80",
@@ -229,7 +229,7 @@ c183f65da5d3c9001a8cbdb96c793d93
         presetId: presetIds.strong,
         description: "Strong",
         moduleType: moduleType,
-        templateData: jsonToBase64({
+        templateData: api.jsonToBase64({
             configuration: cfgStrong,
             endpoints: [
                 "UDP:53",
