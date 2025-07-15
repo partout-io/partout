@@ -1,8 +1,8 @@
 //
-//  Partout+Providers.swift
+//  ProviderCache.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/23/25.
+//  Created by Davide De Rosa on 4/2/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,23 +23,13 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-import PartoutCore
+public struct ProviderCache: Hashable, Codable, Sendable {
+    public let lastUpdate: Timestamp?
 
-extension LoggerCategory {
-    public static let providers = Self(rawValue: "providers")
-}
+    public let tag: String?
 
-extension PartoutError.Code {
-    public enum Providers {
-
-        /// A provider module is corrupt.
-        public static let corruptModule = PartoutError.Code("Providers.corruptModule")
-
-        /// A provider was chosen but the target entity is missing.
-        public static let missingEntity = PartoutError.Code("Providers.missingEntity")
-
-        /// A provider was chosen but a required option is missing.
-        public static let missingOption = PartoutError.Code("Providers.missingOption")
+    public init(lastUpdate: Timestamp?, tag: String?) {
+        self.lastUpdate = lastUpdate
+        self.tag = tag
     }
 }

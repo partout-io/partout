@@ -33,12 +33,6 @@ import Foundation
 
 @_exported import PartoutProviders
 
-extension PartoutError.Code.Providers {
-
-    /// A provider module is corrupt.
-    public static let corruptProviderModule = PartoutError.Code("corruptProviderModule")
-}
-
 // MARK: - API
 
 #if canImport(PartoutAPI)

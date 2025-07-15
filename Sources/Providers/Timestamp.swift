@@ -1,8 +1,8 @@
 //
-//  Partout+Providers.swift
+//  Timestamp.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/23/25.
+//  Created by Davide De Rosa on 7/15/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -24,22 +24,14 @@
 //
 
 import Foundation
-import PartoutCore
 
-extension LoggerCategory {
-    public static let providers = Self(rawValue: "providers")
-}
+// TODO: ###, move to Core
+public typealias Timestamp = UInt32
 
-extension PartoutError.Code {
-    public enum Providers {
+extension Timestamp {
 
-        /// A provider module is corrupt.
-        public static let corruptModule = PartoutError.Code("Providers.corruptModule")
-
-        /// A provider was chosen but the target entity is missing.
-        public static let missingEntity = PartoutError.Code("Providers.missingEntity")
-
-        /// A provider was chosen but a required option is missing.
-        public static let missingOption = PartoutError.Code("Providers.missingOption")
+    // this can be easily done without Foundation
+    public static func now() -> Self {
+        UInt32(Date().timeIntervalSince1970)
     }
 }

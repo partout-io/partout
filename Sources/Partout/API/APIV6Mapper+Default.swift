@@ -1,8 +1,8 @@
 //
-//  Partout+Providers.swift
+//  APIV6Mapper+Default.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/23/25.
+//  Created by Davide De Rosa on 4/20/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,23 +23,31 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+#if canImport(PartoutAPI)
+
 import Foundation
-import PartoutCore
+import PartoutProviders
 
-extension LoggerCategory {
-    public static let providers = Self(rawValue: "providers")
-}
+extension API.V6.Mapper {
+    public convenience init(
+        _ ctx: PartoutLoggerContext,
+        baseURL: URL,
+        timeout: TimeInterval
+    ) {
+        let api = DefaultProviderScriptingAPI(ctx, timeout: timeout)
+        self.init(ctx, baseURL: baseURL, timeout: timeout, api: api)
+    }
 
-extension PartoutError.Code {
-    public enum Providers {
-
-        /// A provider module is corrupt.
-        public static let corruptModule = PartoutError.Code("Providers.corruptModule")
-
-        /// A provider was chosen but the target entity is missing.
-        public static let missingEntity = PartoutError.Code("Providers.missingEntity")
-
-        /// A provider was chosen but a required option is missing.
-        public static let missingOption = PartoutError.Code("Providers.missingOption")
+    public convenience init(
+        _ ctx: PartoutLoggerContext,
+        baseURL: URL,
+        timeout: TimeInterval,
+        api: DefaultProviderScriptingAPI
+    ) {
+        self.init(ctx, baseURL: baseURL, timeout: timeout, api: api) {
+            $0.newScriptingEngine(ctx)
+        }
     }
 }
+
+#endif

@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-function getInfrastructure() {
+function getInfrastructure(headers) {
     const providerId = "hideme";
     const openVPN = {
         moduleType: "OpenVPN",
@@ -31,9 +31,9 @@ function getInfrastructure() {
             recommended: "default"
         }
     };
-
-    const json = getJSON("https://api.hide.me/v1/external/passepartout");
-    if (json.error) {
+    debug(`JS.getInfrastructure: Headers = ${headers}`);
+    const json = getJSON("https://api.hide.me/v1/external/passepartout", headers);
+    if (!json.response) {
         return json;
     }
 

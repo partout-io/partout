@@ -1,8 +1,8 @@
 //
-//  APIV6Mapper+Platform.swift
+//  ProviderScriptingEngine+Apple.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/20/25.
+//  Created by Davide De Rosa on 7/15/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,40 +23,13 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(PartoutAPI)
-
-import Foundation
-import PartoutAPI
-
-extension API.V6.Mapper {
-    public convenience init(
-        _ ctx: PartoutLoggerContext,
-        baseURL: URL,
-        infrastructureURL: ((ProviderID) -> URL)? = nil
-    ) {
-        self.init(ctx, baseURL: baseURL, infrastructureURL: infrastructureURL) {
-            API.V6.DefaultScriptExecutor(
-                ctx,
-                resultURL: $0,
-                cache: $1,
-                timeout: $2,
-                engine: newAPIScriptingEngine(ctx)
-            )
-        }
-    }
-}
-
 #if canImport(_PartoutVendorsApple)
 
 import _PartoutVendorsApple
 import JavaScriptCore
 
-private func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine {
-    AppleJavaScriptEngine(ctx)
-}
-
-extension AppleJavaScriptEngine: APIScriptingEngine {
-    public func inject(from vm: APIEngine.VirtualMachine) {
+extension AppleJavaScriptEngine: ProviderScriptingEngine {
+    public func inject(from vm: ProviderScriptingAPI) {
         let getResultBlock: @convention(block) (JSValue, JSValue, JSValue, JSValue) -> Any? = {
             guard let method = $0.toString() else {
                 assertionFailure("Missing method")
@@ -71,8 +44,8 @@ extension AppleJavaScriptEngine: APIScriptingEngine {
             return vm.getResult(method: method, urlString: urlString, headers: headers, body: body)
         }
         inject("getResult", object: getResultBlock)
-        inject("getText", object: vm.getText as @convention(block) (String) -> Any?)
-        inject("getJSON", object: vm.getJSON as @convention(block) (String) -> Any?)
+        inject("getText", object: vm.getText as @convention(block) (String, [String: String]?) -> Any?)
+        inject("getJSON", object: vm.getJSON as @convention(block) (String, [String: String]?) -> Any?)
         inject("jsonFromBase64", object: vm.jsonFromBase64 as @convention(block) (String) -> Any?)
         inject("jsonToBase64", object: vm.jsonToBase64 as @convention(block) (Any) -> String?)
         inject("timestampFromISO", object: vm.timestampFromISO as @convention(block) (String) -> Int)
@@ -84,14 +57,5 @@ extension AppleJavaScriptEngine: APIScriptingEngine {
         inject("ppHTTPErrorResponse", object: vm.httpErrorResponse as @convention(block) (Int, String) -> [String: Any])
     }
 }
-
-#else
-
-private func newAPIScriptingEngine(_ ctx: PartoutLoggerContext) -> APIScriptingEngine {
-    // TODO: ###, APIScriptingEngine on non-Apple
-    fatalError("Unsupported platform")
-}
-
-#endif
 
 #endif
