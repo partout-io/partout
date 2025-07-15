@@ -152,8 +152,7 @@ extension APIV6MapperTests {
 
 private extension APIV6MapperTests {
     static func apiV6(requestMapper: ((String, String) -> (Int, Data))? = nil) throws -> APIMapper {
-        let root = "Resources/API/v6"
-        guard let baseURL = Bundle.module.url(forResource: root, withExtension: nil) else {
+        guard let baseURL = API.url() else {
             fatalError("Could not find resource path")
         }
         return API.V6.Mapper(
