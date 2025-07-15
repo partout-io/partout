@@ -60,7 +60,7 @@ extension API.V6 {
 
         public func index() async throws -> [Provider] {
             let data = try await data(for: .index)
-            let json = try JSONDecoder().decode(API.V6.Index.self, from: data)
+            let json = try JSONDecoder().decode(Index.self, from: data)
 
             return json
                 .providers

@@ -136,7 +136,7 @@ extension APIV6MapperTests {
     }
 
     func hidemeFetchRequestMapper(urlString: String) -> (Int, Data) {
-        guard let url = Bundle.module.url(forResource: "Resources/JSON/hideme/fetch", withExtension: "json") else {
+        guard let url = Bundle.module.url(forResource: "Resources/hideme/fetch", withExtension: "json") else {
             fatalError("Unable to find fetch.json")
         }
         do {
