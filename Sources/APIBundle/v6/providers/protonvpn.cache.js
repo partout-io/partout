@@ -35,7 +35,7 @@ function getInfrastructure(headers) {
     const url = "https://api.protonvpn.ch/vpn/logicals";
     const query = "Tier=0&Tier=1&Tier=2&WithEntriesForProtocols=OpenVPN,WireGuard";
     const json = api.getJSON(url + "?" + query, headers);
-    if (json.error) {
+    if (!json.response) {
         return json;
     }
 

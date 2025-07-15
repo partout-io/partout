@@ -32,7 +32,7 @@ function getInfrastructure(headers) {
     };
 
     const json = api.getJSON("https://api.ivpn.net/v5/servers.json", headers);
-    if (json.error) {
+    if (!json.response) {
         return json;
     }
 

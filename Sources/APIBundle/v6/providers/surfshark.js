@@ -32,7 +32,7 @@ function getInfrastructure(headers) {
     };
 
     const json = api.getJSON("https://api.surfshark.com/v5/server/clusters", headers);
-    if (json.error) {
+    if (!json.response) {
         return json;
     }
 

@@ -32,7 +32,7 @@ function getInfrastructure(headers) {
     };
 
     const json = api.getJSON("https://api.hide.me/v1/external/passepartout", headers);
-    if (json.error) {
+    if (!json.response) {
         return json;
     }
 

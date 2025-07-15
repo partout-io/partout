@@ -35,7 +35,7 @@ function getInfrastructure(headers) {
     };
 
     const json = api.getJSON(`${baseURL}/app/v1/relays`, headers);
-    if (json.error) {
+    if (!json.response) {
         return json;
     }
 

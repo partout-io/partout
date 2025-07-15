@@ -33,7 +33,7 @@ function getInfrastructure(headers) {
     };
 
     const json = api.getJSON("https://www.oeck.com/oeck-servers.json", headers);
-    if (json.error) {
+    if (!json.response) {
         return json;
     }
 

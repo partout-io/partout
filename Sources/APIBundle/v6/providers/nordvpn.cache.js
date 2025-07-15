@@ -33,7 +33,7 @@ function getInfrastructure(headers) {
     };
 
     const json = api.getJSON("https://api.nordvpn.com/v2/servers?limit=0", headers);
-    if (json.error) {
+    if (!json.response) {
         return json;
     }
 
