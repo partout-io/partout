@@ -31,7 +31,7 @@ import JavaScriptCore
 extension AppleJavaScriptEngine: ProviderScriptingEngine {
 
     @objc
-    protocol ObjCAPIProtocol: JSExport {
+    protocol ObjCProviderAPIProtocol: JSExport {
         func getResult(_ method: JSValue, _ url: JSValue, _ headers: JSValue, _ body: JSValue) -> Any?
         func getText(_ urlString: String, _ headers: [String: String]?) -> [String: Any]
         func getJSON(_ urlString: String, _ headers: [String: String]?) -> [String: Any]
@@ -52,7 +52,7 @@ extension AppleJavaScriptEngine: ProviderScriptingEngine {
     // - the class MUST implement a protocol that implements JSExport
     // - the methods must follow the block convention, i.e. args MUST be unnamed ("_")
     //
-    final class ObjCAPI: NSObject, ObjCAPIProtocol {
+    final class ObjCProviderAPI: NSObject, ObjCProviderAPIProtocol {
         private let vm: ProviderScriptingAPI
 
         init(vm: ProviderScriptingAPI) {
@@ -119,7 +119,7 @@ extension AppleJavaScriptEngine: ProviderScriptingEngine {
     }
 
     public func inject(from vm: ProviderScriptingAPI) {
-        let api = ObjCAPI(vm: vm)
+        let api = ObjCProviderAPI(vm: vm)
         inject("api", object: api)
     }
 }
