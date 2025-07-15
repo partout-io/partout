@@ -31,8 +31,8 @@ function getInfrastructure(headers) {
             recommended: "default"
         }
     };
-    debug(`JS.getInfrastructure: Headers = ${headers}`);
-    const json = getJSON("https://api.hide.me/v1/external/passepartout", headers);
+    api.debug(`JS.getInfrastructure: Headers = ${JSON.stringify(headers)}`);
+    const json = api.getJSON("https://api.hide.me/v1/external/passepartout", headers);
     if (!json.response) {
         return json;
     }
@@ -176,7 +176,7 @@ cdf5c6b3be5f9919854bb10182c86794
 936232e1e44c9feb7a3a2753ed05c90b
 `;
 
-    const tlsWrap = openVPNTLSWrap("crypt", tlsAuthKey);
+    const tlsWrap = api.openVPNTLSWrap("crypt", tlsAuthKey);
 
     const cfg = {
         ca: ca,
@@ -193,7 +193,7 @@ cdf5c6b3be5f9919854bb10182c86794
         presetId: presetIds.recommended,
         description: "Default",
         moduleType: moduleType,
-        templateData: jsonToBase64({
+        templateData: api.jsonToBase64({
             configuration: cfg,
             endpoints: [
                 "UDP:3000", "UDP:3010", "UDP:3020", "UDP:3030", "UDP:3040", "UDP:3050",

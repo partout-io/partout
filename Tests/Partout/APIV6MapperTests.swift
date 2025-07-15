@@ -111,6 +111,8 @@ struct APIV6MapperTests {
         } catch let error as PartoutError {
             if input.isCached {
                 #expect(error.code == .cached)
+            } else {
+                #expect(Bool(false), "Failed: \(error)")
             }
         } catch {
             #expect(Bool(false), "Failed: \(error)")

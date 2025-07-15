@@ -29,32 +29,98 @@ import _PartoutVendorsApple
 import JavaScriptCore
 
 extension AppleJavaScriptEngine: ProviderScriptingEngine {
-    public func inject(from vm: ProviderScriptingAPI) {
-        let getResultBlock: @convention(block) (JSValue, JSValue, JSValue, JSValue) -> Any? = {
-            guard let method = $0.toString() else {
+
+    @objc
+    protocol ObjCAPIProtocol: JSExport {
+        func getResult(_ method: JSValue, _ url: JSValue, _ headers: JSValue, _ body: JSValue) -> Any?
+        func getText(_ urlString: String, _ headers: [String: String]?) -> [String: Any]
+        func getJSON(_ urlString: String, _ headers: [String: String]?) -> [String: Any]
+        func jsonFromBase64(_ string: String) -> Any?
+        func jsonToBase64(_ object: Any) -> String?
+        func timestampFromISO(_ isoString: String) -> Int
+        func timestampToISO(_ timestamp: Int) -> String
+        func ipV4ToBase64(_ ip: String) -> String?
+        func openVPNTLSWrap(_ strategy: String, _ file: String) -> [String: Any]?
+        func errorResponse(_ message: String) -> [String: Any]
+        func httpErrorResponse(_ status: Int, _ urlString: String) -> [String: Any]
+        func debug(_ message: String)
+    }
+
+    //
+    // implementing JSExport alone IS NOT ENOUGH for this to work as a JS object:
+    //
+    // - the class MUST implement a protocol that implements JSExport
+    // - the methods must follow the block convention, i.e. args MUST be unnamed ("_")
+    //
+    final class ObjCAPI: NSObject, ObjCAPIProtocol {
+        private let vm: ProviderScriptingAPI
+
+        init(vm: ProviderScriptingAPI) {
+            self.vm = vm
+        }
+
+        func getResult(_ method: JSValue, _ url: JSValue, _ headers: JSValue, _ body: JSValue) -> Any? {
+            guard let method = method.toString() else {
                 assertionFailure("Missing method")
                 return nil
             }
-            guard let urlString = $1.toString() else {
+            guard let urlString = url.toString() else {
                 assertionFailure("Missing URL")
                 return nil
             }
-            let headers = !$2.isUndefined ? ($2.toObject() as? [String: String]) : nil
-            let body = !$3.isUndefined ? $3.toString() : nil
+            let headers = !headers.isUndefined ? (headers.toObject() as? [String: String]) : nil
+            let body = !body.isUndefined ? body.toString() : nil
             return vm.getResult(method: method, urlString: urlString, headers: headers, body: body)
         }
-        inject("getResult", object: getResultBlock)
-        inject("getText", object: vm.getText as @convention(block) (String, [String: String]?) -> Any?)
-        inject("getJSON", object: vm.getJSON as @convention(block) (String, [String: String]?) -> Any?)
-        inject("jsonFromBase64", object: vm.jsonFromBase64 as @convention(block) (String) -> Any?)
-        inject("jsonToBase64", object: vm.jsonToBase64 as @convention(block) (Any) -> String?)
-        inject("timestampFromISO", object: vm.timestampFromISO as @convention(block) (String) -> Int)
-        inject("timestampToISO", object: vm.timestampToISO as @convention(block) (Int) -> String)
-        inject("ipV4ToBase64", object: vm.ipV4ToBase64 as @convention(block) (String) -> String?)
-        inject("openVPNTLSWrap", object: vm.openVPNTLSWrap as @convention(block) (String, String) -> [String: Any]?)
-        inject("debug", object: vm.debug as @convention(block) (String) -> Void)
-        inject("ppErrorResponse", object: vm.errorResponse as @convention(block) (String) -> [String: Any])
-        inject("ppHTTPErrorResponse", object: vm.httpErrorResponse as @convention(block) (Int, String) -> [String: Any])
+
+        func getText(_ urlString: String, _ headers: [String: String]?) -> [String: Any] {
+            vm.getText(urlString: urlString, headers: headers)
+        }
+
+        func getJSON(_ urlString: String, _ headers: [String: String]?) -> [String: Any] {
+            vm.getJSON(urlString: urlString, headers: headers)
+        }
+
+        func jsonFromBase64(_ string: String) -> Any? {
+            vm.jsonFromBase64(string: string)
+        }
+
+        func jsonToBase64(_ object: Any) -> String? {
+            vm.jsonToBase64(object: object)
+        }
+
+        func timestampFromISO(_ isoString: String) -> Int {
+            vm.timestampFromISO(isoString: isoString)
+        }
+
+        func timestampToISO(_ timestamp: Int) -> String {
+            vm.timestampToISO(timestamp: timestamp)
+        }
+
+        func ipV4ToBase64(_ ip: String) -> String? {
+            vm.ipV4ToBase64(ip: ip)
+        }
+
+        func openVPNTLSWrap(_ strategy: String, _ file: String) -> [String: Any]? {
+            vm.openVPNTLSWrap(strategy: strategy, file: file)
+        }
+
+        func errorResponse(_ message: String) -> [String: Any] {
+            vm.errorResponse(message: message)
+        }
+
+        func httpErrorResponse(_ status: Int, _ urlString: String) -> [String: Any] {
+            vm.httpErrorResponse(status: status, urlString: urlString)
+        }
+
+        func debug(_ message: String) {
+            vm.debug(message: message)
+        }
+    }
+
+    public func inject(from vm: ProviderScriptingAPI) {
+        let api = ObjCAPI(vm: vm)
+        inject("api", object: api)
     }
 }
 
