@@ -1,5 +1,5 @@
 //
-//  APIV6Mapper.swift
+//  DefaultAPIMapper.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 3/25/25.
@@ -32,79 +32,77 @@ import FoundationNetworking
 import PartoutAPI
 import PartoutCore
 
-extension API.V6 {
-    public final class Mapper: APIMapper {
-        private let ctx: PartoutLoggerContext
+public final class DefaultAPIMapper: APIMapper {
+    private let ctx: PartoutLoggerContext
 
-        private let baseURL: URL
+    private let baseURL: URL
 
-        private let timeout: TimeInterval
+    private let timeout: TimeInterval
 
-        private let api: ProviderScriptingAPI
+    private let api: ProviderScriptingAPI
 
-        private let engineFactory: (ProviderScriptingAPI) -> ScriptingEngine
+    private let engineFactory: (ProviderScriptingAPI) -> ScriptingEngine
 
-        public init(
-            _ ctx: PartoutLoggerContext,
-            baseURL: URL,
-            timeout: TimeInterval = 10.0,
-            api: ProviderScriptingAPI,
-            engineFactory: @escaping (ProviderScriptingAPI) -> ScriptingEngine
-        ) {
-            self.ctx = ctx
-            self.baseURL = baseURL
-            self.timeout = timeout
-            self.api = api
-            self.engineFactory = engineFactory
-        }
+    public init(
+        _ ctx: PartoutLoggerContext,
+        baseURL: URL,
+        timeout: TimeInterval = 10.0,
+        api: ProviderScriptingAPI,
+        engineFactory: @escaping (ProviderScriptingAPI) -> ScriptingEngine
+    ) {
+        self.ctx = ctx
+        self.baseURL = baseURL
+        self.timeout = timeout
+        self.api = api
+        self.engineFactory = engineFactory
+    }
 
-        public func index() async throws -> [Provider] {
-            let data = try await data(for: .index)
-            let json = try JSONDecoder().decode(Index.self, from: data)
+    public func index() async throws -> [Provider] {
+        let data = try await data(for: .index)
+        let json = try JSONDecoder().decode(API.REST.Index.self, from: data)
 
-            return json
-                .providers
-                .map {
-                    let metadata = $0.metadata.reduce(into: [:]) {
-                        $0[ModuleType($1.key)] = Provider.Metadata(userInfo: $1.value)
-                    }
-                    return Provider(
-                        $0.id.rawValue,
-                        description: $0.description,
-                        metadata: metadata
-                    )
+        return json
+            .providers
+            .map {
+                let metadata = $0.metadata.reduce(into: [:]) {
+                    $0[ModuleType($1.key)] = Provider.Metadata(userInfo: $1.value)
                 }
-        }
-
-        public func authenticate(_ module: ProviderModule, on deviceId: String) async throws -> ProviderModule {
-            switch module.providerModuleType {
-            case .wireGuard:
-
-                // preconditions (also check in script)
-                guard let auth = module.authentication, !auth.isEmpty else {
-                    throw PartoutError(.authentication)
-                }
-                guard let storage: WireGuardProviderStorage = try module.options(for: .wireGuard) else {
-                    throw PartoutError(.Providers.missingOption)
-                }
-                guard storage.sessions?[deviceId] != nil else {
-                    throw PartoutError(.Providers.missingOption)
-                }
-
-                let script = try await script(for: .provider(module.providerId))
-                let engine = engineFactory(api)
-                return try await engine.authenticate(module, on: deviceId, with: script)
-            default:
-                assertionFailure("Authentication not supported for module type \(module.providerModuleType)")
-                return module
+                return Provider(
+                    $0.id.rawValue,
+                    description: $0.description,
+                    metadata: metadata
+                )
             }
-        }
+    }
 
-        public func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure {
-            let script = try await script(for: .provider(providerId))
+    public func authenticate(_ module: ProviderModule, on deviceId: String) async throws -> ProviderModule {
+        switch module.providerModuleType {
+        case .wireGuard:
+
+            // preconditions (also check in script)
+            guard let auth = module.authentication, !auth.isEmpty else {
+                throw PartoutError(.authentication)
+            }
+            guard let storage: WireGuardProviderStorage = try module.options(for: .wireGuard) else {
+                throw PartoutError(.Providers.missingOption)
+            }
+            guard storage.sessions?[deviceId] != nil else {
+                throw PartoutError(.Providers.missingOption)
+            }
+
+            let script = try await script(for: .provider(module.providerId))
             let engine = engineFactory(api)
-            return try await engine.fetchInfrastructure(with: script, cache: cache)
+            return try await engine.authenticate(module, on: deviceId, with: script)
+        default:
+            assertionFailure("Authentication not supported for module type \(module.providerModuleType)")
+            return module
         }
+    }
+
+    public func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure {
+        let script = try await script(for: .provider(providerId))
+        let engine = engineFactory(api)
+        return try await engine.fetchInfrastructure(with: script, cache: cache)
     }
 }
 
@@ -163,8 +161,8 @@ extension ScriptingEngine {
 
 // MARK: - Helpers
 
-private extension API.V6.Mapper {
-    func script(for resource: API.V6.Resource) async throws -> String {
+private extension DefaultAPIMapper {
+    func script(for resource: API.REST.Resource) async throws -> String {
         let data = try await data(for: resource)
         guard let script = String(data: data, encoding: .utf8) else {
             throw PartoutError(.notFound)
@@ -172,7 +170,7 @@ private extension API.V6.Mapper {
         return script
     }
 
-    func data(for resource: API.V6.Resource) async throws -> Data {
+    func data(for resource: API.REST.Resource) async throws -> Data {
         let url = baseURL.appendingPathComponent(resource.path)
         pp_log(ctx, .api, .info, "Fetch data for \(resource): \(url)")
         let cfg: URLSessionConfiguration = .default

@@ -1,5 +1,5 @@
 //
-//  APIV6MapperTests.swift
+//  APIMapperTests.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 1/14/25.
@@ -29,7 +29,7 @@ import Foundation
 @testable import Partout
 import Testing
 
-struct APIV6MapperTests {
+struct APIMapperTests {
 
     // MARK: Index
 
@@ -37,7 +37,7 @@ struct APIV6MapperTests {
     func whenFetchIndex_thenReturnsProviders() async throws {
         setUpLogging()
 
-        let sut = try Self.apiV6()
+        let sut = try newAPIMapper()
         let index = try await sut.index()
         #expect(index.count == 12)
         #expect(index.map(\.description) == [
@@ -83,7 +83,7 @@ struct APIV6MapperTests {
     func givenHideMe_whenFetchInfrastructure_thenReturns(input: HideMeFetchInput) async throws {
         setUpLogging()
 
-        let sut = try Self.apiV6(requestMapper: input.withMapper ? {
+        let sut = try newAPIMapper(input.withMapper ? {
             hidemeFetchRequestMapper(urlString: $1)
         } : nil)
         do {
@@ -122,7 +122,7 @@ struct APIV6MapperTests {
 
 // MARK: - Request mappers
 
-extension APIV6MapperTests {
+extension APIMapperTests {
     struct HideMeFetchInput {
         let cache: ProviderCache?
 
@@ -150,12 +150,12 @@ extension APIV6MapperTests {
 
 // MARK: - Helpers
 
-private extension APIV6MapperTests {
-    static func apiV6(requestMapper: ((String, String) -> (Int, Data))? = nil) throws -> APIMapper {
+private extension APIMapperTests {
+    func newAPIMapper(_ requestMapper: ((String, String) -> (Int, Data))? = nil) throws -> APIMapper {
         guard let baseURL = API.url() else {
             fatalError("Could not find resource path")
         }
-        return API.V6.Mapper(
+        return DefaultAPIMapper(
             .global,
             baseURL: baseURL,
             timeout: 3.0,
@@ -175,7 +175,7 @@ private extension APIV6MapperTests {
     }
 
     func measureFetchProvider() async throws {
-        let sut = try Self.apiV6()
+        let sut = try newAPIMapper()
         let begin = Date()
         for _ in 0..<1000 {
             _ = try await sut.infrastructure(for: .hideme, cache: nil)

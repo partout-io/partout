@@ -1,5 +1,5 @@
 //
-//  APIV6Mapper+Default.swift
+//  DefaultAPIMapper+Extensions.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 4/20/25.
@@ -28,7 +28,7 @@
 import Foundation
 import PartoutProviders
 
-extension API.V6.Mapper {
+extension DefaultAPIMapper {
     public convenience init(
         _ ctx: PartoutLoggerContext,
         baseURL: URL,
