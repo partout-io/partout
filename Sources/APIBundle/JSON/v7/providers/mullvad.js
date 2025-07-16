@@ -52,37 +52,14 @@ function authenticate(module, deviceId) {
 //    api.debug(`JS.authenticate: Module = ${JSON.stringify(module)}`);
     api.debug(`JS.authenticate: Device ID = ${deviceId}`);
 
-    // no authentication needed for other types, do nothing
-    const wgType = "WireGuard";
-    if (module.providerModuleType != wgType) {
-        return {
-            response: module
-        };
-    }
+    const newModule = module;
+
+    // 1. auth via credentials/token
 
     // assert required input
     const auth = module.authentication;
     if (!auth) {
         return api.errorResponse("missing authentication");
-    }
-    const rawOptions = module.moduleOptions[wgType];
-    if (!rawOptions) {
-        return api.errorResponse("missing options");
-    }
-    const storage = api.jsonFromBase64(rawOptions);
-    if (!storage) {
-        return api.errorResponse("corrupt storage");
-    }
-    const session = storage.sessions[deviceId];
-    if (!session) {
-        return api.errorResponse("missing session");
-    }
-
-//    api.debug(`JS.authenticate: Auth = ${JSON.stringify(auth))}`);
-//    api.debug(`JS.authenticate: Storage = ${JSON.stringify(storage))}`);
-//    api.debug(`JS.authenticate: Session = ${JSON.stringify(session))}`);
-    if (session.peer) {
-        api.debug(`JS.authenticate: Session peer = ${JSON.stringify(session.peer)}`);
     }
 
     // check token validity
@@ -122,6 +99,39 @@ function authenticate(module, deviceId) {
         };
     } else {
         return api.errorResponse("authentication failed");
+    }
+
+    newModule.authentication = auth;
+//    api.debug(`JS.authenticate: Module updated = ${JSON.stringify(newModule)}`);
+
+    // 2. WireGuard session registration
+
+    // stop here if another type
+    const wgType = "WireGuard";
+    if (module.providerModuleType != wgType) {
+        return {
+            response: newModule
+        };
+    }
+
+    const rawOptions = module.moduleOptions[wgType];
+    if (!rawOptions) {
+        return api.errorResponse("missing options");
+    }
+    const storage = api.jsonFromBase64(rawOptions);
+    if (!storage) {
+        return api.errorResponse("corrupt storage");
+    }
+    const session = storage.sessions[deviceId];
+    if (!session) {
+        return api.errorResponse("missing session");
+    }
+
+//    api.debug(`JS.authenticate: Auth = ${JSON.stringify(auth))}`);
+//    api.debug(`JS.authenticate: Storage = ${JSON.stringify(storage))}`);
+//    api.debug(`JS.authenticate: Session = ${JSON.stringify(session))}`);
+    if (session.peer) {
+        api.debug(`JS.authenticate: Session peer = ${JSON.stringify(session.peer)}`);
     }
 
     // if subsequent calls return 401, rather than re-authenticating, just
@@ -205,10 +215,9 @@ function authenticate(module, deviceId) {
     api.debug(`JS.authenticate: Session updated = ${JSON.stringify(session)}`);
     api.debug(`JS.authenticate: Storage updated = ${JSON.stringify(storage)}`);
 
-    const newModule = module;
-    newModule.authentication = auth;
     newModule.moduleOptions[wgType] = api.jsonToBase64(storage);
 //    api.debug(`JS.authenticate: Module updated = ${JSON.stringify(newModule)}`);
+
     return {
         response: newModule
     };
