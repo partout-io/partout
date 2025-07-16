@@ -35,8 +35,8 @@ describe("nordvpn", () => {
     it("should have 2 presets", () => {
         assert.strictEqual(infra.presets.length, 2);
     });
-    it("should have 1 servers", () => {
-        assert.strictEqual(infra.servers.length, 1);
+    it("should have 3 servers", () => {
+        assert.strictEqual(infra.servers.length, 3);
     });
     it("preset 0 should use CBC and 1 endpoint", () => {
         const preset = infra.presets[0];
