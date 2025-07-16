@@ -116,7 +116,7 @@ extension ScriptingEngine {
             throw PartoutError(.encoding)
         }
         let result = try await execute(
-            "JSON.stringify(authenticate(JSON.parse('\(moduleJSON)'), '\(deviceId)'))",
+            "JSON.stringify(authenticate(JSON.parse('\(moduleJSON.jsEscaped)'), '\(deviceId)'))",
             after: script,
             returning: ScriptResult<ProviderModule>.self
         )
@@ -142,8 +142,9 @@ extension ScriptingEngine {
             throw PartoutError(.encoding)
         }
         pp_log(ctx, .api, .debug, "Headers: \(headersJSON)")
+        pp_log(ctx, .api, .debug, "Headers (escaped): \(headersJSON.jsEscaped)")
         let result = try await execute(
-            "JSON.stringify(getInfrastructure(JSON.parse('\(headersJSON)')))",
+            "JSON.stringify(getInfrastructure(JSON.parse('\(headersJSON.jsEscaped)')))",
             after: script,
             returning: ScriptResult<ProviderInfrastructure>.self
         )
@@ -161,6 +162,14 @@ extension ScriptingEngine {
 }
 
 // MARK: - Helpers
+
+private extension String {
+    var jsEscaped: String {
+        replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+    }
+}
 
 private extension DefaultAPIMapper {
     func script(for resource: API.REST.Resource) async throws -> String {
