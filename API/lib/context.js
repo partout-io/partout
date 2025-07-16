@@ -32,24 +32,14 @@ function runSandboxedScript(code, injectedFunctions = {}) {
     return vm.runInContext(code, context);
 }
 
-function fetchScriptPath(root, providerId, forCache) {
-    try {
-        if (forCache) {
-            const name = `${providerId}.cache.js`;
-            const cachePath = `${root}/${name}`;
-            fs.accessSync(cachePath);
-            return cachePath;
-        }
-    } catch {
-        //
-    }
+function fetchScriptPath(root, providerId) {
     const name = `${providerId}.js`;
     return `${root}/${name}`;
 }
 
 export function fetchInfrastructure(api, providerId, options) {
     const scriptRoot = `${api.root}/${api.version}/providers`;
-    const scriptPath = fetchScriptPath(scriptRoot, providerId, options && options.forCache);
+    const scriptPath = fetchScriptPath(scriptRoot, providerId);
     const optionsCopy = { ...options };
     if (api.mockPath) {
         optionsCopy.mockPath = api.mockPath;
@@ -138,9 +128,10 @@ export function fetchRawInfrastructure(scriptPath, options) {
         }
     };
 
+    const fromCache = options.fromCache ?? true;
     const wrappedScript = `
         ${script}
-        getInfrastructure({});
+        getInfrastructure({}, ${fromCache});
     `;
     const json = runSandboxedScript(wrappedScript, injectedFunctions);
     if (options.responseOnly) {

@@ -28,7 +28,7 @@ import { fetchInfrastructure } from "../lib/context.js";
 export function fetchMockInfrastructure(providerId) {
     const mockApi = { ...api };
     mockApi.mockPath = `test/mock/providers/${providerId}/fetch.json`;
-    return fetchInfrastructure(mockApi, providerId, { forCache: true });
+    return fetchInfrastructure(mockApi, providerId, { fromCache: false });
 }
 
 export function templateFrom(preset) {
