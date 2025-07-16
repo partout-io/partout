@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - feature/update-api
     paths:
       - "API/**"
       - "Sources/APIBundle/JSON/**"
