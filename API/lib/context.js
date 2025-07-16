@@ -66,7 +66,7 @@ export function fetchRawInfrastructure(scriptPath, options) {
             const data = fs.readFileSync(options.mockPath, "utf8");
             return {
                 data: data
-            }
+            };
         }
         console.log(`GET ${url}`);
         const response = request("GET", url);
@@ -132,12 +132,15 @@ export function fetchRawInfrastructure(scriptPath, options) {
                     data: key.toString("base64")
                 }
             };
+        },
+        debug(message) {
+            console.error(message);
         }
     };
 
     const wrappedScript = `
         ${script}
-        getInfrastructure();
+        getInfrastructure({});
     `;
     const json = runSandboxedScript(wrappedScript, injectedFunctions);
     if (options.responseOnly) {
