@@ -49,7 +49,7 @@ function getInfrastructure(headers) {
 
         const id = relay.hostname;
         const hostname = `${id.toLowerCase()}.mullvad.net`;
-        const addresses = [relay.ipv4_addr_in].map((a) => ipV4ToBase64(a));
+        const addresses = [relay.ipv4_addr_in].map((a) => api.ipV4ToBase64(a));
 
         const code = id.split("-")[0].toUpperCase();
         const area = location.city;

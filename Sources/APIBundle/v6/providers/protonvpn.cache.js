@@ -77,7 +77,7 @@ function getInfrastructure(headers) {
 
         let addresses;
         if (resolved) {
-            addresses = resolved.map((a) => ipV4ToBase64(a));
+            addresses = resolved.map((a) => api.ipV4ToBase64(a));
         }
 
         const serverObj = {

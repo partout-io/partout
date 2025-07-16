@@ -48,7 +48,7 @@ function getInfrastructure(headers) {
         const extraCountry = null;
 
         const resolved = server.hosts.map(h => h.host);
-        const addresses = resolved.map(addr => ipV4ToBase64(addr));
+        const addresses = resolved.map(addr => api.ipV4ToBase64(addr));
 
         const serverObj = {
             serverId: id,

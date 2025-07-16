@@ -49,7 +49,7 @@ function getInfrastructure(headers) {
                 const num = parseInt(id.split("-").pop(), 10);
 
                 const addresses = [relay["ipv4_addr_in"]].map(a => {
-                    return ipV4ToBase64(a);
+                    return api.ipV4ToBase64(a);
                 });
 
                 const server = {

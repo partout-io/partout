@@ -68,7 +68,7 @@ function getInfrastructure(headers) {
             let addrs = [];
             entry.ips.forEach(obj => {
                 if (obj.ip && obj.ip.version == 4) {
-                    addrs.push(ipV4ToBase64(obj.ip.ip));
+                    addrs.push(api.ipV4ToBase64(obj.ip.ip));
                 }
             });
             server.ipAddresses = addrs;
