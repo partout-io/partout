@@ -28,7 +28,7 @@ import { fetchInfrastructure } from "../lib/context.js";
 export function fetchMockInfrastructure(providerId) {
     return fetchInfrastructure(api, providerId, {
         responsePath: `test/mock/providers/${providerId}/fetch.json`,
-        fromCache: false, // run real-world script
+        preferCache: false, // run real-world script
     });
 }
 

@@ -30,6 +30,12 @@ export const api = {
     index: "index.json"
 };
 
+export const modes = {
+    LOCAL_UNCACHED: null,   // process local mock with full script
+    REMOTE_UNCACHED: 1,     // process remote with full script
+    PRODUCTION: 2           // process remote with cache script if available (production)
+};
+
 export function allProviders(root) {
     const excludedProviders = new Set([]);
     const apiIndex = `${root}/${api.root}/${api.version}/index.json`;

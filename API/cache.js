@@ -22,11 +22,11 @@
 // SOFTWARE.
 //
 
-import { api, allProviders } from "./lib/api.js";
+import { api, modes, allProviders } from "./lib/api.js";
 import { fetchInfrastructure } from "./lib/context.js";
 import { mkdir, writeFile } from "fs/promises";
 
-async function cacheProvidersInParallel(ids) {
+async function cacheProvidersInParallel(ids, mode) {
     try {
         const writePromises = ids
             .map(async providerId => {
@@ -34,9 +34,12 @@ async function cacheProvidersInParallel(ids) {
                 await mkdir(providerPath, { recursive: true });
                 const dest = `${providerPath}/fetch.json`;
                 const options = {
-                    fromCache: false,
+                    preferCache: mode == modes.PRODUCTION,
                     responseOnly: true
                 };
+                if (mode == modes.LOCAL_UNCACHED) {
+                    options.responsePath = `test/mock/providers/${providerId}/fetch.json`;
+                }
                 const json = fetchInfrastructure(api, providerId, options);
                 const minJSON = JSON.stringify(json);
                 return writeFile(dest, minJSON, "utf8");
@@ -53,9 +56,10 @@ async function cacheProvidersInParallel(ids) {
 
 // opt in
 const arg = process.argv[2];
+const mode = process.argv[3];
 if (!arg) {
-    console.error("Please provide a comma-separated list of provider ids");
+    console.error("Please provide a comma-separated list of provider IDs");
     process.exit(1);
 }
 const targetIds = arg.split(",");
-await cacheProvidersInParallel(targetIds);
+await cacheProvidersInParallel(targetIds, mode);

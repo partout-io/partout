@@ -48,13 +48,14 @@ export function fetchRawInfrastructure(scriptPath, options) {
     const referenceDate = new Date(0); // UNIX epoch
 
     function getResult(url) {
+        console.log(`GET ${url}`);
         if (options.responsePath) {
+            console.log(`Read response from: ${options.responsePath}`);
             const data = fs.readFileSync(options.responsePath, "utf8");
             return {
                 data: data
             };
         }
-        console.log(`GET ${url}`);
         const response = request("GET", url);
         const data = response.getBody("utf8");
         // console.log(response.headers);
@@ -124,10 +125,10 @@ export function fetchRawInfrastructure(scriptPath, options) {
         }
     };
 
-    const fromCache = options.fromCache ?? true;
+    const preferCache = options.preferCache ?? true;
     const wrappedScript = `
         ${script}
-        getInfrastructure({}, ${fromCache});
+        getInfrastructure({}, ${preferCache});
     `;
     const json = runSandboxedScript(wrappedScript, injectedFunctions);
     if (options.responseOnly) {
