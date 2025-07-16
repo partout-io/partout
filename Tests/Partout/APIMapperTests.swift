@@ -85,7 +85,7 @@ struct APIMapperTests {
         setUpLogging()
 
         let sut = try newAPIMapper(input.hijacking ? {
-            hidemeFetchRequestMapper(urlString: $1)
+            hidemeFetchHijacker(urlString: $1)
         } : nil)
         do {
             let infra = try await sut.infrastructure(for: .hideme, cache: input.cache)
@@ -136,7 +136,7 @@ extension APIMapperTests {
         var hijacking = true
     }
 
-    func hidemeFetchRequestMapper(urlString: String) -> (Int, Data) {
+    func hidemeFetchHijacker(urlString: String) -> (Int, Data) {
         guard let url = Bundle.module.url(forResource: "Resources/hideme/fetch", withExtension: "json") else {
             fatalError("Unable to find fetch.json")
         }
