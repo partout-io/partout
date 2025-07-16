@@ -1,4 +1,4 @@
-name: Publish API
+name: "API: Publish"
 on:
   push:
     branches:
