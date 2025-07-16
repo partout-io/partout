@@ -5,5 +5,5 @@ gen
 .bundle
 vendor
 node_modules
-cache/api
+cache/src
 **/*-large.json
