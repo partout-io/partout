@@ -1,0 +1,16 @@
+{
+  "name": "passepartout-api",
+  "version": "0.0.1",
+  "type": "module",
+  "dependencies": {
+    "sync-request": "^6.1.0"
+  },
+  "scripts": {
+      "fetch": "node .",
+      "cache": "node cache.js",
+      "test": "node run_tests.js"
+  },
+  "author": "Davide De Rosa",
+  "license": "GPL-3.0",
+  "description": "API for Passepartout"
+}

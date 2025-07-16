@@ -1,0 +1,38 @@
+name: Cache JSON
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "api/**"
+  schedule:
+    - cron: '0 3 * * MON'
+  workflow_dispatch:
+
+jobs:
+  store_to_cache:
+    name: Store to cache
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run tests
+        run: npm test
+      - name: Generate JSON
+        env:
+          CACHE_IDS: ${{ vars.CACHE_IDS }}
+        run: npm run cache 1
+      - name: Push to cache
+        uses: tagus/git-deploy@v0.5.0
+        with:
+          changes: cache/api
+          repository: git@github.com:passepartoutvpn/api-cache.git
+          ssh_key: ${{ secrets.CACHE_DEPLOY_KEY }}
+          name: API
+          email: providers@passepartoutvpn.app
+          branch: master

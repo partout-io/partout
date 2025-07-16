@@ -1,0 +1,36 @@
+name: Publish API
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "api/**"
+  schedule:
+    - cron: '0 21 * * MON'
+  workflow_dispatch:
+
+jobs:
+  push_to_api:
+    name: Push to API
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://github.com/passepartoutvpn/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run tests
+        run: npm test
+      - name: Deploy
+        uses: tagus/git-deploy@v0.5.0
+        with:
+          changes: api
+          repository: git@github.com:passepartoutvpn/api.git
+          ssh_key: ${{ secrets.API_DEPLOY_KEY }}
+          name: API
+          email: providers@passepartoutvpn.app
+          branch: master
