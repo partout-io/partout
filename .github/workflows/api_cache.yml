@@ -30,7 +30,10 @@ jobs:
       - name: Run tests
         run: npm test
       - name: Generate JSON
-        run: npm run cache "${{ vars.CACHE_IDS }}"
+        env:
+          CACHE_MODE=2 # production
+        run: |
+          npm run cache "${{ vars.CACHE_IDS }}" $CACHE_MODE
       - name: Push to cache
         uses: tagus/git-deploy@v0.5.0
         with:
