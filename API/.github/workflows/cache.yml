@@ -24,9 +24,7 @@ jobs:
       - name: Run tests
         run: npm test
       - name: Generate JSON
-        env:
-          CACHE_IDS: ${{ vars.CACHE_IDS }}
-        run: npm run cache 1
+        run: npm run cache "${{ vars.CACHE_IDS }}"
       - name: Push to cache
         uses: tagus/git-deploy@v0.5.0
         with:
