@@ -152,7 +152,7 @@ extension APIMapperTests {
 
 private extension APIMapperTests {
     func newAPIMapper(_ requestHijacker: ((String, String) -> (Int, Data))? = nil) throws -> APIMapper {
-        guard let baseURL = API.bundleURL else {
+        guard let baseURL = API.url() else {
             fatalError("Could not find resource path")
         }
         return DefaultAPIMapper(

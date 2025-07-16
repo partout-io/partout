@@ -27,7 +27,7 @@ import Foundation
 import PartoutAPI
 
 extension API {
-    public static var bundleURL: URL? {
-        Bundle.module.url(forResource: "JSON", withExtension: nil)
+    public static func url(forVersion version: Int = 7) -> URL? {
+        Bundle.module.url(forResource: "JSON/v\(version)", withExtension: nil)
     }
 }
