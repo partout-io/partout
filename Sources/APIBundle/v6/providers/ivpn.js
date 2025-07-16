@@ -172,7 +172,7 @@ ffe737b98916dd15ef6235dee4266d3b
         const proto = map.type;
         endpoints.push(`${proto}:${singlePort}`);
     });
-    recommended.templateData = jsonToBase64({
+    recommended.templateData = api.jsonToBase64({
         configuration: cfg,
         endpoints: endpoints
     });
