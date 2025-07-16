@@ -27,6 +27,7 @@
 
 import Foundation
 @testable import Partout
+@testable import PartoutProviders
 import Testing
 
 struct APIMapperTests {
@@ -70,20 +71,20 @@ struct APIMapperTests {
 //            presetsCount: 1,
 //            serversCount: 99,
 //            isCached: false,
-//            withMapper: false
+//            hijacking: false
 //        ),
 //        HideMeFetchInput(
 //            cache: ProviderCache(lastUpdate: nil, tag: "\\\"0103dd09364f346ff8a8c2b9d5285b5d\\\""),
 //            presetsCount: 1,
 //            serversCount: 99,
 //            isCached: true,
-//            withMapper: false
+//            hijacking: false
 //        )
     ])
     func givenHideMe_whenFetchInfrastructure_thenReturns(input: HideMeFetchInput) async throws {
         setUpLogging()
 
-        let sut = try newAPIMapper(input.withMapper ? {
+        let sut = try newAPIMapper(input.hijacking ? {
             hidemeFetchRequestMapper(urlString: $1)
         } : nil)
         do {
@@ -132,7 +133,7 @@ extension APIMapperTests {
 
         let isCached: Bool
 
-        var withMapper = true
+        var hijacking = true
     }
 
     func hidemeFetchRequestMapper(urlString: String) -> (Int, Data) {
@@ -151,7 +152,7 @@ extension APIMapperTests {
 // MARK: - Helpers
 
 private extension APIMapperTests {
-    func newAPIMapper(_ requestMapper: ((String, String) -> (Int, Data))? = nil) throws -> APIMapper {
+    func newAPIMapper(_ requestHijacker: ((String, String) -> (Int, Data))? = nil) throws -> APIMapper {
         guard let baseURL = API.url() else {
             fatalError("Could not find resource path")
         }
@@ -162,7 +163,7 @@ private extension APIMapperTests {
             api: DefaultProviderScriptingAPI(
                 .global,
                 timeout: 3.0,
-                requestMapper: requestMapper
+                requestHijacker: requestHijacker
             )
         )
     }
