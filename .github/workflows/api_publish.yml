@@ -4,9 +4,6 @@ on:
     branches:
       - master
       - bugfix/api-workflows
-    paths:
-      - "API/**"
-      - "Sources/APIBundle/JSON/**"
   schedule:
     - cron: '0 21 * * MON'
   workflow_dispatch:
