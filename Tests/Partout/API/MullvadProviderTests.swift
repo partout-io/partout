@@ -28,6 +28,8 @@
 import Testing
 
 struct MullvadProviderTests: APITestSuite {
+
+#if canImport(_PartoutWireGuardCore)
     @Test(arguments: [
         AuthInput( // valid token
             accessToken: "sometoken",
@@ -149,6 +151,7 @@ struct MullvadProviderTests: APITestSuite {
             #expect(newSession.peer?.addresses == peerAddresses)
         }
     }
+#endif
 }
 
 extension MullvadProviderTests {

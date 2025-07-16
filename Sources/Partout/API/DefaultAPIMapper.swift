@@ -75,6 +75,7 @@ public final class DefaultAPIMapper: APIMapper {
 
     public func authenticate(_ module: ProviderModule, on deviceId: String) async throws -> ProviderModule {
         switch module.providerModuleType {
+#if canImport(_PartoutWireGuardCore)
         case .wireGuard:
 
             // preconditions (also check in script)
@@ -91,6 +92,7 @@ public final class DefaultAPIMapper: APIMapper {
             let script = try await script(for: .provider(module.providerId))
             let engine = engineFactory(api)
             return try await engine.authenticate(ctx, module, on: deviceId, with: script)
+#endif
         default:
             assertionFailure("Authentication not supported for module type \(module.providerModuleType)")
             return module
