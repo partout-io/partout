@@ -27,7 +27,7 @@ import vm from "vm";
 import request from "sync-request";
 
 function runSandboxedScript(code, injectedFunctions = {}) {
-    const sandbox = { ...injectedFunctions };
+    const sandbox = { api: { ...injectedFunctions } };
     const context = vm.createContext(sandbox);
     return vm.runInContext(code, context);
 }
@@ -51,15 +51,15 @@ export function fetchInfrastructure(api, providerId, options) {
     const scriptRoot = `${api.root}/${api.version}/providers`;
     const scriptPath = fetchScriptPath(scriptRoot, providerId, options && options.forCache);
     const optionsCopy = { ...options };
-    if (api.mockRoot) {
-        optionsCopy.mockPath = `${api.mockRoot}/${api.version}/providers/${providerId}/fetch.json`;
+    if (api.mockPath) {
+        optionsCopy.mockPath = api.mockPath;
     }
     return fetchRawInfrastructure(scriptPath, optionsCopy);
 }
 
 export function fetchRawInfrastructure(scriptPath, options) {
     const script = fs.readFileSync(scriptPath, "utf8");
-    const referenceDate = new Date("2001-01-01T00:00:00Z");
+    const referenceDate = new Date(0); // UNIX epoch
 
     function getResult(url) {
         if (options.mockPath) {
@@ -68,6 +68,7 @@ export function fetchRawInfrastructure(scriptPath, options) {
                 data: data
             }
         }
+        console.log(`GET ${url}`);
         const response = request("GET", url);
         const data = response.getBody("utf8");
         // console.log(response.headers);
