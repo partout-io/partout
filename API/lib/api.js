@@ -33,7 +33,7 @@ export const api = {
 export const modes = {
     LOCAL_UNCACHED: null,   // process local mock with full script
     REMOTE_UNCACHED: 1,     // process remote with full script
-    PRODUCTION: 2           // process remote with cache script if available (production)
+    PRODUCTION: 2           // process remote with cache script if available
 };
 
 export function allProviders(root) {
