@@ -22,14 +22,16 @@
 // SOFTWARE.
 //
 
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
+import { describe, it } from "mocha";
+import { strict as assert } from "assert";
 import * as setup from "../setup.js";
 
 describe("mullvad", () => {
-    const json = setup.fetchMockInfrastructure("mullvad");
-    const infra = json.response;
-
+    let infra;
+    before(() => {
+        const json = setup.fetchMockInfrastructure("mullvad");
+        infra = json.response;
+    });
     it("should have 2 presets", () => {
         assert.strictEqual(infra.presets.length, 2);
     });
