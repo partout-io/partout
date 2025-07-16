@@ -23,8 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(PartoutAPI)
-
 import Foundation
 import PartoutProviders
 
@@ -49,5 +47,3 @@ extension DefaultAPIMapper {
         }
     }
 }
-
-#endif

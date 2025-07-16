@@ -23,8 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(PartoutAPI)
-
 import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
@@ -208,5 +206,3 @@ private struct ScriptResult<T>: Decodable where T: Decodable {
 
     let error: String?
 }
-
-#endif
