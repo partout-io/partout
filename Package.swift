@@ -209,12 +209,26 @@ package.targets.append(contentsOf: [
             }
             return dependencies
         }(),
-        path: "Sources/Partout"
+        path: "Sources/Partout",
+        exclude: {
+            var list: [String] = []
+            if !areas.contains(.api) {
+                list.append("API")
+            }
+            return list
+        }()
     ),
     .testTarget(
         name: "PartoutTests",
         dependencies: ["Partout"],
         path: "Tests/Partout",
+        exclude: {
+            var list: [String] = []
+            if !areas.contains(.api) {
+                list.append("API")
+            }
+            return list
+        }(),
         resources: [
             .copy("Resources")
         ]
