@@ -35,16 +35,15 @@ private let rfc1123: DateFormatter = {
 
 extension Timestamp {
     public func toRFC1123() -> String {
-        rfc1123.string(from: Date(
-            timeIntervalSince1970: TimeInterval(self))
-        )
+        rfc1123
+            .string(from: date)
     }
 }
 
 extension String {
     public func fromRFC1123() -> Timestamp? {
-        rfc1123.date(from: self).map {
-            UInt32($0.timeIntervalSince1970)
-        }
+        rfc1123
+            .date(from: self)
+            .map(\.timestamp)
     }
 }
