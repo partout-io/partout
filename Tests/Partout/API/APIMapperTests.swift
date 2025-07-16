@@ -34,7 +34,7 @@ struct APIMapperTests: APITestSuite {
 
         let sut = try newAPIMapper()
         let index = try await sut.index()
-        #expect(index.count == 12)
+        #expect(index.count == 11)
         #expect(index.map(\.description) == [
             "Hide.me",
             "IVPN",
@@ -42,7 +42,6 @@ struct APIMapperTests: APITestSuite {
             "NordVPN",
             "Oeck",
             "PIA",
-            "ProtonVPN",
             "SurfShark",
             "TorGuard",
             "TunnelBear",
