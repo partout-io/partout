@@ -58,18 +58,6 @@
             }
         },
         {
-            "id": "protonvpn",
-            "description": "ProtonVPN",
-            "metadata": {
-                "OpenVPN": {
-                    "credentials": {
-                        "purpose": "specific",
-                        "url": "https://account.protonvpn.com/account-password"
-                    }
-                }
-            }
-        },
-        {
             "id": "surfshark",
             "description": "SurfShark",
             "metadata": {

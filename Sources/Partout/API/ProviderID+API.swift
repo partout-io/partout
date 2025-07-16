@@ -40,8 +40,6 @@ extension ProviderID {
 
     public static let pia = Self(rawValue: "pia")
 
-    public static let protonvpn = Self(rawValue: "protonvpn")
-
     public static let surfshark = Self(rawValue: "surfshark")
 
     public static let torguard = Self(rawValue: "torguard")
