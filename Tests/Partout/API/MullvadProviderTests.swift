@@ -23,6 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import Foundation
 @testable import Partout
 @testable import PartoutProviders
 import Testing

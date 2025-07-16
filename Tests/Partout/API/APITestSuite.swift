@@ -23,6 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import Foundation
 @testable import Partout
 @testable import PartoutProviders
 
@@ -48,8 +49,10 @@ extension APITestSuite {
 
     func setUpLogging() {
         var logger = PartoutLogger.Builder()
+#if canImport(OSLog)
         logger.setDestination(OSLogDestination(.api), for: [.api])
         logger.setDestination(OSLogDestination(.providers), for: [.providers])
+#endif
         PartoutLogger.register(logger.build())
     }
 
