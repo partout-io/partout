@@ -1,8 +1,8 @@
 //
-//  WireGuard+API.swift
+//  APIMapperTests.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 12/2/24.
+//  Created by Davide De Rosa on 1/14/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,10 +23,31 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(_PartoutWireGuardCore)
-
-import _PartoutWireGuardCore
 import Foundation
-import PartoutCore
+import Testing
 
-#endif
+struct APIMapperTests: APITestSuite {
+
+    @Test
+    func whenFetchIndex_thenReturnsProviders() async throws {
+        setUpLogging()
+
+        let sut = try newAPIMapper()
+        let index = try await sut.index()
+        #expect(index.count == 12)
+        #expect(index.map(\.description) == [
+            "Hide.me",
+            "IVPN",
+            "Mullvad",
+            "NordVPN",
+            "Oeck",
+            "PIA",
+            "ProtonVPN",
+            "SurfShark",
+            "TorGuard",
+            "TunnelBear",
+            "VyprVPN",
+            "Windscribe"
+        ])
+    }
+}

@@ -24,6 +24,205 @@
 
 const baseURL = "https://api.mullvad.net";
 
+/*
+ module = {
+    authentication: {
+        credentials: { username, password },
+        token: { accessToken, expiryDate }
+    }
+ }
+ options = {
+    sessions: {
+        device1: {
+            privateKey: "",
+            publicKey: "",
+            peer: {
+                id: "",
+                creationDate: ...,
+                addresses: []
+            }
+        },
+        device2: { ... }
+    }
+ }
+ session = { privateKey, publicKey, peer: { clientId, addresses } }
+ */
+
+function authenticate(module, deviceId) {
+//    api.debug(`JS.authenticate: Module = ${JSON.stringify(module)}`);
+    api.debug(`JS.authenticate: Device ID = ${deviceId}`);
+
+    const newModule = module;
+
+    // 1. auth via credentials/token
+
+    // assert required input
+    const auth = module.authentication;
+    if (!auth) {
+        return api.errorResponse("missing authentication");
+    }
+
+    // check token validity
+    if (auth.token) {
+        const expiry = new Date(api.timestampToISO(auth.token.expiryDate));
+        const now = new Date();
+        api.debug(`JS.authenticate: Token expiry = ${expiry} (now: ${now})`);
+        if (expiry > now) {
+            api.debug("JS.authenticate: Token is valid");
+        } else {
+            api.debug("JS.authenticate: Token is expired");
+            delete auth.token;
+        }
+    }
+
+    // authenticate if needed
+    if (auth.token) {
+        // token is valid, go ahead
+    } else if (auth.credentials) {
+        api.debug("JS.authenticate: Authenticate with credentials");
+        const body = api.jsonToBase64({
+            "account_number": auth.credentials.username
+        });
+        const authURL = `${baseURL}/auth/v1/token`;
+        const headers = {
+            "Content-Type": "application/json"
+        };
+        const json = api.getResult("POST", authURL, headers, body);
+        if (json.status != 200) {
+            return api.httpErrorResponse(json.status, authURL);
+        }
+        api.debug(`JS.authenticate: Credentials are valid, response = ${json.response}`);
+        const response = JSON.parse(json.response);
+        auth.token = {
+            accessToken: response.access_token,
+            expiryDate: api.timestampFromISO(response.expiry)
+        };
+    } else {
+        return api.errorResponse("authentication failed");
+    }
+
+    newModule.authentication = auth;
+//    api.debug(`JS.authenticate: Module updated = ${JSON.stringify(newModule)}`);
+
+    // 2. WireGuard session registration
+
+    // stop here if another type
+    const wgType = "WireGuard";
+    if (module.providerModuleType != wgType) {
+        return {
+            response: newModule
+        };
+    }
+
+    const rawOptions = module.moduleOptions[wgType];
+    if (!rawOptions) {
+        return api.errorResponse("missing options");
+    }
+    const storage = api.jsonFromBase64(rawOptions);
+    if (!storage) {
+        return api.errorResponse("corrupt storage");
+    }
+    const session = storage.sessions[deviceId];
+    if (!session) {
+        return api.errorResponse("missing session");
+    }
+
+//    api.debug(`JS.authenticate: Auth = ${JSON.stringify(auth))}`);
+//    api.debug(`JS.authenticate: Storage = ${JSON.stringify(storage))}`);
+//    api.debug(`JS.authenticate: Session = ${JSON.stringify(session))}`);
+    if (session.peer) {
+        api.debug(`JS.authenticate: Session peer = ${JSON.stringify(session.peer)}`);
+    }
+
+    // if subsequent calls return 401, rather than re-authenticating, just
+    // fail and inform the user. this should be rare and managing a potentially
+    // infinite auth loop is really not worth the deal
+
+    // authenticate with token from now on
+    const headers = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${auth.token.accessToken}`
+    };
+
+    // get list of devices
+    const devicesURL = `${baseURL}/accounts/v1/devices`;
+    const json = api.getResult("GET", devicesURL, headers);
+    if (json.status != 200) {
+        return api.httpErrorResponse(json.status, devicesURL);
+    }
+    api.debug(`JS.authenticate: Devices = ${json.response}`);
+    api.debug(`JS.authenticate: Session public key = ${session.publicKey}`);
+    const devices = JSON.parse(json.response);
+
+    // look up own device
+    let myDevice = devices.find(d => session.peer && d.id == session.peer.id);
+    if (myDevice) {
+        api.debug(`JS.authenticate: Device found = ${JSON.stringify(myDevice)}`);
+
+        // key differs, update remote
+        if (myDevice.pubkey != session.publicKey) {
+            api.debug(`JS.authenticate: Update public key from '${myDevice.pubkey}' to '${session.publicKey}'`);
+            const body = api.jsonToBase64({
+                "pubkey": session.publicKey
+            });
+            const putDeviceURL = `${baseURL}/accounts/v1/devices/${myDevice.id}/pubkey`;
+            const json = api.getResult("PUT", putDeviceURL, headers, body);
+            if (json.status != 200) {
+                return api.httpErrorResponse(json.status, putDeviceURL);
+            }
+            api.debug(`JS.authenticate: Device updated = ${json.response}`);
+            myDevice = JSON.parse(json.response);
+        }
+        // key is up-to-date, refresh local
+        else {
+            api.debug("JS.authenticate: Public key is up to date");
+        }
+    }
+    // register new device
+    else {
+        api.debug(`JS.authenticate: Device not found, register with public key '${session.publicKey}'`);
+        const body = api.jsonToBase64({
+            "pubkey": session.publicKey
+        });
+
+        // WARNING: fails with 400 if:
+        //
+        // - pubkey is used by another device
+        // - pubkey is used by a device that was recently deleted
+        //
+        const json = api.getResult("POST", devicesURL, headers, body);
+        if (json.status != 201) {
+            return api.httpErrorResponse(json.status, devicesURL);
+        }
+        api.debug(`JS.authenticate: Device created = ${json.response}`);
+        myDevice = JSON.parse(json.response);
+    }
+
+    // update storage
+    const peer = {
+        id: myDevice.id,
+        creationDate: api.timestampFromISO(myDevice.created),
+        addresses: []
+    };
+    if (myDevice.ipv4_address) {
+        peer.addresses.push(myDevice.ipv4_address);
+    }
+    if (myDevice.ipv6_address) {
+        peer.addresses.push(myDevice.ipv6_address);
+    }
+    session.peer = peer;
+    storage.sessions[deviceId] = session;
+    api.debug(`JS.authenticate: Session updated = ${JSON.stringify(session)}`);
+    api.debug(`JS.authenticate: Storage updated = ${JSON.stringify(storage)}`);
+
+    newModule.moduleOptions[wgType] = api.jsonToBase64(storage);
+//    api.debug(`JS.authenticate: Module updated = ${JSON.stringify(newModule)}`);
+
+    return {
+        response: newModule
+    };
+}
+
 function getInfrastructure(headers) {
     const providerId = "mullvad";
     const openVPN = {

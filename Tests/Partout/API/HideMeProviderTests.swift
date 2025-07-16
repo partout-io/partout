@@ -1,5 +1,5 @@
 //
-//  APIMapperTests.swift
+//  HideMeProviderTests.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 1/14/25.
@@ -23,68 +23,39 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(PartoutAPI)
-
+import Foundation
 @testable import Partout
 @testable import PartoutProviders
 import Testing
 
-struct APIMapperTests {
-
-    // MARK: Index
-
-    @Test
-    func whenFetchIndex_thenReturnsProviders() async throws {
-        setUpLogging()
-
-        let sut = try newAPIMapper()
-        let index = try await sut.index()
-        #expect(index.count == 12)
-        #expect(index.map(\.description) == [
-            "Hide.me",
-            "IVPN",
-            "Mullvad",
-            "NordVPN",
-            "Oeck",
-            "PIA",
-            "ProtonVPN",
-            "SurfShark",
-            "TorGuard",
-            "TunnelBear",
-            "VyprVPN",
-            "Windscribe"
-        ])
-    }
-
-    // MARK: Infrastructures
-
+struct HideMeProviderTests: APITestSuite {
     @Test(arguments: [
-        HideMeFetchInput(
+        FetchInput(
             cache: nil,
             presetsCount: 1,
             serversCount: 2,
             isCached: false
         ),
-//        HideMeFetchInput(
+//        FetchInput(
 //            cache: nil,
 //            presetsCount: 1,
 //            serversCount: 99,
 //            isCached: false,
-//            hijacking: false
+//            hijacked: false
 //        ),
-//        HideMeFetchInput(
+//        FetchInput(
 //            cache: ProviderCache(lastUpdate: nil, tag: "\\\"0103dd09364f346ff8a8c2b9d5285b5d\\\""),
 //            presetsCount: 1,
 //            serversCount: 99,
 //            isCached: true,
-//            hijacking: false
+//            hijacked: false
 //        )
     ])
-    func givenHideMe_whenFetchInfrastructure_thenReturns(input: HideMeFetchInput) async throws {
+    func whenFetchInfrastructure_thenReturns(input: FetchInput) async throws {
         setUpLogging()
 
-        let sut = try newAPIMapper(input.hijacking ? {
-            hidemeFetchHijacker(urlString: $1)
+        let sut = try newAPIMapper(input.hijacked ? {
+            hijacker(forFetchURL: $1)
         } : nil)
         do {
             let infra = try await sut.infrastructure(for: .hideme, cache: input.cache)
@@ -120,10 +91,8 @@ struct APIMapperTests {
     }
 }
 
-// MARK: - Hijackers
-
-extension APIMapperTests {
-    struct HideMeFetchInput {
+extension HideMeProviderTests {
+    struct FetchInput {
         let cache: ProviderCache?
 
         let presetsCount: Int
@@ -132,10 +101,10 @@ extension APIMapperTests {
 
         let isCached: Bool
 
-        var hijacking = true
+        var hijacked = true
     }
 
-    func hidemeFetchHijacker(urlString: String) -> (Int, Data) {
+    func hijacker(forFetchURL urlString: String) -> (Int, Data) {
         guard let url = Bundle.module.url(forResource: "Resources/hideme/fetch", withExtension: "json") else {
             fatalError("Unable to find fetch.json")
         }
@@ -147,41 +116,3 @@ extension APIMapperTests {
         }
     }
 }
-
-// MARK: - Helpers
-
-private extension APIMapperTests {
-    func newAPIMapper(_ requestHijacker: ((String, String) -> (Int, Data))? = nil) throws -> APIMapper {
-        guard let baseURL = API.url() else {
-            fatalError("Could not find resource path")
-        }
-        return DefaultAPIMapper(
-            .global,
-            baseURL: baseURL,
-            timeout: 3.0,
-            api: DefaultProviderScriptingAPI(
-                .global,
-                timeout: 3.0,
-                requestHijacker: requestHijacker
-            )
-        )
-    }
-
-    func setUpLogging() {
-        var logger = PartoutLogger.Builder()
-        logger.setDestination(OSLogDestination(.api), for: [.api])
-        logger.setDestination(OSLogDestination(.providers), for: [.providers])
-        PartoutLogger.register(logger.build())
-    }
-
-    func measureFetchProvider() async throws {
-        let sut = try newAPIMapper()
-        let begin = Date()
-        for _ in 0..<1000 {
-            _ = try await sut.infrastructure(for: .hideme, cache: nil)
-        }
-        print("Elapsed: \(-begin.timeIntervalSinceNow)")
-    }
-}
-
-#endif

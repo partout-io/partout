@@ -12,7 +12,7 @@ let version = "0.99.142"
 let checksum = "f101ac460d29e699ece34ee3bd384febe84e16cd9f579fcaed39692a909ec0cf"
 
 // to download the core soruce
-let coreSHA1 = "06a335170d366a67c58fdd78e403761ca12bc093"
+let coreSHA1 = "12bc3ed80e103a4ca5fac73e75bff0e80fc14f9a"
 
 // deployment environment
 let environment: Environment = .remoteBinary
@@ -209,12 +209,26 @@ package.targets.append(contentsOf: [
             }
             return dependencies
         }(),
-        path: "Sources/Partout"
+        path: "Sources/Partout",
+        exclude: {
+            var list: [String] = []
+            if !areas.contains(.api) {
+                list.append("API")
+            }
+            return list
+        }()
     ),
     .testTarget(
         name: "PartoutTests",
         dependencies: ["Partout"],
         path: "Tests/Partout",
+        exclude: {
+            var list: [String] = []
+            if !areas.contains(.api) {
+                list.append("API")
+            }
+            return list
+        }(),
         resources: [
             .copy("Resources")
         ]
