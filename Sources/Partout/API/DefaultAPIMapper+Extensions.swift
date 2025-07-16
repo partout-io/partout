@@ -1,8 +1,8 @@
 //
-//  API+V6.swift
+//  DefaultAPIMapper+Extensions.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 10/6/24.
+//  Created by Davide De Rosa on 4/20/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,9 +23,31 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
+#if canImport(PartoutAPI)
 
-extension API {
-    public enum V6 {
+import Foundation
+import PartoutProviders
+
+extension DefaultAPIMapper {
+    public convenience init(
+        _ ctx: PartoutLoggerContext,
+        baseURL: URL,
+        timeout: TimeInterval
+    ) {
+        let api = DefaultProviderScriptingAPI(ctx, timeout: timeout)
+        self.init(ctx, baseURL: baseURL, timeout: timeout, api: api)
+    }
+
+    public convenience init(
+        _ ctx: PartoutLoggerContext,
+        baseURL: URL,
+        timeout: TimeInterval,
+        api: DefaultProviderScriptingAPI
+    ) {
+        self.init(ctx, baseURL: baseURL, timeout: timeout, api: api) {
+            $0.newScriptingEngine(ctx)
+        }
     }
 }
+
+#endif

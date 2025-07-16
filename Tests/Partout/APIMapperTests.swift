@@ -1,5 +1,5 @@
 //
-//  APIV6MapperTests.swift
+//  APIMapperTests.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 1/14/25.
@@ -25,11 +25,11 @@
 
 #if canImport(PartoutAPI)
 
-import Foundation
 @testable import Partout
+@testable import PartoutProviders
 import Testing
 
-struct APIV6MapperTests {
+struct APIMapperTests {
 
     // MARK: Index
 
@@ -37,7 +37,7 @@ struct APIV6MapperTests {
     func whenFetchIndex_thenReturnsProviders() async throws {
         setUpLogging()
 
-        let sut = try Self.apiV6()
+        let sut = try newAPIMapper()
         let index = try await sut.index()
         #expect(index.count == 12)
         #expect(index.map(\.description) == [
@@ -70,21 +70,21 @@ struct APIV6MapperTests {
 //            presetsCount: 1,
 //            serversCount: 99,
 //            isCached: false,
-//            withMapper: false
+//            hijacking: false
 //        ),
 //        HideMeFetchInput(
 //            cache: ProviderCache(lastUpdate: nil, tag: "\\\"0103dd09364f346ff8a8c2b9d5285b5d\\\""),
 //            presetsCount: 1,
 //            serversCount: 99,
 //            isCached: true,
-//            withMapper: false
+//            hijacking: false
 //        )
     ])
     func givenHideMe_whenFetchInfrastructure_thenReturns(input: HideMeFetchInput) async throws {
         setUpLogging()
 
-        let sut = try Self.apiV6(requestMapper: input.withMapper ? {
-            hidemeFetchRequestMapper(urlString: $1)
+        let sut = try newAPIMapper(input.hijacking ? {
+            hidemeFetchHijacker(urlString: $1)
         } : nil)
         do {
             let infra = try await sut.infrastructure(for: .hideme, cache: input.cache)
@@ -120,9 +120,9 @@ struct APIV6MapperTests {
     }
 }
 
-// MARK: - Request mappers
+// MARK: - Hijackers
 
-extension APIV6MapperTests {
+extension APIMapperTests {
     struct HideMeFetchInput {
         let cache: ProviderCache?
 
@@ -132,11 +132,11 @@ extension APIV6MapperTests {
 
         let isCached: Bool
 
-        var withMapper = true
+        var hijacking = true
     }
 
-    func hidemeFetchRequestMapper(urlString: String) -> (Int, Data) {
-        guard let url = Bundle.module.url(forResource: "Resources/JSON/hideme/fetch", withExtension: "json") else {
+    func hidemeFetchHijacker(urlString: String) -> (Int, Data) {
+        guard let url = Bundle.module.url(forResource: "Resources/hideme/fetch", withExtension: "json") else {
             fatalError("Unable to find fetch.json")
         }
         do {
@@ -150,20 +150,19 @@ extension APIV6MapperTests {
 
 // MARK: - Helpers
 
-private extension APIV6MapperTests {
-    static func apiV6(requestMapper: ((String, String) -> (Int, Data))? = nil) throws -> APIMapper {
-        let root = "Resources/API/v6"
-        guard let baseURL = Bundle.module.url(forResource: root, withExtension: nil) else {
+private extension APIMapperTests {
+    func newAPIMapper(_ requestHijacker: ((String, String) -> (Int, Data))? = nil) throws -> APIMapper {
+        guard let baseURL = API.bundleURL else {
             fatalError("Could not find resource path")
         }
-        return API.V6.Mapper(
+        return DefaultAPIMapper(
             .global,
             baseURL: baseURL,
             timeout: 3.0,
             api: DefaultProviderScriptingAPI(
                 .global,
                 timeout: 3.0,
-                requestMapper: requestMapper
+                requestHijacker: requestHijacker
             )
         )
     }
@@ -176,7 +175,7 @@ private extension APIV6MapperTests {
     }
 
     func measureFetchProvider() async throws {
-        let sut = try Self.apiV6()
+        let sut = try newAPIMapper()
         let begin = Date()
         for _ in 0..<1000 {
             _ = try await sut.infrastructure(for: .hideme, cache: nil)

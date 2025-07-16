@@ -199,6 +199,7 @@ package.targets.append(contentsOf: [
             }
             if areas.contains(.api) {
                 dependencies.append("PartoutAPI")
+                dependencies.append("PartoutAPIBundle")
             }
             if areas.contains(.openVPN) {
                 dependencies.append("_PartoutOpenVPNCore")
@@ -642,6 +643,17 @@ if areas.contains(.api) {
                 "PartoutProviders"
             ],
             path: "Sources/API"
+        ),
+        .target(
+            name: "PartoutAPIBundle",
+            dependencies: [
+                "PartoutAPI",
+                "PartoutProviders"
+            ],
+            path: "Sources/APIBundle",
+            resources: [
+                .copy("JSON")
+            ]
         ),
         .testTarget(
             name: "PartoutAPITests",

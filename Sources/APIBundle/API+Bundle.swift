@@ -1,8 +1,8 @@
 //
-//  Partout.swift
+//  API+Bundle.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 3/29/24.
+//  Created by Davide De Rosa on 7/15/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -24,36 +24,10 @@
 //
 
 import Foundation
+import PartoutAPI
 
-// MARK: Core
-
-@_exported import PartoutCore
-
-// MARK: - Providers
-
-@_exported import PartoutProviders
-
-// MARK: - API
-
-#if canImport(PartoutAPI)
-@_exported import PartoutAPI
-@_exported import PartoutAPIBundle
-#endif
-
-// MARK: - Modules
-
-#if canImport(_PartoutOpenVPNCore)
-@_exported import _PartoutOpenVPNCore
-#endif
-#if canImport(_PartoutWireGuardCore)
-@_exported import _PartoutWireGuardCore
-#endif
-
-// MARK: - Vendors
-
-@_exported import _PartoutVendorsPortable
-
-#if canImport(_PartoutVendorsApple)
-@_exported import _PartoutVendorsApple
-@_exported import _PartoutVendorsAppleNE
-#endif
+extension API {
+    public static var bundleURL: URL? {
+        Bundle.module.url(forResource: "JSON", withExtension: nil)
+    }
+}

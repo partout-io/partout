@@ -1,8 +1,8 @@
 //
-//  V6Resource.swift
+//  API+REST.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 3/27/25.
+//  Created by Davide De Rosa on 10/6/24.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,23 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-import PartoutCore
-import PartoutProviders
+import PartoutAPI
 
-extension API.V6 {
-    public enum Resource {
-        case index
-
-        case provider(ProviderID)
-
-        public var path: String {
-            switch self {
-            case .index:
-                "index.json"
-            case .provider(let id):
-                "providers/\(id.rawValue).js"
-            }
-        }
+extension API {
+    public enum REST {
     }
 }

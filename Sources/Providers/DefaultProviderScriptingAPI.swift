@@ -36,16 +36,23 @@ public final class DefaultProviderScriptingAPI {
 
     private let timeout: TimeInterval
 
-    private let requestMapper: ((String, String) -> (Int, Data))?
+    private let requestHijacker: ((String, String) -> (Int, Data))?
 
-    public init(
+    public convenience init(
+        _ ctx: PartoutLoggerContext,
+        timeout: TimeInterval
+    ) {
+        self.init(ctx, timeout: timeout, requestHijacker: nil)
+    }
+
+    init(
         _ ctx: PartoutLoggerContext,
         timeout: TimeInterval,
-        requestMapper: ((_ method: String, _ urlString: String) -> (httpStatus: Int, responseData: Data))? = nil
+        requestHijacker: ((_ method: String, _ urlString: String) -> (httpStatus: Int, responseData: Data))? = nil
     ) {
         self.ctx = ctx
         self.timeout = timeout
-        self.requestMapper = requestMapper
+        self.requestHijacker = requestHijacker
     }
 }
 
@@ -193,8 +200,8 @@ private extension DefaultProviderScriptingAPI {
         pp_log(ctx, .providers, .info, "API.sendRequest: \(method) \(urlString)")
 
         // hijack requests (for testing)
-        if let requestMapper {
-            let pair = requestMapper(method, urlString)
+        if let requestHijacker {
+            let pair = requestHijacker(method, urlString)
             let fakeResponseStatus = pair.0
             let fakeResponseData = pair.1
 

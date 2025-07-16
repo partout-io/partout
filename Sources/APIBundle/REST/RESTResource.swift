@@ -1,8 +1,8 @@
 //
-//  APIV6Mapper+Default.swift
+//  RESTResource.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 4/20/25.
+//  Created by Davide De Rosa on 3/27/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,31 +23,22 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(PartoutAPI)
-
-import Foundation
+import PartoutAPI
 import PartoutProviders
 
-extension API.V6.Mapper {
-    public convenience init(
-        _ ctx: PartoutLoggerContext,
-        baseURL: URL,
-        timeout: TimeInterval
-    ) {
-        let api = DefaultProviderScriptingAPI(ctx, timeout: timeout)
-        self.init(ctx, baseURL: baseURL, timeout: timeout, api: api)
-    }
+extension API.REST {
+    public enum Resource {
+        case index
 
-    public convenience init(
-        _ ctx: PartoutLoggerContext,
-        baseURL: URL,
-        timeout: TimeInterval,
-        api: DefaultProviderScriptingAPI
-    ) {
-        self.init(ctx, baseURL: baseURL, timeout: timeout, api: api) {
-            $0.newScriptingEngine(ctx)
+        case provider(ProviderID)
+
+        public var path: String {
+            switch self {
+            case .index:
+                "index.json"
+            case .provider(let id):
+                "providers/\(id.rawValue).js"
+            }
         }
     }
 }
-
-#endif
