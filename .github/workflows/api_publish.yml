@@ -1,4 +1,4 @@
-name: Publish API
+name: "API: Publish"
 on:
   push:
     branches:
@@ -14,7 +14,7 @@ jobs:
   push_to_api:
     name: Push to API
     runs-on: ubuntu-latest
-    timeout: 2
+    timeout-minutes: 2
     environment:
       name: production
       url: https://github.com/passepartoutvpn/api
@@ -34,7 +34,7 @@ jobs:
       - name: Deploy
         uses: tagus/git-deploy@v0.5.0
         with:
-          changes: "src"
+          changes: "API/src"
           repository: git@github.com:passepartoutvpn/api.git
           ssh_key: ${{ secrets.API_DEPLOY_KEY }}
           name: API
