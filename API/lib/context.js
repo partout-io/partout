@@ -40,11 +40,7 @@ function fetchScriptPath(root, providerId) {
 export function fetchInfrastructure(api, providerId, options) {
     const scriptRoot = `${api.root}/${api.version}/providers`;
     const scriptPath = fetchScriptPath(scriptRoot, providerId);
-    const optionsCopy = { ...options };
-    if (api.mockPath) {
-        optionsCopy.mockPath = api.mockPath;
-    }
-    return fetchRawInfrastructure(scriptPath, optionsCopy);
+    return fetchRawInfrastructure(scriptPath, options);
 }
 
 export function fetchRawInfrastructure(scriptPath, options) {
@@ -52,8 +48,8 @@ export function fetchRawInfrastructure(scriptPath, options) {
     const referenceDate = new Date(0); // UNIX epoch
 
     function getResult(url) {
-        if (options.mockPath) {
-            const data = fs.readFileSync(options.mockPath, "utf8");
+        if (options.responsePath) {
+            const data = fs.readFileSync(options.responsePath, "utf8");
             return {
                 data: data
             };
