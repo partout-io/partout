@@ -121,7 +121,7 @@ struct APIMapperTests {
     }
 }
 
-// MARK: - Request mappers
+// MARK: - Hijackers
 
 extension APIMapperTests {
     struct HideMeFetchInput {
