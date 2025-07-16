@@ -74,29 +74,23 @@ public final class DefaultAPIMapper: APIMapper {
     }
 
     public func authenticate(_ module: ProviderModule, on deviceId: String) async throws -> ProviderModule {
-        switch module.providerModuleType {
-#if canImport(_PartoutWireGuardCore)
-        case .wireGuard:
 
-            // preconditions (also check in script)
-            guard let auth = module.authentication, !auth.isEmpty else {
-                throw PartoutError(.authentication)
-            }
-            guard let storage: WireGuardProviderStorage = try module.options(for: .wireGuard) else {
-                throw PartoutError(.Providers.missingOption)
-            }
-            guard storage.sessions?[deviceId] != nil else {
-                throw PartoutError(.Providers.missingOption)
-            }
-
-            let script = try await script(for: .provider(module.providerId))
-            let engine = engineFactory(api)
-            return try await engine.authenticate(ctx, module, on: deviceId, with: script)
-#endif
-        default:
-            assertionFailure("Authentication not supported for module type \(module.providerModuleType)")
-            return module
+        // preconditions (also check in script)
+        guard let auth = module.authentication, !auth.isEmpty else {
+            throw PartoutError(.authentication)
         }
+#if canImport(_PartoutWireGuardCore)
+        guard let storage: WireGuardProviderStorage = try module.options(for: .wireGuard) else {
+            throw PartoutError(.Providers.missingOption)
+        }
+        guard storage.sessions?[deviceId] != nil else {
+            throw PartoutError(.Providers.missingOption)
+        }
+#endif
+
+        let script = try await script(for: .provider(module.providerId))
+        let engine = engineFactory(api)
+        return try await engine.authenticate(ctx, module, on: deviceId, with: script)
     }
 
     public func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure {
