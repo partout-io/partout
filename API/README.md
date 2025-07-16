@@ -23,6 +23,12 @@ Fetch the infrastructure of a provider:
 npm run fetch hideme
 ```
 
+Fetch the infrastructure ignoring the cache:
+
+```sh
+npm run fetch hideme 0
+```
+
 Run the tests against the mocks:
 
 ```sh
