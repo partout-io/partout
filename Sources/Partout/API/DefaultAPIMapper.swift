@@ -92,7 +92,7 @@ public final class DefaultAPIMapper: APIMapper {
 
             let script = try await script(for: .provider(module.providerId))
             let engine = engineFactory(api)
-            return try await engine.authenticate(module, on: deviceId, with: script)
+            return try await engine.authenticate(ctx, module, on: deviceId, with: script)
         default:
             assertionFailure("Authentication not supported for module type \(module.providerModuleType)")
             return module
@@ -102,7 +102,7 @@ public final class DefaultAPIMapper: APIMapper {
     public func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure {
         let script = try await script(for: .provider(providerId))
         let engine = engineFactory(api)
-        return try await engine.fetchInfrastructure(with: script, cache: cache)
+        return try await engine.fetchInfrastructure(ctx, with: script, cache: cache)
     }
 }
 
@@ -110,7 +110,7 @@ public final class DefaultAPIMapper: APIMapper {
 
 // TODO: #54/partout, assumes engine to be JavaScript
 extension ScriptingEngine {
-    func authenticate(_ module: ProviderModule, on deviceId: String, with script: String) async throws -> ProviderModule {
+    func authenticate(_ ctx: PartoutLoggerContext, _ module: ProviderModule, on deviceId: String, with script: String) async throws -> ProviderModule {
         let moduleData = try JSONEncoder().encode(module)
         guard let moduleJSON = String(data: moduleData, encoding: .utf8) else {
             throw PartoutError(.encoding)
@@ -129,7 +129,7 @@ extension ScriptingEngine {
         return response
     }
 
-    func fetchInfrastructure(with script: String, cache: ProviderCache?) async throws -> ProviderInfrastructure {
+    func fetchInfrastructure(_ ctx: PartoutLoggerContext, with script: String, cache: ProviderCache?) async throws -> ProviderInfrastructure {
         var headers: [String: String] = [:]
         if let lastUpdate = cache?.lastUpdate {
             headers["If-Modified-Since"] = lastUpdate.toRFC1123()
@@ -141,6 +141,7 @@ extension ScriptingEngine {
         guard let headersJSON = String(data: headersData, encoding: .utf8) else {
             throw PartoutError(.encoding)
         }
+        pp_log(ctx, .api, .debug, "Headers: \(headersJSON)")
         let result = try await execute(
             "JSON.stringify(getInfrastructure(JSON.parse('\(headersJSON)')))",
             after: script,
