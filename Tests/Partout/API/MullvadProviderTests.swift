@@ -1,5 +1,5 @@
 //
-//  APIMapperTests.swift
+//  MullvadProviderTests.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 1/14/25.
@@ -23,64 +23,34 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(PartoutAPI)
-
 @testable import Partout
 @testable import PartoutProviders
 import Testing
 
-struct APIMapperTests {
-
-    // MARK: Index
-
-    @Test
-    func whenFetchIndex_thenReturnsProviders() async throws {
-        setUpLogging()
-
-        let sut = try newAPIMapper()
-        let index = try await sut.index()
-        #expect(index.count == 12)
-        #expect(index.map(\.description) == [
-            "Hide.me",
-            "IVPN",
-            "Mullvad",
-            "NordVPN",
-            "Oeck",
-            "PIA",
-            "ProtonVPN",
-            "SurfShark",
-            "TorGuard",
-            "TunnelBear",
-            "VyprVPN",
-            "Windscribe"
-        ])
-    }
-
-    // MARK: Authentication
-
+struct MullvadProviderTests: APITestSuite {
     @Test(arguments: [
-        MullvadAuthInput( // valid token
+        AuthInput( // valid token
             accessToken: "sometoken",
             tokenExpiryTimestamp: "2100-01-01T14:42:07+00:00",
             privateKey: "dummyPrivateKey",
             publicKey: "test_existingPublicKey",
             existingPeerId: "test_existingPeerId"
         ),
-        MullvadAuthInput( // no token
+        AuthInput( // no token
             accessToken: nil,
             tokenExpiryTimestamp: nil,
             privateKey: "dummyPrivateKey",
             publicKey: "test_existingPublicKey",
             existingPeerId: "test_existingPeerId"
         ),
-        MullvadAuthInput( // expired token
+        AuthInput( // expired token
             accessToken: nil,
             tokenExpiryTimestamp: "2010-01-01T14:42:07+00:00",
             privateKey: "dummyPrivateKey",
             publicKey: "test_existingPublicKey",
             existingPeerId: "test_existingPeerId"
         ),
-        MullvadAuthInput( // new device
+        AuthInput( // new device
             accessToken: "sometoken",
             tokenExpiryTimestamp: "2100-01-01T14:42:07+00:00",
             privateKey: "dummyPrivateKey",
@@ -88,7 +58,7 @@ struct APIMapperTests {
             existingPeerId: nil,
             peerAddresses: ["10.10.10.10/32", "fc00::10/128"]
         ),
-        MullvadAuthInput( // existing device, same public key
+        AuthInput( // existing device, same public key
             accessToken: "sometoken",
             tokenExpiryTimestamp: "2100-01-01T14:42:07+00:00",
             privateKey: "dummyPrivateKey",
@@ -96,7 +66,7 @@ struct APIMapperTests {
             existingPeerId: "test_existingPeerId",
             peerAddresses: ["10.10.10.10/32", "fc00::10/128"]
         ),
-        MullvadAuthInput( // existing device, new public key
+        AuthInput( // existing device, new public key
             accessToken: "sometoken",
             tokenExpiryTimestamp: "2100-01-01T14:42:07+00:00",
             privateKey: "dummyPrivateKey",
@@ -105,11 +75,11 @@ struct APIMapperTests {
             peerAddresses: ["10.10.10.10/32", "fc00::10/128"]
         )
     ])
-    func givenMullvad_whenAuth_thenSucceeds(input: MullvadAuthInput) async throws {
+    func whenAuth_thenSucceeds(input: AuthInput) async throws {
         setUpLogging()
 
-        let sut = try newAPIMapper(input.withMapper ? {
-            mullvadAuthRequestMapper(for: input, method: $0, urlString: $1)
+        let sut = try newAPIMapper(input.hijacked ? {
+            hijacker(for: input, method: $0, urlString: $1)
         } : nil)
 
         // constants
@@ -179,75 +149,10 @@ struct APIMapperTests {
             #expect(newSession.peer?.addresses == peerAddresses)
         }
     }
-
-    // MARK: Infrastructures
-
-    @Test(arguments: [
-        HideMeFetchInput(
-            cache: nil,
-            presetsCount: 1,
-            serversCount: 2,
-            isCached: false
-        ),
-//        HideMeFetchInput(
-//            cache: nil,
-//            presetsCount: 1,
-//            serversCount: 99,
-//            isCached: false,
-//            hijacking: false
-//        ),
-//        HideMeFetchInput(
-//            cache: ProviderCache(lastUpdate: nil, tag: "\\\"0103dd09364f346ff8a8c2b9d5285b5d\\\""),
-//            presetsCount: 1,
-//            serversCount: 99,
-//            isCached: true,
-//            hijacking: false
-//        )
-    ])
-    func givenHideMe_whenFetchInfrastructure_thenReturns(input: HideMeFetchInput) async throws {
-        setUpLogging()
-
-        let sut = try newAPIMapper(input.hijacking ? {
-            hidemeFetchHijacker(urlString: $1)
-        } : nil)
-        do {
-            let infra = try await sut.infrastructure(for: .hideme, cache: input.cache)
-            #expect(infra.presets.count == input.presetsCount)
-            #expect(infra.servers.count == input.serversCount)
-
-#if canImport(_PartoutOpenVPNCore)
-            try infra.presets.forEach {
-                let template = try JSONDecoder().decode(OpenVPNProviderTemplate.self, from: $0.templateData)
-                switch $0.presetId {
-                case "default":
-                    #expect(template.configuration.cipher == .aes256cbc)
-                    #expect(template.endpoints.map(\.rawValue) == [
-                        "UDP:3000", "UDP:3010", "UDP:3020", "UDP:3030", "UDP:3040", "UDP:3050",
-                        "UDP:3060", "UDP:3070", "UDP:3080", "UDP:3090", "UDP:3100",
-                        "TCP:3000", "TCP:3010", "TCP:3020", "TCP:3030", "TCP:3040", "TCP:3050",
-                        "TCP:3060", "TCP:3070", "TCP:3080", "TCP:3090", "TCP:3100"
-                    ])
-                default:
-                    break
-                }
-            }
-#endif
-        } catch let error as PartoutError {
-            if input.isCached {
-                #expect(error.code == .cached)
-            } else {
-                #expect(Bool(false), "Failed: \(error)")
-            }
-        } catch {
-            #expect(Bool(false), "Failed: \(error)")
-        }
-    }
 }
 
-// MARK: - Hijackers
-
-extension APIMapperTests {
-    struct MullvadAuthInput {
+extension MullvadProviderTests {
+    struct AuthInput {
         let accessToken: String?
 
         let tokenExpiryTimestamp: String?
@@ -260,10 +165,10 @@ extension APIMapperTests {
 
         var peerAddresses: [String]?
 
-        var withMapper = true
+        var hijacked = true
     }
 
-    func mullvadAuthRequestMapper(for input: MullvadAuthInput, method: String, urlString: String) -> (Int, Data) {
+    func hijacker(for input: AuthInput, method: String, urlString: String) -> (Int, Data) {
         var filename: String?
         var httpStatus: Int?
         if urlString.contains("/devices") {
@@ -304,66 +209,4 @@ extension APIMapperTests {
             fatalError("Unable to read JSON contents: \(error)")
         }
     }
-
-    struct HideMeFetchInput {
-        let cache: ProviderCache?
-
-        let presetsCount: Int
-
-        let serversCount: Int
-
-        let isCached: Bool
-
-        var hijacking = true
-    }
-
-    func hidemeFetchHijacker(urlString: String) -> (Int, Data) {
-        guard let url = Bundle.module.url(forResource: "Resources/hideme/fetch", withExtension: "json") else {
-            fatalError("Unable to find fetch.json")
-        }
-        do {
-            let data = try Data(contentsOf: url)
-            return (200, data)
-        } catch {
-            fatalError("Unable to read JSON contents: \(error)")
-        }
-    }
 }
-
-// MARK: - Helpers
-
-private extension APIMapperTests {
-    func newAPIMapper(_ requestHijacker: ((String, String) -> (Int, Data))? = nil) throws -> APIMapper {
-        guard let baseURL = API.url() else {
-            fatalError("Could not find resource path")
-        }
-        return DefaultAPIMapper(
-            .global,
-            baseURL: baseURL,
-            timeout: 3.0,
-            api: DefaultProviderScriptingAPI(
-                .global,
-                timeout: 3.0,
-                requestHijacker: requestHijacker
-            )
-        )
-    }
-
-    func setUpLogging() {
-        var logger = PartoutLogger.Builder()
-        logger.setDestination(OSLogDestination(.api), for: [.api])
-        logger.setDestination(OSLogDestination(.providers), for: [.providers])
-        PartoutLogger.register(logger.build())
-    }
-
-    func measureFetchProvider() async throws {
-        let sut = try newAPIMapper()
-        let begin = Date()
-        for _ in 0..<1000 {
-            _ = try await sut.infrastructure(for: .hideme, cache: nil)
-        }
-        print("Elapsed: \(-begin.timeIntervalSinceNow)")
-    }
-}
-
-#endif
