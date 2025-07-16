@@ -165,16 +165,17 @@ It's highly desirable that you add some basic unit tests in `test/providers`. Yo
 
 ## Built-ins
 
-Below is a list of the additional functions available in the context of a provider script. Base64 is normally used for binary data.
+Below is a list of the additional functions available in the context of a provider script through the injected `api` object. Base64 is normally used for binary data. The full API is defined in [ProviderScriptingAPI][github-provider-scripting-api].
 
-### getText(url)
+### getText(url, headers)
 
 Returns content from an URL as text.
 
 Example:
 
 ```javascript
-let result = getText("https://raw.githubusercontent.com/passepartoutvpn/api-cache/refs/heads/master/v7/providers/oeck/fetch.json"
+const headers = {"Content-Type": "application/json"};
+const result = api.getText("https://raw.githubusercontent.com/passepartoutvpn/api-cache/refs/heads/master/v7/providers/oeck/fetch.json", headers);
 /*
 result = {
     response: '{"presets": [], "servers": []}',
@@ -186,14 +187,14 @@ result = {
 */
 ```
 
-### getJSON(url)
+### getJSON(url, headers)
 
-Returns content from an URL as a JSON object.
+Similar to `getText`, but returns a JSON object.
 
 Example:
 
 ```javascript
-let result = getText("https://raw.githubusercontent.com/passepartoutvpn/api-cache/refs/heads/master/v7/providers/oeck/fetch.json"
+const result = api.getJSON("https://raw.githubusercontent.com/passepartoutvpn/api-cache/refs/heads/master/v7/providers/oeck/fetch.json", null);
 /*
 result = {
     response: {
@@ -212,6 +213,10 @@ result = {
 
 Returns a Base64 string from a JSON object. For example, use this for preset template data.
 
+### jsonFromBase64(object)
+
+Returns a JSON object from a Base64 string.
+
 ### ipV4ToBase64(ip)
 
 Returns a Base64 string from an IPv4 address. For example, use this for pre-resolved server addresses.
@@ -224,6 +229,7 @@ Returns an object for the `tlsWrap` of an OpenVPN template configuration, given 
 [github-provider-infrastructure]: ../Sources/API/ProviderInfrastructure.swift
 [github-provider-preset]: ../Sources/Providers/ProviderPreset.swift
 [github-provider-server]: ../Sources/Providers/ProviderServer.swift
+[github-provider-scripting-api]: ../Sources/Providers/ProviderScriptingAPI.swift
 [github-provider-script-result]: ../Sources/Providers/DefaultProviderScriptingAPI.swift
 [github-openvpn-template]: ../Sources/Partout/Providers/OpenVPN/OpenVPNProviderTemplate.swift
 [github-openvpn-configuration]: ../Sources/OpenVPN/Core/OpenVPN%2BConfiguration.swift
