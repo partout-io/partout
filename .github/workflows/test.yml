@@ -37,5 +37,6 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: API/package-lock.json
       - run: npm ci
       - run: npm test
