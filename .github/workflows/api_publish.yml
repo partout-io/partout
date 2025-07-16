@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - bugfix/api-workflows
     paths:
       - "API/**"
       - "Sources/APIBundle/JSON/**"
