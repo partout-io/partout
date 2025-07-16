@@ -73,7 +73,7 @@ function getInfrastructure(headers) {
         servers.push(server);
     });
 
-    const presets = api.getOpenVPNPresets(providerId, openVPN.moduleType, openVPN.presetIds, json.response.openvpn.ports);
+    const presets = getOpenVPNPresets(providerId, openVPN.moduleType, openVPN.presetIds, json.response.openvpn.ports);
 
     return {
         response: {
