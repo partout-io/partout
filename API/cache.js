@@ -22,12 +22,9 @@
 // SOFTWARE.
 //
 
-import { api, mockApi, allProviders } from "./lib/api.js";
+import { api, allProviders } from "./lib/api.js";
 import { fetchInfrastructure } from "./lib/context.js";
 import { mkdir, writeFile } from "fs/promises";
-
-const isRemote = process.argv[2] == 1; // local by default
-const cachedIds = process.env.CACHE_IDS ? process.env.CACHE_IDS.split(",") : [];
 
 async function cacheProvidersInParallel(ids) {
     try {
@@ -40,7 +37,7 @@ async function cacheProvidersInParallel(ids) {
                     forCache: true,
                     responseOnly: true
                 };
-                const json = fetchInfrastructure(isRemote ? api : mockApi, providerId, options);
+                const json = fetchInfrastructure(api, providerId, options);
                 const minJSON = JSON.stringify(json);
                 return writeFile(dest, minJSON, "utf8");
             });
@@ -50,14 +47,15 @@ async function cacheProvidersInParallel(ids) {
         console.log("All files written successfully");
     } catch (error) {
         console.error("Error writing files:", error);
+        throw error;
     }
 }
 
-// opt out
-//const targetIds = allProviders(".")
-//    .filter(id => !cachedIds.has(id));
-
 // opt in
-const targetIds = cachedIds;
-
+const arg = process.argv[2];
+if (!arg) {
+    console.error("Please provide a comma-separated list of provider ids");
+    process.exit(1);
+}
+const targetIds = arg.split(",");
 await cacheProvidersInParallel(targetIds);

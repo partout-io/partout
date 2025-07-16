@@ -30,9 +30,6 @@ export const api = {
     index: "index.json"
 };
 
-export const mockApi = { ...api };
-mockApi.mockRoot = "test/mock";
-
 export function allProviders(root) {
     const excludedProviders = new Set([]);
     const apiIndex = `${root}/${api.root}/${api.version}/index.json`;
