@@ -25,7 +25,7 @@
 import fs from "fs";
 
 export const api = {
-    version: "v6",
+    version: "v7",
     root: "api",
     index: "index.json"
 };
