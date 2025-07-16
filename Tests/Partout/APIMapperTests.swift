@@ -25,7 +25,6 @@
 
 #if canImport(PartoutAPI)
 
-import Foundation
 @testable import Partout
 @testable import PartoutProviders
 import Testing
