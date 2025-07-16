@@ -14,7 +14,7 @@ jobs:
   store_to_cache:
     name: Store to cache
     runs-on: ubuntu-latest
-    timeout: 5
+    timeout-minutes: 5
     environment: production
     defaults:
       run:
