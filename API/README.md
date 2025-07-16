@@ -1,6 +1,5 @@
-[![Unit Tests](https://github.com/passepartoutvpn/api-source/actions/workflows/test.yml/badge.svg)](https://github.com/passepartoutvpn/api-source/actions/workflows/test.yml)
-[![Publish](https://github.com/passepartoutvpn/api-source/actions/workflows/publish.yml/badge.svg)](https://github.com/passepartoutvpn/api-source/actions/workflows/publish.yml)
-[![Cache](https://github.com/passepartoutvpn/api-source/actions/workflows/cache.yml/badge.svg)](https://github.com/passepartoutvpn/api-source/actions/workflows/cache.yml)
+[![Publish](https://github.com/passepartoutvpn/partout/actions/workflows/api_publish.yml/badge.svg)](https://github.com/passepartoutvpn/partout/actions/workflows/api_publish.yml)
+[![Cache](https://github.com/passepartoutvpn/partout/actions/workflows/api_cache.yml/badge.svg)](https://github.com/passepartoutvpn/partout/actions/workflows/api_cache.yml)
 
 # API
 
