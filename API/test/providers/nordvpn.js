@@ -22,19 +22,21 @@
 // SOFTWARE.
 //
 
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
+import { describe, it } from "mocha";
+import { strict as assert } from "assert";
 import * as setup from "../setup.js";
 
 describe("nordvpn", () => {
-    const json = setup.fetchMockInfrastructure("nordvpn");
-    const infra = json.response;
-
+    let infra;
+    before(() => {
+        const json = setup.fetchMockInfrastructure("nordvpn");
+        infra = json.response;
+    });
     it("should have 2 presets", () => {
         assert.strictEqual(infra.presets.length, 2);
     });
-    it("should have 1 servers", () => {
-        assert.strictEqual(infra.servers.length, 1);
+    it("should have 3 servers", () => {
+        assert.strictEqual(infra.servers.length, 3);
     });
     it("preset 0 should use CBC and 1 endpoint", () => {
         const preset = infra.presets[0];

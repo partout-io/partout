@@ -22,14 +22,16 @@
 // SOFTWARE.
 //
 
-import { describe, it } from "node:test";
-import assert from "node:assert/strict";
+import { describe, it } from "mocha";
+import { strict as assert } from "assert";
 import * as setup from "../setup.js";
 
 describe("surfshark", () => {
-    const json = setup.fetchMockInfrastructure("surfshark");
-    const infra = json.response;
-
+    let infra;
+    before(() => {
+        const json = setup.fetchMockInfrastructure("surfshark");
+        infra = json.response;
+    });
     it("should have 1 preset", () => {
         assert.strictEqual(infra.presets.length, 1);
     });

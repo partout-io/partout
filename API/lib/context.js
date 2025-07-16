@@ -27,46 +27,34 @@ import vm from "vm";
 import request from "sync-request";
 
 function runSandboxedScript(code, injectedFunctions = {}) {
-    const sandbox = { ...injectedFunctions };
+    const sandbox = { api: { ...injectedFunctions } };
     const context = vm.createContext(sandbox);
     return vm.runInContext(code, context);
 }
 
-function fetchScriptPath(root, providerId, forCache) {
-    try {
-        if (forCache) {
-            const name = `${providerId}.cache.js`;
-            const cachePath = `${root}/${name}`;
-            fs.accessSync(cachePath);
-            return cachePath;
-        }
-    } catch {
-        //
-    }
+function fetchScriptPath(root, providerId) {
     const name = `${providerId}.js`;
     return `${root}/${name}`;
 }
 
 export function fetchInfrastructure(api, providerId, options) {
     const scriptRoot = `${api.root}/${api.version}/providers`;
-    const scriptPath = fetchScriptPath(scriptRoot, providerId, options && options.forCache);
-    const optionsCopy = { ...options };
-    if (api.mockRoot) {
-        optionsCopy.mockPath = `${api.mockRoot}/${api.version}/providers/${providerId}/fetch.json`;
-    }
-    return fetchRawInfrastructure(scriptPath, optionsCopy);
+    const scriptPath = fetchScriptPath(scriptRoot, providerId);
+    return fetchRawInfrastructure(scriptPath, options);
 }
 
 export function fetchRawInfrastructure(scriptPath, options) {
     const script = fs.readFileSync(scriptPath, "utf8");
-    const referenceDate = new Date("2001-01-01T00:00:00Z");
+    const referenceDate = new Date(0); // UNIX epoch
 
     function getResult(url) {
-        if (options.mockPath) {
-            const data = fs.readFileSync(options.mockPath, "utf8");
+        console.log(`GET ${url}`);
+        if (options.responsePath) {
+            console.log(`Read response from: ${options.responsePath}`);
+            const data = fs.readFileSync(options.responsePath, "utf8");
             return {
                 data: data
-            }
+            };
         }
         const response = request("GET", url);
         const data = response.getBody("utf8");
@@ -131,12 +119,16 @@ export function fetchRawInfrastructure(scriptPath, options) {
                     data: key.toString("base64")
                 }
             };
+        },
+        debug(message) {
+            console.error(message);
         }
     };
 
+    const preferCache = options.preferCache ?? true;
     const wrappedScript = `
         ${script}
-        getInfrastructure();
+        getInfrastructure({}, ${preferCache});
     `;
     const json = runSandboxedScript(wrappedScript, injectedFunctions);
     if (options.responseOnly) {

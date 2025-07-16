@@ -22,11 +22,14 @@
 // SOFTWARE.
 //
 
-import { mockApi } from "../lib/api.js";
+import { api } from "../lib/api.js";
 import { fetchInfrastructure } from "../lib/context.js";
 
 export function fetchMockInfrastructure(providerId) {
-    return fetchInfrastructure(mockApi, providerId, { forCache: true });
+    return fetchInfrastructure(api, providerId, {
+        responsePath: `test/mock/providers/${providerId}/fetch.json`,
+        preferCache: false, // run real-world script
+    });
 }
 
 export function templateFrom(preset) {
@@ -35,6 +38,6 @@ export function templateFrom(preset) {
         return JSON.parse(jsonString);
     } catch (error) {
         console.error(`Unable to parse template: ${error}`);
-        return null;
+        throw error;
     }
 }

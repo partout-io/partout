@@ -22,14 +22,11 @@
 // SOFTWARE.
 //
 
-import { api, mockApi, allProviders } from "./lib/api.js";
+import { api, modes, allProviders } from "./lib/api.js";
 import { fetchInfrastructure } from "./lib/context.js";
 import { mkdir, writeFile } from "fs/promises";
 
-const isRemote = process.argv[2] == 1; // local by default
-const cachedIds = process.env.CACHE_IDS ? process.env.CACHE_IDS.split(",") : [];
-
-async function cacheProvidersInParallel(ids) {
+async function cacheProvidersInParallel(ids, mode) {
     try {
         const writePromises = ids
             .map(async providerId => {
@@ -37,10 +34,13 @@ async function cacheProvidersInParallel(ids) {
                 await mkdir(providerPath, { recursive: true });
                 const dest = `${providerPath}/fetch.json`;
                 const options = {
-                    forCache: true,
+                    preferCache: mode == modes.PRODUCTION,
                     responseOnly: true
                 };
-                const json = fetchInfrastructure(isRemote ? api : mockApi, providerId, options);
+                if (mode == modes.LOCAL_UNCACHED) {
+                    options.responsePath = `test/mock/providers/${providerId}/fetch.json`;
+                }
+                const json = fetchInfrastructure(api, providerId, options);
                 const minJSON = JSON.stringify(json);
                 return writeFile(dest, minJSON, "utf8");
             });
@@ -50,14 +50,16 @@ async function cacheProvidersInParallel(ids) {
         console.log("All files written successfully");
     } catch (error) {
         console.error("Error writing files:", error);
+        throw error;
     }
 }
 
-// opt out
-//const targetIds = allProviders(".")
-//    .filter(id => !cachedIds.has(id));
-
 // opt in
-const targetIds = cachedIds;
-
-await cacheProvidersInParallel(targetIds);
+const arg = process.argv[2];
+const mode = process.argv[3];
+if (!arg) {
+    console.error("Please provide a comma-separated list of provider IDs");
+    process.exit(1);
+}
+const targetIds = arg.split(",");
+await cacheProvidersInParallel(targetIds, mode);
