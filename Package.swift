@@ -646,10 +646,13 @@ if areas.contains(.api) {
         ),
         .target(
             name: "PartoutAPIBundle",
-            dependencies: ["PartoutAPI"],
+            dependencies: [
+                "PartoutAPI",
+                "PartoutProviders"
+            ],
             path: "Sources/APIBundle",
             resources: [
-                .copy("v6")
+                .copy("JSON")
             ]
         ),
         .testTarget(

@@ -1,5 +1,5 @@
 //
-//  V6Index.swift
+//  RESTIndex.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 11/24/19.
@@ -23,12 +23,11 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
 import GenericJSON
-import PartoutCore
+import PartoutAPI
 import PartoutProviders
 
-extension API.V6 {
+extension API.REST {
     public struct Index: Decodable {
         public struct Provider: Decodable {
             public let id: ProviderID

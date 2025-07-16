@@ -1,5 +1,5 @@
 //
-//  API+V6.swift
+//  API+REST.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 10/6/24.
@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
+import PartoutAPI
 
 extension API {
-    public enum V6 {
+    public enum REST {
     }
 }

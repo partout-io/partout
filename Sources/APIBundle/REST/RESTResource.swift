@@ -1,5 +1,5 @@
 //
-//  V6Resource.swift
+//  RESTResource.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 3/27/25.
@@ -23,11 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-import PartoutCore
+import PartoutAPI
 import PartoutProviders
 
-extension API.V6 {
+extension API.REST {
     public enum Resource {
         case index
 
