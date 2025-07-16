@@ -31,7 +31,7 @@ jobs:
         run: npm test
       - name: Generate JSON
         env:
-          CACHE_MODE: 2 # production
+          CACHE_MODE: 1 # fetch remote, run uncached script
         run: |
           npm run cache "${{ vars.CACHE_IDS }}" $CACHE_MODE
       - name: Push to cache
