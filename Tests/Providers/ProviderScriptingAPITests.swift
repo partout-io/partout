@@ -31,7 +31,7 @@ struct ProviderScriptingAPITests {
     @Test
     func givenAPI_whenGetVersion_thenIsExpected() {
         let sut = DefaultProviderScriptingAPI(.global, timeout: 3.0)
-        #expect(sut.version == 2)
+        #expect(sut.version == "20250718")
     }
 
     @Test

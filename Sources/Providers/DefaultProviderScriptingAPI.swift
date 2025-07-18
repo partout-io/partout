@@ -57,8 +57,8 @@ public final class DefaultProviderScriptingAPI {
 }
 
 extension DefaultProviderScriptingAPI: ProviderScriptingAPI {
-    public var version: Int {
-        2
+    public var version: String {
+        "20250718"
     }
 
     public func getResult(
