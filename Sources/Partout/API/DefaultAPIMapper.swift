@@ -93,10 +93,10 @@ public final class DefaultAPIMapper: APIMapper {
         return try await engine.authenticate(ctx, module, on: deviceId, with: script)
     }
 
-    public func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure {
-        let script = try await script(for: .provider(providerId))
+    public func infrastructure(for module: ProviderModule, cache: ProviderCache?) async throws -> ProviderInfrastructure {
+        let script = try await script(for: .provider(module.providerId))
         let engine = engineFactory(api)
-        return try await engine.fetchInfrastructure(ctx, with: script, cache: cache)
+        return try await engine.infrastructure(ctx, module, with: script, cache: cache)
     }
 }
 
@@ -123,7 +123,7 @@ extension ScriptingEngine {
         return response
     }
 
-    func fetchInfrastructure(_ ctx: PartoutLoggerContext, with script: String, cache: ProviderCache?) async throws -> ProviderInfrastructure {
+    func infrastructure(_ ctx: PartoutLoggerContext, _ module: ProviderModule, with script: String, cache: ProviderCache?) async throws -> ProviderInfrastructure {
         var headers: [String: String] = [:]
         if let lastUpdate = cache?.lastUpdate {
             headers["If-Modified-Since"] = lastUpdate.toRFC1123()
@@ -137,8 +137,13 @@ extension ScriptingEngine {
         }
         pp_log(ctx, .api, .debug, "Headers: \(headersJSON)")
         pp_log(ctx, .api, .debug, "Headers (escaped): \(headersJSON.jsEscaped)")
+
+        let moduleData = try JSONEncoder().encode(module)
+        guard let moduleJSON = String(data: moduleData, encoding: .utf8) else {
+            throw PartoutError(.encoding)
+        }
         let result = try await execute(
-            "JSON.stringify(getInfrastructure(JSON.parse('\(headersJSON.jsEscaped)')))",
+            "JSON.stringify(getInfrastructure(JSON.parse('\(headersJSON.jsEscaped)'), JSON.parse('\(moduleJSON.jsEscaped)')))",
             after: script,
             returning: ScriptResult<ProviderInfrastructure>.self
         )
