@@ -105,7 +105,10 @@ public final class DefaultAPIMapper: APIMapper {
 // TODO: #54/partout, assumes engine to be JavaScript
 extension ScriptingEngine {
     func authenticate(_ ctx: PartoutLoggerContext, _ module: ProviderModule, on deviceId: String, with library: String) async throws -> ProviderModule {
-        let script = try scriptCall(ctx, withName: "authenticate", args: [module, deviceId])
+        let script = try scriptCall(ctx, withName: "authenticate", args: [
+            module.stripped(),
+            deviceId
+        ])
         let result = try await execute(
             script,
             after: library,
@@ -128,7 +131,11 @@ extension ScriptingEngine {
         if let tag = cache?.tag {
             headers["If-None-Match"] = tag
         }
-        let script = try scriptCall(ctx, withName: "getInfrastructure", args: [module, headers, true])
+        let script = try scriptCall(ctx, withName: "getInfrastructure", args: [
+            module.stripped(),
+            headers,
+            true
+        ])
         let result = try await execute(
             script,
             after: library,
@@ -175,6 +182,16 @@ extension ScriptingEngine {
 }
 
 // MARK: - Helpers
+
+private extension ProviderModule {
+
+    // save heavy encoding of unused .entity
+    func stripped() throws -> Self {
+        var stripped = builder()
+        stripped.entity = nil
+        return try stripped.tryBuild()
+    }
+}
 
 private extension String {
     var jsEscaped: String {
