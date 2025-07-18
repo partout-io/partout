@@ -44,6 +44,7 @@ extension AppleJavaScriptEngine: ProviderScriptingEngine {
         func errorResponse(_ message: String) -> [String: Any]
         func httpErrorResponse(_ status: Int, _ urlString: String) -> [String: Any]
         func debug(_ message: String)
+        func version() -> Int
     }
 
     //
@@ -115,6 +116,10 @@ extension AppleJavaScriptEngine: ProviderScriptingEngine {
 
         func debug(_ message: String) {
             vm.debug(message: message)
+        }
+
+        func version() -> Int {
+            vm.version
         }
     }
 

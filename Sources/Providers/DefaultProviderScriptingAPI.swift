@@ -57,6 +57,10 @@ public final class DefaultProviderScriptingAPI {
 }
 
 extension DefaultProviderScriptingAPI: ProviderScriptingAPI {
+    public var version: Int {
+        2
+    }
+
     public func getResult(
         method: String,
         urlString: String,

@@ -29,6 +29,12 @@ import Testing
 
 struct ProviderScriptingAPITests {
     @Test
+    func givenAPI_whenGetVersion_thenIsExpected() {
+        let sut = DefaultProviderScriptingAPI(.global, timeout: 3.0)
+        #expect(sut.version == 2)
+    }
+
+    @Test
     func givenAPI_whenProviderGetResult_thenIsMapped() {
         let sut = DefaultProviderScriptingAPI(.global, timeout: 3.0) {
             #expect($0 == "GET")

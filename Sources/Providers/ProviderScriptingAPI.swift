@@ -24,6 +24,8 @@
 //
 
 public protocol ProviderScriptingAPI {
+    var version: Int { get }
+
     func getResult(
         method: String,
         urlString: String,
