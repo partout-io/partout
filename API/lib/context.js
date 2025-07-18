@@ -126,7 +126,7 @@ export function fetchRawInfrastructure(scriptPath, options) {
     };
 
     const preferCache = options.preferCache ?? true;
-    // headers, module, preferCache
+    // module, headers, preferCache
     const wrappedScript = `
         ${script}
         getInfrastructure(null, {}, ${preferCache});
