@@ -243,6 +243,10 @@ extension ProviderModule {
 
 extension ProviderModule {
     public init(emptyWithProviderId providerId: ProviderID) throws {
-        self = try Builder(providerId: providerId).tryBuild()
+
+        // requires the two for .tryBuild() to succeed
+        let moduleType = ModuleType("")
+        self = try Builder(providerId: providerId, providerModuleType: moduleType)
+            .tryBuild()
     }
 }
