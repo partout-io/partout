@@ -108,7 +108,8 @@ private extension ProviderManagerTests {
             let repository = MockRepository()
 
             let providerManager = APIManager(.global, from: [api], repository: repository)
-            try await providerManager.fetchInfrastructure(for: .mock)
+            let module = try ProviderModule(emptyWithProviderId: .mock)
+            try await providerManager.fetchInfrastructure(for: module)
 
             return repository.providerRepository(for: providerId)
         } catch {

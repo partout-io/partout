@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure(headers) {
+function getInfrastructure(module, headers) {
     const providerId = "oeck";
     const openVPN = {
         moduleType: "OpenVPN",

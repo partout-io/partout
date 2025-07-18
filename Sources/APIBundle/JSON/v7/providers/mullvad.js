@@ -223,7 +223,7 @@ function authenticate(module, deviceId) {
     };
 }
 
-function getInfrastructure(headers) {
+function getInfrastructure(module, headers) {
     const providerId = "mullvad";
     const openVPN = {
         moduleType: "OpenVPN",

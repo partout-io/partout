@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure(headers, preferCache) {
+function getInfrastructure(module, headers, preferCache) {
     const providerId = "nordvpn";
     if (preferCache) {
         const json = api.getJSON("https://passepartoutvpn.app/api-cache/v7/providers/nordvpn/fetch.json", headers);

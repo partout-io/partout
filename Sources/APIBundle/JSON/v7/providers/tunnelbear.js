@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure(headers) {
+function getInfrastructure(module, headers) {
     const providerId = "tunnelbear";
     const openVPN = {
         moduleType: "OpenVPN",

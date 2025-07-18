@@ -120,10 +120,10 @@ public final class APIManager {
         return try await api.authenticate(module, on: deviceId)
     }
 
-    public func fetchInfrastructure(for providerId: ProviderID) async throws {
-        let service: PendingService = .provider(providerId)
+    public func fetchInfrastructure(for module: ProviderModule) async throws {
+        let service: PendingService = .provider(module.providerId)
         guard !pendingServices.contains(service) else {
-            pp_log(ctx, .api, .error, "Discard fetchProviderInfrastructure, another .provider(\(providerId)) is pending")
+            pp_log(ctx, .api, .error, "Discard fetchProviderInfrastructure, another .provider(\(module.providerId)) is pending")
             return
         }
         pendingServices.insert(service)
@@ -134,21 +134,21 @@ public final class APIManager {
         var lastError: Error?
         for api in apis {
             do {
-                let lastCache = cache[providerId]
-                let infrastructure = try await api.infrastructure(for: providerId, cache: lastCache)
+                let lastCache = cache[module.providerId]
+                let infrastructure = try await api.infrastructure(for: module, cache: lastCache)
                 try Task.checkCancellation()
-                try await repository.store(infrastructure, for: providerId)
+                try await repository.store(infrastructure, for: module.providerId)
 #if canImport(Combine)
                 objectWillChange.send()
 #endif
                 return
             } catch {
                 if (error as? PartoutError)?.code == .cached {
-                    pp_log(ctx, .api, .info, "VPN infrastructure for \(providerId) is up to date")
+                    pp_log(ctx, .api, .info, "VPN infrastructure for \(module.providerId) is up to date")
                     return
                 }
                 lastError = error
-                pp_log(ctx, .api, .error, "Unable to fetch VPN infrastructure for \(providerId): \(error)")
+                pp_log(ctx, .api, .error, "Unable to fetch VPN infrastructure for \(module.providerId): \(error)")
                 try Task.checkCancellation()
             }
         }
@@ -171,11 +171,11 @@ public final class APIManager {
         cache[providerId]
     }
 
-    public func providerRepository(for providerId: ProviderID) async throws -> ProviderRepository {
-        if cache(for: providerId) == nil {
-            try await fetchInfrastructure(for: providerId)
+    public func providerRepository(for module: ProviderModule) async throws -> ProviderRepository {
+        if cache(for: module.providerId) == nil {
+            try await fetchInfrastructure(for: module)
         }
-        return repository.providerRepository(for: providerId)
+        return repository.providerRepository(for: module.providerId)
     }
 
     public func resetCacheForAllProviders() async {

@@ -238,3 +238,15 @@ extension ProviderModule {
         }
     }
 }
+
+// MARK: - Shortcuts
+
+extension ProviderModule {
+    public init(emptyWithProviderId providerId: ProviderID) throws {
+
+        // requires the two for .tryBuild() to succeed
+        let moduleType = ModuleType("")
+        self = try Builder(providerId: providerId, providerModuleType: moduleType)
+            .tryBuild()
+    }
+}
