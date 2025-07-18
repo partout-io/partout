@@ -22,7 +22,7 @@
 // SOFTWARE.
 //
 
-function getInfrastructure(headers) {
+function getInfrastructure(headers, module) {
     const providerId = "torguard";
     const openVPN = {
         moduleType: "OpenVPN",
