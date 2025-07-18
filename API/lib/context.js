@@ -129,7 +129,7 @@ export function fetchRawInfrastructure(scriptPath, options) {
     // headers, module, preferCache
     const wrappedScript = `
         ${script}
-        getInfrastructure({}, null, ${preferCache});
+        getInfrastructure(null, {}, ${preferCache});
     `;
     const json = runSandboxedScript(wrappedScript, injectedFunctions);
     if (options.responseOnly) {
