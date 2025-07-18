@@ -128,7 +128,7 @@ extension ScriptingEngine {
         if let tag = cache?.tag {
             headers["If-None-Match"] = tag
         }
-        let script = try scriptCall(ctx, withName: "getInfrastructure", args: [headers, module])
+        let script = try scriptCall(ctx, withName: "getInfrastructure", args: [module, headers, true])
         let result = try await execute(
             script,
             after: library,
@@ -152,6 +152,8 @@ extension ScriptingEngine {
                 if let value = $0 as? String {
                     return "'\(value)'"
                 } else if let value = $0 as? Int {
+                    return value.description
+                } else if let value = $0 as? Bool {
                     return value.description
                 } else if let value = $0 as? Encodable {
                     let encoded = try JSONEncoder().encode(value)
