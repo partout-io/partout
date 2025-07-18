@@ -88,15 +88,15 @@ public final class DefaultAPIMapper: APIMapper {
         }
 #endif
 
-        let script = try await script(for: .provider(module.providerId))
+        let library = try await scriptLibrary(at: .provider(module.providerId))
         let engine = engineFactory(api)
-        return try await engine.authenticate(ctx, module, on: deviceId, with: script)
+        return try await engine.authenticate(ctx, module, on: deviceId, with: library)
     }
 
     public func infrastructure(for module: ProviderModule, cache: ProviderCache?) async throws -> ProviderInfrastructure {
-        let script = try await script(for: .provider(module.providerId))
+        let library = try await scriptLibrary(at: .provider(module.providerId))
         let engine = engineFactory(api)
-        return try await engine.infrastructure(ctx, module, with: script, cache: cache)
+        return try await engine.infrastructure(ctx, module, with: library, cache: cache)
     }
 }
 
@@ -104,14 +104,11 @@ public final class DefaultAPIMapper: APIMapper {
 
 // TODO: #54/partout, assumes engine to be JavaScript
 extension ScriptingEngine {
-    func authenticate(_ ctx: PartoutLoggerContext, _ module: ProviderModule, on deviceId: String, with script: String) async throws -> ProviderModule {
-        let moduleData = try JSONEncoder().encode(module)
-        guard let moduleJSON = String(data: moduleData, encoding: .utf8) else {
-            throw PartoutError(.encoding)
-        }
+    func authenticate(_ ctx: PartoutLoggerContext, _ module: ProviderModule, on deviceId: String, with library: String) async throws -> ProviderModule {
+        let script = try scriptCall(ctx, withName: "authenticate", args: [module, deviceId])
         let result = try await execute(
-            "JSON.stringify(authenticate(JSON.parse('\(moduleJSON.jsEscaped)'), '\(deviceId)'))",
-            after: script,
+            script,
+            after: library,
             returning: ScriptResult<ProviderModule>.self
         )
         if let error = result.error {
@@ -123,7 +120,7 @@ extension ScriptingEngine {
         return response
     }
 
-    func infrastructure(_ ctx: PartoutLoggerContext, _ module: ProviderModule, with script: String, cache: ProviderCache?) async throws -> ProviderInfrastructure {
+    func infrastructure(_ ctx: PartoutLoggerContext, _ module: ProviderModule, with library: String, cache: ProviderCache?) async throws -> ProviderInfrastructure {
         var headers: [String: String] = [:]
         if let lastUpdate = cache?.lastUpdate {
             headers["If-Modified-Since"] = lastUpdate.toRFC1123()
@@ -131,20 +128,10 @@ extension ScriptingEngine {
         if let tag = cache?.tag {
             headers["If-None-Match"] = tag
         }
-        let headersData = try JSONEncoder().encode(headers)
-        guard let headersJSON = String(data: headersData, encoding: .utf8) else {
-            throw PartoutError(.encoding)
-        }
-        pp_log(ctx, .api, .debug, "Headers: \(headersJSON)")
-        pp_log(ctx, .api, .debug, "Headers (escaped): \(headersJSON.jsEscaped)")
-
-        let moduleData = try JSONEncoder().encode(module)
-        guard let moduleJSON = String(data: moduleData, encoding: .utf8) else {
-            throw PartoutError(.encoding)
-        }
+        let script = try scriptCall(ctx, withName: "getInfrastructure", args: [headers, module])
         let result = try await execute(
-            "JSON.stringify(getInfrastructure(JSON.parse('\(headersJSON.jsEscaped)'), JSON.parse('\(moduleJSON.jsEscaped)')))",
-            after: script,
+            script,
+            after: library,
             returning: ScriptResult<ProviderInfrastructure>.self
         )
         guard let response = result.response else {
@@ -158,6 +145,31 @@ extension ScriptingEngine {
         }
         return response
     }
+
+    func scriptCall(_ ctx: PartoutLoggerContext, withName name: String, args: [Any]) throws -> String {
+        let argsString = try args
+            .map {
+                if let value = $0 as? String {
+                    return "'\(value)'"
+                } else if let value = $0 as? Int {
+                    return value.description
+                } else if let value = $0 as? Encodable {
+                    let encoded = try JSONEncoder().encode(value)
+                    guard let json = String(data: encoded, encoding: .utf8) else {
+                        throw PartoutError(.encoding)
+                    }
+//                    pp_log(ctx, .api, .debug, "Argument: \(json)")
+//                    pp_log(ctx, .api, .debug, "Argument (escaped): \(json.jsEscaped)")
+                    return "JSON.parse('\(json.jsEscaped)')"
+                } else {
+                    assertionFailure("Unhandled argument type")
+                    return "null"
+                }
+            }
+            .joined(separator: ",")
+
+        return "JSON.stringify(\(name)(\(argsString)))"
+    }
 }
 
 // MARK: - Helpers
@@ -170,8 +182,8 @@ private extension String {
     }
 }
 
-private extension DefaultAPIMapper {
-    func script(for resource: API.REST.Resource) async throws -> String {
+extension DefaultAPIMapper {
+    func scriptLibrary(at resource: API.REST.Resource) async throws -> String {
         let data = try await data(for: resource)
         guard let script = String(data: data, encoding: .utf8) else {
             throw PartoutError(.notFound)
