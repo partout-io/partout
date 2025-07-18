@@ -238,3 +238,11 @@ extension ProviderModule {
         }
     }
 }
+
+// MARK: - Shortcuts
+
+extension ProviderModule {
+    public init(emptyWithProviderId providerId: ProviderID) throws {
+        self = try Builder(providerId: providerId).tryBuild()
+    }
+}

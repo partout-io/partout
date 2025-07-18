@@ -60,7 +60,8 @@ extension APITestSuite {
         let sut = try newAPIMapper()
         let begin = Date()
         for _ in 0..<1000 {
-            _ = try await sut.infrastructure(for: .hideme, cache: nil)
+            let module = try ProviderModule(emptyWithProviderId: .hideme)
+            _ = try await sut.infrastructure(for: module, cache: nil)
         }
         print("Elapsed: \(-begin.timeIntervalSinceNow)")
     }

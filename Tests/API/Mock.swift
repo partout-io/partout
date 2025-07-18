@@ -57,7 +57,7 @@ struct MockAPI: APIMapper {
         module
     }
 
-    func infrastructure(for providerId: ProviderID, cache: ProviderCache?) async throws -> ProviderInfrastructure {
+    func infrastructure(for module: ProviderModule, cache: ProviderCache?) async throws -> ProviderInfrastructure {
         ProviderInfrastructure(
             presets: [
                 ProviderPreset(

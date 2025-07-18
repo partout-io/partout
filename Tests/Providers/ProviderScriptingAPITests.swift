@@ -28,21 +28,6 @@ import Foundation
 import Testing
 
 struct ProviderScriptingAPITests {
-
-    @Test
-    func givenScriptResult_whenHasCache_thenReturnsProviderCache() throws {
-        let date = Timestamp.now()
-        let tag = "12345"
-        let sut = ProviderScriptResult("", status: nil, lastModified: date, tag: tag)
-
-        let object = try #require(sut.serialized()["cache"])
-        let data = try JSONSerialization.data(withJSONObject: object)
-        let cache = try JSONDecoder().decode(ProviderCache.self, from: data)
-
-        #expect(cache.lastUpdate == date)
-        #expect(cache.tag == tag)
-    }
-
     @Test
     func givenAPI_whenProviderGetResult_thenIsMapped() {
         let sut = DefaultProviderScriptingAPI(.global, timeout: 3.0) {
@@ -67,5 +52,19 @@ struct ProviderScriptingAPITests {
     func givenTimestamp_whenGetRFC1123_thenIsExpected(timestamp: Timestamp, rfc: String) {
         #expect(timestamp.toRFC1123() == rfc)
         #expect(rfc.fromRFC1123() == timestamp)
+    }
+
+    @Test
+    func givenScriptResult_whenHasCache_thenReturnsProviderCache() throws {
+        let date = Timestamp.now()
+        let tag = "12345"
+        let sut = ProviderScriptResult("", status: nil, lastModified: date, tag: tag)
+
+        let object = try #require(sut.serialized()["cache"])
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let cache = try JSONDecoder().decode(ProviderCache.self, from: data)
+
+        #expect(cache.lastUpdate == date)
+        #expect(cache.tag == tag)
     }
 }

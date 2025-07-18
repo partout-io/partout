@@ -58,7 +58,8 @@ struct HideMeProviderTests: APITestSuite {
             hijacker(forFetchURL: $1)
         } : nil)
         do {
-            let infra = try await sut.infrastructure(for: .hideme, cache: input.cache)
+            let module = try ProviderModule(emptyWithProviderId: .hideme)
+            let infra = try await sut.infrastructure(for: module, cache: input.cache)
             #expect(infra.presets.count == input.presetsCount)
             #expect(infra.servers.count == input.serversCount)
 
