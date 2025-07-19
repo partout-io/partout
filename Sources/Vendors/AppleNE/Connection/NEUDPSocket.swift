@@ -107,8 +107,13 @@ private actor NEUDPSocket: LinkInterface {
 
 extension NEUDPSocket {
     nonisolated var hasBetterPath: AsyncStream<Void> {
-        stream(for: \.hasBetterPath, of: nwSession) { $0 }
+        nwSession
+            .publisher(for: \.hasBetterPath)
+            .removeDuplicates()
+            .filter { $0 } // true
             .map { _ in }
+            .stream()
+            .ignoreErrors()
     }
 
     nonisolated func upgraded() -> LinkInterface {
