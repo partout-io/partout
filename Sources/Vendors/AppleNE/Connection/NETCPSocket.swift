@@ -108,6 +108,8 @@ private actor NETCPSocket: LinkInterface {
 // MARK: LinkInterface
 
 extension NETCPSocket {
+
+    // FIXME: #117, #131, stream() might cause a retain cycle on self
     nonisolated var hasBetterPath: AsyncStream<Void> {
         nwConnection
             .publisher(for: \.hasBetterPath)
