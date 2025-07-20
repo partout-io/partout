@@ -831,7 +831,7 @@ private extension StandardOpenVPNParser.Builder {
 
 private extension Set where Element == StandardOpenVPNParser.Builder.RedirectGateway {
     var isEnabledForIPv4: Bool {
-        contains(.def1) || (contains(.ipv6) && !contains(.noIPv4))
+        !isEmpty && !contains(.noIPv4)
     }
 
     var isEnabledForIPv6: Bool {
