@@ -108,16 +108,9 @@ private actor NETCPSocket: LinkInterface {
 // MARK: LinkInterface
 
 extension NETCPSocket {
-
-    // FIXME: #117, #131, stream() might cause a retain cycle on self
     nonisolated var hasBetterPath: AsyncStream<Void> {
-        nwConnection
-            .publisher(for: \.hasBetterPath)
-            .removeDuplicates()
-            .filter { $0 } // true
+        stream(for: \.hasBetterPath, of: nwConnection) { $0 }
             .map { _ in }
-            .stream()
-            .ignoreErrors()
     }
 
     nonisolated func upgraded() -> LinkInterface {

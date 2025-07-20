@@ -106,16 +106,9 @@ private actor NEUDPSocket: LinkInterface {
 // MARK: LinkInterface
 
 extension NEUDPSocket {
-
-    // FIXME: #117, #131, stream() might cause a retain cycle on self
     nonisolated var hasBetterPath: AsyncStream<Void> {
-        nwSession
-            .publisher(for: \.hasBetterPath)
-            .removeDuplicates()
-            .filter { $0 } // true
+        stream(for: \.hasBetterPath, of: nwSession) { $0 }
             .map { _ in }
-            .stream()
-            .ignoreErrors()
     }
 
     nonisolated func upgraded() -> LinkInterface {
