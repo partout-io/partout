@@ -203,6 +203,33 @@ final class PushReplyTests: XCTestCase {
 
         XCTAssertEqual(reply?.options.routingPolicies, [.IPv4])
     }
+
+    func test_givenRouteGateway_whenParse_thenMustNotIncludeDefaultGateway() throws {
+        let msg = "PUSH_REPLY,dhcp-option DNS 1.1.1.1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 20,ifconfig 10.8.0.2 255.255.255.0,peer-id 0,cipher AES-256-GCM"
+
+        let reply = try parser.pushReply(with: msg)
+        reply?.debug()
+
+        let includedRoutes = reply?.options.ipv4?.includedRoutes
+        XCTAssertEqual(includedRoutes?.count, 1)
+        XCTAssertEqual(includedRoutes, [
+            Route(.init(rawValue: "10.8.0.0/24"), nil)
+        ])
+    }
+
+    func test_givenRouteGatewayAndRedirectGateway_whenParse_thenMustIncludeDefaultGateway() throws {
+        let msg = "PUSH_REPLY,dhcp-option DNS 1.1.1.1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 20,ifconfig 10.8.0.2 255.255.255.0,peer-id 0,cipher AES-256-GCM,redirect-gateway def1"
+
+        let reply = try parser.pushReply(with: msg)
+        reply?.debug()
+
+        let includedRoutes = reply?.options.ipv4?.includedRoutes
+        XCTAssertEqual(includedRoutes?.count, 2)
+        XCTAssertEqual(includedRoutes, [
+            Route(nil, .init(rawValue: "10.8.0.1")),
+            Route(.init(rawValue: "10.8.0.0/24"), nil)
+        ])
+    }
 }
 
 // MARK: - Helpers
