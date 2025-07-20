@@ -69,7 +69,7 @@ final class PushReplyTests: XCTestCase {
 
         XCTAssertEqual(reply.options.ipv4?.subnet?.address.rawValue, "10.8.0.2")
         XCTAssertEqual(reply.options.ipv4?.subnet?.ipv4Mask, "255.255.255.0")
-        XCTAssertEqual(reply.options.ipv4?.defaultGateway?.rawValue, "10.8.0.1")
+        XCTAssertNil(reply.options.ipv4?.defaultGateway?.rawValue)
         XCTAssertEqual(reply.options.dnsServers, ["8.8.8.8", "4.4.4.4"])
     }
 
@@ -101,10 +101,10 @@ final class PushReplyTests: XCTestCase {
 
         XCTAssertEqual(reply.options.ipv4?.subnet?.address.rawValue, "10.8.0.2")
         XCTAssertEqual(reply.options.ipv4?.subnet?.ipv4Mask, "255.255.255.0")
-        XCTAssertEqual(reply.options.ipv4?.defaultGateway?.rawValue, "10.8.0.1")
+        XCTAssertNil(reply.options.ipv4?.defaultGateway?.rawValue)
         XCTAssertEqual(reply.options.ipv6?.subnet?.address.rawValue, "fe80::601:30ff:feb7:ec01")
         XCTAssertEqual(reply.options.ipv6?.subnet?.prefixLength, 64)
-        XCTAssertEqual(reply.options.ipv6?.defaultGateway?.rawValue, "fe80::601:30ff:feb7:dc02")
+        XCTAssertNil(reply.options.ipv6?.defaultGateway?.rawValue)
         XCTAssertEqual(reply.options.dnsServers, ["2001:4860:4860::8888", "2001:4860:4860::8844"])
     }
 
