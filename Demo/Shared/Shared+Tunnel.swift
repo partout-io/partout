@@ -32,13 +32,14 @@ import PartoutWireGuard
 
 extension Registry {
     static let shared = Registry(
+        deviceId: "",
         withKnown: true,
         allImplementations: [
             OpenVPNModule.Implementation(
                 importer: StandardOpenVPNParser(),
                 connectionBlock: {
                     let ctx = PartoutLoggerContext($0.controller.profile.id)
-                    return try await OpenVPNConnection(
+                    return try OpenVPNConnection(
                         ctx,
                         parameters: $0,
                         module: $1,

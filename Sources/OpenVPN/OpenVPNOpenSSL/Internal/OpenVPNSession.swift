@@ -547,7 +547,7 @@ private extension OpenVPNSession {
 
 @OpenVPNActor
 private extension OpenVPNCryptoProtocol {
-    func newControlChannel(
+    nonisolated func newControlChannel(
         _ ctx: PartoutLoggerContext,
         with prng: PRNGProtocol,
         configuration: OpenVPN.Configuration

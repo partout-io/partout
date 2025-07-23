@@ -32,11 +32,11 @@ extension OpenVPNModule {
 
         public let importer: ModuleImporter
 
-        public let connectionBlock: @Sendable (ConnectionParameters, OpenVPNModule) async throws -> Connection
+        public let connectionBlock: @Sendable (ConnectionParameters, OpenVPNModule) throws -> Connection
 
         public init(
             importer: ModuleImporter,
-            connectionBlock: @escaping @Sendable (ConnectionParameters, OpenVPNModule) async throws -> Connection
+            connectionBlock: @escaping @Sendable (ConnectionParameters, OpenVPNModule) throws -> Connection
         ) {
             self.importer = importer
             self.connectionBlock = connectionBlock

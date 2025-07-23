@@ -44,74 +44,26 @@ public actor CrossOpenVPNConnection {
 
     private let configuration: OpenVPN.Configuration
 
-    // MARK: State
+    private let sessionFactory: () async throws -> OpenVPNSessionProtocol
 
     let backend: CyclingConnection
 
-    let session: OpenVPNSessionProtocol
+    private let dns: DNSResolver
 
-    public init(
-        _ ctx: PartoutLoggerContext,
-        parameters: ConnectionParameters,
-        module: OpenVPNModule,
-        cachesURL: URL,
-        options: OpenVPN.ConnectionOptions = .init()
-    ) async throws {
-        guard let configuration = module.configuration else {
-            fatalError("Creating session without OpenVPN configuration?")
-        }
+    private let tunnelInterface: TunnelInterface
 
-        // hardcode portable implementations
-        let prng = PlatformPRNG()
-        let dns = SimpleDNSResolver {
-            POSIXDNSStrategy(hostname: $0)
-        }
+    // MARK: State
 
-        // native: Swift/C
-        // legacy: Swift/ObjC
-        let session = try await OpenVPNSession(
-            ctx,
-            configuration: configuration,
-            credentials: module.credentials,
-            prng: prng,
-            cachesURL: cachesURL,
-            options: options,
-            tlsFactory: {
-#if OPENVPN_WRAPPED_NATIVE
-                try TLSWrapper.native(with: $0).tls
-#else
-                try TLSWrapper.legacy(with: $0).tls
-#endif
-            },
-            dpFactory: {
-                let wrapper: DataPathWrapper
-#if OPENVPN_WRAPPED_NATIVE
-                wrapper = try .native(with: $0, prf: $1, prng: $2)
-#else
-                wrapper = try .legacy(with: $0, prf: $1, prng: $2)
-#endif
-                return wrapper.dataPath
-            }
-        )
+    private var hooks: CyclingConnection.Hooks?
 
-        try await self.init(
-            ctx,
-            parameters: parameters,
-            module: module,
-            prng: prng,
-            dns: dns,
-            session: session
-        )
-    }
-
-    private init(
+    init(
         _ ctx: PartoutLoggerContext,
         parameters: ConnectionParameters,
         module: OpenVPNModule,
         prng: PRNGProtocol,
         dns: DNSResolver,
-        session: OpenVPNSessionProtocol
-    ) async throws {
+        sessionFactory: @escaping () async throws -> OpenVPNSessionProtocol
+    ) throws {
         self.ctx = ctx
         moduleId = module.id
         controller = parameters.controller
@@ -125,8 +77,14 @@ public actor CrossOpenVPNConnection {
               !endpoints.isEmpty else {
             fatalError("No OpenVPN remotes defined?")
         }
+        guard let tunnelInterface = parameters.factory.tunnelInterface() else {
+            throw PartoutError(.releasedObject)
+        }
 
         self.configuration = try configuration.withModules(from: parameters.controller.profile)
+        self.sessionFactory = sessionFactory
+        self.dns = dns
+        self.tunnelInterface = tunnelInterface
 
         backend = CyclingConnection(
             ctx,
@@ -136,30 +94,60 @@ public actor CrossOpenVPNConnection {
             endpoints: endpoints
         )
 
-        self.session = session
+    }
+}
 
-        // post-configuration
+// MARK: - Connection
+
+extension CrossOpenVPNConnection: Connection {
+    public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
+        backend.statusStream
+    }
+
+    @discardableResult
+    public func start() async throws -> Bool {
+        do {
+            try await bindIfNeeded()
+            return try await backend.start()
+        } catch let error as PartoutError {
+            if error.code == .exhaustedEndpoints, let reason = error.reason {
+                throw reason
+            }
+            throw error
+        }
+    }
+
+    public func stop(timeout: Int) async {
+        await backend.stop(timeout: timeout)
+    }
+}
+
+private extension CrossOpenVPNConnection {
+    func bindIfNeeded() async throws {
+        guard hooks == nil else {
+            return
+        }
+
+        let ctx = self.ctx
+        let configuration = self.configuration
+        let session = try await sessionFactory()
 
         let hooks = CyclingConnection.Hooks(dns: dns) { newLink in
 
             // wrap new link into a specific OpenVPN link
             newLink.openVPNLink(method: configuration.xorMethod)
 
-        } startBlock: { [weak self] newLink in
+        } startBlock: { newLink in
 
-            try await self?.session.setLink(newLink)
+            try await session.setLink(newLink)
 
-        } upgradeBlock: { [weak self] in
+        } upgradeBlock: {
 
             // TODO: #143/notes, may improve this with floating
             pp_log(ctx, .openvpn, .notice, "Link has a better path, shut down session to reconnect")
-            await self?.session.shutdown(PartoutError(.networkChanged))
+            await session.shutdown(PartoutError(.networkChanged))
 
-        } stopBlock: { [weak self] _, timeout in
-
-            guard let session = await self?.session else {
-                return
-            }
+        } stopBlock: { _, timeout in
 
             // stop the OpenVPN connection on user request
             await session.shutdown(nil, timeout: TimeInterval(timeout) / 1000.0)
@@ -187,38 +175,12 @@ public actor CrossOpenVPNConnection {
             self?.onError(error)
         }
 
+        self.hooks = hooks
         await backend.setHooks(hooks)
         await session.setDelegate(self)
 
         // set this once
-        guard let tunnelInterface = parameters.factory.tunnelInterface() else {
-            throw PartoutError(.releasedObject)
-        }
         await session.setTunnel(tunnelInterface)
-    }
-}
-
-// MARK: - Connection
-
-extension CrossOpenVPNConnection: Connection {
-    public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
-        backend.statusStream
-    }
-
-    @discardableResult
-    public func start() async throws -> Bool {
-        do {
-            return try await backend.start()
-        } catch let error as PartoutError {
-            if error.code == .exhaustedEndpoints, let reason = error.reason {
-                throw reason
-            }
-            throw error
-        }
-    }
-
-    public func stop(timeout: Int) async {
-        await backend.stop(timeout: timeout)
     }
 }
 

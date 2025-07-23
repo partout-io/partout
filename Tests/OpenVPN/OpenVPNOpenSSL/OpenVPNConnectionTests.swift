@@ -305,18 +305,18 @@ private struct Constants {
         let impl = OpenVPNModule.Implementation(
             importer: StandardOpenVPNParser(),
             connectionBlock: {
-                try await OpenVPNConnection(
+                try OpenVPNConnection(
                     .global,
                     parameters: $0,
                     module: $1,
                     prng: prng,
                     dns: dns,
-                    session: session
+                    sessionFactory: { session }
                 )
             }
         )
         let options = ConnectionParameters.Options()
-        let conn = try await module.newConnection(with: impl, parameters: .init(
+        let conn = try module.newConnection(with: impl, parameters: .init(
             controller: controller,
             factory: factory,
             environment: environment,

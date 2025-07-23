@@ -532,7 +532,7 @@ private extension OpenVPNSession {
 }
 
 private extension OpenVPNSession {
-    static func newControlChannel(
+    static nonisolated func newControlChannel(
         _ ctx: PartoutLoggerContext,
         with prng: PRNGProtocol,
         configuration: OpenVPN.Configuration
