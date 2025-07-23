@@ -14,8 +14,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/passepartoutvpn/openssl-apple",
       "state" : {
-        "revision" : "8d8db0e0b9aaad1dbb7c09b387d91b7b3af93415",
-        "version" : "3.5.101"
+        "revision" : "4ae97d5f0d2a449441f87a775db1b815bf7b2671",
+        "version" : "3.5.200"
       }
     },
     {
