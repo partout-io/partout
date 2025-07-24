@@ -1,8 +1,8 @@
 //
-//  CrossOpenVPNConnection+Default.swift
+//  LegacyOpenVPNConnection+Default.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 3/15/24.
+//  Created by Davide De Rosa on 1/10/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -24,57 +24,45 @@
 //
 
 import _PartoutOpenVPNCore
-internal import _PartoutVendorsPortable
+internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
-extension CrossOpenVPNConnection {
+extension LegacyOpenVPNConnection {
     public init(
         _ ctx: PartoutLoggerContext,
         parameters: ConnectionParameters,
         module: OpenVPNModule,
-        cachesURL: URL,
-        options: OpenVPN.ConnectionOptions = .init()
+        prng: PRNGProtocol,
+        dns: DNSResolver,
+        options: OpenVPN.ConnectionOptions = .init(),
+        cachesURL: URL
     ) throws {
         guard let configuration = module.configuration else {
             fatalError("Creating session without OpenVPN configuration?")
         }
-
-        // hardcode portable implementations
-        let prng = PlatformPRNG()
-        let dns = SimpleDNSResolver {
-            POSIXDNSStrategy(hostname: $0)
+        let tlsFactory = { @Sendable in
+            OSSLTLSBox()
         }
-
-        // native: Swift/C
-        // legacy: Swift/ObjC
+        let cryptoFactory = { @Sendable in
+            let seed = prng.safeData(length: 64)
+            guard let box = OSSLCryptoBox(seed: seed) else {
+                fatalError("Unable to create OSSLCryptoBox")
+            }
+            return box
+        }
         let sessionFactory = {
             try await OpenVPNSession(
                 ctx,
                 configuration: configuration,
                 credentials: module.credentials,
                 prng: prng,
+                tlsFactory: tlsFactory,
+                cryptoFactory: cryptoFactory,
                 cachesURL: cachesURL,
-                options: options,
-                tlsFactory: {
-#if OPENVPN_WRAPPED_NATIVE
-                    try TLSWrapper.native(with: $0).tls
-#else
-                    try TLSWrapper.legacy(with: $0).tls
-#endif
-                },
-                dpFactory: {
-                    let wrapper: DataPathWrapper
-#if OPENVPN_WRAPPED_NATIVE
-                    wrapper = try .native(with: $0, prf: $1, prng: $2)
-#else
-                    wrapper = try .legacy(with: $0, prf: $1, prng: $2)
-#endif
-                    return wrapper.dataPath
-                }
+                options: options
             )
         }
-
         try self.init(
             ctx,
             parameters: parameters,

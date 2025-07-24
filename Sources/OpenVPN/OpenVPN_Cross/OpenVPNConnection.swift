@@ -1,5 +1,5 @@
 //
-//  CrossOpenVPNConnection.swift
+//  OpenVPNConnection.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 3/15/24.
@@ -28,7 +28,7 @@ internal import _PartoutVendorsPortable
 import Foundation
 import PartoutCore
 
-public actor CrossOpenVPNConnection {
+public actor OpenVPNConnection {
 
     // MARK: Initialization
 
@@ -99,7 +99,7 @@ public actor CrossOpenVPNConnection {
 
 // MARK: - Connection
 
-extension CrossOpenVPNConnection: Connection {
+extension OpenVPNConnection: Connection {
     public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
         backend.statusStream
     }
@@ -122,7 +122,7 @@ extension CrossOpenVPNConnection: Connection {
     }
 }
 
-private extension CrossOpenVPNConnection {
+private extension OpenVPNConnection {
     func bindIfNeeded() async throws {
         guard hooks == nil else {
             return
@@ -186,7 +186,7 @@ private extension CrossOpenVPNConnection {
 
 // MARK: - OpenVPNSessionDelegate
 
-extension CrossOpenVPNConnection: OpenVPNSessionDelegate {
+extension OpenVPNConnection: OpenVPNSessionDelegate {
     func sessionDidStart(_ session: OpenVPNSessionProtocol, remoteAddress: String, remoteProtocol: EndpointProtocol, remoteOptions: OpenVPN.Configuration) async {
         let addressObject = Address(rawValue: remoteAddress)
         if addressObject == nil {
@@ -308,7 +308,7 @@ private extension IPModule {
     }
 }
 
-private extension CrossOpenVPNConnection {
+private extension OpenVPNConnection {
     nonisolated func onStatus(_ connectionStatus: ConnectionStatus) {
         switch connectionStatus {
         case .connected:

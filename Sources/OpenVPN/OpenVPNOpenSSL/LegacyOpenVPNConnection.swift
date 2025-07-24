@@ -1,5 +1,5 @@
 //
-//  OpenVPNConnection.swift
+//  LegacyOpenVPNConnection.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 3/15/24.
@@ -27,7 +27,7 @@ import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
 
-public actor OpenVPNConnection {
+public actor LegacyOpenVPNConnection {
 
     // MARK: Initialization
 
@@ -97,7 +97,7 @@ public actor OpenVPNConnection {
 
 // MARK: - Connection
 
-extension OpenVPNConnection: Connection {
+extension LegacyOpenVPNConnection: Connection {
     public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
         backend.statusStream
     }
@@ -120,7 +120,7 @@ extension OpenVPNConnection: Connection {
     }
 }
 
-private extension OpenVPNConnection {
+private extension LegacyOpenVPNConnection {
     func bindIfNeeded() async throws {
         guard hooks == nil else {
             return
@@ -184,7 +184,7 @@ private extension OpenVPNConnection {
 
 // MARK: - OpenVPNSessionDelegate
 
-extension OpenVPNConnection: OpenVPNSessionDelegate {
+extension LegacyOpenVPNConnection: OpenVPNSessionDelegate {
     func sessionDidStart(_ session: OpenVPNSessionProtocol, remoteAddress: String, remoteProtocol: EndpointProtocol, remoteOptions: OpenVPN.Configuration) async {
         let addressObject = Address(rawValue: remoteAddress)
         if addressObject == nil {
@@ -306,7 +306,7 @@ private extension IPModule {
     }
 }
 
-private extension OpenVPNConnection {
+private extension LegacyOpenVPNConnection {
     nonisolated func onStatus(_ connectionStatus: ConnectionStatus) {
         switch connectionStatus {
         case .connected:

@@ -301,11 +301,11 @@ private struct Constants {
         controller: TunnelController = MockTunnelController(),
         factory: NetworkInterfaceFactory = MockNetworkInterfaceFactory(),
         environment: TunnelEnvironment = SharedTunnelEnvironment(profileId: nil)
-    ) async throws -> OpenVPNConnection {
+    ) async throws -> LegacyOpenVPNConnection {
         let impl = OpenVPNModule.Implementation(
             importer: StandardOpenVPNParser(),
             connectionBlock: {
-                try OpenVPNConnection(
+                try LegacyOpenVPNConnection(
                     .global,
                     parameters: $0,
                     module: $1,
@@ -322,7 +322,7 @@ private struct Constants {
             environment: environment,
             options: options
         ))
-        return try XCTUnwrap(conn as? OpenVPNConnection)
+        return try XCTUnwrap(conn as? LegacyOpenVPNConnection)
     }
 }
 
