@@ -1,7 +1,6 @@
 // swift-tools-version: 5.9
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
-import Foundation
 import PackageDescription
 
 // MARK: Tuning
@@ -20,7 +19,7 @@ let environment: Environment = .remoteBinary
 // implies included targets (exclude docs until ready)
 let areas = {
     var included = Set(Area.allCases)
-    included.remove(.documentation) // until ready
+    included.remove(.documentation)
 #if os(Windows) || os(Linux)
     included.remove(.wireGuard)
 #endif

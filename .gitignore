@@ -3,7 +3,9 @@
 *.pbxuser
 **/*.xcodeproj/project.xcworkspace
 **/xcuserdata
+**/.swiftpm/xcode
 PartoutCore
 PartoutCore.xcframework*
 .build
-**/.swiftpm/xcode
+.docc
+docs
