@@ -63,7 +63,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
             let ctx = PartoutLoggerContext(controller.originalProfile.id)
             self.ctx = ctx
 
-            fwd = try await NEPTPForwarder(ctx, controller: controller)
+            fwd = try NEPTPForwarder(ctx, controller: controller)
             try await fwd?.startTunnel(options: options)
         } catch {
             flushLog()
