@@ -43,10 +43,6 @@ extension Registry {
                         ctx,
                         parameters: $0,
                         module: $1,
-                        prng: SimplePRNG(),
-                        dns: SimpleDNSResolver {
-                            POSIXDNSStrategy(hostname: $0)
-                        },
                         cachesURL: Demo.moduleURL(for: "OpenVPN")
                     )
                 }
