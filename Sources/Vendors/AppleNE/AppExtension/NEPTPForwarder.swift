@@ -50,7 +50,7 @@ public actor NEPTPForwarder {
         connectionOptions: ConnectionParameters.Options = .init(),
         stopDelay: Int = 2000,
         reconnectionDelay: Int = 2000
-    ) {
+    ) throws {
         let environment = controller.environment
         let factory = NEInterfaceFactory(ctx, provider: controller.provider, options: factoryOptions)
         let reachability = NEObservablePath(ctx)
@@ -73,7 +73,7 @@ public actor NEPTPForwarder {
         )
 
         self.ctx = ctx
-        daemon = SimpleConnectionDaemon(params: params)
+        daemon = try SimpleConnectionDaemon(params: params)
         originalProfile = controller.originalProfile
     }
 

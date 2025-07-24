@@ -36,13 +36,13 @@ extension WireGuardModule {
 
         public let validator: ModuleBuilderValidator
 
-        public let connectionBlock: @Sendable (ConnectionParameters, WireGuardModule) async throws -> Connection
+        public let connectionBlock: @Sendable (ConnectionParameters, WireGuardModule) throws -> Connection
 
         public init(
             keyGenerator: WireGuardKeyGenerator,
             importer: ModuleImporter,
             validator: ModuleBuilderValidator,
-            connectionBlock: @escaping @Sendable (ConnectionParameters, WireGuardModule) async throws -> Connection
+            connectionBlock: @escaping @Sendable (ConnectionParameters, WireGuardModule) throws -> Connection
         ) {
             self.keyGenerator = keyGenerator
             self.importer = importer

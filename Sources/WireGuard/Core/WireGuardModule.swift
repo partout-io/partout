@@ -87,10 +87,10 @@ extension WireGuardModule: ConnectionModule {
     public func newConnection(
         with impl: ModuleImplementation?,
         parameters: ConnectionParameters
-    ) async throws -> Connection {
+    ) throws -> Connection {
         guard let impl = impl as? WireGuardModule.Implementation else {
             throw PartoutError(.requiredImplementation)
         }
-        return try await impl.connectionBlock(parameters, self)
+        return try impl.connectionBlock(parameters, self)
     }
 }

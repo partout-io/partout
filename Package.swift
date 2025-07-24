@@ -8,11 +8,11 @@ import PackageDescription
 
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.145"
-let checksum = "34a9fb64197f14f73bc54582d082177499a49e5d6a7b8fac7f9267c9a25e7e47"
+let version = "0.99.152"
+let checksum = "1d769a0adfbf6e9d46a7da62e7e0cab5268c0c2216a449523d73e44afabb5f1f"
 
 // to download the core soruce
-let coreSHA1 = "db2cde66aa18fc63373050d3c99cbcc62778b7b9"
+let coreSHA1 = "72e0133ed3c103f565c427d8ab6880fa67ff427a"
 
 // deployment environment
 let environment: Environment = .remoteBinary
@@ -380,7 +380,7 @@ vendors.forEach {
         ])
 
         if $0 == .openSSLApple {
-            package.dependencies.append(.package(url: "https://github.com/passepartoutvpn/openssl-apple", from: "3.5.101"))
+            package.dependencies.append(.package(url: "https://github.com/passepartoutvpn/openssl-apple", exact: "3.5.200"))
 
             // legacy (ObjC)
             package.targets.append(contentsOf: [

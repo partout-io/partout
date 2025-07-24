@@ -127,10 +127,10 @@ extension OpenVPNModule: ConnectionModule {
     public func newConnection(
         with impl: ModuleImplementation?,
         parameters: ConnectionParameters
-    ) async throws -> Connection {
+    ) throws -> Connection {
         guard let impl = impl as? Implementation else {
             throw PartoutError(.requiredImplementation)
         }
-        return try await impl.connectionBlock(parameters, self)
+        return try impl.connectionBlock(parameters, self)
     }
 }

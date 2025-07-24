@@ -301,28 +301,28 @@ private struct Constants {
         controller: TunnelController = MockTunnelController(),
         factory: NetworkInterfaceFactory = MockNetworkInterfaceFactory(),
         environment: TunnelEnvironment = SharedTunnelEnvironment(profileId: nil)
-    ) async throws -> OpenVPNConnection {
+    ) async throws -> LegacyOpenVPNConnection {
         let impl = OpenVPNModule.Implementation(
             importer: StandardOpenVPNParser(),
             connectionBlock: {
-                try await OpenVPNConnection(
+                try LegacyOpenVPNConnection(
                     .global,
                     parameters: $0,
                     module: $1,
                     prng: prng,
                     dns: dns,
-                    session: session
+                    sessionFactory: { session }
                 )
             }
         )
         let options = ConnectionParameters.Options()
-        let conn = try await module.newConnection(with: impl, parameters: .init(
+        let conn = try module.newConnection(with: impl, parameters: .init(
             controller: controller,
             factory: factory,
             environment: environment,
             options: options
         ))
-        return try XCTUnwrap(conn as? OpenVPNConnection)
+        return try XCTUnwrap(conn as? LegacyOpenVPNConnection)
     }
 }
 
