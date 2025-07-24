@@ -216,7 +216,7 @@ extension OpenVPNSession: OpenVPNSessionProtocol {
 
     func shutdown(_ error: Error?, timeout: TimeInterval?) async {
         guard sessionState != .stopping, sessionState != .stopped else {
-            pp_log(ctx, .openvpn, .error, "Ignore stop request, stopped or already stopping")
+            pp_log(ctx, .openvpn, .debug, "Ignore stop request, stopped or already stopping")
             return
         }
 

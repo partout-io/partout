@@ -1,5 +1,5 @@
 //
-//  OpenVPNConnection+Default.swift
+//  LegacyOpenVPNConnection+Default.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 1/10/25.
@@ -28,7 +28,7 @@ internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
-extension OpenVPNConnection {
+extension LegacyOpenVPNConnection {
     public init(
         _ ctx: PartoutLoggerContext,
         parameters: ConnectionParameters,
@@ -37,7 +37,7 @@ extension OpenVPNConnection {
         dns: DNSResolver,
         options: OpenVPN.ConnectionOptions = .init(),
         cachesURL: URL
-    ) async throws {
+    ) throws {
         guard let configuration = module.configuration else {
             fatalError("Creating session without OpenVPN configuration?")
         }
@@ -51,25 +51,25 @@ extension OpenVPNConnection {
             }
             return box
         }
-
-        let session = try await OpenVPNSession(
-            ctx,
-            configuration: configuration,
-            credentials: module.credentials,
-            prng: prng,
-            tlsFactory: tlsFactory,
-            cryptoFactory: cryptoFactory,
-            cachesURL: cachesURL,
-            options: options
-        )
-
-        try await self.init(
+        let sessionFactory = {
+            try await OpenVPNSession(
+                ctx,
+                configuration: configuration,
+                credentials: module.credentials,
+                prng: prng,
+                tlsFactory: tlsFactory,
+                cryptoFactory: cryptoFactory,
+                cachesURL: cachesURL,
+                options: options
+            )
+        }
+        try self.init(
             ctx,
             parameters: parameters,
             module: module,
             prng: prng,
             dns: dns,
-            session: session
+            sessionFactory: sessionFactory
         )
     }
 }

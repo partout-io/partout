@@ -24,6 +24,7 @@
 //
 
 import _PartoutOpenVPNCore
+internal import _PartoutVendorsPortable
 import Foundation
 import PartoutCore
 
@@ -43,11 +44,17 @@ public actor OpenVPNConnection {
 
     private let configuration: OpenVPN.Configuration
 
-    // MARK: State
+    private let sessionFactory: () async throws -> OpenVPNSessionProtocol
 
     let backend: CyclingConnection
 
-    let session: OpenVPNSessionProtocol
+    private let dns: DNSResolver
+
+    private let tunnelInterface: TunnelInterface
+
+    // MARK: State
+
+    private var hooks: CyclingConnection.Hooks?
 
     init(
         _ ctx: PartoutLoggerContext,
@@ -55,8 +62,8 @@ public actor OpenVPNConnection {
         module: OpenVPNModule,
         prng: PRNGProtocol,
         dns: DNSResolver,
-        session: OpenVPNSessionProtocol
-    ) async throws {
+        sessionFactory: @escaping () async throws -> OpenVPNSessionProtocol
+    ) throws {
         self.ctx = ctx
         moduleId = module.id
         controller = parameters.controller
@@ -70,8 +77,14 @@ public actor OpenVPNConnection {
               !endpoints.isEmpty else {
             fatalError("No OpenVPN remotes defined?")
         }
+        guard let tunnelInterface = parameters.factory.tunnelInterface() else {
+            throw PartoutError(.releasedObject)
+        }
 
         self.configuration = try configuration.withModules(from: parameters.controller.profile)
+        self.sessionFactory = sessionFactory
+        self.dns = dns
+        self.tunnelInterface = tunnelInterface
 
         backend = CyclingConnection(
             ctx,
@@ -81,30 +94,60 @@ public actor OpenVPNConnection {
             endpoints: endpoints
         )
 
-        self.session = session
+    }
+}
 
-        // post-configuration
+// MARK: - Connection
+
+extension OpenVPNConnection: Connection {
+    public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
+        backend.statusStream
+    }
+
+    @discardableResult
+    public func start() async throws -> Bool {
+        do {
+            try await bindIfNeeded()
+            return try await backend.start()
+        } catch let error as PartoutError {
+            if error.code == .exhaustedEndpoints, let reason = error.reason {
+                throw reason
+            }
+            throw error
+        }
+    }
+
+    public func stop(timeout: Int) async {
+        await backend.stop(timeout: timeout)
+    }
+}
+
+private extension OpenVPNConnection {
+    func bindIfNeeded() async throws {
+        guard hooks == nil else {
+            return
+        }
+
+        let ctx = self.ctx
+        let configuration = self.configuration
+        let session = try await sessionFactory()
 
         let hooks = CyclingConnection.Hooks(dns: dns) { newLink in
 
             // wrap new link into a specific OpenVPN link
-            newLink.openVPNLink(xorMethod: configuration.xorMethod)
+            newLink.openVPNLink(method: configuration.xorMethod)
 
-        } startBlock: { [weak self] newLink in
+        } startBlock: { newLink in
 
-            try await self?.session.setLink(newLink)
+            try await session.setLink(newLink)
 
-        } upgradeBlock: { [weak self] in
+        } upgradeBlock: {
 
             // TODO: #143/notes, may improve this with floating
             pp_log(ctx, .openvpn, .notice, "Link has a better path, shut down session to reconnect")
-            await self?.session.shutdown(PartoutError(.networkChanged))
+            await session.shutdown(PartoutError(.networkChanged))
 
-        } stopBlock: { [weak self] _, timeout in
-
-            guard let session = await self?.session else {
-                return
-            }
+        } stopBlock: { _, timeout in
 
             // stop the OpenVPN connection on user request
             await session.shutdown(nil, timeout: TimeInterval(timeout) / 1000.0)
@@ -132,38 +175,12 @@ public actor OpenVPNConnection {
             self?.onError(error)
         }
 
+        self.hooks = hooks
         await backend.setHooks(hooks)
         await session.setDelegate(self)
 
         // set this once
-        guard let tunnelInterface = parameters.factory.tunnelInterface() else {
-            throw PartoutError(.releasedObject)
-        }
         await session.setTunnel(tunnelInterface)
-    }
-}
-
-// MARK: - Connection
-
-extension OpenVPNConnection: Connection {
-    public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
-        backend.statusStream
-    }
-
-    @discardableResult
-    public func start() async throws -> Bool {
-        do {
-            return try await backend.start()
-        } catch let error as PartoutError {
-            if error.code == .exhaustedEndpoints, let reason = error.reason {
-                throw reason
-            }
-            throw error
-        }
-    }
-
-    public func stop(timeout: Int) async {
-        await backend.stop(timeout: timeout)
     }
 }
 
@@ -313,13 +330,13 @@ private extension OpenVPNConnection {
 }
 
 private extension LinkInterface {
-    func openVPNLink(xorMethod: OpenVPN.ObfuscationMethod?) -> LinkInterface {
+    func openVPNLink(method: OpenVPN.ObfuscationMethod?) -> LinkInterface {
         switch linkType.plainType {
         case .udp:
-            return OpenVPNUDPLink(link: self, xorMethod: xorMethod)
+            return OpenVPNUDPLink(link: self, method: method)
 
         case .tcp:
-            return OpenVPNTCPLink(link: self, xorMethod: xorMethod)
+            return OpenVPNTCPLink(link: self, method: method)
         }
     }
 }
