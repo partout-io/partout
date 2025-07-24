@@ -380,7 +380,7 @@ vendors.forEach {
         ])
 
         if $0 == .openSSLApple {
-            package.dependencies.append(.package(url: "https://github.com/passepartoutvpn/openssl-apple", exact: "3.4.200"))
+            package.dependencies.append(.package(url: "https://github.com/passepartoutvpn/openssl-apple", exact: "3.5.200"))
 
             // legacy (ObjC)
             package.targets.append(contentsOf: [
