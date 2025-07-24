@@ -28,6 +28,7 @@ internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
+@OpenVPNActor
 final class ControlChannel {
     private let ctx: PartoutLoggerContext
 
