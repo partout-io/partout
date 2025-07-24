@@ -27,7 +27,7 @@ import Foundation
 import NetworkExtension
 import PartoutCore
 
-/// Encodes and decodes `Profile` to and from `NETunnelProviderProtocol`.
+/// Encodes and decodes a ``/PartoutCore/Profile`` to and from `NETunnelProviderProtocol`.
 public typealias NEProtocolCoder = NEProtocolEncoder & NEProtocolDecoder
 
 /// Encodes a `Profile` for use in Network Extension.

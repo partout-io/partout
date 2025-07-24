@@ -27,7 +27,7 @@ import Foundation
 import NetworkExtension
 import PartoutCore
 
-/// ``NEProtocolCoder`` encoding to and from a `Keychain`.
+/// ``NEProtocolCoder`` encoding to and from a ``/PartoutCore/Keychain``.
 public struct KeychainNEProtocolCoder: NEProtocolCoder {
     private let ctx: PartoutLoggerContext
 

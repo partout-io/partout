@@ -27,7 +27,7 @@ import Foundation
 import PartoutCore
 import Security.SecRandom
 
-/// Implementation of ``PRNGProtocol`` based on the `Security` framework.
+/// Implementation of ``/PartoutCore/PRNGProtocol`` based on the `Security` framework.
 public final class AppleRandom: PRNGProtocol {
     public init() {
     }

@@ -27,6 +27,7 @@ import Foundation
 import JavaScriptCore
 import PartoutCore
 
+/// Implementation of ``/PartoutCore/ScriptingEngine`` based on the `JavaScriptCore` framework.
 public final class AppleJavaScriptEngine: ScriptingEngine {
     private let engine: JSContext
 

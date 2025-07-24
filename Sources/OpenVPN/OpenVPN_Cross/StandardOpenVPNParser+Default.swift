@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
 internal import _PartoutOpenVPN_C
+import _PartoutOpenVPNCore
 
 extension StandardOpenVPNParser {
     public convenience init() {

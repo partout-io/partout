@@ -39,7 +39,7 @@ internal import _PartoutOpenVPNOpenSSL_ObjC
 #endif
 import Foundation
 
-/// Thrown during ``OpenVPNSession`` operation.
+/// Thrown during `OpenVPNSession` operation.
 enum OpenVPNSessionError: Error {
 
     /// Recoverable error (reconnecting may resolve).

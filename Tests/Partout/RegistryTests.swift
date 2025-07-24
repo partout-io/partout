@@ -33,6 +33,7 @@ import _PartoutOpenVPNCore
 #if canImport(_PartoutWireGuardCore)
 import _PartoutWireGuardCore
 #endif
+import PartoutCore
 
 final class RegistryTests: XCTestCase {
 

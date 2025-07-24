@@ -27,7 +27,7 @@ import Foundation
 import NetworkExtension
 import PartoutCore
 
-/// A transient `Module` that embeds a full set of `NEPacketTunnelNetworkSettings`.
+/// A transient ``/PartoutCore/Module`` that embeds a full set of `NEPacketTunnelNetworkSettings`.
 public struct NESettingsModule: Module, @unchecked Sendable {
     public let id: UUID
 

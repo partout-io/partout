@@ -27,6 +27,7 @@
 
 import _PartoutOpenVPNCore
 import Foundation
+import PartoutCore
 
 public struct OpenVPNProviderTemplate: Codable, Sendable {
     public let configuration: OpenVPN.Configuration

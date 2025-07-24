@@ -27,9 +27,10 @@ import Foundation
 
 // MARK: Core
 
+@_exported import _PartoutCryptoCore
 @_exported import PartoutCore
 
-// MARK: - Providers
+// MARK: Crypto
 
 @_exported import PartoutProviders
 

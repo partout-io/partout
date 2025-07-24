@@ -31,8 +31,8 @@
 import _PartoutWireGuardCore
 import Foundation
 import NetworkExtension // TODO: #13, this depends on Apple unnecessarily
-import PartoutCore
 import os
+import PartoutCore
 
 public final class WireGuardConnection: Connection {
     private let ctx: PartoutLoggerContext

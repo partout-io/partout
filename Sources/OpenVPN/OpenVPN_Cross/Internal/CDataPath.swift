@@ -23,20 +23,13 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutOpenVPN_C
 internal import _PartoutCryptoCore_C
+internal import _PartoutOpenVPN_C
 import Foundation
 
 // TODO: ###, move more logic to C (replay protection, byte-aligned enc/dec zd)
 
 final class CDataPath {
-    typealias DecryptedTuple = (
-        packetId: UInt32,
-        header: UInt8,
-        isKeepAlive: Bool,
-        data: Data
-    )
-
     private let mode: UnsafeMutablePointer<dp_mode_t>
 
     private let encBuffer: UnsafeMutablePointer<zeroing_data_t>
@@ -158,7 +151,7 @@ extension CDataPath {
     func decryptAndParse(
         _ packet: Data,
         withNewBuffer: Bool
-    ) throws -> DecryptedTuple {
+    ) throws -> DataPathDecryptedAndParsedTuple {
         let buf = withNewBuffer ? zd_create(0) : nil
         return try decryptAndParse(packet, buf: buf)
     }
@@ -190,7 +183,7 @@ extension CDataPath {
 
     func decrypt(
         packet: Data
-    ) throws -> (packetId: UInt32, data: Data) {
+    ) throws -> DataPathDecryptedTuple {
         let buf = zd_create(packet.count)
         defer {
             zd_free(buf)
@@ -242,7 +235,7 @@ extension CDataPath {
     func decryptAndParse(
         _ packet: Data,
         buf: UnsafeMutablePointer<zeroing_data_t>?
-    ) throws -> DecryptedTuple {
+    ) throws -> DataPathDecryptedAndParsedTuple {
         let buf = buf ?? decBuffer
         resize(buf, for: packet.count)
         return try packet.withUnsafeBytes { src in
@@ -264,7 +257,7 @@ extension CDataPath {
                 throw CDataPathError.error(for: error)
             }
             let data = Data(zeroing: zd)
-            return (packetId, header, keepAlive, data)
+            return DataPathDecryptedAndParsedTuple(packetId, header, keepAlive, data)
         }
     }
 }
@@ -320,7 +313,7 @@ extension CDataPath {
     func decrypt(
         packet: Data,
         buf: UnsafeMutablePointer<zeroing_data_t>?
-    ) throws -> (packetId: UInt32, data: Data) {
+    ) throws -> DataPathDecryptedTuple {
         let buf = buf ?? decBuffer
         let inputCount = packet.count
         resize(buf, for: inputCount)
@@ -339,7 +332,7 @@ extension CDataPath {
                 throw CDataPathError.error(for: error)
             }
             let data = Data(bytes: buf.pointee.bytes, count: outLength)
-            return (packetId, data)
+            return DataPathDecryptedTuple(packetId, data)
         }
     }
 

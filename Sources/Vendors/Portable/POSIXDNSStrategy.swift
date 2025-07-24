@@ -26,6 +26,7 @@
 import Foundation
 import PartoutCore
 
+/// Implementation of ``/PartoutCore/SimpleDNSStrategy`` with the POSIX C library.
 public final class POSIXDNSStrategy: SimpleDNSStrategy {
     private let hostname: String
 
@@ -43,8 +44,9 @@ public final class POSIXDNSStrategy: SimpleDNSStrategy {
         if let task {
             records = try await task.value
         } else {
-            let newTask = Task.detached { [weak self] in
-                try self?.resolveAndBlock()
+            let hostname = self.hostname
+            let newTask = Task.detached { @Sendable in
+                try Self.resolveAndBlock(hostname: hostname)
             }
             task = newTask
             records = try await newTask.value
@@ -62,11 +64,11 @@ public final class POSIXDNSStrategy: SimpleDNSStrategy {
 }
 
 private extension POSIXDNSStrategy {
-    func resolveAndBlock() throws -> [DNSRecord]? {
+    static func resolveAndBlock(hostname: String) throws -> [DNSRecord]? {
         let addr = hostname.cString(using: .utf8)
         var hints = addrinfo()
         hints.ai_family = AF_UNSPEC // IPv4/IPv6
-        var infoPointer: UnsafeMutablePointer<addrinfo>? = nil
+        var infoPointer: UnsafeMutablePointer<addrinfo>?
         let result = getaddrinfo(addr, nil, &hints, &infoPointer)
         if result != 0 {
             throw PartoutError(.dnsFailure)

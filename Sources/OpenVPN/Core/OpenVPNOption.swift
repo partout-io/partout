@@ -26,6 +26,8 @@
 import Foundation
 
 extension OpenVPN {
+
+    /// The supported options of an OpenVPN configuration file.
     public enum Option: String, CaseIterable, Sendable {
 
         // MARK: Continuation

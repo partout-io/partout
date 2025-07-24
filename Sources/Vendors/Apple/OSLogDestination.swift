@@ -27,7 +27,7 @@ import Foundation
 @preconcurrency import OSLog
 import PartoutCore
 
-/// Represents an OSLog logging destination.
+/// Represents a ``/PartoutCore/LoggerDestination`` based on `OSLog`.
 public struct OSLogDestination: LoggerDestination {
     private static var subsystem: String {
         Partout.identifier

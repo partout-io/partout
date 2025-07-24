@@ -27,7 +27,7 @@ import Foundation
 @preconcurrency import NetworkExtension
 import PartoutCore
 
-/// Creates network interfaces via a `NEPacketTunnelProvider`.
+/// A ``/PartoutCore/NetworkInterfaceFactory`` that spawns ``/PartoutCore/LinkInterface`` and ``/PartoutCore/TunnelInterface`` objects from a `NEPacketTunnelProvider`.
 public final class NEInterfaceFactory: NetworkInterfaceFactory {
     public struct Options: Sendable {
         public var maxUDPDatagrams = 200

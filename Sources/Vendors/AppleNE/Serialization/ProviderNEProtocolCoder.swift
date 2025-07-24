@@ -27,7 +27,7 @@ import Foundation
 import NetworkExtension
 import PartoutCore
 
-/// ``NEProtocolCoder`` encoding to and from the `providerConfiguration`.
+/// ``NEProtocolCoder`` encoding to and from a `NETunnelProviderProtocol.providerConfiguration`.
 public struct ProviderNEProtocolCoder: NEProtocolCoder {
     private let ctx: PartoutLoggerContext
 

@@ -27,7 +27,7 @@ import Foundation
 import NetworkExtension
 import PartoutCore
 
-/// Implementation of a `TunnelInterface` via `NEPacketTunnelFlow`.
+/// Implementation of a ``/PartoutCore/TunnelInterface`` via `NEPacketTunnelFlow`.
 public final class NETunnelInterface: TunnelInterface {
     private let ctx: PartoutLoggerContext
 

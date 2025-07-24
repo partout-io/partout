@@ -24,8 +24,8 @@
 //
 
 internal import _PartoutCryptoOpenSSL_ObjC
-internal import _PartoutOpenVPNOpenSSL_ObjC
 import _PartoutOpenVPNCore
+internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
 
@@ -102,7 +102,6 @@ struct XORProcessor {
             }
         @unknown default:
             assertionFailure("Unhandled XOR method: \(method)")
-            break
         }
         return Data(dst)
     }

@@ -30,11 +30,9 @@ extension LoggerCategory {
     public static let openvpn = Self(rawValue: "openvpn")
 }
 
-public typealias OpenVPNConfigurationType = OpenVPN.Configuration
-
 extension TunnelEnvironmentKeys {
     public enum OpenVPN {
-        public static let serverConfiguration = TunnelEnvironmentKey<OpenVPNConfigurationType>("OpenVPN.serverConfiguration")
+        public static let serverConfiguration = TunnelEnvironmentKey<_PartoutOpenVPNCore.OpenVPN.Configuration>("OpenVPN.serverConfiguration")
     }
 }
 

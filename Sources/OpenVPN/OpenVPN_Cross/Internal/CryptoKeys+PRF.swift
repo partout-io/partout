@@ -24,8 +24,8 @@
 //
 
 internal import _PartoutCryptoCore
-import _PartoutOpenVPNCore
 internal import _PartoutOpenVPN_C
+import _PartoutOpenVPNCore
 import Foundation
 
 extension CryptoKeys {

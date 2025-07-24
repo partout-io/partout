@@ -368,7 +368,7 @@ struct ProviderScriptResult {
     }
 }
 
-extension ProviderScriptResult {
+extension ProviderScriptResult: @unchecked Sendable {
     private static let apiPrefix = "API"
 
     static let invalidURL = Self("\(apiPrefix).invalidURL")

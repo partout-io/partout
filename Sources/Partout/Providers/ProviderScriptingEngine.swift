@@ -23,6 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import PartoutCore
 import PartoutProviders
 
 protocol ProviderScriptingEngine: ScriptingEngine {

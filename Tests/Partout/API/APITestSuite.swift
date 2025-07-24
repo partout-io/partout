@@ -25,6 +25,7 @@
 
 import Foundation
 @testable import Partout
+import PartoutCore
 @testable import PartoutProviders
 
 protocol APITestSuite {

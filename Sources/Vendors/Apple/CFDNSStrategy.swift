@@ -26,7 +26,8 @@
 import Foundation
 import PartoutCore
 
-/// `CoreFoundation` implementation of ``SimpleDNSStrategy``.
+/// `CoreFoundation` implementation of ``/PartoutCore/SimpleDNSStrategy``.
+@available(*, deprecated, message: "Prefer the portable POSIXDNSStrategy.")
 public actor CFDNSStrategy: SimpleDNSStrategy {
     private let host: CFHost
 

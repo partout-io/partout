@@ -29,6 +29,7 @@ import _PartoutVendorsPortable_C
 import Foundation
 import PartoutCore
 
+/// Implementation of ``/PartoutCore/PRNGProtocol`` with the OS C library.
 public final class PlatformPRNG: PRNGProtocol {
     public init() {
     }

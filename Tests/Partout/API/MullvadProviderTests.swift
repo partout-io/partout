@@ -29,6 +29,10 @@ import Foundation
 import Testing
 
 struct MullvadProviderTests: APITestSuite {
+    init() {
+        setUpLogging()
+    }
+
     @Test(arguments: [
         AuthInput( // valid token
             accessToken: "sometoken",
@@ -77,8 +81,6 @@ struct MullvadProviderTests: APITestSuite {
         )
     ])
     func whenAuth_thenSucceeds(input: AuthInput) async throws {
-        setUpLogging()
-
         let sut = try newAPIMapper(input.hijacked ? {
             hijacker(for: input, method: $0, urlString: $1)
         } : nil)

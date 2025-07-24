@@ -24,8 +24,8 @@
 //
 
 internal import _PartoutCryptoCore
-import _PartoutOpenVPNCore
 internal import _PartoutOpenVPN_C
+import _PartoutOpenVPNCore
 #if canImport(_PartoutOpenVPNOpenSSL_ObjC)
 internal import _PartoutOpenVPNOpenSSL_ObjC
 #endif

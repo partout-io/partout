@@ -42,7 +42,7 @@ extension DataPathWrapper {
         keys: CryptoKeys,
         prng: PRNGProtocol
     ) throws -> DataPathWrapper {
-        NSLog("PartoutOpenVPN: Using DataPathWrapper (legacy Swift/ObjC)");
+        NSLog("PartoutOpenVPN: Using DataPathWrapper (legacy Swift/ObjC)")
 
         let seed = prng.data(length: PRNGSeedLength)
         guard let cryptoBox = OSSLCryptoBox(seed: Z(seed)) else {

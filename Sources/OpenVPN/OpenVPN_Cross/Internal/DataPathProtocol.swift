@@ -25,17 +25,33 @@
 
 import Foundation
 
-typealias DataPathDecryptedTuple = (
-    packetId: UInt32,
-    data: Data
-)
+struct DataPathDecryptedTuple {
+    let packetId: UInt32
 
-typealias DataPathDecryptedAndParsedTuple = (
-    packetId: UInt32,
-    header: UInt8,
-    isKeepAlive: Bool,
-    data: Data
-)
+    let data: Data
+
+    init(_ packetId: UInt32, _ data: Data) {
+        self.packetId = packetId
+        self.data = data
+    }
+}
+
+struct DataPathDecryptedAndParsedTuple {
+    let packetId: UInt32
+
+    let header: UInt8
+
+    let isKeepAlive: Bool
+
+    let data: Data
+
+    init(_ packetId: UInt32, _ header: UInt8, _ isKeepAlive: Bool, _ data: Data) {
+        self.packetId = packetId
+        self.header = header
+        self.isKeepAlive = isKeepAlive
+        self.data = data
+    }
+}
 
 // new C-based protocol
 protocol DataPathProtocol {

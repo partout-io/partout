@@ -27,7 +27,7 @@ import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
 
-/// Default implementation of ``OpenVPNSessionProtocol``.
+/// Default implementation of `OpenVPNSessionProtocol`.
 @OpenVPNActor
 final class OpenVPNSession {
     enum SessionState {

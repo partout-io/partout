@@ -25,10 +25,15 @@
 
 import Foundation
 @testable import Partout
+import PartoutCore
 @testable import PartoutProviders
 import Testing
 
 struct HideMeProviderTests: APITestSuite {
+    init() {
+        setUpLogging()
+    }
+
     @Test(arguments: [
         FetchInput(
             cache: nil,
@@ -52,8 +57,6 @@ struct HideMeProviderTests: APITestSuite {
 //        )
     ])
     func whenFetchInfrastructure_thenReturns(input: FetchInput) async throws {
-        setUpLogging()
-
         let sut = try newAPIMapper(input.hijacked ? {
             hijacker(forFetchURL: $1)
         } : nil)

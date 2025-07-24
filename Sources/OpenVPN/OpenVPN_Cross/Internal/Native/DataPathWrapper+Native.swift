@@ -24,8 +24,8 @@
 //
 
 internal import _PartoutCryptoCore
-import _PartoutOpenVPNCore
 internal import _PartoutOpenVPN_C
+import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
 
@@ -42,7 +42,7 @@ extension DataPathWrapper {
     }
 
     static func native(with parameters: Parameters, keys: CryptoKeys) throws -> DataPathWrapper {
-        NSLog("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)");
+        NSLog("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)")
 
         let mode: UnsafeMutablePointer<dp_mode_t>?
         let cipherAlgorithm = parameters.cipher?.rawValue.uppercased()

@@ -23,14 +23,14 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
 internal import _PartoutOpenVPN_C
+import _PartoutOpenVPNCore
 import PartoutCore
 
 final class OSSLKeyDecrypter: KeyDecrypter, Sendable {
     func decryptedKey(fromPEM pem: String, passphrase: String) throws -> String {
         let buf = pem.withCString { cPEM in
-            passphrase.withCString { cPassphrase in
+            passphrase.withCString { _ in
                 key_decrypted_from_pem(cPEM, passphrase)
             }
         }
@@ -45,7 +45,7 @@ final class OSSLKeyDecrypter: KeyDecrypter, Sendable {
 
     func decryptedKey(fromPath path: String, passphrase: String) throws -> String {
         let buf = path.withCString { cPath in
-            passphrase.withCString { cPassphrase in
+            passphrase.withCString { _ in
                 key_decrypted_from_path(cPath, passphrase)
             }
         }
