@@ -1,6 +1,14 @@
 {
   "pins" : [
     {
+      "identity" : "partout-core",
+      "kind" : "remoteSourceControl",
+      "location" : "git@gitlab.com:passepartoutvpn/partout-core.git",
+      "state" : {
+        "revision" : "15c0008cebe5a4b34bf98e56bfe3552108ac153d"
+      }
+    },
+    {
       "identity" : "swift-docc-plugin",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-docc-plugin",
