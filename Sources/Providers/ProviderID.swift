@@ -23,8 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-
 /// Unique value identifying a provider.
 public struct ProviderID: RawRepresentable, Hashable, Codable, Sendable {
     public let rawValue: String

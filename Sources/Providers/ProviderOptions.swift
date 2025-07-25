@@ -23,6 +23,4 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-
 public typealias ProviderOptions = Hashable & Codable & Sendable

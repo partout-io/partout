@@ -23,8 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-
 public struct ProviderEntity: Hashable, Codable, Sendable {
     public struct Header: Hashable, Codable, Sendable {
         public let providerId: ProviderID

@@ -23,8 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(PartoutProviders)
-
 import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
@@ -381,5 +379,3 @@ extension ProviderScriptResult: @unchecked Sendable {
         error?.hasPrefix(Self.apiPrefix) == true
     }
 }
-
-#endif

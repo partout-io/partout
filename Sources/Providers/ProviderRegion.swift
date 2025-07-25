@@ -23,8 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-
 public struct ProviderRegion: Identifiable, Hashable, Codable, Sendable {
     public let id: String
 
