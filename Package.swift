@@ -14,7 +14,7 @@ let checksum = "1d769a0adfbf6e9d46a7da62e7e0cab5268c0c2216a449523d73e44afabb5f1f
 let coreSHA1 = "f26c0eeb5cb2ba6bd3fbf64fa090abcec492df9a"
 
 // deployment environment
-let environment: Environment = .remoteSource
+let environment: Environment = .documentation
 
 // the global settings for C targets
 let cSettings: [CSetting] = [
@@ -36,7 +36,7 @@ let package = Package(
         .library(
             name: "Partout",
             targets: [
-                "PartoutCoreWrapper",
+                environment.coreDependency,
                 "PartoutProviders"
             ]
         )
@@ -47,7 +47,9 @@ let package = Package(
     targets: [
         .target(
             name: "PartoutProviders",
-            dependencies: ["PartoutCoreWrapper"],
+            dependencies: [
+                .target(name: environment.coreDependency)
+            ],
             path: "Sources/Providers"
         ),
         .testTarget(
@@ -68,6 +70,14 @@ enum Environment {
     case remoteSource
     case localBinary
     case localSource
+    case documentation
+
+    var coreDependency: String {
+        switch self {
+        case .documentation: "PartoutCore"
+        default: "PartoutCoreWrapper"
+        }
+    }
 }
 
 switch environment {
@@ -103,13 +113,27 @@ case .localSource:
         dependencies: [
             .product(name: "PartoutCore", package: "partout-core")
         ],
-        path: "Sources/Core"
+        path: "../partout-core/Sources/PartoutCore"
     ))
+case .documentation:
+    package.targets.append(contentsOf: [
+        .target(
+            name: "_PartoutCore_C",
+            path: "PartoutCore/_PartoutCore_C"
+        ),
+        .target(
+            name: "PartoutCore",
+            dependencies: ["_PartoutCore_C"],
+            path: "PartoutCore/PartoutCore"
+        )
+    ])
 }
-package.targets.append(contentsOf: [
-    .testTarget(
-        name: "PartoutCoreTests",
-        dependencies: ["PartoutCoreWrapper"],
-        path: "Tests/Core"
-    )
-])
+if environment != .documentation {
+    package.targets.append(contentsOf: [
+        .testTarget(
+            name: "PartoutCoreTests",
+            dependencies: ["PartoutCoreWrapper"],
+            path: "Tests/Core"
+        )
+    ])
+}
