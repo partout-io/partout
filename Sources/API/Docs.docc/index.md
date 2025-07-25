@@ -27,7 +27,5 @@ Objects to interact with the Partout API.
 
 ### Implementations
 
-- ``DefaultAPIMapper``
-- ``DefaultProviderScriptingAPI``
 - ``InMemoryAPIRepository``
 - ``InMemoryProviderRepository``
