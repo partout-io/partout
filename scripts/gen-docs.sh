@@ -5,7 +5,9 @@ web_dst="docs"
 set -e
 
 swift package generate-documentation \
-    --enable-experimental-combined-documentation
+    --enable-experimental-combined-documentation \
+    --target PartoutCore \
+    --target PartoutProviders
 
 if [[ -z $1 ]]; then
     exit
