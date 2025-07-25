@@ -43,10 +43,13 @@ let package = Package(
             ]
         )
     ],
-    dependencies: [
-        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0")
-    ],
 )
+
+if areas.contains(.documentation) {
+    package.dependencies.append(
+        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0")
+    )
+}
 
 // MARK: - Providers
 
