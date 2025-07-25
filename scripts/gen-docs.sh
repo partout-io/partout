@@ -14,9 +14,7 @@ cp -rp "$core_src/PartoutCore" \
 
 swift package generate-documentation \
     --enable-experimental-combined-documentation \
-    --target PartoutAPI \
-    --target PartoutCore \
-    --target PartoutProviders
+    --product Partout
 
 if [[ -z $1 ]]; then
     exit

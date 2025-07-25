@@ -37,6 +37,7 @@ let package = Package(
             name: "Partout",
             targets: [
                 environment.coreDependency,
+                "PartoutAPI",
                 "PartoutProviders"
             ]
         )
