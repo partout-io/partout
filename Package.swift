@@ -3,6 +3,8 @@
 
 import PackageDescription
 
+// MARK: Tuning
+
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
 let version = "0.99.152"
@@ -11,12 +13,18 @@ let checksum = "1d769a0adfbf6e9d46a7da62e7e0cab5268c0c2216a449523d73e44afabb5f1f
 // to download the core soruce
 let coreSHA1 = "f26c0eeb5cb2ba6bd3fbf64fa090abcec492df9a"
 
+// deployment environment
+let environment: Environment = .remoteSource
+
 // the global settings for C targets
 let cSettings: [CSetting] = [
     .unsafeFlags([
         "-Wall", "-Wextra"//, "-Werror"
     ])
 ]
+
+// MARK: Package
+
 let package = Package(
     name: "Partout",
     platforms: [
@@ -34,28 +42,12 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0"),
-        .package(url: "git@gitlab.com:passepartoutvpn/partout-core.git", revision: coreSHA1)
-//        .package(path: "../partout-core")
+        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0")
     ],
     targets: [
-//        .binaryTarget(
-//            name: "PartoutCoreWrapper",
-//            url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(binaryFilename)",
-//            checksum: checksum
-//        ),
-        .target(
-            name: "PartoutCoreWrapper",
-            dependencies: [
-                .product(name: "PartoutCore", package: "partout-core")
-            ],
-            path: "Sources/Core"
-        ),
         .target(
             name: "PartoutProviders",
-            dependencies: [
-                .product(name: "PartoutCore", package: "partout-core")
-            ],
+            dependencies: ["PartoutCoreWrapper"],
             path: "Sources/Providers"
         ),
         .testTarget(
@@ -69,14 +61,55 @@ let package = Package(
     ]
 )
 
-//package.targets.append(contentsOf: [
-//    .target(
-//        name: "_PartoutCore_C",
-//        path: "Sources/PartoutCore/_PartoutCore_C"
-//    ),
-//    .target(
-//        name: "PartoutCore",
-//        dependencies: ["_PartoutCore_C"],
-//        path: "Sources/PartoutCore/PartoutCore"
-//    )
-//])
+// MARK: Core
+
+enum Environment {
+    case remoteBinary
+    case remoteSource
+    case localBinary
+    case localSource
+}
+
+switch environment {
+case .remoteBinary:
+    package.targets.append(.binaryTarget(
+        name: "PartoutCoreWrapper",
+        url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(binaryFilename)",
+        checksum: checksum
+    ))
+case .remoteSource:
+    package.dependencies.append(
+//        .package(url: "git@github.com:passepartoutvpn/partout-core.git", revision: coreSHA1)
+        .package(url: "git@gitlab.com:passepartoutvpn/partout-core.git", revision: coreSHA1)
+    )
+    package.targets.append(.target(
+        name: "PartoutCoreWrapper",
+        dependencies: [
+            .product(name: "PartoutCore", package: "partout-core")
+        ],
+        path: "Sources/Core"
+    ))
+case .localBinary:
+    package.targets.append(.binaryTarget(
+        name: "PartoutCoreWrapper",
+        path: "../partout-core/PartoutCore.xcframework"
+    ))
+case .localSource:
+    package.dependencies.append(
+        .package(path: "../partout-core")
+    )
+    package.targets.append(.target(
+        name: "PartoutCoreWrapper",
+        dependencies: [
+            .product(name: "PartoutCore", package: "partout-core")
+        ],
+        path: "Sources/Core"
+    ))
+}
+package.targets.append(contentsOf: [
+    .testTarget(
+        name: "PartoutCoreTests",
+        dependencies: ["PartoutCoreWrapper"],
+        path: "Tests/Core"
+    )
+])
