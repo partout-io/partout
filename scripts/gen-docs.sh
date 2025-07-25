@@ -2,7 +2,7 @@
 core_src="../partout-core/Sources"
 core_dst="PartoutCore"
 web_src=".build/plugins/Swift-DocC/outputs/Partout.doccarchive"
-web_dst="docs"
+web_dst=".build/docs"
 
 set -e
 
