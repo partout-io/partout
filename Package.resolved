@@ -5,7 +5,7 @@
       "kind" : "remoteSourceControl",
       "location" : "git@gitlab.com:passepartoutvpn/partout-core.git",
       "state" : {
-        "revision" : "15c0008cebe5a4b34bf98e56bfe3552108ac153d"
+        "revision" : "f26c0eeb5cb2ba6bd3fbf64fa090abcec492df9a"
       }
     },
     {
