@@ -138,11 +138,11 @@ if areas.contains(.openVPN) {
     if isDevelopment {
         package.products.append(contentsOf: [
             .library(
-                name: "PartoutOpenVPN",
+                name: "_PartoutOpenVPNWrapper",
                 targets: ["_PartoutOpenVPNWrapper"]
             ),
             .library(
-                name: "PartoutOpenVPNCore",
+                name: "PartoutOpenVPN",
                 targets: ["PartoutOpenVPN"]
             )
         ])
@@ -267,11 +267,11 @@ if areas.contains(.wireGuard) {
     if isDevelopment {
         package.products.append(contentsOf: [
             .library(
-                name: "PartoutWireGuard",
+                name: "_PartoutWireGuardWrapper",
                 targets: ["_PartoutWireGuardWrapper"]
             ),
             .library(
-                name: "PartoutWireGuardCore",
+                name: "PartoutWireGuard",
                 targets: ["PartoutWireGuard"]
             )
         ])
