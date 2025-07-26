@@ -11,7 +11,7 @@ let version = "0.99.160"
 let checksum = "17a7494bf8295e5db5c6c0c9a5fcc6d7a5896d7e724e088b47e5e2b50ec0fb61"
 
 // to download the core soruce
-let coreSHA1 = "2b38fa48c7f1e8220331fc6368acb3ff4f9cbc15"
+let coreSHA1 = "c61a587e03d023c8359ab6ea99624363a36de0fd"
 
 // deployment environment
 let environment: Environment = .remoteBinary
