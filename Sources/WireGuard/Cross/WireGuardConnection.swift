@@ -28,7 +28,7 @@
 //  SPDX-License-Identifier: MIT
 //  Copyright © 2018-2024 WireGuard LLC. All Rights Reserved.
 
-import _PartoutVendorsWireGuardBackend
+import _PartoutVendorsWireGuard
 import Foundation
 import NetworkExtension // TODO: #13, this depends on Apple unnecessarily
 import os

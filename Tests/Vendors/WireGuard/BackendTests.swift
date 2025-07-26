@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutVendorsWireGuardBackend
+import _PartoutVendorsWireGuard
 import Testing
 
 struct BackendTests {
