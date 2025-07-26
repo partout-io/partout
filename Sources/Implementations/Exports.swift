@@ -23,10 +23,17 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(_PartoutOpenVPNWrapper)
-@_exported import _PartoutOpenVPNWrapper
+#if canImport(PartoutOpenVPN)
+@_exported import PartoutOpenVPN
+#if canImport(_PartoutOpenVPNOpenSSL)
+@_exported import _PartoutOpenVPNOpenSSL
+#endif
+#if canImport(_PartoutOpenVPN_Cross)
+@_exported import _PartoutOpenVPN_Cross
+#endif
 #endif
 
-#if canImport(_PartoutWireGuardWrapper)
-@_exported import _PartoutWireGuardWrapper
+#if canImport(PartoutWireGuard)
+@_exported import PartoutWireGuard
+@_exported import _PartoutWireGuard_Cross
 #endif

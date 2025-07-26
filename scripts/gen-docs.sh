@@ -1,7 +1,7 @@
 #!/bin/bash
 core_src="../partout-core/Sources"
 core_dst="PartoutCore"
-web_src=".build/plugins/Swift-DocC/outputs/Partout.doccarchive"
+web_src=".build/plugins/Swift-DocC/outputs/partout.doccarchive"
 web_dst=".build/docs"
 
 set -e
@@ -17,6 +17,7 @@ PARTOUT_DOCS="1" swift package generate-documentation \
     --target Partout \
     --target PartoutAPI \
     --target PartoutCore \
+    --target PartoutImplementations \
     --target PartoutProviders \
     --target PartoutOpenVPN \
     --target PartoutWireGuard
