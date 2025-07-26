@@ -27,7 +27,7 @@ import Foundation
 import NetworkExtension
 import PartoutCore
 
-/// Implementation of a `LinkObserver` via `NWUDPSession`.
+/// Implementation of a ``/PartoutCore/LinkObserver`` via `NWUDPSession`.
 public final class NEUDPObserver: LinkObserver {
     public struct Options: Sendable {
         public let maxDatagrams: Int

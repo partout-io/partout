@@ -27,7 +27,7 @@ import Foundation
 import NetworkExtension
 import PartoutCore
 
-/// Implementation of a `LinkObserver` via `NWTCPConnection`.
+/// Implementation of a ``/PartoutCore/LinkObserver`` via `NWTCPConnection`.
 public final class NETCPObserver: LinkObserver {
     public struct Options: Sendable {
         public let minLength: Int

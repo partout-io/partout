@@ -23,12 +23,11 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutCryptoCore
-import _PartoutCryptoCore_C
 import _PartoutVendorsPortable_C
 import Foundation
 import PartoutCore
 
+/// Implementation of ``/PartoutCore/PRNGProtocol`` with the OS C library.
 public final class PlatformPRNG: PRNGProtocol {
     public init() {
     }

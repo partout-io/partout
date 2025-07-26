@@ -144,7 +144,7 @@ extension OpenVPN {
 
 extension OpenVPN {
 
-    /// The immutable configuration for ``OpenVPNSession``.
+    /// The immutable configuration for `OpenVPNSession`.
     public struct Configuration: Codable, Hashable, Sendable {
         struct Fallback {
             static let cipher: Cipher = .aes128cbc
@@ -383,10 +383,10 @@ extension OpenVPN.Configuration {
 
         // MARK: Routing
 
-        /// The settings for IPv4. `OpenVPNSession` only evaluates this server-side.
+        /// The settings for IPv4. Only evaluated when server-side.
         public var ipv4: IPSettings?
 
-        /// The settings for IPv6. `OpenVPNSession` only evaluates this server-side.
+        /// The settings for IPv6. Only evaluated when Fserver-side.
         public var ipv6: IPSettings?
 
         /// The IPv4 routes if `ipv4` is nil.

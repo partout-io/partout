@@ -27,11 +27,12 @@ import Foundation
 import Testing
 
 struct APIMapperTests: APITestSuite {
+    init() {
+        setUpLogging()
+    }
 
     @Test
     func whenFetchIndex_thenReturnsProviders() async throws {
-        setUpLogging()
-
         let sut = try newAPIMapper()
         let index = try await sut.index()
         #expect(index.count == 11)

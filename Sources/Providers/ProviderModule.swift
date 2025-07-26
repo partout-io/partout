@@ -30,6 +30,7 @@ extension ModuleType {
     public static let provider = ModuleType("Provider")
 }
 
+/// A provider-based ``/PartoutCore/Module``.
 public struct ProviderModule: Module, BuildableType, Hashable, Codable {
     public static let moduleHandler = ModuleHandler(.provider, ProviderModule.self)
 

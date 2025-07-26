@@ -30,7 +30,7 @@ extension ModuleType {
     public static let wireGuard = ModuleType("WireGuard")
 }
 
-/// A `ConnectionModule` providing a WireGuard connection.
+/// A ``/PartoutCore/ConnectionModule`` providing a WireGuard connection.
 public struct WireGuardModule: Module, BuildableType, Hashable, Codable {
     public static let moduleHandler = ModuleHandler(.wireGuard, WireGuardModule.self)
 

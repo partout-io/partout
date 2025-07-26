@@ -37,7 +37,7 @@
 import Foundation
 import PartoutCore
 
-/// The Apple ``Keychain``.
+/// The Apple ``/PartoutCore/Keychain``.
 public final class AppleKeychain: Keychain {
     private let ctx: PartoutLoggerContext
 
@@ -46,6 +46,7 @@ public final class AppleKeychain: Keychain {
     /**
      Creates a keychain.
 
+     - Parameter ctx: The context.
      - Parameter group: An optional App Group.
      - Precondition: Proper App Group entitlements (if group is non-nil).
      **/

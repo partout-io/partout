@@ -23,8 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-
 public enum ProviderHeuristic: Identifiable, Hashable, Codable, Sendable {
     case exact(ProviderServer)
 

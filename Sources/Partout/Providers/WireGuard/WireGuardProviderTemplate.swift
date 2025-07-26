@@ -23,11 +23,11 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(_PartoutWireGuardCore)
+#if canImport(PartoutWireGuard)
 
-import _PartoutWireGuardCore
 import Foundation
 import PartoutCore
+import PartoutWireGuard
 
 // FIXME: passepartout#507, generate WireGuard configuration from template
 public struct WireGuardProviderTemplate: Hashable, Codable, Sendable {

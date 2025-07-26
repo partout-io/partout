@@ -24,7 +24,7 @@
 //
 
 import Foundation
-import Partout
+@testable import Partout
 import XCTest
 
 final class ProviderModulesTests: XCTestCase {
@@ -32,7 +32,7 @@ final class ProviderModulesTests: XCTestCase {
 
     private let resourcesURL = Bundle.module.url(forResource: "Resources", withExtension: nil)
 
-#if canImport(_PartoutOpenVPNCore)
+#if canImport(PartoutOpenVPN)
     func test_givenProviderModule_whenOpenVPN_thenResolves() throws {
         var sut = ProviderModule.Builder()
         sut.providerId = mockId
@@ -55,7 +55,7 @@ final class ProviderModulesTests: XCTestCase {
     }
 #endif
 
-#if canImport(_PartoutWireGuardCore)
+#if canImport(PartoutWireGuard)
 //    func test_givenProviderModule_whenWireGuard_thenResolves() throws {
 //        var sut = ProviderModule.Builder()
 //        sut.providerId = .hideme
@@ -68,7 +68,7 @@ final class ProviderModulesTests: XCTestCase {
 }
 
 private extension ProviderModulesTests {
-#if canImport(_PartoutOpenVPNCore)
+#if canImport(PartoutOpenVPN)
     func openVPNEntity() throws -> ProviderEntity {
         let presetURL = try XCTUnwrap(resourcesURL?.appendingPathComponent("preset.openvpn.json"))
         let templateData = try Data(contentsOf: presetURL)

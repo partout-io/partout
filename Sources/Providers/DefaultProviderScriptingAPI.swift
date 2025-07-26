@@ -23,8 +23,6 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(PartoutProviders)
-
 import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
@@ -368,7 +366,7 @@ struct ProviderScriptResult {
     }
 }
 
-extension ProviderScriptResult {
+extension ProviderScriptResult: @unchecked Sendable {
     private static let apiPrefix = "API"
 
     static let invalidURL = Self("\(apiPrefix).invalidURL")
@@ -381,5 +379,3 @@ extension ProviderScriptResult {
         error?.hasPrefix(Self.apiPrefix) == true
     }
 }
-
-#endif

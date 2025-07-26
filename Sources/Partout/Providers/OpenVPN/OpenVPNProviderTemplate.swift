@@ -23,10 +23,11 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(_PartoutOpenVPNCore)
+#if canImport(PartoutOpenVPN)
 
-import _PartoutOpenVPNCore
 import Foundation
+import PartoutCore
+import PartoutOpenVPN
 
 public struct OpenVPNProviderTemplate: Codable, Sendable {
     public let configuration: OpenVPN.Configuration

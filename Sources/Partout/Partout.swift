@@ -28,31 +28,26 @@ import Foundation
 // MARK: Core
 
 @_exported import PartoutCore
-
-// MARK: - Providers
-
 @_exported import PartoutProviders
 
-// MARK: - API
+// MARK: - Optional
+
+#if canImport(PartoutOpenVPN)
+@_exported import PartoutOpenVPN
+#endif
+
+#if canImport(PartoutWireGuard)
+@_exported import PartoutWireGuard
+#endif
 
 #if canImport(PartoutAPI)
 @_exported import PartoutAPI
 @_exported import PartoutAPIBundle
 #endif
 
-// MARK: - Modules
-
-#if canImport(_PartoutOpenVPNCore)
-@_exported import _PartoutOpenVPNCore
-#endif
-#if canImport(_PartoutWireGuardCore)
-@_exported import _PartoutWireGuardCore
-#endif
-
 // MARK: - Vendors
 
 @_exported import _PartoutVendorsPortable
-
 #if canImport(_PartoutVendorsApple)
 @_exported import _PartoutVendorsApple
 @_exported import _PartoutVendorsAppleNE

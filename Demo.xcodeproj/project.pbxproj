@@ -19,13 +19,11 @@
 		0EC332CD2B8A1808000B9C2F /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EC332CC2B8A1808000B9C2F /* PacketTunnelProvider.swift */; };
 		0EC332D22B8A1808000B9C2F /* PartoutDemoTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0EC332C82B8A1808000B9C2F /* PartoutDemoTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		0ED1EFCE2DB9161F00CA043E /* Partout in Frameworks */ = {isa = PBXBuildFile; productRef = 0ED1EFCD2DB9161F00CA043E /* Partout */; };
-		0ED1EFD02DB9161F00CA043E /* PartoutOpenVPN in Frameworks */ = {isa = PBXBuildFile; productRef = 0ED1EFCF2DB9161F00CA043E /* PartoutOpenVPN */; };
-		0ED1EFD22DB9161F00CA043E /* PartoutWireGuard in Frameworks */ = {isa = PBXBuildFile; productRef = 0ED1EFD12DB9161F00CA043E /* PartoutWireGuard */; };
 		0ED1EFD42DB9162600CA043E /* Partout in Frameworks */ = {isa = PBXBuildFile; productRef = 0ED1EFD32DB9162600CA043E /* Partout */; };
-		0ED1EFD62DB9162600CA043E /* PartoutOpenVPN in Frameworks */ = {isa = PBXBuildFile; productRef = 0ED1EFD52DB9162600CA043E /* PartoutOpenVPN */; };
-		0ED1EFD82DB9162600CA043E /* PartoutWireGuard in Frameworks */ = {isa = PBXBuildFile; productRef = 0ED1EFD72DB9162600CA043E /* PartoutWireGuard */; };
 		0ED5F8FA2BB34C8C007F8E85 /* Demo+WireGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ED5F8F92BB34C8C007F8E85 /* Demo+WireGuard.swift */; };
 		0ED5F8FF2BB3562E007F8E85 /* Shared+Tunnel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ED5F8FD2BB3561F007F8E85 /* Shared+Tunnel.swift */; };
+		0EF9354A2E35166400CCC524 /* PartoutImplementations in Frameworks */ = {isa = PBXBuildFile; productRef = 0EF935492E35166400CCC524 /* PartoutImplementations */; };
+		0EF9354C2E3516A900CCC524 /* PartoutImplementations in Frameworks */ = {isa = PBXBuildFile; productRef = 0EF9354B2E3516A900CCC524 /* PartoutImplementations */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -79,9 +77,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				0ED1EFD42DB9162600CA043E /* Partout in Frameworks */,
-				0ED1EFD82DB9162600CA043E /* PartoutWireGuard in Frameworks */,
-				0ED1EFD62DB9162600CA043E /* PartoutOpenVPN in Frameworks */,
 				0EC332CA2B8A1808000B9C2F /* NetworkExtension.framework in Frameworks */,
+				0EF9354C2E3516A900CCC524 /* PartoutImplementations in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -89,9 +86,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0ED1EFD22DB9161F00CA043E /* PartoutWireGuard in Frameworks */,
 				0ED1EFCE2DB9161F00CA043E /* Partout in Frameworks */,
-				0ED1EFD02DB9161F00CA043E /* PartoutOpenVPN in Frameworks */,
+				0EF9354A2E35166400CCC524 /* PartoutImplementations in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -223,8 +219,7 @@
 			name = PartoutDemoTunnel;
 			packageProductDependencies = (
 				0ED1EFD32DB9162600CA043E /* Partout */,
-				0ED1EFD52DB9162600CA043E /* PartoutOpenVPN */,
-				0ED1EFD72DB9162600CA043E /* PartoutWireGuard */,
+				0EF9354B2E3516A900CCC524 /* PartoutImplementations */,
 			);
 			productName = Tunnel;
 			productReference = 0EC332C82B8A1808000B9C2F /* PartoutDemoTunnel.appex */;
@@ -641,30 +636,20 @@
 			package = 0ED1EFC62DB9160A00CA043E /* XCLocalSwiftPackageReference "../partout" */;
 			productName = Partout;
 		};
-		0ED1EFCF2DB9161F00CA043E /* PartoutOpenVPN */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 0ED1EFC62DB9160A00CA043E /* XCLocalSwiftPackageReference "../partout" */;
-			productName = PartoutOpenVPN;
-		};
-		0ED1EFD12DB9161F00CA043E /* PartoutWireGuard */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 0ED1EFC62DB9160A00CA043E /* XCLocalSwiftPackageReference "../partout" */;
-			productName = PartoutWireGuard;
-		};
 		0ED1EFD32DB9162600CA043E /* Partout */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0ED1EFC62DB9160A00CA043E /* XCLocalSwiftPackageReference "../partout" */;
 			productName = Partout;
 		};
-		0ED1EFD52DB9162600CA043E /* PartoutOpenVPN */ = {
+		0EF935492E35166400CCC524 /* PartoutImplementations */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0ED1EFC62DB9160A00CA043E /* XCLocalSwiftPackageReference "../partout" */;
-			productName = PartoutOpenVPN;
+			productName = PartoutImplementations;
 		};
-		0ED1EFD72DB9162600CA043E /* PartoutWireGuard */ = {
+		0EF9354B2E3516A900CCC524 /* PartoutImplementations */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0ED1EFC62DB9160A00CA043E /* XCLocalSwiftPackageReference "../partout" */;
-			productName = PartoutWireGuard;
+			productName = PartoutImplementations;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

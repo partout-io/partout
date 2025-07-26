@@ -24,6 +24,7 @@
 //
 
 import Foundation
+import PartoutCore
 import PartoutProviders
 
 extension DefaultAPIMapper {

@@ -27,7 +27,7 @@ import Foundation
 import NetworkExtension
 import PartoutCore
 
-/// Tunnel strategy based on `NETunnelProviderManager`.
+/// Implementation of ``/PartoutCore/TunnelStrategy`` based on `NETunnelProviderManager`.
 public actor NETunnelStrategy {
     public enum Option {
         case multiple

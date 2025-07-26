@@ -23,11 +23,11 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(_PartoutOpenVPNCore)
-import _PartoutOpenVPNCore
+#if canImport(PartoutOpenVPN)
+import PartoutOpenVPN
 #endif
-#if canImport(_PartoutWireGuardCore)
-import _PartoutWireGuardCore
+#if canImport(PartoutWireGuard)
+import PartoutWireGuard
 #endif
 import Foundation
 import PartoutCore
@@ -43,10 +43,10 @@ extension Registry {
             OnDemandModule.moduleHandler,
             ProviderModule.moduleHandler
         ]
-#if canImport(_PartoutOpenVPNCore)
+#if canImport(PartoutOpenVPN)
         handlers.append(OpenVPNModule.moduleHandler)
 #endif
-#if canImport(_PartoutWireGuardCore)
+#if canImport(PartoutWireGuard)
         handlers.append(WireGuardModule.moduleHandler)
 #endif
         return handlers
@@ -54,19 +54,21 @@ extension Registry {
 
     private static let knownProviderResolvers: [ProviderModuleResolver] = {
         var resolvers: [ProviderModuleResolver] = []
-#if canImport(_PartoutOpenVPNCore)
+#if canImport(PartoutOpenVPN)
         resolvers.append(OpenVPNProviderResolver(.global))
 #endif
-#if canImport(_PartoutWireGuardCore)
+#if canImport(PartoutWireGuard)
         resolvers.append(WireGuardProviderResolver(.global))
 #endif
         return resolvers
     }()
 
+    /// Returns a ``/PartoutCore/Registry`` with the known module handlers and resolvers and an empty device ID.
     public convenience init() {
         self.init(deviceId: "", withKnown: true)
     }
 
+    /// Returns a ``/PartoutCore/Registry`` that optionally includes the known module handlers and resolvers.
     public convenience init(
         deviceId: String,
         withKnown: Bool,

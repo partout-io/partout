@@ -27,7 +27,7 @@ import Foundation
 @preconcurrency import NetworkExtension
 import PartoutCore
 
-/// Implementation of a `TunnelController` via `NEPacketTunnelProvider`.
+/// Implementation of a ``/PartoutCore/TunnelController`` via `NEPacketTunnelProvider`.
 public final class NETunnelController: TunnelController {
     public struct Options: Sendable {
         public var dnsFallbackServers: [String]

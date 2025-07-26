@@ -79,7 +79,7 @@ public final class DefaultAPIMapper: APIMapper {
         guard let auth = module.authentication, !auth.isEmpty else {
             throw PartoutError(.authentication)
         }
-#if canImport(_PartoutWireGuardCore)
+#if canImport(PartoutWireGuard)
         guard let storage: WireGuardProviderStorage = try module.options(for: .wireGuard) else {
             throw PartoutError(.Providers.missingOption)
         }
