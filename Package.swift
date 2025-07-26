@@ -108,41 +108,43 @@ package.targets.append(contentsOf: [
 
 // MARK: API
 
-package.products.append(
-    .library(
-        name: "PartoutAPI",
-        targets: ["PartoutAPI"]
+if areas.contains(.api) {
+    package.products.append(
+        .library(
+            name: "PartoutAPI",
+            targets: ["PartoutAPI"]
+        )
     )
-)
-package.dependencies.append(
-    .package(url: "https://github.com/iwill/generic-json-swift", from: "2.0.0")
-)
-package.targets.append(contentsOf: [
-    .target(
-        name: "PartoutAPI",
-        dependencies: [
-            .product(name: "GenericJSON", package: "generic-json-swift"),
-            "PartoutProviders"
-        ],
-        path: "Sources/API"
-    ),
-    .target(
-        name: "PartoutAPIBundle",
-        dependencies: [
-            "PartoutAPI",
-            "PartoutProviders"
-        ],
-        path: "Sources/APIBundle",
-        resources: [
-            .copy("JSON")
-        ]
-    ),
-    .testTarget(
-        name: "PartoutAPITests",
-        dependencies: ["PartoutAPI"],
-        path: "Tests/API"
+    package.dependencies.append(
+        .package(url: "https://github.com/iwill/generic-json-swift", from: "2.0.0")
     )
-])
+    package.targets.append(contentsOf: [
+        .target(
+            name: "PartoutAPI",
+            dependencies: [
+                .product(name: "GenericJSON", package: "generic-json-swift"),
+                "PartoutProviders"
+            ],
+            path: "Sources/API"
+        ),
+        .target(
+            name: "PartoutAPIBundle",
+            dependencies: [
+                "PartoutAPI",
+                "PartoutProviders"
+            ],
+            path: "Sources/APIBundle",
+            resources: [
+                .copy("JSON")
+            ]
+        ),
+        .testTarget(
+            name: "PartoutAPITests",
+            dependencies: ["PartoutAPI"],
+            path: "Tests/API"
+        )
+    ])
+}
 
 // MARK: - Deployment
 
@@ -182,6 +184,7 @@ enum OS {
 }
 
 enum Area: CaseIterable {
+    case api
     case documentation
     case openVPN
     case wireGuard
