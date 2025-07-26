@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutWireGuardCore
 import Foundation
 import PartoutCore
+import PartoutWireGuard
 
 extension WireGuard.LocalInterface {
     init(wg: InterfaceConfiguration) throws {

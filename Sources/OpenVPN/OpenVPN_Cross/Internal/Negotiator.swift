@@ -24,7 +24,7 @@
 //
 
 internal import _PartoutVendorsPortable
-import _PartoutOpenVPNCore
+import PartoutOpenVPN
 import Foundation
 import PartoutCore
 

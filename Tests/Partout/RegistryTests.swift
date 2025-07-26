@@ -27,17 +27,17 @@ import Foundation
 import Partout
 import XCTest
 
-#if canImport(_PartoutOpenVPNCore)
-import _PartoutOpenVPNCore
+#if canImport(PartoutOpenVPN)
+import PartoutOpenVPN
 #endif
-#if canImport(_PartoutWireGuardCore)
-import _PartoutWireGuardCore
+#if canImport(PartoutWireGuard)
+import PartoutWireGuard
 #endif
 import PartoutCore
 
 final class RegistryTests: XCTestCase {
 
-#if canImport(_PartoutOpenVPNCore) && canImport(_PartoutWireGuardCore)
+#if canImport(PartoutOpenVPN) && canImport(PartoutWireGuard)
     func test_givenKnownHandlers_whenSerializeProfile_thenIsDeserialized() throws {
         let sut = Registry()
 

@@ -66,7 +66,7 @@ struct HideMeProviderTests: APITestSuite {
             #expect(infra.presets.count == input.presetsCount)
             #expect(infra.servers.count == input.serversCount)
 
-#if canImport(_PartoutOpenVPNCore)
+#if canImport(PartoutOpenVPN)
             try infra.presets.forEach {
                 let template = try JSONDecoder().decode(OpenVPNProviderTemplate.self, from: $0.templateData)
                 switch $0.presetId {

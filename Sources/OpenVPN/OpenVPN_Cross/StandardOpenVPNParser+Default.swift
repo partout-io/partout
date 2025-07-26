@@ -24,7 +24,7 @@
 //
 
 internal import _PartoutOpenVPN_C
-import _PartoutOpenVPNCore
+import PartoutOpenVPN
 
 extension StandardOpenVPNParser {
     public convenience init() {

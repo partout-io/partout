@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
+import PartoutOpenVPN
 
 /// Default implementation of `OpenVPNSessionProtocol`.
 @OpenVPNActor

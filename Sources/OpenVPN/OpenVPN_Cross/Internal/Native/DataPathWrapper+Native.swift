@@ -24,10 +24,10 @@
 //
 
 internal import _PartoutOpenVPN_C
-import _PartoutOpenVPNCore
 internal import _PartoutVendorsPortable
 import Foundation
 import PartoutCore
+import PartoutOpenVPN
 
 extension DataPathWrapper {
     static func native(with parameters: Parameters, prf: CryptoKeys.PRF, prng: PRNGProtocol) throws -> DataPathWrapper {

@@ -48,10 +48,10 @@ let package = Package(
                     list.append("PartoutAPIBundle")
                 }
                 if areas.contains(.openVPN) {
-                    list.append("_PartoutOpenVPNCore")
+                    list.append("PartoutOpenVPN")
                 }
                 if areas.contains(.wireGuard) {
-                    list.append("_PartoutWireGuardCore")
+                    list.append("PartoutWireGuard")
                 }
                 list.append("_PartoutVendorsCrypto_C")
                 list.append("_PartoutVendorsPortable")
@@ -119,8 +119,8 @@ if areas.contains(.openVPN) {
             targets: ["_PartoutOpenVPNWrapper"]
         ),
         .library(
-            name: "_PartoutOpenVPNCore",
-            targets: ["_PartoutOpenVPNCore"]
+            name: "PartoutOpenVPNCore",
+            targets: ["PartoutOpenVPN"]
         )
     ])
     package.targets.append(contentsOf: [
@@ -132,13 +132,13 @@ if areas.contains(.openVPN) {
             path: "Sources/OpenVPN/Wrapper"
         ),
         .target(
-            name: "_PartoutOpenVPNCore",
+            name: "PartoutOpenVPN",
             dependencies: ["PartoutCoreWrapper"],
             path: "Sources/OpenVPN/Core"
         ),
         .testTarget(
             name: "_PartoutOpenVPNTests",
-            dependencies: ["_PartoutOpenVPNCore"],
+            dependencies: ["PartoutOpenVPN"],
             path: "Tests/OpenVPN/Core"
         )
     ])
@@ -154,7 +154,7 @@ if areas.contains(.openVPN) {
             .target(
                 name: "_PartoutOpenVPNOpenSSL",
                 dependencies: [
-                    "_PartoutOpenVPNCore",
+                    "PartoutOpenVPN",
                     "_PartoutOpenVPN_Cross",
                     "_PartoutOpenVPNOpenSSL_ObjC"
                 ],
@@ -200,7 +200,7 @@ if areas.contains(.openVPN) {
         .target(
             name: "_PartoutOpenVPN_Cross",
             dependencies: [
-                "_PartoutOpenVPNCore",
+                "PartoutOpenVPN",
                 "_PartoutOpenVPN_C",
                 "_PartoutVendorsPortable"
             ],
@@ -239,8 +239,8 @@ if areas.contains(.wireGuard) {
             targets: ["_PartoutWireGuardWrapper"]
         ),
         .library(
-            name: "_PartoutWireGuardCore",
-            targets: ["_PartoutWireGuardCore"]
+            name: "PartoutWireGuardCore",
+            targets: ["PartoutWireGuard"]
         )
     ])
     package.targets.append(contentsOf: [
@@ -250,7 +250,7 @@ if areas.contains(.wireGuard) {
             path: "Sources/WireGuard/Wrapper"
         ),
         .target(
-            name: "_PartoutWireGuardCore",
+            name: "PartoutWireGuard",
             dependencies: ["PartoutCoreWrapper"],
             path: "Sources/WireGuard/Core"
         ),
@@ -264,13 +264,13 @@ if areas.contains(.wireGuard) {
             dependencies: [
                 "_PartoutVendorsWireGuardBackend",
                 "_PartoutWireGuard_C",
-                "_PartoutWireGuardCore"
+                "PartoutWireGuard"
             ],
             path: "Sources/WireGuard/WireGuard_Cross",
         ),
         .testTarget(
             name: "_PartoutWireGuardTests",
-            dependencies: ["_PartoutWireGuardCore"],
+            dependencies: ["PartoutWireGuard"],
             path: "Tests/WireGuard/Core"
         ),
         .testTarget(

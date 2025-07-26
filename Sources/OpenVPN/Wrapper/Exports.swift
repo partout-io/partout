@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@_exported import _PartoutOpenVPNCore
+@_exported import PartoutOpenVPN
 #if canImport(_PartoutOpenVPNOpenSSL)
 @_exported import _PartoutOpenVPNOpenSSL
 #endif

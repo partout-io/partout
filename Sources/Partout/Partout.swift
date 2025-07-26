@@ -32,12 +32,12 @@ import Foundation
 
 // MARK: - Optional
 
-#if canImport(_PartoutOpenVPNCore)
-@_exported import _PartoutOpenVPNCore
+#if canImport(PartoutOpenVPN)
+@_exported import PartoutOpenVPN
 #endif
 
-#if canImport(_PartoutWireGuardCore)
-@_exported import _PartoutWireGuardCore
+#if canImport(PartoutWireGuard)
+@_exported import PartoutWireGuard
 #endif
 
 #if canImport(PartoutAPI)

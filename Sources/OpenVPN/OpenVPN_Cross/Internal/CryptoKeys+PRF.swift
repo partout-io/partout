@@ -24,9 +24,9 @@
 //
 
 internal import _PartoutOpenVPN_C
-import _PartoutOpenVPNCore
 internal import _PartoutVendorsPortable
 import Foundation
+import PartoutOpenVPN
 
 extension CryptoKeys {
     struct PRF {

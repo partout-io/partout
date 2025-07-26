@@ -101,7 +101,7 @@ struct MullvadProviderTests: APITestSuite {
             builder.token = ProviderAuthentication.Token(accessToken: accessToken, expiryDate: tokenExpiry)
         }
 
-#if canImport(_PartoutWireGuardCore)
+#if canImport(PartoutWireGuard)
         builder.providerModuleType = .wireGuard
 
         let peer = input.existingPeerId.map {
@@ -122,7 +122,7 @@ struct MullvadProviderTests: APITestSuite {
         let newModule = try await sut.authenticate(module, on: deviceId)
         print("Updated module: \(newModule)")
 
-#if canImport(_PartoutWireGuardCore)
+#if canImport(PartoutWireGuard)
         print("Original storage: \(storage)")
         let newStorage: WireGuardProviderStorage = try #require(try newModule.options(for: .wireGuard))
         print("Updated storage: \(newStorage)")
@@ -144,7 +144,7 @@ struct MullvadProviderTests: APITestSuite {
             #expect(newModule.authentication?.token == newToken)
         }
 
-#if canImport(_PartoutWireGuardCore)
+#if canImport(PartoutWireGuard)
         // assert device lookup or creation
         let newSession = try #require(newStorage.sessions?[deviceId])
         if let peerId = input.existingPeerId {

@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutWireGuardCore
 import Foundation
 import PartoutCore
+import PartoutWireGuard
 
 /// Parses WireGuard configurations in `wg-quick` format.
 public final class StandardWireGuardParser {

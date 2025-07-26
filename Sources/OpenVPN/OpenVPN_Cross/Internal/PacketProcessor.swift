@@ -24,10 +24,10 @@
 //
 
 internal import _PartoutOpenVPN_C
-import _PartoutOpenVPNCore
 internal import _PartoutVendorsPortable
 import Foundation
 import PartoutCore
+import PartoutOpenVPN
 
 /// Processes data packets according to an obfuscation method.
 final class PacketProcessor {

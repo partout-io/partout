@@ -24,10 +24,10 @@
 //
 
 internal import _PartoutCryptoOpenSSL_ObjC
-import _PartoutOpenVPNCore
 internal import _PartoutOpenVPNOpenSSL_ObjC
 import Foundation
 import PartoutCore
+import PartoutOpenVPN
 
 /// Processes data packets according to a XOR method.
 struct XORProcessor {

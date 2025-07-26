@@ -23,10 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
 internal import _PartoutVendorsPortable
 import Foundation
 import PartoutCore
+import PartoutOpenVPN
 
 public actor OpenVPNConnection {
 

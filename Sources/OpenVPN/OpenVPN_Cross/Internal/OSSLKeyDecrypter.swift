@@ -24,8 +24,8 @@
 //
 
 internal import _PartoutOpenVPN_C
-import _PartoutOpenVPNCore
 import PartoutCore
+import PartoutOpenVPN
 
 final class OSSLKeyDecrypter: KeyDecrypter, Sendable {
     func decryptedKey(fromPEM pem: String, passphrase: String) throws -> String {

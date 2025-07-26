@@ -24,4 +24,4 @@
 //
 
 @_exported import _PartoutWireGuard_Cross
-@_exported import _PartoutWireGuardCore
+@_exported import PartoutWireGuard

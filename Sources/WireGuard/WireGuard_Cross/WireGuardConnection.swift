@@ -29,11 +29,11 @@
 //  Copyright © 2018-2024 WireGuard LLC. All Rights Reserved.
 
 import _PartoutVendorsWireGuardBackend
-import _PartoutWireGuardCore
 import Foundation
 import NetworkExtension // TODO: #13, this depends on Apple unnecessarily
 import os
 import PartoutCore
+import PartoutWireGuard
 
 public final class WireGuardConnection: Connection {
     private let ctx: PartoutLoggerContext

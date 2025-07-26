@@ -32,7 +32,7 @@ extension LoggerCategory {
 
 extension TunnelEnvironmentKeys {
     public enum OpenVPN {
-        public static let serverConfiguration = TunnelEnvironmentKey<_PartoutOpenVPNCore.OpenVPN.Configuration>("OpenVPN.serverConfiguration")
+        public static let serverConfiguration = TunnelEnvironmentKey<PartoutOpenVPN.OpenVPN.Configuration>("OpenVPN.serverConfiguration")
     }
 }
 

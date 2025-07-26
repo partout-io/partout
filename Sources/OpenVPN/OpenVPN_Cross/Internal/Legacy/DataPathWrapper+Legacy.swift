@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutOpenVPNCore
 internal import _PartoutOpenVPNOpenSSL_ObjC
 import PartoutCore
+import PartoutOpenVPN
 
 extension DataPathWrapper {
     static func legacy(

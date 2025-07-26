@@ -24,10 +24,10 @@
 //
 
 internal import _PartoutOpenVPN_C
-import _PartoutOpenVPNCore
 internal import _PartoutVendorsCrypto_C
 import Foundation
 import PartoutCore
+import PartoutOpenVPN
 
 extension ControlChannel {
     final class AuthSerializer: ControlChannelSerializer {

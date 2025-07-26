@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable import _PartoutWireGuardCore
+@testable import PartoutWireGuard
 import PartoutCore
 import XCTest
 

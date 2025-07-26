@@ -18,8 +18,8 @@ PARTOUT_DOCS="1" swift package generate-documentation \
     --target PartoutAPI \
     --target PartoutCore \
     --target PartoutProviders \
-    --target _PartoutOpenVPNCore \
-    --target _PartoutWireGuardCore
+    --target PartoutOpenVPN \
+    --target PartoutWireGuard
 
 if [[ -z $1 ]]; then
     exit

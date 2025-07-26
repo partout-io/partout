@@ -24,7 +24,7 @@
 //
 
 internal import _PartoutCryptoOpenSSL_ObjC
-import _PartoutOpenVPNCore
+import PartoutOpenVPN
 @testable import _PartoutOpenVPNOpenSSL
 internal import _PartoutOpenVPNOpenSSL_ObjC
 import PartoutCore
