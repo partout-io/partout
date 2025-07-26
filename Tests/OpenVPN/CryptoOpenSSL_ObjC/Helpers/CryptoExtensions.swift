@@ -1,5 +1,5 @@
 //
-//  Crypto+Legacy.swift
+//  CryptoExtensions.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 7/7/18.
@@ -43,7 +43,7 @@ extension Encrypter {
         var dest: [UInt8] = Array(repeating: 0, count: srcLength + 256)
         var destLength = 0
         _ = try data.withUnsafeBytes {
-            try encryptBytes($0.bytePointer, length: srcLength, dest: &dest, destLength: &destLength, flags: flags)
+            try encryptBytes($0.baseAddress!, length: srcLength, dest: &dest, destLength: &destLength, flags: flags)
         }
         dest.removeSubrange(destLength..<dest.count)
         return Data(dest)
@@ -56,7 +56,7 @@ extension Decrypter {
         var dest: [UInt8] = Array(repeating: 0, count: srcLength + 256)
         var destLength = 0
         _ = try data.withUnsafeBytes {
-            try decryptBytes($0.bytePointer, length: srcLength, dest: &dest, destLength: &destLength, flags: flags)
+            try decryptBytes($0.baseAddress!, length: srcLength, dest: &dest, destLength: &destLength, flags: flags)
         }
         dest.removeSubrange(destLength..<dest.count)
         return Data(dest)
@@ -65,7 +65,7 @@ extension Decrypter {
     func verifyData(_ data: Data, flags: UnsafePointer<CryptoFlags>?) throws {
         let srcLength = data.count
         _ = try data.withUnsafeBytes {
-            try verifyBytes($0.bytePointer, length: srcLength, flags: flags)
+            try verifyBytes($0.baseAddress!, length: srcLength, flags: flags)
         }
     }
 }

@@ -1,5 +1,5 @@
 //
-//  Extensions.swift
+//  TestExtensions.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 1/14/25.
@@ -23,6 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutCryptoOpenSSL_ObjC
 import Foundation
 
 extension Data {
@@ -41,21 +42,27 @@ extension Data {
         }
         self.init(data)
     }
-
-    func toHex() -> String {
-        var hexString = ""
-        for i in 0..<count {
-            hexString += String(format: "%02x", self[i])
-        }
-        return hexString
-    }
 }
 
-extension UnsafeRawBufferPointer {
-    var bytePointer: UnsafePointer<Element> {
-        guard let address = bindMemory(to: Element.self).baseAddress else {
-            fatalError("Cannot bind to self")
+protocol CryptoFlagsProviding {
+    var packetId: [UInt8] { get }
+
+    var ad: [UInt8] { get }
+}
+
+extension CryptoFlagsProviding {
+    func withCryptoFlags<T>(_ block: (UnsafePointer<CryptoFlags>) throws -> T) rethrows -> T {
+        try packetId.withUnsafeBufferPointer { iv in
+            try ad.withUnsafeBufferPointer { ad in
+                var flags = CryptoFlags(
+                    iv: iv.baseAddress,
+                    ivLength: iv.count,
+                    ad: ad.baseAddress,
+                    adLength: ad.count,
+                    forTesting: true
+                )
+                return try block(&flags)
+            }
         }
-        return address
     }
 }

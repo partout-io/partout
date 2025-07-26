@@ -1,5 +1,5 @@
 //
-//  CryptoProtocols+Data.swift
+//  CryptoWrapper+Data.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 6/16/25.
@@ -23,11 +23,12 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
+internal import _PartoutVendorsCryptoCore_C
 internal import _PartoutVendorsPortable
+import Foundation
 
-extension Encrypter {
-    func encryptData(_ data: CZeroingData, flags: CryptoFlagsWrapper?) throws -> CZeroingData {
+extension CryptoWrapper {
+    func encryptData(_ data: CZeroingData, flags: UnsafePointer<crypto_flags_t>?) throws -> CZeroingData {
         let dest = CZeroingData(count: data.count + 256)
         let destLength = try encryptBytes(
             data.bytes,
@@ -40,8 +41,8 @@ extension Encrypter {
     }
 }
 
-extension Decrypter {
-    func decryptData(_ data: CZeroingData, flags: CryptoFlagsWrapper?) throws -> CZeroingData {
+extension CryptoWrapper {
+    func decryptData(_ data: CZeroingData, flags: UnsafePointer<crypto_flags_t>?) throws -> CZeroingData {
         let dest = CZeroingData(count: data.count + 256)
         let destLength = try decryptBytes(
             data.bytes,
@@ -53,7 +54,7 @@ extension Decrypter {
         return dest
     }
 
-    func verifyData(_ data: CZeroingData, flags: CryptoFlagsWrapper?) throws {
+    func verifyData(_ data: CZeroingData, flags: UnsafePointer<crypto_flags_t>?) throws {
         _ = try verifyBytes(data.bytes, length: data.count, flags: flags)
     }
 }

@@ -1,8 +1,8 @@
 //
-//  CryptoFlagsProviding.swift
+//  CryptoError.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 1/14/25.
+//  Created by Davide De Rosa on 6/16/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,29 +23,18 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable internal import _PartoutVendorsPortable
+internal import _PartoutVendorsCryptoCore_C
 
-struct CryptoFlags {
-    var iv: [UInt8] = []
+enum CryptoError: Error {
+    case creation
 
-    var ad: [UInt8] = []
-    
-    var forTesting = true
-}
+    case openssl(crypto_error_code)
 
-extension CryptoFlags {
-    func withUnsafeFlags( _ block: @escaping (CryptoFlagsWrapper) throws -> Void) rethrows {
-        try iv.withUnsafeBufferPointer { iv in
-            try ad.withUnsafeBufferPointer { ad in
-                let flags = CryptoFlagsWrapper(
-                    iv: iv.baseAddress,
-                    ivLength: iv.count,
-                    ad: ad.baseAddress,
-                    adLength: ad.count,
-                    forTesting: forTesting
-                )
-                try block(flags)
-            }
+    init(_ code: crypto_error_code? = nil) {
+        guard let code else {
+            self = .creation
+            return
         }
+        self = .openssl(code)
     }
 }

@@ -32,8 +32,9 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         sut.configureEncryption(withCipherKey: nil, hmacKey: hmacKey)
 
         do {
-            let flags = newCryptoFlags()
-            let returnedData = try sut.encryptData(plainData, flags: flags)
+            let returnedData = try withCryptoFlags {
+                try sut.encryptData(plainData, flags: $0)
+            }
             XCTAssertEqual(returnedData, plainHMACData)
         } catch {
             XCTFail("Cannot encrypt: \(error)")
@@ -45,8 +46,9 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         sut.configureEncryption(withCipherKey: cipherKey, hmacKey: hmacKey)
 
         do {
-            let flags = newCryptoFlags()
-            let returnedData = try sut.encryptData(plainData, flags: flags)
+            let returnedData = try withCryptoFlags {
+                try sut.encryptData(plainData, flags: $0)
+            }
             XCTAssertEqual(returnedData, encryptedHMACData)
         } catch {
             XCTFail("Cannot encrypt: \(error)")
@@ -58,8 +60,9 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         sut.configureDecryption(withCipherKey: nil, hmacKey: hmacKey)
 
         do {
-            let flags = newCryptoFlags()
-            let returnedData = try sut.decryptData(plainHMACData, flags: flags)
+            let returnedData = try withCryptoFlags {
+                try sut.decryptData(plainHMACData, flags: $0)
+            }
             XCTAssertEqual(returnedData, plainData)
         } catch {
             XCTFail("Cannot decrypt: \(error)")
@@ -71,8 +74,9 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
 
         do {
-            let flags = newCryptoFlags()
-            let returnedData = try sut.decryptData(encryptedHMACData, flags: flags)
+            let returnedData = try withCryptoFlags {
+                try sut.decryptData(encryptedHMACData, flags: $0)
+            }
             XCTAssertEqual(returnedData, plainData)
         } catch {
             XCTFail("Cannot decrypt: \(error)")
@@ -83,9 +87,10 @@ final class CryptoCBCTests: XCTestCase, CryptoFlagsProviding {
         let sut = try CryptoCBC(cipherName: nil, digestName: "sha256")
         sut.configureDecryption(withCipherKey: nil, hmacKey: hmacKey)
 
-        let flags = newCryptoFlags()
-        XCTAssertNoThrow(try sut.verifyData(plainHMACData, flags: flags))
-        XCTAssertNoThrow(try sut.verifyData(encryptedHMACData, flags: flags))
+        try withCryptoFlags {
+            XCTAssertNoThrow(try sut.verifyData(plainHMACData, flags: $0))
+            XCTAssertNoThrow(try sut.verifyData(encryptedHMACData, flags: $0))
+        }
     }
 }
 

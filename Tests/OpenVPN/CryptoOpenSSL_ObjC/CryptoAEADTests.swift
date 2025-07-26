@@ -29,20 +29,23 @@ import XCTest
 final class CryptoAEADTests: XCTestCase, CryptoFlagsProviding {
     func test_givenData_whenEncrypt_thenDecrypts() throws {
         let sut = try CryptoAEAD(cipherName: "aes-256-gcm", tagLength: 16, idLength: 4)
-        let flags = newCryptoFlags()
 
         sut.configureEncryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         sut.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         let encryptedData: Data
 
         do {
-            encryptedData = try sut.encryptData(plainData, flags: flags)
+            encryptedData = try withCryptoFlags {
+                try sut.encryptData(plainData, flags: $0)
+            }
         } catch {
             XCTFail("Cannot encrypt: \(error)")
             return
         }
         do {
-            let returnedData = try sut.decryptData(encryptedData, flags: flags)
+            let returnedData = try withCryptoFlags {
+                try sut.decryptData(encryptedData, flags: $0)
+            }
             XCTAssertEqual(returnedData, plainData)
         } catch {
             XCTFail("Cannot decrypt: \(error)")

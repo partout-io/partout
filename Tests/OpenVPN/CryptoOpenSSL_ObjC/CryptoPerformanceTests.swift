@@ -52,15 +52,16 @@ private extension CryptoPerformanceTests {
         crypto.configureEncryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         crypto.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         let plainData = Data(hex: "00112233ffddaa")
-        let flags = newCryptoFlags()
-        measure {
-            for _ in 0...10000 {
-                do {
-                    let encryptedData = try crypto.encryptData(plainData, flags: flags)
-                    let returnedData = try crypto.decryptData(encryptedData, flags: flags)
-                    XCTAssertEqual(returnedData, plainData)
-                } catch {
-                    XCTFail("Cannot decrypt: \(error)")
+        withCryptoFlags { flags in
+            measure {
+                for _ in 0...10000 {
+                    do {
+                        let encryptedData = try crypto.encryptData(plainData, flags: flags)
+                        let returnedData = try crypto.decryptData(encryptedData, flags: flags)
+                        XCTAssertEqual(returnedData, plainData)
+                    } catch {
+                        XCTFail("Cannot decrypt: \(error)")
+                    }
                 }
             }
         }

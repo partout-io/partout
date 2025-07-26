@@ -23,61 +23,59 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable internal import _PartoutCryptoOpenSSL_ObjC
 @testable internal import _PartoutVendorsPortable
 import XCTest
 
-#if canImport(_PartoutOpenVPN_Cross)
-#endif
-
 final class CryptoPerformanceTests: XCTestCase {
 
-    // 0.030
+    // 0.011 (ObjC = 0.032)
     func test_aes256gcm() throws {
-        let sut = try CryptoAEAD(cipherName: "aes-256-gcm", tagLength: 16, idLength: 4)
+        let sut = try CryptoWrapper(withAEADCipherName: "aes-256-gcm", tagLength: 16, idLength: 4)
         runMeasurement(crypto: sut)
     }
 
-    // 0.046
+    // 0.025 (ObjC = 0.046)
     func test_aes256cbc() throws {
-        let sut = try CryptoCBC(cipherName: "aes-256-cbc", digestName: "sha-512")
+        let sut = try CryptoWrapper(withCBCCipherName: "aes-256-cbc", digestName: "sha-512")
         runMeasurement(crypto: sut)
     }
 
-    // 0.041
+    // 0.021 (ObjC = 0.043)
     func test_aes256ctr() throws {
-        let sut = try CryptoCTR(cipherName: "aes-256-ctr", digestName: "sha-256", tagLength: 32, payloadLength: 17)
+        let sut = try CryptoWrapper(withCTRCipherName: "aes-256-ctr", digestName: "sha-256", tagLength: 32, payloadLength: 17)
         runMeasurement(crypto: sut)
     }
 }
 
 private extension CryptoPerformanceTests {
-    func runMeasurement(crypto: Encrypter & Decrypter) {
+    func runMeasurement(crypto: CryptoWrapper) {
         crypto.configureEncryption(withCipherKey: cipherKey, hmacKey: hmacKey)
         crypto.configureDecryption(withCipherKey: cipherKey, hmacKey: hmacKey)
-        let plainData = Data(hex: "00112233ffddaa")
-        let flags = newCryptoFlags()
-        measure {
-            for _ in 0...10000 {
-                do {
-                    let encryptedData = try crypto.encryptData(plainData, flags: flags)
-                    let returnedData = try crypto.decryptData(encryptedData, flags: flags)
-                    XCTAssertEqual(returnedData, plainData)
-                } catch {
-                    XCTFail("Cannot decrypt: \(error)")
+        let plainData = CZX("00112233ffddaa")
+        let flags = CryptoFlags(iv: packetId, ad: ad)
+        flags.withUnsafeFlags { flags in
+            measure {
+                for _ in 0...10000 {
+                    do {
+                        let encryptedData = try crypto.encryptData(plainData, flags: flags)
+                        let returnedData = try crypto.decryptData(encryptedData, flags: flags)
+                        XCTAssertEqual(returnedData, plainData)
+                    } catch {
+                        XCTFail("Cannot decrypt: \(error)")
+                    }
                 }
             }
         }
     }
 }
 
-extension CryptoPerformanceTests: CryptoFlagsProviding {
+extension CryptoPerformanceTests {
     var cipherKey: CZeroingData {
-        CZeroingData(length: 64)
+        CZeroingData(count: 64)
     }
 
     var hmacKey: CZeroingData {
-        CZeroingData(length: 64)
+        CZeroingData(count: 64)
     }
 
     var packetId: [UInt8] {

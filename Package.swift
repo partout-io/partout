@@ -187,15 +187,15 @@ if areas.contains(.openVPN) {
             .testTarget(
                 name: "_PartoutCryptoOpenSSL_ObjCTests",
                 dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-                path: "Tests/OpenVPN/CryptoOpenSSL_ObjC"
+                path: "Tests/OpenVPN/CryptoOpenSSL_ObjC",
+                exclude: [
+                    "CryptoPerformanceTests.swift"
+                ]
             ),
             .testTarget(
                 name: "_PartoutOpenVPNOpenSSLTests",
                 dependencies: ["_PartoutOpenVPNOpenSSL"],
                 path: "Tests/OpenVPN/OpenVPNOpenSSL",
-                exclude: [
-                    "CryptoPerformanceTests.swift"
-                ],
                 resources: [
                     .process("Resources")
                 ]
@@ -407,7 +407,10 @@ package.targets.append(
             "_PartoutVendorsCrypto_C", // now platform-independent
             "_PartoutVendorsPortable"
         ],
-        path: "Tests/Vendors/Crypto_C"
+        path: "Tests/Vendors/Crypto_C",
+        exclude: [
+            "CryptoPerformanceTests.swift"
+        ]
     )
 )
 

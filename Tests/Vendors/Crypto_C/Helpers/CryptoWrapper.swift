@@ -23,11 +23,11 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutVendorsCryptoCore_C
+internal import _PartoutVendorsCryptoCore_C
 @testable internal import _PartoutVendorsPortable
 import Foundation
 
-final class CryptoWrapper: Encrypter, Decrypter {
+final class CryptoWrapper {
     private let ptr: crypto_ctx
 
     private let free_fn: crypto_free_fn
@@ -83,11 +83,9 @@ final class CryptoWrapper: Encrypter, Decrypter {
         crypto_configure_encrypt(ptr, cipherKey?.ptr, hmacKey?.ptr)
     }
 
-    func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: CZeroingData, flags: CryptoFlagsWrapper?) throws -> Int {
+    func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: CZeroingData, flags: UnsafePointer<crypto_flags_t>?) throws -> Int {
         var code = CryptoErrorNone
-        var cFlags = crypto_flags_t()
-        let flagsPtr = flags.pointer(to: &cFlags)
-        let destLength = crypto_encrypt(ptr, dest.mutableBytes, dest.count, bytes, length, flagsPtr, &code)
+        let destLength = crypto_encrypt(ptr, dest.mutableBytes, dest.count, bytes, length, flags, &code)
         guard destLength > 0 else {
             throw CryptoError(code)
         }
@@ -98,18 +96,16 @@ final class CryptoWrapper: Encrypter, Decrypter {
         crypto_configure_decrypt(ptr, cipherKey?.ptr, hmacKey?.ptr)
     }
 
-    func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: CZeroingData, flags: CryptoFlagsWrapper?) throws -> Int {
+    func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: CZeroingData, flags: UnsafePointer<crypto_flags_t>?) throws -> Int {
         var code = CryptoErrorNone
-        var cFlags = crypto_flags_t()
-        let flagsPtr = flags.pointer(to: &cFlags)
-        let destLength = crypto_decrypt(ptr, dest.mutableBytes, dest.count, bytes, length, flagsPtr, &code)
+        let destLength = crypto_decrypt(ptr, dest.mutableBytes, dest.count, bytes, length, flags, &code)
         guard destLength > 0 else {
             throw CryptoError(code)
         }
         return destLength
     }
 
-    func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int, flags: CryptoFlagsWrapper?) throws -> Bool {
+    func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int, flags: UnsafePointer<crypto_flags_t>?) throws -> Bool {
         var code = CryptoErrorNone
         guard crypto_verify(ptr, bytes, length, &code) else {
             throw CryptoError(code)

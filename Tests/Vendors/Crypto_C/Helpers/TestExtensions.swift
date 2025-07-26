@@ -1,5 +1,5 @@
 //
-//  Extensions.swift
+//  TestExtensions.swift
 //  Partout
 //
 //  Created by Davide De Rosa on 1/14/25.
@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutVendorsCryptoCore_C
 import Foundation
-import XCTest
 
 extension Data {
     init(hex: String) {
@@ -42,34 +42,34 @@ extension Data {
         }
         self.init(data)
     }
-}
 
-extension UnsafeRawBufferPointer {
-    var bytePointer: UnsafePointer<Element> {
-        guard let address = bindMemory(to: Element.self).baseAddress else {
-            fatalError("Cannot bind to self")
+    func toHex() -> String {
+        var hexString = ""
+        for i in 0..<count {
+            hexString += String(format: "%02x", self[i])
         }
-        return address
+        return hexString
     }
 }
 
-protocol CryptoFlagsProviding {
-    var packetId: [UInt8] { get }
+struct CryptoFlags {
+    var iv: [UInt8] = []
 
-    var ad: [UInt8] { get }
+    var ad: [UInt8] = []
 }
 
-extension CryptoFlagsProviding {
-    func newCryptoFlags() -> CryptoFlagsWrapper {
-        packetId.withUnsafeBufferPointer { iv in
-            ad.withUnsafeBufferPointer { ad in
-                CryptoFlagsWrapper(
+extension CryptoFlags {
+    func withUnsafeFlags<T>(_ block: (UnsafePointer<crypto_flags_t>) throws -> T) rethrows -> T {
+        try iv.withUnsafeBufferPointer { iv in
+            try ad.withUnsafeBufferPointer { ad in
+                var flags = crypto_flags_t(
                     iv: iv.baseAddress,
-                    ivLength: iv.count,
+                    iv_len: iv.count,
                     ad: ad.baseAddress,
-                    adLength: ad.count,
-                    forTesting: true
+                    ad_len: ad.count,
+                    for_testing: 1
                 )
+                return try block(&flags)
             }
         }
     }
