@@ -121,7 +121,7 @@ if areas.contains(.documentation) {
     )
 }
 
-// MARK: OpenVPN
+// MARK: - OpenVPN
 
 if areas.contains(.openVPN) {
     let mainTarget: String
@@ -304,7 +304,7 @@ if areas.contains(.wireGuard) {
     ])
 }
 
-// MARK: - API
+// MARK: API
 
 if areas.contains(.api) {
     if isDevelopment {
