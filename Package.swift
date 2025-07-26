@@ -463,17 +463,25 @@ case .linux:
         )
     ])
 case .windows:
-    package.targets.append(contentsOf: [
+    package.targets.append(
         .target(
             name: "_PartoutVendorsWindows_C",
+            dependencies: [
+                "_PartoutVendorsCryptoCore_C",
+                "_PartoutVendorsPortable_C"
+            ],
             path: "Sources/Vendors/Windows_C"
         ),
+    )
+
+    // crypto
+    package.targets.append(
         .target(
-            name: "_PartoutVendorsCryptoImpl",
+            name: "_PartoutVendorsCrypto_C",
             dependencies: ["_PartoutVendorsWindows_C"],
             path: "Sources/Vendors/Crypto/Windows"
         )
-    ])
+    )
 default:
     break
 }
