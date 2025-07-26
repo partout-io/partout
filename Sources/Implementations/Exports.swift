@@ -27,11 +27,9 @@
 @_exported import PartoutOpenVPN
 #if canImport(PartoutOpenVPNLegacy)
 @_exported import PartoutOpenVPNLegacy
-public typealias ObjCOpenVPNConnection = LegacyOpenVPNConnection
 #endif
 #if canImport(PartoutOpenVPNCross)
 @_exported import PartoutOpenVPNCross
-public typealias COpenVPNConnection = OpenVPNConnection
 #endif
 #endif
 
