@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoCore_C
 internal import _PartoutOpenVPN_C
+internal import _PartoutVendorsCrypto_C
 import Foundation
 
 // TODO: ###, move more logic to C (replay protection, byte-aligned enc/dec zd)

@@ -27,7 +27,7 @@ import Foundation
 
 // MARK: Core
 
-@_exported import _PartoutCryptoCore
+@_exported import _PartoutVendorsPortable
 @_exported import PartoutCore
 
 // MARK: Crypto
@@ -51,8 +51,6 @@ import Foundation
 #endif
 
 // MARK: - Vendors
-
-@_exported import _PartoutVendorsPortable
 
 #if canImport(_PartoutVendorsApple)
 @_exported import _PartoutVendorsApple

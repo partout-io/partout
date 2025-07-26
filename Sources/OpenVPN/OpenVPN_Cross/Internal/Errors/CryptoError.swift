@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoCore_C
+internal import _PartoutVendorsCryptoCore_C
 
 enum CryptoError: Error {
     case creation

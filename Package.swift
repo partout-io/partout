@@ -111,7 +111,127 @@ if areas.contains(.api) {
     ])
 }
 
-// MARK: Vendors
+// MARK: - OpenVPN
+
+if areas.contains(.openVPN) {
+    let mainTarget: String
+    switch OS.current {
+    case .android, .linux, .windows:
+        mainTarget = "_PartoutOpenVPN_Cross"
+    default:
+        mainTarget = "_PartoutOpenVPNOpenSSL" // legacy
+    }
+
+    package.products.append(contentsOf: [
+        .library(
+            name: "PartoutOpenVPN",
+            targets: ["PartoutOpenVPN"]
+        ),
+        .library(
+            name: "_PartoutOpenVPNCore",
+            targets: ["_PartoutOpenVPNCore"]
+        )
+    ])
+    package.targets.append(contentsOf: [
+        .target(
+            name: "PartoutOpenVPN",
+            dependencies: [
+                .target(name: mainTarget)
+            ],
+            path: "Sources/OpenVPN/Wrapper"
+        ),
+        .target(
+            name: "_PartoutOpenVPNCore",
+            dependencies: ["PartoutCoreWrapper"],
+            path: "Sources/OpenVPN/Core"
+        ),
+        .testTarget(
+            name: "_PartoutOpenVPNTests",
+            dependencies: ["_PartoutOpenVPNCore"],
+            path: "Tests/OpenVPN/Core"
+        )
+    ])
+
+    // legacy
+    if OS.current == .apple {
+        package.targets.append(contentsOf: [
+            .target(
+                name: "_PartoutOpenVPNOpenSSL",
+                dependencies: [
+                    "_PartoutOpenVPNCore",
+                    "_PartoutOpenVPN_Cross",
+                    "_PartoutOpenVPNOpenSSL_ObjC"
+                ],
+                path: "Sources/OpenVPN/OpenVPNOpenSSL"
+            ),
+            .target(
+                name: "_PartoutCryptoOpenSSL_ObjC",
+                dependencies: ["openssl-apple"],
+                path: "Sources/Vendors/Crypto/CryptoOpenSSL_ObjC"
+            ),
+            .target(
+                name: "_PartoutOpenVPNOpenSSL_ObjC",
+                dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
+                path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
+                exclude: [
+                    "lib/COPYING",
+                    "lib/Makefile",
+                    "lib/README.LZO",
+                    "lib/testmini.c"
+                ]
+            ),
+            .testTarget(
+                name: "_PartoutOpenVPNOpenSSLTests",
+                dependencies: ["_PartoutOpenVPNOpenSSL"],
+                path: "Tests/OpenVPN/OpenVPNOpenSSL",
+                resources: [
+                    .process("Resources")
+                ]
+            )
+        ])
+    }
+
+    // cross-platform (experimental)
+    package.targets.append(contentsOf: [
+        .target(
+            name: "_PartoutOpenVPN_C",
+            dependencies: ["_PartoutVendorsCrypto_C"],
+            path: "Sources/OpenVPN/OpenVPN_C"
+        ),
+        .target(
+            name: "_PartoutOpenVPN_Cross",
+            dependencies: [
+                "_PartoutOpenVPNCore",
+                "_PartoutOpenVPN_C",
+                "_PartoutVendorsPortable"
+            ],
+            path: "Sources/OpenVPN/OpenVPN_Cross",
+            exclude: {
+                var list: [String] = ["Internal/Legacy"]
+                if OS.current == .apple {
+                    list.append("StandardOpenVPNParser+Default.swift")
+                }
+                return list
+            }(),
+            swiftSettings: [
+                .define("OPENVPN_WRAPPED_NATIVE")
+            ]
+        ),
+        .testTarget(
+            name: "_PartoutOpenVPN_CrossTests",
+            dependencies: ["_PartoutOpenVPN_Cross"],
+            path: "Tests/OpenVPN/OpenVPN_Cross",
+            exclude: [
+                "DataPathPerformanceTests.swift"
+            ],
+            resources: [
+                .process("Resources")
+            ]
+        )
+    ])
+}
+
+// MARK: - Vendors
 
 package.targets.append(contentsOf: [
     .target(

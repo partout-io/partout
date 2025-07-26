@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoCore
 internal import _PartoutOpenVPN_C
 import _PartoutOpenVPNCore
+internal import _PartoutVendorsPortable
 #if canImport(_PartoutOpenVPNOpenSSL_ObjC)
 internal import _PartoutOpenVPNOpenSSL_ObjC
 #endif

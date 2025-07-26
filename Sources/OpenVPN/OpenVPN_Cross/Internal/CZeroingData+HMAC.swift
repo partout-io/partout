@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import _PartoutCryptoCore
-internal import _PartoutCryptoCore_C
+internal import _PartoutVendorsCryptoCore_C
+internal import _PartoutVendorsPortable
 
 extension CZeroingData {
     static func forHMAC() -> CZeroingData {
