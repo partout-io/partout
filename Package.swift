@@ -34,8 +34,14 @@ let package = Package(
     products: [
         .library(
             name: "Partout",
-            targets: {
-                var list: [String] = [environment.coreDependency]
+            targets: ["Partout"]
+        )
+    ],
+    targets: [
+        .target(
+            name: "Partout",
+            dependencies: {
+                var list: [Target.Dependency] = [environment.coreDependency]
                 if areas.contains(.api) {
                     list.append("PartoutAPI")
                     list.append("PartoutAPIBundle")
@@ -60,9 +66,7 @@ if areas.contains(.documentation) {
 package.targets.append(contentsOf: [
     .target(
         name: "PartoutProviders",
-        dependencies: [
-            .target(name: environment.coreDependency)
-        ],
+        dependencies: [environment.coreDependency],
         path: "Sources/Providers"
     ),
     .testTarget(
@@ -305,7 +309,7 @@ package.targets.append(contentsOf: [
     .target(
         name: "_PartoutVendorsPortable",
         dependencies: [
-            .target(name: environment.coreDependency),
+            environment.coreDependency,
             "_PartoutVendorsPortable_C"
         ],
         path: "Sources/Vendors/Portable"
@@ -489,7 +493,7 @@ enum Environment {
     case localSource
     case documentation
 
-    var coreDependency: String {
+    var coreDependency: Target.Dependency {
         switch self {
         case .documentation: "PartoutCore"
         default: "PartoutCoreWrapper"

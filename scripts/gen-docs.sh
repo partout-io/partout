@@ -14,11 +14,12 @@ cp -rp "$core_src/PartoutCore" \
 
 PARTOUT_DOCS="1" swift package generate-documentation \
     --enable-experimental-combined-documentation \
+    --target Partout \
     --target PartoutAPI \
     --target PartoutCore \
     --target PartoutProviders \
-    --product PartoutOpenVPN \
-    --product PartoutWireGuard
+    --target _PartoutOpenVPNCore \
+    --target _PartoutWireGuardCore
 
 if [[ -z $1 ]]; then
     exit
