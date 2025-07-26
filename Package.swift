@@ -16,7 +16,10 @@ let coreSHA1 = "f26c0eeb5cb2ba6bd3fbf64fa090abcec492df9a"
 // deployment environment
 let environment: Environment = .localSource
 let areas: Set<Area> = Area.default
+
+// FIXME: ###, set to false on deploy (check CI)
 let isDevelopment = false
+let isTestingOpenVPNDataPath = false
 
 // the global settings for C targets
 let cSettings: [CSetting] = [
@@ -204,6 +207,7 @@ if areas.contains(.openVPN) {
                 name: "PartoutOpenVPNLegacyTests",
                 dependencies: ["PartoutOpenVPNLegacy"],
                 path: "Tests/OpenVPN/Legacy",
+                exclude: isTestingOpenVPNDataPath ? [] : ["DataPathPerformanceTests.swift"],
                 resources: [
                     .process("Resources")
                 ]
@@ -220,14 +224,23 @@ if areas.contains(.openVPN) {
         ),
         .target(
             name: "PartoutOpenVPNCross",
-            dependencies: [
-                "PartoutOpenVPN",
-                "_PartoutOpenVPN_C",
-                "_PartoutVendorsPortable"
-            ],
+            dependencies: {
+                var list: [Target.Dependency] = [
+                    "PartoutOpenVPN",
+                    "_PartoutOpenVPN_C",
+                    "_PartoutVendorsPortable"
+                ]
+                if isTestingOpenVPNDataPath {
+                    list.append("PartoutOpenVPNLegacy_ObjC")
+                }
+                return list
+            }(),
             path: "Sources/OpenVPN/Cross",
             exclude: {
-                var list: [String] = ["Internal/Legacy"]
+                var list: [String] = []
+                if !isTestingOpenVPNDataPath {
+                    list.append("Internal/Legacy")
+                }
                 if OS.current == .apple {
                     list.append("StandardOpenVPNParser+Default.swift")
                 }
@@ -241,9 +254,6 @@ if areas.contains(.openVPN) {
             name: "PartoutOpenVPNCrossTests",
             dependencies: ["PartoutOpenVPNCross"],
             path: "Tests/OpenVPN/Cross",
-            exclude: [
-                "DataPathPerformanceTests.swift"
-            ],
             resources: [
                 .process("Resources")
             ]

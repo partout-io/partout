@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable import PartoutOpenVPNLegacy
+@testable internal import PartoutOpenVPNLegacy
 import PartoutCore
 import XCTest
 

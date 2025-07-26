@@ -24,7 +24,7 @@
 //
 
 import PartoutOpenVPN
-@testable import PartoutOpenVPNLegacy
+@testable internal import PartoutOpenVPNLegacy
 internal import PartoutOpenVPNLegacy_ObjC
 import Foundation
 import PartoutCore

@@ -23,6 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutCryptoOpenSSL_ObjC
+internal import _PartoutVendorsPortable
 import PartoutOpenVPN
 @testable internal import PartoutOpenVPNCross
 internal import PartoutOpenVPNLegacy_ObjC

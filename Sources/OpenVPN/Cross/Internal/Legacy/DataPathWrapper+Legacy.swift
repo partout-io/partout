@@ -44,7 +44,7 @@ extension DataPathWrapper {
     ) throws -> DataPathWrapper {
         NSLog("PartoutOpenVPN: Using DataPathWrapper (legacy Swift/ObjC)")
 
-        let seed = prng.data(length: PRNGSeedLength)
+        let seed = prng.data(length: Constants.DataChannel.prngSeedLength)
         guard let cryptoBox = OSSLCryptoBox(seed: Z(seed)) else {
             fatalError("Unable to create OSSLCryptoBox")
         }
@@ -67,7 +67,7 @@ extension DataPathWrapper {
             compressionFraming: compressionFraming.legacyNative,
             compressionAlgorithm: .disabled,
             maxPackets: 100,
-            usesReplayProtection: Constants.usesReplayProtection
+            usesReplayProtection: true
         )
         return DataPathWrapper(dataPath: dataPath)
     }

@@ -24,7 +24,7 @@
 //
 
 @testable import PartoutOpenVPN
-@testable import PartoutOpenVPNLegacy
+@testable internal import PartoutOpenVPNLegacy
 import PartoutCore
 import XCTest
 
