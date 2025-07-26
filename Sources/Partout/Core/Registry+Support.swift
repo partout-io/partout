@@ -63,10 +63,12 @@ extension Registry {
         return resolvers
     }()
 
+    /// Returns a ``/PartoutCore/Registry`` with the known module handlers and resolvers and an empty device ID.
     public convenience init() {
         self.init(deviceId: "", withKnown: true)
     }
 
+    /// Returns a ``/PartoutCore/Registry`` that optionally includes the known module handlers and resolvers.
     public convenience init(
         deviceId: String,
         withKnown: Bool,

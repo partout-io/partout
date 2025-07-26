@@ -28,18 +28,18 @@
 import _PartoutWireGuardCore
 import PartoutCore
 
-public struct WireGuardProviderResolver: ProviderModuleResolver {
+struct WireGuardProviderResolver: ProviderModuleResolver {
     private let ctx: PartoutLoggerContext
 
-    public var moduleType: ModuleType {
+    var moduleType: ModuleType {
         .wireGuard
     }
 
-    public init(_ ctx: PartoutLoggerContext) {
+    init(_ ctx: PartoutLoggerContext) {
         self.ctx = ctx
     }
 
-    public func resolved(from providerModule: ProviderModule, on deviceId: String) throws -> Module {
+    func resolved(from providerModule: ProviderModule, on deviceId: String) throws -> Module {
         try providerModule.compiled(
             ctx,
             withTemplate: WireGuardProviderTemplate.self,

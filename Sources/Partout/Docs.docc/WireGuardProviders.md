@@ -1,7 +1,8 @@
 # WireGuard Providers
 
+Templates for use with ``/PartoutProviders/ProviderModule``.
+
 ## Topics
 
-- ``WireGuardProviderResolver``
 - ``WireGuardProviderTemplate``
 - ``WireGuardProviderStorage``

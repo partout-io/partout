@@ -29,18 +29,18 @@ import _PartoutOpenVPNCore
 import Foundation
 import PartoutCore
 
-public struct OpenVPNProviderResolver: ProviderModuleResolver {
+struct OpenVPNProviderResolver: ProviderModuleResolver {
     private let ctx: PartoutLoggerContext
 
-    public var moduleType: ModuleType {
+    var moduleType: ModuleType {
         .openVPN
     }
 
-    public init(_ ctx: PartoutLoggerContext) {
+    init(_ ctx: PartoutLoggerContext) {
         self.ctx = ctx
     }
 
-    public func resolved(from providerModule: ProviderModule, on deviceId: String) throws -> Module {
+    func resolved(from providerModule: ProviderModule, on deviceId: String) throws -> Module {
         try providerModule.compiled(
             ctx,
             withTemplate: OpenVPNProviderTemplate.self,

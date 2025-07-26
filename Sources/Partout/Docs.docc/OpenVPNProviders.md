@@ -1,6 +1,7 @@
 # OpenVPN Providers
 
+Templates for use with ``/PartoutProviders/ProviderModule``.
+
 ## Topics
 
-- ``OpenVPNProviderResolver``
 - ``OpenVPNProviderTemplate``

@@ -8,9 +8,10 @@ This is the umbrella package that exports the internal packages and provides som
 
 ## Topics
 
-### API
+### Default Implementations
 
-- <doc:APIImplementation>
+- <doc:CoreExtensions>
+- <doc:APIMappers>
 
 ### Providers Integration
 

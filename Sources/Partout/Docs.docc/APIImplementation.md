@@ -1,5 +1,0 @@
-# API Implementation
-
-## Topics
-
-- ``DefaultAPIMapper``
