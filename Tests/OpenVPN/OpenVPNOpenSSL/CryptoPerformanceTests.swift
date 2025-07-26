@@ -23,10 +23,12 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+@testable internal import _PartoutCryptoOpenSSL_ObjC
 @testable internal import _PartoutVendorsPortable
 import XCTest
 
-// FIXME: ###, restore these tests with CryptoAEAD/CBC/CTR (ObjC) or new CryptoWrapper (Swift/C)
+#if canImport(_PartoutOpenVPN_Cross)
+#endif
 
 final class CryptoPerformanceTests: XCTestCase {
 

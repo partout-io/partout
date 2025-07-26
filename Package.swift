@@ -160,6 +160,11 @@ if areas.contains(.openVPN) {
     if OS.current == .apple {
         package.targets.append(contentsOf: [
             .target(
+                name: "_PartoutCryptoOpenSSL_ObjC",
+                dependencies: ["openssl-apple"],
+                path: "Sources/OpenVPN/CryptoOpenSSL_ObjC"
+            ),
+            .target(
                 name: "_PartoutOpenVPNOpenSSL",
                 dependencies: [
                     "_PartoutOpenVPNCore",
@@ -167,11 +172,6 @@ if areas.contains(.openVPN) {
                     "_PartoutOpenVPNOpenSSL_ObjC"
                 ],
                 path: "Sources/OpenVPN/OpenVPNOpenSSL"
-            ),
-            .target(
-                name: "_PartoutCryptoOpenSSL_ObjC",
-                dependencies: ["openssl-apple"],
-                path: "Sources/Vendors/Crypto/CryptoOpenSSL_ObjC"
             ),
             .target(
                 name: "_PartoutOpenVPNOpenSSL_ObjC",
@@ -185,9 +185,17 @@ if areas.contains(.openVPN) {
                 ]
             ),
             .testTarget(
+                name: "_PartoutCryptoOpenSSL_ObjCTests",
+                dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
+                path: "Tests/OpenVPN/CryptoOpenSSL_ObjC"
+            ),
+            .testTarget(
                 name: "_PartoutOpenVPNOpenSSLTests",
                 dependencies: ["_PartoutOpenVPNOpenSSL"],
                 path: "Tests/OpenVPN/OpenVPNOpenSSL",
+                exclude: [
+                    "CryptoPerformanceTests.swift"
+                ],
                 resources: [
                     .process("Resources")
                 ]
@@ -399,10 +407,7 @@ package.targets.append(
             "_PartoutVendorsCrypto_C", // now platform-independent
             "_PartoutVendorsPortable"
         ],
-        path: "Tests/Vendors/Crypto_C",
-        exclude: [
-            "CryptoPerformanceTests.swift"
-        ]
+        path: "Tests/Vendors/Crypto_C"
     )
 )
 
