@@ -28,6 +28,7 @@ import Foundation
 import PartoutCore
 import PartoutOpenVPN
 
+/// Swift/C implementation of an OpenVPN ``/PartoutCore/Connection``.
 public actor OpenVPNConnection {
 
     // MARK: Initialization

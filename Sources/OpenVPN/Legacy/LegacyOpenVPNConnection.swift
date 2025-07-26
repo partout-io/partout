@@ -27,6 +27,8 @@ import Foundation
 import PartoutCore
 import PartoutOpenVPN
 
+/// Legacy ObjC version of ``OpenVPNConnection``.
+@available(*, deprecated, message: "Use OpenVPNConnection")
 public actor LegacyOpenVPNConnection {
 
     // MARK: Initialization
