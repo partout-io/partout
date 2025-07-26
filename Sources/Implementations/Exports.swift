@@ -1,8 +1,8 @@
 //
-//  Demo+WireGuard.swift
+//  Exports.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 3/26/24.
+//  Created by Davide De Rosa on 7/26/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,26 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import Foundation
-import Partout
-import PartoutImplementations
+#if canImport(_PartoutOpenVPNWrapper)
+@_exported import _PartoutOpenVPNWrapper
+#endif
 
-extension WireGuard {
-    static var demoModule: WireGuardModule? {
-        do {
-            guard let url = Constants.demoURL else {
-                return nil
-            }
-            let wg = try String(contentsOf: url)
-            let builder = try StandardWireGuardParser().configuration(from: wg).builder()
-            let module = WireGuardModule.Builder(configurationBuilder: builder)
-            return try module.tryBuild()
-        } catch {
-            fatalError("Unable to build: \(error)")
-        }
-    }
-}
-
-private enum Constants {
-    static let demoURL = Bundle.main.url(forResource: "Files/test-sample", withExtension: "wg")
-}
+#if canImport(_PartoutWireGuardWrapper)
+@_exported import _PartoutWireGuardWrapper
+#endif

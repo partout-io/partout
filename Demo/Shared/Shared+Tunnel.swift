@@ -25,10 +25,7 @@
 
 import Foundation
 import Partout
-import PartoutOpenVPN
-import PartoutWireGuard
-
-// MARK: - Implementations
+import PartoutImplementations
 
 extension Registry {
     static let shared = Registry(

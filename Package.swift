@@ -16,6 +16,7 @@ let coreSHA1 = "f26c0eeb5cb2ba6bd3fbf64fa090abcec492df9a"
 // deployment environment
 let environment: Environment = .localSource
 let areas: Set<Area> = Area.default
+let isDevelopment = false
 
 // the global settings for C targets
 let cSettings: [CSetting] = [
@@ -25,7 +26,7 @@ let cSettings: [CSetting] = [
 ]
 
 let package = Package(
-    name: "Partout",
+    name: "partout",
     platforms: [
         .iOS(.v15),
         .macOS(.v12),
@@ -35,6 +36,10 @@ let package = Package(
         .library(
             name: "Partout",
             targets: ["Partout"]
+        ),
+        .library(
+            name: "PartoutImplementations",
+            targets: ["PartoutImplementations"]
         )
     ],
     targets: [
@@ -61,6 +66,20 @@ let package = Package(
                 }
                 return list
             }()
+        ),
+        .target(
+            name: "PartoutImplementations",
+            dependencies: {
+                var list: [Target.Dependency] = []
+                if areas.contains(.openVPN) {
+                    list.append("_PartoutOpenVPNWrapper")
+                }
+                if areas.contains(.wireGuard) {
+                    list.append("_PartoutWireGuardWrapper")
+                }
+                return list
+            }(),
+            path: "Sources/Implementations"
         ),
         .target(
             name: "PartoutProviders",
@@ -113,16 +132,18 @@ if areas.contains(.openVPN) {
         mainTarget = "_PartoutOpenVPNOpenSSL" // legacy
     }
 
-    package.products.append(contentsOf: [
-        .library(
-            name: "PartoutOpenVPN",
-            targets: ["_PartoutOpenVPNWrapper"]
-        ),
-        .library(
-            name: "PartoutOpenVPNCore",
-            targets: ["PartoutOpenVPN"]
-        )
-    ])
+    if isDevelopment {
+        package.products.append(contentsOf: [
+            .library(
+                name: "PartoutOpenVPN",
+                targets: ["_PartoutOpenVPNWrapper"]
+            ),
+            .library(
+                name: "PartoutOpenVPNCore",
+                targets: ["PartoutOpenVPN"]
+            )
+        ])
+    }
     package.targets.append(contentsOf: [
         .target(
             name: "_PartoutOpenVPNWrapper",
@@ -233,16 +254,18 @@ if areas.contains(.openVPN) {
 // MARK: WireGuard
 
 if areas.contains(.wireGuard) {
-    package.products.append(contentsOf: [
-        .library(
-            name: "PartoutWireGuard",
-            targets: ["_PartoutWireGuardWrapper"]
-        ),
-        .library(
-            name: "PartoutWireGuardCore",
-            targets: ["PartoutWireGuard"]
-        )
-    ])
+    if isDevelopment {
+        package.products.append(contentsOf: [
+            .library(
+                name: "PartoutWireGuard",
+                targets: ["_PartoutWireGuardWrapper"]
+            ),
+            .library(
+                name: "PartoutWireGuardCore",
+                targets: ["PartoutWireGuard"]
+            )
+        ])
+    }
     package.targets.append(contentsOf: [
         .target(
             name: "_PartoutWireGuardWrapper",
@@ -284,12 +307,14 @@ if areas.contains(.wireGuard) {
 // MARK: - API
 
 if areas.contains(.api) {
-    package.products.append(
-        .library(
-            name: "PartoutAPI",
-            targets: ["PartoutAPI"]
+    if isDevelopment {
+        package.products.append(
+            .library(
+                name: "PartoutAPI",
+                targets: ["PartoutAPI"]
+            )
         )
-    )
+    }
     package.dependencies.append(
         .package(url: "https://github.com/iwill/generic-json-swift", from: "2.0.0")
     )
@@ -588,7 +613,7 @@ case .documentation:
         )
     ])
 }
-if environment != .documentation {
+if isDevelopment {
     package.targets.append(contentsOf: [
         .testTarget(
             name: "PartoutCoreTests",
