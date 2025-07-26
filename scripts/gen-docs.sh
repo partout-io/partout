@@ -12,7 +12,7 @@ cp -rp "$core_src/PartoutCore" \
     "$core_src/_PartoutCore_C" \
     "$core_dst"
 
-swift package generate-documentation \
+PARTOUT_DOCS="1" swift package generate-documentation \
     --enable-experimental-combined-documentation \
     --product Partout
 
