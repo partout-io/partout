@@ -24,10 +24,10 @@
 //
 
 internal import _PartoutCryptoOpenSSL_ObjC
-internal import PartoutOpenVPNLegacy_ObjC
 import Foundation
 import PartoutCore
 import PartoutOpenVPN
+internal import PartoutOpenVPNLegacy_ObjC
 
 /// Wrapper for connecting over a TCP socket.
 final class OpenVPNTCPLink {

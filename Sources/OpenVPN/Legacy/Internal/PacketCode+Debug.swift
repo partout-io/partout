@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import PartoutOpenVPNLegacy_ObjC
 import Foundation
+internal import PartoutOpenVPNLegacy_ObjC
 
 extension PacketCode: @retroactive CustomDebugStringConvertible {
     var debugDescription: String {

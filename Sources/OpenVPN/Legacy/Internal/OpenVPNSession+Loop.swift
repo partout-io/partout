@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import PartoutOpenVPNLegacy_ObjC
 import Foundation
 import PartoutCore
+internal import PartoutOpenVPNLegacy_ObjC
 
 // TODO: #142/notes, LINK and TUN should be able to run detached in full-duplex
 extension OpenVPNSession {

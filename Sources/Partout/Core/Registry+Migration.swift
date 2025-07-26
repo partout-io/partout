@@ -23,11 +23,11 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import Foundation
+import PartoutCore
 #if canImport(PartoutOpenVPN)
 import PartoutOpenVPN
 #endif
-import Foundation
-import PartoutCore
 import PartoutProviders
 
 extension Registry {

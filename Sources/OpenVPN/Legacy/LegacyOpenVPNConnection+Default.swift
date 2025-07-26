@@ -23,10 +23,10 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import PartoutOpenVPNLegacy_ObjC
 import Foundation
 import PartoutCore
 import PartoutOpenVPN
+internal import PartoutOpenVPNLegacy_ObjC
 
 extension LegacyOpenVPNConnection {
     public init(
