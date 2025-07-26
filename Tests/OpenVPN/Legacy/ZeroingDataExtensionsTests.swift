@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  ZeroingDataExtensionsTests.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 7/26/25.
+//  Created by Davide De Rosa on 1/14/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,19 +23,19 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(PartoutOpenVPN)
-@_exported import PartoutOpenVPN
-#if canImport(PartoutOpenVPNLegacy)
-@_exported import PartoutOpenVPNLegacy
-public typealias ObjCOpenVPNConnection = LegacyOpenVPNConnection
-#endif
-#if canImport(PartoutOpenVPNCross)
-@_exported import PartoutOpenVPNCross
-public typealias COpenVPNConnection = OpenVPNConnection
-#endif
-#endif
+@testable import PartoutOpenVPNLegacy
+import PartoutCore
+import XCTest
 
-#if canImport(PartoutWireGuard)
-@_exported import PartoutWireGuard
-@_exported import PartoutWireGuardCross
-#endif
+final class ZeroingDataExtensionsTests: XCTestCase {
+    func test_givenPRNG_whenGenerateSafeData_thenHasGivenLength() {
+        let sut = SimplePRNG()
+        XCTAssertEqual(sut.safeData(length: 500).length, 500)
+    }
+
+    func test_givenZeroingData_whenAsSensitive_thenOmitsSensitiveData() throws {
+        let sut = Z(Data(hex: "12345678abcdef"))
+        XCTAssertEqual(sut.debugDescription(withSensitiveData: true), "[7 bytes, 12345678abcdef]")
+        XCTAssertEqual(sut.debugDescription(withSensitiveData: false), "[7 bytes]")
+    }
+}

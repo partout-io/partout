@@ -4,6 +4,6 @@ Leaf implementations.
 
 ## Topics
 
-- ``/PartoutOpenVPN_Cross/OpenVPNConnection``
-- ``/PartoutOpenVPNOpenSSL/LegacyOpenVPNConnection``
-- ``/PartoutWireGuard_Cross/WireGuardConnection``
+- ``/PartoutOpenVPNCross/OpenVPNConnection``
+- ``/PartoutOpenVPNLegacy/LegacyOpenVPNConnection``
+- ``/PartoutWireGuardCross/WireGuardConnection``

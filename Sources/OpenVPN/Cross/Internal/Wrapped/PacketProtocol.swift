@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  PacketProtocol.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 7/26/25.
+//  Created by Davide De Rosa on 6/15/25.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,19 +23,19 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(PartoutOpenVPN)
-@_exported import PartoutOpenVPN
-#if canImport(PartoutOpenVPNLegacy)
-@_exported import PartoutOpenVPNLegacy
-public typealias ObjCOpenVPNConnection = LegacyOpenVPNConnection
-#endif
-#if canImport(PartoutOpenVPNCross)
-@_exported import PartoutOpenVPNCross
-public typealias COpenVPNConnection = OpenVPNConnection
-#endif
+#if canImport(PartoutOpenVPNLegacy_ObjC)
+internal import PartoutOpenVPNLegacy_ObjC
+#else
+protocol PacketProtocol {
+    var packetId: UInt32 { get }
+}
+
+extension PacketProtocol {
+    static func < (lhs: Self, rhs: Self) -> Bool {
+        lhs.packetId < rhs.packetId
+    }
+}
 #endif
 
-#if canImport(PartoutWireGuard)
-@_exported import PartoutWireGuard
-@_exported import PartoutWireGuardCross
-#endif
+extension CControlPacket: PacketProtocol {
+}

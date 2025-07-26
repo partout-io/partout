@@ -127,9 +127,9 @@ if areas.contains(.openVPN) {
     let mainTarget: String
     switch OS.current {
     case .android, .linux, .windows:
-        mainTarget = "_PartoutOpenVPN_Cross"
+        mainTarget = "PartoutOpenVPNCross"
     default:
-        mainTarget = "_PartoutOpenVPNOpenSSL" // legacy
+        mainTarget = "PartoutOpenVPNLegacy" // legacy
     }
 
     if isDevelopment {
@@ -173,18 +173,18 @@ if areas.contains(.openVPN) {
                 path: "Sources/OpenVPN/CryptoOpenSSL_ObjC"
             ),
             .target(
-                name: "_PartoutOpenVPNOpenSSL",
+                name: "PartoutOpenVPNLegacy",
                 dependencies: [
                     "PartoutOpenVPN",
-                    "_PartoutOpenVPN_Cross",
-                    "_PartoutOpenVPNOpenSSL_ObjC"
+                    "PartoutOpenVPNCross",
+                    "PartoutOpenVPNLegacy_ObjC"
                 ],
-                path: "Sources/OpenVPN/OpenVPNOpenSSL"
+                path: "Sources/OpenVPN/Legacy"
             ),
             .target(
-                name: "_PartoutOpenVPNOpenSSL_ObjC",
+                name: "PartoutOpenVPNLegacy_ObjC",
                 dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-                path: "Sources/OpenVPN/OpenVPNOpenSSL_ObjC",
+                path: "Sources/OpenVPN/Legacy_ObjC",
                 exclude: [
                     "lib/COPYING",
                     "lib/Makefile",
@@ -201,9 +201,9 @@ if areas.contains(.openVPN) {
                 ]
             ),
             .testTarget(
-                name: "_PartoutOpenVPNOpenSSLTests",
-                dependencies: ["_PartoutOpenVPNOpenSSL"],
-                path: "Tests/OpenVPN/OpenVPNOpenSSL",
+                name: "PartoutOpenVPNLegacyTests",
+                dependencies: ["PartoutOpenVPNLegacy"],
+                path: "Tests/OpenVPN/Legacy",
                 resources: [
                     .process("Resources")
                 ]
@@ -216,16 +216,16 @@ if areas.contains(.openVPN) {
         .target(
             name: "_PartoutOpenVPN_C",
             dependencies: ["_PartoutVendorsCrypto_C"],
-            path: "Sources/OpenVPN/OpenVPN_C"
+            path: "Sources/OpenVPN/Cross_C"
         ),
         .target(
-            name: "_PartoutOpenVPN_Cross",
+            name: "PartoutOpenVPNCross",
             dependencies: [
                 "PartoutOpenVPN",
                 "_PartoutOpenVPN_C",
                 "_PartoutVendorsPortable"
             ],
-            path: "Sources/OpenVPN/OpenVPN_Cross",
+            path: "Sources/OpenVPN/Cross",
             exclude: {
                 var list: [String] = ["Internal/Legacy"]
                 if OS.current == .apple {
@@ -238,9 +238,9 @@ if areas.contains(.openVPN) {
             ]
         ),
         .testTarget(
-            name: "_PartoutOpenVPN_CrossTests",
-            dependencies: ["_PartoutOpenVPN_Cross"],
-            path: "Tests/OpenVPN/OpenVPN_Cross",
+            name: "PartoutOpenVPNCrossTests",
+            dependencies: ["PartoutOpenVPNCross"],
+            path: "Tests/OpenVPN/Cross",
             exclude: [
                 "DataPathPerformanceTests.swift"
             ],
@@ -269,7 +269,7 @@ if areas.contains(.wireGuard) {
     package.targets.append(contentsOf: [
         .target(
             name: "_PartoutWireGuardWrapper",
-            dependencies: ["_PartoutWireGuard_Cross"],
+            dependencies: ["PartoutWireGuardCross"],
             path: "Sources/WireGuard/Wrapper"
         ),
         .target(
@@ -279,17 +279,17 @@ if areas.contains(.wireGuard) {
         ),
         .target(
             name: "_PartoutWireGuard_C",
-            path: "Sources/WireGuard/WireGuard_C",
+            path: "Sources/WireGuard/Cross_C",
             publicHeadersPath: "."
         ),
         .target(
-            name: "_PartoutWireGuard_Cross",
+            name: "PartoutWireGuardCross",
             dependencies: [
                 "_PartoutVendorsWireGuardBackend",
                 "_PartoutWireGuard_C",
                 "PartoutWireGuard"
             ],
-            path: "Sources/WireGuard/WireGuard_Cross",
+            path: "Sources/WireGuard/Cross",
         ),
         .testTarget(
             name: "_PartoutWireGuardTests",
@@ -297,9 +297,9 @@ if areas.contains(.wireGuard) {
             path: "Tests/WireGuard/Core"
         ),
         .testTarget(
-            name: "_PartoutWireGuard_CrossTests",
-            dependencies: ["_PartoutWireGuard_Cross"],
-            path: "Tests/WireGuard/WireGuard_Cross"
+            name: "PartoutWireGuardCrossTests",
+            dependencies: ["PartoutWireGuardCross"],
+            path: "Tests/WireGuard/Cross"
         )
     ])
 }

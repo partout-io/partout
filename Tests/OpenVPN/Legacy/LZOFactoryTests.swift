@@ -1,8 +1,8 @@
 //
-//  Exports.swift
+//  LZOFactoryTests.swift
 //  Partout
 //
-//  Created by Davide De Rosa on 7/26/25.
+//  Created by Davide De Rosa on 3/18/19.
 //  Copyright (c) 2025 Davide De Rosa. All rights reserved.
 //
 //  https://github.com/passepartoutvpn
@@ -23,19 +23,12 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(PartoutOpenVPN)
-@_exported import PartoutOpenVPN
-#if canImport(PartoutOpenVPNLegacy)
-@_exported import PartoutOpenVPNLegacy
-public typealias ObjCOpenVPNConnection = LegacyOpenVPNConnection
-#endif
-#if canImport(PartoutOpenVPNCross)
-@_exported import PartoutOpenVPNCross
-public typealias COpenVPNConnection = OpenVPNConnection
-#endif
-#endif
+internal import PartoutOpenVPNLegacy_ObjC
+import XCTest
 
-#if canImport(PartoutWireGuard)
-@_exported import PartoutWireGuard
-@_exported import PartoutWireGuardCross
-#endif
+final class LZOFactoryTests: XCTestCase {
+    func test_givenLibrary_whenCheckLZOSupport_thenSucceeds() {
+        XCTAssertTrue(LZOFactory.canCreate())
+        XCTAssertNotNil(LZOFactory.create())
+    }
+}
