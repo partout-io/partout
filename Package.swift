@@ -84,6 +84,9 @@ let package = Package(
                 if !areas.contains(.api) {
                     list.append("API")
                 }
+                if OS.current != .apple {
+                    list.append("ProviderScriptingEngineTests.swift")
+                }
                 return list
             }(),
             resources: [
