@@ -132,7 +132,7 @@ if areas.contains(.openVPN) {
     case .android, .linux, .windows:
         mainTarget = "PartoutOpenVPNCross"
     default:
-        mainTarget = "PartoutOpenVPNLegacy" // legacy
+        mainTarget = "PartoutOpenVPNLegacy"
     }
 
     if isDevelopment {
