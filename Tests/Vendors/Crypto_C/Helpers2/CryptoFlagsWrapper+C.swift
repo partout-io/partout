@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutVendorsCrypto_C
+import _PartoutVendorsCryptoCore_C
 
 extension CryptoFlagsWrapper {
     init(cFlags: crypto_flags_t) {

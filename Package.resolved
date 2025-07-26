@@ -10,6 +10,15 @@
       }
     },
     {
+      "identity" : "openssl-apple",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/passepartoutvpn/openssl-apple",
+      "state" : {
+        "revision" : "4ae97d5f0d2a449441f87a775db1b815bf7b2671",
+        "version" : "3.5.200"
+      }
+    },
+    {
       "identity" : "swift-docc-plugin",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-docc-plugin",

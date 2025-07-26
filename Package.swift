@@ -48,45 +48,7 @@ let package = Package(
     ],
 )
 
-// MARK: - Vendors
-
-package.targets.append(contentsOf: [
-    .target(
-        name: "_PartoutVendorsCrypto_C",
-        dependencies: ["_PartoutVendorsPortable_C"],
-        path: "Sources/Vendors/Crypto_C"
-    ),
-    .target(
-        name: "_PartoutVendorsPortable",
-        dependencies: [
-            .target(name: environment.coreDependency),
-            "_PartoutVendorsPortable_C"
-        ],
-        path: "Sources/Vendors/Portable"
-    ),
-    .target(
-        name: "_PartoutVendorsPortable_C",
-        path: "Sources/Vendors/Portable_C"
-    ),
-    .testTarget(
-        name: "_PartoutVendorsPortableTests",
-        dependencies: ["_PartoutVendorsPortable"],
-        path: "Tests/Vendors/Portable"
-    ),
-    .testTarget(
-        name: "_PartoutVendorsCrypto_CTests",
-        dependencies: [
-            "_PartoutVendorsCrypto_C",
-            "_PartoutVendorsPortable"
-        ],
-        path: "Tests/Vendors/Crypto_C",
-        exclude: [
-            "CryptoPerformanceTests.swift"
-        ]
-    )
-])
-
-// MARK: Providers
+// MARK: - Providers
 
 package.targets.append(contentsOf: [
     .target(
@@ -145,6 +107,107 @@ if areas.contains(.api) {
         )
     ])
 }
+
+// MARK: Vendors
+
+package.targets.append(contentsOf: [
+    .target(
+        name: "_PartoutVendorsCryptoCore_C",
+        dependencies: ["_PartoutVendorsPortable_C"],
+        path: "Sources/Vendors/Crypto/CryptoCore_C"
+    ),
+    .target(
+        name: "_PartoutVendorsPortable",
+        dependencies: [
+            .target(name: environment.coreDependency),
+            "_PartoutVendorsPortable_C"
+        ],
+        path: "Sources/Vendors/Portable"
+    ),
+    .target(
+        name: "_PartoutVendorsPortable_C",
+        path: "Sources/Vendors/Portable_C"
+    ),
+    .testTarget(
+        name: "_PartoutVendorsPortableTests",
+        dependencies: ["_PartoutVendorsPortable"],
+        path: "Tests/Vendors/Portable"
+    )
+])
+
+// pick implementation
+switch OS.current {
+case .apple:
+    package.dependencies.append(
+        .package(url: "https://github.com/passepartoutvpn/openssl-apple", exact: "3.5.200")
+    )
+    package.targets.append(contentsOf: [
+        .target(
+            name: "_PartoutVendorsCryptoImpl",
+            dependencies: ["openssl-apple"],
+            path: "Sources/Vendors/Crypto/OpenSSL",
+            exclude: [
+                "include/shim.h",
+                "module.modulemap"
+            ]
+        ),
+        .target(
+            name: "_PartoutVendorsCrypto_C",
+            dependencies: [
+                "_PartoutVendorsCryptoCore_C",
+                "_PartoutVendorsCryptoImpl"
+            ],
+            path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
+        )
+    ])
+case .linux:
+    package.targets.append(contentsOf: [
+        .systemLibrary(
+            name: "_PartoutVendorsCryptoImpl",
+            path: "Sources/Vendors/Crypto/OpenSSL",
+            pkgConfig: "openssl",
+            providers: [
+                .apt(["libssl-dev"])
+            ]
+        ),
+        .target(
+            name: "_PartoutVendorsCrypto_C",
+            dependencies: [
+                "_PartoutVendorsCryptoCore_C",
+                "_PartoutVendorsCryptoImpl"
+            ],
+            path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
+        )
+    ])
+case .windows:
+    package.targets.append(contentsOf: [
+        .target(
+            name: "_PartoutVendorsWindows_C",
+            path: "Sources/Vendors/Windows_C"
+        ),
+        .target(
+            name: "_PartoutVendorsCryptoImpl",
+            dependencies: ["_PartoutVendorsWindows_C"],
+            path: "Sources/Vendors/Crypto/Windows"
+        )
+    ])
+default:
+    break
+}
+
+package.targets.append(contentsOf: [
+    .testTarget(
+        name: "_PartoutVendorsCrypto_CTests",
+        dependencies: [
+            "_PartoutVendorsCrypto_C", // now platform-independent
+            "_PartoutVendorsPortable"
+        ],
+        path: "Tests/Vendors/Crypto_C",
+        exclude: [
+            "CryptoPerformanceTests.swift"
+        ]
+    )
+])
 
 // MARK: - Deployment
 
