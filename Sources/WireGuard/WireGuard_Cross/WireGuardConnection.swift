@@ -28,6 +28,7 @@
 //  SPDX-License-Identifier: MIT
 //  Copyright © 2018-2024 WireGuard LLC. All Rights Reserved.
 
+import _PartoutVendorsWireGuardBackend
 import _PartoutWireGuardCore
 import Foundation
 import NetworkExtension // TODO: #13, this depends on Apple unnecessarily
@@ -52,7 +53,7 @@ public final class WireGuardConnection: Connection {
     private var dataCountTimer: Task<Void, Error>?
 
     private lazy var adapter: WireGuardAdapter = {
-        WireGuardAdapter(with: delegate, backend: WireGuardBackendGo()) { [weak self] logLevel, message in
+        WireGuardAdapter(with: delegate, backend: VendorWireGuardBackend()) { [weak self] logLevel, message in
             pp_log(self?.ctx ?? .global, .wireguard, logLevel.debugLevel, message)
         }
     }()

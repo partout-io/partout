@@ -23,17 +23,16 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-import _PartoutWireGuardGo
-import wg_go
-import XCTest
+import _PartoutVendorsWireGuardBackend
+import Testing
 
-final class BackendTests: XCTestCase {
-    func test_givenBackend_whenGetVersion_thenIsExpected() throws {
-        let version = "f333402"
-        let versionGo = String(cString: try XCTUnwrap(wgVersion()))
-        let versionSwift = try XCTUnwrap(WireGuardBackendGo().version())
-        XCTAssertEqual(versionGo, versionSwift)
-        XCTAssertEqual(versionGo, version)
-        print("WireGuard version: \(version)")
+struct BackendTests {
+    @Test
+    func givenBackend_whenGetVersion_thenIsExpected() throws {
+        let sut = VendorWireGuardBackend()
+        let expectedVersion = "f333402"
+        let vendorVersion = try #require(sut.version())
+        #expect(vendorVersion == expectedVersion)
+        print("WireGuard version: \(vendorVersion)")
     }
 }

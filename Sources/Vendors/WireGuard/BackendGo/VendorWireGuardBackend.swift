@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
+import _PartoutVendorsWireGuardBackendCore
 import Foundation
 import wg_go
 
 // swiftlint:disable identifier_name
-public final class WireGuardBackendGo: WireGuardBackend {
+public final class VendorWireGuardBackend: WireGuardBackend {
     public init() {
     }
 

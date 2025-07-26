@@ -231,6 +231,57 @@ if areas.contains(.openVPN) {
     ])
 }
 
+// MARK: WireGuard
+
+if areas.contains(.wireGuard) {
+    package.products.append(contentsOf: [
+        .library(
+            name: "PartoutWireGuard",
+            targets: ["PartoutWireGuard"]
+        ),
+        .library(
+            name: "_PartoutWireGuardCore",
+            targets: ["_PartoutWireGuardCore"]
+        )
+    ])
+    package.targets.append(contentsOf: [
+        .target(
+            name: "PartoutWireGuard",
+            dependencies: ["_PartoutWireGuard_Cross"],
+            path: "Sources/WireGuard/Wrapper"
+        ),
+        .target(
+            name: "_PartoutWireGuardCore",
+            dependencies: ["PartoutCoreWrapper"],
+            path: "Sources/WireGuard/Core"
+        ),
+        .target(
+            name: "_PartoutWireGuard_C",
+            path: "Sources/WireGuard/WireGuard_C",
+            publicHeadersPath: "."
+        ),
+        .target(
+            name: "_PartoutWireGuard_Cross",
+            dependencies: [
+                "_PartoutVendorsWireGuardBackend",
+                "_PartoutWireGuard_C",
+                "_PartoutWireGuardCore"
+            ],
+            path: "Sources/WireGuard/WireGuard_Cross",
+        ),
+        .testTarget(
+            name: "_PartoutWireGuardTests",
+            dependencies: ["_PartoutWireGuardCore"],
+            path: "Tests/WireGuard/Core"
+        ),
+        .testTarget(
+            name: "_PartoutWireGuard_CrossTests",
+            dependencies: ["_PartoutWireGuard_Cross"],
+            path: "Tests/WireGuard/WireGuard_Cross"
+        )
+    ])
+}
+
 // MARK: - Vendors
 
 package.targets.append(contentsOf: [
@@ -250,6 +301,10 @@ package.targets.append(contentsOf: [
     .target(
         name: "_PartoutVendorsPortable_C",
         path: "Sources/Vendors/Portable_C"
+    ),
+    .target(
+        name: "_PartoutVendorsWireGuardBackendCore",
+        path: "Sources/Vendors/WireGuard/BackendCore"
     ),
     .testTarget(
         name: "_PartoutVendorsPortableTests",
@@ -283,6 +338,21 @@ case .apple:
             path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
         )
     ])
+    if areas.contains(.wireGuard) {
+        package.dependencies.append(
+            .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.20250630")
+        )
+        package.targets.append(
+            .target(
+                name: "_PartoutVendorsWireGuardBackend",
+                dependencies: [
+                    "_PartoutVendorsWireGuardBackendCore",
+                    "wg-go-apple"
+                ],
+                path: "Sources/Vendors/WireGuard/BackendGo"
+            )
+        )
+    }
 case .linux:
     package.targets.append(contentsOf: [
         .systemLibrary(
@@ -318,7 +388,7 @@ default:
     break
 }
 
-package.targets.append(contentsOf: [
+package.targets.append(
     .testTarget(
         name: "_PartoutVendorsCrypto_CTests",
         dependencies: [
@@ -330,7 +400,20 @@ package.targets.append(contentsOf: [
             "CryptoPerformanceTests.swift"
         ]
     )
-])
+)
+
+// WireGuard not implemented yet on non-Apple
+if OS.current == .apple {
+    package.targets.append(
+        .testTarget(
+            name: "_PartoutVendorsWireGuardBackendTests",
+            dependencies: [
+                "_PartoutVendorsWireGuardBackend" // now platform-independent
+            ],
+            path: "Tests/Vendors/WireGuardBackend"
+        )
+    )
+}
 
 // MARK: - Deployment
 
@@ -380,9 +463,9 @@ enum Area: CaseIterable {
         if ProcessInfo.processInfo.environment["PARTOUT_DOCS"] != "1" {
             included.remove(.documentation)
         }
-#if os(Windows) || os(Linux)
-        included.remove(.wireGuard)
-#endif
+        if OS.current != .apple {
+            included.remove(.wireGuard)
+        }
         return included
     }
 }

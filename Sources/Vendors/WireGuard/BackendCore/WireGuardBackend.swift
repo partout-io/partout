@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright © 2018-2024 WireGuard LLC. All Rights Reserved.
 
-import Foundation
-
 // swiftlint:disable identifier_name
 public typealias WireGuardLoggerCallback = @convention(c) (_ context: UnsafeMutableRawPointer?, _ level: Int32, _ msg: UnsafePointer<Int8>?) -> Void
 
