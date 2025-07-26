@@ -13,6 +13,16 @@ This is the umbrella package that exports the internal packages and provides som
 - <doc:CoreExtensions>
 - <doc:APIMappers>
 
+### Platform-specific
+
+- <doc:Apple>
+- <doc:AppleNE>
+
+### Cross-platform
+
+- <doc:Portable>
+- <doc:ZeroingData>
+
 ### Providers Integration
 
 - <doc:OpenVPNProviders>
