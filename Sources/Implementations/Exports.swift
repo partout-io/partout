@@ -25,11 +25,11 @@
 
 #if canImport(PartoutOpenVPN)
 @_exported import PartoutOpenVPN
-#if canImport(PartoutOpenVPNLegacy)
-@_exported import PartoutOpenVPNLegacy
-#endif
 #if canImport(PartoutOpenVPNCross)
 @_exported import PartoutOpenVPNCross
+#endif
+#if canImport(PartoutOpenVPNLegacy)
+@_exported import PartoutOpenVPNLegacy
 #endif
 #endif
 
