@@ -34,15 +34,19 @@ let package = Package(
     products: [
         .library(
             name: "Partout",
-            targets: [
-                environment.coreDependency,
-                "PartoutAPI",
-                "PartoutProviders",
-                "_PartoutVendorsCrypto_C",
-                "_PartoutVendorsPortable"
-            ]
+            targets: {
+                var list: [String] = [environment.coreDependency]
+                if areas.contains(.api) {
+                    list.append("PartoutAPI")
+                    list.append("PartoutAPIBundle")
+                }
+                list.append("PartoutProviders")
+                list.append("_PartoutVendorsCrypto_C")
+                list.append("_PartoutVendorsPortable")
+                return list
+            }()
         )
-    ],
+    ]
 )
 
 if areas.contains(.documentation) {
