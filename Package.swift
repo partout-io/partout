@@ -148,6 +148,39 @@ package.targets.append(contentsOf: [
 
 import Foundation
 
+enum OS {
+    case android
+    case apple
+    case linux
+    case windows
+
+    // unfortunately, SwiftPM has no "when" conditionals on package
+    // dependencies. we resort on some raw #if, which are reliable
+    // as long as we don't cross-compile
+    //
+    // FIXME: #53, in fact, Android is wrong here because it's never compiled natively
+    static var current: OS {
+#if os(Windows)
+        .windows
+#elseif os(Linux)
+        .linux
+#elseif os(Android)
+        .android
+#else
+        .apple
+#endif
+    }
+
+    var platforms: [Platform] {
+        switch self {
+        case .android: [.android]
+        case .apple: [.iOS, .macOS, .tvOS]
+        case .linux: [.linux]
+        case .windows: [.windows]
+        }
+    }
+}
+
 enum Area: CaseIterable {
     case documentation
     case openVPN
