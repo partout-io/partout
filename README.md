@@ -33,8 +33,7 @@ targets: [
         name: "MyTarget",
         dependencies: [
             .product(name: "Partout", package: "partout"),
-            .product(name: "PartoutOpenVPN", package: "partout"),
-            .product(name: "PartoutWireGuard", package: "partout")
+            .product(name: "PartoutImplementations", package: "partout")
         ]
     )
 ]
