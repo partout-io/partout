@@ -24,6 +24,7 @@
 //
 
 import Foundation
+internal import _PartoutVendorsPortable
 
 extension Encrypter {
     func encryptData(_ data: CZeroingData, flags: CryptoFlagsWrapper?) throws -> CZeroingData {

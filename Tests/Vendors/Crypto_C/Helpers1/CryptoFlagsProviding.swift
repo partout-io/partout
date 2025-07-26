@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-@testable internal import _PartoutCryptoCore
+@testable internal import _PartoutVendorsPortable
 
 struct CryptoFlags {
     var iv: [UInt8] = []

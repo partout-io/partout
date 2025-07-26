@@ -23,6 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutVendorsPortable
+
 // NOTE: it doesn't matter to use Swift CryptoFlagsWrapper here. for
 // efficiency reasons, OpenVPN will use the C API directly without
 // going through Encrypter/Decrypter

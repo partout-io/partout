@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "vendors/prng.h"
+#include "crypto/prng.h"
 
 #ifdef __APPLE__
 #include <Security/Security.h>

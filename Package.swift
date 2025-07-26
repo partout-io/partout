@@ -3,7 +3,7 @@
 
 import PackageDescription
 
-// MARK: Tuning
+// MARK: Package
 
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
@@ -14,8 +14,8 @@ let checksum = "1d769a0adfbf6e9d46a7da62e7e0cab5268c0c2216a449523d73e44afabb5f1f
 let coreSHA1 = "f26c0eeb5cb2ba6bd3fbf64fa090abcec492df9a"
 
 // deployment environment
+let environment: Environment = .localSource
 let areas: Set<Area> = Area.default
-let environment: Environment = .documentation
 
 // the global settings for C targets
 let cSettings: [CSetting] = [
@@ -23,8 +23,6 @@ let cSettings: [CSetting] = [
         "-Wall", "-Wextra"//, "-Werror"
     ])
 ]
-
-// MARK: Package
 
 let package = Package(
     name: "Partout",
@@ -39,31 +37,74 @@ let package = Package(
             targets: [
                 environment.coreDependency,
                 "PartoutAPI",
-                "PartoutProviders"
+                "PartoutProviders",
+                "_PartoutVendorsCrypto_C",
+                "_PartoutVendorsPortable"
             ]
         )
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0")
     ],
-    targets: [
-        .target(
-            name: "PartoutProviders",
-            dependencies: [
-                .target(name: environment.coreDependency)
-            ],
-            path: "Sources/Providers"
-        ),
-        .testTarget(
-            name: "PartoutProvidersTests",
-            dependencies: ["PartoutProviders"],
-            path: "Tests/Providers",
-            resources: [
-                .process("Resources")
-            ]
-        )
-    ]
 )
+
+// MARK: - Vendors
+
+package.targets.append(contentsOf: [
+    .target(
+        name: "_PartoutVendorsCrypto_C",
+        dependencies: ["_PartoutVendorsPortable_C"],
+        path: "Sources/Vendors/Crypto_C"
+    ),
+    .target(
+        name: "_PartoutVendorsPortable",
+        dependencies: [
+            .target(name: environment.coreDependency),
+            "_PartoutVendorsPortable_C"
+        ],
+        path: "Sources/Vendors/Portable"
+    ),
+    .target(
+        name: "_PartoutVendorsPortable_C",
+        path: "Sources/Vendors/Portable_C"
+    ),
+    .testTarget(
+        name: "_PartoutVendorsPortableTests",
+        dependencies: ["_PartoutVendorsPortable"],
+        path: "Tests/Vendors/Portable"
+    ),
+    .testTarget(
+        name: "_PartoutVendorsCrypto_CTests",
+        dependencies: [
+            "_PartoutVendorsCrypto_C",
+            "_PartoutVendorsPortable"
+        ],
+        path: "Tests/Vendors/Crypto_C",
+        exclude: [
+            "CryptoPerformanceTests.swift"
+        ]
+    )
+])
+
+// MARK: Providers
+
+package.targets.append(contentsOf: [
+    .target(
+        name: "PartoutProviders",
+        dependencies: [
+            .target(name: environment.coreDependency)
+        ],
+        path: "Sources/Providers"
+    ),
+    .testTarget(
+        name: "PartoutProvidersTests",
+        dependencies: ["PartoutProviders"],
+        path: "Tests/Providers",
+        resources: [
+            .process("Resources")
+        ]
+    )
+])
 
 // MARK: API
 
@@ -172,7 +213,7 @@ case .localSource:
         dependencies: [
             .product(name: "PartoutCore", package: "partout-core")
         ],
-        path: "../partout-core/Sources/PartoutCore"
+        path: "Sources/Core"
     ))
 case .documentation:
     package.targets.append(contentsOf: [

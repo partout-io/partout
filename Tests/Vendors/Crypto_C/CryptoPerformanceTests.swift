@@ -26,6 +26,8 @@
 @testable internal import _PartoutVendorsPortable
 import XCTest
 
+// FIXME: ###, restore these tests with CryptoAEAD/CBC/CTR (ObjC) or new CryptoWrapper (Swift/C)
+
 final class CryptoPerformanceTests: XCTestCase {
 
     // 0.030
