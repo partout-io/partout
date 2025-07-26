@@ -14,8 +14,8 @@ let checksum = "1d769a0adfbf6e9d46a7da62e7e0cab5268c0c2216a449523d73e44afabb5f1f
 let coreSHA1 = "f26c0eeb5cb2ba6bd3fbf64fa090abcec492df9a"
 
 // deployment environment
-let environment: Environment = .localSource
-let areas: Set<Area> = Area.default
+let environment: Environment = .remoteBinary
+let areas: Set<Area> = Area.defaultAreas
 
 // FIXME: ###, set to false on deploy (check CI)
 let isDevelopment = false
@@ -548,7 +548,7 @@ enum Area: CaseIterable {
     case openVPN
     case wireGuard
 
-    static var `default`: Set<Area> {
+    static var defaultAreas: Set<Area> {
         var included = Set(Area.allCases)
         if ProcessInfo.processInfo.environment["PARTOUT_DOCS"] != "1" {
             included.remove(.documentation)
