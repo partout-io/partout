@@ -42,15 +42,53 @@ let package = Package(
             name: "Partout",
             dependencies: {
                 var list: [Target.Dependency] = [environment.coreDependency]
+                list.append("PartoutProviders")
                 if areas.contains(.api) {
                     list.append("PartoutAPI")
                     list.append("PartoutAPIBundle")
                 }
-                list.append("PartoutProviders")
+                if areas.contains(.openVPN) {
+                    list.append("_PartoutOpenVPNCore")
+                }
+                if areas.contains(.wireGuard) {
+                    list.append("_PartoutWireGuardCore")
+                }
                 list.append("_PartoutVendorsCrypto_C")
                 list.append("_PartoutVendorsPortable")
+                if OS.current == .apple {
+                    list.append("_PartoutVendorsApple")
+                    list.append("_PartoutVendorsAppleNE")
+                }
                 return list
             }()
+        ),
+        .target(
+            name: "PartoutProviders",
+            dependencies: [environment.coreDependency],
+            path: "Sources/Providers"
+        ),
+        .testTarget(
+            name: "PartoutProvidersTests",
+            dependencies: ["PartoutProviders"],
+            path: "Tests/Providers",
+            resources: [
+                .process("Resources")
+            ]
+        ),
+        .testTarget(
+            name: "PartoutTests",
+            dependencies: ["Partout"],
+            path: "Tests/Partout",
+            exclude: {
+                var list: [String] = []
+                if !areas.contains(.api) {
+                    list.append("API")
+                }
+                return list
+            }(),
+            resources: [
+                .copy("Resources")
+            ]
         )
     ]
 )
@@ -61,65 +99,7 @@ if areas.contains(.documentation) {
     )
 }
 
-// MARK: - Providers
-
-package.targets.append(contentsOf: [
-    .target(
-        name: "PartoutProviders",
-        dependencies: [environment.coreDependency],
-        path: "Sources/Providers"
-    ),
-    .testTarget(
-        name: "PartoutProvidersTests",
-        dependencies: ["PartoutProviders"],
-        path: "Tests/Providers",
-        resources: [
-            .process("Resources")
-        ]
-    )
-])
-
-// MARK: API
-
-if areas.contains(.api) {
-    package.products.append(
-        .library(
-            name: "PartoutAPI",
-            targets: ["PartoutAPI"]
-        )
-    )
-    package.dependencies.append(
-        .package(url: "https://github.com/iwill/generic-json-swift", from: "2.0.0")
-    )
-    package.targets.append(contentsOf: [
-        .target(
-            name: "PartoutAPI",
-            dependencies: [
-                .product(name: "GenericJSON", package: "generic-json-swift"),
-                "PartoutProviders"
-            ],
-            path: "Sources/API"
-        ),
-        .target(
-            name: "PartoutAPIBundle",
-            dependencies: [
-                "PartoutAPI",
-                "PartoutProviders"
-            ],
-            path: "Sources/APIBundle",
-            resources: [
-                .copy("JSON")
-            ]
-        ),
-        .testTarget(
-            name: "PartoutAPITests",
-            dependencies: ["PartoutAPI"],
-            path: "Tests/API"
-        )
-    ])
-}
-
-// MARK: - OpenVPN
+// MARK: OpenVPN
 
 if areas.contains(.openVPN) {
     let mainTarget: String
@@ -298,6 +278,46 @@ if areas.contains(.wireGuard) {
     ])
 }
 
+// MARK: - API
+
+if areas.contains(.api) {
+    package.products.append(
+        .library(
+            name: "PartoutAPI",
+            targets: ["PartoutAPI"]
+        )
+    )
+    package.dependencies.append(
+        .package(url: "https://github.com/iwill/generic-json-swift", from: "2.0.0")
+    )
+    package.targets.append(contentsOf: [
+        .target(
+            name: "PartoutAPI",
+            dependencies: [
+                .product(name: "GenericJSON", package: "generic-json-swift"),
+                "PartoutProviders"
+            ],
+            path: "Sources/API"
+        ),
+        .target(
+            name: "PartoutAPIBundle",
+            dependencies: [
+                "PartoutAPI",
+                "PartoutProviders"
+            ],
+            path: "Sources/APIBundle",
+            resources: [
+                .copy("JSON")
+            ]
+        ),
+        .testTarget(
+            name: "PartoutAPITests",
+            dependencies: ["PartoutAPI"],
+            path: "Tests/API"
+        )
+    ])
+}
+
 // MARK: - Vendors
 
 package.targets.append(contentsOf: [
@@ -332,6 +352,20 @@ package.targets.append(contentsOf: [
 // pick implementation
 switch OS.current {
 case .apple:
+    package.targets.append(contentsOf: [
+        .target(
+            name: "_PartoutVendorsApple",
+            dependencies: [environment.coreDependency],
+            path: "Sources/Vendors/Apple"
+        ),
+        .target(
+            name: "_PartoutVendorsAppleNE",
+            dependencies: [environment.coreDependency],
+            path: "Sources/Vendors/AppleNE"
+        )
+    ])
+
+    // crypto
     package.dependencies.append(
         .package(url: "https://github.com/passepartoutvpn/openssl-apple", exact: "3.5.200")
     )
@@ -354,6 +388,8 @@ case .apple:
             path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
         )
     ])
+
+    // WireGuard
     if areas.contains(.wireGuard) {
         package.dependencies.append(
             .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.20250630")
@@ -431,7 +467,7 @@ if OS.current == .apple {
     )
 }
 
-// MARK: - Deployment
+// MARK: Deployment
 
 import Foundation
 

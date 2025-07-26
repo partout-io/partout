@@ -27,31 +27,27 @@ import Foundation
 
 // MARK: Core
 
-@_exported import _PartoutVendorsPortable
 @_exported import PartoutCore
-
-// MARK: Crypto
-
 @_exported import PartoutProviders
 
-// MARK: - API
+// MARK: - Optional
+
+#if canImport(_PartoutOpenVPNCore)
+@_exported import _PartoutOpenVPNCore
+#endif
+
+#if canImport(_PartoutWireGuardCore)
+@_exported import _PartoutWireGuardCore
+#endif
 
 #if canImport(PartoutAPI)
 @_exported import PartoutAPI
 @_exported import PartoutAPIBundle
 #endif
 
-// MARK: - Modules
-
-#if canImport(_PartoutOpenVPNCore)
-@_exported import _PartoutOpenVPNCore
-#endif
-#if canImport(_PartoutWireGuardCore)
-@_exported import _PartoutWireGuardCore
-#endif
-
 // MARK: - Vendors
 
+@_exported import _PartoutVendorsPortable
 #if canImport(_PartoutVendorsApple)
 @_exported import _PartoutVendorsApple
 @_exported import _PartoutVendorsAppleNE

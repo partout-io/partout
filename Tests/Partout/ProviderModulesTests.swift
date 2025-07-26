@@ -24,7 +24,7 @@
 //
 
 import Foundation
-import Partout
+@testable import Partout
 import XCTest
 
 final class ProviderModulesTests: XCTestCase {
