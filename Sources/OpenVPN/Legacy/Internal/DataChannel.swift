@@ -23,9 +23,9 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutOpenVPNLegacy_ObjC
 import Foundation
 import PartoutCore
-internal import PartoutOpenVPNLegacy_ObjC
 
 final class DataChannel {
     private let ctx: PartoutLoggerContext

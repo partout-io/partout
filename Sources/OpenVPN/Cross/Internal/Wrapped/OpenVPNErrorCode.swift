@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-#if canImport(PartoutOpenVPNLegacy_ObjC)
-internal import PartoutOpenVPNLegacy_ObjC
+#if canImport(_PartoutOpenVPNLegacy_ObjC)
+internal import _PartoutOpenVPNLegacy_ObjC
 
 extension OpenVPNErrorCode: @retroactive CustomDebugStringConvertible {
     var debugDescription: String {

@@ -24,7 +24,7 @@
 //
 
 import PartoutOpenVPN
-internal import PartoutOpenVPNLegacy_ObjC
+internal import _PartoutOpenVPNLegacy_ObjC
 import XCTest
 
 final class StandardOpenVPNOpenSSLParserTests: XCTestCase {

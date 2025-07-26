@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutOpenVPNLegacy_ObjC
 import PartoutCore
-internal import PartoutOpenVPNLegacy_ObjC
 
 extension OpenVPNSessionError: PartoutErrorMappable {
     public var asPartoutError: PartoutError {

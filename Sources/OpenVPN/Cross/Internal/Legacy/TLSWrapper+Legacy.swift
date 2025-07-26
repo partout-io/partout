@@ -23,8 +23,8 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+internal import _PartoutOpenVPNLegacy_ObjC
 import Foundation
-internal import PartoutOpenVPNLegacy_ObjC
 
 extension TLSWrapper {
     static func legacy(with parameters: Parameters) throws -> TLSWrapper {

@@ -180,12 +180,12 @@ if areas.contains(.openVPN) {
                 dependencies: [
                     "PartoutOpenVPN",
                     "PartoutOpenVPNCross",
-                    "PartoutOpenVPNLegacy_ObjC"
+                    "_PartoutOpenVPNLegacy_ObjC"
                 ],
                 path: "Sources/OpenVPN/Legacy"
             ),
             .target(
-                name: "PartoutOpenVPNLegacy_ObjC",
+                name: "_PartoutOpenVPNLegacy_ObjC",
                 dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
                 path: "Sources/OpenVPN/Legacy_ObjC",
                 exclude: [
@@ -231,7 +231,7 @@ if areas.contains(.openVPN) {
                     "_PartoutVendorsPortable"
                 ]
                 if isTestingOpenVPNDataPath {
-                    list.append("PartoutOpenVPNLegacy_ObjC")
+                    list.append("_PartoutOpenVPNLegacy_ObjC")
                 }
                 return list
             }(),

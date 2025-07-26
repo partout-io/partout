@@ -24,8 +24,8 @@
 //
 
 internal import _PartoutVendorsPortable
-#if canImport(PartoutOpenVPNLegacy_ObjC)
-internal import PartoutOpenVPNLegacy_ObjC
+#if canImport(_PartoutOpenVPNLegacy_ObjC)
+internal import _PartoutOpenVPNLegacy_ObjC
 #endif
 internal import _PartoutOpenVPN_C
 import Foundation

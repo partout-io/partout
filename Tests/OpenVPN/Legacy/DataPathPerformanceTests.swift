@@ -27,7 +27,7 @@ internal import _PartoutCryptoOpenSSL_ObjC
 internal import _PartoutVendorsPortable
 import PartoutOpenVPN
 @testable internal import PartoutOpenVPNCross
-internal import PartoutOpenVPNLegacy_ObjC
+internal import _PartoutOpenVPNLegacy_ObjC
 import XCTest
 
 final class DataPathPerformanceTests: XCTestCase {

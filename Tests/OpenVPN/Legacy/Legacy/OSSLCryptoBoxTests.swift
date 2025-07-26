@@ -26,7 +26,7 @@
 internal import _PartoutCryptoOpenSSL_ObjC
 import PartoutOpenVPN
 @testable internal import PartoutOpenVPNLegacy
-internal import PartoutOpenVPNLegacy_ObjC
+internal import _PartoutOpenVPNLegacy_ObjC
 import PartoutCore
 import XCTest
 

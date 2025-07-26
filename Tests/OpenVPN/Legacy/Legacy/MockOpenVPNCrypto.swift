@@ -23,7 +23,7 @@
 //  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
 //
 
-internal import PartoutOpenVPNLegacy_ObjC
+internal import _PartoutOpenVPNLegacy_ObjC
 import Foundation
 
 final class MockOpenVPNCrypto: OpenVPNCryptoProtocol {

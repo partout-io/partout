@@ -31,7 +31,7 @@ import Testing
 struct TLSTests {
     let cachesURL = FileManager.default.temporaryDirectory
 
-#if canImport(PartoutOpenVPNLegacy_ObjC)
+#if canImport(_PartoutOpenVPNLegacy_ObjC)
     @Test
     func givenTLS_whenCAMD5_thenIsExpected() throws {
         let params = try emptyParameters()
