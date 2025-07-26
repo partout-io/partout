@@ -584,8 +584,7 @@ case .remoteBinary:
     ))
 case .remoteSource:
     package.dependencies.append(
-//        .package(url: "git@github.com:passepartoutvpn/partout-core.git", revision: coreSHA1)
-        .package(url: "git@gitlab.com:passepartoutvpn/partout-core.git", revision: coreSHA1)
+        .package(url: "git@github.com:passepartoutvpn/partout-core.git", revision: coreSHA1)
     )
     package.targets.append(.target(
         name: "PartoutCoreWrapper",
