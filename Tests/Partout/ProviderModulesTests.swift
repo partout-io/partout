@@ -1,30 +1,9 @@
+// SPDX-FileCopyrightText: 2025 Davide De Rosa
 //
-//  ProviderModulesTests.swift
-//  Partout
-//
-//  Created by Davide De Rosa on 1/29/25.
-//  Copyright (c) 2025 Davide De Rosa. All rights reserved.
-//
-//  https://github.com/passepartoutvpn
-//
-//  This file is part of Partout.
-//
-//  Partout is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  Partout is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
-//
+// SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-import Partout
+@testable import Partout
 import XCTest
 
 final class ProviderModulesTests: XCTestCase {
@@ -32,7 +11,7 @@ final class ProviderModulesTests: XCTestCase {
 
     private let resourcesURL = Bundle.module.url(forResource: "Resources", withExtension: nil)
 
-#if canImport(_PartoutOpenVPNCore)
+#if canImport(PartoutOpenVPN)
     func test_givenProviderModule_whenOpenVPN_thenResolves() throws {
         var sut = ProviderModule.Builder()
         sut.providerId = mockId
@@ -55,7 +34,7 @@ final class ProviderModulesTests: XCTestCase {
     }
 #endif
 
-#if canImport(_PartoutWireGuardCore)
+#if canImport(PartoutWireGuard)
 //    func test_givenProviderModule_whenWireGuard_thenResolves() throws {
 //        var sut = ProviderModule.Builder()
 //        sut.providerId = .hideme
@@ -68,7 +47,7 @@ final class ProviderModulesTests: XCTestCase {
 }
 
 private extension ProviderModulesTests {
-#if canImport(_PartoutOpenVPNCore)
+#if canImport(PartoutOpenVPN)
     func openVPNEntity() throws -> ProviderEntity {
         let presetURL = try XCTUnwrap(resourcesURL?.appendingPathComponent("preset.openvpn.json"))
         let templateData = try Data(contentsOf: presetURL)

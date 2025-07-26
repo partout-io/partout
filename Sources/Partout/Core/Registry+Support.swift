@@ -1,33 +1,12 @@
+// SPDX-FileCopyrightText: 2025 Davide De Rosa
 //
-//  Registry+Support.swift
-//  Partout
-//
-//  Created by Davide De Rosa on 2/24/24.
-//  Copyright (c) 2025 Davide De Rosa. All rights reserved.
-//
-//  https://github.com/passepartoutvpn
-//
-//  This file is part of Partout.
-//
-//  Partout is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  Partout is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
-//
+// SPDX-License-Identifier: GPL-3.0
 
-#if canImport(_PartoutOpenVPNCore)
-import _PartoutOpenVPNCore
+#if canImport(PartoutOpenVPN)
+import PartoutOpenVPN
 #endif
-#if canImport(_PartoutWireGuardCore)
-import _PartoutWireGuardCore
+#if canImport(PartoutWireGuard)
+import PartoutWireGuard
 #endif
 import Foundation
 import PartoutCore
@@ -43,10 +22,10 @@ extension Registry {
             OnDemandModule.moduleHandler,
             ProviderModule.moduleHandler
         ]
-#if canImport(_PartoutOpenVPNCore)
+#if canImport(PartoutOpenVPN)
         handlers.append(OpenVPNModule.moduleHandler)
 #endif
-#if canImport(_PartoutWireGuardCore)
+#if canImport(PartoutWireGuard)
         handlers.append(WireGuardModule.moduleHandler)
 #endif
         return handlers
@@ -54,19 +33,21 @@ extension Registry {
 
     private static let knownProviderResolvers: [ProviderModuleResolver] = {
         var resolvers: [ProviderModuleResolver] = []
-#if canImport(_PartoutOpenVPNCore)
+#if canImport(PartoutOpenVPN)
         resolvers.append(OpenVPNProviderResolver(.global))
 #endif
-#if canImport(_PartoutWireGuardCore)
+#if canImport(PartoutWireGuard)
         resolvers.append(WireGuardProviderResolver(.global))
 #endif
         return resolvers
     }()
 
+    /// Returns a ``/PartoutCore/Registry`` with the known module handlers and resolvers and an empty device ID.
     public convenience init() {
         self.init(deviceId: "", withKnown: true)
     }
 
+    /// Returns a ``/PartoutCore/Registry`` that optionally includes the known module handlers and resolvers.
     public convenience init(
         deviceId: String,
         withKnown: Bool,

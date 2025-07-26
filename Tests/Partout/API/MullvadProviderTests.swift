@@ -1,27 +1,6 @@
+// SPDX-FileCopyrightText: 2025 Davide De Rosa
 //
-//  MullvadProviderTests.swift
-//  Partout
-//
-//  Created by Davide De Rosa on 1/14/25.
-//  Copyright (c) 2025 Davide De Rosa. All rights reserved.
-//
-//  https://github.com/passepartoutvpn
-//
-//  This file is part of Partout.
-//
-//  Partout is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  Partout is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
-//
+// SPDX-License-Identifier: GPL-3.0
 
 import Foundation
 @testable import Partout
@@ -29,6 +8,10 @@ import Foundation
 import Testing
 
 struct MullvadProviderTests: APITestSuite {
+    init() {
+        setUpLogging()
+    }
+
     @Test(arguments: [
         AuthInput( // valid token
             accessToken: "sometoken",
@@ -77,8 +60,6 @@ struct MullvadProviderTests: APITestSuite {
         )
     ])
     func whenAuth_thenSucceeds(input: AuthInput) async throws {
-        setUpLogging()
-
         let sut = try newAPIMapper(input.hijacked ? {
             hijacker(for: input, method: $0, urlString: $1)
         } : nil)
@@ -99,7 +80,7 @@ struct MullvadProviderTests: APITestSuite {
             builder.token = ProviderAuthentication.Token(accessToken: accessToken, expiryDate: tokenExpiry)
         }
 
-#if canImport(_PartoutWireGuardCore)
+#if canImport(PartoutWireGuard)
         builder.providerModuleType = .wireGuard
 
         let peer = input.existingPeerId.map {
@@ -120,7 +101,7 @@ struct MullvadProviderTests: APITestSuite {
         let newModule = try await sut.authenticate(module, on: deviceId)
         print("Updated module: \(newModule)")
 
-#if canImport(_PartoutWireGuardCore)
+#if canImport(PartoutWireGuard)
         print("Original storage: \(storage)")
         let newStorage: WireGuardProviderStorage = try #require(try newModule.options(for: .wireGuard))
         print("Updated storage: \(newStorage)")
@@ -142,7 +123,7 @@ struct MullvadProviderTests: APITestSuite {
             #expect(newModule.authentication?.token == newToken)
         }
 
-#if canImport(_PartoutWireGuardCore)
+#if canImport(PartoutWireGuard)
         // assert device lookup or creation
         let newSession = try #require(newStorage.sessions?[deviceId])
         if let peerId = input.existingPeerId {

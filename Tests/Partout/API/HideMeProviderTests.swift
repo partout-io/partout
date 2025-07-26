@@ -1,34 +1,18 @@
+// SPDX-FileCopyrightText: 2025 Davide De Rosa
 //
-//  HideMeProviderTests.swift
-//  Partout
-//
-//  Created by Davide De Rosa on 1/14/25.
-//  Copyright (c) 2025 Davide De Rosa. All rights reserved.
-//
-//  https://github.com/passepartoutvpn
-//
-//  This file is part of Partout.
-//
-//  Partout is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  Partout is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
-//
+// SPDX-License-Identifier: GPL-3.0
 
 import Foundation
 @testable import Partout
+import PartoutCore
 @testable import PartoutProviders
 import Testing
 
 struct HideMeProviderTests: APITestSuite {
+    init() {
+        setUpLogging()
+    }
+
     @Test(arguments: [
         FetchInput(
             cache: nil,
@@ -52,8 +36,6 @@ struct HideMeProviderTests: APITestSuite {
 //        )
     ])
     func whenFetchInfrastructure_thenReturns(input: FetchInput) async throws {
-        setUpLogging()
-
         let sut = try newAPIMapper(input.hijacked ? {
             hijacker(forFetchURL: $1)
         } : nil)
@@ -63,7 +45,7 @@ struct HideMeProviderTests: APITestSuite {
             #expect(infra.presets.count == input.presetsCount)
             #expect(infra.servers.count == input.serversCount)
 
-#if canImport(_PartoutOpenVPNCore)
+#if canImport(PartoutOpenVPN)
             try infra.presets.forEach {
                 let template = try JSONDecoder().decode(OpenVPNProviderTemplate.self, from: $0.templateData)
                 switch $0.presetId {

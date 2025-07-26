@@ -1,0 +1,89 @@
+// SPDX-FileCopyrightText: 2025 Davide De Rosa
+//
+// SPDX-License-Identifier: GPL-3.0
+
+internal import _PartoutOpenVPN_C
+import Foundation
+import PartoutCore
+
+struct Constants {
+    enum Keys {
+        static let label1 = "OpenVPN master secret"
+
+        static let label2 = "OpenVPN key expansion"
+
+        static let randomLength = 32
+
+        static let preMasterLength = 48
+
+        static let keyLength = 64
+
+        static let keysCount = 4
+    }
+
+    enum ControlChannel {
+        static let maxPacketSize = 1000
+
+        // UInt32(0) + UInt8(KeyMethod = 2)
+        static let tlsPrefix = Data(hex: "0000000002")
+
+        private static let numberOfKeys = UInt8(8) // 3-bit
+
+        static func nextKey(after currentKey: UInt8) -> UInt8 {
+            max(1, (currentKey + 1) % numberOfKeys)
+        }
+
+        static let ctrTagLength = 32
+
+        static let ctrPayloadLength = PacketOpcodeLength + PacketSessionIdLength + PacketReplayIdLength + PacketReplayTimestampLength
+    }
+
+    enum DataChannel {
+        static let prngSeedLength = 64
+
+        static let aeadTagLength = 16
+
+        static let aeadIdLength = PacketIdLength
+
+        static let pingString = Data(hex: "2a187bf3641eb4cb07ed2d0a981fc748")
+    }
+}
+
+extension Constants.ControlChannel {
+    static func peerInfo(sslVersion: String? = nil, withPlatform: Bool = true, extra: [String: String]? = nil) -> String {
+        let uiVersion = Partout.versionIdentifier
+        var info = [
+            "IV_VER=2.4",
+            "IV_UI_VER=\(uiVersion)",
+            "IV_PROTO=2",
+            "IV_NCP=2",
+            "IV_LZO_STUB=1"
+        ]
+        info.append("IV_LZO=0")
+        // XXX: always do --push-peer-info
+        // however, MAC is inaccessible and IFAD is deprecated, skip IV_HWADDR
+        if let sslVersion {
+            info.append("IV_SSL=\(sslVersion)")
+        }
+        if withPlatform {
+            let platform: String
+            let platformVersion = ProcessInfo.processInfo.operatingSystemVersion
+#if os(iOS)
+            platform = "ios"
+#elseif os(tvOS)
+            platform = "tvos"
+#else
+            platform = "mac"
+#endif
+            info.append("IV_PLAT=\(platform)")
+            info.append("IV_PLAT_VER=\(platformVersion.majorVersion).\(platformVersion.minorVersion)")
+        }
+        if let extra {
+            info.append(contentsOf: extra.map {
+                "\($0)=\($1)"
+            })
+        }
+        info.append("")
+        return info.joined(separator: "\n")
+    }
+}

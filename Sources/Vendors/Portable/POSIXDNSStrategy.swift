@@ -1,31 +1,11 @@
+// SPDX-FileCopyrightText: 2025 Davide De Rosa
 //
-//  POSIXDNSStrategy.swift
-//  Partout
-//
-//  Created by Davide De Rosa on 5/13/25.
-//  Copyright (c) 2025 Davide De Rosa. All rights reserved.
-//
-//  https://github.com/passepartoutvpn
-//
-//  This file is part of Partout.
-//
-//  Partout is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  Partout is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU General Public License for more details.
-//
-//  You should have received a copy of the GNU General Public License
-//  along with Partout.  If not, see <http://www.gnu.org/licenses/>.
-//
+// SPDX-License-Identifier: GPL-3.0
 
 import Foundation
 import PartoutCore
 
+/// Implementation of ``/PartoutCore/SimpleDNSStrategy`` with the POSIX C library.
 public final class POSIXDNSStrategy: SimpleDNSStrategy {
     private let hostname: String
 
@@ -43,8 +23,9 @@ public final class POSIXDNSStrategy: SimpleDNSStrategy {
         if let task {
             records = try await task.value
         } else {
-            let newTask = Task.detached { [weak self] in
-                try self?.resolveAndBlock()
+            let hostname = self.hostname
+            let newTask = Task.detached { @Sendable in
+                try Self.resolveAndBlock(hostname: hostname)
             }
             task = newTask
             records = try await newTask.value
@@ -62,11 +43,11 @@ public final class POSIXDNSStrategy: SimpleDNSStrategy {
 }
 
 private extension POSIXDNSStrategy {
-    func resolveAndBlock() throws -> [DNSRecord]? {
+    static func resolveAndBlock(hostname: String) throws -> [DNSRecord]? {
         let addr = hostname.cString(using: .utf8)
         var hints = addrinfo()
         hints.ai_family = AF_UNSPEC // IPv4/IPv6
-        var infoPointer: UnsafeMutablePointer<addrinfo>? = nil
+        var infoPointer: UnsafeMutablePointer<addrinfo>?
         let result = getaddrinfo(addr, nil, &hints, &infoPointer)
         if result != 0 {
             throw PartoutError(.dnsFailure)
