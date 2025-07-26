@@ -295,7 +295,7 @@ if areas.contains(.wireGuard) {
         .target(
             name: "PartoutWireGuardCross",
             dependencies: [
-                "_PartoutVendorsWireGuardBackend",
+                "_PartoutVendorsWireGuard",
                 "_PartoutWireGuard_C",
                 "PartoutWireGuard"
             ],
@@ -377,8 +377,8 @@ package.targets.append(contentsOf: [
         path: "Sources/Vendors/Portable_C"
     ),
     .target(
-        name: "_PartoutVendorsWireGuardBackendCore",
-        path: "Sources/Vendors/WireGuard/BackendCore"
+        name: "_PartoutVendorsWireGuardCore",
+        path: "Sources/Vendors/WireGuard/Core"
     ),
     .testTarget(
         name: "_PartoutVendorsPortableTests",
@@ -434,12 +434,12 @@ case .apple:
         )
         package.targets.append(
             .target(
-                name: "_PartoutVendorsWireGuardBackend",
+                name: "_PartoutVendorsWireGuard",
                 dependencies: [
-                    "_PartoutVendorsWireGuardBackendCore",
+                    "_PartoutVendorsWireGuardCore",
                     "wg-go-apple"
                 ],
-                path: "Sources/Vendors/WireGuard/BackendGo"
+                path: "Sources/Vendors/WireGuard/Go"
             )
         )
     }
@@ -496,11 +496,11 @@ package.targets.append(
 if OS.current == .apple {
     package.targets.append(
         .testTarget(
-            name: "_PartoutVendorsWireGuardBackendTests",
+            name: "_PartoutVendorsWireGuardTests",
             dependencies: [
-                "_PartoutVendorsWireGuardBackend" // now platform-independent
+                "_PartoutVendorsWireGuard" // now platform-independent
             ],
-            path: "Tests/Vendors/WireGuardBackend"
+            path: "Tests/Vendors/WireGuard"
         )
     )
 }
