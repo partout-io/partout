@@ -85,18 +85,7 @@ final class Authenticator {
                 "V4",
                 "dev-type tun"
             ]
-            if let comp = options.compressionFraming {
-                switch comp {
-                case .compLZO:
-                    opts.append("comp-lzo")
-
-                case .compress:
-                    opts.append("compress")
-
-                default:
-                    break
-                }
-            }
+            opts.append("comp-lzo")
             if let direction = options.tlsWrap?.key.direction?.rawValue {
                 opts.append("keydir \(direction)")
             }
