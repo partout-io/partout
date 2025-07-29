@@ -79,7 +79,7 @@ final class StandardOpenVPNParserTests: XCTestCase {
     }
 
     func test_givenTLSCryptV2_whenParse_thenFails() throws {
-        let lines = ["tls-crypt-v2"]
+        let lines = ["tls-crypt-v2-client"]
         XCTAssertThrowsError(try parser.parsed(fromLines: lines))
     }
 
