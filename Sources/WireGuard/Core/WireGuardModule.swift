@@ -49,12 +49,15 @@ extension WireGuardModule {
         }
 
         public func tryBuild() throws -> WireGuardModule {
-            guard configurationBuilder != nil else {
+            guard let configurationBuilder else {
                 throw PartoutError(.incompleteModule, self)
+            }
+            guard !configurationBuilder.peers.isEmpty else {
+                throw PartoutError(.WireGuard.emptyPeers)
             }
             return WireGuardModule(
                 id: id,
-                configuration: try configurationBuilder?.tryBuild()
+                configuration: try configurationBuilder.tryBuild()
             )
         }
     }

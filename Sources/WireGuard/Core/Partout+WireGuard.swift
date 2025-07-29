@@ -9,6 +9,7 @@ extension LoggerCategory {
 }
 
 extension PartoutError.Code {
-    enum WireGuard {
+    public enum WireGuard {
+        public static let emptyPeers = PartoutError.Code("WireGuard.emptyPeers")
     }
 }
