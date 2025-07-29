@@ -52,9 +52,6 @@ extension WireGuardModule {
             guard let configurationBuilder else {
                 throw PartoutError(.incompleteModule, self)
             }
-            guard !configurationBuilder.peers.isEmpty else {
-                throw PartoutError(.WireGuard.emptyPeers)
-            }
             return WireGuardModule(
                 id: id,
                 configuration: try configurationBuilder.tryBuild()
