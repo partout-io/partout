@@ -27,7 +27,8 @@ final class RegistryTests: XCTestCase {
             try XCTUnwrap(.init("host.name", .init(.tcp, 80)))
         ]
 
-        let wgBuilder = WireGuard.Configuration.Builder(privateKey: "")
+        var wgBuilder = WireGuard.Configuration.Builder(privateKey: "")
+        wgBuilder.peers = [.init(publicKey: "")]
 
         var profileBuilder = Profile.Builder()
         profileBuilder.modules.append(try DNSModule.Builder().tryBuild())
