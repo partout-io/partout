@@ -87,6 +87,8 @@ extension StandardOpenVPNParser.Builder {
             throw StandardOpenVPNParserError.unsupportedConfiguration(option: "proxy: \"\(line)\"")
         case .externalFiles:
             throw StandardOpenVPNParserError.unsupportedConfiguration(option: "external file: \"\(line)\"")
+        case .tlsCryptV2:
+            throw StandardOpenVPNParserError.unsupportedConfiguration(option: "tls-crypt-v2")
 
             // MARK: Continuation
 
