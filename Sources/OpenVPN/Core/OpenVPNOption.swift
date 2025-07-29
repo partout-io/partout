@@ -18,11 +18,13 @@ extension OpenVPN {
         // check blocks first
         case connectionBlock = "^<connection>"
 
-        case fragment = "^fragment"
-
         case connectionProxy = "^\\w+-proxy"
 
         case externalFiles = "^(auth-user-pass|ca|cert|key|tls-auth|tls-crypt) "
+
+        case fragment = "^fragment"
+
+        case tlsCryptV2 = "tls-crypt-v2"
 
         // MARK: General
 
