@@ -52,6 +52,9 @@ extension WireGuard.Configuration {
         }
 
         public func tryBuild() throws -> WireGuard.Configuration {
+            guard !peers.isEmpty else {
+                throw PartoutError(.WireGuard.emptyPeers)
+            }
             return WireGuard.Configuration(
                 interface: try interface.tryBuild(),
                 peers: try peers.map {
