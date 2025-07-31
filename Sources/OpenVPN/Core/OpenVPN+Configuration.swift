@@ -211,6 +211,12 @@ extension OpenVPN {
         /// - Seealso: `Configuration.Builder.routes6`
         public let routes6: [Route]?
 
+        /// - Seealso: `Configuration.Builder.routeGateway4`
+        public let routeGateway4: Address?
+
+        /// - Seealso: `Configuration.Builder.routeGateway6`
+        public let routeGateway6: Address?
+
         /// - Seealso: `Configuration.Builder.dnsServers`
         public let dnsServers: [String]?
 
@@ -363,6 +369,12 @@ extension OpenVPN.Configuration {
         /// The IPv6 routes if `ipv6` is nil.
         public var routes6: [Route]?
 
+        /// The IPv4 gateway for routes.
+        public var routeGateway4: Address?
+
+        /// The IPv6 gateway for routes.
+        public var routeGateway6: Address?
+
         /// The DNS protocol, defaults to `.plain`.
         public var dnsProtocol: DNSProtocol?
 
@@ -474,6 +486,8 @@ extension OpenVPN.Configuration {
                 ipv6: ipv6,
                 routes4: routes4,
                 routes6: routes6,
+                routeGateway4: routeGateway4,
+                routeGateway6: routeGateway6,
                 dnsServers: dnsServers,
                 dnsDomain: dnsDomain,
                 searchDomains: searchDomains,

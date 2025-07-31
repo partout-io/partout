@@ -672,6 +672,7 @@ extension StandardOpenVPNParser.Builder {
             let gateway = (tuple.gateway ?? defaultGateway4).map(Address.init(rawValue:)) ?? nil
             return Route(subnet, gateway)
         }
+        builder.routeGateway4 = defaultGateway4.map(Address.init(rawValue:)) ?? nil
 
         let defaultGateway6: String?
         if let ifconfig6Arguments = optIfconfig6Arguments {
@@ -707,6 +708,7 @@ extension StandardOpenVPNParser.Builder {
             let gateway = (tuple.gateway ?? defaultGateway6).map(Address.init(rawValue:)) ?? nil
             return Route(subnet, gateway)
         }
+        builder.routeGateway6 = defaultGateway6.map(Address.init(rawValue:)) ?? nil
 
         builder.dnsServers = optDNSServers
         builder.dnsDomain = optDomain
