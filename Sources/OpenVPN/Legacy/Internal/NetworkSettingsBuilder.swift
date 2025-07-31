@@ -180,10 +180,10 @@ private extension NetworkSettingsBuilder {
 
         let routes: [Route] = target.compactMap { route in
             let ipv4Route = Route(route.destination, route.gateway ?? remoteOptions.routeGateway4)
-            if route.destination == nil {
-                pp_log(ctx, .openvpn, .info, "\tIPv4: Set default gateway")
+            if let destination = route.destination {
+                pp_log(ctx, .openvpn, .info, "\tIPv4: Add route \(destination.description) -> \(route.gateway?.description ?? "*")")
             } else {
-                pp_log(ctx, .openvpn, .info, "\tIPv4: Add route \(route.destination?.description ?? "default") -> \(route.gateway?.description ?? "*")")
+                pp_log(ctx, .openvpn, .info, "\tIPv4: Set default gateway -> \(route.gateway?.description ?? "*")")
             }
             return ipv4Route
         }
@@ -205,10 +205,10 @@ private extension NetworkSettingsBuilder {
 
         let routes: [Route] = target.compactMap { route in
             let ipv6Route = Route(route.destination, route.gateway ?? remoteOptions.routeGateway6)
-            if route.destination == nil {
-                pp_log(ctx, .openvpn, .info, "\tIPv6: Set default gateway")
+            if let destination = route.destination {
+                pp_log(ctx, .openvpn, .info, "\tIPv6: Add route \(destination.description) -> \(route.gateway?.description ?? "*")")
             } else {
-                pp_log(ctx, .openvpn, .info, "\tIPv6: Add route \(route.destination?.description ?? "default") -> \(route.gateway?.description ?? "*")")
+                pp_log(ctx, .openvpn, .info, "\tIPv6: Set default gateway -> \(route.gateway?.description ?? "*")")
             }
             return ipv6Route
         }
