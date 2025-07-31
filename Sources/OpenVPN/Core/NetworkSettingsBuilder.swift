@@ -169,11 +169,10 @@ private extension NetworkSettingsBuilder {
         guard let ipv4 = remoteOptions.ipv4 else {
             return nil
         }
-
-        // prepend main routes
         let defaultRouteGateway = remoteOptions.routeGateway4
-        var computedRoutes = allRoutes4
-        computedRoutes.insert(contentsOf: ipv4.includedRoutes, at: 0)
+
+        // prepend main server routes
+        var computedRoutes = ipv4.includedRoutes + allRoutes4
         if isIPv4Gateway {
             computedRoutes.append(Route(defaultWithGateway: defaultRouteGateway))
         }
@@ -194,11 +193,10 @@ private extension NetworkSettingsBuilder {
         guard let ipv6 = remoteOptions.ipv6 else {
             return nil
         }
-
-        // prepend main routes
         let defaultRouteGateway = remoteOptions.routeGateway6
-        var computedRoutes = allRoutes6
-        computedRoutes.insert(contentsOf: ipv6.includedRoutes, at: 0)
+
+        // prepend main server routes
+        var computedRoutes = ipv6.includedRoutes + allRoutes6
         if isIPv6Gateway {
             computedRoutes.append(Route(defaultWithGateway: defaultRouteGateway))
         }
