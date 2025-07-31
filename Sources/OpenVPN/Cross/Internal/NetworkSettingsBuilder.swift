@@ -175,11 +175,11 @@ private extension NetworkSettingsBuilder {
         var target = allRoutes4
         target.insert(contentsOf: ipv4.includedRoutes, at: 0)
         if isIPv4Gateway {
-            target.append(Route(defaultWithGateway: nil))
+            target.append(Route(defaultWithGateway: remoteOptions.routeGateway4))
         }
 
         let routes: [Route] = target.compactMap { route in
-            let ipv4Route = Route(route.destination, route.gateway)
+            let ipv4Route = Route(route.destination, route.gateway ?? remoteOptions.routeGateway4)
             if route.destination == nil {
                 pp_log(ctx, .openvpn, .info, "\tIPv4: Set default gateway")
             } else {
@@ -200,11 +200,11 @@ private extension NetworkSettingsBuilder {
         var target = allRoutes6
         target.insert(contentsOf: ipv6.includedRoutes, at: 0)
         if isIPv6Gateway {
-            target.append(Route(defaultWithGateway: nil))
+            target.append(Route(defaultWithGateway: remoteOptions.routeGateway6))
         }
 
         let routes: [Route] = target.compactMap { route in
-            let ipv6Route = Route(route.destination, route.gateway)
+            let ipv6Route = Route(route.destination, route.gateway ?? remoteOptions.routeGateway6)
             if route.destination == nil {
                 pp_log(ctx, .openvpn, .info, "\tIPv6: Set default gateway")
             } else {
