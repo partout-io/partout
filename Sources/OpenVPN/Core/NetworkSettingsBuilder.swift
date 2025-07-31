@@ -4,12 +4,11 @@
 
 import Foundation
 import PartoutCore
-import PartoutOpenVPN
 
 /// Merges local and remote settings.
 ///
 /// OpenVPN settings may be set locally, but may also received from a remote server. This object merges the local and remote ``OpenVPN/Configuration`` into a digestible list of `Module`.
-struct NetworkSettingsBuilder {
+public struct NetworkSettingsBuilder {
     private let ctx: PartoutLoggerContext
 
     /// The client options.
@@ -18,14 +17,14 @@ struct NetworkSettingsBuilder {
     /// The server options.
     private let remoteOptions: OpenVPN.Configuration
 
-    init(_ ctx: PartoutLoggerContext, localOptions: OpenVPN.Configuration, remoteOptions: OpenVPN.Configuration) {
+    public init(_ ctx: PartoutLoggerContext, localOptions: OpenVPN.Configuration, remoteOptions: OpenVPN.Configuration) {
         self.ctx = ctx
         self.localOptions = localOptions
         self.remoteOptions = remoteOptions
     }
 
     /// A list of `Module` mapped from ``localOptions`` and ``remoteOptions``.
-    func modules() -> [Module] {
+    public func modules() -> [Module] {
         pp_log(ctx, .openvpn, .info, "Build modules from local/remote options")
 
         return [
@@ -35,7 +34,7 @@ struct NetworkSettingsBuilder {
         ].compactMap { $0 }
     }
 
-    func print() {
+    public func print() {
         pp_log(ctx, .openvpn, .notice, "Negotiated options (remote overrides local)")
         if let negCipher = remoteOptions.cipher {
             pp_log(ctx, .openvpn, .notice, "\tCipher: \(negCipher.rawValue)")
@@ -172,22 +171,22 @@ private extension NetworkSettingsBuilder {
         }
 
         // prepend main routes
-        var target = allRoutes4
-        target.insert(contentsOf: ipv4.includedRoutes, at: 0)
+        let defaultRouteGateway = remoteOptions.routeGateway4
+        var computedRoutes = allRoutes4
+        computedRoutes.insert(contentsOf: ipv4.includedRoutes, at: 0)
         if isIPv4Gateway {
-            target.append(Route(defaultWithGateway: remoteOptions.routeGateway4))
+            computedRoutes.append(Route(defaultWithGateway: defaultRouteGateway))
         }
 
-        let routes: [Route] = target.compactMap { route in
-            let ipv4Route = Route(route.destination, route.gateway ?? remoteOptions.routeGateway4)
-            if route.destination == nil {
-                pp_log(ctx, .openvpn, .info, "\tIPv4: Set default gateway")
+        let routes: [Route] = computedRoutes.compactMap { route in
+            let ipv4Route = Route(route.destination, route.gateway ?? defaultRouteGateway)
+            if let destination = route.destination {
+                pp_log(ctx, .openvpn, .info, "\tIPv4: Add route \(destination.description) -> \(route.gateway?.description ?? "*")")
             } else {
-                pp_log(ctx, .openvpn, .info, "\tIPv4: Add route \(route.destination?.description ?? "default") -> \(route.gateway?.description ?? "*")")
+                pp_log(ctx, .openvpn, .info, "\tIPv4: Set default gateway -> \(route.gateway?.description ?? "*")")
             }
             return ipv4Route
         }
-
         return ipv4.including(routes: routes)
     }
 
@@ -197,22 +196,22 @@ private extension NetworkSettingsBuilder {
         }
 
         // prepend main routes
-        var target = allRoutes6
-        target.insert(contentsOf: ipv6.includedRoutes, at: 0)
+        let defaultRouteGateway = remoteOptions.routeGateway6
+        var computedRoutes = allRoutes6
+        computedRoutes.insert(contentsOf: ipv6.includedRoutes, at: 0)
         if isIPv6Gateway {
-            target.append(Route(defaultWithGateway: remoteOptions.routeGateway6))
+            computedRoutes.append(Route(defaultWithGateway: defaultRouteGateway))
         }
 
-        let routes: [Route] = target.compactMap { route in
-            let ipv6Route = Route(route.destination, route.gateway ?? remoteOptions.routeGateway6)
-            if route.destination == nil {
-                pp_log(ctx, .openvpn, .info, "\tIPv6: Set default gateway")
+        let routes = computedRoutes.compactMap { route in
+            let ipv6Route = Route(route.destination, route.gateway ?? defaultRouteGateway)
+            if let destination = route.destination {
+                pp_log(ctx, .openvpn, .info, "\tIPv6: Add route \(destination.description) -> \(route.gateway?.description ?? "*")")
             } else {
-                pp_log(ctx, .openvpn, .info, "\tIPv6: Add route \(route.destination?.description ?? "default") -> \(route.gateway?.description ?? "*")")
+                pp_log(ctx, .openvpn, .info, "\tIPv6: Set default gateway -> \(route.gateway?.description ?? "*")")
             }
             return ipv6Route
         }
-
         return ipv6.including(routes: routes)
     }
 }
