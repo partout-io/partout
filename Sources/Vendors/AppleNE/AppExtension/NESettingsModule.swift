@@ -10,7 +10,7 @@ import PartoutCore
 public struct NESettingsModule: Module, @unchecked Sendable {
     public let id: UUID
 
-    public var checksum: Int {
+    public var fingerprint: Int {
         fullSettings.hashValue
     }
 
