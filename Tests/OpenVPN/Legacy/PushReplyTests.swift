@@ -189,6 +189,7 @@ final class PushReplyTests: XCTestCase {
         let reply = try parser.pushReply(with: msg)
         reply?.debug()
 
+        XCTAssertNil(reply?.options.routingPolicies)
         let includedRoutes = reply?.options.ipv4?.includedRoutes
         XCTAssertEqual(includedRoutes?.count, 1)
         XCTAssertEqual(includedRoutes, [
@@ -202,10 +203,9 @@ final class PushReplyTests: XCTestCase {
         let reply = try parser.pushReply(with: msg)
         reply?.debug()
 
+        XCTAssertEqual(reply?.options.routingPolicies, [.IPv4])
         let includedRoutes = reply?.options.ipv4?.includedRoutes
-        XCTAssertEqual(includedRoutes?.count, 2)
         XCTAssertEqual(includedRoutes, [
-            Route(nil, .init(rawValue: "10.8.0.1")),
             Route(.init(rawValue: "10.8.0.0/24"), nil)
         ])
     }

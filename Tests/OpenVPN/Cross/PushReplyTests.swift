@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+import PartoutCore
 @testable import PartoutOpenVPN
 @testable internal import PartoutOpenVPNCross
 import Testing
@@ -180,6 +181,34 @@ struct PushReplyTests {
         reply?.debug()
 
         #expect(reply?.options.routingPolicies == [.IPv4])
+    }
+
+    @Test
+    func givenRouteGateway_whenParse_thenMustNotIncludeDefaultGateway() throws {
+        let msg = "PUSH_REPLY,dhcp-option DNS 1.1.1.1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 20,ifconfig 10.8.0.2 255.255.255.0,peer-id 0,cipher AES-256-GCM"
+
+        let reply = try parser.pushReply(with: msg)
+        reply?.debug()
+
+        #expect(reply?.options.routingPolicies == nil)
+        let includedRoutes = reply?.options.ipv4?.includedRoutes
+        #expect(includedRoutes == [
+            Route(.init(rawValue: "10.8.0.0/24"), nil)
+        ])
+    }
+
+    @Test
+    func givenRouteGatewayAndRedirectGateway_whenParse_thenMustIncludeDefaultGateway() throws {
+        let msg = "PUSH_REPLY,dhcp-option DNS 1.1.1.1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 20,ifconfig 10.8.0.2 255.255.255.0,peer-id 0,cipher AES-256-GCM,redirect-gateway def1"
+
+        let reply = try parser.pushReply(with: msg)
+        reply?.debug()
+
+        #expect(reply?.options.routingPolicies == [.IPv4])
+        let includedRoutes = reply?.options.ipv4?.includedRoutes
+        #expect(includedRoutes == [
+            Route(.init(rawValue: "10.8.0.0/24"), nil)
+        ])
     }
 }
 
