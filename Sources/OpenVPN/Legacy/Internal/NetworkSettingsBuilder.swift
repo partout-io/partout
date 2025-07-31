@@ -174,15 +174,14 @@ private extension NetworkSettingsBuilder {
         // prepend main routes
         var target = allRoutes4
         target.insert(contentsOf: ipv4.includedRoutes, at: 0)
+        if isIPv4Gateway {
+            target.append(Route(defaultWithGateway: nil))
+        }
 
         let routes: [Route] = target.compactMap { route in
             let ipv4Route = Route(route.destination, route.gateway)
             if route.destination == nil {
-                guard isIPv4Gateway, let gw = route.gateway else {
-                    pp_log(ctx, .openvpn, .error, "\tIPv4: Ignored default route (not default gateway)")
-                    return nil
-                }
-                pp_log(ctx, .openvpn, .info, "\tIPv4: Set default gateway to \(gw)")
+                pp_log(ctx, .openvpn, .info, "\tIPv4: Set default gateway")
             } else {
                 pp_log(ctx, .openvpn, .info, "\tIPv4: Add route \(route.destination?.description ?? "default") -> \(route.gateway?.description ?? "*")")
             }
@@ -200,15 +199,14 @@ private extension NetworkSettingsBuilder {
         // prepend main routes
         var target = allRoutes6
         target.insert(contentsOf: ipv6.includedRoutes, at: 0)
+        if isIPv6Gateway {
+            target.append(Route(defaultWithGateway: nil))
+        }
 
         let routes: [Route] = target.compactMap { route in
             let ipv6Route = Route(route.destination, route.gateway)
             if route.destination == nil {
-                guard isIPv6Gateway, let gw = route.gateway else {
-                    pp_log(ctx, .openvpn, .error, "\tIPv6: Ignored default route (not default gateway)")
-                    return nil
-                }
-                pp_log(ctx, .openvpn, .info, "\tIPv6: Set default gateway to \(gw)")
+                pp_log(ctx, .openvpn, .info, "\tIPv6: Set default gateway")
             } else {
                 pp_log(ctx, .openvpn, .info, "\tIPv6: Add route \(route.destination?.description ?? "default") -> \(route.gateway?.description ?? "*")")
             }
