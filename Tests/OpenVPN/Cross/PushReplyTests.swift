@@ -43,6 +43,7 @@ struct PushReplyTests {
         #expect(reply.options.ipv4?.subnet?.address.rawValue == "10.8.0.2")
         #expect(reply.options.ipv4?.subnet?.ipv4Mask == "255.255.255.0")
         #expect(reply.options.ipv4?.includesDefaultRoute == false)
+        #expect(reply.options.routeGateway4?.rawValue == "10.8.0.1")
         #expect(reply.options.dnsServers == ["8.8.8.8", "4.4.4.4"])
     }
 
@@ -72,6 +73,7 @@ struct PushReplyTests {
         #expect(reply.options.ipv6?.subnet?.prefixLength == 64)
         #expect(reply.options.ipv6?.includesDefaultRoute == false)
         #expect(reply.options.dnsServers == ["2001:4860:4860::8888", "2001:4860:4860::8844"])
+        #expect(reply.options.routeGateway4?.rawValue == "10.8.0.1")
     }
 
     @Test
@@ -181,6 +183,7 @@ struct PushReplyTests {
         reply?.debug()
 
         #expect(reply?.options.routingPolicies == [.IPv4])
+        #expect(reply?.options.routeGateway4?.rawValue == "10.8.0.1")
     }
 
     @Test
@@ -195,6 +198,7 @@ struct PushReplyTests {
         #expect(includedRoutes == [
             Route(.init(rawValue: "10.8.0.0/24"), nil)
         ])
+        #expect(reply?.options.routeGateway4?.rawValue == "10.8.0.1")
     }
 
     @Test
@@ -209,6 +213,7 @@ struct PushReplyTests {
         #expect(includedRoutes == [
             Route(.init(rawValue: "10.8.0.0/24"), nil)
         ])
+        #expect(reply?.options.routeGateway4?.rawValue == "10.8.0.1")
     }
 }
 
