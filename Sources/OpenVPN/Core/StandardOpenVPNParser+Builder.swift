@@ -654,13 +654,8 @@ extension StandardOpenVPNParser.Builder {
                 throw StandardOpenVPNParserError.unsupportedConfiguration(option: "topology p2p")
             }
 
-            let redirectsDefault = optRedirectGateway?.isEnabledForIPv4 == true
             let vpnAddress4 = try Subnet(address4, vpnMask4)
             var includedRoutes: [Route] = []
-            if redirectsDefault, let defaultGateway4,
-               let defaultGw4Address = Address(rawValue: defaultGateway4) {
-                includedRoutes.append(Route(defaultWithGateway: defaultGw4Address))
-            }
             if let vpnNetwork4 = vpnAddress4.address.network(with: vpnMask4) {
                 let vpnDestination4 = try Subnet(vpnNetwork4.rawValue, vpnMask4)
                 includedRoutes.append(Route(vpnDestination4, nil))
@@ -671,12 +666,12 @@ extension StandardOpenVPNParser.Builder {
         } else {
             defaultGateway4 = nil
         }
-
         builder.routes4 = try optRoutes4?.compactMap { tuple in
             let subnet = try Subnet(tuple.address, tuple.netmask)
-            let gateway = (tuple.gateway ?? defaultGateway4).map(Address.init(rawValue:)) ?? nil
+            let gateway = tuple.gateway.map(Address.init(rawValue:)) ?? nil
             return Route(subnet, gateway)
         }
+        builder.routeGateway4 = defaultGateway4.map(Address.init(rawValue:)) ?? nil
 
         let defaultGateway6: String?
         if let ifconfig6Arguments = optIfconfig6Arguments {
@@ -694,13 +689,8 @@ extension StandardOpenVPNParser.Builder {
             let address6 = address6Components[0]
             defaultGateway6 = ifconfig6Arguments[1]
 
-            let redirectsDefault = optRedirectGateway?.isEnabledForIPv6 == true
             let vpnAddress6 = try Subnet(address6, vpnPrefix6)
             var includedRoutes: [Route] = []
-            if redirectsDefault, let defaultGateway6,
-               let defaultGw6Address = Address(rawValue: defaultGateway6) {
-                includedRoutes.append(Route(defaultWithGateway: defaultGw6Address))
-            }
             if let vpnNetwork6 = vpnAddress6.address.network(with: vpnPrefix6) {
                 let vpnDestination6 = try Subnet(vpnNetwork6.rawValue, vpnPrefix6)
                 includedRoutes.append(Route(vpnDestination6, nil))
@@ -711,12 +701,12 @@ extension StandardOpenVPNParser.Builder {
         } else {
             defaultGateway6 = nil
         }
-
         builder.routes6 = try optRoutes6?.compactMap { tuple in
             let subnet = try Subnet(tuple.destination, tuple.prefix)
-            let gateway = (tuple.gateway ?? defaultGateway6).map(Address.init(rawValue:)) ?? nil
+            let gateway = tuple.gateway.map(Address.init(rawValue:)) ?? nil
             return Route(subnet, gateway)
         }
+        builder.routeGateway6 = defaultGateway6.map(Address.init(rawValue:)) ?? nil
 
         builder.dnsServers = optDNSServers
         builder.dnsDomain = optDomain
@@ -809,16 +799,6 @@ private extension StandardOpenVPNParser.Builder {
     typealias Route6Group = (destination: String, prefix: Int, gateway: String?)
 }
 // swiftlint:enable large_tuple
-
-private extension Set where Element == StandardOpenVPNParser.Builder.RedirectGateway {
-    var isEnabledForIPv4: Bool {
-        !isEmpty && !contains(.noIPv4)
-    }
-
-    var isEnabledForIPv6: Bool {
-        contains(.ipv6)
-    }
-}
 
 private extension IPSocketType {
     init?(protoString: String) {

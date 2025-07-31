@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+import PartoutCore
 @testable import PartoutOpenVPN
 @testable internal import PartoutOpenVPNCross
 import Testing
@@ -29,7 +30,8 @@ struct PushReplyTests {
 
         #expect(reply.options.ipv4?.subnet?.address.rawValue == "10.5.10.6")
         #expect(reply.options.ipv4?.subnet?.ipv4Mask == "255.255.255.252")
-        #expect(reply.options.ipv4?.defaultGateway?.rawValue == "10.5.10.5")
+        #expect(reply.options.ipv4?.includesDefaultRoute == false)
+        #expect(reply.options.routeGateway4?.rawValue == "10.5.10.5")
         #expect(reply.options.dnsServers == ["209.222.18.222", "209.222.18.218"])
     }
 
@@ -41,7 +43,8 @@ struct PushReplyTests {
 
         #expect(reply.options.ipv4?.subnet?.address.rawValue == "10.8.0.2")
         #expect(reply.options.ipv4?.subnet?.ipv4Mask == "255.255.255.0")
-        #expect(reply.options.ipv4?.defaultGateway?.rawValue == nil)
+        #expect(reply.options.ipv4?.includesDefaultRoute == false)
+        #expect(reply.options.routeGateway4?.rawValue == "10.8.0.1")
         #expect(reply.options.dnsServers == ["8.8.8.8", "4.4.4.4"])
     }
 
@@ -66,11 +69,12 @@ struct PushReplyTests {
 
         #expect(reply.options.ipv4?.subnet?.address.rawValue == "10.8.0.2")
         #expect(reply.options.ipv4?.subnet?.ipv4Mask == "255.255.255.0")
-        #expect(reply.options.ipv4?.defaultGateway?.rawValue == nil)
+        #expect(reply.options.ipv4?.includesDefaultRoute == false)
         #expect(reply.options.ipv6?.subnet?.address.rawValue == "fe80::601:30ff:feb7:ec01")
         #expect(reply.options.ipv6?.subnet?.prefixLength == 64)
-        #expect(reply.options.ipv6?.defaultGateway?.rawValue == nil)
+        #expect(reply.options.ipv6?.includesDefaultRoute == false)
         #expect(reply.options.dnsServers == ["2001:4860:4860::8888", "2001:4860:4860::8844"])
+        #expect(reply.options.routeGateway4?.rawValue == "10.8.0.1")
     }
 
     @Test
@@ -180,6 +184,37 @@ struct PushReplyTests {
         reply?.debug()
 
         #expect(reply?.options.routingPolicies == [.IPv4])
+        #expect(reply?.options.routeGateway4?.rawValue == "10.8.0.1")
+    }
+
+    @Test
+    func givenRouteGateway_whenParse_thenMustNotIncludeDefaultGateway() throws {
+        let msg = "PUSH_REPLY,dhcp-option DNS 1.1.1.1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 20,ifconfig 10.8.0.2 255.255.255.0,peer-id 0,cipher AES-256-GCM"
+
+        let reply = try parser.pushReply(with: msg)
+        reply?.debug()
+
+        #expect(reply?.options.routingPolicies == nil)
+        let includedRoutes = reply?.options.ipv4?.includedRoutes
+        #expect(includedRoutes == [
+            Route(.init(rawValue: "10.8.0.0/24"), nil)
+        ])
+        #expect(reply?.options.routeGateway4?.rawValue == "10.8.0.1")
+    }
+
+    @Test
+    func givenRouteGatewayAndRedirectGateway_whenParse_thenMustIncludeDefaultGateway() throws {
+        let msg = "PUSH_REPLY,dhcp-option DNS 1.1.1.1,route-gateway 10.8.0.1,topology subnet,ping 10,ping-restart 20,ifconfig 10.8.0.2 255.255.255.0,peer-id 0,cipher AES-256-GCM,redirect-gateway def1"
+
+        let reply = try parser.pushReply(with: msg)
+        reply?.debug()
+
+        #expect(reply?.options.routingPolicies == [.IPv4])
+        let includedRoutes = reply?.options.ipv4?.includedRoutes
+        #expect(includedRoutes == [
+            Route(.init(rawValue: "10.8.0.0/24"), nil)
+        ])
+        #expect(reply?.options.routeGateway4?.rawValue == "10.8.0.1")
     }
 }
 

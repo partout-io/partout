@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import PartoutOpenVPN
-@testable internal import PartoutOpenVPNLegacy
 import Foundation
 import PartoutCore
 import XCTest
@@ -67,67 +66,61 @@ final class NetworkSettingsBuilderTests: XCTestCase {
     }
 
     func test_givenSettings_whenBuildIPModule_thenFollowsRoutingPolicies() throws {
+        let routeGw4 = "6.6.6.6"
+        let routeGw6 = "::6"
+
         var sut: IPModule
         var remoteOptions = OpenVPN.Configuration.Builder()
         remoteOptions.ipv4 = IPSettings(
             subnet: Subnet(try XCTUnwrap(Address(rawValue: "1.1.1.1")), 16)
         )
-        .including(
-            routes: [
-                Route(defaultWithGateway: try XCTUnwrap(Address(rawValue: "6.6.6.6")))
-            ]
-        )
+        remoteOptions.routeGateway4 = try XCTUnwrap(Address(rawValue: routeGw4))
         remoteOptions.ipv6 = IPSettings(
             subnet: Subnet(try XCTUnwrap(Address(rawValue: "1:1::1")), 72)
         )
-        .including(
-            routes: [
-                Route(defaultWithGateway: try XCTUnwrap(Address(rawValue: "::6")))
-            ]
-        )
+        remoteOptions.routeGateway6 = try XCTUnwrap(Address(rawValue: routeGw6))
 
         sut = try XCTUnwrap(try builtModule(ofType: IPModule.self, with: remoteOptions))
         XCTAssertEqual(sut.ipv4?.subnet?.rawValue, "1.1.1.1/16")
         XCTAssertEqual(sut.ipv6?.subnet?.rawValue, "1:1::1/72")
-        XCTAssertNil(sut.ipv4?.defaultGateway?.rawValue)
-        XCTAssertNil(sut.ipv6?.defaultGateway?.rawValue)
+        XCTAssertFalse(sut.ipv4?.includesDefaultRoute ?? false)
+        XCTAssertFalse(sut.ipv6?.includesDefaultRoute ?? false)
 
         remoteOptions.routingPolicies = [.IPv4]
         sut = try XCTUnwrap(try builtModule(ofType: IPModule.self, with: remoteOptions))
-        XCTAssertEqual(sut.ipv4?.defaultGateway?.rawValue, "6.6.6.6")
-        XCTAssertNil(sut.ipv6?.defaultGateway?.rawValue)
+        XCTAssertTrue(sut.ipv4?.includesDefaultRoute ?? false)
+        XCTAssertEqual(sut.ipv4?.defaultRoute?.gateway, remoteOptions.routeGateway4)
+        XCTAssertFalse(sut.ipv6?.includesDefaultRoute ?? false)
 
         remoteOptions.routingPolicies = [.IPv6]
         sut = try XCTUnwrap(try builtModule(ofType: IPModule.self, with: remoteOptions))
-        XCTAssertNil(sut.ipv4?.defaultGateway?.rawValue)
-        XCTAssertEqual(sut.ipv6?.defaultGateway?.rawValue, "::6")
+        XCTAssertFalse(sut.ipv4?.includesDefaultRoute ?? false)
+        XCTAssertTrue(sut.ipv6?.includesDefaultRoute ?? false)
+        XCTAssertEqual(sut.ipv6?.defaultRoute?.gateway, remoteOptions.routeGateway6)
 
         remoteOptions.routingPolicies = [.IPv4, .IPv6]
         sut = try XCTUnwrap(try builtModule(ofType: IPModule.self, with: remoteOptions))
-        XCTAssertEqual(sut.ipv4?.defaultGateway?.rawValue, "6.6.6.6")
-        XCTAssertEqual(sut.ipv6?.defaultGateway?.rawValue, "::6")
+        XCTAssertTrue(sut.ipv4?.includesDefaultRoute ?? false)
+        XCTAssertTrue(sut.ipv6?.includesDefaultRoute ?? false)
+        XCTAssertEqual(sut.ipv4?.defaultRoute?.gateway, remoteOptions.routeGateway4)
+        XCTAssertEqual(sut.ipv6?.defaultRoute?.gateway, remoteOptions.routeGateway6)
     }
 
     func test_givenSettings_whenBuildIPModule_thenLocalRoutesUseRemoteGateway() throws {
+        let routeGw4 = "6.6.6.6"
+        let routeGw6 = "::6"
+
         var sut: IPModule
         var remoteOptions = OpenVPN.Configuration.Builder()
         remoteOptions.routingPolicies = [.IPv4, .IPv6]
         remoteOptions.ipv4 = IPSettings(
             subnet: Subnet(try XCTUnwrap(Address(rawValue: "1.1.1.1")), 16)
         )
-        .including(
-            routes: [
-                Route(defaultWithGateway: try XCTUnwrap(Address(rawValue: "6.6.6.6")))
-            ]
-        )
+        remoteOptions.routeGateway4 = try XCTUnwrap(Address(rawValue: routeGw4))
         remoteOptions.ipv6 = IPSettings(
             subnet: Subnet(try XCTUnwrap(Address(rawValue: "1:1::1")), 72)
         )
-        .including(
-            routes: [
-                Route(defaultWithGateway: try XCTUnwrap(Address(rawValue: "::6")))
-            ]
-        )
+        remoteOptions.routeGateway6 = try XCTUnwrap(Address(rawValue: routeGw6))
         var localOptions = OpenVPN.Configuration.Builder()
         localOptions.routes4 = [
             Route(Subnet(rawValue: "50.50.50.50/24"), nil)
@@ -143,15 +136,15 @@ final class NetworkSettingsBuilderTests: XCTestCase {
         ))
         XCTAssertEqual(sut.ipv4?.subnet?.rawValue, "1.1.1.1/16")
         XCTAssertEqual(sut.ipv6?.subnet?.rawValue, "1:1::1/72")
-        XCTAssertEqual(sut.ipv4?.defaultGateway?.rawValue, "6.6.6.6")
-        XCTAssertEqual(sut.ipv6?.defaultGateway?.rawValue, "::6")
+        XCTAssertTrue(sut.ipv4?.includesDefaultRoute ?? false)
+        XCTAssertTrue(sut.ipv6?.includesDefaultRoute ?? false)
         XCTAssertEqual(sut.ipv4?.includedRoutes, [
-            Route(nil, Address(rawValue: "6.6.6.6")),
-            Route(Subnet(rawValue: "50.50.50.50/24"), nil)
+            Route(Subnet(rawValue: "50.50.50.50/24"), remoteOptions.routeGateway4),
+            Route(defaultWithGateway: remoteOptions.routeGateway4)
         ])
         XCTAssertEqual(sut.ipv6?.includedRoutes, [
-            Route(nil, Address(rawValue: "::6")),
-            Route(Subnet(rawValue: "50:50::50/64"), nil)
+            Route(Subnet(rawValue: "50:50::50/64"), remoteOptions.routeGateway6),
+            Route(defaultWithGateway: remoteOptions.routeGateway6)
         ])
 
         remoteOptions.routingPolicies = []
@@ -160,8 +153,8 @@ final class NetworkSettingsBuilderTests: XCTestCase {
             with: remoteOptions,
             localOptions: localOptions
         ))
-        XCTAssertNil(sut.ipv4?.defaultGateway?.rawValue)
-        XCTAssertNil(sut.ipv6?.defaultGateway?.rawValue)
+        XCTAssertFalse(sut.ipv4?.includesDefaultRoute ?? false)
+        XCTAssertFalse(sut.ipv6?.includesDefaultRoute ?? false)
     }
 
     // MARK: DNS
