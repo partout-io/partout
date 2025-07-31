@@ -31,6 +31,7 @@ struct PushReplyTests {
         #expect(reply.options.ipv4?.subnet?.address.rawValue == "10.5.10.6")
         #expect(reply.options.ipv4?.subnet?.ipv4Mask == "255.255.255.252")
         #expect(reply.options.ipv4?.includesDefaultRoute == false)
+        #expect(reply.options.routeGateway4?.rawValue == "10.5.10.5")
         #expect(reply.options.dnsServers == ["209.222.18.222", "209.222.18.218"])
     }
 
