@@ -8,7 +8,6 @@ import Foundation
 import PartoutCore
 import PartoutWireGuard
 
-// FIXME: passepartout#507, generate WireGuard configuration from template
 public struct WireGuardProviderTemplate: Hashable, Codable, Sendable {
     public struct UserInfo: Sendable {
         public let deviceId: String
@@ -18,8 +17,10 @@ public struct WireGuardProviderTemplate: Hashable, Codable, Sendable {
         }
     }
 
-    public func builder() -> WireGuard.Configuration.Builder {
-        fatalError("TODO: define WireGuard template for providers")
+    public let ports: [UInt16]
+
+    public init(ports: [UInt16]) {
+        self.ports = ports
     }
 }
 
@@ -34,15 +35,39 @@ extension WireGuardProviderTemplate: ProviderTemplateCompiler {
         guard let deviceId = userInfo?.deviceId else {
             throw PartoutError(.Providers.missingOption, "userInfo.deviceId")
         }
-        var configurationBuilder = builder()
+        guard let ipAddresses = entity.server.ipAddresses, !ipAddresses.isEmpty else {
+            throw PartoutError(.Providers.missingOption, "entity.server.ipAddresses")
+        }
+        guard let serverPublicKey = entity.server.userInfo?["wgPublicKey"] as? String else {
+            throw PartoutError(.Providers.missingOption, "entity.server.wgPublicKey")
+        }
+        let serverPreSharedKey = entity.server.userInfo?["wgPreSharedKey"] as? String
         guard let session = options?.sessions?[deviceId] else {
             throw PartoutError(.Providers.missingOption, "session")
         }
         guard let peer = session.peer else {
             throw PartoutError(.Providers.missingOption, "session.peer")
         }
-        configurationBuilder.interface.privateKey = session.privateKey
+        let template = try entity.preset.template(ofType: WireGuardProviderTemplate.self)
+        guard !template.ports.isEmpty else {
+            throw PartoutError(.Providers.missingOption, "template.ports")
+        }
+
+        // local interface from session
+        var configurationBuilder = WireGuard.Configuration.Builder(privateKey: session.privateKey)
         configurationBuilder.interface.addresses = peer.addresses
+
+        // remote interfaces from infrastructure
+        configurationBuilder.peers = ipAddresses.reduce(into: []) { list, addrData in
+            guard let addr = Address(data: addrData) else { return }
+            template.ports.forEach { port in
+                var peer = WireGuard.RemoteInterface.Builder(publicKey: serverPublicKey)
+                peer.preSharedKey = serverPreSharedKey
+                peer.endpoint = "\(addr):\(port)"
+                peer.allowedIPs = ["0.0.0.0/0", "::/0"]
+                list.append(peer)
+            }
+        }
 
         var builder = WireGuardModule.Builder(id: moduleId)
         builder.configurationBuilder = configurationBuilder

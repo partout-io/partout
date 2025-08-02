@@ -48,13 +48,16 @@ public struct ProviderServer: Identifiable, Hashable, Codable, Sendable {
 
     public let supportedPresetIds: [String]?
 
-    public init(metadata: Metadata, serverId: String, hostname: String?, ipAddresses: Set<Data>?, supportedModuleTypes: [ModuleType]?, supportedPresetIds: [String]?) {
+    public let userInfo: [String: String]?
+
+    public init(metadata: Metadata, serverId: String, hostname: String?, ipAddresses: Set<Data>?, supportedModuleTypes: [ModuleType]?, supportedPresetIds: [String]?, userInfo: [String: String]? = nil) {
         self.metadata = metadata
         self.serverId = serverId
         self.hostname = hostname
         self.ipAddresses = ipAddresses
         self.supportedModuleTypes = supportedModuleTypes
         self.supportedPresetIds = supportedPresetIds
+        self.userInfo = userInfo
     }
 }
 

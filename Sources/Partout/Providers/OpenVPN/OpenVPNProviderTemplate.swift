@@ -69,9 +69,7 @@ private extension OpenVPNProviderTemplate {
         }
         endpoints.forEach { ep in
             server.ipAddresses?.forEach { data in
-                guard let addr = Address(data: data) else {
-                    return
-                }
+                guard let addr = Address(data: data) else { return }
                 remotes.append(.init(addr, ep))
             }
         }
