@@ -35,9 +35,6 @@ extension WireGuardProviderTemplate: ProviderTemplateCompiler {
         guard let deviceId = userInfo?.deviceId else {
             throw PartoutError(.Providers.missingOption, "userInfo.deviceId")
         }
-        guard let ipAddresses = entity.server.ipAddresses, !ipAddresses.isEmpty else {
-            throw PartoutError(.Providers.missingOption, "entity.server.ipAddresses")
-        }
         guard let serverPublicKey = entity.server.userInfo?["wgPublicKey"] as? String else {
             throw PartoutError(.Providers.missingOption, "entity.server.wgPublicKey")
         }
@@ -52,14 +49,17 @@ extension WireGuardProviderTemplate: ProviderTemplateCompiler {
         guard !template.ports.isEmpty else {
             throw PartoutError(.Providers.missingOption, "template.ports")
         }
+        let addresses = entity.server.allAddresses
+        guard !addresses.isEmpty else {
+            throw PartoutError(.Providers.missingOption, "entity.server.allAddresses")
+        }
 
         // local interface from session
         var configurationBuilder = WireGuard.Configuration.Builder(privateKey: session.privateKey)
         configurationBuilder.interface.addresses = peer.addresses
 
         // remote interfaces from infrastructure
-        configurationBuilder.peers = ipAddresses.reduce(into: []) { list, addrData in
-            guard let addr = Address(data: addrData) else { return }
+        configurationBuilder.peers = addresses.reduce(into: []) { list, addr in
             template.ports.forEach { port in
                 var peer = WireGuard.RemoteInterface.Builder(publicKey: serverPublicKey)
                 peer.preSharedKey = serverPreSharedKey

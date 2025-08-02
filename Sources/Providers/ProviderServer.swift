@@ -62,6 +62,19 @@ public struct ProviderServer: Identifiable, Hashable, Codable, Sendable {
 }
 
 extension ProviderServer {
+    public var allAddresses: [Address] {
+        var list: [Address] = []
+        if let hostname, let addr = Address(rawValue: hostname) {
+            list.append(addr)
+        }
+        if let ipAddresses {
+            list.append(contentsOf: ipAddresses.compactMap {
+                Address(data: $0)
+            })
+        }
+        return list
+    }
+
     public var localizedCountry: String? {
         Locale.current.localizedString(forRegionCode: metadata.countryCode)
     }
