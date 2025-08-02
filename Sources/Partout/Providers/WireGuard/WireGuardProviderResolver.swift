@@ -8,10 +8,6 @@ import PartoutCore
 import PartoutWireGuard
 
 public struct WireGuardProviderResolver: ProviderModuleResolver {
-    public enum UserInfo: String {
-        case deviceId
-    }
-
     private let ctx: PartoutLoggerContext
 
     private let deviceId: String
@@ -29,7 +25,7 @@ public struct WireGuardProviderResolver: ProviderModuleResolver {
         try providerModule.compiled(
             ctx,
             withTemplate: WireGuardProviderTemplate.self,
-            userInfo: [UserInfo.deviceId.rawValue: deviceId]
+            userInfo: WireGuardProviderTemplate.UserInfo(deviceId: deviceId)
         )
     }
 }

@@ -10,12 +10,14 @@ public protocol ProviderTemplateCompiler {
 
     associatedtype Options: ProviderOptions
 
+    associatedtype UserInfo
+
     static func compiled(
         _ ctx: PartoutLoggerContext,
         moduleId: UUID,
         entity: ProviderEntity,
         options: Options?,
-        userInfo: [String: Any]?
+        userInfo: UserInfo?
     ) throws -> CompiledModule
 }
 
@@ -29,7 +31,7 @@ extension ProviderModule {
     public func compiled<T>(
         _ ctx: PartoutLoggerContext,
         withTemplate templateType: T.Type,
-        userInfo: [String: Any]?
+        userInfo: T.UserInfo?
     ) throws -> Module where T: ProviderTemplateCompiler {
         guard let entity else {
             throw PartoutError(.Providers.missingEntity)
