@@ -37,14 +37,20 @@ public final class NETunnelController: TunnelController {
         willProcess: ((Profile) async throws -> Profile)? = nil
     ) async throws {
         guard let tunnelConfiguration = provider.protocolConfiguration as? NETunnelProviderProtocol else {
+            pp_log_g(.ne, .error, "Unable to parse profile from NETunnelProviderProtocol")
             throw PartoutError(.decoding)
         }
         self.provider = provider
         self.registry = registry
         self.options = options
-        originalProfile = try decoder.profile(from: tunnelConfiguration)
-        let resolvedProfile = try registry.resolvedProfile(originalProfile)
-        profile = try await willProcess?(resolvedProfile) ?? resolvedProfile
+        do {
+            originalProfile = try decoder.profile(from: tunnelConfiguration)
+            let resolvedProfile = try registry.resolvedProfile(originalProfile)
+            profile = try await willProcess?(resolvedProfile) ?? resolvedProfile
+        } catch {
+            pp_log_g(.ne, .error, "Unable to decode and process profile: \(error)")
+            throw error
+        }
         environment = environmentFactory(profile.id)
     }
 
