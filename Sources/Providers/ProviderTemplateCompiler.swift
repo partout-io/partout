@@ -12,10 +12,10 @@ public protocol ProviderTemplateCompiler {
 
     static func compiled(
         _ ctx: PartoutLoggerContext,
-        deviceId: String,
         moduleId: UUID,
         entity: ProviderEntity,
-        options: Options?
+        options: Options?,
+        userInfo: [String: Any]?
     ) throws -> CompiledModule
 }
 
@@ -29,7 +29,7 @@ extension ProviderModule {
     public func compiled<T>(
         _ ctx: PartoutLoggerContext,
         withTemplate templateType: T.Type,
-        onDevice deviceId: String
+        userInfo: [String: Any]?
     ) throws -> Module where T: ProviderTemplateCompiler {
         guard let entity else {
             throw PartoutError(.Providers.missingEntity)
@@ -37,10 +37,10 @@ extension ProviderModule {
         let options: T.Options? = try options(for: providerModuleType)
         return try T.compiled(
             ctx,
-            deviceId: deviceId,
             moduleId: id,
             entity: entity,
-            options: options
+            options: options,
+            userInfo: userInfo
         )
     }
 }

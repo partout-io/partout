@@ -33,10 +33,10 @@ extension OpenVPNProviderTemplate {
 extension OpenVPNProviderTemplate: ProviderTemplateCompiler {
     public static func compiled(
         _ ctx: PartoutLoggerContext,
-        deviceId: String,
         moduleId: UUID,
         entity: ProviderEntity,
-        options: Options?
+        options: Options?,
+        userInfo: [String: Any]?
     ) throws -> OpenVPNModule {
         let template = try entity.preset.template(ofType: OpenVPNProviderTemplate.self)
         var configurationBuilder = template.configuration.builder()
