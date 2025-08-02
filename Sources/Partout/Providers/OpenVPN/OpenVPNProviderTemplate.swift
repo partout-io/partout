@@ -36,7 +36,7 @@ extension OpenVPNProviderTemplate: ProviderTemplateCompiler {
         moduleId: UUID,
         entity: ProviderEntity,
         options: Options?,
-        userInfo: [String: Any]?
+        userInfo: Void?
     ) throws -> OpenVPNModule {
         let template = try entity.preset.template(ofType: OpenVPNProviderTemplate.self)
         var configurationBuilder = template.configuration.builder()
