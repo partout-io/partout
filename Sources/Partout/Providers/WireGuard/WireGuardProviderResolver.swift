@@ -7,22 +7,25 @@
 import PartoutCore
 import PartoutWireGuard
 
-struct WireGuardProviderResolver: ProviderModuleResolver {
+public struct WireGuardProviderResolver: ProviderModuleResolver {
     private let ctx: PartoutLoggerContext
 
-    var moduleType: ModuleType {
+    private let deviceId: String
+
+    public var moduleType: ModuleType {
         .wireGuard
     }
 
-    init(_ ctx: PartoutLoggerContext) {
+    public init(_ ctx: PartoutLoggerContext, deviceId: String) {
         self.ctx = ctx
+        self.deviceId = deviceId
     }
 
-    func resolved(from providerModule: ProviderModule, on deviceId: String) throws -> Module {
+    public func resolved(from providerModule: ProviderModule) throws -> Module {
         try providerModule.compiled(
             ctx,
             withTemplate: WireGuardProviderTemplate.self,
-            onDevice: deviceId
+            userInfo: WireGuardProviderTemplate.UserInfo(deviceId: deviceId)
         )
     }
 }

@@ -31,45 +31,31 @@ extension Registry {
         return handlers
     }()
 
-    private static let knownProviderResolvers: [ProviderModuleResolver] = {
-        var resolvers: [ProviderModuleResolver] = []
-#if canImport(PartoutOpenVPN)
-        resolvers.append(OpenVPNProviderResolver(.global))
-#endif
-#if canImport(PartoutWireGuard)
-        resolvers.append(WireGuardProviderResolver(.global))
-#endif
-        return resolvers
-    }()
-
     /// Returns a ``/PartoutCore/Registry`` with the known module handlers and resolvers and an empty device ID.
     public convenience init() {
-        self.init(deviceId: "", withKnown: true)
+        self.init(withKnown: true)
     }
 
     /// Returns a ``/PartoutCore/Registry`` that optionally includes the known module handlers and resolvers.
     public convenience init(
-        deviceId: String,
         withKnown: Bool,
         customHandlers: [ModuleHandler] = [],
-        customProviderResolvers: [ProviderModuleResolver] = [],
+        providerResolvers: [ProviderModuleResolver] = [],
         allImplementations: [ModuleImplementation] = []
     ) {
         let handlers = withKnown ? Self.knownHandlers + customHandlers : customHandlers
-        let resolvers = withKnown ? Self.knownProviderResolvers + customProviderResolvers : customProviderResolvers
 
-        let mappedResolvers = resolvers
+        let mappedResolvers = providerResolvers
             .reduce(into: [:]) {
                 $0[$1.moduleType] = $1
             }
 
         self.init(
-            deviceId: deviceId,
             allHandlers: handlers,
             allImplementations: allImplementations,
             postDecodeBlock: Self.migratedProfile,
             resolvedModuleBlock: {
-                try Self.resolvedModule($1, in: $2, with: mappedResolvers, on: $0)
+                try Self.resolvedModule($0, in: $1, with: mappedResolvers)
             }
         )
     }
@@ -81,8 +67,7 @@ private extension Registry {
     static func resolvedModule(
         _ module: Module,
         in profile: Profile?,
-        with resolvers: [ModuleType: ProviderModuleResolver],
-        on deviceId: String
+        with resolvers: [ModuleType: ProviderModuleResolver]
     ) throws -> Module {
         do {
             if let profile {
@@ -97,7 +82,7 @@ private extension Registry {
             guard let resolver = resolvers[providerModule.providerModuleType] else {
                 return module
             }
-            return try resolver.resolved(from: providerModule, on: deviceId)
+            return try resolver.resolved(from: providerModule)
         } catch {
             pp_log_id(profile?.id, .core, .error, "Unable to resolve module: \(error)")
             throw error as? PartoutError ?? PartoutError(.Providers.corruptModule, error)

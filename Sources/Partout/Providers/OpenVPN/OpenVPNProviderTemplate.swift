@@ -31,17 +31,16 @@ extension OpenVPNProviderTemplate {
 }
 
 extension OpenVPNProviderTemplate: ProviderTemplateCompiler {
-    public static func compiled(
+    public func compiled(
         _ ctx: PartoutLoggerContext,
-        deviceId: String,
         moduleId: UUID,
         entity: ProviderEntity,
-        options: Options?
+        options: Options?,
+        userInfo: Void?
     ) throws -> OpenVPNModule {
-        let template = try entity.preset.template(ofType: OpenVPNProviderTemplate.self)
-        var configurationBuilder = template.configuration.builder()
+        var configurationBuilder = configuration.builder()
         configurationBuilder.authUserPass = true
-        configurationBuilder.remotes = try template.remotes(
+        configurationBuilder.remotes = try remotes(
             ctx,
             with: entity.server,
             excludingHostname: options?.excludingHostname == true

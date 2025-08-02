@@ -10,23 +10,31 @@ import PartoutWireGuard
 
 // FIXME: passepartout#507, generate WireGuard configuration from template
 public struct WireGuardProviderTemplate: Hashable, Codable, Sendable {
+    public struct UserInfo: Sendable {
+        public let deviceId: String
+
+        public init(deviceId: String) {
+            self.deviceId = deviceId
+        }
+    }
+
     public func builder() -> WireGuard.Configuration.Builder {
         fatalError("TODO: define WireGuard template for providers")
     }
 }
 
 extension WireGuardProviderTemplate: ProviderTemplateCompiler {
-
-    // FIXME: passepartout#507, generate WireGuard configuration from template
-    public static func compiled(
+    public func compiled(
         _ ctx: PartoutLoggerContext,
-        deviceId: String,
         moduleId: UUID,
         entity: ProviderEntity,
-        options: WireGuardProviderStorage?
+        options: WireGuardProviderStorage?,
+        userInfo: UserInfo?
     ) throws -> WireGuardModule {
-        let template = try entity.preset.template(ofType: WireGuardProviderTemplate.self)
-        var configurationBuilder = template.builder()
+        guard let deviceId = userInfo?.deviceId else {
+            throw PartoutError(.Providers.missingOption, "userInfo.deviceId")
+        }
+        var configurationBuilder = builder()
         guard let session = options?.sessions?[deviceId] else {
             throw PartoutError(.Providers.missingOption, "session")
         }

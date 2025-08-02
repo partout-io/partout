@@ -176,7 +176,7 @@ extension ProviderModule {
 public protocol ProviderModuleResolver: Sendable {
     var moduleType: ModuleType { get }
 
-    func resolved(from providerModule: ProviderModule, on deviceId: String) throws -> Module
+    func resolved(from providerModule: ProviderModule) throws -> Module
 }
 
 // MARK: - Options
