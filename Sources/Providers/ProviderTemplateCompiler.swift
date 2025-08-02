@@ -12,7 +12,7 @@ public protocol ProviderTemplateCompiler {
 
     associatedtype UserInfo
 
-    static func compiled(
+    func compiled(
         _ ctx: PartoutLoggerContext,
         moduleId: UUID,
         entity: ProviderEntity,
@@ -32,12 +32,13 @@ extension ProviderModule {
         _ ctx: PartoutLoggerContext,
         withTemplate templateType: T.Type,
         userInfo: T.UserInfo?
-    ) throws -> Module where T: ProviderTemplateCompiler {
+    ) throws -> Module where T: ProviderTemplateCompiler & Decodable {
         guard let entity else {
             throw PartoutError(.Providers.missingEntity)
         }
+        let template = try entity.preset.template(ofType: templateType)
         let options: T.Options? = try options(for: providerModuleType)
-        return try T.compiled(
+        return try template.compiled(
             ctx,
             moduleId: id,
             entity: entity,

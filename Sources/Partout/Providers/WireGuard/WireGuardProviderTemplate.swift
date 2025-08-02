@@ -24,7 +24,7 @@ public struct WireGuardProviderTemplate: Hashable, Codable, Sendable {
 }
 
 extension WireGuardProviderTemplate: ProviderTemplateCompiler {
-    public static func compiled(
+    public func compiled(
         _ ctx: PartoutLoggerContext,
         moduleId: UUID,
         entity: ProviderEntity,
@@ -34,8 +34,7 @@ extension WireGuardProviderTemplate: ProviderTemplateCompiler {
         guard let deviceId = userInfo?.deviceId else {
             throw PartoutError(.Providers.missingOption, "userInfo.deviceId")
         }
-        let template = try entity.preset.template(ofType: WireGuardProviderTemplate.self)
-        var configurationBuilder = template.builder()
+        var configurationBuilder = builder()
         guard let session = options?.sessions?[deviceId] else {
             throw PartoutError(.Providers.missingOption, "session")
         }
