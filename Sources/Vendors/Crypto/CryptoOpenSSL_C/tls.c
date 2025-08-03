@@ -344,7 +344,6 @@ bool tls_channel_verify_ssl_eku(SSL *_Nonnull ssl) {
     for (int i = 0; i < num; ++i) {
         OBJ_obj2txt(buffer, sizeof(buffer), sk_ASN1_OBJECT_value(eku, i), 1); // get OID
         const char *oid = OBJ_nid2ln(OBJ_obj2nid(sk_ASN1_OBJECT_value(eku, i)));
-//        NSLog(@"eku flag %d: %s - %s", i, buffer, oid);
         if (oid && !strcmp(oid, TLSBoxServerEKU)) {
             is_valid = true;
             break;

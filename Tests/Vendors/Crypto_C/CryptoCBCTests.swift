@@ -25,8 +25,8 @@ struct CryptoCBCTests {
         let id = "\(cipherName ?? "nil"):\(digestName)"
         try flags.withUnsafeFlags { flags in
             let returnedData = try sut.encryptData(CZX(plainHex), flags: flags)
-            NSLog("\(id):encrypted: \(returnedData.toHex())")
-            NSLog("\(id):expected : \(expected)")
+            print("\(id):encrypted: \(returnedData.toHex())")
+            print("\(id):expected : \(expected)")
             #expect(returnedData.toHex() == expected)
         }
     }
