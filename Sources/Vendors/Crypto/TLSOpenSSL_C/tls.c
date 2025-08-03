@@ -10,7 +10,7 @@
 #include <openssl/err.h>
 #include <stdio.h>
 #include "crypto/allocation.h"
-#include "crypto/tls.h"
+#include "tls/tls.h"
 #include "macros.h"
 
 //static const char *const TLSBoxClientEKU = "TLS Web Client Authentication";

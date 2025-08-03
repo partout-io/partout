@@ -7,6 +7,7 @@ internal import _PartoutVendorsPortable
 internal import _PartoutOpenVPNLegacy_ObjC
 #endif
 internal import _PartoutOpenVPN_C
+internal import _PartoutVendorsTLSCore_C
 import Foundation
 
 extension OpenVPNSessionError {

@@ -9,30 +9,34 @@ import PartoutCore
 import Testing
 
 struct MappersTests {
-    // FIXME: ###
-//    @Test
-//    func givenEndpointString_whenMapped_thenReverts() throws {
-//        let sut = [
-//            "1.2.3.4:10000",
-//            "[1:2:3::4]:10000"
-//        ]
-//        let expected: [(String, UInt16)] = [
-//            ("1.2.3.4", 10000),
-//            ("1:2:3::4", 10000)
-//        ]
-//        for (i, raw) in sut.enumerated() {
-//            let wg = try #require(Endpoint(from: raw))
+    @Test
+    func givenEndpointString_whenMapped_thenReverts() throws {
+        let sut = [
+            "1.2.3.4:10000",
+            "[1:2:3::4]:10000"
+        ]
+        let expected: [(String, UInt16)] = [
+            ("1.2.3.4", 10000),
+            ("1:2:3::4", 10000)
+        ]
+        for (i, raw) in sut.enumerated() {
+            let wg = try #require(Endpoint(from: raw))
+            // work around dumb macro compile error
 //            let kit = try #require(PartoutCore.Endpoint(wg: wg))
-//            let kitEndpoint = try kit.toWireGuardEndpoint()
-//            #expect(wg == kitEndpoint, "Index \(i) failed")
-//
-//            let pair = expected[i]
-//            #expect(wg.host.debugDescription == pair.0)
-//            #expect(wg.port.rawValue == pair.1)
-//            #expect(kit.address.rawValue == pair.0)
-//            #expect(kit.port == pair.1)
-//        }
-//    }
+            let kit = try {
+                let kit = PartoutCore.Endpoint(wg: wg)
+                return try #require(kit)
+            }()
+            let kitEndpoint = try kit.toWireGuardEndpoint()
+            #expect(wg == kitEndpoint, "Index \(i) failed")
+
+            let pair = expected[i]
+            #expect(wg.host.debugDescription == pair.0)
+            #expect(wg.port.rawValue == pair.1)
+            #expect(kit.address.rawValue == pair.0)
+            #expect(kit.port == pair.1)
+        }
+    }
 
     @Test
     func givenConfigurationWithAllowedIPs_whenMapped_thenReverts() throws {

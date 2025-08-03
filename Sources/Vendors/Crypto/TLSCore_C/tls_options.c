@@ -5,7 +5,7 @@
  */
 
 #include "crypto/allocation.h"
-#include "crypto/tls.h"
+#include "tls/tls.h"
 
 tls_channel_options *_Nonnull tls_channel_options_create(int sec_level,
                                                          size_t buf_len,
