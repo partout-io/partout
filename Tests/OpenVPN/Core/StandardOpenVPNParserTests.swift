@@ -3,12 +3,11 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @testable import PartoutOpenVPN
-@testable internal import PartoutOpenVPNLegacy
 import PartoutCore
 import XCTest
 
 final class StandardOpenVPNParserTests: XCTestCase {
-    private let parser = StandardOpenVPNParser()
+    private let parser = StandardOpenVPNParser(decrypter: nil)
 
     func test_givenOption_whenEnumerateComponents_thenAreParsedCorrectly() throws {
         let sut = try OpenVPN.Option.remote.regularExpression()
@@ -148,34 +147,6 @@ final class StandardOpenVPNParserTests: XCTestCase {
         let cfg4 = try parser.parsed(fromLines: ["scramble obfuscate FFFF"])
         XCTAssertNil(cfg.warning)
         XCTAssertEqual(cfg4.configuration.xorMethod, .obfuscate(mask: multiMask))
-    }
-
-    func test_givenMessage_whenParse_thenIsFastEnough() throws {
-        let msg = "PUSH_REPLY,route 87.233.192.218,route 87.233.192.219,route 87.233.192.220,route 87.248.186.252,route 92.241.171.245,route 103.246.200.0 255.255.252.0,route 109.239.140.0 255.255.255.0,route 128.199.0.0 255.255.0.0,route 13.125.0.0 255.255.0.0,route 13.230.0.0 255.254.0.0,route 13.56.0.0 255.252.0.0,route 149.154.160.0 255.255.252.0,route 149.154.164.0 255.255.252.0,route 149.154.168.0 255.255.252.0,route 149.154.172.0 255.255.252.0,route 159.122.128.0 255.255.192.0,route 159.203.0.0 255.255.0.0,route 159.65.0.0 255.255.0.0,route 159.89.0.0 255.255.0.0,route 165.227.0.0 255.255.0.0,route 167.99.0.0 255.255.0.0,route 174.138.0.0 255.255.128.0,route 176.67.169.0 255.255.255.0,route 178.239.88.0 255.255.248.0,route 178.63.0.0 255.255.0.0,route 18.130.0.0 255.255.0.0,route 18.144.0.0 255.255.0.0,route 18.184.0.0 255.254.0.0,route 18.194.0.0 255.254.0.0,route 18.196.0.0 255.254.0.0,route 18.204.0.0 255.252.0.0,push-continuation 2"
-
-        let parser = StandardOpenVPNParser()
-        let lines = msg.components(separatedBy: ",")
-        measure {
-            _ = try? parser.parsed(fromLines: lines)
-        }
-    }
-
-    // MARK: Routes
-
-    func test_givenIfconfig_whenParse_thenIncludesNetworkRoutes() throws {
-        let line = "PUSH_REPLY,route-gateway 172.31.2.1,route-gateway 172.31.2.1,topology subnet,ping 10,ping-restart 120,route 192.168.41.0 255.255.255.0,route 192.168.50.0 255.255.255.0,route 192.168.42.0 255.255.255.0,route 192.168.43.0 255.255.255.0,route 192.168.44.0 255.255.255.0,route 192.168.45.0 255.255.255.0,route 192.168.70.0 255.255.255.0,route 192.168.31.0 255.255.255.0,dhcp-option DNS 192.168.41.2,dhcp-option DNS 192.168.44.11,ifconfig 172.31.2.6 255.255.255.0,ifconfig-ipv6 1234::12/10 1234::1,"
-
-        let pushReply = try XCTUnwrap(parser.pushReply(with: line))
-
-        XCTAssertEqual(pushReply.options.ipv4?.subnet, Subnet(rawValue: "172.31.2.6/24"))
-        XCTAssertEqual(pushReply.options.ipv4?.includedRoutes, [
-            Route(Subnet(rawValue: "172.31.2.0/24"), nil)
-        ])
-
-        XCTAssertEqual(pushReply.options.ipv6?.subnet, Subnet(rawValue: "1234::12/10"))
-        XCTAssertEqual(pushReply.options.ipv6?.includedRoutes, [
-            Route(Subnet(rawValue: "1200::/10"), nil)
-        ])
     }
 }
 

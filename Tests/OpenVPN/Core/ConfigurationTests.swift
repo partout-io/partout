@@ -2,9 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutOpenVPN
-@testable internal import PartoutOpenVPNLegacy
 import PartoutCore
+@testable import PartoutOpenVPN
 import XCTest
 
 final class ConfigurationTests: XCTestCase {

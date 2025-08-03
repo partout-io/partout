@@ -2,9 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 import PartoutCore
-import PartoutOpenVPN
 
 extension ExtendedEndpoint {
     func withRandomPrefixLength(_ length: Int, prng: PRNGProtocol) -> ExtendedEndpoint {
@@ -24,7 +22,7 @@ extension ExtendedEndpoint {
 extension OpenVPN.Configuration {
     private static let randomHostnamePrefixLength = 6
 
-    func processedRemotes(prng: PRNGProtocol) -> [ExtendedEndpoint]? {
+    public func processedRemotes(prng: PRNGProtocol) -> [ExtendedEndpoint]? {
         guard var processedRemotes = remotes else {
             return nil
         }

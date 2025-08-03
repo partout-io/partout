@@ -163,7 +163,10 @@ if areas.contains(.openVPN) {
         .testTarget(
             name: "_PartoutOpenVPNTests",
             dependencies: ["PartoutOpenVPN"],
-            path: "Tests/OpenVPN/Core"
+            path: "Tests/OpenVPN/Core",
+            resources: [
+                .process("Resources")
+            ]
         )
     ])
 

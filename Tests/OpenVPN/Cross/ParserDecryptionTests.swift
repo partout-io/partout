@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutOpenVPNLegacy_ObjC
 import PartoutOpenVPN
+@testable internal import PartoutOpenVPNCross
 import XCTest
 
-final class StandardOpenVPNOpenSSLParserTests: XCTestCase {
+final class ParserDecryptionTests: XCTestCase {
     func test_givenPKCS1_whenParse_thenFails() {
         let sut = newParser()
         let cfgURL = url(withName: "tunnelbear.enc.1")
@@ -33,9 +33,9 @@ final class StandardOpenVPNOpenSSLParserTests: XCTestCase {
     }
 }
 
-private extension StandardOpenVPNOpenSSLParserTests {
+private extension ParserDecryptionTests {
     func newParser() -> StandardOpenVPNParser {
-        StandardOpenVPNParser(decrypter: OSSLTLSBox())
+        StandardOpenVPNParser(supportsLZO: false, decrypter: OSSLKeyDecrypter())
     }
 
     func url(withName name: String) -> URL {

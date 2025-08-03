@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import PartoutOpenVPN
-@testable internal import PartoutOpenVPNLegacy
 import Foundation
 import PartoutCore
 import XCTest
@@ -38,11 +37,11 @@ final class JSONTests: XCTestCase {
 
         let tlsWrap = try XCTUnwrap(sut["tlsWrap"] as? [String: Any])
         let tlsWrapKey = try XCTUnwrap(tlsWrap["key"] as? [String: Any])
-        XCTAssertEqual(tlsWrapKey["data"] as? String, cfg.tlsWrap?.key.secureData.zData.toData().base64EncodedString())
+        XCTAssertEqual(tlsWrapKey["data"] as? String, cfg.tlsWrap?.key.secureData.toData().base64EncodedString())
 
         let xorMethod = try XCTUnwrap(sut["xorMethod"] as? [String: Any])
         let xorMethodObfuscate = try XCTUnwrap(xorMethod["obfuscate"] as? [String: Any])
-        XCTAssertEqual(xorMethodObfuscate["mask"] as? String, cfg.xorMethod?.mask?.zData.toData().base64EncodedString())
+        XCTAssertEqual(xorMethodObfuscate["mask"] as? String, cfg.xorMethod?.mask?.toData().base64EncodedString())
 
         let remotes = try XCTUnwrap(sut["remotes"] as? [String])
         let rawRemotes = Set(remotes)
@@ -75,7 +74,7 @@ final class JSONTests: XCTestCase {
 
 private extension JSONTests {
     func subjectPair(withSensitiveData: Bool) throws -> (cfg: OpenVPN.Configuration, json: [String: Any]) {
-        let parser = StandardOpenVPNParser()
+        let parser = StandardOpenVPNParser(decrypter: nil)
         let url = try XCTUnwrap(Bundle.module.url(forResource: "protonvpn", withExtension: "ovpn"))
         let result = try parser.parsed(fromURL: url)
         let cfg = result.configuration
