@@ -9,7 +9,7 @@
 #include "crypto/allocation.h"
 #include "crypto/zeroing_data.h"
 
-// TODO: ###, make zd inline
+// TODO: #155, make zd inline
 
 // MARK: Creation
 

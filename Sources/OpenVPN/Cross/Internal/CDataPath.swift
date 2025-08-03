@@ -6,7 +6,7 @@ internal import _PartoutOpenVPN_C
 internal import _PartoutVendorsCrypto_C
 import Foundation
 
-// TODO: ###, move more logic to C (replay protection, byte-aligned enc/dec zd)
+// TODO: #155, move more logic to C (replay protection, byte-aligned enc/dec zd)
 
 final class CDataPath {
     private let mode: UnsafeMutablePointer<dp_mode_t>
