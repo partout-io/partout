@@ -226,6 +226,10 @@ function getInfrastructure(module, headers) {
 
     const locations = json.response.locations;
     const servers = [];
+
+    // the following code relies on OpenVPN/WireGuard servers not
+    // overlapping. each server is either OpenVPN or WireGuard, but
+    // not both
     const processRelay = function(relay, moduleType) {
         if (!relay.active) return;
         if (moduleType == wireGuard.moduleType && !relay.public_key) return;
@@ -266,8 +270,6 @@ function getInfrastructure(module, headers) {
 
         servers.push(server);
     };
-
-    // relies on OpenVPN/WireGuard servers not overlapping
     json.response.openvpn.relays.forEach((relay) => {
         processRelay(relay, openVPN.moduleType);
     });
@@ -371,7 +373,7 @@ H7nDIGdrCC9U/g1Lqk8Td00Oj8xesyKzsG214Xd8m7/7GmJ7nXe5
     return [recommended, dnsOverride];
 }
 
-// MARK: Wireguard
+// MARK: WireGuard
 
 function getWireGuardPresets(providerId, moduleType, presetIds) {
     const recommended = {
