@@ -8,6 +8,7 @@ import Foundation
 import PartoutCore
 import PartoutWireGuard
 
+// FIXME: passepartout#507, generate WireGuard configuration from template
 public struct WireGuardProviderTemplate: Hashable, Codable, Sendable {
     public struct UserInfo: Sendable {
         public let deviceId: String
