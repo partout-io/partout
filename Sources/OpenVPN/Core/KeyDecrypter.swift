@@ -5,6 +5,6 @@
 import Foundation
 
 /// Provides a way to decrypt a PEM private key.
-public protocol KeyDecrypter: Sendable {
+public protocol KeyDecrypter {
     func decryptedKey(fromPEM pem: String, passphrase: String) throws -> String
 }

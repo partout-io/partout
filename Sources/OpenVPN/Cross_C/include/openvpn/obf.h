@@ -10,7 +10,7 @@
 
 // WARNING: assume dst to be able to hold src_len
 
-// TODO: ###, make more efficient by XOR-ing 4-8 bytes per loop
+// TODO: #154, make more efficient by XOR-ing 4-8 bytes per loop
 
 static inline
 void obf_xor_mask(uint8_t *_Nonnull dst,

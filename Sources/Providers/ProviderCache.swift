@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+import PartoutCore
+
 public struct ProviderCache: Hashable, Codable, Sendable {
     public let lastUpdate: Timestamp?
 

@@ -40,7 +40,6 @@ public func CZ(_ native: CZeroingData) -> CZeroingData {
     native
 }
 
-// TODO: ###, drop middle Data
 public func CZX(_ hex: String) -> CZeroingData {
-    CZ(Data(hex: hex))
+    CZeroingData(hex: hex)
 }
