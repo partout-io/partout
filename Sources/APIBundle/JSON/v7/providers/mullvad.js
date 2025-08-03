@@ -212,12 +212,6 @@ function getInfrastructure(module, headers) {
             dnsOverride: "dns"
         }
     };
-    const wireGuard = {
-        moduleType: "WireGuard",
-        presetIds: {
-            recommended: "default"
-        }
-    };
 
     const json = api.getJSON(`${baseURL}/app/v1/relays`, headers);
     if (!json.response) {
@@ -226,19 +220,15 @@ function getInfrastructure(module, headers) {
 
     const locations = json.response.locations;
     const servers = [];
-    const processRelay = function(relay, moduleType) {
-        if (!relay.active) return;
-        if (moduleType == wireGuard.moduleType && !relay.public_key) return;
-
+    json.response.openvpn.relays.forEach((relay) => {
         const location = locations[relay.location];
-        if (!location) return;
+        if (!location) {
+            return;
+        }
 
         const id = relay.hostname;
         const hostname = `${id.toLowerCase()}.mullvad.net`;
-        const addresses = [
-            relay.ipv4_addr_in,
-//            relay.ipv6_addr_in // FIXME: ###, IPv6 encoding?
-        ].map((a) => api.ipV4ToBase64(a));
+        const addresses = [relay.ipv4_addr_in].map((a) => api.ipV4ToBase64(a));
 
         const code = id.split("-")[0].toUpperCase();
         const area = location.city;
@@ -248,13 +238,8 @@ function getInfrastructure(module, headers) {
             serverId: id,
             hostname: hostname,
             ipAddresses: addresses,
-            supportedModuleTypes: [moduleType]
+            supportedModuleTypes: [openVPN.moduleType]
         };
-        if (relay.public_key) {
-            server.userInfo = {
-                "wgPublicKey": relay.public_key
-            };
-        }
         const metadata = {
             providerId: providerId,
             categoryName: "Default",
@@ -265,21 +250,9 @@ function getInfrastructure(module, headers) {
         server.metadata = metadata;
 
         servers.push(server);
-    };
-
-    // relies on OpenVPN/WireGuard servers not overlapping
-    json.response.openvpn.relays.forEach((relay) => {
-        processRelay(relay, openVPN.moduleType);
     });
-    json.response.wireguard.relays.forEach((relay) => {
-        processRelay(relay, wireGuard.moduleType);
-    })
 
-    const ovpnPresets = getOpenVPNPresets(providerId, openVPN.moduleType,
-                                          openVPN.presetIds, json.response.openvpn.ports);
-    const wgPresets = getWireGuardPresets(providerId, wireGuard.moduleType,
-                                          wireGuard.presetIds);
-    const presets = ovpnPresets.concat(wgPresets);
+    const presets = getOpenVPNPresets(providerId, openVPN.moduleType, openVPN.presetIds, json.response.openvpn.ports);
 
     return {
         response: {
@@ -369,19 +342,4 @@ H7nDIGdrCC9U/g1Lqk8Td00Oj8xesyKzsG214Xd8m7/7GmJ7nXe5
     };
 
     return [recommended, dnsOverride];
-}
-
-// MARK: Wireguard
-
-function getWireGuardPresets(providerId, moduleType, presetIds) {
-    const recommended = {
-        providerId: providerId,
-        presetId: presetIds.recommended,
-        description: "Default",
-        moduleType: moduleType,
-        templateData: api.jsonToBase64({
-            ports: [51820]
-        })
-    };
-    return [recommended];
 }
