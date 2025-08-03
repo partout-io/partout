@@ -8,19 +8,19 @@ import XCTest
 final class CryptoPerformanceTests: XCTestCase {
 
     // 0.011 (ObjC = 0.032)
-    func test_aes256gcm() throws {
+    func aes256gcm() throws {
         let sut = try CryptoWrapper(withAEADCipherName: "aes-256-gcm", tagLength: 16, idLength: 4)
         runMeasurement(crypto: sut)
     }
 
     // 0.025 (ObjC = 0.046)
-    func test_aes256cbc() throws {
+    func aes256cbc() throws {
         let sut = try CryptoWrapper(withCBCCipherName: "aes-256-cbc", digestName: "sha-512")
         runMeasurement(crypto: sut)
     }
 
     // 0.021 (ObjC = 0.043)
-    func test_aes256ctr() throws {
+    func aes256ctr() throws {
         let sut = try CryptoWrapper(withCTRCipherName: "aes-256-ctr", digestName: "sha-256", tagLength: 32, payloadLength: 17)
         runMeasurement(crypto: sut)
     }
@@ -38,7 +38,7 @@ private extension CryptoPerformanceTests {
                     do {
                         let encryptedData = try crypto.encryptData(plainData, flags: flags)
                         let returnedData = try crypto.decryptData(encryptedData, flags: flags)
-                        XCTAssertEqual(returnedData, plainData)
+                        #expect(returnedData, plainData)
                     } catch {
                         XCTFail("Cannot decrypt: \(error)")
                     }

@@ -19,7 +19,7 @@ final class CryptoWrapper {
         guard let ptr = crypto_aead_create(cipherName, tagLength, idLength, nil) else {
             throw CryptoError()
         }
-        NSLog("PartoutOpenVPN: Using CryptoAEAD (native Swift/C)")
+        print("PartoutOpenVPN: Using CryptoAEAD (native Swift/C)")
         self.ptr = ptr
         free_fn = crypto_aead_free
     }
@@ -31,7 +31,7 @@ final class CryptoWrapper {
         guard let ptr = crypto_cbc_create(cipherName, digestName, nil) else {
             throw CryptoError()
         }
-        NSLog("PartoutOpenVPN: Using CryptoCBC (native Swift/C)")
+        print("PartoutOpenVPN: Using CryptoCBC (native Swift/C)")
         self.ptr = ptr
         free_fn = crypto_cbc_free
     }
@@ -45,7 +45,7 @@ final class CryptoWrapper {
         guard let ptr = crypto_ctr_create(cipherName, digestName, tagLength, payloadLength, nil) else {
             throw CryptoError()
         }
-        NSLog("PartoutOpenVPN: Using CryptoCTR (native Swift/C)")
+        print("PartoutOpenVPN: Using CryptoCTR (native Swift/C)")
         self.ptr = ptr
         free_fn = crypto_ctr_free
     }

@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutOpenVPN
 internal import _PartoutOpenVPNLegacy_ObjC
+import PartoutOpenVPN
 import XCTest
 
 final class StandardOpenVPNOpenSSLParserTests: XCTestCase {
@@ -35,7 +35,7 @@ final class StandardOpenVPNOpenSSLParserTests: XCTestCase {
 
 private extension StandardOpenVPNOpenSSLParserTests {
     func newParser() -> StandardOpenVPNParser {
-        StandardOpenVPNParser(decrypter: OSSLTLSBox())
+        StandardOpenVPNParser(supportsLZO: true, decrypter: OSSLTLSBox())
     }
 
     func url(withName name: String) -> URL {

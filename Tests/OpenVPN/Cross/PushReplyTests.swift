@@ -96,13 +96,9 @@ struct PushReplyTests {
         #expect(reply?.options.compressionFraming == .compLZO)
         #expect(reply?.options.compressionAlgorithm == .disabled)
 
-        do {
+        #expect(throws: Error.self) {
             _ = try parser.pushReply(with: msg.appending(",comp-lzo"))
-            #expect(Bool(false))
             _ = try parser.pushReply(with: msg.appending(",comp-lzo yes"))
-            #expect(Bool(false))
-        } catch {
-            //
         }
 
         reply = try parser.pushReply(with: msg.appending(",compress"))
@@ -110,11 +106,8 @@ struct PushReplyTests {
         #expect(reply?.options.compressionFraming == .compress)
         #expect(reply?.options.compressionAlgorithm == .disabled)
 
-        do {
+        #expect(throws: Error.self) {
             _ = try parser.pushReply(with: msg.appending(",compress lz4"))
-            #expect(Bool(false))
-        } catch {
-            //
         }
     }
 

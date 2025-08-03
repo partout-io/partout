@@ -4,19 +4,20 @@
 
 @testable import PartoutWireGuard
 import PartoutCore
-import XCTest
+import Testing
 
-final class ParseErrorTests: XCTestCase {
-    func test_givenParseError_whenMap_thenReturnsAsReason() throws {
+struct ParseErrorTests {
+    @Test
+    func givenParseError_whenMap_thenReturnsAsReason() throws {
         let sut = WireGuardParseError.noInterface
         let mapped = sut.asPartoutError
-        XCTAssertTrue(mapped.reason is WireGuardParseError)
-        let reason = try XCTUnwrap(mapped.reason as? WireGuardParseError)
+        #expect(mapped.reason is WireGuardParseError)
+        let reason = try #require(mapped.reason as? WireGuardParseError)
         switch reason {
         case .noInterface:
             break
         default:
-            XCTFail("Mapped to different error: \(reason)")
+            #expect(Bool(false), "Mapped to different error: \(reason)")
         }
     }
 }

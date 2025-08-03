@@ -11,11 +11,8 @@ struct KeyDecrypterTests {
     func givenPKCS1_whenParse_thenFails() throws {
         let sut = newDecrypter()
         let path = try path(withName: "tunnelbear.enc.1.key")
-        do {
+        #expect(throws: Error.self) {
             _ = try sut.decryptedKey(fromPath: path, passphrase: "")
-            #expect(Bool(false))
-        } catch {
-            //
         }
     }
 
@@ -32,11 +29,8 @@ struct KeyDecrypterTests {
     func givenPKCS8_whenParse_thenFails() throws {
         let sut = newDecrypter()
         let path = try path(withName: "tunnelbear.enc.8.key")
-        do {
+        #expect(throws: Error.self) {
             _ = try sut.decryptedKey(fromPath: path, passphrase: "")
-            #expect(Bool(false))
-        } catch {
-            //
         }
     }
 

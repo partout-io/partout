@@ -120,12 +120,6 @@
 
     *destLength = self.tagLength + l1 + l2;
 
-    //    NSLog(@">>> ENC iv: %@", [NSData dataWithBytes:self.cipherIVEnc length:self.cipherIVLength]);
-    //    NSLog(@">>> ENC ad: %@", [NSData dataWithBytes:extra length:self.extraLength]);
-    //    NSLog(@">>> ENC x: %d", x);
-    //    NSLog(@">>> ENC tag: %@", [NSData dataWithBytes:dest length:self.tagLength]);
-    //    NSLog(@">>> ENC dest: %@", [NSData dataWithBytes:dest + self.tagLength length:*destLength - self.tagLength]);
-
     CRYPTO_OPENSSL_RETURN_STATUS(code, self.mappedError(CryptoAEADErrorGeneric))
 }
 
@@ -160,12 +154,6 @@
     CRYPTO_OPENSSL_TRACK_STATUS(code) EVP_CipherFinal_ex(self.cipherCtxDec, dest + l1, &l2);
 
     *destLength = l1 + l2;
-
-    //    NSLog(@">>> DEC iv: %@", [NSData dataWithBytes:self.cipherIVDec length:self.cipherIVLength]);
-    //    NSLog(@">>> DEC ad: %@", [NSData dataWithBytes:extra length:self.extraLength]);
-    //    NSLog(@">>> DEC x: %d", x);
-    //    NSLog(@">>> DEC tag: %@", [NSData dataWithBytes:bytes length:self.tagLength]);
-    //    NSLog(@">>> DEC dest: %@", [NSData dataWithBytes:dest length:*destLength]);
 
     CRYPTO_OPENSSL_RETURN_STATUS(code, self.mappedError(CryptoAEADErrorGeneric))
 }

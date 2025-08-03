@@ -4,6 +4,7 @@
 
 import _PartoutVendorsPortable_C
 import Foundation
+import PartoutCore
 
 public final class CZeroingData {
     public let ptr: UnsafeMutablePointer<zeroing_data_t>
@@ -181,5 +182,19 @@ extension CZeroingData {
             hexString += String(format: "%02x", bytes[i])
         }
         return hexString
+    }
+}
+
+// MARK: Logging
+
+extension SecureData {
+    public var czData: CZeroingData {
+        CZeroingData(data: toData())
+    }
+}
+
+extension CZeroingData: SensitiveDebugStringConvertible {
+    public func debugDescription(withSensitiveData: Bool) -> String {
+        withSensitiveData ? "[\(count) bytes, \(toHex())]" : "[\(count) bytes]"
     }
 }
