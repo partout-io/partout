@@ -17,7 +17,7 @@ let coreSHA1 = "4c24129597885a17d782d12f7a81ecdd862a8659"
 let environment: Environment = .remoteBinary
 let areas: Set<Area> = Area.defaultAreas
 
-// FIXME: ###, set to false on deploy (check CI)
+// must be false in production (check in CI)
 let isDevelopment = false
 let isTestingOpenVPNDataPath = false
 
