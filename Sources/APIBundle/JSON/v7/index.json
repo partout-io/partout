@@ -28,7 +28,8 @@
                         "purpose": "web",
                         "options": ["noPassword"]
                     }
-                }
+                },
+                "WireGuard": {}
             }
         },
         {

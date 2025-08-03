@@ -12,11 +12,11 @@ describe("mullvad", () => {
         const json = setup.fetchMockInfrastructure("mullvad");
         infra = json.response;
     });
-    it("should have 2 presets", () => {
-        assert.strictEqual(infra.presets.length, 2);
+    it("should have 3 presets", () => {
+        assert.strictEqual(infra.presets.length, 3);
     });
-    it("should have 2 servers", () => {
-        assert.strictEqual(infra.servers.length, 2);
+    it("should have 6 servers", () => {
+        assert.strictEqual(infra.servers.length, 6);
     });
     it("preset 0 should use CBC and 9 endpoints", () => {
         const preset = infra.presets[0];

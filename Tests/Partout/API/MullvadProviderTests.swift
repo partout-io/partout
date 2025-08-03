@@ -12,6 +12,73 @@ struct MullvadProviderTests: APITestSuite {
         setUpLogging()
     }
 
+    let providerId: ProviderID = .mullvad
+
+    @Test(arguments: [
+        FetchInput(
+            cache: nil,
+            presetsCount: 3,
+            serversCount: 665,
+            isCached: false
+        )
+    ])
+    func whenFetchInfrastructure_thenReturns(input: FetchInput) async throws {
+        let sut = try newAPIMapper(input.hijacked ? {
+            providerId.hijacker(forFetchURL: $1)
+        } : nil)
+        do {
+            let module = try ProviderModule(emptyWithProviderId: providerId)
+            let infra = try await sut.infrastructure(for: module, cache: input.cache)
+            #expect(infra.presets.count == input.presetsCount)
+            #expect(infra.servers.count == input.serversCount)
+
+            try infra.presets.forEach {
+                switch $0.moduleType {
+                case .openVPN:
+#if canImport(PartoutOpenVPN)
+                    let template = try JSONDecoder().decode(OpenVPNProviderTemplate.self, from: $0.templateData)
+                    switch $0.presetId {
+                    case "default":
+                        #expect(template.configuration.cipher == .aes256cbc)
+                        #expect(template.endpoints.map(\.rawValue) == [
+                            "UDP:1194", "UDP:1195", "UDP:1196", "UDP:1197",
+                            "UDP:1300", "UDP:1301", "UDP:1302",
+                            "TCP:443", "TCP:80"
+                        ])
+                    case "dns":
+                        #expect(template.configuration.cipher == .aes256cbc)
+                        #expect(template.endpoints.map(\.rawValue) == [
+                            "UDP:1400", "TCP:1401"
+                        ])
+                    default:
+                        break
+                    }
+#endif
+                case .wireGuard:
+#if canImport(PartoutWireGuard)
+                    let template = try JSONDecoder().decode(WireGuardProviderTemplate.self, from: $0.templateData)
+                    switch $0.presetId {
+                    case "default":
+                        #expect(template.ports == [51820])
+                    default:
+                        break
+                    }
+#endif
+                default:
+                    #expect(Bool(false), "Preset of unexpected module type \($0.moduleType)")
+                }
+            }
+        } catch let error as PartoutError {
+            if input.isCached {
+                #expect(error.code == .cached)
+            } else {
+                #expect(Bool(false), "Failed: \(error)")
+            }
+        } catch {
+            #expect(Bool(false), "Failed: \(error)")
+        }
+    }
+
     @Test(arguments: [
         AuthInput( // valid token
             accessToken: "sometoken",
@@ -74,7 +141,7 @@ struct MullvadProviderTests: APITestSuite {
         }
 
         var builder = ProviderModule.Builder()
-        builder.providerId = .mullvad
+        builder.providerId = providerId
         builder.credentials = ProviderAuthentication.Credentials(username: username, password: "")
         if let accessToken = input.accessToken, let tokenExpiry {
             builder.token = ProviderAuthentication.Token(accessToken: accessToken, expiryDate: tokenExpiry)
@@ -144,22 +211,6 @@ struct MullvadProviderTests: APITestSuite {
 }
 
 extension MullvadProviderTests {
-    struct AuthInput {
-        let accessToken: String?
-
-        let tokenExpiryTimestamp: String?
-
-        let privateKey: String
-
-        let publicKey: String
-
-        let existingPeerId: String?
-
-        var peerAddresses: [String]?
-
-        var hijacked = true
-    }
-
     func hijacker(for input: AuthInput, method: String, urlString: String) -> (Int, Data) {
         var filename: String?
         var httpStatus: Int?
