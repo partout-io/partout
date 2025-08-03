@@ -3,9 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-
-// TODO: ###, move to Core
-public typealias Timestamp = UInt32
+import PartoutCore
 
 // seconds since the epoch
 extension Timestamp {
