@@ -24,6 +24,7 @@ zeroing_data_t *_Nonnull zd_create_with_uint16(uint16_t value);
 zeroing_data_t *_Nonnull zd_create_from_data(const uint8_t *_Nonnull data, size_t length);
 zeroing_data_t *_Nonnull zd_create_from_data_range(const uint8_t *_Nonnull data, size_t offset, size_t length);
 zeroing_data_t *_Nonnull zd_create_from_string(const char *_Nonnull string, bool null_terminated);
+zeroing_data_t *_Nullable zd_create_from_hex(const char *_Nonnull hex);
 void zd_free(zeroing_data_t *_Nonnull zd);
 
 // MARK: Properties

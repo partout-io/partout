@@ -62,6 +62,17 @@ zeroing_data_t *zd_create_from_string(const char *string, bool null_terminated) 
     }
 }
 
+zeroing_data_t *zd_create_from_hex(const char *hex) {
+    const size_t len = strlen(hex);
+    if (len & 1) return NULL;
+    const size_t bytes_len = len / 2;
+    uint8_t *bytes = pp_alloc_crypto(bytes_len);
+    for (size_t i = 0; i < bytes_len; i++) {
+        sscanf(hex + 2 * i, "%2hhx", bytes + i);
+    }
+    return zd_create_copy(bytes, bytes_len);
+}
+
 void zd_free(zeroing_data_t *zd) {
     if (!zd) return;
 

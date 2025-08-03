@@ -54,11 +54,15 @@ public final class CZeroingData {
     }
 
     public init(string: String, nullTerminated: Bool) {
-        guard let cstr = string.cString(using: .utf8) else {
-            ptr = zd_create(0)
-            return
+        ptr = string.withCString {
+            zd_create_from_string($0, nullTerminated)
         }
-        ptr = zd_create_from_string(cstr, nullTerminated)
+    }
+
+    public init(hex: String) {
+        ptr = hex.withCString {
+            zd_create_from_hex($0) ?? zd_create(0)
+        }
     }
 
     deinit {
