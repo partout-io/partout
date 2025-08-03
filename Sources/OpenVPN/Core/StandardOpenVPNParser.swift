@@ -63,7 +63,7 @@ public final class StandardOpenVPNParser {
         }
     }
 
-    public init(supportsLZO: Bool = true, decrypter: KeyDecrypter?) {
+    public init(supportsLZO: Bool, decrypter: KeyDecrypter?) {
         self.supportsLZO = supportsLZO
         self.decrypter = decrypter
     }

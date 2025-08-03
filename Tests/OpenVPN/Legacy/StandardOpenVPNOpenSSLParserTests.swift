@@ -35,7 +35,7 @@ final class StandardOpenVPNOpenSSLParserTests: XCTestCase {
 
 private extension StandardOpenVPNOpenSSLParserTests {
     func newParser() -> StandardOpenVPNParser {
-        StandardOpenVPNParser(decrypter: OSSLTLSBox())
+        StandardOpenVPNParser(supportsLZO: true, decrypter: OSSLTLSBox())
     }
 
     func url(withName name: String) -> URL {

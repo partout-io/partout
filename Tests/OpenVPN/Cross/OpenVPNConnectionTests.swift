@@ -317,7 +317,7 @@ private struct Constants {
         environment: TunnelEnvironment = SharedTunnelEnvironment(profileId: nil)
     ) async throws -> OpenVPNConnection {
         let impl = OpenVPNModule.Implementation(
-            importer: StandardOpenVPNParser(decrypter: nil),
+            importer: StandardOpenVPNParser(supportsLZO: false, decrypter: nil),
             connectionBlock: {
                 try OpenVPNConnection(
                     .global,

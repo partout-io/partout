@@ -77,7 +77,7 @@ struct JSONTests {
 
 private extension JSONTests {
     func subjectPair(withSensitiveData: Bool) throws -> (cfg: OpenVPN.Configuration, json: [String: Any]) {
-        let parser = StandardOpenVPNParser(decrypter: nil)
+        let parser = StandardOpenVPNParser(supportsLZO: false, decrypter: nil)
         let url = try #require(Bundle.module.url(forResource: "protonvpn", withExtension: "ovpn"))
         let result = try parser.parsed(fromURL: url)
         let cfg = result.configuration

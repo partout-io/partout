@@ -25,7 +25,7 @@ final class Negotiator {
 
     private let ctx: PartoutLoggerContext
 
-    private let parser = StandardOpenVPNParser(decrypter: nil)
+    private let parser = StandardOpenVPNParser(supportsLZO: false, decrypter: nil)
 
     let key: UInt8 // 3-bit
 
