@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import _PartoutOpenVPN_C
-internal import _PartoutVendorsCrypto_C
 internal import _PartoutVendorsPortable
+internal import _PartoutVendorsTLSCore_C
 import Foundation
 
 extension TLSWrapper {

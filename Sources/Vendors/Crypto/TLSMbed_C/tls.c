@@ -7,7 +7,7 @@
 #include "crypto/allocation.h"
 #include "crypto/tls.h"
 
-// FIXME: #108, port to Windows Schannel or mbedTLS (would then move out of Windows_C)
+// FIXME: #108, implement with mbedTLS
 
 //static const char *const TLSBoxClientEKU = "TLS Web Client Authentication";
 static const char *const TLSBoxServerEKU = "TLS Web Server Authentication";

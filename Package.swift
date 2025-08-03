@@ -222,7 +222,10 @@ if areas.contains(.openVPN) {
     package.targets.append(contentsOf: [
         .target(
             name: "_PartoutOpenVPN_C",
-            dependencies: ["_PartoutVendorsCrypto_C"],
+            dependencies: [
+                "_PartoutVendorsCrypto_C",
+                "_PartoutVendorsTLS_C"
+            ],
             path: "Sources/OpenVPN/Cross_C"
         ),
         .target(
@@ -368,6 +371,14 @@ package.targets.append(contentsOf: [
         path: "Sources/Vendors/Crypto/CryptoCore_C"
     ),
     .target(
+        name: "_PartoutVendorsTLSCore_C",
+        dependencies: [
+            "_PartoutVendorsCryptoCore_C",
+            "_PartoutVendorsPortable_C",
+        ],
+        path: "Sources/Vendors/Crypto/TLSCore_C"
+    ),
+    .target(
         name: "_PartoutVendorsPortable",
         dependencies: [
             environment.coreDependency,
@@ -422,9 +433,9 @@ case .apple:
     )
     package.targets.append(contentsOf: [
         .target(
-            name: "_PartoutVendorsCryptoImpl",
+            name: "_PartoutVendorsOpenSSL",
             dependencies: ["openssl-apple"],
-            path: "Sources/Vendors/Crypto/OpenSSL",
+            path: "Sources/Vendors/OpenSSL",
             exclude: [
                 "include/shim.h",
                 "module.modulemap"
@@ -434,9 +445,17 @@ case .apple:
             name: "_PartoutVendorsCrypto_C",
             dependencies: [
                 "_PartoutVendorsCryptoCore_C",
-                "_PartoutVendorsCryptoImpl"
+                "_PartoutVendorsOpenSSL"
             ],
             path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
+        ),
+        .target(
+            name: "_PartoutVendorsTLS_C",
+            dependencies: [
+                "_PartoutVendorsCrypto_C",
+                "_PartoutVendorsTLSCore_C"
+            ],
+            path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
         )
     ])
 
@@ -459,8 +478,8 @@ case .apple:
 case .linux:
     package.targets.append(contentsOf: [
         .systemLibrary(
-            name: "_PartoutVendorsCryptoImpl",
-            path: "Sources/Vendors/Crypto/OpenSSL",
+            name: "_PartoutVendorsOpenSSL",
+            path: "Sources/Vendors/OpenSSL",
             pkgConfig: "openssl",
             providers: [
                 .apt(["libssl-dev"])
@@ -470,29 +489,28 @@ case .linux:
             name: "_PartoutVendorsCrypto_C",
             dependencies: [
                 "_PartoutVendorsCryptoCore_C",
-                "_PartoutVendorsCryptoImpl"
+                "_PartoutVendorsOpenSSL"
             ],
             path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
+        ),
+        .target(
+            name: "_PartoutVendorsTLS_C",
+            dependencies: [
+                "_PartoutVendorsCrypto_C",
+                "_PartoutVendorsTLSCore_C"
+            ],
+            path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
         )
     ])
 case .windows:
     package.targets.append(
         .target(
-            name: "_PartoutVendorsWindows_C",
+            name: "_PartoutVendorsCrypto_C",
             dependencies: [
                 "_PartoutVendorsCryptoCore_C",
                 "_PartoutVendorsPortable_C"
             ],
-            path: "Sources/Vendors/Windows_C"
-        ),
-    )
-
-    // crypto
-    package.targets.append(
-        .target(
-            name: "_PartoutVendorsCrypto_C",
-            dependencies: ["_PartoutVendorsWindows_C"],
-            path: "Sources/Vendors/Crypto/Windows"
+            path: "Sources/Vendors/Crypto/CryptoWindows_C"
         )
     )
 default:
