@@ -4,7 +4,7 @@
 
 import Foundation
 import Partout
-import XCTest
+import Testing
 
 #if canImport(PartoutOpenVPN)
 import PartoutOpenVPN
@@ -14,21 +14,22 @@ import PartoutWireGuard
 #endif
 import PartoutCore
 
-final class RegistryTests: XCTestCase {
+struct RegistryTests {
 
 #if canImport(PartoutOpenVPN) && canImport(PartoutWireGuard)
-    func test_givenKnownHandlers_whenSerializeProfile_thenIsDeserialized() throws {
+    @Test
+    func givenKnownHandlers_whenSerializeProfile_thenIsDeserialized() throws {
         let sut = Registry()
 
         var ovpnBuilder = OpenVPN.Configuration.Builder()
         ovpnBuilder.ca = OpenVPN.CryptoContainer(pem: "ca is required")
         ovpnBuilder.cipher = .aes128cbc
         ovpnBuilder.remotes = [
-            try XCTUnwrap(.init("host.name", .init(.tcp, 80)))
+            try ExtendedEndpoint("host.name", EndpointProtocol(.tcp, 80))
         ]
 
         var wgBuilder = WireGuard.Configuration.Builder(privateKey: "")
-        wgBuilder.peers = [.init(publicKey: "")]
+        wgBuilder.peers = [WireGuard.RemoteInterface.Builder(publicKey: "")]
 
         var profileBuilder = Profile.Builder()
         profileBuilder.modules.append(try DNSModule.Builder().tryBuild())
@@ -45,7 +46,7 @@ final class RegistryTests: XCTestCase {
         print(encoded)
 
         let decoded = try sut.decodedProfile(from: encoded, with: coder)
-        XCTAssertEqual(profile, decoded)
+        #expect(profile == decoded)
     }
 #endif
 }

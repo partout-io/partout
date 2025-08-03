@@ -6,32 +6,35 @@
 import Foundation
 import NetworkExtension
 import PartoutCore
-import XCTest
+import Testing
 
-final class OnDemandModuleRulesTests: XCTestCase {
-    func test_givenAnyPolicy_whenGetRules_thenHasConnect() {
+struct OnDemandModuleRulesTests {
+    @Test
+    func givenAnyPolicy_whenGetRules_thenHasConnect() {
         var module = OnDemandModule.Builder()
         module.policy = .any
 
         let sut = module.tryBuild()
 
-        XCTAssertEqual(sut.neRules, [
+        #expect(sut.neRules == [
             NEOnDemandRuleConnect()
         ])
     }
 
-    func test_givenExcludingPolicy_whenGetRules_thenHasConnect() {
+    @Test
+    func givenExcludingPolicy_whenGetRules_thenHasConnect() {
         var module = OnDemandModule.Builder()
         module.policy = .excluding
 
         let sut = module.tryBuild()
 
-        XCTAssertEqual(sut.neRules, [
+        #expect(sut.neRules == [
             NEOnDemandRuleConnect()
         ])
     }
 
-    func test_givenExcludingPolicyWithCustomRules_whenGetRules_thenHasConnectExceptExcludedNetworks() throws {
+    @Test
+    func givenExcludingPolicyWithCustomRules_whenGetRules_thenHasConnectExceptExcludedNetworks() throws {
         var module = OnDemandModule.Builder()
         module.policy = .excluding
         module.withMobileNetwork = true
@@ -44,15 +47,15 @@ final class OnDemandModuleRulesTests: XCTestCase {
 
         let sut = module.tryBuild()
 
-        XCTAssertEqual(sut.neRules, {
+        let computedRules = {
             var rules: [NEOnDemandRule] = []
 #if os(iOS)
-            XCTAssertTrue(OnDemandModule.supportsCellular)
+            #expect(OnDemandModule.supportsCellular)
             let mobileRule = NEOnDemandRuleDisconnect()
             mobileRule.interfaceTypeMatch = .cellular
             rules.append(mobileRule)
 #else
-            XCTAssertTrue(OnDemandModule.supportsEthernet)
+            #expect(OnDemandModule.supportsEthernet)
             let ethernetRule = NEOnDemandRuleDisconnect()
             ethernetRule.interfaceTypeMatch = .ethernet
             rules.append(ethernetRule)
@@ -63,10 +66,12 @@ final class OnDemandModuleRulesTests: XCTestCase {
             rules.append(wifiRule)
             rules.append(NEOnDemandRuleConnect())
             return rules
-        }())
+        }()
+        #expect(sut.neRules == computedRules)
     }
 
-    func test_givenIncludingPolicyWithCustomRules_whenGetRules_thenHasIgnoreExceptIncludedNetworks() throws {
+    @Test
+    func givenIncludingPolicyWithCustomRules_whenGetRules_thenHasIgnoreExceptIncludedNetworks() throws {
         var module = OnDemandModule.Builder()
         module.policy = .including
         module.withMobileNetwork = true
@@ -79,15 +84,15 @@ final class OnDemandModuleRulesTests: XCTestCase {
 
         let sut = module.tryBuild()
 
-        XCTAssertEqual(sut.neRules, {
+        let computedRules = {
             var rules: [NEOnDemandRule] = []
 #if os(iOS)
-            XCTAssertTrue(OnDemandModule.supportsCellular)
+            #expect(OnDemandModule.supportsCellular)
             let mobileRule = NEOnDemandRuleConnect()
             mobileRule.interfaceTypeMatch = .cellular
             rules.append(mobileRule)
 #else
-            XCTAssertTrue(OnDemandModule.supportsEthernet)
+            #expect(OnDemandModule.supportsEthernet)
             let ethernetRule = NEOnDemandRuleConnect()
             ethernetRule.interfaceTypeMatch = .ethernet
             rules.append(ethernetRule)
@@ -98,7 +103,8 @@ final class OnDemandModuleRulesTests: XCTestCase {
             rules.append(wifiRule)
             rules.append(NEOnDemandRuleIgnore())
             return rules
-        }())
+        }()
+        #expect(sut.neRules == computedRules)
     }
 }
 

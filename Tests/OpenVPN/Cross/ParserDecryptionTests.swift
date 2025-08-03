@@ -2,34 +2,41 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+import Foundation
 import PartoutOpenVPN
 @testable internal import PartoutOpenVPNCross
-import XCTest
+import Testing
 
-final class ParserDecryptionTests: XCTestCase {
-    func test_givenPKCS1_whenParse_thenFails() {
+struct ParserDecryptionTests {
+    func givenPKCS1_whenParse_thenFails() {
         let sut = newParser()
         let cfgURL = url(withName: "tunnelbear.enc.1")
-        XCTAssertThrowsError(try sut.parsed(fromURL: cfgURL))
+        #expect(throws: StandardOpenVPNParserError.self) {
+            try sut.parsed(fromURL: cfgURL)
+        }
     }
 
-    func test_givenPKCS1_whenParseWithPassphrase_thenSucceeds() {
+    func givenPKCS1_whenParseWithPassphrase_thenSucceeds() throws {
         let sut = newParser()
         let cfgURL = url(withName: "tunnelbear.enc.1")
-        XCTAssertNoThrow(try sut.parsed(fromURL: cfgURL, passphrase: "foobar"))
+        _ = try sut.parsed(fromURL: cfgURL, passphrase: "foobar")
     }
 
-    func test_givenPKCS8_whenParse_thenFails() {
+    func givenPKCS8_whenParse_thenFails() {
         let sut = newParser()
         let cfgURL = url(withName: "tunnelbear.enc.8")
-        XCTAssertThrowsError(try sut.parsed(fromURL: cfgURL))
+        #expect(throws: StandardOpenVPNParserError.self) {
+            try sut.parsed(fromURL: cfgURL)
+        }
     }
 
-    func test_givenPKCS8_whenParseWithPassphrase_thenSucceeds() {
+    func givenPKCS8_whenParseWithPassphrase_thenSucceeds() throws {
         let sut = newParser()
         let cfgURL = url(withName: "tunnelbear.enc.8")
-        XCTAssertThrowsError(try sut.parsed(fromURL: cfgURL))
-        XCTAssertNoThrow(try sut.parsed(fromURL: cfgURL, passphrase: "foobar"))
+        #expect(throws: StandardOpenVPNParserError.self) {
+            try sut.parsed(fromURL: cfgURL)
+        }
+        _ = try sut.parsed(fromURL: cfgURL, passphrase: "foobar")
     }
 }
 

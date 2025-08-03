@@ -4,23 +4,25 @@
 
 import _PartoutVendorsApple
 import Foundation
-import XCTest
+import Testing
 
-final class AppleRandomTests: XCTestCase {
+struct AppleRandomTests {
     private let sut = AppleRandom()
 
-    func test_givenPRNG_whenGenerateData_thenHasGivenLength() {
-        XCTAssertEqual(sut.data(length: 123).count, 123)
+    @Test
+    func givenPRNG_whenGenerateData_thenHasGivenLength() {
+        #expect(sut.data(length: 123).count == 123)
     }
 
-    func test_givenPRNG_whenGenerateSuite_thenHasGivenParameters() {
+    @Test
+    func givenPRNG_whenGenerateSuite_thenHasGivenParameters() {
         let length = 52
         let elements = 680
         let suite = sut.suite(withDataLength: 52, numberOfElements: 680)
 
-        XCTAssertEqual(suite.count, elements)
+        #expect(suite.count == elements)
         suite.forEach {
-            XCTAssertEqual($0.count, length)
+            #expect($0.count == length)
         }
     }
 }

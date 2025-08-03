@@ -6,60 +6,70 @@ import PartoutOpenVPN
 @testable internal import PartoutOpenVPNCross
 import Foundation
 import PartoutCore
-import XCTest
+import Testing
 
-final class OpenVPNConnectionTests: XCTestCase {
+struct OpenVPNConnectionTests {
     private let constants = Constants()
 
-    func test_givenConnection_whenStart_thenConnects() async throws {
+    @Test
+    func givenConnection_whenStart_thenConnects() async throws {
         let session = MockOpenVPNSession()
         var status: ConnectionStatus
 
-        let expLink = expectation(description: "Link")
-        let expTunnel = expectation(description: "Tunnel")
+        let expLink = Expectation()
+        let expTunnel = Expectation()
         session.onSetLink = {
-            expLink.fulfill()
+            Task {
+                await expLink.fulfill()
+            }
         }
         session.onSetTunnel = {
-            expTunnel.fulfill()
+            Task {
+                await expTunnel.fulfill()
+            }
         }
 
         let sut = try await constants.newConnection(with: session)
         status = await sut.backend.status
-        XCTAssertEqual(status, .disconnected)
+        #expect(status == .disconnected)
 
         try await sut.start()
-        await fulfillment(of: [expLink, expTunnel], timeout: 0.3)
+        try await expLink.fulfillment(timeout: 300)
+        try await expTunnel.fulfillment(timeout: 300)
         status = await sut.backend.status
-        XCTAssertEqual(status, .connected)
+        #expect(status == .connected)
     }
 
-    func test_givenConnectionFailingLink_whenStart_thenFails() async throws {
+    @Test
+    func givenConnectionFailingLink_whenStart_thenFails() async throws {
         let session = MockOpenVPNSession()
         var status: ConnectionStatus
         let controller = MockTunnelController()
 
-        let expLink = expectation(description: "Link")
+        let expLink = Expectation()
         session.onSetLink = {
             throw PartoutError(.crypto)
         }
         session.onDidFailToSetLink = {
-            expLink.fulfill()
+            Task {
+                await expLink.fulfill()
+            }
         }
 
         let sut = try await constants.newConnection(with: session, controller: controller)
         status = await sut.backend.status
-        XCTAssertEqual(status, .disconnected)
+        #expect(status == .disconnected)
 
         do {
             try await sut.start()
-            await fulfillment(of: [expLink], timeout: 0.3)
+            try await expLink.fulfillment(timeout: 300)
         } catch {
-            XCTAssertEqual((error as? PartoutError)?.code, .crypto)
+            #expect((error as? PartoutError)?.code == .crypto)
         }
     }
 
-    func test_givenConnectionFailingTunnelSetup_whenStart_thenFails() async throws {
+    @Test
+    func givenConnectionFailingTunnelSetup_whenStart_thenFails() async throws {
         let session = MockOpenVPNSession()
         var status: ConnectionStatus
         let controller = MockTunnelController()
@@ -68,26 +78,27 @@ final class OpenVPNConnectionTests: XCTestCase {
         }
 
         session.onStop = {
-            XCTAssertEqual(($0 as? PartoutError)?.code, .incompatibleModules)
+            #expect(($0 as? PartoutError)?.code == .incompatibleModules)
         }
 
         let sut = try await constants.newConnection(with: session, controller: controller)
         status = await sut.backend.status
-        XCTAssertEqual(status, .disconnected)
+        #expect(status == .disconnected)
 
         do {
             try await sut.start()
         } catch {
-            XCTAssertEqual((error as? PartoutError)?.code, .incompatibleModules)
+            #expect((error as? PartoutError)?.code == .incompatibleModules)
         }
     }
 
-    func test_givenConnectionFailingAsynchronously_whenStart_thenCancelsShortlyAfter() async throws {
+    @Test
+    func givenConnectionFailingAsynchronously_whenStart_thenCancelsShortlyAfter() async throws {
         let session = MockOpenVPNSession()
         var status: ConnectionStatus
         let controller = MockTunnelController()
 
-        let expStop = expectation(description: "Stop tunnel")
+        let expStop = Expectation()
         session.onSetLink = {
             Task {
                 try? await Task.sleep(milliseconds: 200)
@@ -95,36 +106,43 @@ final class OpenVPNConnectionTests: XCTestCase {
             }
         }
         session.onStop = {
-            XCTAssertEqual(($0 as? PartoutError)?.code, .crypto)
-            expStop.fulfill()
+            #expect(($0 as? PartoutError)?.code == .crypto)
+            Task {
+                await expStop.fulfill()
+            }
         }
 
         let sut = try await constants.newConnection(with: session, controller: controller)
         status = await sut.backend.status
-        XCTAssertEqual(status, .disconnected)
+        #expect(status == .disconnected)
 
         try await sut.start()
-        await fulfillment(of: [expStop], timeout: 1.0)
+        try await expStop.fulfillment(timeout: 1000)
     }
 
-    func test_givenConnectionFailingWithRecoverableError_whenStart_thenDisconnects() async throws {
+    @Test
+    func givenConnectionFailingWithRecoverableError_whenStart_thenDisconnects() async throws {
         let session = MockOpenVPNSession()
         var status: ConnectionStatus
         let controller = MockTunnelController()
         let recoverableError = PartoutError(.timeout)
         assert(recoverableError.isOpenVPNRecoverable)
 
-        let expStart = expectation(description: "Start")
-        let expStop = expectation(description: "Stop")
+        let expStart = Expectation()
+        let expStop = Expectation()
         session.onSetLink = {
-            expStart.fulfill()
+            Task {
+                await expStart.fulfill()
+            }
         }
         session.onStop = {
-            XCTAssertEqual(($0 as? PartoutError)?.code, recoverableError.code)
-            expStop.fulfill()
+            #expect(($0 as? PartoutError)?.code == recoverableError.code)
+            Task {
+                await expStop.fulfill()
+            }
         }
         controller.onCancelTunnelConnection = { _ in
-            XCTFail("Should not cancel connection")
+            #expect(Bool(false), "Should not cancel connection")
         }
 
         let sut = try await constants.newConnection(
@@ -132,82 +150,93 @@ final class OpenVPNConnectionTests: XCTestCase {
             controller: controller
         )
         status = await sut.backend.status
-        XCTAssertEqual(status, .disconnected)
+        #expect(status == .disconnected)
 
         try await sut.start()
-        await fulfillment(of: [expStart], timeout: 0.3)
+        try await expStart.fulfillment(timeout: 300)
         status = await sut.backend.status
-        XCTAssertEqual(status, .connected)
+        #expect(status == .connected)
 
         Task {
             await session.shutdown(recoverableError)
         }
 
-        await fulfillment(of: [expStop], timeout: 0.5)
+        try await expStop.fulfillment(timeout: 500)
         status = await sut.backend.status
-        XCTAssertEqual(status, .disconnected)
+        #expect(status == .disconnected)
     }
 
-    func test_givenStartedConnection_whenStop_thenDisconnects() async throws {
+    @Test
+    func givenStartedConnection_whenStop_thenDisconnects() async throws {
         let session = MockOpenVPNSession()
         var status: ConnectionStatus
 
-        let expLink = expectation(description: "Link")
-        let expStop = expectation(description: "Stop")
+        let expLink = Expectation()
+        let expStop = Expectation()
         session.onSetLink = {
-            expLink.fulfill()
+            Task {
+                await expLink.fulfill()
+            }
         }
         session.onStop = {
-            XCTAssertNil($0)
-            expStop.fulfill()
+            #expect($0 == nil)
+            Task {
+                await expStop.fulfill()
+            }
         }
 
         let sut = try await constants.newConnection(with: session)
         status = await sut.backend.status
-        XCTAssertEqual(status, .disconnected)
+        #expect(status == .disconnected)
 
         try await sut.start()
-        await fulfillment(of: [expLink], timeout: 0.2)
+        try await expLink.fulfillment(timeout: 200)
         status = await sut.backend.status
-        XCTAssertEqual(status, .connected)
+        #expect(status == .connected)
 
         await sut.stop(timeout: 100)
-        await fulfillment(of: [expStop], timeout: 0.3)
+        try await expStop.fulfillment(timeout: 300)
         status = await sut.backend.status
-        XCTAssertEqual(status, .disconnected)
+        #expect(status == .disconnected)
     }
 
-    func test_givenStartedConnectionWithHangingLink_whenStop_thenDisconnectsAfterTimeout() async throws {
+    @Test
+    func givenStartedConnectionWithHangingLink_whenStop_thenDisconnectsAfterTimeout() async throws {
         let session = MockOpenVPNSession()
         var status: ConnectionStatus
 
-        let expLink = expectation(description: "Link")
-        let expStop = expectation(description: "Stop")
+        let expLink = Expectation()
+        let expStop = Expectation()
         session.onSetLink = {
             session.mockHasLink = true
-            expLink.fulfill()
+            Task {
+                await expLink.fulfill()
+            }
         }
         session.onStop = {
-            XCTAssertNil($0)
-            expStop.fulfill()
+            #expect($0 == nil)
+            Task {
+                await expStop.fulfill()
+            }
         }
 
         let sut = try await constants.newConnection(with: session)
         status = await sut.backend.status
-        XCTAssertEqual(status, .disconnected)
+        #expect(status == .disconnected)
 
         try await sut.start()
-        await fulfillment(of: [expLink], timeout: 0.2)
+        try await expLink.fulfillment(timeout: 200)
         status = await sut.backend.status
-        XCTAssertEqual(status, .connected)
+        #expect(status == .connected)
 
         await sut.stop(timeout: 100)
-        await fulfillment(of: [expStop], timeout: 0.3)
+        try await expStop.fulfillment(timeout: 300)
         status = await sut.backend.status
-        XCTAssertEqual(status, .disconnected)
+        #expect(status == .disconnected)
     }
 
-    func test_givenStartedConnection_whenUpgraded_thenDisconnectsWithNetworkChanged() async throws {
+    @Test
+    func givenStartedConnection_whenUpgraded_thenDisconnectsWithNetworkChanged() async throws {
         let session = MockOpenVPNSession()
         var status: ConnectionStatus
         let hasBetterPath = PassthroughStream<Void>()
@@ -216,18 +245,24 @@ final class OpenVPNConnectionTests: XCTestCase {
             $0.hasBetterPath = hasBetterPath.subscribe()
         }
 
-        let expInitialLink = expectation(description: "Initial link")
-        let expConnected = expectation(description: "Connected")
-        let expStop = expectation(description: "Stop")
+        let expInitialLink = Expectation()
+        let expConnected = Expectation()
+        let expStop = Expectation()
         session.onSetLink = {
-            expInitialLink.fulfill()
+            Task {
+                await expInitialLink.fulfill()
+            }
         }
         session.onConnected = {
-            expConnected.fulfill()
+            Task {
+                await expConnected.fulfill()
+            }
         }
         session.onStop = {
-            XCTAssertEqual(($0 as? PartoutError)?.code, .networkChanged)
-            expStop.fulfill()
+            #expect(($0 as? PartoutError)?.code == .networkChanged)
+            Task {
+                await expStop.fulfill()
+            }
         }
 
         let sut = try await constants.newConnection(
@@ -235,17 +270,18 @@ final class OpenVPNConnectionTests: XCTestCase {
             factory: factory
         )
         status = await sut.backend.status
-        XCTAssertEqual(status, .disconnected)
+        #expect(status == .disconnected)
 
         try await sut.start()
-        await fulfillment(of: [expInitialLink, expConnected], timeout: 0.5)
+        try await expInitialLink.fulfillment(timeout: 500)
+        try await expConnected.fulfillment(timeout: 500)
         status = await sut.backend.status
-        XCTAssertEqual(status, .connected)
+        #expect(status == .connected)
 
         hasBetterPath.send()
-        await fulfillment(of: [expStop], timeout: 0.5)
+        try await expStop.fulfillment(timeout: 500)
         status = await sut.backend.status
-        XCTAssertEqual(status, .disconnected)
+        #expect(status == .disconnected)
     }
 }
 
@@ -300,7 +336,7 @@ private struct Constants {
             environment: environment,
             options: options
         ))
-        return try XCTUnwrap(conn as? OpenVPNConnection)
+        return try #require(conn as? OpenVPNConnection)
     }
 }
 

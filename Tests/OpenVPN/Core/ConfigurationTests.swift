@@ -2,12 +2,14 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+import Foundation
 import PartoutCore
 @testable import PartoutOpenVPN
-import XCTest
+import Testing
 
-final class ConfigurationTests: XCTestCase {
-    func test_givenRandomizeHostnames_whenProcessRemotes_thenHostnamesHaveAlphanumericPrefix() throws {
+struct ConfigurationTests {
+    @Test
+    func givenRandomizeHostnames_whenProcessRemotes_thenHostnamesHaveAlphanumericPrefix() throws {
         var builder = OpenVPN.Configuration.Builder()
         let hostname = "my.host.name"
         let ipv4 = "1.2.3.4"
@@ -18,19 +20,16 @@ final class ConfigurationTests: XCTestCase {
         builder.randomizeHostnames = true
         let cfg = try builder.tryBuild(isClient: false)
 
-        cfg.processedRemotes(prng: MockPRNG())?
+        try cfg.processedRemotes(prng: MockPRNG())?
             .forEach {
                 let comps = $0.address.rawValue.components(separatedBy: ".")
-                guard let first = comps.first else {
-                    XCTFail()
-                    return
-                }
+                let first = try #require(comps.first)
                 if $0.isHostname {
-                    XCTAssert($0.address.rawValue.hasSuffix(hostname))
-                    XCTAssertEqual(first.count, 12)
-                    XCTAssertTrue(first.allSatisfy("0123456789abcdef".contains))
+                    #expect($0.address.rawValue.hasSuffix(hostname))
+                    #expect(first.count == 12)
+                    #expect(first.allSatisfy("0123456789abcdef".contains))
                 } else {
-                    XCTAssertEqual($0.address.rawValue, ipv4)
+                    #expect($0.address.rawValue == ipv4)
                 }
             }
     }

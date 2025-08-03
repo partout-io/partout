@@ -5,16 +5,17 @@
 import PartoutWireGuard
 @testable import PartoutWireGuardCross
 import PartoutCore
-import XCTest
+import Testing
 
-final class StandardWireGuardParserTests: XCTestCase {
+struct StandardWireGuardParserTests {
     private let parser = StandardWireGuardParser()
 
     private let keyGenerator = StandardWireGuardKeyGenerator()
 
     // MARK: - Interface
 
-    func test_givenParser_whenGoodBuilder_thenDoesNotThrow() {
+    @Test
+    func givenParser_whenGoodBuilder_thenDoesNotThrow() throws {
         var sut = newBuilder()
         sut.interface.addresses = ["1.2.3.4"]
 
@@ -24,24 +25,26 @@ final class StandardWireGuardParserTests: XCTestCase {
         sut.interface.dns = dns
 
         let builder = WireGuardModule.Builder(configurationBuilder: sut)
-        XCTAssertNoThrow(try parser.validate(builder))
+        try parser.validate(builder)
     }
 
-    func test_givenParser_whenBadPrivateKey_thenThrows() {
+    @Test
+    func givenParser_whenBadPrivateKey_thenThrows() {
         let sut = WireGuard.Configuration.Builder(privateKey: "")
         do {
             try assertValidationFailure(sut)
         } catch {
             assertParseError(error) {
                 guard case .interfaceHasInvalidPrivateKey = $0 else {
-                    XCTFail($0.localizedDescription)
+                    #expect(Bool(false), "\($0.localizedDescription)")
                     return
                 }
             }
         }
     }
 
-    func test_givenParser_whenBadAddresses_thenThrows() {
+    @Test
+    func givenParser_whenBadAddresses_thenThrows() {
         var sut = newBuilder()
         sut.interface.addresses = ["dsfds"]
         do {
@@ -49,7 +52,7 @@ final class StandardWireGuardParserTests: XCTestCase {
         } catch {
             assertParseError(error) {
                 guard case .interfaceHasInvalidAddress = $0 else {
-                    XCTFail($0.localizedDescription)
+                    #expect(Bool(false), "\($0.localizedDescription)")
                     return
                 }
             }
@@ -57,7 +60,8 @@ final class StandardWireGuardParserTests: XCTestCase {
     }
 
     // parser is too tolerant, never fails
-//    func test_givenParser_whenBadDNS_thenThrows() {
+//    @Test
+//    func givenParser_whenBadDNS_thenThrows() {
 //        var sut = newBuilder()
 //        sut.interface.addresses = ["1.2.3.4"]
 //
@@ -80,7 +84,8 @@ final class StandardWireGuardParserTests: XCTestCase {
 
     // MARK: - Peers
 
-    func test_givenParser_whenBadPeerPublicKey_thenThrows() {
+    @Test
+    func givenParser_whenBadPeerPublicKey_thenThrows() {
         var sut = newBuilder(withInterface: true)
 
         let peer = WireGuard.RemoteInterface.Builder(publicKey: "")
@@ -91,14 +96,15 @@ final class StandardWireGuardParserTests: XCTestCase {
         } catch {
             assertParseError(error) {
                 guard case .peerHasInvalidPublicKey = $0 else {
-                    XCTFail($0.localizedDescription)
+                    #expect(Bool(false), "\($0.localizedDescription)")
                     return
                 }
             }
         }
     }
 
-    func test_givenParser_whenBadPeerPresharedKey_thenThrows() {
+    @Test
+    func givenParser_whenBadPeerPresharedKey_thenThrows() {
         var sut = newBuilder(withInterface: true, withPeer: true)
         var peer = sut.peers[0]
         peer.preSharedKey = "fdsfokn.,x"
@@ -109,14 +115,15 @@ final class StandardWireGuardParserTests: XCTestCase {
         } catch {
             assertParseError(error) {
                 guard case .peerHasInvalidPreSharedKey = $0 else {
-                    XCTFail($0.localizedDescription)
+                    #expect(Bool(false), "\($0.localizedDescription)")
                     return
                 }
             }
         }
     }
 
-    func test_givenParser_whenBadPeerEndpoint_thenThrows() {
+    @Test
+    func givenParser_whenBadPeerEndpoint_thenThrows() {
         var sut = newBuilder(withInterface: true, withPeer: true)
         var peer = sut.peers[0]
         peer.endpoint = "fdsfokn.,x"
@@ -127,14 +134,15 @@ final class StandardWireGuardParserTests: XCTestCase {
         } catch {
             assertParseError(error) {
                 guard case .peerHasInvalidEndpoint = $0 else {
-                    XCTFail($0.localizedDescription)
+                    #expect(Bool(false), "\($0.localizedDescription)")
                     return
                 }
             }
         }
     }
 
-    func test_givenParser_whenBadPeerAllowedIPs_thenThrows() {
+    @Test
+    func givenParser_whenBadPeerAllowedIPs_thenThrows() {
         var sut = newBuilder(withInterface: true, withPeer: true)
         var peer = sut.peers[0]
         peer.allowedIPs = ["fdsfokn.,x"]
@@ -145,7 +153,7 @@ final class StandardWireGuardParserTests: XCTestCase {
         } catch {
             assertParseError(error) {
                 guard case .peerHasInvalidAllowedIP = $0 else {
-                    XCTFail($0.localizedDescription)
+                    #expect(Bool(false), "\($0.localizedDescription)")
                     return
                 }
             }
@@ -169,7 +177,7 @@ private extension StandardWireGuardParserTests {
                 let publicKey = try keyGenerator.publicKey(for: peerPrivateKey)
                 builder.peers = [WireGuard.RemoteInterface.Builder(publicKey: publicKey)]
             } catch {
-                XCTFail(error.localizedDescription)
+                #expect(Bool(false), "\(error.localizedDescription)")
                 return builder
             }
         }
@@ -178,18 +186,19 @@ private extension StandardWireGuardParserTests {
 
     func assertValidationFailure(_ wgBuilder: WireGuard.Configuration.Builder) throws {
         let builder = WireGuardModule.Builder(configurationBuilder: wgBuilder)
-        try parser.validate(builder)
-        XCTFail("Must fail")
+        #expect(throws: Error.self) {
+            try parser.validate(builder)
+        }
     }
 
     func assertParseError(_ error: Error, _ block: (WireGuardParseError) -> Void) {
-        NSLog("Thrown: \(error.localizedDescription)")
+        print("Thrown: \(error.localizedDescription)")
         guard let ppError = error as? PartoutError else {
-            XCTFail("Not a PartoutError")
+            #expect(Bool(false), "Not a PartoutError")
             return
         }
         guard let parseError = ppError.reason as? WireGuardParseError else {
-            XCTFail("Not a TunnelConfiguration.ParseError")
+            #expect(Bool(false), "Not a TunnelConfiguration.ParseError")
             return
         }
         block(parseError)

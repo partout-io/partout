@@ -403,6 +403,16 @@ case .apple:
             name: "_PartoutVendorsAppleNE",
             dependencies: [environment.coreDependency],
             path: "Sources/Vendors/AppleNE"
+        ),
+        .testTarget(
+            name: "_PartoutVendorsAppleTests",
+            dependencies: ["_PartoutVendorsApple"],
+            path: "Tests/Vendors/Apple"
+        ),
+        .testTarget(
+            name: "_PartoutVendorsAppleNETests",
+            dependencies: ["_PartoutVendorsAppleNE"],
+            path: "Tests/Vendors/AppleNE"
         )
     ])
 

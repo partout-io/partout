@@ -5,67 +5,70 @@
 import PartoutOpenVPN
 import Foundation
 import PartoutCore
-import XCTest
+import Testing
 
-final class JSONTests: XCTestCase {
-    func test_givenProtonVPN_whenConvertToJSON_thenFieldsExist() throws {
+struct JSONTests {
+    @Test
+    func givenProtonVPN_whenConvertToJSON_thenFieldsExist() throws {
         let pair = try subjectPair(withSensitiveData: false)
         let sut = pair.json
 
-        XCTAssertNotNil(sut["remotes"])
-        XCTAssertNotNil(sut["randomizeEndpoint"])
-        XCTAssertNotNil(sut["authUserPass"])
-        XCTAssertNotNil(sut["renegotiatesAfter"])
-        XCTAssertNotNil(sut["cipher"])
-        XCTAssertNotNil(sut["digest"])
-        XCTAssertNotNil(sut["ca"])
-        XCTAssertNotNil(sut["tlsWrap"])
-        XCTAssertNotNil(sut["xorMethod"])
-        XCTAssertNotNil(sut["mtu"])
-        XCTAssertNotNil(sut["checksEKU"])
-        XCTAssertNil(sut["dnsServers"])
-        XCTAssertNil(sut["clientCertificate"])
-        XCTAssertNil(sut["clientKey"])
+        #expect(sut["remotes"] != nil)
+        #expect(sut["randomizeEndpoint"] != nil)
+        #expect(sut["authUserPass"] != nil)
+        #expect(sut["renegotiatesAfter"] != nil)
+        #expect(sut["cipher"] != nil)
+        #expect(sut["digest"] != nil)
+        #expect(sut["ca"] != nil)
+        #expect(sut["tlsWrap"] != nil)
+        #expect(sut["xorMethod"] != nil)
+        #expect(sut["mtu"] != nil)
+        #expect(sut["checksEKU"] != nil)
+        #expect(sut["dnsServers"] == nil)
+        #expect(sut["clientCertificate"] == nil)
+        #expect(sut["clientKey"] == nil)
     }
 
-    func test_givenProtonVPN_whenConvertToJSON_thenFieldsAreDisclosed() throws {
+    @Test
+    func givenProtonVPN_whenConvertToJSON_thenFieldsAreDisclosed() throws {
         let pair = try subjectPair(withSensitiveData: true)
         let sut = pair.json
         let cfg = pair.cfg
 
-        XCTAssertEqual(sut["ca"] as? String, cfg.ca?.pem)
+        #expect(sut["ca"] as? String == cfg.ca?.pem)
 
-        let tlsWrap = try XCTUnwrap(sut["tlsWrap"] as? [String: Any])
-        let tlsWrapKey = try XCTUnwrap(tlsWrap["key"] as? [String: Any])
-        XCTAssertEqual(tlsWrapKey["data"] as? String, cfg.tlsWrap?.key.secureData.toData().base64EncodedString())
+        let tlsWrap = try #require(sut["tlsWrap"] as? [String: Any])
+        let tlsWrapKey = try #require(tlsWrap["key"] as? [String: Any])
+        #expect(tlsWrapKey["data"] as? String == cfg.tlsWrap?.key.secureData.toData().base64EncodedString())
 
-        let xorMethod = try XCTUnwrap(sut["xorMethod"] as? [String: Any])
-        let xorMethodObfuscate = try XCTUnwrap(xorMethod["obfuscate"] as? [String: Any])
-        XCTAssertEqual(xorMethodObfuscate["mask"] as? String, cfg.xorMethod?.mask?.toData().base64EncodedString())
+        let xorMethod = try #require(sut["xorMethod"] as? [String: Any])
+        let xorMethodObfuscate = try #require(xorMethod["obfuscate"] as? [String: Any])
+        #expect(xorMethodObfuscate["mask"] as? String == cfg.xorMethod?.mask?.toData().base64EncodedString())
 
-        let remotes = try XCTUnwrap(sut["remotes"] as? [String])
+        let remotes = try #require(sut["remotes"] as? [String])
         let rawRemotes = Set(remotes)
         let cfgRemotes = Set(cfg.remotes?.map(\.description) ?? [])
-        XCTAssertEqual(rawRemotes, cfgRemotes)
+        #expect(rawRemotes == cfgRemotes)
     }
 
-    func test_givenProtonVPN_whenConvertToSensitiveJSON_thenFieldsAreRedacted() throws {
+    @Test
+    func givenProtonVPN_whenConvertToSensitiveJSON_thenFieldsAreRedacted() throws {
         let pair = try subjectPair(withSensitiveData: false)
         let sut = pair.json
 
-        XCTAssertEqual(sut["ca"] as? String, JSONEncoder.redactedValue)
+        #expect(sut["ca"] as? String == JSONEncoder.redactedValue)
 
-        let tlsWrap = try XCTUnwrap(sut["tlsWrap"] as? [String: Any])
-        let tlsWrapKey = try XCTUnwrap(tlsWrap["key"] as? [String: Any])
-        XCTAssertEqual(tlsWrapKey["data"] as? String, JSONEncoder.redactedValue)
+        let tlsWrap = try #require(sut["tlsWrap"] as? [String: Any])
+        let tlsWrapKey = try #require(tlsWrap["key"] as? [String: Any])
+        #expect(tlsWrapKey["data"] as? String == JSONEncoder.redactedValue)
 
-        let xorMethod = try XCTUnwrap(sut["xorMethod"] as? [String: Any])
-        let xorMethodObfuscate = try XCTUnwrap(xorMethod["obfuscate"] as? [String: Any])
-        XCTAssertEqual(xorMethodObfuscate["mask"] as? String, JSONEncoder.redactedValue)
+        let xorMethod = try #require(sut["xorMethod"] as? [String: Any])
+        let xorMethodObfuscate = try #require(xorMethod["obfuscate"] as? [String: Any])
+        #expect(xorMethodObfuscate["mask"] as? String == JSONEncoder.redactedValue)
 
-        let remotes = try XCTUnwrap(sut["remotes"] as? [String])
+        let remotes = try #require(sut["remotes"] as? [String])
         remotes.forEach {
-            XCTAssertTrue($0.contains(JSONEncoder.redactedValue))
+            #expect($0.contains(JSONEncoder.redactedValue))
         }
     }
 }
@@ -75,14 +78,14 @@ final class JSONTests: XCTestCase {
 private extension JSONTests {
     func subjectPair(withSensitiveData: Bool) throws -> (cfg: OpenVPN.Configuration, json: [String: Any]) {
         let parser = StandardOpenVPNParser(decrypter: nil)
-        let url = try XCTUnwrap(Bundle.module.url(forResource: "protonvpn", withExtension: "ovpn"))
+        let url = try #require(Bundle.module.url(forResource: "protonvpn", withExtension: "ovpn"))
         let result = try parser.parsed(fromURL: url)
         let cfg = result.configuration
 
-        let jsonString = try XCTUnwrap(cfg.asJSON(.global, withSensitiveData: withSensitiveData))
+        let jsonString = try #require(cfg.asJSON(.global, withSensitiveData: withSensitiveData))
         print(jsonString)
-        let jsonData = try XCTUnwrap(jsonString.data(using: .utf8))
-        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: jsonData) as? [String: Any])
+        let jsonData = try #require(jsonString.data(using: .utf8))
+        let json = try #require(try JSONSerialization.jsonObject(with: jsonData) as? [String: Any])
 
         return (cfg, json)
     }

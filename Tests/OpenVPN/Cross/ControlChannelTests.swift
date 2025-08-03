@@ -3,18 +3,20 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @testable internal import PartoutOpenVPNCross
-import XCTest
+import Testing
 
 @OpenVPNActor
-final class ControlChannelTests: XCTestCase {
-    func test_givenChannel_whenHandleSequence_thenIsReordered() {
+struct ControlChannelTests {
+    @Test
+    func givenChannel_whenHandleSequence_thenIsReordered() {
         let seq1: [UInt32] = [0, 5, 2, 1, 4, 3]
         let seq2: [UInt32] = [5, 2, 1, 9, 4, 3, 0, 8, 7, 10, 4, 3, 5, 6]
         let seq3: [UInt32] = [5, 2, 11, 1, 2, 9, 4, 5, 5, 3, 8, 0, 6, 8, 2, 7, 10, 4, 3, 5, 6]
 
         for seq in [seq1, seq2, seq3] {
-            XCTAssertEqual(
-                seq.sorted().unique(),
+            #expect(
+                seq.sorted().unique()
+                ==
                 handledSequence(seq.map(Wrapper.init)).map(\.packetId)
             )
         }
