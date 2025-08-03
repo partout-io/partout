@@ -220,13 +220,9 @@ private extension DefaultProviderScriptingAPI {
         cfg.timeoutIntervalForRequest = timeout
         let session = URLSession(configuration: cfg)
 
-        final class StatusHolder {
-            var status: Int?
-        }
-
         let semaphore = DispatchSemaphore(value: 0)
         let storage = ResultStorage()
-        let statusHolder = StatusHolder()
+        var status: Int?
         let task = session.dataTask(with: request) { [weak self] data, response, error in
             guard let self else {
                 return
@@ -247,7 +243,7 @@ private extension DefaultProviderScriptingAPI {
                     pp_log(ctx, .providers, .info, "API.sendRequest: ETag: \(tag)")
                     storage.tag = tag
                 }
-                statusHolder.status = httpResponse.statusCode
+                status = httpResponse.statusCode
                 storage.isCached = httpResponse.statusCode == 304
             }
             storage.textData = data
@@ -262,19 +258,19 @@ private extension DefaultProviderScriptingAPI {
             // nil response but no error = result.isCached
             return ProviderScriptResult(
                 nil,
-                status: statusHolder.status,
+                status: status,
                 lastModified: storage.lastModified,
                 tag: storage.tag
             )
         }
-        guard let textData = storage.textData else {
+        guard  let textData = storage.textData else {
             pp_log(ctx, .providers, .error, "API.sendRequest: Empty response")
             return ProviderScriptResult.notData
         }
         pp_log(ctx, .providers, .info, "API.sendRequest: Success")
         return ProviderScriptResult(
             textData,
-            status: statusHolder.status,
+            status: status,
             lastModified: storage.lastModified,
             tag: storage.tag
         )
