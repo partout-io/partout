@@ -496,7 +496,7 @@ case .linux:
         .target(
             name: "_PartoutVendorsTLS_C",
             dependencies: [
-                "_PartoutVendorsCrypto_C",
+                "_PartoutVendorsOpenSSL",
                 "_PartoutVendorsTLSCore_C"
             ],
             path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
