@@ -395,7 +395,8 @@ package.targets.append(contentsOf: [
     )
 ])
 
-// pick implementation
+// MARK: OS
+
 switch OS.current {
 case .android:
     if areas.contains(.crypto) {
@@ -452,8 +453,6 @@ case .apple:
             path: "Tests/Vendors/AppleNE"
         )
     ])
-
-    // crypto
     if areas.contains(.crypto) {
         package.dependencies.append(
             .package(url: "https://github.com/passepartoutvpn/openssl-apple", exact: "3.5.200")
@@ -486,8 +485,6 @@ case .apple:
             )
         ])
     }
-
-    // WireGuard
     if areas.contains(.wireGuard) {
         package.dependencies.append(
             .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.20250630")
@@ -598,7 +595,7 @@ if areas.contains(.wireGuard) {
     }
 }
 
-// MARK: Deployment
+// MARK: - Deployment
 
 import Foundation
 
