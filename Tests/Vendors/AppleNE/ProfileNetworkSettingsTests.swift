@@ -38,12 +38,12 @@ struct ProfileNetworkSettingsTests {
         let ipV4Settings = try #require(sut.ipv4Settings)
         let ipV6Settings = try #require(sut.ipv6Settings)
         let expRoutesV4: [NEIPv4Route] = {
-            let route = NEIPv4Route.default()
+            let route = NEIPv4Route.default().copy() as! NEIPv4Route
             route.gatewayAddress = "10.20.30.40"
             return [route]
         }()
         let expRoutesV6: [NEIPv6Route] = {
-            let route = NEIPv6Route.default()
+            let route = NEIPv6Route.default().copy() as! NEIPv6Route
             route.gatewayAddress = "10:20::30:40"
             return [route]
         }()
