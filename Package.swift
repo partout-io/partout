@@ -38,10 +38,12 @@ let package = Package(
     products: [
         .library(
             name: "Partout",
+            type: .static,
             targets: ["Partout"]
         ),
         .library(
             name: "PartoutImplementations",
+            type: .static,
             targets: ["PartoutImplementations"]
         )
     ],
