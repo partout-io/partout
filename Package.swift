@@ -17,6 +17,11 @@ let coreSHA1 = "22cd45a7790812a218c98e0e1c6184edeb8b0d59"
 let coreDeployment: CoreDeployment = .remoteBinary
 let areas: Set<Area> = Area.defaultAreas
 
+// PartoutCore binaries only on non-Apple
+guard OS.current == .apple || ![.remoteBinary, .localBinary].contains(coreDeployment) else {
+    fatalError("Core binary only available on Apple platforms")
+}
+
 // must be false in production (check in CI)
 let isDevelopment = false
 let isTestingOpenVPNDataPath = false
