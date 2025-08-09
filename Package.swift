@@ -13,8 +13,8 @@ let checksum = "100dc00b0a54b01cb4b237a2396a930ad05bd452eba896b69500697241ae07e1
 // to download the core soruce
 let coreSHA1 = "22cd45a7790812a218c98e0e1c6184edeb8b0d59"
 
-// deployment environment
-let environment: Environment = .remoteBinary
+// deployment of PartoutCore sub-library
+let coreDeployment: CoreDeployment = .remoteBinary
 let areas: Set<Area> = Area.defaultAreas
 
 // must be false in production (check in CI)
@@ -38,10 +38,12 @@ let package = Package(
     products: [
         .library(
             name: "Partout",
+            type: .static,
             targets: ["Partout"]
         ),
         .library(
             name: "PartoutImplementations",
+            type: .static,
             targets: ["PartoutImplementations"]
         )
     ],
@@ -49,7 +51,7 @@ let package = Package(
         .target(
             name: "Partout",
             dependencies: {
-                var list: [Target.Dependency] = [environment.coreDependency]
+                var list: [Target.Dependency] = [coreDeployment.dependency]
                 list.append("PartoutProviders")
                 if areas.contains(.api) {
                     list.append("PartoutAPI")
@@ -61,14 +63,23 @@ let package = Package(
                 if areas.contains(.wireGuard) {
                     list.append("PartoutWireGuard")
                 }
-                list.append("_PartoutVendorsCrypto_C")
+                if areas.contains(.crypto) {
+                    list.append("_PartoutVendorsCrypto_C")
+                }
                 list.append("_PartoutVendorsPortable")
                 if OS.current == .apple {
                     list.append("_PartoutVendorsApple")
                     list.append("_PartoutVendorsAppleNE")
                 }
                 return list
-            }()
+            }(),
+            exclude: {
+                var list: [String] = []
+                if !areas.contains(.api) {
+                    list.append("API")
+                }
+                return list
+            }(),
         ),
         .target(
             name: "PartoutImplementations",
@@ -86,7 +97,7 @@ let package = Package(
         ),
         .target(
             name: "PartoutProviders",
-            dependencies: [environment.coreDependency],
+            dependencies: [coreDeployment.dependency],
             path: "Sources/Providers"
         ),
         .testTarget(
@@ -366,22 +377,9 @@ if areas.contains(.api) {
 
 package.targets.append(contentsOf: [
     .target(
-        name: "_PartoutVendorsCryptoCore_C",
-        dependencies: ["_PartoutVendorsPortable_C"],
-        path: "Sources/Vendors/Crypto/CryptoCore_C"
-    ),
-    .target(
-        name: "_PartoutVendorsTLSCore_C",
-        dependencies: [
-            "_PartoutVendorsCryptoCore_C",
-            "_PartoutVendorsPortable_C",
-        ],
-        path: "Sources/Vendors/Crypto/TLSCore_C"
-    ),
-    .target(
         name: "_PartoutVendorsPortable",
         dependencies: [
-            environment.coreDependency,
+            coreDeployment.dependency,
             "_PartoutVendorsPortable_C"
         ],
         path: "Sources/Vendors/Portable"
@@ -390,10 +388,6 @@ package.targets.append(contentsOf: [
         name: "_PartoutVendorsPortable_C",
         path: "Sources/Vendors/Portable_C"
     ),
-    .target(
-        name: "_PartoutVendorsWireGuardCore",
-        path: "Sources/Vendors/WireGuard/Core"
-    ),
     .testTarget(
         name: "_PartoutVendorsPortableTests",
         dependencies: ["_PartoutVendorsPortable"],
@@ -401,18 +395,51 @@ package.targets.append(contentsOf: [
     )
 ])
 
-// pick implementation
+// MARK: OS
+
 switch OS.current {
+case .android:
+    if areas.contains(.crypto) {
+        package.targets.append(contentsOf: [
+            .target(
+                name: "_PartoutVendorsOpenSSL",
+                path: "Sources/Vendors/OpenSSL",
+                // use .artifactbundle once supported
+                linkerSettings: [
+                    .unsafeFlags(["-Lvendors/lib/android/arm64"]),
+                    // WARNING: order matters, ssl then crypto
+                    .linkedLibrary("ssl"),
+                    .linkedLibrary("crypto")
+                ]
+            ),
+            .target(
+                name: "_PartoutVendorsCrypto_C",
+                dependencies: [
+                    "_PartoutVendorsCryptoCore_C",
+                    "_PartoutVendorsOpenSSL"
+                ],
+                path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
+            ),
+            .target(
+                name: "_PartoutVendorsTLS_C",
+                dependencies: [
+                    "_PartoutVendorsOpenSSL",
+                    "_PartoutVendorsTLSCore_C"
+                ],
+                path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
+            )
+        ])
+    }
 case .apple:
     package.targets.append(contentsOf: [
         .target(
             name: "_PartoutVendorsApple",
-            dependencies: [environment.coreDependency],
+            dependencies: [coreDeployment.dependency],
             path: "Sources/Vendors/Apple"
         ),
         .target(
             name: "_PartoutVendorsAppleNE",
-            dependencies: [environment.coreDependency],
+            dependencies: [coreDeployment.dependency],
             path: "Sources/Vendors/AppleNE"
         ),
         .testTarget(
@@ -426,40 +453,38 @@ case .apple:
             path: "Tests/Vendors/AppleNE"
         )
     ])
-
-    // crypto
-    package.dependencies.append(
-        .package(url: "https://github.com/passepartoutvpn/openssl-apple", exact: "3.5.200")
-    )
-    package.targets.append(contentsOf: [
-        .target(
-            name: "_PartoutVendorsOpenSSL",
-            dependencies: ["openssl-apple"],
-            path: "Sources/Vendors/OpenSSL",
-            exclude: [
-                "include/shim.h",
-                "module.modulemap"
-            ]
-        ),
-        .target(
-            name: "_PartoutVendorsCrypto_C",
-            dependencies: [
-                "_PartoutVendorsCryptoCore_C",
-                "_PartoutVendorsOpenSSL"
-            ],
-            path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
-        ),
-        .target(
-            name: "_PartoutVendorsTLS_C",
-            dependencies: [
-                "_PartoutVendorsOpenSSL",
-                "_PartoutVendorsTLSCore_C"
-            ],
-            path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
+    if areas.contains(.crypto) {
+        package.dependencies.append(
+            .package(url: "https://github.com/passepartoutvpn/openssl-apple", exact: "3.5.200")
         )
-    ])
-
-    // WireGuard
+        package.targets.append(contentsOf: [
+            .target(
+                name: "_PartoutVendorsOpenSSL",
+                dependencies: ["openssl-apple"],
+                path: "Sources/Vendors/OpenSSL",
+                exclude: [
+                    "include/shim.h",
+                    "module.modulemap"
+                ]
+            ),
+            .target(
+                name: "_PartoutVendorsCrypto_C",
+                dependencies: [
+                    "_PartoutVendorsCryptoCore_C",
+                    "_PartoutVendorsOpenSSL"
+                ],
+                path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
+            ),
+            .target(
+                name: "_PartoutVendorsTLS_C",
+                dependencies: [
+                    "_PartoutVendorsOpenSSL",
+                    "_PartoutVendorsTLSCore_C"
+                ],
+                path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
+            )
+        ])
+    }
     if areas.contains(.wireGuard) {
         package.dependencies.append(
             .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.20250630")
@@ -476,98 +501,128 @@ case .apple:
         )
     }
 case .linux:
+    if areas.contains(.crypto) {
+        package.targets.append(contentsOf: [
+            .systemLibrary(
+                name: "_PartoutVendorsOpenSSL",
+                path: "Sources/Vendors/OpenSSL",
+                pkgConfig: "openssl",
+                providers: [
+                    .apt(["libssl-dev"])
+                ]
+            ),
+            .target(
+                name: "_PartoutVendorsCrypto_C",
+                dependencies: [
+                    "_PartoutVendorsCryptoCore_C",
+                    "_PartoutVendorsOpenSSL"
+                ],
+                path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
+            ),
+            .target(
+                name: "_PartoutVendorsTLS_C",
+                dependencies: [
+                    "_PartoutVendorsOpenSSL",
+                    "_PartoutVendorsTLSCore_C"
+                ],
+                path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
+            )
+        ])
+    }
+case .windows:
+    if areas.contains(.crypto) {
+        package.targets.append(
+            .target(
+                name: "_PartoutVendorsCrypto_C",
+                dependencies: [
+                    "_PartoutVendorsCryptoCore_C",
+                    "_PartoutVendorsPortable_C"
+                ],
+                path: "Sources/Vendors/Crypto/CryptoWindows_C"
+            )
+        )
+    }
+}
+
+if areas.contains(.crypto) {
     package.targets.append(contentsOf: [
-        .systemLibrary(
-            name: "_PartoutVendorsOpenSSL",
-            path: "Sources/Vendors/OpenSSL",
-            pkgConfig: "openssl",
-            providers: [
-                .apt(["libssl-dev"])
-            ]
+        .target(
+            name: "_PartoutVendorsCryptoCore_C",
+            dependencies: ["_PartoutVendorsPortable_C"],
+            path: "Sources/Vendors/Crypto/CryptoCore_C"
         ),
         .target(
-            name: "_PartoutVendorsCrypto_C",
+            name: "_PartoutVendorsTLSCore_C",
             dependencies: [
                 "_PartoutVendorsCryptoCore_C",
-                "_PartoutVendorsOpenSSL"
+                "_PartoutVendorsPortable_C",
             ],
-            path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
+            path: "Sources/Vendors/Crypto/TLSCore_C"
         ),
-        .target(
-            name: "_PartoutVendorsTLS_C",
+        .testTarget(
+            name: "_PartoutVendorsCrypto_CTests",
             dependencies: [
-                "_PartoutVendorsOpenSSL",
-                "_PartoutVendorsTLSCore_C"
+                "_PartoutVendorsCrypto_C", // now platform-independent
+                "_PartoutVendorsPortable"
             ],
-            path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
+            path: "Tests/Vendors/Crypto_C",
+            exclude: [
+                "CryptoPerformanceTests.swift"
+            ]
         )
     ])
-case .windows:
+}
+
+if areas.contains(.wireGuard) {
     package.targets.append(
         .target(
-            name: "_PartoutVendorsCrypto_C",
-            dependencies: [
-                "_PartoutVendorsCryptoCore_C",
-                "_PartoutVendorsPortable_C"
-            ],
-            path: "Sources/Vendors/Crypto/CryptoWindows_C"
+            name: "_PartoutVendorsWireGuardCore",
+            path: "Sources/Vendors/WireGuard/Core"
         )
     )
-default:
-    break
-}
 
-package.targets.append(
-    .testTarget(
-        name: "_PartoutVendorsCrypto_CTests",
-        dependencies: [
-            "_PartoutVendorsCrypto_C", // now platform-independent
-            "_PartoutVendorsPortable"
-        ],
-        path: "Tests/Vendors/Crypto_C",
-        exclude: [
-            "CryptoPerformanceTests.swift"
-        ]
-    )
-)
-
-// WireGuard not implemented yet on non-Apple
-if OS.current == .apple {
-    package.targets.append(
-        .testTarget(
-            name: "_PartoutVendorsWireGuardTests",
-            dependencies: [
-                "_PartoutVendorsWireGuard" // now platform-independent
-            ],
-            path: "Tests/Vendors/WireGuard"
+    // WireGuard not implemented yet on non-Apple
+    if OS.current == .apple {
+        package.targets.append(
+            .testTarget(
+                name: "_PartoutVendorsWireGuardTests",
+                dependencies: [
+                    "_PartoutVendorsWireGuard" // now platform-independent
+                ],
+                path: "Tests/Vendors/WireGuard"
+            )
         )
-    )
+    }
 }
 
-// MARK: Deployment
+// MARK: - Deployment
 
 import Foundation
 
-enum OS {
+enum OS: String {
     case android
     case apple
     case linux
     case windows
 
-    // unfortunately, SwiftPM has no "when" conditionals on package
-    // dependencies. we resort on some raw #if, which are reliable
-    // as long as we don't cross-compile
-    //
-    // FIXME: #53, in fact, Android is wrong here because it's never compiled natively
+    // Unfortunately, SwiftPM has no "when" conditionals on package
+    // dependencies. We resort on some raw #if, which are reliable
+    // as long as we don't cross-compile.
     static var current: OS {
+        // Android is never compiled natively, therefore #if os(Android)
+        // would be wrong here. Resort to an explicit env variable.
+        if let envPlatformString = ProcessInfo.processInfo.environment["PARTOUT_PLATFORM"] {
+            guard let envPlatform = OS(rawValue: envPlatformString) else {
+                fatalError("Unrecognized platform '\(envPlatformString)'")
+            }
+            return envPlatform
+        }
 #if os(Windows)
-        .windows
+        return .windows
 #elseif os(Linux)
-        .linux
-#elseif os(Android)
-        .android
+        return .linux
 #else
-        .apple
+        return .apple
 #endif
     }
 
@@ -583,6 +638,7 @@ enum OS {
 
 enum Area: CaseIterable {
     case api
+    case crypto
     case documentation
     case openVPN
     case wireGuard
@@ -599,14 +655,14 @@ enum Area: CaseIterable {
     }
 }
 
-enum Environment {
+enum CoreDeployment {
     case remoteBinary
     case remoteSource
     case localBinary
     case localSource
     case documentation
 
-    var coreDependency: Target.Dependency {
+    var dependency: Target.Dependency {
         switch self {
         case .documentation: "PartoutCore"
         default: "PartoutCoreWrapper"
@@ -614,7 +670,7 @@ enum Environment {
     }
 }
 
-switch environment {
+switch coreDeployment {
 case .remoteBinary:
     package.targets.append(.binaryTarget(
         name: "PartoutCoreWrapper",
