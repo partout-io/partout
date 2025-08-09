@@ -70,7 +70,14 @@ let package = Package(
                     list.append("_PartoutVendorsAppleNE")
                 }
                 return list
-            }()
+            }(),
+            exclude: {
+                var list: [String] = []
+                if !areas.contains(.api) {
+                    list.append("API")
+                }
+                return list
+            }(),
         ),
         .target(
             name: "PartoutImplementations",
