@@ -63,7 +63,9 @@ let package = Package(
                 if areas.contains(.wireGuard) {
                     list.append("PartoutWireGuard")
                 }
-                list.append("_PartoutVendorsCrypto_C")
+                if areas.contains(.crypto) {
+                    list.append("_PartoutVendorsCrypto_C")
+                }
                 list.append("_PartoutVendorsPortable")
                 if OS.current == .apple {
                     list.append("_PartoutVendorsApple")
@@ -437,36 +439,38 @@ case .apple:
     ])
 
     // crypto
-    package.dependencies.append(
-        .package(url: "https://github.com/passepartoutvpn/openssl-apple", exact: "3.5.200")
-    )
-    package.targets.append(contentsOf: [
-        .target(
-            name: "_PartoutVendorsOpenSSL",
-            dependencies: ["openssl-apple"],
-            path: "Sources/Vendors/OpenSSL",
-            exclude: [
-                "include/shim.h",
-                "module.modulemap"
-            ]
-        ),
-        .target(
-            name: "_PartoutVendorsCrypto_C",
-            dependencies: [
-                "_PartoutVendorsCryptoCore_C",
-                "_PartoutVendorsOpenSSL"
-            ],
-            path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
-        ),
-        .target(
-            name: "_PartoutVendorsTLS_C",
-            dependencies: [
-                "_PartoutVendorsOpenSSL",
-                "_PartoutVendorsTLSCore_C"
-            ],
-            path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
+    if areas.contains(.crypto) {
+        package.dependencies.append(
+            .package(url: "https://github.com/passepartoutvpn/openssl-apple", exact: "3.5.200")
         )
-    ])
+        package.targets.append(contentsOf: [
+            .target(
+                name: "_PartoutVendorsOpenSSL",
+                dependencies: ["openssl-apple"],
+                path: "Sources/Vendors/OpenSSL",
+                exclude: [
+                    "include/shim.h",
+                    "module.modulemap"
+                ]
+            ),
+            .target(
+                name: "_PartoutVendorsCrypto_C",
+                dependencies: [
+                    "_PartoutVendorsCryptoCore_C",
+                    "_PartoutVendorsOpenSSL"
+                ],
+                path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
+            ),
+            .target(
+                name: "_PartoutVendorsTLS_C",
+                dependencies: [
+                    "_PartoutVendorsOpenSSL",
+                    "_PartoutVendorsTLSCore_C"
+                ],
+                path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
+            )
+        ])
+    }
 
     // WireGuard
     if areas.contains(.wireGuard) {
@@ -485,60 +489,64 @@ case .apple:
         )
     }
 case .linux:
-    package.targets.append(contentsOf: [
-        .systemLibrary(
-            name: "_PartoutVendorsOpenSSL",
-            path: "Sources/Vendors/OpenSSL",
-            pkgConfig: "openssl",
-            providers: [
-                .apt(["libssl-dev"])
-            ]
-        ),
-        .target(
-            name: "_PartoutVendorsCrypto_C",
-            dependencies: [
-                "_PartoutVendorsCryptoCore_C",
-                "_PartoutVendorsOpenSSL"
-            ],
-            path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
-        ),
-        .target(
-            name: "_PartoutVendorsTLS_C",
-            dependencies: [
-                "_PartoutVendorsOpenSSL",
-                "_PartoutVendorsTLSCore_C"
-            ],
-            path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
-        )
-    ])
+    if areas.contains(.crypto) {
+        package.targets.append(contentsOf: [
+            .systemLibrary(
+                name: "_PartoutVendorsOpenSSL",
+                path: "Sources/Vendors/OpenSSL",
+                pkgConfig: "openssl",
+                providers: [
+                    .apt(["libssl-dev"])
+                ]
+            ),
+            .target(
+                name: "_PartoutVendorsCrypto_C",
+                dependencies: [
+                    "_PartoutVendorsCryptoCore_C",
+                    "_PartoutVendorsOpenSSL"
+                ],
+                path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
+            ),
+            .target(
+                name: "_PartoutVendorsTLS_C",
+                dependencies: [
+                    "_PartoutVendorsOpenSSL",
+                    "_PartoutVendorsTLSCore_C"
+                ],
+                path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
+            )
+        ])
+    }
 case .windows:
-    package.targets.append(
-        .target(
-            name: "_PartoutVendorsCrypto_C",
-            dependencies: [
-                "_PartoutVendorsCryptoCore_C",
-                "_PartoutVendorsPortable_C"
-            ],
-            path: "Sources/Vendors/Crypto/CryptoWindows_C"
+    if areas.contains(.crypto) {
+        package.targets.append(
+            .target(
+                name: "_PartoutVendorsCrypto_C",
+                dependencies: [
+                    "_PartoutVendorsCryptoCore_C",
+                    "_PartoutVendorsPortable_C"
+                ],
+                path: "Sources/Vendors/Crypto/CryptoWindows_C"
+            )
         )
-    )
-default:
-    break
+    }
 }
 
-package.targets.append(
-    .testTarget(
-        name: "_PartoutVendorsCrypto_CTests",
-        dependencies: [
-            "_PartoutVendorsCrypto_C", // now platform-independent
-            "_PartoutVendorsPortable"
-        ],
-        path: "Tests/Vendors/Crypto_C",
-        exclude: [
-            "CryptoPerformanceTests.swift"
-        ]
+if areas.contains(.crypto) {
+    package.targets.append(
+        .testTarget(
+            name: "_PartoutVendorsCrypto_CTests",
+            dependencies: [
+                "_PartoutVendorsCrypto_C", // now platform-independent
+                "_PartoutVendorsPortable"
+            ],
+            path: "Tests/Vendors/Crypto_C",
+            exclude: [
+                "CryptoPerformanceTests.swift"
+            ]
+        )
     )
-)
+}
 
 // WireGuard not implemented yet on non-Apple
 if OS.current == .apple {
@@ -592,6 +600,7 @@ enum OS {
 
 enum Area: CaseIterable {
     case api
+    case crypto
     case documentation
     case openVPN
     case wireGuard
