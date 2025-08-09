@@ -377,19 +377,6 @@ if areas.contains(.api) {
 
 package.targets.append(contentsOf: [
     .target(
-        name: "_PartoutVendorsCryptoCore_C",
-        dependencies: ["_PartoutVendorsPortable_C"],
-        path: "Sources/Vendors/Crypto/CryptoCore_C"
-    ),
-    .target(
-        name: "_PartoutVendorsTLSCore_C",
-        dependencies: [
-            "_PartoutVendorsCryptoCore_C",
-            "_PartoutVendorsPortable_C",
-        ],
-        path: "Sources/Vendors/Crypto/TLSCore_C"
-    ),
-    .target(
         name: "_PartoutVendorsPortable",
         dependencies: [
             coreDeployment.dependency,
@@ -400,10 +387,6 @@ package.targets.append(contentsOf: [
     .target(
         name: "_PartoutVendorsPortable_C",
         path: "Sources/Vendors/Portable_C"
-    ),
-    .target(
-        name: "_PartoutVendorsWireGuardCore",
-        path: "Sources/Vendors/WireGuard/Core"
     ),
     .testTarget(
         name: "_PartoutVendorsPortableTests",
@@ -565,7 +548,20 @@ case .windows:
 }
 
 if areas.contains(.crypto) {
-    package.targets.append(
+    package.targets.append(contentsOf: [
+        .target(
+            name: "_PartoutVendorsCryptoCore_C",
+            dependencies: ["_PartoutVendorsPortable_C"],
+            path: "Sources/Vendors/Crypto/CryptoCore_C"
+        ),
+        .target(
+            name: "_PartoutVendorsTLSCore_C",
+            dependencies: [
+                "_PartoutVendorsCryptoCore_C",
+                "_PartoutVendorsPortable_C",
+            ],
+            path: "Sources/Vendors/Crypto/TLSCore_C"
+        ),
         .testTarget(
             name: "_PartoutVendorsCrypto_CTests",
             dependencies: [
@@ -577,20 +573,29 @@ if areas.contains(.crypto) {
                 "CryptoPerformanceTests.swift"
             ]
         )
-    )
+    ])
 }
 
-// WireGuard not implemented yet on non-Apple
-if OS.current == .apple {
+if areas.contains(.wireGuard) {
     package.targets.append(
-        .testTarget(
-            name: "_PartoutVendorsWireGuardTests",
-            dependencies: [
-                "_PartoutVendorsWireGuard" // now platform-independent
-            ],
-            path: "Tests/Vendors/WireGuard"
+        .target(
+            name: "_PartoutVendorsWireGuardCore",
+            path: "Sources/Vendors/WireGuard/Core"
         )
     )
+
+    // WireGuard not implemented yet on non-Apple
+    if OS.current == .apple {
+        package.targets.append(
+            .testTarget(
+                name: "_PartoutVendorsWireGuardTests",
+                dependencies: [
+                    "_PartoutVendorsWireGuard" // now platform-independent
+                ],
+                path: "Tests/Vendors/WireGuard"
+            )
+        )
+    }
 }
 
 // MARK: Deployment
