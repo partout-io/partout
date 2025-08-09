@@ -414,6 +414,38 @@ package.targets.append(contentsOf: [
 
 // pick implementation
 switch OS.current {
+case .android:
+    if areas.contains(.crypto) {
+        package.targets.append(contentsOf: [
+            .target(
+                name: "_PartoutVendorsOpenSSL",
+                path: "Sources/Vendors/OpenSSL",
+                // use .artifactbundle once supported
+                linkerSettings: [
+                    .unsafeFlags(["-Lvendors/lib/android/arm64"]),
+                    // WARNING: order matters, ssl then crypto
+                    .linkedLibrary("ssl"),
+                    .linkedLibrary("crypto")
+                ]
+            ),
+            .target(
+                name: "_PartoutVendorsCrypto_C",
+                dependencies: [
+                    "_PartoutVendorsCryptoCore_C",
+                    "_PartoutVendorsOpenSSL"
+                ],
+                path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
+            ),
+            .target(
+                name: "_PartoutVendorsTLS_C",
+                dependencies: [
+                    "_PartoutVendorsOpenSSL",
+                    "_PartoutVendorsTLSCore_C"
+                ],
+                path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
+            )
+        ])
+    }
 case .apple:
     package.targets.append(contentsOf: [
         .target(
@@ -565,26 +597,30 @@ if OS.current == .apple {
 
 import Foundation
 
-enum OS {
+enum OS: String {
     case android
     case apple
     case linux
     case windows
 
-    // unfortunately, SwiftPM has no "when" conditionals on package
-    // dependencies. we resort on some raw #if, which are reliable
-    // as long as we don't cross-compile
-    //
-    // FIXME: #53, in fact, Android is wrong here because it's never compiled natively
+    // Unfortunately, SwiftPM has no "when" conditionals on package
+    // dependencies. We resort on some raw #if, which are reliable
+    // as long as we don't cross-compile.
     static var current: OS {
+        // Android is never compiled natively, therefore #if os(Android)
+        // would be wrong here. Resort to an explicit env variable.
+        if let envPlatformString = ProcessInfo.processInfo.environment["PARTOUT_PLATFORM"] {
+            guard let envPlatform = OS(rawValue: envPlatformString) else {
+                fatalError("Unrecognized platform '\(envPlatformString)'")
+            }
+            return envPlatform
+        }
 #if os(Windows)
-        .windows
+        return .windows
 #elseif os(Linux)
-        .linux
-#elseif os(Android)
-        .android
+        return .linux
 #else
-        .apple
+        return .apple
 #endif
     }
 

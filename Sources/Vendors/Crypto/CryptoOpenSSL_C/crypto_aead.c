@@ -26,7 +26,7 @@ static inline
 void local_prepare_iv(const void *vctx, uint8_t *_Nonnull iv, const zeroing_data_t *_Nonnull hmac_key) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
     pp_assert(ctx);
-    bzero(iv, ctx->id_len);
+    pp_zero(iv, ctx->id_len);
     memcpy(iv + ctx->id_len, hmac_key->bytes, ctx->crypto.meta.cipher_iv_len - ctx->id_len);
 }
 

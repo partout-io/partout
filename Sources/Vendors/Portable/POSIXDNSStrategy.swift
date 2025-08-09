@@ -72,6 +72,8 @@ private extension POSIXDNSStrategy {
             var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
 #if os(Windows)
             let hostBufLength = DWORD(hostBuffer.count)
+#elseif os(Android)
+            let hostBufLength = Int(hostBuffer.count)
 #else
             let hostBufLength = socklen_t(hostBuffer.count)
 #endif
