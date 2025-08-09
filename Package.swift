@@ -13,8 +13,8 @@ let checksum = "100dc00b0a54b01cb4b237a2396a930ad05bd452eba896b69500697241ae07e1
 // to download the core soruce
 let coreSHA1 = "22cd45a7790812a218c98e0e1c6184edeb8b0d59"
 
-// deployment environment
-let environment: Environment = .remoteBinary
+// deployment of PartoutCore sub-library
+let coreDeployment: CoreDeployment = .remoteBinary
 let areas: Set<Area> = Area.defaultAreas
 
 // must be false in production (check in CI)
@@ -49,7 +49,7 @@ let package = Package(
         .target(
             name: "Partout",
             dependencies: {
-                var list: [Target.Dependency] = [environment.coreDependency]
+                var list: [Target.Dependency] = [coreDeployment.dependency]
                 list.append("PartoutProviders")
                 if areas.contains(.api) {
                     list.append("PartoutAPI")
@@ -86,7 +86,7 @@ let package = Package(
         ),
         .target(
             name: "PartoutProviders",
-            dependencies: [environment.coreDependency],
+            dependencies: [coreDeployment.dependency],
             path: "Sources/Providers"
         ),
         .testTarget(
@@ -381,7 +381,7 @@ package.targets.append(contentsOf: [
     .target(
         name: "_PartoutVendorsPortable",
         dependencies: [
-            environment.coreDependency,
+            coreDeployment.dependency,
             "_PartoutVendorsPortable_C"
         ],
         path: "Sources/Vendors/Portable"
@@ -407,12 +407,12 @@ case .apple:
     package.targets.append(contentsOf: [
         .target(
             name: "_PartoutVendorsApple",
-            dependencies: [environment.coreDependency],
+            dependencies: [coreDeployment.dependency],
             path: "Sources/Vendors/Apple"
         ),
         .target(
             name: "_PartoutVendorsAppleNE",
-            dependencies: [environment.coreDependency],
+            dependencies: [coreDeployment.dependency],
             path: "Sources/Vendors/AppleNE"
         ),
         .testTarget(
@@ -599,14 +599,14 @@ enum Area: CaseIterable {
     }
 }
 
-enum Environment {
+enum CoreDeployment {
     case remoteBinary
     case remoteSource
     case localBinary
     case localSource
     case documentation
 
-    var coreDependency: Target.Dependency {
+    var dependency: Target.Dependency {
         switch self {
         case .documentation: "PartoutCore"
         default: "PartoutCoreWrapper"
@@ -614,7 +614,7 @@ enum Environment {
     }
 }
 
-switch environment {
+switch coreDeployment {
 case .remoteBinary:
     package.targets.append(.binaryTarget(
         name: "PartoutCoreWrapper",
