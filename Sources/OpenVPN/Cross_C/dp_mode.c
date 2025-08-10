@@ -9,14 +9,14 @@
 #include "openvpn/dp_mode.h"
 #include "openvpn/packet.h"
 
-dp_mode_t *dp_mode_create_opt(pp_crypto_ctx crypto,
+openvpn_dp_mode *dp_mode_create_opt(pp_crypto_ctx crypto,
                               pp_crypto_free_fn pp_crypto_free,
-                              const dp_mode_encrypter_t *enc,
-                              const dp_mode_decrypter_t *dec,
-                              const dp_mode_options_t *opt) {
+                              const openvpn_dp_mode_encrypter *enc,
+                              const openvpn_dp_mode_decrypter *dec,
+                              const openvpn_dp_mode_options *opt) {
     DP_LOG("dp_mode_create_opt");
 
-    dp_mode_t *mode = pp_alloc_crypto(sizeof(dp_mode_t));
+    openvpn_dp_mode *mode = pp_alloc_crypto(sizeof(openvpn_dp_mode));
     mode->crypto = crypto;
     mode->pp_crypto_free = pp_crypto_free;
     if (opt) {
@@ -36,7 +36,7 @@ dp_mode_t *dp_mode_create_opt(pp_crypto_ctx crypto,
     return mode;
 }
 
-void dp_mode_free(dp_mode_t *mode) {
+void dp_mode_free(openvpn_dp_mode *mode) {
     DP_LOG("dp_mode_free");
     mode->pp_crypto_free(mode->crypto);
     free(mode);
@@ -44,7 +44,7 @@ void dp_mode_free(dp_mode_t *mode) {
 
 // MARK: - Encryption
 
-size_t dp_mode_assemble(dp_mode_t *_Nonnull mode,
+size_t dp_mode_assemble(openvpn_dp_mode *_Nonnull mode,
                         uint32_t openvpn_packet_id,
                         pp_zd *_Nonnull dst,
                         const uint8_t *_Nonnull src,
@@ -59,7 +59,7 @@ size_t dp_mode_assemble(dp_mode_t *_Nonnull mode,
     return mode->enc.assemble(mode);
 }
 
-size_t dp_mode_encrypt(dp_mode_t *_Nonnull mode,
+size_t dp_mode_encrypt(openvpn_dp_mode *_Nonnull mode,
                        uint8_t key,
                        uint32_t openvpn_packet_id,
                        pp_zd *_Nonnull dst,
@@ -79,7 +79,7 @@ size_t dp_mode_encrypt(dp_mode_t *_Nonnull mode,
 
 // MARK: - Decryption
 
-size_t dp_mode_decrypt(dp_mode_t *_Nonnull mode,
+size_t dp_mode_decrypt(openvpn_dp_mode *_Nonnull mode,
                        pp_zd *_Nonnull dst,
                        uint32_t *_Nonnull dst_packet_id,
                        const uint8_t *_Nonnull src,
@@ -95,7 +95,7 @@ size_t dp_mode_decrypt(dp_mode_t *_Nonnull mode,
     return mode->dec.decrypt(mode);
 }
 
-size_t dp_mode_parse(dp_mode_t *_Nonnull mode,
+size_t dp_mode_parse(openvpn_dp_mode *_Nonnull mode,
                      pp_zd *_Nonnull dst,
                      uint8_t *_Nonnull dst_header,
                      uint8_t *_Nonnull src,

@@ -8,13 +8,13 @@
 #include "portable/common.h"
 #include "openvpn/control.h"
 
-ctrl_pkt_t *_Nonnull ctrl_pkt_create(openvpn_packet_code code, uint8_t key, uint32_t openvpn_packet_id,
+openvpn_ctrl_pkt *_Nonnull ctrl_pkt_create(openvpn_packet_code code, uint8_t key, uint32_t openvpn_packet_id,
                                      const uint8_t *_Nonnull session_id,
                                      const uint8_t *_Nullable payload, size_t payload_len,
                                      const uint32_t *_Nullable ack_ids, size_t ack_ids_len,
                                      const uint8_t *_Nullable ack_remote_session_id) {
 
-    ctrl_pkt_t *pkt = pp_alloc_crypto(sizeof(ctrl_pkt_t));
+    openvpn_ctrl_pkt *pkt = pp_alloc_crypto(sizeof(openvpn_ctrl_pkt));
     pkt->code = code;
     pkt->key = key;
     pkt->openvpn_packet_id = openvpn_packet_id;
@@ -44,7 +44,7 @@ ctrl_pkt_t *_Nonnull ctrl_pkt_create(openvpn_packet_code code, uint8_t key, uint
     return pkt;
 }
 
-void ctrl_pkt_free(ctrl_pkt_t *_Nonnull pkt) {
+void ctrl_pkt_free(openvpn_ctrl_pkt *_Nonnull pkt) {
     if (!pkt) return;
     if (pkt->session_id) {
         free(pkt->session_id);
@@ -64,12 +64,12 @@ void ctrl_pkt_free(ctrl_pkt_t *_Nonnull pkt) {
 // MARK: - Plain
 
 static inline
-size_t ctrl_pkt_is_ack(const ctrl_pkt_t *pkt) {
+size_t ctrl_pkt_is_ack(const openvpn_ctrl_pkt *pkt) {
     return pkt->openvpn_packet_id == UINT32_MAX;
 }
 
 static inline
-size_t ctrl_pkt_raw_capacity(const ctrl_pkt_t *pkt) {
+size_t ctrl_pkt_raw_capacity(const openvpn_ctrl_pkt *pkt) {
     const bool is_ack = ctrl_pkt_is_ack(pkt);
     pp_assert(!is_ack || pkt->ack_ids);//, @"Ack packet must provide positive ackLength");
     size_t n = OpenVPNPacketAckLengthLength;
@@ -83,19 +83,19 @@ size_t ctrl_pkt_raw_capacity(const ctrl_pkt_t *pkt) {
     return n;
 }
 
-size_t ctrl_pkt_capacity(const ctrl_pkt_t *pkt) {
+size_t ctrl_pkt_capacity(const openvpn_ctrl_pkt *pkt) {
     const size_t raw_capacity = ctrl_pkt_raw_capacity(pkt);
     return OpenVPNPacketOpcodeLength + OpenVPNPacketSessionIdLength + raw_capacity;
 }
 
-size_t ctrl_pkt_capacity_alg(const ctrl_pkt_t *pkt, const ctrl_pkt_alg *alg) {
+size_t ctrl_pkt_capacity_alg(const openvpn_ctrl_pkt *pkt, const ctrl_pkt_alg *alg) {
     const size_t plain_capacity = ctrl_pkt_capacity(pkt);
     const size_t enc_capacity = pp_crypto_encryption_capacity(alg->crypto, plain_capacity);
     const size_t header_len = OpenVPNPacketOpcodeLength + OpenVPNPacketSessionIdLength + OpenVPNPacketReplayIdLength + OpenVPNPacketReplayTimestampLength;
     return header_len + enc_capacity;
 }
 
-size_t ctrl_pkt_serialize(uint8_t *_Nonnull dst, const ctrl_pkt_t *_Nonnull pkt) {
+size_t ctrl_pkt_serialize(uint8_t *_Nonnull dst, const openvpn_ctrl_pkt *_Nonnull pkt) {
     uint8_t *ptr = dst;
     if (pkt->ack_ids) {
         *ptr = pkt->ack_ids_len;
@@ -127,7 +127,7 @@ size_t ctrl_pkt_serialize(uint8_t *_Nonnull dst, const ctrl_pkt_t *_Nonnull pkt)
 
 size_t ctrl_pkt_serialize_auth(uint8_t *dst,
                                size_t dst_buf_len,
-                               const ctrl_pkt_t *pkt,
+                               const openvpn_ctrl_pkt *pkt,
                                ctrl_pkt_alg *alg,
                                pp_crypto_error_code *error) {
 
@@ -161,7 +161,7 @@ size_t ctrl_pkt_serialize_auth(uint8_t *dst,
 
 size_t ctrl_pkt_serialize_crypt(uint8_t *dst,
                                 size_t dst_buf_len,
-                                const ctrl_pkt_t *pkt,
+                                const openvpn_ctrl_pkt *pkt,
                                 ctrl_pkt_alg *alg,
                                 pp_crypto_error_code *error) {
 

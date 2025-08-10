@@ -10,7 +10,7 @@ extension CControlPacket {
     typealias SerializationFunction = (
         _ dst: UnsafeMutablePointer<UInt8>,
         _ dstLength: Int,
-        _ pkt: UnsafePointer<ctrl_pkt_t>,
+        _ pkt: UnsafePointer<openvpn_ctrl_pkt>,
         _ alg: UnsafeMutablePointer<ctrl_pkt_alg>,
         _ error: UnsafeMutablePointer<pp_crypto_error_code>
     ) -> Int

@@ -9,7 +9,7 @@ import Foundation
 // TODO: #155, move more logic to C (replay protection, byte-aligned enc/dec zd)
 
 final class CDataPath {
-    private let mode: UnsafeMutablePointer<dp_mode_t>
+    private let mode: UnsafeMutablePointer<openvpn_dp_mode>
 
     private let encBuffer: UnsafeMutablePointer<pp_zd>
 
@@ -23,7 +23,7 @@ final class CDataPath {
 
     private var outPacketId: UInt32
 
-    init(mode: UnsafeMutablePointer<dp_mode_t>, peerId: UInt32) {
+    init(mode: UnsafeMutablePointer<openvpn_dp_mode>, peerId: UInt32) {
         self.mode = mode
         dp_mode_set_peer_id(mode, peerId)
 

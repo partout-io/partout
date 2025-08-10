@@ -48,7 +48,7 @@ struct DataPathTests {
         digest: OpenVPN.Digest?,
         framing: OpenVPN.CompressionFraming
     ) throws {
-        let mode: UnsafeMutablePointer<dp_mode_t>
+        let mode: UnsafeMutablePointer<openvpn_dp_mode>
         switch cipher {
         case .aes128gcm:
             precondition(cipher != nil)

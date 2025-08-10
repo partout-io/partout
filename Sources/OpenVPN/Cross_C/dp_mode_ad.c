@@ -12,7 +12,7 @@
 static
 size_t dp_assemble(void *vmode) {
     DP_LOG("dp_mode_ad_assemble");
-    const dp_mode_t *mode = vmode;
+    const openvpn_dp_mode *mode = vmode;
     const dp_mode_assemble_ctx *ctx = &mode->assemble_ctx;
 
     const size_t dst_capacity = dp_mode_assemble_capacity(mode, ctx->src_len);
@@ -39,7 +39,7 @@ size_t dp_assemble(void *vmode) {
 static
 size_t dp_encrypt(void *vmode) {
     DP_LOG("dp_mode_ad_encrypt");
-    const dp_mode_t *mode = vmode;
+    const openvpn_dp_mode *mode = vmode;
     const dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
 
     pp_assert(mode->enc.raw_encrypt);
@@ -90,7 +90,7 @@ size_t dp_encrypt(void *vmode) {
 static
 size_t dp_decrypt(void *vmode) {
     DP_LOG("dp_mode_ad_decrypt");
-    const dp_mode_t *mode = vmode;
+    const openvpn_dp_mode *mode = vmode;
     const dp_mode_decrypt_ctx *ctx = &mode->dec_ctx;
 
     pp_assert(mode->dec.raw_decrypt);
@@ -145,7 +145,7 @@ size_t dp_decrypt(void *vmode) {
 static
 size_t dp_parse(void *vmode) {
     DP_LOG("dp_mode_ad_parse");
-    const dp_mode_t *mode = vmode;
+    const openvpn_dp_mode *mode = vmode;
     const dp_mode_parse_ctx *ctx = &mode->parse_ctx;
 
     pp_assert(ctx->dst->length >= ctx->src_len);
@@ -178,26 +178,26 @@ size_t dp_parse(void *vmode) {
 
 // MARK: -
 
-dp_mode_t *dp_mode_ad_create(pp_crypto_ctx crypto,
+openvpn_dp_mode *dp_mode_ad_create(pp_crypto_ctx crypto,
                              pp_crypto_free_fn pp_crypto_free,
                              openvpn_compression_framing comp_f) {
 
     DP_LOG("dp_mode_ad_create");
 
-    const dp_framing_t *frm = dp_framing(comp_f);
-    const dp_mode_encrypter_t enc = {
+    const openvpn_dp_framing *frm = dp_framing(comp_f);
+    const openvpn_dp_mode_encrypter enc = {
         frm->assemble,
         dp_assemble,
         NULL,
         dp_encrypt
     };
-    const dp_mode_decrypter_t dec = {
+    const openvpn_dp_mode_decrypter dec = {
         frm->parse,
         dp_parse,
         NULL,
         dp_decrypt
     };
-    const dp_mode_options_t opt = {
+    const openvpn_dp_mode_options opt = {
         comp_f,
         OpenVPNPacketPeerIdDisabled,
         0

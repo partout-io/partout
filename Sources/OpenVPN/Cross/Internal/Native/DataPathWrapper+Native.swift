@@ -23,7 +23,7 @@ extension DataPathWrapper {
     static func native(with parameters: Parameters, keys: CryptoKeys) throws -> DataPathWrapper {
         NSLog("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)")
 
-        let mode: UnsafeMutablePointer<dp_mode_t>?
+        let mode: UnsafeMutablePointer<openvpn_dp_mode>?
         let cipherAlgorithm = parameters.cipher?.rawValue.uppercased()
         let digestAlgorithm = parameters.digest?.rawValue.uppercased()
         let keysBridge = CryptoKeysBridge(keys: keys)
@@ -102,7 +102,7 @@ extension DataPathWrapper {
 
 private extension DataPathWrapper {
     static func cNative(
-        with mode: UnsafeMutablePointer<dp_mode_t>,
+        with mode: UnsafeMutablePointer<openvpn_dp_mode>,
         peerId: UInt32?
     ) -> DataPathWrapper {
         let dataPath = CDataPath(mode: mode, peerId: peerId ?? OpenVPNPacketPeerIdDisabled)

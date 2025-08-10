@@ -7,7 +7,7 @@ import Foundation
 import PartoutCore
 
 final class CControlPacket {
-    let pkt: UnsafeMutablePointer<ctrl_pkt_t>
+    let pkt: UnsafeMutablePointer<openvpn_ctrl_pkt>
 
     let code: CPacketCode
 
