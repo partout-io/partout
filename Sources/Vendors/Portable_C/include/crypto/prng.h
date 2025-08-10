@@ -8,4 +8,4 @@
 #include <stddef.h>
 #include <stdint.h>
 
-bool prng_do(uint8_t *_Nonnull dst, size_t len);
+bool pp_prng_do(uint8_t *_Nonnull dst, size_t len);
