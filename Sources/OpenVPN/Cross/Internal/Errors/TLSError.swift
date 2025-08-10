@@ -5,7 +5,7 @@
 internal import _PartoutOpenVPN_C
 internal import _PartoutVendorsTLSCore_C
 
-enum TLSError: Error {
+enum PPTLSError: Error {
     case missingCA
 
     case start
@@ -21,7 +21,7 @@ struct CTLSError: Error {
     let code: pp_tls_error_code
 
     init(_ code: pp_tls_error_code) {
-        precondition(code != TLSErrorNone)
+        precondition(code != PPTLSErrorNone)
         self.code = code
     }
 }

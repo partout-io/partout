@@ -10,9 +10,9 @@
 #include "portable/zd.h"
 
 typedef enum {
-    CryptoErrorNone,
-    CryptoErrorEncryption,
-    CryptoErrorHMAC
+    PPCryptoErrorNone,
+    PPCryptoErrorEncryption,
+    PPCryptoErrorHMAC
 } pp_crypto_error_code;
 
 typedef struct {

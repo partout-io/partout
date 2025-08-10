@@ -142,7 +142,7 @@ size_t local_decrypt(void *vctx,
 
     pp_assert(mac_len == digest_len);
     if (CRYPTO_memcmp(ctx->buffer_hmac, in, mac_len) != 0) {
-        CRYPTO_SET_ERROR(CryptoErrorHMAC)
+        CRYPTO_SET_ERROR(PPCryptoErrorHMAC)
         return 0;
     }
 
@@ -176,7 +176,7 @@ bool local_verify(void *vctx, const uint8_t *in, size_t in_len, pp_crypto_error_
 
     pp_assert(mac_len == digest_len);
     if (CRYPTO_memcmp(ctx->buffer_hmac, in, mac_len) != 0) {
-        CRYPTO_SET_ERROR(CryptoErrorHMAC)
+        CRYPTO_SET_ERROR(PPCryptoErrorHMAC)
         return false;
     }
     return true;

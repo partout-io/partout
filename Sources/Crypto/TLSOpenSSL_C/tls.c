@@ -62,23 +62,23 @@ pp_tls_channel_ctx pp_tls_channel_create(const pp_tls_channel_options *opt, pp_t
 
     if (opt->ca_path) {
         if (!SSL_CTX_load_verify_locations(ssl_ctx, opt->ca_path, NULL)) {
-            CRYPTO_SET_ERROR(TLSErrorCAUse)
+            CRYPTO_SET_ERROR(PPTLSErrorCAUse)
             goto failure;
         }
     }
     if (opt->cert_pem) {
         cert_bio = create_BIO_from_PEM(opt->cert_pem);
         if (!cert_bio) {
-            CRYPTO_SET_ERROR(TLSErrorClientCertificateRead)
+            CRYPTO_SET_ERROR(PPTLSErrorClientCertificateRead)
             goto failure;
         }
         cert = PEM_read_bio_X509(cert_bio, NULL, NULL, NULL);
         if (!cert) {
-            CRYPTO_SET_ERROR(TLSErrorClientCertificateRead)
+            CRYPTO_SET_ERROR(PPTLSErrorClientCertificateRead)
             goto failure;
         }
         if (!SSL_CTX_use_certificate(ssl_ctx, cert)) {
-            CRYPTO_SET_ERROR(TLSErrorClientCertificateUse)
+            CRYPTO_SET_ERROR(PPTLSErrorClientCertificateUse)
             goto failure;
         }
         X509_free(cert);
@@ -87,16 +87,16 @@ pp_tls_channel_ctx pp_tls_channel_create(const pp_tls_channel_options *opt, pp_t
         if (opt->key_pem) {
             pkey_bio = create_BIO_from_PEM(opt->key_pem);
             if (!pkey_bio) {
-                CRYPTO_SET_ERROR(TLSErrorClientKeyRead)
+                CRYPTO_SET_ERROR(PPTLSErrorClientKeyRead)
                 goto failure;
             }
             pkey = PEM_read_bio_PrivateKey(pkey_bio, NULL, NULL, NULL);
             if (!pkey) {
-                CRYPTO_SET_ERROR(TLSErrorClientKeyRead)
+                CRYPTO_SET_ERROR(PPTLSErrorClientKeyRead)
                 goto failure;
             }
             if (!SSL_CTX_use_PrivateKey(ssl_ctx, pkey)) {
-                CRYPTO_SET_ERROR(TLSErrorClientKeyUse)
+                CRYPTO_SET_ERROR(PPTLSErrorClientKeyUse)
                 goto failure;
             }
             EVP_PKEY_free(pkey);
@@ -191,7 +191,7 @@ bool pp_tls_channel_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull 
 pp_zd *_Nullable pp_tls_channel_pull_cipher(pp_tls_channel_ctx _Nonnull tls,
                                                   pp_tls_error_code *_Nullable error) {
     if (error) {
-        *error = TLSErrorNone;
+        *error = PPTLSErrorNone;
     }
     if (!tls->is_connected && !SSL_is_init_finished(tls->ssl)) {
         SSL_do_handshake(tls->ssl);
@@ -201,7 +201,7 @@ pp_zd *_Nullable pp_tls_channel_pull_cipher(pp_tls_channel_ctx _Nonnull tls,
         tls->is_connected = true;
         if (tls->opt->eku && !pp_tls_channel_verify_ssl_eku(tls->ssl)) {
             if (error) {
-                *error = TLSErrorServerEKU;
+                *error = PPTLSErrorServerEKU;
             }
             return NULL;
         }
@@ -209,7 +209,7 @@ pp_zd *_Nullable pp_tls_channel_pull_cipher(pp_tls_channel_ctx _Nonnull tls,
             pp_assert(tls->opt->hostname);
             if (!pp_tls_channel_verify_ssl_san_host(tls->ssl, tls->opt->hostname)) {
                 if (error) {
-                    *error = TLSErrorServerHost;
+                    *error = PPTLSErrorServerHost;
                 }
                 return NULL;
             }
@@ -217,7 +217,7 @@ pp_zd *_Nullable pp_tls_channel_pull_cipher(pp_tls_channel_ctx _Nonnull tls,
     }
     if ((ret < 0) && !BIO_should_retry(tls->bio_cipher_out)) {
         if (error) {
-            *error = TLSErrorHandshake;
+            *error = PPTLSErrorHandshake;
         }
         return NULL;
     }
@@ -231,11 +231,11 @@ pp_zd *_Nullable pp_tls_channel_pull_plain(pp_tls_channel_ctx _Nonnull tls,
                                                  pp_tls_error_code *_Nullable error) {
     const int ret = BIO_read(tls->bio_plain, tls->buf_plain, (int)tls->opt->buf_len);
     if (error) {
-        *error = TLSErrorNone;
+        *error = PPTLSErrorNone;
     }
     if ((ret < 0) && !BIO_should_retry(tls->bio_plain)) {
         if (error) {
-            *error = TLSErrorHandshake;
+            *error = PPTLSErrorHandshake;
         }
         return NULL;
     }
@@ -249,12 +249,12 @@ bool pp_tls_channel_put_cipher(pp_tls_channel_ctx _Nonnull tls,
                             const uint8_t *_Nonnull src, size_t src_len,
                             pp_tls_error_code *_Nullable error) {
     if (error) {
-        *error = TLSErrorNone;
+        *error = PPTLSErrorNone;
     }
     const int ret = BIO_write(tls->bio_cipher_in, src, (int)src_len);
     if (ret != (int)src_len) {
         if (error) {
-            *error = TLSErrorHandshake;
+            *error = PPTLSErrorHandshake;
         }
         return false;
     }
@@ -265,12 +265,12 @@ bool pp_tls_channel_put_plain(pp_tls_channel_ctx _Nonnull tls,
                            const uint8_t *_Nonnull src, size_t src_len,
                            pp_tls_error_code *_Nullable error) {
     if (error) {
-        *error = TLSErrorNone;
+        *error = PPTLSErrorNone;
     }
     const int ret = BIO_write(tls->bio_plain, src, (int)src_len);
     if (ret != (int)src_len) {
         if (error) {
-            *error = TLSErrorHandshake;
+            *error = PPTLSErrorHandshake;
         }
         return false;
     }

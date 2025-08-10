@@ -49,7 +49,7 @@ extension ControlChannel {
                 }
             }
             guard let cbc else {
-                throw CryptoError.creation
+                throw PPCryptoError.creation
             }
             self.cbc = cbc
 
@@ -106,7 +106,7 @@ extension ControlChannel {
                         prefixLength,
                         authLength
                     )
-                    var dec_error = CryptoErrorNone
+                    var dec_error = PPCryptoErrorNone
                     guard pp_crypto_verify(
                         cbc,
                         dst.bytePointer,

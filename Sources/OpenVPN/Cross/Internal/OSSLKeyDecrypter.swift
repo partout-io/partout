@@ -14,7 +14,7 @@ final class OSSLKeyDecrypter: KeyDecrypter, Sendable {
             }
         }
         guard let buf else {
-            throw CryptoError.creation
+            throw PPCryptoError.creation
         }
         let str = String(cString: buf)
         pp_zero(buf, str.count)
@@ -29,7 +29,7 @@ final class OSSLKeyDecrypter: KeyDecrypter, Sendable {
             }
         }
         guard let buf else {
-            throw CryptoError.creation
+            throw PPCryptoError.creation
         }
         let str = String(cString: buf)
         pp_zero(buf, str.count)

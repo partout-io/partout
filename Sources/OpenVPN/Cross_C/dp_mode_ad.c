@@ -110,7 +110,7 @@ size_t dp_decrypt(void *vmode) {
         if (peer_id != mode->opt.peer_id) {
             if (ctx->error) {
                 ctx->error->dp_code = DataPathErrorPeerIdMismatch;
-                ctx->error->pp_crypto_code = CryptoErrorNone;
+                ctx->error->pp_crypto_code = PPCryptoErrorNone;
             }
             return 0;
         }

@@ -46,7 +46,7 @@ extension CControlPacket {
         }
         var dst = Data(count: capacity)
         let written = try dst.withUnsafeMutableBytes { dst in
-            var enc_error = CryptoErrorNone
+            var enc_error = PPCryptoErrorNone
             let written = function(dst.bytePointer, capacity, pkt, &alg, &enc_error)
             guard written > 0 else {
                 throw CCryptoError(enc_error)

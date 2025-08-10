@@ -17,7 +17,7 @@ final class CryptoWrapper {
         idLength: Int
     ) throws {
         guard let ptr = pp_crypto_aead_create(cipherName, tagLength, idLength, nil) else {
-            throw CryptoError()
+            throw PPCryptoError()
         }
         print("PartoutOpenVPN: Using CryptoAEAD (native Swift/C)")
         self.ptr = ptr
@@ -29,7 +29,7 @@ final class CryptoWrapper {
         digestName: String
     ) throws {
         guard let ptr = pp_crypto_cbc_create(cipherName, digestName, nil) else {
-            throw CryptoError()
+            throw PPCryptoError()
         }
         print("PartoutOpenVPN: Using CryptoCBC (native Swift/C)")
         self.ptr = ptr
@@ -43,7 +43,7 @@ final class CryptoWrapper {
         payloadLength: Int
     ) throws {
         guard let ptr = pp_crypto_ctr_create(cipherName, digestName, tagLength, payloadLength, nil) else {
-            throw CryptoError()
+            throw PPCryptoError()
         }
         print("PartoutOpenVPN: Using CryptoCTR (native Swift/C)")
         self.ptr = ptr
@@ -63,10 +63,10 @@ final class CryptoWrapper {
     }
 
     func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: CZeroingData, flags: UnsafePointer<pp_crypto_flags>?) throws -> Int {
-        var code = CryptoErrorNone
+        var code = PPCryptoErrorNone
         let destLength = pp_crypto_encrypt(ptr, dest.mutableBytes, dest.count, bytes, length, flags, &code)
         guard destLength > 0 else {
-            throw CryptoError(code)
+            throw PPCryptoError(code)
         }
         return destLength
     }
@@ -76,18 +76,18 @@ final class CryptoWrapper {
     }
 
     func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: CZeroingData, flags: UnsafePointer<pp_crypto_flags>?) throws -> Int {
-        var code = CryptoErrorNone
+        var code = PPCryptoErrorNone
         let destLength = pp_crypto_decrypt(ptr, dest.mutableBytes, dest.count, bytes, length, flags, &code)
         guard destLength > 0 else {
-            throw CryptoError(code)
+            throw PPCryptoError(code)
         }
         return destLength
     }
 
     func verifyBytes(_ bytes: UnsafePointer<UInt8>, length: Int, flags: UnsafePointer<pp_crypto_flags>?) throws -> Bool {
-        var code = CryptoErrorNone
+        var code = PPCryptoErrorNone
         guard pp_crypto_verify(ptr, bytes, length, &code) else {
-            throw CryptoError(code)
+            throw PPCryptoError(code)
         }
         return true
     }

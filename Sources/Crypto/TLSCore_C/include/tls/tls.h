@@ -11,17 +11,17 @@
 #include "portable/zd.h"
 
 typedef enum {
-    TLSErrorNone,
-    TLSErrorCARead,
-    TLSErrorCAUse,
-    TLSErrorCAPeerVerification,
-    TLSErrorClientCertificateRead,
-    TLSErrorClientCertificateUse,
-    TLSErrorClientKeyRead,
-    TLSErrorClientKeyUse,
-    TLSErrorHandshake,
-    TLSErrorServerEKU,
-    TLSErrorServerHost
+    PPTLSErrorNone,
+    PPTLSErrorCARead,
+    PPTLSErrorCAUse,
+    PPTLSErrorCAPeerVerification,
+    PPTLSErrorClientCertificateRead,
+    PPTLSErrorClientCertificateUse,
+    PPTLSErrorClientKeyRead,
+    PPTLSErrorClientKeyUse,
+    PPTLSErrorHandshake,
+    PPTLSErrorServerEKU,
+    PPTLSErrorServerHost
 } pp_tls_error_code;
 
 typedef struct {

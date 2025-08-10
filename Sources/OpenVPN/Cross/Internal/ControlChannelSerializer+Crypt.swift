@@ -52,7 +52,7 @@ extension ControlChannel {
                 }
             }()
             guard let ctr else {
-                throw CryptoError.creation
+                throw PPCryptoError.creation
             }
             self.ctr = ctr
 
@@ -107,7 +107,7 @@ extension ControlChannel {
                 let dstBufCount = decryptedPacket.count
                 try decryptedPacket.withUnsafeMutableBytes {
                     let dst = $0.bytePointer
-                    var dec_error = CryptoErrorNone
+                    var dec_error = PPCryptoErrorNone
                     decryptedCount = pp_crypto_decrypt(
                         ctr,
                         dst + headerLength,

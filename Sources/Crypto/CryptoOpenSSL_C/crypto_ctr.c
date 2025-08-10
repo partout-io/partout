@@ -133,7 +133,7 @@ size_t local_decrypt(void *vctx,
 
     pp_assert(mac_len == ctx->ns_tag_len);
     if (CRYPTO_memcmp(ctx->buffer_hmac, in, ctx->ns_tag_len) != 0) {
-        CRYPTO_SET_ERROR(CryptoErrorHMAC)
+        CRYPTO_SET_ERROR(PPCryptoErrorHMAC)
         return 0;
     }
     return out_len;

@@ -4,7 +4,7 @@
 
 internal import _PartoutCryptoCore_C
 
-enum CryptoError: Error {
+enum PPCryptoError: Error {
     case creation
 
     case openssl(pp_crypto_error_code)

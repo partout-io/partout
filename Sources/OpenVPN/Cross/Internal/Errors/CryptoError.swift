@@ -4,7 +4,7 @@
 
 internal import _PartoutCryptoCore_C
 
-enum CryptoError: Error {
+enum PPCryptoError: Error {
     case creation
 
     case hmac
@@ -14,7 +14,7 @@ struct CCryptoError: Error {
     let code: pp_crypto_error_code
 
     init(_ code: pp_crypto_error_code) {
-        precondition(code != CryptoErrorNone)
+        precondition(code != PPCryptoErrorNone)
         self.code = code
     }
 }

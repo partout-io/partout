@@ -25,7 +25,7 @@ extension CZeroingData {
             return pp_key_hmac_do(&ctx)
         }
         guard hmacLength > 0 else {
-            throw CryptoError.hmac
+            throw PPCryptoError.hmac
         }
         return CZeroingData(
             bytes: ptr.pointee.bytes,

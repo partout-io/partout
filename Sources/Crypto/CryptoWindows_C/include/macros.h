@@ -12,20 +12,20 @@
 
 #define CRYPTO_CHECK(ntstatus)\
 if (!BCRYPT_SUCCESS(ntstatus)) {\
-    if (error) *error = CryptoErrorEncryption;\
+    if (error) *error = PPCryptoErrorEncryption;\
     return 0;\
 }
 
 #define CRYPTO_CHECK_MAC(ntstatus)\
 if (!BCRYPT_SUCCESS(ntstatus)) {\
-    if (error) *error = CryptoErrorHMAC;\
+    if (error) *error = PPCryptoErrorHMAC;\
     if (hHmac) BCryptDestroyHash(hHmac);\
     return 0;\
 }
 
 #define CRYPTO_CHECK_MAC_ALG(ntstatus)\
 if (!BCRYPT_SUCCESS(ntstatus)) {\
-    if (error) *error = CryptoErrorHMAC;\
+    if (error) *error = PPCryptoErrorHMAC;\
     if (hHmac) BCryptDestroyHash(hHmac);\
     if (hAlgHmac) BCryptCloseAlgorithmProvider(hAlgHmac, 0);\
     return 0;\

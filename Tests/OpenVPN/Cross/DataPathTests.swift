@@ -57,7 +57,7 @@ struct DataPathTests {
                 pp_crypto_aead_create(cipher!.rawValue, 16, 4, keys)
             }
             guard let cryptoAEAD else {
-                throw CryptoError.creation
+                throw PPCryptoError.creation
             }
             mode = dp_mode_ad_create(cryptoAEAD, cryptoFree, framing.cNative)
         case .aes128cbc:
@@ -67,7 +67,7 @@ struct DataPathTests {
                 pp_crypto_cbc_create(cipher?.rawValue, digest!.rawValue, keys)
             }
             guard let cryptoCBC else {
-                throw CryptoError.creation
+                throw PPCryptoError.creation
             }
             mode = dp_mode_hmac_create(cryptoCBC, cryptoFree, framing.cNative)
         default:
