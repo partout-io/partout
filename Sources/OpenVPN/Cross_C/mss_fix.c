@@ -5,7 +5,7 @@
  */
 
 #include "portable/endian.h"
-#include "openvpn/openvpn_mss_fix.h"
+#include "openvpn/mss_fix.h"
 
 static const int FLAG_SYN      = 2;
 static const int PROTO_TCP     = 6;

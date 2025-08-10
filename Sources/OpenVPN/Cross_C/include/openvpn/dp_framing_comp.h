@@ -8,7 +8,7 @@
 
 #include <string.h>
 #include "openvpn/dp_framing.h"
-#include "openvpn/openvpn_mss_fix.h"
+#include "openvpn/mss_fix.h"
 #include "openvpn/packet.h"
 
 static
