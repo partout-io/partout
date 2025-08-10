@@ -24,7 +24,7 @@ size_t dp_assemble(void *vmode) {
         memcpy(ctx->dst, ctx->src, ctx->src_len);
     } else {
         size_t openvpn_packet_len_offset;
-        dp_framing_assemble_ctx assemble;
+        openvpn_dp_framing_assemble_ctx assemble;
         assemble.dst = dst;
         assemble.dst_len_offset = &openvpn_packet_len_offset;
         assemble.src = ctx->src;
@@ -160,7 +160,7 @@ size_t dp_parse(void *vmode) {
 
     size_t payload_offset;
     size_t payload_header_len;
-    dp_framing_parse_ctx parse;
+    openvpn_dp_framing_parse_ctx parse;
     parse.dst_payload = payload;
     parse.dst_payload_offset = &payload_offset;
     parse.dst_header = ctx->dst_header;
@@ -184,7 +184,7 @@ openvpn_dp_mode *dp_mode_ad_create(pp_crypto_ctx crypto,
 
     DP_LOG("dp_mode_ad_create");
 
-    const openvpn_dp_framing *frm = dp_framing_of(comp_f);
+    const openvpn_dp_framing *frm = openvpn_dp_framing_of(comp_f);
     const openvpn_dp_mode_encrypter enc = {
         frm->assemble,
         dp_assemble,

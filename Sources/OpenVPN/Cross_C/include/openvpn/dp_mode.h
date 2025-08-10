@@ -88,14 +88,14 @@ typedef size_t (*dp_mode_parse_fn)(void *_Nonnull mode);
 #include "openvpn/packet.h"
 
 typedef struct {
-    dp_framing_assemble_fn _Nullable framing_assemble;
+    openvpn_dp_framing_assemble_fn _Nullable framing_assemble;
     dp_mode_assemble_fn _Nonnull assemble;
     pp_crypto_encrypt_fn _Nonnull raw_encrypt;
     dp_mode_encrypt_fn _Nonnull encrypt;
 } openvpn_dp_mode_encrypter;
 
 typedef struct {
-    dp_framing_parse_fn _Nullable framing_parse;
+    openvpn_dp_framing_parse_fn _Nullable framing_parse;
     dp_mode_parse_fn _Nonnull parse;
     pp_crypto_decrypt_fn _Nonnull raw_decrypt;
     dp_mode_decrypt_fn _Nonnull decrypt;
@@ -162,7 +162,7 @@ openvpn_compression_framing dp_mode_framing(const openvpn_dp_mode *_Nonnull mode
 static inline
 size_t dp_mode_assemble_capacity(const openvpn_dp_mode *_Nonnull mode, size_t len) {
     (void)mode;
-    return dp_framing_assemble_capacity(len) + sizeof(uint32_t);
+    return openvpn_dp_framing_assemble_capacity(len) + sizeof(uint32_t);
 }
 
 //

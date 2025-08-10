@@ -17,7 +17,7 @@ typedef struct {
     const uint8_t *_Nonnull src;
     size_t src_len;
     uint16_t mss_val;
-} dp_framing_assemble_ctx;
+} openvpn_dp_framing_assemble_ctx;
 
 typedef struct {
     uint8_t *_Nonnull dst_payload;
@@ -27,21 +27,21 @@ typedef struct {
     const uint8_t *_Nonnull src;
     size_t src_len;
     openvpn_dp_error *_Nullable error;
-} dp_framing_parse_ctx;
+} openvpn_dp_framing_parse_ctx;
 
-typedef void (*dp_framing_assemble_fn)(dp_framing_assemble_ctx *_Nonnull);
-typedef bool (*dp_framing_parse_fn)(dp_framing_parse_ctx *_Nonnull);
-typedef size_t (*dp_framing_capacity_t)(size_t);
+typedef void (*openvpn_dp_framing_assemble_fn)(openvpn_dp_framing_assemble_ctx *_Nonnull);
+typedef bool (*openvpn_dp_framing_parse_fn)(openvpn_dp_framing_parse_ctx *_Nonnull);
+typedef size_t (*openvpn_dp_framing_capacity_t)(size_t);
 
 typedef struct {
-    dp_framing_assemble_fn _Nonnull assemble;
-    dp_framing_parse_fn _Nonnull parse;
+    openvpn_dp_framing_assemble_fn _Nonnull assemble;
+    openvpn_dp_framing_parse_fn _Nonnull parse;
 } openvpn_dp_framing;
 
-const openvpn_dp_framing *_Nonnull dp_framing_of(openvpn_compression_framing comp_f);
+const openvpn_dp_framing *_Nonnull openvpn_dp_framing_of(openvpn_compression_framing comp_f);
 
 // assembled payloads may add up to 2 bytes
 static inline
-size_t dp_framing_assemble_capacity(size_t len) {
+size_t openvpn_dp_framing_assemble_capacity(size_t len) {
     return 2 + len;
 }

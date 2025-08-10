@@ -89,7 +89,7 @@ extension CDataPath {
         var keepAlive = false
         let list = try packets.compactMap { encrypted -> Data? in
 
-            // framing will throw if compressed (handled in dp_framing_parse_*)
+            // framing will throw if compressed (handled in openvpn_dp_framing_parse_*)
             let tuple = try decryptAndParse(
                 encrypted,
                 buf: nil
