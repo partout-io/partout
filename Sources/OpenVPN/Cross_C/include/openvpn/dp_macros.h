@@ -12,21 +12,21 @@
 #include "openvpn/packet.h"
 
 #define DP_ENCRYPT_BEGIN(peerId) \
-    const bool has_peer_id = (peerId != PacketPeerIdDisabled); \
-    size_t dst_header_len = PacketOpcodeLength; \
+    const bool has_peer_id = (peerId != OpenVPNPacketPeerIdDisabled); \
+    size_t dst_header_len = OpenVPNPacketOpcodeLength; \
     if (has_peer_id) { \
-        dst_header_len += PacketPeerIdLength; \
+        dst_header_len += OpenVPNPacketPeerIdLength; \
     }
 
 #define DP_DECRYPT_BEGIN(ctx) \
     const uint8_t *ptr = ctx->src; \
     openvpn_packet_code code; \
     openvpn_packet_header_get(&code, NULL, ptr); \
-    uint32_t peer_id = PacketPeerIdDisabled; \
-    const bool has_peer_id = (code == PacketCodeDataV2); \
-    size_t src_header_len = PacketOpcodeLength; \
+    uint32_t peer_id = OpenVPNPacketPeerIdDisabled; \
+    const bool has_peer_id = (code == OpenVPNPacketCodeDataV2); \
+    size_t src_header_len = OpenVPNPacketOpcodeLength; \
     if (has_peer_id) { \
-        src_header_len += PacketPeerIdLength; \
+        src_header_len += OpenVPNPacketPeerIdLength; \
         if (ctx->src_len < src_header_len) { \
             return false; \
         } \

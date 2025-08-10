@@ -23,7 +23,7 @@ dp_mode_t *dp_mode_create_opt(pp_crypto_ctx crypto,
         mode->opt = *opt;
     } else {
         mode->opt.comp_f = CompressionFramingDisabled;
-        mode->opt.peer_id = PacketPeerIdDisabled;
+        mode->opt.peer_id = OpenVPNPacketPeerIdDisabled;
         mode->opt.mss_val = 0;
     }
 

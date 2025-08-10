@@ -80,7 +80,7 @@ final class ControlChannel {
 extension ControlChannel {
     func reset(forNewSession: Bool) {
         if forNewSession {
-            sessionId = prng.data(length: _PartoutOpenVPN_C.PacketSessionIdLength)
+            sessionId = prng.data(length: _PartoutOpenVPN_C.OpenVPNPacketSessionIdLength)
             remoteSessionId = nil
         }
         queue.reset()

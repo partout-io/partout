@@ -145,7 +145,7 @@ uint32_t dp_mode_peer_id(dp_mode_t *_Nonnull mode) {
 
 static inline
 void dp_mode_set_peer_id(dp_mode_t *_Nonnull mode, uint32_t peer_id) {
-    mode->opt.peer_id = peer_id_masked(peer_id);
+    mode->opt.peer_id = openvpn_peer_id_masked(peer_id);
 }
 
 static inline
@@ -166,13 +166,13 @@ size_t dp_mode_assemble_capacity(const dp_mode_t *_Nonnull mode, size_t len) {
 }
 
 //
-// AD = PacketOpcodeLength + PacketPeerIdLength + meta.encryption_capacity(len)
-// HMAC = PacketOpcodeLength + meta.encryption_capacity(len)
+// AD = OpenVPNPacketOpcodeLength + PacketPeerIdLength + meta.encryption_capacity(len)
+// HMAC = OpenVPNPacketOpcodeLength + meta.encryption_capacity(len)
 //
 static inline
 size_t dp_mode_encrypt_capacity(const dp_mode_t *_Nonnull mode, size_t len) {
     const pp_crypto_ctx ctx = mode->crypto;
-    const size_t max_prefix_len = PacketOpcodeLength + PacketPeerIdLength;
+    const size_t max_prefix_len = OpenVPNPacketOpcodeLength + OpenVPNPacketPeerIdLength;
     const size_t enc_len = pp_crypto_encryption_capacity(ctx, len);
     return max_prefix_len + enc_len;
 }

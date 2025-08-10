@@ -105,7 +105,7 @@ private extension DataPathWrapper {
         with mode: UnsafeMutablePointer<dp_mode_t>,
         peerId: UInt32?
     ) -> DataPathWrapper {
-        let dataPath = CDataPath(mode: mode, peerId: peerId ?? PacketPeerIdDisabled)
+        let dataPath = CDataPath(mode: mode, peerId: peerId ?? OpenVPNPacketPeerIdDisabled)
         return DataPathWrapper(dataPath: dataPath)
     }
 }

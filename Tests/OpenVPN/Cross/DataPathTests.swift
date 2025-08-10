@@ -85,10 +85,10 @@ struct DataPathTests {
     }
 
     @Test(arguments: [
-        UInt8(DataPacketNoCompressSwap),
-        UInt8(DataPacketLZOCompress),
-        UInt8(DataPacketV2Indicator),
-        UInt8(DataPacketV2Uncompressed)
+        UInt8(OpenVPNDataPacketNoCompressSwap),
+        UInt8(OpenVPNDataPacketLZOCompress),
+        UInt8(OpenVPNDataPacketV2Indicator),
+        UInt8(OpenVPNDataPacketV2Uncompressed)
     ])
     func givenMagicPacket_whenEncryptMockCompressV2_thenDecrypts(byte: UInt8) throws {
         let mode = dp_mode_ad_create_mock(OpenVPN.CompressionFraming.compressV2.cNative)

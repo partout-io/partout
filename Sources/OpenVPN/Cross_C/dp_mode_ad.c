@@ -53,23 +53,23 @@ size_t dp_encrypt(void *vmode) {
 
     pp_crypto_flags flags = { 0 };
     flags.iv = dst + dst_header_len;
-    flags.iv_len = PacketIdLength;
+    flags.iv_len = OpenVPNPacketIdLength;
     if (has_peer_id) {
         openvpn_packet_header_v2_set(dst, ctx->key, mode->opt.peer_id);
         flags.ad = dst;
-        flags.ad_len = dst_header_len + PacketIdLength;
+        flags.ad_len = dst_header_len + OpenVPNPacketIdLength;
     }
     else {
-        openvpn_packet_header_set(dst, PacketCodeDataV1, ctx->key, NULL);
+        openvpn_packet_header_set(dst, OpenVPNPacketCodeDataV1, ctx->key, NULL);
         flags.ad = dst + dst_header_len;
-        flags.ad_len = PacketIdLength;
+        flags.ad_len = OpenVPNPacketIdLength;
     }
 
     // skip header and packet id
     pp_crypto_error_code enc_error;
     const size_t dst_packet_len = mode->enc.raw_encrypt(mode->crypto,
-                                                        dst + dst_header_len + PacketIdLength,
-                                                        ctx->dst->length - (dst_header_len + PacketIdLength),
+                                                        dst + dst_header_len + OpenVPNPacketIdLength,
+                                                        ctx->dst->length - (dst_header_len + OpenVPNPacketIdLength),
                                                         ctx->src,
                                                         ctx->src_len,
                                                         &flags,
@@ -84,7 +84,7 @@ size_t dp_encrypt(void *vmode) {
         }
         return 0;
     }
-    return dst_header_len + PacketIdLength + dst_packet_len;
+    return dst_header_len + OpenVPNPacketIdLength + dst_packet_len;
 }
 
 static
@@ -99,13 +99,13 @@ size_t dp_decrypt(void *vmode) {
     uint8_t *dst = ctx->dst->bytes;
 
     DP_DECRYPT_BEGIN(ctx)
-    if (ctx->src_len < src_header_len + PacketIdLength) {
+    if (ctx->src_len < src_header_len + OpenVPNPacketIdLength) {
         return 0;
     }
 
     pp_crypto_flags flags = { 0 };
     flags.iv = ctx->src + src_header_len;
-    flags.iv_len = PacketIdLength;
+    flags.iv_len = OpenVPNPacketIdLength;
     if (has_peer_id) {
         if (peer_id != mode->opt.peer_id) {
             if (ctx->error) {
@@ -115,11 +115,11 @@ size_t dp_decrypt(void *vmode) {
             return 0;
         }
         flags.ad = ctx->src;
-        flags.ad_len = src_header_len + PacketIdLength;
+        flags.ad_len = src_header_len + OpenVPNPacketIdLength;
     }
     else {
         flags.ad = ctx->src + src_header_len;
-        flags.ad_len = PacketIdLength;
+        flags.ad_len = OpenVPNPacketIdLength;
     }
 
     // skip header + packet id
@@ -127,8 +127,8 @@ size_t dp_decrypt(void *vmode) {
     const size_t dst_len = mode->dec.raw_decrypt(mode->crypto,
                                                  dst,
                                                  ctx->dst->length,
-                                                 ctx->src + src_header_len + PacketIdLength,
-                                                 (int)(ctx->src_len - (src_header_len + PacketIdLength)),
+                                                 ctx->src + src_header_len + OpenVPNPacketIdLength,
+                                                 (int)(ctx->src_len - (src_header_len + OpenVPNPacketIdLength)),
                                                  &flags,
                                                  &dec_error);
     if (!dst_len) {
@@ -199,7 +199,7 @@ dp_mode_t *dp_mode_ad_create(pp_crypto_ctx crypto,
     };
     const dp_mode_options_t opt = {
         comp_f,
-        PacketPeerIdDisabled,
+        OpenVPNPacketPeerIdDisabled,
         0
     };
     return dp_mode_create_opt(crypto, pp_crypto_free, &enc, &dec, &opt);

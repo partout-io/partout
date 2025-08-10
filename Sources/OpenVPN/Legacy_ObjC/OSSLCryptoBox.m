@@ -16,9 +16,9 @@
 @import _PartoutCryptoOpenSSL_ObjC;
 
 static const NSInteger CryptoAEADTagLength = 16;
-static const NSInteger CryptoAEADIdLength = PacketIdLength;
+static const NSInteger CryptoAEADIdLength = OpenVPNPacketIdLength;
 static const NSInteger CryptoCTRTagLength = 32;
-static const NSInteger CryptoCTRPayloadLength = PacketOpcodeLength + PacketSessionIdLength + PacketReplayIdLength + PacketReplayTimestampLength;
+static const NSInteger CryptoCTRPayloadLength = OpenVPNPacketOpcodeLength + OpenVPNPacketSessionIdLength + OpenVPNPacketReplayIdLength + OpenVPNPacketReplayTimestampLength;
 
 @interface OSSLCryptoBox ()
 

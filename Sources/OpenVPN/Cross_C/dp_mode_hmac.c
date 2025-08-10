@@ -74,7 +74,7 @@ size_t dp_encrypt(void *vmode) {
     if (has_peer_id) {
         openvpn_packet_header_v2_set(dst, ctx->key, mode->opt.peer_id);
     } else {
-        openvpn_packet_header_set(dst, PacketCodeDataV1, ctx->key, NULL);
+        openvpn_packet_header_set(dst, OpenVPNPacketCodeDataV1, ctx->key, NULL);
     }
     return dst_header_len + dst_packet_len;
 }
@@ -183,7 +183,7 @@ dp_mode_t *dp_mode_hmac_create(pp_crypto_ctx crypto,
     };
     const dp_mode_options_t opt = {
         comp_f,
-        PacketPeerIdDisabled,
+        OpenVPNPacketPeerIdDisabled,
         0
     };
     return dp_mode_create_opt(crypto, pp_crypto_free, &enc, &dec, &opt);

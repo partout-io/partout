@@ -18,8 +18,8 @@ ctrl_pkt_t *_Nonnull ctrl_pkt_create(openvpn_packet_code code, uint8_t key, uint
     pkt->code = code;
     pkt->key = key;
     pkt->openvpn_packet_id = openvpn_packet_id;
-    pkt->session_id = pp_alloc_crypto(PacketSessionIdLength);
-    memcpy(pkt->session_id, session_id, PacketSessionIdLength);
+    pkt->session_id = pp_alloc_crypto(OpenVPNPacketSessionIdLength);
+    memcpy(pkt->session_id, session_id, OpenVPNPacketSessionIdLength);
     if (payload) {
         pkt->payload = pp_alloc_crypto(payload_len);
         pkt->payload_len = payload_len;
@@ -34,8 +34,8 @@ ctrl_pkt_t *_Nonnull ctrl_pkt_create(openvpn_packet_code code, uint8_t key, uint
         pkt->ack_ids = pp_alloc_crypto(ack_len);
         pkt->ack_ids_len = ack_ids_len;
         memcpy(pkt->ack_ids, ack_ids, ack_len);
-        pkt->ack_remote_session_id = pp_alloc_crypto(PacketSessionIdLength);
-        memcpy(pkt->ack_remote_session_id, ack_remote_session_id, PacketSessionIdLength);
+        pkt->ack_remote_session_id = pp_alloc_crypto(OpenVPNPacketSessionIdLength);
+        memcpy(pkt->ack_remote_session_id, ack_remote_session_id, OpenVPNPacketSessionIdLength);
     } else {
         pkt->ack_ids = NULL;
         pkt->ack_ids_len = 0;
@@ -72,12 +72,12 @@ static inline
 size_t ctrl_pkt_raw_capacity(const ctrl_pkt_t *pkt) {
     const bool is_ack = ctrl_pkt_is_ack(pkt);
     pp_assert(!is_ack || pkt->ack_ids);//, @"Ack packet must provide positive ackLength");
-    size_t n = PacketAckLengthLength;
+    size_t n = OpenVPNPacketAckLengthLength;
     if (pkt->ack_ids) {
-        n += pkt->ack_ids_len * PacketIdLength + PacketSessionIdLength;
+        n += pkt->ack_ids_len * OpenVPNPacketIdLength + OpenVPNPacketSessionIdLength;
     }
     if (!is_ack) {
-        n += PacketIdLength;
+        n += OpenVPNPacketIdLength;
     }
     n += pkt->payload_len;
     return n;
@@ -85,13 +85,13 @@ size_t ctrl_pkt_raw_capacity(const ctrl_pkt_t *pkt) {
 
 size_t ctrl_pkt_capacity(const ctrl_pkt_t *pkt) {
     const size_t raw_capacity = ctrl_pkt_raw_capacity(pkt);
-    return PacketOpcodeLength + PacketSessionIdLength + raw_capacity;
+    return OpenVPNPacketOpcodeLength + OpenVPNPacketSessionIdLength + raw_capacity;
 }
 
 size_t ctrl_pkt_capacity_alg(const ctrl_pkt_t *pkt, const ctrl_pkt_alg *alg) {
     const size_t plain_capacity = ctrl_pkt_capacity(pkt);
     const size_t enc_capacity = pp_crypto_encryption_capacity(alg->crypto, plain_capacity);
-    const size_t header_len = PacketOpcodeLength + PacketSessionIdLength + PacketReplayIdLength + PacketReplayTimestampLength;
+    const size_t header_len = OpenVPNPacketOpcodeLength + OpenVPNPacketSessionIdLength + OpenVPNPacketReplayIdLength + OpenVPNPacketReplayTimestampLength;
     return header_len + enc_capacity;
 }
 
@@ -99,22 +99,22 @@ size_t ctrl_pkt_serialize(uint8_t *_Nonnull dst, const ctrl_pkt_t *_Nonnull pkt)
     uint8_t *ptr = dst;
     if (pkt->ack_ids) {
         *ptr = pkt->ack_ids_len;
-        ptr += PacketAckLengthLength;
+        ptr += OpenVPNPacketAckLengthLength;
         for (size_t i = 0; i < pkt->ack_ids_len; ++i) {
             const uint32_t ack_id = pkt->ack_ids[i];
             *(uint32_t *)ptr = pp_endian_htonl(ack_id);
-            ptr += PacketIdLength;
+            ptr += OpenVPNPacketIdLength;
         }
         pp_assert(pkt->ack_remote_session_id);
-        memcpy(ptr, pkt->ack_remote_session_id, PacketSessionIdLength);
-        ptr += PacketSessionIdLength;
+        memcpy(ptr, pkt->ack_remote_session_id, OpenVPNPacketSessionIdLength);
+        ptr += OpenVPNPacketSessionIdLength;
     } else {
         *ptr = 0; // no acks
-        ptr += PacketAckLengthLength;
+        ptr += OpenVPNPacketAckLengthLength;
     }
-    if (pkt->code != PacketCodeAckV1) {
+    if (pkt->code != OpenVPNPacketCodeAckV1) {
         *(uint32_t *)ptr = pp_endian_htonl(pkt->openvpn_packet_id);
-        ptr += PacketIdLength;
+        ptr += OpenVPNPacketIdLength;
         if (pkt->payload) {
             memcpy(ptr, pkt->payload, pkt->payload_len);
             ptr += pkt->payload_len;
@@ -135,9 +135,9 @@ size_t ctrl_pkt_serialize_auth(uint8_t *dst,
     uint8_t *ptr = dst + digest_len;
     const uint8_t *subject = ptr;
     *(uint32_t *)ptr = pp_endian_htonl(alg->openvpn_replay_id);
-    ptr += PacketReplayIdLength;
+    ptr += OpenVPNPacketReplayIdLength;
     *(uint32_t *)ptr = pp_endian_htonl(alg->timestamp);
-    ptr += PacketReplayTimestampLength;
+    ptr += OpenVPNPacketReplayTimestampLength;
     ptr += openvpn_packet_header_set(ptr, pkt->code, pkt->key, pkt->session_id);
     ptr += ctrl_pkt_serialize(ptr, pkt);
 
@@ -153,7 +153,7 @@ size_t ctrl_pkt_serialize_auth(uint8_t *dst,
         return 0;
     }
     pp_assert(dst_len == digest_len + subject_len);//, @"Encrypted packet size != (Digest + Subject)");
-    openvpn_data_swap(dst, digest_len + PacketReplayIdLength + PacketReplayTimestampLength, PacketOpcodeLength + PacketSessionIdLength);
+    openvpn_data_swap(dst, digest_len + OpenVPNPacketReplayIdLength + OpenVPNPacketReplayTimestampLength, OpenVPNPacketOpcodeLength + OpenVPNPacketSessionIdLength);
     return dst_len;
 }
 
@@ -168,9 +168,9 @@ size_t ctrl_pkt_serialize_crypt(uint8_t *dst,
     uint8_t *ptr = dst;
     ptr += openvpn_packet_header_set(dst, pkt->code, pkt->key, pkt->session_id);
     *(uint32_t *)ptr = pp_endian_htonl(alg->openvpn_replay_id);
-    ptr += PacketReplayIdLength;
+    ptr += OpenVPNPacketReplayIdLength;
     *(uint32_t *)ptr = pp_endian_htonl(alg->timestamp);
-    ptr += PacketReplayTimestampLength;
+    ptr += OpenVPNPacketReplayTimestampLength;
 
     const size_t ad_len = ptr - dst;
     const pp_crypto_flags flags = { NULL, 0, dst, ad_len, false };

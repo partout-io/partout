@@ -674,7 +674,7 @@ private extension Negotiator {
         let dataPath = DataPath(
             encrypter: cryptoBox.encrypter(),
             decrypter: cryptoBox.decrypter(),
-            peerId: history.pushReply.options.peerId ?? PacketPeerIdDisabled,
+            peerId: history.pushReply.options.peerId ?? OpenVPNPacketPeerIdDisabled,
             compressionFraming: compressionFraming.native,
             compressionAlgorithm: compressionAlgorithm.native,
             maxPackets: options.sessionOptions.maxPackets,

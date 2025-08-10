@@ -36,7 +36,7 @@
 {
     if ((self = [super init])) {
         self.crypto = crypto;
-        self.peerId = PacketPeerIdDisabled;
+        self.peerId = OpenVPNPacketPeerIdDisabled;
     }
     return self;
 }
@@ -72,7 +72,7 @@
 {
     DP_ENCRYPT_BEGIN(self.peerId)
 
-    const int capacity = headerLength + PacketIdLength + (int)[self.crypto encryptionCapacityWithLength:packetLength];
+    const int capacity = headerLength + OpenVPNPacketIdLength + (int)[self.crypto encryptionCapacityWithLength:packetLength];
     NSMutableData *encryptedPacket = [[NSMutableData alloc] initWithLength:capacity];
     uint8_t *ptr = encryptedPacket.mutableBytes;
     NSInteger encryptedPacketLength = INT_MAX;
@@ -81,21 +81,21 @@
 
     CryptoFlags flags;
     flags.iv = ptr + headerLength;
-    flags.ivLength = PacketIdLength;
+    flags.ivLength = OpenVPNPacketIdLength;
     if (hasPeerId) {
         PacketHeaderSetDataV2(ptr, key, self.peerId);
         flags.ad = ptr;
-        flags.adLength = headerLength + PacketIdLength;
+        flags.adLength = headerLength + OpenVPNPacketIdLength;
     }
     else {
         PacketHeaderSet(ptr, PacketCodeDataV1, key, nil);
         flags.ad = ptr + headerLength;
-        flags.adLength = PacketIdLength;
+        flags.adLength = OpenVPNPacketIdLength;
     }
 
     const BOOL success = [self.crypto encryptBytes:packetBytes
                                             length:packetLength
-                                              dest:(ptr + headerLength + PacketIdLength) // skip header and packet id
+                                              dest:(ptr + headerLength + OpenVPNPacketIdLength) // skip header and packet id
                                         destLength:&encryptedPacketLength
                                              flags:&flags
                                              error:error];
@@ -106,7 +106,7 @@
         return nil;
     }
 
-    encryptedPacket.length = headerLength + PacketIdLength + encryptedPacketLength;
+    encryptedPacket.length = headerLength + OpenVPNPacketIdLength + encryptedPacketLength;
     return encryptedPacket;
 }
 
@@ -117,13 +117,13 @@
     NSAssert(packet.length > 0, @"Decrypting an empty packet, how did it get this far?");
 
     DP_DECRYPT_BEGIN(packet)
-    if (packet.length < headerLength + PacketIdLength) {
+    if (packet.length < headerLength + OpenVPNPacketIdLength) {
         return NO;
     }
 
     CryptoFlags flags;
     flags.iv = packet.bytes + headerLength;
-    flags.ivLength = PacketIdLength;
+    flags.ivLength = OpenVPNPacketIdLength;
     if (hasPeerId) {
         if (peerId != self.peerId) {
             if (error) {
@@ -132,16 +132,16 @@
             return NO;
         }
         flags.ad = packet.bytes;
-        flags.adLength = headerLength + PacketIdLength;
+        flags.adLength = headerLength + OpenVPNPacketIdLength;
     }
     else {
         flags.ad = packet.bytes + headerLength;
-        flags.adLength = PacketIdLength;
+        flags.adLength = OpenVPNPacketIdLength;
     }
 
     // skip header + packet id
-    const BOOL success = [self.crypto decryptBytes:(packet.bytes + headerLength + PacketIdLength)
-                                            length:(int)(packet.length - (headerLength + PacketIdLength))
+    const BOOL success = [self.crypto decryptBytes:(packet.bytes + headerLength + OpenVPNPacketIdLength)
+                                            length:(int)(packet.length - (headerLength + OpenVPNPacketIdLength))
                                               dest:packetBytes
                                         destLength:packetLength
                                              flags:&flags

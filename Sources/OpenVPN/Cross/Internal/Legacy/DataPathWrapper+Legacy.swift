@@ -42,7 +42,7 @@ extension DataPathWrapper {
         let dataPath = DataPath(
             encrypter: cryptoBox.encrypter().dataPathEncrypter(),
             decrypter: cryptoBox.decrypter().dataPathDecrypter(),
-            peerId: parameters.peerId ?? PacketPeerIdDisabled,
+            peerId: parameters.peerId ?? OpenVPNPacketPeerIdDisabled,
             compressionFraming: compressionFraming.legacyNative,
             compressionAlgorithm: .disabled,
             maxPackets: 100,

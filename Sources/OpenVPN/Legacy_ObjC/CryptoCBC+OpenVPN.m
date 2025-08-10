@@ -37,7 +37,7 @@
 {
     if ((self = [super init])) {
         self.crypto = crypto;
-        self.peerId = PacketPeerIdDisabled;
+        self.peerId = OpenVPNPacketPeerIdDisabled;
     }
     return self;
 }

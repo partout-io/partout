@@ -56,8 +56,8 @@ extension ControlChannel {
             }
             self.ctr = ctr
 
-            headerLength = PacketOpcodeLength + PacketSessionIdLength
-            adLength = headerLength + PacketReplayIdLength + PacketReplayTimestampLength
+            headerLength = OpenVPNPacketOpcodeLength + OpenVPNPacketSessionIdLength
+            adLength = headerLength + OpenVPNPacketReplayIdLength + OpenVPNPacketReplayTimestampLength
             tagLength = pp_crypto_meta_of(ctr).tag_len
 
             currentReplayId = BidirectionalState(withResetValue: 1)
