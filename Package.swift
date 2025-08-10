@@ -97,8 +97,7 @@ let package = Package(
                     list.append("_PartoutWireGuardWrapper")
                 }
                 return list
-            }(),
-            path: "Sources/Implementations"
+            }()
         ),
         .target(
             name: "PartoutProviders",
