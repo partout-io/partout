@@ -22,26 +22,26 @@ static
 void alg_xor_mask(const openvpn_pkt_proc_alg_ctx *ctx) {
     pp_assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
-    obf_xor_mask(ctx->dst + ctx->dst_offset, ctx->src_len, ctx->mask, ctx->mask_len);
+    openvpn_obf_xor_mask(ctx->dst + ctx->dst_offset, ctx->src_len, ctx->mask, ctx->mask_len);
 }
 
 static
 void alg_xor_ptrpos(const openvpn_pkt_proc_alg_ctx *ctx) {
     alg_plain(ctx);
-    obf_xor_ptrpos(ctx->dst + ctx->dst_offset, ctx->src_len);
+    openvpn_obf_xor_ptrpos(ctx->dst + ctx->dst_offset, ctx->src_len);
 }
 
 static
 void alg_reverse(const openvpn_pkt_proc_alg_ctx *ctx) {
     alg_plain(ctx);
-    obf_reverse(ctx->dst + ctx->dst_offset, ctx->src_len);
+    openvpn_obf_reverse(ctx->dst + ctx->dst_offset, ctx->src_len);
 }
 
 static
 void alg_xor_obfuscate_in(const openvpn_pkt_proc_alg_ctx *ctx) {
     pp_assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
-    obf_xor_obfuscate(ctx->dst + ctx->dst_offset,
+    openvpn_obf_xor_obfuscate(ctx->dst + ctx->dst_offset,
                       ctx->src_len,
                       ctx->mask, ctx->mask_len,
                       false);
@@ -51,7 +51,7 @@ static
 void alg_xor_obfuscate_out(const openvpn_pkt_proc_alg_ctx *ctx) {
     pp_assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
-    obf_xor_obfuscate(ctx->dst + ctx->dst_offset,
+    openvpn_obf_xor_obfuscate(ctx->dst + ctx->dst_offset,
                       ctx->src_len,
                       ctx->mask, ctx->mask_len,
                       true);
