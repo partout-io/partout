@@ -100,7 +100,7 @@ uint32_t openvpn_packet_header_v2_get_peer_id(const uint8_t *_Nonnull src) {
 #pragma mark - Utils
 
 static inline
-void data_swap(uint8_t *_Nonnull ptr, size_t len1, size_t len2)
+void openvpn_data_swap(uint8_t *_Nonnull ptr, size_t len1, size_t len2)
 {
     // two buffers due to overlapping
     uint8_t buf1[len1];
@@ -112,7 +112,7 @@ void data_swap(uint8_t *_Nonnull ptr, size_t len1, size_t len2)
 }
 
 static inline
-void data_swap_copy(uint8_t *_Nonnull dst, const uint8_t *_Nonnull src, size_t src_len, size_t len1, size_t len2) {
+void openvpn_data_swap_copy(uint8_t *_Nonnull dst, const uint8_t *_Nonnull src, size_t src_len, size_t len1, size_t len2) {
     pp_assert(src_len >= len1 + len2);//, @"src is smaller than expected");
     memcpy(dst, src + len1, len2);
     memcpy(dst + len2, src, len1);

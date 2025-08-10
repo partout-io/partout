@@ -99,7 +99,7 @@ extension ControlChannel {
             let authCount = authPacket.count
             try authPacket.withUnsafeMutableBytes { dst in
                 try packet.withUnsafeBytes { src in
-                    data_swap_copy(
+                    openvpn_data_swap_copy(
                         dst.bytePointer,
                         src.bytePointer,
                         packet.count,

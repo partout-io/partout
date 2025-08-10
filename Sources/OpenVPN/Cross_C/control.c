@@ -153,7 +153,7 @@ size_t ctrl_pkt_serialize_auth(uint8_t *dst,
         return 0;
     }
     pp_assert(dst_len == digest_len + subject_len);//, @"Encrypted packet size != (Digest + Subject)");
-    data_swap(dst, digest_len + PacketReplayIdLength + PacketReplayTimestampLength, PacketOpcodeLength + PacketSessionIdLength);
+    openvpn_data_swap(dst, digest_len + PacketReplayIdLength + PacketReplayTimestampLength, PacketOpcodeLength + PacketSessionIdLength);
     return dst_len;
 }
 
