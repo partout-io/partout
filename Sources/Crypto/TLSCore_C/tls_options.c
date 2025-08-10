@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include "crypto/allocation.h"
+#include "portable/common.h"
 #include "tls/tls.h"
 
 pp_tls_channel_options *_Nonnull pp_tls_channel_options_create(int sec_level,

@@ -8,7 +8,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "crypto/zeroing_data.h"
+#include "portable/zd.h"
 
 bool key_init_seed(const pp_zd *_Nonnull zd);
 

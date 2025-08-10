@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include "crypto/allocation.h"
+#include "portable/common.h"
 #include "crypto/tls.h"
 
 // FIXME: #108, implement with mbedTLS

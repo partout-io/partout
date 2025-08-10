@@ -6,7 +6,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#include "crypto/allocation.h"
+#include "portable/common.h"
 #include "openvpn/obf.h"
 #include "openvpn/pkt_proc.h"
 

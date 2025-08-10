@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include "crypto/prng.h"
+#include "portable/prng.h"
 
 #if defined(__APPLE__)
 

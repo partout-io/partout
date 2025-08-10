@@ -6,8 +6,8 @@
 
 #pragma once
 
-#include "crypto/allocation.h"
-#include "crypto/zeroing_data.h"
+#include "portable/common.h"
+#include "portable/zd.h"
 
 typedef enum {
     CryptoErrorNone,

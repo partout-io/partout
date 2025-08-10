@@ -8,7 +8,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "crypto/zeroing_data.h"
+#include "portable/zd.h"
 
 typedef enum {
     TLSErrorNone,

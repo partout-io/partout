@@ -9,8 +9,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include "crypto/endian.h"
-#include "crypto/zeroing_data.h"
+#include "portable/endian.h"
+#include "portable/zd.h"
 
 typedef enum {
     PktProcMethodNone,

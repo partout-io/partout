@@ -5,7 +5,7 @@
  */
 
 #include <string.h>
-#include "crypto/allocation.h"
+#include "portable/common.h"
 #include "openvpn/control.h"
 
 ctrl_pkt_t *_Nonnull ctrl_pkt_create(packet_code code, uint8_t key, uint32_t packet_id,

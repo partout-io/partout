@@ -8,7 +8,7 @@
 #include <openssl/hmac.h>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
-#include "crypto/allocation.h"
+#include "portable/common.h"
 #include "crypto/keys.h"
 
 #define KeyHMACMaxLength    (size_t)128

@@ -8,8 +8,8 @@
 
 #include <stdint.h>
 #include <string.h>
-#include "crypto/allocation.h"
-#include "crypto/endian.h"
+#include "portable/common.h"
+#include "portable/endian.h"
 
 // MARK: - Packets
 

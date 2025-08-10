@@ -7,7 +7,7 @@
 #pragma once
 
 #include "crypto.h"
-#include "crypto/zeroing_data.h"
+#include "portable/zd.h"
 
 crypto_ctx _Nullable crypto_aead_create(const char *_Nonnull cipher_name,
                                         size_t tag_len, size_t id_len,

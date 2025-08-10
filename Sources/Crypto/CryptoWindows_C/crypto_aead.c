@@ -7,7 +7,7 @@
 #include <windows.h>
 #include <bcrypt.h>
 #include <string.h>
-#include "crypto/allocation.h"
+#include "portable/common.h"
 #include "crypto/crypto_aead.h"
 #include "macros.h"
 

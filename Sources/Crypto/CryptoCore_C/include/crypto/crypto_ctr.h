@@ -7,7 +7,7 @@
 #pragma once
 
 #include "crypto.h"
-#include "crypto/zeroing_data.h"
+#include "portable/zd.h"
 
 crypto_ctx _Nullable crypto_ctr_create(const char *_Nonnull cipher_name,
                                        const char *_Nonnull digest_name,

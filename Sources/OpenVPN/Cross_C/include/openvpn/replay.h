@@ -8,7 +8,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "crypto/allocation.h"
+#include "portable/common.h"
 #include "crypto/crypto.h"
 
 typedef struct {

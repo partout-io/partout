@@ -7,7 +7,7 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <string.h>
-#include "crypto/allocation.h"
+#include "portable/common.h"
 #include "crypto/crypto_cbc.h"
 #include "macros.h"
 

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include "crypto/endian.h"
+#include "portable/endian.h"
 #include "openvpn/mss_fix.h"
 
 static const int FLAG_SYN      = 2;
