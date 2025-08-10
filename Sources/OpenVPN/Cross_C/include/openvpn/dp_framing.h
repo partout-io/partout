@@ -38,7 +38,7 @@ typedef struct {
     dp_framing_parse_fn _Nonnull parse;
 } openvpn_dp_framing;
 
-const openvpn_dp_framing *_Nonnull dp_framing(openvpn_compression_framing comp_f);
+const openvpn_dp_framing *_Nonnull dp_framing_of(openvpn_compression_framing comp_f);
 
 // assembled payloads may add up to 2 bytes
 static inline

@@ -168,7 +168,7 @@ openvpn_dp_mode *dp_mode_hmac_create(pp_crypto_ctx crypto,
 
     DP_LOG("dp_mode_hmac_create");
 
-    const openvpn_dp_framing *frm = dp_framing(comp_f);
+    const openvpn_dp_framing *frm = dp_framing_of(comp_f);
     const openvpn_dp_mode_encrypter enc = {
         frm->assemble,
         dp_assemble,

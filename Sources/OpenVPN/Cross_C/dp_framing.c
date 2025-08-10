@@ -26,7 +26,7 @@ static const openvpn_dp_framing comp_compress_v2 = {
     dp_framing_parse_compress_v2
 };
 
-const openvpn_dp_framing *dp_framing(openvpn_compression_framing comp_f) {
+const openvpn_dp_framing *dp_framing_of(openvpn_compression_framing comp_f) {
     switch (comp_f) {
     case OpenVPNCompressionFramingDisabled:
         return &comp_disabled;
