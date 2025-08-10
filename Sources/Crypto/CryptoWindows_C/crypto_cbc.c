@@ -60,9 +60,9 @@ void local_configure_encrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *h
         ))
     }
     if (ctx->hmac_key_enc) {
-        zd_free(ctx->hmac_key_enc);
+        pp_zd_free(ctx->hmac_key_enc);
     }
-    ctx->hmac_key_enc = zd_create_from_data(hmac_key->bytes, ctx->crypto.meta.hmac_key_len);
+    ctx->hmac_key_enc = pp_zd_create_from_data(hmac_key->bytes, ctx->crypto.meta.hmac_key_len);
 }
 
 static
@@ -147,9 +147,9 @@ void local_configure_decrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *h
         ))
     }
     if (ctx->hmac_key_dec) {
-        zd_free(ctx->hmac_key_dec);
+        pp_zd_free(ctx->hmac_key_dec);
     }
-    ctx->hmac_key_dec = zd_create_from_data(hmac_key->bytes, ctx->crypto.meta.hmac_key_len);
+    ctx->hmac_key_dec = pp_zd_create_from_data(hmac_key->bytes, ctx->crypto.meta.hmac_key_len);
 }
 
 static
@@ -332,8 +332,8 @@ void crypto_cbc_free(crypto_ctx vctx) {
     if (ctx->hKeyDec) BCryptDestroyKey(ctx->hKeyDec);
     if (ctx->hAlgCipher) BCryptCloseAlgorithmProvider(ctx->hAlgCipher, 0);
 
-    if (ctx->hmac_key_enc) zd_free(ctx->hmac_key_enc);
-    if (ctx->hmac_key_dec) zd_free(ctx->hmac_key_dec);
+    if (ctx->hmac_key_enc) pp_zd_free(ctx->hmac_key_enc);
+    if (ctx->hmac_key_dec) pp_zd_free(ctx->hmac_key_dec);
     BCryptCloseAlgorithmProvider(ctx->hAlgHmac, 0);
     pp_zero(ctx->buffer_iv, sizeof(ctx->buffer_iv));
     pp_zero(ctx->buffer_hmac, sizeof(ctx->buffer_hmac));

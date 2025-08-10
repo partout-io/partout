@@ -12,7 +12,7 @@ extension Data {
             bytesNoCopy: zd.pointee.bytes,
             count: count,
             deallocator: .custom { _, _ in
-                zd_free(zd)
+                pp_zd_free(zd)
             }
         )
     }

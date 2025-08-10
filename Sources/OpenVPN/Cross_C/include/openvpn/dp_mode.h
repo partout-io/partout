@@ -211,14 +211,14 @@ pp_zd *_Nullable dp_mode_assemble_and_encrypt(dp_mode_t *_Nonnull mode,
     if (!asm_len) {
         return NULL;
     }
-    pp_zd *dst = zd_create(dp_mode_encrypt_capacity(mode, asm_len));
+    pp_zd *dst = pp_zd_create(dp_mode_encrypt_capacity(mode, asm_len));
     const size_t dst_len = dp_mode_encrypt(mode, key, packet_id, dst,
                                            buf->bytes, asm_len, error);
     if (!dst_len) {
-        zd_free(dst);
+        pp_zd_free(dst);
         return NULL;
     }
-    zd_resize(dst, dst_len);
+    pp_zd_resize(dst, dst_len);
     return dst;
 }
 
@@ -254,14 +254,14 @@ pp_zd *_Nullable dp_mode_decrypt_and_parse(dp_mode_t *_Nonnull mode,
     if (!dec_len) {
         return NULL;
     }
-    pp_zd *dst = zd_create(dec_len);
+    pp_zd *dst = pp_zd_create(dec_len);
     const size_t dst_len = dp_mode_parse(mode, dst, dst_header,
                                          buf->bytes, dec_len, error);
     if (!dst_len) {
-        zd_free(dst);
+        pp_zd_free(dst);
         return NULL;
     }
-    zd_resize(dst, dst_len);
+    pp_zd_resize(dst, dst_len);
     pp_assert(dst->length == dst_len);
     if (packet_is_ping(dst->bytes, dst->length)) {
         *dst_keep_alive = true;

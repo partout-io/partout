@@ -49,9 +49,9 @@ void local_configure_encrypt(void *vctx,
     CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_enc))
     CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1))
     if (ctx->hmac_key_enc) {
-        zd_free(ctx->hmac_key_enc);
+        pp_zd_free(ctx->hmac_key_enc);
     }
-    ctx->hmac_key_enc = zd_create_from_data(hmac_key->bytes, ctx->crypto.meta.hmac_key_len);
+    ctx->hmac_key_enc = pp_zd_create_from_data(hmac_key->bytes, ctx->crypto.meta.hmac_key_len);
 }
 
 static
@@ -97,9 +97,9 @@ void local_configure_decrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *h
     CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_dec))
     CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0))
     if (ctx->hmac_key_dec) {
-        zd_free(ctx->hmac_key_dec);
+        pp_zd_free(ctx->hmac_key_dec);
     }
-    ctx->hmac_key_dec = zd_create_from_data(hmac_key->bytes, ctx->crypto.meta.hmac_key_len);
+    ctx->hmac_key_dec = pp_zd_create_from_data(hmac_key->bytes, ctx->crypto.meta.hmac_key_len);
 }
 
 static
@@ -215,8 +215,8 @@ void crypto_ctr_free(crypto_ctx vctx) {
     if (!vctx) return;
     crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
 
-    if (ctx->hmac_key_enc) zd_free(ctx->hmac_key_enc);
-    if (ctx->hmac_key_dec) zd_free(ctx->hmac_key_dec);
+    if (ctx->hmac_key_enc) pp_zd_free(ctx->hmac_key_enc);
+    if (ctx->hmac_key_dec) pp_zd_free(ctx->hmac_key_dec);
 
     EVP_CIPHER_CTX_free(ctx->ctx_enc);
     EVP_CIPHER_CTX_free(ctx->ctx_dec);

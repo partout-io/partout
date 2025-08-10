@@ -23,7 +23,7 @@ bool key_init_seed(const pp_zd *seed) {
 }
 
 pp_zd *key_hmac_create() {
-    return zd_create(KeyHMACMaxLength);
+    return pp_zd_create(KeyHMACMaxLength);
 }
 
 size_t key_hmac_do(key_hmac_ctx *ctx) {

@@ -17,7 +17,7 @@ public final class PlatformPRNG: PRNGProtocol {
 
     public func data(length: Int) -> Data {
         precondition(length > 0)
-        let randomData = zd_create(length)
+        let randomData = pp_zd_create(length)
         guard prng_do(randomData.pointee.bytes, length) else {
             fatalError("prng_do() failed")
         }

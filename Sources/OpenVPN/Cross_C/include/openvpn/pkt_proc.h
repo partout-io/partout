@@ -100,7 +100,7 @@ pp_zd *_Nullable pkt_proc_stream_recv(const void *_Nonnull vproc,
     }
 
     const pkt_proc_t *proc = vproc;
-    pp_zd *dst = zd_create(buf_len);
+    pp_zd *dst = pp_zd_create(buf_len);
     const pkt_proc_alg_ctx ctx = {
         dst->bytes, 0,
         buf_payload, 0, buf_len,

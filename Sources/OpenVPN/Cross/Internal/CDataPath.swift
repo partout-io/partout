@@ -28,8 +28,8 @@ final class CDataPath {
         dp_mode_set_peer_id(mode, peerId)
 
         let oneKilo = 1024
-        encBuffer = zd_create(64 * oneKilo)
-        decBuffer = zd_create(64 * oneKilo)
+        encBuffer = pp_zd_create(64 * oneKilo)
+        decBuffer = pp_zd_create(64 * oneKilo)
         replay = replay_create()
         resizeStep = 1024
         maxPacketId = .max - 10 * UInt32(oneKilo)
@@ -39,8 +39,8 @@ final class CDataPath {
     deinit {
         replay_free(replay)
         dp_mode_free(mode)
-        zd_free(encBuffer)
-        zd_free(decBuffer)
+        pp_zd_free(encBuffer)
+        pp_zd_free(decBuffer)
     }
 }
 
@@ -52,20 +52,20 @@ private extension CDataPath {
     ) {
         let ck = cipherKey.map { data in
             data.withUnsafeBytes { ptr in
-                zd_create_from_data(ptr.bytePointer, data.count)
+                pp_zd_create_from_data(ptr.bytePointer, data.count)
             }
         }
         let hk = hmacKey.map { data in
             data.withUnsafeBytes { ptr in
-                zd_create_from_data(ptr.bytePointer, data.count)
+                pp_zd_create_from_data(ptr.bytePointer, data.count)
             }
         }
         block(ck, hk)
         if let ck {
-            zd_free(ck)
+            pp_zd_free(ck)
         }
         if let hk {
-            zd_free(hk)
+            pp_zd_free(hk)
         }
     }
 }
@@ -123,7 +123,7 @@ extension CDataPath {
         packetId: UInt32,
         withNewBuffer: Bool
     ) throws -> Data {
-        let buf = withNewBuffer ? zd_create(0) : nil
+        let buf = withNewBuffer ? pp_zd_create(0) : nil
         return try assembleAndEncrypt(packet, key: key, packetId: packetId, buf: buf)
     }
 
@@ -131,7 +131,7 @@ extension CDataPath {
         _ packet: Data,
         withNewBuffer: Bool
     ) throws -> DataPathDecryptedAndParsedTuple {
-        let buf = withNewBuffer ? zd_create(0) : nil
+        let buf = withNewBuffer ? pp_zd_create(0) : nil
         return try decryptAndParse(packet, buf: buf)
     }
 }
@@ -141,9 +141,9 @@ extension CDataPath {
         packetId: UInt32,
         payload: Data
     ) -> Data {
-        let buf = zd_create(dp_mode_assemble_capacity(mode, payload.count))
+        let buf = pp_zd_create(dp_mode_assemble_capacity(mode, payload.count))
         defer {
-            zd_free(buf)
+            pp_zd_free(buf)
         }
         return assemble(packetId: packetId, payload: payload, buf: buf)
     }
@@ -153,9 +153,9 @@ extension CDataPath {
         packetId: UInt32,
         assembled: Data
     ) throws -> Data {
-        let buf = zd_create(dp_mode_encrypt_capacity(mode, assembled.count))
+        let buf = pp_zd_create(dp_mode_encrypt_capacity(mode, assembled.count))
         defer {
-            zd_free(buf)
+            pp_zd_free(buf)
         }
         return try encrypt(key: key, packetId: packetId, assembled: assembled, buf: buf)
     }
@@ -163,9 +163,9 @@ extension CDataPath {
     func decrypt(
         packet: Data
     ) throws -> DataPathDecryptedTuple {
-        let buf = zd_create(packet.count)
+        let buf = pp_zd_create(packet.count)
         defer {
-            zd_free(buf)
+            pp_zd_free(buf)
         }
         return try decrypt(packet: packet, buf: buf)
     }
@@ -174,9 +174,9 @@ extension CDataPath {
         decrypted: Data,
         header: inout UInt8,
     ) throws -> Data {
-        let buf = zd_create(decrypted.count)
+        let buf = pp_zd_create(decrypted.count)
         defer {
-            zd_free(buf)
+            pp_zd_free(buf)
         }
         return try parse(decrypted: decrypted, header: &header, buf: buf)
     }
@@ -356,6 +356,6 @@ private extension CDataPath {
         }
         var newCount = count + resizeStep
         newCount -= newCount % resizeStep // align to step boundary
-        zd_resize(buf, newCount)
+        pp_zd_resize(buf, newCount)
     }
 }

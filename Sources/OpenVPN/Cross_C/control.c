@@ -176,7 +176,7 @@ size_t ctrl_pkt_serialize_crypt(uint8_t *dst,
     const crypto_flags_t flags = { NULL, 0, dst, ad_len, false };
 
     const size_t raw_capacity = ctrl_pkt_raw_capacity(pkt);
-    pp_zd *msg = zd_create(raw_capacity);
+    pp_zd *msg = pp_zd_create(raw_capacity);
     ctrl_pkt_serialize(msg->bytes, pkt);
     const size_t enc_msg_len = crypto_encrypt(alg->crypto,
                                               dst + ad_len,
@@ -186,9 +186,9 @@ size_t ctrl_pkt_serialize_crypt(uint8_t *dst,
                                               &flags,
                                               error);
     if (!enc_msg_len) {
-        zd_free(msg);
+        pp_zd_free(msg);
         return 0;
     }
-    zd_free(msg);
+    pp_zd_free(msg);
     return ad_len + enc_msg_len;
 }

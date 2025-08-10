@@ -224,7 +224,7 @@ pp_zd *_Nullable tls_channel_pull_cipher(tls_channel_ctx _Nonnull tls,
     if (ret <= 0) {
         return NULL;
     }
-    return zd_create_from_data(tls->buf_cipher, ret);
+    return pp_zd_create_from_data(tls->buf_cipher, ret);
 }
 
 pp_zd *_Nullable tls_channel_pull_plain(tls_channel_ctx _Nonnull tls,
@@ -242,7 +242,7 @@ pp_zd *_Nullable tls_channel_pull_plain(tls_channel_ctx _Nonnull tls,
     if (ret <= 0) {
         return NULL;
     }
-    return zd_create_from_data(tls->buf_plain, ret);
+    return pp_zd_create_from_data(tls->buf_plain, ret);
 }
 
 bool tls_channel_put_cipher(tls_channel_ctx _Nonnull tls,

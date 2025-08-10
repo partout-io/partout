@@ -100,7 +100,7 @@ final class PacketProcessor {
     }
 
     func stream(fromPacket packet: Data) -> Data {
-        let dst = zd_create(pkt_proc_stream_send_bufsize(1, packet.count))
+        let dst = pp_zd_create(pkt_proc_stream_send_bufsize(1, packet.count))
         _ = packet.withUnsafeBytes { src in
             pkt_proc_stream_send(
                 proc,
@@ -112,7 +112,7 @@ final class PacketProcessor {
     }
 
     func stream(fromPackets packets: [Data]) -> Data {
-        let dst = zd_create(pkt_proc_stream_send_bufsize(Int32(packets.count), packets.flatCount))
+        let dst = pp_zd_create(pkt_proc_stream_send_bufsize(Int32(packets.count), packets.flatCount))
         var dstOffset = 0
         for packet in packets {
             packet.withUnsafeBytes { src in

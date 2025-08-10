@@ -49,10 +49,10 @@ final class CryptoKeysBridge {
     }
 
     deinit {
-        zd_free(cipherEncKey)
-        zd_free(cipherDecKey)
-        zd_free(hmacEncKey)
-        zd_free(hmacDecKey)
+        pp_zd_free(cipherEncKey)
+        pp_zd_free(cipherDecKey)
+        pp_zd_free(hmacEncKey)
+        pp_zd_free(hmacDecKey)
     }
 
     func withUnsafeKeys<T>(_ body: (UnsafePointer<crypto_keys_t>) -> T) -> T {
@@ -78,8 +78,8 @@ private extension CryptoKeysBridge {
 private extension Optional<CZeroingData> {
     func unsafeCopy() -> UnsafeMutablePointer<pp_zd> {
         guard let self else {
-            return zd_create(0)
+            return pp_zd_create(0)
         }
-        return zd_create_from_data(self.bytes, self.count)
+        return pp_zd_create_from_data(self.bytes, self.count)
     }
 }
