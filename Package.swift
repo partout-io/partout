@@ -380,7 +380,7 @@ if areas.contains(.api) {
                 .product(name: "GenericJSON", package: "generic-json-swift"),
                 "PartoutProviders"
             ],
-            path: "Sources/API"
+            path: "Sources/API/Library"
         ),
         .target(
             name: "PartoutAPIBundle",
@@ -388,7 +388,7 @@ if areas.contains(.api) {
                 "PartoutAPI",
                 "PartoutProviders"
             ],
-            path: "Sources/APIBundle",
+            path: "Sources/API/Bundle",
             resources: [
                 .copy("JSON")
             ]
@@ -588,12 +588,12 @@ if areas.contains(.crypto) {
             path: "Sources/Crypto/TLSCore_C"
         ),
         .testTarget(
-            name: "_PartoutCrypto_CTests",
+            name: "_PartoutCryptoTests",
             dependencies: [
                 "_PartoutCrypto_C", // now platform-independent
                 "_PartoutVendorsPortable"
             ],
-            path: "Tests/Crypto/Crypto_C",
+            path: "Tests/Crypto",
             exclude: [
                 "CryptoPerformanceTests.swift"
             ]
