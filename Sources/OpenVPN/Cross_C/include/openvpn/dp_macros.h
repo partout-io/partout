@@ -11,14 +11,14 @@
 #include <stdio.h>
 #include "openvpn/packet.h"
 
-#define DP_ENCRYPT_BEGIN(peerId) \
+#define OPENVPN_DP_ENCRYPT_BEGIN(peerId) \
     const bool has_peer_id = (peerId != OpenVPNPacketPeerIdDisabled); \
     size_t dst_header_len = OpenVPNPacketOpcodeLength; \
     if (has_peer_id) { \
         dst_header_len += OpenVPNPacketPeerIdLength; \
     }
 
-#define DP_DECRYPT_BEGIN(ctx) \
+#define OPENVPN_DP_DECRYPT_BEGIN(ctx) \
     const uint8_t *ptr = ctx->src; \
     openvpn_packet_code code; \
     openvpn_packet_header_get(&code, NULL, ptr); \

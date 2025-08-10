@@ -43,7 +43,7 @@ size_t dp_encrypt(void *vmode) {
     const dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
 
     pp_assert(mode->enc.raw_encrypt);
-    DP_ENCRYPT_BEGIN(mode->opt.peer_id)
+    OPENVPN_DP_ENCRYPT_BEGIN(mode->opt.peer_id)
 
     const size_t dst_capacity = dp_mode_encrypt_capacity(mode, ctx->src_len);
     pp_assert(ctx->dst->length >= dst_capacity);
@@ -98,7 +98,7 @@ size_t dp_decrypt(void *vmode) {
     pp_assert(ctx->dst->length >= ctx->src_len);
     uint8_t *dst = ctx->dst->bytes;
 
-    DP_DECRYPT_BEGIN(ctx)
+    OPENVPN_DP_DECRYPT_BEGIN(ctx)
     if (ctx->src_len < src_header_len + OpenVPNPacketIdLength) {
         return 0;
     }
