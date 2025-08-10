@@ -34,12 +34,12 @@ typedef struct {
     const char *_Nullable key_pem;
     const char *_Nullable hostname;
     void (*_Nonnull on_verify_failure)();
-} pp_tls_channel_options;
+} pp_tls_options;
 
-typedef struct pp_tls_channel pp_tls_channel;
-typedef struct pp_tls_channel *pp_tls_channel_ctx;
+typedef struct pp_tls pp_tls;
+typedef struct pp_tls *pp_tls_ctx;
 
-pp_tls_channel_options *_Nonnull pp_tls_channel_options_create(int sec_level,
+pp_tls_options *_Nonnull pp_tls_options_create(int sec_level,
                                                          size_t buf_len,
                                                          bool eku,
                                                          bool san_host,
@@ -49,28 +49,28 @@ pp_tls_channel_options *_Nonnull pp_tls_channel_options_create(int sec_level,
                                                          const char *_Nullable hostname,
                                                          void (*_Nonnull on_verify_failure)());
 
-void pp_tls_channel_options_free(pp_tls_channel_options *_Nonnull opt);
+void pp_tls_options_free(pp_tls_options *_Nonnull opt);
 
 // "opt" ownership is transferred and released on free
-pp_tls_channel_ctx _Nullable pp_tls_channel_create(const pp_tls_channel_options *_Nonnull opt,
+pp_tls_ctx _Nullable pp_tls_create(const pp_tls_options *_Nonnull opt,
                                             pp_tls_error_code *_Nonnull error);
-void pp_tls_channel_free(pp_tls_channel_ctx _Nonnull tls);
+void pp_tls_free(pp_tls_ctx _Nonnull tls);
 
-bool pp_tls_channel_start(pp_tls_channel_ctx _Nonnull tls);
-bool pp_tls_channel_is_connected(pp_tls_channel_ctx _Nonnull tls);
+bool pp_tls_start(pp_tls_ctx _Nonnull tls);
+bool pp_tls_is_connected(pp_tls_ctx _Nonnull tls);
 
-pp_zd *_Nullable pp_tls_channel_pull_cipher(pp_tls_channel_ctx _Nonnull tls,
+pp_zd *_Nullable pp_tls_pull_cipher(pp_tls_ctx _Nonnull tls,
                                                   pp_tls_error_code *_Nullable error);
 
-pp_zd *_Nullable pp_tls_channel_pull_plain(pp_tls_channel_ctx _Nonnull tls,
+pp_zd *_Nullable pp_tls_pull_plain(pp_tls_ctx _Nonnull tls,
                                                  pp_tls_error_code *_Nullable error);
 
-bool pp_tls_channel_put_cipher(pp_tls_channel_ctx _Nonnull tls,
+bool pp_tls_put_cipher(pp_tls_ctx _Nonnull tls,
                             const uint8_t *_Nonnull src, size_t src_len,
                             pp_tls_error_code *_Nullable error);
 
-bool pp_tls_channel_put_plain(pp_tls_channel_ctx _Nonnull tls,
+bool pp_tls_put_plain(pp_tls_ctx _Nonnull tls,
                            const uint8_t *_Nonnull src, size_t src_len,
                            pp_tls_error_code *_Nullable error);
 
-char *_Nullable pp_tls_channel_ca_md5(const pp_tls_channel_ctx _Nonnull tls);
+char *_Nullable pp_tls_ca_md5(const pp_tls_ctx _Nonnull tls);

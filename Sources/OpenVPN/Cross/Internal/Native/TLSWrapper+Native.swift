@@ -22,7 +22,7 @@ private final class NativeTLSWrapper: TLSProtocol {
         static let bufferLength = 16 * 1024
     }
 
-    private let tls: pp_tls_channel_ctx
+    private let tls: pp_tls_ctx
 
     private let caURL: URL
 
@@ -48,7 +48,7 @@ private final class NativeTLSWrapper: TLSProtocol {
             free(keyPEM)
             free(hostname)
         }
-        let options = pp_tls_channel_options_create(
+        let options = pp_tls_options_create(
             Int32(securityLevel ?? Constants.defaultSecurityLevel),
             Constants.bufferLength,
             checksEKU,
@@ -62,8 +62,8 @@ private final class NativeTLSWrapper: TLSProtocol {
             }
         )
         var error = PPTLSErrorNone
-        guard let tls = pp_tls_channel_create(options, &error) else {
-            pp_tls_channel_options_free(options)
+        guard let tls = pp_tls_create(options, &error) else {
+            pp_tls_options_free(options)
             try? FileManager.default.removeItem(at: caURL)
 
             throw CTLSError(error)
@@ -82,24 +82,24 @@ private final class NativeTLSWrapper: TLSProtocol {
 
     deinit {
         NotificationCenter.default.removeObserver(verificationObserver)
-        pp_tls_channel_free(tls)
+        pp_tls_free(tls)
         try? FileManager.default.removeItem(at: caURL)
     }
 
     func start() throws {
-        guard pp_tls_channel_start(tls) else {
+        guard pp_tls_start(tls) else {
             throw PPTLSError.start
         }
     }
 
     func isConnected() -> Bool {
-        pp_tls_channel_is_connected(tls)
+        pp_tls_is_connected(tls)
     }
 
     func putPlainText(_ text: String) throws {
         try text.withCString { buf in
             var error = PPTLSErrorNone
-            guard pp_tls_channel_put_plain(tls, buf, text.count, &error) else {
+            guard pp_tls_put_plain(tls, buf, text.count, &error) else {
                 throw CTLSError(error)
             }
         }
@@ -108,7 +108,7 @@ private final class NativeTLSWrapper: TLSProtocol {
     func putRawPlainText(_ text: Data) throws {
         try text.withUnsafeBytes { buf in
             var error = PPTLSErrorNone
-            guard pp_tls_channel_put_plain(tls, buf.bytePointer, text.count, &error) else {
+            guard pp_tls_put_plain(tls, buf.bytePointer, text.count, &error) else {
                 throw CTLSError(error)
             }
         }
@@ -117,7 +117,7 @@ private final class NativeTLSWrapper: TLSProtocol {
     func putCipherText(_ data: Data) throws {
         try data.withUnsafeBytes { buf in
             var error = PPTLSErrorNone
-            guard pp_tls_channel_put_cipher(tls, buf.bytePointer, data.count, &error) else {
+            guard pp_tls_put_cipher(tls, buf.bytePointer, data.count, &error) else {
                 throw CTLSError(error)
             }
         }
@@ -125,7 +125,7 @@ private final class NativeTLSWrapper: TLSProtocol {
 
     func pullPlainText() throws -> Data {
         var error = PPTLSErrorNone
-        guard let zd = pp_tls_channel_pull_plain(tls, &error) else {
+        guard let zd = pp_tls_pull_plain(tls, &error) else {
             guard error == PPTLSErrorNone else {
                 throw CTLSError(error)
             }
@@ -136,7 +136,7 @@ private final class NativeTLSWrapper: TLSProtocol {
 
     func pullCipherText() throws -> Data {
         var error = PPTLSErrorNone
-        guard let zd = pp_tls_channel_pull_cipher(tls, &error) else {
+        guard let zd = pp_tls_pull_cipher(tls, &error) else {
             guard error == PPTLSErrorNone else {
                 throw CTLSError(error)
             }
@@ -146,7 +146,7 @@ private final class NativeTLSWrapper: TLSProtocol {
     }
 
     func caMD5() throws -> String {
-        guard let buf = pp_tls_channel_ca_md5(tls) else {
+        guard let buf = pp_tls_ca_md5(tls) else {
             throw PPTLSError.encryption
         }
         defer {

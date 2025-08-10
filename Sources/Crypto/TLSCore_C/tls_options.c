@@ -7,7 +7,7 @@
 #include "portable/common.h"
 #include "tls/tls.h"
 
-pp_tls_channel_options *_Nonnull pp_tls_channel_options_create(int sec_level,
+pp_tls_options *_Nonnull pp_tls_options_create(int sec_level,
                                                          size_t buf_len,
                                                          bool eku,
                                                          bool san_host,
@@ -19,7 +19,7 @@ pp_tls_channel_options *_Nonnull pp_tls_channel_options_create(int sec_level,
 
     pp_assert(ca_path && on_verify_failure);
 
-    pp_tls_channel_options *opt = pp_alloc_crypto(sizeof(pp_tls_channel_options));
+    pp_tls_options *opt = pp_alloc_crypto(sizeof(pp_tls_options));
     opt->sec_level = sec_level;
     opt->buf_len = buf_len;
     opt->eku = eku;
@@ -32,7 +32,7 @@ pp_tls_channel_options *_Nonnull pp_tls_channel_options_create(int sec_level,
     return opt;
 }
 
-void pp_tls_channel_options_free(pp_tls_channel_options *_Nonnull opt) {
+void pp_tls_options_free(pp_tls_options *_Nonnull opt) {
     free((char *)opt->ca_path);
     free((char *)opt->cert_pem);
     free((char *)opt->key_pem);
