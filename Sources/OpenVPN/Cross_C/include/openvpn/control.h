@@ -35,7 +35,7 @@ size_t ctrl_pkt_capacity(const ctrl_pkt_t *_Nonnull pkt);
 
 typedef struct {
     pp_crypto_ctx _Nonnull crypto;
-    uint32_t replay_id;
+    uint32_t openvpn_replay_id;
     uint32_t timestamp;
 } ctrl_pkt_alg;
 

@@ -14,7 +14,7 @@
 typedef struct {
     uint32_t highest_pid;
     uint32_t *_Nonnull bitmap;
-} replay_t;
+} openvpn_replay;
 
 #define REPLAY_HIDDEN_WINSIZE           128
 #define REPLAY_BITMAP_LEN               (REPLAY_HIDDEN_WINSIZE / 32)
@@ -25,22 +25,22 @@ typedef struct {
 #define REPLAY_WINSIZE                  (REPLAY_HIDDEN_WINSIZE - REPLAY_REDUNDANT_BITS)
 
 static inline
-replay_t *_Nonnull replay_create() {
-    replay_t *rp = pp_alloc_crypto(sizeof(replay_t));
+openvpn_replay *_Nonnull openvpn_replay_create() {
+    openvpn_replay *rp = pp_alloc_crypto(sizeof(openvpn_replay));
     rp->highest_pid = 0;
     rp->bitmap =  pp_alloc_crypto(REPLAY_BITMAP_LEN * sizeof(uint32_t));
     return rp;
 }
 
 static inline
-void replay_free(replay_t *_Nonnull rp) {
+void openvpn_replay_free(openvpn_replay *_Nonnull rp) {
     if (!rp) return;
     free(rp->bitmap);
     free(rp);
 }
 
 static inline
-bool replay_is_replayed(replay_t *_Nonnull rp, uint32_t packet_id) {
+bool openvpn_replay_is_replayed(openvpn_replay *_Nonnull rp, uint32_t packet_id) {
     if (packet_id == 0) {
         return true;
     }

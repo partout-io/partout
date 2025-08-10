@@ -15,7 +15,7 @@ final class CDataPath {
 
     private let decBuffer: UnsafeMutablePointer<pp_zd>
 
-    private let replay: UnsafeMutablePointer<replay_t>
+    private let replay: UnsafeMutablePointer<openvpn_replay>
 
     private let resizeStep: Int
 
@@ -30,14 +30,14 @@ final class CDataPath {
         let oneKilo = 1024
         encBuffer = pp_zd_create(64 * oneKilo)
         decBuffer = pp_zd_create(64 * oneKilo)
-        replay = replay_create()
+        replay = openvpn_replay_create()
         resizeStep = 1024
         maxPacketId = .max - 10 * UInt32(oneKilo)
         outPacketId = .zero
     }
 
     deinit {
-        replay_free(replay)
+        openvpn_replay_free(replay)
         dp_mode_free(mode)
         pp_zd_free(encBuffer)
         pp_zd_free(decBuffer)
@@ -100,7 +100,7 @@ extension CDataPath {
                 throw DataPathError.overflow
             }
             // ignore replayed packet ids
-            guard !replay_is_replayed(replay, tuple.packetId) else {
+            guard !openvpn_replay_is_replayed(replay, tuple.packetId) else {
                 return nil
             }
             // detect keep-alive packet (ping)

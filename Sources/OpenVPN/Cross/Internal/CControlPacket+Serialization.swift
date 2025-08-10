@@ -40,7 +40,7 @@ extension CControlPacket {
         timestamp: UInt32,
         function: SerializationFunction
     ) throws -> Data {
-        var alg = ctrl_pkt_alg(crypto: crypto, replay_id: replayId, timestamp: timestamp)
+        var alg = ctrl_pkt_alg(crypto: crypto, openvpn_replay_id: replayId, timestamp: timestamp)
         let capacity = withUnsafePointer(to: alg) {
             ctrl_pkt_capacity_alg(pkt, $0)
         }

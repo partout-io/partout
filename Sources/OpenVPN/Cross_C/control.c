@@ -134,7 +134,7 @@ size_t ctrl_pkt_serialize_auth(uint8_t *dst,
     const size_t digest_len = alg->crypto->base.meta.digest_len;
     uint8_t *ptr = dst + digest_len;
     const uint8_t *subject = ptr;
-    *(uint32_t *)ptr = pp_endian_htonl(alg->replay_id);
+    *(uint32_t *)ptr = pp_endian_htonl(alg->openvpn_replay_id);
     ptr += PacketReplayIdLength;
     *(uint32_t *)ptr = pp_endian_htonl(alg->timestamp);
     ptr += PacketReplayTimestampLength;
@@ -167,7 +167,7 @@ size_t ctrl_pkt_serialize_crypt(uint8_t *dst,
 
     uint8_t *ptr = dst;
     ptr += packet_header_set(dst, pkt->code, pkt->key, pkt->session_id);
-    *(uint32_t *)ptr = pp_endian_htonl(alg->replay_id);
+    *(uint32_t *)ptr = pp_endian_htonl(alg->openvpn_replay_id);
     ptr += PacketReplayIdLength;
     *(uint32_t *)ptr = pp_endian_htonl(alg->timestamp);
     ptr += PacketReplayTimestampLength;
