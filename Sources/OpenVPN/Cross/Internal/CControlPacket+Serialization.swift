@@ -12,7 +12,7 @@ extension CControlPacket {
         _ dstLength: Int,
         _ pkt: UnsafePointer<ctrl_pkt_t>,
         _ alg: UnsafeMutablePointer<ctrl_pkt_alg>,
-        _ error: UnsafeMutablePointer<crypto_error_code>
+        _ error: UnsafeMutablePointer<pp_crypto_error_code>
     ) -> Int
 
     func serialized() -> Data {
@@ -35,7 +35,7 @@ extension CControlPacket {
     }
 
     func serialized(
-        with crypto: crypto_ctx,
+        with crypto: pp_crypto_ctx,
         replayId: UInt32,
         timestamp: UInt32,
         function: SerializationFunction

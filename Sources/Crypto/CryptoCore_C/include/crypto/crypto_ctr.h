@@ -9,8 +9,8 @@
 #include "crypto.h"
 #include "portable/zd.h"
 
-crypto_ctx _Nullable crypto_ctr_create(const char *_Nonnull cipher_name,
+pp_crypto_ctx _Nullable pp_crypto_ctr_create(const char *_Nonnull cipher_name,
                                        const char *_Nonnull digest_name,
                                        size_t tag_len, size_t payload_len,
-                                       const crypto_keys_t *_Nullable keys);
-void crypto_ctr_free(crypto_ctx _Nonnull ctx);
+                                       const pp_crypto_keys_t *_Nullable keys);
+void pp_crypto_ctr_free(pp_crypto_ctx _Nonnull ctx);

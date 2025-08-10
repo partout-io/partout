@@ -17,7 +17,7 @@ struct CDataPathError: Error {
 
     static func error(for err: dp_error_t) -> Error {
         if err.dp_code == DataPathErrorCrypto {
-            return CCryptoError(err.crypto_code)
+            return CCryptoError(err.pp_crypto_code)
         } else {
             return CDataPathError(err.dp_code)
         }

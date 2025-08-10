@@ -12,7 +12,7 @@ extension ControlChannel {
     final class AuthSerializer: ControlChannelSerializer {
         private let ctx: PartoutLoggerContext
 
-        private let cbc: crypto_ctx
+        private let cbc: pp_crypto_ctx
 
         private let prefixLength: Int
 
@@ -45,7 +45,7 @@ extension ControlChannel {
                 )
                 let keysBridge = CryptoKeysBridge(keys: keys)
                 return keysBridge.withUnsafeKeys {
-                    crypto_cbc_create(nil, digest.rawValue, $0)
+                    pp_crypto_cbc_create(nil, digest.rawValue, $0)
                 }
             }
             guard let cbc else {
@@ -54,7 +54,7 @@ extension ControlChannel {
             self.cbc = cbc
 
             prefixLength = PacketOpcodeLength + PacketSessionIdLength
-            hmacLength = crypto_meta(cbc).digest_len
+            hmacLength = pp_crypto_meta(cbc).digest_len
             authLength = hmacLength + PacketReplayIdLength + PacketReplayTimestampLength
             preambleLength = prefixLength + authLength
 
@@ -64,7 +64,7 @@ extension ControlChannel {
         }
 
         deinit {
-            crypto_cbc_free(cbc)
+            pp_crypto_cbc_free(cbc)
         }
 
         func reset() {
@@ -107,7 +107,7 @@ extension ControlChannel {
                         authLength
                     )
                     var dec_error = CryptoErrorNone
-                    guard crypto_verify(
+                    guard pp_crypto_verify(
                         cbc,
                         dst.bytePointer,
                         authCount,

@@ -10,20 +10,20 @@
 #include <stdint.h>
 #include "portable/zd.h"
 
-bool key_init_seed(const pp_zd *_Nonnull zd);
+bool pp_key_init_seed(const pp_zd *_Nonnull zd);
 
 typedef struct {
     pp_zd *_Nonnull dst;
     const char *_Nonnull digest_name;
     const pp_zd *_Nonnull secret;
     const pp_zd *_Nonnull data;
-} key_hmac_ctx;
+} pp_key_hmac_ctx;
 
-pp_zd *_Nonnull key_hmac_create();
-size_t key_hmac_do(key_hmac_ctx *_Nonnull ctx);
+pp_zd *_Nonnull pp_key_hmac_create();
+size_t pp_key_hmac_do(pp_key_hmac_ctx *_Nonnull ctx);
 
-char *_Nullable key_decrypted_from_path(const char *_Nonnull path,
+char *_Nullable pp_key_decrypted_from_path(const char *_Nonnull path,
                                         const char *_Nonnull passphrase);
 
-char *_Nullable key_decrypted_from_pem(const char *_Nonnull pem,
+char *_Nullable pp_key_decrypted_from_pem(const char *_Nonnull pem,
                                        const char *_Nonnull passphrase);

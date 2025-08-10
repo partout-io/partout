@@ -34,7 +34,7 @@ void ctrl_pkt_free(ctrl_pkt_t *_Nonnull pkt);
 size_t ctrl_pkt_capacity(const ctrl_pkt_t *_Nonnull pkt);
 
 typedef struct {
-    crypto_ctx _Nonnull crypto;
+    pp_crypto_ctx _Nonnull crypto;
     uint32_t replay_id;
     uint32_t timestamp;
 } ctrl_pkt_alg;
@@ -48,10 +48,10 @@ size_t ctrl_pkt_serialize_auth(uint8_t *_Nonnull dst,
                                size_t dst_buf_len,
                                const ctrl_pkt_t *_Nonnull pkt,
                                ctrl_pkt_alg *_Nullable alg,
-                               crypto_error_code *_Nullable error);
+                               pp_crypto_error_code *_Nullable error);
 
 size_t ctrl_pkt_serialize_crypt(uint8_t *_Nonnull dst,
                                 size_t dst_buf_len,
                                 const ctrl_pkt_t *_Nonnull pkt,
                                 ctrl_pkt_alg *_Nullable alg,
-                                crypto_error_code *_Nullable error);
+                                pp_crypto_error_code *_Nullable error);

@@ -9,8 +9,8 @@
 #include "openvpn/dp_mode.h"
 #include "openvpn/packet.h"
 
-dp_mode_t *dp_mode_create_opt(crypto_ctx crypto,
-                              crypto_free_fn crypto_free,
+dp_mode_t *dp_mode_create_opt(pp_crypto_ctx crypto,
+                              pp_crypto_free_fn pp_crypto_free,
                               const dp_mode_encrypter_t *enc,
                               const dp_mode_decrypter_t *dec,
                               const dp_mode_options_t *opt) {
@@ -18,7 +18,7 @@ dp_mode_t *dp_mode_create_opt(crypto_ctx crypto,
 
     dp_mode_t *mode = pp_alloc_crypto(sizeof(dp_mode_t));
     mode->crypto = crypto;
-    mode->crypto_free = crypto_free;
+    mode->pp_crypto_free = pp_crypto_free;
     if (opt) {
         mode->opt = *opt;
     } else {
@@ -38,7 +38,7 @@ dp_mode_t *dp_mode_create_opt(crypto_ctx crypto,
 
 void dp_mode_free(dp_mode_t *mode) {
     DP_LOG("dp_mode_free");
-    mode->crypto_free(mode->crypto);
+    mode->pp_crypto_free(mode->crypto);
     free(mode);
 }
 

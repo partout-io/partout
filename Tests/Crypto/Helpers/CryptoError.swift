@@ -7,9 +7,9 @@ internal import _PartoutCryptoCore_C
 enum CryptoError: Error {
     case creation
 
-    case openssl(crypto_error_code)
+    case openssl(pp_crypto_error_code)
 
-    init(_ code: crypto_error_code? = nil) {
+    init(_ code: pp_crypto_error_code? = nil) {
         guard let code else {
             self = .creation
             return

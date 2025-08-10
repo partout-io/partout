@@ -17,5 +17,5 @@ typedef enum {
 
 typedef struct {
     dp_error_code dp_code;
-    crypto_error_code crypto_code;
+    pp_crypto_error_code pp_crypto_code;
 } dp_error_t;

@@ -74,7 +74,7 @@ typedef size_t (*dp_mode_parse_fn)(void *_Nonnull mode);
     - Parses packet from payload
 
  The way packets are encrypted and decrypted is delegated to
- the crypto_*_t types in the CryptoOpenSSL target. On the other
+ the pp_crypto_*_t types in the CryptoOpenSSL target. On the other
  hand, the way payloads are assembled and parsed depends on
  two factors:
 
@@ -90,14 +90,14 @@ typedef size_t (*dp_mode_parse_fn)(void *_Nonnull mode);
 typedef struct {
     dp_framing_assemble_fn _Nullable framing_assemble;
     dp_mode_assemble_fn _Nonnull assemble;
-    crypto_encrypt_fn _Nonnull raw_encrypt;
+    pp_crypto_encrypt_fn _Nonnull raw_encrypt;
     dp_mode_encrypt_fn _Nonnull encrypt;
 } dp_mode_encrypter_t;
 
 typedef struct {
     dp_framing_parse_fn _Nullable framing_parse;
     dp_mode_parse_fn _Nonnull parse;
-    crypto_decrypt_fn _Nonnull raw_decrypt;
+    pp_crypto_decrypt_fn _Nonnull raw_decrypt;
     dp_mode_decrypt_fn _Nonnull decrypt;
 } dp_mode_decrypter_t;
 
@@ -109,7 +109,7 @@ typedef struct {
 
 typedef struct {
     void *_Nonnull crypto;
-    crypto_free_fn _Nonnull crypto_free;
+    pp_crypto_free_fn _Nonnull pp_crypto_free;
     dp_mode_encrypter_t enc;
     dp_mode_decrypter_t dec;
     dp_mode_options_t opt;
@@ -122,18 +122,18 @@ typedef struct {
 
 // "crypto" is owned and released on free
 
-dp_mode_t *_Nonnull dp_mode_create_opt(crypto_ctx _Nonnull crypto,
-                                       crypto_free_fn _Nonnull crypto_free,
+dp_mode_t *_Nonnull dp_mode_create_opt(pp_crypto_ctx _Nonnull crypto,
+                                       pp_crypto_free_fn _Nonnull pp_crypto_free,
                                        const dp_mode_encrypter_t *_Nonnull enc,
                                        const dp_mode_decrypter_t *_Nonnull dec,
                                        const dp_mode_options_t *_Nullable opt);
 
 static inline
-dp_mode_t *_Nonnull dp_mode_create(crypto_ctx _Nonnull crypto,
-                                   crypto_free_fn _Nonnull crypto_free,
+dp_mode_t *_Nonnull dp_mode_create(pp_crypto_ctx _Nonnull crypto,
+                                   pp_crypto_free_fn _Nonnull pp_crypto_free,
                                    const dp_mode_encrypter_t *_Nonnull enc,
                                    const dp_mode_decrypter_t *_Nonnull dec) {
-    return dp_mode_create_opt(crypto, crypto_free, enc, dec, NULL);
+    return dp_mode_create_opt(crypto, pp_crypto_free, enc, dec, NULL);
 }
 
 void dp_mode_free(dp_mode_t * _Nonnull);
@@ -171,9 +171,9 @@ size_t dp_mode_assemble_capacity(const dp_mode_t *_Nonnull mode, size_t len) {
 //
 static inline
 size_t dp_mode_encrypt_capacity(const dp_mode_t *_Nonnull mode, size_t len) {
-    const crypto_ctx ctx = mode->crypto;
+    const pp_crypto_ctx ctx = mode->crypto;
     const size_t max_prefix_len = PacketOpcodeLength + PacketPeerIdLength;
-    const size_t enc_len = crypto_encryption_capacity(ctx, len);
+    const size_t enc_len = pp_crypto_encryption_capacity(ctx, len);
     return max_prefix_len + enc_len;
 }
 

@@ -11,7 +11,7 @@
 #include "macros.h"
 
 typedef struct {
-    crypto_t crypto;
+    pp_crypto_t crypto;
 
     // cipher
     const EVP_CIPHER *_Nonnull cipher;
@@ -29,11 +29,11 @@ typedef struct {
     pp_zd *_Nonnull hmac_key_enc;
     pp_zd *_Nonnull hmac_key_dec;
     uint8_t *_Nonnull buffer_hmac;
-} crypto_ctr_ctx;
+} pp_crypto_ctr_ctx;
 
 static
 size_t local_encryption_capacity(const void *vctx, size_t len) {
-    const crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
+    const pp_crypto_ctr_ctx *ctx = (pp_crypto_ctr_ctx *)vctx;
     pp_assert(ctx);
     return pp_alloc_crypto_capacity(len, ctx->payload_len + ctx->ns_tag_len);
 }
@@ -41,7 +41,7 @@ size_t local_encryption_capacity(const void *vctx, size_t len) {
 static
 void local_configure_encrypt(void *vctx,
                              const pp_zd *cipher_key, const pp_zd *hmac_key) {
-    crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
+    pp_crypto_ctr_ctx *ctx = (pp_crypto_ctr_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(hmac_key && hmac_key->length >= ctx->crypto.meta.hmac_key_len);
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
@@ -58,8 +58,8 @@ static
 size_t local_encrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
-                     const crypto_flags_t *flags, crypto_error_code *error) {
-    crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
+                     const pp_crypto_flags_t *flags, pp_crypto_error_code *error) {
+    pp_crypto_ctr_ctx *ctx = (pp_crypto_ctr_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(ctx->ctx_enc);
     pp_assert(ctx->hmac_key_enc);
@@ -89,7 +89,7 @@ size_t local_encrypt(void *vctx,
 
 static
 void local_configure_decrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *hmac_key) {
-    crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
+    pp_crypto_ctr_ctx *ctx = (pp_crypto_ctr_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(hmac_key && hmac_key->length >= ctx->crypto.meta.hmac_key_len);
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
@@ -106,8 +106,8 @@ static
 size_t local_decrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
-                     const crypto_flags_t *flags, crypto_error_code *error) {
-    crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
+                     const pp_crypto_flags_t *flags, pp_crypto_error_code *error) {
+    pp_crypto_ctr_ctx *ctx = (pp_crypto_ctr_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(ctx->ctx_dec);
     pp_assert(ctx->hmac_key_dec);
@@ -141,12 +141,12 @@ size_t local_decrypt(void *vctx,
 
 // MARK: -
 
-crypto_ctx crypto_ctr_create(const char *cipher_name, const char *digest_name,
+pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name, const char *digest_name,
                              size_t tag_len, size_t payload_len,
-                             const crypto_keys_t *keys) {
+                             const pp_crypto_keys_t *keys) {
     pp_assert(cipher_name && digest_name);
 
-    crypto_ctr_ctx *ctx = pp_alloc_crypto(sizeof(crypto_ctr_ctx));
+    pp_crypto_ctr_ctx *ctx = pp_alloc_crypto(sizeof(pp_crypto_ctr_ctx));
 
     ctx->cipher = EVP_get_cipherbyname(cipher_name);
     if (!ctx->cipher) {
@@ -181,7 +181,7 @@ crypto_ctx crypto_ctr_create(const char *cipher_name, const char *digest_name,
 
     ctx->crypto.meta.cipher_key_len = EVP_CIPHER_key_length(ctx->cipher);
     ctx->crypto.meta.cipher_iv_len = EVP_CIPHER_iv_length(ctx->cipher);
-    // as seen in OpenVPN's crypto_openssl.c:md_kt_size()
+    // as seen in OpenVPN's pp_crypto_openssl.c:md_kt_size()
     ctx->crypto.meta.hmac_key_len = EVP_MD_size(ctx->digest);
     ctx->crypto.meta.digest_len = tag_len;
     ctx->crypto.meta.tag_len = tag_len;
@@ -200,7 +200,7 @@ crypto_ctx crypto_ctr_create(const char *cipher_name, const char *digest_name,
         local_configure_decrypt(ctx, keys->cipher.dec_key, keys->hmac.dec_key);
     }
 
-    return (crypto_ctx)ctx;
+    return (pp_crypto_ctx)ctx;
 
 failure:
     // cipher and digest (EVP_get_*byname) do not need to be free-ed
@@ -211,9 +211,9 @@ failure:
     return NULL;
 }
 
-void crypto_ctr_free(crypto_ctx vctx) {
+void pp_crypto_ctr_free(pp_crypto_ctx vctx) {
     if (!vctx) return;
-    crypto_ctr_ctx *ctx = (crypto_ctr_ctx *)vctx;
+    pp_crypto_ctr_ctx *ctx = (pp_crypto_ctr_ctx *)vctx;
 
     if (ctx->hmac_key_enc) pp_zd_free(ctx->hmac_key_enc);
     if (ctx->hmac_key_dec) pp_zd_free(ctx->hmac_key_dec);

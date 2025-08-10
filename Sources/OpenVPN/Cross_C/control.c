@@ -90,7 +90,7 @@ size_t ctrl_pkt_capacity(const ctrl_pkt_t *pkt) {
 
 size_t ctrl_pkt_capacity_alg(const ctrl_pkt_t *pkt, const ctrl_pkt_alg *alg) {
     const size_t plain_capacity = ctrl_pkt_capacity(pkt);
-    const size_t enc_capacity = crypto_encryption_capacity(alg->crypto, plain_capacity);
+    const size_t enc_capacity = pp_crypto_encryption_capacity(alg->crypto, plain_capacity);
     const size_t header_len = PacketOpcodeLength + PacketSessionIdLength + PacketReplayIdLength + PacketReplayTimestampLength;
     return header_len + enc_capacity;
 }
@@ -129,7 +129,7 @@ size_t ctrl_pkt_serialize_auth(uint8_t *dst,
                                size_t dst_buf_len,
                                const ctrl_pkt_t *pkt,
                                ctrl_pkt_alg *alg,
-                               crypto_error_code *error) {
+                               pp_crypto_error_code *error) {
 
     const size_t digest_len = alg->crypto->base.meta.digest_len;
     uint8_t *ptr = dst + digest_len;
@@ -142,7 +142,7 @@ size_t ctrl_pkt_serialize_auth(uint8_t *dst,
     ptr += ctrl_pkt_serialize(ptr, pkt);
 
     const size_t subject_len = ptr - subject;
-    const size_t dst_len = crypto_encrypt(alg->crypto,
+    const size_t dst_len = pp_crypto_encrypt(alg->crypto,
                                           dst,
                                           dst_buf_len,
                                           subject,
@@ -163,7 +163,7 @@ size_t ctrl_pkt_serialize_crypt(uint8_t *dst,
                                 size_t dst_buf_len,
                                 const ctrl_pkt_t *pkt,
                                 ctrl_pkt_alg *alg,
-                                crypto_error_code *error) {
+                                pp_crypto_error_code *error) {
 
     uint8_t *ptr = dst;
     ptr += packet_header_set(dst, pkt->code, pkt->key, pkt->session_id);
@@ -173,12 +173,12 @@ size_t ctrl_pkt_serialize_crypt(uint8_t *dst,
     ptr += PacketReplayTimestampLength;
 
     const size_t ad_len = ptr - dst;
-    const crypto_flags_t flags = { NULL, 0, dst, ad_len, false };
+    const pp_crypto_flags_t flags = { NULL, 0, dst, ad_len, false };
 
     const size_t raw_capacity = ctrl_pkt_raw_capacity(pkt);
     pp_zd *msg = pp_zd_create(raw_capacity);
     ctrl_pkt_serialize(msg->bytes, pkt);
-    const size_t enc_msg_len = crypto_encrypt(alg->crypto,
+    const size_t enc_msg_len = pp_crypto_encrypt(alg->crypto,
                                               dst + ad_len,
                                               dst_buf_len - ad_len,
                                               msg->bytes,

@@ -51,7 +51,7 @@ size_t dp_encrypt(void *vmode) {
 
     *(uint32_t *)(dst + dst_header_len) = pp_endian_htonl(ctx->packet_id);
 
-    crypto_flags_t flags = { 0 };
+    pp_crypto_flags_t flags = { 0 };
     flags.iv = dst + dst_header_len;
     flags.iv_len = PacketIdLength;
     if (has_peer_id) {
@@ -66,7 +66,7 @@ size_t dp_encrypt(void *vmode) {
     }
 
     // skip header and packet id
-    crypto_error_code enc_error;
+    pp_crypto_error_code enc_error;
     const size_t dst_packet_len = mode->enc.raw_encrypt(mode->crypto,
                                                         dst + dst_header_len + PacketIdLength,
                                                         ctx->dst->length - (dst_header_len + PacketIdLength),
@@ -80,7 +80,7 @@ size_t dp_encrypt(void *vmode) {
     if (!dst_packet_len) {
         if (ctx->error) {
             ctx->error->dp_code = DataPathErrorCrypto;
-            ctx->error->crypto_code = enc_error;
+            ctx->error->pp_crypto_code = enc_error;
         }
         return 0;
     }
@@ -103,14 +103,14 @@ size_t dp_decrypt(void *vmode) {
         return 0;
     }
 
-    crypto_flags_t flags = { 0 };
+    pp_crypto_flags_t flags = { 0 };
     flags.iv = ctx->src + src_header_len;
     flags.iv_len = PacketIdLength;
     if (has_peer_id) {
         if (peer_id != mode->opt.peer_id) {
             if (ctx->error) {
                 ctx->error->dp_code = DataPathErrorPeerIdMismatch;
-                ctx->error->crypto_code = CryptoErrorNone;
+                ctx->error->pp_crypto_code = CryptoErrorNone;
             }
             return 0;
         }
@@ -123,7 +123,7 @@ size_t dp_decrypt(void *vmode) {
     }
 
     // skip header + packet id
-    crypto_error_code dec_error;
+    pp_crypto_error_code dec_error;
     const size_t dst_len = mode->dec.raw_decrypt(mode->crypto,
                                                  dst,
                                                  ctx->dst->length,
@@ -134,7 +134,7 @@ size_t dp_decrypt(void *vmode) {
     if (!dst_len) {
         if (ctx->error) {
             ctx->error->dp_code = DataPathErrorCrypto;
-            ctx->error->crypto_code = dec_error;
+            ctx->error->pp_crypto_code = dec_error;
         }
         return 0;
     }
@@ -178,8 +178,8 @@ size_t dp_parse(void *vmode) {
 
 // MARK: -
 
-dp_mode_t *dp_mode_ad_create(crypto_ctx crypto,
-                             crypto_free_fn crypto_free,
+dp_mode_t *dp_mode_ad_create(pp_crypto_ctx crypto,
+                             pp_crypto_free_fn pp_crypto_free,
                              compression_framing_t comp_f) {
 
     DP_LOG("dp_mode_ad_create");
@@ -202,5 +202,5 @@ dp_mode_t *dp_mode_ad_create(crypto_ctx crypto,
         PacketPeerIdDisabled,
         0
     };
-    return dp_mode_create_opt(crypto, crypto_free, &enc, &dec, &opt);
+    return dp_mode_create_opt(crypto, pp_crypto_free, &enc, &dec, &opt);
 }

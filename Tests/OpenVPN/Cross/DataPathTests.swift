@@ -8,7 +8,7 @@ internal import _PartoutOpenVPN_C
 import Foundation
 import Testing
 
-private func cryptoFree(_: crypto_ctx) {
+private func cryptoFree(_: pp_crypto_ctx) {
 }
 
 private let peerId: UInt32 = 0x01
@@ -54,7 +54,7 @@ struct DataPathTests {
             precondition(cipher != nil)
             let keys = CryptoKeys(emptyWithCipherLength: 1024, hmacKeyLength: 1024)
             let cryptoAEAD = CryptoKeysBridge(keys: keys).withUnsafeKeys { keys in
-                crypto_aead_create(cipher!.rawValue, 16, 4, keys)
+                pp_crypto_aead_create(cipher!.rawValue, 16, 4, keys)
             }
             guard let cryptoAEAD else {
                 throw CryptoError.creation
@@ -64,7 +64,7 @@ struct DataPathTests {
             precondition(digest != nil)
             let keys = CryptoKeys(emptyWithCipherLength: 1024, hmacKeyLength: 1024)
             let cryptoCBC = CryptoKeysBridge(keys: keys).withUnsafeKeys { keys in
-                crypto_cbc_create(cipher?.rawValue, digest!.rawValue, keys)
+                pp_crypto_cbc_create(cipher?.rawValue, digest!.rawValue, keys)
             }
             guard let cryptoCBC else {
                 throw CryptoError.creation

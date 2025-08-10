@@ -17,7 +17,7 @@
 #define HMACMaxLength (size_t)128
 
 typedef struct {
-    crypto_t crypto;
+    pp_crypto_t crypto;
 
     // cipher
     BCRYPT_ALG_HANDLE hAlgCipher;
@@ -30,18 +30,18 @@ typedef struct {
     pp_zd *_Nonnull hmac_key_dec;
     UCHAR buffer_iv[IVMaxLength];
     UCHAR buffer_hmac[HMACMaxLength];
-} crypto_cbc_ctx;
+} pp_crypto_cbc_ctx;
 
 static
 size_t local_encryption_capacity(const void *vctx, size_t input_len) {
-    const crypto_cbc_ctx *ctx = (const crypto_cbc_ctx *)vctx;
+    const pp_crypto_cbc_ctx *ctx = (const pp_crypto_cbc_ctx *)vctx;
     pp_assert(ctx);
     return pp_alloc_crypto_capacity(input_len, ctx->crypto.meta.digest_len + ctx->crypto.meta.cipher_iv_len);
 }
 
 static
 void local_configure_encrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *hmac_key) {
-    crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
+    pp_crypto_cbc_ctx *ctx = (pp_crypto_cbc_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(hmac_key && hmac_key->length >= ctx->crypto.meta.hmac_key_len);
 
@@ -69,8 +69,8 @@ static
 size_t local_encrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
-                     const crypto_flags_t *flags, crypto_error_code *error) {
-    crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
+                     const pp_crypto_flags_t *flags, pp_crypto_error_code *error) {
+    pp_crypto_cbc_ctx *ctx = (pp_crypto_cbc_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(ctx->hmac_key_enc);
 
@@ -128,7 +128,7 @@ size_t local_encrypt(void *vctx,
 
 static
 void local_configure_decrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *hmac_key) {
-    crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
+    pp_crypto_cbc_ctx *ctx = (pp_crypto_cbc_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(hmac_key && hmac_key->length >= ctx->crypto.meta.hmac_key_len);
 
@@ -156,9 +156,9 @@ static
 size_t local_decrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
-                     const crypto_flags_t *flags, crypto_error_code *error) {
+                     const pp_crypto_flags_t *flags, pp_crypto_error_code *error) {
     (void)flags;
-    crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
+    pp_crypto_cbc_ctx *ctx = (pp_crypto_cbc_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(ctx->hmac_key_dec);
 
@@ -206,8 +206,8 @@ size_t local_decrypt(void *vctx,
 }
 
 static
-bool local_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_code *error) {
-    crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
+bool local_verify(void *vctx, const uint8_t *in, size_t in_len, pp_crypto_error_code *error) {
+    pp_crypto_cbc_ctx *ctx = (pp_crypto_cbc_ctx *)vctx;
     pp_assert(ctx);
     size_t hmac_len = 0;
 
@@ -234,8 +234,8 @@ bool local_verify(void *vctx, const uint8_t *in, size_t in_len, crypto_error_cod
 
 // MARK: -
 
-crypto_ctx crypto_cbc_create(const char *cipher_name, const char *digest_name,
-                             const crypto_keys_t *keys) {
+pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name, const char *digest_name,
+                             const pp_crypto_keys_t *keys) {
     pp_assert(digest_name);
 
     size_t cipher_key_len;
@@ -270,7 +270,7 @@ crypto_ctx crypto_cbc_create(const char *cipher_name, const char *digest_name,
         return NULL;
     }
 
-    crypto_cbc_ctx *ctx = pp_alloc_crypto(sizeof(crypto_cbc_ctx));
+    pp_crypto_cbc_ctx *ctx = pp_alloc_crypto(sizeof(pp_crypto_cbc_ctx));
 
     if (cipher_name) {
         CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
@@ -316,7 +316,7 @@ crypto_ctx crypto_cbc_create(const char *cipher_name, const char *digest_name,
         local_configure_decrypt(ctx, keys->cipher.dec_key, keys->hmac.dec_key);
     }
 
-    return (crypto_ctx)ctx;
+    return (pp_crypto_ctx)ctx;
 
 failure:
     if (ctx->hAlgCipher) BCryptCloseAlgorithmProvider(ctx->hAlgCipher, 0);
@@ -324,9 +324,9 @@ failure:
     return NULL;
 }
 
-void crypto_cbc_free(crypto_ctx vctx) {
+void pp_crypto_cbc_free(pp_crypto_ctx vctx) {
     if (!vctx) return;
-    crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
+    pp_crypto_cbc_ctx *ctx = (pp_crypto_cbc_ctx *)vctx;
 
     if (ctx->hKeyEnc) BCryptDestroyKey(ctx->hKeyEnc);
     if (ctx->hKeyDec) BCryptDestroyKey(ctx->hKeyDec);

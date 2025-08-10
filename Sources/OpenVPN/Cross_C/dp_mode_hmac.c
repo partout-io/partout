@@ -53,7 +53,7 @@ size_t dp_encrypt(void *vmode) {
     uint8_t *dst = ctx->dst->bytes;
 
     // skip header bytes
-    crypto_error_code enc_error;
+    pp_crypto_error_code enc_error;
     const size_t dst_packet_len = mode->enc.raw_encrypt(mode->crypto,
                                                         dst + dst_header_len,
                                                         ctx->dst->length - dst_header_len,
@@ -67,7 +67,7 @@ size_t dp_encrypt(void *vmode) {
     if (!dst_packet_len) {
         if (ctx->error) {
             ctx->error->dp_code = DataPathErrorCrypto;
-            ctx->error->crypto_code = enc_error;
+            ctx->error->pp_crypto_code = enc_error;
         }
         return 0;
     }
@@ -91,13 +91,13 @@ size_t dp_decrypt(void *vmode) {
     uint8_t *dst = ctx->dst->bytes;
 
     DP_DECRYPT_BEGIN(ctx)
-    const crypto_ctx crypto = (const crypto_ctx)mode->crypto;
+    const pp_crypto_ctx crypto = (const pp_crypto_ctx)mode->crypto;
     if (ctx->src_len < src_header_len + crypto->base.meta.digest_len + crypto->base.meta.cipher_iv_len) {
         return 0;
     }
 
     // skip header = (code, key)
-    crypto_error_code dec_error;
+    pp_crypto_error_code dec_error;
     const size_t dst_len = mode->dec.raw_decrypt(mode->crypto,
                                                  dst,
                                                  ctx->dst->length,
@@ -108,7 +108,7 @@ size_t dp_decrypt(void *vmode) {
     if (!dst_len) {
         if (ctx->error) {
             ctx->error->dp_code = DataPathErrorCrypto;
-            ctx->error->crypto_code = dec_error;
+            ctx->error->pp_crypto_code = dec_error;
         }
         return 0;
     }
@@ -116,7 +116,7 @@ size_t dp_decrypt(void *vmode) {
         if (peer_id != mode->opt.peer_id) {
             if (ctx->error) {
                 ctx->error->dp_code = DataPathErrorPeerIdMismatch;
-                ctx->error->crypto_code = CryptoErrorNone;
+                ctx->error->pp_crypto_code = CryptoErrorNone;
             }
             return 0;
         }
@@ -162,8 +162,8 @@ size_t dp_parse(void *vmode) {
 
 // MARK: -
 
-dp_mode_t *dp_mode_hmac_create(crypto_ctx crypto,
-                               crypto_free_fn crypto_free,
+dp_mode_t *dp_mode_hmac_create(pp_crypto_ctx crypto,
+                               pp_crypto_free_fn pp_crypto_free,
                                compression_framing_t comp_f) {
 
     DP_LOG("dp_mode_hmac_create");
@@ -186,5 +186,5 @@ dp_mode_t *dp_mode_hmac_create(crypto_ctx crypto,
         PacketPeerIdDisabled,
         0
     };
-    return dp_mode_create_opt(crypto, crypto_free, &enc, &dec, &opt);
+    return dp_mode_create_opt(crypto, pp_crypto_free, &enc, &dec, &opt);
 }

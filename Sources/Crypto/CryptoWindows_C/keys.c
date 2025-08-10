@@ -9,28 +9,28 @@
 
 #define KeyHMACMaxLength    (size_t)128
 
-bool key_init_seed(const pp_zd *seed) {
+bool pp_key_init_seed(const pp_zd *seed) {
     // FIXME: #108, port to Windows CNG
     return true;
 }
 
-pp_zd *key_hmac_create() {
+pp_zd *pp_key_hmac_create() {
     return pp_zd_create(KeyHMACMaxLength);
 }
 
-size_t key_hmac_do(key_hmac_ctx *ctx) {
+size_t pp_key_hmac_do(pp_key_hmac_ctx *ctx) {
     // FIXME: #108, port to Windows CNG
     return 0;
 }
 
 // MARK: -
 
-char *key_decrypted_from_path(const char *path, const char *passphrase) {
+char *pp_key_decrypted_from_path(const char *path, const char *passphrase) {
     // FIXME: #108, port to Windows CNG
     return NULL;
 }
 
-char *key_decrypted_from_pem(const char *pem, const char *passphrase) {
+char *pp_key_decrypted_from_pem(const char *pem, const char *passphrase) {
     // FIXME: #108, port to Windows CNG
     return NULL;
 }

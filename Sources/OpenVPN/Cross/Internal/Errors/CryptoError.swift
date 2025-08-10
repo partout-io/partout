@@ -11,9 +11,9 @@ enum CryptoError: Error {
 }
 
 struct CCryptoError: Error {
-    let code: crypto_error_code
+    let code: pp_crypto_error_code
 
-    init(_ code: crypto_error_code) {
+    init(_ code: pp_crypto_error_code) {
         precondition(code != CryptoErrorNone)
         self.code = code
     }

@@ -11,7 +11,7 @@
 #include "macros.h"
 
 typedef struct {
-    crypto_t crypto;
+    pp_crypto_t crypto;
 
     // cipher
     const EVP_CIPHER *_Nonnull cipher;
@@ -20,18 +20,18 @@ typedef struct {
     uint8_t *_Nonnull iv_enc;
     uint8_t *_Nonnull iv_dec;
     size_t id_len;
-} crypto_aead_ctx;
+} pp_crypto_aead_ctx;
 
 static inline
 void local_prepare_iv(const void *vctx, uint8_t *_Nonnull iv, const pp_zd *_Nonnull hmac_key) {
-    crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
+    pp_crypto_aead_ctx *ctx = (pp_crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_zero(iv, ctx->id_len);
     memcpy(iv + ctx->id_len, hmac_key->bytes, ctx->crypto.meta.cipher_iv_len - ctx->id_len);
 }
 
 size_t local_encryption_capacity(const void *vctx, size_t len) {
-    crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
+    pp_crypto_aead_ctx *ctx = (pp_crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     return pp_alloc_crypto_capacity(len, ctx->crypto.meta.tag_len);
 }
@@ -39,7 +39,7 @@ size_t local_encryption_capacity(const void *vctx, size_t len) {
 static
 void local_configure_encrypt(void *vctx,
                              const pp_zd *cipher_key, const pp_zd *hmac_key) {
-    crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
+    pp_crypto_aead_ctx *ctx = (pp_crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
     pp_assert(hmac_key);
@@ -53,9 +53,9 @@ static
 size_t local_encrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
-                     const crypto_flags_t *flags,
-                     crypto_error_code *error) {
-    crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
+                     const pp_crypto_flags_t *flags,
+                     pp_crypto_error_code *error) {
+    pp_crypto_aead_ctx *ctx = (pp_crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(ctx->ctx_enc);
     pp_assert(flags);
@@ -83,7 +83,7 @@ size_t local_encrypt(void *vctx,
 static
 void local_configure_decrypt(void *vctx,
                              const pp_zd *cipher_key, const pp_zd *hmac_key) {
-    crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
+    pp_crypto_aead_ctx *ctx = (pp_crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
     pp_assert(hmac_key);
@@ -97,9 +97,9 @@ static
 size_t local_decrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
-                     const crypto_flags_t *flags,
-                     crypto_error_code *error) {
-    crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
+                     const pp_crypto_flags_t *flags,
+                     pp_crypto_error_code *error) {
+    pp_crypto_aead_ctx *ctx = (pp_crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(ctx->ctx_dec);
     pp_assert(flags);
@@ -126,12 +126,12 @@ size_t local_decrypt(void *vctx,
 
 // MARK: -
 
-crypto_ctx crypto_aead_create(const char *cipher_name,
+pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
                               size_t tag_len, size_t id_len,
-                              const crypto_keys_t *keys) {
+                              const pp_crypto_keys_t *keys) {
     pp_assert(cipher_name);
 
-    crypto_aead_ctx *ctx = pp_alloc_crypto(sizeof(crypto_aead_ctx));
+    pp_crypto_aead_ctx *ctx = pp_alloc_crypto(sizeof(pp_crypto_aead_ctx));
     ctx->cipher = EVP_get_cipherbyname(cipher_name);
     if (!ctx->cipher) {
         goto failure;
@@ -169,7 +169,7 @@ crypto_ctx crypto_aead_create(const char *cipher_name,
         local_configure_decrypt(ctx, keys->cipher.dec_key, keys->hmac.dec_key);
     }
 
-    return (crypto_ctx)ctx;
+    return (pp_crypto_ctx)ctx;
 
 failure:
     if (ctx->ctx_enc) EVP_CIPHER_CTX_free(ctx->ctx_enc);
@@ -178,9 +178,9 @@ failure:
     return NULL;
 }
 
-void crypto_aead_free(crypto_ctx vctx) {
+void pp_crypto_aead_free(pp_crypto_ctx vctx) {
     if (!vctx) return;
-    crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
+    pp_crypto_aead_ctx *ctx = (pp_crypto_aead_ctx *)vctx;
 
     EVP_CIPHER_CTX_free(ctx->ctx_enc);
     EVP_CIPHER_CTX_free(ctx->ctx_dec);

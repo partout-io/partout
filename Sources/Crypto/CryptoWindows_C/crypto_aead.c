@@ -14,7 +14,7 @@
 #pragma comment(lib, "bcrypt.lib")
 
 typedef struct {
-    crypto_t crypto;
+    pp_crypto_t crypto;
 
     // cipher
     BCRYPT_ALG_HANDLE hAlg;
@@ -24,10 +24,10 @@ typedef struct {
     uint8_t *_Nonnull iv_dec;
     size_t id_len;
     UCHAR tag[128]; // max length
-} crypto_aead_ctx;
+} pp_crypto_aead_ctx;
 
 size_t local_encryption_capacity(const void *vctx, size_t len) {
-    const crypto_aead_ctx *ctx = (const crypto_aead_ctx *)vctx;
+    const pp_crypto_aead_ctx *ctx = (const pp_crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     return pp_alloc_crypto_capacity(len, ctx->crypto.meta.tag_len);
 }
@@ -35,7 +35,7 @@ size_t local_encryption_capacity(const void *vctx, size_t len) {
 static
 void local_configure_encrypt(void *vctx,
                              const pp_zd *cipher_key, const pp_zd *hmac_key) {
-    crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
+    pp_crypto_aead_ctx *ctx = (pp_crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
     pp_assert(hmac_key);
@@ -60,8 +60,8 @@ static
 size_t local_encrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
-                     const crypto_flags_t *flags, crypto_error_code *error) {
-    crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
+                     const pp_crypto_flags_t *flags, pp_crypto_error_code *error) {
+    pp_crypto_aead_ctx *ctx = (pp_crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(ctx->hKeyEnc);
     pp_assert(flags);
@@ -100,7 +100,7 @@ size_t local_encrypt(void *vctx,
 static
 void local_configure_decrypt(void *vctx,
                              const pp_zd *cipher_key, const pp_zd *hmac_key) {
-    crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
+    pp_crypto_aead_ctx *ctx = (pp_crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
     pp_assert(hmac_key);
@@ -125,8 +125,8 @@ static
 size_t local_decrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
-                     const crypto_flags_t *flags, crypto_error_code *error) {
-    crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
+                     const pp_crypto_flags_t *flags, pp_crypto_error_code *error) {
+    pp_crypto_aead_ctx *ctx = (pp_crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(ctx->hKeyDec);
     pp_assert(flags);
@@ -163,9 +163,9 @@ size_t local_decrypt(void *vctx,
 
 // MARK: -
 
-crypto_ctx crypto_aead_create(const char *cipher_name,
+pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
                               size_t tag_len, size_t id_len,
-                              const crypto_keys_t *keys) {
+                              const pp_crypto_keys_t *keys) {
     pp_assert(cipher_name);
 
     size_t cipher_key_len;
@@ -177,7 +177,7 @@ crypto_ctx crypto_aead_create(const char *cipher_name,
         return NULL;
     }
 
-    crypto_aead_ctx *ctx = pp_alloc_crypto(sizeof(crypto_aead_ctx));
+    pp_crypto_aead_ctx *ctx = pp_alloc_crypto(sizeof(pp_crypto_aead_ctx));
     CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
         &ctx->hAlg,
         BCRYPT_AES_ALGORITHM,
@@ -216,7 +216,7 @@ crypto_ctx crypto_aead_create(const char *cipher_name,
         local_configure_decrypt(ctx, keys->cipher.dec_key, keys->hmac.dec_key);
     }
 
-    return (crypto_ctx)ctx;
+    return (pp_crypto_ctx)ctx;
 
 failure:
     if (ctx->hAlg) BCryptCloseAlgorithmProvider(ctx->hAlg, 0);
@@ -224,9 +224,9 @@ failure:
     return NULL;
 }
 
-void crypto_aead_free(crypto_ctx vctx) {
+void pp_crypto_aead_free(pp_crypto_ctx vctx) {
     if (!vctx) return;
-    crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
+    pp_crypto_aead_ctx *ctx = (pp_crypto_aead_ctx *)vctx;
 
     if (ctx->hKeyEnc) BCryptDestroyKey(ctx->hKeyEnc);
     if (ctx->hKeyDec) BCryptDestroyKey(ctx->hKeyDec);
