@@ -11,7 +11,7 @@ let version = "0.99.172"
 let checksum = "100dc00b0a54b01cb4b237a2396a930ad05bd452eba896b69500697241ae07e1"
 
 // to download the core soruce
-let coreSHA1 = "22cd45a7790812a218c98e0e1c6184edeb8b0d59"
+let coreSHA1 = "510c109b44efce60fe362775652990519a506511"
 
 // deployment of PartoutCore sub-library
 let coreDeployment: CoreDeployment = .remoteBinary
