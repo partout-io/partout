@@ -77,7 +77,7 @@ extension ControlChannel {
                 with: ctr,
                 replayId: currentReplayId.outbound,
                 timestamp: timestamp,
-                function: openvpn_ctrl_pkt_serialize_crypt
+                function: openvpn_ctrl_serialize_crypt
             )
             currentReplayId.outbound += 1
             return data
