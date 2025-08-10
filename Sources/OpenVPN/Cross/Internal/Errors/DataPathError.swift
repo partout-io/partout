@@ -4,7 +4,7 @@
 
 internal import _PartoutOpenVPN_C
 
-enum DataPathError: Error {
+enum OpenVPNDataPathError: Error {
     case creation
 
     case algorithm
@@ -13,18 +13,18 @@ enum DataPathError: Error {
 }
 
 struct CDataPathError: Error {
-    let code: dp_error_code
+    let code: openvpn_dp_error_code
 
-    static func error(for err: dp_error_t) -> Error {
-        if err.dp_code == DataPathErrorCrypto {
-            return CCryptoError(err.pp_crypto_code)
+    static func error(for err: openvpn_dp_error) -> Error {
+        if err.dp_code == OpenVPNDataPathErrorCrypto {
+            return CCryptoError(err.crypto_code)
         } else {
             return CDataPathError(err.dp_code)
         }
     }
 
-    private init(_ code: dp_error_code) {
-        precondition(code != DataPathErrorNone)
+    private init(_ code: openvpn_dp_error_code) {
+        precondition(code != OpenVPNDataPathErrorNone)
         self.code = code
     }
 }

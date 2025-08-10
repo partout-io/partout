@@ -42,7 +42,7 @@ extension DataPathWrapper {
             }
         } else {
             guard let digestAlgorithm else {
-                throw DataPathError.algorithm
+                throw OpenVPNDataPathError.algorithm
             }
             mode = digestAlgorithm.withCString { cDigest in
                 keysBridge.withUnsafeKeys { keys in
@@ -68,7 +68,7 @@ extension DataPathWrapper {
         }
 
         guard let mode else {
-            throw DataPathError.creation
+            throw OpenVPNDataPathError.creation
         }
 
         // the encryption keys must match the cipher/digest
@@ -137,13 +137,13 @@ extension CDataPath: DataPathTestingProtocol {
 // MARK: -
 
 extension OpenVPN.CompressionFraming {
-    var cNative: compression_framing_t {
+    var cNative: openvpn_compression_framing {
         switch self {
-        case .disabled: CompressionFramingDisabled
-        case .compLZO: CompressionFramingCompLZO
-        case .compress: CompressionFramingCompress
-        case .compressV2: CompressionFramingCompressV2
-        @unknown default: CompressionFramingDisabled
+        case .disabled: OpenVPNCompressionFramingDisabled
+        case .compLZO: OpenVPNCompressionFramingCompLZO
+        case .compress: OpenVPNCompressionFramingCompress
+        case .compressV2: OpenVPNCompressionFramingCompressV2
+        @unknown default: OpenVPNCompressionFramingDisabled
         }
     }
 }

@@ -26,15 +26,15 @@ static const dp_framing_t comp_compress_v2 = {
     dp_framing_parse_compress_v2
 };
 
-const dp_framing_t *dp_framing(compression_framing_t comp_f) {
+const dp_framing_t *dp_framing(openvpn_compression_framing comp_f) {
     switch (comp_f) {
-    case CompressionFramingDisabled:
+    case OpenVPNCompressionFramingDisabled:
         return &comp_disabled;
-    case CompressionFramingCompLZO:
+    case OpenVPNCompressionFramingCompLZO:
         return &comp_lzo;
-    case CompressionFramingCompress:
+    case OpenVPNCompressionFramingCompress:
         return &comp_compress;
-    case CompressionFramingCompressV2:
+    case OpenVPNCompressionFramingCompressV2:
         return &comp_compress_v2;
     }
 }

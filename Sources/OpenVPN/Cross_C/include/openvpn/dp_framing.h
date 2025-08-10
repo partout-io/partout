@@ -26,7 +26,7 @@ typedef struct {
     size_t *_Nonnull dst_header_len;
     const uint8_t *_Nonnull src;
     size_t src_len;
-    dp_error_t *_Nullable error;
+    openvpn_dp_error *_Nullable error;
 } dp_framing_parse_ctx;
 
 typedef void (*dp_framing_assemble_fn)(dp_framing_assemble_ctx *_Nonnull);
@@ -38,7 +38,7 @@ typedef struct {
     dp_framing_parse_fn _Nonnull parse;
 } dp_framing_t;
 
-const dp_framing_t *_Nonnull dp_framing(compression_framing_t comp_f);
+const dp_framing_t *_Nonnull dp_framing(openvpn_compression_framing comp_f);
 
 // assembled payloads may add up to 2 bytes
 static inline

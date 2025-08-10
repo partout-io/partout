@@ -7,8 +7,8 @@
 #pragma once
 
 typedef enum {
-    CompressionFramingDisabled,     // no option
-    CompressionFramingCompLZO,      // --comp-lzo
-    CompressionFramingCompress,     // --compress stub
-    CompressionFramingCompressV2    // --compress stub-v2
-} compression_framing_t;
+    OpenVPNCompressionFramingDisabled,     // no option
+    OpenVPNCompressionFramingCompLZO,      // --comp-lzo
+    OpenVPNCompressionFramingCompress,     // --compress stub
+    OpenVPNCompressionFramingCompressV2    // --compress stub-v2
+} openvpn_compression_framing;

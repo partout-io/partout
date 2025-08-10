@@ -21,5 +21,5 @@ if (ossl_code <= 0) {\
     return 0;\
 }
 
-#define CRYPTO_SET_ERROR(pp_crypto_code)\
-if (error) *error = pp_crypto_code;\
+#define CRYPTO_SET_ERROR(crypto_code)\
+if (error) *error = crypto_code;\

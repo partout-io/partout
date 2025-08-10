@@ -11,4 +11,4 @@
 // WARNING: retains crypto
 dp_mode_t *_Nonnull dp_mode_hmac_create(pp_crypto_ctx _Nonnull crypto,
                                         pp_crypto_free_fn _Nonnull pp_crypto_free,
-                                        compression_framing_t comp_f);
+                                        openvpn_compression_framing comp_f);

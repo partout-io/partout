@@ -22,7 +22,7 @@ dp_mode_t *dp_mode_create_opt(pp_crypto_ctx crypto,
     if (opt) {
         mode->opt = *opt;
     } else {
-        mode->opt.comp_f = CompressionFramingDisabled;
+        mode->opt.comp_f = OpenVPNCompressionFramingDisabled;
         mode->opt.peer_id = OpenVPNPacketPeerIdDisabled;
         mode->opt.mss_val = 0;
     }
@@ -65,7 +65,7 @@ size_t dp_mode_encrypt(dp_mode_t *_Nonnull mode,
                        pp_zd *_Nonnull dst,
                        const uint8_t *_Nonnull src,
                        size_t src_len,
-                       dp_error_t *_Nullable error) {
+                       openvpn_dp_error *_Nullable error) {
 
     dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
     ctx->key = key;
@@ -84,7 +84,7 @@ size_t dp_mode_decrypt(dp_mode_t *_Nonnull mode,
                        uint32_t *_Nonnull dst_packet_id,
                        const uint8_t *_Nonnull src,
                        size_t src_len,
-                       dp_error_t *_Nullable error) {
+                       openvpn_dp_error *_Nullable error) {
 
     dp_mode_decrypt_ctx *ctx = &mode->dec_ctx;
     ctx->dst = dst;
@@ -100,7 +100,7 @@ size_t dp_mode_parse(dp_mode_t *_Nonnull mode,
                      uint8_t *_Nonnull dst_header,
                      uint8_t *_Nonnull src,
                      size_t src_len,
-                     dp_error_t *_Nullable error) {
+                     openvpn_dp_error *_Nullable error) {
 
     dp_mode_parse_ctx *ctx = &mode->parse_ctx;
     ctx->dst_header = dst_header;

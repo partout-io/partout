@@ -50,8 +50,8 @@ bool dp_framing_parse_v1(dp_framing_parse_ctx *_Nonnull ctx) {
 
         case OpenVPNDataPacketLZOCompress:
             if (ctx->error) {
-                ctx->error->dp_code = DataPathErrorCompression;
-                ctx->error->pp_crypto_code = PPCryptoErrorNone;
+                ctx->error->dp_code = OpenVPNDataPathErrorCompression;
+                ctx->error->crypto_code = PPCryptoErrorNone;
             }
             return false;
 
@@ -71,8 +71,8 @@ bool dp_framing_parse_v2(dp_framing_parse_ctx *_Nonnull ctx) {
         case OpenVPNDataPacketV2Indicator:
             if (ctx->dst_payload[1] != OpenVPNDataPacketV2Uncompressed) {
                 if (ctx->error) {
-                    ctx->error->dp_code = DataPathErrorCompression;
-                    ctx->error->pp_crypto_code = PPCryptoErrorNone;
+                    ctx->error->dp_code = OpenVPNDataPathErrorCompression;
+                    ctx->error->crypto_code = PPCryptoErrorNone;
                 }
                 return false;
             }

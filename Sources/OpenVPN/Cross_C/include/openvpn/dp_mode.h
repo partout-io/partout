@@ -30,7 +30,7 @@ typedef struct {
     pp_zd *_Nonnull dst;
     const uint8_t *_Nonnull src;
     size_t src_len;
-    dp_error_t *_Nullable error;
+    openvpn_dp_error *_Nullable error;
 } dp_mode_encrypt_ctx;
 
 typedef size_t (*dp_mode_assemble_fn)(void *_Nonnull mode);
@@ -44,7 +44,7 @@ typedef struct {
     uint32_t *_Nonnull dst_packet_id;
     const uint8_t *_Nonnull src;
     size_t src_len;
-    dp_error_t *_Nullable error;
+    openvpn_dp_error *_Nullable error;
 } dp_mode_decrypt_ctx;
 
 // decrypt -> parse
@@ -53,7 +53,7 @@ typedef struct {
     uint8_t *_Nonnull dst_header;
     uint8_t *_Nonnull src; // allow parse in place
     size_t src_len;
-    dp_error_t *_Nullable error;
+    openvpn_dp_error *_Nullable error;
 } dp_mode_parse_ctx;
 
 typedef size_t (*dp_mode_decrypt_fn)(void *_Nonnull mode);
@@ -79,7 +79,7 @@ typedef size_t (*dp_mode_parse_fn)(void *_Nonnull mode);
  two factors:
 
  - The encryption mode (AD or HMAC, where AD = associated data)
- - The compression framing (see compression_framing_t)
+ - The compression framing (see openvpn_compression_framing)
 
  Only AEAD (AD) and CBC (HMAC) algorithms are supported for
  data transfer at this time.
@@ -102,7 +102,7 @@ typedef struct {
 } dp_mode_decrypter_t;
 
 typedef struct {
-    compression_framing_t comp_f;
+    openvpn_compression_framing comp_f;
     uint32_t peer_id;
     uint16_t mss_val;
 } dp_mode_options_t;
@@ -149,7 +149,7 @@ void dp_mode_set_peer_id(dp_mode_t *_Nonnull mode, uint32_t peer_id) {
 }
 
 static inline
-compression_framing_t dp_mode_framing(const dp_mode_t *_Nonnull mode) {
+openvpn_compression_framing dp_mode_framing(const dp_mode_t *_Nonnull mode) {
     return mode->opt.comp_f;
 }
 
@@ -194,7 +194,7 @@ size_t dp_mode_encrypt(dp_mode_t *_Nonnull mode,
                        pp_zd *_Nonnull dst,
                        const uint8_t *_Nonnull src,
                        size_t src_len,
-                       dp_error_t *_Nullable error);
+                       openvpn_dp_error *_Nullable error);
 
 static inline
 pp_zd *_Nullable dp_mode_assemble_and_encrypt(dp_mode_t *_Nonnull mode,
@@ -203,7 +203,7 @@ pp_zd *_Nullable dp_mode_assemble_and_encrypt(dp_mode_t *_Nonnull mode,
                                                        pp_zd *_Nonnull buf,
                                                        const uint8_t *_Nonnull src,
                                                        size_t src_len,
-                                                       dp_error_t *_Nullable error) {
+                                                       openvpn_dp_error *_Nullable error) {
 
     pp_assert(buf->length >= dp_mode_assemble_and_encrypt_capacity(mode, src_len));
     const size_t asm_len = dp_mode_assemble(mode, openvpn_packet_id, buf,
@@ -229,14 +229,14 @@ size_t dp_mode_decrypt(dp_mode_t *_Nonnull mode,
                        uint32_t *_Nonnull dst_packet_id,
                        const uint8_t *_Nonnull src,
                        size_t src_len,
-                       dp_error_t *_Nullable error);
+                       openvpn_dp_error *_Nullable error);
 
 size_t dp_mode_parse(dp_mode_t *_Nonnull mode,
                      pp_zd *_Nonnull dst,
                      uint8_t *_Nonnull dst_header,
                      uint8_t *_Nonnull src,
                      size_t src_len,
-                     dp_error_t *_Nullable error);
+                     openvpn_dp_error *_Nullable error);
 
 static inline
 pp_zd *_Nullable dp_mode_decrypt_and_parse(dp_mode_t *_Nonnull mode,
@@ -246,7 +246,7 @@ pp_zd *_Nullable dp_mode_decrypt_and_parse(dp_mode_t *_Nonnull mode,
                                                     bool *_Nonnull dst_keep_alive,
                                                     const uint8_t *_Nonnull src,
                                                     size_t src_len,
-                                                    dp_error_t *_Nullable error) {
+                                                    openvpn_dp_error *_Nullable error) {
 
     pp_assert(buf->length >= src_len);
     const size_t dec_len = dp_mode_decrypt(mode, buf, dst_packet_id,

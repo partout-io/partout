@@ -41,8 +41,8 @@ private extension OpenVPNSessionError {
                     assertionFailure("Crypto error with unknown error code: \(cryptoError.code)")
                 }
             }
-            // DataPathError
-            else if let dpError = rawError as? DataPathError {
+            // OpenVPNDataPathError
+            else if let dpError = rawError as? OpenVPNDataPathError {
                 switch dpError {
                 case .algorithm, .creation:
                     return .cryptoAlgorithm
@@ -53,11 +53,11 @@ private extension OpenVPNSessionError {
             // CDataPathError
             else if let dpError = rawError as? CDataPathError {
                 switch dpError.code {
-                case DataPathErrorPeerIdMismatch:
+                case OpenVPNDataPathErrorPeerIdMismatch:
                     return .dataPathPeerIdMismatch
-                case DataPathErrorCompression:
+                case OpenVPNDataPathErrorCompression:
                     return .dataPathCompression
-                case DataPathErrorCrypto:
+                case OpenVPNDataPathErrorCrypto:
                     return .cryptoEncryption
                 default:
                     assertionFailure("Data path error with unknown error code: \(dpError.code)")

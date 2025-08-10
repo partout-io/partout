@@ -79,8 +79,8 @@ size_t dp_encrypt(void *vmode) {
 
     if (!dst_packet_len) {
         if (ctx->error) {
-            ctx->error->dp_code = DataPathErrorCrypto;
-            ctx->error->pp_crypto_code = enc_error;
+            ctx->error->dp_code = OpenVPNDataPathErrorCrypto;
+            ctx->error->crypto_code = enc_error;
         }
         return 0;
     }
@@ -109,8 +109,8 @@ size_t dp_decrypt(void *vmode) {
     if (has_peer_id) {
         if (peer_id != mode->opt.peer_id) {
             if (ctx->error) {
-                ctx->error->dp_code = DataPathErrorPeerIdMismatch;
-                ctx->error->pp_crypto_code = PPCryptoErrorNone;
+                ctx->error->dp_code = OpenVPNDataPathErrorPeerIdMismatch;
+                ctx->error->crypto_code = PPCryptoErrorNone;
             }
             return 0;
         }
@@ -133,8 +133,8 @@ size_t dp_decrypt(void *vmode) {
                                                  &dec_error);
     if (!dst_len) {
         if (ctx->error) {
-            ctx->error->dp_code = DataPathErrorCrypto;
-            ctx->error->pp_crypto_code = dec_error;
+            ctx->error->dp_code = OpenVPNDataPathErrorCrypto;
+            ctx->error->crypto_code = dec_error;
         }
         return 0;
     }
@@ -180,7 +180,7 @@ size_t dp_parse(void *vmode) {
 
 dp_mode_t *dp_mode_ad_create(pp_crypto_ctx crypto,
                              pp_crypto_free_fn pp_crypto_free,
-                             compression_framing_t comp_f) {
+                             openvpn_compression_framing comp_f) {
 
     DP_LOG("dp_mode_ad_create");
 

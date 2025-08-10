@@ -97,7 +97,7 @@ extension CDataPath {
 
             // throw on packet id overflow
             guard tuple.packetId <= maxPacketId else {
-                throw DataPathError.overflow
+                throw OpenVPNDataPathError.overflow
             }
             // ignore replayed packet ids
             guard !openvpn_replay_is_replayed(replay, tuple.packetId) else {
@@ -194,7 +194,7 @@ extension CDataPath {
         let buf = buf ?? encBuffer
         resize(buf, for: dp_mode_assemble_and_encrypt_capacity(mode, packet.count))
         return try packet.withUnsafeBytes { src in
-            var error = dp_error_t()
+            var error = openvpn_dp_error()
             let zd = dp_mode_assemble_and_encrypt(
                 mode,
                 key,
@@ -221,7 +221,7 @@ extension CDataPath {
             var packetId: UInt32 = .zero
             var header: UInt8 = .zero
             var keepAlive: Bool = false
-            var error = dp_error_t()
+            var error = openvpn_dp_error()
             let zd = dp_mode_decrypt_and_parse(
                 mode,
                 buf,
@@ -272,7 +272,7 @@ extension CDataPath {
         let inputCount = assembled.count
         resize(buf, for: dp_mode_encrypt_capacity(mode, inputCount))
         return try assembled.withUnsafeBytes { input in
-            var error = dp_error_t()
+            var error = openvpn_dp_error()
             let outLength = dp_mode_encrypt(
                 mode,
                 key,
@@ -298,7 +298,7 @@ extension CDataPath {
         resize(buf, for: inputCount)
         return try packet.withUnsafeBytes { input in
             var packetId: UInt32 = 0
-            var error = dp_error_t()
+            var error = openvpn_dp_error()
             let outLength = dp_mode_decrypt(
                 mode,
                 buf,
@@ -327,7 +327,7 @@ extension CDataPath {
 
         let decryptedOriginal = decrypted
         let parsed = try inputCopy.withUnsafeMutableBytes { input in
-            var error = dp_error_t()
+            var error = openvpn_dp_error()
             let outLength = dp_mode_parse(
                 mode,
                 buf,
