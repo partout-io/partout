@@ -13,32 +13,32 @@
 // MARK: - Pointers
 
 static inline
-void alg_plain(const pkt_proc_alg_ctx *ctx) {
+void alg_plain(const openvpn_pkt_proc_alg_ctx *ctx) {
     pp_assert(ctx);
     memcpy(ctx->dst + ctx->dst_offset, ctx->src + ctx->src_offset, ctx->src_len);
 }
 
 static
-void alg_xor_mask(const pkt_proc_alg_ctx *ctx) {
+void alg_xor_mask(const openvpn_pkt_proc_alg_ctx *ctx) {
     pp_assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
     obf_xor_mask(ctx->dst + ctx->dst_offset, ctx->src_len, ctx->mask, ctx->mask_len);
 }
 
 static
-void alg_xor_ptrpos(const pkt_proc_alg_ctx *ctx) {
+void alg_xor_ptrpos(const openvpn_pkt_proc_alg_ctx *ctx) {
     alg_plain(ctx);
     obf_xor_ptrpos(ctx->dst + ctx->dst_offset, ctx->src_len);
 }
 
 static
-void alg_reverse(const pkt_proc_alg_ctx *ctx) {
+void alg_reverse(const openvpn_pkt_proc_alg_ctx *ctx) {
     alg_plain(ctx);
     obf_reverse(ctx->dst + ctx->dst_offset, ctx->src_len);
 }
 
 static
-void alg_xor_obfuscate_in(const pkt_proc_alg_ctx *ctx) {
+void alg_xor_obfuscate_in(const openvpn_pkt_proc_alg_ctx *ctx) {
     pp_assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
     obf_xor_obfuscate(ctx->dst + ctx->dst_offset,
@@ -48,7 +48,7 @@ void alg_xor_obfuscate_in(const pkt_proc_alg_ctx *ctx) {
 }
 
 static
-void alg_xor_obfuscate_out(const pkt_proc_alg_ctx *ctx) {
+void alg_xor_obfuscate_out(const openvpn_pkt_proc_alg_ctx *ctx) {
     pp_assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
     obf_xor_obfuscate(ctx->dst + ctx->dst_offset,
@@ -59,8 +59,8 @@ void alg_xor_obfuscate_out(const pkt_proc_alg_ctx *ctx) {
 
 // MARK: - Obfuscator
 
-pkt_proc_t *pkt_proc_create(pkt_proc_method method, const uint8_t *mask, size_t mask_len) {
-    pkt_proc_t *proc = pp_alloc_crypto(sizeof(pkt_proc_t));
+openvpn_pkt_proc *openvpn_pkt_proc_create(openvpn_pkt_proc_method method, const uint8_t *mask, size_t mask_len) {
+    openvpn_pkt_proc *proc = pp_alloc_crypto(sizeof(openvpn_pkt_proc));
     proc->mask = NULL;
     switch (method) {
         case PktProcMethodNone:
@@ -89,7 +89,7 @@ pkt_proc_t *pkt_proc_create(pkt_proc_method method, const uint8_t *mask, size_t 
     return proc;
 }
 
-void pkt_proc_free(pkt_proc_t *proc) {
+void openvpn_pkt_proc_free(openvpn_pkt_proc *proc) {
     if (proc->mask) {
         pp_zd_free(proc->mask);
     }
