@@ -14,7 +14,7 @@ let checksum = "100dc00b0a54b01cb4b237a2396a930ad05bd452eba896b69500697241ae07e1
 let coreSHA1 = "22cd45a7790812a218c98e0e1c6184edeb8b0d59"
 
 // deployment of PartoutCore sub-library
-let coreDeployment: CoreDeployment = .remoteBinary
+let coreDeployment: CoreDeployment = .remoteSource
 let areas: Set<Area> = Area.defaultAreas
 
 // PartoutCore binaries only on non-Apple
@@ -70,7 +70,7 @@ let package = Package(
                     list.append("PartoutAPIBundle")
                 }
                 if areas.contains(.crypto) {
-                    list.append("_PartoutVendorsCrypto_C")
+                    list.append("_PartoutCrypto_C")
                 }
                 if areas.contains(.openVPN) {
                     list.append("PartoutOpenVPN")
@@ -262,7 +262,7 @@ if areas.contains(.openVPN) {
         .target(
             name: "_PartoutOpenVPN_C",
             dependencies: [
-                "_PartoutVendorsCrypto_C",
+                "_PartoutCrypto_C",
                 "_PartoutVendorsTLS_C"
             ],
             path: "Sources/OpenVPN/Cross_C"
@@ -441,12 +441,12 @@ case .android:
                 ]
             ),
             .target(
-                name: "_PartoutVendorsCrypto_C",
+                name: "_PartoutCrypto_C",
                 dependencies: [
-                    "_PartoutVendorsCryptoCore_C",
+                    "_PartoutCryptoCore_C",
                     "_PartoutVendorsOpenSSL"
                 ],
-                path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
+                path: "Sources/Crypto/CryptoOpenSSL_C"
             ),
             .target(
                 name: "_PartoutVendorsTLS_C",
@@ -454,7 +454,7 @@ case .android:
                     "_PartoutVendorsOpenSSL",
                     "_PartoutVendorsTLSCore_C"
                 ],
-                path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
+                path: "Sources/Crypto/TLSOpenSSL_C"
             )
         ])
     }
@@ -496,12 +496,12 @@ case .apple:
                 ]
             ),
             .target(
-                name: "_PartoutVendorsCrypto_C",
+                name: "_PartoutCrypto_C",
                 dependencies: [
-                    "_PartoutVendorsCryptoCore_C",
+                    "_PartoutCryptoCore_C",
                     "_PartoutVendorsOpenSSL"
                 ],
-                path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
+                path: "Sources/Crypto/CryptoOpenSSL_C"
             ),
             .target(
                 name: "_PartoutVendorsTLS_C",
@@ -509,7 +509,7 @@ case .apple:
                     "_PartoutVendorsOpenSSL",
                     "_PartoutVendorsTLSCore_C"
                 ],
-                path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
+                path: "Sources/Crypto/TLSOpenSSL_C"
             )
         ])
     }
@@ -540,12 +540,12 @@ case .linux:
                 ]
             ),
             .target(
-                name: "_PartoutVendorsCrypto_C",
+                name: "_PartoutCrypto_C",
                 dependencies: [
-                    "_PartoutVendorsCryptoCore_C",
+                    "_PartoutCryptoCore_C",
                     "_PartoutVendorsOpenSSL"
                 ],
-                path: "Sources/Vendors/Crypto/CryptoOpenSSL_C"
+                path: "Sources/Crypto/CryptoOpenSSL_C"
             ),
             .target(
                 name: "_PartoutVendorsTLS_C",
@@ -553,7 +553,7 @@ case .linux:
                     "_PartoutVendorsOpenSSL",
                     "_PartoutVendorsTLSCore_C"
                 ],
-                path: "Sources/Vendors/Crypto/TLSOpenSSL_C"
+                path: "Sources/Crypto/TLSOpenSSL_C"
             )
         ])
     }
@@ -561,12 +561,12 @@ case .windows:
     if areas.contains(.crypto) {
         package.targets.append(
             .target(
-                name: "_PartoutVendorsCrypto_C",
+                name: "_PartoutCrypto_C",
                 dependencies: [
-                    "_PartoutVendorsCryptoCore_C",
+                    "_PartoutCryptoCore_C",
                     "_PartoutVendorsPortable_C"
                 ],
-                path: "Sources/Vendors/Crypto/CryptoWindows_C"
+                path: "Sources/Crypto/CryptoWindows_C"
             )
         )
     }
@@ -575,25 +575,25 @@ case .windows:
 if areas.contains(.crypto) {
     package.targets.append(contentsOf: [
         .target(
-            name: "_PartoutVendorsCryptoCore_C",
+            name: "_PartoutCryptoCore_C",
             dependencies: ["_PartoutVendorsPortable_C"],
-            path: "Sources/Vendors/Crypto/CryptoCore_C"
+            path: "Sources/Crypto/CryptoCore_C"
         ),
         .target(
             name: "_PartoutVendorsTLSCore_C",
             dependencies: [
-                "_PartoutVendorsCryptoCore_C",
+                "_PartoutCryptoCore_C",
                 "_PartoutVendorsPortable_C",
             ],
-            path: "Sources/Vendors/Crypto/TLSCore_C"
+            path: "Sources/Crypto/TLSCore_C"
         ),
         .testTarget(
-            name: "_PartoutVendorsCrypto_CTests",
+            name: "_PartoutCrypto_CTests",
             dependencies: [
-                "_PartoutVendorsCrypto_C", // now platform-independent
+                "_PartoutCrypto_C", // now platform-independent
                 "_PartoutVendorsPortable"
             ],
-            path: "Tests/Vendors/Crypto_C",
+            path: "Tests/Crypto/Crypto_C",
             exclude: [
                 "CryptoPerformanceTests.swift"
             ]

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutVendorsCryptoCore_C
+internal import _PartoutCryptoCore_C
 import Foundation
 
 extension Data {
