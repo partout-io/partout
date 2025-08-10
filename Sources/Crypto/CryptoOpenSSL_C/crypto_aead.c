@@ -8,7 +8,7 @@
 #include <string.h>
 #include "portable/common.h"
 #include "crypto/crypto_aead.h"
-#include "macros.h"
+#include "crypto/macros.h"
 
 typedef struct {
     pp_crypto crypto;
