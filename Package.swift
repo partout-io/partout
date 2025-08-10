@@ -56,11 +56,21 @@ let package = Package(
         .target(
             name: "Partout",
             dependencies: {
-                var list: [Target.Dependency] = [coreDeployment.dependency]
+                var list: [Target.Dependency] = []
+
+                // always included
+                list.append(coreDeployment.dependency)
+                list.append("PartoutABI")
                 list.append("PartoutProviders")
+                list.append("_PartoutVendorsPortable")
+
+                // conditional
                 if areas.contains(.api) {
                     list.append("PartoutAPI")
                     list.append("PartoutAPIBundle")
+                }
+                if areas.contains(.crypto) {
+                    list.append("_PartoutVendorsCrypto_C")
                 }
                 if areas.contains(.openVPN) {
                     list.append("PartoutOpenVPN")
@@ -68,14 +78,16 @@ let package = Package(
                 if areas.contains(.wireGuard) {
                     list.append("PartoutWireGuard")
                 }
-                if areas.contains(.crypto) {
-                    list.append("_PartoutVendorsCrypto_C")
-                }
-                list.append("_PartoutVendorsPortable")
-                if OS.current == .apple {
+
+                // OS-dependent
+                switch OS.current {
+                case .apple:
                     list.append("_PartoutVendorsApple")
                     list.append("_PartoutVendorsAppleNE")
+                default:
+                    break
                 }
+
                 return list
             }(),
             exclude: {
@@ -99,19 +111,6 @@ let package = Package(
                 return list
             }()
         ),
-        .target(
-            name: "PartoutProviders",
-            dependencies: [coreDeployment.dependency],
-            path: "Sources/Providers"
-        ),
-        .testTarget(
-            name: "PartoutProvidersTests",
-            dependencies: ["PartoutProviders"],
-            path: "Tests/Providers",
-            resources: [
-                .process("Resources")
-            ]
-        ),
         .testTarget(
             name: "PartoutTests",
             dependencies: ["Partout"],
@@ -132,6 +131,31 @@ let package = Package(
         )
     ]
 )
+
+package.targets.append(contentsOf: [
+    .target(
+        name: "_PartoutABI_C",
+        path: "Sources/ABI/Library_C"
+    ),
+    .target(
+        name: "PartoutABI",
+        dependencies: ["_PartoutABI_C"],
+        path: "Sources/ABI/Library"
+    ),
+    .target(
+        name: "PartoutProviders",
+        dependencies: [coreDeployment.dependency],
+        path: "Sources/Providers"
+    ),
+    .testTarget(
+        name: "PartoutProvidersTests",
+        dependencies: ["PartoutProviders"],
+        path: "Tests/Providers",
+        resources: [
+            .process("Resources")
+        ]
+    )
+])
 
 if areas.contains(.documentation) {
     package.dependencies.append(
