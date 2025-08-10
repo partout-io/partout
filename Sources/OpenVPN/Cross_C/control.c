@@ -173,7 +173,7 @@ size_t ctrl_pkt_serialize_crypt(uint8_t *dst,
     ptr += PacketReplayTimestampLength;
 
     const size_t ad_len = ptr - dst;
-    const pp_crypto_flags_t flags = { NULL, 0, dst, ad_len, false };
+    const pp_crypto_flags flags = { NULL, 0, dst, ad_len, false };
 
     const size_t raw_capacity = ctrl_pkt_raw_capacity(pkt);
     pp_zd *msg = pp_zd_create(raw_capacity);

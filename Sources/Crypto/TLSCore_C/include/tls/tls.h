@@ -36,8 +36,8 @@ typedef struct {
     void (*_Nonnull on_verify_failure)();
 } pp_tls_channel_options;
 
-typedef struct pp_tls_channel_t pp_tls_channel_t;
-typedef struct pp_tls_channel_t *pp_tls_channel_ctx;
+typedef struct pp_tls_channel pp_tls_channel;
+typedef struct pp_tls_channel *pp_tls_channel_ctx;
 
 pp_tls_channel_options *_Nonnull pp_tls_channel_options_create(int sec_level,
                                                          size_t buf_len,

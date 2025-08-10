@@ -14,7 +14,7 @@
 #define HMACMaxLength (size_t)128
 
 typedef struct {
-    pp_crypto_t crypto;
+    pp_crypto crypto;
 
     // cipher
     const EVP_CIPHER *_Nullable cipher;
@@ -60,7 +60,7 @@ static
 size_t local_encrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
-                     const pp_crypto_flags_t *flags, pp_crypto_error_code *error) {
+                     const pp_crypto_flags *flags, pp_crypto_error_code *error) {
     pp_crypto_cbc_ctx *ctx = (pp_crypto_cbc_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(!ctx->cipher || ctx->ctx_enc);
@@ -121,7 +121,7 @@ static
 size_t local_decrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
-                     const pp_crypto_flags_t *flags, pp_crypto_error_code *error) {
+                     const pp_crypto_flags *flags, pp_crypto_error_code *error) {
     (void)flags;
     pp_crypto_cbc_ctx *ctx = (pp_crypto_cbc_ctx *)vctx;
     pp_assert(ctx);
@@ -185,7 +185,7 @@ bool local_verify(void *vctx, const uint8_t *in, size_t in_len, pp_crypto_error_
 // MARK: -
 
 pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name, const char *digest_name,
-                             const pp_crypto_keys_t *keys) {
+                             const pp_crypto_keys *keys) {
     pp_assert(digest_name);
 
     pp_crypto_cbc_ctx *ctx = pp_alloc_crypto(sizeof(pp_crypto_cbc_ctx));

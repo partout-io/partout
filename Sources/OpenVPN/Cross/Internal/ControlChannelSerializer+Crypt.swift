@@ -58,7 +58,7 @@ extension ControlChannel {
 
             headerLength = PacketOpcodeLength + PacketSessionIdLength
             adLength = headerLength + PacketReplayIdLength + PacketReplayTimestampLength
-            tagLength = pp_crypto_meta(ctr).tag_len
+            tagLength = pp_crypto_meta_of(ctr).tag_len
 
             currentReplayId = BidirectionalState(withResetValue: 1)
             timestamp = UInt32(Date().timeIntervalSince1970)
@@ -97,7 +97,7 @@ extension ControlChannel {
             var decryptedCount = 0
             try packet.withUnsafeBytes {
                 let src = $0.bytePointer
-                var flags = pp_crypto_flags_t(
+                var flags = pp_crypto_flags(
                     iv: nil,
                     iv_len: 0,
                     ad: src,

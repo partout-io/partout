@@ -51,7 +51,7 @@ size_t dp_encrypt(void *vmode) {
 
     *(uint32_t *)(dst + dst_header_len) = pp_endian_htonl(ctx->packet_id);
 
-    pp_crypto_flags_t flags = { 0 };
+    pp_crypto_flags flags = { 0 };
     flags.iv = dst + dst_header_len;
     flags.iv_len = PacketIdLength;
     if (has_peer_id) {
@@ -103,7 +103,7 @@ size_t dp_decrypt(void *vmode) {
         return 0;
     }
 
-    pp_crypto_flags_t flags = { 0 };
+    pp_crypto_flags flags = { 0 };
     flags.iv = ctx->src + src_header_len;
     flags.iv_len = PacketIdLength;
     if (has_peer_id) {

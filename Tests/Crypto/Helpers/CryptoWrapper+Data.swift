@@ -7,7 +7,7 @@ internal import _PartoutVendorsPortable
 import Foundation
 
 extension CryptoWrapper {
-    func encryptData(_ data: CZeroingData, flags: UnsafePointer<pp_crypto_flags_t>?) throws -> CZeroingData {
+    func encryptData(_ data: CZeroingData, flags: UnsafePointer<pp_crypto_flags>?) throws -> CZeroingData {
         let dest = CZeroingData(count: data.count + 256)
         let destLength = try encryptBytes(
             data.bytes,
@@ -21,7 +21,7 @@ extension CryptoWrapper {
 }
 
 extension CryptoWrapper {
-    func decryptData(_ data: CZeroingData, flags: UnsafePointer<pp_crypto_flags_t>?) throws -> CZeroingData {
+    func decryptData(_ data: CZeroingData, flags: UnsafePointer<pp_crypto_flags>?) throws -> CZeroingData {
         let dest = CZeroingData(count: data.count + 256)
         let destLength = try decryptBytes(
             data.bytes,
@@ -33,7 +33,7 @@ extension CryptoWrapper {
         return dest
     }
 
-    func verifyData(_ data: CZeroingData, flags: UnsafePointer<pp_crypto_flags_t>?) throws {
+    func verifyData(_ data: CZeroingData, flags: UnsafePointer<pp_crypto_flags>?) throws {
         _ = try verifyBytes(data.bytes, length: data.count, flags: flags)
     }
 }

@@ -11,5 +11,5 @@
 
 pp_crypto_ctx _Nullable pp_crypto_aead_create(const char *_Nonnull cipher_name,
                                         size_t tag_len, size_t id_len,
-                                        const pp_crypto_keys_t *_Nullable keys);
+                                        const pp_crypto_keys *_Nullable keys);
 void pp_crypto_aead_free(pp_crypto_ctx _Nonnull ctx);

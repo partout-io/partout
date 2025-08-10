@@ -55,19 +55,19 @@ final class CryptoKeysBridge {
         pp_zd_free(hmacDecKey)
     }
 
-    func withUnsafeKeys<T>(_ body: (UnsafePointer<pp_crypto_keys_t>) -> T) -> T {
+    func withUnsafeKeys<T>(_ body: (UnsafePointer<pp_crypto_keys>) -> T) -> T {
         withUnsafePointer(to: cKeys, body)
     }
 }
 
 private extension CryptoKeysBridge {
-    var cKeys: pp_crypto_keys_t {
-        pp_crypto_keys_t(
-            cipher: pp_crypto_key_pair_t(
+    var cKeys: pp_crypto_keys {
+        pp_crypto_keys(
+            cipher: pp_crypto_key_pair(
                 enc_key: cipherEncKey,
                 dec_key: cipherDecKey
             ),
-            hmac: pp_crypto_key_pair_t(
+            hmac: pp_crypto_key_pair(
                 enc_key: hmacEncKey,
                 dec_key: hmacDecKey
             )

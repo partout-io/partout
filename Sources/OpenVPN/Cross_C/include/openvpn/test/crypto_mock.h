@@ -9,8 +9,8 @@
 #include "crypto/crypto.h"
 
 typedef struct {
-    pp_crypto_t crypto;
-} pp_crypto_mock_t;
+    pp_crypto crypto;
+} pp_crypto_mock;
 
 pp_crypto_ctx _Nonnull pp_crypto_mock_create();
 void pp_crypto_mock_free(pp_crypto_ctx _Nonnull ctx);

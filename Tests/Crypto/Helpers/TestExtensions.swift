@@ -38,10 +38,10 @@ struct CryptoFlags {
 }
 
 extension CryptoFlags {
-    func withUnsafeFlags<T>(_ block: (UnsafePointer<pp_crypto_flags_t>) throws -> T) rethrows -> T {
+    func withUnsafeFlags<T>(_ block: (UnsafePointer<pp_crypto_flags>) throws -> T) rethrows -> T {
         try iv.withUnsafeBufferPointer { iv in
             try ad.withUnsafeBufferPointer { ad in
-                var flags = pp_crypto_flags_t(
+                var flags = pp_crypto_flags(
                     iv: iv.baseAddress,
                     iv_len: iv.count,
                     ad: ad.baseAddress,

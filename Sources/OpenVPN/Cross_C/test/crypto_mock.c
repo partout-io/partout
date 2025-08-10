@@ -25,7 +25,7 @@ static
 size_t mock_encrypt(void *vctx,
                     uint8_t *out, size_t out_buf_len,
                     const uint8_t *in, size_t in_len,
-                    const pp_crypto_flags_t *flags, pp_crypto_error_code *error) {
+                    const pp_crypto_flags *flags, pp_crypto_error_code *error) {
     (void)vctx;
     (void)flags;
     (void)error;
@@ -44,7 +44,7 @@ static
 size_t mock_decrypt(void *vctx,
                     uint8_t *out, size_t out_buf_len,
                     const uint8_t *in, size_t in_len,
-                    const pp_crypto_flags_t *flags, pp_crypto_error_code *error) {
+                    const pp_crypto_flags *flags, pp_crypto_error_code *error) {
     (void)vctx;
     (void)flags;
     (void)error;
@@ -72,7 +72,7 @@ bool mock_verify(void *vctx, const uint8_t *in, size_t in_len, pp_crypto_error_c
 
 pp_crypto_ctx pp_crypto_mock_create() {
     DP_LOG("pp_crypto_mock_create");
-    pp_crypto_mock_t *ctx = pp_alloc_crypto(sizeof(pp_crypto_mock_t));
+    pp_crypto_mock *ctx = pp_alloc_crypto(sizeof(pp_crypto_mock));
     ctx->crypto.encrypter.encrypt = mock_encrypt;
     ctx->crypto.decrypter.decrypt = mock_decrypt;
     ctx->crypto.decrypter.verify = mock_verify;
@@ -85,7 +85,7 @@ pp_crypto_ctx pp_crypto_mock_create() {
 
 void pp_crypto_mock_free(pp_crypto_ctx vctx) {
     if (!vctx) return;
-    pp_crypto_mock_t *ctx = (pp_crypto_mock_t *)vctx;
+    pp_crypto_mock *ctx = (pp_crypto_mock *)vctx;
     DP_LOG("pp_crypto_mock_free");
     free(ctx);
 }

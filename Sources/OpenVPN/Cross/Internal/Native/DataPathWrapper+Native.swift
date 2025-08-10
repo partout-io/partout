@@ -72,7 +72,7 @@ extension DataPathWrapper {
         }
 
         // the encryption keys must match the cipher/digest
-        let crypto = mode.pointee.crypto.assumingMemoryBound(to: pp_crypto_t.self)
+        let crypto = mode.pointee.crypto.assumingMemoryBound(to: pp_crypto.self)
         let cipherKeyLength = crypto.pointee.meta.cipher_key_len
         let hmacKeyLength = crypto.pointee.meta.hmac_key_len
 

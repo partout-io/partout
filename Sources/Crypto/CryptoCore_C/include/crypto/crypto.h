@@ -18,12 +18,12 @@ typedef enum {
 typedef struct {
     const pp_zd *_Nonnull enc_key;
     const pp_zd *_Nonnull dec_key;
-} pp_crypto_key_pair_t;
+} pp_crypto_key_pair;
 
 typedef struct {
-    pp_crypto_key_pair_t cipher;
-    pp_crypto_key_pair_t hmac;
-} pp_crypto_keys_t;
+    pp_crypto_key_pair cipher;
+    pp_crypto_key_pair hmac;
+} pp_crypto_keys;
 
 /// Custom flags for encryption routines.
 typedef struct {
@@ -42,7 +42,7 @@ typedef struct {
 
     /// Enable testable (predictable) behavior.
     int for_testing;
-} pp_crypto_flags_t;
+} pp_crypto_flags;
 
 typedef void (*pp_crypto_configure_fn)(void *_Nonnull ctx,
                                     const pp_zd *_Nullable cipher_key,
@@ -51,13 +51,13 @@ typedef void (*pp_crypto_configure_fn)(void *_Nonnull ctx,
 typedef size_t (*pp_crypto_encrypt_fn)(void *_Nonnull ctx,
                                     uint8_t *_Nonnull out, size_t out_buf_len,
                                     const uint8_t *_Nonnull in, size_t in_len,
-                                    const pp_crypto_flags_t *_Nullable flags,
+                                    const pp_crypto_flags *_Nullable flags,
                                     pp_crypto_error_code *_Nullable error);
 
 typedef size_t (*pp_crypto_decrypt_fn)(void *_Nonnull ctx,
                                     uint8_t *_Nonnull out, size_t out_buf_len,
                                     const uint8_t *_Nonnull in, size_t in_len,
-                                    const pp_crypto_flags_t *_Nullable flags,
+                                    const pp_crypto_flags *_Nullable flags,
                                     pp_crypto_error_code *_Nullable error);
 
 typedef bool (*pp_crypto_verify_fn)(void *_Nonnull ctx,
@@ -67,13 +67,13 @@ typedef bool (*pp_crypto_verify_fn)(void *_Nonnull ctx,
 typedef struct {
     pp_crypto_configure_fn _Nonnull configure;
     pp_crypto_encrypt_fn _Nonnull encrypt;
-} pp_crypto_encrypter_t;
+} pp_crypto_encrypter;
 
 typedef struct {
     pp_crypto_configure_fn _Nonnull configure;
     pp_crypto_decrypt_fn _Nonnull decrypt;
     pp_crypto_verify_fn _Nonnull verify;
-} pp_crypto_decrypter_t;
+} pp_crypto_decrypter;
 
 typedef size_t (*pp_crypto_capacity_fn)(const void *_Nonnull ctx, size_t len);
 
@@ -84,16 +84,16 @@ typedef struct {
     size_t digest_len;
     size_t tag_len;
     pp_crypto_capacity_fn _Nonnull encryption_capacity;
-} pp_crypto_meta_t;
+} pp_crypto_meta;
 
 typedef struct {
-    pp_crypto_meta_t meta;
-    pp_crypto_encrypter_t encrypter;
-    pp_crypto_decrypter_t decrypter;
-} pp_crypto_t;
+    pp_crypto_meta meta;
+    pp_crypto_encrypter encrypter;
+    pp_crypto_decrypter decrypter;
+} pp_crypto;
 
 typedef struct {
-    pp_crypto_t base;
+    pp_crypto base;
 } *pp_crypto_ctx;
 
 typedef void (*pp_crypto_free_fn)(pp_crypto_ctx _Nonnull);
@@ -123,7 +123,7 @@ static inline
 size_t pp_crypto_encrypt(pp_crypto_ctx _Nonnull ctx,
                       uint8_t *_Nonnull out, size_t out_buf_len,
                       const uint8_t *_Nonnull in, size_t in_len,
-                      const pp_crypto_flags_t *_Nullable flags, pp_crypto_error_code *_Nullable error) {
+                      const pp_crypto_flags *_Nullable flags, pp_crypto_error_code *_Nullable error) {
 
     return ctx->base.encrypter.encrypt(&ctx->base, out, out_buf_len, in, in_len, flags, error);
 }
@@ -140,7 +140,7 @@ static inline
 size_t pp_crypto_decrypt(pp_crypto_ctx _Nonnull ctx,
                       uint8_t *_Nonnull out, size_t out_buf_len,
                       const uint8_t *_Nonnull in, size_t in_len,
-                      const pp_crypto_flags_t *_Nullable flags, pp_crypto_error_code *_Nullable error) {
+                      const pp_crypto_flags *_Nullable flags, pp_crypto_error_code *_Nullable error) {
 
     return ctx->base.decrypter.decrypt(&ctx->base, out, out_buf_len, in, in_len, flags, error);
 }
@@ -155,6 +155,6 @@ bool pp_crypto_verify(pp_crypto_ctx _Nonnull ctx,
 }
 
 static inline
-pp_crypto_meta_t pp_crypto_meta(pp_crypto_ctx _Nonnull ctx) {
+pp_crypto_meta pp_crypto_meta_of(pp_crypto_ctx _Nonnull ctx) {
     return ctx->base.meta;
 }

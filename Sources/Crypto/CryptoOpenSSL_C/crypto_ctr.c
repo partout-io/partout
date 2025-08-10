@@ -11,7 +11,7 @@
 #include "macros.h"
 
 typedef struct {
-    pp_crypto_t crypto;
+    pp_crypto crypto;
 
     // cipher
     const EVP_CIPHER *_Nonnull cipher;
@@ -58,7 +58,7 @@ static
 size_t local_encrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
-                     const pp_crypto_flags_t *flags, pp_crypto_error_code *error) {
+                     const pp_crypto_flags *flags, pp_crypto_error_code *error) {
     pp_crypto_ctr_ctx *ctx = (pp_crypto_ctr_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(ctx->ctx_enc);
@@ -106,7 +106,7 @@ static
 size_t local_decrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
-                     const pp_crypto_flags_t *flags, pp_crypto_error_code *error) {
+                     const pp_crypto_flags *flags, pp_crypto_error_code *error) {
     pp_crypto_ctr_ctx *ctx = (pp_crypto_ctr_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(ctx->ctx_dec);
@@ -143,7 +143,7 @@ size_t local_decrypt(void *vctx,
 
 pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name, const char *digest_name,
                              size_t tag_len, size_t payload_len,
-                             const pp_crypto_keys_t *keys) {
+                             const pp_crypto_keys *keys) {
     pp_assert(cipher_name && digest_name);
 
     pp_crypto_ctr_ctx *ctx = pp_alloc_crypto(sizeof(pp_crypto_ctr_ctx));

@@ -54,7 +54,7 @@ extension ControlChannel {
             self.cbc = cbc
 
             prefixLength = PacketOpcodeLength + PacketSessionIdLength
-            hmacLength = pp_crypto_meta(cbc).digest_len
+            hmacLength = pp_crypto_meta_of(cbc).digest_len
             authLength = hmacLength + PacketReplayIdLength + PacketReplayTimestampLength
             preambleLength = prefixLength + authLength
 

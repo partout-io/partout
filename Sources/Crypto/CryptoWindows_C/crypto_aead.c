@@ -14,7 +14,7 @@
 #pragma comment(lib, "bcrypt.lib")
 
 typedef struct {
-    pp_crypto_t crypto;
+    pp_crypto crypto;
 
     // cipher
     BCRYPT_ALG_HANDLE hAlg;
@@ -60,7 +60,7 @@ static
 size_t local_encrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
-                     const pp_crypto_flags_t *flags, pp_crypto_error_code *error) {
+                     const pp_crypto_flags *flags, pp_crypto_error_code *error) {
     pp_crypto_aead_ctx *ctx = (pp_crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(ctx->hKeyEnc);
@@ -125,7 +125,7 @@ static
 size_t local_decrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
-                     const pp_crypto_flags_t *flags, pp_crypto_error_code *error) {
+                     const pp_crypto_flags *flags, pp_crypto_error_code *error) {
     pp_crypto_aead_ctx *ctx = (pp_crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(ctx->hKeyDec);
@@ -165,7 +165,7 @@ size_t local_decrypt(void *vctx,
 
 pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
                               size_t tag_len, size_t id_len,
-                              const pp_crypto_keys_t *keys) {
+                              const pp_crypto_keys *keys) {
     pp_assert(cipher_name);
 
     size_t cipher_key_len;

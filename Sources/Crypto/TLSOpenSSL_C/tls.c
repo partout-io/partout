@@ -18,7 +18,7 @@ static const char *const TLSBoxServerEKU = "TLS Web Server Authentication";
 
 static int pp_tls_channel_ex_data_idx = -1;
 
-struct pp_tls_channel_t {
+struct pp_tls_channel {
     const pp_tls_channel_options *_Nonnull opt;
     SSL_CTX *_Nonnull ssl_ctx;
     size_t buf_len;
@@ -106,7 +106,7 @@ pp_tls_channel_ctx pp_tls_channel_create(const pp_tls_channel_options *opt, pp_t
 
     // no longer fails
 
-    pp_tls_channel_ctx tls = pp_alloc_crypto(sizeof(pp_tls_channel_t));
+    pp_tls_channel_ctx tls = pp_alloc_crypto(sizeof(pp_tls_channel));
     tls->opt = opt;
     tls->ssl_ctx = ssl_ctx;
     tls->buf_len = tls->opt->buf_len;
