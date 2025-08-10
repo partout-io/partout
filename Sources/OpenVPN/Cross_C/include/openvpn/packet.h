@@ -31,7 +31,7 @@ typedef enum {
     PacketCodeHardResetServerV2     = 0x08,
     PacketCodeDataV2                = 0x09,
     PacketCodeUnknown               = 0xff
-} packet_code;
+} openvpn_packet_code;
 
 // MARK: - Framing
 
@@ -47,7 +47,7 @@ typedef enum {
 #define peer_id_masked(pid)         (pid & 0xffffff)
 
 static inline
-bool packet_is_ping(const uint8_t *_Nonnull bytes, size_t len) {
+bool openvpn_packet_is_ping(const uint8_t *_Nonnull bytes, size_t len) {
     static const uint8_t ping[] = {
         0x2a, 0x18, 0x7b, 0xf3, 0x64, 0x1e, 0xb4, 0xcb,
         0x07, 0xed, 0x2d, 0x0a, 0x98, 0x1f, 0xc7, 0x48
@@ -56,12 +56,12 @@ bool packet_is_ping(const uint8_t *_Nonnull bytes, size_t len) {
 }
 
 static inline
-void packet_header_get(packet_code *_Nullable dst_code,
+void openvpn_packet_header_get(openvpn_packet_code *_Nullable dst_code,
                        uint8_t *_Nullable dst_key,
                        const uint8_t *_Nonnull src) {
 
     if (dst_code) {
-        *dst_code = (packet_code)(*src >> 3);
+        *dst_code = (openvpn_packet_code)(*src >> 3);
     }
     if (dst_key) {
         *dst_key = *src & 0b111;
@@ -69,8 +69,8 @@ void packet_header_get(packet_code *_Nullable dst_code,
 }
 
 static inline
-size_t packet_header_set(uint8_t *_Nonnull dst,
-                         packet_code src_code,
+size_t openvpn_packet_header_set(uint8_t *_Nonnull dst,
+                         openvpn_packet_code src_code,
                          uint8_t src_key,
                          const uint8_t *_Nullable src_session_id) {
 
@@ -84,7 +84,7 @@ size_t packet_header_set(uint8_t *_Nonnull dst,
 }
 
 static inline
-size_t packet_header_v2_set(uint8_t *_Nonnull dst,
+size_t openvpn_packet_header_v2_set(uint8_t *_Nonnull dst,
                             uint8_t src_key,
                             uint32_t src_peer_id) {
 
@@ -93,7 +93,7 @@ size_t packet_header_v2_set(uint8_t *_Nonnull dst,
 }
 
 static inline
-uint32_t packet_header_v2_get_peer_id(const uint8_t *_Nonnull src) {
+uint32_t openvpn_packet_header_v2_get_peer_id(const uint8_t *_Nonnull src) {
     return pp_endian_ntohl(*(const uint32_t *)src & 0xffffff00);
 }
 

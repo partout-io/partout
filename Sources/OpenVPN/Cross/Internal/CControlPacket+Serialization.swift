@@ -19,7 +19,7 @@ extension CControlPacket {
         let capacity = ctrl_pkt_capacity(pkt)
         var dst = Data(count: capacity)
         let written = dst.withUnsafeMutableBytes { ptr in
-            let headerLength = packet_header_set(
+            let headerLength = openvpn_packet_header_set(
                 ptr.bytePointer,
                 pkt.pointee.code,
                 key,

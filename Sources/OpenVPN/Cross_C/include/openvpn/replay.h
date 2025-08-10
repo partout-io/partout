@@ -40,17 +40,17 @@ void openvpn_replay_free(openvpn_replay *_Nonnull rp) {
 }
 
 static inline
-bool openvpn_replay_is_replayed(openvpn_replay *_Nonnull rp, uint32_t packet_id) {
-    if (packet_id == 0) {
+bool openvpn_replay_is_replayed(openvpn_replay *_Nonnull rp, uint32_t openvpn_packet_id) {
+    if (openvpn_packet_id == 0) {
         return true;
     }
-    if (REPLAY_WINSIZE + packet_id < rp->highest_pid) {
+    if (REPLAY_WINSIZE + openvpn_packet_id < rp->highest_pid) {
         return true;
     }
 
-    uint32_t p_index = (packet_id >> REPLAY_REDUNDANT_BIT_SHIFTS);
+    uint32_t p_index = (openvpn_packet_id >> REPLAY_REDUNDANT_BIT_SHIFTS);
 
-    if (packet_id > rp->highest_pid) {
+    if (openvpn_packet_id > rp->highest_pid) {
         const uint32_t curr_index = rp->highest_pid >> REPLAY_REDUNDANT_BIT_SHIFTS;
         const uint32_t diff = MIN(p_index - curr_index, REPLAY_BITMAP_LEN);
 
@@ -59,11 +59,11 @@ bool openvpn_replay_is_replayed(openvpn_replay *_Nonnull rp, uint32_t packet_id)
         }
 
         // side-effect
-        rp->highest_pid = packet_id;
+        rp->highest_pid = openvpn_packet_id;
     }
 
     p_index &= REPLAY_BITMAP_INDEX_MASK;
-    const uint32_t bit_loc = packet_id & REPLAY_BITMAP_LOC_MASK;
+    const uint32_t bit_loc = openvpn_packet_id & REPLAY_BITMAP_LOC_MASK;
     const uint32_t bitmask = (1 << bit_loc);
 
     if (rp->bitmap[p_index] & bitmask) {

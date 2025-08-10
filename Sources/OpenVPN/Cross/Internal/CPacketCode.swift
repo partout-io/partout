@@ -33,7 +33,7 @@ extension CPacketCode: CustomDebugStringConvertible {
 }
 
 extension CPacketCode {
-    var native: packet_code {
+    var native: openvpn_packet_code {
         switch self {
         case .softResetV1:          PacketCodeSoftResetV1
         case .controlV1:            PacketCodeControlV1

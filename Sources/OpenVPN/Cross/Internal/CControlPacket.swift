@@ -18,7 +18,7 @@ final class CControlPacket {
     let sessionId: Data
 
     var packetId: UInt32 {
-        pkt.pointee.packet_id
+        pkt.pointee.openvpn_packet_id
     }
 
     let payload: Data?

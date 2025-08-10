@@ -20,8 +20,8 @@
 
 #define DP_DECRYPT_BEGIN(ctx) \
     const uint8_t *ptr = ctx->src; \
-    packet_code code; \
-    packet_header_get(&code, NULL, ptr); \
+    openvpn_packet_code code; \
+    openvpn_packet_header_get(&code, NULL, ptr); \
     uint32_t peer_id = PacketPeerIdDisabled; \
     const bool has_peer_id = (code == PacketCodeDataV2); \
     size_t src_header_len = PacketOpcodeLength; \
@@ -30,7 +30,7 @@
         if (ctx->src_len < src_header_len) { \
             return false; \
         } \
-        peer_id = packet_header_v2_get_peer_id(ptr); \
+        peer_id = openvpn_packet_header_v2_get_peer_id(ptr); \
     }
 
 #ifdef OPENVPN_DP_DEBUG

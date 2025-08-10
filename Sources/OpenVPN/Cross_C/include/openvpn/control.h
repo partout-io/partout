@@ -12,10 +12,10 @@
 #include "openvpn/packet.h"
 
 typedef struct {
-    packet_code code;
+    openvpn_packet_code code;
     uint8_t key;
     uint8_t *_Nonnull session_id;
-    uint32_t packet_id;
+    uint32_t openvpn_packet_id;
     uint8_t *_Nullable payload;
     size_t payload_len;
     uint32_t *_Nullable ack_ids;
@@ -23,7 +23,7 @@ typedef struct {
     uint8_t *_Nullable ack_remote_session_id;
 } ctrl_pkt_t;
 
-ctrl_pkt_t *_Nonnull ctrl_pkt_create(packet_code code, uint8_t key, uint32_t packet_id,
+ctrl_pkt_t *_Nonnull ctrl_pkt_create(openvpn_packet_code code, uint8_t key, uint32_t openvpn_packet_id,
                                      const uint8_t *_Nonnull session_id,
                                      const uint8_t *_Nullable payload, size_t payload_len,
                                      const uint32_t *_Nullable ack_ids, size_t ack_ids_len,

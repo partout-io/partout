@@ -17,7 +17,7 @@
 // assemble -> encrypt
 typedef struct {
     void *_Nonnull mode;
-    uint32_t packet_id;
+    uint32_t openvpn_packet_id;
     pp_zd *_Nonnull dst;
     const uint8_t *_Nonnull src;
     size_t src_len;
@@ -26,7 +26,7 @@ typedef struct {
 // encrypt -> SEND
 typedef struct {
     uint8_t key;
-    uint32_t packet_id;
+    uint32_t openvpn_packet_id;
     pp_zd *_Nonnull dst;
     const uint8_t *_Nonnull src;
     size_t src_len;
@@ -183,14 +183,14 @@ size_t dp_mode_assemble_and_encrypt_capacity(const dp_mode_t *_Nonnull mode, siz
 }
 
 size_t dp_mode_assemble(dp_mode_t *_Nonnull mode,
-                        uint32_t packet_id,
+                        uint32_t openvpn_packet_id,
                         pp_zd *_Nonnull dst,
                         const uint8_t *_Nonnull src,
                         size_t src_len);
 
 size_t dp_mode_encrypt(dp_mode_t *_Nonnull mode,
                        uint8_t key,
-                       uint32_t packet_id,
+                       uint32_t openvpn_packet_id,
                        pp_zd *_Nonnull dst,
                        const uint8_t *_Nonnull src,
                        size_t src_len,
@@ -199,20 +199,20 @@ size_t dp_mode_encrypt(dp_mode_t *_Nonnull mode,
 static inline
 pp_zd *_Nullable dp_mode_assemble_and_encrypt(dp_mode_t *_Nonnull mode,
                                                        uint8_t key,
-                                                       uint32_t packet_id,
+                                                       uint32_t openvpn_packet_id,
                                                        pp_zd *_Nonnull buf,
                                                        const uint8_t *_Nonnull src,
                                                        size_t src_len,
                                                        dp_error_t *_Nullable error) {
 
     pp_assert(buf->length >= dp_mode_assemble_and_encrypt_capacity(mode, src_len));
-    const size_t asm_len = dp_mode_assemble(mode, packet_id, buf,
+    const size_t asm_len = dp_mode_assemble(mode, openvpn_packet_id, buf,
                                             src, src_len);
     if (!asm_len) {
         return NULL;
     }
     pp_zd *dst = pp_zd_create(dp_mode_encrypt_capacity(mode, asm_len));
-    const size_t dst_len = dp_mode_encrypt(mode, key, packet_id, dst,
+    const size_t dst_len = dp_mode_encrypt(mode, key, openvpn_packet_id, dst,
                                            buf->bytes, asm_len, error);
     if (!dst_len) {
         pp_zd_free(dst);
@@ -263,7 +263,7 @@ pp_zd *_Nullable dp_mode_decrypt_and_parse(dp_mode_t *_Nonnull mode,
     }
     pp_zd_resize(dst, dst_len);
     pp_assert(dst->length == dst_len);
-    if (packet_is_ping(dst->bytes, dst->length)) {
+    if (openvpn_packet_is_ping(dst->bytes, dst->length)) {
         *dst_keep_alive = true;
     }
     return dst;
