@@ -31,5 +31,5 @@ if (!BCRYPT_SUCCESS(ntstatus)) {\
     return 0;\
 }
 
-#define CRYPTO_SET_ERROR(crypto_code)\
+#define PP_CRYPTO_SET_ERROR(crypto_code)\
 if (error) *error = crypto_code;\

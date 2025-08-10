@@ -62,23 +62,23 @@ pp_tls_ctx pp_tls_create(const pp_tls_options *opt, pp_tls_error_code *error) {
 
     if (opt->ca_path) {
         if (!SSL_CTX_load_verify_locations(ssl_ctx, opt->ca_path, NULL)) {
-            CRYPTO_SET_ERROR(PPTLSErrorCAUse)
+            PP_CRYPTO_SET_ERROR(PPTLSErrorCAUse)
             goto failure;
         }
     }
     if (opt->cert_pem) {
         cert_bio = create_BIO_from_PEM(opt->cert_pem);
         if (!cert_bio) {
-            CRYPTO_SET_ERROR(PPTLSErrorClientCertificateRead)
+            PP_CRYPTO_SET_ERROR(PPTLSErrorClientCertificateRead)
             goto failure;
         }
         cert = PEM_read_bio_X509(cert_bio, NULL, NULL, NULL);
         if (!cert) {
-            CRYPTO_SET_ERROR(PPTLSErrorClientCertificateRead)
+            PP_CRYPTO_SET_ERROR(PPTLSErrorClientCertificateRead)
             goto failure;
         }
         if (!SSL_CTX_use_certificate(ssl_ctx, cert)) {
-            CRYPTO_SET_ERROR(PPTLSErrorClientCertificateUse)
+            PP_CRYPTO_SET_ERROR(PPTLSErrorClientCertificateUse)
             goto failure;
         }
         X509_free(cert);
@@ -87,16 +87,16 @@ pp_tls_ctx pp_tls_create(const pp_tls_options *opt, pp_tls_error_code *error) {
         if (opt->key_pem) {
             pkey_bio = create_BIO_from_PEM(opt->key_pem);
             if (!pkey_bio) {
-                CRYPTO_SET_ERROR(PPTLSErrorClientKeyRead)
+                PP_CRYPTO_SET_ERROR(PPTLSErrorClientKeyRead)
                 goto failure;
             }
             pkey = PEM_read_bio_PrivateKey(pkey_bio, NULL, NULL, NULL);
             if (!pkey) {
-                CRYPTO_SET_ERROR(PPTLSErrorClientKeyRead)
+                PP_CRYPTO_SET_ERROR(PPTLSErrorClientKeyRead)
                 goto failure;
             }
             if (!SSL_CTX_use_PrivateKey(ssl_ctx, pkey)) {
-                CRYPTO_SET_ERROR(PPTLSErrorClientKeyUse)
+                PP_CRYPTO_SET_ERROR(PPTLSErrorClientKeyUse)
                 goto failure;
             }
             EVP_PKEY_free(pkey);

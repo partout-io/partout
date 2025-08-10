@@ -183,7 +183,7 @@ size_t local_decrypt(void *vctx,
     BCryptDestroyHash(hHmac);
 
     if (memcmp(ctx->buffer_hmac, in, digest_len) != 0) {
-        CRYPTO_SET_ERROR(PPCryptoErrorHMAC)
+        PP_CRYPTO_SET_ERROR(PPCryptoErrorHMAC)
         return 0;
     }
 
@@ -226,7 +226,7 @@ bool local_verify(void *vctx, const uint8_t *in, size_t in_len, pp_crypto_error_
     BCryptDestroyHash(hHmac);
 
     if (memcmp(ctx->buffer_hmac, in, digest_len) != 0) {
-        CRYPTO_SET_ERROR(PPCryptoErrorHMAC)
+        PP_CRYPTO_SET_ERROR(PPCryptoErrorHMAC)
         return false;
     }
     return true;
