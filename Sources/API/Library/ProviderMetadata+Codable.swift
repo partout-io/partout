@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-import GenericJSON
 import PartoutCore
 
 // WARNING: this relies on APIV5Mapper to store [String: JSON] as is from API

@@ -5,7 +5,6 @@
 #if canImport(PartoutOpenVPN)
 
 import Foundation
-import GenericJSON
 import PartoutCore
 import PartoutOpenVPN
 
