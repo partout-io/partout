@@ -10,7 +10,7 @@
 
 typedef struct {
     pp_crypto crypto;
-} pp_crypto_mock;
+} openvpn_crypto_mock;
 
-pp_crypto_ctx _Nonnull pp_crypto_mock_create();
-void pp_crypto_mock_free(pp_crypto_ctx _Nonnull ctx);
+pp_crypto_ctx _Nonnull openvpn_crypto_mock_create();
+void openvpn_crypto_mock_free(pp_crypto_ctx _Nonnull ctx);

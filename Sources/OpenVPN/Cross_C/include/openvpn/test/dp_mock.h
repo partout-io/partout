@@ -13,8 +13,8 @@
 
 static inline
 openvpn_dp_mode *_Nonnull openvpn_dp_mode_ad_create_mock(openvpn_compression_framing comp_f) {
-    pp_crypto_ctx mock = pp_crypto_mock_create();
-    return openvpn_dp_mode_ad_create(mock, pp_crypto_mock_free, comp_f);
+    pp_crypto_ctx mock = openvpn_crypto_mock_create();
+    return openvpn_dp_mode_ad_create(mock, openvpn_crypto_mock_free, comp_f);
 }
 
 static inline
@@ -31,8 +31,8 @@ openvpn_dp_mode *_Nullable openvpn_dp_mode_ad_create_aead(const char *_Nonnull c
 
 static inline
 openvpn_dp_mode *_Nonnull openvpn_dp_mode_hmac_create_mock(openvpn_compression_framing comp_f) {
-    pp_crypto_ctx mock = pp_crypto_mock_create();
-    return openvpn_dp_mode_hmac_create(mock, pp_crypto_mock_free, comp_f);
+    pp_crypto_ctx mock = openvpn_crypto_mock_create();
+    return openvpn_dp_mode_hmac_create(mock, openvpn_crypto_mock_free, comp_f);
 }
 
 static inline
