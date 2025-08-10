@@ -16,10 +16,10 @@
 //static const char *const TLSBoxClientEKU = "TLS Web Client Authentication";
 static const char *const TLSBoxServerEKU = "TLS Web Server Authentication";
 
-static int tls_channel_ex_data_idx = -1;
+static int pp_tls_channel_ex_data_idx = -1;
 
-struct tls_channel_t {
-    const tls_channel_options *_Nonnull opt;
+struct pp_tls_channel_t {
+    const pp_tls_channel_options *_Nonnull opt;
     SSL_CTX *_Nonnull ssl_ctx;
     size_t buf_len;
     uint8_t *_Nonnull buf_cipher;
@@ -38,10 +38,10 @@ BIO *create_BIO_from_PEM(const char *_Nonnull pem) {
 }
 
 static
-int tls_channel_verify_peer(int ok, X509_STORE_CTX *_Nonnull ctx) {
+int pp_tls_channel_verify_peer(int ok, X509_STORE_CTX *_Nonnull ctx) {
     if (!ok) {
         SSL *ssl = X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
-        tls_channel_ctx tls = SSL_get_ex_data(ssl, tls_channel_ex_data_idx);
+        pp_tls_channel_ctx tls = SSL_get_ex_data(ssl, pp_tls_channel_ex_data_idx);
         tls->opt->on_verify_failure();
     }
     return ok;
@@ -49,7 +49,7 @@ int tls_channel_verify_peer(int ok, X509_STORE_CTX *_Nonnull ctx) {
 
 // MARK: -
 
-tls_channel_ctx tls_channel_create(const tls_channel_options *opt, tls_error_code *error) {
+pp_tls_channel_ctx pp_tls_channel_create(const pp_tls_channel_options *opt, pp_tls_error_code *error) {
     SSL_CTX *ssl_ctx = SSL_CTX_new(TLS_client_method());
     X509 *cert = NULL;
     BIO *cert_bio = NULL;
@@ -57,7 +57,7 @@ tls_channel_ctx tls_channel_create(const tls_channel_options *opt, tls_error_cod
     BIO *pkey_bio = NULL;
 
     SSL_CTX_set_options(ssl_ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION);
-    SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER, tls_channel_verify_peer);
+    SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER, pp_tls_channel_verify_peer);
     SSL_CTX_set_security_level(ssl_ctx, opt->sec_level);
 
     if (opt->ca_path) {
@@ -106,7 +106,7 @@ tls_channel_ctx tls_channel_create(const tls_channel_options *opt, tls_error_cod
 
     // no longer fails
 
-    tls_channel_ctx tls = pp_alloc_crypto(sizeof(tls_channel_t));
+    pp_tls_channel_ctx tls = pp_alloc_crypto(sizeof(pp_tls_channel_t));
     tls->opt = opt;
     tls->ssl_ctx = ssl_ctx;
     tls->buf_len = tls->opt->buf_len;
@@ -124,7 +124,7 @@ failure:
     return NULL;
 }
 
-void tls_channel_free(tls_channel_ctx tls) {
+void pp_tls_channel_free(pp_tls_channel_ctx tls) {
     if (!tls) return;
 
     // DO NOT FREE these due to use in BIO_set_ssl() macro
@@ -145,11 +145,11 @@ void tls_channel_free(tls_channel_ctx tls) {
     pp_zero(tls->buf_plain, tls->opt->buf_len);
     free(tls->buf_cipher);
     free(tls->buf_plain);
-    tls_channel_options_free((tls_channel_options *)tls->opt);
+    pp_tls_channel_options_free((pp_tls_channel_options *)tls->opt);
     SSL_CTX_free(tls->ssl_ctx);
 }
 
-bool tls_channel_start(tls_channel_ctx _Nonnull tls) {
+bool pp_tls_channel_start(pp_tls_channel_ctx _Nonnull tls) {
     if (tls->bio_plain) {
         BIO_free_all(tls->bio_plain);
         tls->bio_plain = NULL;
@@ -174,22 +174,22 @@ bool tls_channel_start(tls_channel_ctx _Nonnull tls) {
     BIO_set_ssl(tls->bio_plain, tls->ssl, BIO_NOCLOSE);
 
     // attach custom object
-    SSL_set_ex_data(tls->ssl, tls_channel_ex_data_idx, tls);
+    SSL_set_ex_data(tls->ssl, pp_tls_channel_ex_data_idx, tls);
 
     return SSL_do_handshake(tls->ssl);
 }
 
-bool tls_channel_is_connected(tls_channel_ctx _Nonnull tls) {
+bool pp_tls_channel_is_connected(pp_tls_channel_ctx _Nonnull tls) {
     return tls->is_connected;
 }
 
 // MARK: - I/O
 
-bool tls_channel_verify_ssl_eku(SSL *_Nonnull ssl);
-bool tls_channel_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hostname);
+bool pp_tls_channel_verify_ssl_eku(SSL *_Nonnull ssl);
+bool pp_tls_channel_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hostname);
 
-pp_zd *_Nullable tls_channel_pull_cipher(tls_channel_ctx _Nonnull tls,
-                                                  tls_error_code *_Nullable error) {
+pp_zd *_Nullable pp_tls_channel_pull_cipher(pp_tls_channel_ctx _Nonnull tls,
+                                                  pp_tls_error_code *_Nullable error) {
     if (error) {
         *error = TLSErrorNone;
     }
@@ -199,7 +199,7 @@ pp_zd *_Nullable tls_channel_pull_cipher(tls_channel_ctx _Nonnull tls,
     const int ret = BIO_read(tls->bio_cipher_out, tls->buf_cipher, (int)tls->opt->buf_len);
     if (!tls->is_connected && SSL_is_init_finished(tls->ssl)) {
         tls->is_connected = true;
-        if (tls->opt->eku && !tls_channel_verify_ssl_eku(tls->ssl)) {
+        if (tls->opt->eku && !pp_tls_channel_verify_ssl_eku(tls->ssl)) {
             if (error) {
                 *error = TLSErrorServerEKU;
             }
@@ -207,7 +207,7 @@ pp_zd *_Nullable tls_channel_pull_cipher(tls_channel_ctx _Nonnull tls,
         }
         if (tls->opt->san_host) {
             pp_assert(tls->opt->hostname);
-            if (!tls_channel_verify_ssl_san_host(tls->ssl, tls->opt->hostname)) {
+            if (!pp_tls_channel_verify_ssl_san_host(tls->ssl, tls->opt->hostname)) {
                 if (error) {
                     *error = TLSErrorServerHost;
                 }
@@ -227,8 +227,8 @@ pp_zd *_Nullable tls_channel_pull_cipher(tls_channel_ctx _Nonnull tls,
     return pp_zd_create_from_data(tls->buf_cipher, ret);
 }
 
-pp_zd *_Nullable tls_channel_pull_plain(tls_channel_ctx _Nonnull tls,
-                                                 tls_error_code *_Nullable error) {
+pp_zd *_Nullable pp_tls_channel_pull_plain(pp_tls_channel_ctx _Nonnull tls,
+                                                 pp_tls_error_code *_Nullable error) {
     const int ret = BIO_read(tls->bio_plain, tls->buf_plain, (int)tls->opt->buf_len);
     if (error) {
         *error = TLSErrorNone;
@@ -245,9 +245,9 @@ pp_zd *_Nullable tls_channel_pull_plain(tls_channel_ctx _Nonnull tls,
     return pp_zd_create_from_data(tls->buf_plain, ret);
 }
 
-bool tls_channel_put_cipher(tls_channel_ctx _Nonnull tls,
+bool pp_tls_channel_put_cipher(pp_tls_channel_ctx _Nonnull tls,
                             const uint8_t *_Nonnull src, size_t src_len,
-                            tls_error_code *_Nullable error) {
+                            pp_tls_error_code *_Nullable error) {
     if (error) {
         *error = TLSErrorNone;
     }
@@ -261,9 +261,9 @@ bool tls_channel_put_cipher(tls_channel_ctx _Nonnull tls,
     return true;
 }
 
-bool tls_channel_put_plain(tls_channel_ctx _Nonnull tls,
+bool pp_tls_channel_put_plain(pp_tls_channel_ctx _Nonnull tls,
                            const uint8_t *_Nonnull src, size_t src_len,
-                           tls_error_code *_Nullable error) {
+                           pp_tls_error_code *_Nullable error) {
     if (error) {
         *error = TLSErrorNone;
     }
@@ -279,7 +279,7 @@ bool tls_channel_put_plain(tls_channel_ctx _Nonnull tls,
 
 // MARK: - MD5
 
-char *tls_channel_ca_md5(const tls_channel_ctx tls) {
+char *pp_tls_channel_ca_md5(const pp_tls_channel_ctx tls) {
     const EVP_MD *alg = EVP_get_digestbyname("MD5");
     uint8_t md[16];
     unsigned int len;
@@ -312,7 +312,7 @@ failure:
 
 // MARK: - Verifications
 
-bool tls_channel_verify_ssl_eku(SSL *_Nonnull ssl) {
+bool pp_tls_channel_verify_ssl_eku(SSL *_Nonnull ssl) {
     X509 *cert = NULL;
     EXTENDED_KEY_USAGE *eku = NULL;
 
@@ -359,7 +359,7 @@ failure:
     return false;
 }
 
-bool tls_channel_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hostname) {
+bool pp_tls_channel_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hostname) {
     X509 *cert = NULL;
     GENERAL_NAMES *names = NULL;
 

@@ -18,9 +18,9 @@ enum TLSError: Error {
 }
 
 struct CTLSError: Error {
-    let code: tls_error_code
+    let code: pp_tls_error_code
 
-    init(_ code: tls_error_code) {
+    init(_ code: pp_tls_error_code) {
         precondition(code != TLSErrorNone)
         self.code = code
     }
