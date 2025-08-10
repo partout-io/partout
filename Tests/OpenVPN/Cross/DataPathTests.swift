@@ -59,7 +59,7 @@ struct DataPathTests {
             guard let cryptoAEAD else {
                 throw PPCryptoError.creation
             }
-            mode = dp_mode_ad_create(cryptoAEAD, cryptoFree, framing.cNative)
+            mode = openvpn_dp_mode_ad_create(cryptoAEAD, cryptoFree, framing.cNative)
         case .aes128cbc:
             precondition(digest != nil)
             let keys = CryptoKeys(emptyWithCipherLength: 1024, hmacKeyLength: 1024)
@@ -69,12 +69,12 @@ struct DataPathTests {
             guard let cryptoCBC else {
                 throw PPCryptoError.creation
             }
-            mode = dp_mode_hmac_create(cryptoCBC, cryptoFree, framing.cNative)
+            mode = openvpn_dp_mode_hmac_create(cryptoCBC, cryptoFree, framing.cNative)
         default:
             if digest != nil {
-                mode = dp_mode_hmac_create_mock(framing.cNative)
+                mode = openvpn_dp_mode_hmac_create_mock(framing.cNative)
             } else {
-                mode = dp_mode_ad_create_mock(framing.cNative)
+                mode = openvpn_dp_mode_ad_create_mock(framing.cNative)
             }
         }
         let sut = CDataPath(mode: mode, peerId: peerId)
@@ -91,7 +91,7 @@ struct DataPathTests {
         UInt8(OpenVPNDataPacketV2Uncompressed)
     ])
     func givenMagicPacket_whenEncryptMockCompressV2_thenDecrypts(byte: UInt8) throws {
-        let mode = dp_mode_ad_create_mock(OpenVPN.CompressionFraming.compressV2.cNative)
+        let mode = openvpn_dp_mode_ad_create_mock(OpenVPN.CompressionFraming.compressV2.cNative)
         let sut = CDataPath(mode: mode, peerId: peerId)
         try testReversibleBulkEncryption(sut: sut, customPayloads: [
             Data([byte])

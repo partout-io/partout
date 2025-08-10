@@ -12,11 +12,11 @@
 
 static
 size_t dp_assemble(void *vmode) {
-    DP_LOG("dp_mode_hmac_assemble");
+    DP_LOG("openvpn_dp_mode_hmac_assemble");
     const openvpn_dp_mode *mode = vmode;
-    const dp_mode_assemble_ctx *ctx = &mode->assemble_ctx;
+    const openvpn_dp_mode_assemble_ctx *ctx = &mode->assemble_ctx;
 
-    const size_t dst_capacity = dp_mode_assemble_capacity(mode, ctx->src_len);
+    const size_t dst_capacity = openvpn_dp_mode_assemble_capacity(mode, ctx->src_len);
     pp_assert(ctx->dst->length >= dst_capacity);
 
     uint8_t *dst = ctx->dst->bytes;
@@ -41,14 +41,14 @@ size_t dp_assemble(void *vmode) {
 
 static
 size_t dp_encrypt(void *vmode) {
-    DP_LOG("dp_mode_hmac_encrypt");
+    DP_LOG("openvpn_dp_mode_hmac_encrypt");
     const openvpn_dp_mode *mode = vmode;
-    const dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
+    const openvpn_dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
 
     pp_assert(mode->enc.raw_encrypt);
     OPENVPN_DP_ENCRYPT_BEGIN(mode->opt.peer_id)
 
-    const size_t dst_capacity = dp_mode_encrypt_capacity(mode, ctx->src_len);
+    const size_t dst_capacity = openvpn_dp_mode_encrypt_capacity(mode, ctx->src_len);
     pp_assert(ctx->dst->length >= dst_capacity);
     uint8_t *dst = ctx->dst->bytes;
 
@@ -81,9 +81,9 @@ size_t dp_encrypt(void *vmode) {
 
 static
 size_t dp_decrypt(void *vmode) {
-    DP_LOG("dp_mode_hmac_decrypt");
+    DP_LOG("openvpn_dp_mode_hmac_decrypt");
     const openvpn_dp_mode *mode = vmode;
-    const dp_mode_decrypt_ctx *ctx = &mode->dec_ctx;
+    const openvpn_dp_mode_decrypt_ctx *ctx = &mode->dec_ctx;
 
     pp_assert(mode->dec.raw_decrypt);
     pp_assert(ctx->src_len > 0);//, @"Decrypting an empty packet, how did it get this far?");
@@ -127,9 +127,9 @@ size_t dp_decrypt(void *vmode) {
 
 static
 size_t dp_parse(void *vmode) {
-    DP_LOG("dp_mode_hmac_parse");
+    DP_LOG("openvpn_dp_mode_hmac_parse");
     const openvpn_dp_mode *mode = vmode;
-    const dp_mode_parse_ctx *ctx = &mode->parse_ctx;
+    const openvpn_dp_mode_parse_ctx *ctx = &mode->parse_ctx;
 
     pp_assert(ctx->dst->length >= ctx->src_len);
 
@@ -162,11 +162,11 @@ size_t dp_parse(void *vmode) {
 
 // MARK: -
 
-openvpn_dp_mode *dp_mode_hmac_create(pp_crypto_ctx crypto,
+openvpn_dp_mode *openvpn_dp_mode_hmac_create(pp_crypto_ctx crypto,
                                pp_crypto_free_fn pp_crypto_free,
                                openvpn_compression_framing comp_f) {
 
-    DP_LOG("dp_mode_hmac_create");
+    DP_LOG("openvpn_dp_mode_hmac_create");
 
     const openvpn_dp_framing *frm = openvpn_dp_framing_of(comp_f);
     const openvpn_dp_mode_encrypter enc = {
@@ -186,5 +186,5 @@ openvpn_dp_mode *dp_mode_hmac_create(pp_crypto_ctx crypto,
         OpenVPNPacketPeerIdDisabled,
         0
     };
-    return dp_mode_create_opt(crypto, pp_crypto_free, &enc, &dec, &opt);
+    return openvpn_dp_mode_create_opt(crypto, pp_crypto_free, &enc, &dec, &opt);
 }

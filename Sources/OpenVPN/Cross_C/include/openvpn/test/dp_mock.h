@@ -12,13 +12,13 @@
 #include "openvpn/test/crypto_mock.h"
 
 static inline
-openvpn_dp_mode *_Nonnull dp_mode_ad_create_mock(openvpn_compression_framing comp_f) {
+openvpn_dp_mode *_Nonnull openvpn_dp_mode_ad_create_mock(openvpn_compression_framing comp_f) {
     pp_crypto_ctx mock = pp_crypto_mock_create();
-    return dp_mode_ad_create(mock, pp_crypto_mock_free, comp_f);
+    return openvpn_dp_mode_ad_create(mock, pp_crypto_mock_free, comp_f);
 }
 
 static inline
-openvpn_dp_mode *_Nullable dp_mode_ad_create_aead(const char *_Nonnull cipher,
+openvpn_dp_mode *_Nullable openvpn_dp_mode_ad_create_aead(const char *_Nonnull cipher,
                                             size_t tag_len, size_t id_len,
                                             const pp_crypto_keys *_Nullable keys,
                                             openvpn_compression_framing comp_f) {
@@ -26,17 +26,17 @@ openvpn_dp_mode *_Nullable dp_mode_ad_create_aead(const char *_Nonnull cipher,
     if (!crypto) {
         return NULL;
     }
-    return dp_mode_ad_create(crypto, pp_crypto_aead_free, comp_f);
+    return openvpn_dp_mode_ad_create(crypto, pp_crypto_aead_free, comp_f);
 }
 
 static inline
-openvpn_dp_mode *_Nonnull dp_mode_hmac_create_mock(openvpn_compression_framing comp_f) {
+openvpn_dp_mode *_Nonnull openvpn_dp_mode_hmac_create_mock(openvpn_compression_framing comp_f) {
     pp_crypto_ctx mock = pp_crypto_mock_create();
-    return dp_mode_hmac_create(mock, pp_crypto_mock_free, comp_f);
+    return openvpn_dp_mode_hmac_create(mock, pp_crypto_mock_free, comp_f);
 }
 
 static inline
-openvpn_dp_mode *_Nullable dp_mode_hmac_create_cbc(const char *_Nullable cipher,
+openvpn_dp_mode *_Nullable openvpn_dp_mode_hmac_create_cbc(const char *_Nullable cipher,
                                              const char *_Nonnull digest,
                                              const pp_crypto_keys *_Nullable keys,
                                              openvpn_compression_framing comp_f) {
@@ -44,5 +44,5 @@ openvpn_dp_mode *_Nullable dp_mode_hmac_create_cbc(const char *_Nullable cipher,
     if (!crypto) {
         return NULL;
     }
-    return dp_mode_hmac_create(crypto, pp_crypto_cbc_free, comp_f);
+    return openvpn_dp_mode_hmac_create(crypto, pp_crypto_cbc_free, comp_f);
 }

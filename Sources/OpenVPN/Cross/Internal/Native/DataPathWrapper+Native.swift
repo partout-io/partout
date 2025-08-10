@@ -31,7 +31,7 @@ extension DataPathWrapper {
         if let cipherAlgorithm, cipherAlgorithm.hasSuffix("-GCM") {
             mode = keysBridge.withUnsafeKeys { keys in
                 cipherAlgorithm.withCString { cCipher in
-                    dp_mode_ad_create_aead(
+                    openvpn_dp_mode_ad_create_aead(
                         cCipher,
                         Constants.DataChannel.aeadTagLength,
                         Constants.DataChannel.aeadIdLength,
@@ -48,7 +48,7 @@ extension DataPathWrapper {
                 keysBridge.withUnsafeKeys { keys in
                     if let cipherAlgorithm {
                         return cipherAlgorithm.withCString { cCipher in
-                            dp_mode_hmac_create_cbc(
+                            openvpn_dp_mode_hmac_create_cbc(
                                 cCipher,
                                 cDigest,
                                 keys,
@@ -56,7 +56,7 @@ extension DataPathWrapper {
                             )
                         }
                     } else {
-                        return dp_mode_hmac_create_cbc(
+                        return openvpn_dp_mode_hmac_create_cbc(
                             nil,
                             cDigest,
                             keys,
@@ -90,12 +90,12 @@ extension DataPathWrapper {
 
 extension DataPathWrapper {
     static func nativeADMock(with framing: OpenVPN.CompressionFraming) -> DataPathWrapper {
-        let mode = dp_mode_ad_create_mock(framing.cNative)
+        let mode = openvpn_dp_mode_ad_create_mock(framing.cNative)
         return cNative(with: mode, peerId: nil)
     }
 
     static func nativeHMACMock(with framing: OpenVPN.CompressionFraming) -> DataPathWrapper {
-        let mode = dp_mode_hmac_create_mock(framing.cNative)
+        let mode = openvpn_dp_mode_hmac_create_mock(framing.cNative)
         return cNative(with: mode, peerId: nil)
     }
 }
