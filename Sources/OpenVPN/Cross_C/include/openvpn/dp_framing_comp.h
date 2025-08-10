@@ -8,14 +8,14 @@
 
 #include <string.h>
 #include "openvpn/dp_framing.h"
-#include "openvpn/mss_fix.h"
+#include "openvpn/openvpn_mss_fix.h"
 #include "openvpn/packet.h"
 
 static
 void dp_framing_assemble_disabled(dp_framing_assemble_ctx *_Nonnull ctx) {
     memcpy(ctx->dst, ctx->src, ctx->src_len);
     if (ctx->mss_val) {
-        mss_fix(ctx->dst, ctx->src_len, ctx->mss_val);
+        openvpn_mss_fix(ctx->dst, ctx->src_len, ctx->mss_val);
     }
     *ctx->dst_len_offset = 0;
 }
@@ -92,7 +92,7 @@ void dp_framing_assemble_lzo(dp_framing_assemble_ctx *_Nonnull ctx) {
     *ctx->dst_len_offset = 1;
     memcpy(ctx->dst + 1, ctx->src, ctx->src_len);
     if (ctx->mss_val) {
-        mss_fix(ctx->dst + 1, ctx->src_len, ctx->mss_val);
+        openvpn_mss_fix(ctx->dst + 1, ctx->src_len, ctx->mss_val);
     }
 }
 
@@ -106,7 +106,7 @@ void dp_framing_assemble_compress(dp_framing_assemble_ctx *_Nonnull ctx) {
     *ctx->dst_len_offset = 1;
     memcpy(ctx->dst, ctx->src, ctx->src_len);
     if (ctx->mss_val) {
-        mss_fix(ctx->dst, ctx->src_len, ctx->mss_val);
+        openvpn_mss_fix(ctx->dst, ctx->src_len, ctx->mss_val);
     }
     // swap (compression disabled)
     ctx->dst[ctx->src_len] = ctx->dst[0];
@@ -133,7 +133,7 @@ void dp_framing_assemble_compress_v2(dp_framing_assemble_ctx *_Nonnull ctx) {
     }
     memcpy(ctx->dst + *ctx->dst_len_offset, ctx->src, ctx->src_len);
     if (ctx->mss_val) {
-        mss_fix(ctx->dst + *ctx->dst_len_offset, ctx->src_len, ctx->mss_val);
+        openvpn_mss_fix(ctx->dst + *ctx->dst_len_offset, ctx->src_len, ctx->mss_val);
     }
 }
 

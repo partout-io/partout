@@ -5,7 +5,7 @@
  */
 
 #include "portable/endian.h"
-#include "openvpn/mss_fix.h"
+#include "openvpn/openvpn_mss_fix.h"
 
 static const int FLAG_SYN      = 2;
 static const int PROTO_TCP     = 6;
@@ -38,7 +38,7 @@ void mss_update_sum(uint16_t* sum_ptr, uint16_t* val_ptr, uint16_t new_val)
     *val_ptr = pp_endian_htons(new_val);
 }
 
-void mss_fix(uint8_t *data, size_t data_len, uint16_t mtu)
+void openvpn_mss_fix(uint8_t *data, size_t data_len, uint16_t mtu)
 {
     /* XXX Prevent buffer overread */
     if (data_len < sizeof(ip_hdr_t)) {
