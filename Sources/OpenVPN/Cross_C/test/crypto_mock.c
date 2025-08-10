@@ -29,7 +29,7 @@ size_t mock_encrypt(void *vctx,
     (void)vctx;
     (void)flags;
     (void)error;
-    DP_LOG("pp_crypto_mock_encrypt");
+    OPENVPN_DP_LOG("pp_crypto_mock_encrypt");
     out[0] = 0xaa;
     out[1] = 0xbb;
     reverse(out + 2, in, in_len);
@@ -48,7 +48,7 @@ size_t mock_decrypt(void *vctx,
     (void)vctx;
     (void)flags;
     (void)error;
-    DP_LOG("pp_crypto_mock_decrypt");
+    OPENVPN_DP_LOG("pp_crypto_mock_decrypt");
     size_t out_len = in_len - 4;
     pp_assert(in[0] == 0xaa);
     pp_assert(in[1] == 0xbb);
@@ -64,14 +64,14 @@ bool mock_verify(void *vctx, const uint8_t *in, size_t in_len, pp_crypto_error_c
     (void)in;
     (void)in_len;
     (void)error;
-    DP_LOG("pp_crypto_mock_verify");
+    OPENVPN_DP_LOG("pp_crypto_mock_verify");
     return true;
 }
 
 // MARK: -
 
 pp_crypto_ctx pp_crypto_mock_create() {
-    DP_LOG("pp_crypto_mock_create");
+    OPENVPN_DP_LOG("pp_crypto_mock_create");
     pp_crypto_mock *ctx = pp_alloc_crypto(sizeof(pp_crypto_mock));
     ctx->crypto.encrypter.encrypt = mock_encrypt;
     ctx->crypto.decrypter.decrypt = mock_decrypt;
@@ -86,6 +86,6 @@ pp_crypto_ctx pp_crypto_mock_create() {
 void pp_crypto_mock_free(pp_crypto_ctx vctx) {
     if (!vctx) return;
     pp_crypto_mock *ctx = (pp_crypto_mock *)vctx;
-    DP_LOG("pp_crypto_mock_free");
+    OPENVPN_DP_LOG("pp_crypto_mock_free");
     free(ctx);
 }

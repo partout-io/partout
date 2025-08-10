@@ -12,7 +12,7 @@
 
 static
 size_t dp_assemble(void *vmode) {
-    DP_LOG("openvpn_dp_mode_hmac_assemble");
+    OPENVPN_DP_LOG("openvpn_dp_mode_hmac_assemble");
     const openvpn_dp_mode *mode = vmode;
     const openvpn_dp_mode_assemble_ctx *ctx = &mode->assemble_ctx;
 
@@ -41,7 +41,7 @@ size_t dp_assemble(void *vmode) {
 
 static
 size_t dp_encrypt(void *vmode) {
-    DP_LOG("openvpn_dp_mode_hmac_encrypt");
+    OPENVPN_DP_LOG("openvpn_dp_mode_hmac_encrypt");
     const openvpn_dp_mode *mode = vmode;
     const openvpn_dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
 
@@ -81,7 +81,7 @@ size_t dp_encrypt(void *vmode) {
 
 static
 size_t dp_decrypt(void *vmode) {
-    DP_LOG("openvpn_dp_mode_hmac_decrypt");
+    OPENVPN_DP_LOG("openvpn_dp_mode_hmac_decrypt");
     const openvpn_dp_mode *mode = vmode;
     const openvpn_dp_mode_decrypt_ctx *ctx = &mode->dec_ctx;
 
@@ -127,7 +127,7 @@ size_t dp_decrypt(void *vmode) {
 
 static
 size_t dp_parse(void *vmode) {
-    DP_LOG("openvpn_dp_mode_hmac_parse");
+    OPENVPN_DP_LOG("openvpn_dp_mode_hmac_parse");
     const openvpn_dp_mode *mode = vmode;
     const openvpn_dp_mode_parse_ctx *ctx = &mode->parse_ctx;
 
@@ -166,7 +166,7 @@ openvpn_dp_mode *openvpn_dp_mode_hmac_create(pp_crypto_ctx crypto,
                                pp_crypto_free_fn pp_crypto_free,
                                openvpn_compression_framing comp_f) {
 
-    DP_LOG("openvpn_dp_mode_hmac_create");
+    OPENVPN_DP_LOG("openvpn_dp_mode_hmac_create");
 
     const openvpn_dp_framing *frm = openvpn_dp_framing_of(comp_f);
     const openvpn_dp_mode_encrypter enc = {
