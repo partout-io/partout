@@ -23,35 +23,35 @@ typedef struct {
     uint8_t *_Nullable ack_remote_session_id;
 } openvpn_ctrl_pkt;
 
-openvpn_ctrl_pkt *_Nonnull ctrl_pkt_create(openvpn_packet_code code, uint8_t key, uint32_t openvpn_packet_id,
+openvpn_ctrl_pkt *_Nonnull openvpn_ctrl_pkt_create(openvpn_packet_code code, uint8_t key, uint32_t openvpn_packet_id,
                                      const uint8_t *_Nonnull session_id,
                                      const uint8_t *_Nullable payload, size_t payload_len,
                                      const uint32_t *_Nullable ack_ids, size_t ack_ids_len,
                                      const uint8_t *_Nullable ack_remote_session_id);
 
-void ctrl_pkt_free(openvpn_ctrl_pkt *_Nonnull pkt);
+void openvpn_ctrl_pkt_free(openvpn_ctrl_pkt *_Nonnull pkt);
 
-size_t ctrl_pkt_capacity(const openvpn_ctrl_pkt *_Nonnull pkt);
+size_t openvpn_ctrl_pkt_capacity(const openvpn_ctrl_pkt *_Nonnull pkt);
 
 typedef struct {
     pp_crypto_ctx _Nonnull crypto;
     uint32_t openvpn_replay_id;
     uint32_t timestamp;
-} ctrl_pkt_alg;
+} openvpn_ctrl_pkt_alg;
 
-size_t ctrl_pkt_capacity(const openvpn_ctrl_pkt *_Nonnull pkt);
-size_t ctrl_pkt_capacity_alg(const openvpn_ctrl_pkt *_Nonnull pkt, const ctrl_pkt_alg *_Nonnull alg);
+size_t openvpn_ctrl_pkt_capacity(const openvpn_ctrl_pkt *_Nonnull pkt);
+size_t openvpn_ctrl_pkt_capacity_alg(const openvpn_ctrl_pkt *_Nonnull pkt, const openvpn_ctrl_pkt_alg *_Nonnull alg);
 
-size_t ctrl_pkt_serialize(uint8_t *_Nonnull dst, const openvpn_ctrl_pkt *_Nonnull pkt);
+size_t openvpn_ctrl_pkt_serialize(uint8_t *_Nonnull dst, const openvpn_ctrl_pkt *_Nonnull pkt);
 
-size_t ctrl_pkt_serialize_auth(uint8_t *_Nonnull dst,
+size_t openvpn_ctrl_pkt_serialize_auth(uint8_t *_Nonnull dst,
                                size_t dst_buf_len,
                                const openvpn_ctrl_pkt *_Nonnull pkt,
-                               ctrl_pkt_alg *_Nullable alg,
+                               openvpn_ctrl_pkt_alg *_Nullable alg,
                                pp_crypto_error_code *_Nullable error);
 
-size_t ctrl_pkt_serialize_crypt(uint8_t *_Nonnull dst,
+size_t openvpn_ctrl_pkt_serialize_crypt(uint8_t *_Nonnull dst,
                                 size_t dst_buf_len,
                                 const openvpn_ctrl_pkt *_Nonnull pkt,
-                                ctrl_pkt_alg *_Nullable alg,
+                                openvpn_ctrl_pkt_alg *_Nullable alg,
                                 pp_crypto_error_code *_Nullable error);

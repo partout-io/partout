@@ -11,12 +11,12 @@ extension CControlPacket {
         _ dst: UnsafeMutablePointer<UInt8>,
         _ dstLength: Int,
         _ pkt: UnsafePointer<openvpn_ctrl_pkt>,
-        _ alg: UnsafeMutablePointer<ctrl_pkt_alg>,
+        _ alg: UnsafeMutablePointer<openvpn_ctrl_pkt_alg>,
         _ error: UnsafeMutablePointer<pp_crypto_error_code>
     ) -> Int
 
     func serialized() -> Data {
-        let capacity = ctrl_pkt_capacity(pkt)
+        let capacity = openvpn_ctrl_pkt_capacity(pkt)
         var dst = Data(count: capacity)
         let written = dst.withUnsafeMutableBytes { ptr in
             let headerLength = openvpn_packet_header_set(
@@ -25,7 +25,7 @@ extension CControlPacket {
                 key,
                 pkt.pointee.session_id
             )
-            let serializedLength = ctrl_pkt_serialize(
+            let serializedLength = openvpn_ctrl_pkt_serialize(
                 ptr.bytePointer.advanced(by: headerLength),
                 pkt
             )
@@ -40,9 +40,9 @@ extension CControlPacket {
         timestamp: UInt32,
         function: SerializationFunction
     ) throws -> Data {
-        var alg = ctrl_pkt_alg(crypto: crypto, openvpn_replay_id: replayId, timestamp: timestamp)
+        var alg = openvpn_ctrl_pkt_alg(crypto: crypto, openvpn_replay_id: replayId, timestamp: timestamp)
         let capacity = withUnsafePointer(to: alg) {
-            ctrl_pkt_capacity_alg(pkt, $0)
+            openvpn_ctrl_pkt_capacity_alg(pkt, $0)
         }
         var dst = Data(count: capacity)
         let written = try dst.withUnsafeMutableBytes { dst in

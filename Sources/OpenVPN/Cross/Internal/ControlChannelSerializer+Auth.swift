@@ -79,7 +79,7 @@ extension ControlChannel {
                 with: cbc,
                 replayId: currentReplayId.outbound,
                 timestamp: timestamp,
-                function: ctrl_pkt_serialize_auth
+                function: openvpn_ctrl_pkt_serialize_auth
             )
             currentReplayId.outbound += 1
             return data

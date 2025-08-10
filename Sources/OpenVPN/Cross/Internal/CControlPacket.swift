@@ -32,7 +32,7 @@ final class CControlPacket {
         packetId: UInt32, payload: Data?,
         ackIds: [UInt32]?, ackRemoteSessionId: Data?
     ) {
-        let pkt = ctrl_pkt_create(
+        let pkt = openvpn_ctrl_pkt_create(
             code.native,
             key,
             packetId,
@@ -76,7 +76,7 @@ final class CControlPacket {
     }
 
     deinit {
-        ctrl_pkt_free(pkt)
+        openvpn_ctrl_pkt_free(pkt)
     }
 
     var isAck: Bool {
