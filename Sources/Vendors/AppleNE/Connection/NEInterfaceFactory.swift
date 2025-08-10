@@ -24,6 +24,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
 
     private let ctx: PartoutLoggerContext
 
+    nonisolated(unsafe)
     private weak var provider: NEPacketTunnelProvider?
 
     private let options: Options
