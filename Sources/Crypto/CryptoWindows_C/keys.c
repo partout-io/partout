@@ -9,12 +9,12 @@
 
 #define KeyHMACMaxLength    (size_t)128
 
-bool key_init_seed(const zeroing_data_t *seed) {
+bool key_init_seed(const pp_zd *seed) {
     // FIXME: #108, port to Windows CNG
     return true;
 }
 
-zeroing_data_t *key_hmac_create() {
+pp_zd *key_hmac_create() {
     return zd_create(KeyHMACMaxLength);
 }
 

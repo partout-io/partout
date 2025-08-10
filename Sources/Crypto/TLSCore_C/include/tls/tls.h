@@ -59,10 +59,10 @@ void tls_channel_free(tls_channel_ctx _Nonnull tls);
 bool tls_channel_start(tls_channel_ctx _Nonnull tls);
 bool tls_channel_is_connected(tls_channel_ctx _Nonnull tls);
 
-zeroing_data_t *_Nullable tls_channel_pull_cipher(tls_channel_ctx _Nonnull tls,
+pp_zd *_Nullable tls_channel_pull_cipher(tls_channel_ctx _Nonnull tls,
                                                   tls_error_code *_Nullable error);
 
-zeroing_data_t *_Nullable tls_channel_pull_plain(tls_channel_ctx _Nonnull tls,
+pp_zd *_Nullable tls_channel_pull_plain(tls_channel_ctx _Nonnull tls,
                                                  tls_error_code *_Nullable error);
 
 bool tls_channel_put_cipher(tls_channel_ctx _Nonnull tls,

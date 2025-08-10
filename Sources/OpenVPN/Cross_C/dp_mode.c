@@ -46,7 +46,7 @@ void dp_mode_free(dp_mode_t *mode) {
 
 size_t dp_mode_assemble(dp_mode_t *_Nonnull mode,
                         uint32_t packet_id,
-                        zeroing_data_t *_Nonnull dst,
+                        pp_zd *_Nonnull dst,
                         const uint8_t *_Nonnull src,
                         size_t src_len) {
 
@@ -62,7 +62,7 @@ size_t dp_mode_assemble(dp_mode_t *_Nonnull mode,
 size_t dp_mode_encrypt(dp_mode_t *_Nonnull mode,
                        uint8_t key,
                        uint32_t packet_id,
-                       zeroing_data_t *_Nonnull dst,
+                       pp_zd *_Nonnull dst,
                        const uint8_t *_Nonnull src,
                        size_t src_len,
                        dp_error_t *_Nullable error) {
@@ -80,7 +80,7 @@ size_t dp_mode_encrypt(dp_mode_t *_Nonnull mode,
 // MARK: - Decryption
 
 size_t dp_mode_decrypt(dp_mode_t *_Nonnull mode,
-                       zeroing_data_t *_Nonnull dst,
+                       pp_zd *_Nonnull dst,
                        uint32_t *_Nonnull dst_packet_id,
                        const uint8_t *_Nonnull src,
                        size_t src_len,
@@ -96,7 +96,7 @@ size_t dp_mode_decrypt(dp_mode_t *_Nonnull mode,
 }
 
 size_t dp_mode_parse(dp_mode_t *_Nonnull mode,
-                     zeroing_data_t *_Nonnull dst,
+                     pp_zd *_Nonnull dst,
                      uint8_t *_Nonnull dst_header,
                      uint8_t *_Nonnull src,
                      size_t src_len,

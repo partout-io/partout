@@ -7,9 +7,9 @@ import Foundation
 import PartoutCore
 
 public final class CZeroingData {
-    public let ptr: UnsafeMutablePointer<zeroing_data_t>
+    public let ptr: UnsafeMutablePointer<pp_zd>
 
-    public init(ptr: UnsafeMutablePointer<zeroing_data_t>) {
+    public init(ptr: UnsafeMutablePointer<pp_zd>) {
         self.ptr = ptr
     }
 

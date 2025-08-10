@@ -10,16 +10,16 @@
 #include <stdint.h>
 #include "crypto/zeroing_data.h"
 
-bool key_init_seed(const zeroing_data_t *_Nonnull zd);
+bool key_init_seed(const pp_zd *_Nonnull zd);
 
 typedef struct {
-    zeroing_data_t *_Nonnull dst;
+    pp_zd *_Nonnull dst;
     const char *_Nonnull digest_name;
-    const zeroing_data_t *_Nonnull secret;
-    const zeroing_data_t *_Nonnull data;
+    const pp_zd *_Nonnull secret;
+    const pp_zd *_Nonnull data;
 } key_hmac_ctx;
 
-zeroing_data_t *_Nonnull key_hmac_create();
+pp_zd *_Nonnull key_hmac_create();
 size_t key_hmac_do(key_hmac_ctx *_Nonnull ctx);
 
 char *_Nullable key_decrypted_from_path(const char *_Nonnull path,

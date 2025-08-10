@@ -13,7 +13,7 @@
 
 #define KeyHMACMaxLength    (size_t)128
 
-bool key_init_seed(const zeroing_data_t *seed) {
+bool key_init_seed(const pp_zd *seed) {
     unsigned char x[1];
     if (RAND_bytes(x, 1) != 1) {
         return false;
@@ -22,7 +22,7 @@ bool key_init_seed(const zeroing_data_t *seed) {
     return true;
 }
 
-zeroing_data_t *key_hmac_create() {
+pp_zd *key_hmac_create() {
     return zd_create(KeyHMACMaxLength);
 }
 

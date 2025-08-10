@@ -11,9 +11,9 @@ import Foundation
 final class CDataPath {
     private let mode: UnsafeMutablePointer<dp_mode_t>
 
-    private let encBuffer: UnsafeMutablePointer<zeroing_data_t>
+    private let encBuffer: UnsafeMutablePointer<pp_zd>
 
-    private let decBuffer: UnsafeMutablePointer<zeroing_data_t>
+    private let decBuffer: UnsafeMutablePointer<pp_zd>
 
     private let replay: UnsafeMutablePointer<replay_t>
 
@@ -48,7 +48,7 @@ private extension CDataPath {
     func configure(
         cipherKey: Data?,
         hmacKey: Data?,
-        block: (UnsafePointer<zeroing_data_t>?, UnsafePointer<zeroing_data_t>?) -> Void
+        block: (UnsafePointer<pp_zd>?, UnsafePointer<pp_zd>?) -> Void
     ) {
         let ck = cipherKey.map { data in
             data.withUnsafeBytes { ptr in
@@ -189,7 +189,7 @@ extension CDataPath {
         _ packet: Data,
         key: UInt8,
         packetId: UInt32,
-        buf: UnsafeMutablePointer<zeroing_data_t>?
+        buf: UnsafeMutablePointer<pp_zd>?
     ) throws -> Data {
         let buf = buf ?? encBuffer
         resize(buf, for: dp_mode_assemble_and_encrypt_capacity(mode, packet.count))
@@ -213,7 +213,7 @@ extension CDataPath {
 
     func decryptAndParse(
         _ packet: Data,
-        buf: UnsafeMutablePointer<zeroing_data_t>?
+        buf: UnsafeMutablePointer<pp_zd>?
     ) throws -> DataPathDecryptedAndParsedTuple {
         let buf = buf ?? decBuffer
         resize(buf, for: packet.count)
@@ -245,7 +245,7 @@ extension CDataPath {
     func assemble(
         packetId: UInt32,
         payload: Data,
-        buf: UnsafeMutablePointer<zeroing_data_t>?
+        buf: UnsafeMutablePointer<pp_zd>?
     ) -> Data {
         let buf = buf ?? encBuffer
         let inputCount = payload.count
@@ -266,7 +266,7 @@ extension CDataPath {
         key: UInt8,
         packetId: UInt32,
         assembled: Data,
-        buf: UnsafeMutablePointer<zeroing_data_t>?
+        buf: UnsafeMutablePointer<pp_zd>?
     ) throws -> Data {
         let buf = buf ?? encBuffer
         let inputCount = assembled.count
@@ -291,7 +291,7 @@ extension CDataPath {
 
     func decrypt(
         packet: Data,
-        buf: UnsafeMutablePointer<zeroing_data_t>?
+        buf: UnsafeMutablePointer<pp_zd>?
     ) throws -> DataPathDecryptedTuple {
         let buf = buf ?? decBuffer
         let inputCount = packet.count
@@ -318,7 +318,7 @@ extension CDataPath {
     func parse(
         decrypted: Data,
         header: inout UInt8,
-        buf: UnsafeMutablePointer<zeroing_data_t>?
+        buf: UnsafeMutablePointer<pp_zd>?
     ) throws -> Data {
         let buf = buf ?? decBuffer
         var inputCopy = [UInt8](decrypted) // copy because parsed in place
@@ -350,7 +350,7 @@ extension CDataPath {
 // MARK: -
 
 private extension CDataPath {
-    func resize(_ buf: UnsafeMutablePointer<zeroing_data_t>, for count: Int) {
+    func resize(_ buf: UnsafeMutablePointer<pp_zd>, for count: Int) {
         guard buf.pointee.length < count else {
             return
         }

@@ -33,13 +33,13 @@ extension CryptoKeys {
 }
 
 final class CryptoKeysBridge {
-    private let cipherEncKey: UnsafeMutablePointer<zeroing_data_t>
+    private let cipherEncKey: UnsafeMutablePointer<pp_zd>
 
-    private let cipherDecKey: UnsafeMutablePointer<zeroing_data_t>
+    private let cipherDecKey: UnsafeMutablePointer<pp_zd>
 
-    private let hmacEncKey: UnsafeMutablePointer<zeroing_data_t>
+    private let hmacEncKey: UnsafeMutablePointer<pp_zd>
 
-    private let hmacDecKey: UnsafeMutablePointer<zeroing_data_t>
+    private let hmacDecKey: UnsafeMutablePointer<pp_zd>
 
     init(keys: CryptoKeys) {
         cipherEncKey = (keys.cipher?.encryptionKey).unsafeCopy()
@@ -76,7 +76,7 @@ private extension CryptoKeysBridge {
 }
 
 private extension Optional<CZeroingData> {
-    func unsafeCopy() -> UnsafeMutablePointer<zeroing_data_t> {
+    func unsafeCopy() -> UnsafeMutablePointer<pp_zd> {
         guard let self else {
             return zd_create(0)
         }

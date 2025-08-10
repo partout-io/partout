@@ -16,8 +16,8 @@ typedef enum {
 } crypto_error_code;
 
 typedef struct {
-    const zeroing_data_t *_Nonnull enc_key;
-    const zeroing_data_t *_Nonnull dec_key;
+    const pp_zd *_Nonnull enc_key;
+    const pp_zd *_Nonnull dec_key;
 } crypto_key_pair_t;
 
 typedef struct {
@@ -45,8 +45,8 @@ typedef struct {
 } crypto_flags_t;
 
 typedef void (*crypto_configure_fn)(void *_Nonnull ctx,
-                                    const zeroing_data_t *_Nullable cipher_key,
-                                    const zeroing_data_t *_Nullable hmac_key);
+                                    const pp_zd *_Nullable cipher_key,
+                                    const pp_zd *_Nullable hmac_key);
 
 typedef size_t (*crypto_encrypt_fn)(void *_Nonnull ctx,
                                     uint8_t *_Nonnull out, size_t out_buf_len,
@@ -113,8 +113,8 @@ size_t crypto_encryption_capacity(crypto_ctx _Nonnull ctx, size_t len) {
 
 static inline
 void crypto_configure_encrypt(crypto_ctx _Nonnull ctx,
-                              const zeroing_data_t *_Nullable cipher_key,
-                              const zeroing_data_t *_Nullable hmac_key) {
+                              const pp_zd *_Nullable cipher_key,
+                              const pp_zd *_Nullable hmac_key) {
 
     ctx->base.encrypter.configure(&ctx->base, cipher_key, hmac_key);
 }
@@ -130,8 +130,8 @@ size_t crypto_encrypt(crypto_ctx _Nonnull ctx,
 
 static inline
 void crypto_configure_decrypt(crypto_ctx _Nonnull ctx,
-                              const zeroing_data_t *_Nullable cipher_key,
-                              const zeroing_data_t *_Nullable hmac_key) {
+                              const pp_zd *_Nullable cipher_key,
+                              const pp_zd *_Nullable hmac_key) {
 
     ctx->base.decrypter.configure(&ctx->base, cipher_key, hmac_key);
 }

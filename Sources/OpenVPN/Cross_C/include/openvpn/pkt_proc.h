@@ -33,7 +33,7 @@ typedef struct {
 typedef void (*pkt_proc_algorithm)(const pkt_proc_alg_ctx *_Nonnull);
 
 typedef struct {
-    zeroing_data_t *_Nullable mask;
+    pp_zd *_Nullable mask;
     pkt_proc_algorithm _Nonnull recv;
     pkt_proc_algorithm _Nonnull send;
 } pkt_proc_t;
@@ -83,7 +83,7 @@ void pkt_proc_send(const pkt_proc_t *_Nonnull proc,
 // loop until 0
 // stream -> parse packet and return new offset
 static inline
-zeroing_data_t *_Nullable pkt_proc_stream_recv(const void *_Nonnull vproc,
+pp_zd *_Nullable pkt_proc_stream_recv(const void *_Nonnull vproc,
                                                const uint8_t *_Nonnull src,
                                                size_t src_len,
                                                size_t *_Nullable src_rcvd) {
@@ -100,7 +100,7 @@ zeroing_data_t *_Nullable pkt_proc_stream_recv(const void *_Nonnull vproc,
     }
 
     const pkt_proc_t *proc = vproc;
-    zeroing_data_t *dst = zd_create(buf_len);
+    pp_zd *dst = zd_create(buf_len);
     const pkt_proc_alg_ctx ctx = {
         dst->bytes, 0,
         buf_payload, 0, buf_len,
@@ -121,7 +121,7 @@ size_t pkt_proc_stream_send_bufsize(const int num, const size_t len) {
 
 static inline
 size_t pkt_proc_stream_send(const void *_Nonnull vproc,
-                            zeroing_data_t *_Nonnull dst,
+                            pp_zd *_Nonnull dst,
                             size_t dst_offset,
                             const uint8_t *_Nonnull src,
                             size_t src_len) {

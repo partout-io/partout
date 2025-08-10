@@ -18,7 +18,7 @@
 typedef struct {
     void *_Nonnull mode;
     uint32_t packet_id;
-    zeroing_data_t *_Nonnull dst;
+    pp_zd *_Nonnull dst;
     const uint8_t *_Nonnull src;
     size_t src_len;
 } dp_mode_assemble_ctx;
@@ -27,7 +27,7 @@ typedef struct {
 typedef struct {
     uint8_t key;
     uint32_t packet_id;
-    zeroing_data_t *_Nonnull dst;
+    pp_zd *_Nonnull dst;
     const uint8_t *_Nonnull src;
     size_t src_len;
     dp_error_t *_Nullable error;
@@ -40,7 +40,7 @@ typedef size_t (*dp_mode_encrypt_fn)(void *_Nonnull mode);
 
 // RECEIVE -> decrypt
 typedef struct {
-    zeroing_data_t *_Nonnull dst;
+    pp_zd *_Nonnull dst;
     uint32_t *_Nonnull dst_packet_id;
     const uint8_t *_Nonnull src;
     size_t src_len;
@@ -49,7 +49,7 @@ typedef struct {
 
 // decrypt -> parse
 typedef struct {
-    zeroing_data_t *_Nonnull dst;
+    pp_zd *_Nonnull dst;
     uint8_t *_Nonnull dst_header;
     uint8_t *_Nonnull src; // allow parse in place
     size_t src_len;
@@ -184,23 +184,23 @@ size_t dp_mode_assemble_and_encrypt_capacity(const dp_mode_t *_Nonnull mode, siz
 
 size_t dp_mode_assemble(dp_mode_t *_Nonnull mode,
                         uint32_t packet_id,
-                        zeroing_data_t *_Nonnull dst,
+                        pp_zd *_Nonnull dst,
                         const uint8_t *_Nonnull src,
                         size_t src_len);
 
 size_t dp_mode_encrypt(dp_mode_t *_Nonnull mode,
                        uint8_t key,
                        uint32_t packet_id,
-                       zeroing_data_t *_Nonnull dst,
+                       pp_zd *_Nonnull dst,
                        const uint8_t *_Nonnull src,
                        size_t src_len,
                        dp_error_t *_Nullable error);
 
 static inline
-zeroing_data_t *_Nullable dp_mode_assemble_and_encrypt(dp_mode_t *_Nonnull mode,
+pp_zd *_Nullable dp_mode_assemble_and_encrypt(dp_mode_t *_Nonnull mode,
                                                        uint8_t key,
                                                        uint32_t packet_id,
-                                                       zeroing_data_t *_Nonnull buf,
+                                                       pp_zd *_Nonnull buf,
                                                        const uint8_t *_Nonnull src,
                                                        size_t src_len,
                                                        dp_error_t *_Nullable error) {
@@ -211,7 +211,7 @@ zeroing_data_t *_Nullable dp_mode_assemble_and_encrypt(dp_mode_t *_Nonnull mode,
     if (!asm_len) {
         return NULL;
     }
-    zeroing_data_t *dst = zd_create(dp_mode_encrypt_capacity(mode, asm_len));
+    pp_zd *dst = zd_create(dp_mode_encrypt_capacity(mode, asm_len));
     const size_t dst_len = dp_mode_encrypt(mode, key, packet_id, dst,
                                            buf->bytes, asm_len, error);
     if (!dst_len) {
@@ -225,22 +225,22 @@ zeroing_data_t *_Nullable dp_mode_assemble_and_encrypt(dp_mode_t *_Nonnull mode,
 // MARK: - Decryption
 
 size_t dp_mode_decrypt(dp_mode_t *_Nonnull mode,
-                       zeroing_data_t *_Nonnull dst,
+                       pp_zd *_Nonnull dst,
                        uint32_t *_Nonnull dst_packet_id,
                        const uint8_t *_Nonnull src,
                        size_t src_len,
                        dp_error_t *_Nullable error);
 
 size_t dp_mode_parse(dp_mode_t *_Nonnull mode,
-                     zeroing_data_t *_Nonnull dst,
+                     pp_zd *_Nonnull dst,
                      uint8_t *_Nonnull dst_header,
                      uint8_t *_Nonnull src,
                      size_t src_len,
                      dp_error_t *_Nullable error);
 
 static inline
-zeroing_data_t *_Nullable dp_mode_decrypt_and_parse(dp_mode_t *_Nonnull mode,
-                                                    zeroing_data_t *_Nonnull buf,
+pp_zd *_Nullable dp_mode_decrypt_and_parse(dp_mode_t *_Nonnull mode,
+                                                    pp_zd *_Nonnull buf,
                                                     uint32_t *_Nonnull dst_packet_id,
                                                     uint8_t *_Nonnull dst_header,
                                                     bool *_Nonnull dst_keep_alive,
@@ -254,7 +254,7 @@ zeroing_data_t *_Nullable dp_mode_decrypt_and_parse(dp_mode_t *_Nonnull mode,
     if (!dec_len) {
         return NULL;
     }
-    zeroing_data_t *dst = zd_create(dec_len);
+    pp_zd *dst = zd_create(dec_len);
     const size_t dst_len = dp_mode_parse(mode, dst, dst_header,
                                          buf->bytes, dec_len, error);
     if (!dst_len) {

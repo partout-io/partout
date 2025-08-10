@@ -29,12 +29,12 @@ bool tls_channel_is_connected(tls_channel_ctx _Nonnull tls) {
 
 // MARK: - I/O
 
-zeroing_data_t *_Nullable tls_channel_pull_cipher(tls_channel_ctx _Nonnull tls,
+pp_zd *_Nullable tls_channel_pull_cipher(tls_channel_ctx _Nonnull tls,
                                                   tls_error_code *_Nullable error) {
     return NULL;
 }
 
-zeroing_data_t *_Nullable tls_channel_pull_plain(tls_channel_ctx _Nonnull tls,
+pp_zd *_Nullable tls_channel_pull_plain(tls_channel_ctx _Nonnull tls,
                                                  tls_error_code *_Nullable error) {
     return NULL;
 }

@@ -6,7 +6,7 @@ import _PartoutVendorsPortable_C
 import Foundation
 
 extension Data {
-    public init(zeroing zd: UnsafeMutablePointer<zeroing_data_t>) {
+    public init(zeroing zd: UnsafeMutablePointer<pp_zd>) {
         let count = zd.pointee.length
         self.init(
             bytesNoCopy: zd.pointee.bytes,

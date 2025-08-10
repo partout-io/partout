@@ -188,7 +188,7 @@ bool tls_channel_is_connected(tls_channel_ctx _Nonnull tls) {
 bool tls_channel_verify_ssl_eku(SSL *_Nonnull ssl);
 bool tls_channel_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hostname);
 
-zeroing_data_t *_Nullable tls_channel_pull_cipher(tls_channel_ctx _Nonnull tls,
+pp_zd *_Nullable tls_channel_pull_cipher(tls_channel_ctx _Nonnull tls,
                                                   tls_error_code *_Nullable error) {
     if (error) {
         *error = TLSErrorNone;
@@ -227,7 +227,7 @@ zeroing_data_t *_Nullable tls_channel_pull_cipher(tls_channel_ctx _Nonnull tls,
     return zd_create_from_data(tls->buf_cipher, ret);
 }
 
-zeroing_data_t *_Nullable tls_channel_pull_plain(tls_channel_ctx _Nonnull tls,
+pp_zd *_Nullable tls_channel_pull_plain(tls_channel_ctx _Nonnull tls,
                                                  tls_error_code *_Nullable error) {
     const int ret = BIO_read(tls->bio_plain, tls->buf_plain, (int)tls->opt->buf_len);
     if (error) {

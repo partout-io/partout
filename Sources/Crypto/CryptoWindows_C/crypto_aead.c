@@ -34,7 +34,7 @@ size_t local_encryption_capacity(const void *vctx, size_t len) {
 
 static
 void local_configure_encrypt(void *vctx,
-                             const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
+                             const pp_zd *cipher_key, const pp_zd *hmac_key) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
@@ -99,7 +99,7 @@ size_t local_encrypt(void *vctx,
 
 static
 void local_configure_decrypt(void *vctx,
-                             const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
+                             const pp_zd *cipher_key, const pp_zd *hmac_key) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);

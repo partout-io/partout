@@ -23,7 +23,7 @@ typedef struct {
 } crypto_aead_ctx;
 
 static inline
-void local_prepare_iv(const void *vctx, uint8_t *_Nonnull iv, const zeroing_data_t *_Nonnull hmac_key) {
+void local_prepare_iv(const void *vctx, uint8_t *_Nonnull iv, const pp_zd *_Nonnull hmac_key) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_zero(iv, ctx->id_len);
@@ -38,7 +38,7 @@ size_t local_encryption_capacity(const void *vctx, size_t len) {
 
 static
 void local_configure_encrypt(void *vctx,
-                             const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
+                             const pp_zd *cipher_key, const pp_zd *hmac_key) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
@@ -82,7 +82,7 @@ size_t local_encrypt(void *vctx,
 
 static
 void local_configure_decrypt(void *vctx,
-                             const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
+                             const pp_zd *cipher_key, const pp_zd *hmac_key) {
     crypto_aead_ctx *ctx = (crypto_aead_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);

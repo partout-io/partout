@@ -28,8 +28,8 @@ typedef struct {
     EVP_MAC *_Nonnull mac;
     OSSL_PARAM *_Nonnull mac_params;
     uint8_t buffer_hmac[HMACMaxLength];
-    zeroing_data_t *_Nonnull hmac_key_enc;
-    zeroing_data_t *_Nonnull hmac_key_dec;
+    pp_zd *_Nonnull hmac_key_enc;
+    pp_zd *_Nonnull hmac_key_dec;
 } crypto_cbc_ctx;
 
 static
@@ -40,7 +40,7 @@ size_t local_encryption_capacity(const void *vctx, size_t input_len) {
 }
 
 static
-void local_configure_encrypt(void *vctx, const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
+void local_configure_encrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *hmac_key) {
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(hmac_key && hmac_key->length >= ctx->crypto.meta.hmac_key_len);
@@ -101,7 +101,7 @@ size_t local_encrypt(void *vctx,
 }
 
 static
-void local_configure_decrypt(void *vctx, const zeroing_data_t *cipher_key, const zeroing_data_t *hmac_key) {
+void local_configure_decrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *hmac_key) {
     crypto_cbc_ctx *ctx = (crypto_cbc_ctx *)vctx;
     pp_assert(ctx);
     pp_assert(hmac_key && hmac_key->length >= ctx->crypto.meta.hmac_key_len);
