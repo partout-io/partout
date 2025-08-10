@@ -93,7 +93,7 @@ pp_zd *_Nullable pkt_proc_stream_recv(const void *_Nonnull vproc,
     }
 
     // [length(2 bytes)][packet(length)]
-    const size_t buf_len = endian_ntohs(*(uint16_t *)src);
+    const size_t buf_len = pp_endian_ntohs(*(uint16_t *)src);
     const uint8_t *buf_payload = src + pkt_proc_stream_header_len;
     if (src_len < pkt_proc_stream_header_len + buf_len) {
         return NULL;
@@ -130,7 +130,7 @@ size_t pkt_proc_stream_send(const void *_Nonnull vproc,
     pp_assert(dst->length >= dst_offset + buf_len);
 
     uint8_t *ptr = dst->bytes + dst_offset;
-    *(uint16_t *)ptr = endian_htons(src_len);
+    *(uint16_t *)ptr = pp_endian_htons(src_len);
     ptr += pkt_proc_stream_header_len;
 
     const pkt_proc_t *proc = vproc;

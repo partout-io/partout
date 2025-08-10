@@ -102,7 +102,7 @@ size_t ctrl_pkt_serialize(uint8_t *_Nonnull dst, const ctrl_pkt_t *_Nonnull pkt)
         ptr += PacketAckLengthLength;
         for (size_t i = 0; i < pkt->ack_ids_len; ++i) {
             const uint32_t ack_id = pkt->ack_ids[i];
-            *(uint32_t *)ptr = endian_htonl(ack_id);
+            *(uint32_t *)ptr = pp_endian_htonl(ack_id);
             ptr += PacketIdLength;
         }
         pp_assert(pkt->ack_remote_session_id);
@@ -113,7 +113,7 @@ size_t ctrl_pkt_serialize(uint8_t *_Nonnull dst, const ctrl_pkt_t *_Nonnull pkt)
         ptr += PacketAckLengthLength;
     }
     if (pkt->code != PacketCodeAckV1) {
-        *(uint32_t *)ptr = endian_htonl(pkt->packet_id);
+        *(uint32_t *)ptr = pp_endian_htonl(pkt->packet_id);
         ptr += PacketIdLength;
         if (pkt->payload) {
             memcpy(ptr, pkt->payload, pkt->payload_len);
@@ -134,9 +134,9 @@ size_t ctrl_pkt_serialize_auth(uint8_t *dst,
     const size_t digest_len = alg->crypto->base.meta.digest_len;
     uint8_t *ptr = dst + digest_len;
     const uint8_t *subject = ptr;
-    *(uint32_t *)ptr = endian_htonl(alg->replay_id);
+    *(uint32_t *)ptr = pp_endian_htonl(alg->replay_id);
     ptr += PacketReplayIdLength;
-    *(uint32_t *)ptr = endian_htonl(alg->timestamp);
+    *(uint32_t *)ptr = pp_endian_htonl(alg->timestamp);
     ptr += PacketReplayTimestampLength;
     ptr += packet_header_set(ptr, pkt->code, pkt->key, pkt->session_id);
     ptr += ctrl_pkt_serialize(ptr, pkt);
@@ -167,9 +167,9 @@ size_t ctrl_pkt_serialize_crypt(uint8_t *dst,
 
     uint8_t *ptr = dst;
     ptr += packet_header_set(dst, pkt->code, pkt->key, pkt->session_id);
-    *(uint32_t *)ptr = endian_htonl(alg->replay_id);
+    *(uint32_t *)ptr = pp_endian_htonl(alg->replay_id);
     ptr += PacketReplayIdLength;
-    *(uint32_t *)ptr = endian_htonl(alg->timestamp);
+    *(uint32_t *)ptr = pp_endian_htonl(alg->timestamp);
     ptr += PacketReplayTimestampLength;
 
     const size_t ad_len = ptr - dst;

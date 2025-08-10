@@ -20,7 +20,7 @@ size_t dp_assemble(void *vmode) {
     pp_assert(ctx->dst->length >= dst_capacity);
 
     uint8_t *dst = ctx->dst->bytes;
-    *(uint32_t *)dst = endian_htonl(ctx->packet_id);
+    *(uint32_t *)dst = pp_endian_htonl(ctx->packet_id);
     dst += sizeof(uint32_t);
     size_t dst_len = (size_t)(dst - ctx->dst->bytes + ctx->src_len);
     if (!mode->enc.framing_assemble) {
@@ -121,7 +121,7 @@ size_t dp_decrypt(void *vmode) {
             return 0;
         }
     }
-    *ctx->dst_packet_id = endian_ntohl(*(uint32_t *)ctx->dst->bytes);
+    *ctx->dst_packet_id = pp_endian_ntohl(*(uint32_t *)ctx->dst->bytes);
     return dst_len;
 }
 

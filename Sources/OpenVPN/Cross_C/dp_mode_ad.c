@@ -49,7 +49,7 @@ size_t dp_encrypt(void *vmode) {
     pp_assert(ctx->dst->length >= dst_capacity);
     uint8_t *dst = ctx->dst->bytes;
 
-    *(uint32_t *)(dst + dst_header_len) = endian_htonl(ctx->packet_id);
+    *(uint32_t *)(dst + dst_header_len) = pp_endian_htonl(ctx->packet_id);
 
     crypto_flags_t flags = { 0 };
     flags.iv = dst + dst_header_len;
@@ -138,7 +138,7 @@ size_t dp_decrypt(void *vmode) {
         }
         return 0;
     }
-    *ctx->dst_packet_id = endian_ntohl(*(const uint32_t *)(flags.iv));
+    *ctx->dst_packet_id = pp_endian_ntohl(*(const uint32_t *)(flags.iv));
     return dst_len;
 }
 

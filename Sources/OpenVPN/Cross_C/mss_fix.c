@@ -31,11 +31,11 @@ typedef struct {
 static inline
 void mss_update_sum(uint16_t* sum_ptr, uint16_t* val_ptr, uint16_t new_val)
 {
-    uint32_t sum = (~endian_ntohs(*sum_ptr) & 0xffff) + (~endian_ntohs(*val_ptr) & 0xffff) + new_val;
+    uint32_t sum = (~pp_endian_ntohs(*sum_ptr) & 0xffff) + (~pp_endian_ntohs(*val_ptr) & 0xffff) + new_val;
     sum = (sum >> 16) + (sum & 0xffff);
     sum += (sum >> 16);
-    *sum_ptr = endian_htons(~sum & 0xffff);
-    *val_ptr = endian_htons(new_val);
+    *sum_ptr = pp_endian_htons(~sum & 0xffff);
+    *val_ptr = pp_endian_htons(new_val);
 }
 
 void mss_fix(uint8_t *data, size_t data_len, uint16_t mtu)
@@ -79,7 +79,7 @@ void mss_fix(uint8_t *data, size_t data_len, uint16_t mtu)
             if (i + o->size > optlen) {
                 return;
             }
-            if (endian_ntohs(o->mss) <= mtu) {
+            if (pp_endian_ntohs(o->mss) <= mtu) {
                 return;
             }
             mss_update_sum(&tcph->sum, &o->mss, mtu);

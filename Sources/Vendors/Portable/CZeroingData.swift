@@ -145,7 +145,7 @@ extension CZeroingData {
 
 extension CZeroingData {
     public func networkUInt16Value(fromOffset offset: Int) -> UInt16 {
-        endian_ntohs(pp_zd_uint16(ptr, offset))
+        pp_endian_ntohs(pp_zd_uint16(ptr, offset))
     }
 
     public func nullTerminatedString(fromOffset offset: Int) -> String? {
