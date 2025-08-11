@@ -11,14 +11,16 @@ let binaryFilename = "PartoutCore.xcframework.zip"
 let version = "0.99.172"
 let checksum = "100dc00b0a54b01cb4b237a2396a930ad05bd452eba896b69500697241ae07e1"
 
-// to download the core soruce
-let coreSHA1 = "510c109b44efce60fe362775652990519a506511"
-
-// deployment of PartoutCore sub-library
-let coreDeployment: CoreDeployment = .remoteBinary
+// included areas and environment
 let areas: Set<Area> = Area.defaultAreas
+let coreDeployment: CoreDeployment = .remoteBinary
+let coreSourceSHA1 = "510c109b44efce60fe362775652990519a506511"
 
-// environment
+// must be false in production (check in CI)
+let isDevelopment = false
+let isTestingOpenVPNDataPath = false
+
+// optional overrides from environment
 let env = ProcessInfo.processInfo.environment
 let packageOS = env["PARTOUT_OS"]
 let packageHasDocs = env["PARTOUT_DOCS"] == "1"
@@ -27,10 +29,6 @@ let packageHasDocs = env["PARTOUT_DOCS"] == "1"
 guard OS.current == .apple || ![.remoteBinary, .localBinary].contains(coreDeployment) else {
     fatalError("Core binary only available on Apple platforms")
 }
-
-// must be false in production (check in CI)
-let isDevelopment = false
-let isTestingOpenVPNDataPath = false
 
 // the global settings for C targets
 let cSettings: [CSetting] = [
@@ -705,7 +703,7 @@ case .remoteBinary:
     ))
 case .remoteSource:
     package.dependencies.append(
-        .package(url: "git@github.com:passepartoutvpn/partout-core.git", revision: coreSHA1)
+        .package(url: "git@github.com:passepartoutvpn/partout-core.git", revision: coreSourceSHA1)
     )
     package.targets.append(.target(
         name: "PartoutCoreWrapper",
