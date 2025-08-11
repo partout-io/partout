@@ -1,6 +1,7 @@
 // swift-tools-version: 5.9
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
+import Foundation
 import PackageDescription
 
 // MARK: Package
@@ -16,6 +17,11 @@ let coreSHA1 = "510c109b44efce60fe362775652990519a506511"
 // deployment of PartoutCore sub-library
 let coreDeployment: CoreDeployment = .remoteBinary
 let areas: Set<Area> = Area.defaultAreas
+
+// environment
+let env = ProcessInfo.processInfo.environment
+let packageOS = env["PARTOUT_OS"]
+let packageHasDocs = env["PARTOUT_DOCS"] == "1"
 
 // PartoutCore binaries only on non-Apple
 guard OS.current == .apple || ![.remoteBinary, .localBinary].contains(coreDeployment) else {
@@ -619,8 +625,6 @@ if areas.contains(.wireGuard) {
 
 // MARK: - Deployment
 
-import Foundation
-
 enum OS: String {
     case android
     case apple
@@ -633,11 +637,11 @@ enum OS: String {
     static var current: OS {
         // Android is never compiled natively, therefore #if os(Android)
         // would be wrong here. Resort to an explicit env variable.
-        if let envPlatformString = ProcessInfo.processInfo.environment["PARTOUT_PLATFORM"] {
-            guard let envPlatform = OS(rawValue: envPlatformString) else {
-                fatalError("Unrecognized platform '\(envPlatformString)'")
+        if let packageOS {
+            guard let os = OS(rawValue: packageOS) else {
+                fatalError("Unrecognized OS '\(packageOS)'")
             }
-            return envPlatform
+            return os
         }
 #if os(Windows)
         return .windows
@@ -667,7 +671,7 @@ enum Area: CaseIterable {
 
     static var defaultAreas: Set<Area> {
         var included = Set(Area.allCases)
-        if ProcessInfo.processInfo.environment["PARTOUT_DOCS"] != "1" {
+        if !packageHasDocs {
             included.remove(.documentation)
         }
         if OS.current != .apple {
