@@ -8,7 +8,7 @@
 #include "portable/common.h"
 #include "openvpn/control.h"
 
-openvpn_ctrl *_Nonnull openvpn_ctrl_create(openvpn_packet_code code, uint8_t key, uint32_t openvpn_packet_id,
+openvpn_ctrl *_Nonnull openvpn_ctrl_create(openvpn_packet_code code, uint8_t key, uint32_t packet_id,
                                      const uint8_t *_Nonnull session_id,
                                      const uint8_t *_Nullable payload, size_t payload_len,
                                      const uint32_t *_Nullable ack_ids, size_t ack_ids_len,
@@ -17,7 +17,7 @@ openvpn_ctrl *_Nonnull openvpn_ctrl_create(openvpn_packet_code code, uint8_t key
     openvpn_ctrl *pkt = pp_alloc_crypto(sizeof(openvpn_ctrl));
     pkt->code = code;
     pkt->key = key;
-    pkt->openvpn_packet_id = openvpn_packet_id;
+    pkt->packet_id = packet_id;
     pkt->session_id = pp_alloc_crypto(OpenVPNPacketSessionIdLength);
     memcpy(pkt->session_id, session_id, OpenVPNPacketSessionIdLength);
     if (payload) {
@@ -65,7 +65,7 @@ void openvpn_ctrl_free(openvpn_ctrl *_Nonnull pkt) {
 
 static inline
 size_t openvpn_ctrl_is_ack(const openvpn_ctrl *pkt) {
-    return pkt->openvpn_packet_id == UINT32_MAX;
+    return pkt->packet_id == UINT32_MAX;
 }
 
 static inline
@@ -113,7 +113,7 @@ size_t openvpn_ctrl_serialize(uint8_t *_Nonnull dst, const openvpn_ctrl *_Nonnul
         ptr += OpenVPNPacketAckLengthLength;
     }
     if (pkt->code != OpenVPNPacketCodeAckV1) {
-        *(uint32_t *)ptr = pp_endian_htonl(pkt->openvpn_packet_id);
+        *(uint32_t *)ptr = pp_endian_htonl(pkt->packet_id);
         ptr += OpenVPNPacketIdLength;
         if (pkt->payload) {
             memcpy(ptr, pkt->payload, pkt->payload_len);
@@ -134,7 +134,7 @@ size_t openvpn_ctrl_serialize_auth(uint8_t *dst,
     const size_t digest_len = alg->crypto->base.meta.digest_len;
     uint8_t *ptr = dst + digest_len;
     const uint8_t *subject = ptr;
-    *(uint32_t *)ptr = pp_endian_htonl(alg->openvpn_replay_id);
+    *(uint32_t *)ptr = pp_endian_htonl(alg->replay_id);
     ptr += OpenVPNPacketReplayIdLength;
     *(uint32_t *)ptr = pp_endian_htonl(alg->timestamp);
     ptr += OpenVPNPacketReplayTimestampLength;
@@ -167,7 +167,7 @@ size_t openvpn_ctrl_serialize_crypt(uint8_t *dst,
 
     uint8_t *ptr = dst;
     ptr += openvpn_packet_header_set(dst, pkt->code, pkt->key, pkt->session_id);
-    *(uint32_t *)ptr = pp_endian_htonl(alg->openvpn_replay_id);
+    *(uint32_t *)ptr = pp_endian_htonl(alg->replay_id);
     ptr += OpenVPNPacketReplayIdLength;
     *(uint32_t *)ptr = pp_endian_htonl(alg->timestamp);
     ptr += OpenVPNPacketReplayTimestampLength;

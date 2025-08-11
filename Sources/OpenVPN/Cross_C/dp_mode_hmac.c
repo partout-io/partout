@@ -20,21 +20,21 @@ size_t dp_assemble(void *vmode) {
     pp_assert(ctx->dst->length >= dst_capacity);
 
     uint8_t *dst = ctx->dst->bytes;
-    *(uint32_t *)dst = pp_endian_htonl(ctx->openvpn_packet_id);
+    *(uint32_t *)dst = pp_endian_htonl(ctx->packet_id);
     dst += sizeof(uint32_t);
     size_t dst_len = (size_t)(dst - ctx->dst->bytes + ctx->src_len);
     if (!mode->enc.framing_assemble) {
         memcpy(dst, ctx->src, ctx->src_len);
     } else {
-        size_t openvpn_packet_len_offset;
+        size_t packet_len_offset;
         openvpn_dp_framing_assemble_ctx assemble;
         assemble.dst = dst;
-        assemble.dst_len_offset = &openvpn_packet_len_offset;
+        assemble.dst_len_offset = &packet_len_offset;
         assemble.src = ctx->src;
         assemble.src_len = ctx->src_len;
         assemble.mss_val = mode->opt.mss_val;
         mode->enc.framing_assemble(&assemble);
-        dst_len += openvpn_packet_len_offset;
+        dst_len += packet_len_offset;
     }
     return dst_len;
 }

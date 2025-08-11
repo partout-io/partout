@@ -45,14 +45,14 @@ void openvpn_dp_mode_free(openvpn_dp_mode *mode) {
 // MARK: - Encryption
 
 size_t openvpn_dp_mode_assemble(openvpn_dp_mode *_Nonnull mode,
-                        uint32_t openvpn_packet_id,
+                        uint32_t packet_id,
                         pp_zd *_Nonnull dst,
                         const uint8_t *_Nonnull src,
                         size_t src_len) {
 
     openvpn_dp_mode_assemble_ctx *ctx = &mode->assemble_ctx;
     ctx->mode = mode;
-    ctx->openvpn_packet_id = openvpn_packet_id;
+    ctx->packet_id = packet_id;
     ctx->dst = dst;
     ctx->src = src;
     ctx->src_len = src_len;
@@ -61,7 +61,7 @@ size_t openvpn_dp_mode_assemble(openvpn_dp_mode *_Nonnull mode,
 
 size_t openvpn_dp_mode_encrypt(openvpn_dp_mode *_Nonnull mode,
                        uint8_t key,
-                       uint32_t openvpn_packet_id,
+                       uint32_t packet_id,
                        pp_zd *_Nonnull dst,
                        const uint8_t *_Nonnull src,
                        size_t src_len,
@@ -69,7 +69,7 @@ size_t openvpn_dp_mode_encrypt(openvpn_dp_mode *_Nonnull mode,
 
     openvpn_dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
     ctx->key = key;
-    ctx->openvpn_packet_id = openvpn_packet_id;
+    ctx->packet_id = packet_id;
     ctx->dst = dst;
     ctx->src = src;
     ctx->src_len = src_len;

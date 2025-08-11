@@ -15,7 +15,7 @@ typedef struct {
     openvpn_packet_code code;
     uint8_t key;
     uint8_t *_Nonnull session_id;
-    uint32_t openvpn_packet_id;
+    uint32_t packet_id;
     uint8_t *_Nullable payload;
     size_t payload_len;
     uint32_t *_Nullable ack_ids;
@@ -23,7 +23,7 @@ typedef struct {
     uint8_t *_Nullable ack_remote_session_id;
 } openvpn_ctrl;
 
-openvpn_ctrl *_Nonnull openvpn_ctrl_create(openvpn_packet_code code, uint8_t key, uint32_t openvpn_packet_id,
+openvpn_ctrl *_Nonnull openvpn_ctrl_create(openvpn_packet_code code, uint8_t key, uint32_t packet_id,
                                      const uint8_t *_Nonnull session_id,
                                      const uint8_t *_Nullable payload, size_t payload_len,
                                      const uint32_t *_Nullable ack_ids, size_t ack_ids_len,
@@ -35,7 +35,7 @@ size_t openvpn_ctrl_capacity(const openvpn_ctrl *_Nonnull pkt);
 
 typedef struct {
     pp_crypto_ctx _Nonnull crypto;
-    uint32_t openvpn_replay_id;
+    uint32_t replay_id;
     uint32_t timestamp;
 } openvpn_ctrl_alg;
 
