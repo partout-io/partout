@@ -44,8 +44,8 @@ void local_configure_encrypt(void *vctx,
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
     pp_assert(hmac_key);
 
-    CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_enc))
-    CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1))
+    PP_CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_enc))
+    PP_CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1))
     local_prepare_iv(ctx, ctx->iv_enc, hmac_key);
 }
 
@@ -70,11 +70,11 @@ size_t local_encrypt(void *vctx,
 
     memcpy(ctx->iv_enc, flags->iv, (size_t)MIN(flags->iv_len, cipher_iv_len));
 
-    CRYPTO_CHECK(EVP_CipherInit(ossl, NULL, NULL, ctx->iv_enc, -1))
-    CRYPTO_CHECK(EVP_CipherUpdate(ossl, NULL, &aad_len, flags->ad, (int)flags->ad_len))
-    CRYPTO_CHECK(EVP_CipherUpdate(ossl, out + tag_len, &ciphertext_len, in, (int)in_len))
-    CRYPTO_CHECK(EVP_CipherFinal_ex(ossl, out + tag_len + ciphertext_len, &final_len))
-    CRYPTO_CHECK(EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_GET_TAG, (int)tag_len, out))
+    PP_CRYPTO_CHECK(EVP_CipherInit(ossl, NULL, NULL, ctx->iv_enc, -1))
+    PP_CRYPTO_CHECK(EVP_CipherUpdate(ossl, NULL, &aad_len, flags->ad, (int)flags->ad_len))
+    PP_CRYPTO_CHECK(EVP_CipherUpdate(ossl, out + tag_len, &ciphertext_len, in, (int)in_len))
+    PP_CRYPTO_CHECK(EVP_CipherFinal_ex(ossl, out + tag_len + ciphertext_len, &final_len))
+    PP_CRYPTO_CHECK(EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_GET_TAG, (int)tag_len, out))
 
     const size_t out_len = tag_len + ciphertext_len + final_len;
     return out_len;
@@ -88,8 +88,8 @@ void local_configure_decrypt(void *vctx,
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
     pp_assert(hmac_key);
 
-    CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_dec))
-    CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0))
+    PP_CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_dec))
+    PP_CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0))
     local_prepare_iv(ctx, ctx->iv_dec, hmac_key);
 }
 
@@ -114,11 +114,11 @@ size_t local_decrypt(void *vctx,
 
     memcpy(ctx->iv_dec, flags->iv, (size_t)MIN(flags->iv_len, cipher_iv_len));
 
-    CRYPTO_CHECK(EVP_CipherInit(ossl, NULL, NULL, ctx->iv_dec, -1))
-    CRYPTO_CHECK(EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_SET_TAG, (int)tag_len, (void *)in))
-    CRYPTO_CHECK(EVP_CipherUpdate(ossl, NULL, &aad_len, flags->ad, (int)flags->ad_len))
-    CRYPTO_CHECK(EVP_CipherUpdate(ossl, out, &plaintext_len, in + tag_len, (int)(in_len - tag_len)))
-    CRYPTO_CHECK(EVP_CipherFinal_ex(ossl, out + plaintext_len, &final_len))
+    PP_CRYPTO_CHECK(EVP_CipherInit(ossl, NULL, NULL, ctx->iv_dec, -1))
+    PP_CRYPTO_CHECK(EVP_CIPHER_CTX_ctrl(ossl, EVP_CTRL_GCM_SET_TAG, (int)tag_len, (void *)in))
+    PP_CRYPTO_CHECK(EVP_CipherUpdate(ossl, NULL, &aad_len, flags->ad, (int)flags->ad_len))
+    PP_CRYPTO_CHECK(EVP_CipherUpdate(ossl, out, &plaintext_len, in + tag_len, (int)(in_len - tag_len)))
+    PP_CRYPTO_CHECK(EVP_CipherFinal_ex(ossl, out + plaintext_len, &final_len))
 
     const size_t out_len = plaintext_len + final_len;
     return out_len;

@@ -47,8 +47,8 @@ void local_configure_encrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *h
 
     if (ctx->cipher) {
         pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
-        CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_enc))
-        CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1))
+        PP_CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_enc))
+        PP_CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_enc, ctx->cipher, cipher_key->bytes, NULL, 1))
     }
     if (ctx->hmac_key_enc) {
         pp_zd_free(ctx->hmac_key_enc);
@@ -81,9 +81,9 @@ size_t local_encrypt(void *vctx,
                 return false;
             }
         }
-        CRYPTO_CHECK(EVP_CipherInit(ctx->ctx_enc, NULL, NULL, out_iv, -1))
-        CRYPTO_CHECK(EVP_CipherUpdate(ctx->ctx_enc, out_encrypted, &ciphertext_len, in, (int)in_len))
-        CRYPTO_CHECK(EVP_CipherFinal_ex(ctx->ctx_enc, out_encrypted + ciphertext_len, &final_len))
+        PP_CRYPTO_CHECK(EVP_CipherInit(ctx->ctx_enc, NULL, NULL, out_iv, -1))
+        PP_CRYPTO_CHECK(EVP_CipherUpdate(ctx->ctx_enc, out_encrypted, &ciphertext_len, in, (int)in_len))
+        PP_CRYPTO_CHECK(EVP_CipherFinal_ex(ctx->ctx_enc, out_encrypted + ciphertext_len, &final_len))
     } else {
         pp_assert(out_encrypted == out_iv);
         memcpy(out_encrypted, in, in_len);
@@ -91,9 +91,9 @@ size_t local_encrypt(void *vctx,
     }
 
     EVP_MAC_CTX *mac_ctx = EVP_MAC_CTX_new(ctx->mac);
-    CRYPTO_CHECK_MAC(EVP_MAC_init(mac_ctx, ctx->hmac_key_enc->bytes, ctx->hmac_key_enc->length, ctx->mac_params))
-    CRYPTO_CHECK_MAC(EVP_MAC_update(mac_ctx, out_iv, ciphertext_len + final_len + cipher_iv_len))
-    CRYPTO_CHECK_MAC(EVP_MAC_final(mac_ctx, out, &mac_len, digest_len))
+    PP_CRYPTO_CHECK_MAC(EVP_MAC_init(mac_ctx, ctx->hmac_key_enc->bytes, ctx->hmac_key_enc->length, ctx->mac_params))
+    PP_CRYPTO_CHECK_MAC(EVP_MAC_update(mac_ctx, out_iv, ciphertext_len + final_len + cipher_iv_len))
+    PP_CRYPTO_CHECK_MAC(EVP_MAC_final(mac_ctx, out, &mac_len, digest_len))
     EVP_MAC_CTX_free(mac_ctx);
 
     const size_t out_len = ciphertext_len + final_len + cipher_iv_len + digest_len;
@@ -108,8 +108,8 @@ void local_configure_decrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *h
 
     if (ctx->cipher) {
         pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
-        CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_dec))
-        CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0))
+        PP_CRYPTO_ASSERT(EVP_CIPHER_CTX_reset(ctx->ctx_dec))
+        PP_CRYPTO_ASSERT(EVP_CipherInit(ctx->ctx_dec, ctx->cipher, cipher_key->bytes, NULL, 0))
     }
     if (ctx->hmac_key_dec) {
         pp_zd_free(ctx->hmac_key_dec);
@@ -135,9 +135,9 @@ size_t local_decrypt(void *vctx,
     size_t mac_len = 0;
 
     EVP_MAC_CTX *mac_ctx = EVP_MAC_CTX_new(ctx->mac);
-    CRYPTO_CHECK_MAC(EVP_MAC_init(mac_ctx, ctx->hmac_key_dec->bytes, ctx->hmac_key_dec->length, ctx->mac_params))
-    CRYPTO_CHECK_MAC(EVP_MAC_update(mac_ctx, in + digest_len, in_len - digest_len))
-    CRYPTO_CHECK_MAC(EVP_MAC_final(mac_ctx, ctx->buffer_hmac, &mac_len, digest_len))
+    PP_CRYPTO_CHECK_MAC(EVP_MAC_init(mac_ctx, ctx->hmac_key_dec->bytes, ctx->hmac_key_dec->length, ctx->mac_params))
+    PP_CRYPTO_CHECK_MAC(EVP_MAC_update(mac_ctx, in + digest_len, in_len - digest_len))
+    PP_CRYPTO_CHECK_MAC(EVP_MAC_final(mac_ctx, ctx->buffer_hmac, &mac_len, digest_len))
     EVP_MAC_CTX_free(mac_ctx);
 
     pp_assert(mac_len == digest_len);
@@ -150,9 +150,9 @@ size_t local_decrypt(void *vctx,
     if (ctx->cipher) {
         size_t plaintext_len = 0;
         size_t final_len = 0;
-        CRYPTO_CHECK(EVP_CipherInit(ctx->ctx_dec, NULL, NULL, iv, -1))
-        CRYPTO_CHECK(EVP_CipherUpdate(ctx->ctx_dec, out, (int *)&plaintext_len, encrypted, (int)(in_len - mac_len - cipher_iv_len)))
-        CRYPTO_CHECK(EVP_CipherFinal_ex(ctx->ctx_dec, out + plaintext_len, (int *)&final_len))
+        PP_CRYPTO_CHECK(EVP_CipherInit(ctx->ctx_dec, NULL, NULL, iv, -1))
+        PP_CRYPTO_CHECK(EVP_CipherUpdate(ctx->ctx_dec, out, (int *)&plaintext_len, encrypted, (int)(in_len - mac_len - cipher_iv_len)))
+        PP_CRYPTO_CHECK(EVP_CipherFinal_ex(ctx->ctx_dec, out + plaintext_len, (int *)&final_len))
         out_len = plaintext_len + final_len;
     } else {
         out_len = in_len - mac_len;
@@ -169,9 +169,9 @@ bool local_verify(void *vctx, const uint8_t *in, size_t in_len, pp_crypto_error_
     const size_t digest_len = ctx->crypto.meta.digest_len;
     size_t mac_len = 0;
     EVP_MAC_CTX *mac_ctx = EVP_MAC_CTX_new(ctx->mac);
-    CRYPTO_CHECK_MAC(EVP_MAC_init(mac_ctx, ctx->hmac_key_dec->bytes, ctx->hmac_key_dec->length, ctx->mac_params))
-    CRYPTO_CHECK_MAC(EVP_MAC_update(mac_ctx, in + digest_len, in_len - digest_len))
-    CRYPTO_CHECK_MAC(EVP_MAC_final(mac_ctx, ctx->buffer_hmac, &mac_len, digest_len))
+    PP_CRYPTO_CHECK_MAC(EVP_MAC_init(mac_ctx, ctx->hmac_key_dec->bytes, ctx->hmac_key_dec->length, ctx->mac_params))
+    PP_CRYPTO_CHECK_MAC(EVP_MAC_update(mac_ctx, in + digest_len, in_len - digest_len))
+    PP_CRYPTO_CHECK_MAC(EVP_MAC_final(mac_ctx, ctx->buffer_hmac, &mac_len, digest_len))
     EVP_MAC_CTX_free(mac_ctx);
 
     pp_assert(mac_len == digest_len);

@@ -44,7 +44,7 @@ void local_configure_encrypt(void *vctx,
         BCryptDestroyKey(ctx->hKeyEnc);
         ctx->hKeyEnc = NULL;
     }
-    CRYPTO_ASSERT(BCryptGenerateSymmetricKey(
+    PP_CRYPTO_ASSERT(BCryptGenerateSymmetricKey(
         ctx->hAlg,
         &ctx->hKeyEnc,
         NULL, 0,
@@ -81,7 +81,7 @@ size_t local_encrypt(void *vctx,
     authInfo.pbTag = ctx->tag;
     authInfo.cbTag = (ULONG)tag_len;
 
-    CRYPTO_CHECK(BCryptEncrypt(
+    PP_CRYPTO_CHECK(BCryptEncrypt(
         ctx->hKeyEnc,
         (PUCHAR)in, (ULONG)in_len,
         &authInfo,
@@ -109,7 +109,7 @@ void local_configure_decrypt(void *vctx,
         BCryptDestroyKey(ctx->hKeyDec);
         ctx->hKeyDec = NULL;
     }
-    CRYPTO_ASSERT(BCryptGenerateSymmetricKey(
+    PP_CRYPTO_ASSERT(BCryptGenerateSymmetricKey(
         ctx->hAlg,
         &ctx->hKeyDec,
         NULL, 0,
@@ -146,7 +146,7 @@ size_t local_decrypt(void *vctx,
     authInfo.pbTag = (PUCHAR)in;
     authInfo.cbTag = (ULONG)tag_len;
 
-    CRYPTO_CHECK(BCryptDecrypt(
+    PP_CRYPTO_CHECK(BCryptDecrypt(
         ctx->hKeyDec,
         (PUCHAR)(in + tag_len),
         (ULONG)(in_len - tag_len),
@@ -178,13 +178,13 @@ pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
     }
 
     pp_crypto_aead_ctx *ctx = pp_alloc_crypto(sizeof(pp_crypto_aead_ctx));
-    CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
+    PP_CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
         &ctx->hAlg,
         BCRYPT_AES_ALGORITHM,
         NULL,
         0
     ));
-    CRYPTO_CHECK_CREATE(BCryptSetProperty(
+    PP_CRYPTO_CHECK_CREATE(BCryptSetProperty(
         ctx->hAlg,
         BCRYPT_CHAINING_MODE,
         (PUCHAR)BCRYPT_CHAIN_MODE_GCM,

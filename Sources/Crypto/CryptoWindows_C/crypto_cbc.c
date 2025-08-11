@@ -50,7 +50,7 @@ void local_configure_encrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *h
         ctx->hKeyEnc = NULL;
     }
     if (ctx->hAlgCipher) {
-        CRYPTO_ASSERT(BCryptGenerateSymmetricKey(
+        PP_CRYPTO_ASSERT(BCryptGenerateSymmetricKey(
             ctx->hAlgCipher,
             &ctx->hKeyEnc,
             NULL, 0,
@@ -84,7 +84,7 @@ size_t local_encrypt(void *vctx,
 
     if (ctx->hAlgCipher) {
         if (!flags || !flags->for_testing) {
-            CRYPTO_CHECK(BCryptGenRandom(
+            PP_CRYPTO_CHECK(BCryptGenRandom(
                 NULL,
                 out_iv,
                 (ULONG)cipher_iv_len,
@@ -95,7 +95,7 @@ size_t local_encrypt(void *vctx,
         // do NOT use out_iv directly because BCryptEncrypt has side-effect
         memcpy(ctx->buffer_iv, out_iv, cipher_iv_len);
 
-        CRYPTO_CHECK(BCryptEncrypt(
+        PP_CRYPTO_CHECK(BCryptEncrypt(
             ctx->hKeyEnc,
             (PUCHAR)in, (ULONG)in_len,
             NULL,
@@ -111,15 +111,15 @@ size_t local_encrypt(void *vctx,
     }
 
     BCRYPT_HASH_HANDLE hHmac = NULL;
-    CRYPTO_CHECK_MAC(BCryptCreateHash(
+    PP_CRYPTO_CHECK_MAC(BCryptCreateHash(
         ctx->hAlgHmac,
         &hHmac,
         NULL, 0,
         ctx->hmac_key_enc->bytes, (ULONG)hmac_key_len,
         0
     ))
-    CRYPTO_CHECK_MAC(BCryptHashData(hHmac, out_iv, (ULONG)(enc_len + cipher_iv_len), 0))
-    CRYPTO_CHECK_MAC(BCryptFinishHash(hHmac, out, (ULONG)digest_len, 0))
+    PP_CRYPTO_CHECK_MAC(BCryptHashData(hHmac, out_iv, (ULONG)(enc_len + cipher_iv_len), 0))
+    PP_CRYPTO_CHECK_MAC(BCryptFinishHash(hHmac, out, (ULONG)digest_len, 0))
     BCryptDestroyHash(hHmac);
 
     const size_t out_len = enc_len + cipher_iv_len + digest_len;
@@ -137,7 +137,7 @@ void local_configure_decrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *h
         ctx->hKeyDec = NULL;
     }
     if (ctx->hAlgCipher) {
-        CRYPTO_ASSERT(BCryptGenerateSymmetricKey(
+        PP_CRYPTO_ASSERT(BCryptGenerateSymmetricKey(
             ctx->hAlgCipher,
             &ctx->hKeyDec,
             NULL, 0,
@@ -171,15 +171,15 @@ size_t local_decrypt(void *vctx,
     size_t hmac_len = 0;
 
     BCRYPT_HASH_HANDLE hHmac = NULL;
-    CRYPTO_CHECK(BCryptCreateHash(
+    PP_CRYPTO_CHECK(BCryptCreateHash(
         ctx->hAlgHmac,
         &hHmac,
         NULL, 0,
         ctx->hmac_key_dec->bytes, (ULONG)hmac_key_len,
         0
     ))
-    CRYPTO_CHECK(BCryptHashData(hHmac, (PUCHAR)(in + digest_len), (ULONG)(in_len - digest_len), 0))
-    CRYPTO_CHECK(BCryptFinishHash(hHmac, ctx->buffer_hmac, (ULONG)digest_len, 0))
+    PP_CRYPTO_CHECK(BCryptHashData(hHmac, (PUCHAR)(in + digest_len), (ULONG)(in_len - digest_len), 0))
+    PP_CRYPTO_CHECK(BCryptFinishHash(hHmac, ctx->buffer_hmac, (ULONG)digest_len, 0))
     BCryptDestroyHash(hHmac);
 
     if (memcmp(ctx->buffer_hmac, in, digest_len) != 0) {
@@ -189,7 +189,7 @@ size_t local_decrypt(void *vctx,
 
     ULONG out_len = 0;
     if (ctx->hAlgCipher) {
-        CRYPTO_CHECK(BCryptDecrypt(
+        PP_CRYPTO_CHECK(BCryptDecrypt(
             ctx->hKeyDec,
             (PUCHAR)encrypted, (ULONG)(in_len - digest_len - cipher_iv_len),
             NULL,
@@ -214,15 +214,15 @@ bool local_verify(void *vctx, const uint8_t *in, size_t in_len, pp_crypto_error_
     const size_t digest_len = ctx->crypto.meta.digest_len;
     const size_t hmac_key_len = ctx->crypto.meta.hmac_key_len;
     BCRYPT_HASH_HANDLE hHmac = NULL;
-    CRYPTO_CHECK_MAC(BCryptCreateHash(
+    PP_CRYPTO_CHECK_MAC(BCryptCreateHash(
         ctx->hAlgHmac,
         &hHmac,
         NULL, 0,
         ctx->hmac_key_dec->bytes, (ULONG)hmac_key_len,
         0
     ))
-    CRYPTO_CHECK_MAC(BCryptHashData(hHmac, (PUCHAR)(in + digest_len), (ULONG)(in_len - digest_len), 0))
-    CRYPTO_CHECK_MAC(BCryptFinishHash(hHmac, ctx->buffer_hmac, (ULONG)digest_len, 0))
+    PP_CRYPTO_CHECK_MAC(BCryptHashData(hHmac, (PUCHAR)(in + digest_len), (ULONG)(in_len - digest_len), 0))
+    PP_CRYPTO_CHECK_MAC(BCryptFinishHash(hHmac, ctx->buffer_hmac, (ULONG)digest_len, 0))
     BCryptDestroyHash(hHmac);
 
     if (memcmp(ctx->buffer_hmac, in, digest_len) != 0) {
@@ -273,13 +273,13 @@ pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name, const char *digest_n
     pp_crypto_cbc_ctx *ctx = pp_alloc_crypto(sizeof(pp_crypto_cbc_ctx));
 
     if (cipher_name) {
-        CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
+        PP_CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
             &ctx->hAlgCipher,
             BCRYPT_AES_ALGORITHM,
             NULL,
             0
         ));
-        CRYPTO_CHECK_CREATE(BCryptSetProperty(
+        PP_CRYPTO_CHECK_CREATE(BCryptSetProperty(
             ctx->hAlgCipher,
             BCRYPT_CHAINING_MODE,
             (PUCHAR)BCRYPT_CHAIN_MODE_CBC,
@@ -289,7 +289,7 @@ pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name, const char *digest_n
     } else {
         ctx->hAlgCipher = NULL;
     }
-    CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
+    PP_CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
         &ctx->hAlgHmac,
         hmac_alg_id,
         NULL,

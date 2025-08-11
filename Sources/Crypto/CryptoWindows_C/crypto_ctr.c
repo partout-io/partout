@@ -55,7 +55,7 @@ void local_configure_encrypt(void *vctx,
         BCryptDestroyKey(ctx->hKeyEnc);
         ctx->hKeyEnc = NULL;
     }
-    CRYPTO_ASSERT(BCryptGenerateSymmetricKey(
+    PP_CRYPTO_ASSERT(BCryptGenerateSymmetricKey(
         ctx->hAlgCipher,
         &ctx->hKeyEnc,
         NULL, 0,
@@ -90,22 +90,22 @@ size_t local_encrypt(void *vctx,
     // HMAC (SHA256)
     BCRYPT_ALG_HANDLE hAlgHmac = NULL;
     BCRYPT_HASH_HANDLE hHmac = NULL;
-    CRYPTO_CHECK_MAC_ALG(BCryptOpenAlgorithmProvider(
+    PP_CRYPTO_CHECK_MAC_ALG(BCryptOpenAlgorithmProvider(
         &hAlgHmac,
         BCRYPT_SHA256_ALGORITHM,
         NULL,
         BCRYPT_ALG_HANDLE_HMAC_FLAG
     ))
-    CRYPTO_CHECK_MAC_ALG(BCryptCreateHash(
+    PP_CRYPTO_CHECK_MAC_ALG(BCryptCreateHash(
         hAlgHmac,
         &hHmac,
         NULL, 0,
         ctx->hmac_key_enc->bytes, (ULONG)ctx->crypto.meta.hmac_key_len,
         0
     ))
-    CRYPTO_CHECK_MAC_ALG(BCryptHashData(hHmac, (PUCHAR)flags->ad, (ULONG)flags->ad_len, 0))
-    CRYPTO_CHECK_MAC_ALG(BCryptHashData(hHmac, (PUCHAR)in, (ULONG)in_len, 0))
-    CRYPTO_CHECK_MAC_ALG(BCryptFinishHash(hHmac, out, (ULONG)ctx->ns_tag_len, 0))
+    PP_CRYPTO_CHECK_MAC_ALG(BCryptHashData(hHmac, (PUCHAR)flags->ad, (ULONG)flags->ad_len, 0))
+    PP_CRYPTO_CHECK_MAC_ALG(BCryptHashData(hHmac, (PUCHAR)in, (ULONG)in_len, 0))
+    PP_CRYPTO_CHECK_MAC_ALG(BCryptFinishHash(hHmac, out, (ULONG)ctx->ns_tag_len, 0))
     BCryptDestroyHash(hHmac);
     BCryptCloseAlgorithmProvider(hAlgHmac, 0);
 
@@ -113,7 +113,7 @@ size_t local_encrypt(void *vctx,
     memcpy(counter, out, block_size); // Use tag as IV/counter
     for (size_t b = 0; b < nblocks; ++b) {
         ULONG ecb_len = 0;
-        CRYPTO_CHECK(BCryptEncrypt(
+        PP_CRYPTO_CHECK(BCryptEncrypt(
             ctx->hKeyEnc,
             counter, (ULONG)block_size,
             NULL,
@@ -144,7 +144,7 @@ void local_configure_decrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *h
         BCryptDestroyKey(ctx->hKeyDec);
         ctx->hKeyDec = NULL;
     }
-    CRYPTO_ASSERT(BCryptGenerateSymmetricKey(
+    PP_CRYPTO_ASSERT(BCryptGenerateSymmetricKey(
         ctx->hAlgCipher,
         &ctx->hKeyDec,
         NULL, 0,
@@ -182,7 +182,7 @@ size_t local_decrypt(void *vctx,
     memcpy(counter, iv, block_size);
     for (size_t b = 0; b < nblocks; ++b) {
         ULONG ecb_len = 0;
-        CRYPTO_CHECK(BCryptEncrypt(
+        PP_CRYPTO_CHECK(BCryptEncrypt(
             ctx->hKeyDec,
             counter, (ULONG)block_size,
             NULL,
@@ -204,22 +204,22 @@ size_t local_decrypt(void *vctx,
     // HMAC verify
     BCRYPT_ALG_HANDLE hAlgHmac = NULL;
     BCRYPT_HASH_HANDLE hHmac = NULL;
-    CRYPTO_CHECK_MAC_ALG(BCryptOpenAlgorithmProvider(
+    PP_CRYPTO_CHECK_MAC_ALG(BCryptOpenAlgorithmProvider(
         &hAlgHmac,
         BCRYPT_SHA256_ALGORITHM,
         NULL,
         BCRYPT_ALG_HANDLE_HMAC_FLAG
     ))
-    CRYPTO_CHECK_MAC_ALG(BCryptCreateHash(
+    PP_CRYPTO_CHECK_MAC_ALG(BCryptCreateHash(
         hAlgHmac,
         &hHmac,
         NULL, 0,
         ctx->hmac_key_dec->bytes, (ULONG)ctx->crypto.meta.hmac_key_len,
         0
     ))
-    CRYPTO_CHECK_MAC_ALG(BCryptHashData(hHmac, (PUCHAR)flags->ad, (ULONG)flags->ad_len, 0))
-    CRYPTO_CHECK_MAC_ALG(BCryptHashData(hHmac, out, out_len, 0))
-    CRYPTO_CHECK_MAC_ALG(BCryptFinishHash(hHmac, ctx->buffer_hmac, (ULONG)ctx->ns_tag_len, 0))
+    PP_CRYPTO_CHECK_MAC_ALG(BCryptHashData(hHmac, (PUCHAR)flags->ad, (ULONG)flags->ad_len, 0))
+    PP_CRYPTO_CHECK_MAC_ALG(BCryptHashData(hHmac, out, out_len, 0))
+    PP_CRYPTO_CHECK_MAC_ALG(BCryptFinishHash(hHmac, ctx->buffer_hmac, (ULONG)ctx->ns_tag_len, 0))
     BCryptDestroyHash(hHmac);
     BCryptCloseAlgorithmProvider(hAlgHmac, 0);
 
@@ -248,7 +248,7 @@ pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name, const char *digest_n
     pp_crypto_ctr_ctx *ctx = pp_alloc_crypto(sizeof(pp_crypto_ctr_ctx));
 
     // no chaining mode, use ECB for manual CTR
-    CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
+    PP_CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
         &ctx->hAlgCipher,
         BCRYPT_AES_ALGORITHM,
         NULL,

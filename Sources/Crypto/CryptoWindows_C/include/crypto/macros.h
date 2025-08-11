@@ -6,24 +6,24 @@
 
 #pragma once
 
-#define CRYPTO_ASSERT(ntstatus) pp_assert(BCRYPT_SUCCESS(ntstatus));
+#define PP_CRYPTO_ASSERT(ntstatus) pp_assert(BCRYPT_SUCCESS(ntstatus));
 
-#define CRYPTO_CHECK_CREATE(ntstatus) if (!BCRYPT_SUCCESS(ntstatus)) goto failure;
+#define PP_CRYPTO_CHECK_CREATE(ntstatus) if (!BCRYPT_SUCCESS(ntstatus)) goto failure;
 
-#define CRYPTO_CHECK(ntstatus)\
+#define PP_CRYPTO_CHECK(ntstatus)\
 if (!BCRYPT_SUCCESS(ntstatus)) {\
     if (error) *error = PPCryptoErrorEncryption;\
     return 0;\
 }
 
-#define CRYPTO_CHECK_MAC(ntstatus)\
+#define PP_CRYPTO_CHECK_MAC(ntstatus)\
 if (!BCRYPT_SUCCESS(ntstatus)) {\
     if (error) *error = PPCryptoErrorHMAC;\
     if (hHmac) BCryptDestroyHash(hHmac);\
     return 0;\
 }
 
-#define CRYPTO_CHECK_MAC_ALG(ntstatus)\
+#define PP_CRYPTO_CHECK_MAC_ALG(ntstatus)\
 if (!BCRYPT_SUCCESS(ntstatus)) {\
     if (error) *error = PPCryptoErrorHMAC;\
     if (hHmac) BCryptDestroyHash(hHmac);\

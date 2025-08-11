@@ -6,15 +6,15 @@
 
 #pragma once
 
-#define CRYPTO_ASSERT(ossl_code) pp_assert(ossl_code > 0);
+#define PP_CRYPTO_ASSERT(ossl_code) pp_assert(ossl_code > 0);
 
-#define CRYPTO_CHECK(ossl_code)\
+#define PP_CRYPTO_CHECK(ossl_code)\
 if (ossl_code <= 0) {\
     if (error) *error = PPCryptoErrorEncryption;\
     return 0;\
 }
 
-#define CRYPTO_CHECK_MAC(ossl_code)\
+#define PP_CRYPTO_CHECK_MAC(ossl_code)\
 if (ossl_code <= 0) {\
     if (error) *error = PPCryptoErrorHMAC;\
     EVP_MAC_CTX_free(mac_ctx);\
