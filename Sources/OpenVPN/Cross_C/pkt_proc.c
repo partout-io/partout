@@ -63,24 +63,24 @@ openvpn_pkt_proc *openvpn_pkt_proc_create(openvpn_pkt_proc_method method, const 
     openvpn_pkt_proc *proc = pp_alloc_crypto(sizeof(openvpn_pkt_proc));
     proc->mask = NULL;
     switch (method) {
-        case PktProcMethodNone:
+        case OpenVPNPktProcMethodNone:
             proc->recv = alg_plain;
             proc->send = alg_plain;
             break;
-        case PktProcMethodXORMask:
+        case OpenVPNPktProcMethodXORMask:
             proc->recv = alg_xor_mask;
             proc->send = alg_xor_mask;
             proc->mask = pp_zd_create_from_data(mask, mask_len);
             break;
-        case PktProcMethodXORPtrPos:
+        case OpenVPNPktProcMethodXORPtrPos:
             proc->recv = alg_xor_ptrpos;
             proc->send = alg_xor_ptrpos;
             break;
-        case PktProcMethodReverse:
+        case OpenVPNPktProcMethodReverse:
             proc->recv = alg_reverse;
             proc->send = alg_reverse;
             break;
-        case PktProcMethodXORObfuscate:
+        case OpenVPNPktProcMethodXORObfuscate:
             proc->recv = alg_xor_obfuscate_in;
             proc->send = alg_xor_obfuscate_out;
             proc->mask = pp_zd_create_from_data(mask, mask_len);

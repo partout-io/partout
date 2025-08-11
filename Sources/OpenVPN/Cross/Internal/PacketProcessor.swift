@@ -22,18 +22,18 @@ final class PacketProcessor {
         switch method {
         case .xormask(let mask):
             proc = mask.toData().withUnsafeBytes { maskPtr in
-                openvpn_pkt_proc_create(PktProcMethodXORMask, maskPtr.bytePointer, mask.count)
+                openvpn_pkt_proc_create(OpenVPNPktProcMethodXORMask, maskPtr.bytePointer, mask.count)
             }
         case .xorptrpos:
-            proc = openvpn_pkt_proc_create(PktProcMethodXORPtrPos, nil, 0)
+            proc = openvpn_pkt_proc_create(OpenVPNPktProcMethodXORPtrPos, nil, 0)
         case .reverse:
-            proc = openvpn_pkt_proc_create(PktProcMethodReverse, nil, 0)
+            proc = openvpn_pkt_proc_create(OpenVPNPktProcMethodReverse, nil, 0)
         case .obfuscate(let mask):
             proc = mask.toData().withUnsafeBytes { maskPtr in
-                openvpn_pkt_proc_create(PktProcMethodXORObfuscate, maskPtr.bytePointer, mask.count)
+                openvpn_pkt_proc_create(OpenVPNPktProcMethodXORObfuscate, maskPtr.bytePointer, mask.count)
             }
         default:
-            proc = openvpn_pkt_proc_create(PktProcMethodNone, nil, 0)
+            proc = openvpn_pkt_proc_create(OpenVPNPktProcMethodNone, nil, 0)
         }
     }
 

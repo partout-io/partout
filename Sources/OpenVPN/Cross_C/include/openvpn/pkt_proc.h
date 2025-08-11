@@ -13,11 +13,11 @@
 #include "portable/zd.h"
 
 typedef enum {
-    PktProcMethodNone,
-    PktProcMethodXORMask,
-    PktProcMethodXORPtrPos,
-    PktProcMethodReverse,
-    PktProcMethodXORObfuscate
+    OpenVPNPktProcMethodNone,
+    OpenVPNPktProcMethodXORMask,
+    OpenVPNPktProcMethodXORPtrPos,
+    OpenVPNPktProcMethodReverse,
+    OpenVPNPktProcMethodXORObfuscate
 } openvpn_pkt_proc_method;
 
 typedef struct {
