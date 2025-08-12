@@ -16,7 +16,7 @@
 //static const char *const TLSBoxClientEKU = "TLS Web Client Authentication";
 static const char *const TLSBoxServerEKU = "TLS Web Server Authentication";
 
-static int pp_tls_ex_data_idx = -1;
+static int PPTLSExDataIdx = -1;
 
 struct pp_tls {
     const pp_tls_options *_Nonnull opt;
@@ -41,7 +41,7 @@ static
 int pp_tls_verify_peer(int ok, X509_STORE_CTX *_Nonnull ctx) {
     if (!ok) {
         SSL *ssl = X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
-        pp_tls_ctx tls = SSL_get_ex_data(ssl, pp_tls_ex_data_idx);
+        pp_tls_ctx tls = SSL_get_ex_data(ssl, PPTLSExDataIdx);
         tls->opt->on_verify_failure();
     }
     return ok;
@@ -174,7 +174,7 @@ bool pp_tls_start(pp_tls_ctx _Nonnull tls) {
     BIO_set_ssl(tls->bio_plain, tls->ssl, BIO_NOCLOSE);
 
     // attach custom object
-    SSL_set_ex_data(tls->ssl, pp_tls_ex_data_idx, tls);
+    SSL_set_ex_data(tls->ssl, PPTLSExDataIdx, tls);
 
     return SSL_do_handshake(tls->ssl);
 }
