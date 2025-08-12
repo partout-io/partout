@@ -145,7 +145,7 @@ uint32_t openvpn_dp_mode_peer_id(openvpn_dp_mode *_Nonnull mode) {
 
 static inline
 void openvpn_dp_mode_set_peer_id(openvpn_dp_mode *_Nonnull mode, uint32_t peer_id) {
-    mode->opt.peer_id = openvpn_peer_id_masked(peer_id);
+    mode->opt.peer_id = OPENVPN_PEER_ID_MASKED(peer_id);
 }
 
 static inline

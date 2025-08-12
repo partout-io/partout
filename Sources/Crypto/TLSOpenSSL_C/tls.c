@@ -300,7 +300,7 @@ char *pp_tls_ca_md5(const pp_tls_ctx tls) {
     char *hex = pp_alloc_crypto(2 * sizeof(md) + 1);
     char *ptr = hex;
     for (size_t i = 0; i < sizeof(md); ++i) {
-        ptr += snprintf(ptr, 2, "%02x", md[i]);
+        ptr += snprintf(ptr, 3, "%02x", md[i]);
     }
     *ptr = '\0';
     return hex;
