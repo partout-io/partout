@@ -8,8 +8,8 @@ import PackageDescription
 
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.173"
-let checksum = "dc1b215584afdb36bddb2619b05fc3ebf69d2f9a25aa6baabd140734d06f31ef"
+let version = "0.99.174"
+let checksum = "e882ea65c2d42fbff5655a3d1ecec8b1c8d88f8260100f104099791e932becc5"
 
 // included areas and environment
 let areas: Set<Area> = Area.defaultAreas
