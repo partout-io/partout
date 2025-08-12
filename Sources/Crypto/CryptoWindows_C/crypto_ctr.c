@@ -27,7 +27,7 @@ typedef struct {
     pp_zd *_Nonnull hmac_key_enc;
     pp_zd *_Nonnull hmac_key_dec;
     uint8_t *_Nonnull buffer_hmac;
-} pp_crypto_ctr_ctx;
+} pp_crypto_ctr;
 
 static inline
 void ctr_increment(uint8_t *counter, size_t len) {
@@ -38,7 +38,7 @@ void ctr_increment(uint8_t *counter, size_t len) {
 
 static
 size_t local_encryption_capacity(const void *vctx, size_t len) {
-    const pp_crypto_ctr_ctx *ctx = (const pp_crypto_ctr_ctx *)vctx;
+    const pp_crypto_ctr *ctx = (const pp_crypto_ctr *)vctx;
     pp_assert(ctx);
     return pp_alloc_crypto_capacity(len, ctx->payload_len + ctx->ns_tag_len);
 }
@@ -46,7 +46,7 @@ size_t local_encryption_capacity(const void *vctx, size_t len) {
 static
 void local_configure_encrypt(void *vctx,
                              const pp_zd *cipher_key, const pp_zd *hmac_key) {
-    pp_crypto_ctr_ctx *ctx = vctx;
+    pp_crypto_ctr *ctx = vctx;
     pp_assert(ctx);
     pp_assert(hmac_key && hmac_key->length >= ctx->crypto.meta.hmac_key_len);
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
@@ -74,7 +74,7 @@ size_t local_encrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
                      const pp_crypto_flags *flags, pp_crypto_error_code *error) {
-    pp_crypto_ctr_ctx *ctx = vctx;
+    pp_crypto_ctr *ctx = vctx;
     pp_assert(ctx);
     pp_assert(ctx->hKeyEnc);
     pp_assert(ctx->hmac_key_enc);
@@ -135,7 +135,7 @@ size_t local_encrypt(void *vctx,
 
 static
 void local_configure_decrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *hmac_key) {
-    pp_crypto_ctr_ctx *ctx = vctx;
+    pp_crypto_ctr *ctx = vctx;
     pp_assert(ctx);
     pp_assert(hmac_key && hmac_key->length >= ctx->crypto.meta.hmac_key_len);
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
@@ -163,7 +163,7 @@ size_t local_decrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
                      const pp_crypto_flags *flags, pp_crypto_error_code *error) {
-    pp_crypto_ctr_ctx *ctx = vctx;
+    pp_crypto_ctr *ctx = vctx;
     pp_assert(ctx);
     pp_assert(ctx->hKeyDec);
     pp_assert(ctx->hmac_key_dec);
@@ -245,7 +245,7 @@ pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name, const char *digest_n
         return NULL;
     }
 
-    pp_crypto_ctr_ctx *ctx = pp_alloc_crypto(sizeof(pp_crypto_ctr_ctx));
+    pp_crypto_ctr *ctx = pp_alloc_crypto(sizeof(pp_crypto_ctr));
 
     // no chaining mode, use ECB for manual CTR
     PP_CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
@@ -289,7 +289,7 @@ failure:
 
 void pp_crypto_ctr_free(pp_crypto_ctx vctx) {
     if (!vctx) return;
-    pp_crypto_ctr_ctx *ctx = (pp_crypto_ctr_ctx *)vctx;
+    pp_crypto_ctr *ctx = (pp_crypto_ctr *)vctx;
 
     if (ctx->hKeyEnc) BCryptDestroyKey(ctx->hKeyEnc);
     if (ctx->hKeyDec) BCryptDestroyKey(ctx->hKeyDec);
