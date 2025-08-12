@@ -16,14 +16,14 @@ let areas: Set<Area> = Area.defaultAreas
 let coreDeployment: CoreDeployment = .remoteBinary
 let coreSourceSHA1 = "510c109b44efce60fe362775652990519a506511"
 
-// must be false in production (check in CI)
-let isDevelopment = false
-let isTestingOpenVPNDataPath = false
-
 // optional overrides from environment
 let env = ProcessInfo.processInfo.environment
 let packageOS = env["PARTOUT_OS"]
 let packageHasDocs = env["PARTOUT_DOCS"] == "1"
+
+// must be false in production (check in CI)
+let isDevelopment = false
+let isTestingOpenVPNDataPath = false
 
 // PartoutCore binaries only on non-Apple
 guard OS.current == .apple || ![.remoteBinary, .localBinary].contains(coreDeployment) else {
