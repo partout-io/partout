@@ -44,7 +44,7 @@ typedef enum {
 
 // MARK: - Macros
 
-#define openvpn_peer_id_masked(pid)         (pid & 0xffffff)
+#define OPENVPN_PEER_ID_MASKED(pid)        (pid & 0xffffff)
 
 static inline
 bool openvpn_packet_is_ping(const uint8_t *_Nonnull bytes, size_t len) {
@@ -88,7 +88,7 @@ size_t openvpn_packet_header_v2_set(uint8_t *_Nonnull dst,
                             uint8_t src_key,
                             uint32_t src_peer_id) {
 
-    *(uint32_t *)dst = ((OpenVPNPacketCodeDataV2 << 3) | (src_key & 0b111)) | pp_endian_htonl(openvpn_peer_id_masked(src_peer_id));
+    *(uint32_t *)dst = ((OpenVPNPacketCodeDataV2 << 3) | (src_key & 0b111)) | pp_endian_htonl(OPENVPN_PEER_ID_MASKED(src_peer_id));
     return OpenVPNPacketOpcodeLength + OpenVPNPacketPeerIdLength;
 }
 
