@@ -229,7 +229,6 @@ pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name, const char *digest_n
         ctx->crypto.meta.cipher_key_len = EVP_CIPHER_key_length(ctx->cipher);
         ctx->crypto.meta.cipher_iv_len = EVP_CIPHER_iv_length(ctx->cipher);
     }
-    // as seen in OpenVPN's pp_crypto_openssl.c:md_kt_size()
     ctx->crypto.meta.hmac_key_len = EVP_MD_size(ctx->digest);
     ctx->crypto.meta.digest_len = ctx->crypto.meta.hmac_key_len;
     ctx->crypto.meta.tag_len = 0;
