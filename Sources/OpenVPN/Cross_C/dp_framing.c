@@ -6,35 +6,35 @@
 
 #include "openvpn/dp_framing_comp.h"
 
-static const dp_framing_t comp_disabled = {
-    dp_framing_assemble_disabled,
-    dp_framing_parse_disabled
+static const openvpn_dp_framing comp_disabled = {
+    openvpn_dp_framing_assemble_disabled,
+    openvpn_dp_framing_parse_disabled
 };
 
-static const dp_framing_t comp_lzo = {
-    dp_framing_assemble_lzo,
-    dp_framing_parse_lzo
+static const openvpn_dp_framing comp_lzo = {
+    openvpn_dp_framing_assemble_lzo,
+    openvpn_dp_framing_parse_lzo
 };
 
-static const dp_framing_t comp_compress = {
-    dp_framing_assemble_compress,
-    dp_framing_parse_compress
+static const openvpn_dp_framing comp_compress = {
+    openvpn_dp_framing_assemble_compress,
+    openvpn_dp_framing_parse_compress
 };
 
-static const dp_framing_t comp_compress_v2 = {
-    dp_framing_assemble_compress_v2,
-    dp_framing_parse_compress_v2
+static const openvpn_dp_framing comp_compress_v2 = {
+    openvpn_dp_framing_assemble_compress_v2,
+    openvpn_dp_framing_parse_compress_v2
 };
 
-const dp_framing_t *dp_framing(compression_framing_t comp_f) {
+const openvpn_dp_framing *openvpn_dp_framing_of(openvpn_compression_framing comp_f) {
     switch (comp_f) {
-    case CompressionFramingDisabled:
+    case OpenVPNCompressionFramingDisabled:
         return &comp_disabled;
-    case CompressionFramingCompLZO:
+    case OpenVPNCompressionFramingCompLZO:
         return &comp_lzo;
-    case CompressionFramingCompress:
+    case OpenVPNCompressionFramingCompress:
         return &comp_compress;
-    case CompressionFramingCompressV2:
+    case OpenVPNCompressionFramingCompressV2:
         return &comp_compress_v2;
     }
 }

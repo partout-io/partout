@@ -67,7 +67,6 @@
 
         self.cipherKeyLength = EVP_CIPHER_key_length(self.cipher);
         self.cipherIVLength = EVP_CIPHER_iv_length(self.cipher);
-        // as seen in OpenVPN's crypto_openssl.c:md_kt_size()
         self.hmacKeyLength = (int)EVP_MD_size(self.digest);
         NSAssert(EVP_MD_size(self.digest) == self.tagLength, @"Expected digest size to be tag length (%ld)", (long)self.tagLength);
 

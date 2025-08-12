@@ -2,19 +2,19 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutVendorsCryptoCore_C
+internal import _PartoutCryptoCore_C
 
-enum CryptoError: Error {
+enum PPCryptoError: Error {
     case creation
 
     case hmac
 }
 
 struct CCryptoError: Error {
-    let code: crypto_error_code
+    let code: pp_crypto_error_code
 
-    init(_ code: crypto_error_code) {
-        precondition(code != CryptoErrorNone)
+    init(_ code: pp_crypto_error_code) {
+        precondition(code != PPCryptoErrorNone)
         self.code = code
     }
 }

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutVendorsCryptoCore_C
+internal import _PartoutCryptoCore_C
 internal import _PartoutVendorsPortable
 internal import _PartoutVendorsPortable_C
 import Foundation
@@ -33,13 +33,13 @@ extension CryptoKeys {
 }
 
 final class CryptoKeysBridge {
-    private let cipherEncKey: UnsafeMutablePointer<zeroing_data_t>
+    private let cipherEncKey: UnsafeMutablePointer<pp_zd>
 
-    private let cipherDecKey: UnsafeMutablePointer<zeroing_data_t>
+    private let cipherDecKey: UnsafeMutablePointer<pp_zd>
 
-    private let hmacEncKey: UnsafeMutablePointer<zeroing_data_t>
+    private let hmacEncKey: UnsafeMutablePointer<pp_zd>
 
-    private let hmacDecKey: UnsafeMutablePointer<zeroing_data_t>
+    private let hmacDecKey: UnsafeMutablePointer<pp_zd>
 
     init(keys: CryptoKeys) {
         cipherEncKey = (keys.cipher?.encryptionKey).unsafeCopy()
@@ -49,25 +49,25 @@ final class CryptoKeysBridge {
     }
 
     deinit {
-        zd_free(cipherEncKey)
-        zd_free(cipherDecKey)
-        zd_free(hmacEncKey)
-        zd_free(hmacDecKey)
+        pp_zd_free(cipherEncKey)
+        pp_zd_free(cipherDecKey)
+        pp_zd_free(hmacEncKey)
+        pp_zd_free(hmacDecKey)
     }
 
-    func withUnsafeKeys<T>(_ body: (UnsafePointer<crypto_keys_t>) -> T) -> T {
+    func withUnsafeKeys<T>(_ body: (UnsafePointer<pp_crypto_keys>) -> T) -> T {
         withUnsafePointer(to: cKeys, body)
     }
 }
 
 private extension CryptoKeysBridge {
-    var cKeys: crypto_keys_t {
-        crypto_keys_t(
-            cipher: crypto_key_pair_t(
+    var cKeys: pp_crypto_keys {
+        pp_crypto_keys(
+            cipher: pp_crypto_key_pair(
                 enc_key: cipherEncKey,
                 dec_key: cipherDecKey
             ),
-            hmac: crypto_key_pair_t(
+            hmac: pp_crypto_key_pair(
                 enc_key: hmacEncKey,
                 dec_key: hmacDecKey
             )
@@ -76,10 +76,10 @@ private extension CryptoKeysBridge {
 }
 
 private extension Optional<CZeroingData> {
-    func unsafeCopy() -> UnsafeMutablePointer<zeroing_data_t> {
+    func unsafeCopy() -> UnsafeMutablePointer<pp_zd> {
         guard let self else {
-            return zd_create(0)
+            return pp_zd_create(0)
         }
-        return zd_create_from_data(self.bytes, self.count)
+        return pp_zd_create_from_data(self.bytes, self.count)
     }
 }

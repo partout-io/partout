@@ -15,7 +15,7 @@
                       ackIds:(nullable NSArray<NSNumber *> *)ackIds
           ackRemoteSessionId:(nullable NSData *)ackRemoteSessionId
 {
-    NSCParameterAssert(sessionId.length == PacketSessionIdLength);
+    NSCParameterAssert(sessionId.length == OpenVPNPacketSessionIdLength);
     
     if (!(self = [super init])) {
         return nil;
@@ -36,8 +36,8 @@
                      ackIds:(NSArray<NSNumber *> *)ackIds
          ackRemoteSessionId:(NSData *)ackRemoteSessionId
 {
-    NSCParameterAssert(sessionId.length == PacketSessionIdLength);
-    NSCParameterAssert(ackRemoteSessionId.length == PacketSessionIdLength);
+    NSCParameterAssert(sessionId.length == OpenVPNPacketSessionIdLength);
+    NSCParameterAssert(ackRemoteSessionId.length == OpenVPNPacketSessionIdLength);
     
     if (!(self = [super init])) {
         return nil;
@@ -62,12 +62,12 @@
     const BOOL isAck = self.isAck;
     const NSUInteger ackLength = self.ackIds.count;
     NSCAssert(!isAck || ackLength > 0, @"Ack packet must provide positive ackLength");
-    NSInteger n = PacketAckLengthLength;
+    NSInteger n = OpenVPNPacketAckLengthLength;
     if (ackLength > 0) {
-        n += ackLength * PacketIdLength + PacketSessionIdLength;
+        n += ackLength * OpenVPNPacketIdLength + OpenVPNPacketSessionIdLength;
     }
     if (!isAck) {
-        n += PacketIdLength;
+        n += OpenVPNPacketIdLength;
     }
     n += self.payload.length;
     return n;
@@ -77,24 +77,24 @@
 {
     uint8_t *ptr = to;
     if (self.ackIds.count > 0) {
-        NSCParameterAssert(self.ackRemoteSessionId.length == PacketSessionIdLength);
+        NSCParameterAssert(self.ackRemoteSessionId.length == OpenVPNPacketSessionIdLength);
         *ptr = self.ackIds.count;
-        ptr += PacketAckLengthLength;
+        ptr += OpenVPNPacketAckLengthLength;
         for (NSNumber *n in self.ackIds) {
             const uint32_t ackId = (uint32_t)n.unsignedIntegerValue;
             *(uint32_t *)ptr = CFSwapInt32HostToBig(ackId);
-            ptr += PacketIdLength;
+            ptr += OpenVPNPacketIdLength;
         }
-        memcpy(ptr, self.ackRemoteSessionId.bytes, PacketSessionIdLength);
-        ptr += PacketSessionIdLength;
+        memcpy(ptr, self.ackRemoteSessionId.bytes, OpenVPNPacketSessionIdLength);
+        ptr += OpenVPNPacketSessionIdLength;
     }
     else {
         *ptr = 0; // no acks
-        ptr += PacketAckLengthLength;
+        ptr += OpenVPNPacketAckLengthLength;
     }
     if (self.code != PacketCodeAckV1) {
         *(uint32_t *)ptr = CFSwapInt32HostToBig(self.packetId);
-        ptr += PacketIdLength;
+        ptr += OpenVPNPacketIdLength;
         if (self.payload) {
             memcpy(ptr, self.payload.bytes, self.payload.length);
             ptr += self.payload.length;
@@ -105,7 +105,7 @@
 
 - (NSInteger)capacity
 {
-    return PacketOpcodeLength + PacketSessionIdLength + self.rawCapacity;
+    return OpenVPNPacketOpcodeLength + OpenVPNPacketSessionIdLength + self.rawCapacity;
 }
 
 - (NSData *)serialized
@@ -123,7 +123,7 @@
 
 - (NSInteger)capacityWithAuthenticator:(id<Encrypter>)auth
 {
-    return auth.digestLength + PacketReplayIdLength + PacketReplayTimestampLength + self.capacity;
+    return auth.digestLength + OpenVPNPacketReplayIdLength + OpenVPNPacketReplayTimestampLength + self.capacity;
 }
 
 - (BOOL)serializeTo:(uint8_t *)to authenticatingWith:(id<Encrypter>)auth replayId:(uint32_t)replayId timestamp:(uint32_t)timestamp error:(NSError *__autoreleasing  _Nullable *)error
@@ -131,9 +131,9 @@
     uint8_t *ptr = to + auth.digestLength;
     const uint8_t *subject = ptr;
     *(uint32_t *)ptr = CFSwapInt32HostToBig(replayId);
-    ptr += PacketReplayIdLength;
+    ptr += OpenVPNPacketReplayIdLength;
     *(uint32_t *)ptr = CFSwapInt32HostToBig(timestamp);
-    ptr += PacketReplayTimestampLength;
+    ptr += OpenVPNPacketReplayTimestampLength;
     ptr += PacketHeaderSet(ptr, self.code, self.key, self.sessionId.bytes);
     ptr += [self rawSerializeTo:ptr];
     
@@ -143,7 +143,7 @@
         return NO;
     }
     NSCAssert(totalLength == auth.digestLength + subjectLength, @"Encrypted packet size != (Digest + Subject)");
-    PacketSwap(to, auth.digestLength + PacketReplayIdLength + PacketReplayTimestampLength, PacketOpcodeLength + PacketSessionIdLength);
+    PacketSwap(to, auth.digestLength + OpenVPNPacketReplayIdLength + OpenVPNPacketReplayTimestampLength, OpenVPNPacketOpcodeLength + OpenVPNPacketSessionIdLength);
     return YES;
 }
 
@@ -162,7 +162,7 @@
 
 - (NSInteger)capacityWithEncrypter:(id<Encrypter>)encrypter
 {
-    return PacketOpcodeLength + PacketSessionIdLength + PacketReplayIdLength + PacketReplayTimestampLength + [encrypter encryptionCapacityWithLength:self.capacity];
+    return OpenVPNPacketOpcodeLength + OpenVPNPacketSessionIdLength + OpenVPNPacketReplayIdLength + OpenVPNPacketReplayTimestampLength + [encrypter encryptionCapacityWithLength:self.capacity];
 }
     
 - (BOOL)serializeTo:(uint8_t *)to encryptingWith:(nonnull id<Encrypter>)encrypter replayId:(uint32_t)replayId timestamp:(uint32_t)timestamp length:(NSInteger *)length adLength:(NSInteger)adLength error:(NSError *__autoreleasing  _Nullable * _Nullable)error
@@ -170,9 +170,9 @@
     uint8_t *ptr = to;
     ptr += PacketHeaderSet(to, self.code, self.key, self.sessionId.bytes);
     *(uint32_t *)ptr = CFSwapInt32HostToBig(replayId);
-    ptr += PacketReplayIdLength;
+    ptr += OpenVPNPacketReplayIdLength;
     *(uint32_t *)ptr = CFSwapInt32HostToBig(timestamp);
-    ptr += PacketReplayTimestampLength;
+    ptr += OpenVPNPacketReplayTimestampLength;
     
     NSAssert2(ptr - to == adLength, @"Incorrect AD bytes (%ld != %ld)", ptr - to, (long)adLength);
     

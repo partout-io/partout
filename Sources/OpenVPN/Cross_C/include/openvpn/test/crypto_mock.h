@@ -9,8 +9,8 @@
 #include "crypto/crypto.h"
 
 typedef struct {
-    crypto_t crypto;
-} crypto_mock_t;
+    pp_crypto crypto;
+} openvpn_crypto_mock;
 
-crypto_ctx _Nonnull crypto_mock_create();
-void crypto_mock_free(crypto_ctx _Nonnull ctx);
+pp_crypto_ctx _Nonnull openvpn_crypto_mock_create();
+void openvpn_crypto_mock_free(pp_crypto_ctx _Nonnull ctx);

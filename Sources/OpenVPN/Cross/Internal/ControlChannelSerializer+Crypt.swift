@@ -12,7 +12,7 @@ extension ControlChannel {
     final class CryptSerializer: ControlChannelSerializer {
         private let ctx: PartoutLoggerContext
 
-        private let ctr: crypto_ctx
+        private let ctr: pp_crypto_ctx
 
         private let headerLength: Int
 
@@ -42,7 +42,7 @@ extension ControlChannel {
                 )
                 let keysBridge = CryptoKeysBridge(keys: keys)
                 return keysBridge.withUnsafeKeys {
-                    crypto_ctr_create(
+                    pp_crypto_ctr_create(
                         "AES-256-CTR",
                         "SHA256",
                         Constants.ControlChannel.ctrTagLength,
@@ -52,13 +52,13 @@ extension ControlChannel {
                 }
             }()
             guard let ctr else {
-                throw CryptoError.creation
+                throw PPCryptoError.creation
             }
             self.ctr = ctr
 
-            headerLength = PacketOpcodeLength + PacketSessionIdLength
-            adLength = headerLength + PacketReplayIdLength + PacketReplayTimestampLength
-            tagLength = crypto_meta(ctr).tag_len
+            headerLength = OpenVPNPacketOpcodeLength + OpenVPNPacketSessionIdLength
+            adLength = headerLength + OpenVPNPacketReplayIdLength + OpenVPNPacketReplayTimestampLength
+            tagLength = pp_crypto_meta_of(ctr).tag_len
 
             currentReplayId = BidirectionalState(withResetValue: 1)
             timestamp = UInt32(Date().timeIntervalSince1970)
@@ -77,7 +77,7 @@ extension ControlChannel {
                 with: ctr,
                 replayId: currentReplayId.outbound,
                 timestamp: timestamp,
-                function: ctrl_pkt_serialize_crypt
+                function: openvpn_ctrl_serialize_crypt
             )
             currentReplayId.outbound += 1
             return data
@@ -93,11 +93,11 @@ extension ControlChannel {
             }
 
             let encryptedCount = packet.count - adLength
-            var decryptedPacket = Data(count: crypto_encryption_capacity(ctr, encryptedCount))
+            var decryptedPacket = Data(count: pp_crypto_encryption_capacity(ctr, encryptedCount))
             var decryptedCount = 0
             try packet.withUnsafeBytes {
                 let src = $0.bytePointer
-                var flags = crypto_flags_t(
+                var flags = pp_crypto_flags(
                     iv: nil,
                     iv_len: 0,
                     ad: src,
@@ -107,8 +107,8 @@ extension ControlChannel {
                 let dstBufCount = decryptedPacket.count
                 try decryptedPacket.withUnsafeMutableBytes {
                     let dst = $0.bytePointer
-                    var dec_error = CryptoErrorNone
-                    decryptedCount = crypto_decrypt(
+                    var dec_error = PPCryptoErrorNone
+                    decryptedCount = pp_crypto_decrypt(
                         ctr,
                         dst + headerLength,
                         dstBufCount - headerLength,

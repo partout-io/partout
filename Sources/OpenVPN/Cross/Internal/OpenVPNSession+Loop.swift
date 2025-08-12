@@ -90,11 +90,11 @@ private extension OpenVPNSession {
 
             var offset = 1
             if code == .dataV2 {
-                guard packet.count >= offset + PacketPeerIdLength else {
+                guard packet.count >= offset + OpenVPNPacketPeerIdLength else {
                     pp_log(ctx, .openvpn, .error, "Dropped malformed packet (missing peerId)")
                     continue
                 }
-                offset += PacketPeerIdLength
+                offset += OpenVPNPacketPeerIdLength
             }
 
             if code == .dataV1 || code == .dataV2 {

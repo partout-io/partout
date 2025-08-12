@@ -8,14 +8,14 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-#define PacketOpcodeLength          ((NSInteger)1)
-#define PacketIdLength              ((NSInteger)4)
-#define PacketSessionIdLength       ((NSInteger)8)
-#define PacketAckLengthLength       ((NSInteger)1)
+#define OpenVPNPacketOpcodeLength          ((NSInteger)1)
+#define OpenVPNPacketIdLength              ((NSInteger)4)
+#define OpenVPNPacketSessionIdLength       ((NSInteger)8)
+#define OpenVPNPacketAckLengthLength       ((NSInteger)1)
 #define PacketPeerIdLength          ((NSInteger)3)
-#define PacketPeerIdDisabled        ((uint32_t)0xffffffu)
-#define PacketReplayIdLength        ((NSInteger)4)
-#define PacketReplayTimestampLength ((NSInteger)4)
+#define OpenVPNPacketPeerIdDisabled        ((uint32_t)0xffffffu)
+#define OpenVPNPacketReplayIdLength        ((NSInteger)4)
+#define OpenVPNPacketReplayTimestampLength ((NSInteger)4)
 
 typedef NS_ENUM(uint8_t, PacketCode) {
     PacketCodeSoftResetV1           = 0x03,
@@ -43,7 +43,7 @@ extern const uint8_t DataPacketPingData[16];
 
 @end
 
-static inline void PacketOpcodeGet(const uint8_t *from, PacketCode *_Nullable code, uint8_t *_Nullable key)
+static inline void OpenVPNPacketOpcodeGet(const uint8_t *from, PacketCode *_Nullable code, uint8_t *_Nullable key)
 {
     if (code) {
         *code = (PacketCode)(*from >> 3);
@@ -56,10 +56,10 @@ static inline void PacketOpcodeGet(const uint8_t *from, PacketCode *_Nullable co
 static inline int PacketHeaderSet(uint8_t *to, PacketCode code, uint8_t key, const uint8_t *_Nullable sessionId)
 {
     *(uint8_t *)to = (code << 3) | (key & 0b111);
-    int offset = PacketOpcodeLength;
+    int offset = OpenVPNPacketOpcodeLength;
     if (sessionId) {
-        memcpy(to + offset, sessionId, PacketSessionIdLength);
-        offset += PacketSessionIdLength;
+        memcpy(to + offset, sessionId, OpenVPNPacketSessionIdLength);
+        offset += OpenVPNPacketSessionIdLength;
     }
     return offset;
 }
@@ -67,7 +67,7 @@ static inline int PacketHeaderSet(uint8_t *to, PacketCode code, uint8_t key, con
 static inline int PacketHeaderSetDataV2(uint8_t *to, uint8_t key, uint32_t peerId)
 {
     *(uint32_t *)to = ((PacketCodeDataV2 << 3) | (key & 0b111)) | htonl(peerId & 0xffffff);
-    return PacketOpcodeLength + PacketPeerIdLength;
+    return OpenVPNPacketOpcodeLength + PacketPeerIdLength;
 }
 
 static inline int PacketHeaderGetDataV2PeerId(const uint8_t *from)

@@ -8,20 +8,20 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-#define DP_ENCRYPT_BEGIN(peerId) \
-    const BOOL hasPeerId = (peerId != PacketPeerIdDisabled); \
-    int headerLength = PacketOpcodeLength; \
+#define OPENVPN_DP_ENCRYPT_BEGIN(peerId) \
+    const BOOL hasPeerId = (peerId != OpenVPNPacketPeerIdDisabled); \
+    int headerLength = OpenVPNPacketOpcodeLength; \
     if (hasPeerId) { \
         headerLength += PacketPeerIdLength; \
     }
 
-#define DP_DECRYPT_BEGIN(packet) \
+#define OPENVPN_DP_DECRYPT_BEGIN(packet) \
     const uint8_t *ptr = packet.bytes; \
     PacketCode code; \
-    PacketOpcodeGet(ptr, &code, NULL); \
-    uint32_t peerId = PacketPeerIdDisabled; \
+    OpenVPNPacketOpcodeGet(ptr, &code, NULL); \
+    uint32_t peerId = OpenVPNPacketPeerIdDisabled; \
     const BOOL hasPeerId = (code == PacketCodeDataV2); \
-    int headerLength = PacketOpcodeLength; \
+    int headerLength = OpenVPNPacketOpcodeLength; \
     if (hasPeerId) { \
         headerLength += PacketPeerIdLength; \
         if (packet.length < headerLength) { \

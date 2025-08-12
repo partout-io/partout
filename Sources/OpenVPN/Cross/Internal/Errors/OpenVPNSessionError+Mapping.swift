@@ -23,8 +23,8 @@ extension OpenVPNSessionError {
 private extension OpenVPNSessionError {
     init(rawError: Error) {
         let code: OpenVPNErrorCode = {
-            // CryptoError
-            if let cryptoError = rawError as? CryptoError {
+            // PPCryptoError
+            if let cryptoError = rawError as? PPCryptoError {
                 switch cryptoError {
                 case .creation, .hmac:
                     return .cryptoAlgorithm
@@ -33,16 +33,16 @@ private extension OpenVPNSessionError {
             // CCryptoError
             else if let cryptoError = rawError as? CCryptoError {
                 switch cryptoError.code {
-                case CryptoErrorEncryption:
+                case PPCryptoErrorEncryption:
                     return .cryptoEncryption
-                case CryptoErrorHMAC:
+                case PPCryptoErrorHMAC:
                     return .cryptoHMAC
                 default:
                     assertionFailure("Crypto error with unknown error code: \(cryptoError.code)")
                 }
             }
-            // DataPathError
-            else if let dpError = rawError as? DataPathError {
+            // OpenVPNDataPathError
+            else if let dpError = rawError as? OpenVPNDataPathError {
                 switch dpError {
                 case .algorithm, .creation:
                     return .cryptoAlgorithm
@@ -53,11 +53,11 @@ private extension OpenVPNSessionError {
             // CDataPathError
             else if let dpError = rawError as? CDataPathError {
                 switch dpError.code {
-                case DataPathErrorPeerIdMismatch:
+                case OpenVPNDataPathErrorPeerIdMismatch:
                     return .dataPathPeerIdMismatch
-                case DataPathErrorCompression:
+                case OpenVPNDataPathErrorCompression:
                     return .dataPathCompression
-                case DataPathErrorCrypto:
+                case OpenVPNDataPathErrorCrypto:
                     return .cryptoEncryption
                 default:
                     assertionFailure("Data path error with unknown error code: \(dpError.code)")
@@ -66,23 +66,23 @@ private extension OpenVPNSessionError {
             // CTLSError
             else if let tlsError = rawError as? CTLSError {
                 switch tlsError.code {
-                case TLSErrorCAUse:
+                case PPTLSErrorCAUse:
                     return .tlscaUse
-                case TLSErrorCAPeerVerification:
+                case PPTLSErrorCAPeerVerification:
                     return .tlscaPeerVerification
-                case TLSErrorClientCertificateRead:
+                case PPTLSErrorClientCertificateRead:
                     return .tlsClientCertificateRead
-                case TLSErrorClientCertificateUse:
+                case PPTLSErrorClientCertificateUse:
                     return .tlsClientCertificateUse
-                case TLSErrorClientKeyRead:
+                case PPTLSErrorClientKeyRead:
                     return .tlsClientKeyRead
-                case TLSErrorClientKeyUse:
+                case PPTLSErrorClientKeyUse:
                     return .tlsClientKeyUse
-                case TLSErrorHandshake:
+                case PPTLSErrorHandshake:
                     return .tlsHandshake
-                case TLSErrorServerEKU:
+                case PPTLSErrorServerEKU:
                     return .tlsServerEKU
-                case TLSErrorServerHost:
+                case PPTLSErrorServerHost:
                     return .tlsServerHost
                 default:
                     fatalError()

@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include "crypto/prng.h"
+#include "portable/prng.h"
 
 #if defined(__APPLE__)
 
 #include <Security/Security.h>
 
-bool prng_do(uint8_t *dst, size_t len) {
+bool pp_prng_do(uint8_t *dst, size_t len) {
     return SecRandomCopyBytes(kSecRandomDefault, len, dst) == errSecSuccess;
 }
 
@@ -19,7 +19,7 @@ bool prng_do(uint8_t *dst, size_t len) {
 #include <windows.h>
 #include <bcrypt.h>
 
-bool prng_do(uint8_t *_Nonnull dst, size_t len) {
+bool pp_prng_do(uint8_t *_Nonnull dst, size_t len) {
     NTSTATUS status = BCryptGenRandom(
         NULL,
         dst,
@@ -34,7 +34,7 @@ bool prng_do(uint8_t *_Nonnull dst, size_t len) {
 #include <stdlib.h>
 #include <sys/random.h>
 
-bool prng_do(uint8_t *dst, size_t len) {
+bool pp_prng_do(uint8_t *dst, size_t len) {
 #ifdef __ANDROID_API__
     arc4random_buf(dst, len);
     return true;

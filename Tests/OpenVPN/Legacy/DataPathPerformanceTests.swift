@@ -76,7 +76,7 @@ extension DataPathPerformanceTests {
         let sut = DataPath(
             encrypter: cryptoBox.encrypter().dataPathEncrypter(),
             decrypter: cryptoBox.decrypter().dataPathDecrypter(),
-            peerId: PacketPeerIdDisabled,
+            peerId: OpenVPNPacketPeerIdDisabled,
             compressionFraming: .disabled,
             compressionAlgorithm: .disabled,
             maxPackets: 1000,

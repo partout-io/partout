@@ -7,7 +7,7 @@ import Foundation
 import PartoutCore
 
 final class CControlPacket {
-    let pkt: UnsafeMutablePointer<ctrl_pkt_t>
+    let pkt: UnsafeMutablePointer<openvpn_ctrl>
 
     let code: CPacketCode
 
@@ -32,7 +32,7 @@ final class CControlPacket {
         packetId: UInt32, payload: Data?,
         ackIds: [UInt32]?, ackRemoteSessionId: Data?
     ) {
-        let pkt = ctrl_pkt_create(
+        let pkt = openvpn_ctrl_create(
             code.native,
             key,
             packetId,
@@ -46,7 +46,7 @@ final class CControlPacket {
 
         self.pkt = pkt
         self.code = code
-        self.sessionId = Data(bytesNoCopy: pkt.pointee.session_id, count: _PartoutOpenVPN_C.PacketSessionIdLength, deallocator: .none)
+        self.sessionId = Data(bytesNoCopy: pkt.pointee.session_id, count: OpenVPNPacketSessionIdLength, deallocator: .none)
         self.payload = pkt.pointee.payload.map {
             Data(bytesNoCopy: $0, count: pkt.pointee.payload_len, deallocator: .none)
         }
@@ -54,7 +54,7 @@ final class CControlPacket {
             Array(UnsafeBufferPointer(start: $0, count: pkt.pointee.ack_ids_len))
         }
         self.ackRemoteSessionId = pkt.pointee.ack_remote_session_id.map {
-            Data(bytesNoCopy: $0, count: _PartoutOpenVPN_C.PacketSessionIdLength, deallocator: .none)
+            Data(bytesNoCopy: $0, count: OpenVPNPacketSessionIdLength, deallocator: .none)
         }
     }
 
@@ -76,7 +76,7 @@ final class CControlPacket {
     }
 
     deinit {
-        ctrl_pkt_free(pkt)
+        openvpn_ctrl_free(pkt)
     }
 
     var isAck: Bool {

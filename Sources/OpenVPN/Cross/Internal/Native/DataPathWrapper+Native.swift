@@ -15,7 +15,7 @@ extension DataPathWrapper {
     }
 
     static func native(with parameters: Parameters, prf: CryptoKeys.PRF, seed: CZeroingData) throws -> DataPathWrapper {
-        key_init_seed(seed.ptr)
+        pp_key_init_seed(seed.ptr)
         let keys = try CryptoKeys(withPRF: prf)
         return try .native(with: parameters, keys: keys)
     }
@@ -23,7 +23,7 @@ extension DataPathWrapper {
     static func native(with parameters: Parameters, keys: CryptoKeys) throws -> DataPathWrapper {
         NSLog("PartoutOpenVPN: Using DataPathWrapper (native Swift/C)")
 
-        let mode: UnsafeMutablePointer<dp_mode_t>?
+        let mode: UnsafeMutablePointer<openvpn_dp_mode>?
         let cipherAlgorithm = parameters.cipher?.rawValue.uppercased()
         let digestAlgorithm = parameters.digest?.rawValue.uppercased()
         let keysBridge = CryptoKeysBridge(keys: keys)
@@ -31,7 +31,7 @@ extension DataPathWrapper {
         if let cipherAlgorithm, cipherAlgorithm.hasSuffix("-GCM") {
             mode = keysBridge.withUnsafeKeys { keys in
                 cipherAlgorithm.withCString { cCipher in
-                    dp_mode_ad_create_aead(
+                    openvpn_dp_mode_ad_create_aead(
                         cCipher,
                         Constants.DataChannel.aeadTagLength,
                         Constants.DataChannel.aeadIdLength,
@@ -42,13 +42,13 @@ extension DataPathWrapper {
             }
         } else {
             guard let digestAlgorithm else {
-                throw DataPathError.algorithm
+                throw OpenVPNDataPathError.algorithm
             }
             mode = digestAlgorithm.withCString { cDigest in
                 keysBridge.withUnsafeKeys { keys in
                     if let cipherAlgorithm {
                         return cipherAlgorithm.withCString { cCipher in
-                            dp_mode_hmac_create_cbc(
+                            openvpn_dp_mode_hmac_create_cbc(
                                 cCipher,
                                 cDigest,
                                 keys,
@@ -56,7 +56,7 @@ extension DataPathWrapper {
                             )
                         }
                     } else {
-                        return dp_mode_hmac_create_cbc(
+                        return openvpn_dp_mode_hmac_create_cbc(
                             nil,
                             cDigest,
                             keys,
@@ -68,11 +68,11 @@ extension DataPathWrapper {
         }
 
         guard let mode else {
-            throw DataPathError.creation
+            throw OpenVPNDataPathError.creation
         }
 
         // the encryption keys must match the cipher/digest
-        let crypto = mode.pointee.crypto.assumingMemoryBound(to: crypto_t.self)
+        let crypto = mode.pointee.crypto.assumingMemoryBound(to: pp_crypto.self)
         let cipherKeyLength = crypto.pointee.meta.cipher_key_len
         let hmacKeyLength = crypto.pointee.meta.hmac_key_len
 
@@ -90,22 +90,22 @@ extension DataPathWrapper {
 
 extension DataPathWrapper {
     static func nativeADMock(with framing: OpenVPN.CompressionFraming) -> DataPathWrapper {
-        let mode = dp_mode_ad_create_mock(framing.cNative)
+        let mode = openvpn_dp_mode_ad_create_mock(framing.cNative)
         return cNative(with: mode, peerId: nil)
     }
 
     static func nativeHMACMock(with framing: OpenVPN.CompressionFraming) -> DataPathWrapper {
-        let mode = dp_mode_hmac_create_mock(framing.cNative)
+        let mode = openvpn_dp_mode_hmac_create_mock(framing.cNative)
         return cNative(with: mode, peerId: nil)
     }
 }
 
 private extension DataPathWrapper {
     static func cNative(
-        with mode: UnsafeMutablePointer<dp_mode_t>,
+        with mode: UnsafeMutablePointer<openvpn_dp_mode>,
         peerId: UInt32?
     ) -> DataPathWrapper {
-        let dataPath = CDataPath(mode: mode, peerId: peerId ?? PacketPeerIdDisabled)
+        let dataPath = CDataPath(mode: mode, peerId: peerId ?? OpenVPNPacketPeerIdDisabled)
         return DataPathWrapper(dataPath: dataPath)
     }
 }
@@ -137,13 +137,13 @@ extension CDataPath: DataPathTestingProtocol {
 // MARK: -
 
 extension OpenVPN.CompressionFraming {
-    var cNative: compression_framing_t {
+    var cNative: openvpn_compression_framing {
         switch self {
-        case .disabled: CompressionFramingDisabled
-        case .compLZO: CompressionFramingCompLZO
-        case .compress: CompressionFramingCompress
-        case .compressV2: CompressionFramingCompressV2
-        @unknown default: CompressionFramingDisabled
+        case .disabled: OpenVPNCompressionFramingDisabled
+        case .compLZO: OpenVPNCompressionFramingCompLZO
+        case .compress: OpenVPNCompressionFramingCompress
+        case .compressV2: OpenVPNCompressionFramingCompressV2
+        @unknown default: OpenVPNCompressionFramingDisabled
         }
     }
 }

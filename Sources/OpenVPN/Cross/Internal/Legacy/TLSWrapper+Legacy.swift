@@ -18,7 +18,7 @@ private final class LegacyTLSWrapper: TLSProtocol {
 
     init(parameters: TLSWrapper.Parameters) throws {
         guard let ca = parameters.cfg.ca else {
-            throw TLSError.missingCA
+            throw PPTLSError.missingCA
         }
         caURL = parameters.cachesURL.appendingPathComponent("ca.pem")
         try ca.pem.write(to: caURL, atomically: true, encoding: .ascii)
