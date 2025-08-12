@@ -33,7 +33,7 @@ typedef struct {
 
 static
 size_t local_encryption_capacity(const void *vctx, size_t len) {
-    const pp_crypto_ctr_ctx *ctx = (pp_crypto_ctr_ctx *)vctx;
+    const pp_crypto_ctr_ctx *ctx = vctx;
     pp_assert(ctx);
     return pp_alloc_crypto_capacity(len, ctx->payload_len + ctx->ns_tag_len);
 }
@@ -41,7 +41,7 @@ size_t local_encryption_capacity(const void *vctx, size_t len) {
 static
 void local_configure_encrypt(void *vctx,
                              const pp_zd *cipher_key, const pp_zd *hmac_key) {
-    pp_crypto_ctr_ctx *ctx = (pp_crypto_ctr_ctx *)vctx;
+    pp_crypto_ctr_ctx *ctx = vctx;
     pp_assert(ctx);
     pp_assert(hmac_key && hmac_key->length >= ctx->crypto.meta.hmac_key_len);
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
@@ -59,7 +59,7 @@ size_t local_encrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
                      const pp_crypto_flags *flags, pp_crypto_error_code *error) {
-    pp_crypto_ctr_ctx *ctx = (pp_crypto_ctr_ctx *)vctx;
+    pp_crypto_ctr_ctx *ctx = vctx;
     pp_assert(ctx);
     pp_assert(ctx->ctx_enc);
     pp_assert(ctx->hmac_key_enc);
@@ -89,7 +89,7 @@ size_t local_encrypt(void *vctx,
 
 static
 void local_configure_decrypt(void *vctx, const pp_zd *cipher_key, const pp_zd *hmac_key) {
-    pp_crypto_ctr_ctx *ctx = (pp_crypto_ctr_ctx *)vctx;
+    pp_crypto_ctr_ctx *ctx = vctx;
     pp_assert(ctx);
     pp_assert(hmac_key && hmac_key->length >= ctx->crypto.meta.hmac_key_len);
     pp_assert(cipher_key && cipher_key->length >= ctx->crypto.meta.cipher_key_len);
@@ -107,7 +107,7 @@ size_t local_decrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
                      const pp_crypto_flags *flags, pp_crypto_error_code *error) {
-    pp_crypto_ctr_ctx *ctx = (pp_crypto_ctr_ctx *)vctx;
+    pp_crypto_ctr_ctx *ctx = vctx;
     pp_assert(ctx);
     pp_assert(ctx->ctx_dec);
     pp_assert(ctx->hmac_key_dec);
