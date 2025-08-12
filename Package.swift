@@ -14,7 +14,7 @@ let checksum = "dc1b215584afdb36bddb2619b05fc3ebf69d2f9a25aa6baabd140734d06f31ef
 // included areas and environment
 let areas: Set<Area> = Area.defaultAreas
 let coreDeployment: CoreDeployment = .remoteBinary
-let coreSourceSHA1 = "510c109b44efce60fe362775652990519a506511"
+let coreSourceSHA1 = "ca8b0496806a1835bcd6ff465129f18b5e5eaadf"
 
 // optional overrides from environment
 let env = ProcessInfo.processInfo.environment
