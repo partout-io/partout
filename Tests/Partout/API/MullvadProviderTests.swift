@@ -93,7 +93,9 @@ struct MullvadProviderTests: APITestSuite {
         storage.sessions = [deviceId: session]
         try builder.setOptions(storage, for: .wireGuard)
 #else
+#if canImport(PartoutOpenVPN)
         builder.providerModuleType = .openVPN
+#endif
 #endif
 
         let module = try builder.tryBuild()
