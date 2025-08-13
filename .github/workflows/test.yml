@@ -19,8 +19,8 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Ensure remote Core binary
         run: |
-          expected="let coreDeployment = packageCoreDeployment \?\? .remoteBinary"
-          grep "^$expected$" Package.swift
+          expected="let coreDeployment = packageCoreDeployment \?\? \.remoteBinary"
+          grep -E "^$expected$" Package.swift
       - name: Ensure not development
         run: |
           expected="let isDevelopment = false"
