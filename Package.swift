@@ -13,13 +13,13 @@ let checksum = "e882ea65c2d42fbff5655a3d1ecec8b1c8d88f8260100f104099791e932becc5
 
 // optional overrides from environment
 let env = ProcessInfo.processInfo.environment
-let packageOS = env["PARTOUT_OS"]
-let packageCoreDeployment = env["PARTOUT_CORE"].map(CoreDeployment.init(rawValue:)) ?? nil
-let packageHasDocs = env["PARTOUT_DOCS"] == "1"
+let envOS = env["PARTOUT_OS"]
+let envCoreDeployment = env["PARTOUT_CORE"].map(CoreDeployment.init(rawValue:)) ?? nil
+let envWithDocs = env["PARTOUT_DOCS"] == "1"
 
 // included areas and environment
 let areas: Set<Area> = Area.defaultAreas
-let coreDeployment = packageCoreDeployment ?? .remoteBinary
+let coreDeployment = envCoreDeployment ?? .remoteBinary
 let coreSourceSHA1 = "ca8b0496806a1835bcd6ff465129f18b5e5eaadf"
 
 // must be false in production (check in CI)
@@ -636,9 +636,9 @@ enum OS: String {
     static var current: OS {
         // Android is never compiled natively, therefore #if os(Android)
         // would be wrong here. Resort to an explicit env variable.
-        if let packageOS {
-            guard let os = OS(rawValue: packageOS) else {
-                fatalError("Unrecognized OS '\(packageOS)'")
+        if let envOS {
+            guard let os = OS(rawValue: envOS) else {
+                fatalError("Unrecognized OS '\(envOS)'")
             }
             return os
         }
@@ -670,7 +670,7 @@ enum Area: CaseIterable {
 
     static var defaultAreas: Set<Area> {
         var included = Set(Area.allCases)
-        if !packageHasDocs {
+        if !envWithDocs {
             included.remove(.documentation)
         }
         if OS.current != .apple {
