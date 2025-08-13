@@ -140,6 +140,7 @@ let package = Package(
 package.targets.append(contentsOf: [
     .target(
         name: "_PartoutABI_C",
+        dependencies: ["_PartoutVendorsPortable_C"],
         path: "Sources/ABI/Library_C"
     ),
     .target(
