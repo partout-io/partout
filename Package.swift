@@ -11,15 +11,16 @@ let binaryFilename = "PartoutCore.xcframework.zip"
 let version = "0.99.174"
 let checksum = "e882ea65c2d42fbff5655a3d1ecec8b1c8d88f8260100f104099791e932becc5"
 
-// included areas and environment
-let areas: Set<Area> = Area.defaultAreas
-let coreDeployment: CoreDeployment = .remoteBinary
-let coreSourceSHA1 = "ca8b0496806a1835bcd6ff465129f18b5e5eaadf"
-
 // optional overrides from environment
 let env = ProcessInfo.processInfo.environment
 let packageOS = env["PARTOUT_OS"]
+let packageCoreDeployment = env["PARTOUT_CORE"].map(CoreDeployment.init(rawValue:)) ?? nil
 let packageHasDocs = env["PARTOUT_DOCS"] == "1"
+
+// included areas and environment
+let areas: Set<Area> = Area.defaultAreas
+let coreDeployment = packageCoreDeployment ?? .remoteBinary
+let coreSourceSHA1 = "ca8b0496806a1835bcd6ff465129f18b5e5eaadf"
 
 // must be false in production (check in CI)
 let isDevelopment = false
@@ -679,7 +680,7 @@ enum Area: CaseIterable {
     }
 }
 
-enum CoreDeployment {
+enum CoreDeployment: String, RawRepresentable {
     case remoteBinary
     case remoteSource
     case localBinary
