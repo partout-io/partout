@@ -1,1 +1,0 @@
-../local/copy-to-android-app.sh
