@@ -7,7 +7,7 @@ import PartoutCore
 import PartoutOpenVPN
 
 /// Observes major events notified by a `OpenVPNSessionProtocol`.
-protocol OpenVPNSessionDelegate: AnyObject {
+protocol OpenVPNSessionDelegate: AnyObject, Sendable {
 
     /// Called after starting a session.
     ///
@@ -31,7 +31,7 @@ protocol OpenVPNSessionDelegate: AnyObject {
 }
 
 /// Provides methods to set up and maintain an OpenVPN session.
-protocol OpenVPNSessionProtocol {
+protocol OpenVPNSessionProtocol: Sendable {
 
     /// Observe events with a `OpenVPNSessionDelegate`.
     func setDelegate(_ delegate: OpenVPNSessionDelegate) async
