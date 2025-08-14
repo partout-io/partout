@@ -46,7 +46,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
                 let impl = NWConnection(to: endpoint.nwEndpoint, using: .udp)
                 let socketOptions = NESocketObserver.Options(
                     proto: .udp,
-                    minLength: options.minTCPLength,
+                    minLength: 1,
                     maxLength: options.maxTCPLength
                 )
                 return NESocketObserver(ctx, nwConnection: impl, options: socketOptions)
