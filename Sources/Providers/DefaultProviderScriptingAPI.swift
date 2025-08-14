@@ -220,17 +220,15 @@ private extension DefaultProviderScriptingAPI {
         cfg.timeoutIntervalForRequest = timeout
         let session = URLSession(configuration: cfg)
 
-        final class StatusHolder {
+        final class StatusHolder: @unchecked Sendable {
             var status: Int?
         }
 
         let semaphore = DispatchSemaphore(value: 0)
         let storage = ResultStorage()
         let statusHolder = StatusHolder()
-        let task = session.dataTask(with: request) { [weak self] data, response, error in
-            guard let self else {
-                return
-            }
+        let ctx = self.ctx // to avoid capturing self
+        let task = session.dataTask(with: request) { data, response, error in
             if let error {
                 pp_log(ctx, .providers, .error, "API.sendRequest: Unable to execute: \(error)")
             } else if let httpResponse = response as? HTTPURLResponse {
