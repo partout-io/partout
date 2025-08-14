@@ -121,7 +121,16 @@ private extension ProviderModulesTests {
             serverId: "be-v4",
             hostname: "be-v4.hideservers.net",
             ipAddresses: withIPAddresses ? [Data(hex: "01020304")] : nil, // 1.2.3.4
-            supportedModuleTypes: [.openVPN, .wireGuard],
+            supportedModuleTypes: {
+                var list: [ModuleType] = []
+#if canImport(PartoutOpenVPN)
+                list.append(.openVPN)
+#endif
+#if canImport(PartoutWireGuard)
+                list.append(.wireGuard)
+#endif
+                return list
+            }(),
             supportedPresetIds: nil,
             userInfo: [
                 "wgPublicKey": ""

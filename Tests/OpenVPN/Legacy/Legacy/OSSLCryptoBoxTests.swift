@@ -285,7 +285,7 @@ private extension OSSLCryptoBoxTests {
         let path = DataPath(
             encrypter: enc,
             decrypter: dec,
-            peerId: peerId ?? PacketPeerIdDisabled,
+            peerId: peerId ?? OpenVPNPacketPeerIdDisabled,
             compressionFraming: .disabled,
             compressionAlgorithm: .disabled,
             maxPackets: 1000,

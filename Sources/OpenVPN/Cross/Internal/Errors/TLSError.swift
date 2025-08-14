@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import _PartoutOpenVPN_C
+internal import _PartoutVendorsTLSCore_C
 
-enum TLSError: Error {
+enum PPTLSError: Error {
     case missingCA
 
     case start
@@ -17,10 +18,10 @@ enum TLSError: Error {
 }
 
 struct CTLSError: Error {
-    let code: tls_error_code
+    let code: pp_tls_error_code
 
-    init(_ code: tls_error_code) {
-        precondition(code != TLSErrorNone)
+    init(_ code: pp_tls_error_code) {
+        precondition(code != PPTLSErrorNone)
         self.code = code
     }
 }

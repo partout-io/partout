@@ -2,20 +2,20 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+internal import _PartoutCrypto_C
 internal import _PartoutOpenVPN_C
-internal import _PartoutVendorsCrypto_C
 import Foundation
 
-// TODO: ###, move more logic to C (replay protection, byte-aligned enc/dec zd)
+// TODO: #155, move more logic to C (replay protection, byte-aligned enc/dec zd)
 
 final class CDataPath {
-    private let mode: UnsafeMutablePointer<dp_mode_t>
+    private let mode: UnsafeMutablePointer<openvpn_dp_mode>
 
-    private let encBuffer: UnsafeMutablePointer<zeroing_data_t>
+    private let encBuffer: UnsafeMutablePointer<pp_zd>
 
-    private let decBuffer: UnsafeMutablePointer<zeroing_data_t>
+    private let decBuffer: UnsafeMutablePointer<pp_zd>
 
-    private let replay: UnsafeMutablePointer<replay_t>
+    private let replay: UnsafeMutablePointer<openvpn_replay>
 
     private let resizeStep: Int
 
@@ -23,24 +23,24 @@ final class CDataPath {
 
     private var outPacketId: UInt32
 
-    init(mode: UnsafeMutablePointer<dp_mode_t>, peerId: UInt32) {
+    init(mode: UnsafeMutablePointer<openvpn_dp_mode>, peerId: UInt32) {
         self.mode = mode
-        dp_mode_set_peer_id(mode, peerId)
+        openvpn_dp_mode_set_peer_id(mode, peerId)
 
         let oneKilo = 1024
-        encBuffer = zd_create(64 * oneKilo)
-        decBuffer = zd_create(64 * oneKilo)
-        replay = replay_create()
+        encBuffer = pp_zd_create(64 * oneKilo)
+        decBuffer = pp_zd_create(64 * oneKilo)
+        replay = openvpn_replay_create()
         resizeStep = 1024
         maxPacketId = .max - 10 * UInt32(oneKilo)
         outPacketId = .zero
     }
 
     deinit {
-        replay_free(replay)
-        dp_mode_free(mode)
-        zd_free(encBuffer)
-        zd_free(decBuffer)
+        openvpn_replay_free(replay)
+        openvpn_dp_mode_free(mode)
+        pp_zd_free(encBuffer)
+        pp_zd_free(decBuffer)
     }
 }
 
@@ -48,24 +48,24 @@ private extension CDataPath {
     func configure(
         cipherKey: Data?,
         hmacKey: Data?,
-        block: (UnsafePointer<zeroing_data_t>?, UnsafePointer<zeroing_data_t>?) -> Void
+        block: (UnsafePointer<pp_zd>?, UnsafePointer<pp_zd>?) -> Void
     ) {
         let ck = cipherKey.map { data in
             data.withUnsafeBytes { ptr in
-                zd_create_from_data(ptr.bytePointer, data.count)
+                pp_zd_create_from_data(ptr.bytePointer, data.count)
             }
         }
         let hk = hmacKey.map { data in
             data.withUnsafeBytes { ptr in
-                zd_create_from_data(ptr.bytePointer, data.count)
+                pp_zd_create_from_data(ptr.bytePointer, data.count)
             }
         }
         block(ck, hk)
         if let ck {
-            zd_free(ck)
+            pp_zd_free(ck)
         }
         if let hk {
-            zd_free(hk)
+            pp_zd_free(hk)
         }
     }
 }
@@ -89,7 +89,7 @@ extension CDataPath {
         var keepAlive = false
         let list = try packets.compactMap { encrypted -> Data? in
 
-            // framing will throw if compressed (handled in dp_framing_parse_*)
+            // framing will throw if compressed (handled in openvpn_dp_framing_parse_*)
             let tuple = try decryptAndParse(
                 encrypted,
                 buf: nil
@@ -97,10 +97,10 @@ extension CDataPath {
 
             // throw on packet id overflow
             guard tuple.packetId <= maxPacketId else {
-                throw DataPathError.overflow
+                throw OpenVPNDataPathError.overflow
             }
             // ignore replayed packet ids
-            guard !replay_is_replayed(replay, tuple.packetId) else {
+            guard !openvpn_replay_is_replayed(replay, tuple.packetId) else {
                 return nil
             }
             // detect keep-alive packet (ping)
@@ -123,7 +123,7 @@ extension CDataPath {
         packetId: UInt32,
         withNewBuffer: Bool
     ) throws -> Data {
-        let buf = withNewBuffer ? zd_create(0) : nil
+        let buf = withNewBuffer ? pp_zd_create(0) : nil
         return try assembleAndEncrypt(packet, key: key, packetId: packetId, buf: buf)
     }
 
@@ -131,7 +131,7 @@ extension CDataPath {
         _ packet: Data,
         withNewBuffer: Bool
     ) throws -> DataPathDecryptedAndParsedTuple {
-        let buf = withNewBuffer ? zd_create(0) : nil
+        let buf = withNewBuffer ? pp_zd_create(0) : nil
         return try decryptAndParse(packet, buf: buf)
     }
 }
@@ -141,9 +141,9 @@ extension CDataPath {
         packetId: UInt32,
         payload: Data
     ) -> Data {
-        let buf = zd_create(dp_mode_assemble_capacity(mode, payload.count))
+        let buf = pp_zd_create(openvpn_dp_mode_assemble_capacity(mode, payload.count))
         defer {
-            zd_free(buf)
+            pp_zd_free(buf)
         }
         return assemble(packetId: packetId, payload: payload, buf: buf)
     }
@@ -153,9 +153,9 @@ extension CDataPath {
         packetId: UInt32,
         assembled: Data
     ) throws -> Data {
-        let buf = zd_create(dp_mode_encrypt_capacity(mode, assembled.count))
+        let buf = pp_zd_create(openvpn_dp_mode_encrypt_capacity(mode, assembled.count))
         defer {
-            zd_free(buf)
+            pp_zd_free(buf)
         }
         return try encrypt(key: key, packetId: packetId, assembled: assembled, buf: buf)
     }
@@ -163,9 +163,9 @@ extension CDataPath {
     func decrypt(
         packet: Data
     ) throws -> DataPathDecryptedTuple {
-        let buf = zd_create(packet.count)
+        let buf = pp_zd_create(packet.count)
         defer {
-            zd_free(buf)
+            pp_zd_free(buf)
         }
         return try decrypt(packet: packet, buf: buf)
     }
@@ -174,9 +174,9 @@ extension CDataPath {
         decrypted: Data,
         header: inout UInt8,
     ) throws -> Data {
-        let buf = zd_create(decrypted.count)
+        let buf = pp_zd_create(decrypted.count)
         defer {
-            zd_free(buf)
+            pp_zd_free(buf)
         }
         return try parse(decrypted: decrypted, header: &header, buf: buf)
     }
@@ -189,13 +189,13 @@ extension CDataPath {
         _ packet: Data,
         key: UInt8,
         packetId: UInt32,
-        buf: UnsafeMutablePointer<zeroing_data_t>?
+        buf: UnsafeMutablePointer<pp_zd>?
     ) throws -> Data {
         let buf = buf ?? encBuffer
-        resize(buf, for: dp_mode_assemble_and_encrypt_capacity(mode, packet.count))
+        resize(buf, for: openvpn_dp_mode_assemble_and_encrypt_capacity(mode, packet.count))
         return try packet.withUnsafeBytes { src in
-            var error = dp_error_t()
-            let zd = dp_mode_assemble_and_encrypt(
+            var error = openvpn_dp_error()
+            let zd = openvpn_dp_mode_assemble_and_encrypt(
                 mode,
                 key,
                 packetId,
@@ -213,7 +213,7 @@ extension CDataPath {
 
     func decryptAndParse(
         _ packet: Data,
-        buf: UnsafeMutablePointer<zeroing_data_t>?
+        buf: UnsafeMutablePointer<pp_zd>?
     ) throws -> DataPathDecryptedAndParsedTuple {
         let buf = buf ?? decBuffer
         resize(buf, for: packet.count)
@@ -221,8 +221,8 @@ extension CDataPath {
             var packetId: UInt32 = .zero
             var header: UInt8 = .zero
             var keepAlive: Bool = false
-            var error = dp_error_t()
-            let zd = dp_mode_decrypt_and_parse(
+            var error = openvpn_dp_error()
+            let zd = openvpn_dp_mode_decrypt_and_parse(
                 mode,
                 buf,
                 &packetId,
@@ -245,13 +245,13 @@ extension CDataPath {
     func assemble(
         packetId: UInt32,
         payload: Data,
-        buf: UnsafeMutablePointer<zeroing_data_t>?
+        buf: UnsafeMutablePointer<pp_zd>?
     ) -> Data {
         let buf = buf ?? encBuffer
         let inputCount = payload.count
-        resize(buf, for: dp_mode_assemble_capacity(mode, inputCount))
+        resize(buf, for: openvpn_dp_mode_assemble_capacity(mode, inputCount))
         return payload.withUnsafeBytes { input in
-            let outLength = dp_mode_assemble(
+            let outLength = openvpn_dp_mode_assemble(
                 mode,
                 packetId,
                 buf,
@@ -266,14 +266,14 @@ extension CDataPath {
         key: UInt8,
         packetId: UInt32,
         assembled: Data,
-        buf: UnsafeMutablePointer<zeroing_data_t>?
+        buf: UnsafeMutablePointer<pp_zd>?
     ) throws -> Data {
         let buf = buf ?? encBuffer
         let inputCount = assembled.count
-        resize(buf, for: dp_mode_encrypt_capacity(mode, inputCount))
+        resize(buf, for: openvpn_dp_mode_encrypt_capacity(mode, inputCount))
         return try assembled.withUnsafeBytes { input in
-            var error = dp_error_t()
-            let outLength = dp_mode_encrypt(
+            var error = openvpn_dp_error()
+            let outLength = openvpn_dp_mode_encrypt(
                 mode,
                 key,
                 packetId,
@@ -291,15 +291,15 @@ extension CDataPath {
 
     func decrypt(
         packet: Data,
-        buf: UnsafeMutablePointer<zeroing_data_t>?
+        buf: UnsafeMutablePointer<pp_zd>?
     ) throws -> DataPathDecryptedTuple {
         let buf = buf ?? decBuffer
         let inputCount = packet.count
         resize(buf, for: inputCount)
         return try packet.withUnsafeBytes { input in
             var packetId: UInt32 = 0
-            var error = dp_error_t()
-            let outLength = dp_mode_decrypt(
+            var error = openvpn_dp_error()
+            let outLength = openvpn_dp_mode_decrypt(
                 mode,
                 buf,
                 &packetId,
@@ -318,7 +318,7 @@ extension CDataPath {
     func parse(
         decrypted: Data,
         header: inout UInt8,
-        buf: UnsafeMutablePointer<zeroing_data_t>?
+        buf: UnsafeMutablePointer<pp_zd>?
     ) throws -> Data {
         let buf = buf ?? decBuffer
         var inputCopy = [UInt8](decrypted) // copy because parsed in place
@@ -327,8 +327,8 @@ extension CDataPath {
 
         let decryptedOriginal = decrypted
         let parsed = try inputCopy.withUnsafeMutableBytes { input in
-            var error = dp_error_t()
-            let outLength = dp_mode_parse(
+            var error = openvpn_dp_error()
+            let outLength = openvpn_dp_mode_parse(
                 mode,
                 buf,
                 &header,
@@ -350,12 +350,12 @@ extension CDataPath {
 // MARK: -
 
 private extension CDataPath {
-    func resize(_ buf: UnsafeMutablePointer<zeroing_data_t>, for count: Int) {
+    func resize(_ buf: UnsafeMutablePointer<pp_zd>, for count: Int) {
         guard buf.pointee.length < count else {
             return
         }
         var newCount = count + resizeStep
         newCount -= newCount % resizeStep // align to step boundary
-        zd_resize(buf, newCount)
+        pp_zd_resize(buf, newCount)
     }
 }

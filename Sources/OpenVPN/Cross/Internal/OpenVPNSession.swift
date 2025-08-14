@@ -307,7 +307,7 @@ extension OpenVPNSession {
             cfg: configuration,
             onVerificationFailure: { [weak self] in
                 Task {
-                    await self?.shutdown(TLSError.peerVerification)
+                    await self?.shutdown(PPTLSError.peerVerification)
                 }
             }
         )

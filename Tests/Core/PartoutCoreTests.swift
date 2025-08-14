@@ -3,12 +3,14 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import PartoutCore
-import XCTest
+import Testing
 
-final class PartoutCoreTests: XCTestCase {
-    func test_givenCore_whenCreateProfileBuilder_thenWorks() {
+struct PartoutCoreTests {
+
+    @Test
+    func givenCore_whenCreateProfileBuilder_thenWorks() {
         var profile = Profile.Builder(activatingModules: true)
         profile.name = "foobar"
-        XCTAssertEqual(profile.name, "foobar")
+        #expect(profile.name == "foobar")
     }
 }

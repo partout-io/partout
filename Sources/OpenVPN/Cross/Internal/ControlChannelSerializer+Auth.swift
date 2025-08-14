@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+internal import _PartoutCrypto_C
 internal import _PartoutOpenVPN_C
-internal import _PartoutVendorsCrypto_C
 import Foundation
 import PartoutCore
 import PartoutOpenVPN
@@ -12,7 +12,7 @@ extension ControlChannel {
     final class AuthSerializer: ControlChannelSerializer {
         private let ctx: PartoutLoggerContext
 
-        private let cbc: crypto_ctx
+        private let cbc: pp_crypto_ctx
 
         private let prefixLength: Int
 
@@ -45,17 +45,17 @@ extension ControlChannel {
                 )
                 let keysBridge = CryptoKeysBridge(keys: keys)
                 return keysBridge.withUnsafeKeys {
-                    crypto_cbc_create(nil, digest.rawValue, $0)
+                    pp_crypto_cbc_create(nil, digest.rawValue, $0)
                 }
             }
             guard let cbc else {
-                throw CryptoError.creation
+                throw PPCryptoError.creation
             }
             self.cbc = cbc
 
-            prefixLength = PacketOpcodeLength + PacketSessionIdLength
-            hmacLength = crypto_meta(cbc).digest_len
-            authLength = hmacLength + PacketReplayIdLength + PacketReplayTimestampLength
+            prefixLength = OpenVPNPacketOpcodeLength + OpenVPNPacketSessionIdLength
+            hmacLength = pp_crypto_meta_of(cbc).digest_len
+            authLength = hmacLength + OpenVPNPacketReplayIdLength + OpenVPNPacketReplayTimestampLength
             preambleLength = prefixLength + authLength
 
             currentReplayId = BidirectionalState(withResetValue: 1)
@@ -64,7 +64,7 @@ extension ControlChannel {
         }
 
         deinit {
-            crypto_cbc_free(cbc)
+            pp_crypto_cbc_free(cbc)
         }
 
         func reset() {
@@ -79,7 +79,7 @@ extension ControlChannel {
                 with: cbc,
                 replayId: currentReplayId.outbound,
                 timestamp: timestamp,
-                function: ctrl_pkt_serialize_auth
+                function: openvpn_ctrl_serialize_auth
             )
             currentReplayId.outbound += 1
             return data
@@ -99,15 +99,15 @@ extension ControlChannel {
             let authCount = authPacket.count
             try authPacket.withUnsafeMutableBytes { dst in
                 try packet.withUnsafeBytes { src in
-                    data_swap_copy(
+                    openvpn_data_swap_copy(
                         dst.bytePointer,
                         src.bytePointer,
                         packet.count,
                         prefixLength,
                         authLength
                     )
-                    var dec_error = CryptoErrorNone
-                    guard crypto_verify(
+                    var dec_error = PPCryptoErrorNone
+                    guard pp_crypto_verify(
                         cbc,
                         dst.bytePointer,
                         authCount,

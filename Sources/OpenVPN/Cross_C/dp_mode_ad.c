@@ -4,18 +4,18 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include "crypto/endian.h"
+#include "portable/endian.h"
 #include "openvpn/dp_macros.h"
 #include "openvpn/dp_mode_ad.h"
 #include "openvpn/packet.h"
 
 static
 size_t dp_assemble(void *vmode) {
-    DP_LOG("dp_mode_ad_assemble");
-    const dp_mode_t *mode = vmode;
-    const dp_mode_assemble_ctx *ctx = &mode->assemble_ctx;
+    OPENVPN_DP_LOG("openvpn_dp_mode_ad_assemble");
+    const openvpn_dp_mode *mode = vmode;
+    const openvpn_dp_mode_assemble_ctx *ctx = &mode->assemble_ctx;
 
-    const size_t dst_capacity = dp_mode_assemble_capacity(mode, ctx->src_len);
+    const size_t dst_capacity = openvpn_dp_mode_assemble_capacity(mode, ctx->src_len);
     pp_assert(ctx->dst->length >= dst_capacity);
 
     uint8_t *dst = ctx->dst->bytes;
@@ -24,7 +24,7 @@ size_t dp_assemble(void *vmode) {
         memcpy(ctx->dst, ctx->src, ctx->src_len);
     } else {
         size_t packet_len_offset;
-        dp_framing_assemble_ctx assemble;
+        openvpn_dp_framing_assemble_ctx assemble;
         assemble.dst = dst;
         assemble.dst_len_offset = &packet_len_offset;
         assemble.src = ctx->src;
@@ -38,38 +38,38 @@ size_t dp_assemble(void *vmode) {
 
 static
 size_t dp_encrypt(void *vmode) {
-    DP_LOG("dp_mode_ad_encrypt");
-    const dp_mode_t *mode = vmode;
-    const dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
+    OPENVPN_DP_LOG("openvpn_dp_mode_ad_encrypt");
+    const openvpn_dp_mode *mode = vmode;
+    const openvpn_dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
 
     pp_assert(mode->enc.raw_encrypt);
-    DP_ENCRYPT_BEGIN(mode->opt.peer_id)
+    OPENVPN_DP_ENCRYPT_BEGIN(mode->opt.peer_id)
 
-    const size_t dst_capacity = dp_mode_encrypt_capacity(mode, ctx->src_len);
+    const size_t dst_capacity = openvpn_dp_mode_encrypt_capacity(mode, ctx->src_len);
     pp_assert(ctx->dst->length >= dst_capacity);
     uint8_t *dst = ctx->dst->bytes;
 
-    *(uint32_t *)(dst + dst_header_len) = endian_htonl(ctx->packet_id);
+    *(uint32_t *)(dst + dst_header_len) = pp_endian_htonl(ctx->packet_id);
 
-    crypto_flags_t flags = { 0 };
+    pp_crypto_flags flags = { 0 };
     flags.iv = dst + dst_header_len;
-    flags.iv_len = PacketIdLength;
+    flags.iv_len = OpenVPNPacketIdLength;
     if (has_peer_id) {
-        packet_header_v2_set(dst, ctx->key, mode->opt.peer_id);
+        openvpn_packet_header_v2_set(dst, ctx->key, mode->opt.peer_id);
         flags.ad = dst;
-        flags.ad_len = dst_header_len + PacketIdLength;
+        flags.ad_len = dst_header_len + OpenVPNPacketIdLength;
     }
     else {
-        packet_header_set(dst, PacketCodeDataV1, ctx->key, NULL);
+        openvpn_packet_header_set(dst, OpenVPNPacketCodeDataV1, ctx->key, NULL);
         flags.ad = dst + dst_header_len;
-        flags.ad_len = PacketIdLength;
+        flags.ad_len = OpenVPNPacketIdLength;
     }
 
     // skip header and packet id
-    crypto_error_code enc_error;
+    pp_crypto_error_code enc_error;
     const size_t dst_packet_len = mode->enc.raw_encrypt(mode->crypto,
-                                                        dst + dst_header_len + PacketIdLength,
-                                                        ctx->dst->length - (dst_header_len + PacketIdLength),
+                                                        dst + dst_header_len + OpenVPNPacketIdLength,
+                                                        ctx->dst->length - (dst_header_len + OpenVPNPacketIdLength),
                                                         ctx->src,
                                                         ctx->src_len,
                                                         &flags,
@@ -79,74 +79,74 @@ size_t dp_encrypt(void *vmode) {
 
     if (!dst_packet_len) {
         if (ctx->error) {
-            ctx->error->dp_code = DataPathErrorCrypto;
+            ctx->error->dp_code = OpenVPNDataPathErrorCrypto;
             ctx->error->crypto_code = enc_error;
         }
         return 0;
     }
-    return dst_header_len + PacketIdLength + dst_packet_len;
+    return dst_header_len + OpenVPNPacketIdLength + dst_packet_len;
 }
 
 static
 size_t dp_decrypt(void *vmode) {
-    DP_LOG("dp_mode_ad_decrypt");
-    const dp_mode_t *mode = vmode;
-    const dp_mode_decrypt_ctx *ctx = &mode->dec_ctx;
+    OPENVPN_DP_LOG("openvpn_dp_mode_ad_decrypt");
+    const openvpn_dp_mode *mode = vmode;
+    const openvpn_dp_mode_decrypt_ctx *ctx = &mode->dec_ctx;
 
     pp_assert(mode->dec.raw_decrypt);
     pp_assert(ctx->src_len > 0);//, @"Decrypting an empty packet, how did it get this far?");
     pp_assert(ctx->dst->length >= ctx->src_len);
     uint8_t *dst = ctx->dst->bytes;
 
-    DP_DECRYPT_BEGIN(ctx)
-    if (ctx->src_len < src_header_len + PacketIdLength) {
+    OPENVPN_DP_DECRYPT_BEGIN(ctx)
+    if (ctx->src_len < src_header_len + OpenVPNPacketIdLength) {
         return 0;
     }
 
-    crypto_flags_t flags = { 0 };
+    pp_crypto_flags flags = { 0 };
     flags.iv = ctx->src + src_header_len;
-    flags.iv_len = PacketIdLength;
+    flags.iv_len = OpenVPNPacketIdLength;
     if (has_peer_id) {
         if (peer_id != mode->opt.peer_id) {
             if (ctx->error) {
-                ctx->error->dp_code = DataPathErrorPeerIdMismatch;
-                ctx->error->crypto_code = CryptoErrorNone;
+                ctx->error->dp_code = OpenVPNDataPathErrorPeerIdMismatch;
+                ctx->error->crypto_code = PPCryptoErrorNone;
             }
             return 0;
         }
         flags.ad = ctx->src;
-        flags.ad_len = src_header_len + PacketIdLength;
+        flags.ad_len = src_header_len + OpenVPNPacketIdLength;
     }
     else {
         flags.ad = ctx->src + src_header_len;
-        flags.ad_len = PacketIdLength;
+        flags.ad_len = OpenVPNPacketIdLength;
     }
 
     // skip header + packet id
-    crypto_error_code dec_error;
+    pp_crypto_error_code dec_error;
     const size_t dst_len = mode->dec.raw_decrypt(mode->crypto,
                                                  dst,
                                                  ctx->dst->length,
-                                                 ctx->src + src_header_len + PacketIdLength,
-                                                 (int)(ctx->src_len - (src_header_len + PacketIdLength)),
+                                                 ctx->src + src_header_len + OpenVPNPacketIdLength,
+                                                 (int)(ctx->src_len - (src_header_len + OpenVPNPacketIdLength)),
                                                  &flags,
                                                  &dec_error);
     if (!dst_len) {
         if (ctx->error) {
-            ctx->error->dp_code = DataPathErrorCrypto;
+            ctx->error->dp_code = OpenVPNDataPathErrorCrypto;
             ctx->error->crypto_code = dec_error;
         }
         return 0;
     }
-    *ctx->dst_packet_id = endian_ntohl(*(const uint32_t *)(flags.iv));
+    *ctx->dst_packet_id = pp_endian_ntohl(*(const uint32_t *)(flags.iv));
     return dst_len;
 }
 
 static
 size_t dp_parse(void *vmode) {
-    DP_LOG("dp_mode_ad_parse");
-    const dp_mode_t *mode = vmode;
-    const dp_mode_parse_ctx *ctx = &mode->parse_ctx;
+    OPENVPN_DP_LOG("openvpn_dp_mode_ad_parse");
+    const openvpn_dp_mode *mode = vmode;
+    const openvpn_dp_mode_parse_ctx *ctx = &mode->parse_ctx;
 
     pp_assert(ctx->dst->length >= ctx->src_len);
 
@@ -160,7 +160,7 @@ size_t dp_parse(void *vmode) {
 
     size_t payload_offset;
     size_t payload_header_len;
-    dp_framing_parse_ctx parse;
+    openvpn_dp_framing_parse_ctx parse;
     parse.dst_payload = payload;
     parse.dst_payload_offset = &payload_offset;
     parse.dst_header = ctx->dst_header;
@@ -178,29 +178,29 @@ size_t dp_parse(void *vmode) {
 
 // MARK: -
 
-dp_mode_t *dp_mode_ad_create(crypto_ctx crypto,
-                             crypto_free_fn crypto_free,
-                             compression_framing_t comp_f) {
+openvpn_dp_mode *openvpn_dp_mode_ad_create(pp_crypto_ctx crypto,
+                             pp_crypto_free_fn pp_crypto_free,
+                             openvpn_compression_framing comp_f) {
 
-    DP_LOG("dp_mode_ad_create");
+    OPENVPN_DP_LOG("openvpn_dp_mode_ad_create");
 
-    const dp_framing_t *frm = dp_framing(comp_f);
-    const dp_mode_encrypter_t enc = {
+    const openvpn_dp_framing *frm = openvpn_dp_framing_of(comp_f);
+    const openvpn_dp_mode_encrypter enc = {
         frm->assemble,
         dp_assemble,
         NULL,
         dp_encrypt
     };
-    const dp_mode_decrypter_t dec = {
+    const openvpn_dp_mode_decrypter dec = {
         frm->parse,
         dp_parse,
         NULL,
         dp_decrypt
     };
-    const dp_mode_options_t opt = {
+    const openvpn_dp_mode_options opt = {
         comp_f,
-        PacketPeerIdDisabled,
+        OpenVPNPacketPeerIdDisabled,
         0
     };
-    return dp_mode_create_opt(crypto, crypto_free, &enc, &dec, &opt);
+    return openvpn_dp_mode_create_opt(crypto, pp_crypto_free, &enc, &dec, &opt);
 }

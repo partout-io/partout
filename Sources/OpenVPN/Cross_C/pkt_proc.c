@@ -6,52 +6,52 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#include "crypto/allocation.h"
+#include "portable/common.h"
 #include "openvpn/obf.h"
 #include "openvpn/pkt_proc.h"
 
 // MARK: - Pointers
 
 static inline
-void alg_plain(const pkt_proc_alg_ctx *ctx) {
+void alg_plain(const openvpn_pkt_proc_alg_ctx *ctx) {
     pp_assert(ctx);
     memcpy(ctx->dst + ctx->dst_offset, ctx->src + ctx->src_offset, ctx->src_len);
 }
 
 static
-void alg_xor_mask(const pkt_proc_alg_ctx *ctx) {
+void alg_xor_mask(const openvpn_pkt_proc_alg_ctx *ctx) {
     pp_assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
-    obf_xor_mask(ctx->dst + ctx->dst_offset, ctx->src_len, ctx->mask, ctx->mask_len);
+    openvpn_obf_xor_mask(ctx->dst + ctx->dst_offset, ctx->src_len, ctx->mask, ctx->mask_len);
 }
 
 static
-void alg_xor_ptrpos(const pkt_proc_alg_ctx *ctx) {
+void alg_xor_ptrpos(const openvpn_pkt_proc_alg_ctx *ctx) {
     alg_plain(ctx);
-    obf_xor_ptrpos(ctx->dst + ctx->dst_offset, ctx->src_len);
+    openvpn_obf_xor_ptrpos(ctx->dst + ctx->dst_offset, ctx->src_len);
 }
 
 static
-void alg_reverse(const pkt_proc_alg_ctx *ctx) {
+void alg_reverse(const openvpn_pkt_proc_alg_ctx *ctx) {
     alg_plain(ctx);
-    obf_reverse(ctx->dst + ctx->dst_offset, ctx->src_len);
+    openvpn_obf_reverse(ctx->dst + ctx->dst_offset, ctx->src_len);
 }
 
 static
-void alg_xor_obfuscate_in(const pkt_proc_alg_ctx *ctx) {
+void alg_xor_obfuscate_in(const openvpn_pkt_proc_alg_ctx *ctx) {
     pp_assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
-    obf_xor_obfuscate(ctx->dst + ctx->dst_offset,
+    openvpn_obf_xor_obfuscate(ctx->dst + ctx->dst_offset,
                       ctx->src_len,
                       ctx->mask, ctx->mask_len,
                       false);
 }
 
 static
-void alg_xor_obfuscate_out(const pkt_proc_alg_ctx *ctx) {
+void alg_xor_obfuscate_out(const openvpn_pkt_proc_alg_ctx *ctx) {
     pp_assert(ctx->mask && ctx->mask_len);
     alg_plain(ctx);
-    obf_xor_obfuscate(ctx->dst + ctx->dst_offset,
+    openvpn_obf_xor_obfuscate(ctx->dst + ctx->dst_offset,
                       ctx->src_len,
                       ctx->mask, ctx->mask_len,
                       true);
@@ -59,39 +59,39 @@ void alg_xor_obfuscate_out(const pkt_proc_alg_ctx *ctx) {
 
 // MARK: - Obfuscator
 
-pkt_proc_t *pkt_proc_create(pkt_proc_method method, const uint8_t *mask, size_t mask_len) {
-    pkt_proc_t *proc = pp_alloc_crypto(sizeof(pkt_proc_t));
+openvpn_pkt_proc *openvpn_pkt_proc_create(openvpn_pkt_proc_method method, const uint8_t *mask, size_t mask_len) {
+    openvpn_pkt_proc *proc = pp_alloc_crypto(sizeof(openvpn_pkt_proc));
     proc->mask = NULL;
     switch (method) {
-        case PktProcMethodNone:
+        case OpenVPNPktProcMethodNone:
             proc->recv = alg_plain;
             proc->send = alg_plain;
             break;
-        case PktProcMethodXORMask:
+        case OpenVPNPktProcMethodXORMask:
             proc->recv = alg_xor_mask;
             proc->send = alg_xor_mask;
-            proc->mask = zd_create_from_data(mask, mask_len);
+            proc->mask = pp_zd_create_from_data(mask, mask_len);
             break;
-        case PktProcMethodXORPtrPos:
+        case OpenVPNPktProcMethodXORPtrPos:
             proc->recv = alg_xor_ptrpos;
             proc->send = alg_xor_ptrpos;
             break;
-        case PktProcMethodReverse:
+        case OpenVPNPktProcMethodReverse:
             proc->recv = alg_reverse;
             proc->send = alg_reverse;
             break;
-        case PktProcMethodXORObfuscate:
+        case OpenVPNPktProcMethodXORObfuscate:
             proc->recv = alg_xor_obfuscate_in;
             proc->send = alg_xor_obfuscate_out;
-            proc->mask = zd_create_from_data(mask, mask_len);
+            proc->mask = pp_zd_create_from_data(mask, mask_len);
             break;
     }
     return proc;
 }
 
-void pkt_proc_free(pkt_proc_t *proc) {
+void openvpn_pkt_proc_free(openvpn_pkt_proc *proc) {
     if (proc->mask) {
-        zd_free(proc->mask);
+        pp_zd_free(proc->mask);
     }
     free(proc);
 }

@@ -6,13 +6,14 @@
 import Foundation
 import NetworkExtension
 import PartoutCore
-import XCTest
+import Testing
 
-final class ProfileNetworkSettingsTests: XCTestCase {
+struct ProfileNetworkSettingsTests {
 
     // MARK: Plain
 
-    func test_givenProfileWithDefaultGateway_whenGetNetworkSettings_thenDoesNothingAboutDNS() throws {
+    @Test
+    func givenProfileWithDefaultGateway_whenGetNetworkSettings_thenDoesNothingAboutDNS() throws {
         let connModule = BogusConnectionModule()
         let ipModule = IPModule.Builder(
             ipv4: IPSettings(subnet: Subnet(rawValue: "1.2.3.4/32")!)
@@ -34,8 +35,8 @@ final class ProfileNetworkSettingsTests: XCTestCase {
 
         let sut = profile.networkSettings(with: nil)
 
-        let ipV4Settings = try XCTUnwrap(sut.ipv4Settings)
-        let ipV6Settings = try XCTUnwrap(sut.ipv6Settings)
+        let ipV4Settings = try #require(sut.ipv4Settings)
+        let ipV6Settings = try #require(sut.ipv6Settings)
         let expRoutesV4: [NEIPv4Route] = {
             let route = NEIPv4Route.default()
             route.gatewayAddress = "10.20.30.40"
@@ -46,14 +47,15 @@ final class ProfileNetworkSettingsTests: XCTestCase {
             route.gatewayAddress = "10:20::30:40"
             return [route]
         }()
-        XCTAssertEqual(Set(ipV4Settings.includedRoutes ?? []), Set(expRoutesV4))
-        XCTAssertEqual(Set(ipV6Settings.includedRoutes ?? []), Set(expRoutesV6))
+        #expect(Set(ipV4Settings.includedRoutes ?? []) == Set(expRoutesV4))
+        #expect(Set(ipV6Settings.includedRoutes ?? []) == Set(expRoutesV6))
 
-        let dnsSettings = try XCTUnwrap(sut.dnsSettings)
-        XCTAssertEqual(dnsSettings.matchDomains, [""])
+        let dnsSettings = try #require(sut.dnsSettings)
+        #expect(dnsSettings.matchDomains == [""])
     }
 
-    func test_givenProfileWithoutDefaultGateway_whenGetNetworkSettings_thenAddsBogusMatchDomains() throws {
+    @Test
+    func givenProfileWithoutDefaultGateway_whenGetNetworkSettings_thenAddsBogusMatchDomains() throws {
         let connectionModule = BogusConnectionModule()
         let ipModule = IPModule.Builder(
             ipv4: IPSettings(subnet: Subnet(rawValue: "1.2.3.4/32")!),
@@ -72,14 +74,14 @@ final class ProfileNetworkSettingsTests: XCTestCase {
         ).tryBuild()
         sut = profile.networkSettings(with: nil)
 
-        let ipV4Settings = try XCTUnwrap(sut.ipv4Settings)
-        let ipV6Settings = try XCTUnwrap(sut.ipv6Settings)
+        let ipV4Settings = try #require(sut.ipv4Settings)
+        let ipV6Settings = try #require(sut.ipv6Settings)
         let expRoutesV4: [NEIPv4Route] = []
         let expRoutesV6: [NEIPv6Route] = []
-        XCTAssertEqual(Set(ipV4Settings.includedRoutes ?? []), Set(expRoutesV4))
-        XCTAssertEqual(Set(ipV6Settings.includedRoutes ?? []), Set(expRoutesV6))
+        #expect(Set(ipV4Settings.includedRoutes ?? []) == Set(expRoutesV4))
+        #expect(Set(ipV6Settings.includedRoutes ?? []) == Set(expRoutesV6))
 
-        XCTAssertEqual(sut.dnsSettings?.matchDomains, [""])
+        #expect(sut.dnsSettings?.matchDomains == [""])
 
         //
 
@@ -89,12 +91,13 @@ final class ProfileNetworkSettingsTests: XCTestCase {
             activatingModules: true
         ).tryBuild().networkSettings(with: nil)
 
-        XCTAssertEqual(sut.dnsSettings?.matchDomains, [""])
+        #expect(sut.dnsSettings?.matchDomains == [""])
     }
 
     // MARK: With remote info
 
-    func test_givenProfile_whenGetNetworkSettingsWithInfo_thenAppliesInfo() throws {
+    @Test
+    func givenProfile_whenGetNetworkSettingsWithInfo_thenAppliesInfo() throws {
         let bogusModule = try DNSModule.Builder().tryBuild()
         let profile = try Profile.Builder(
             modules: [bogusModule],
@@ -107,12 +110,13 @@ final class ProfileNetworkSettingsTests: XCTestCase {
             modules: [try DNSModule.Builder(servers: ["1.1.1.1"]).tryBuild()]
         ))
 
-        XCTAssertEqual(sut.tunnelRemoteAddress, "5.6.7.8")
-        XCTAssertEqual(sut.dnsSettings?.servers, ["1.1.1.1"])
-        XCTAssertNil(sut.mtu)
+        #expect(sut.tunnelRemoteAddress == "5.6.7.8")
+        #expect(sut.dnsSettings?.servers == ["1.1.1.1"])
+        #expect(sut.mtu == nil)
     }
 
-    func test_givenProfileWithRemoteDefaultGateway_whenExcludeDefaultRoute_thenHasNoRoutes() throws {
+    @Test
+    func givenProfileWithRemoteDefaultGateway_whenExcludeDefaultRoute_thenHasNoRoutes() throws {
         let connectionModule = BogusConnectionModule()
         let remoteInfo = TunnelRemoteInfo(
             originalModuleId: UUID(),
@@ -147,10 +151,10 @@ final class ProfileNetworkSettingsTests: XCTestCase {
 
         let sut = profile.networkSettings(with: remoteInfo)
 
-        let ipV4Settings = try XCTUnwrap(sut.ipv4Settings)
-        let ipV6Settings = try XCTUnwrap(sut.ipv6Settings)
-        XCTAssertEqual(ipV4Settings.includedRoutes, [])
-        XCTAssertEqual(ipV6Settings.includedRoutes, [])
+        let ipV4Settings = try #require(sut.ipv4Settings)
+        let ipV6Settings = try #require(sut.ipv6Settings)
+        #expect(ipV4Settings.includedRoutes == [])
+        #expect(ipV6Settings.includedRoutes == [])
     }
 }
 

@@ -5,10 +5,11 @@
 @testable import _PartoutVendorsAppleNE
 import Foundation
 import PartoutCore
-import XCTest
+import Testing
 
-final class ValueObserverTests: XCTestCase {
-    func test_givenSubject_whenValueIsExpected_thenSucceeds() async throws {
+struct ValueObserverTests {
+    @Test
+    func givenSubject_whenValueIsExpected_thenSucceeds() async throws {
         let subject = SomeObject()
         let sut = ValueObserver(subject)
 
@@ -34,7 +35,8 @@ final class ValueObserverTests: XCTestCase {
         }
     }
 
-    func test_givenSubject_whenValueIsUndesired_thenFails() async {
+    @Test
+    func givenSubject_whenValueIsUndesired_thenFails() async {
         let subject = SomeObject()
         let sut = ValueObserver(subject)
 
@@ -63,13 +65,14 @@ final class ValueObserverTests: XCTestCase {
                     return false
                 }
             }
-            XCTFail("Undesired value should fail")
+            #expect(Bool(false), "Undesired value should fail")
         } catch {
-            XCTAssert(type(of: error) == SomeError.self)
+            #expect(type(of: error) == SomeError.self)
         }
     }
 
-    func test_givenSubject_whenValueIsDelayed_thenFailsWithTimeout() async {
+    @Test
+    func givenSubject_whenValueIsDelayed_thenFailsWithTimeout() async {
         let subject = SomeObject()
         let sut = ValueObserver(subject)
 
@@ -77,11 +80,11 @@ final class ValueObserverTests: XCTestCase {
             try await sut.waitForValue(on: \.value, timeout: 200) { _ in
                 false
             }
-            XCTFail("Should time out")
+            #expect(Bool(false), "Should time out")
         } catch let error as PartoutError {
-            XCTAssertEqual(error.code, .timeout)
+            #expect(error.code == .timeout)
         } catch {
-            XCTFail("Unexpected error: \(error)")
+            #expect(Bool(false), "Unexpected error: \(error)")
         }
     }
 }

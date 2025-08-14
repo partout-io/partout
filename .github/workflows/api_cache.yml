@@ -15,7 +15,9 @@ jobs:
     name: Store to cache
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    environment: production
+    environment:
+      name: production
+      url: https://github.com/passepartoutvpn/api-cache
     defaults:
       run:
         working-directory: ./API

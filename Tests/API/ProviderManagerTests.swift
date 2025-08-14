@@ -6,50 +6,52 @@ import Foundation
 @testable import PartoutAPI
 import PartoutCore
 import PartoutProviders
-import XCTest
-
-final class ProviderManagerTests: XCTestCase {
-}
+import Testing
 
 @MainActor
-extension ProviderManagerTests {
-    func test_givenManager_whenFetchSupportedPresets_thenIsNotEmpty() async throws {
+struct ProviderManagerTests {
+
+    @Test
+    func givenManager_whenFetchSupportedPresets_thenIsNotEmpty() async throws {
         let repository = try await Self.repository(for: .mock)
         let sut = ProviderManager()
         try await sut.setRepository(repository, for: MockModule.moduleHandler.id)
 
         print(sut.presets)
-        XCTAssertEqual(sut.presets.count, 1)
+        #expect(sut.presets.count == 1)
     }
 
-    func test_givenManager_whenFetchUnsupportedPresets_thenIsEmpty() async throws {
+    @Test
+    func givenManager_whenFetchUnsupportedPresets_thenIsEmpty() async throws {
         let repository = try await Self.repository(for: .mock)
         let sut = ProviderManager()
         try await sut.setRepository(repository, for: MockUnsupportedModule.moduleHandler.id)
 
         print(sut.presets)
-        XCTAssertTrue(sut.presets.isEmpty)
+        #expect(sut.presets.isEmpty)
     }
 
-    func test_givenManager_whenSetProvider_thenReturnsServers() async throws {
+    @Test
+    func givenManager_whenSetProvider_thenReturnsServers() async throws {
         let repository = try await Self.repository(for: .mock)
         let sut = ProviderManager()
         try await sut.setRepository(repository, for: MockModule.moduleHandler.id)
 
-        XCTAssertEqual(sut.options.countryCodes.count, 1)
+        #expect(sut.options.countryCodes.count == 1)
         let servers = try await sut.filteredServers()
-        XCTAssertEqual(servers.count, 1)
+        #expect(servers.count == 1)
 
-        let server = try XCTUnwrap(servers.first)
-        XCTAssertEqual(server.metadata.countryCode, "US")
+        let server = try #require(servers.first)
+        #expect(server.metadata.countryCode == "US")
 
         let ipAddresses = server.ipAddresses?.compactMap {
             Address(data: $0)
         } ?? []
-        XCTAssertEqual(ipAddresses.map(\.rawValue), ["1.2.3.4"])
+        #expect(ipAddresses.map(\.rawValue) == ["1.2.3.4"])
     }
 
-    func test_givenManager_whenSetFilters_thenReturnsFilteredServers() async throws {
+    @Test
+    func givenManager_whenSetFilters_thenReturnsFilteredServers() async throws {
         let repository = try await Self.repository(for: .mock)
         let sut = ProviderManager()
         try await sut.setRepository(repository, for: MockModule.moduleHandler.id)
@@ -57,10 +59,11 @@ extension ProviderManagerTests {
         var filters = ProviderFilters()
         filters.categoryName = "foobar"
         let servers = try await sut.filteredServers(with: filters)
-        XCTAssertTrue(servers.isEmpty)
+        #expect(servers.isEmpty)
     }
 
-    func test_givenManager_whenSetFiltersThenReset_thenReturnsAllServers() async throws {
+    @Test
+    func givenManager_whenSetFiltersThenReset_thenReturnsAllServers() async throws {
         let repository = try await Self.repository(for: .mock)
         let sut = ProviderManager()
         try await sut.setRepository(repository, for: MockModule.moduleHandler.id)
@@ -69,7 +72,7 @@ extension ProviderManagerTests {
         filters.categoryName = "foobar"
         var servers = try await sut.filteredServers(with: filters)
         servers = try await sut.filteredServers()
-        XCTAssertEqual(servers.count, 1)
+        #expect(servers.count == 1)
     }
 }
 

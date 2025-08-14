@@ -35,7 +35,7 @@ struct Constants {
 
         static let ctrTagLength = 32
 
-        static let ctrPayloadLength = PacketOpcodeLength + PacketSessionIdLength + PacketReplayIdLength + PacketReplayTimestampLength
+        static let ctrPayloadLength = OpenVPNPacketOpcodeLength + OpenVPNPacketSessionIdLength + OpenVPNPacketReplayIdLength + OpenVPNPacketReplayTimestampLength
     }
 
     enum DataChannel {
@@ -43,7 +43,7 @@ struct Constants {
 
         static let aeadTagLength = 16
 
-        static let aeadIdLength = PacketIdLength
+        static let aeadIdLength = OpenVPNPacketIdLength
 
         static let pingString = Data(hex: "2a187bf3641eb4cb07ed2d0a981fc748")
     }

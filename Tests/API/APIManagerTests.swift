@@ -8,51 +8,55 @@ import Combine
 import Foundation
 @testable import PartoutAPI
 import PartoutCore
-import XCTest
-
-final class APIManagerTests: XCTestCase {
-    private var subscriptions: Set<AnyCancellable> = []
-}
+import Testing
 
 @MainActor
-extension APIManagerTests {
-    func test_givenAPI_whenFetchIndex_thenReturnsProviders() async throws {
+struct APIManagerTests {
+    @Test
+    func givenAPI_whenFetchIndex_thenReturnsProviders() async throws {
         let sut = Self.manager()
+        var subscriptions: Set<AnyCancellable> = []
 
-        let exp = expectation(description: "Index")
+        let exp = Expectation()
         sut
             .$providers
             .dropFirst(2) // initial, observeObjects
             .sink { _ in
-                exp.fulfill()
+                Task {
+                    await exp.fulfill()
+                }
             }
             .store(in: &subscriptions)
 
         try await sut.fetchIndex()
-        await fulfillment(of: [exp])
+        try await exp.fulfillment(timeout: 200)
 
-        XCTAssertEqual(sut.providers.map(\.description), ["bar1", "bar2", "bar3"])
+        #expect(sut.providers.map(\.description) == ["bar1", "bar2", "bar3"])
     }
 
-    func test_givenIndex_whenFilterBySupport_thenReturnsSupportedProviders() async throws {
+    @Test
+    func givenIndex_whenFilterBySupport_thenReturnsSupportedProviders() async throws {
         let sut = Self.manager()
+        var subscriptions: Set<AnyCancellable> = []
 
-        let exp = expectation(description: "SupportedIndex")
+        let exp = Expectation()
         sut
             .$providers
             .dropFirst(2)
             .sink { _ in
-                exp.fulfill()
+                Task {
+                    await exp.fulfill()
+                }
             }
             .store(in: &subscriptions)
 
         try await sut.fetchIndex()
-        await fulfillment(of: [exp])
+        try await exp.fulfillment(timeout: 200)
 
         let supporting = sut.providers.filter {
             $0.supports(MockModule.self)
         }
-        XCTAssertEqual(supporting.map(\.description), ["bar2"])
+        #expect(supporting.map(\.description) == ["bar2"])
     }
 }
 

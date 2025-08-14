@@ -6,10 +6,11 @@ import _PartoutVendorsAppleNE
 import Foundation
 import NetworkExtension
 import PartoutCore
-import XCTest
+import Testing
 
-final class NESettingsApplyingTests: XCTestCase {
-    func test_givenIPv4_whenApply_thenUpdatesSettings() throws {
+struct NESettingsApplyingTests {
+    @Test
+    func givenIPv4_whenApply_thenUpdatesSettings() throws {
         let ipv4 = IPSettings(subnet: Subnet(rawValue: "2.2.2.2/12")!)
             .including(routes: [
                 Route(defaultWithGateway: Address(rawValue: "30.30.30.30")!),
@@ -24,30 +25,25 @@ final class NESettingsApplyingTests: XCTestCase {
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
         module.apply(.global, to: &sut)
 
-        let settings = try XCTUnwrap(sut.ipv4Settings)
+        let settings = try #require(sut.ipv4Settings)
         let subnets = ipv4.subnet.map { [$0] } ?? []
-        XCTAssertEqual(settings.addresses, subnets.map(\.address.rawValue))
-        XCTAssertEqual(settings.subnetMasks, subnets.map(\.ipv4Mask))
-        XCTAssertEqual(settings.includedRoutes?.count, ipv4.includedRoutes.count)
-        XCTAssertEqual(settings.excludedRoutes?.count, ipv4.excludedRoutes.count)
+        #expect(settings.addresses == subnets.map(\.address.rawValue))
+        #expect(settings.subnetMasks == subnets.map(\.ipv4Mask))
+        #expect(settings.includedRoutes?.count == ipv4.includedRoutes.count)
+        #expect(settings.excludedRoutes?.count == ipv4.excludedRoutes.count)
 
-        settings.includedRoutes?.forEach { neRoute in
-            guard let route = ipv4.includedRoutes.findIPv4Route(neRoute) else {
-                XCTFail("Included route not found: \(neRoute.destinationAddress)")
-                return
-            }
+        try settings.includedRoutes?.forEach { neRoute in
+            let route = try #require(ipv4.includedRoutes.findIPv4Route(neRoute))
             assertMatching(neRoute, route: route)
         }
-        settings.excludedRoutes?.forEach { neRoute in
-            guard let route = ipv4.excludedRoutes.findIPv4Route(neRoute) else {
-                XCTFail("Excluded route not found: \(neRoute.destinationAddress)")
-                return
-            }
+        try settings.excludedRoutes?.forEach { neRoute in
+            let route = try #require(ipv4.excludedRoutes.findIPv4Route(neRoute))
             assertMatching(neRoute, route: route)
         }
     }
 
-    func test_givenIPv6_whenApply_thenUpdatesSettings() throws {
+    @Test
+    func givenIPv6_whenApply_thenUpdatesSettings() throws {
         let ipv6 = IPSettings(subnet: Subnet(rawValue: "::2/96")!)
             .including(routes: [
                 Route(defaultWithGateway: Address(rawValue: "::3")!),
@@ -62,30 +58,25 @@ final class NESettingsApplyingTests: XCTestCase {
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
         module.apply(.global, to: &sut)
 
-        let settings = try XCTUnwrap(sut.ipv6Settings)
+        let settings = try #require(sut.ipv6Settings)
         let subnets = ipv6.subnet.map { [$0] } ?? []
-        XCTAssertEqual(settings.addresses, subnets.map(\.address.rawValue))
-        XCTAssertEqual(settings.networkPrefixLengths.map(\.intValue), subnets.map(\.prefixLength))
-        XCTAssertEqual(settings.includedRoutes?.count, ipv6.includedRoutes.count)
-        XCTAssertEqual(settings.excludedRoutes?.count, ipv6.excludedRoutes.count)
+        #expect(settings.addresses == subnets.map(\.address.rawValue))
+        #expect(settings.networkPrefixLengths.map(\.intValue) == subnets.map(\.prefixLength))
+        #expect(settings.includedRoutes?.count == ipv6.includedRoutes.count)
+        #expect(settings.excludedRoutes?.count == ipv6.excludedRoutes.count)
 
-        settings.includedRoutes?.forEach { neRoute in
-            guard let route = ipv6.includedRoutes.findIPv6Route(neRoute) else {
-                XCTFail("Included route not found: \(neRoute.destinationAddress)")
-                return
-            }
+        try settings.includedRoutes?.forEach { neRoute in
+            let route = try #require(ipv6.includedRoutes.findIPv6Route(neRoute))
             assertMatching(neRoute, route: route)
         }
-        settings.excludedRoutes?.forEach { neRoute in
-            guard let route = ipv6.excludedRoutes.findIPv6Route(neRoute) else {
-                XCTFail("Excluded route not found: \(neRoute.destinationAddress)")
-                return
-            }
+        try settings.excludedRoutes?.forEach { neRoute in
+            let route = try #require(ipv6.excludedRoutes.findIPv6Route(neRoute))
             assertMatching(neRoute, route: route)
         }
     }
 
-    func test_givenHTTPProxy_whenApply_thenUpdatesSettings() throws {
+    @Test
+    func givenHTTPProxy_whenApply_thenUpdatesSettings() throws {
         let module = try HTTPProxyModule.Builder(
             address: "4.5.6.7",
             port: 1080,
@@ -98,19 +89,20 @@ final class NESettingsApplyingTests: XCTestCase {
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
         module.apply(.global, to: &sut)
 
-        let proxySettings = try XCTUnwrap(sut.proxySettings)
-        XCTAssertTrue(proxySettings.httpEnabled)
-        XCTAssertTrue(proxySettings.httpsEnabled)
-        XCTAssertEqual(proxySettings.httpServer?.address, module.proxy?.address.rawValue)
-        XCTAssertEqual(proxySettings.httpServer?.port, module.proxy.map { Int($0.port) })
-        XCTAssertEqual(proxySettings.httpsServer?.address, module.secureProxy?.address.rawValue)
-        XCTAssertEqual(proxySettings.httpsServer?.port, module.secureProxy.map { Int($0.port) })
-        XCTAssertTrue(proxySettings.autoProxyConfigurationEnabled)
-        XCTAssertEqual(proxySettings.proxyAutoConfigurationURL, module.pacURL)
-        XCTAssertEqual(proxySettings.exceptionList, module.bypassDomains.map(\.rawValue))
+        let proxySettings = try #require(sut.proxySettings)
+        #expect(proxySettings.httpEnabled)
+        #expect(proxySettings.httpsEnabled)
+        #expect(proxySettings.httpServer?.address == module.proxy?.address.rawValue)
+        #expect(proxySettings.httpServer?.port == module.proxy.map { Int($0.port) })
+        #expect(proxySettings.httpsServer?.address == module.secureProxy?.address.rawValue)
+        #expect(proxySettings.httpsServer?.port == module.secureProxy.map { Int($0.port) })
+        #expect(proxySettings.autoProxyConfigurationEnabled)
+        #expect(proxySettings.proxyAutoConfigurationURL == module.pacURL)
+        #expect(proxySettings.exceptionList == module.bypassDomains.map(\.rawValue))
     }
 
-    func test_givenDNS_whenApply_thenUpdatesSettings() throws {
+    @Test
+    func givenDNS_whenApply_thenUpdatesSettings() throws {
         let module = try DNSModule.Builder(
             protocolType: .cleartext,
             servers: ["1.1.1.1", "2.2.2.2"],
@@ -121,14 +113,15 @@ final class NESettingsApplyingTests: XCTestCase {
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
         module.apply(.global, to: &sut)
 
-        let dnsSettings = try XCTUnwrap(sut.dnsSettings)
-        XCTAssertEqual(dnsSettings.dnsProtocol, .cleartext)
-        XCTAssertEqual(dnsSettings.servers, module.servers.map(\.rawValue))
-        XCTAssertEqual(dnsSettings.domainName, module.domainName?.rawValue)
-        XCTAssertEqual(dnsSettings.searchDomains, module.searchDomains?.map(\.rawValue))
+        let dnsSettings = try #require(sut.dnsSettings)
+        #expect(dnsSettings.dnsProtocol == .cleartext)
+        #expect(dnsSettings.servers == module.servers.map(\.rawValue))
+        #expect(dnsSettings.domainName == module.domainName?.rawValue)
+        #expect(dnsSettings.searchDomains == module.searchDomains?.map(\.rawValue))
     }
 
-    func test_givenDNSOverHTTPS_whenApply_thenUpdatesSettings() throws {
+    @Test
+    func givenDNSOverHTTPS_whenApply_thenUpdatesSettings() throws {
         let module = try DNSModule.Builder(
             protocolType: .https,
             servers: ["1.1.1.1", "2.2.2.2"],
@@ -138,17 +131,18 @@ final class NESettingsApplyingTests: XCTestCase {
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
         module.apply(.global, to: &sut)
 
-        let dnsSettings = try XCTUnwrap(sut.dnsSettings as? NEDNSOverHTTPSSettings)
-        XCTAssertEqual(dnsSettings.dnsProtocol, .HTTPS)
-        XCTAssertEqual(dnsSettings.servers, module.servers.map(\.rawValue))
+        let dnsSettings = try #require(sut.dnsSettings as? NEDNSOverHTTPSSettings)
+        #expect(dnsSettings.dnsProtocol == .HTTPS)
+        #expect(dnsSettings.servers == module.servers.map(\.rawValue))
         guard case .https(let url) = module.protocolType else {
-            XCTFail("Wrong protocolType")
+            #expect(Bool(false), "Wrong protocolType")
             return
         }
-        XCTAssertEqual(dnsSettings.serverURL, url)
+        #expect(dnsSettings.serverURL == url)
     }
 
-    func test_givenDNSOverTLS_whenApply_thenUpdatesSettings() throws {
+    @Test
+    func givenDNSOverTLS_whenApply_thenUpdatesSettings() throws {
         let module = try DNSModule.Builder(
             protocolType: .tls,
             servers: ["1.1.1.1", "2.2.2.2"],
@@ -158,17 +152,18 @@ final class NESettingsApplyingTests: XCTestCase {
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
         module.apply(.global, to: &sut)
 
-        let dnsSettings = try XCTUnwrap(sut.dnsSettings as? NEDNSOverTLSSettings)
-        XCTAssertEqual(dnsSettings.dnsProtocol, .TLS)
-        XCTAssertEqual(dnsSettings.servers, module.servers.map(\.rawValue))
+        let dnsSettings = try #require(sut.dnsSettings as? NEDNSOverTLSSettings)
+        #expect(dnsSettings.dnsProtocol == .TLS)
+        #expect(dnsSettings.servers == module.servers.map(\.rawValue))
         guard case .tls(let hostname) = module.protocolType else {
-            XCTFail("Wrong protocolType")
+            #expect(Bool(false), "Wrong protocolType")
             return
         }
-        XCTAssertEqual(dnsSettings.serverName, hostname)
+        #expect(dnsSettings.serverName == hostname)
     }
 
-    func test_givenNESettings_whenApply_thenReplacesSettings() throws {
+    @Test
+    func givenNESettings_whenApply_thenReplacesSettings() throws {
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "1.2.3.4")
         settings.ipv4Settings = NEIPv4Settings(addresses: ["6.6.6.6"], subnetMasks: ["255.0.0.0"])
         settings.dnsSettings = NEDNSSettings(servers: ["1.1.1.1"])
@@ -180,10 +175,11 @@ final class NESettingsApplyingTests: XCTestCase {
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
         module.apply(.global, to: &sut)
 
-        XCTAssertEqual(sut, settings)
+        #expect(sut == settings)
     }
 
-    func test_givenNESettings_whenApplyFilter_thenDisablesSettings() throws {
+    @Test
+    func givenNESettings_whenApplyFilter_thenDisablesSettings() throws {
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "1.2.3.4")
         sut.ipv4Settings = NEIPv4Settings(addresses: ["6.6.6.6"], subnetMasks: ["255.0.0.0"])
         sut.dnsSettings = NEDNSSettings(servers: ["1.1.1.1"])
@@ -195,12 +191,12 @@ final class NESettingsApplyingTests: XCTestCase {
             disabledMask: [.ipv4, .ipv6, .dns, .proxy, .mtu]
         ).tryBuild()
         filterModule.apply(.global, to: &sut)
-        XCTAssertNil(sut.ipv4Settings)
-        XCTAssertNil(sut.ipv6Settings)
-        XCTAssertNil(sut.dnsSettings)
-        XCTAssertNil(sut.proxySettings)
-        XCTAssertNil(sut.mtu)
-        XCTAssertNil(sut.tunnelOverheadBytes)
+        #expect(sut.ipv4Settings == nil)
+        #expect(sut.ipv6Settings == nil)
+        #expect(sut.dnsSettings == nil)
+        #expect(sut.proxySettings == nil)
+        #expect(sut.mtu == nil)
+        #expect(sut.tunnelOverheadBytes == nil)
     }
 }
 
@@ -209,22 +205,22 @@ final class NESettingsApplyingTests: XCTestCase {
 private extension NESettingsApplyingTests {
     func assertMatching(_ neRoute: NEIPv4Route, route: Route) {
         if let destination = route.destination {
-            XCTAssertEqual(neRoute.destinationAddress, destination.address.rawValue)
-            XCTAssertEqual(neRoute.destinationSubnetMask, destination.ipv4Mask)
+            #expect(neRoute.destinationAddress == destination.address.rawValue)
+            #expect(neRoute.destinationSubnetMask == destination.ipv4Mask)
         } else {
-            XCTAssertEqual(neRoute, NEIPv4Route.default())
+            #expect(neRoute == NEIPv4Route.default())
         }
-        XCTAssertEqual(neRoute.gatewayAddress, route.gateway?.rawValue)
+        #expect(neRoute.gatewayAddress == route.gateway?.rawValue)
     }
 
     func assertMatching(_ neRoute: NEIPv6Route, route: Route) {
         if let destination = route.destination {
-            XCTAssertEqual(neRoute.destinationAddress, destination.address.rawValue)
-            XCTAssertEqual(neRoute.destinationNetworkPrefixLength.intValue, destination.prefixLength)
+            #expect(neRoute.destinationAddress == destination.address.rawValue)
+            #expect(neRoute.destinationNetworkPrefixLength.intValue == destination.prefixLength)
         } else {
-            XCTAssertEqual(neRoute, NEIPv6Route.default())
+            #expect(neRoute == NEIPv6Route.default())
         }
-        XCTAssertEqual(neRoute.gatewayAddress, route.gateway?.rawValue)
+        #expect(neRoute.gatewayAddress == route.gateway?.rawValue)
     }
 }
 

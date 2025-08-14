@@ -6,10 +6,11 @@ import PartoutWireGuard
 @testable import PartoutWireGuardCross
 import Foundation
 import PartoutCore
-import XCTest
+import Testing
 
-final class MappersTests: XCTestCase {
-    func test_givenEndpointString_whenMapped_thenReverts() throws {
+struct MappersTests {
+    @Test
+    func givenEndpointString_whenMapped_thenReverts() throws {
         let sut = [
             "1.2.3.4:10000",
             "[1:2:3::4]:10000"
@@ -19,19 +20,26 @@ final class MappersTests: XCTestCase {
             ("1:2:3::4", 10000)
         ]
         for (i, raw) in sut.enumerated() {
-            let wg = try XCTUnwrap(Endpoint(from: raw))
-            let kit = try XCTUnwrap(PartoutCore.Endpoint(wg: wg))
-            try XCTAssertEqual(wg, kit.toWireGuardEndpoint(), "Index \(i) failed")
+            let wg = try #require(Endpoint(from: raw))
+            // work around dumb macro compile error
+//            let kit = try #require(PartoutCore.Endpoint(wg: wg))
+            let kit = try {
+                let kit = PartoutCore.Endpoint(wg: wg)
+                return try #require(kit)
+            }()
+            let kitEndpoint = try kit.toWireGuardEndpoint()
+            #expect(wg == kitEndpoint, "Index \(i) failed")
 
             let pair = expected[i]
-            XCTAssertEqual(wg.host.debugDescription, pair.0)
-            XCTAssertEqual(wg.port.rawValue, pair.1)
-            XCTAssertEqual(kit.address.rawValue, pair.0)
-            XCTAssertEqual(kit.port, pair.1)
+            #expect(wg.host.debugDescription == pair.0)
+            #expect(wg.port.rawValue == pair.1)
+            #expect(kit.address.rawValue == pair.0)
+            #expect(kit.port == pair.1)
         }
     }
 
-    func test_givenConfigurationWithAllowedIPs_whenMapped_thenReverts() throws {
+    @Test
+    func givenConfigurationWithAllowedIPs_whenMapped_thenReverts() throws {
         let quickConfig = """
 [Interface]
 PrivateKey = 4hBza7JtPKZFKwqtEmDR0iZyru1kqpQta/DRduMbHQw=
@@ -48,15 +56,17 @@ Endpoint = 1.2.3.4:12345
         let wg = try TunnelConfiguration(fromWgQuickConfig: quickConfig)
         let sut = try WireGuard.Configuration(wg: wg)
 
-        XCTAssertEqual(try sut.interface.toWireGuardConfiguration(), wg.interface)
+        #expect(try sut.interface.toWireGuardConfiguration() == wg.interface)
         try sut.peers.enumerated().forEach { i, peer in
-            XCTAssertEqual(try peer.toWireGuardConfiguration(), wg.peers[i])
+            try #expect(peer.toWireGuardConfiguration() == wg.peers[i])
         }
 
-        XCTAssertEqual(wg, try sut.toWireGuardConfiguration())
+        let sutCfg = try sut.toWireGuardConfiguration()
+        #expect(wg == sutCfg)
     }
 
-    func test_givenConfigurationWithManyAllowedIPs_whenMapped_thenReverts() throws {
+    @Test
+    func givenConfigurationWithManyAllowedIPs_whenMapped_thenReverts() throws {
         let quickConfig = """
 [Interface]
 PrivateKey = OE4Bp66J0y2xT475hVZrO96X7kfZZad6LUwWAn4oBmM=
@@ -73,6 +83,7 @@ Endpoint = 176.124.208.254:51820
 
         let wg = try TunnelConfiguration(fromWgQuickConfig: quickConfig)
         let sut = try WireGuard.Configuration(wg: wg)
-        XCTAssertEqual(wg, try sut.toWireGuardConfiguration())
+        let sutCfg = try sut.toWireGuardConfiguration()
+        #expect(wg == sutCfg)
     }
 }

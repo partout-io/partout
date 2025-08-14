@@ -5,10 +5,11 @@
 @testable import _PartoutVendorsAppleNE
 import Foundation
 import PartoutCore
-import XCTest
+import Testing
 
-final class NEProtocolCoderTests: XCTestCase {
-    func test_givenProfile_whenEncodeToProvider_thenDecodes() throws {
+struct NEProtocolCoderTests {
+    @Test
+    func givenProfile_whenEncodeToProvider_thenDecodes() throws {
         let profile = try newProfile()
         let sut = ProviderNEProtocolCoder(
             .global,
@@ -18,14 +19,15 @@ final class NEProtocolCoderTests: XCTestCase {
         )
 
         let proto = try sut.protocolConfiguration(from: profile, title: \.name)
-        XCTAssertEqual(proto.providerBundleIdentifier, bundleIdentifier)
-        XCTAssertNotNil(proto.providerConfiguration?[ProviderNEProtocolCoder.providerKey] as? String)
+        #expect(proto.providerBundleIdentifier == bundleIdentifier)
+        #expect(proto.providerConfiguration?[ProviderNEProtocolCoder.providerKey] as? String != nil)
 
         let decodedProfile = try sut.profile(from: proto)
-        XCTAssertEqual(decodedProfile, profile)
+        #expect(decodedProfile == profile)
     }
 
-    func test_givenProfile_whenEncodeToKeychain_thenDecodes() throws {
+    @Test
+    func givenProfile_whenEncodeToKeychain_thenDecodes() throws {
         let profile = try newProfile()
         let sut = KeychainNEProtocolCoder(
             .global,
@@ -36,11 +38,11 @@ final class NEProtocolCoderTests: XCTestCase {
         )
 
         let proto = try sut.protocolConfiguration(from: profile, title: \.name)
-        XCTAssertEqual(proto.providerBundleIdentifier, bundleIdentifier)
-        XCTAssertNil(proto.providerConfiguration)
+        #expect(proto.providerBundleIdentifier == bundleIdentifier)
+        #expect(proto.providerConfiguration == nil)
 
         let decodedProfile = try sut.profile(from: proto)
-        XCTAssertEqual(decodedProfile, profile)
+        #expect(decodedProfile == profile)
     }
 }
 

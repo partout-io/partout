@@ -6,38 +6,38 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "crypto/allocation.h"
-#include "crypto/zeroing_data.h"
+#include "portable/common.h"
+#include "portable/zd.h"
 
-// TODO: ###, make zd inline
+// TODO: #155, make zd inline
 
 // MARK: Creation
 
-zeroing_data_t *zd_create(size_t length) {
-    zeroing_data_t *zd = pp_alloc_crypto(sizeof(zeroing_data_t));
+pp_zd *pp_zd_create(size_t length) {
+    pp_zd *zd = pp_alloc_crypto(sizeof(pp_zd));
     zd->bytes = pp_alloc_crypto(length);
     zd->length = length;
     return zd;
 }
 
-zeroing_data_t *zd_create_copy(const uint8_t *bytes, size_t length) {
-    zeroing_data_t *zd = pp_alloc_crypto(sizeof(zeroing_data_t));
+pp_zd *pp_zd_create_copy(const uint8_t *bytes, size_t length) {
+    pp_zd *zd = pp_alloc_crypto(sizeof(pp_zd));
     zd->bytes = pp_alloc_crypto(length);
     memcpy(zd->bytes, bytes, length);
     zd->length = length;
     return zd;
 }
 
-zeroing_data_t *zd_create_with_uint8(uint8_t value) {
-    zeroing_data_t *zd = pp_alloc_crypto(sizeof(zeroing_data_t));
+pp_zd *pp_zd_create_with_uint8(uint8_t value) {
+    pp_zd *zd = pp_alloc_crypto(sizeof(pp_zd));
     zd->bytes = pp_alloc_crypto(1);
     zd->bytes[0] = value;
     zd->length = 1;
     return zd;
 }
 
-zeroing_data_t *zd_create_with_uint16(uint16_t value) {
-    zeroing_data_t *zd = pp_alloc_crypto(sizeof(zeroing_data_t));
+pp_zd *pp_zd_create_with_uint16(uint16_t value) {
+    pp_zd *zd = pp_alloc_crypto(sizeof(pp_zd));
     zd->bytes = pp_alloc_crypto(2);
     zd->bytes[0] = value & 0xFF;
     zd->bytes[1] = value >> 8;
@@ -45,24 +45,35 @@ zeroing_data_t *zd_create_with_uint16(uint16_t value) {
     return zd;
 }
 
-zeroing_data_t *zd_create_from_data(const uint8_t *data, size_t length) {
-    return zd_create_copy(data, length);
+pp_zd *pp_zd_create_from_data(const uint8_t *data, size_t length) {
+    return pp_zd_create_copy(data, length);
 }
 
-zeroing_data_t *zd_create_from_data_range(const uint8_t *data, size_t offset, size_t length) {
-    return zd_create_copy(data + offset, length);
+pp_zd *pp_zd_create_from_data_range(const uint8_t *data, size_t offset, size_t length) {
+    return pp_zd_create_copy(data + offset, length);
 }
 
-zeroing_data_t *zd_create_from_string(const char *string, bool null_terminated) {
+pp_zd *pp_zd_create_from_string(const char *string, bool null_terminated) {
     size_t len = strlen(string);
     if (null_terminated) {
-        return zd_create_copy((const uint8_t *)string, len + 1);
+        return pp_zd_create_copy((const uint8_t *)string, len + 1);
     } else {
-        return zd_create_copy((const uint8_t *)string, len);
+        return pp_zd_create_copy((const uint8_t *)string, len);
     }
 }
 
-void zd_free(zeroing_data_t *zd) {
+pp_zd *pp_zd_create_from_hex(const char *hex) {
+    const size_t len = strlen(hex);
+    if (len & 1) return NULL;
+    const size_t bytes_len = len / 2;
+    uint8_t *bytes = pp_alloc_crypto(bytes_len);
+    for (size_t i = 0; i < bytes_len; i++) {
+        sscanf(hex + 2 * i, "%2hhx", bytes + i);
+    }
+    return pp_zd_create_copy(bytes, bytes_len);
+}
+
+void pp_zd_free(pp_zd *zd) {
     if (!zd) return;
 
     pp_zero(zd->bytes, zd->length);
@@ -72,16 +83,16 @@ void zd_free(zeroing_data_t *zd) {
 
 // MARK: Copy
 
-zeroing_data_t *zd_make_copy(const zeroing_data_t *zd) {
+pp_zd *pp_zd_make_copy(const pp_zd *zd) {
     pp_assert(zd);
-    return zd_create_copy(zd->bytes, zd->length);
+    return pp_zd_create_copy(zd->bytes, zd->length);
 }
 
-zeroing_data_t *zd_make_slice(const zeroing_data_t *zd, size_t offset, size_t length) {
+pp_zd *pp_zd_make_slice(const pp_zd *zd, size_t offset, size_t length) {
     pp_assert(zd);
     if (offset + length > zd->length) return NULL;
 
-    zeroing_data_t *slice = pp_alloc_crypto(sizeof(zeroing_data_t));
+    pp_zd *slice = pp_alloc_crypto(sizeof(pp_zd));
     slice->bytes = pp_alloc_crypto(length);
     memcpy(slice->bytes, zd->bytes + offset, length);
     slice->length = length;
@@ -90,7 +101,7 @@ zeroing_data_t *zd_make_slice(const zeroing_data_t *zd, size_t offset, size_t le
 
 // MARK: Side effect
 
-void zd_append(zeroing_data_t *zd, const zeroing_data_t *other) {
+void pp_zd_append(pp_zd *zd, const pp_zd *other) {
     pp_assert(zd);
     size_t new_len = zd->length + other->length;
     uint8_t *new_bytes = pp_alloc_crypto(new_len);
@@ -103,7 +114,7 @@ void zd_append(zeroing_data_t *zd, const zeroing_data_t *other) {
     zd->length = new_len;
 }
 
-void zd_resize(zeroing_data_t *zd, size_t new_length) {
+void pp_zd_resize(pp_zd *zd, size_t new_length) {
     pp_assert(zd);
     if (new_length == zd->length) return;
 
@@ -121,7 +132,7 @@ void zd_resize(zeroing_data_t *zd, size_t new_length) {
     zd->length = new_length;
 }
 
-void zd_remove_until(zeroing_data_t *zd, size_t offset) {
+void pp_zd_remove_until(pp_zd *zd, size_t offset) {
     pp_assert(zd);
     if (offset > zd->length) return;
 
@@ -136,14 +147,14 @@ void zd_remove_until(zeroing_data_t *zd, size_t offset) {
     zd->length = new_length;
 }
 
-void zd_zero(zeroing_data_t *zd) {
+void pp_zd_zero(pp_zd *zd) {
     pp_assert(zd);
     pp_zero(zd->bytes, zd->length);
 }
 
 // MARK: Accessors
 
-uint16_t zd_uint16(const zeroing_data_t *zd, size_t offset) {
+uint16_t pp_zd_uint16(const pp_zd *zd, size_t offset) {
     pp_assert(zd);
     if (offset + 2 > zd->length) return 0;
     return zd->bytes[offset] | (zd->bytes[offset + 1] << 8);

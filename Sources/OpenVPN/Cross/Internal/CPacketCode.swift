@@ -33,16 +33,16 @@ extension CPacketCode: CustomDebugStringConvertible {
 }
 
 extension CPacketCode {
-    var native: packet_code {
+    var native: openvpn_packet_code {
         switch self {
-        case .softResetV1:          PacketCodeSoftResetV1
-        case .controlV1:            PacketCodeControlV1
-        case .ackV1:                PacketCodeAckV1
-        case .dataV1:               PacketCodeDataV1
-        case .hardResetClientV2:    PacketCodeHardResetClientV2
-        case .hardResetServerV2:    PacketCodeHardResetServerV2
-        case .dataV2:               PacketCodeDataV2
-        case .unknown:              PacketCodeUnknown
+        case .softResetV1:          OpenVPNPacketCodeSoftResetV1
+        case .controlV1:            OpenVPNPacketCodeControlV1
+        case .ackV1:                OpenVPNPacketCodeAckV1
+        case .dataV1:               OpenVPNPacketCodeDataV1
+        case .hardResetClientV2:    OpenVPNPacketCodeHardResetClientV2
+        case .hardResetServerV2:    OpenVPNPacketCodeHardResetServerV2
+        case .dataV2:               OpenVPNPacketCodeDataV2
+        case .unknown:              OpenVPNPacketCodeUnknown
         }
     }
 }

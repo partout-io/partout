@@ -5,9 +5,6 @@
 import Foundation
 import NetworkExtension
 import PartoutCore
-#if os(iOS)
-import UIKit
-#endif
 
 extension OnDemandModule {
     public static var supportsCellular: Bool {
@@ -36,7 +33,6 @@ extension OnDemandModule {
     public static var supportsEthernet: Bool {
 #if os(iOS)
         // TODO: #1119/passepartout, iPad Pro supports Ethernet via USB-C, but NE offers no way to match it
-        // UIDevice.current.userInterfaceIdiom == .pad
         false
 #else
         true // macOS, tvOS

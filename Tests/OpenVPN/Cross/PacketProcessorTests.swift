@@ -61,12 +61,12 @@ struct PacketProcessorTests {
 
 //        // this crashes as if it returned pre-removeFirst() offsets, bug in Data?
 //        for (i, byte) in processed.enumerated() {
-//            XCTAssertEqual(byte, data[data.count - i - 1])
+//            #expect(byte, data[data.count - i - 1])
 //        }
 //
 //        // this crashes for the same reason
 //        for (i, byte) in processed.reversed().enumerated() {
-//            XCTAssertEqual(byte, data[i])
+//            #expect(byte, data[i])
 //        }
     }
 

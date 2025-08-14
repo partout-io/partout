@@ -10,10 +10,10 @@
 
 // WARNING: assume dst to be able to hold src_len
 
-// TODO: ###, make more efficient by XOR-ing 4-8 bytes per loop
+// TODO: #154, make more efficient by XOR-ing 4-8 bytes per loop
 
 static inline
-void obf_xor_mask(uint8_t *_Nonnull dst,
+void openvpn_obf_xor_mask(uint8_t *_Nonnull dst,
                   size_t dst_len,
                   const uint8_t *_Nonnull mask,
                   size_t mask_len) {
@@ -28,7 +28,7 @@ void obf_xor_mask(uint8_t *_Nonnull dst,
 }
 
 static inline
-void obf_xor_ptrpos(uint8_t *_Nonnull dst, size_t dst_len) {
+void openvpn_obf_xor_ptrpos(uint8_t *_Nonnull dst, size_t dst_len) {
 
     for (size_t i = 0; i < dst_len; ++i) {
         dst[i] ^= ((i + 1) & 0xff);
@@ -37,7 +37,7 @@ void obf_xor_ptrpos(uint8_t *_Nonnull dst, size_t dst_len) {
 
 // first byte as-is, [1..n-1] reversed
 static inline
-void obf_reverse(uint8_t *_Nonnull dst, size_t dst_len) {
+void openvpn_obf_reverse(uint8_t *_Nonnull dst, size_t dst_len) {
 
     if (dst_len <= 2) {
         return;
@@ -55,21 +55,21 @@ void obf_reverse(uint8_t *_Nonnull dst, size_t dst_len) {
 }
 
 static inline
-void obf_xor_obfuscate(uint8_t *_Nonnull dst,
+void openvpn_obf_xor_obfuscate(uint8_t *_Nonnull dst,
                        size_t dst_len,
                        const uint8_t *_Nonnull mask,
                        size_t mask_len,
                        bool outbound)
 {
     if (outbound) {
-        obf_xor_ptrpos(dst, dst_len);
-        obf_reverse(dst, dst_len);
-        obf_xor_ptrpos(dst, dst_len);
-        obf_xor_mask(dst, dst_len, mask, mask_len);
+        openvpn_obf_xor_ptrpos(dst, dst_len);
+        openvpn_obf_reverse(dst, dst_len);
+        openvpn_obf_xor_ptrpos(dst, dst_len);
+        openvpn_obf_xor_mask(dst, dst_len, mask, mask_len);
     } else {
-        obf_xor_mask(dst, dst_len, mask, mask_len);
-        obf_xor_ptrpos(dst, dst_len);
-        obf_reverse(dst, dst_len);
-        obf_xor_ptrpos(dst, dst_len);
+        openvpn_obf_xor_mask(dst, dst_len, mask, mask_len);
+        openvpn_obf_xor_ptrpos(dst, dst_len);
+        openvpn_obf_reverse(dst, dst_len);
+        openvpn_obf_xor_ptrpos(dst, dst_len);
     }
 }

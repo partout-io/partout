@@ -27,7 +27,7 @@ extension ControlChannel {
             var offset = start
             let end = end ?? packet.count
 
-            guard end >= offset + PacketOpcodeLength else {
+            guard end >= offset + OpenVPNPacketOpcodeLength else {
                 throw OpenVPNSessionError.controlChannel(message: "Missing opcode")
             }
             let codeValue = packet[offset] >> 3
@@ -35,15 +35,15 @@ extension ControlChannel {
                 throw OpenVPNSessionError.controlChannel(message: "Unknown code: \(codeValue))")
             }
             let key = packet[offset] & 0b111
-            offset += PacketOpcodeLength
+            offset += OpenVPNPacketOpcodeLength
 
             pp_log(ctx, .openvpn, .info, "Control: Try read packet with code \(code.debugDescription) and key \(key)")
 
-            guard end >= offset + PacketSessionIdLength else {
+            guard end >= offset + OpenVPNPacketSessionIdLength else {
                 throw OpenVPNSessionError.controlChannel(message: "Missing sessionId")
             }
-            let sessionId = packet.subdata(offset: offset, count: PacketSessionIdLength)
-            offset += PacketSessionIdLength
+            let sessionId = packet.subdata(offset: offset, count: OpenVPNPacketSessionIdLength)
+            offset += OpenVPNPacketSessionIdLength
 
             guard end >= offset + 1 else {
                 throw OpenVPNSessionError.controlChannel(message: "Missing ackSize")
@@ -54,21 +54,21 @@ extension ControlChannel {
             var ackIds: [UInt32]?
             var ackRemoteSessionId: Data?
             if ackSize > 0 {
-                guard end >= (offset + Int(ackSize) * PacketIdLength) else {
+                guard end >= (offset + Int(ackSize) * OpenVPNPacketIdLength) else {
                     throw OpenVPNSessionError.controlChannel(message: "Missing acks")
                 }
                 var ids: [UInt32] = []
                 for _ in 0..<ackSize {
                     let id = packet.networkUInt32Value(from: offset)
                     ids.append(id)
-                    offset += PacketIdLength
+                    offset += OpenVPNPacketIdLength
                 }
 
-                guard end >= offset + PacketSessionIdLength else {
+                guard end >= offset + OpenVPNPacketSessionIdLength else {
                     throw OpenVPNSessionError.controlChannel(message: "Missing remoteSessionId")
                 }
-                let remoteSessionId = packet.subdata(offset: offset, count: PacketSessionIdLength)
-                offset += PacketSessionIdLength
+                let remoteSessionId = packet.subdata(offset: offset, count: OpenVPNPacketSessionIdLength)
+                offset += OpenVPNPacketSessionIdLength
 
                 ackIds = ids
                 ackRemoteSessionId = remoteSessionId
@@ -89,11 +89,11 @@ extension ControlChannel {
                 )
             }
 
-            guard end >= offset + PacketIdLength else {
+            guard end >= offset + OpenVPNPacketIdLength else {
                 throw OpenVPNSessionError.controlChannel(message: "Missing packetId")
             }
             let packetId = packet.networkUInt32Value(from: offset)
-            offset += PacketIdLength
+            offset += OpenVPNPacketIdLength
 
             var payload: Data?
             if offset < end {
