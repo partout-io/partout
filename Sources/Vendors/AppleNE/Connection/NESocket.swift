@@ -206,7 +206,7 @@ extension NESocket {
 // MARK: IOInterface
 
 extension NESocket {
-    public nonisolated func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
+    public nonisolated func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
         switch options.proto.plainType {
         case .udp:
             loopReadUDPPackets(handler)
@@ -227,7 +227,7 @@ private extension NESocket {
 
     // WARNING: loops run in Network.framework queue
 
-    nonisolated func loopReadUDPPackets(_ handler: @escaping ([Data]?, Error?) -> Void) {
+    nonisolated func loopReadUDPPackets(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
         queue.async { [weak self] in
             guard let self else { return }
             nwConnection.receiveMessage { [weak self] data, context, isComplete, error in
@@ -241,7 +241,7 @@ private extension NESocket {
         }
     }
 
-    nonisolated func loopReadTCPPackets(_ handler: @escaping ([Data]?, Error?) -> Void) {
+    nonisolated func loopReadTCPPackets(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
         queue.async { [weak self] in
             guard let self else { return }
             nwConnection.receive(
