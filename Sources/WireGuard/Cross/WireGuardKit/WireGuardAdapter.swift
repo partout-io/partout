@@ -41,7 +41,8 @@ public protocol WireGuardAdapterDelegate: AnyObject {
     func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: NEPacketTunnelNetworkSettings, completionHandler: (@Sendable (Error?) -> Void)?)
 }
 
-public class WireGuardAdapter {
+// FIXME: #13, drop @unchecked after refactoring
+public class WireGuardAdapter: @unchecked Sendable {
     public typealias LogHandler = (WireGuardLogLevel, String) -> Void
 
     /// Network routes monitor.
