@@ -130,7 +130,7 @@ private extension Data {
         guard result == 0 else {
             return nil
         }
-        let address = String(cString: ipAddress)
+        let address = ipAddress.string
         return DNSRecord(address: address, isIPv6: address.contains(":"))
     }
 }
