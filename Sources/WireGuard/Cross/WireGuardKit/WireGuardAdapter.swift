@@ -317,7 +317,7 @@ public class WireGuardAdapter: @unchecked Sendable {
     /// - Throws: an error of type `WireGuardAdapterError`.
     /// - Returns: `PacketTunnelSettingsGenerator`.
     private func setNetworkSettings(_ networkSettings: NEPacketTunnelNetworkSettings) throws {
-        var systemError: Error?
+        nonisolated(unsafe) var systemError: Error?
         let condition = NSCondition()
 
         // Activate the condition
