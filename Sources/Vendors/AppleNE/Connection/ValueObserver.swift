@@ -6,7 +6,7 @@ import Foundation
 import PartoutCore
 
 /// Observes KVO updates asynchronously.
-@available(*, deprecated, message: "Unstable, use NESocketObserver")
+@available(*, deprecated, message: "Required by deprecated NEUDPSocket and NETCPSocket. Use NESocket instead")
 actor ValueObserver<O> where O: NSObject {
     private weak var subject: O?
 

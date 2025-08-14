@@ -7,6 +7,7 @@ import NetworkExtension
 import PartoutCore
 
 /// Implementation of a ``/PartoutCore/LinkObserver`` via `NWTCPConnection`.
+@available(*, deprecated, message: "Use NESocketObserver")
 public final class NETCPObserver: LinkObserver {
     public struct Options: Sendable {
         public let minLength: Int
