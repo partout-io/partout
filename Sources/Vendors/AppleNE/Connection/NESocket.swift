@@ -180,7 +180,12 @@ extension NESocket {
 
 extension NESocket {
     public nonisolated func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
-        loopReadPackets(handler)
+        switch options.proto.plainType {
+        case .udp:
+            loopReadUDPPackets(handler)
+        case .tcp:
+            loopReadTCPPackets(handler)
+        }
     }
 
     public func writePackets(_ packets: [Data]) async throws {
@@ -192,15 +197,30 @@ extension NESocket {
 }
 
 private extension NESocket {
-    nonisolated func loopReadPackets(_ handler: @escaping ([Data]?, Error?) -> Void) {
 
-        // WARNING: runs in Network.framework queue
+    // WARNING: loops run in Network.framework queue
+
+    nonisolated func loopReadUDPPackets(_ handler: @escaping ([Data]?, Error?) -> Void) {
         nwConnection.receiveMessage { [weak self] data, context, isComplete, error in
             handler(data.map { [$0] }, error)
 
             // repeat until failure
             if error == nil {
-                self?.loopReadPackets(handler)
+                self?.loopReadUDPPackets(handler)
+            }
+        }
+    }
+
+    nonisolated func loopReadTCPPackets(_ handler: @escaping ([Data]?, Error?) -> Void) {
+        nwConnection.receive(
+            minimumIncompleteLength: options.minLength,
+            maximumLength: options.maxLength
+        ) { [weak self] data, context, isComplete, error in
+            handler(data.map { [$0] }, error)
+
+            // repeat until failure
+            if error == nil {
+                self?.loopReadTCPPackets(handler)
             }
         }
     }
