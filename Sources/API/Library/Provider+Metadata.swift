@@ -6,7 +6,7 @@ import Foundation
 import PartoutCore
 
 extension Provider {
-    public struct Metadata: UserInfoCodable, Hashable {
+    public struct Metadata: UserInfoCodable, Hashable, @unchecked Sendable {
         public let userInfo: AnyHashable?
 
         public init(userInfo: AnyHashable? = nil) {
