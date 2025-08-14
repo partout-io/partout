@@ -10,12 +10,12 @@ import PartoutCore
 public protocol NETunnelManagerRepository {
     func fetch() async throws -> [NETunnelProviderManager]
 
-    func save(
+    func save<O>(
         _ profile: Profile,
         forConnecting: Bool,
-        options: [String: NSObject]?,
-        title: (Profile) -> String
-    ) async throws
+        options: O?,
+        title: @Sendable (Profile) -> String
+    ) async throws where O: Sendable
 
     func remove(profileId: Profile.ID) async throws
 
