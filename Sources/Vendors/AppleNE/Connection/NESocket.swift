@@ -15,6 +15,8 @@ public final class NESocketObserver: LinkObserver {
         public let maxLength: Int
     }
 
+    private let queue: DispatchQueue
+
     private let ctx: PartoutLoggerContext
 
     private let nwConnection: NWConnection
@@ -24,6 +26,7 @@ public final class NESocketObserver: LinkObserver {
     private var readyContinuation: CheckedContinuation<Void, Error>?
 
     public init(_ ctx: PartoutLoggerContext, nwConnection: NWConnection, options: Options) {
+        queue = DispatchQueue(label: "NESocket", attributes: .concurrent)
         self.ctx = ctx
         self.nwConnection = nwConnection
         self.options = options
@@ -40,7 +43,7 @@ public final class NESocketObserver: LinkObserver {
         try await withCheckedThrowingContinuation { [weak self] continuation in
             guard let self else { return }
             readyContinuation = continuation
-            nwConnection.start(queue: .global())
+            nwConnection.start(queue: queue)
         }
         cancellationTask.cancel()
 
@@ -64,6 +67,7 @@ public final class NESocketObserver: LinkObserver {
         }
 
         return NESocket(
+            queue: queue,
             nwConnection: nwConnection,
             options: options,
             remoteAddress: rawAddress,
@@ -99,7 +103,9 @@ private extension NESocketObserver {
 // MARK: - NESocket
 
 private actor NESocket: LinkInterface {
-    private nonisolated let nwConnection: NWConnection
+    private let queue: DispatchQueue
+
+    private let nwConnection: NWConnection
 
     private let options: NESocketObserver.Options
 
@@ -112,11 +118,13 @@ private actor NESocket: LinkInterface {
     private var writeBlock: (@Sendable ([Data]) async throws -> Void)?
 
     init(
+        queue: DispatchQueue,
         nwConnection: NWConnection,
         options: NESocketObserver.Options,
         remoteAddress: String,
         remoteProtocol: EndpointProtocol
     ) {
+        self.queue = queue
         self.nwConnection = nwConnection
         self.options = options
         self.remoteAddress = remoteAddress
@@ -161,6 +169,7 @@ extension NESocket {
 
     nonisolated func upgraded() -> LinkInterface {
         Self(
+            queue: queue,
             nwConnection: NWConnection(
                 to: nwConnection.endpoint,
                 using: nwConnection.parameters
@@ -201,26 +210,32 @@ private extension NESocket {
     // WARNING: loops run in Network.framework queue
 
     nonisolated func loopReadUDPPackets(_ handler: @escaping ([Data]?, Error?) -> Void) {
-        nwConnection.receiveMessage { [weak self] data, context, isComplete, error in
-            handler(data.map { [$0] }, error)
+        queue.async { [weak self] in
+            guard let self else { return }
+            nwConnection.receiveMessage { [weak self] data, context, isComplete, error in
+                handler(data.map { [$0] }, error)
 
-            // repeat until failure
-            if error == nil {
-                self?.loopReadUDPPackets(handler)
+                // repeat until failure
+                if error == nil {
+                    self?.loopReadUDPPackets(handler)
+                }
             }
         }
     }
 
     nonisolated func loopReadTCPPackets(_ handler: @escaping ([Data]?, Error?) -> Void) {
-        nwConnection.receive(
-            minimumIncompleteLength: options.minLength,
-            maximumLength: options.maxLength
-        ) { [weak self] data, context, isComplete, error in
-            handler(data.map { [$0] }, error)
+        queue.async { [weak self] in
+            guard let self else { return }
+            nwConnection.receive(
+                minimumIncompleteLength: options.minLength,
+                maximumLength: options.maxLength
+            ) { [weak self] data, context, isComplete, error in
+                handler(data.map { [$0] }, error)
 
-            // repeat until failure
-            if error == nil {
-                self?.loopReadTCPPackets(handler)
+                // repeat until failure
+                if error == nil {
+                    self?.loopReadTCPPackets(handler)
+                }
             }
         }
     }
