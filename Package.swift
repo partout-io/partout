@@ -10,8 +10,8 @@ import PackageDescription
 
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.174"
-let checksum = "e882ea65c2d42fbff5655a3d1ecec8b1c8d88f8260100f104099791e932becc5"
+let version = "0.99.175"
+let checksum = "dbee3aaf8bce02cfd85efce83386fdd6127dd8ac2c2950fb477a06b1e2666f7f"
 
 // optional overrides from environment
 let env = ProcessInfo.processInfo.environment
@@ -24,7 +24,7 @@ let envWithDocs = env["PARTOUT_DOCS"] == "1"
 // included areas and environment
 let areas: Set<Area> = Area.defaultAreas
 let coreDeployment = envCoreDeployment ?? .remoteBinary
-let coreSourceSHA1 = "ca8b0496806a1835bcd6ff465129f18b5e5eaadf"
+let coreSourceSHA1 = "8d6e1836ee9177fb5a2525efc2aa6d576184379c"
 
 // must be false in production (check in CI)
 let isDevelopment = false
