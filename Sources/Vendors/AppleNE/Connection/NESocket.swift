@@ -71,7 +71,7 @@ public final class NESocketObserver: LinkObserver {
             case .ipv6(let addr):
                 // XXX: this might be unsafe
                 rawAddress = addr.debugDescription
-            case .name(let name, let interface):
+            case .name(let name, _):
                 rawAddress = name
             default:
                 throw PartoutError(.connectionNotStarted)
