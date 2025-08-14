@@ -468,7 +468,19 @@ case .apple:
         .target(
             name: "_PartoutVendorsAppleNE",
             dependencies: [coreDeployment.dependency],
-            path: "Sources/Vendors/AppleNE"
+            path: "Sources/Vendors/AppleNE",
+            exclude: {
+#if swift(>=6.0)
+                [
+                    "Connection/NEUDPSocket.swift",
+                    "Connection/NETCPSocket.swift",
+                    "Extensions/NWUDPSessionState+Description.swift",
+                    "Extensions/NWTCPConnectionState+Description.swift"
+                ]
+#else
+                []
+#endif
+            }()
         ),
         .testTarget(
             name: "_PartoutVendorsAppleTests",
