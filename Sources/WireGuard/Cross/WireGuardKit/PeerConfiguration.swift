@@ -3,7 +3,7 @@
 
 import Foundation
 
-public struct PeerConfiguration {
+public struct PeerConfiguration: Sendable {
     public var publicKey: PublicKey
     public var preSharedKey: PreSharedKey?
     public var allowedIPs = [IPAddressRange]()

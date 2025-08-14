@@ -6,7 +6,7 @@ import _PartoutWireGuard_C
 import Foundation
 import NetworkExtension
 
-public enum WireGuardAdapterError: Error {
+public enum WireGuardAdapterError: Error, Sendable {
     /// Failure to locate tunnel file descriptor.
     case cannotLocateTunnelFileDescriptor
 
@@ -160,7 +160,7 @@ public class WireGuardAdapter: @unchecked Sendable {
 
     /// Returns a runtime configuration from WireGuard.
     /// - Parameter completionHandler: completion handler.
-    public func getRuntimeConfiguration(completionHandler: @escaping (String?) -> Void) {
+    public func getRuntimeConfiguration(completionHandler: @escaping @Sendable (String?) -> Void) {
         workQueue.async {
             guard case .started(let handle, _) = self.state else {
                 completionHandler(nil)
@@ -179,7 +179,7 @@ public class WireGuardAdapter: @unchecked Sendable {
     /// - Parameters:
     ///   - tunnelConfiguration: tunnel configuration.
     ///   - completionHandler: completion handler.
-    public func start(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping (WireGuardAdapterError?) -> Void) {
+    public func start(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping @Sendable (WireGuardAdapterError?) -> Void) {
         workQueue.async {
             guard case .stopped = self.state else {
                 completionHandler(.invalidState)
@@ -216,7 +216,7 @@ public class WireGuardAdapter: @unchecked Sendable {
 
     /// Stop the tunnel.
     /// - Parameter completionHandler: completion handler.
-    public func stop(completionHandler: @escaping (WireGuardAdapterError?) -> Void) {
+    public func stop(completionHandler: @escaping @Sendable (WireGuardAdapterError?) -> Void) {
         workQueue.async {
             switch self.state {
             case .started(let handle, _):
@@ -243,7 +243,7 @@ public class WireGuardAdapter: @unchecked Sendable {
     /// - Parameters:
     ///   - tunnelConfiguration: tunnel configuration.
     ///   - completionHandler: completion handler.
-    public func update(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping (WireGuardAdapterError?) -> Void) {
+    public func update(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping @Sendable (WireGuardAdapterError?) -> Void) {
         workQueue.async {
             if case .stopped = self.state {
                 completionHandler(.invalidState)
