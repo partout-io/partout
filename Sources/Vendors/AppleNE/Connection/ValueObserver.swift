@@ -19,7 +19,7 @@ actor ValueObserver<O> where O: NSObject {
     func waitForValue<V>(
         on keyPath: KeyPath<O, V>,
         timeout: Int,
-        onValue: @escaping (V) throws -> Bool
+        onValue: @escaping @Sendable (V) throws -> Bool
     ) async throws {
         return try await withCheckedThrowingContinuation { continuation in
 
@@ -55,7 +55,7 @@ actor ValueObserver<O> where O: NSObject {
 }
 
 private extension ValueObserver {
-    func waitSubject<V>(on keyPath: KeyPath<O, V>, onValue: @escaping (V) async -> Void) {
+    func waitSubject<V>(on keyPath: KeyPath<O, V>, onValue: @escaping @Sendable (V) async -> Void) {
 
         // could also sink subject?.publisher(for: keyPath)
         waitObserver = subject?.observe(keyPath, options: [.initial, .new]) { object, _ in
@@ -73,3 +73,5 @@ private extension ValueObserver {
         waitObserver = nil
     }
 }
+
+extension KeyPath: @retroactive @unchecked Sendable {}
