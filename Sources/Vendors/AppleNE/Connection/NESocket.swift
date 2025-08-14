@@ -35,17 +35,30 @@ public final class NESocketObserver: LinkObserver {
     }
 
     public func waitForActivity(timeout: Int) async throws -> LinkInterface {
-        let cancellationTask = Task {
-            try await Task.sleep(milliseconds: timeout)
-            guard !Task.isCancelled else { return }
-            nwConnection.cancel()
+        let isReady = try await withThrowingTaskGroup(returning: Bool.self) { group in
+            group.addTask { [weak self] in
+                try await withCheckedThrowingContinuation { [weak self] continuation in
+                    guard let self else { return }
+                    readyContinuation = continuation
+                    nwConnection.start(queue: queue)
+                }
+            }
+            group.addTask { [weak self] in
+                try await Task.sleep(milliseconds: timeout)
+                guard !Task.isCancelled else {
+                    throw PartoutError(.timeout)
+                }
+                self?.nwConnection.cancel()
+            }
+
+            // return first task to finish and cancel the other one
+            try await group.next()
+            group.cancelAll()
+            return nwConnection.state == .ready
         }
-        try await withCheckedThrowingContinuation { [weak self] continuation in
-            guard let self else { return }
-            readyContinuation = continuation
-            nwConnection.start(queue: queue)
+        guard isReady else {
+            throw PartoutError(.connectionNotStarted)
         }
-        cancellationTask.cancel()
 
         let rawAddress: String
         let rawPort: UInt16
