@@ -135,11 +135,14 @@ private actor NESocket: LinkInterface {
 
         switch remoteProtocol.socketType.plainType {
         case .udp:
-            writeBlock = { [weak self] in
+            writeBlock = { [weak self] packets in
                 guard let self else { return }
-                // can this be parallelized with TaskGroup?
-                for p in $0 {
-                    try await asyncWritePacket(p)
+                try await withThrowingTaskGroup { [weak self] group in
+                    packets.forEach { packet in
+                        group.addTask {
+                            try await self?.asyncWritePacket(packet)
+                        }
+                    }
                 }
             }
         case .tcp:
