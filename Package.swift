@@ -491,7 +491,16 @@ case .apple:
         .testTarget(
             name: "_PartoutVendorsAppleNETests",
             dependencies: ["_PartoutVendorsAppleNE"],
-            path: "Tests/Vendors/AppleNE"
+            path: "Tests/Vendors/AppleNE",
+            exclude: {
+#if swift(>=6.0)
+                [
+                    "ValueObserverTests.swift"
+                ]
+#else
+                []
+#endif
+            }()
         )
     ])
     if areas.contains(.crypto) {
