@@ -33,7 +33,7 @@ public final class NESocketObserver: LinkObserver {
 
     public func waitForActivity(timeout: Int) async throws -> LinkInterface {
         let cancellationTask = Task {
-            try await Task.sleep(for: .milliseconds(timeout))
+            try await Task.sleep(milliseconds: timeout)
             guard !Task.isCancelled else { return }
             nwConnection.cancel()
         }
