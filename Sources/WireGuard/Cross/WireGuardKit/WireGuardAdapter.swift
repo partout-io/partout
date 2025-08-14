@@ -38,7 +38,7 @@ private enum State {
 public protocol WireGuardAdapterDelegate: AnyObject {
     func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool)
 
-    func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: NEPacketTunnelNetworkSettings, completionHandler: ((Error?) -> Void)?)
+    func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: NEPacketTunnelNetworkSettings, completionHandler: (@Sendable (Error?) -> Void)?)
 }
 
 public class WireGuardAdapter {
