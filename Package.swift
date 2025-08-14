@@ -474,6 +474,7 @@ case .apple:
                 [
                     "Connection/NEUDPSocket.swift",
                     "Connection/NETCPSocket.swift",
+                    "Connection/ValueObserver.swift",
                     "Extensions/NWUDPSessionState+Description.swift",
                     "Extensions/NWTCPConnectionState+Description.swift"
                 ]
