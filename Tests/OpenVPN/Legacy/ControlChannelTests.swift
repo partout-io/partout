@@ -6,9 +6,10 @@
 internal import _PartoutOpenVPNLegacy_ObjC
 import XCTest
 
-@OpenVPNActor
-final class ControlChannelTests: XCTestCase {
-    func test_givenChannel_whenHandleSequence_thenIsReordered() {
+final class ControlChannelTests: XCTestCase, @unchecked Sendable {
+    // https://forums.swift.org/t/xctest-data-race-detected/75322/2
+    @OpenVPNActor
+    func test_givenChannel_whenHandleSequence_thenIsReordered() async {
         let seq1: [UInt32] = [0, 5, 2, 1, 4, 3]
         let seq2: [UInt32] = [5, 2, 1, 9, 4, 3, 0, 8, 7, 10, 4, 3, 5, 6]
         let seq3: [UInt32] = [5, 2, 11, 1, 2, 9, 4, 5, 5, 3, 8, 0, 6, 8, 2, 7, 10, 4, 3, 5, 6]
@@ -25,6 +26,7 @@ final class ControlChannelTests: XCTestCase {
 // MARK: - Helpers
 
 private extension ControlChannelTests {
+    @OpenVPNActor
     func handledSequence(_ sequence: [Wrapper]) -> [Wrapper] {
         let sut = ControlChannel.self
 
