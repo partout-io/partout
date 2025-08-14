@@ -6,7 +6,7 @@ import NetworkExtension
 import PartoutCore
 
 /// Implementation of a ``/PartoutCore/LinkObserver`` via `NWTCPConnection`.
-public final class NESocketObserver: LinkObserver {
+public final class NESocketObserver: LinkObserver, @unchecked Sendable {
     public struct Options: Sendable {
         public let proto: IPSocketType
 
@@ -31,7 +31,11 @@ public final class NESocketObserver: LinkObserver {
         self.nwConnection = nwConnection
         self.options = options
 
-        nwConnection.stateUpdateHandler = onStateUpdate
+        nwConnection.stateUpdateHandler = { [weak self] state in
+            self?.queue.async { [weak self] in
+                self?.onStateUpdate(state)
+            }
+        }
     }
 
     public func waitForActivity(timeout: Int) async throws -> LinkInterface {
@@ -39,8 +43,8 @@ public final class NESocketObserver: LinkObserver {
             group.addTask { [weak self] in
                 try await withCheckedThrowingContinuation { [weak self] continuation in
                     guard let self else { return }
-                    readyContinuation = continuation
-                    nwConnection.start(queue: queue)
+                    self.readyContinuation = continuation
+                    self.nwConnection.start(queue: self.queue)
                 }
             }
             group.addTask { [weak self] in
@@ -81,7 +85,7 @@ public final class NESocketObserver: LinkObserver {
             throw PartoutError(.connectionNotStarted)
         }
 
-        return NESocket(
+        let socket = NESocket(
             queue: queue,
             nwConnection: nwConnection,
             options: options,
@@ -91,6 +95,8 @@ public final class NESocketObserver: LinkObserver {
                 rawPort
             )
         )
+        await socket.configure()
+        return socket
     }
 }
 
@@ -145,17 +151,20 @@ private actor NESocket: LinkInterface {
         self.remoteAddress = remoteAddress
         self.remoteProtocol = remoteProtocol
         betterPathStream = PassthroughStream()
+    }
 
+    func configure() {
         switch remoteProtocol.socketType.plainType {
         case .udp:
             writeBlock = { [weak self] packets in
                 guard let self else { return }
                 try await withThrowingTaskGroup { [weak self] group in
-                    packets.forEach { packet in
-                        group.addTask {
+                    packets.forEach { [weak self] packet in
+                        group.addTask { [weak self] in
                             try await self?.asyncWritePacket(packet)
                         }
                     }
+                    try await group.waitForAll()
                 }
             }
         case .tcp:
