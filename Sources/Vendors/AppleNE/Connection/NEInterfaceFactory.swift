@@ -9,6 +9,9 @@ import PartoutCore
 /// A ``/PartoutCore/NetworkInterfaceFactory`` that spawns ``/PartoutCore/LinkInterface`` and ``/PartoutCore/TunnelInterface`` objects from a `NEPacketTunnelProvider`.
 public final class NEInterfaceFactory: NetworkInterfaceFactory {
     public struct Options: Sendable {
+        // Enable to use NWConnection, NW* sockets were removed from NetworkExtension.
+        public var usesNetworkFramework = false
+
         public var maxUDPDatagrams = 200
 
         public var minTCPLength = 2
@@ -37,28 +40,55 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
             logReleasedProvider()
             return nil
         }
-        let nwEndpoint = endpoint.nwEndpoint
         switch endpoint.proto.socketType.plainType {
         case .udp:
-            let impl = provider.createUDPSession(to: nwEndpoint, from: nil)
-            return NEUDPObserver(
-                ctx,
-                nwSession: impl,
-                options: .init(
-                    maxDatagrams: options.maxUDPDatagrams
+            if options.usesNetworkFramework {
+                let impl = NWConnection(to: endpoint.nwEndpoint, using: .udp)
+                let socketOptions = NESocketObserver.Options(
+                    proto: .udp,
+                    minLength: 0,   // unused
+                    maxLength: 0    // unused
                 )
-            )
+                return NESocketObserver(ctx, nwConnection: impl, options: socketOptions)
+            } else {
+                let impl = provider.createUDPSession(
+                    to: endpoint.nwHostEndpoint,
+                    from: nil
+                )
+                return NEUDPObserver(
+                    ctx,
+                    nwSession: impl,
+                    options: .init(
+                        maxDatagrams: options.maxUDPDatagrams
+                    )
+                )
+            }
 
         case .tcp:
-            let impl = provider.createTCPConnection(to: nwEndpoint, enableTLS: false, tlsParameters: nil, delegate: nil)
-            return NETCPObserver(
-                ctx,
-                nwConnection: impl,
-                options: .init(
+            if options.usesNetworkFramework {
+                let impl = NWConnection(to: endpoint.nwEndpoint, using: .tcp)
+                let socketOptions = NESocketObserver.Options(
+                    proto: .tcp,
                     minLength: options.minTCPLength,
                     maxLength: options.maxTCPLength
                 )
-            )
+                return NESocketObserver(ctx, nwConnection: impl, options: socketOptions)
+            } else {
+                let impl = provider.createTCPConnection(
+                    to: endpoint.nwHostEndpoint,
+                    enableTLS: false,
+                    tlsParameters: nil,
+                    delegate: nil
+                )
+                return NETCPObserver(
+                    ctx,
+                    nwConnection: impl,
+                    options: .init(
+                        minLength: options.minTCPLength,
+                        maxLength: options.maxTCPLength
+                    )
+                )
+            }
         }
     }
 
@@ -78,7 +108,12 @@ private extension NEInterfaceFactory {
 }
 
 private extension ExtendedEndpoint {
-    var nwEndpoint: NWHostEndpoint {
+    var nwEndpoint: Network.NWEndpoint {
+        .hostPort(host: .init(address.rawValue), port: .init(integerLiteral: proto.port))
+    }
+
+    @available(*, deprecated, message: "NetworkExtension UDP/TCP sockets were removed in Swift 6")
+    var nwHostEndpoint: NWHostEndpoint {
         NWHostEndpoint(hostname: address.rawValue, port: proto.port.description)
     }
 }
