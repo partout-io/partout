@@ -53,8 +53,10 @@ public final class NESocketObserver: LinkObserver {
         case .hostPort(let host, let port):
             switch host {
             case .ipv4(let addr):
+                // XXX: this might be unsafe
                 rawAddress = addr.debugDescription
             case .ipv6(let addr):
+                // XXX: this might be unsafe
                 rawAddress = addr.debugDescription
             case .name(let name, let interface):
                 rawAddress = name
