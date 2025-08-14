@@ -424,7 +424,7 @@ extension OpenVPNSession {
 extension OpenVPNSession {
 
     @discardableResult
-    nonisolated func runInActor(after: TimeInterval? = nil, _ block: @escaping @Sendable () async throws -> Void) -> Task<Void, Error> {
+    nonisolated func runInActor(after: TimeInterval? = nil, _ block: @escaping () async throws -> Void) -> Task<Void, Error> {
         Task {
             if let after {
                 try await Task.sleep(interval: after)
@@ -451,7 +451,7 @@ private extension OpenVPNSession {
         pendingPingTask?.cancel()
         pendingPingTask = runInActor(after: interval) { [weak self] in
             do {
-                try await self?.ping()
+                try self?.ping()
             } catch {
                 await self?.shutdown(error)
             }
