@@ -49,7 +49,7 @@ extension OpenVPNSession {
                     return
                 }
                 do {
-                    try await self.receiveLink(packets: packets)
+                    try self.receiveLink(packets: packets)
                 } catch {
                     await self.shutdown(error)
                 }
