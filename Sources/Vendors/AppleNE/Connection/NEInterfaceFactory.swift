@@ -44,7 +44,12 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
         case .udp:
             if options.withNetworkFramework {
                 let impl = NWConnection(to: endpoint.nwEndpoint, using: .udp)
-                return NESocketObserver(ctx, nwConnection: impl, options: .init())
+                let socketOptions = NESocketObserver.Options(
+                    proto: .udp,
+                    minLength: options.minTCPLength,
+                    maxLength: options.maxTCPLength
+                )
+                return NESocketObserver(ctx, nwConnection: impl, options: socketOptions)
             } else {
                 let impl = provider.createUDPSession(
                     to: endpoint.nwHostEndpoint,
@@ -62,7 +67,12 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
         case .tcp:
             if options.withNetworkFramework {
                 let impl = NWConnection(to: endpoint.nwEndpoint, using: .tcp)
-                return NESocketObserver(ctx, nwConnection: impl, options: .init())
+                let socketOptions = NESocketObserver.Options(
+                    proto: .tcp,
+                    minLength: options.minTCPLength,
+                    maxLength: options.maxTCPLength
+                )
+                return NESocketObserver(ctx, nwConnection: impl, options: socketOptions)
             } else {
                 let impl = provider.createTCPConnection(
                     to: endpoint.nwHostEndpoint,

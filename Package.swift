@@ -41,8 +41,8 @@ let cSettings: [CSetting] = [
 let package = Package(
     name: "partout",
     platforms: [
-        .iOS(.v15),
-        .macOS(.v12),
+        .iOS(.v16),
+        .macOS(.v13),
         .tvOS(.v17)
     ],
     products: [
