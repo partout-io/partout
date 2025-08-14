@@ -109,8 +109,6 @@ private actor NESocket: LinkInterface {
 
     private let betterPathStream: PassthroughStream<Void>
 
-    private let writeComplete: Bool
-
     private var writeBlock: (@Sendable ([Data]) async throws -> Void)?
 
     init(
@@ -127,7 +125,6 @@ private actor NESocket: LinkInterface {
 
         switch remoteProtocol.socketType.plainType {
         case .udp:
-            writeComplete = true
             writeBlock = { [weak self] in
                 guard let self else { return }
                 // can this be parallelized with TaskGroup?
@@ -136,7 +133,6 @@ private actor NESocket: LinkInterface {
                 }
             }
         case .tcp:
-            writeComplete = false
             writeBlock = { [weak self] in
                 guard let self else { return }
                 let joinedPacket = Data($0.joined())
@@ -214,7 +210,6 @@ private extension NESocket {
             try await withCheckedThrowingContinuation { continuation in
                 nwConnection.send(
                     content: packet,
-                    isComplete: writeComplete,
                     completion: .contentProcessed { error in
                         if let error {
                             continuation.resume(throwing: error)
