@@ -36,7 +36,7 @@ struct HideMeProviderTests: APITestSuite {
 //        )
     ])
     func whenFetchInfrastructure_thenReturns(input: FetchInput) async throws {
-        let sut = try newAPIMapper(input.hijacked ? {
+        let sut = try newAPIMapper(input.hijacked ? { @Sendable in
             hijacker(forFetchURL: $1)
         } : nil)
         do {
