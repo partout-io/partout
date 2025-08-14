@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-public protocol ProviderScriptingAPI {
+public protocol ProviderScriptingAPI: Sendable {
     var version: String { get }
 
     func getResult(

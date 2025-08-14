@@ -13,7 +13,7 @@ public final class DefaultProviderScriptingAPI {
 
     private let timeout: TimeInterval
 
-    private let requestHijacker: ((String, String) -> (Int, Data))?
+    private let requestHijacker: (@Sendable (String, String) -> (Int, Data))?
 
     public convenience init(
         _ ctx: PartoutLoggerContext,
@@ -25,7 +25,7 @@ public final class DefaultProviderScriptingAPI {
     init(
         _ ctx: PartoutLoggerContext,
         timeout: TimeInterval,
-        requestHijacker: ((_ method: String, _ urlString: String) -> (httpStatus: Int, responseData: Data))? = nil
+        requestHijacker: (@Sendable (_ method: String, _ urlString: String) -> (httpStatus: Int, responseData: Data))? = nil
     ) {
         self.ctx = ctx
         self.timeout = timeout
