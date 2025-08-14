@@ -6,6 +6,8 @@ import PackageDescription
 
 // MARK: Package
 
+// MARK: Auto-generated (do not modify)
+
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
 let version = "0.99.174"
@@ -17,6 +19,8 @@ let envOS = env["PARTOUT_OS"]
 let envCoreDeployment = env["PARTOUT_CORE"].map(CoreDeployment.init(rawValue:)) ?? nil
 let envWithDocs = env["PARTOUT_DOCS"] == "1"
 
+// MARK: Fine-tuning
+
 // included areas and environment
 let areas: Set<Area> = Area.defaultAreas
 let coreDeployment = envCoreDeployment ?? .remoteBinary
@@ -26,17 +30,19 @@ let coreSourceSHA1 = "ca8b0496806a1835bcd6ff465129f18b5e5eaadf"
 let isDevelopment = false
 let isTestingOpenVPNDataPath = false
 
-// PartoutCore binaries only on non-Apple
-guard OS.current == .apple || ![.remoteBinary, .localBinary].contains(coreDeployment) else {
-    fatalError("Core binary only available on Apple platforms")
-}
-
 // the global settings for C targets
 let cSettings: [CSetting] = [
     .unsafeFlags([
         "-Wall", "-Wextra"//, "-Werror"
     ])
 ]
+
+// MARK: Definition
+
+// PartoutCore binaries only on non-Apple
+guard OS.current == .apple || ![.remoteBinary, .localBinary].contains(coreDeployment) else {
+    fatalError("Core binary only available on Apple platforms")
+}
 
 let package = Package(
     name: "partout",
