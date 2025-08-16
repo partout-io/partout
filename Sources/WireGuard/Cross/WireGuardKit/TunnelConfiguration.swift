@@ -3,7 +3,7 @@
 
 import Foundation
 
-public final class TunnelConfiguration {
+public struct TunnelConfiguration: Sendable {
     public var name: String?
     public var interface: InterfaceConfiguration
     public let peers: [PeerConfiguration]

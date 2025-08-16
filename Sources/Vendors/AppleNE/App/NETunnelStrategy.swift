@@ -3,12 +3,12 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-import NetworkExtension
+@preconcurrency import NetworkExtension
 import PartoutCore
 
 /// Implementation of ``/PartoutCore/TunnelStrategy`` based on `NETunnelProviderManager`.
 public actor NETunnelStrategy {
-    public enum Option {
+    public enum Option: Sendable {
         case multiple
     }
 
@@ -18,7 +18,7 @@ public actor NETunnelStrategy {
 
     private let coder: NEProtocolCoder
 
-    private nonisolated let options: Set<Option>
+    private let options: Set<Option>
 
     private nonisolated let managersSubject: CurrentValueStream<[Profile.ID: NETunnelProviderManager]>
 
@@ -78,7 +78,7 @@ extension NETunnelStrategy: TunnelObservableStrategy {
         _ profile: Profile,
         connect: Bool,
         options: Sendable?,
-        title: @escaping (Profile) -> String
+        title: @escaping @Sendable (Profile) -> String
     ) async throws {
         if connect, !self.options.contains(.multiple) {
             await disconnectCurrentManagers()
@@ -129,12 +129,12 @@ extension NETunnelStrategy: TunnelObservableStrategy {
                     continuation.finish()
                     return
                 }
-                for await activeProfiles in activeProfilesStream.dropFirst() {
+                for await activeProfiles in self.activeProfilesStream.dropFirst() {
                     guard !Task.isCancelled else {
-                        pp_log(ctx, .ne, .debug, "Cancelled NETunnelStrategy.didUpdateActiveProfiles")
+                        pp_log(self.ctx, .ne, .debug, "Cancelled NETunnelStrategy.didUpdateActiveProfiles")
                         break
                     }
-                    pp_log(ctx, .ne, .debug, "NETunnelStrategy.activeProfiles -> \(activeProfiles.values.description)")
+                    pp_log(self.ctx, .ne, .debug, "NETunnelStrategy.activeProfiles -> \(activeProfiles.values.description)")
                     continuation.yield(activeProfiles)
                 }
                 continuation.finish()
@@ -153,11 +153,11 @@ extension NETunnelStrategy: NETunnelManagerRepository {
         return managers
     }
 
-    public func save(
+    public func save<O>(
         _ profile: Profile,
         forConnecting: Bool,
-        options: [String: NSObject]?,
-        title: (Profile) -> String
+        options: O?,
+        title: @Sendable (Profile) -> String
     ) async throws {
         profile.log(.ne, .notice, withPreamble: "Encoded profile:")
 
@@ -205,6 +205,7 @@ extension NETunnelStrategy: NETunnelManagerRepository {
         }
 
         if forConnecting {
+            let options = options as? [String: NSObject]
             try manager.connection.startVPNTunnel(options: options)
         }
     }
@@ -232,9 +233,9 @@ extension NETunnelStrategy: NETunnelManagerRepository {
                     continuation.finish()
                     return
                 }
-                for await value in managersSubject.subscribe().dropFirst() {
+                for await value in self.managersSubject.subscribe().dropFirst() {
                     guard !Task.isCancelled else {
-                        pp_log(ctx, .ne, .debug, "Cancelled NETunnelStrategy.managersStream")
+                        pp_log(self.ctx, .ne, .debug, "Cancelled NETunnelStrategy.managersStream")
                         break
                     }
                     continuation.yield(value)
@@ -289,7 +290,7 @@ private extension NETunnelStrategy {
 private extension NETunnelStrategy {
     func saveAtomically(
         _ profileId: Profile.ID,
-        block: @escaping (NETunnelProviderManager) -> Void
+        block: @escaping @Sendable (NETunnelProviderManager) -> Void
     ) async throws -> NETunnelProviderManager {
         try await saveAtomically(
             self.allManagers[profileId] ?? NETunnelProviderManager(),
@@ -300,13 +301,13 @@ private extension NETunnelStrategy {
     @discardableResult
     func saveAtomically(
         _ managerBlock: @escaping @autoclosure () -> NETunnelProviderManager,
-        block: @escaping (NETunnelProviderManager) -> Void
+        block: @escaping @Sendable (NETunnelProviderManager) -> Void
     ) async throws -> NETunnelProviderManager {
         if let pendingSaveTask {
             try await pendingSaveTask.value
         }
         let manager = managerBlock()
-        pendingSaveTask = Task {
+        pendingSaveTask = Task { @Sendable in
             try await manager.loadFromPreferences()
             try Task.checkCancellation()
             block(manager)
@@ -512,6 +513,9 @@ private extension NEVPNConnection {
             }
         }
     }
+}
+
+extension NETunnelProviderManager: @retroactive @unchecked Sendable {
 }
 
 private extension NETunnelProviderManager {

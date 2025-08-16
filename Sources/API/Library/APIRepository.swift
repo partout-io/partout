@@ -8,7 +8,7 @@ import PartoutProviders
 
 public typealias APIRepository = APIRepositoryReader & APIRepositoryWriter
 
-public protocol APIRepositoryReader {
+public protocol APIRepositoryReader: Sendable {
     var indexStream: AsyncStream<[Provider]> { get }
 
     var cacheStream: AsyncStream<[ProviderID: ProviderCache]> { get }
@@ -18,7 +18,7 @@ public protocol APIRepositoryReader {
     func providerRepository(for providerId: ProviderID) -> ProviderRepository
 }
 
-public protocol APIRepositoryWriter {
+public protocol APIRepositoryWriter: Sendable {
     func store(_ index: [Provider]) async throws
 
     func store(_ infrastructure: ProviderInfrastructure, for providerId: ProviderID) async throws

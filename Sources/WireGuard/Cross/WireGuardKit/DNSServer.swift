@@ -4,7 +4,7 @@
 import Foundation
 import Network
 
-public struct DNSServer {
+public struct DNSServer: Sendable {
     public let address: IPAddress
 
     public init(address: IPAddress) {

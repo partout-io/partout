@@ -15,7 +15,8 @@ import os
 import PartoutCore
 import PartoutWireGuard
 
-public final class WireGuardConnection: Connection {
+// FIXME: #13, drop @unchecked after refactoring
+public final class WireGuardConnection: Connection, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
     private let statusSubject: CurrentValueStream<ConnectionStatus>
@@ -176,7 +177,7 @@ private extension WireGuardConnection {
             }
         }
 
-        func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: NEPacketTunnelNetworkSettings, completionHandler: ((Error?) -> Void)?) {
+        func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: NEPacketTunnelNetworkSettings, completionHandler: (@Sendable (Error?) -> Void)?) {
             guard let connection else {
                 pp_log(ctx, .wireguard, .error, "Lost weak reference to connection?")
                 return
@@ -195,11 +196,11 @@ private extension WireGuardConnection {
                         modules: [module]
                     ))
                     completionHandler?(nil)
-                    pp_log(ctx, .wireguard, .info, "Tunnel interface is now UP")
+                    pp_log(connection.ctx, .wireguard, .info, "Tunnel interface is now UP")
                     connection.statusSubject.send(.connected)
                 } catch {
                     completionHandler?(error)
-                    pp_log(ctx, .wireguard, .error, "Unable to configure tunnel settings: \(error)")
+                    pp_log(connection.ctx, .wireguard, .error, "Unable to configure tunnel settings: \(error)")
                     connection.statusSubject.send(.disconnected)
                 }
             }

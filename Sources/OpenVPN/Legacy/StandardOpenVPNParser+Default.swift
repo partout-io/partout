@@ -10,3 +10,6 @@ extension StandardOpenVPNParser {
         self.init(supportsLZO: true, decrypter: OSSLTLSBox())
     }
 }
+
+// XXX: unsafe but legacy
+extension OSSLTLSBox: @retroactive @unchecked Sendable {}

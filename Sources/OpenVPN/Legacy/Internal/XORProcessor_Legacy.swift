@@ -9,7 +9,7 @@ import PartoutCore
 import PartoutOpenVPN
 
 /// Processes data packets according to a XOR method.
-struct XORProcessor {
+struct XORProcessor: @unchecked Sendable {
     private enum RawMethod {
         case xormask(mask: ZeroingData)
 

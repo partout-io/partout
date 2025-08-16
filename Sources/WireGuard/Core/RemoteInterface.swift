@@ -50,7 +50,7 @@ extension WireGuard {
 }
 
 extension WireGuard.RemoteInterface {
-    public struct Builder: BuilderType, Hashable {
+    public struct Builder: BuilderType, Hashable, Sendable {
         public let publicKey: String
 
         public var preSharedKey: String?

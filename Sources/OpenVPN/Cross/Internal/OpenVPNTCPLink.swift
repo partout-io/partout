@@ -13,6 +13,7 @@ final class OpenVPNTCPLink {
     private let proc: PacketProcessor
 
     // WARNING: not thread-safe, only use in setReadHandler()
+    nonisolated(unsafe)
     private var buffer: Data
 
     /// - Parameters:
@@ -61,7 +62,7 @@ extension OpenVPNTCPLink: LinkInterface {
 // MARK: - IOInterface
 
 extension OpenVPNTCPLink {
-    func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
+    func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
         link.setReadHandler { [weak self] packets, error in
             guard let self else {
                 return

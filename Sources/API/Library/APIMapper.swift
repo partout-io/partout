@@ -5,7 +5,7 @@
 import PartoutCore
 import PartoutProviders
 
-public protocol APIMapper {
+public protocol APIMapper: Sendable {
     func index() async throws -> [Provider]
 
     func authenticate(_ module: ProviderModule, on deviceId: String) async throws -> ProviderModule

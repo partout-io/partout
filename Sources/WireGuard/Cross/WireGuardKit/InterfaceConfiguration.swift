@@ -4,7 +4,7 @@
 import Foundation
 import Network
 
-public struct InterfaceConfiguration {
+public struct InterfaceConfiguration: Sendable {
     public var privateKey: PrivateKey
     public var addresses = [IPAddressRange]()
     public var listenPort: UInt16?
