@@ -49,7 +49,7 @@ extension OpenVPNSession {
                     return
                 }
                 do {
-                    try receiveLink(packets: packets)
+                    try await receiveLink(packets: packets)
                 } catch {
                     await shutdown(error)
                 }
