@@ -10,8 +10,8 @@ import PackageDescription
 
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.175"
-let checksum = "dbee3aaf8bce02cfd85efce83386fdd6127dd8ac2c2950fb477a06b1e2666f7f"
+let version = "0.99.176"
+let checksum = "bfdb8c11f1e8924e06c5cfe964e7cb4fab6096eadee30e717dac926d7bd9ced7"
 
 // optional overrides from environment
 let env = ProcessInfo.processInfo.environment
