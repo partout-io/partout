@@ -10,6 +10,7 @@ import PartoutCore
 public final class NETunnelInterface: TunnelInterface {
     private let ctx: PartoutLoggerContext
 
+    nonisolated(unsafe)
     private weak var impl: NEPacketTunnelFlow?
 
     public init(_ ctx: PartoutLoggerContext, impl: NEPacketTunnelFlow) {

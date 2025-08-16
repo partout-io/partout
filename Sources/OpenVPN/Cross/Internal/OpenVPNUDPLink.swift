@@ -57,7 +57,7 @@ extension OpenVPNUDPLink: LinkInterface {
 // MARK: - IOInterface
 
 extension OpenVPNUDPLink {
-    func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
+    func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
         link.setReadHandler { [weak self] packets, error in
             guard let self, let packets, !packets.isEmpty else {
                 return

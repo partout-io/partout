@@ -9,8 +9,8 @@ import Testing
 private let plainHex = "00112233ffddaa"
 private let plainHMACHex = "8dd324c81ca32f52e4aa1aa35139deba799a68460e80b0e5ac8bceb043edf6e500112233ffddaa"
 private let encryptedHMACHex = "fea3fe87ee68eb21c697e62d3c29f7bea2f5b457d9a7fa66291322fc9c2fe6f700000000000000000000000000000000ebe197e706c3c5dcad026f4e3af1048b"
-private let cipherKey = CZeroingData(count: 32)
-private let hmacKey = CZeroingData(count: 32)
+private nonisolated(unsafe) let cipherKey = CZeroingData(count: 32)
+private nonisolated(unsafe) let hmacKey = CZeroingData(count: 32)
 private let flags = CryptoFlags()
 
 struct CryptoCBCTests {

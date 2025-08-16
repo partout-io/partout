@@ -6,7 +6,7 @@ import Foundation
 import PartoutCore
 import PartoutProviders
 
-public protocol ProviderRepository: AnyObject {
+public protocol ProviderRepository: AnyObject, Sendable {
     var providerId: ProviderID { get }
 
     func availableOptions(for moduleType: ModuleType) async throws -> ProviderFilterOptions

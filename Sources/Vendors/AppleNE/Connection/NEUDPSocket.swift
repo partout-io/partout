@@ -7,6 +7,7 @@ import NetworkExtension
 import PartoutCore
 
 /// Implementation of a ``/PartoutCore/LinkObserver`` via `NWUDPSession`.
+@available(*, deprecated, message: "Use NESocketObserver")
 public final class NEUDPObserver: LinkObserver {
     public struct Options: Sendable {
         public let maxDatagrams: Int

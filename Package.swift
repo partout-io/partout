@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 5.10
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import Foundation // required for ProcessInfo
@@ -6,10 +6,12 @@ import PackageDescription
 
 // MARK: Package
 
+// MARK: Auto-generated (do not modify)
+
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.174"
-let checksum = "e882ea65c2d42fbff5655a3d1ecec8b1c8d88f8260100f104099791e932becc5"
+let version = "0.99.175"
+let checksum = "dbee3aaf8bce02cfd85efce83386fdd6127dd8ac2c2950fb477a06b1e2666f7f"
 
 // optional overrides from environment
 let env = ProcessInfo.processInfo.environment
@@ -17,19 +19,16 @@ let envOS = env["PARTOUT_OS"]
 let envCoreDeployment = env["PARTOUT_CORE"].map(CoreDeployment.init(rawValue:)) ?? nil
 let envWithDocs = env["PARTOUT_DOCS"] == "1"
 
+// MARK: Fine-tuning
+
 // included areas and environment
 let areas: Set<Area> = Area.defaultAreas
 let coreDeployment = envCoreDeployment ?? .remoteBinary
-let coreSourceSHA1 = "ca8b0496806a1835bcd6ff465129f18b5e5eaadf"
+let coreSourceSHA1 = "8d6e1836ee9177fb5a2525efc2aa6d576184379c"
 
 // must be false in production (check in CI)
 let isDevelopment = false
 let isTestingOpenVPNDataPath = false
-
-// PartoutCore binaries only on non-Apple
-guard OS.current == .apple || ![.remoteBinary, .localBinary].contains(coreDeployment) else {
-    fatalError("Core binary only available on Apple platforms")
-}
 
 // the global settings for C targets
 let cSettings: [CSetting] = [
@@ -37,6 +36,13 @@ let cSettings: [CSetting] = [
         "-Wall", "-Wextra"//, "-Werror"
     ])
 ]
+
+// MARK: Definition
+
+// PartoutCore binaries only on non-Apple
+guard OS.current == .apple || ![.remoteBinary, .localBinary].contains(coreDeployment) else {
+    fatalError("Core binary only available on Apple platforms")
+}
 
 let package = Package(
     name: "partout",
@@ -140,6 +146,7 @@ let package = Package(
 package.targets.append(contentsOf: [
     .target(
         name: "_PartoutABI_C",
+        dependencies: ["_PartoutVendorsPortable_C"],
         path: "Sources/ABI/Library_C"
     ),
     .target(
@@ -467,7 +474,20 @@ case .apple:
         .target(
             name: "_PartoutVendorsAppleNE",
             dependencies: [coreDeployment.dependency],
-            path: "Sources/Vendors/AppleNE"
+            path: "Sources/Vendors/AppleNE",
+            exclude: {
+#if swift(>=6.0)
+                [
+                    "Connection/NEUDPSocket.swift",
+                    "Connection/NETCPSocket.swift",
+                    "Connection/ValueObserver.swift",
+                    "Extensions/NWUDPSessionState+Description.swift",
+                    "Extensions/NWTCPConnectionState+Description.swift"
+                ]
+#else
+                []
+#endif
+            }()
         ),
         .testTarget(
             name: "_PartoutVendorsAppleTests",
@@ -477,7 +497,16 @@ case .apple:
         .testTarget(
             name: "_PartoutVendorsAppleNETests",
             dependencies: ["_PartoutVendorsAppleNE"],
-            path: "Tests/Vendors/AppleNE"
+            path: "Tests/Vendors/AppleNE",
+            exclude: {
+#if swift(>=6.0)
+                [
+                    "ValueObserverTests.swift"
+                ]
+#else
+                []
+#endif
+            }()
         )
     ])
     if areas.contains(.crypto) {

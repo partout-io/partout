@@ -6,7 +6,7 @@ import Foundation
 import PartoutCore
 import PartoutProviders
 
-public struct Provider: Identifiable, Hashable, CustomStringConvertible {
+public struct Provider: Identifiable, Hashable, CustomStringConvertible, Sendable {
     public let id: ProviderID
 
     public let description: String

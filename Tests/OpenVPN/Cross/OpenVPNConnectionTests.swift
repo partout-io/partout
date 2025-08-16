@@ -340,7 +340,7 @@ private struct Constants {
     }
 }
 
-private final class MockOpenVPNSession: OpenVPNSessionProtocol {
+private final class MockOpenVPNSession: OpenVPNSessionProtocol, @unchecked Sendable {
     private let options: OpenVPN.Configuration = {
         do {
             return try OpenVPN.Configuration.Builder().tryBuild(isClient: false)

@@ -23,7 +23,7 @@ struct MullvadProviderTests: APITestSuite {
         )
     ])
     func whenFetchInfrastructure_thenReturns(input: FetchInput) async throws {
-        let sut = try newAPIMapper(input.hijacked ? {
+        let sut = try newAPIMapper(input.hijacked ? { @Sendable in
             providerId.hijacker(forFetchURL: $1)
         } : nil)
         do {
@@ -127,7 +127,7 @@ struct MullvadProviderTests: APITestSuite {
         )
     ])
     func whenAuth_thenSucceeds(input: AuthInput) async throws {
-        let sut = try newAPIMapper(input.hijacked ? {
+        let sut = try newAPIMapper(input.hijacked ? { @Sendable in
             hijacker(for: input, method: $0, urlString: $1)
         } : nil)
 

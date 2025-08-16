@@ -13,7 +13,7 @@ public final class DefaultProviderScriptingAPI {
 
     private let timeout: TimeInterval
 
-    private let requestHijacker: ((String, String) -> (Int, Data))?
+    private let requestHijacker: (@Sendable (String, String) -> (Int, Data))?
 
     public convenience init(
         _ ctx: PartoutLoggerContext,
@@ -25,7 +25,7 @@ public final class DefaultProviderScriptingAPI {
     init(
         _ ctx: PartoutLoggerContext,
         timeout: TimeInterval,
-        requestHijacker: ((_ method: String, _ urlString: String) -> (httpStatus: Int, responseData: Data))? = nil
+        requestHijacker: (@Sendable (_ method: String, _ urlString: String) -> (httpStatus: Int, responseData: Data))? = nil
     ) {
         self.ctx = ctx
         self.timeout = timeout
@@ -220,13 +220,15 @@ private extension DefaultProviderScriptingAPI {
         cfg.timeoutIntervalForRequest = timeout
         let session = URLSession(configuration: cfg)
 
+        final class StatusHolder: @unchecked Sendable {
+            var status: Int?
+        }
+
         let semaphore = DispatchSemaphore(value: 0)
         let storage = ResultStorage()
-        var status: Int?
-        let task = session.dataTask(with: request) { [weak self] data, response, error in
-            guard let self else {
-                return
-            }
+        let statusHolder = StatusHolder()
+        let ctx = self.ctx // to avoid capturing self
+        let task = session.dataTask(with: request) { data, response, error in
             if let error {
                 pp_log(ctx, .providers, .error, "API.sendRequest: Unable to execute: \(error)")
             } else if let httpResponse = response as? HTTPURLResponse {
@@ -243,7 +245,7 @@ private extension DefaultProviderScriptingAPI {
                     pp_log(ctx, .providers, .info, "API.sendRequest: ETag: \(tag)")
                     storage.tag = tag
                 }
-                status = httpResponse.statusCode
+                statusHolder.status = httpResponse.statusCode
                 storage.isCached = httpResponse.statusCode == 304
             }
             storage.textData = data
@@ -258,19 +260,19 @@ private extension DefaultProviderScriptingAPI {
             // nil response but no error = result.isCached
             return ProviderScriptResult(
                 nil,
-                status: status,
+                status: statusHolder.status,
                 lastModified: storage.lastModified,
                 tag: storage.tag
             )
         }
-        guard  let textData = storage.textData else {
+        guard let textData = storage.textData else {
             pp_log(ctx, .providers, .error, "API.sendRequest: Empty response")
             return ProviderScriptResult.notData
         }
         pp_log(ctx, .providers, .info, "API.sendRequest: Success")
         return ProviderScriptResult(
             textData,
-            status: status,
+            status: statusHolder.status,
             lastModified: storage.lastModified,
             tag: storage.tag
         )

@@ -103,7 +103,7 @@ final class MockRepository: APIRepository {
     }
 }
 
-final class MockVPNRepository: ProviderRepository {
+final class MockVPNRepository: ProviderRepository, @unchecked Sendable {
     let providerId: ProviderID
 
     var allServers: [ProviderServer] = []

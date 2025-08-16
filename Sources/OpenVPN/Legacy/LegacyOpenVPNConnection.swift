@@ -166,7 +166,7 @@ private extension LegacyOpenVPNConnection {
 // MARK: - OpenVPNSessionDelegate
 
 extension LegacyOpenVPNConnection: OpenVPNSessionDelegate {
-    func sessionDidStart(_ session: OpenVPNSessionProtocol, remoteAddress: String, remoteProtocol: EndpointProtocol, remoteOptions: OpenVPN.Configuration) async {
+    nonisolated func sessionDidStart(_ session: OpenVPNSessionProtocol, remoteAddress: String, remoteProtocol: EndpointProtocol, remoteOptions: OpenVPN.Configuration) async {
         let addressObject = Address(rawValue: remoteAddress)
         if addressObject == nil {
             pp_log(ctx, .openvpn, .error, "Unable to parse remote tunnel address")
@@ -212,7 +212,7 @@ extension LegacyOpenVPNConnection: OpenVPNSessionDelegate {
         }
     }
 
-    func sessionDidStop(_ session: OpenVPNSessionProtocol, withError error: Error?) async {
+    nonisolated func sessionDidStop(_ session: OpenVPNSessionProtocol, withError error: Error?) async {
         if let error {
             pp_log(ctx, .openvpn, .error, "Session did stop: \(error)")
         } else {
@@ -236,7 +236,7 @@ extension LegacyOpenVPNConnection: OpenVPNSessionDelegate {
         await backend.sendStatus(.disconnected)
     }
 
-    func session(_ session: OpenVPNSessionProtocol, didUpdateDataCount dataCount: DataCount) async {
+    nonisolated func session(_ session: OpenVPNSessionProtocol, didUpdateDataCount dataCount: DataCount) async {
         guard await backend.status == .connected else {
             return
         }

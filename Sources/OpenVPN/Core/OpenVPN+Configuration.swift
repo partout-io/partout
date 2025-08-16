@@ -272,7 +272,7 @@ extension OpenVPN {
 extension OpenVPN.Configuration {
 
     /// The way to create a `Configuration` object for a `OpenVPNSession`.
-    public struct Builder: Hashable {
+    public struct Builder: Hashable, Sendable {
 
         // MARK: General
 

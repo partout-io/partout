@@ -6,7 +6,7 @@ import Foundation
 import PartoutCore
 import PartoutProviders
 
-public struct ProviderServerParameters {
+public struct ProviderServerParameters: Sendable {
     public var filters: ProviderFilters
 
     public var sorting: [ProviderSortField]
@@ -17,7 +17,7 @@ public struct ProviderServerParameters {
     }
 }
 
-public struct ProviderFilters: Equatable {
+public struct ProviderFilters: Equatable, Sendable {
     public var moduleType: ModuleType?
 
     public var categoryName: String?
@@ -34,7 +34,7 @@ public struct ProviderFilters: Equatable {
     }
 }
 
-public enum ProviderSortField {
+public enum ProviderSortField: Sendable {
     case localizedCountry
 
     case area
@@ -42,7 +42,7 @@ public enum ProviderSortField {
     case serverId
 }
 
-public struct ProviderFilterOptions {
+public struct ProviderFilterOptions: Sendable {
     public let countriesByCategoryName: [String: Set<String>]
 
     public let countryCodes: Set<String>

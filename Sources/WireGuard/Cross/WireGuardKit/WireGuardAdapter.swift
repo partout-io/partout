@@ -6,7 +6,7 @@ import _PartoutWireGuard_C
 import Foundation
 import NetworkExtension
 
-public enum WireGuardAdapterError: Error {
+public enum WireGuardAdapterError: Error, Sendable {
     /// Failure to locate tunnel file descriptor.
     case cannotLocateTunnelFileDescriptor
 
@@ -38,10 +38,11 @@ private enum State {
 public protocol WireGuardAdapterDelegate: AnyObject {
     func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool)
 
-    func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: NEPacketTunnelNetworkSettings, completionHandler: ((Error?) -> Void)?)
+    func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: NEPacketTunnelNetworkSettings, completionHandler: (@Sendable (Error?) -> Void)?)
 }
 
-public class WireGuardAdapter {
+// FIXME: #13, drop @unchecked after refactoring
+public class WireGuardAdapter: @unchecked Sendable {
     public typealias LogHandler = (WireGuardLogLevel, String) -> Void
 
     /// Network routes monitor.
@@ -159,7 +160,7 @@ public class WireGuardAdapter {
 
     /// Returns a runtime configuration from WireGuard.
     /// - Parameter completionHandler: completion handler.
-    public func getRuntimeConfiguration(completionHandler: @escaping (String?) -> Void) {
+    public func getRuntimeConfiguration(completionHandler: @escaping @Sendable (String?) -> Void) {
         workQueue.async {
             guard case .started(let handle, _) = self.state else {
                 completionHandler(nil)
@@ -178,7 +179,7 @@ public class WireGuardAdapter {
     /// - Parameters:
     ///   - tunnelConfiguration: tunnel configuration.
     ///   - completionHandler: completion handler.
-    public func start(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping (WireGuardAdapterError?) -> Void) {
+    public func start(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping @Sendable (WireGuardAdapterError?) -> Void) {
         workQueue.async {
             guard case .stopped = self.state else {
                 completionHandler(.invalidState)
@@ -215,7 +216,7 @@ public class WireGuardAdapter {
 
     /// Stop the tunnel.
     /// - Parameter completionHandler: completion handler.
-    public func stop(completionHandler: @escaping (WireGuardAdapterError?) -> Void) {
+    public func stop(completionHandler: @escaping @Sendable (WireGuardAdapterError?) -> Void) {
         workQueue.async {
             switch self.state {
             case .started(let handle, _):
@@ -242,7 +243,7 @@ public class WireGuardAdapter {
     /// - Parameters:
     ///   - tunnelConfiguration: tunnel configuration.
     ///   - completionHandler: completion handler.
-    public func update(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping (WireGuardAdapterError?) -> Void) {
+    public func update(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping @Sendable (WireGuardAdapterError?) -> Void) {
         workQueue.async {
             if case .stopped = self.state {
                 completionHandler(.invalidState)
@@ -316,7 +317,7 @@ public class WireGuardAdapter {
     /// - Throws: an error of type `WireGuardAdapterError`.
     /// - Returns: `PacketTunnelSettingsGenerator`.
     private func setNetworkSettings(_ networkSettings: NEPacketTunnelNetworkSettings) throws {
-        var systemError: Error?
+        nonisolated(unsafe) var systemError: Error?
         let condition = NSCondition()
 
         // Activate the condition

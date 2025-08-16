@@ -24,6 +24,22 @@ extension NEIPv4Route {
     }
 }
 
+extension NEIPv4Route {
+    public func cloned() -> NEIPv4Route {
+        let copy = NEIPv4Route(
+            destinationAddress: destinationAddress,
+            subnetMask: destinationSubnetMask
+        )
+        copy.gatewayAddress = gatewayAddress
+        return copy
+    }
+
+    public func hasSameDestination(as other: NEIPv4Route) -> Bool {
+        destinationAddress == other.destinationAddress &&
+            destinationSubnetMask == other.destinationSubnetMask
+    }
+}
+
 private extension NEIPv4Route {
     var equalitySubject: [String?] {
         [

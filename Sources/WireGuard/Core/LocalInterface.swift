@@ -39,7 +39,7 @@ extension WireGuard {
 }
 
 extension WireGuard.LocalInterface {
-    public struct Builder: BuilderType, Hashable {
+    public struct Builder: BuilderType, Hashable, Sendable {
         public var privateKey: String
 
         public var addresses: [String]

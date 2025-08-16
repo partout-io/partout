@@ -3,11 +3,11 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-import JavaScriptCore
+@preconcurrency import JavaScriptCore
 import PartoutCore
 
-/// Implementation of ``/PartoutCore/ScriptingEngine`` based on the `JavaScriptCore` framework.
-public final class AppleJavaScriptEngine: ScriptingEngine {
+/// Implementation of ``/PartoutCore/ScriptingEngine`` based on the `JavaScriptCore` framework. This class is not actor-safe.
+public final class AppleJavaScriptEngine: ScriptingEngine, @unchecked Sendable {
     private let engine: JSContext
 
     public init(_ ctx: PartoutLoggerContext) {
@@ -21,7 +21,7 @@ public final class AppleJavaScriptEngine: ScriptingEngine {
         engine.setObject(object, forKeyedSubscript: name as NSString)
     }
 
-    public func execute<O>(_ script: String, after preScript: String?, returning: O.Type) async throws -> O where O: Decodable {
+    public func execute<O>(_ script: String, after preScript: String?, returning: O.Type) async throws -> O where O: Decodable & Sendable {
         try await Task.detached {
             if let preScript {
                 _ = self.engine.evaluateScript(preScript)

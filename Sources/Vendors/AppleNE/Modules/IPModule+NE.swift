@@ -43,7 +43,7 @@ private extension Route {
     var neIPv4Route: NEIPv4Route {
         let route = destination.map {
             NEIPv4Route(destinationAddress: $0.address.rawValue, subnetMask: $0.ipv4Mask)
-        } ?? NEIPv4Route.default()
+        } ?? NEIPv4Route.default().cloned()
         route.gatewayAddress = gateway?.rawValue
         return route
     }
@@ -69,7 +69,7 @@ private extension Route {
     var neIPv6Route: NEIPv6Route {
         let route = destination.map {
             NEIPv6Route(destinationAddress: $0.address.rawValue, networkPrefixLength: $0.prefixLength as NSNumber)
-        } ?? NEIPv6Route.default()
+        } ?? NEIPv6Route.default().cloned()
         route.gatewayAddress = gateway?.rawValue
         return route
     }

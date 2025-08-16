@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
+@preconcurrency import Foundation
 import PartoutCore
 
 /// `CoreFoundation` implementation of ``/PartoutCore/SimpleDNSStrategy``.
@@ -130,7 +130,9 @@ private extension Data {
         guard result == 0 else {
             return nil
         }
-        let address = String(cString: ipAddress)
+        let address = ipAddress.string
         return DNSRecord(address: address, isIPv6: address.contains(":"))
     }
 }
+
+extension Notification: @retroactive @unchecked Sendable {}

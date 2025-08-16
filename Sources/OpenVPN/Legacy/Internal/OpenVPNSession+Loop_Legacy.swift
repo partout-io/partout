@@ -42,16 +42,16 @@ extension OpenVPNSession {
                     return
                 }
                 if let error {
-                    pp_log(ctx, .openvpn, .error, "Failed LINK read: \(error)")
-                    await shutdown(PartoutError(.linkFailure, error))
+                    pp_log(self.ctx, .openvpn, .error, "Failed LINK read: \(error)")
+                    await self.shutdown(PartoutError(.linkFailure, error))
                 }
                 guard let packets, !packets.isEmpty else {
                     return
                 }
                 do {
-                    try receiveLink(packets: packets)
+                    try self.receiveLink(packets: packets)
                 } catch {
-                    await shutdown(error)
+                    await self.shutdown(error)
                 }
             }
         }

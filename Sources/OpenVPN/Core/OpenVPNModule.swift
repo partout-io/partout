@@ -10,7 +10,7 @@ extension ModuleType {
 }
 
 /// A ``/PartoutCore/ConnectionModule`` providing an OpenVPN connection.
-public struct OpenVPNModule: Module, BuildableType, Hashable, Codable {
+public struct OpenVPNModule: Module, BuildableType, Hashable, Codable, Sendable {
     public static let moduleHandler = ModuleHandler(.openVPN, OpenVPNModule.self)
 
     public let id: UUID
@@ -58,7 +58,7 @@ private extension OpenVPNModule {
 }
 
 extension OpenVPNModule {
-    public struct Builder: ModuleBuilder, Hashable {
+    public struct Builder: ModuleBuilder, Hashable, Sendable {
         public let id: UUID
 
         public var configurationBuilder: OpenVPN.Configuration.Builder?

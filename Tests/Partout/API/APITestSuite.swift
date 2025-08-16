@@ -11,7 +11,7 @@ protocol APITestSuite {
 }
 
 extension APITestSuite {
-    func newAPIMapper(_ requestHijacker: ((String, String) -> (Int, Data))? = nil) throws -> APIMapper {
+    func newAPIMapper(_ requestHijacker: (@Sendable (String, String) -> (Int, Data))? = nil) throws -> APIMapper {
         guard let baseURL = API.url() else {
             fatalError("Could not find resource path")
         }

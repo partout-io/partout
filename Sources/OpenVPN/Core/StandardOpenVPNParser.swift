@@ -51,7 +51,7 @@ public final class StandardOpenVPNParser {
     private let supportsLZO: Bool
 
     /// The decrypter for private keys.
-    private nonisolated let decrypter: KeyDecrypter?
+    private let decrypter: (KeyDecrypter & Sendable)?
 
     private let rxOptions: [(option: OpenVPN.Option, rx: NSRegularExpression)] = OpenVPN.Option.allCases.compactMap {
         do {
@@ -63,7 +63,7 @@ public final class StandardOpenVPNParser {
         }
     }
 
-    public init(supportsLZO: Bool, decrypter: KeyDecrypter?) {
+    public init(supportsLZO: Bool, decrypter: (KeyDecrypter & Sendable)?) {
         self.supportsLZO = supportsLZO
         self.decrypter = decrypter
     }
