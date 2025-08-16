@@ -24,7 +24,7 @@ let envWithDocs = env["PARTOUT_DOCS"] == "1"
 // included areas and environment
 let areas: Set<Area> = Area.defaultAreas
 let coreDeployment = envCoreDeployment ?? .remoteBinary
-let coreSourceSHA1 = "8d6e1836ee9177fb5a2525efc2aa6d576184379c"
+let coreSourceSHA1 = "dd2b02cc7bdd2ea8899deb3df55e615c41764101"
 
 // must be false in production (check in CI)
 let isDevelopment = false
