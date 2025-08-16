@@ -24,6 +24,17 @@ extension NEIPv6Route {
     }
 }
 
+extension NEIPv6Route {
+    public func cloned() -> NEIPv6Route {
+        let copy = NEIPv6Route(
+            destinationAddress: destinationAddress,
+            networkPrefixLength: destinationNetworkPrefixLength
+        )
+        copy.gatewayAddress = gatewayAddress
+        return copy
+    }
+}
+
 private extension NEIPv6Route {
     var equalitySubject: [String?] {
         [
