@@ -9,7 +9,7 @@ import PartoutCore
 import PartoutOpenVPN
 
 /// Wrapper for connecting over a TCP socket.
-final class OpenVPNTCPLink {
+final class OpenVPNTCPLink: @unchecked Sendable {
     private let link: LinkInterface
 
     private let xorMethod: OpenVPN.ObfuscationMethod?
@@ -63,7 +63,7 @@ extension OpenVPNTCPLink: LinkInterface {
 // MARK: - IOInterface
 
 extension OpenVPNTCPLink {
-    func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
+    func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
         link.setReadHandler { [weak self] packets, error in
             guard let self else {
                 return

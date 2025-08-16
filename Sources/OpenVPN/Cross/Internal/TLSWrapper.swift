@@ -10,12 +10,12 @@ extension Notification.Name {
 }
 
 final class TLSWrapper {
-    struct Parameters {
+    struct Parameters: Sendable {
         let cachesURL: URL
 
         let cfg: OpenVPN.Configuration
 
-        let onVerificationFailure: () -> Void
+        let onVerificationFailure: @Sendable () -> Void
     }
 
     let tls: TLSProtocol

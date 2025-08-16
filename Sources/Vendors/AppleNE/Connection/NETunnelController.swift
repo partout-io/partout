@@ -16,6 +16,7 @@ public final class NETunnelController: TunnelController {
         }
     }
 
+    nonisolated(unsafe)
     public private(set) weak var provider: NEPacketTunnelProvider?
 
     public let registry: Registry

@@ -9,7 +9,7 @@ import PartoutCore
 import PartoutOpenVPN
 
 /// Processes data packets according to an obfuscation method.
-final class PacketProcessor {
+final class PacketProcessor: @unchecked Sendable {
     enum Direction {
         case outbound
 

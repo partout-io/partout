@@ -5,7 +5,7 @@
 import Foundation
 import PartoutProviders
 
-public struct ProviderInfrastructure: Decodable {
+public struct ProviderInfrastructure: Decodable, Sendable {
     public let presets: [ProviderPreset]
 
     public let servers: [ProviderServer]

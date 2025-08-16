@@ -5,7 +5,7 @@ import _PartoutWireGuard_C
 import Foundation
 
 /// The class describing a private key used by WireGuard.
-public class PrivateKey: BaseKey {
+public class PrivateKey: BaseKey, @unchecked Sendable {
     /// Derived public key
     public var publicKey: PublicKey {
         return rawValue.withUnsafeBytes { (privateKeyBufferPointer: UnsafeRawBufferPointer) -> PublicKey in
@@ -33,13 +33,13 @@ public class PrivateKey: BaseKey {
 }
 
 /// The class describing a public key used by WireGuard.
-public class PublicKey: BaseKey {}
+public class PublicKey: BaseKey, @unchecked Sendable {}
 
 /// The class describing a pre-shared key used by WireGuard.
-public class PreSharedKey: BaseKey {}
+public class PreSharedKey: BaseKey, @unchecked Sendable {}
 
 /// The base key implementation. Should not be used directly.
-public class BaseKey: RawRepresentable, Equatable, Hashable {
+public class BaseKey: RawRepresentable, Equatable, Hashable, @unchecked Sendable {
     /// Raw key representation
     public let rawValue: Data
 

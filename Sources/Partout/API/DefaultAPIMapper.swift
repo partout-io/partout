@@ -18,14 +18,14 @@ public final class DefaultAPIMapper: APIMapper {
 
     private let api: ProviderScriptingAPI
 
-    private let engineFactory: (ProviderScriptingAPI) -> ScriptingEngine
+    private let engineFactory: @Sendable (ProviderScriptingAPI) -> ScriptingEngine
 
     public init(
         _ ctx: PartoutLoggerContext,
         baseURL: URL,
         timeout: TimeInterval = 10.0,
         api: ProviderScriptingAPI,
-        engineFactory: @escaping (ProviderScriptingAPI) -> ScriptingEngine
+        engineFactory: @escaping @Sendable (ProviderScriptingAPI) -> ScriptingEngine
     ) {
         self.ctx = ctx
         self.baseURL = baseURL

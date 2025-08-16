@@ -24,6 +24,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
 
     private let ctx: PartoutLoggerContext
 
+    nonisolated(unsafe)
     private weak var provider: NEPacketTunnelProvider?
 
     private let options: Options
@@ -51,6 +52,9 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
                 )
                 return NESocketObserver(ctx, nwConnection: impl, options: socketOptions)
             } else {
+#if swift(>=6.0)
+                fatalError("Must enable .usesNetworkFramework in Swift 6.0")
+#else
                 let impl = provider.createUDPSession(
                     to: endpoint.nwHostEndpoint,
                     from: nil
@@ -62,6 +66,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
                         maxDatagrams: options.maxUDPDatagrams
                     )
                 )
+#endif
             }
 
         case .tcp:
@@ -74,6 +79,9 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
                 )
                 return NESocketObserver(ctx, nwConnection: impl, options: socketOptions)
             } else {
+#if swift(>=6.0)
+                fatalError("Must enable .usesNetworkFramework in Swift 6.0")
+#else
                 let impl = provider.createTCPConnection(
                     to: endpoint.nwHostEndpoint,
                     enableTLS: false,
@@ -88,6 +96,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
                         maxLength: options.maxTCPLength
                     )
                 )
+#endif
             }
         }
     }
@@ -112,8 +121,10 @@ private extension ExtendedEndpoint {
         .hostPort(host: .init(address.rawValue), port: .init(integerLiteral: proto.port))
     }
 
+#if swift(<6.0)
     @available(*, deprecated, message: "NetworkExtension UDP/TCP sockets were removed in Swift 6")
     var nwHostEndpoint: NWHostEndpoint {
         NWHostEndpoint(hostname: address.rawValue, port: proto.port.description)
     }
+#endif
 }

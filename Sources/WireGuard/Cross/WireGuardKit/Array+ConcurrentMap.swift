@@ -14,19 +14,23 @@ extension Array {
     ///            Pass `nil` to perform computations on the current queue.
     ///   - transform: the block to perform concurrent computations over the given element.
     /// - Returns: an array of concurrently computed values.
-    func concurrentMap<U>(queue: DispatchQueue?, _ transform: (Element) -> U) -> [U] {
-        var result = [U?](repeating: nil, count: self.count)
+    func concurrentMap<U>(queue: DispatchQueue?, _ transform: @escaping @Sendable (Element) -> U) -> [U] where U: Sendable {
+        nonisolated(unsafe) let copy = self
+        nonisolated(unsafe) var result = [U?](repeating: nil, count: copy.count)
         let resultQueue = DispatchQueue(label: "ConcurrentMapQueue")
 
-        let execute = queue?.sync ?? { $0() }
-
-        execute {
-            DispatchQueue.concurrentPerform(iterations: self.count) { index in
-                let value = transform(self[index])
+        let block = {
+            DispatchQueue.concurrentPerform(iterations: copy.count) { index in
+                let value = transform(copy[index])
                 resultQueue.sync {
                     result[index] = value
                 }
             }
+        }
+        if let queue {
+            queue.sync(execute: block)
+        } else {
+            block()
         }
 
         return result.map { $0! }

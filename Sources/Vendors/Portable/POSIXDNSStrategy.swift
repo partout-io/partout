@@ -6,7 +6,7 @@ import Foundation
 import PartoutCore
 
 /// Implementation of ``/PartoutCore/SimpleDNSStrategy`` with the POSIX C library.
-public final class POSIXDNSStrategy: SimpleDNSStrategy {
+public actor POSIXDNSStrategy: SimpleDNSStrategy {
     private let hostname: String
 
     private var task: Task<[DNSRecord]?, Error>?
@@ -87,7 +87,7 @@ private extension POSIXDNSStrategy {
                 NI_NUMERICHOST
             )
             if result == 0 {
-                let address = String(cString: hostBuffer)
+                let address = hostBuffer.string
                 records.append(DNSRecord(address: address, isIPv6: addrLength == 128))
             }
             currentPointer = info.ai_next

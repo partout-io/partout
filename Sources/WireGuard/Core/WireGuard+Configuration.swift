@@ -27,7 +27,7 @@ extension WireGuard {
 }
 
 extension WireGuard.Configuration {
-    public struct Builder: BuilderType, Hashable {
+    public struct Builder: BuilderType, Hashable, Sendable {
         public var interface: WireGuard.LocalInterface.Builder
 
         public var peers: [WireGuard.RemoteInterface.Builder]
