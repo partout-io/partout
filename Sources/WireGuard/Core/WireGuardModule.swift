@@ -10,7 +10,7 @@ extension ModuleType {
 }
 
 /// A ``/PartoutCore/ConnectionModule`` providing a WireGuard connection.
-public struct WireGuardModule: Module, BuildableType, Hashable, Codable, Sendable {
+public struct WireGuardModule: Module, BuildableType, Hashable, Codable {
     public static let moduleHandler = ModuleHandler(.wireGuard, WireGuardModule.self)
 
     public let id: UUID
@@ -31,7 +31,7 @@ public struct WireGuardModule: Module, BuildableType, Hashable, Codable, Sendabl
 }
 
 extension WireGuardModule {
-    public struct Builder: ModuleBuilder, Hashable, Sendable {
+    public struct Builder: ModuleBuilder, Hashable {
         public let id: UUID
 
         public var configurationBuilder: WireGuard.Configuration.Builder?
