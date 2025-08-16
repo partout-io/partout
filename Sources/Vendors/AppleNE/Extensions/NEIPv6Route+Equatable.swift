@@ -33,6 +33,11 @@ extension NEIPv6Route {
         copy.gatewayAddress = gatewayAddress
         return copy
     }
+
+    public func sameDestination(as other: NEIPv6Route) -> Bool {
+        destinationAddress == other.destinationAddress &&
+            destinationNetworkPrefixLength == other.destinationNetworkPrefixLength
+    }
 }
 
 private extension NEIPv6Route {

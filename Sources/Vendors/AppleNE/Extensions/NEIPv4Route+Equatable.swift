@@ -33,6 +33,11 @@ extension NEIPv4Route {
         copy.gatewayAddress = gatewayAddress
         return copy
     }
+
+    public func sameDestination(as other: NEIPv4Route) -> Bool {
+        destinationAddress == other.destinationAddress &&
+            destinationSubnetMask == other.destinationSubnetMask
+    }
 }
 
 private extension NEIPv4Route {
