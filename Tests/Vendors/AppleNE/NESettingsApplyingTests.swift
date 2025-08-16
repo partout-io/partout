@@ -208,7 +208,7 @@ private extension NESettingsApplyingTests {
             #expect(neRoute.destinationAddress == destination.address.rawValue)
             #expect(neRoute.destinationSubnetMask == destination.ipv4Mask)
         } else {
-            #expect(neRoute.sameDestination(as: .default()))
+            #expect(neRoute.hasSameDestination(as: .default()))
         }
         #expect(neRoute.gatewayAddress == route.gateway?.rawValue)
     }
@@ -218,7 +218,7 @@ private extension NESettingsApplyingTests {
             #expect(neRoute.destinationAddress == destination.address.rawValue)
             #expect(neRoute.destinationNetworkPrefixLength.intValue == destination.prefixLength)
         } else {
-            #expect(neRoute.sameDestination(as: .default()))
+            #expect(neRoute.hasSameDestination(as: .default()))
         }
         #expect(neRoute.gatewayAddress == route.gateway?.rawValue)
     }
@@ -231,7 +231,7 @@ private extension Collection where Element == Route {
                 neRoute.destinationAddress == destination.address.rawValue &&
                 neRoute.destinationSubnetMask == destination.ipv4Mask
             } else {
-                neRoute.sameDestination(as: .default())
+                neRoute.hasSameDestination(as: .default())
             }
         }
     }
@@ -242,7 +242,7 @@ private extension Collection where Element == Route {
                 neRoute.destinationAddress == destination.address.rawValue &&
                 neRoute.destinationNetworkPrefixLength.intValue == destination.prefixLength
             } else {
-                neRoute.sameDestination(as: .default())
+                neRoute.hasSameDestination(as: .default())
             }
         }
     }

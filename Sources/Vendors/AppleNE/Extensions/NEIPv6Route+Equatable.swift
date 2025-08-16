@@ -34,7 +34,7 @@ extension NEIPv6Route {
         return copy
     }
 
-    public func sameDestination(as other: NEIPv6Route) -> Bool {
+    public func hasSameDestination(as other: NEIPv6Route) -> Bool {
         destinationAddress == other.destinationAddress &&
             destinationNetworkPrefixLength == other.destinationNetworkPrefixLength
     }
