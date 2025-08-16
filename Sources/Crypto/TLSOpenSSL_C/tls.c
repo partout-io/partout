@@ -284,7 +284,7 @@ char *pp_tls_ca_md5(const pp_tls_ctx tls) {
     uint8_t md[16];
     unsigned int len;
 
-    FILE *pem = fopen(tls->opt->ca_path, "r");
+    FILE *pem = pp_fopen(tls->opt->ca_path, "r");
     if (!pem) {
         goto failure;
     }
