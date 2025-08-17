@@ -8,7 +8,6 @@ import PartoutImplementations
 
 extension Registry {
     static let shared = Registry(
-        deviceId: "",
         withKnown: true,
         allImplementations: [
             OpenVPNModule.Implementation(
