@@ -19,6 +19,9 @@ let envOS = env["PARTOUT_OS"]
 let envCoreDeployment = env["PARTOUT_CORE"].map(CoreDeployment.init(rawValue:)) ?? nil
 let envWithDocs = env["PARTOUT_DOCS"] == "1"
 
+// inferred library type
+let libraryType: Product.Library.LibraryType? = OS.current == .android ? .dynamic : nil
+
 // MARK: Fine-tuning
 
 // included areas and environment
@@ -54,12 +57,12 @@ let package = Package(
     products: [
         .library(
             name: "Partout",
-            type: .dynamic,
+            type: libraryType,
             targets: ["Partout"]
         ),
         .library(
             name: "PartoutImplementations",
-            type: .dynamic,
+            type: libraryType,
             targets: ["PartoutImplementations"]
         )
     ],
