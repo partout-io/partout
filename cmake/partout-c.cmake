@@ -8,12 +8,12 @@ file(GLOB_RECURSE PARTOUT_C_SOURCES
 
 # Set up exclusions
 set(EXCLUDED_PATTERNS
-    # FIXME: #118, WireGuard excluded until properly integrated
+    # FIXME: #118, restore WireGuard when properly integrated
     WireGuard\/
 )
 
 # Filter by platform
-# FIXME: #173, exclude Windows regardless for now
+# FIXME: #174, restore Windows crypto
 #if(NOT WIN32)
     list(APPEND EXCLUDED_PATTERNS Crypto\/CryptoWindows_C\/)
 #endif()

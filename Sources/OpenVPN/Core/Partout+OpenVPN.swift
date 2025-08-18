@@ -11,12 +11,12 @@ extension LoggerCategory {
     public static let openvpn = Self(rawValue: "openvpn")
 }
 
-// FIXME: #173, workaround for name clash
-public typealias ExternalOpenVPN = OpenVPN
+// XXX: workaround for name clash
+public typealias OpenVPNConfiguration = OpenVPN.Configuration
 
 extension TunnelEnvironmentKeys {
     public enum OpenVPN {
-        public static let serverConfiguration = TunnelEnvironmentKey<ExternalOpenVPN.Configuration>("OpenVPN.serverConfiguration")
+        public static let serverConfiguration = TunnelEnvironmentKey<OpenVPNConfiguration>("OpenVPN.serverConfiguration")
     }
 }
 

@@ -18,7 +18,7 @@ set(EXCLUDED_PATTERNS
     OpenVPN\/CryptoOpenSSL_ObjC\/
     OpenVPN\/Legacy\/
     OpenVPN\/Legacy_ObjC\/
-    # FIXME: #118, WireGuard excluded until properly integrated
+    # FIXME: #118, restore WireGuard when properly integrated
     WireGuard\/
 )
 
