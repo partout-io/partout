@@ -11,12 +11,13 @@ include(partout.cmake)
 set_target_properties(Partout PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${PARTOUT_DIR}/bin
     ARCHIVE_OUTPUT_DIRECTORY ${PARTOUT_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${PARTOUT_DIR}/bin
 )
 
 # Mind platform differences about static libraries
 function(add_static_lib dir name out_list)
     if (WIN32)
-        set(lib_path ${dir}/${name}.lib)
+        set(lib_path ${dir}/lib${name}.lib)
     else()
         set(lib_path ${dir}/lib${name}.a)
     endif()

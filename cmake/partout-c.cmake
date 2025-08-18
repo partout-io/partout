@@ -13,9 +13,10 @@ set(EXCLUDED_PATTERNS
 )
 
 # Filter by platform
-if (NOT WIN32)
+# FIXME: #173, exclude Windows regardless for now
+#if (NOT WIN32)
     list(APPEND EXCLUDED_PATTERNS Crypto\/CryptoWindows_C\/)
-endif()
+#endif()
 if (NOT DEFINED OPENSSL_DIR)
     list(APPEND EXCLUDED_PATTERNS Crypto\/.*OpenSSL_C\/)
 endif()
@@ -40,9 +41,9 @@ set(PARTOUT_C_INCLUDE_DIRS
 add_library(Partout_C STATIC
     ${PARTOUT_C_SOURCES}
 )
-target_compile_options(Partout_C PRIVATE
-    -fPIC
-)
 target_include_directories(Partout_C PRIVATE
     ${PARTOUT_C_INCLUDE_DIRS}
 )
+if (LINUX)
+    target_compile_options(Partout_C PRIVATE -fPIC)
+endif()
