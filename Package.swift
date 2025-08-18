@@ -54,12 +54,12 @@ let package = Package(
     products: [
         .library(
             name: "Partout",
-            type: .static,
+            type: .dynamic,
             targets: ["Partout"]
         ),
         .library(
             name: "PartoutImplementations",
-            type: .static,
+            type: .dynamic,
             targets: ["PartoutImplementations"]
         )
     ],
