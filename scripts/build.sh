@@ -4,6 +4,7 @@ if [ ! -d build ]; then
     mkdir build
 fi
 set -e
-cd build && rm -rf PartoutProject*
+cd build
+rm -rf PartoutProject*
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
 cmake --build .
