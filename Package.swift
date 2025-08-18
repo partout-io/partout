@@ -54,12 +54,12 @@ let package = Package(
     products: [
         .library(
             name: "Partout",
-            type: .static,
+            type: .dynamic,
             targets: ["Partout"]
         ),
         .library(
             name: "PartoutImplementations",
-            type: .static,
+            type: .dynamic,
             targets: ["PartoutImplementations"]
         )
     ],
@@ -275,7 +275,7 @@ if areas.contains(.openVPN) {
             name: "_PartoutOpenVPN_C",
             dependencies: [
                 "_PartoutCrypto_C",
-                "_PartoutVendorsTLS_C"
+                "_PartoutTLS_C"
             ],
             path: "Sources/OpenVPN/Cross_C"
         ),
@@ -440,7 +440,7 @@ case .android:
                 path: "Sources/Vendors/OpenSSL",
                 // use .artifactbundle once supported
                 linkerSettings: [
-                    .unsafeFlags(["-Lvendors/lib/android/arm64"]),
+                    .unsafeFlags(["-Lbin/openssl/lib"]),
                     // WARNING: order matters, ssl then crypto
                     .linkedLibrary("ssl"),
                     .linkedLibrary("crypto")
@@ -452,15 +452,21 @@ case .android:
                     "_PartoutCryptoCore_C",
                     "_PartoutVendorsOpenSSL"
                 ],
-                path: "Sources/Crypto/CryptoOpenSSL_C"
+                path: "Sources/Crypto/CryptoOpenSSL_C",
+                cSettings: [
+                    .unsafeFlags(["-Ibin/openssl/include"])
+                ],
             ),
             .target(
-                name: "_PartoutVendorsTLS_C",
+                name: "_PartoutTLS_C",
                 dependencies: [
                     "_PartoutVendorsOpenSSL",
-                    "_PartoutVendorsTLSCore_C"
+                    "_PartoutTLSCore_C"
                 ],
-                path: "Sources/Crypto/TLSOpenSSL_C"
+                path: "Sources/Crypto/TLSOpenSSL_C",
+                cSettings: [
+                    .unsafeFlags(["-Ibin/openssl/include"])
+                ],
             )
         ])
     }
@@ -532,10 +538,10 @@ case .apple:
                 path: "Sources/Crypto/CryptoOpenSSL_C"
             ),
             .target(
-                name: "_PartoutVendorsTLS_C",
+                name: "_PartoutTLS_C",
                 dependencies: [
                     "_PartoutVendorsOpenSSL",
-                    "_PartoutVendorsTLSCore_C"
+                    "_PartoutTLSCore_C"
                 ],
                 path: "Sources/Crypto/TLSOpenSSL_C"
             )
@@ -576,10 +582,10 @@ case .linux:
                 path: "Sources/Crypto/CryptoOpenSSL_C"
             ),
             .target(
-                name: "_PartoutVendorsTLS_C",
+                name: "_PartoutTLS_C",
                 dependencies: [
                     "_PartoutVendorsOpenSSL",
-                    "_PartoutVendorsTLSCore_C"
+                    "_PartoutTLSCore_C"
                 ],
                 path: "Sources/Crypto/TLSOpenSSL_C"
             )
@@ -608,7 +614,7 @@ if areas.contains(.crypto) {
             path: "Sources/Crypto/CryptoCore_C"
         ),
         .target(
-            name: "_PartoutVendorsTLSCore_C",
+            name: "_PartoutTLSCore_C",
             dependencies: [
                 "_PartoutCryptoCore_C",
                 "_PartoutVendorsPortable_C",

@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutProviders
+#endif
 
 protocol ProviderScriptingEngine: ScriptingEngine {
     func inject(from engine: ProviderScriptingAPI)

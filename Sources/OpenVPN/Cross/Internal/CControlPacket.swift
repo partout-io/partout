@@ -4,7 +4,9 @@
 
 internal import _PartoutOpenVPN_C
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 final class CControlPacket {
     let pkt: UnsafeMutablePointer<openvpn_ctrl>

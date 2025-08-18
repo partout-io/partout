@@ -2,9 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutCryptoOpenSSL_ObjC
 import Foundation
+#if !PARTOUT_MONOLITH
+internal import _PartoutCryptoOpenSSL_ObjC
 import PartoutCore
+#endif
 
 extension PRNGProtocol {
     func safeData(length: Int) -> ZeroingData {

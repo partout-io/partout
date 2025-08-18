@@ -3,9 +3,11 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import _PartoutOpenVPN_C
-internal import _PartoutVendorsPortable
 import Foundation
+#if !PARTOUT_MONOLITH
+internal import _PartoutVendorsPortable
 import PartoutOpenVPN
+#endif
 
 extension CryptoKeys {
     struct PRF {

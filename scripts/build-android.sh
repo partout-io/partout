@@ -1,11 +1,20 @@
 #!/bin/bash
-build_cfg="debug"
-if [ -n "$1" ]; then
-    build_cfg="$1"
+cmake_cfg="Debug"
+spm_cfg="debug"
+if [ "$1" == 1 ]; then
+    cmake_cfg="Release"
+    spm_cfg="release"
 fi
+
+# 1. Build CMake vendors
+
+scripts/build.sh -c $cmake_cfg -android
+
+# 2. Build SwiftPM with Android SDK
+
 PARTOUT_OS="android" \
 PARTOUT_CORE="remoteSource" \
 swiftly run \
 swift build \
-    -c $build_cfg \
+    -c $spm_cfg \
     --swift-sdk aarch64-unknown-linux-android24

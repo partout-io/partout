@@ -2,9 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutOpenVPNLegacy_ObjC
 import Foundation
+#if !PARTOUT_MONOLITH
+internal import _PartoutOpenVPNLegacy_ObjC
 import PartoutOpenVPN
+#endif
 
 extension OSSLTLSBox: KeyDecrypter {
 }

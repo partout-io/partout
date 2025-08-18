@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 // FIXME: #507/passepartout, ridiculously complex
 public protocol ProviderCustomizationSupporting {

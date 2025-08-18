@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @preconcurrency import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 /// `CoreFoundation` implementation of ``/PartoutCore/SimpleDNSStrategy``.
 @available(*, deprecated, message: "Prefer the portable POSIXDNSStrategy.")

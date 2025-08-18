@@ -2,7 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 extension ExtendedEndpoint {
     func withRandomPrefixLength(_ length: Int, prng: PRNGProtocol) -> ExtendedEndpoint {

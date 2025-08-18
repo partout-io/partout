@@ -4,8 +4,10 @@
 
 #if canImport(PartoutWireGuard)
 
+#if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutWireGuard
+#endif
 
 public struct WireGuardProviderResolver: ProviderModuleResolver {
     private let ctx: PartoutLoggerContext

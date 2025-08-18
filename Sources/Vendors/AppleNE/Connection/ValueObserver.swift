@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 /// Observes KVO updates asynchronously.
 @available(*, deprecated, message: "Required by the deprecated NEUDPObserver and NETCPObserver. Use NESocketObserver instead")

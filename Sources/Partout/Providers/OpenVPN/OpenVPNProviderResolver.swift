@@ -5,8 +5,10 @@
 #if canImport(PartoutOpenVPN)
 
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutOpenVPN
+#endif
 
 public struct OpenVPNProviderResolver: ProviderModuleResolver {
     private let ctx: PartoutLoggerContext

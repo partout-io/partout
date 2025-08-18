@@ -4,7 +4,9 @@
 
 import Foundation
 import Network
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 extension Subnet {
     init?(wg: IPAddressRange) {

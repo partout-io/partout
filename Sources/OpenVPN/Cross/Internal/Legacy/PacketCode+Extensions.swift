@@ -2,7 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_MONOLITH
 internal import _PartoutOpenVPNLegacy_ObjC
+#endif
 
 extension PacketCode: @retroactive CustomDebugStringConvertible {
     var debugDescription: String {

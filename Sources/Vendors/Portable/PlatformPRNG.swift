@@ -4,7 +4,9 @@
 
 import _PartoutVendorsPortable_C
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 /// Implementation of ``/PartoutCore/PRNGProtocol`` with the OS C library.
 public final class PlatformPRNG: PRNGProtocol {

@@ -6,8 +6,10 @@ import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
+#if !PARTOUT_MONOLITH
 import PartoutAPI
 import PartoutCore
+#endif
 
 public final class DefaultAPIMapper: APIMapper {
     private let ctx: PartoutLoggerContext

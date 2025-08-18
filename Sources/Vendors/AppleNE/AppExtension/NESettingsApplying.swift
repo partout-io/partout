@@ -4,7 +4,9 @@
 
 import Foundation
 import NetworkExtension
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 /// Able to apply its own settings to `NEPacketTunnelNetworkSettings`.
 public protocol NESettingsApplying {

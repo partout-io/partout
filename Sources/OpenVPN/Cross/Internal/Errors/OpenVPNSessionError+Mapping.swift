@@ -2,12 +2,14 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_MONOLITH
 internal import _PartoutVendorsPortable
 #if canImport(_PartoutOpenVPNLegacy_ObjC)
 internal import _PartoutOpenVPNLegacy_ObjC
 #endif
+#endif
 internal import _PartoutOpenVPN_C
-internal import _PartoutVendorsTLSCore_C
+internal import _PartoutTLSCore_C
 import Foundation
 
 extension OpenVPNSessionError {

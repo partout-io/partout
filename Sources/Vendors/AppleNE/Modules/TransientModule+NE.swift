@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import NetworkExtension
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 extension TransientModule: NESettingsApplying {
     public func apply(_ ctx: PartoutLoggerContext, to settings: inout NEPacketTunnelNetworkSettings) {

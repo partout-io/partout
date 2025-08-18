@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 /// Provides methods to parse a ``OpenVPN/Configuration`` from an .ovpn configuration file.
 ///

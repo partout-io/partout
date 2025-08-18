@@ -5,7 +5,9 @@
 #if canImport(PartoutWireGuard)
 
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutWireGuard
+#endif
 
 #endif

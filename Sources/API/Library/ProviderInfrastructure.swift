@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutProviders
+#endif
 
 public struct ProviderInfrastructure: Decodable, Sendable {
     public let presets: [ProviderPreset]

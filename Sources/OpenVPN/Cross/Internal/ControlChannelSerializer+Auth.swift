@@ -2,11 +2,12 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutCrypto_C
 internal import _PartoutOpenVPN_C
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutOpenVPN
+#endif
 
 extension ControlChannel {
     final class AuthSerializer: ControlChannelSerializer {

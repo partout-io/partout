@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutWireGuard
+#endif
 
 public final class StandardWireGuardKeyGenerator: WireGuardKeyGenerator {
     public init() {

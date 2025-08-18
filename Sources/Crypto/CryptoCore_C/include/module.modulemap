@@ -1,0 +1,8 @@
+module _PartoutCryptoCore_C {
+    header "crypto/crypto.h"
+    header "crypto/crypto_aead.h"
+    header "crypto/crypto_cbc.h"
+    header "crypto/crypto_ctr.h"
+    header "crypto/keys.h"
+    export *
+}

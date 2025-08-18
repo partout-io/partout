@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 /// A ``/PartoutCore/TunnelEnvironment`` that stores data to `UserDefaults`.
 public final class UserDefaultsEnvironment: TunnelEnvironment, @unchecked Sendable {

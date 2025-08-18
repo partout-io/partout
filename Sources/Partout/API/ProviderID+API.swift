@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutProviders
+#endif
 
 extension ProviderID {
     public static let hideme = Self(rawValue: "hideme")

@@ -3,10 +3,12 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import _PartoutOpenVPN_C
-internal import _PartoutVendorsPortable
 import Foundation
+#if !PARTOUT_MONOLITH
+internal import _PartoutVendorsPortable
 import PartoutCore
 import PartoutOpenVPN
+#endif
 
 extension DataPathWrapper {
     static func native(with parameters: Parameters, prf: CryptoKeys.PRF, prng: PRNGProtocol) throws -> DataPathWrapper {

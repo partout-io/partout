@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 /// Implementation of ``/PartoutCore/SimpleDNSStrategy`` with the POSIX C library.
 public actor POSIXDNSStrategy: SimpleDNSStrategy {

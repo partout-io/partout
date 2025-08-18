@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 @available(*, deprecated, message: "Backward-compatibility with persisted modules before ProviderModule")
 public struct OpenVPNLegacyProviderID: RawRepresentable, Hashable, Codable, Sendable {

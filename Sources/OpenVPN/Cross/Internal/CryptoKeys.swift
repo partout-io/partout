@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import _PartoutCryptoCore_C
+#if !PARTOUT_MONOLITH
 internal import _PartoutVendorsPortable
-internal import _PartoutVendorsPortable_C
+#endif
+import _PartoutVendorsPortable_C
 import Foundation
 
 struct CryptoKeys {

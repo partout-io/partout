@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import _PartoutOpenVPN_C
+#if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutOpenVPN
+#endif
 
 final class OSSLKeyDecrypter: KeyDecrypter, Sendable {
     func decryptedKey(fromPEM pem: String, passphrase: String) throws -> String {

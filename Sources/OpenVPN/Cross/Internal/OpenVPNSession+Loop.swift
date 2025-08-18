@@ -4,7 +4,9 @@
 
 internal import _PartoutOpenVPN_C
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 // TODO: #142/notes, LINK and TUN should be able to run detached in full-duplex
 extension OpenVPNSession {

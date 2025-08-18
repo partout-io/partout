@@ -62,3 +62,19 @@ char *_Nonnull pp_dup(const char *_Nonnull str) {
     }
     return ptr;
 }
+
+#ifdef _WIN32
+static inline
+FILE *_Nullable pp_fopen(const char *_Nonnull filename, const char *_Nonnull mode) {
+    FILE *file_ret = NULL;
+    errno_t file_err = fopen_s(&file_ret, filename, mode);
+    if (file_err == 0) {
+        return NULL;
+    }
+    return file_ret;
+}
+#define pp_sscanf sscanf_s
+#else
+#define pp_fopen fopen
+#define pp_sscanf sscanf
+#endif

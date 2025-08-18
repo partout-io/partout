@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 /// A ``/PartoutCore/TunnelEnvironmentReader`` that updates via Network Extension messaging.
 public final class NETunnelEnvironment: TunnelEnvironmentReader, @unchecked Sendable {

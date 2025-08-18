@@ -2,10 +2,12 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutOpenVPNLegacy_ObjC
 import Foundation
+#if !PARTOUT_MONOLITH
+internal import _PartoutOpenVPNLegacy_ObjC
 import PartoutCore
 import PartoutOpenVPN
+#endif
 
 /// Default implementation of `OpenVPNSessionProtocol`.
 @OpenVPNActor

@@ -5,8 +5,10 @@
 #if canImport(PartoutOpenVPN)
 
 import Foundation
+#if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutOpenVPN
+#endif
 
 // FIXME: #507/passepartout, ridiculously complex
 extension OpenVPNModule: ProviderCustomizationSupporting {
