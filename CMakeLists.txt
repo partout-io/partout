@@ -11,17 +11,17 @@ option(BUILD_FOR_ANDROID "Build for Android" 0)
 # message(FATAL_ERROR "STOP")
 
 # All vendor-inherited args
-set(ALL_CMAKE_ARGS)
+set(VENDOR_CMAKE_ARGS)
 
 include("vendors/openssl.cmake")
 ExternalProject_Get_Property(OpenSSLProject BINARY_DIR)
-list(APPEND ALL_CMAKE_ARGS -DOPENSSL_DIR=${OPENSSL_OUTPUT_DIR})
+list(APPEND VENDOR_CMAKE_ARGS -DOPENSSL_DIR=${OPENSSL_OUTPUT_DIR})
 
 # include("vendors/mbedtls.cmake")
 # ExternalProject_Get_Property(mbedTLSProject BINARY_DIR)
-# list(APPEND ALL_CMAKE_ARGS -DMBEDTLS_DIR=${MBEDTLS_OUTPUT_DIR})
+# list(APPEND VENDOR_CMAKE_ARGS -DMBEDTLS_DIR=${MBEDTLS_OUTPUT_DIR})
 
-# Build Partout, unless -DVENDORS_ONLY
+# Build Partout library (opt-in), after vendored dependencies
 if(BUILD_LIBRARY)
 
     # Bundle library with ABI header
@@ -30,7 +30,7 @@ if(BUILD_LIBRARY)
     ExternalProject_Add(
         PartoutProject
         SOURCE_DIR ${CMAKE_SOURCE_DIR}/cmake
-        CMAKE_ARGS ${ALL_CMAKE_ARGS}
+        CMAKE_ARGS ${VENDOR_CMAKE_ARGS}
         INSTALL_COMMAND ""
         COMMAND ${CMAKE_COMMAND} -E copy ${PARTOUT_ABI_HEADER} ${CMAKE_SOURCE_DIR}/bin
         DEPENDS OpenSSLProject
