@@ -440,7 +440,7 @@ case .android:
                 path: "Sources/Vendors/OpenSSL",
                 // use .artifactbundle once supported
                 linkerSettings: [
-                    .unsafeFlags(["-Lvendors/lib/android/arm64"]),
+                    .unsafeFlags(["-Lbin/openssl/lib"]),
                     // WARNING: order matters, ssl then crypto
                     .linkedLibrary("ssl"),
                     .linkedLibrary("crypto")
@@ -452,7 +452,10 @@ case .android:
                     "_PartoutCryptoCore_C",
                     "_PartoutVendorsOpenSSL"
                 ],
-                path: "Sources/Crypto/CryptoOpenSSL_C"
+                path: "Sources/Crypto/CryptoOpenSSL_C",
+                cSettings: [
+                    .unsafeFlags(["-Ibin/openssl/include"])
+                ],
             ),
             .target(
                 name: "_PartoutTLS_C",
@@ -460,7 +463,10 @@ case .android:
                     "_PartoutVendorsOpenSSL",
                     "_PartoutTLSCore_C"
                 ],
-                path: "Sources/Crypto/TLSOpenSSL_C"
+                path: "Sources/Crypto/TLSOpenSSL_C",
+                cSettings: [
+                    .unsafeFlags(["-Ibin/openssl/include"])
+                ],
             )
         ])
     }

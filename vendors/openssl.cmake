@@ -1,7 +1,7 @@
 set(OPENSSL_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/bin/openssl)
 
 # Use nmake on Windows
-if (WIN32)
+if(WIN32)
     set(OPENSSL_BUILD_CMD nmake)
     set(OPENSSL_BUILD_IN_SOURCE TRUE)
 else()
@@ -9,10 +9,24 @@ else()
     set(OPENSSL_BUILD_IN_SOURCE FALSE)
 endif()
 
+# Configure flags
+set(OPENSSL_CFG_FLAGS no-apps no-docs no-engine no-gost no-legacy no-shared no-ssl no-tests no-zlib)
+
+# Add some flags if -DANDROID (requires NDK tools in the PATH)
+if(BUILD_FOR_ANDROID)
+    set(OPENSSL_TARGET "android-arm64")
+    set(OPENSSL_SYMBOLS "-D__ANDROID_API__=24")
+else()
+    set(OPENSSL_TARGET "")
+    set(OPENSSL_SYMBOLS "")
+endif()
+
 set(CFG_ARGS
+    ${OPENSSL_TARGET}
     --prefix=${OPENSSL_OUTPUT_DIR}
     --openssldir=${OPENSSL_OUTPUT_DIR}
-    no-apps no-docs no-engine no-gost no-legacy no-shared no-tests no-zlib
+    ${OPENSSL_SYMBOLS}
+    ${OPENSSL_CFG_FLAGS}
 )
 ExternalProject_Add(
     OpenSSLProject
