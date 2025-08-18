@@ -45,8 +45,8 @@ struct KeyDecrypterTests {
 }
 
 private extension KeyDecrypterTests {
-    func newDecrypter() -> OSSLKeyDecrypter {
-        OSSLKeyDecrypter()
+    func newDecrypter() -> SimpleKeyDecrypter {
+        SimpleKeyDecrypter()
     }
 
     func path(withName name: String) throws -> String {
