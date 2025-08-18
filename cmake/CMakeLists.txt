@@ -13,17 +13,26 @@ set_target_properties(Partout PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY ${PARTOUT_DIR}/bin
 )
 
+# Mind platform differences about static libraries
+function(add_static_lib dir name out_list)
+    if (WIN32)
+        set(lib_path ${dir}/${name}.lib)
+    else()
+        set(lib_path ${dir}/lib${name}.a)
+    endif()
+    set(${out_list} ${${out_list}} ${lib_path} PARENT_SCOPE)
+endfunction()
+
 # Link to vendor-specific dependencies
+set(PARTOUT_LIBS)
 if (DEFINED OPENSSL_DIR)
     target_include_directories(Partout_C PRIVATE
         ${PARTOUT_DIR}/Sources/Crypto/CryptoOpenSSL_C/include
         ${PARTOUT_DIR}/Sources/Crypto/TLSOpenSSL_C/include
         ${OPENSSL_DIR}/include
     )
-    target_link_libraries(Partout_C PRIVATE
-        ${OPENSSL_DIR}/lib/libssl.a
-        ${OPENSSL_DIR}/lib/libcrypto.a
-    )
+    add_static_lib(${OPENSSL_DIR}/lib ssl PARTOUT_LIBS)
+    add_static_lib(${OPENSSL_DIR}/lib crypto PARTOUT_LIBS)
 endif()
 if (DEFINED MBEDTLS_DIR)
     target_include_directories(Partout_C PRIVATE
@@ -31,9 +40,10 @@ if (DEFINED MBEDTLS_DIR)
         ${PARTOUT_DIR}/Sources/Crypto/TLSMbedTLS_C/include
         ${MBEDTLS_DIR}/include
     )
-    target_link_libraries(Partout_C PRIVATE
-        ${MBEDTLS_DIR}/lib/libmbedcrypto.a
-        ${MBEDTLS_DIR}/lib/libmbedtls.a
-        ${MBEDTLS_DIR}/lib/libmbedx509.a
-    )
+    add_static_lib(${MBEDTLS_DIR}/lib mbedcrypto PARTOUT_LIBS)
+    add_static_lib(${MBEDTLS_DIR}/lib mbedtls PARTOUT_LIBS)
+    add_static_lib(${MBEDTLS_DIR}/lib mbedx509 PARTOUT_LIBS)
 endif()
+target_link_libraries(Partout_C PRIVATE
+    ${PARTOUT_LIBS}
+)
