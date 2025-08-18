@@ -8,12 +8,14 @@
 //  SPDX-License-Identifier: MIT
 //  Copyright © 2018-2024 WireGuard LLC. All Rights Reserved.
 
-import _PartoutVendorsWireGuard
 import Foundation
 import NetworkExtension // TODO: #13, this depends on Apple unnecessarily
 import os
+#if !PARTOUT_STATIC
+import _PartoutVendorsWireGuard
 import PartoutCore
 import PartoutWireGuard
+#endif
 
 // FIXME: #13, drop @unchecked after refactoring
 public final class WireGuardConnection: Connection, @unchecked Sendable {

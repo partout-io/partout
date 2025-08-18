@@ -4,7 +4,9 @@
 
 import Foundation
 import Network
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 /// A ``/PartoutCore/ReachabilityObserver`` that publishes updates from a `NWPathMonitor`.
 public final class NEObservablePath: ReachabilityObserver {

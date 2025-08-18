@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 /// Thrown by ``StandardOpenVPNParser``, with details about the line that triggered it.
 public enum StandardOpenVPNParserError: Error {

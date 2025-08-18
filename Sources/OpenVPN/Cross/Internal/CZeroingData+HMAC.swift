@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import _PartoutCryptoCore_C
+#if !PARTOUT_STATIC
 internal import _PartoutVendorsPortable
+#endif
 
 extension CZeroingData {
     static func forHMAC() -> CZeroingData {

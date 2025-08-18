@@ -4,7 +4,9 @@
 
 import Foundation
 import NetworkExtension
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 /// Implementation of a ``/PartoutCore/LinkObserver`` via `NWTCPConnection`.
 @available(*, deprecated, message: "Use NESocketObserver")

@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_STATIC
 import PartoutAPI
+#endif
 
 extension API {
     public static func url(forVersion version: Int = 7) -> URL? {

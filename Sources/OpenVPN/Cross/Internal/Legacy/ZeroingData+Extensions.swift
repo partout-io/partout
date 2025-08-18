@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_STATIC
 internal import _PartoutCryptoOpenSSL_ObjC
 import PartoutCore
+#endif
 
 extension SecureData {
     var zData: ZeroingData {

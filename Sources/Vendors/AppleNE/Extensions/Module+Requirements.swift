@@ -2,7 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 extension Module {
     public var requiresConnection: Bool {

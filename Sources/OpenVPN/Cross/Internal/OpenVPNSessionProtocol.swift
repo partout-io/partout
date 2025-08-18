@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_STATIC
 import PartoutCore
 import PartoutOpenVPN
+#endif
 
 /// Observes major events notified by a `OpenVPNSessionProtocol`.
 protocol OpenVPNSessionDelegate: AnyObject, Sendable {

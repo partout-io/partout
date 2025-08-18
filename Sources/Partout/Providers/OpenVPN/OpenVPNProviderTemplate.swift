@@ -5,8 +5,10 @@
 #if canImport(PartoutOpenVPN)
 
 import Foundation
+#if !PARTOUT_STATIC
 import PartoutCore
 import PartoutOpenVPN
+#endif
 
 public struct OpenVPNProviderTemplate: Codable, Sendable {
     public let configuration: OpenVPN.Configuration

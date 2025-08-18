@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import NetworkExtension
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 /// Implementation of a ``/PartoutCore/LinkObserver`` via `NWTCPConnection`.
 public final class NESocketObserver: LinkObserver, @unchecked Sendable {
@@ -239,7 +241,7 @@ private extension NESocket {
     nonisolated func loopReadUDPPackets(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
         queue.async { [weak self] in
             guard let self else { return }
-            nwConnection.receiveMessage { [weak self] data, context, isComplete, error in
+            nwConnection.receiveMessage { [weak self] data, _, _, error in
                 handler(data.map { [$0] }, error)
 
                 // repeat until failure
@@ -256,7 +258,7 @@ private extension NESocket {
             nwConnection.receive(
                 minimumIncompleteLength: options.minLength,
                 maximumLength: options.maxLength
-            ) { [weak self] data, context, isComplete, error in
+            ) { [weak self] data, _, _, error in
                 handler(data.map { [$0] }, error)
 
                 // repeat until failure

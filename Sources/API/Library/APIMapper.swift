@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_STATIC
 import PartoutCore
 import PartoutProviders
+#endif
 
 public protocol APIMapper: Sendable {
     func index() async throws -> [Provider]

@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #if canImport(_PartoutOpenVPNLegacy_ObjC)
+#if !PARTOUT_STATIC
 internal import _PartoutOpenVPNLegacy_ObjC
+#endif
 #else
 protocol PacketProtocol {
     var packetId: UInt32 { get }

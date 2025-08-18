@@ -2,7 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_STATIC
 internal import _PartoutVendorsPortable
+#endif
 import Foundation
 
 protocol TLSProtocol {

@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #if canImport(_PartoutOpenVPNLegacy_ObjC)
+#if !PARTOUT_STATIC
 internal import _PartoutOpenVPNLegacy_ObjC
+#endif
 #endif
 import Foundation
 

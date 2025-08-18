@@ -4,7 +4,9 @@
 
 import Foundation
 import NetworkExtension
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 /// Offers an API to manage the installed set of NETunnelProviderManager.
 public protocol NETunnelManagerRepository {

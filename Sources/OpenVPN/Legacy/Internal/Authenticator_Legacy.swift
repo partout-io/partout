@@ -2,10 +2,12 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutOpenVPNLegacy_ObjC
 import Foundation
+#if !PARTOUT_STATIC
+internal import _PartoutOpenVPNLegacy_ObjC
 import PartoutCore
 import PartoutOpenVPN
+#endif
 
 fileprivate extension ZeroingData {
     func appendSized(_ buf: ZeroingData) {

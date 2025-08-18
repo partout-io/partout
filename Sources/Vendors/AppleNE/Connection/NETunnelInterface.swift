@@ -4,7 +4,9 @@
 
 import Foundation
 import NetworkExtension
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 /// Implementation of a ``/PartoutCore/TunnelInterface`` via `NEPacketTunnelFlow`.
 public final class NETunnelInterface: TunnelInterface {

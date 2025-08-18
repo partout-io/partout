@@ -4,7 +4,9 @@
 
 import Foundation
 @preconcurrency import NetworkExtension
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 /// Implementation of ``/PartoutCore/TunnelStrategy`` based on `NETunnelProviderManager`.
 public actor NETunnelStrategy {

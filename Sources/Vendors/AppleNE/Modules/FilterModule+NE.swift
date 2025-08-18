@@ -4,7 +4,9 @@
 
 import Foundation
 import NetworkExtension
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 extension FilterModule: NESettingsApplying {
     public func apply(_ ctx: PartoutLoggerContext, to settings: inout NEPacketTunnelNetworkSettings) {

@@ -4,7 +4,9 @@
 
 import _PartoutVendorsPortable_C
 import Foundation
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 public final class CZeroingData {
     public let ptr: UnsafeMutablePointer<pp_zd>

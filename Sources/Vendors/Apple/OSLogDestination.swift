@@ -4,7 +4,9 @@
 
 import Foundation
 @preconcurrency import OSLog
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 /// Represents a ``/PartoutCore/LoggerDestination`` based on `OSLog`.
 public struct OSLogDestination: LoggerDestination {

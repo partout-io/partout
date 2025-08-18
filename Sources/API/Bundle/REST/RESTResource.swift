@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_STATIC
 import PartoutAPI
 import PartoutProviders
+#endif
 
 extension API.REST {
     public enum Resource {

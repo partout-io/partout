@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_STATIC
 import PartoutCore
 import PartoutOpenVPN
+#endif
 
 struct PushReply {
     private let original: String

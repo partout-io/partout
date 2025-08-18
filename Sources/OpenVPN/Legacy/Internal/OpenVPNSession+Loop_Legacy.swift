@@ -2,9 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutOpenVPNLegacy_ObjC
 import Foundation
+#if !PARTOUT_STATIC
+internal import _PartoutOpenVPNLegacy_ObjC
 import PartoutCore
+#endif
 
 // TODO: #142/notes, LINK and TUN should be able to run detached in full-duplex
 extension OpenVPNSession {

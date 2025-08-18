@@ -2,7 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 typealias TLSFactory = @Sendable (TLSWrapper.Parameters) throws -> TLSProtocol
 

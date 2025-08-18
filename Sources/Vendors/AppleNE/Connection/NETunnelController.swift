@@ -4,7 +4,9 @@
 
 import Foundation
 @preconcurrency import NetworkExtension
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 /// Implementation of a ``/PartoutCore/TunnelController`` via `NEPacketTunnelProvider`.
 public final class NETunnelController: TunnelController {

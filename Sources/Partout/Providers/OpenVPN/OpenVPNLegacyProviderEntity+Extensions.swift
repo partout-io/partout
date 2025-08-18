@@ -5,7 +5,9 @@
 #if canImport(PartoutOpenVPN)
 
 import Foundation
+#if !PARTOUT_STATIC
 import PartoutOpenVPN
+#endif
 
 extension OpenVPNLegacyProviderEntity {
     public func upgraded() throws -> ProviderEntity {

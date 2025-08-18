@@ -2,11 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+import Foundation
+#if !PARTOUT_STATIC
 internal import _PartoutCryptoOpenSSL_ObjC
 internal import _PartoutOpenVPNLegacy_ObjC
-import Foundation
 import PartoutCore
 import PartoutOpenVPN
+#endif
 
 /// Wrapper for connecting over a TCP socket.
 final class OpenVPNTCPLink: @unchecked Sendable {

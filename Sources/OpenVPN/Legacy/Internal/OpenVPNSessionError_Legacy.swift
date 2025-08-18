@@ -2,7 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_STATIC
 internal import _PartoutOpenVPNLegacy_ObjC
+#endif
 import Foundation
 
 /// Thrown during `OpenVPNSession` operation.

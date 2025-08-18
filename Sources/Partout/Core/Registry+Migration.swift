@@ -3,11 +3,13 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_STATIC
 import PartoutCore
 #if canImport(PartoutOpenVPN)
 import PartoutOpenVPN
 #endif
 import PartoutProviders
+#endif
 
 extension Registry {
 

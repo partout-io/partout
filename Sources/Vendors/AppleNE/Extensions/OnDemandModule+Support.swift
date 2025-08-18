@@ -4,7 +4,9 @@
 
 import Foundation
 import NetworkExtension
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 extension OnDemandModule {
     public static var supportsCellular: Bool {

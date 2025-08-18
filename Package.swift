@@ -275,7 +275,7 @@ if areas.contains(.openVPN) {
             name: "_PartoutOpenVPN_C",
             dependencies: [
                 "_PartoutCrypto_C",
-                "_PartoutVendorsTLS_C"
+                "_PartoutTLS_C"
             ],
             path: "Sources/OpenVPN/Cross_C"
         ),
@@ -455,10 +455,10 @@ case .android:
                 path: "Sources/Crypto/CryptoOpenSSL_C"
             ),
             .target(
-                name: "_PartoutVendorsTLS_C",
+                name: "_PartoutTLS_C",
                 dependencies: [
                     "_PartoutVendorsOpenSSL",
-                    "_PartoutVendorsTLSCore_C"
+                    "_PartoutTLSCore_C"
                 ],
                 path: "Sources/Crypto/TLSOpenSSL_C"
             )
@@ -532,10 +532,10 @@ case .apple:
                 path: "Sources/Crypto/CryptoOpenSSL_C"
             ),
             .target(
-                name: "_PartoutVendorsTLS_C",
+                name: "_PartoutTLS_C",
                 dependencies: [
                     "_PartoutVendorsOpenSSL",
-                    "_PartoutVendorsTLSCore_C"
+                    "_PartoutTLSCore_C"
                 ],
                 path: "Sources/Crypto/TLSOpenSSL_C"
             )
@@ -576,10 +576,10 @@ case .linux:
                 path: "Sources/Crypto/CryptoOpenSSL_C"
             ),
             .target(
-                name: "_PartoutVendorsTLS_C",
+                name: "_PartoutTLS_C",
                 dependencies: [
                     "_PartoutVendorsOpenSSL",
-                    "_PartoutVendorsTLSCore_C"
+                    "_PartoutTLSCore_C"
                 ],
                 path: "Sources/Crypto/TLSOpenSSL_C"
             )
@@ -608,7 +608,7 @@ if areas.contains(.crypto) {
             path: "Sources/Crypto/CryptoCore_C"
         ),
         .target(
-            name: "_PartoutVendorsTLSCore_C",
+            name: "_PartoutTLSCore_C",
             dependencies: [
                 "_PartoutCryptoCore_C",
                 "_PartoutVendorsPortable_C",

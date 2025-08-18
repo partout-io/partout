@@ -4,7 +4,9 @@
 
 import Foundation
 import NetworkExtension
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 /// Delegates behavior of a `NEPacketTunnelProvider`.
 public actor NEPTPForwarder {

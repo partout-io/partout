@@ -4,7 +4,9 @@
 
 #if canImport(_PartoutVendorsApple)
 
+#if !PARTOUT_STATIC
 import _PartoutVendorsApple
+#endif
 import JavaScriptCore
 
 extension AppleJavaScriptEngine: ProviderScriptingEngine {

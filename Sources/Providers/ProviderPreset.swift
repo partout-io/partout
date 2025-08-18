@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 public struct ProviderPreset: Hashable, Codable, Sendable {
     public let providerId: ProviderID

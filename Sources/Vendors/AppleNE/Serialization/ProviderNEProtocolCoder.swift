@@ -4,7 +4,9 @@
 
 import Foundation
 import NetworkExtension
+#if !PARTOUT_STATIC
 import PartoutCore
+#endif
 
 /// ``NEProtocolCoder`` encoding to and from a `NETunnelProviderProtocol.providerConfiguration`.
 public struct ProviderNEProtocolCoder: NEProtocolCoder {

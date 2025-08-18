@@ -5,8 +5,10 @@
 #if canImport(PartoutWireGuard)
 
 import Foundation
+#if !PARTOUT_STATIC
 import PartoutCore
 import PartoutWireGuard
+#endif
 
 public struct WireGuardProviderStorage: ProviderOptions {
 
