@@ -7,3 +7,5 @@
 PartoutCore
 PartoutCore.xcframework*
 .build
+build
+bin
