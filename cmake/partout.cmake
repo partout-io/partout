@@ -23,7 +23,7 @@ set(EXCLUDED_PATTERNS
 )
 
 # Exclude per platform
-if (NOT APPLE)
+if(NOT APPLE)
     list(APPEND EXCLUDED_PATTERNS
         Vendors\/Apple\/
         Vendors\/AppleNE\/

@@ -16,8 +16,10 @@ set_target_properties(partout PROPERTIES
 
 # Mind platform differences about static libraries
 function(add_static_lib dir name out_list)
-    if (WIN32)
+    if(WIN32)
         set(lib_path ${dir}/lib${name}.lib)
+    elseif(APPLE)
+        set(lib_path ${dir}/lib${name}.a)
     else()
         set(lib_path ${dir}/lib${name}.a)
     endif()
@@ -26,7 +28,7 @@ endfunction()
 
 # Link to vendor-specific dependencies
 set(PARTOUT_LIBS)
-if (DEFINED OPENSSL_DIR)
+if(DEFINED OPENSSL_DIR)
     target_include_directories(partout_c PRIVATE
         ${PARTOUT_DIR}/Sources/Crypto/CryptoOpenSSL_C/include
         ${PARTOUT_DIR}/Sources/Crypto/TLSOpenSSL_C/include
@@ -35,7 +37,7 @@ if (DEFINED OPENSSL_DIR)
     add_static_lib(${OPENSSL_DIR}/lib ssl PARTOUT_LIBS)
     add_static_lib(${OPENSSL_DIR}/lib crypto PARTOUT_LIBS)
 endif()
-if (DEFINED MBEDTLS_DIR)
+if(DEFINED MBEDTLS_DIR)
     target_include_directories(partout_c PRIVATE
         ${PARTOUT_DIR}/Sources/Crypto/CryptoMbedTLS_C/include
         ${PARTOUT_DIR}/Sources/Crypto/TLSMbedTLS_C/include

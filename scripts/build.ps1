@@ -14,7 +14,7 @@ try {
     Get-ChildItem -Path "PartoutProject*" -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
     # Run CMake with ninja for Swift
-    cmake -G "Ninja" ..
+    cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     cmake --build .
