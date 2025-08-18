@@ -7,7 +7,10 @@ file(GLOB_RECURSE PARTOUT_C_SOURCES
 )
 
 # Set up exclusions
-set(EXCLUDED_PATTERNS)
+set(EXCLUDED_PATTERNS
+    # FIXME: #118, WireGuard excluded until properly integrated
+    WireGuard\/
+)
 
 # Filter by platform
 if (NOT WIN32)
