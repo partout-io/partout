@@ -1,0 +1,4 @@
+module _PartoutTLSCore_C {
+    header "tls/tls.h"
+    export *
+}
