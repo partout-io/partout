@@ -5,7 +5,11 @@ positional_args=()
 cmake_opts=()
 while [[ $# -gt 0 ]]; do
     case $1 in
-    -c)
+    -clean)
+        rm -rf build bin
+        shift
+        ;;
+    -config)
         cmake_opts+=("-DCMAKE_BUILD_TYPE=$2") # Debug|Release
         shift
         shift
