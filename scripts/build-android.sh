@@ -8,6 +8,7 @@ fi
 
 # 1. Build CMake vendors
 
+rm -rf build bin
 scripts/build.sh -c $cmake_cfg -android
 
 # 2. Build SwiftPM with Android SDK
