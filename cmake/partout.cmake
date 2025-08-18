@@ -4,21 +4,35 @@ file(GLOB_RECURSE PARTOUT_SOURCES
     ${PARTOUT_DIR}/Sources/*.swift
 )
 
-# Exclude unnecessary exports (wrong in monolith)
-list(FILTER PARTOUT_SOURCES EXCLUDE REGEX "PartoutExports.swift")
-list(FILTER PARTOUT_SOURCES EXCLUDE REGEX "OpenVPNWrapper.swift")
-list(FILTER PARTOUT_SOURCES EXCLUDE REGEX "WireGuardWrapper.swift")
+# Set up global exclusions
+set(EXCLUDED_PATTERNS
+    # Unnecessary exports (wrong in monolith)
+    Partout\/PartoutExports\.swift
+    OpenVPN\/Wrapper\/OpenVPNWrapper\.swift
+    WireGuard\/Wrapper\/WireGuardWrapper\.swift
+    # Bundled API resources
+    API\/Bundle\/API\\+Bundle\.swift
+    API\/Bundle\/JSON\/
+    # OpenVPN legacy
+    OpenVPN\/Cross\/Internal\/Legacy\/
+    OpenVPN\/CryptoOpenSSL_ObjC\/
+    OpenVPN\/Legacy\/
+    OpenVPN\/Legacy_ObjC\/
+    # FIXME: #118, WireGuard excluded until properly integrated
+    WireGuard\/
+)
 
-# TODO: #173, Exclude API due to bundled resources
-list(FILTER PARTOUT_SOURCES EXCLUDE REGEX "API\/.*")
+# Exclude per platform
+if (NOT APPLE)
+    list(APPEND EXCLUDED_PATTERNS
+        Vendors\/Apple\/
+        Vendors\/AppleNE\/
+    )
+endif()
 
-# Exclude OpenVPN legacy
-list(FILTER PARTOUT_SOURCES EXCLUDE REGEX "OpenVPN\/CryptoOpenSSL_ObjC\/.*")
-list(FILTER PARTOUT_SOURCES EXCLUDE REGEX "OpenVPN\/.*Legacy\/.*")
-
-# TODO: #173, Exclude WireGuard until properly integrated
-list(FILTER PARTOUT_SOURCES EXCLUDE REGEX "Apple.*")
-list(FILTER PARTOUT_SOURCES EXCLUDE REGEX "WireGuard")
+foreach(pattern ${EXCLUDED_PATTERNS})
+    list(FILTER PARTOUT_SOURCES EXCLUDE REGEX ${pattern})
+endforeach()
 
 # Try simple vendor test
 #add_library(Partout SHARED ${CMAKE_SOURCE_DIR}/file.c)

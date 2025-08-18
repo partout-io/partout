@@ -6,11 +6,23 @@ file(GLOB_RECURSE PARTOUT_C_SOURCES
     ${PARTOUT_DIR}/Sources/*.cpp
 )
 
-# TODO: #173, Restore later with platform/vendor conditionals (forcing OpenSSL now)
-list(FILTER PARTOUT_C_SOURCES EXCLUDE REGEX "Apple.*")
-list(FILTER PARTOUT_C_SOURCES EXCLUDE REGEX "Crypto\/CryptoWindows_C\/.*")
-list(FILTER PARTOUT_C_SOURCES EXCLUDE REGEX "Crypto\/TLSMbed_C\/.*")
-list(FILTER PARTOUT_C_SOURCES EXCLUDE REGEX "WireGuard.*")
+# Set up exclusions
+set(EXCLUDED_PATTERNS)
+
+# Filter by platform
+if (NOT WIN32)
+    list(APPEND EXCLUDED_PATTERNS Crypto\/CryptoWindows_C\/)
+endif()
+if (NOT DEFINED OPENSSL_DIR)
+    list(APPEND EXCLUDED_PATTERNS Crypto\/.*OpenSSL_C\/)
+endif()
+if (NOT DEFINED MBEDTLS_DIR)
+    list(APPEND EXCLUDED_PATTERNS Crypto\/.*MbedTLS_C\/)
+endif()
+
+foreach(pattern ${EXCLUDED_PATTERNS})
+    list(FILTER PARTOUT_C_SOURCES EXCLUDE REGEX ${pattern})
+endforeach()
 
 # Header search paths from all C targets
 set(PARTOUT_C_INCLUDE_DIRS
