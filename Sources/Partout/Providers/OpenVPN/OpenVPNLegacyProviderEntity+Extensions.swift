@@ -5,7 +5,7 @@
 #if canImport(PartoutOpenVPN)
 
 import Foundation
-#if !PARTOUT_STATIC
+#if !PARTOUT_MONOLITH
 import PartoutOpenVPN
 #endif
 

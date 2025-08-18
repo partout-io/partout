@@ -4,7 +4,7 @@
 
 #if canImport(_PartoutVendorsApple)
 
-#if !PARTOUT_STATIC
+#if !PARTOUT_MONOLITH
 import _PartoutVendorsApple
 #endif
 import JavaScriptCore

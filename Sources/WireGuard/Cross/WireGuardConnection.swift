@@ -11,7 +11,7 @@
 import Foundation
 import NetworkExtension // TODO: #13, this depends on Apple unnecessarily
 import os
-#if !PARTOUT_STATIC
+#if !PARTOUT_MONOLITH
 import _PartoutVendorsWireGuard
 import PartoutCore
 import PartoutWireGuard

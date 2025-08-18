@@ -4,7 +4,7 @@
 
 import Foundation
 import Network
-#if !PARTOUT_STATIC
+#if !PARTOUT_MONOLITH
 import PartoutCore
 #endif
 

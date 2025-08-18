@@ -4,7 +4,7 @@
 
 #if canImport(PartoutWireGuard)
 
-#if !PARTOUT_STATIC
+#if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutWireGuard
 #endif

@@ -4,7 +4,7 @@
 
 import Foundation
 @preconcurrency import JavaScriptCore
-#if !PARTOUT_STATIC
+#if !PARTOUT_MONOLITH
 import PartoutCore
 #endif
 

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-#if !PARTOUT_STATIC
+#if !PARTOUT_MONOLITH
 internal import _PartoutCryptoOpenSSL_ObjC
 internal import _PartoutOpenVPNLegacy_ObjC
 import PartoutCore

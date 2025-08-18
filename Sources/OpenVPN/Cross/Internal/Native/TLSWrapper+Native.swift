@@ -4,7 +4,7 @@
 
 internal import _PartoutOpenVPN_C
 internal import _PartoutTLSCore_C
-#if !PARTOUT_STATIC
+#if !PARTOUT_MONOLITH
 internal import _PartoutVendorsPortable
 #endif
 import Foundation

@@ -4,7 +4,7 @@
 
 import _PartoutVendorsPortable_C
 import Foundation
-#if !PARTOUT_STATIC
+#if !PARTOUT_MONOLITH
 import PartoutCore
 #endif
 

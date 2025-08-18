@@ -6,7 +6,7 @@ import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
-#if !PARTOUT_STATIC
+#if !PARTOUT_MONOLITH
 import PartoutAPI
 import PartoutCore
 #endif
