@@ -38,25 +38,23 @@ endforeach()
 #add_library(Partout SHARED ${CMAKE_SOURCE_DIR}/file.c)
 
 # Partout library base configuration
-add_library(Partout SHARED ${PARTOUT_SOURCES})
-set_target_properties(Partout PROPERTIES
+add_library(partout SHARED ${PARTOUT_SOURCES})
+set_target_properties(partout PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
 # Define symbols to skip Swift imports and legacy code
-target_compile_options(Partout PRIVATE
+target_compile_options(partout PRIVATE
     -DPARTOUT_MONOLITH
     -DOPENVPN_WRAPPED_NATIVE
 )
 
 # Look for modulemaps in C "include" dirs
 foreach(dir ${PARTOUT_C_INCLUDE_DIRS})
-    target_compile_options(Partout PRIVATE -I${dir})
+    target_compile_options(partout PRIVATE -I${dir})
 endforeach()
 
 # Depend on C targets (include before)
-add_dependencies(Partout Partout_C)
-target_link_libraries(Partout PRIVATE
-    Partout_C
-)
+add_dependencies(partout partout_c)
+target_link_libraries(partout PRIVATE partout_c)

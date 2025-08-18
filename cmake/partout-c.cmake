@@ -38,12 +38,12 @@ set(PARTOUT_C_INCLUDE_DIRS
 )
 
 # Define Partout_C sub-target for Partout
-add_library(Partout_C STATIC
+add_library(partout_c STATIC
     ${PARTOUT_C_SOURCES}
 )
-target_include_directories(Partout_C PRIVATE
+target_include_directories(partout_c PRIVATE
     ${PARTOUT_C_INCLUDE_DIRS}
 )
 if (LINUX)
-    target_compile_options(Partout_C PRIVATE -fPIC)
+    target_compile_options(partout_c PRIVATE -fPIC)
 endif()

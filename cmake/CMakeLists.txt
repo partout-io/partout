@@ -8,7 +8,7 @@ include(partout-c.cmake)
 include(partout.cmake)
 
 # Output to root
-set_target_properties(Partout PROPERTIES
+set_target_properties(partout PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${PARTOUT_DIR}/bin
     ARCHIVE_OUTPUT_DIRECTORY ${PARTOUT_DIR}/bin
     RUNTIME_OUTPUT_DIRECTORY ${PARTOUT_DIR}/bin
@@ -27,7 +27,7 @@ endfunction()
 # Link to vendor-specific dependencies
 set(PARTOUT_LIBS)
 if (DEFINED OPENSSL_DIR)
-    target_include_directories(Partout_C PRIVATE
+    target_include_directories(partout_c PRIVATE
         ${PARTOUT_DIR}/Sources/Crypto/CryptoOpenSSL_C/include
         ${PARTOUT_DIR}/Sources/Crypto/TLSOpenSSL_C/include
         ${OPENSSL_DIR}/include
@@ -36,7 +36,7 @@ if (DEFINED OPENSSL_DIR)
     add_static_lib(${OPENSSL_DIR}/lib crypto PARTOUT_LIBS)
 endif()
 if (DEFINED MBEDTLS_DIR)
-    target_include_directories(Partout_C PRIVATE
+    target_include_directories(partout_c PRIVATE
         ${PARTOUT_DIR}/Sources/Crypto/CryptoMbedTLS_C/include
         ${PARTOUT_DIR}/Sources/Crypto/TLSMbedTLS_C/include
         ${MBEDTLS_DIR}/include
@@ -45,6 +45,6 @@ if (DEFINED MBEDTLS_DIR)
     add_static_lib(${MBEDTLS_DIR}/lib mbedtls PARTOUT_LIBS)
     add_static_lib(${MBEDTLS_DIR}/lib mbedx509 PARTOUT_LIBS)
 endif()
-target_link_libraries(Partout_C PRIVATE
+target_link_libraries(partout_c PRIVATE
     ${PARTOUT_LIBS}
 )
