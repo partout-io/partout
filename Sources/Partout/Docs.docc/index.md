@@ -1,4 +1,4 @@
-# ``PartoutImplementations``
+# ``Partout``
 
 Leaf implementations.
 

@@ -17,7 +17,6 @@ PP_BUILD_DOCS="1" swift package generate-documentation \
     --target Partout \
     --target PartoutAPI \
     --target PartoutCore \
-    --target PartoutImplementations \
     --target PartoutProviders \
     --target PartoutOpenVPN \
     --target PartoutWireGuard
