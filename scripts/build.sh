@@ -10,7 +10,14 @@ while [[ $# -gt 0 ]]; do
         shift
         ;;
     -config)
-        cmake_opts+=("-DCMAKE_BUILD_TYPE=$2") # Debug|Release
+        # Debug|Release
+        cmake_opts+=("-DCMAKE_BUILD_TYPE=$2")
+        shift
+        shift
+        ;;
+    -crypto)
+        # openssl|mbedtls
+        cmake_opts+=("-DPP_BUILD_CRYPTO=$2")
         shift
         shift
         ;;
