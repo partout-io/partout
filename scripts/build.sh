@@ -20,6 +20,7 @@ while [[ $# -gt 0 ]]; do
         ;;
     -android)
         PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/bin:$PATH
+        rm -rf build bin/android
         cmake_opts+=("-DBUILD_FOR_ANDROID=1")
         shift
         ;;
