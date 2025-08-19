@@ -5,40 +5,52 @@ positional_args=()
 cmake_opts=()
 while [[ $# -gt 0 ]]; do
     case $1 in
-    -clean)
-        rm -rf build bin
-        shift
-        ;;
-    -config)
-        # Debug|Release
-        cmake_opts+=("-DCMAKE_BUILD_TYPE=$2")
-        shift
-        shift
-        ;;
-    -crypto)
-        # openssl|mbedtls
-        cmake_opts+=("-DPP_BUILD_CRYPTO=$2")
-        shift
-        shift
-        ;;
-    -l)
-        cmake_opts+=("-DPP_BUILD_LIBRARY=1")
-        shift
-        ;;
-    -android)
-        PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/bin:$PATH
-        rm -rf build bin/android
-        cmake_opts+=("-DPP_BUILD_FOR_ANDROID=1")
-        shift
-        ;;
-    -*|--*)
-        echo "Unknown option $1"
-        exit 1
-        ;;
-    *)
-        positional_args+=("$1")
-        shift # past argument
-        ;;
+        -clean)
+            rm -rf build bin
+            shift
+            ;;
+        -config)
+            # Debug|Release
+            cmake_opts+=("-DCMAKE_BUILD_TYPE=$2")
+            shift
+            shift
+            ;;
+        -crypto)
+            # openssl|mbedtls
+            case $2 in
+                openssl)
+                    cmake_opts+=("-DPP_BUILD_USE_OPENSSL=1")
+                    ;;
+                mbedtls)
+                    cmake_opts+=("-DPP_BUILD_USE_OPENSSL=0")
+                    cmake_opts+=("-DPP_BUILD_USE_MBEDTLS=1")
+                    ;;
+                *)
+                    echo "Unknown crypto '$2'"
+                    exit 1
+                    ;;
+            esac
+            shift
+            shift
+            ;;
+        -l)
+            cmake_opts+=("-DPP_BUILD_LIBRARY=1")
+            shift
+            ;;
+        -android)
+            PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/bin:$PATH
+            rm -rf build bin/android
+            cmake_opts+=("-DPP_BUILD_FOR_ANDROID=1")
+            shift
+            ;;
+        -*|--*)
+            echo "Unknown option $1"
+            exit 1
+            ;;
+        *)
+            positional_args+=("$1")
+            shift
+            ;;
     esac
 done
 set -- "${positional_args[@]}"
