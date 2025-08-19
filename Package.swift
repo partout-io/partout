@@ -35,7 +35,7 @@ let vendors: [Vendor] = [.openSSL, .mbedTLS]
 #endif
 
 // must be false in production (check in CI)
-let isDevelopment = true
+let isDevelopment = false
 let isTestingOpenVPNDataPath = false
 
 // the global settings for C targets
