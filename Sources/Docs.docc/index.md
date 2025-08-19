@@ -27,3 +27,9 @@ This is the umbrella package that exports the internal packages and provides som
 
 - <doc:OpenVPNProviders>
 - <doc:WireGuardProviders>
+
+### Implementations
+
+- ``OpenVPNConnection``
+- ``LegacyOpenVPNConnection``
+- ``WireGuardConnection``
