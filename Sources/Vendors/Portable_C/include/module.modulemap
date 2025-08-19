@@ -1,7 +1,0 @@
-module _PartoutVendorsPortable_C {
-    header "portable/common.h"
-    header "portable/endian.h"
-    header "portable/prng.h"
-    header "portable/zd.h"
-    export *
-}
