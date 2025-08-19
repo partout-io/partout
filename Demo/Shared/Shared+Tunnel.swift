@@ -4,7 +4,6 @@
 
 import Foundation
 import Partout
-import PartoutImplementations
 
 extension Registry {
     static let shared = Registry(
