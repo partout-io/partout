@@ -9,7 +9,7 @@ set -ex
 
 # 1. Build CMake vendors
 
-scripts/build.sh -clean -config $cmake_cfg -android
+scripts/build.sh -config $cmake_cfg -android
 
 # 2. Build SwiftPM with Android SDK
 
