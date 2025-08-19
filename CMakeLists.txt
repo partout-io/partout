@@ -28,20 +28,22 @@ message(STATUS "Option PP_BUILD_USE_MBEDTLS = ${PP_BUILD_USE_MBEDTLS}")
 message(STATUS "Option PP_BUILD_FOR_ANDROID = ${PP_BUILD_FOR_ANDROID}")
 message(STATUS "Option PP_BUILD_OUTPUT = ${PP_BUILD_OUTPUT}")
 
+# Forward args to Partout sub-project
+set(PARTOUT_CMAKE_ARGS -DPP_BUILD_OUTPUT=${PP_BUILD_OUTPUT})
+
 # All vendor-inherited args
-set(VENDOR_CMAKE_ARGS)
 set(VENDOR_CRYPTO_DEPENDS)
 if(PP_BUILD_USE_OPENSSL)
     include("vendors/openssl.cmake")
     ExternalProject_Get_Property(OpenSSLProject BINARY_DIR)
     set(VENDOR_CRYPTO_DEPENDS OpenSSLProject)
-    list(APPEND VENDOR_CMAKE_ARGS -DOPENSSL_DIR=${OPENSSL_OUTPUT_DIR})
+    list(APPEND PARTOUT_CMAKE_ARGS -DOPENSSL_DIR=${OPENSSL_OUTPUT_DIR})
 endif()
 if(PP_BUILD_USE_MBEDTLS)
     include("vendors/mbedtls.cmake")
     ExternalProject_Get_Property(mbedTLSProject BINARY_DIR)
     set(VENDOR_CRYPTO_DEPENDS mbedTLSProject)
-    list(APPEND VENDOR_CMAKE_ARGS -DMBEDTLS_DIR=${MBEDTLS_OUTPUT_DIR})
+    list(APPEND PARTOUT_CMAKE_ARGS -DMBEDTLS_DIR=${MBEDTLS_OUTPUT_DIR})
 endif()
 
 # Build Partout library (opt-in), after vendored dependencies
@@ -53,7 +55,7 @@ if(PP_BUILD_LIBRARY)
     ExternalProject_Add(
         PartoutProject
         SOURCE_DIR ${CMAKE_SOURCE_DIR}/cmake
-        CMAKE_ARGS ${VENDOR_CMAKE_ARGS}
+        CMAKE_ARGS ${PARTOUT_CMAKE_ARGS}
         INSTALL_COMMAND ""
         COMMAND ${CMAKE_COMMAND} -E copy ${PARTOUT_ABI_HEADER} ${CMAKE_SOURCE_DIR}/${PP_BUILD_OUTPUT_UNIVERSAL}
         DEPENDS ${VENDOR_CRYPTO_DEPENDS}
