@@ -26,7 +26,7 @@ let libraryType: Product.Library.LibraryType? = OS.current == .android ? .dynami
 
 // included areas and environment
 let areas: Set<Area> = Area.defaultAreas
-let coreDeployment = envCoreDeployment ?? .localSource
+let coreDeployment = envCoreDeployment ?? .remoteBinary
 let coreSourceSHA1 = "dd2b02cc7bdd2ea8899deb3df55e615c41764101"
 #if os(Windows)
 let vendors: [Vendor] = [.windows, .mbedTLS]
