@@ -50,7 +50,7 @@ endif()
 if(PP_BUILD_LIBRARY)
 
     # Bundle library with ABI header
-    set(PARTOUT_ABI_HEADER ${CMAKE_SOURCE_DIR}/Sources/ABI/Library_C/include/partout.h)
+    set(PARTOUT_ABI_HEADER ${CMAKE_SOURCE_DIR}/Sources/Partout_C/include/partout.h)
 
     ExternalProject_Add(
         PartoutProject
