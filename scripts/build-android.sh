@@ -5,6 +5,7 @@ if [ "$1" == 1 ]; then
     cmake_cfg="Release"
     spm_cfg="release"
 fi
+set -ex
 
 # 1. Build CMake vendors
 
