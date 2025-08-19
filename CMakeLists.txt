@@ -31,9 +31,9 @@ include("vendors/openssl.cmake")
 ExternalProject_Get_Property(OpenSSLProject BINARY_DIR)
 list(APPEND VENDOR_CMAKE_ARGS -DOPENSSL_DIR=${OPENSSL_OUTPUT_DIR})
 
-# include("vendors/mbedtls.cmake")
-# ExternalProject_Get_Property(mbedTLSProject BINARY_DIR)
-# list(APPEND VENDOR_CMAKE_ARGS -DMBEDTLS_DIR=${MBEDTLS_OUTPUT_DIR})
+include("vendors/mbedtls.cmake")
+ExternalProject_Get_Property(mbedTLSProject BINARY_DIR)
+list(APPEND VENDOR_CMAKE_ARGS -DMBEDTLS_DIR=${MBEDTLS_OUTPUT_DIR})
 
 # Build Partout library (opt-in), after vendored dependencies
 if(PP_BUILD_LIBRARY)
