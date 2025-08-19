@@ -15,13 +15,13 @@ while [[ $# -gt 0 ]]; do
         shift
         ;;
     -l)
-        cmake_opts+=("-DBUILD_LIBRARY=1")
+        cmake_opts+=("-DPP_BUILD_LIBRARY=1")
         shift
         ;;
     -android)
         PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/bin:$PATH
         rm -rf build bin/android
-        cmake_opts+=("-DBUILD_FOR_ANDROID=1")
+        cmake_opts+=("-DPP_BUILD_FOR_ANDROID=1")
         shift
         ;;
     -*|--*)
