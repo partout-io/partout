@@ -751,9 +751,21 @@ enum Vendor: String {
                 return .target(
                     name: "_PartoutVendorsOpenSSL",
                     dependencies: ["openssl-apple"],
-                    path: "Sources/Vendors/OpenSSL"
+                    path: "Sources/Vendors/OpenSSL",
+                    exclude: [
+                        "include/module.modulemap",
+                        "include/shim.h"
+                    ]
                 )
             case .linux:
+//                return .systemLibrary(
+//                    name: "_PartoutVendorsOpenSSL",
+//                    path: "Sources/Vendors/OpenSSL",
+//                    pkgConfig: "openssl",
+//                    providers: [
+//                        .apt(["libssl-dev"])
+//                    ]
+//                )
                 return .target(
                     name: "_PartoutVendorsOpenSSL",
                     path: "Sources/Vendors/OpenSSL",
