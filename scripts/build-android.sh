@@ -5,11 +5,11 @@ if [ "$1" == 1 ]; then
     cmake_cfg="Release"
     spm_cfg="release"
 fi
+set -ex
 
 # 1. Build CMake vendors
 
-rm -rf build bin
-scripts/build.sh -c $cmake_cfg -android
+scripts/build.sh -config $cmake_cfg -android
 
 # 2. Build SwiftPM with Android SDK
 

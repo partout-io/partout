@@ -1,4 +1,5 @@
-set(MBEDTLS_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/bin/mbedtls)
+set(MBEDTLS_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/${PP_BUILD_OUTPUT}/mbedtls)
+
 ExternalProject_Add(
     mbedTLSProject
     SOURCE_DIR ${CMAKE_SOURCE_DIR}/vendors/mbedtls

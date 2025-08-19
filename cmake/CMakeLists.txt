@@ -8,10 +8,11 @@ include(partout-c.cmake)
 include(partout.cmake)
 
 # Output to root
+set(PARTOUT_OUTPUT ${PARTOUT_DIR}/${PP_BUILD_OUTPUT})
 set_target_properties(partout PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY ${PARTOUT_DIR}/bin
-    ARCHIVE_OUTPUT_DIRECTORY ${PARTOUT_DIR}/bin
-    RUNTIME_OUTPUT_DIRECTORY ${PARTOUT_DIR}/bin
+    LIBRARY_OUTPUT_DIRECTORY ${PARTOUT_OUTPUT}
+    ARCHIVE_OUTPUT_DIRECTORY ${PARTOUT_OUTPUT}
+    RUNTIME_OUTPUT_DIRECTORY ${PARTOUT_OUTPUT}
 )
 
 # Mind platform differences about static libraries

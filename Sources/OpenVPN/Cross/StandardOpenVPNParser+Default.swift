@@ -9,6 +9,6 @@ import PartoutOpenVPN
 
 extension StandardOpenVPNParser {
     public convenience init() {
-        self.init(supportsLZO: false, decrypter: OSSLKeyDecrypter())
+        self.init(supportsLZO: false, decrypter: SimpleKeyDecrypter())
     }
 }

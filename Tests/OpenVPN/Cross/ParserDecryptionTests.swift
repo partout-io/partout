@@ -42,7 +42,7 @@ struct ParserDecryptionTests {
 
 private extension ParserDecryptionTests {
     func newParser() -> StandardOpenVPNParser {
-        StandardOpenVPNParser(supportsLZO: false, decrypter: OSSLKeyDecrypter())
+        StandardOpenVPNParser(supportsLZO: false, decrypter: SimpleKeyDecrypter())
     }
 
     func url(withName name: String) -> URL {
