@@ -22,7 +22,6 @@ while [[ $# -gt 0 ]]; do
                     cmake_opts+=("-DPP_BUILD_USE_OPENSSL=ON")
                     ;;
                 mbedtls)
-                    cmake_opts+=("-DPP_BUILD_USE_OPENSSL=OFF")
                     cmake_opts+=("-DPP_BUILD_USE_MBEDTLS=ON")
                     ;;
                 *)
