@@ -4,7 +4,9 @@
 
 import Foundation
 import NetworkExtension
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 /// Encodes and decodes a ``/PartoutCore/Profile`` to and from `NETunnelProviderProtocol`.
 public typealias NEProtocolCoder = NEProtocolEncoder & NEProtocolDecoder

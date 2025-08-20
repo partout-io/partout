@@ -4,7 +4,6 @@
 
 import Foundation
 import Partout
-import PartoutImplementations
 
 extension WireGuard {
     static var demoModule: WireGuardModule? {

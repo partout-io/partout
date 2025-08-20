@@ -13,17 +13,15 @@
 		0E179B2F2B8A6D2C0053163E /* DemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E179B2A2B8A6D2C0053163E /* DemoApp.swift */; };
 		0E179B302B8A6D2C0053163E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E179B2B2B8A6D2C0053163E /* ContentView.swift */; };
 		0E336F682B9232CD00BE7BA6 /* Demo+Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E336F662B9232CD00BE7BA6 /* Demo+Profile.swift */; };
+		0E8290EB2E5471D90089829C /* Partout in Frameworks */ = {isa = PBXBuildFile; productRef = 0E8290EA2E5471D90089829C /* Partout */; };
 		0E8445A82BD8E7360019DF51 /* Files in Resources */ = {isa = PBXBuildFile; fileRef = 0E8445A72BD8E7360019DF51 /* Files */; };
 		0E9CFB7B2B8B34C0009C8D82 /* Shared+App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E9CFB7A2B8B34C0009C8D82 /* Shared+App.swift */; };
 		0EC332CA2B8A1808000B9C2F /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0EC332C92B8A1808000B9C2F /* NetworkExtension.framework */; };
 		0EC332CD2B8A1808000B9C2F /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EC332CC2B8A1808000B9C2F /* PacketTunnelProvider.swift */; };
 		0EC332D22B8A1808000B9C2F /* PartoutDemoTunnel.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0EC332C82B8A1808000B9C2F /* PartoutDemoTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		0ED1EFCE2DB9161F00CA043E /* Partout in Frameworks */ = {isa = PBXBuildFile; productRef = 0ED1EFCD2DB9161F00CA043E /* Partout */; };
-		0ED1EFD42DB9162600CA043E /* Partout in Frameworks */ = {isa = PBXBuildFile; productRef = 0ED1EFD32DB9162600CA043E /* Partout */; };
 		0ED5F8FA2BB34C8C007F8E85 /* Demo+WireGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ED5F8F92BB34C8C007F8E85 /* Demo+WireGuard.swift */; };
 		0ED5F8FF2BB3562E007F8E85 /* Shared+Tunnel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ED5F8FD2BB3561F007F8E85 /* Shared+Tunnel.swift */; };
-		0EF9354A2E35166400CCC524 /* PartoutImplementations in Frameworks */ = {isa = PBXBuildFile; productRef = 0EF935492E35166400CCC524 /* PartoutImplementations */; };
-		0EF9354C2E3516A900CCC524 /* PartoutImplementations in Frameworks */ = {isa = PBXBuildFile; productRef = 0EF9354B2E3516A900CCC524 /* PartoutImplementations */; };
+		0EEEF8E82E5472320091F0EC /* Partout in Frameworks */ = {isa = PBXBuildFile; productRef = 0EEEF8E72E5472320091F0EC /* Partout */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -76,9 +74,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0ED1EFD42DB9162600CA043E /* Partout in Frameworks */,
+				0EEEF8E82E5472320091F0EC /* Partout in Frameworks */,
 				0EC332CA2B8A1808000B9C2F /* NetworkExtension.framework in Frameworks */,
-				0EF9354C2E3516A900CCC524 /* PartoutImplementations in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -86,8 +83,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0ED1EFCE2DB9161F00CA043E /* Partout in Frameworks */,
-				0EF9354A2E35166400CCC524 /* PartoutImplementations in Frameworks */,
+				0E8290EB2E5471D90089829C /* Partout in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -218,8 +214,7 @@
 			);
 			name = PartoutDemoTunnel;
 			packageProductDependencies = (
-				0ED1EFD32DB9162600CA043E /* Partout */,
-				0EF9354B2E3516A900CCC524 /* PartoutImplementations */,
+				0EEEF8E72E5472320091F0EC /* Partout */,
 			);
 			productName = Tunnel;
 			productReference = 0EC332C82B8A1808000B9C2F /* PartoutDemoTunnel.appex */;
@@ -631,25 +626,15 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		0ED1EFCD2DB9161F00CA043E /* Partout */ = {
+		0E8290EA2E5471D90089829C /* Partout */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0ED1EFC62DB9160A00CA043E /* XCLocalSwiftPackageReference "../partout" */;
 			productName = Partout;
 		};
-		0ED1EFD32DB9162600CA043E /* Partout */ = {
+		0EEEF8E72E5472320091F0EC /* Partout */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0ED1EFC62DB9160A00CA043E /* XCLocalSwiftPackageReference "../partout" */;
 			productName = Partout;
-		};
-		0EF935492E35166400CCC524 /* PartoutImplementations */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 0ED1EFC62DB9160A00CA043E /* XCLocalSwiftPackageReference "../partout" */;
-			productName = PartoutImplementations;
-		};
-		0EF9354B2E3516A900CCC524 /* PartoutImplementations */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 0ED1EFC62DB9160A00CA043E /* XCLocalSwiftPackageReference "../partout" */;
-			productName = PartoutImplementations;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

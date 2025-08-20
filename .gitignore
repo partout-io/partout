@@ -7,5 +7,5 @@
 PartoutCore
 PartoutCore.xcframework*
 .build
-Sources/Vendors/OpenSSL/include
-vendors/**/*.a
+build
+bin

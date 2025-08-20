@@ -4,7 +4,9 @@
 
 import Foundation
 @preconcurrency import NetworkExtension
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 /// A ``/PartoutCore/NetworkInterfaceFactory`` that spawns ``/PartoutCore/LinkInterface`` and ``/PartoutCore/TunnelInterface`` objects from a `NEPacketTunnelProvider`.
 public final class NEInterfaceFactory: NetworkInterfaceFactory {

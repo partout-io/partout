@@ -4,7 +4,9 @@
 
 import Foundation
 import NetworkExtension
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 extension HTTPProxyModule: NESettingsApplying {
     public func apply(_ ctx: PartoutLoggerContext, to settings: inout NEPacketTunnelNetworkSettings) {

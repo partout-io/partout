@@ -4,7 +4,9 @@
 
 import Foundation
 import NetworkExtension
+#if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
 
 extension OnDemandModule {
     func neRules(_ ctx: PartoutLoggerContext) -> [NEOnDemandRule] {

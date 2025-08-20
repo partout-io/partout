@@ -43,7 +43,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
             self.ctx = ctx
 
             fwd = try NEPTPForwarder(ctx, controller: controller)
-            try await fwd?.startTunnel(options: options)
+            try await fwd?.startTunnel(options: [:])
         } catch {
             flushLog()
             throw error

@@ -1,0 +1,9 @@
+set(PARTOUT_CORE_SOURCES_DIR
+    ${PARTOUT_DIR}/vendors/core/Sources/PartoutCore
+)
+set(PARTOUT_CORE_C_SOURCES_DIR
+    ${PARTOUT_DIR}/vendors/core/Sources/_PartoutCore_C
+)
+set(PARTOUT_CORE_C_INCLUDE_DIR
+    ${PARTOUT_DIR}/vendors/core/Sources/_PartoutCore_C/include
+)

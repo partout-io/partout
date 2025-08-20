@@ -10,19 +10,21 @@
 
 A scalable framework to build modern network configuration apps.
 
-Binary distribution for these architectures:
+__DISCLAIMER: the library is still undergoing deep architectural changes.__
+
+## Usage
+
+### Swift
+
+The public library supports development on these architectures:
 
 - macosx
 - iphonesimulator
 - appletvsimulator
 
-__DISCLAIMER: the library is still undergoing deep architectural changes.__
+Therefore, it __will not build__ on your iOS/tvOS physical devices. If you want to use it for proprietary or commercial purposes, please [contact me privately][license-contact].
 
-## Installation
-
-### Usage
-
-Import the library as SwiftPM dependency, for example:
+Import the library as a SwiftPM dependency:
 
 ```swift
 dependencies: [
@@ -33,15 +35,85 @@ targets: [
         name: "MyTarget",
         dependencies: [
             .product(name: "Partout", package: "partout"),
-            .product(name: "PartoutImplementations", package: "partout")
         ]
     )
 ]
 ```
 
-Beware that the public framework only supports development on your Mac or iOS/tvOS Simulators. If you want to use the library for proprietary or commercial purposes, please [contact me privately][license-contact].
+### Other languages (ABI)
 
-### Demo
+The C ABI is a work in progress and for private use, as the `vendors/core` submodule is currently a private repository.
+
+#### Requirements
+
+- Swift
+- C/C++ build tools
+- CMake
+- ninja
+- Android NDK (optional)
+- Swift Android SDK (optional)
+
+These are the requirements for Partout, but additional build tools may be required depending on the vendors build system. Bear in mind that the generated library will still need to be bundled with the proper Swift runtime.
+
+#### Build
+
+First, fetch all the vendored submodules:
+
+```shell
+git submodule init
+git submodule update --recursive
+```
+
+Then, you will use one of the `scripts/build.*` variants based on the host platform:
+
+- `scripts/build.sh` (bash)
+- `scripts/build.ps1` (Windows PowerShell)
+
+The script builds the vendors as static libraries and accepts a few options: 
+
+- `-l`: Build Partout as dynamic library (opt-in)
+- `-config (Debug|Release)`: The CMake build type
+- `-crypto (openssl|mbedtls)`: The crypto subsystem to pick between OpenSSL and mbedTLS
+
+For example, this will build Partout for release with a static dependency on OpenSSL:
+
+```shell
+$ scripts/build.sh -config Release -crypto openssl -l
+```
+
+Sample output:
+
+```
+bin/partout.h                       # The Partout ABI
+bin/darwin-arm64/libPartout.dylib   # macOS
+bin/linux-aarch64/libPartout.so     # Linux
+bin/windows-arm64/Partout.dll       # Windows
+```
+
+This should work for all platforms, except for Android, which asks for a hybrid CMake + SwiftPM approach.
+
+#### Build for Android
+
+Building for Android requires access to the Swift Android SDK, and this is not straightforward from CMake. That's why the `scripts/build-android.sh` script does the heavy-lifting in two steps:
+
+- Cross-compile the vendored static libraries with CMake for Android
+- Embed the static libraries in SwiftPM to generate a dynamic library with the Swift Android SDK
+
+Requirements:
+
+- Set `$ANDROID_NDK_ROOT` to point to your Android NDK installation
+- Add the NDK toolchain to the `$PATH`
+
+The script runs on macOS, but can be adapted for other platforms with slight tweaks to `scripts/build.sh`. The Android output is consistent with the other platforms:
+
+```
+bin/partout.h
+bin/android-arm64/libPartout.so
+```
+
+## Demo
+
+### Xcode
 
 Edit `Demo/Config.xcconfig` with your developer details. You must comply with all the capabilities and entitlements in the main app and the tunnel extension target.
 
