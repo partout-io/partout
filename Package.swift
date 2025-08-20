@@ -483,7 +483,7 @@ case .openSSL:
         )
     )
 case .native: // MbedTLS + OS
-    let vendorTarget: String
+    let vendorTarget: Target.Dependency
     let vendorCSettings: [CSetting]?
 
     // Pick current OS by removing it from exclusions
@@ -499,7 +499,7 @@ case .native: // MbedTLS + OS
         vendorCSettings = nil
         package.targets.append(
             .systemLibrary(
-                name: vendorTarget,
+                name: "mbedtls-linux",
                 path: "Sources/Vendors/MbedTLS",
                 providers: [
                     .apt(["libmbedtls-dev"])
@@ -513,7 +513,7 @@ case .native: // MbedTLS + OS
         ]
         package.targets.append(
             .target(
-                name: vendorTarget,
+                name: "mbedtls-cmake",
                 path: "Sources/Vendors/MbedTLS",
                 exclude: [
                     "shim.h",
@@ -537,7 +537,7 @@ case .native: // MbedTLS + OS
             name: "_PartoutCryptoImpl_C",
             dependencies: [
                 "PartoutPortable_C",
-                .target(name: vendorTarget)
+                vendorTarget
             ],
             path: "Sources/Impl/CryptoNative_C",
             exclude: exclusions,
