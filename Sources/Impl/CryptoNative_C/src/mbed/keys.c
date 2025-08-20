@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include <mbedtls/pem.h>
 #include "portable/common.h"
 #include "crypto/keys.h"
 

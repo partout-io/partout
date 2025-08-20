@@ -155,8 +155,8 @@ private extension ContentView {
         }
     }
 
-#if !os(tvOS)
     var serverConfigurationView: some View {
+#if !os(tvOS)
         NavigationStack {
             VStack {
                 vpn
@@ -176,8 +176,10 @@ private extension ContentView {
             .frame(minWidth: 600.0, minHeight: 400.0)
 #endif
         }
-    }
+#else
+        EmptyView()
 #endif
+    }
 }
 
 // MARK: - Actions

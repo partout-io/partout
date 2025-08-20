@@ -19,8 +19,8 @@ extension Tunnel {
     static let shared: Tunnel = {
 #if targetEnvironment(simulator)
         let strategy = FakeTunnelStrategy()
-        return Tunnel(strategy: strategy) { _ in
-            SharedTunnelEnvironment()
+        return Tunnel(.global, strategy: strategy) {
+            SharedTunnelEnvironment(profileId: $0)
         }
 #else
         let strategy = NETunnelStrategy(

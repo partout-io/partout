@@ -5,7 +5,7 @@ include(ExternalProject)
 # Command line options
 option(PP_BUILD_LIBRARY "Include main library" 0)
 option(PP_BUILD_FOR_ANDROID "Build for Android" 0)
-option(PP_BUILD_USE_OPENSSL "Use OpenSSL" 1)
+option(PP_BUILD_USE_OPENSSL "Use OpenSSL" 0)
 option(PP_BUILD_USE_MBEDTLS "Use mbedTLS" 0)
 
 # Output per platform/arch
@@ -38,8 +38,7 @@ if(PP_BUILD_USE_OPENSSL)
     ExternalProject_Get_Property(OpenSSLProject BINARY_DIR)
     set(VENDOR_CRYPTO_DEPENDS OpenSSLProject)
     list(APPEND PARTOUT_CMAKE_ARGS -DOPENSSL_DIR=${OPENSSL_OUTPUT_DIR})
-endif()
-if(PP_BUILD_USE_MBEDTLS)
+elseif(PP_BUILD_USE_MBEDTLS)
     include("vendors/mbedtls.cmake")
     ExternalProject_Get_Property(mbedTLSProject BINARY_DIR)
     set(VENDOR_CRYPTO_DEPENDS mbedTLSProject)
