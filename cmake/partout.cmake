@@ -18,7 +18,7 @@ set(EXCLUDED_PATTERNS
     PartoutOpenVPN\/Legacy.*\/
     # FIXME: #118, restore WireGuard when properly integrated
     PartoutWireGuard\/
-    Vendors\/WireGuard\/
+    Vendors\/WireGuardGo\/
 )
 
 # Exclude per platform

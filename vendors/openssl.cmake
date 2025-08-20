@@ -3,14 +3,12 @@ set(OPENSSL_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/${PP_BUILD_OUTPUT}/openssl)
 # Use nmake on Windows
 if(WIN32)
     set(OPENSSL_BUILD_CMD nmake)
-    set(OPENSSL_BUILD_IN_SOURCE TRUE)
 else()
     set(OPENSSL_BUILD_CMD make)
-    set(OPENSSL_BUILD_IN_SOURCE FALSE)
 endif()
 
 # Configure flags
-set(OPENSSL_CFG_FLAGS no-apps no-docs no-engine no-gost no-legacy no-shared no-ssl no-tests no-zlib)
+set(OPENSSL_CFG_FLAGS no-apps no-docs no-dsa no-engine no-gost no-legacy no-shared no-ssl no-tests no-zlib)
 
 # Add some flags if -DANDROID (requires NDK tools in the PATH)
 if(PP_BUILD_FOR_ANDROID)
@@ -34,6 +32,5 @@ ExternalProject_Add(
     CONFIGURE_COMMAND perl ${CMAKE_SOURCE_DIR}/vendors/openssl/Configure ${CFG_ARGS}
     BUILD_COMMAND ${OPENSSL_BUILD_CMD}
     INSTALL_COMMAND ${OPENSSL_BUILD_CMD} install
-    BUILD_IN_SOURCE ${OPENSSL_BUILD_IN_SOURCE}
     #BUILD_BYPRODUCTS ${CMAKE_BINARY_DIR}/libcrypto.a ${CMAKE_BINARY_DIR}/libssl.a
 )

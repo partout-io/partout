@@ -10,7 +10,7 @@ file(GLOB_RECURSE PARTOUT_C_SOURCES
 set(EXCLUDED_PATTERNS
     # FIXME: #118, restore WireGuard when properly integrated
     PartoutWireGuard\/
-    Vendors\/WireGuard\/
+    Vendors\/WireGuardGo\/
 )
 
 # Header search paths from all C targets
@@ -20,21 +20,29 @@ set(PARTOUT_C_INCLUDE_DIRS
     ${PARTOUT_DIR}/Sources/PartoutPortable_C/include
 )
 
-# Filter by vendor/platform
-# FIXME: #174, restore Windows crypto
-#if(NOT WIN32)
-    list(APPEND EXCLUDED_PATTERNS Impl\/CryptoWindows_C\/)
-#endif()
+# Filter by crypto vendor
 if(DEFINED OPENSSL_DIR)
     list(APPEND PARTOUT_C_INCLUDE_DIRS ${PARTOUT_DIR}/Sources/Impl/CryptoOpenSSL_C/include)
-    list(APPEND PARTOUT_C_INCLUDE_DIRS ${PARTOUT_DIR}/Sources/Impl/TLSOpenSSL_C/include)
 else()
-    list(APPEND EXCLUDED_PATTERNS Impl\/.*OpenSSL_C\/)
+    list(APPEND EXCLUDED_PATTERNS CryptoOpenSSL_C\/)
 endif()
 if(DEFINED MBEDTLS_DIR)
-    list(APPEND PARTOUT_C_INCLUDE_DIRS ${PARTOUT_DIR}/Sources/Impl/TLSMbedTLS_C/include)
+    list(APPEND PARTOUT_C_INCLUDE_DIRS ${PARTOUT_DIR}/Sources/Impl/CryptoNative_C/include)
+    if(NOT APPLE)
+        list(APPEND EXCLUDED_PATTERNS CryptoNative_C\/src/apple)
+    endif()
+    if(NOT LINUX)
+        list(APPEND EXCLUDED_PATTERNS CryptoNative_C\/src/linux)
+    endif()
+    if(NOT WIN32)
+        list(APPEND EXCLUDED_PATTERNS CryptoNative_C\/src/windows)
+    endif()
+    # XXX: Not sure about this condition
+    if(NOT BUILD_FOR_ANDROID)
+        list(APPEND EXCLUDED_PATTERNS CryptoNative_C\/src/android)
+    endif()
 else()
-    list(APPEND EXCLUDED_PATTERNS Impl\/.*MbedTLS_C\/)
+    list(APPEND EXCLUDED_PATTERNS CryptoNative_C\/)
 endif()
 
 foreach(pattern ${EXCLUDED_PATTERNS})
