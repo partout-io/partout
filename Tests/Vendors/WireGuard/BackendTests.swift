@@ -2,13 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutVendorsWireGuard
+internal import _PartoutVendorsWireGuardImpl
 import Testing
 
 struct BackendTests {
     @Test
     func givenBackend_whenGetVersion_thenIsExpected() throws {
-        let sut = VendorWireGuardBackend()
+        let sut = WireGuardBackendVendor()
         let expectedVersion = "f333402"
         let vendorVersion = try #require(sut.version())
         #expect(vendorVersion == expectedVersion)

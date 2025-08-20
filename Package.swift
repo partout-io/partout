@@ -598,6 +598,17 @@ switch wgMode {
         break
 }
 
+// Include back tests if supported
+if wgMode != nil {
+    package.targets.append(contentsOf: [
+        .testTarget(
+            name: "_PartoutVendorsWireGuardImplTests",
+            dependencies: ["_PartoutVendorsWireGuardImpl"],
+            path: "Tests/Vendors/WireGuard"
+        )
+    ])
+}
+
 // MARK: - OS
 
 // Targets relying on OS-specific frameworks
