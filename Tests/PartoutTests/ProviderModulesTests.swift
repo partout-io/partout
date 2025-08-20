@@ -42,7 +42,7 @@ struct ProviderModulesTests {
         let addresses = ["8.9.10.11/32"]
 
         var sut = ProviderModule.Builder()
-        sut.providerId = .hideme
+        sut.providerId = mockId
         sut.providerModuleType = .wireGuard
 
         let session = WireGuardProviderStorage.Session(privateKey: "", publicKey: "")

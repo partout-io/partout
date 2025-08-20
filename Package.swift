@@ -109,11 +109,11 @@ let package = Package(
                 // These are always included
                 list.append(coreDeployment.dependency)
                 list.append("PartoutPortable")
+                list.append("PartoutProviders")
 
                 // Optional includes
                 if areas.contains(.api) {
                     list.append("PartoutAPI")
-                    list.append("PartoutProviders")
                 }
                 if areas.contains(.openVPN) {
                     list.append("PartoutOpenVPN")
@@ -181,9 +181,24 @@ package.targets.append(contentsOf: [
     )
 ])
 
+// MARK: Providers
+
+package.targets.append(contentsOf: [
+    .target(
+        name: "PartoutProviders",
+        dependencies: [coreDeployment.dependency]
+    ),
+    .testTarget(
+        name: "PartoutProvidersTests",
+        dependencies: ["PartoutProviders"],
+        resources: [
+            .process("Resources")
+        ]
+    )
+])
+
 // MARK: API
 
-// API and Providers
 if areas.contains(.api) {
     package.products.append(
         .library(
@@ -199,20 +214,9 @@ if areas.contains(.api) {
                 .copy("JSON")
             ]
         ),
-        .target(
-            name: "PartoutProviders",
-            dependencies: [coreDeployment.dependency]
-        ),
         .testTarget(
             name: "PartoutAPITests",
             dependencies: ["PartoutAPI"]
-        ),
-        .testTarget(
-            name: "PartoutProvidersTests",
-            dependencies: ["PartoutProviders"],
-            resources: [
-                .process("Resources")
-            ]
         )
     ])
 }
