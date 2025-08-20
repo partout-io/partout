@@ -12,7 +12,7 @@ import Foundation
 import NetworkExtension // TODO: #13, this depends on Apple unnecessarily
 import os
 #if !PARTOUT_MONOLITH
-import _PartoutVendorsWireGuard
+internal import _PartoutVendorsWireGuardImpl
 import PartoutCore
 import PartoutWireGuard
 #endif
@@ -36,7 +36,7 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
     private var dataCountTimer: Task<Void, Error>?
 
     private lazy var adapter: WireGuardAdapter = {
-        WireGuardAdapter(with: delegate, backend: VendorWireGuardBackend()) { [weak self] logLevel, message in
+        WireGuardAdapter(with: delegate, backend: WireGuardBackendVendor()) { [weak self] logLevel, message in
             pp_log(self?.ctx ?? .global, .wireguard, logLevel.debugLevel, message)
         }
     }()

@@ -2,13 +2,13 @@
 // Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
 #if !PARTOUT_MONOLITH
-import _PartoutVendorsWireGuardCore
+import PartoutWireGuard
 #endif
 import Foundation
 import wg_go
 
 // swiftlint:disable identifier_name
-public final class VendorWireGuardBackend: WireGuardBackend {
+public final class WireGuardBackendVendor: WireGuardBackend {
     public init() {
     }
 

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import _PartoutVendorsWireGuard
+internal import _PartoutVendorsWireGuard
 import Testing
 
 struct BackendTests {
