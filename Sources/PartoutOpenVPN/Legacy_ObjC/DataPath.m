@@ -77,11 +77,11 @@
         self.outPackets = [[NSMutableArray alloc] initWithCapacity:maxPackets];
         self.outPacketId = 0;
         self.encBufferCapacity = 65000;
-        self.encBuffer = pp_alloc_crypto(self.encBufferCapacity);
+        self.encBuffer = pp_alloc(self.encBufferCapacity);
 
         self.inPackets = [[NSMutableArray alloc] initWithCapacity:maxPackets];
         self.decBufferCapacity = 65000;
-        self.decBuffer = pp_alloc_crypto(self.decBufferCapacity);
+        self.decBuffer = pp_alloc(self.decBufferCapacity);
         if (usesReplayProtection) {
             self.inReplay = [[ReplayProtector alloc] init];
         }
@@ -114,7 +114,7 @@
     bzero(self.encBuffer, self.encBufferCapacity);
     free(self.encBuffer);
     self.encBufferCapacity = neededCapacity;
-    self.encBuffer = pp_alloc_crypto(self.encBufferCapacity);
+    self.encBuffer = pp_alloc(self.encBufferCapacity);
 }
 
 - (void)adjustDecBufferToPacketSize:(int)size
@@ -126,7 +126,7 @@
     bzero(self.decBuffer, self.decBufferCapacity);
     free(self.decBuffer);
     self.decBufferCapacity = neededCapacity;
-    self.decBuffer = pp_alloc_crypto(self.decBufferCapacity);
+    self.decBuffer = pp_alloc(self.decBufferCapacity);
 }
 
 - (uint8_t *)encBufferAligned

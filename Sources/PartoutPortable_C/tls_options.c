@@ -19,7 +19,7 @@ pp_tls_options *_Nonnull pp_tls_options_create(int sec_level,
 
     pp_assert(ca_path && on_verify_failure);
 
-    pp_tls_options *opt = pp_alloc_crypto(sizeof(pp_tls_options));
+    pp_tls_options *opt = pp_alloc(sizeof(pp_tls_options));
     opt->sec_level = sec_level;
     opt->buf_len = buf_len;
     opt->eku = eku;

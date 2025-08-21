@@ -245,7 +245,7 @@ pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name, const char *digest_n
         return NULL;
     }
 
-    pp_crypto_ctr *ctx = pp_alloc_crypto(sizeof(pp_crypto_ctr));
+    pp_crypto_ctr *ctx = pp_alloc(sizeof(pp_crypto_ctr));
 
     // no chaining mode, use ECB for manual CTR
     PP_CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
@@ -257,7 +257,7 @@ pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name, const char *digest_n
 
     // no longer fails
 
-    ctx->buffer_hmac = pp_alloc_crypto(tag_len);
+    ctx->buffer_hmac = pp_alloc(tag_len);
 
     ctx->crypto.meta.cipher_key_len = 16; // AES-128
     ctx->crypto.meta.cipher_iv_len = 16;  // AES block size

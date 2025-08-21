@@ -188,7 +188,7 @@ pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name, const char *digest_n
                              const pp_crypto_keys *keys) {
     pp_assert(digest_name);
 
-    pp_crypto_cbc *ctx = pp_alloc_crypto(sizeof(pp_crypto_cbc));
+    pp_crypto_cbc *ctx = pp_alloc(sizeof(pp_crypto_cbc));
     if (cipher_name) {
         ctx->cipher = EVP_get_cipherbyname(cipher_name);
         if (!ctx->cipher) {
@@ -221,7 +221,7 @@ pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name, const char *digest_n
     }
     ctx->utf_digest_name = pp_dup(digest_name);
 
-    ctx->mac_params = pp_alloc_crypto(2 * sizeof(OSSL_PARAM));
+    ctx->mac_params = pp_alloc(2 * sizeof(OSSL_PARAM));
     ctx->mac_params[0] = OSSL_PARAM_construct_utf8_string("digest", ctx->utf_digest_name, 0);
     ctx->mac_params[1] = OSSL_PARAM_construct_end();
 

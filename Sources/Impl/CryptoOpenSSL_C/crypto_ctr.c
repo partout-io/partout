@@ -146,7 +146,7 @@ pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name, const char *digest_n
                              const pp_crypto_keys *keys) {
     pp_assert(cipher_name && digest_name);
 
-    pp_crypto_ctr *ctx = pp_alloc_crypto(sizeof(pp_crypto_ctr));
+    pp_crypto_ctr *ctx = pp_alloc(sizeof(pp_crypto_ctr));
 
     ctx->cipher = EVP_get_cipherbyname(cipher_name);
     if (!ctx->cipher) {
@@ -174,10 +174,10 @@ pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name, const char *digest_n
     ctx->utf_cipher_name = pp_dup(cipher_name);
     ctx->utf_digest_name = pp_dup(digest_name);
 
-    ctx->mac_params = pp_alloc_crypto(2 * sizeof(OSSL_PARAM));
+    ctx->mac_params = pp_alloc(2 * sizeof(OSSL_PARAM));
     ctx->mac_params[0] = OSSL_PARAM_construct_utf8_string("digest", ctx->utf_digest_name, 0);
     ctx->mac_params[1] = OSSL_PARAM_construct_end();
-    ctx->buffer_hmac = pp_alloc_crypto(tag_len);
+    ctx->buffer_hmac = pp_alloc(tag_len);
 
     ctx->crypto.meta.cipher_key_len = EVP_CIPHER_key_length(ctx->cipher);
     ctx->crypto.meta.cipher_iv_len = EVP_CIPHER_iv_length(ctx->cipher);

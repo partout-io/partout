@@ -28,7 +28,7 @@
 {
     if ((self = [super init])) {
         self.highestPacketId = 0;
-        self.bitmap =  pp_alloc_crypto(BITMAP_LEN * sizeof(uint32_t));
+        self.bitmap =  pp_alloc(BITMAP_LEN * sizeof(uint32_t));
         bzero(self.bitmap, BITMAP_LEN * sizeof(uint32_t));
     }
     return self;

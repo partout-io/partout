@@ -14,14 +14,14 @@ openvpn_ctrl *_Nonnull openvpn_ctrl_create(openvpn_packet_code code, uint8_t key
                                      const uint32_t *_Nullable ack_ids, size_t ack_ids_len,
                                      const uint8_t *_Nullable ack_remote_session_id) {
 
-    openvpn_ctrl *pkt = pp_alloc_crypto(sizeof(openvpn_ctrl));
+    openvpn_ctrl *pkt = pp_alloc(sizeof(openvpn_ctrl));
     pkt->code = code;
     pkt->key = key;
     pkt->packet_id = packet_id;
-    pkt->session_id = pp_alloc_crypto(OpenVPNPacketSessionIdLength);
+    pkt->session_id = pp_alloc(OpenVPNPacketSessionIdLength);
     memcpy(pkt->session_id, session_id, OpenVPNPacketSessionIdLength);
     if (payload) {
-        pkt->payload = pp_alloc_crypto(payload_len);
+        pkt->payload = pp_alloc(payload_len);
         pkt->payload_len = payload_len;
         memcpy(pkt->payload, payload, payload_len);
     } else {
@@ -31,10 +31,10 @@ openvpn_ctrl *_Nonnull openvpn_ctrl_create(openvpn_packet_code code, uint8_t key
     if (ack_ids) {
         pp_assert(ack_remote_session_id);
         const size_t ack_len = ack_ids_len * sizeof(uint32_t);
-        pkt->ack_ids = pp_alloc_crypto(ack_len);
+        pkt->ack_ids = pp_alloc(ack_len);
         pkt->ack_ids_len = ack_ids_len;
         memcpy(pkt->ack_ids, ack_ids, ack_len);
-        pkt->ack_remote_session_id = pp_alloc_crypto(OpenVPNPacketSessionIdLength);
+        pkt->ack_remote_session_id = pp_alloc(OpenVPNPacketSessionIdLength);
         memcpy(pkt->ack_remote_session_id, ack_remote_session_id, OpenVPNPacketSessionIdLength);
     } else {
         pkt->ack_ids = NULL;

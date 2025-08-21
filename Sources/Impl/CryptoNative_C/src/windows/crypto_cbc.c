@@ -270,7 +270,7 @@ pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name, const char *digest_n
         return NULL;
     }
 
-    pp_crypto_cbc *ctx = pp_alloc_crypto(sizeof(pp_crypto_cbc));
+    pp_crypto_cbc *ctx = pp_alloc(sizeof(pp_crypto_cbc));
 
     if (cipher_name) {
         PP_CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(

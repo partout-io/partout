@@ -177,7 +177,7 @@ pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
         return NULL;
     }
 
-    pp_crypto_aead *ctx = pp_alloc_crypto(sizeof(pp_crypto_aead));
+    pp_crypto_aead *ctx = pp_alloc(sizeof(pp_crypto_aead));
     PP_CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
         &ctx->hAlg,
         BCRYPT_AES_ALGORITHM,
@@ -201,8 +201,8 @@ pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
     ctx->crypto.meta.tag_len = tag_len;
     ctx->crypto.meta.encryption_capacity = local_encryption_capacity;
 
-    ctx->iv_enc = pp_alloc_crypto(ctx->crypto.meta.cipher_iv_len);
-    ctx->iv_dec = pp_alloc_crypto(ctx->crypto.meta.cipher_iv_len);
+    ctx->iv_enc = pp_alloc(ctx->crypto.meta.cipher_iv_len);
+    ctx->iv_dec = pp_alloc(ctx->crypto.meta.cipher_iv_len);
     ctx->id_len = id_len;
 
     ctx->crypto.encrypter.configure = local_configure_encrypt;

@@ -7,10 +7,10 @@
 #import <Foundation/Foundation.h>
 
 static inline
-void *_Nonnull pp_alloc_crypto(size_t size) {
+void *_Nonnull pp_alloc(size_t size) {
     void *memory = calloc(1, size);
     if (!memory) {
-        fputs("pp_alloc_crypto: malloc() call failed", stderr);
+        fputs("pp_alloc: malloc() call failed", stderr);
         abort();
     }
     return memory;

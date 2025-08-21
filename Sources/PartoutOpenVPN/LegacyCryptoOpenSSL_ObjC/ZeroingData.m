@@ -22,7 +22,7 @@
 {
     if ((self = [super init])) {
         _length = length;
-        _bytes = pp_alloc_crypto(length);
+        _bytes = pp_alloc(length);
         bzero(_bytes, _length);
     }
     return self;
@@ -34,7 +34,7 @@
 
     if ((self = [super init])) {
         _length = length;
-        _bytes = pp_alloc_crypto(length);
+        _bytes = pp_alloc(length);
         memcpy(_bytes, bytes, length);
     }
     return self;
@@ -55,7 +55,7 @@
 {
     if ((self = [super init])) {
         _length = 1;
-        _bytes = pp_alloc_crypto(_length);
+        _bytes = pp_alloc(_length);
         _bytes[0] = uint8;
     }
     return self;
@@ -65,7 +65,7 @@
 {
     if ((self = [super init])) {
         _length = 2;
-        _bytes = pp_alloc_crypto(_length);
+        _bytes = pp_alloc(_length);
         _bytes[0] = (uint16 & 0xff);
         _bytes[1] = (uint16 >> 8);
     }
@@ -85,7 +85,7 @@
 
     if ((self = [super init])) {
         _length = length;
-        _bytes = pp_alloc_crypto(length);
+        _bytes = pp_alloc(length);
         memcpy(_bytes, data.bytes + offset, length);
     }
     return self;
@@ -98,7 +98,7 @@
     if ((self = [super init])) {
         const int stringLength = (int)string.length;
         _length = stringLength + (nullTerminated ? 1 : 0);
-        _bytes = pp_alloc_crypto(_length);
+        _bytes = pp_alloc(_length);
 
         const char *stringBytes = [string cStringUsingEncoding:NSUTF8StringEncoding];
         if (stringBytes) {
@@ -140,7 +140,7 @@
     NSParameterAssert(other);
 
     const NSInteger newLength = _length + other.length;
-    uint8_t *newBytes = pp_alloc_crypto(newLength);
+    uint8_t *newBytes = pp_alloc(newLength);
     memcpy(newBytes, _bytes, _length);
     memcpy(newBytes + _length, other.bytes, other.length);
     
@@ -155,7 +155,7 @@
 {
     NSParameterAssert(size <= _length);
     
-    uint8_t *newBytes = pp_alloc_crypto(size);
+    uint8_t *newBytes = pp_alloc(size);
     memcpy(newBytes, _bytes, size);
 
     bzero(_bytes, _length);
@@ -170,7 +170,7 @@
     NSParameterAssert(until <= _length);
     
     const NSInteger newLength = _length - until;
-    uint8_t *newBytes = pp_alloc_crypto(newLength);
+    uint8_t *newBytes = pp_alloc(newLength);
     memcpy(newBytes, _bytes + until, newLength);
     
     bzero(_bytes, _length);
@@ -190,7 +190,7 @@
     NSParameterAssert(other);
 
     const NSInteger newLength = _length + other.length;
-    uint8_t *newBytes = pp_alloc_crypto(newLength);
+    uint8_t *newBytes = pp_alloc(newLength);
     memcpy(newBytes, _bytes, _length);
     memcpy(newBytes + _length, other.bytes, other.length);
     
@@ -201,7 +201,7 @@
 {
     NSParameterAssert(offset + length <= _length);
 
-    uint8_t *newBytes = pp_alloc_crypto(length);
+    uint8_t *newBytes = pp_alloc(length);
     memcpy(newBytes, _bytes + offset, length);
     
     return [[ZeroingData alloc] initWithBytesNoCopy:newBytes length:length];
