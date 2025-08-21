@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutPortable_C
+import _PartoutOSPortable_C
 import Foundation
 #if !PARTOUT_MONOLITH
 import PartoutCore

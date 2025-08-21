@@ -99,7 +99,7 @@ let package = Package(
         ),
         .target(
             name: "Partout_C",
-            dependencies: ["PartoutPortable_C"]
+            dependencies: ["_PartoutOSPortable_C"]
         ),
         .target(
             name: "PartoutInterfaces",
@@ -107,8 +107,7 @@ let package = Package(
                 var list: [Target.Dependency] = []
 
                 // These are always included
-                list.append(coreDeployment.dependency)
-                list.append("PartoutPortable")
+                list.append("_PartoutOSWrapper")
                 list.append("PartoutProviders")
 
                 // Optional includes
@@ -120,17 +119,6 @@ let package = Package(
                 }
                 if areas.contains(.wireGuard) {
                     list.append("PartoutWireGuard")
-                }
-
-                // OS-dependent
-                switch OS.current {
-                case .apple:
-                    list.append("_PartoutOSApple")
-                    list.append("_PartoutOSAppleNE")
-                case .linux:
-                    list.append("_PartoutOSLinux")
-                default:
-                    break
                 }
 
                 return list
@@ -163,32 +151,34 @@ let package = Package(
     ]
 )
 
-// MARK: Portable
-
-// Cross-platform utilities
+// Wrapper = Core + Portable + OS-specific
 package.targets.append(contentsOf: [
     .target(
-        name: "PartoutPortable",
-        dependencies: [
-            coreDeployment.dependency,
-            "PartoutPortable_C"
-        ]
+        name: "_PartoutOSWrapper",
+        dependencies: {
+            var list: [Target.Dependency] = ["_PartoutOSPortable"]
+            switch OS.current {
+            case .android:
+                // list.append("_PartoutOSAndroid")
+                break
+            case .apple:
+                list.append(contentsOf: [
+                    "_PartoutOSApple",
+                    "_PartoutOSAppleNE"
+                ])
+            case .linux:
+                list.append("_PartoutOSLinux")
+            case .windows:
+                // list.append("_PartoutOSWindows")
+                break
+            }
+            return list
+        }(),
+        path: "Sources/OS/Wrapper"
     ),
-    .target(
-        name: "PartoutPortable_C"
-    ),
-    .testTarget(
-        name: "PartoutPortableTests",
-        dependencies: ["PartoutPortable"]
-    )
-])
-
-// MARK: Providers
-
-package.targets.append(contentsOf: [
     .target(
         name: "PartoutProviders",
-        dependencies: [coreDeployment.dependency]
+        dependencies: ["_PartoutOSPortable"]
     ),
     .testTarget(
         name: "PartoutProvidersTests",
@@ -199,7 +189,7 @@ package.targets.append(contentsOf: [
     )
 ])
 
-// MARK: API
+// MARK: - API
 
 if areas.contains(.api) {
     package.products.append(
@@ -330,7 +320,7 @@ if areas.contains(.openVPN) {
                     var list: [Target.Dependency] = [
                         "PartoutOpenVPN",
                         "_PartoutOpenVPN_C",
-                        "PartoutPortable"
+                        "_PartoutOSPortable"
                     ]
                     if isTestingOpenVPNDataPath {
                         list.append("_PartoutOpenVPNLegacy_ObjC")
@@ -481,7 +471,7 @@ case .openSSL:
         .target(
             name: "_PartoutCryptoImpl_C",
             dependencies: [
-                "PartoutPortable_C",
+                "_PartoutOSPortable_C",
                 vendorTarget
             ],
             path: "Sources/Impl/CryptoOpenSSL_C",
@@ -542,7 +532,7 @@ case .native: // MbedTLS + OS
         .target(
             name: "_PartoutCryptoImpl_C",
             dependencies: [
-                "PartoutPortable_C",
+                "_PartoutOSPortable_C",
                 vendorTarget
             ],
             path: "Sources/Impl/CryptoNative_C",
@@ -567,7 +557,7 @@ if cryptoMode != nil {
             name: "PartoutCryptoTests",
             dependencies: [
                 "_PartoutCryptoImpl_C",
-                "PartoutPortable"
+                "_PartoutOSPortable"
             ],
             exclude: [
                 "CryptoPerformanceTests.swift"
@@ -617,14 +607,43 @@ if wgMode != nil {
 
 // MARK: - OS
 
+// Cross-platform utilities
+package.targets.append(contentsOf: [
+    .target(
+        name: "_PartoutOSPortable",
+        dependencies: [
+            coreDeployment.dependency,
+            "_PartoutOSPortable_C"
+        ],
+        path: "Sources/OS/Portable"
+    ),
+    .target(
+        name: "_PartoutOSPortable_C",
+        path: "Sources/OS/Portable_C"
+    ),
+    .testTarget(
+        name: "_PartoutOSPortableTests",
+        dependencies: ["_PartoutOSPortable"],
+        path: "Tests/OS/Portable"
+    )
+])
+
 // Targets relying on OS-specific frameworks
 switch OS.current {
 case .apple:
     package.targets.append(contentsOf: [
         .target(
             name: "_PartoutOSApple",
-            dependencies: [coreDeployment.dependency],
+            dependencies: [
+                coreDeployment.dependency,
+                "_PartoutOSApple_C"
+            ],
             path: "Sources/OS/Apple"
+        ),
+        .target(
+            name: "_PartoutOSApple_C",
+            dependencies: ["_PartoutOSPortable_C"],
+            path: "Sources/OS/Apple_C"
         ),
         .target(
             name: "_PartoutOSAppleNE",
@@ -670,7 +689,7 @@ case .linux:
             name: "_PartoutOSLinux",
             dependencies: [
                 "_PartoutOSLinux_C",
-                "PartoutPortable"
+                "_PartoutOSPortable"
             ],
             path: "Sources/OS/Linux"
         ),

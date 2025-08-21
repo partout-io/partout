@@ -6,6 +6,6 @@ Cross-platform entities that can be used everywhere.
 
 ## Topics
 
-- ``PartoutPortable/PlatformPRNG``
-- ``PartoutPortable/POSIXDNSStrategy``
-- ``PartoutPortable/POSIXInterface``
+- ``_PartoutOSPortable/PlatformPRNG``
+- ``_PartoutOSPortable/POSIXDNSStrategy``
+- ``_PartoutOSPortable/POSIXInterface``

@@ -4,14 +4,14 @@ Data structure for safe erase on deallocation.
 
 ## Topics
 
-- ``PartoutPortable/CZeroingData``
-- ``PartoutPortable/CZ()``
-- ``PartoutPortable/CZ(_:)-3reij``
-- ``PartoutPortable/CZ(_:)-7r0nu``
-- ``PartoutPortable/CZ(_:)-7ojlb``
-- ``PartoutPortable/CZ(_:_:_:)``
-- ``PartoutPortable/CZ(_:nullTerminated:)``
-- ``PartoutPortable/CZ(bytes:count:)``
-- ``PartoutPortable/CZ(count:)``
-- ``PartoutPortable/CZ(_:)-79ua9``
-- ``PartoutPortable/CZX(_:)``
+- ``_PartoutOSPortable/CZeroingData``
+- ``_PartoutOSPortable/CZ()``
+- ``_PartoutOSPortable/CZ(_:)-3reij``
+- ``_PartoutOSPortable/CZ(_:)-7r0nu``
+- ``_PartoutOSPortable/CZ(_:)-7ojlb``
+- ``_PartoutOSPortable/CZ(_:_:_:)``
+- ``_PartoutOSPortable/CZ(_:nullTerminated:)``
+- ``_PartoutOSPortable/CZ(bytes:count:)``
+- ``_PartoutOSPortable/CZ(count:)``
+- ``_PartoutOSPortable/CZ(_:)-79ua9``
+- ``_PartoutOSPortable/CZX(_:)``

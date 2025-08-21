@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutPortable_C
+import _PartoutOSPortable_C
 
 @_cdecl("partout_version")
 public func partout_version() -> UnsafePointer<CChar> {

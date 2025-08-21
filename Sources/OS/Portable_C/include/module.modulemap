@@ -1,4 +1,4 @@
-module PartoutPortable_C {
+module _PartoutOSPortable_C {
     header "portable/common.h"
     header "portable/endian.h"
     header "portable/prng.h"
