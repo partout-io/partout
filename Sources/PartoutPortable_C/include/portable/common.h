@@ -17,6 +17,7 @@ void pp_assert(bool condition) {
     assert(condition);
 }
 
+// FIXME: ###, rename to pp_alloc()
 static inline
 void *_Nonnull pp_alloc_crypto(size_t size) {
     void *memory = calloc(1, size);
@@ -34,10 +35,10 @@ void *_Nonnull pp_alloc_crypto(size_t size) {
 static inline
 size_t pp_alloc_crypto_capacity(size_t size, size_t overhead) {
 
-#define MAX_BLOCK_SIZE 16  // AES only, block is 128-bit
+#define PP_ALLOC_MAX_BLOCK_SIZE 16  // AES only, block is 128-bit
 
     // encryption, byte-alignment, overhead (e.g. IV, digest)
-    return 2 * size + MAX_BLOCK_SIZE + overhead;
+    return 2 * size + PP_ALLOC_MAX_BLOCK_SIZE + overhead;
 }
 
 static inline

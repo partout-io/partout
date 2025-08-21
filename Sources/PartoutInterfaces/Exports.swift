@@ -26,7 +26,10 @@ import Foundation
 
 // MARK: - Vendors
 
-#if canImport(_PartoutVendorsApple)
-@_exported import _PartoutVendorsApple
-@_exported import _PartoutVendorsAppleNE
+#if canImport(_PartoutOSApple)
+@_exported import _PartoutOSApple
+@_exported import _PartoutOSAppleNE
+#endif
+#if canImport(_PartoutOSLinux)
+@_exported import _PartoutOSLinux
 #endif

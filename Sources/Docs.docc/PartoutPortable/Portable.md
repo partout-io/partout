@@ -8,3 +8,4 @@ Cross-platform entities that can be used everywhere.
 
 - ``PartoutPortable/PlatformPRNG``
 - ``PartoutPortable/POSIXDNSStrategy``
+- ``PartoutPortable/POSIXInterface``

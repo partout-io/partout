@@ -26,29 +26,29 @@ The ``NEPTPForwarder`` wrapper is a simple way to build a basic [NEPacketTunnelP
 
 ### App
 
-- ``_PartoutVendorsAppleNE/NETunnelManagerRepository``
-- ``_PartoutVendorsAppleNE/NETunnelStrategy``
-- ``_PartoutVendorsAppleNE/NETunnelEnvironment``
+- ``_PartoutOSAppleNE/NETunnelManagerRepository``
+- ``_PartoutOSAppleNE/NETunnelStrategy``
+- ``_PartoutOSAppleNE/NETunnelEnvironment``
 
 ### App Extension
 
-- ``_PartoutVendorsAppleNE/NEPTPForwarder``
-- ``_PartoutVendorsAppleNE/NESettingsApplying``
-- ``_PartoutVendorsAppleNE/NESettingsModule``
-- ``_PartoutVendorsAppleNE/NEObservablePath``
+- ``_PartoutOSAppleNE/NEPTPForwarder``
+- ``_PartoutOSAppleNE/NESettingsApplying``
+- ``_PartoutOSAppleNE/NESettingsModule``
+- ``_PartoutOSAppleNE/NEObservablePath``
 
 ### Serialization
 
-- ``_PartoutVendorsAppleNE/NEProtocolCoder``
-- ``_PartoutVendorsAppleNE/NEProtocolDecoder``
-- ``_PartoutVendorsAppleNE/NEProtocolEncoder``
-- ``_PartoutVendorsAppleNE/ProviderNEProtocolCoder``
-- ``_PartoutVendorsAppleNE/KeychainNEProtocolCoder``
+- ``_PartoutOSAppleNE/NEProtocolCoder``
+- ``_PartoutOSAppleNE/NEProtocolDecoder``
+- ``_PartoutOSAppleNE/NEProtocolEncoder``
+- ``_PartoutOSAppleNE/ProviderNEProtocolCoder``
+- ``_PartoutOSAppleNE/KeychainNEProtocolCoder``
 
 ### Connection
 
-- ``_PartoutVendorsAppleNE/NEInterfaceFactory``
-- ``_PartoutVendorsAppleNE/NEUDPObserver``
-- ``_PartoutVendorsAppleNE/NETCPObserver``
-- ``_PartoutVendorsAppleNE/NETunnelInterface``
-- ``_PartoutVendorsAppleNE/NETunnelController``
+- ``_PartoutOSAppleNE/NEInterfaceFactory``
+- ``_PartoutOSAppleNE/NEUDPObserver``
+- ``_PartoutOSAppleNE/NETCPObserver``
+- ``_PartoutOSAppleNE/NETunnelInterface``
+- ``_PartoutOSAppleNE/NETunnelController``

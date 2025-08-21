@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import _PartoutVendorsAppleNE
+import _PartoutOSAppleNE
 import Foundation
 import NetworkExtension
 import PartoutCore

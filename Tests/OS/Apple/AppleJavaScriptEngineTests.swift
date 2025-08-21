@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import _PartoutVendorsApple
+import _PartoutOSApple
 import Foundation
 import Testing
 

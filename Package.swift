@@ -125,8 +125,10 @@ let package = Package(
                 // OS-dependent
                 switch OS.current {
                 case .apple:
-                    list.append("_PartoutVendorsApple")
-                    list.append("_PartoutVendorsAppleNE")
+                    list.append("_PartoutOSApple")
+                    list.append("_PartoutOSAppleNE")
+                case .linux:
+                    list.append("_PartoutOSLinux")
                 default:
                     break
                 }
@@ -620,14 +622,14 @@ switch OS.current {
 case .apple:
     package.targets.append(contentsOf: [
         .target(
-            name: "_PartoutVendorsApple",
+            name: "_PartoutOSApple",
             dependencies: [coreDeployment.dependency],
-            path: "Sources/Vendors/Apple"
+            path: "Sources/OS/Apple"
         ),
         .target(
-            name: "_PartoutVendorsAppleNE",
+            name: "_PartoutOSAppleNE",
             dependencies: [coreDeployment.dependency],
-            path: "Sources/Vendors/AppleNE",
+            path: "Sources/OS/AppleNE",
             exclude: {
 #if swift(>=6.0)
                 [
@@ -643,14 +645,14 @@ case .apple:
             }()
         ),
         .testTarget(
-            name: "_PartoutVendorsAppleTests",
-            dependencies: ["_PartoutVendorsApple"],
-            path: "Tests/Vendors/Apple"
+            name: "_PartoutOSAppleTests",
+            dependencies: ["_PartoutOSApple"],
+            path: "Tests/OS/Apple"
         ),
         .testTarget(
-            name: "_PartoutVendorsAppleNETests",
-            dependencies: ["_PartoutVendorsAppleNE"],
-            path: "Tests/Vendors/AppleNE",
+            name: "_PartoutOSAppleNETests",
+            dependencies: ["_PartoutOSAppleNE"],
+            path: "Tests/OS/AppleNE",
             exclude: {
 #if swift(>=6.0)
                 [
@@ -660,6 +662,21 @@ case .apple:
                 []
 #endif
             }()
+        )
+    ])
+case .linux:
+    package.targets.append(contentsOf: [
+        .target(
+            name: "_PartoutOSLinux",
+            dependencies: [
+                "_PartoutOSLinux_C",
+                "PartoutPortable"
+            ],
+            path: "Sources/OS/Linux"
+        ),
+        .target(
+            name: "_PartoutOSLinux_C",
+            path: "Sources/OS/Linux_C"
         )
     ])
 default:
@@ -760,6 +777,7 @@ case .localSource:
 package.targets.append(contentsOf: [
     .testTarget(
         name: "PartoutCoreTests",
-        dependencies: ["PartoutCoreWrapper"]
+        dependencies: ["PartoutCoreWrapper"],
+        path: "Tests/Vendors/Core"
     )
 ])

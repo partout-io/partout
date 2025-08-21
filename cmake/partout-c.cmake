@@ -20,6 +20,21 @@ set(PARTOUT_C_INCLUDE_DIRS
     ${PARTOUT_DIR}/Sources/PartoutPortable_C/include
 )
 
+# Filter by platform
+if(NOT APPLE)
+    list(APPEND EXCLUDED_PATTERNS OS\/Apple.*)
+endif()
+if(NOT LINUX)
+    list(APPEND EXCLUDED_PATTERNS OS\/Linux.*)
+endif()
+if(NOT WIN32)
+    list(APPEND EXCLUDED_PATTERNS OS\/Windows.*)
+endif()
+# XXX: Not sure about this condition
+if(NOT BUILD_FOR_ANDROID)
+    list(APPEND EXCLUDED_PATTERNS OS\/Android.*)
+endif()
+
 # Filter by crypto vendor
 if(DEFINED OPENSSL_DIR)
     list(APPEND PARTOUT_C_INCLUDE_DIRS ${PARTOUT_DIR}/Sources/Impl/CryptoOpenSSL_C/include)

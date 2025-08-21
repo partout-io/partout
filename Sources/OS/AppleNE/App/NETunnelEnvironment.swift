@@ -22,7 +22,7 @@ public final class NETunnelEnvironment: TunnelEnvironmentReader, @unchecked Send
     private var timerSubscription: Task<Void, Never>?
 
     public init(strategy: NETunnelStrategy, profileId: Profile.ID, interval: TimeInterval = 1.0) {
-        queue = DispatchQueue(label: "NETunnelEnvironment.\(profileId)")
+        queue = DispatchQueue(label: "NETunnelEnvironment[\(profileId)]")
         self.strategy = strategy
         self.profileId = profileId
         self.interval = interval
