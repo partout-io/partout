@@ -159,8 +159,7 @@ package.targets.append(contentsOf: [
             var list: [Target.Dependency] = ["_PartoutOSPortable"]
             switch OS.current {
             case .android:
-                // list.append("_PartoutOSAndroid")
-                break
+                list.append("_PartoutOSAndroid")
             case .apple:
                 list.append(contentsOf: [
                     "_PartoutOSApple",
@@ -169,8 +168,7 @@ package.targets.append(contentsOf: [
             case .linux:
                 list.append("_PartoutOSLinux")
             case .windows:
-                // list.append("_PartoutOSWindows")
-                break
+                list.append("_PartoutOSWindows")
             }
             return list
         }(),
@@ -632,6 +630,21 @@ package.targets.append(contentsOf: [
 
 // Targets relying on OS-specific frameworks
 switch OS.current {
+case .android:
+    package.targets.append(contentsOf: [
+        .target(
+            name: "_PartoutOSAndroid",
+            dependencies: [
+                "_PartoutOSAndroid_C",
+                "_PartoutOSPortable"
+            ],
+            path: "Sources/OS/Android"
+        ),
+        .target(
+            name: "_PartoutOSAndroid_C",
+            path: "Sources/OS/Android_C"
+        )
+    ])
 case .apple:
     package.targets.append(contentsOf: [
         .target(
@@ -700,8 +713,21 @@ case .linux:
             path: "Sources/OS/Linux_C"
         )
     ])
-default:
-    break
+case .windows:
+    package.targets.append(contentsOf: [
+        .target(
+            name: "_PartoutOSWindows",
+            dependencies: [
+                "_PartoutOSWindows_C",
+                "_PartoutOSPortable"
+            ],
+            path: "Sources/OS/Windows"
+        ),
+        .target(
+            name: "_PartoutOSWindows_C",
+            path: "Sources/OS/Windows_C"
+        )
+    ])
 }
 
 // MARK: - Configuration structures
