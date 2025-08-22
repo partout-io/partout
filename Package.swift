@@ -88,7 +88,7 @@ let package = Package(
                         list.append("_PartoutOpenVPNWrapper")
                     }
                 }
-                if wgMode != nil {
+                if areas.contains(.wireGuard), wgMode != nil {
                     list.append("_PartoutVendorsWireGuardImpl")
                     if areas.contains(.wireGuard) {
                         list.append("_PartoutWireGuardWrapper")
@@ -569,40 +569,42 @@ if cryptoMode != nil {
 // MARK: WireGuard
 
 // Generic backend interface to implement
-switch wgMode {
-    case .wgGo:
-        // Use portable Go backend for WireGuard
-        switch OS.current {
-        case .apple:
-            package.dependencies.append(
-                .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.20250630")
-            )
-            package.targets.append(
-                .target(
-                    name: "_PartoutVendorsWireGuardImpl",
-                    dependencies: [
-                        "PartoutWireGuard",
-                        "wg-go-apple"
-                    ],
-                    path: "Sources/Vendors/WireGuardGo"
+if areas.contains(.wireGuard) {
+    switch wgMode {
+        case .wgGo:
+            // Use portable Go backend for WireGuard
+            switch OS.current {
+            case .apple:
+                package.dependencies.append(
+                    .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.20250630")
                 )
-            )
+                package.targets.append(
+                    .target(
+                        name: "_PartoutVendorsWireGuardImpl",
+                        dependencies: [
+                            "PartoutWireGuard",
+                            "wg-go-apple"
+                        ],
+                        path: "Sources/Vendors/WireGuardGo"
+                    )
+                )
+            default:
+                break
+            }
         default:
             break
-        }
-    default:
-        break
-}
+    }
 
-// Include back tests if supported
-if wgMode != nil {
-    package.targets.append(contentsOf: [
-        .testTarget(
-            name: "_PartoutVendorsWireGuardImplTests",
-            dependencies: ["_PartoutVendorsWireGuardImpl"],
-            path: "Tests/Vendors/WireGuard"
-        )
-    ])
+    // Include back tests if supported
+    if wgMode != nil {
+        package.targets.append(contentsOf: [
+            .testTarget(
+                name: "_PartoutVendorsWireGuardImplTests",
+                dependencies: ["_PartoutVendorsWireGuardImpl"],
+                path: "Tests/Vendors/WireGuard"
+            )
+        ])
+    }
 }
 
 // MARK: - OS
