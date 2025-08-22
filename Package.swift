@@ -161,10 +161,7 @@ package.targets.append(contentsOf: [
             case .android:
                 list.append("_PartoutOSAndroid")
             case .apple:
-                list.append(contentsOf: [
-                    "_PartoutOSApple",
-                    "_PartoutOSAppleNE"
-                ])
+                list.append("_PartoutOSApple")
             case .linux:
                 list.append("_PartoutOSLinux")
             case .windows:
@@ -651,7 +648,8 @@ case .apple:
             name: "_PartoutOSApple",
             dependencies: [
                 coreDeployment.dependency,
-                "_PartoutOSApple_C"
+                "_PartoutOSApple_C",
+                "_PartoutOSAppleNE"
             ],
             path: "Sources/OS/Apple"
         ),
