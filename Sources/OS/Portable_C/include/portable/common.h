@@ -17,7 +17,6 @@ void pp_assert(bool condition) {
     assert(condition);
 }
 
-// FIXME: ###, rename to pp_alloc()
 static inline
 void *_Nonnull pp_alloc(size_t size) {
     void *memory = calloc(1, size);
