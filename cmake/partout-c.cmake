@@ -16,8 +16,8 @@ set(EXCLUDED_PATTERNS
 # Header search paths from all C targets
 set(PARTOUT_C_INCLUDE_DIRS
     ${PARTOUT_CORE_C_INCLUDE_DIR}
+    ${PARTOUT_DIR}/Sources/OS/Portable_C/include
     ${PARTOUT_DIR}/Sources/PartoutOpenVPN/Cross_C/include
-    ${PARTOUT_DIR}/Sources/PartoutPortable_C/include
 )
 
 # Filter by platform

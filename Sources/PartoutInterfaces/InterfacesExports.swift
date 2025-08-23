@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_MONOLITH
+
 @_exported import PartoutCore
 @_exported import PartoutProviders
 @_exported import _PartoutOSWrapper
@@ -18,4 +20,6 @@
 
 #if canImport(PartoutWireGuard)
 @_exported import PartoutWireGuard
+#endif
+
 #endif

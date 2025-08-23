@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_MONOLITH
+
 @_exported import _PartoutOSPortable
 
 #if canImport(_PartoutOSAndroid)
@@ -19,4 +21,6 @@
 
 #if canImport(_PartoutOSWindows)
 @_exported import _PartoutOSWindows
+#endif
+
 #endif
