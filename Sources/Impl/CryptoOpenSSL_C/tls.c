@@ -143,8 +143,8 @@ void pp_tls_free(pp_tls_ctx tls) {
 
     pp_zero(tls->buf_cipher, tls->opt->buf_len);
     pp_zero(tls->buf_plain, tls->opt->buf_len);
-    free(tls->buf_cipher);
-    free(tls->buf_plain);
+    pp_free(tls->buf_cipher);
+    pp_free(tls->buf_plain);
     pp_tls_options_free((pp_tls_options *)tls->opt);
     SSL_CTX_free(tls->ssl_ctx);
 }

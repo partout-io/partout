@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Use inline rather than #define to make available to Swift
+
 static inline
 void pp_assert(bool condition) {
     assert(condition);
@@ -25,6 +27,12 @@ void *_Nonnull pp_alloc(size_t size) {
         abort();
     }
     return memory;
+}
+
+static inline
+void pp_free(void *_Nullable ptr) {
+    if (!ptr) return;
+    free(ptr);
 }
 
 /// - Parameters:

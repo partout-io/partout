@@ -39,7 +39,7 @@ openvpn_dp_mode *openvpn_dp_mode_create_opt(pp_crypto_ctx crypto,
 void openvpn_dp_mode_free(openvpn_dp_mode *mode) {
     OPENVPN_DP_LOG("openvpn_dp_mode_free");
     mode->pp_crypto_free(mode->crypto);
-    free(mode);
+    pp_free(mode);
 }
 
 // MARK: - Encryption

@@ -77,8 +77,8 @@ void pp_zd_free(pp_zd *zd) {
     if (!zd) return;
 
     pp_zero(zd->bytes, zd->length);
-    free(zd->bytes);
-    free(zd);
+    pp_free(zd->bytes);
+    pp_free(zd);
 }
 
 // MARK: Copy
@@ -109,7 +109,7 @@ void pp_zd_append(pp_zd *zd, const pp_zd *other) {
     memcpy(new_bytes + zd->length, other->bytes, other->length);
 
     pp_zero(zd->bytes, zd->length);
-    free(zd->bytes);
+    pp_free(zd->bytes);
     zd->bytes = new_bytes;
     zd->length = new_len;
 }
@@ -126,7 +126,7 @@ void pp_zd_resize(pp_zd *zd, size_t new_length) {
         pp_zero(new_bytes + zd->length, new_length - zd->length);
     }
     pp_zero(zd->bytes, zd->length);
-    free(zd->bytes);
+    pp_free(zd->bytes);
 
     zd->bytes = new_bytes;
     zd->length = new_length;
@@ -141,7 +141,7 @@ void pp_zd_remove_until(pp_zd *zd, size_t offset) {
     memcpy(new_bytes, zd->bytes + offset, new_length);
 
     pp_zero(zd->bytes, zd->length);
-    free(zd->bytes);
+    pp_free(zd->bytes);
 
     zd->bytes = new_bytes;
     zd->length = new_length;

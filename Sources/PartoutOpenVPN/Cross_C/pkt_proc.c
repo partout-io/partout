@@ -93,5 +93,5 @@ void openvpn_pkt_proc_free(openvpn_pkt_proc *proc) {
     if (proc->mask) {
         pp_zd_free(proc->mask);
     }
-    free(proc);
+    pp_free(proc);
 }

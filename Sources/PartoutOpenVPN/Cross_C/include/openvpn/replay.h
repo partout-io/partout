@@ -35,8 +35,8 @@ openvpn_replay *_Nonnull openvpn_replay_create() {
 static inline
 void openvpn_replay_free(openvpn_replay *_Nonnull rp) {
     if (!rp) return;
-    free(rp->bitmap);
-    free(rp);
+    pp_free(rp->bitmap);
+    pp_free(rp);
 }
 
 static inline

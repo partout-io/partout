@@ -206,7 +206,7 @@ failure:
     if (ctx->ctx_enc) EVP_CIPHER_CTX_free(ctx->ctx_enc);
     if (ctx->ctx_dec) EVP_CIPHER_CTX_free(ctx->ctx_dec);
     if (ctx->mac) EVP_MAC_free(ctx->mac);
-    free(ctx);
+    pp_free(ctx);
     return NULL;
 }
 
@@ -219,13 +219,13 @@ void pp_crypto_ctr_free(pp_crypto_ctx vctx) {
 
     EVP_CIPHER_CTX_free(ctx->ctx_enc);
     EVP_CIPHER_CTX_free(ctx->ctx_dec);
-    free(ctx->utf_cipher_name);
+    pp_free(ctx->utf_cipher_name);
 
-    free(ctx->utf_digest_name);
+    pp_free(ctx->utf_digest_name);
     EVP_MAC_free(ctx->mac);
-    free(ctx->mac_params);
+    pp_free(ctx->mac_params);
     pp_zero(ctx->buffer_hmac, ctx->ns_tag_len);
-    free(ctx->buffer_hmac);
+    pp_free(ctx->buffer_hmac);
 
-    free(ctx);
+    pp_free(ctx);
 }

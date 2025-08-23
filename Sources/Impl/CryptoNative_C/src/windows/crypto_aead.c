@@ -220,7 +220,7 @@ pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
 
 failure:
     if (ctx->hAlg) BCryptCloseAlgorithmProvider(ctx->hAlg, 0);
-    free(ctx);
+    pp_free(ctx);
     return NULL;
 }
 
@@ -233,8 +233,8 @@ void pp_crypto_aead_free(pp_crypto_ctx vctx) {
     BCryptCloseAlgorithmProvider(ctx->hAlg, 0);
     pp_zero(ctx->iv_enc, ctx->crypto.meta.cipher_iv_len);
     pp_zero(ctx->iv_dec, ctx->crypto.meta.cipher_iv_len);
-    free(ctx->iv_enc);
-    free(ctx->iv_dec);
+    pp_free(ctx->iv_enc);
+    pp_free(ctx->iv_dec);
 
-    free(ctx);
+    pp_free(ctx);
 } 

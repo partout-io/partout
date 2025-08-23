@@ -47,18 +47,18 @@ openvpn_ctrl *_Nonnull openvpn_ctrl_create(openvpn_packet_code code, uint8_t key
 void openvpn_ctrl_free(openvpn_ctrl *_Nonnull pkt) {
     if (!pkt) return;
     if (pkt->session_id) {
-        free(pkt->session_id);
+        pp_free(pkt->session_id);
     }
     if (pkt->payload) {
-        free(pkt->payload);
+        pp_free(pkt->payload);
     }
     if (pkt->ack_ids) {
-        free(pkt->ack_ids);
+        pp_free(pkt->ack_ids);
     }
     if (pkt->ack_remote_session_id) {
-        free(pkt->ack_remote_session_id);
+        pp_free(pkt->ack_remote_session_id);
     }
-    free(pkt);
+    pp_free(pkt);
 }
 
 // MARK: - Plain

@@ -174,7 +174,7 @@ pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
 failure:
     if (ctx->ctx_enc) EVP_CIPHER_CTX_free(ctx->ctx_enc);
     if (ctx->ctx_dec) EVP_CIPHER_CTX_free(ctx->ctx_dec);
-    free(ctx);
+    pp_free(ctx);
     return NULL;
 }
 
@@ -186,7 +186,7 @@ void pp_crypto_aead_free(pp_crypto_ctx vctx) {
     EVP_CIPHER_CTX_free(ctx->ctx_dec);
     pp_zero(ctx->iv_enc, ctx->crypto.meta.cipher_iv_len);
     pp_zero(ctx->iv_dec, ctx->crypto.meta.cipher_iv_len);
-    free(ctx->iv_enc);
-    free(ctx->iv_dec);
-    free(ctx);
+    pp_free(ctx->iv_enc);
+    pp_free(ctx->iv_dec);
+    pp_free(ctx);
 }

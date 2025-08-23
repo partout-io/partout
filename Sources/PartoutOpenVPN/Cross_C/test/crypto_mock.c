@@ -87,5 +87,5 @@ void openvpn_crypto_mock_free(pp_crypto_ctx vctx) {
     if (!vctx) return;
     openvpn_crypto_mock *ctx = (openvpn_crypto_mock *)vctx;
     OPENVPN_DP_LOG("openvpn_crypto_mock_free");
-    free(ctx);
+    pp_free(ctx);
 }

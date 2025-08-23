@@ -33,9 +33,9 @@ pp_tls_options *_Nonnull pp_tls_options_create(int sec_level,
 }
 
 void pp_tls_options_free(pp_tls_options *_Nonnull opt) {
-    free((char *)opt->ca_path);
-    free((char *)opt->cert_pem);
-    free((char *)opt->key_pem);
-    free((char *)opt->hostname);
-    free(opt);
+    pp_free((char *)opt->ca_path);
+    pp_free((char *)opt->cert_pem);
+    pp_free((char *)opt->key_pem);
+    pp_free((char *)opt->hostname);
+    pp_free(opt);
 }

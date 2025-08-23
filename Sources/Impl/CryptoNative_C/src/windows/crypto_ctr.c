@@ -283,7 +283,7 @@ pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name, const char *digest_n
 
 failure:
     if (ctx->hAlgCipher) BCryptCloseAlgorithmProvider(ctx->hAlgCipher, 0);
-    free(ctx);
+    pp_free(ctx);
     return NULL;
 }
 
@@ -298,7 +298,7 @@ void pp_crypto_ctr_free(pp_crypto_ctx vctx) {
 
     BCryptCloseAlgorithmProvider(ctx->hAlgCipher, 0);
     pp_zero(ctx->buffer_hmac, ctx->ns_tag_len);
-    free(ctx->buffer_hmac);
+    pp_free(ctx->buffer_hmac);
 
-    free(ctx);
+    pp_free(ctx);
 } 
