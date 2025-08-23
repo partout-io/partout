@@ -96,7 +96,7 @@ static BIO *create_BIO_from_PEM(NSString *pem) {
     NSAssert(self.options == nil, @"Already configured");
     self.options = options;
     self.onFailure = onFailure;
-    self.bufferCipherText = pp_alloc(self.options.bufferLength);
+    self.bufferCipherText = pp_alloc_crypto(self.options.bufferLength);
     return YES;
 }
 
@@ -489,7 +489,7 @@ static BIO *create_BIO_from_PEM(NSString *pem) {
     }
 
     const int decLength = (int)BIO_ctrl_pending(output);
-    char *decKeyBytes = pp_alloc(decLength + 1);
+    char *decKeyBytes = pp_alloc_crypto(decLength + 1);
     if (BIO_read(output, decKeyBytes, decLength) < 0) {
         BIO_free(output);
         return NULL;

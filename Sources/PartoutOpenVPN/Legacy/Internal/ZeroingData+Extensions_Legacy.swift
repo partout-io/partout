@@ -11,7 +11,7 @@ import PartoutCore
 extension PRNGProtocol {
     func safeData(length: Int) -> ZeroingData {
         precondition(length > 0)
-        let randomBytes = pp_alloc(length)
+        let randomBytes = pp_alloc_crypto(length)
         defer {
             bzero(randomBytes, length)
             free(randomBytes)

@@ -79,7 +79,7 @@
         macParams[1] = OSSL_PARAM_construct_end();
         self.macParams = macParams;
 
-        self.bufferDecHMAC = pp_alloc(self.tagLength);
+        self.bufferDecHMAC = pp_alloc_crypto(self.tagLength);
 
         self.mappedError = ^NSError *(CryptoCTRError errorCode) {
             return [NSError errorWithDomain:PartoutCryptoErrorDomain code:0 userInfo:nil];

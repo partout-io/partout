@@ -51,8 +51,8 @@
 
         self.cipherCtxEnc = EVP_CIPHER_CTX_new();
         self.cipherCtxDec = EVP_CIPHER_CTX_new();
-        self.cipherIVEnc = pp_alloc(self.cipherIVLength);
-        self.cipherIVDec = pp_alloc(self.cipherIVLength);
+        self.cipherIVEnc = pp_alloc_crypto(self.cipherIVLength);
+        self.cipherIVDec = pp_alloc_crypto(self.cipherIVLength);
 
         self.mappedError = ^NSError *(CryptoAEADError errorCode) {
             return [NSError errorWithDomain:PartoutCryptoErrorDomain code:0 userInfo:nil];
