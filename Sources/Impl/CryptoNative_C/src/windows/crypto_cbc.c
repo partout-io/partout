@@ -270,7 +270,7 @@ pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name, const char *digest_n
         return NULL;
     }
 
-    pp_crypto_cbc *ctx = pp_alloc_crypto(sizeof(pp_crypto_cbc));
+    pp_crypto_cbc *ctx = pp_alloc(sizeof(pp_crypto_cbc));
 
     if (cipher_name) {
         PP_CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
@@ -320,7 +320,7 @@ pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name, const char *digest_n
 
 failure:
     if (ctx->hAlgCipher) BCryptCloseAlgorithmProvider(ctx->hAlgCipher, 0);
-    free(ctx);
+    pp_free(ctx);
     return NULL;
 }
 
@@ -338,5 +338,5 @@ void pp_crypto_cbc_free(pp_crypto_ctx vctx) {
     pp_zero(ctx->buffer_iv, sizeof(ctx->buffer_iv));
     pp_zero(ctx->buffer_hmac, sizeof(ctx->buffer_hmac));
 
-    free(ctx);
+    pp_free(ctx);
 } 

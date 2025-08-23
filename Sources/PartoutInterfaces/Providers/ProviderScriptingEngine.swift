@@ -16,7 +16,7 @@ protocol ProviderScriptingEngine: ScriptingEngine {
 extension ProviderScriptingAPI {
     func newScriptingEngine(_ ctx: PartoutLoggerContext) -> ScriptingEngine {
         let engine: ProviderScriptingEngine
-#if canImport(_PartoutVendorsApple)
+#if canImport(_PartoutOSApple)
         engine = AppleJavaScriptEngine(ctx)
 #else
         fatalError("Unsupported platform")

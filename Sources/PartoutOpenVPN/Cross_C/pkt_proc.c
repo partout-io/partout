@@ -60,7 +60,7 @@ void alg_xor_obfuscate_out(const openvpn_pkt_proc_alg_ctx *ctx) {
 // MARK: - Obfuscator
 
 openvpn_pkt_proc *openvpn_pkt_proc_create(openvpn_pkt_proc_method method, const uint8_t *mask, size_t mask_len) {
-    openvpn_pkt_proc *proc = pp_alloc_crypto(sizeof(openvpn_pkt_proc));
+    openvpn_pkt_proc *proc = pp_alloc(sizeof(openvpn_pkt_proc));
     proc->mask = NULL;
     switch (method) {
         case OpenVPNPktProcMethodNone:
@@ -93,5 +93,5 @@ void openvpn_pkt_proc_free(openvpn_pkt_proc *proc) {
     if (proc->mask) {
         pp_zd_free(proc->mask);
     }
-    free(proc);
+    pp_free(proc);
 }

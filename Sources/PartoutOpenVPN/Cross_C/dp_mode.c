@@ -16,7 +16,7 @@ openvpn_dp_mode *openvpn_dp_mode_create_opt(pp_crypto_ctx crypto,
                               const openvpn_dp_mode_options *opt) {
     OPENVPN_DP_LOG("openvpn_dp_mode_create_opt");
 
-    openvpn_dp_mode *mode = pp_alloc_crypto(sizeof(openvpn_dp_mode));
+    openvpn_dp_mode *mode = pp_alloc(sizeof(openvpn_dp_mode));
     mode->crypto = crypto;
     mode->pp_crypto_free = pp_crypto_free;
     if (opt) {
@@ -39,7 +39,7 @@ openvpn_dp_mode *openvpn_dp_mode_create_opt(pp_crypto_ctx crypto,
 void openvpn_dp_mode_free(openvpn_dp_mode *mode) {
     OPENVPN_DP_LOG("openvpn_dp_mode_free");
     mode->pp_crypto_free(mode->crypto);
-    free(mode);
+    pp_free(mode);
 }
 
 // MARK: - Encryption

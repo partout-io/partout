@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #if !PARTOUT_MONOLITH
-internal import PartoutPortable
+internal import _PartoutOSPortable
 #if canImport(_PartoutOpenVPNLegacy_ObjC)
 internal import _PartoutOpenVPNLegacy_ObjC
 #endif

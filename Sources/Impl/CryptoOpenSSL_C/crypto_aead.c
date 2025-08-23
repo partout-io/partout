@@ -131,7 +131,7 @@ pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
                               const pp_crypto_keys *keys) {
     pp_assert(cipher_name);
 
-    pp_crypto_aead *ctx = pp_alloc_crypto(sizeof(pp_crypto_aead));
+    pp_crypto_aead *ctx = pp_alloc(sizeof(pp_crypto_aead));
     ctx->cipher = EVP_get_cipherbyname(cipher_name);
     if (!ctx->cipher) {
         goto failure;
@@ -154,8 +154,8 @@ pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
     ctx->crypto.meta.tag_len = tag_len;
     ctx->crypto.meta.encryption_capacity = local_encryption_capacity;
 
-    ctx->iv_enc = pp_alloc_crypto(ctx->crypto.meta.cipher_iv_len);
-    ctx->iv_dec = pp_alloc_crypto(ctx->crypto.meta.cipher_iv_len);
+    ctx->iv_enc = pp_alloc(ctx->crypto.meta.cipher_iv_len);
+    ctx->iv_dec = pp_alloc(ctx->crypto.meta.cipher_iv_len);
     ctx->id_len = id_len;
 
     ctx->crypto.encrypter.configure = local_configure_encrypt;
@@ -174,7 +174,7 @@ pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
 failure:
     if (ctx->ctx_enc) EVP_CIPHER_CTX_free(ctx->ctx_enc);
     if (ctx->ctx_dec) EVP_CIPHER_CTX_free(ctx->ctx_dec);
-    free(ctx);
+    pp_free(ctx);
     return NULL;
 }
 
@@ -186,7 +186,7 @@ void pp_crypto_aead_free(pp_crypto_ctx vctx) {
     EVP_CIPHER_CTX_free(ctx->ctx_dec);
     pp_zero(ctx->iv_enc, ctx->crypto.meta.cipher_iv_len);
     pp_zero(ctx->iv_dec, ctx->crypto.meta.cipher_iv_len);
-    free(ctx->iv_enc);
-    free(ctx->iv_dec);
-    free(ctx);
+    pp_free(ctx->iv_enc);
+    pp_free(ctx->iv_dec);
+    pp_free(ctx);
 }

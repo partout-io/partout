@@ -106,12 +106,12 @@ pp_tls_ctx pp_tls_create(const pp_tls_options *opt, pp_tls_error_code *error) {
 
     // no longer fails
 
-    pp_tls_ctx tls = pp_alloc_crypto(sizeof(pp_tls));
+    pp_tls_ctx tls = pp_alloc(sizeof(pp_tls));
     tls->opt = opt;
     tls->ssl_ctx = ssl_ctx;
     tls->buf_len = tls->opt->buf_len;
-    tls->buf_cipher = pp_alloc_crypto(tls->buf_len);
-    tls->buf_plain = pp_alloc_crypto(tls->buf_len);
+    tls->buf_cipher = pp_alloc(tls->buf_len);
+    tls->buf_plain = pp_alloc(tls->buf_len);
     return tls;
 
 failure:
@@ -143,8 +143,8 @@ void pp_tls_free(pp_tls_ctx tls) {
 
     pp_zero(tls->buf_cipher, tls->opt->buf_len);
     pp_zero(tls->buf_plain, tls->opt->buf_len);
-    free(tls->buf_cipher);
-    free(tls->buf_plain);
+    pp_free(tls->buf_cipher);
+    pp_free(tls->buf_plain);
     pp_tls_options_free((pp_tls_options *)tls->opt);
     SSL_CTX_free(tls->ssl_ctx);
 }
@@ -297,7 +297,7 @@ char *pp_tls_ca_md5(const pp_tls_ctx tls) {
     fclose(pem);
     pp_assert(len == sizeof(md));//, @"Unexpected MD5 size (%d != %lu)", len, sizeof(md));
 
-    char *hex = pp_alloc_crypto(2 * sizeof(md) + 1);
+    char *hex = pp_alloc(2 * sizeof(md) + 1);
     char *ptr = hex;
     for (size_t i = 0; i < sizeof(md); ++i) {
         ptr += snprintf(ptr, 3, "%02x", md[i]);

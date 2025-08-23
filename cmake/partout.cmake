@@ -23,10 +23,17 @@ set(EXCLUDED_PATTERNS
 
 # Exclude per platform
 if(NOT APPLE)
-    list(APPEND EXCLUDED_PATTERNS
-        Vendors\/Apple\/
-        Vendors\/AppleNE\/
-    )
+    list(APPEND EXCLUDED_PATTERNS OS\/Apple.*)
+endif()
+if(NOT LINUX)
+    list(APPEND EXCLUDED_PATTERNS OS\/Linux.*)
+endif()
+if(NOT WIN32)
+    list(APPEND EXCLUDED_PATTERNS OS\/Windows.*)
+endif()
+# XXX: Not sure about this condition
+if(NOT BUILD_FOR_ANDROID)
+    list(APPEND EXCLUDED_PATTERNS OS\/Android.*)
 endif()
 
 foreach(pattern ${EXCLUDED_PATTERNS})

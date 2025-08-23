@@ -12,6 +12,7 @@ struct MullvadProviderTests: APITestSuite {
         setUpLogging()
     }
 
+#if canImport(PartoutWireGuard)
     @Test(arguments: [
         AuthInput( // valid token
             accessToken: "sometoken",
@@ -80,7 +81,6 @@ struct MullvadProviderTests: APITestSuite {
             builder.token = ProviderAuthentication.Token(accessToken: accessToken, expiryDate: tokenExpiry)
         }
 
-#if canImport(PartoutWireGuard)
         builder.providerModuleType = .wireGuard
 
         let peer = input.existingPeerId.map {
@@ -92,22 +92,15 @@ struct MullvadProviderTests: APITestSuite {
         var storage = WireGuardProviderStorage()
         storage.sessions = [deviceId: session]
         try builder.setOptions(storage, for: .wireGuard)
-#else
-#if canImport(PartoutOpenVPN)
-        builder.providerModuleType = .openVPN
-#endif
-#endif
 
         let module = try builder.tryBuild()
         print("Original module: \(module)")
         let newModule = try await sut.authenticate(module, on: deviceId)
         print("Updated module: \(newModule)")
 
-#if canImport(PartoutWireGuard)
         print("Original storage: \(storage)")
         let newStorage: WireGuardProviderStorage = try #require(try newModule.options(for: .wireGuard))
         print("Updated storage: \(newStorage)")
-#endif
 
         // assert token reuse or renewal
         let newToken = ProviderAuthentication.Token(
@@ -125,7 +118,6 @@ struct MullvadProviderTests: APITestSuite {
             #expect(newModule.authentication?.token == newToken)
         }
 
-#if canImport(PartoutWireGuard)
         // assert device lookup or creation
         let newSession = try #require(newStorage.sessions?[deviceId])
         if let peerId = input.existingPeerId {
@@ -141,8 +133,8 @@ struct MullvadProviderTests: APITestSuite {
         if let peerAddresses = input.peerAddresses {
             #expect(newSession.peer?.addresses == peerAddresses)
         }
-#endif
     }
+#endif
 }
 
 extension MullvadProviderTests {

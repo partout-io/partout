@@ -6,6 +6,7 @@
 **/.swiftpm/xcode
 PartoutCore
 PartoutCore.xcframework*
+Package.resolved
 .build
 build
 bin
