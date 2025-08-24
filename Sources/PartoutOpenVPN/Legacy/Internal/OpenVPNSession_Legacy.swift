@@ -54,7 +54,7 @@ final class OpenVPNSession {
 
     private var sessionState: SessionState
 
-    private(set) var tunnel: TunnelInterface?
+    private(set) var tunnel: IOInterface?
 
     private(set) var link: LinkInterface?
 
@@ -165,7 +165,7 @@ extension OpenVPNSession: OpenVPNSessionProtocol {
         self.delegate = delegate
     }
 
-    func setTunnel(_ tunnel: TunnelInterface) {
+    func setTunnel(_ tunnel: IOInterface) {
         guard self.tunnel == nil else {
             pp_log(ctx, .openvpn, .error, "Tunnel interface already set")
             return

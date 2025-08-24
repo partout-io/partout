@@ -93,6 +93,12 @@ extension NEUDPSocket {
             .map { _ in }
     }
 
+    nonisolated func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
+
+        // WARNING: runs in Network.framework queue
+        nwSession.setReadHandler(handler, maxDatagrams: options.maxDatagrams)
+    }
+
     nonisolated func upgraded() -> LinkInterface {
         Self(
             nwSession: NWUDPSession(upgradeFor: nwSession),
@@ -110,13 +116,11 @@ extension NEUDPSocket {
 // MARK: IOInterface
 
 extension NEUDPSocket {
-    public nonisolated func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
-
-        // WARNING: runs in Network.framework queue
-        nwSession.setReadHandler(handler, maxDatagrams: options.maxDatagrams)
+    func readPackets() async throws -> [Data] {
+        fatalError("readPackets() unavailable")
     }
 
-    public func writePackets(_ packets: [Data]) async throws {
+    func writePackets(_ packets: [Data]) async throws {
         guard !packets.isEmpty else {
             return
         }

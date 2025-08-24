@@ -32,7 +32,7 @@ public actor OpenVPNConnection {
 
     private let dns: DNSResolver
 
-    private let tunnelInterface: TunnelInterface
+    private let tunnelInterface: IOInterface
 
     // MARK: State
 
@@ -59,9 +59,7 @@ public actor OpenVPNConnection {
               !endpoints.isEmpty else {
             fatalError("No OpenVPN remotes defined?")
         }
-        guard let tunnelInterface = parameters.factory.tunnelInterface() else {
-            throw PartoutError(.releasedObject)
-        }
+        let tunnelInterface = parameters.tunnelInterface
 
         self.configuration = try configuration.withModules(from: parameters.controller.profile)
         self.sessionFactory = sessionFactory

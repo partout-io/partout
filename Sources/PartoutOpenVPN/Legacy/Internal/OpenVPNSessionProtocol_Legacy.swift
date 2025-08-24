@@ -43,9 +43,9 @@ protocol OpenVPNSessionProtocol: Sendable {
 
      - Precondition: `tunnel` is an active network interface.
      - Postcondition: The VPN data channel is open.
-     - Parameter tunnel: The `TunnelInterface` on which to exchange the VPN data traffic.
+     - Parameter tunnel: The `IOInterface` on which to exchange the VPN data traffic.
      */
-    func setTunnel(_ tunnel: TunnelInterface) async
+    func setTunnel(_ tunnel: IOInterface) async
 
     /**
      Establishes the link interface for this session. The interface must be up and running for sending and receiving packets.

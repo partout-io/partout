@@ -9,7 +9,7 @@ import PartoutCore
 #endif
 
 /// Implementation of a ``/PartoutCore/TunnelInterface`` via `NEPacketTunnelFlow`.
-public final class NETunnelInterface: TunnelInterface {
+public final class NETunnelInterface: IOInterface {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)

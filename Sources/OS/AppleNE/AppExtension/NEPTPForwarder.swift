@@ -32,13 +32,19 @@ public actor NEPTPForwarder {
         stopDelay: Int = 2000,
         reconnectionDelay: Int = 2000
     ) throws {
+        guard let provider = controller.provider else {
+            pp_log(ctx, .ne, .info, "NEPTPForwarder: NEPacketTunnelProvider released")
+            throw PartoutError(.releasedObject)
+        }
         let environment = controller.environment
-        let factory = NEInterfaceFactory(ctx, provider: controller.provider, options: factoryOptions)
+        let factory = NEInterfaceFactory(ctx, provider: provider, options: factoryOptions)
+        let tunnelInterface = NETunnelInterface(ctx, impl: provider.packetFlow)
         let reachability = NEObservablePath(ctx)
 
         let connectionParameters = ConnectionParameters(
             controller: controller,
             factory: factory,
+            tunnelInterface: tunnelInterface,
             environment: environment,
             options: connectionOptions
         )
