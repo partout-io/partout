@@ -8,4 +8,5 @@
 #include <stddef.h>
 #include <stdint.h>
 
+uint32_t pp_prng_rand();
 bool pp_prng_do(uint8_t *_Nonnull dst, size_t len);
