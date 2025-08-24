@@ -24,7 +24,7 @@ private final class NativeTLSWrapper: TLSProtocol {
         static let bufferLength = 16 * 1024
     }
 
-    private let tls: pp_tls_ctx
+    private let tls: pp_tls
 
     private let caURL: URL
 
