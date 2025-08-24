@@ -7,15 +7,13 @@
 #include <stdlib.h>
 #include "portable/prng.h"
 
+uint32_t pp_prng_rand() {
 #ifdef _WIN32
-uint32_t pp_prng_rand() {
     return rand();
-}
 #else
-uint32_t pp_prng_rand() {
     return arc4random();
-}
 #endif
+}
 
 #if defined(__APPLE__)
 
