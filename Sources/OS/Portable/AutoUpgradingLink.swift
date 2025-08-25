@@ -7,24 +7,31 @@ import Foundation
 import PartoutCore
 #endif
 
-public final class AutoUpgradingSocket: LinkInterface, SocketIOInterface {
-    private let io: SocketIOInterface
+public final class AutoUpgradingLink: LinkInterface {
+    public typealias IOBlock = @Sendable (ExtendedEndpoint) throws -> SocketIOInterface
+
+    public typealias BetterPathBlock = @Sendable () throws -> PassthroughStream<Void>
 
     private let endpoint: ExtendedEndpoint
 
-    private let upgradedBlock: @Sendable (ExtendedEndpoint) throws -> SocketIOInterface
+    private let ioBlock: IOBlock
+
+    private let betterPathBlock: BetterPathBlock
+
+    private let io: SocketIOInterface
 
     private let betterPathStream: PassthroughStream<Void>
 
     public init(
         endpoint: ExtendedEndpoint,
-        upgradedBlock: @escaping @Sendable (ExtendedEndpoint) throws -> SocketIOInterface
+        ioBlock: @escaping IOBlock,
+        betterPathBlock: @escaping BetterPathBlock
     ) throws {
-        io = try upgradedBlock(endpoint)
         self.endpoint = endpoint
-        self.upgradedBlock = upgradedBlock
-        // FIXME: ###, POSIXSocket, implement or receive betterPathStream
-        betterPathStream = PassthroughStream()
+        self.ioBlock = ioBlock
+        self.betterPathBlock = betterPathBlock
+        io = try ioBlock(endpoint)
+        betterPathStream = try betterPathBlock()
     }
 
     public func connect(timeout: Int) async throws {
@@ -67,7 +74,11 @@ public final class AutoUpgradingSocket: LinkInterface, SocketIOInterface {
     }
 
     public func upgraded() throws -> LinkInterface {
-        try AutoUpgradingSocket(endpoint: endpoint, upgradedBlock: upgradedBlock)
+        try AutoUpgradingLink(
+            endpoint: endpoint,
+            ioBlock: ioBlock,
+            betterPathBlock: betterPathBlock
+        )
     }
 
     public func shutdown() {

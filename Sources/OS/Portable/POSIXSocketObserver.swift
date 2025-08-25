@@ -13,16 +13,24 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
 
     private let endpoint: ExtendedEndpoint
 
+    private let betterPathBlock: AutoUpgradingLink.BetterPathBlock
+
     private let maxReadLength: Int
 
-    public init(_ ctx: PartoutLoggerContext, endpoint: ExtendedEndpoint, maxReadLength: Int = 128 * 1024) {
+    public init(
+        _ ctx: PartoutLoggerContext,
+        endpoint: ExtendedEndpoint,
+        betterPathBlock: @escaping AutoUpgradingLink.BetterPathBlock,
+        maxReadLength: Int = 128 * 1024
+    ) {
         self.ctx = ctx
         self.endpoint = endpoint
+        self.betterPathBlock = betterPathBlock
         self.maxReadLength = maxReadLength
     }
 
     public func waitForActivity(timeout: Int) async throws -> LinkInterface {
-        let socket: AutoUpgradingSocket
+        let link: AutoUpgradingLink
 
         // Copy local constants to avoid strong retain on self in blocks
         let ctx = self.ctx
@@ -31,29 +39,48 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
 
         // Use different implementations based on platform support
         do {
-            socket = try AutoUpgradingSocket(endpoint: endpoint) {
-                try POSIXDispatchSourceSocket(
-                    ctx,
-                    endpoint: $0,
-                    closesOnEmptyRead: closesOnEmptyRead,
-                    maxReadLength: maxReadLength
-                )
-            }
+            link = try AutoUpgradingLink(
+                endpoint: endpoint,
+                ioBlock: { [weak self] in
+                    guard let self else { throw PartoutError(.releasedObject) }
+                    return try POSIXDispatchSourceSocket(
+                        ctx,
+                        endpoint: $0,
+                        closesOnEmptyRead: closesOnEmptyRead,
+                        maxReadLength: maxReadLength
+                    )
+                },
+                betterPathBlock: { [weak self] in
+                    guard let self else { throw PartoutError(.releasedObject) }
+                    return try betterPathBlock()
+                }
+            )
         } catch let error as PartoutError {
             // POSIXDispatchSourceSocket throws .unhandled if unsupported
             guard error.code == .unhandled else {
                 throw error
             }
-            socket = try AutoUpgradingSocket(endpoint: endpoint) {
-                try POSIXBlockingSocket(
-                    ctx,
-                    endpoint: $0,
-                    closesOnEmptyRead: closesOnEmptyRead,
-                    maxReadLength: maxReadLength
-                )
-            }
+            link = try AutoUpgradingLink(
+                endpoint: endpoint,
+                ioBlock: { [weak self] in
+                    guard let self else { throw PartoutError(.releasedObject) }
+                    return try POSIXBlockingSocket(
+                        ctx,
+                        endpoint: $0,
+                        closesOnEmptyRead: closesOnEmptyRead,
+                        maxReadLength: maxReadLength
+                    )
+                },
+                betterPathBlock: { [weak self] in
+                    guard let self else { throw PartoutError(.releasedObject) }
+                    return try betterPathBlock()
+                }
+            )
         }
-        try await socket.connect(timeout: timeout)
-        return socket
+
+        // Establish actual connection
+        try await link.connect(timeout: timeout)
+
+        return link
     }
 }

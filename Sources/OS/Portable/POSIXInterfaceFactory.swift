@@ -9,11 +9,17 @@ import PartoutCore
 public final class POSIXInterfaceFactory: NetworkInterfaceFactory {
     private let ctx: PartoutLoggerContext
 
-    public init(_ ctx: PartoutLoggerContext, blocking: Bool = false) {
+    private let betterPathBlock: AutoUpgradingLink.BetterPathBlock
+
+    public init(
+        _ ctx: PartoutLoggerContext,
+        betterPathBlock: @escaping AutoUpgradingLink.BetterPathBlock
+    ) {
         self.ctx = ctx
+        self.betterPathBlock = betterPathBlock
     }
 
     public func linkObserver(to endpoint: ExtendedEndpoint) -> LinkObserver {
-        POSIXSocketObserver(ctx, endpoint: endpoint)
+        POSIXSocketObserver(ctx, endpoint: endpoint, betterPathBlock: betterPathBlock)
     }
 }
