@@ -146,7 +146,6 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
                     }
                     for toWrite in packets {
                         guard !toWrite.isEmpty else { continue }
-                        let rnd = pp_prng_rand()
                         let writtenCount = toWrite.withUnsafeBytes {
                             pp_socket_write(sock, $0.bytePointer, toWrite.count)
                         }
