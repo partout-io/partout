@@ -8,7 +8,7 @@ import _PartoutOSPortable_C
 import PartoutCore
 #endif
 
-public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
+public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
     private let readQueue: DispatchQueue
@@ -23,9 +23,11 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
 
     private let closesOnEmptyRead: Bool
 
+    // Synchronize manually
+    nonisolated(unsafe)
     private var readBuf: [UInt8]
 
-    public convenience init(
+    public init(
         _ ctx: PartoutLoggerContext,
         endpoint: ExtendedEndpoint,
         closesOnEmptyRead: Bool,
@@ -43,7 +45,7 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
 
     // Assumes fd to be an open socket descriptor. The socket is not
     // closed on deinit (isOwned is false).
-    public convenience init(
+    public init(
         _ ctx: PartoutLoggerContext,
         sock: pp_socket,
         closesOnEmptyRead: Bool,
@@ -87,7 +89,10 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
 
     // Does nothing if the sock is already open and connected
     public func connect(timeout: Int) async throws {
-        guard sock == nil, let endpoint else { return }
+        guard let endpoint else { return }
+        guard sock == nil else {
+            throw PartoutError(.linkNotActive)
+        }
         let sock: pp_socket = try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global().async {
                 let sock = endpoint.address.rawValue.withCString { cAddr in
@@ -107,19 +112,18 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
                 continuation.resume(returning: sock)
             }
         }
-        readQueue.sync {
-            writeQueue.sync {
-                self.sock = sock
-            }
-        }
+        self.sock = sock
     }
 
     public func readPackets() async throws -> [Data] {
+        guard let sock else {
+            throw PartoutError(.linkNotActive)
+        }
         do {
             return try await withCheckedThrowingContinuation { continuation in
                 readQueue.async { [weak self] in
-                    guard let self, let sock else {
-                        continuation.resume(throwing: PartoutError(.linkNotActive))
+                    guard let self else {
+                        continuation.resume(throwing: PartoutError(.releasedObject))
                         return
                     }
                     let readCount = pp_socket_read(sock, &readBuf, readBuf.count)
@@ -143,11 +147,14 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     }
 
     public func writePackets(_ packets: [Data]) async throws {
+        guard let sock else {
+            throw PartoutError(.linkNotActive)
+        }
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 writeQueue.async { [weak self] in
-                    guard let self, let sock else {
-                        continuation.resume(throwing: PartoutError(.linkNotActive))
+                    guard let self else {
+                        continuation.resume(throwing: PartoutError(.releasedObject))
                         return
                     }
                     for toWrite in packets {
@@ -171,15 +178,11 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     }
 
     public func shutdown() {
-        readQueue.sync { [weak self] in
-            self?.writeQueue.sync { [weak self] in
-                guard let self, let sock else { return }
-                pp_log(ctx, .core, .info, "Shut down socket")
-                if isOwned {
-                    pp_socket_free(sock)
-                }
-                self.sock = nil
-            }
+        guard let sock else { return }
+        pp_log(ctx, .core, .info, "Shut down socket")
+        if isOwned {
+            pp_socket_free(sock)
         }
+        self.sock = nil
     }
 }
