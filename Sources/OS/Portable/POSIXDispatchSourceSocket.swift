@@ -9,6 +9,16 @@ import PartoutCore
 #endif
 
 public actor POSIXDispatchSourceSocket: SocketIOInterface {
+
+    // DispatchSource seems broken on Windows. Android?
+    public static var isSupported: Bool {
+#if os(Windows)
+        false
+#else
+        true
+#endif
+    }
+
     private let ctx: PartoutLoggerContext
 
     private let queue: DispatchQueue
@@ -39,7 +49,7 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
         closesOnEmptyRead: Bool,
         maxReadLength: Int
     ) throws {
-        self.init(
+        try self.init(
             ctx: ctx,
             sock: nil,
             endpoint: endpoint,
@@ -57,7 +67,7 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
         closesOnEmptyRead: Bool,
         maxReadLength: Int
     ) throws {
-        self.init(
+        try self.init(
             ctx: ctx,
             sock: sock,
             endpoint: nil,
@@ -74,13 +84,11 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
         isOwned: Bool,
         closesOnEmptyRead: Bool,
         maxReadLength: Int
-    ) {
+    ) throws {
         precondition(sock != nil || endpoint != nil)
-
-        // DispatchSource seems broken on Windows. Android?
-#if os(Windows)
-        throw PartoutError(.unhandled)
-#endif
+        guard Self.isSupported else {
+            fatalError("POSIXDispatchSourceSocket is not supported on this platform")
+        }
 
         //
         // No, you don’t have to call resume(), suspend(), or cancel() on the same queue

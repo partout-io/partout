@@ -30,51 +30,37 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
     }
 
     public func waitForActivity(timeout: Int) async throws -> LinkInterface {
-        let link: AutoUpgradingLink
 
         // Copy local constants to avoid strong retain on self in blocks
         let ctx = self.ctx
         let closesOnEmptyRead = endpoint.proto.socketType == .tcp
         let maxReadLength = self.maxReadLength
 
-        // Use different implementations based on platform support
-        do {
-            link = try AutoUpgradingLink(
-                endpoint: endpoint,
-                ioBlock: {
+        // Use different I/O implementations based on platform support
+        let link = try AutoUpgradingLink(
+            endpoint: endpoint,
+            ioBlock: {
+                if POSIXDispatchSourceSocket.isSupported {
                     try POSIXDispatchSourceSocket(
                         ctx,
                         endpoint: $0,
                         closesOnEmptyRead: closesOnEmptyRead,
                         maxReadLength: maxReadLength
                     )
-                },
-                betterPathBlock: { [weak self] in
-                    guard let self else { throw PartoutError(.releasedObject) }
-                    return try betterPathBlock()
-                }
-            )
-        } catch let error as PartoutError {
-            // POSIXDispatchSourceSocket throws .unhandled if unsupported
-            guard error.code == .unhandled else {
-                throw error
-            }
-            link = try AutoUpgradingLink(
-                endpoint: endpoint,
-                ioBlock: {
+                } else {
                     try POSIXBlockingSocket(
                         ctx,
                         endpoint: $0,
                         closesOnEmptyRead: closesOnEmptyRead,
                         maxReadLength: maxReadLength
                     )
-                },
-                betterPathBlock: { [weak self] in
-                    guard let self else { throw PartoutError(.releasedObject) }
-                    return try betterPathBlock()
                 }
-            )
-        }
+            },
+            betterPathBlock: { [weak self] in
+                guard let self else { throw PartoutError(.releasedObject) }
+                return try betterPathBlock()
+            }
+        )
 
         // Establish actual connection
         try await link.connect(timeout: timeout)
