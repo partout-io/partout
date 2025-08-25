@@ -49,8 +49,8 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
         )
     }
 
-    // Assumes fd to be an open socket descriptor. The socket is closed
-    // on deinit if and only if isOwned is true.
+    // Assumes fd to be an open socket descriptor. The socket is not
+    // closed on deinit (isOwned is false).
     public init(
         _ ctx: PartoutLoggerContext,
         sock: pp_socket,
@@ -82,15 +82,16 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
         throw PartoutError(.unhandled)
 #endif
 
-        /* No, you don’t have to call resume(), suspend(), or cancel() on the same queue
-         * that you created the source with. GCD sources are thread-safe for those
-         * methods. What matters is:
-         *
-         * - The event handler you provide is always invoked on the queue you assigned
-         *   when creating the source.
-         * - You can call resume(), suspend(), or cancel() from any thread (including
-         *   from an actor or a Task).
-         */
+        //
+        // No, you don’t have to call resume(), suspend(), or cancel() on the same queue
+        // that you created the source with. GCD sources are thread-safe for those
+        // methods. What matters is:
+        //
+        // - The event handler you provide is always invoked on the queue you assigned
+        // when creating the source.
+        // - You can call resume(), suspend(), or cancel() from any thread (including
+        // from an actor or a Task).
+        //
         self.ctx = ctx
         let queueLabelContext = sock.map { pp_socket_fd($0) }?.description ?? endpoint?.description ?? "*"
         queue = DispatchQueue(label: "POSIXInterface[\(queueLabelContext)]")

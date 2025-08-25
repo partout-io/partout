@@ -41,8 +41,8 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
         )
     }
 
-    // Assumes fd to be an open socket descriptor. The socket is closed
-    // on deinit if and only if isOwned is true.
+    // Assumes fd to be an open socket descriptor. The socket is not
+    // closed on deinit (isOwned is false).
     public convenience init(
         _ ctx: PartoutLoggerContext,
         sock: pp_socket,
