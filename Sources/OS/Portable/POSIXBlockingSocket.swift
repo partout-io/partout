@@ -9,6 +9,8 @@ import PartoutCore
 #endif
 
 public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
+    private let ctx: PartoutLoggerContext
+
     private let readQueue: DispatchQueue
 
     private let writeQueue: DispatchQueue
@@ -24,11 +26,13 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     private var readBuf: [UInt8]
 
     public convenience init(
+        _ ctx: PartoutLoggerContext,
         endpoint: ExtendedEndpoint,
         closesOnEmptyRead: Bool,
         maxReadLength: Int
     ) throws {
         self.init(
+            ctx: ctx,
             sock: nil,
             endpoint: endpoint,
             isOwned: true,
@@ -40,11 +44,13 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     // Assumes fd to be an open socket descriptor. The socket is closed
     // on deinit if and only if isOwned is true.
     public convenience init(
-        _ sock: pp_socket,
+        _ ctx: PartoutLoggerContext,
+        sock: pp_socket,
         closesOnEmptyRead: Bool,
         maxReadLength: Int
     ) {
         self.init(
+            ctx: ctx,
             sock: sock,
             endpoint: nil,
             isOwned: false,
@@ -54,6 +60,7 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     }
 
     private init(
+        ctx: PartoutLoggerContext,
         sock: pp_socket?,
         endpoint: ExtendedEndpoint?,
         isOwned: Bool,
@@ -61,6 +68,7 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
         maxReadLength: Int
     ) {
         precondition(sock != nil || endpoint != nil)
+        self.ctx = ctx
         let queueLabelContext = sock.map { pp_socket_fd($0) }?.description ?? endpoint?.description ?? "*"
         readQueue = DispatchQueue(label: "POSIXBlockingSocket[R:\(queueLabelContext)]")
         writeQueue = DispatchQueue(label: "POSIXBlockingSocket[W:\(queueLabelContext)]")
@@ -72,6 +80,7 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     }
 
     deinit {
+        pp_log(ctx, .core, .info, "Deinit POSIXBlockingSocket")
         guard let sock, isOwned else { return }
         pp_socket_free(sock)
     }
@@ -103,15 +112,11 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
         do {
             return try await withCheckedThrowingContinuation { continuation in
                 readQueue.async { [weak self] in
-                    // FIXME: ###
-                    let rnd = pp_prng_rand()
                     guard let self, let sock else {
                         continuation.resume(throwing: PartoutError(.linkNotActive))
                         return
                     }
-                    pp_log_g(.core, .error, ">>> readPackets() [\(rnd)]")
                     let readCount = pp_socket_read(sock, &readBuf, readBuf.count)
-                    pp_log_g(.core, .error, ">>> readPackets() [\(rnd)]: \(readCount)")
                     guard readCount > 0 else {
                         if readCount == 0, closesOnEmptyRead {
                             continuation.resume(throwing: PartoutError(.linkNotActive))
@@ -125,8 +130,7 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
                 }
             }
         } catch {
-            // FIXME: ###, POSIXInterface logs
-//            pp_log(.global, .core, .fault, ">>> POSIXInterface.readPackets(): \(error)")
+            pp_log(ctx, .core, .fault, "Unable to read packets: \(error)")
             shutdown()
             throw error
         }
@@ -136,7 +140,6 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 writeQueue.async { [weak self] in
-                    // FIXME: ###
                     guard let self, let sock else {
                         continuation.resume(throwing: PartoutError(.linkNotActive))
                         return
@@ -144,11 +147,9 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
                     for toWrite in packets {
                         guard !toWrite.isEmpty else { continue }
                         let rnd = pp_prng_rand()
-                        pp_log_g(.core, .error, ">>> writePackets() [\(rnd)]")
                         let writtenCount = toWrite.withUnsafeBytes {
                             pp_socket_write(sock, $0.bytePointer, toWrite.count)
                         }
-                        pp_log_g(.core, .error, ">>> writePackets(): \(rnd)")
                         guard writtenCount > 0 else {
                             continuation.resume(throwing: PartoutError(.linkFailure))
                             return
@@ -158,8 +159,7 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
                 }
             }
         } catch {
-            // FIXME: ###, POSIXInterface logs
-//            pp_log(.global, .core, .fault, ">>> POSIXInterface.writePackets(): \(error)")
+            pp_log(ctx, .core, .fault, "Unable to write packets: \(error)")
             shutdown()
             throw error
         }
@@ -169,12 +169,11 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
         readQueue.sync { [weak self] in
             self?.writeQueue.sync { [weak self] in
                 guard let self, let sock else { return }
-                // FIXME: ###, POSIXInterface logs
-//                pp_log(.global, .core, .fault, ">>> POSIXInterface.close()")
+                pp_log(ctx, .core, .info, "Shut down socket")
                 if isOwned {
                     pp_socket_free(sock)
-                    self.sock = nil
                 }
+                self.sock = nil
             }
         }
     }

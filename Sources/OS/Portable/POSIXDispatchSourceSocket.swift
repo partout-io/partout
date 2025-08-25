@@ -9,6 +9,8 @@ import PartoutCore
 #endif
 
 public actor POSIXDispatchSourceSocket: SocketIOInterface {
+    private let ctx: PartoutLoggerContext
+
     private let queue: DispatchQueue
 
     private var sock: pp_socket?
@@ -32,11 +34,13 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
     private var isWriteResumed: Bool
 
     public init(
+        _ ctx: PartoutLoggerContext,
         endpoint: ExtendedEndpoint,
         closesOnEmptyRead: Bool,
         maxReadLength: Int
     ) throws {
         self.init(
+            ctx: ctx,
             sock: nil,
             endpoint: endpoint,
             isOwned: true,
@@ -48,11 +52,13 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
     // Assumes fd to be an open socket descriptor. The socket is closed
     // on deinit if and only if isOwned is true.
     public init(
-        _ sock: pp_socket,
+        _ ctx: PartoutLoggerContext,
+        sock: pp_socket,
         closesOnEmptyRead: Bool,
         maxReadLength: Int
     ) throws {
         self.init(
+            ctx: ctx,
             sock: sock,
             endpoint: nil,
             isOwned: false,
@@ -62,6 +68,7 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
     }
 
     private init(
+        ctx: PartoutLoggerContext,
         sock: pp_socket?,
         endpoint: ExtendedEndpoint?,
         isOwned: Bool,
@@ -84,10 +91,9 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
          * - You can call resume(), suspend(), or cancel() from any thread (including
          *   from an actor or a Task).
          */
+        self.ctx = ctx
         let queueLabelContext = sock.map { pp_socket_fd($0) }?.description ?? endpoint?.description ?? "*"
-        let queue = DispatchQueue(label: "POSIXInterface[\(queueLabelContext)]")
-
-        self.queue = queue
+        queue = DispatchQueue(label: "POSIXInterface[\(queueLabelContext)]")
         self.sock = sock
         self.endpoint = endpoint
         self.isOwned = isOwned
@@ -98,11 +104,9 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
     }
 
     deinit {
-        // FIXME: ###, ctx
-        pp_log_g(.core, .fault, "POSIXInterface.deinit")
+        pp_log(ctx, .core, .info, "Deinit POSIXDispatchSourceSocket")
         guard let sock else { return }
-
-        // XXX: Crashes if cancelled while suspended
+        // XXX: Crashes if writeSource is cancelled while suspended
         if !isWriteResumed {
             writeSource?.resume()
         }
@@ -155,8 +159,7 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
                 readContinuation = continuation
             }
         } catch {
-            // FIXME: ###, POSIXInterface logs
-            pp_log(.global, .core, .fault, ">>> POSIXInterface.readPackets(): \(error)")
+            pp_log(ctx, .core, .fault, "Unable to read packets: \(error)")
             shutdown()
             throw error
         }
@@ -170,8 +173,7 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
                 resumeWriteSource(true)
             }
         } catch {
-            // FIXME: ###, POSIXInterface logs
-            pp_log(.global, .core, .fault, ">>> POSIXInterface.writePackets(): \(error)")
+            pp_log(ctx, .core, .fault, "Unable to write packets: \(error)")
             shutdown()
             throw error
         }
@@ -179,13 +181,9 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
 
     public func shutdown() {
         guard let sock else { return }
-
-        // FIXME: ###, POSIXInterface logs
-        pp_log(.global, .core, .fault, ">>> POSIXInterface.close()")
-
-        // XXX: Crashes if cancelled while suspended
+        pp_log(ctx, .core, .info, "Shut down socket")
+        // XXX: Crashes if writeSource is cancelled while writeSource suspended
         resumeWriteSource(true)
-
         readSource?.cancel()
         readSource = nil
         writeSource?.cancel()
@@ -221,10 +219,9 @@ private extension POSIXDispatchSourceSocket {
     }
 
     func handleWriteEvent() {
-        // FIXME: ###, POSIXInterface, many empty calls to this, can we avoid it? consumes CPU? blocking or non-blocking?
+        // XXX: Many empty calls to this, can we avoid it? Does it consume real CPU?
         guard let sock, !writeQueue.isEmpty else { return }
-        // FIXME: ###, POSIXInterface logs
-//        pp_log(.global, .core, .fault, ">>> POSIXInterface.handleWriteEvent")
+//        pp_log(ctx, .core, .debug, "Handle write event")
         while !writeQueue.isEmpty {
             let (packets, continuation) = writeQueue.removeFirst()
             packets.forEach {
@@ -245,14 +242,12 @@ private extension POSIXDispatchSourceSocket {
         guard let writeSource, !writeSource.isCancelled else { return }
         if doResume {
             guard !isWriteResumed else { return }
-            // FIXME: ###, POSIXInterface logs
-//            pp_log(.global, .core, .fault, ">>> POSIXInterface.writeSource.resume()")
+//            pp_log(ctx, .core, .debug, "Resume writeSource")
             writeSource.resume()
             isWriteResumed = true
         } else {
             guard isWriteResumed else { return }
-            // FIXME: ###, POSIXInterface logs
-//            pp_log(.global, .core, .fault, ">>> POSIXInterface.writeSource.suspend()")
+//            pp_log(ctx, .core, .debug, "Suspend writeSource")
             writeSource.suspend()
             isWriteResumed = false
         }

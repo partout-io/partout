@@ -14,6 +14,6 @@ public final class POSIXInterfaceFactory: NetworkInterfaceFactory {
     }
 
     public func linkObserver(to endpoint: ExtendedEndpoint) -> LinkObserver {
-        POSIXSocketObserver(endpoint: endpoint)
+        POSIXSocketObserver(ctx, endpoint: endpoint)
     }
 }
