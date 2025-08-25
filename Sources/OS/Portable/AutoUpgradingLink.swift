@@ -10,8 +10,6 @@ import PartoutCore
 public final class AutoUpgradingLink: LinkInterface {
     public typealias IOBlock = @Sendable (ExtendedEndpoint) throws -> SocketIOInterface
 
-    public typealias BetterPathBlock = @Sendable () throws -> PassthroughStream<Void>
-
     private let endpoint: ExtendedEndpoint
 
     private let ioBlock: IOBlock

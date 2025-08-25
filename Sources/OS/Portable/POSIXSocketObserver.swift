@@ -13,14 +13,14 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
 
     private let endpoint: ExtendedEndpoint
 
-    private let betterPathBlock: AutoUpgradingLink.BetterPathBlock
+    private let betterPathBlock: BetterPathBlock
 
     private let maxReadLength: Int
 
     public init(
         _ ctx: PartoutLoggerContext,
         endpoint: ExtendedEndpoint,
-        betterPathBlock: @escaping AutoUpgradingLink.BetterPathBlock,
+        betterPathBlock: @escaping BetterPathBlock,
         maxReadLength: Int = 128 * 1024
     ) {
         self.ctx = ctx
@@ -41,9 +41,8 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
         do {
             link = try AutoUpgradingLink(
                 endpoint: endpoint,
-                ioBlock: { [weak self] in
-                    guard let self else { throw PartoutError(.releasedObject) }
-                    return try POSIXDispatchSourceSocket(
+                ioBlock: {
+                    try POSIXDispatchSourceSocket(
                         ctx,
                         endpoint: $0,
                         closesOnEmptyRead: closesOnEmptyRead,
@@ -62,9 +61,8 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
             }
             link = try AutoUpgradingLink(
                 endpoint: endpoint,
-                ioBlock: { [weak self] in
-                    guard let self else { throw PartoutError(.releasedObject) }
-                    return try POSIXBlockingSocket(
+                ioBlock: {
+                    try POSIXBlockingSocket(
                         ctx,
                         endpoint: $0,
                         closesOnEmptyRead: closesOnEmptyRead,

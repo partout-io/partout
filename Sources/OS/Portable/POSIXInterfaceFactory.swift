@@ -9,11 +9,11 @@ import PartoutCore
 public final class POSIXInterfaceFactory: NetworkInterfaceFactory {
     private let ctx: PartoutLoggerContext
 
-    private let betterPathBlock: AutoUpgradingLink.BetterPathBlock
+    private let betterPathBlock: BetterPathBlock
 
     public init(
         _ ctx: PartoutLoggerContext,
-        betterPathBlock: @escaping AutoUpgradingLink.BetterPathBlock
+        betterPathBlock: @escaping BetterPathBlock
     ) {
         self.ctx = ctx
         self.betterPathBlock = betterPathBlock
