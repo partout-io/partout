@@ -8,14 +8,7 @@ import _PartoutOSPortable_C
 import PartoutCore
 #endif
 
-// DispatchSource seems broken on Windows. Android?
-#if os(macOS) || os(iOS) || os(tvOS) || os(Linux)
-
 public actor POSIXDispatchSourceSocket: SocketIOInterface {
-    public static var isSupported: Bool {
-        true
-    }
-
     private let queue: DispatchQueue
 
     private var sock: pp_socket?
@@ -58,7 +51,7 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
         _ sock: pp_socket,
         closesOnEmptyRead: Bool,
         maxReadLength: Int
-    ) {
+    ) throws {
         self.init(
             sock: sock,
             endpoint: nil,
@@ -76,6 +69,11 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
         maxReadLength: Int
     ) {
         precondition(sock != nil || endpoint != nil)
+
+        // DispatchSource seems broken on Windows. Android?
+#if os(Windows)
+        throw PartoutError(.unhandled)
+#endif
 
         /* No, you don’t have to call resume(), suspend(), or cancel() on the same queue
          * that you created the source with. GCD sources are thread-safe for those
@@ -260,33 +258,3 @@ private extension POSIXDispatchSourceSocket {
         }
     }
 }
-
-#else
-
-public final class POSIXDispatchSourceSocket: ClosingIOInterface {
-    public static var isSupported: Bool {
-        false
-    }
-
-    public init(
-        endpoint: ExtendedEndpoint,
-        closesOnEmptyRead: Bool,
-        maxReadLength: Int
-    ) async throws {
-        fatalError()
-    }
-
-    public func readPackets() async throws -> [Data] {
-        fatalError()
-    }
-
-    public func writePackets(_ packets: [Data]) async throws {
-        fatalError()
-    }
-
-    public func shutdown() async {
-        fatalError()
-    }
-}
-
-#endif
