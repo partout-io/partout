@@ -10,7 +10,8 @@ import PartoutCore
 
 public actor POSIXDispatchSourceSocket: SocketIOInterface {
 
-    // DispatchSource seems broken on Windows. Android?
+    // DispatchSource seems broken on Windows. Not fully tested
+    // on Android, but seems to work.
     public static var isSupported: Bool {
 #if os(Windows)
         false
