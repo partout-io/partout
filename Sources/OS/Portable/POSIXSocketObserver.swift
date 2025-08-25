@@ -20,12 +20,11 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
 
     public func waitForActivity(timeout: Int) async throws -> LinkInterface {
         // FIXME: ###, POSIXSocket.waitForActivity() - handle timeout
-
         // FIXME: ###, POSIXSocket.waitForActivity() - pp_socket_open is blocking
+
         let closesOnEmptyRead = endpoint.proto.socketType == .tcp
         let maxReadLength = self.maxReadLength
-        // FIXME: ###, drop this false
-        if false && POSIXDispatchSourceSocket.isSupported {
+        if POSIXDispatchSourceSocket.isSupported {
             return try AutoUpgradingSocket(endpoint: endpoint) {
                 try POSIXDispatchSourceSocket(
                     endpoint: $0,
