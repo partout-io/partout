@@ -63,7 +63,7 @@ public final class NESocketObserver: LinkObserver, @unchecked Sendable {
             return nwConnection.state == .ready
         }
         guard isReady else {
-            throw PartoutError(.connectionNotStarted)
+            throw PartoutError(.linkNotActive)
         }
 
         let rawAddress: String
@@ -80,11 +80,11 @@ public final class NESocketObserver: LinkObserver, @unchecked Sendable {
             case .name(let name, _):
                 rawAddress = name
             default:
-                throw PartoutError(.connectionNotStarted)
+                throw PartoutError(.linkNotActive)
             }
             rawPort = port.rawValue
         default:
-            throw PartoutError(.connectionNotStarted)
+            throw PartoutError(.linkNotActive)
         }
 
         let socket = NESocket(
@@ -196,6 +196,15 @@ extension NESocket {
         betterPathStream.send()
     }
 
+    nonisolated func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
+        switch options.proto.plainType {
+        case .udp:
+            loopReadUDPPackets(handler)
+        case .tcp:
+            loopReadTCPPackets(handler)
+        }
+    }
+
     nonisolated func upgraded() -> LinkInterface {
         Self(
             queue: queue,
@@ -217,16 +226,11 @@ extension NESocket {
 // MARK: IOInterface
 
 extension NESocket {
-    public nonisolated func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
-        switch options.proto.plainType {
-        case .udp:
-            loopReadUDPPackets(handler)
-        case .tcp:
-            loopReadTCPPackets(handler)
-        }
+    func readPackets() async throws -> [Data] {
+        fatalError("readPackets() unavailable")
     }
 
-    public func writePackets(_ packets: [Data]) async throws {
+    func writePackets(_ packets: [Data]) async throws {
         guard !packets.isEmpty else {
             return
         }

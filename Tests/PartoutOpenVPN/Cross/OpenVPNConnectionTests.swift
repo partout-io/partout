@@ -333,6 +333,7 @@ private struct Constants {
         let conn = try module.newConnection(with: impl, parameters: .init(
             controller: controller,
             factory: factory,
+            tunnelInterface: MockTunnelInterface(),
             environment: environment,
             options: options
         ))
@@ -389,7 +390,7 @@ private final class MockOpenVPNSession: OpenVPNSessionProtocol, @unchecked Senda
         mockHasLink
     }
 
-    func setTunnel(_ tunnel: TunnelInterface) async {
+    func setTunnel(_ tunnel: IOInterface) async {
         onSetTunnel()
     }
 

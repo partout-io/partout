@@ -12,7 +12,7 @@ import PartoutWireGuard
 
 extension WireGuardConnectionError: PartoutErrorMappable {
     var asPartoutError: PartoutError {
-        PartoutError(.connectionNotStarted, self)
+        PartoutError(.linkNotActive, self)
     }
 }
 

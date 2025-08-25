@@ -4,7 +4,16 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include <stdlib.h>
 #include "portable/prng.h"
+
+uint32_t pp_prng_rand() {
+#ifdef _WIN32
+    return rand();
+#else
+    return arc4random();
+#endif
+}
 
 #if defined(__APPLE__)
 

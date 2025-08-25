@@ -47,18 +47,6 @@ extension OpenVPNUDPLink: LinkInterface {
         link.hasBetterPath
     }
 
-    func upgraded() -> LinkInterface {
-        OpenVPNUDPLink(link: link.upgraded(), proc: proc)
-    }
-
-    func shutdown() {
-        link.shutdown()
-    }
-}
-
-// MARK: - IOInterface
-
-extension OpenVPNUDPLink {
     func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
         link.setReadHandler { [weak self] packets, error in
             guard let self, let packets, !packets.isEmpty else {
@@ -71,6 +59,22 @@ extension OpenVPNUDPLink {
             }
             handler(packets, error)
         }
+    }
+
+    func upgraded() throws -> LinkInterface {
+        OpenVPNUDPLink(link: try link.upgraded(), proc: proc)
+    }
+
+    func shutdown() {
+        link.shutdown()
+    }
+}
+
+// MARK: - IOInterface
+
+extension OpenVPNUDPLink {
+    func readPackets() async throws -> [Data] {
+        fatalError("readPackets() unavailable")
     }
 
     func writePackets(_ packets: [Data]) async throws {

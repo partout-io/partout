@@ -95,6 +95,10 @@ extension NETCPSocket {
             .map { _ in }
     }
 
+    nonisolated func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
+        loopReadPackets(handler)
+    }
+
     nonisolated func upgraded() -> LinkInterface {
         Self(
             nwConnection: NWTCPConnection(upgradeFor: nwConnection),
@@ -113,11 +117,11 @@ extension NETCPSocket {
 // MARK: IOInterface
 
 extension NETCPSocket {
-    public nonisolated func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
-        loopReadPackets(handler)
+    func readPackets() async throws -> [Data] {
+        fatalError("readPackets() unavailable")
     }
 
-    public func writePackets(_ packets: [Data]) async throws {
+    func writePackets(_ packets: [Data]) async throws {
         guard !packets.isEmpty else {
             return
         }

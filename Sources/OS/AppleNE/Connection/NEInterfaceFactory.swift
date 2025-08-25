@@ -37,10 +37,10 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
         self.options = options
     }
 
-    public func linkObserver(to endpoint: ExtendedEndpoint) -> LinkObserver? {
+    public func linkObserver(to endpoint: ExtendedEndpoint) throws -> LinkObserver {
         guard let provider else {
-            logReleasedProvider()
-            return nil
+            pp_log(ctx, .ne, .info, "NEInterfaceFactory: NEPacketTunnelProvider released")
+            throw PartoutError(.releasedObject)
         }
         switch endpoint.proto.socketType.plainType {
         case .udp:
@@ -100,20 +100,6 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
 #endif
             }
         }
-    }
-
-    public func tunnelInterface() -> TunnelInterface? {
-        guard let provider else {
-            logReleasedProvider()
-            return nil
-        }
-        return NETunnelInterface(ctx, impl: provider.packetFlow)
-    }
-}
-
-private extension NEInterfaceFactory {
-    func logReleasedProvider() {
-        pp_log(ctx, .ne, .info, "NEInterfaceFactory: NEPacketTunnelProvider released")
     }
 }
 
