@@ -63,7 +63,7 @@ public final class NESocketObserver: LinkObserver, @unchecked Sendable {
             return nwConnection.state == .ready
         }
         guard isReady else {
-            throw PartoutError(.connectionNotStarted)
+            throw PartoutError(.linkNotActive)
         }
 
         let rawAddress: String
@@ -80,11 +80,11 @@ public final class NESocketObserver: LinkObserver, @unchecked Sendable {
             case .name(let name, _):
                 rawAddress = name
             default:
-                throw PartoutError(.connectionNotStarted)
+                throw PartoutError(.linkNotActive)
             }
             rawPort = port.rawValue
         default:
-            throw PartoutError(.connectionNotStarted)
+            throw PartoutError(.linkNotActive)
         }
 
         let socket = NESocket(
