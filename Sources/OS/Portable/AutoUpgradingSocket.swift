@@ -7,7 +7,7 @@ import Foundation
 import PartoutCore
 #endif
 
-public final class AutoUpgradingSocket: LinkInterface {
+public final class AutoUpgradingSocket: LinkInterface, SocketIOInterface {
     private let io: SocketIOInterface
 
     private let endpoint: ExtendedEndpoint
@@ -27,8 +27,8 @@ public final class AutoUpgradingSocket: LinkInterface {
         betterPathStream = PassthroughStream()
     }
 
-    public func connect() async throws {
-        try await io.connect()
+    public func connect(timeout: Int) async throws {
+        try await io.connect(timeout: timeout)
     }
 
     public nonisolated var remoteAddress: String {

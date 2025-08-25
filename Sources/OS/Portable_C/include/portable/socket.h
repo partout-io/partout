@@ -22,16 +22,18 @@ typedef struct _pp_socket *pp_socket;
 pp_socket _Nonnull pp_socket_create(uint64_t fd);
 void pp_socket_free(pp_socket _Nonnull sock);
 
-/* From network connection. */
+/* Create socket to endpoint. */
 pp_socket _Nullable pp_socket_open(const char *_Nonnull ip_addr,
                                    pp_socket_proto proto,
                                    uint16_t port,
-                                   bool blocking);
+                                   bool blocking,
+                                   int timeout);
 
-/* I/O */
+/* I/O. */
 int pp_socket_read(pp_socket _Nonnull sock,
                    uint8_t *_Nonnull dst, size_t dst_len);
 int pp_socket_write(pp_socket _Nonnull sock,
                     const uint8_t *_Nonnull src, size_t src_len);
 
+/* Universal file descriptor. */
 uint64_t pp_socket_fd(pp_socket _Nonnull sock);

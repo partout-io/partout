@@ -114,7 +114,7 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
         pp_socket_free(sock)
     }
 
-    public func connect() async throws {
+    public func connect(timeout: Int) async throws {
         let fd: UInt64
         if let sock {
             fd = pp_socket_fd(sock)
@@ -123,7 +123,13 @@ public actor POSIXDispatchSourceSocket: SocketIOInterface {
                 DispatchQueue.global().async {
                     let sock = endpoint.address.rawValue.withCString { cAddr in
                         // Open in non-blocking mode
-                        pp_socket_open(cAddr, endpoint.socketProto, endpoint.proto.port, false)
+                        pp_socket_open(
+                            cAddr,
+                            endpoint.socketProto,
+                            endpoint.proto.port,
+                            false,
+                            Int32(timeout)
+                        )
                     }
                     guard let sock else {
                         continuation.resume(throwing: PartoutError(.linkNotActive))

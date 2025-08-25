@@ -53,7 +53,8 @@ pp_socket pp_socket_create(uint64_t fd) {
 pp_socket pp_socket_open(const char *ip_addr,
                          pp_socket_proto proto,
                          uint16_t port,
-                         bool blocking) {
+                         bool blocking,
+                         int timeout) {
 #ifdef _WIN32
     static int wsa_initialized = 0;
     if (!wsa_initialized) {
@@ -66,10 +67,8 @@ pp_socket pp_socket_open(const char *ip_addr,
     }
 #endif
 
-    pp_socket sock = NULL;
-    struct addrinfo hints, *res = NULL;
-    char port_str[16];
-    snprintf(port_str, sizeof(port_str), "%u", port);
+    struct addrinfo hints, *resolved = NULL;
+    char port_str[16] = { 0 };
 
     pp_zero(&hints, sizeof(hints));
     hints.ai_family = AF_UNSPEC;   // IPv4 or IPv6
@@ -82,34 +81,31 @@ pp_socket pp_socket_open(const char *ip_addr,
             break;
     }
 
-    if (getaddrinfo(ip_addr, port_str, &hints, &res) != 0) {
+    snprintf(port_str, sizeof(port_str), "%u", port);
+    if (getaddrinfo(ip_addr, port_str, &hints, &resolved) != 0) {
         SOCKET_PRINT_ERROR("getaddrinfo()");
         goto failure;
     }
 
-    sock = pp_alloc(sizeof(struct _pp_socket));
-    sock->fd = OS_INVALID_SOCKET;
-
-    struct addrinfo *p;
-    for (p = res; p != NULL; p = p->ai_next) {
-        sock->fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (sock->fd == OS_INVALID_SOCKET) {
+    // Loop through resolved to find first working socket
+    os_socket_fd new_fd;
+    for (struct addrinfo *p = resolved; p != NULL; p = p->ai_next) {
+        new_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (new_fd == OS_INVALID_SOCKET) {
             SOCKET_PRINT_ERROR("socket()");
-            goto failed_socket;
+            continue;
         }
-        if (connect(sock->fd, p->ai_addr, (int)p->ai_addrlen) == 0) {
-            break; // Success
+        const int ret = connect(new_fd, p->ai_addr, (int)p->ai_addrlen);
+        if (ret != 0) {
+            os_close_socket(new_fd);
+            SOCKET_PRINT_ERROR("connect()");
+            continue;
         }
-        SOCKET_PRINT_ERROR("connect()");
-
-    failed_socket:
-        if (sock->fd != OS_INVALID_SOCKET) os_close_socket(sock->fd);
-        sock->fd = OS_INVALID_SOCKET;
+        // Exit loop on first success
+        break;
     }
-    freeaddrinfo(res);
-
-    // No socket in the for loop managed to connect()
-    if (sock->fd == OS_INVALID_SOCKET) {
+    freeaddrinfo(resolved);
+    if (new_fd == OS_INVALID_SOCKET) {
         goto failure;
     }
 
@@ -122,30 +118,29 @@ pp_socket pp_socket_open(const char *ip_addr,
 #else
     // Blocking by default
     if (!blocking) {
-        const int flags = fcntl(sock->fd, F_GETFL);
-        if (fcntl(sock->fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+        const int flags = fcntl(new_fd, F_GETFL);
+        if (fcntl(new_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
             SOCKET_PRINT_ERROR("fnctl()");
-            goto failed_socket;
+            goto failure;
         }
     }
 #endif
 
-    /* Best-effort to avoid port reuse. */
+    // Best-effort to avoid port reuse
     struct sockaddr_in local = { 0 };
     local.sin_family = AF_INET;
     local.sin_addr.s_addr = htonl(INADDR_ANY);
     local.sin_port = 0;
-    bind(sock->fd, (struct sockaddr *)&local, sizeof(local));
+    if (bind(new_fd, (struct sockaddr *)&local, sizeof(local)) < 0) {
+        SOCKET_PRINT_ERROR("bind()");
+        goto failure;
+    }
 
-    return sock;
+    // Success
+    return pp_socket_create(new_fd);
 
 failure:
-    if (sock) {
-        if (sock->fd != OS_INVALID_SOCKET) {
-            os_close_socket(sock->fd);
-        }
-        pp_free(sock);
-    }
+    if (new_fd != OS_INVALID_SOCKET) os_close_socket(new_fd);
     return NULL;
 }
 

@@ -53,9 +53,7 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
                 )
             }
         }
-
-        // FIXME: ###, POSIXSocket.waitForActivity() - handle timeout
-        try await socket.connect()
+        try await socket.connect(timeout: timeout)
         return socket
     }
 }

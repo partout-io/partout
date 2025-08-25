@@ -86,13 +86,19 @@ public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     }
 
     // Does nothing if the sock is already open and connected
-    public func connect() async throws {
+    public func connect(timeout: Int) async throws {
         guard sock == nil, let endpoint else { return }
         let sock: pp_socket = try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global().async {
                 let sock = endpoint.address.rawValue.withCString { cAddr in
                     // Open in blocking mode
-                    pp_socket_open(cAddr, endpoint.socketProto, endpoint.proto.port, true)
+                    pp_socket_open(
+                        cAddr,
+                        endpoint.socketProto,
+                        endpoint.proto.port,
+                        true,
+                        Int32(timeout)
+                    )
                 }
                 guard let sock else {
                     continuation.resume(throwing: PartoutError(.linkNotActive))
