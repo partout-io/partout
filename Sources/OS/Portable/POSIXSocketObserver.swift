@@ -30,7 +30,6 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
         let maxReadLength = self.maxReadLength
 
         // Use different implementations based on platform support
-        // POSIXDispatchSourceSocket throws .unhandled if unsupported
         do {
             socket = try AutoUpgradingSocket(endpoint: endpoint) {
                 try POSIXDispatchSourceSocket(
@@ -41,6 +40,7 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
                 )
             }
         } catch let error as PartoutError {
+            // POSIXDispatchSourceSocket throws .unhandled if unsupported
             guard error.code == .unhandled else {
                 throw error
             }
