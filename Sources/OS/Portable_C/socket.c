@@ -33,6 +33,8 @@
 #include "portable/common.h"
 #include "portable/socket.h"
 
+int connect_with_timeout(os_socket_fd fd, const struct sockaddr *addr, socklen_t addrlen, int timeout_ms);
+
 /* Host a file descriptor with the specific platform type. POSIX systems
  * use int, whereas Windows uses SOCKET.  */
 struct _pp_socket {
@@ -95,7 +97,7 @@ pp_socket pp_socket_open(const char *ip_addr,
             SOCKET_PRINT_ERROR("socket()");
             continue;
         }
-        const int ret = connect(new_fd, p->ai_addr, (int)p->ai_addrlen);
+        const int ret = connect_with_timeout(new_fd, p->ai_addr, (int)p->ai_addrlen, timeout);
         if (ret != 0) {
             os_close_socket(new_fd);
             SOCKET_PRINT_ERROR("connect()");
@@ -181,4 +183,78 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
 uint64_t pp_socket_fd(pp_socket sock) {
     assert(sock && sock->fd != OS_INVALID_SOCKET);
     return sock->fd;
+}
+
+int connect_with_timeout(os_socket_fd fd, const struct sockaddr *addr, socklen_t addrlen, int timeout_ms) {
+    int ret;
+
+#ifdef _WIN32
+    // Set non-blocking
+    u_long mode = 1;
+    ioctlsocket(fd, FIONBIO, &mode);
+#else
+    // Set non-blocking
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0) return -1;
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+#endif
+
+    ret = connect(fd, addr, addrlen);
+    if (ret == 0) {
+        // Connected immediately
+        goto done;
+    }
+
+#ifdef _WIN32
+    if (WSAGetLastError() != WSAEWOULDBLOCK && WSAGetLastError() != WSAEINPROGRESS) {
+        return -1; // real error
+    }
+#else
+    if (errno != EINPROGRESS) {
+        return -1; // real error
+    }
+#endif
+
+    // Wait for socket to be writable
+    fd_set wfds;
+    FD_ZERO(&wfds);
+    FD_SET(fd, &wfds);
+
+    struct timeval tv;
+    tv.tv_sec = timeout_ms / 1000;
+    tv.tv_usec = (timeout_ms % 1000) * 1000;
+
+    ret = select(fd + 1, NULL, &wfds, NULL, &tv);
+    if (ret == 0) {
+        return -2; // timeout
+    } else if (ret < 0) {
+        return -1; // select error
+    }
+
+    // Check SO_ERROR to see if connect succeeded
+    int err = 0;
+    socklen_t len = sizeof(err);
+#ifdef _WIN32
+    getsockopt(sock, SOL_SOCKET, SO_ERROR, (char*)&err, &len);
+    if (err != 0) {
+        WSASetLastError(err);
+        return -1;
+    }
+#else
+    getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len);
+    if (err != 0) {
+        errno = err;
+        return -1;
+    }
+#endif
+
+done:
+    // Restore blocking mode
+#ifdef _WIN32
+    mode = 0;
+    ioctlsocket(sock, FIONBIO, &mode);
+#else
+    fcntl(fd, F_SETFL, flags);
+#endif
+    return 0; // success
 }
