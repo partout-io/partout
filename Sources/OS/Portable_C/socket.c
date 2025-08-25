@@ -126,16 +126,6 @@ pp_socket pp_socket_open(const char *ip_addr,
     }
 #endif
 
-    // Best-effort to avoid port reuse
-    struct sockaddr_in local = { 0 };
-    local.sin_family = AF_INET;
-    local.sin_addr.s_addr = htonl(INADDR_ANY);
-    local.sin_port = 0;
-    if (bind(new_fd, (struct sockaddr *)&local, sizeof(local)) < 0) {
-        SOCKET_PRINT_ERROR("bind()");
-        goto failure;
-    }
-
     // Success
     return pp_socket_create(new_fd);
 
