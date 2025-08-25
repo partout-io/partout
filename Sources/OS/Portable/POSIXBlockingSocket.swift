@@ -152,11 +152,7 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
         }
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                writeQueue.async { [weak self] in
-                    guard let self else {
-                        continuation.resume(throwing: PartoutError(.releasedObject))
-                        return
-                    }
+                writeQueue.async {
                     for toWrite in packets {
                         guard !toWrite.isEmpty else { continue }
                         let writtenCount = toWrite.withUnsafeBytes {
@@ -186,3 +182,6 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
         self.sock = nil
     }
 }
+
+// XXX: Suppress warnings for safe cross-Task usage (struct is immutable)
+extension pp_socket: @retroactive @unchecked Sendable {}
