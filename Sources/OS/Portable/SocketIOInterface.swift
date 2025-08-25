@@ -6,6 +6,8 @@
 import PartoutCore
 #endif
 
-public protocol ClosingIOInterface: IOInterface {
+public protocol SocketIOInterface: IOInterface {
+    func connect() async throws
+
     func shutdown() async
 }

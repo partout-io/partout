@@ -8,23 +8,27 @@ import PartoutCore
 #endif
 
 public final class AutoUpgradingSocket: LinkInterface {
-    private let io: ClosingIOInterface
+    private let io: SocketIOInterface
 
     private let endpoint: ExtendedEndpoint
 
-    private let upgradedBlock: @Sendable (ExtendedEndpoint) throws -> ClosingIOInterface
+    private let upgradedBlock: @Sendable (ExtendedEndpoint) throws -> SocketIOInterface
 
     private let betterPathStream: PassthroughStream<Void>
 
     public init(
         endpoint: ExtendedEndpoint,
-        upgradedBlock: @escaping @Sendable (ExtendedEndpoint) throws -> ClosingIOInterface
+        upgradedBlock: @escaping @Sendable (ExtendedEndpoint) throws -> SocketIOInterface
     ) throws {
         io = try upgradedBlock(endpoint)
         self.endpoint = endpoint
         self.upgradedBlock = upgradedBlock
         // FIXME: ###, POSIXSocket, implement or receive betterPathStream
         betterPathStream = PassthroughStream()
+    }
+
+    public func connect() async throws {
+        try await io.connect()
     }
 
     public nonisolated var remoteAddress: String {

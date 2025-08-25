@@ -48,7 +48,8 @@ pp_socket pp_socket_create(uint64_t fd) {
 }
 
 /* Open a socket to an IP address, an UDP/TCP protocol, and a port. Set
- * the non-blocking flag as an option. */
+ * the non-blocking flag as an option. Beware with Swift Concurrency that
+ * this function is blocking regardless of the blocking argument. */
 pp_socket pp_socket_open(const char *ip_addr,
                          pp_socket_proto proto,
                          uint16_t port,
@@ -81,7 +82,6 @@ pp_socket pp_socket_open(const char *ip_addr,
             break;
     }
 
-    // FIXME: ###, getaddrinfo() is blocking!
     if (getaddrinfo(ip_addr, port_str, &hints, &res) != 0) {
         SOCKET_PRINT_ERROR("getaddrinfo()");
         goto failure;
@@ -97,12 +97,6 @@ pp_socket pp_socket_open(const char *ip_addr,
             SOCKET_PRINT_ERROR("socket()");
             goto failed_socket;
         }
-
-        // FIXME: ###, connect() is blocking!
-//        // Make non-blocking?
-//        const int flags = fcntl(fd, F_GETFL);
-//        if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) goto failed_socket;
-
         if (connect(sock->fd, p->ai_addr, (int)p->ai_addrlen) == 0) {
             break; // Success
         }

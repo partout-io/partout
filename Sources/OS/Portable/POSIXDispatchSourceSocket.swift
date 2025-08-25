@@ -11,7 +11,7 @@ import PartoutCore
 // DispatchSource seems broken on Windows. Android?
 #if os(macOS) || os(iOS) || os(tvOS) || os(Linux)
 
-public actor POSIXDispatchSourceSocket: ClosingIOInterface {
+public actor POSIXDispatchSourceSocket: SocketIOInterface {
     public static var isSupported: Bool {
         true
     }
@@ -19,6 +19,8 @@ public actor POSIXDispatchSourceSocket: ClosingIOInterface {
     private let queue: DispatchQueue
 
     private var sock: pp_socket?
+
+    private let endpoint: ExtendedEndpoint?
 
     private let isOwned: Bool
 
@@ -41,27 +43,40 @@ public actor POSIXDispatchSourceSocket: ClosingIOInterface {
         closesOnEmptyRead: Bool,
         maxReadLength: Int
     ) throws {
-        // Open in non-blocking mode
-        guard let sock = endpoint.address.rawValue.withCString({ cAddr in
-            pp_socket_open(cAddr, endpoint.socketProto, endpoint.proto.port, false)
-        }) else {
-            throw PartoutError(.linkNotActive)
-        }
         self.init(
-            sock,
+            sock: nil,
+            endpoint: endpoint,
             isOwned: true,
             closesOnEmptyRead: closesOnEmptyRead,
             maxReadLength: maxReadLength
         )
     }
 
-    // Assumes fd to be an open socket descriptor
+    // Assumes fd to be an open socket descriptor. The socket is closed
+    // on deinit if and only if isOwned is true.
     public init(
         _ sock: pp_socket,
-        isOwned: Bool, // Close on deinit
         closesOnEmptyRead: Bool,
         maxReadLength: Int
     ) {
+        self.init(
+            sock: sock,
+            endpoint: nil,
+            isOwned: false,
+            closesOnEmptyRead: closesOnEmptyRead,
+            maxReadLength: maxReadLength
+        )
+    }
+
+    private init(
+        sock: pp_socket?,
+        endpoint: ExtendedEndpoint?,
+        isOwned: Bool,
+        closesOnEmptyRead: Bool,
+        maxReadLength: Int
+    ) {
+        precondition(sock != nil || endpoint != nil)
+
         /* No, you don’t have to call resume(), suspend(), or cancel() on the same queue
          * that you created the source with. GCD sources are thread-safe for those
          * methods. What matters is:
@@ -71,32 +86,17 @@ public actor POSIXDispatchSourceSocket: ClosingIOInterface {
          * - You can call resume(), suspend(), or cancel() from any thread (including
          *   from an actor or a Task).
          */
-        let fd = pp_socket_fd(sock)
-        let queue = DispatchQueue(label: "POSIXInterface[\(fd)]")
-        let readSource = DispatchSource.makeReadSource(fileDescriptor: Int32(fd), queue: queue)
-        let writeSource = DispatchSource.makeWriteSource(fileDescriptor: Int32(fd), queue: queue)
+        let queueLabelContext = sock.map { pp_socket_fd($0) }?.description ?? endpoint?.description ?? "*"
+        let queue = DispatchQueue(label: "POSIXInterface[\(queueLabelContext)]")
 
         self.queue = queue
         self.sock = sock
+        self.endpoint = endpoint
         self.isOwned = isOwned
         self.closesOnEmptyRead = closesOnEmptyRead
-        self.readSource = readSource
-        self.writeSource = writeSource
         readBuf = [UInt8](repeating: 0, count: maxReadLength)
         writeQueue = []
         isWriteResumed = false
-
-        readSource.setEventHandler { [weak self] in
-            Task {
-                await self?.handleReadEvent()
-            }
-        }
-        writeSource.setEventHandler { [weak self] in
-            Task {
-                await self?.handleWriteEvent()
-            }
-        }
-        readSource.resume()
     }
 
     deinit {
@@ -108,9 +108,46 @@ public actor POSIXDispatchSourceSocket: ClosingIOInterface {
         if !isWriteResumed {
             writeSource?.resume()
         }
-        if isOwned {
-            pp_socket_free(sock)
+        guard isOwned else { return }
+        pp_socket_free(sock)
+    }
+
+    public func connect() async throws {
+        let fd: UInt64
+        if let sock {
+            fd = pp_socket_fd(sock)
+        } else if let endpoint {
+            sock = try await withCheckedThrowingContinuation { continuation in
+                DispatchQueue.global().async {
+                    let sock = endpoint.address.rawValue.withCString { cAddr in
+                        // Open in non-blocking mode
+                        pp_socket_open(cAddr, endpoint.socketProto, endpoint.proto.port, false)
+                    }
+                    guard let sock else {
+                        continuation.resume(throwing: PartoutError(.linkNotActive))
+                        return
+                    }
+                    continuation.resume(returning: sock)
+                }
+            }
+            fd = pp_socket_fd(sock!)
+        } else {
+            fatalError("Both sock and endpoint are nil")
         }
+
+        readSource = DispatchSource.makeReadSource(fileDescriptor: Int32(fd), queue: queue)
+        writeSource = DispatchSource.makeWriteSource(fileDescriptor: Int32(fd), queue: queue)
+        readSource?.setEventHandler { [weak self] in
+            Task {
+                await self?.handleReadEvent()
+            }
+        }
+        writeSource?.setEventHandler { [weak self] in
+            Task {
+                await self?.handleWriteEvent()
+            }
+        }
+        readSource?.resume()
     }
 
     public func readPackets() async throws -> [Data] {
@@ -157,8 +194,8 @@ public actor POSIXDispatchSourceSocket: ClosingIOInterface {
         writeSource = nil
         if isOwned {
             pp_socket_free(sock)
-            self.sock = nil
         }
+        self.sock = nil
     }
 }
 
@@ -178,8 +215,6 @@ private extension POSIXDispatchSourceSocket {
                 }
                 return
             }
-            // FIXME: ###
-            fatalError("handleReadEvent")
             readContinuation.resume(throwing: PartoutError(.linkFailure))
             return
         }
@@ -199,8 +234,6 @@ private extension POSIXDispatchSourceSocket {
                     pp_socket_write(sock, $0.bytePointer, $0.count)
                 }
                 guard writtenCount >= 0 else {
-                    // FIXME: ###
-                    fatalError("handleWriteEvent")
                     continuation.resume(throwing: PartoutError(.linkFailure))
                     return
                 }
@@ -239,7 +272,7 @@ public final class POSIXDispatchSourceSocket: ClosingIOInterface {
         endpoint: ExtendedEndpoint,
         closesOnEmptyRead: Bool,
         maxReadLength: Int
-    ) throws {
+    ) async throws {
         fatalError()
     }
 

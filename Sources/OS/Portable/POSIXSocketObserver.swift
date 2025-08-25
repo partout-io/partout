@@ -19,13 +19,13 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
     }
 
     public func waitForActivity(timeout: Int) async throws -> LinkInterface {
-        // FIXME: ###, POSIXSocket.waitForActivity() - handle timeout
-        // FIXME: ###, POSIXSocket.waitForActivity() - pp_socket_open is blocking
-
+        let socket: AutoUpgradingSocket
         let closesOnEmptyRead = endpoint.proto.socketType == .tcp
         let maxReadLength = self.maxReadLength
+
+        // Use different implementations based on platform support
         if POSIXDispatchSourceSocket.isSupported {
-            return try AutoUpgradingSocket(endpoint: endpoint) {
+            socket = try AutoUpgradingSocket(endpoint: endpoint) {
                 try POSIXDispatchSourceSocket(
                     endpoint: $0,
                     closesOnEmptyRead: closesOnEmptyRead,
@@ -33,7 +33,7 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
                 )
             }
         } else {
-            return try AutoUpgradingSocket(endpoint: endpoint) {
+            socket = try AutoUpgradingSocket(endpoint: endpoint) {
                 try POSIXBlockingSocket(
                     endpoint: $0,
                     closesOnEmptyRead: closesOnEmptyRead,
@@ -41,5 +41,9 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
                 )
             }
         }
+
+        // FIXME: ###, POSIXSocket.waitForActivity() - handle timeout
+        try await socket.connect()
+        return socket
     }
 }

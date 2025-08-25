@@ -8,12 +8,14 @@ import _PartoutOSPortable_C
 import PartoutCore
 #endif
 
-public final class POSIXBlockingSocket: ClosingIOInterface, @unchecked Sendable {
+public final class POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     private let readQueue: DispatchQueue
 
     private let writeQueue: DispatchQueue
 
     private var sock: pp_socket?
+
+    private let endpoint: ExtendedEndpoint?
 
     private let isOwned: Bool
 
@@ -26,40 +28,74 @@ public final class POSIXBlockingSocket: ClosingIOInterface, @unchecked Sendable 
         closesOnEmptyRead: Bool,
         maxReadLength: Int
     ) throws {
-        // Open in blocking mode
-        guard let sock = endpoint.address.rawValue.withCString({ cAddr in
-            pp_socket_open(cAddr, endpoint.socketProto, endpoint.proto.port, true)
-        }) else {
-            throw PartoutError(.linkNotActive)
-        }
         self.init(
-            sock,
+            sock: nil,
+            endpoint: endpoint,
             isOwned: true,
             closesOnEmptyRead: closesOnEmptyRead,
             maxReadLength: maxReadLength
         )
     }
 
-    // Assumes fd to be an open socket descriptor
-    public init(
+    // Assumes fd to be an open socket descriptor. The socket is closed
+    // on deinit if and only if isOwned is true.
+    public convenience init(
         _ sock: pp_socket,
-        isOwned: Bool, // Close on deinit
         closesOnEmptyRead: Bool,
         maxReadLength: Int
     ) {
-        readQueue = DispatchQueue(label: "POSIXBlockingSocket[R:\(pp_socket_fd(sock))]")
-        writeQueue = DispatchQueue(label: "POSIXBlockingSocket[W:\(pp_socket_fd(sock))]")
+        self.init(
+            sock: sock,
+            endpoint: nil,
+            isOwned: false,
+            closesOnEmptyRead: closesOnEmptyRead,
+            maxReadLength: maxReadLength
+        )
+    }
+
+    private init(
+        sock: pp_socket?,
+        endpoint: ExtendedEndpoint?,
+        isOwned: Bool,
+        closesOnEmptyRead: Bool,
+        maxReadLength: Int
+    ) {
+        precondition(sock != nil || endpoint != nil)
+        let queueLabelContext = sock.map { pp_socket_fd($0) }?.description ?? endpoint?.description ?? "*"
+        readQueue = DispatchQueue(label: "POSIXBlockingSocket[R:\(queueLabelContext)]")
+        writeQueue = DispatchQueue(label: "POSIXBlockingSocket[W:\(queueLabelContext)]")
         self.sock = sock
+        self.endpoint = endpoint
         self.isOwned = isOwned
         self.closesOnEmptyRead = closesOnEmptyRead
         readBuf = [UInt8](repeating: 0, count: maxReadLength)
     }
 
     deinit {
-        guard let sock else { return }
-        if isOwned {
-            // FIXME: ###, does this interrupt recv/send?
-            pp_socket_free(sock)
+        guard let sock, isOwned else { return }
+        pp_socket_free(sock)
+    }
+
+    // Does nothing if the sock is already open and connected
+    public func connect() async throws {
+        guard sock == nil, let endpoint else { return }
+        let sock: pp_socket = try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global().async {
+                let sock = endpoint.address.rawValue.withCString { cAddr in
+                    // Open in blocking mode
+                    pp_socket_open(cAddr, endpoint.socketProto, endpoint.proto.port, true)
+                }
+                guard let sock else {
+                    continuation.resume(throwing: PartoutError(.linkNotActive))
+                    return
+                }
+                continuation.resume(returning: sock)
+            }
+        }
+        readQueue.sync {
+            writeQueue.sync {
+                self.sock = sock
+            }
         }
     }
 
