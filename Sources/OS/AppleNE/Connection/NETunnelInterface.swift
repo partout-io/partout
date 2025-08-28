@@ -33,6 +33,6 @@ public final class NETunnelInterface: IOInterface {
 
     public func writePackets(_ packets: [Data]) {
         let protocols = packets.map(IPHeader.protocolNumber(inPacket:))
-        impl?.writePackets(packets, withProtocols: protocols)
+        impl?.writePackets(packets, withProtocols: protocols as [NSNumber])
     }
 }
