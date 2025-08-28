@@ -40,21 +40,12 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
         let link = try AutoUpgradingLink(
             endpoint: endpoint,
             ioBlock: {
-                if POSIXDispatchSourceSocket.isSupported {
-                    try POSIXDispatchSourceSocket(
-                        ctx,
-                        endpoint: $0,
-                        closesOnEmptyRead: closesOnEmptyRead,
-                        maxReadLength: maxReadLength
-                    )
-                } else {
-                    try POSIXBlockingSocket(
-                        ctx,
-                        endpoint: $0,
-                        closesOnEmptyRead: closesOnEmptyRead,
-                        maxReadLength: maxReadLength
-                    )
-                }
+                try POSIXBlockingSocket(
+                    ctx,
+                    endpoint: $0,
+                    closesOnEmptyRead: closesOnEmptyRead,
+                    maxReadLength: maxReadLength
+                )
             },
             betterPathBlock: { [weak self] in
                 guard let self else { throw PartoutError(.releasedObject) }
