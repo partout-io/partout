@@ -6,6 +6,7 @@
 import PartoutCore
 #endif
 
+// FIXME: #188, @MainActor maybe
 final class ABIContext {
     let registry: Registry
 
