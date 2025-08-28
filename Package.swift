@@ -71,6 +71,10 @@ let package = Package(
         .library(
             name: "PartoutInterfaces",
             targets: ["PartoutInterfaces"]
+        ),
+        .executable(
+            name: "partoutd",
+            targets: ["partoutd"]
         )
     ],
     targets: [
@@ -130,6 +134,10 @@ let package = Package(
                 }
                 return list
             }(),
+        ),
+        .executableTarget(
+            name: "partoutd",
+            dependencies: ["Partout"]
         ),
         .testTarget(
             name: "PartoutTests",
@@ -639,6 +647,7 @@ case .android:
         ),
         .target(
             name: "_PartoutOSAndroid_C",
+            dependencies: ["_PartoutOSPortable_C"],
             path: "Sources/OS/Android_C"
         )
     ])
@@ -708,6 +717,7 @@ case .linux:
         ),
         .target(
             name: "_PartoutOSLinux_C",
+            dependencies: ["_PartoutOSPortable_C"],
             path: "Sources/OS/Linux_C"
         )
     ])
@@ -723,6 +733,7 @@ case .windows:
         ),
         .target(
             name: "_PartoutOSWindows_C",
+            dependencies: ["_PartoutOSPortable_C"],
             path: "Sources/OS/Windows_C"
         )
     ])
@@ -826,3 +837,13 @@ package.targets.append(contentsOf: [
         path: "Tests/Vendors/Core"
     )
 ])
+
+// MARK: - Test executables
+
+package.targets.append(
+    .executableTarget(
+        name: "test-posix-interface",
+        dependencies: ["PartoutInterfaces"]
+
+    )
+)

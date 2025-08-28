@@ -132,7 +132,11 @@ void pp_socket_free(pp_socket sock) {
 /* Read up to dst_len bytes, and return the amount of the actually read
  * bytes. Returns < 0 on failure. */
 int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
+#ifdef _WIN32
     const int read_len = (int)recv(sock->fd, (void *)dst, dst_len, 0);
+#else
+    const int read_len = (int)read(sock->fd, (void *)dst, dst_len);
+#endif
     if (read_len < 0) {
         /* If no messages are available at the socket, the receive call waits
          * for a message to arrive, unless the socket is nonblocking (see fcntl(2))
@@ -151,7 +155,11 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
 int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
     size_t remaining = src_len;
     while (remaining > 0) {
+#ifdef _WIN32
         const int written_len = (int)send(sock->fd, (void *)src, src_len, 0);
+#else
+        const int written_len = (int)write(sock->fd, (void *)src, src_len);
+#endif
         if (written_len < 0) {
             if (errno == EAGAIN) {
                 return 0;
@@ -248,18 +256,18 @@ done:
     if (blocking) {
 #ifdef _WIN32
         mode = 0;
-        if (ioctlsocket(sock->fd, FIONBIO, &mode) == SOCKET_ERROR) {
+        if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
             SOCKET_PRINT_ERROR("ioctlsocket()");
-            goto failure;
+            return -1;
         }
 #else
         flags = fcntl(fd, F_GETFL);
-        if (fcntl(fd, F_SETFL, flags) < 0) {
+        if (fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) < 0) {
             SOCKET_PRINT_ERROR("fnctl()");
             return -1;
         }
-    }
 #endif
+    }
 
     // Success
     return 0;

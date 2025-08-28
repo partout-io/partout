@@ -5,3 +5,7 @@
  */
 
 const char *partout_version();
+
+void *partout_initialize(const char *cache_dir);
+int partout_daemon_start(void *ctx, const char *profile);
+void partout_daemon_stop(void *ctx);
