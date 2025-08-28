@@ -71,6 +71,10 @@ let package = Package(
         .library(
             name: "PartoutInterfaces",
             targets: ["PartoutInterfaces"]
+        ),
+        .executable(
+            name: "partoutd",
+            targets: ["partoutd"]
         )
     ],
     targets: [
@@ -130,6 +134,10 @@ let package = Package(
                 }
                 return list
             }(),
+        ),
+        .executableTarget(
+            name: "partoutd",
+            dependencies: ["Partout"]
         ),
         .testTarget(
             name: "PartoutTests",
