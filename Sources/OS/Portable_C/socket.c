@@ -256,18 +256,18 @@ done:
     if (blocking) {
 #ifdef _WIN32
         mode = 0;
-        if (ioctlsocket(sock->fd, FIONBIO, &mode) == SOCKET_ERROR) {
+        if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
             SOCKET_PRINT_ERROR("ioctlsocket()");
-            goto failure;
+            return -1;
         }
 #else
         flags = fcntl(fd, F_GETFL);
-        if (fcntl(fd, F_SETFL, flags) < 0) {
+        if (fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) < 0) {
             SOCKET_PRINT_ERROR("fnctl()");
             return -1;
         }
-    }
 #endif
+    }
 
     // Success
     return 0;
