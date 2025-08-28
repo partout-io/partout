@@ -829,3 +829,13 @@ package.targets.append(contentsOf: [
         path: "Tests/Vendors/Core"
     )
 ])
+
+// MARK: - Test executables
+
+package.targets.append(
+    .executableTarget(
+        name: "test-posix-interface",
+        dependencies: ["PartoutInterfaces"]
+
+    )
+)
