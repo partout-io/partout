@@ -240,8 +240,8 @@ private extension POSIXDispatchSourceSocket {
 //        pp_log(ctx, .core, .debug, "Handle write event")
         while !writeQueue.isEmpty {
             let (packets, continuation) = writeQueue.removeFirst()
-            packets.forEach {
-                let writtenCount = $0.withUnsafeBytes {
+            for p in packets {
+                let writtenCount = p.withUnsafeBytes {
                     pp_socket_write(sock, $0.bytePointer, $0.count)
                 }
                 guard writtenCount >= 0 else {
