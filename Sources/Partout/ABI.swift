@@ -10,7 +10,13 @@ import PartoutCore
 
 var ctx: ABIContext?
 
-// FIXME: #188, ABI is still optimistic, e.g. doesn't handle concurrency or double start/stop calls
+// FIXME: #188, ABI is still optimistic
+//
+// - doesn't handle concurrency
+// - doesn't check preconditions like double start/stop calls
+// - doesn't exit on async failure becuase exceptions are thrown inside tasks
+// - doesn't handle interrupts/signals (should exit or at least handle them)
+//
 
 @_cdecl("partout_version")
 public func partout_version() -> UnsafePointer<CChar> {
