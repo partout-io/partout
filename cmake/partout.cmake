@@ -6,6 +6,9 @@ file(GLOB_RECURSE PARTOUT_SOURCES
 
 # Set up global exclusions
 set(EXCLUDED_PATTERNS
+    # Executables
+    partoutd
+    test-.*
     # Unnecessary exports (wrong in monolith)
     Partout.*\/Exports\.swift
     PartoutOpenVPN\/Wrapper\/OpenVPNWrapper\.swift
