@@ -10,7 +10,7 @@ import PartoutCore
 
 var ctx: ABIContext?
 
-// FIXME: #188, ABI is still optimistic, e.g. doesn't handle double start/stop calls
+// FIXME: #188, ABI is still optimistic, e.g. doesn't handle concurrency or double start/stop calls
 
 @_cdecl("partout_version")
 public func partout_version() -> UnsafePointer<CChar> {
@@ -93,7 +93,7 @@ public func partout_daemon_start(cCtx: UnsafeMutableRawPointer, cProfile: Unsafe
     //print(ovpn)
 
     // This task is short-lived
-    Task { @MainActor in
+    Task {
         do {
             // try await Task.sleep(interval: 3.0)
             try await daemon.start()
@@ -110,7 +110,7 @@ public func partout_daemon_start(cCtx: UnsafeMutableRawPointer, cProfile: Unsafe
 @_cdecl("partout_daemon_stop")
 public func partout_daemon_stop(cCtx: UnsafeMutableRawPointer) {
     let ctx = ABIContext.fromOpaque(cCtx)
-    Task { @MainActor in
+    Task {
         await ctx.daemon?.stop()
         ctx.daemon = nil
     }
