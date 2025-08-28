@@ -10,6 +10,8 @@ import PartoutCore
 
 var ctx: ABIContext?
 
+// FIXME: #188, ABI is still optimistic, e.g. doesn't handle double start/stop calls
+
 @_cdecl("partout_version")
 public func partout_version() -> UnsafePointer<CChar> {
     UnsafePointer(pp_dup(Partout.version))
@@ -20,7 +22,7 @@ public func partout_initialize(cCacheDir: UnsafePointer<CChar>) -> UnsafeMutable
     let cacheDir = String(cString: cCacheDir)
 
     var logBuilder = PartoutLogger.Builder()
-    // FIXME: ###, some categories are conditional
+    // FIXME: #187, check defines for conditional areas
     logBuilder.setDestination(NSLogDestination(), for: [
         .core,
         .api,
@@ -91,7 +93,7 @@ public func partout_daemon_start(cCtx: UnsafeMutableRawPointer, cProfile: Unsafe
     //print(ovpn)
 
     // This task is short-lived
-    Task {
+    Task { @MainActor in
         do {
             // try await Task.sleep(interval: 3.0)
             try await daemon.start()
@@ -108,7 +110,7 @@ public func partout_daemon_start(cCtx: UnsafeMutableRawPointer, cProfile: Unsafe
 @_cdecl("partout_daemon_stop")
 public func partout_daemon_stop(cCtx: UnsafeMutableRawPointer) {
     let ctx = ABIContext.fromOpaque(cCtx)
-    Task {
+    Task { @MainActor in
         await ctx.daemon?.stop()
         ctx.daemon = nil
     }
