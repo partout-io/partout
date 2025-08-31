@@ -71,8 +71,8 @@ extension OpenVPNTCPLink: LinkInterface {
         }
     }
 
-    func upgraded() throws -> LinkInterface {
-        OpenVPNTCPLink(link: try link.upgraded(), proc: proc)
+    func upgraded() async throws -> LinkInterface {
+        OpenVPNTCPLink(link: try await link.upgraded(), proc: proc)
     }
 
     func shutdown() {
@@ -83,6 +83,10 @@ extension OpenVPNTCPLink: LinkInterface {
 // MARK: - IOInterface
 
 extension OpenVPNTCPLink {
+    var fileDescriptor: UInt64? {
+        link.fileDescriptor
+    }
+
     func readPackets() async throws -> [Data] {
         fatalError("readPackets() unavailable")
     }

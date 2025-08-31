@@ -12,15 +12,17 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
 
     override func startTunnel(options: [String: NSObject]? = nil) async throws {
         do {
+            // Decode profile
+            let profile = try Profile(withNEProvider: self, decoder: .shared)
+
+            // Set IPC environment
+            let environment = Demo.tunnelEnvironment
+
             // NetworkExtension specifics
             let controller = try await NETunnelController(
                 provider: self,
-                decoder: .shared,
-                registry: .shared,
-                options: .init(),
-                environmentFactory: { _ in
-                    Demo.tunnelEnvironment
-                }
+                profile: profile,
+                options: .init()
             )
 
             var loggerBuilder = PartoutLogger.Builder()
@@ -39,10 +41,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
             )
             PartoutLogger.register(loggerBuilder.build())
 
-            let ctx = PartoutLoggerContext(controller.originalProfile.id)
+            let ctx = PartoutLoggerContext(profile.id)
             self.ctx = ctx
 
-            fwd = try NEPTPForwarder(ctx, controller: controller)
+            fwd = try NEPTPForwarder(
+                ctx,
+                profile: profile,
+                registry: .shared,
+                controller: controller,
+                environment: environment
+            )
             try await fwd?.startTunnel(options: [:])
         } catch {
             flushLog()

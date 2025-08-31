@@ -58,7 +58,7 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
             fatalError("No WireGuard configuration defined?")
         }
 
-        let tweakedConfiguration = try configuration.withModules(from: parameters.controller.profile)
+        let tweakedConfiguration = try configuration.withModules(from: parameters.profile)
         tunnelConfiguration = try tweakedConfiguration.toWireGuardConfiguration()
 
         dataCountTimerInterval = TimeInterval(parameters.options.minDataCountInterval) / 1000.0
@@ -192,10 +192,12 @@ private extension WireGuardConnection {
 
             Task {
                 do {
-                    try await connection.controller.setTunnelSettings(with: TunnelRemoteInfo(
+                    _ = try await connection.controller.setTunnelSettings(with: TunnelRemoteInfo(
                         originalModuleId: connection.moduleId,
                         address: addressObject,
-                        modules: [module]
+                        modules: [module],
+                        // FIXME: #188, fd is required by Android
+                        fileDescriptor: nil
                     ))
                     completionHandler?(nil)
                     pp_log(connection.ctx, .wireguard, .info, "Tunnel interface is now UP")

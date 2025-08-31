@@ -18,16 +18,14 @@ public func makeDaemon(with profile: Profile, registry: Registry) throws -> Simp
     let factory = POSIXInterfaceFactory(ctx) {
         PassthroughStream()
     }
-    let tun = DummyTunnelinterface()
-    let controller = DummyTunnelController(profile: profile)
+    let controller = DummyTunnelController()
     let reachability = DummyReachabilityObserver()
-
     let environment = SharedTunnelEnvironment(profileId: profile.id)
     let messageHandler = DefaultMessageHandler(ctx, environment: environment)
     let connParams = ConnectionParameters(
+        profile: profile,
         controller: controller,
         factory: factory,
-        tunnelInterface: tun,
         environment: environment,
         options: ConnectionParameters.Options()
     )

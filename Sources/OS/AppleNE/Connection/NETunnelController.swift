@@ -8,6 +8,21 @@ import Foundation
 import PartoutCore
 #endif
 
+extension Profile {
+    public init(withNEProvider provider: NETunnelProvider, decoder: NEProtocolDecoder) throws {
+        guard let tunnelConfiguration = provider.protocolConfiguration as? NETunnelProviderProtocol else {
+            pp_log_g(.ne, .error, "Unable to parse profile from NETunnelProviderProtocol")
+            throw PartoutError(.decoding)
+        }
+        do {
+            self = try decoder.profile(from: tunnelConfiguration)
+        } catch {
+            pp_log_g(.ne, .error, "Unable to decode and process profile: \(error)")
+            throw error
+        }
+    }
+}
+
 /// Implementation of a ``/PartoutCore/TunnelController`` via `NEPacketTunnelProvider`.
 public final class NETunnelController: TunnelController {
     public struct Options: Sendable {
@@ -21,50 +36,33 @@ public final class NETunnelController: TunnelController {
     nonisolated(unsafe)
     public private(set) weak var provider: NEPacketTunnelProvider?
 
-    public let registry: Registry
+    private let profile: Profile
 
     private let options: Options
 
-    public let profile: Profile
-
-    public let originalProfile: Profile
-
-    public let environment: TunnelEnvironment
+    private let tun: NETunnelInterface
 
     public init(
         provider: NEPacketTunnelProvider,
-        decoder: NEProtocolDecoder,
-        registry: Registry,
-        options: Options,
-        environmentFactory: @escaping (Profile.ID) -> TunnelEnvironment,
-        willProcess: ((Profile) async throws -> Profile)? = nil
+        profile: Profile,
+        options: Options
     ) async throws {
-        guard let tunnelConfiguration = provider.protocolConfiguration as? NETunnelProviderProtocol else {
-            pp_log_g(.ne, .error, "Unable to parse profile from NETunnelProviderProtocol")
-            throw PartoutError(.decoding)
-        }
         self.provider = provider
-        self.registry = registry
+        self.profile = profile
         self.options = options
-        do {
-            originalProfile = try decoder.profile(from: tunnelConfiguration)
-            let resolvedProfile = try registry.resolvedProfile(originalProfile)
-            profile = try await willProcess?(resolvedProfile) ?? resolvedProfile
-        } catch {
-            pp_log_g(.ne, .error, "Unable to decode and process profile: \(error)")
-            throw error
-        }
-        environment = environmentFactory(profile.id)
+        tun = NETunnelInterface(.init(profile.id), impl: provider.packetFlow)
     }
 
-    public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws {
+    public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
         guard let provider else {
             logReleasedProvider()
-            return
+            throw PartoutError(.releasedObject)
         }
         let tunnelSettings = profile.networkSettings(with: info, options: options)
         pp_log_id(profile.id, .ne, .info, "Commit tunnel settings: \(tunnelSettings)")
         try await provider.setTunnelNetworkSettings(tunnelSettings)
+
+        return tun
     }
 
     public func clearTunnelSettings() async {

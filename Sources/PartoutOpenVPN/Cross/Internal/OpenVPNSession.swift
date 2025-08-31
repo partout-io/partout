@@ -148,9 +148,7 @@ extension OpenVPNSession: OpenVPNSessionProtocol {
             pp_log(ctx, .openvpn, .error, "Tunnel interface already set")
             return
         }
-
         pp_log(ctx, .openvpn, .info, "Start TUN loop")
-
         self.tunnel = tunnel
         loopTunnel()
     }
@@ -160,12 +158,9 @@ extension OpenVPNSession: OpenVPNSessionProtocol {
             pp_log(ctx, .openvpn, .error, "Link interface already set")
             return
         }
-
         pp_log(ctx, .openvpn, .info, "Start VPN session")
-
         self.link = link
         sessionState = .starting
-
         try startNegotiation(on: link)
     }
 
@@ -258,6 +253,7 @@ private extension OpenVPNSession {
         dataCount.reset()
 
         link = nil
+        tunnel = nil
         currentNegotiatorKey = nil
         currentDataChannelKey = nil
         pushReply = nil
@@ -376,7 +372,8 @@ extension OpenVPNSession {
                 self,
                 remoteAddress: remoteAddress,
                 remoteProtocol: remoteProtocol,
-                remoteOptions: pushReply.options
+                remoteOptions: pushReply.options,
+                remoteFd: link?.fileDescriptor
             )
         }
         scheduleNextPing()

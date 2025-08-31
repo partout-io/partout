@@ -27,7 +27,7 @@ pp_socket _Nullable pp_socket_open(const char *_Nonnull ip_addr,
                                    pp_socket_proto proto,
                                    uint16_t port,
                                    bool blocking,
-                                   int timeout);
+                                   int timeout_ms);
 
 /* I/O. */
 int pp_socket_read(pp_socket _Nonnull sock,

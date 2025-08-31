@@ -18,15 +18,16 @@ public actor NEPTPForwarder {
         daemon.profile
     }
 
-    public let originalProfile: Profile
-
     public nonisolated var environment: TunnelEnvironment {
         daemon.environment
     }
 
     public init(
         _ ctx: PartoutLoggerContext,
+        profile: Profile,
+        registry: Registry,
         controller: NETunnelController,
+        environment: TunnelEnvironment,
         factoryOptions: NEInterfaceFactory.Options = .init(),
         connectionOptions: ConnectionParameters.Options = .init(),
         stopDelay: Int = 2000,
@@ -36,22 +37,20 @@ public actor NEPTPForwarder {
             pp_log(ctx, .ne, .info, "NEPTPForwarder: NEPacketTunnelProvider released")
             throw PartoutError(.releasedObject)
         }
-        let environment = controller.environment
         let factory = NEInterfaceFactory(ctx, provider: provider, options: factoryOptions)
-        let tunnelInterface = NETunnelInterface(ctx, impl: provider.packetFlow)
         let reachability = NEObservablePath(ctx)
 
         let connectionParameters = ConnectionParameters(
+            profile: profile,
             controller: controller,
             factory: factory,
-            tunnelInterface: tunnelInterface,
             environment: environment,
             options: connectionOptions
         )
         let messageHandler = DefaultMessageHandler(ctx, environment: environment)
 
         let params = SimpleConnectionDaemon.Parameters(
-            registry: controller.registry,
+            registry: registry,
             connectionParameters: connectionParameters,
             reachability: reachability,
             messageHandler: messageHandler,
@@ -61,7 +60,6 @@ public actor NEPTPForwarder {
 
         self.ctx = ctx
         daemon = try SimpleConnectionDaemon(params: params)
-        originalProfile = controller.originalProfile
     }
 
     deinit {

@@ -22,6 +22,10 @@ public final class NETunnelInterface: IOInterface {
 
     // MARK: TunnelInterface
 
+    public var fileDescriptor: UInt64? {
+        nil
+    }
+
     public func readPackets() async throws -> [Data] {
         guard let impl else {
             pp_log(ctx, .ne, .error, "NEPacketTunnelFlow released prematurely")

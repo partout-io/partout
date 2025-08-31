@@ -117,6 +117,10 @@ extension NETCPSocket {
 // MARK: IOInterface
 
 extension NETCPSocket {
+    nonisolated var fileDescriptor: UInt64? {
+        nil
+    }
+
     func readPackets() async throws -> [Data] {
         fatalError("readPackets() unavailable")
     }

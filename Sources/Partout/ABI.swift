@@ -44,7 +44,7 @@ public func partout_initialize(cCacheDir: UnsafePointer<CChar>) -> UnsafeMutable
         OpenVPNModule.Implementation(
             importer: StandardOpenVPNParser(),
             connectionBlock: {
-                let ctx = PartoutLoggerContext($0.controller.profile.id)
+                let ctx = PartoutLoggerContext($0.profile.id)
                 return try OpenVPNConnection(
                     ctx,
                     parameters: $0,

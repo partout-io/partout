@@ -7,7 +7,5 @@ import PartoutCore
 #endif
 
 public protocol SocketIOInterface: IOInterface {
-    func connect(timeout: Int) async throws
-
     func shutdown() async
 }

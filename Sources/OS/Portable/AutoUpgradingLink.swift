@@ -8,7 +8,7 @@ import PartoutCore
 #endif
 
 public final class AutoUpgradingLink: LinkInterface {
-    public typealias IOBlock = @Sendable (ExtendedEndpoint) throws -> SocketIOInterface
+    public typealias IOBlock = @Sendable (ExtendedEndpoint) async throws -> SocketIOInterface
 
     private let endpoint: ExtendedEndpoint
 
@@ -24,16 +24,12 @@ public final class AutoUpgradingLink: LinkInterface {
         endpoint: ExtendedEndpoint,
         ioBlock: @escaping IOBlock,
         betterPathBlock: @escaping BetterPathBlock
-    ) throws {
+    ) async throws {
         self.endpoint = endpoint
         self.ioBlock = ioBlock
         self.betterPathBlock = betterPathBlock
-        io = try ioBlock(endpoint)
+        io = try await ioBlock(endpoint)
         betterPathStream = try betterPathBlock()
-    }
-
-    public func connect(timeout: Int) async throws {
-        try await io.connect(timeout: timeout)
     }
 
     public nonisolated var remoteAddress: String {
@@ -42,6 +38,10 @@ public final class AutoUpgradingLink: LinkInterface {
 
     public nonisolated var remoteProtocol: EndpointProtocol {
         endpoint.proto
+    }
+
+    public var fileDescriptor: UInt64? {
+        io.fileDescriptor
     }
 
     public func readPackets() async throws -> [Data] {
@@ -71,8 +71,8 @@ public final class AutoUpgradingLink: LinkInterface {
         betterPathStream.subscribe()
     }
 
-    public func upgraded() throws -> LinkInterface {
-        try AutoUpgradingLink(
+    public func upgraded() async throws -> LinkInterface {
+        try await AutoUpgradingLink(
             endpoint: endpoint,
             ioBlock: ioBlock,
             betterPathBlock: betterPathBlock

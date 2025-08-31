@@ -277,6 +277,7 @@ private extension OpenVPNSession {
         dataCount.reset()
 
         link = nil
+        tunnel = nil
         currentNegotiatorKey = nil
         currentDataChannelKey = nil
         pushReply = nil
@@ -386,7 +387,8 @@ extension OpenVPNSession {
                 self,
                 remoteAddress: remoteAddress,
                 remoteProtocol: remoteProtocol,
-                remoteOptions: pushReply.options
+                remoteOptions: pushReply.options,
+                remoteFd: link?.fileDescriptor
             )
         }
         scheduleNextPing()

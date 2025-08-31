@@ -336,7 +336,7 @@ if areas.contains(.openVPN) {
                     if !isTestingOpenVPNDataPath {
                         list.append("Internal/Legacy")
                     }
-                    if OS.current == .apple {
+                    if includesLegacy {
                         list.append("StandardOpenVPNParser+Default.swift")
                     }
                     return list
@@ -799,8 +799,8 @@ enum WireGuardMode {
 
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.183"
-let checksum = "e43b51dcdc6dfccd1b2583b9998aef70cd3eba88a84a49727c6426280ad89e02"
+let version = "0.99.184"
+let checksum = "cf828028faf581ba401f88352270387ed26612f1dd02b196929263fee175cdf6"
 
 enum CoreDeployment: String, RawRepresentable {
     case remoteBinary

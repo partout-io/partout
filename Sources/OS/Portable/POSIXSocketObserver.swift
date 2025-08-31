@@ -36,26 +36,33 @@ public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
         let closesOnEmptyRead = endpoint.proto.socketType == .tcp
         let maxReadLength = self.maxReadLength
 
-        // Use different I/O implementations based on platform support
-        let link = try AutoUpgradingLink(
+        return try await AutoUpgradingLink(
             endpoint: endpoint,
-            ioBlock: {
-                try POSIXBlockingSocket(
-                    ctx,
-                    endpoint: $0,
-                    closesOnEmptyRead: closesOnEmptyRead,
-                    maxReadLength: maxReadLength
-                )
+            ioBlock: { endpoint in
+
+                // POSIXBlockingSocket.init() does blocking I/O and MUST
+                // be deferred to not block the actor
+                try await withCheckedThrowingContinuation { continuation in
+                    DispatchQueue.global().async {
+                        do {
+                            let socket = try POSIXBlockingSocket(
+                                ctx,
+                                to: endpoint,
+                                timeout: timeout,
+                                closesOnEmptyRead: closesOnEmptyRead,
+                                maxReadLength: maxReadLength
+                            )
+                            continuation.resume(returning: socket)
+                        } catch {
+                            continuation.resume(throwing: PartoutError(.linkNotActive))
+                        }
+                    }
+                }
             },
             betterPathBlock: { [weak self] in
                 guard let self else { throw PartoutError(.releasedObject) }
                 return try betterPathBlock()
             }
         )
-
-        // Establish actual connection
-        try await link.connect(timeout: timeout)
-
-        return link
     }
 }

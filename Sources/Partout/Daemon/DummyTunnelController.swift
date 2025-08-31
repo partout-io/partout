@@ -7,14 +7,11 @@ import PartoutCore
 #endif
 
 final class DummyTunnelController: TunnelController {
-    let profile: Profile
-
-    init(profile: Profile) {
-        self.profile = profile
+    init() {
     }
 
-    func setTunnelSettings(with info: TunnelRemoteInfo?) async throws {
-        // set routes
+    func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
+        DummyTunnelinterface()
     }
 
     func clearTunnelSettings() async {
