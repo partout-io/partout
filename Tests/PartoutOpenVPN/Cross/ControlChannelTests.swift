@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @testable internal import PartoutOpenVPNCross
+#if canImport(_PartoutOpenVPNLegacy_ObjC)
+internal import _PartoutOpenVPNLegacy_ObjC
+#endif
 import Testing
 
 @OpenVPNActor

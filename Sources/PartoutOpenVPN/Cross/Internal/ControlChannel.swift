@@ -8,6 +8,9 @@ import Foundation
 internal import _PartoutOSPortable
 import PartoutCore
 import PartoutOpenVPN
+#if canImport(_PartoutOpenVPNLegacy_ObjC)
+internal import _PartoutOpenVPNLegacy_ObjC
+#endif
 #endif
 
 final class ControlChannel {
@@ -79,7 +82,7 @@ final class ControlChannel {
 extension ControlChannel {
     func reset(forNewSession: Bool) {
         if forNewSession {
-            sessionId = prng.data(length: OpenVPNPacketSessionIdLength)
+            sessionId = prng.data(length: _PartoutOpenVPN_C.OpenVPNPacketSessionIdLength)
             remoteSessionId = nil
         }
         queue.reset()
