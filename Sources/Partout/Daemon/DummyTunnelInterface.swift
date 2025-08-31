@@ -8,8 +8,8 @@ import PartoutCore
 #endif
 
 final class DummyTunnelinterface: IOInterface {
-    var deviceName: String {
-        ""
+    var fileDescriptor: UInt64? {
+        nil
     }
 
     func readPackets() async throws -> [Data] {

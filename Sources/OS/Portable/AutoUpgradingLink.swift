@@ -40,6 +40,10 @@ public final class AutoUpgradingLink: LinkInterface {
         endpoint.proto
     }
 
+    public var fileDescriptor: UInt64? {
+        io.fileDescriptor
+    }
+
     public func readPackets() async throws -> [Data] {
         try await io.readPackets()
     }

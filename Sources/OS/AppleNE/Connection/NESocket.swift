@@ -226,6 +226,10 @@ extension NESocket {
 // MARK: IOInterface
 
 extension NESocket {
+    nonisolated var fileDescriptor: UInt64? {
+        nil
+    }
+
     func readPackets() async throws -> [Data] {
         fatalError("readPackets() unavailable")
     }

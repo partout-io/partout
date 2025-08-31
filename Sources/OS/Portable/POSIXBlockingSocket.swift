@@ -96,6 +96,10 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
         pp_socket_free(sock)
     }
 
+    public nonisolated var fileDescriptor: UInt64? {
+        pp_socket_fd(sock)
+    }
+
     public func readPackets() async throws -> [Data] {
         guard isActive else {
             throw PartoutError(.linkNotActive)
