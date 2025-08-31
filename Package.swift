@@ -336,7 +336,7 @@ if areas.contains(.openVPN) {
                     if !isTestingOpenVPNDataPath {
                         list.append("Internal/Legacy")
                     }
-                    if OS.current == .apple {
+                    if includesLegacy {
                         list.append("StandardOpenVPNParser+Default.swift")
                     }
                     return list
