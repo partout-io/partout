@@ -15,11 +15,9 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
 
     private let writeQueue: DispatchQueue
 
-    private var sock: pp_socket?
+    private let sock: pp_socket
 
     private let endpoint: ExtendedEndpoint?
-
-    private let isOwned: Bool
 
     private let closesOnEmptyRead: Bool
 
@@ -27,17 +25,32 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     nonisolated(unsafe)
     private var readBuf: [UInt8]
 
+    private var isActive = false
+
     public init(
         _ ctx: PartoutLoggerContext,
-        endpoint: ExtendedEndpoint,
+        to endpoint: ExtendedEndpoint,
+        timeout: Int,
         closesOnEmptyRead: Bool,
         maxReadLength: Int
     ) throws {
+        let newSock = endpoint.address.rawValue.withCString { cAddr in
+            // Open in blocking mode
+            pp_socket_open(
+                cAddr,
+                endpoint.socketProto,
+                endpoint.proto.port,
+                true,
+                Int32(timeout)
+            )
+        }
+        guard let newSock else {
+            throw PartoutError(.linkNotActive)
+        }
         self.init(
             ctx: ctx,
-            sock: nil,
+            sock: newSock,
             endpoint: endpoint,
-            isOwned: true,
             closesOnEmptyRead: closesOnEmptyRead,
             maxReadLength: maxReadLength
         )
@@ -55,7 +68,6 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
             ctx: ctx,
             sock: sock,
             endpoint: nil,
-            isOwned: false,
             closesOnEmptyRead: closesOnEmptyRead,
             maxReadLength: maxReadLength
         )
@@ -63,60 +75,29 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
 
     private init(
         ctx: PartoutLoggerContext,
-        sock: pp_socket?,
+        sock: pp_socket,
         endpoint: ExtendedEndpoint?,
-        isOwned: Bool,
         closesOnEmptyRead: Bool,
         maxReadLength: Int
     ) {
-        precondition(sock != nil || endpoint != nil)
         self.ctx = ctx
-        let queueLabelContext = sock.map { pp_socket_fd($0) }?.description ?? endpoint?.description ?? "*"
+        let queueLabelContext = pp_socket_fd(sock).description
         readQueue = DispatchQueue(label: "POSIXBlockingSocket[R:\(queueLabelContext)]")
         writeQueue = DispatchQueue(label: "POSIXBlockingSocket[W:\(queueLabelContext)]")
         self.sock = sock
         self.endpoint = endpoint
-        self.isOwned = isOwned
         self.closesOnEmptyRead = closesOnEmptyRead
         readBuf = [UInt8](repeating: 0, count: maxReadLength)
+        isActive = true
     }
 
     deinit {
         pp_log(ctx, .core, .info, "Deinit POSIXBlockingSocket")
-        guard let sock, isOwned else { return }
         pp_socket_free(sock)
     }
 
-    // Does nothing if the sock is already open and connected
-    public func connect(timeout: Int) async throws {
-        guard let endpoint else { return }
-        guard sock == nil else {
-            throw PartoutError(.linkNotActive)
-        }
-        let sock: pp_socket = try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global().async {
-                let sock = endpoint.address.rawValue.withCString { cAddr in
-                    // Open in blocking mode
-                    pp_socket_open(
-                        cAddr,
-                        endpoint.socketProto,
-                        endpoint.proto.port,
-                        true,
-                        Int32(timeout)
-                    )
-                }
-                guard let sock else {
-                    continuation.resume(throwing: PartoutError(.linkNotActive))
-                    return
-                }
-                continuation.resume(returning: sock)
-            }
-        }
-        self.sock = sock
-    }
-
     public func readPackets() async throws -> [Data] {
-        guard let sock else {
+        guard isActive else {
             throw PartoutError(.linkNotActive)
         }
         do {
@@ -147,12 +128,13 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     }
 
     public func writePackets(_ packets: [Data]) async throws {
-        guard let sock else {
+        guard isActive else {
             throw PartoutError(.linkNotActive)
         }
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                writeQueue.async {
+                writeQueue.async { [weak self] in
+                    guard let sock = self?.sock else { return }
                     for toWrite in packets {
                         guard !toWrite.isEmpty else { continue }
                         let writtenCount = toWrite.withUnsafeBytes {
@@ -174,12 +156,10 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     }
 
     public func shutdown() {
-        guard let sock else { return }
+        guard isActive else { return }
+        isActive = false
         pp_log(ctx, .core, .info, "Shut down socket")
-        if isOwned {
-            pp_socket_free(sock)
-        }
-        self.sock = nil
+        pp_socket_free(sock)
     }
 }
 

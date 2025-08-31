@@ -61,8 +61,8 @@ extension OpenVPNUDPLink: LinkInterface {
         }
     }
 
-    func upgraded() throws -> LinkInterface {
-        OpenVPNUDPLink(link: try link.upgraded(), proc: proc)
+    func upgraded() async throws -> LinkInterface {
+        OpenVPNUDPLink(link: try await link.upgraded(), proc: proc)
     }
 
     func shutdown() {

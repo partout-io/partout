@@ -71,8 +71,8 @@ extension OpenVPNTCPLink: LinkInterface {
         }
     }
 
-    func upgraded() throws -> LinkInterface {
-        OpenVPNTCPLink(link: try link.upgraded(), proc: proc)
+    func upgraded() async throws -> LinkInterface {
+        OpenVPNTCPLink(link: try await link.upgraded(), proc: proc)
     }
 
     func shutdown() {

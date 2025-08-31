@@ -39,6 +39,7 @@ int connect_with_timeout(os_socket_fd fd, const struct sockaddr *addr, socklen_t
  * use int, whereas Windows uses SOCKET.  */
 struct _pp_socket {
     os_socket_fd fd;
+    bool is_owned;
 };
 
 /* Create a socket from a formerly opened file descriptor. Use uint64_t to
@@ -46,6 +47,7 @@ struct _pp_socket {
 pp_socket pp_socket_create(uint64_t fd) {
     pp_socket sock = pp_alloc(sizeof(pp_socket *));
     sock->fd = (os_socket_fd)fd;
+    sock->is_owned = false;
     return sock;
 }
 
@@ -56,7 +58,7 @@ pp_socket pp_socket_open(const char *ip_addr,
                          pp_socket_proto proto,
                          uint16_t port,
                          bool blocking,
-                         int timeout) {
+                         int timeout_ms) {
 #ifdef _WIN32
     static int wsa_initialized = 0;
     if (!wsa_initialized) {
@@ -101,7 +103,7 @@ pp_socket pp_socket_open(const char *ip_addr,
                                              p->ai_addr,
                                              (int)p->ai_addrlen,
                                              blocking,
-                                             timeout);
+                                             timeout_ms);
         if (ret != 0) {
             os_close_socket(new_fd);
             SOCKET_PRINT_ERROR("connect()");
@@ -116,7 +118,9 @@ pp_socket pp_socket_open(const char *ip_addr,
     }
 
     // Success
-    return pp_socket_create(new_fd);
+    pp_socket sock = pp_socket_create(new_fd);
+    sock->is_owned = true;
+    return sock;
 
 failure:
     if (new_fd != OS_INVALID_SOCKET) os_close_socket(new_fd);
@@ -126,7 +130,7 @@ failure:
 /* Free the socket. */
 void pp_socket_free(pp_socket sock) {
     if (!sock) return;
-    os_close_socket(sock->fd);
+    if (sock->is_owned) os_close_socket(sock->fd);
 }
 
 /* Read up to dst_len bytes, and return the amount of the actually read
