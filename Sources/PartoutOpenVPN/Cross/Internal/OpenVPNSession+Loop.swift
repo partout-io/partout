@@ -23,6 +23,7 @@ extension OpenVPNSession {
             do {
                 let packets = try await tunnel.readPackets()
                 guard !packets.isEmpty else {
+                    pp_log(ctx, .openvpn, .debug, "Exit TUN loop after empty packets")
                     return
                 }
                 try receiveTunnel(packets: packets)
