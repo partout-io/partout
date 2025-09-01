@@ -65,7 +65,7 @@ public final class NETunnelController: TunnelController {
         return tun
     }
 
-    public func clearTunnelSettings() async {
+    public func clearTunnelSettings(_ tunnel: IOInterface) async {
         do {
             pp_log_id(profile.id, .ne, .info, "Clear tunnel settings")
             try await provider?.setTunnelNetworkSettings(nil)
