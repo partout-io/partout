@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include <unistd.h>
 #include "portable/common.h"
 #include "portable/tun.h"
 
