@@ -35,7 +35,7 @@ public actor VirtualTunnelInterface: IOInterface {
         self.tun = tun
         deviceName = String(cString: pp_tun_name(tun))
 
-        // Socket is not owned by POSIXBlockingSocket to prevent double free in deinit
+        // Socket ownership is transferred to POSIXBlockingSocket
         let sock = pp_tun_socket(tun)
         io = POSIXBlockingSocket(
             ctx,

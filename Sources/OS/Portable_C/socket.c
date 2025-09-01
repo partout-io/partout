@@ -44,10 +44,10 @@ struct _pp_socket {
 
 /* Create a socket from a formerly opened file descriptor. Use uint64_t to
  * cover the whole range of possible platform values. */
-pp_socket pp_socket_create(uint64_t fd) {
+pp_socket pp_socket_create(uint64_t fd, bool is_owned) {
     pp_socket sock = pp_alloc(sizeof(pp_socket *));
     sock->fd = (os_socket_fd)fd;
-    sock->is_owned = false;
+    sock->is_owned = is_owned;
     return sock;
 }
 
@@ -118,9 +118,7 @@ pp_socket pp_socket_open(const char *ip_addr,
     }
 
     // Success
-    pp_socket sock = pp_socket_create(new_fd);
-    sock->is_owned = true;
-    return sock;
+    return pp_socket_create(new_fd, true);
 
 failure:
     if (new_fd != OS_INVALID_SOCKET) os_close_socket(new_fd);

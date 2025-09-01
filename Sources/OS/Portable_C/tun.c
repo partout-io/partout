@@ -19,7 +19,7 @@ struct _pp_tun {
 pp_tun pp_tun_create(const char *name, uint64_t fd) {
     pp_tun tun = pp_alloc(sizeof(pp_tun *));
     tun->dev_name = pp_dup(name);
-    tun->sock = pp_socket_create(fd);
+    tun->sock = pp_socket_create(fd, true);
     return tun;
 }
 
