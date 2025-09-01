@@ -52,12 +52,16 @@ public actor VirtualTunnelInterface: IOInterface {
                 }
             }
             writeBlock = { io, packets in
-                try await io.writePackets(packets.map {
-                    let packetFamily = IPHeader.protocolNumber(inPacket: $0)
-                    var wrapped = Data(capacity: 4 + $0.count)
-                    wrapped.append(packetFamily.bigEndian)
-                    wrapped.append(contentsOf: $0)
-                    return wrapped
+                try await io.writePackets(packets.map { packet in
+                    let family = IPHeader.protocolNumber(inPacket: packet)
+                    return withUnsafeBytes(of: family.bigEndian) { familyBytes in
+                        var result = Data(count: familyBytes.count + packet.count)
+                        result.withUnsafeMutableBytes { buffer in
+                            buffer[..<familyBytes.count].copyBytes(from: familyBytes)
+                            buffer[familyBytes.count...].copyBytes(from: packet)
+                        }
+                        return result
+                    }
                 })
             }
         } else {
