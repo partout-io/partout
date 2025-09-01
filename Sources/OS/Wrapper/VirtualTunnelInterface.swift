@@ -43,7 +43,6 @@ public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
     }
 
     public func readPackets() async throws -> [Data] {
-//        pp_log(ctx, .core, .fault, ">>> readPackets()")
         try await withCheckedThrowingContinuation { continuation in
             readQueue.async { [weak self] in
                 guard let self else {
@@ -63,7 +62,6 @@ public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
     }
 
     public func writePackets(_ packets: [Data]) async throws {
-//        pp_log(ctx, .core, .fault, ">>> writePackets()")
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             writeQueue.async { [weak self] in
                 guard let self else { return }
