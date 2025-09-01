@@ -14,7 +14,6 @@
 #if TARGET_OS_OSX || defined(__linux)
 
 #include <unistd.h>
-#include "portable/socket.h"
 
 /* A tun device has a device name, and an associated socket to
  * do I/O. Usually a regular POSIX file descriptor. */
