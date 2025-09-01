@@ -10,18 +10,20 @@ import _PartoutOSPortable_C
 import PartoutCore
 #endif
 
-public actor VirtualTunnelInterface: IOInterface {
+public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
-    private let tun: pp_tun
+    private nonisolated(unsafe) let tun: pp_tun
 
     public nonisolated let deviceName: String
 
-    private let io: IOInterface
+    public nonisolated let fileDescriptor: UInt64?
 
-    private let readBlock: (IOInterface) async throws -> [Data]
+    private let readQueue: DispatchQueue
 
-    private let writeBlock: (IOInterface, [Data]) async throws -> Void
+    private let writeQueue: DispatchQueue
+
+    private var readBuf: [UInt8]
 
     public init(_ ctx: PartoutLoggerContext, maxReadLength: Int) throws {
         guard let tun = pp_tun_open() else {
@@ -30,72 +32,54 @@ public actor VirtualTunnelInterface: IOInterface {
         self.ctx = ctx
         self.tun = tun
         deviceName = String(cString: pp_tun_name(tun))
-
-        // Socket ownership is transferred to POSIXBlockingSocket
-        let sock = pp_tun_socket(tun)
-        io = POSIXBlockingSocket(
-            ctx,
-            sock: sock,
-            closesOnEmptyRead: true,
-            maxReadLength: maxReadLength
-        )
-
-#if os(macOS)
-        // Mac packets are prefixed with the IP header
-        readBlock = { io in
-            try await io.readPackets().map {
-                $0[4..<$0.count]
-            }
-        }
-        writeBlock = { io, packets in
-            try await io.writePackets(packets.map { packet in
-                let family = IPHeader.protocolNumber(inPacket: packet)
-                return withUnsafeBytes(of: family.bigEndian) { familyBytes in
-                    var result = Data(count: familyBytes.count + packet.count)
-                    result.withUnsafeMutableBytes { buffer in
-                        buffer[..<familyBytes.count].copyBytes(from: familyBytes)
-                        buffer[familyBytes.count...].copyBytes(from: packet)
-                    }
-                    return result
-                }
-            })
-        }
-#else
-        // Raw IP packets (Linux requires IFF_NO_PI)
-        readBlock = {
-            try await $0.readPackets()
-        }
-        writeBlock = {
-            try await $0.writePackets($1)
-        }
-#endif
+        fileDescriptor = pp_socket_fd(pp_tun_socket(tun))
+        readQueue = DispatchQueue(label: "VirtualTunnelInterface[R:\(fileDescriptor!)]")
+        writeQueue = DispatchQueue(label: "VirtualTunnelInterface[W:\(fileDescriptor!)]")
+        readBuf = [UInt8](repeating: 0, count: maxReadLength)
     }
 
     deinit {
         pp_tun_free(tun)
     }
 
-    public nonisolated var fileDescriptor: UInt64? {
-        pp_socket_fd(pp_tun_socket(tun))
-    }
-
     public func readPackets() async throws -> [Data] {
 //        pp_log(ctx, .core, .fault, ">>> readPackets()")
-        do {
-            return try await readBlock(io)
-        } catch {
-            pp_log(ctx, .core, .fault, "Unable to read TUN packets: \(error)")
-            throw error
+        try await withCheckedThrowingContinuation { continuation in
+            readQueue.async { [weak self] in
+                guard let self else {
+                    continuation.resume(throwing: PartoutError(.releasedObject))
+                    return
+                }
+                let readCount = pp_tun_read(tun, &readBuf, readBuf.count)
+                guard readCount > 0 else {
+                    pp_log(ctx, .core, .fault, "Unable to read TUN packets")
+                    continuation.resume(throwing: PartoutError(.linkFailure))
+                    return
+                }
+                let newPacket = Data(readBuf[0..<Int(readCount)])
+                continuation.resume(returning: [newPacket])
+            }
         }
     }
 
     public func writePackets(_ packets: [Data]) async throws {
 //        pp_log(ctx, .core, .fault, ">>> writePackets()")
-        do {
-            try await writeBlock(io, packets)
-        } catch {
-            pp_log(ctx, .core, .fault, "Unable to write TUN packets: \(error)")
-            throw error
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            writeQueue.async { [weak self] in
+                guard let self else { return }
+                for toWrite in packets {
+                    guard !toWrite.isEmpty else { continue }
+                    let writtenCount = toWrite.withUnsafeBytes {
+                        pp_tun_write(self.tun, $0.bytePointer, toWrite.count)
+                    }
+                    guard writtenCount > 0 else {
+                        pp_log(ctx, .core, .fault, "Unable to write TUN packets")
+                        continuation.resume(throwing: PartoutError(.linkFailure))
+                        return
+                    }
+                }
+                continuation.resume()
+            }
         }
     }
 }

@@ -177,7 +177,7 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
 }
 
 /* Return the native file descriptor. */
-uint64_t pp_socket_fd(pp_socket sock) {
+uint64_t pp_socket_fd(const pp_socket sock) {
     assert(sock && sock->fd != OS_INVALID_SOCKET);
     return sock->fd;
 }
