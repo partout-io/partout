@@ -41,16 +41,6 @@ const char *_Nonnull pp_tun_name(pp_tun _Nonnull tun) {
     return tun->dev_name;
 }
 
-static inline
-ssize_t pp_tun_raw_read(const pp_tun _Nonnull tun, uint8_t *_Nonnull dst, size_t dst_len) {
-    return read(tun->fd, dst, dst_len);
-}
-
-static inline
-ssize_t pp_tun_raw_write(const pp_tun _Nonnull tun, const uint8_t *_Nonnull src, size_t src_len) {
-    return write(tun->fd, src, src_len);
-}
-
 /* Platform-specific implementations. */
 pp_tun _Nullable pp_tun_open();
 ssize_t pp_tun_read(const pp_tun _Nonnull tun, uint8_t *_Nonnull dst, size_t dst_len);

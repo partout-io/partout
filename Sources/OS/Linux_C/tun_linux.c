@@ -46,9 +46,9 @@ failure:
 }
 
 ssize_t pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
-    return pp_tun_raw_read(tun, dst, dst_len);
+    return read(tun->fd, dst, dst_len);
 }
 
 ssize_t pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
-    return pp_tun_raw_write(tun, src, src_len);
+    return write(tun->fd, src, src_len);
 }
