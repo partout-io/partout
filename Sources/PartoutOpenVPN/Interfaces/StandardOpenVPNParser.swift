@@ -81,7 +81,7 @@ public final class StandardOpenVPNParser {
         fromURL url: URL,
         passphrase: String? = nil
     ) throws -> Result {
-        let contents = try String(contentsOf: url)
+        let contents = try String(contentsOf: url, encoding: .utf8)
         return try parsed(
             fromContents: contents,
             passphrase: passphrase,
