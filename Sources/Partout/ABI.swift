@@ -12,6 +12,7 @@ import PartoutCore
 
 // FIXME: #188, ABI is still optimistic
 //
+// - should receive callback arguments for completion and error handling
 // - doesn't handle concurrency
 // - doesn't check preconditions like double start/stop calls
 // - doesn't exit on async failure becuase exceptions are thrown inside tasks
@@ -23,9 +24,19 @@ public func partout_version() -> UnsafePointer<CChar> {
     UnsafePointer(pp_dup(Partout.version))
 }
 
-@_cdecl("partout_initialize")
-public func partout_initialize(cCacheDir: UnsafePointer<CChar>) -> UnsafeMutableRawPointer {
-    let cacheDir = String(cString: cCacheDir)
+@_cdecl("partout_init")
+public func partout_init(cArgs: UnsafePointer<partout_daemon_init_args>) -> UnsafeMutableRawPointer {
+    pp_log_g(.core, .debug, "Partout: Initialize")
+
+    // Test callback
+    if let callback = cArgs.pointee.test_callback {
+        pp_log_g(.core, .debug, "Partout: Test callback...")
+        callback()
+        pp_log_g(.core, .debug, "Partout: Callback successful!")
+    }
+
+    // Global directory e.g. for temporary files
+    let cacheDir = String(cString: cArgs.pointee.cache_dir)
 
     var logBuilder = PartoutLogger.Builder()
     // FIXME: #187, check defines for conditional areas
@@ -75,26 +86,19 @@ public func partout_initialize(cCacheDir: UnsafePointer<CChar>) -> UnsafeMutable
     return cCtx
 }
 
-@_cdecl("partout_deinitialize")
-public func partout_deinitialize(cCtx: UnsafeMutableRawPointer) {
+@_cdecl("partout_deinit")
+public func partout_deinit(cCtx: UnsafeMutableRawPointer) {
     ABIContext.pop(cCtx)
 }
 
 @_cdecl("partout_daemon_start")
 public func partout_daemon_start(
     cCtx: UnsafeMutableRawPointer,
-    cArgs: UnsafePointer<partout_daemon_args>
+    cArgs: UnsafePointer<partout_daemon_start_args>
 ) -> Int {
     pp_log_g(.core, .debug, "Partout: Start daemon with ctx: \(cCtx)")
     let ctx = ABIContext.peek(cCtx)
     pp_log_g(.core, .debug, "Partout: Start daemon with ctx (ABIContext): \(ctx)")
-
-    // Test callback
-    if let callback = cArgs.pointee.test_callback {
-        pp_log_g(.core, .debug, "Partout: Testing callback...")
-        callback()
-        pp_log_g(.core, .debug, "Partout: Callback successful!")
-    }
 
     // Profile is a command line argument
     let daemon: SimpleConnectionDaemon

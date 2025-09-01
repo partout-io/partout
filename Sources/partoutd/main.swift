@@ -14,10 +14,18 @@ guard CommandLine.arguments.count > 1 else {
 let profilePath = CommandLine.arguments[1]
 print("Starting with profile at: \(profilePath)")
 let profile = try String(contentsOfFile: profilePath, encoding: .utf8)
+let cacheDir = "."
 
-let ctx = partout_initialize(cCacheDir: ".")
+// Initialize library
+let ctx = cacheDir.withCString { cCacheDir in
+    var args = partout_daemon_init_args()
+    args.cache_dir = cCacheDir
+    return partout_init(cArgs: &args)
+}
+
+// Start daemon
 try profile.withCString { cProfile in
-    var args = partout_daemon_args()
+    var args = partout_daemon_start_args()
     args.profile = cProfile
     guard partout_daemon_start(cCtx: ctx, cArgs: &args) == 0 else {
         throw PartoutError(.linkNotActive)
