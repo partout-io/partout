@@ -10,7 +10,6 @@ void partout_deinitialize(void *ctx);
 
 typedef struct {
     const char *profile;
-    partout_daemon_ctrl *ctrl;
     void (*test_callback)();
 } partout_daemon_args;
 
