@@ -6,6 +6,9 @@ import Foundation
 import Partout
 import Partout_C
 
+// C structs are zero-initialized by Swift, no dangling
+// pointers in uninitialized fields of *_args structs.
+
 guard CommandLine.arguments.count > 1 else {
     print("Configuration file required")
     throw PartoutError(.notFound)
