@@ -19,7 +19,7 @@ typedef enum {
 typedef struct _pp_socket *pp_socket;
 
 /* Externally managed. */
-pp_socket _Nonnull pp_socket_create(uint64_t fd);
+pp_socket _Nonnull pp_socket_create(uint64_t fd, bool is_owned);
 void pp_socket_free(pp_socket _Nonnull sock);
 
 /* Create socket to endpoint. */

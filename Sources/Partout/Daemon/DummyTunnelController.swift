@@ -14,8 +14,7 @@ final class DummyTunnelController: TunnelController {
         DummyTunnelinterface()
     }
 
-    func clearTunnelSettings() async {
-        // revert settings
+    func clearTunnelSettings(_ tunnel: IOInterface) async {
     }
 
     func setReasserting(_ reasserting: Bool) {

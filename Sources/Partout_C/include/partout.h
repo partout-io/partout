@@ -6,6 +6,17 @@
 
 const char *partout_version();
 
-void *partout_initialize(const char *cache_dir);
-int partout_daemon_start(void *ctx, const char *profile);
+typedef struct {
+    const char *cache_dir;
+    void (*test_callback)();
+} partout_daemon_init_args;
+
+void *partout_init(const partout_daemon_init_args *args);
+void partout_deinit(void *ctx);
+
+typedef struct {
+    const char *profile;
+} partout_daemon_start_args;
+
+int partout_daemon_start(void *ctx, const partout_daemon_start_args *args);
 void partout_daemon_stop(void *ctx);

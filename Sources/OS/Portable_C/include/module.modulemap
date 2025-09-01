@@ -3,6 +3,7 @@ module _PartoutOSPortable_C {
     header "portable/endian.h"
     header "portable/prng.h"
     header "portable/socket.h"
+    header "portable/tun.h"
     header "portable/zd.h"
     export *
 }

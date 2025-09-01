@@ -4,14 +4,15 @@
 
 import _PartoutOSPortable_C
 import Foundation
+import Partout_C
 #if !PARTOUT_MONOLITH
+import _PartoutOSPortable
 import PartoutCore
 #endif
 
-var ctx: ABIContext?
-
 // FIXME: #188, ABI is still optimistic
 //
+// - should receive callback arguments for completion and error handling
 // - doesn't handle concurrency
 // - doesn't check preconditions like double start/stop calls
 // - doesn't exit on async failure becuase exceptions are thrown inside tasks
@@ -23,9 +24,19 @@ public func partout_version() -> UnsafePointer<CChar> {
     UnsafePointer(pp_dup(Partout.version))
 }
 
-@_cdecl("partout_initialize")
-public func partout_initialize(cCacheDir: UnsafePointer<CChar>) -> UnsafeMutableRawPointer {
-    let cacheDir = String(cString: cCacheDir)
+@_cdecl("partout_init")
+public func partout_init(cArgs: UnsafePointer<partout_daemon_init_args>) -> UnsafeMutableRawPointer {
+    pp_log_g(.core, .debug, "Partout: Initialize")
+
+    // Test callback
+    if let callback = cArgs.pointee.test_callback {
+        pp_log_g(.core, .debug, "Partout: Test callback...")
+        callback()
+        pp_log_g(.core, .debug, "Partout: Callback successful!")
+    }
+
+    // Global directory e.g. for temporary files
+    let cacheDir = String(cString: cArgs.pointee.cache_dir)
 
     var logBuilder = PartoutLogger.Builder()
     // FIXME: #187, check defines for conditional areas
@@ -70,26 +81,41 @@ public func partout_initialize(cCacheDir: UnsafePointer<CChar>) -> UnsafeMutable
     ])
 
     let ctx = ABIContext(registry: registry)
-    return ctx.toOpaque
+    let cCtx = ctx.push()
+    pp_log_g(.core, .debug, "Partout: Initialize with ctx: \(cCtx)")
+    return cCtx
+}
+
+@_cdecl("partout_deinit")
+public func partout_deinit(cCtx: UnsafeMutableRawPointer) {
+    ABIContext.pop(cCtx)
 }
 
 @_cdecl("partout_daemon_start")
-public func partout_daemon_start(cCtx: UnsafeMutableRawPointer, cProfile: UnsafePointer<CChar>) -> Int {
-    let ctx = ABIContext.fromOpaque(cCtx)
+public func partout_daemon_start(
+    cCtx: UnsafeMutableRawPointer,
+    cArgs: UnsafePointer<partout_daemon_start_args>
+) -> Int {
+    pp_log_g(.core, .debug, "Partout: Start daemon with ctx: \(cCtx)")
+    let ctx = ABIContext.peek(cCtx)
+    pp_log_g(.core, .debug, "Partout: Start daemon with ctx (ABIContext): \(ctx)")
 
     // Profile is a command line argument
     let daemon: SimpleConnectionDaemon
     do {
-        let contents = String(cString: cProfile)
+        let contents = String(cString: cArgs.pointee.profile)
         let module = try ctx.registry.module(fromContents: contents, object: nil)
         var builder = Profile.Builder()
         builder.modules = [module]
         builder.activateAllModules()
         let profile = try builder.tryBuild()
 
-        daemon = try makeDaemon(with: profile, registry: ctx.registry)
+        // FIXME: #188, create raw C-based controller here (if applicable)
+        let controller: TunnelController? = nil
+
+        daemon = try makeDaemon(with: profile, registry: ctx.registry, controller: controller)
     } catch {
-        pp_log_g(.core, .error, "Unable to create daemon: \(error)")
+        pp_log_g(.core, .error, "Partout: Unable to create daemon: \(error)")
         return -1
     }
 
@@ -105,7 +131,7 @@ public func partout_daemon_start(cCtx: UnsafeMutableRawPointer, cProfile: Unsafe
             try await daemon.start()
             ctx.daemon = daemon
         } catch {
-            pp_log_g(.core, .error, "Unable to start daemon: \(error)")
+            pp_log_g(.core, .error, "Partout: Unable to start daemon: \(error)")
             exit(-1)
         }
     }
@@ -115,7 +141,9 @@ public func partout_daemon_start(cCtx: UnsafeMutableRawPointer, cProfile: Unsafe
 
 @_cdecl("partout_daemon_stop")
 public func partout_daemon_stop(cCtx: UnsafeMutableRawPointer) {
-    let ctx = ABIContext.fromOpaque(cCtx)
+    pp_log_g(.core, .debug, "Partout: Stop daemon with ctx: \(cCtx)")
+    let ctx = ABIContext.peek(cCtx)
+    pp_log_g(.core, .debug, "Partout: Stop daemon with ctx (ABIContext): \(ctx)")
     Task {
         await ctx.daemon?.stop()
         ctx.daemon = nil

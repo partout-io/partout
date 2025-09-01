@@ -8,23 +8,29 @@
 //#if PARTOUT_MONOLITH || canImport(_PartoutOSLinux)
 //#if PARTOUT_MONOLITH || canImport(_PartoutOSWindows)
 
+#if !os(iOS) && !os(tvOS)
+
 #if !PARTOUT_MONOLITH
 import PartoutCore
 import _PartoutOSWrapper
 #endif
 
-public func makeDaemon(with profile: Profile, registry: Registry) throws -> SimpleConnectionDaemon {
+public func makeDaemon(
+    with profile: Profile,
+    registry: Registry,
+    controller: TunnelController?
+) throws -> SimpleConnectionDaemon {
     let ctx = PartoutLoggerContext(profile.id)
     let factory = POSIXInterfaceFactory(ctx) {
         PassthroughStream()
     }
-    let controller = DummyTunnelController()
+    let controllerImpl = controller ?? DummyTunnelController()
     let reachability = DummyReachabilityObserver()
     let environment = SharedTunnelEnvironment(profileId: profile.id)
     let messageHandler = DefaultMessageHandler(ctx, environment: environment)
     let connParams = ConnectionParameters(
         profile: profile,
-        controller: controller,
+        controller: controllerImpl,
         factory: factory,
         environment: environment,
         options: ConnectionParameters.Options()
@@ -39,3 +45,5 @@ public func makeDaemon(with profile: Profile, registry: Registry) throws -> Simp
     )
     return try SimpleConnectionDaemon(params: params)
 }
+
+#endif
