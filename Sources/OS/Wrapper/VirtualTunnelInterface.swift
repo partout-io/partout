@@ -46,17 +46,15 @@ public actor VirtualTunnelInterface: IOInterface {
 
         // Assume that packets are prefixed with the IP header
         if withPacketInformation {
-            readBlock = {
-                try await $0.readPackets().map {
+            readBlock = { io in
+                try await io.readPackets().map {
                     $0[4..<$0.count]
                 }
             }
-            writeBlock = {
-                try await $0.writePackets($1.map {
-                    // FIXME: #188, IPHeader.protocolNumber should be a fast C function
+            writeBlock = { io, packets in
+                try await io.writePackets(packets.map {
                     let packetFamily = IPHeader.protocolNumber(inPacket: $0)
                     var wrapped = Data(capacity: 4 + $0.count)
-                    // FIXME: #188, is this necessary?
                     wrapped.append(packetFamily.bigEndian)
                     wrapped.append(contentsOf: $0)
                     return wrapped
