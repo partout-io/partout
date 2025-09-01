@@ -8,7 +8,7 @@ const char *partout_version();
 void *partout_initialize(const char *cache_dir);
 void partout_deinitialize(void *ctx);
 
-// FIXME: ###, merge into partout_daemon_args as facade
+// FIXME: #188, merge into partout_daemon_args as facade
 typedef struct {
     void *obj;
     void (*set_address)(void *obj, const char *addr, int prefix);
