@@ -18,11 +18,15 @@ final class ABIContext {
 }
 
 extension ABIContext {
-    static func fromOpaque(_ raw: UnsafeMutableRawPointer) -> ABIContext {
-        Unmanaged.fromOpaque(raw).takeRetainedValue()
+    func push() -> UnsafeMutableRawPointer {
+        Unmanaged.passRetained(self).toOpaque()
     }
 
-    var toOpaque: UnsafeMutableRawPointer {
-        Unmanaged.passRetained(self).toOpaque()
+    static func pop(_ raw: UnsafeMutableRawPointer) {
+        Unmanaged<ABIContext>.fromOpaque(raw).release()
+    }
+
+    static func peek(_ raw: UnsafeMutableRawPointer) -> ABIContext {
+        Unmanaged.fromOpaque(raw).takeUnretainedValue()
     }
 }

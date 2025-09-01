@@ -4,6 +4,7 @@
 
 import Foundation
 import Partout
+import Partout_C
 
 guard CommandLine.arguments.count > 1 else {
     print("Configuration file required")
@@ -12,11 +13,15 @@ guard CommandLine.arguments.count > 1 else {
 
 let profilePath = CommandLine.arguments[1]
 print("Starting with profile at: \(profilePath)")
-let cProfile = try String(contentsOfFile: profilePath, encoding: .utf8)
+let profile = try String(contentsOfFile: profilePath, encoding: .utf8)
 
 let ctx = partout_initialize(cCacheDir: ".")
-guard partout_daemon_start(cCtx: ctx, cProfile: cProfile) == 0 else {
-    throw PartoutError(.linkNotActive)
+try profile.withCString { cProfile in
+    var args = partout_daemon_args()
+    args.profile = cProfile
+    guard partout_daemon_start(cCtx: ctx, cArgs: &args) == 0 else {
+        throw PartoutError(.linkNotActive)
+    }
 }
 print("Daemon successfully started")
 
