@@ -14,18 +14,9 @@ public final class VirtualTunnelController: TunnelController {
 
     private let maxReadLength: Int
 
-    private let withPacketInformation: Bool
-
     public init(_ ctx: PartoutLoggerContext, maxReadLength: Int = 128 * 1024) throws {
         self.ctx = ctx
         self.maxReadLength = maxReadLength
-
-        // FIXME: #188, make PI a postRead/preWrite block pair for VirtualTunnelInterface
-#if os(macOS)
-        withPacketInformation = true
-#else
-        withPacketInformation = false
-#endif
     }
 
     public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
@@ -34,11 +25,7 @@ public final class VirtualTunnelController: TunnelController {
         }
 
         // Create virtual device
-        let tun = try VirtualTunnelInterface(
-            ctx,
-            withPacketInformation: withPacketInformation,
-            maxReadLength: maxReadLength
-        )
+        let tun = try VirtualTunnelInterface(ctx, maxReadLength: maxReadLength)
 
         // FIXME: #188, add better codes for PartoutError
         // FIXME: #188, apply subnets and routes (default first, drop excluded from included)

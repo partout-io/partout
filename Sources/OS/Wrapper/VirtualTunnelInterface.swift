@@ -23,11 +23,7 @@ public actor VirtualTunnelInterface: IOInterface {
 
     private let writeBlock: (IOInterface, [Data]) async throws -> Void
 
-    public init(
-        _ ctx: PartoutLoggerContext,
-        withPacketInformation: Bool,
-        maxReadLength: Int
-    ) throws {
+    public init(_ ctx: PartoutLoggerContext, maxReadLength: Int) throws {
         guard let tun = pp_tun_open() else {
             throw PartoutError(.linkNotActive)
         }
@@ -44,34 +40,35 @@ public actor VirtualTunnelInterface: IOInterface {
             maxReadLength: maxReadLength
         )
 
-        // Assume that packets are prefixed with the IP header
-        if withPacketInformation {
-            readBlock = { io in
-                try await io.readPackets().map {
-                    $0[4..<$0.count]
-                }
-            }
-            writeBlock = { io, packets in
-                try await io.writePackets(packets.map { packet in
-                    let family = IPHeader.protocolNumber(inPacket: packet)
-                    return withUnsafeBytes(of: family.bigEndian) { familyBytes in
-                        var result = Data(count: familyBytes.count + packet.count)
-                        result.withUnsafeMutableBytes { buffer in
-                            buffer[..<familyBytes.count].copyBytes(from: familyBytes)
-                            buffer[familyBytes.count...].copyBytes(from: packet)
-                        }
-                        return result
-                    }
-                })
-            }
-        } else {
-            readBlock = {
-                try await $0.readPackets()
-            }
-            writeBlock = {
-                try await $0.writePackets($1)
+#if os(macOS)
+        // Mac packets are prefixed with the IP header
+        readBlock = { io in
+            try await io.readPackets().map {
+                $0[4..<$0.count]
             }
         }
+        writeBlock = { io, packets in
+            try await io.writePackets(packets.map { packet in
+                let family = IPHeader.protocolNumber(inPacket: packet)
+                return withUnsafeBytes(of: family.bigEndian) { familyBytes in
+                    var result = Data(count: familyBytes.count + packet.count)
+                    result.withUnsafeMutableBytes { buffer in
+                        buffer[..<familyBytes.count].copyBytes(from: familyBytes)
+                        buffer[familyBytes.count...].copyBytes(from: packet)
+                    }
+                    return result
+                }
+            })
+        }
+#else
+        // Raw IP packets (Linux requires IFF_NO_PI)
+        readBlock = {
+            try await $0.readPackets()
+        }
+        writeBlock = {
+            try await $0.writePackets($1)
+        }
+#endif
     }
 
     deinit {
