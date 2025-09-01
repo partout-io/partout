@@ -32,7 +32,7 @@ public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
         self.ctx = ctx
         self.tun = tun
         deviceName = String(cString: pp_tun_name(tun))
-        fileDescriptor = pp_socket_fd(pp_tun_socket(tun))
+        fileDescriptor = UInt64(pp_tun_fd(tun))
         readQueue = DispatchQueue(label: "VirtualTunnelInterface[R:\(fileDescriptor!)]")
         writeQueue = DispatchQueue(label: "VirtualTunnelInterface[W:\(fileDescriptor!)]")
         readBuf = [UInt8](repeating: 0, count: maxReadLength)

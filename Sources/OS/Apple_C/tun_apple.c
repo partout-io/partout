@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <string.h>
 #include "portable/common.h"
-#include "portable/socket.h"
 #include "portable/tun.h"
 
 pp_tun pp_tun_open() {
@@ -93,8 +92,7 @@ ssize_t pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     iov[1].iov_base = dst;
     iov[1].iov_len  = dst_len;
 
-    const int fd = (int)pp_socket_fd(pp_tun_socket(tun));
-    const ssize_t read_len = readv(fd, iov, sizeof(iov) / sizeof(struct iovec));
+    const ssize_t read_len = readv(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
     if (read_len < 0) return -1;
     if (read_len < sizeof(pi)) {
         fputs("Missing 4-byte utun packet header\n", stderr);
@@ -113,8 +111,7 @@ ssize_t pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     iov[1].iov_base = (void *)src;
     iov[1].iov_len  = src_len;
 
-    const int fd = (int)pp_socket_fd(pp_tun_socket(tun));
-    const ssize_t written_len = writev(fd, iov, sizeof(iov) / sizeof(struct iovec));
+    const ssize_t written_len = writev(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
     if (written_len < 0) return -1;
     if (written_len != pi_len + src_len) return -2;
     return written_len;

@@ -20,7 +20,7 @@ public final class VirtualTunnelController: TunnelController {
     }
 
     public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
-        guard let info else {
+        guard info != nil else {
             throw PartoutError(.notFound)
         }
 
