@@ -17,7 +17,7 @@
 
 struct _pp_tun {
     int fd;
-    const char *_Nullable dev_name;
+    const char *dev_name;
 };
 
 pp_tun pp_tun_create(const void *_Nullable impl) {
