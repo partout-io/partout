@@ -19,7 +19,7 @@ let areas = Set(Area.allCases)
 let cryptoMode: CryptoMode? = .openSSL
 var wgMode: WireGuardMode? = .wgGo
 let coreDeployment = envCoreDeployment ?? .remoteBinary
-let cmakeOutput = envCMakeOutput ?? "bin/darwin-arm64"
+let cmakeOutput = envCMakeOutput ?? "bin/windows-arm64"
 
 // Must be false in production (check in CI)
 let isTestingOpenVPNDataPath = false
@@ -569,6 +569,21 @@ if cryptoMode != nil {
     ])
 }
 
+// MARK: Wintun
+
+if OS.current == .windows {
+    package.targets.append(
+        .target(
+            name: "Wintun",
+            path: "Sources/Vendors/Wintun",
+            publicHeadersPath: ".",
+            linkerSettings: [
+                .unsafeFlags(["-Lvendors/wintun"])
+            ]
+        )
+    )
+}
+
 // MARK: WireGuard
 
 // Generic backend interface to implement
@@ -733,8 +748,14 @@ case .windows:
         ),
         .target(
             name: "_PartoutOSWindows_C",
-            dependencies: ["_PartoutOSPortable_C"],
-            path: "Sources/OS/Windows_C"
+            dependencies: [
+                "_PartoutOSPortable_C",
+                "Wintun"
+            ],
+            path: "Sources/OS/Windows_C",
+            cSettings: [
+                .unsafeFlags(["-Ivendors/wintun"])
+            ]
         )
     ])
 }
@@ -842,8 +863,16 @@ package.targets.append(contentsOf: [
 
 package.targets.append(
     .executableTarget(
-        name: "test-posix-interface",
+        name: "test-posix-socket",
         dependencies: ["PartoutInterfaces"]
-
     )
 )
+
+if OS.current == .windows {
+    package.targets.append(
+        .executableTarget(
+            name: "test-wintun",
+            dependencies: ["PartoutInterfaces"]
+        )
+    )
+}

@@ -7,7 +7,7 @@ import Foundation
 import PartoutCore
 #endif
 
-final class DummyTunnelinterface: IOInterface {
+final class DummyTunnelInterface: IOInterface {
     var fileDescriptor: UInt64? {
         nil
     }

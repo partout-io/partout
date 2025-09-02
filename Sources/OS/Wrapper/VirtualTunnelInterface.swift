@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if os(macOS) || os(Linux)
+#if os(macOS) || os(Linux) || os(Windows)
 
 import Foundation
 import _PartoutOSPortable_C
@@ -13,9 +13,9 @@ import PartoutCore
 public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
-    private nonisolated(unsafe) let tun: pp_tun
+    private nonisolated let tun: pp_tun
 
-    public nonisolated let deviceName: String
+    public nonisolated let deviceName: String?
 
     public nonisolated let fileDescriptor: UInt64?
 
@@ -26,15 +26,22 @@ public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
     private var readBuf: [UInt8]
 
     public init(_ ctx: PartoutLoggerContext, maxReadLength: Int) throws {
-        guard let tun = pp_tun_open() else {
+        guard let tun = pp_tun_create(nil) else {
             throw PartoutError(.linkNotActive)
         }
         self.ctx = ctx
         self.tun = tun
-        deviceName = String(cString: pp_tun_name(tun))
-        fileDescriptor = UInt64(pp_tun_fd(tun))
-        readQueue = DispatchQueue(label: "VirtualTunnelInterface[R:\(fileDescriptor!)]")
-        writeQueue = DispatchQueue(label: "VirtualTunnelInterface[W:\(fileDescriptor!)]")
+        if let tunName = pp_tun_name(tun) {
+            deviceName = String(cString: tunName)
+        } else {
+            deviceName = nil
+        }
+        let fd = pp_tun_fd(tun)
+        fileDescriptor = fd >= 0 ? UInt64(fd) : nil
+        // FIXME: #188, Windows has device name but it's wchar_t *
+        let label = deviceName?.description ?? fileDescriptor?.description ?? "*"
+        readQueue = DispatchQueue(label: "VirtualTunnelInterface[R:\(label)]")
+        writeQueue = DispatchQueue(label: "VirtualTunnelInterface[W:\(label)]")
         readBuf = [UInt8](repeating: 0, count: maxReadLength)
     }
 
@@ -43,41 +50,49 @@ public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
     }
 
     public func readPackets() async throws -> [Data] {
-        try await withCheckedThrowingContinuation { continuation in
-            readQueue.async { [weak self] in
-                guard let self else {
-                    continuation.resume(throwing: PartoutError(.releasedObject))
-                    return
+        do {
+            return try await withCheckedThrowingContinuation { continuation in
+                readQueue.async { [weak self] in
+                    guard let self else {
+                        continuation.resume(throwing: PartoutError(.releasedObject))
+                        return
+                    }
+                    let readCount = pp_tun_read(tun, &readBuf, readBuf.count)
+                    guard readCount > 0 else {
+                        continuation.resume(throwing: PartoutError(.linkFailure))
+                        return
+                    }
+                    let newPacket = Data(readBuf[0..<Int(readCount)])
+                    continuation.resume(returning: [newPacket])
                 }
-                let readCount = pp_tun_read(tun, &readBuf, readBuf.count)
-                guard readCount > 0 else {
-                    pp_log(ctx, .core, .fault, "Unable to read TUN packets")
-                    continuation.resume(throwing: PartoutError(.linkFailure))
-                    return
-                }
-                let newPacket = Data(readBuf[0..<Int(readCount)])
-                continuation.resume(returning: [newPacket])
             }
+        } catch {
+            pp_log(ctx, .core, .fault, "Unable to read TUN packets: \(error)")
+            throw error
         }
     }
 
     public func writePackets(_ packets: [Data]) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            writeQueue.async { [weak self] in
-                guard let self else { return }
-                for toWrite in packets {
-                    guard !toWrite.isEmpty else { continue }
-                    let writtenCount = toWrite.withUnsafeBytes {
-                        pp_tun_write(self.tun, $0.bytePointer, toWrite.count)
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                writeQueue.async { [weak self] in
+                    guard let self else { return }
+                    for toWrite in packets {
+                        guard !toWrite.isEmpty else { continue }
+                        let writtenCount = toWrite.withUnsafeBytes {
+                            pp_tun_write(self.tun, $0.bytePointer, toWrite.count)
+                        }
+                        guard writtenCount > 0 else {
+                            continuation.resume(throwing: PartoutError(.linkFailure))
+                            return
+                        }
                     }
-                    guard writtenCount > 0 else {
-                        pp_log(ctx, .core, .fault, "Unable to write TUN packets")
-                        continuation.resume(throwing: PartoutError(.linkFailure))
-                        return
-                    }
+                    continuation.resume()
                 }
-                continuation.resume()
             }
+        } catch {
+            pp_log(ctx, .core, .fault, "Unable to write TUN packets: \(error)")
+            throw error
         }
     }
 }

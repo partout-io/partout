@@ -106,7 +106,7 @@ pp_tls pp_tls_create(const pp_tls_options *opt, pp_tls_error_code *error) {
 
     // no longer fails
 
-    pp_tls tls = pp_alloc(sizeof(struct _pp_tls));
+    pp_tls tls = pp_alloc(sizeof(*tls));
     tls->opt = opt;
     tls->ssl_ctx = ssl_ctx;
     tls->buf_len = tls->opt->buf_len;

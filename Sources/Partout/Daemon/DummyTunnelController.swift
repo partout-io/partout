@@ -11,7 +11,7 @@ final class DummyTunnelController: TunnelController {
     }
 
     func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
-        DummyTunnelinterface()
+        DummyTunnelInterface()
     }
 
     func clearTunnelSettings(_ tunnel: IOInterface) async {
