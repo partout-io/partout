@@ -36,9 +36,12 @@ public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
         } else {
             deviceName = nil
         }
-        fileDescriptor = UInt64(pp_tun_fd(tun))
-        readQueue = DispatchQueue(label: "VirtualTunnelInterface[R:\(fileDescriptor!)]")
-        writeQueue = DispatchQueue(label: "VirtualTunnelInterface[W:\(fileDescriptor!)]")
+        let fd = pp_tun_fd(tun)
+        fileDescriptor = fd >= 0 ? UInt64(fd) : nil
+        // FIXME: #188, Windows has device name but it's wchar_t *
+        let label = deviceName?.description ?? fileDescriptor?.description ?? "*"
+        readQueue = DispatchQueue(label: "VirtualTunnelInterface[R:\(label)]")
+        writeQueue = DispatchQueue(label: "VirtualTunnelInterface[W:\(label)]")
         readBuf = [UInt8](repeating: 0, count: maxReadLength)
     }
 
