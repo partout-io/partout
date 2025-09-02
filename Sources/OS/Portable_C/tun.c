@@ -11,7 +11,7 @@
 /* Create a structure for an open tun device. The tun object
  * takes ownership of the file descriptor. */
 pp_tun pp_tun_create(const char *name, int fd) {
-    pp_tun tun = pp_alloc(sizeof(pp_tun *));
+    pp_tun tun = pp_alloc(sizeof(*tun));
     tun->fd = fd;
     tun->dev_name = pp_dup(name);
     return tun;
