@@ -569,6 +569,21 @@ if cryptoMode != nil {
     ])
 }
 
+// MARK: Wintun
+
+if OS.current == .windows {
+    package.targets.append(
+        .target(
+            name: "Wintun",
+            path: "Sources/Vendors/Wintun",
+            publicHeadersPath: ".",
+            linkerSettings: [
+                .unsafeFlags(["-Lvendors/wintun"])
+            ]
+        )
+    )
+}
+
 // MARK: WireGuard
 
 // Generic backend interface to implement
@@ -733,8 +748,14 @@ case .windows:
         ),
         .target(
             name: "_PartoutOSWindows_C",
-            dependencies: ["_PartoutOSPortable_C"],
-            path: "Sources/OS/Windows_C"
+            dependencies: [
+                "_PartoutOSPortable_C",
+                "Wintun"
+            ],
+            path: "Sources/OS/Windows_C",
+            cSettings: [
+                .unsafeFlags(["-Ivendors/wintun"])
+            ]
         )
     ])
 }
