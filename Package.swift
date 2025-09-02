@@ -842,8 +842,7 @@ package.targets.append(contentsOf: [
 
 package.targets.append(
     .executableTarget(
-        name: "test-posix-interface",
+        name: "test-posix-socket",
         dependencies: ["PartoutInterfaces"]
-
     )
 )
