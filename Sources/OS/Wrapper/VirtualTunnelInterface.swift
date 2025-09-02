@@ -13,9 +13,9 @@ import PartoutCore
 public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
-    private nonisolated(unsafe) let tun: pp_tun
+    private nonisolated let tun: pp_tun
 
-    public nonisolated let deviceName: String
+    public nonisolated let deviceName: String?
 
     public nonisolated let fileDescriptor: UInt64?
 
@@ -26,12 +26,16 @@ public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
     private var readBuf: [UInt8]
 
     public init(_ ctx: PartoutLoggerContext, maxReadLength: Int) throws {
-        guard let tun = pp_tun_open() else {
+        guard let tun = pp_tun_create(nil) else {
             throw PartoutError(.linkNotActive)
         }
         self.ctx = ctx
         self.tun = tun
-        deviceName = String(cString: pp_tun_name(tun))
+        if let tunName = pp_tun_name(tun) {
+            deviceName = String(cString: tunName)
+        } else {
+            deviceName = nil
+        }
         fileDescriptor = UInt64(pp_tun_fd(tun))
         readQueue = DispatchQueue(label: "VirtualTunnelInterface[R:\(fileDescriptor!)]")
         writeQueue = DispatchQueue(label: "VirtualTunnelInterface[W:\(fileDescriptor!)]")

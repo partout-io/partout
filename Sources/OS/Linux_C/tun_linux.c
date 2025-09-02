@@ -15,7 +15,13 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
-pp_tun pp_tun_open() {
+struct _pp_tun {
+    int fd;
+    const char *_Nullable dev_name;
+};
+
+pp_tun pp_tun_create(const void *_Nullable impl) {
+    (void)impl;
     const char *dev_path = "/dev/net/tun";
     int fd = -1;
     struct ifreq ifr = { 0 };
@@ -38,17 +44,35 @@ pp_tun pp_tun_open() {
     }
 
     printf("tun_linux: Created tun device %s\n", ifr.ifr_name);
-    return pp_tun_create(ifr.ifr_name, fd);
+    pp_tun tun = pp_alloc(sizeof(*tun));
+    tun->fd = fd;
+    tun->dev_name = pp_dup(ifr.ifr_name);
+    return tun;
 
 failure:
     if (fd != -1) close(fd);
     return NULL;
 }
 
-ssize_t pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
+void pp_tun_free(pp_tun tun) {
+    if (!tun) return;
+    close(tun->fd);
+    pp_free((void *)tun->dev_name);
+    pp_free(tun);
+}
+
+int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     return read(tun->fd, dst, dst_len);
 }
 
-ssize_t pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
+int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     return write(tun->fd, src, src_len);
+}
+
+int pp_tun_fd(const pp_tun tun) {
+    return tun->fd;
+}
+
+const char *pp_tun_name(const pp_tun tun) {
+    return tun->dev_name;
 }

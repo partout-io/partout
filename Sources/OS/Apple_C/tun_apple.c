@@ -20,9 +20,16 @@
 #include <stdio.h>
 #include <string.h>
 #include "portable/common.h"
+#include "portable/endian.h"
 #include "portable/tun.h"
 
-pp_tun pp_tun_open() {
+struct _pp_tun {
+    int fd;
+    const char *_Nullable dev_name;
+};
+
+pp_tun pp_tun_create(const void *_Nullable impl) {
+    (void)impl;
     struct sockaddr_ctl sc = { 0 };
     struct ctl_info ctl_info = { 0 };
     char ifname[IFNAMSIZ] = { 0 };
@@ -59,15 +66,22 @@ pp_tun pp_tun_open() {
     }
 
     printf("tun_apple: Created utun device %s\n", ifname);
-    return pp_tun_create(ifname, fd);
+    pp_tun tun = pp_alloc(sizeof(*tun));
+    tun->fd = fd;
+    tun->dev_name = pp_dup(ifname);
+    return tun;
 
 failure:
     if (fd != -1) close(fd);
     return NULL;
 }
 
-/* Platform-specific implementation to request a new tun device. */
-pp_tun _Nullable pp_tun_open();
+void pp_tun_free(pp_tun tun) {
+    if (!tun) return;
+    close(tun->fd);
+    pp_free((void *)tun->dev_name);
+    pp_free(tun);
+}
 
 /* The first 4 bits of a local packet identify the IP family. */
 static inline
@@ -83,7 +97,7 @@ uint32_t pp_tun_proto_for(uint8_t byte) {
     }
 }
 
-ssize_t pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
+int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     uint32_t pi = 0; // 4-byte utun protocol header
 
     struct iovec iov[2];
@@ -92,16 +106,16 @@ ssize_t pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     iov[1].iov_base = dst;
     iov[1].iov_len  = dst_len;
 
-    const ssize_t read_len = readv(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
+    const int read_len = (int)readv(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
     if (read_len < 0) return -1;
     if (read_len < sizeof(pi)) {
         fputs("Missing 4-byte utun packet header\n", stderr);
         return -1;
     }
-    return read_len - (ssize_t)sizeof(pi);
+    return read_len - (int)sizeof(pi);
 }
 
-ssize_t pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
+int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     const uint32_t pi = pp_endian_htonl(pp_tun_proto_for(*src));
     const size_t pi_len = sizeof(pi);
 
@@ -111,10 +125,18 @@ ssize_t pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     iov[1].iov_base = (void *)src;
     iov[1].iov_len  = src_len;
 
-    const ssize_t written_len = writev(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
+    const int written_len = (int)writev(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
     if (written_len < 0) return -1;
     if (written_len != pi_len + src_len) return -2;
     return written_len;
+}
+
+int pp_tun_fd(const pp_tun tun) {
+    return tun->fd;
+}
+
+const char *pp_tun_name(const pp_tun tun) {
+    return tun->dev_name;
 }
 
 #endif
