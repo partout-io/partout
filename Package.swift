@@ -19,7 +19,7 @@ let areas = Set(Area.allCases)
 let cryptoMode: CryptoMode? = .openSSL
 var wgMode: WireGuardMode? = .wgGo
 let coreDeployment = envCoreDeployment ?? .remoteBinary
-let cmakeOutput = envCMakeOutput ?? "bin/darwin-arm64"
+let cmakeOutput = envCMakeOutput ?? "bin/windows-arm64"
 
 // Must be false in production (check in CI)
 let isTestingOpenVPNDataPath = false

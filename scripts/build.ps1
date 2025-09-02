@@ -14,7 +14,8 @@ try {
     Get-ChildItem -Path "PartoutProject*" -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
     # Run CMake with ninja for Swift
-    cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
+    cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DPP_BUILD_USE_OPENSSL=ON -DPP_BUILD_LIBRARY=ON ..
+
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     cmake --build .
