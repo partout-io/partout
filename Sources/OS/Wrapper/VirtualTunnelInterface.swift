@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if os(macOS) || os(Linux)
+#if os(macOS) || os(Linux) || os(Windows)
 
 import Foundation
 import _PartoutOSPortable_C
