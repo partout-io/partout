@@ -28,8 +28,13 @@ endif()
 if(NOT LINUX)
     list(APPEND EXCLUDED_PATTERNS OS\/Linux.*)
 endif()
-if(NOT WIN32)
-    list(APPEND EXCLUDED_PATTERNS OS\/Windows.*)
+if(WIN32)
+    list(APPEND PARTOUT_C_INCLUDE_DIRS ${PARTOUT_DIR}/vendors/wintun)
+else()
+    list(APPEND EXCLUDED_PATTERNS
+        test-wintun.*
+        OS\/Windows.*
+    )
 endif()
 # XXX: Not sure about this condition
 if(NOT BUILD_FOR_ANDROID)
