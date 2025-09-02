@@ -867,3 +867,12 @@ package.targets.append(
         dependencies: ["PartoutInterfaces"]
     )
 )
+
+if OS.current == .windows {
+    package.targets.append(
+        .executableTarget(
+            name: "test-wintun",
+            dependencies: ["PartoutInterfaces"]
+        )
+    )
+}
