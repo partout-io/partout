@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#if TARGET_OS_OSX || defined(__linux__) || defined(_WIN32)
-
 #include <wintun.h>
 #include "portable/common.h"
 #include "portable/tun.h"
@@ -178,5 +176,3 @@ int pp_tun_fd(const pp_tun tun) {
 const char *pp_tun_name(const pp_tun tun) {
     return NULL;
 }
-
-#endif
