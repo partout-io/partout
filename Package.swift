@@ -102,8 +102,7 @@ let package = Package(
             }()
         ),
         .target(
-            name: "Partout_C",
-            dependencies: ["_PartoutOSPortable_C"]
+            name: "Partout_C"
         ),
         .target(
             name: "PartoutInterfaces",
@@ -673,7 +672,8 @@ case .apple:
             dependencies: [
                 coreDeployment.dependency,
                 "_PartoutOSApple_C",
-                "_PartoutOSAppleNE"
+                "_PartoutOSAppleNE",
+                "_PartoutOSPortable"
             ],
             path: "Sources/OS/Apple"
         ),

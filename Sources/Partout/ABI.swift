@@ -19,12 +19,6 @@ import PartoutCore
 // - doesn't handle interrupts/signals (should exit or at least handle them)
 //
 
-@_cdecl("partout_version")
-public func partout_version() -> UnsafePointer<CChar> {
-    // WARNING: This is only safe because Partout.version is static
-    Partout.version.withCString { $0 }
-}
-
 @_cdecl("partout_init")
 public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutableRawPointer {
     pp_log_g(.core, .debug, "Partout: Initialize")

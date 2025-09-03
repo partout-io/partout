@@ -1,0 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2025 Davide De Rosa
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ */
+
+const char *partout_identifier = "com.algoritmico.Partout";
+const char *partout_version = "0.99.x";
