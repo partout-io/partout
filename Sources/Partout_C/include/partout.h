@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+/*
+ * Success -> int == 0 or != NULL
+ * Failure -> int != 0 or == NULL
+ */
+
 const char *partout_version();
 
 typedef struct {
