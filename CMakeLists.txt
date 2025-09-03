@@ -53,7 +53,7 @@ if(PP_BUILD_LIBRARY)
 
     ExternalProject_Add(
         PartoutProject
-        SOURCE_DIR ${CMAKE_SOURCE_DIR}/cmake
+        SOURCE_DIR ${CMAKE_SOURCE_DIR}/Sources
         CMAKE_ARGS ${PARTOUT_CMAKE_ARGS}
         INSTALL_COMMAND ""
         COMMAND ${CMAKE_COMMAND} -E copy ${PARTOUT_ABI_HEADER} ${CMAKE_SOURCE_DIR}/${PP_BUILD_OUTPUT_UNIVERSAL}

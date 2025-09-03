@@ -1,9 +1,9 @@
+set(ROOT_DIR ${CMAKE_SOURCE_DIR}/..)
+
 # C/C++ sources, including vendored PartoutCore
 file(GLOB_RECURSE PARTOUT_C_SOURCES
-    ${PARTOUT_CORE_C_SOURCES_DIR}/*.c
-    ${PARTOUT_DIR}/Sources/*.c
-    ${PARTOUT_DIR}/Sources/*.cc
-    ${PARTOUT_DIR}/Sources/*.cpp
+    ${ROOT_DIR}/vendors/core/Sources/_PartoutCore_C/*.c
+    *.c
 )
 
 # Set up exclusions
@@ -15,10 +15,10 @@ set(EXCLUDED_PATTERNS
 
 # Header search paths from all C targets
 set(PARTOUT_C_INCLUDE_DIRS
-    ${PARTOUT_CORE_C_INCLUDE_DIR}
-    ${PARTOUT_DIR}/Sources/Partout_C/include
-    ${PARTOUT_DIR}/Sources/OS/Portable_C/include
-    ${PARTOUT_DIR}/Sources/PartoutOpenVPN/Cross_C/include
+    ${ROOT_DIR}/vendors/core/Sources/_PartoutCore_C/include
+    ${CMAKE_SOURCE_DIR}/Partout_C/include
+    ${CMAKE_SOURCE_DIR}/OS/Portable_C/include
+    ${CMAKE_SOURCE_DIR}/PartoutOpenVPN/Cross_C/include
 )
 
 # Filter by platform
@@ -29,7 +29,7 @@ if(NOT LINUX)
     list(APPEND EXCLUDED_PATTERNS OS\/Linux.*)
 endif()
 if(WIN32)
-    list(APPEND PARTOUT_C_INCLUDE_DIRS ${PARTOUT_DIR}/vendors/wintun)
+    list(APPEND PARTOUT_C_INCLUDE_DIRS ${ROOT_DIR}/vendors/wintun)
 else()
     list(APPEND EXCLUDED_PATTERNS
         test-wintun.*
@@ -43,12 +43,12 @@ endif()
 
 # Filter by crypto vendor
 if(DEFINED OPENSSL_DIR)
-    list(APPEND PARTOUT_C_INCLUDE_DIRS ${PARTOUT_DIR}/Sources/Impl/CryptoOpenSSL_C/include)
+    list(APPEND PARTOUT_C_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/Impl/CryptoOpenSSL_C/include)
 else()
     list(APPEND EXCLUDED_PATTERNS CryptoOpenSSL_C\/)
 endif()
 if(DEFINED MBEDTLS_DIR)
-    list(APPEND PARTOUT_C_INCLUDE_DIRS ${PARTOUT_DIR}/Sources/Impl/CryptoNative_C/include)
+    list(APPEND PARTOUT_C_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/Impl/CryptoNative_C/include)
     if(NOT APPLE)
         list(APPEND EXCLUDED_PATTERNS CryptoNative_C\/src/apple)
     endif()
