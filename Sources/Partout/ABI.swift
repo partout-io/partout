@@ -21,7 +21,8 @@ import PartoutCore
 
 @_cdecl("partout_version")
 public func partout_version() -> UnsafePointer<CChar> {
-    UnsafePointer(pp_dup(Partout.version))
+    // WARNING: This is only safe because Partout.version is static
+    Partout.version.withCString { $0 }
 }
 
 @_cdecl("partout_init")

@@ -861,12 +861,16 @@ package.targets.append(contentsOf: [
 
 // MARK: - Test executables
 
-package.targets.append(
+package.targets.append(contentsOf: [
+    .executableTarget(
+        name: "test-abi",
+        dependencies: ["Partout"]
+    ),
     .executableTarget(
         name: "test-posix-socket",
         dependencies: ["PartoutInterfaces"]
     )
-)
+])
 
 if OS.current == .windows {
     package.targets.append(
