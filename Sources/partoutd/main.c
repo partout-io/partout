@@ -15,6 +15,7 @@
 #endif
 #include "partout.h"
 
+// FIXME: #188, move this inside partout_daemon_start (args take profile or profile_path)
 char *pp_read_file(const char *path);
 
 int main(int argc, char *argv[]) {
@@ -34,7 +35,7 @@ int main(int argc, char *argv[]) {
     cache_dir = "."; // FIXME: #188, hardcoded
 
     // Initialize library
-    partout_daemon_init_args init_args = { 0 };
+    partout_init_args init_args = { 0 };
     init_args.cache_dir = cache_dir;
     void *ctx = partout_init(&init_args);
     if (!ctx) {

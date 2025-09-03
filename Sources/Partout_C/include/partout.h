@@ -14,9 +14,9 @@ const char *partout_version();
 typedef struct {
     const char *cache_dir;
     void (*test_callback)();
-} partout_daemon_init_args;
+} partout_init_args;
 
-void *partout_init(const partout_daemon_init_args *args);
+void *partout_init(const partout_init_args *args);
 void partout_deinit(void *ctx);
 
 typedef struct {

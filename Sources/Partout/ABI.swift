@@ -26,7 +26,7 @@ public func partout_version() -> UnsafePointer<CChar> {
 }
 
 @_cdecl("partout_init")
-public func partout_init(cArgs: UnsafePointer<partout_daemon_init_args>) -> UnsafeMutableRawPointer {
+public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutableRawPointer {
     pp_log_g(.core, .debug, "Partout: Initialize")
 
     // Test callback
