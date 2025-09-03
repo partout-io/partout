@@ -18,7 +18,6 @@
 int main(int argc, char *argv[]) {
     const char *profile_path = NULL;
     const char *cache_dir = NULL;
-
     if (argc < 2) {
         puts("Configuration file required");
         return 1;
@@ -27,7 +26,8 @@ int main(int argc, char *argv[]) {
     // Read input
     profile_path = argv[1];
     printf("Starting with profile at: %s\n", profile_path);
-    cache_dir = "."; // FIXME: #188, hardcoded
+    cache_dir = argc > 2 ? argv[2] : ".";
+    printf("Caching at: %s\n", cache_dir);
 
     // Initialize library
     partout_init_args init_args = { 0 };
