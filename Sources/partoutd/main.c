@@ -15,13 +15,9 @@
 #endif
 #include "partout.h"
 
-// FIXME: #188, move this inside partout_daemon_start (args take profile or profile_path)
-char *pp_read_file(const char *path);
-
 int main(int argc, char *argv[]) {
     const char *profile_path = NULL;
     const char *cache_dir = NULL;
-    char *profile = NULL;
 
     if (argc < 2) {
         puts("Configuration file required");
@@ -31,7 +27,6 @@ int main(int argc, char *argv[]) {
     // Read input
     profile_path = argv[1];
     printf("Starting with profile at: %s\n", profile_path);
-    profile = pp_read_file(profile_path);
     cache_dir = "."; // FIXME: #188, hardcoded
 
     // Initialize library
@@ -45,7 +40,7 @@ int main(int argc, char *argv[]) {
 
     // Start daemon
     partout_daemon_start_args start_args = { 0 };
-    start_args.profile = profile;
+    start_args.profile_path = profile_path;
     if (partout_daemon_start(ctx, &start_args) != 0) {
         puts("Unable to start daemon");
         goto failure;
@@ -59,22 +54,5 @@ int main(int argc, char *argv[]) {
     return 0;
 
 failure:
-    if (profile) free(profile);
     return 1;
-}
-
-char *pp_read_file(const char *path) {
-    FILE *f = fopen(path, "rb");
-    if (!f) return NULL;
-
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    rewind(f);
-
-    char *buf = malloc(size + 1);
-    fread(buf, 1, size, f);
-    buf[size] = '\0';
-
-    fclose(f);
-    return buf;
 }

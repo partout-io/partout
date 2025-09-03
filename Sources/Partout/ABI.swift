@@ -104,7 +104,15 @@ public func partout_daemon_start(
     // Profile is a command line argument
     let daemon: SimpleConnectionDaemon
     do {
-        let contents = String(cString: cArgs.pointee.profile)
+        let contents: String
+        if let cProfile = cArgs.pointee.profile {
+            contents = String(cString: cProfile)
+        } else if let cProfilePath = cArgs.pointee.profile_path {
+            let path = String(cString: cProfilePath)
+            contents = try String(contentsOfFile: path, encoding: .utf8)
+        } else {
+            throw PartoutError(.notFound)
+        }
         let module = try ctx.registry.module(fromContents: contents, object: nil)
         var builder = Profile.Builder()
         builder.modules = [module]

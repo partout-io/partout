@@ -21,6 +21,7 @@ void partout_deinit(void *ctx);
 
 typedef struct {
     const char *profile;
+    const char *profile_path;
 } partout_daemon_start_args;
 
 int partout_daemon_start(void *ctx, const partout_daemon_start_args *args);
