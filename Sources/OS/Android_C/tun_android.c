@@ -16,7 +16,7 @@ struct _pp_tun {
 /* Impl is the pp_tun struct as is. */
 pp_tun pp_tun_create(const void *_Nullable any_impl) {
     if (!any_impl) return NULL;
-    struct _pp_tun *impl = (struct _pp_tun *)any_impl;
+    pp_tun impl = (pp_tun)any_impl;
     assert(impl && impl->fd > 0);
 
     printf("tun_android: Created tun device %d\n", impl->fd);
