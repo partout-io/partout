@@ -5,6 +5,7 @@
 import Foundation
 @preconcurrency import OSLog
 #if !PARTOUT_MONOLITH
+import _PartoutOSPortable
 import PartoutCore
 #endif
 

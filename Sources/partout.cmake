@@ -1,7 +1,9 @@
+set(ROOT_DIR ${CMAKE_SOURCE_DIR}/..)
+
 # Swift sources, including vendored PartoutCore
 file(GLOB_RECURSE PARTOUT_SOURCES
-    ${PARTOUT_CORE_SOURCES_DIR}/*.swift
-    ${PARTOUT_DIR}/Sources/*.swift
+    ${ROOT_DIR}/vendors/core/Sources/PartoutCore/*.swift
+    *.swift
 )
 
 # Set up global exclusions

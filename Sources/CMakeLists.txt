@@ -1,18 +1,16 @@
 cmake_minimum_required(VERSION 3.27)
 project(PartoutProject LANGUAGES Swift C CXX)
 
-set(PARTOUT_DIR ${CMAKE_SOURCE_DIR}/..)
-
-include(partout-core.cmake)
+# One include per Swift target
 include(partout-c.cmake)
 include(partout.cmake)
 
-# Output to root
-set(PARTOUT_OUTPUT ${PARTOUT_DIR}/${PP_BUILD_OUTPUT})
+# Set output from flag
+set(OUTPUT_DIR ${CMAKE_SOURCE_DIR}/../${PP_BUILD_OUTPUT})
 set_target_properties(Partout PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY ${PARTOUT_OUTPUT}
-    ARCHIVE_OUTPUT_DIRECTORY ${PARTOUT_OUTPUT}
-    RUNTIME_OUTPUT_DIRECTORY ${PARTOUT_OUTPUT}
+    LIBRARY_OUTPUT_DIRECTORY ${OUTPUT_DIR}
+    ARCHIVE_OUTPUT_DIRECTORY ${OUTPUT_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
 )
 
 # Mind platform differences about static libraries
@@ -31,8 +29,8 @@ endfunction()
 set(PARTOUT_LIBS)
 if(DEFINED OPENSSL_DIR)
     target_include_directories(Partout_C PRIVATE
-        ${PARTOUT_DIR}/Sources/Crypto/CryptoOpenSSL_C/include
-        ${PARTOUT_DIR}/Sources/Crypto/TLSOpenSSL_C/include
+        ${CMAKE_SOURCE_DIR}/Crypto/CryptoOpenSSL_C/include
+        ${CMAKE_SOURCE_DIR}/Crypto/TLSOpenSSL_C/include
         ${OPENSSL_DIR}/include
     )
     add_static_lib(${OPENSSL_DIR}/lib ssl PARTOUT_LIBS)
@@ -40,8 +38,8 @@ if(DEFINED OPENSSL_DIR)
 endif()
 if(DEFINED MBEDTLS_DIR)
     target_include_directories(Partout_C PRIVATE
-        ${PARTOUT_DIR}/Sources/Crypto/CryptoMbedTLS_C/include
-        ${PARTOUT_DIR}/Sources/Crypto/TLSMbedTLS_C/include
+        ${CMAKE_SOURCE_DIR}/Crypto/CryptoMbedTLS_C/include
+        ${CMAKE_SOURCE_DIR}/Crypto/TLSMbedTLS_C/include
         ${MBEDTLS_DIR}/include
     )
     add_static_lib(${MBEDTLS_DIR}/lib mbedcrypto PARTOUT_LIBS)

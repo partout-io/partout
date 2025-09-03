@@ -19,13 +19,8 @@ import PartoutCore
 // - doesn't handle interrupts/signals (should exit or at least handle them)
 //
 
-@_cdecl("partout_version")
-public func partout_version() -> UnsafePointer<CChar> {
-    UnsafePointer(pp_dup(Partout.version))
-}
-
 @_cdecl("partout_init")
-public func partout_init(cArgs: UnsafePointer<partout_daemon_init_args>) -> UnsafeMutableRawPointer {
+public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutableRawPointer {
     pp_log_g(.core, .debug, "Partout: Initialize")
 
     // Test callback
@@ -103,7 +98,15 @@ public func partout_daemon_start(
     // Profile is a command line argument
     let daemon: SimpleConnectionDaemon
     do {
-        let contents = String(cString: cArgs.pointee.profile)
+        let contents: String
+        if let cProfile = cArgs.pointee.profile {
+            contents = String(cString: cProfile)
+        } else if let cProfilePath = cArgs.pointee.profile_path {
+            let path = String(cString: cProfilePath)
+            contents = try String(contentsOfFile: path, encoding: .utf8)
+        } else {
+            throw PartoutError(.notFound)
+        }
         let module = try ctx.registry.module(fromContents: contents, object: nil)
         var builder = Profile.Builder()
         builder.modules = [module]

@@ -102,8 +102,7 @@ let package = Package(
             }()
         ),
         .target(
-            name: "Partout_C",
-            dependencies: ["_PartoutOSPortable_C"]
+            name: "Partout_C"
         ),
         .target(
             name: "PartoutInterfaces",
@@ -673,7 +672,8 @@ case .apple:
             dependencies: [
                 coreDeployment.dependency,
                 "_PartoutOSApple_C",
-                "_PartoutOSAppleNE"
+                "_PartoutOSAppleNE",
+                "_PartoutOSPortable"
             ],
             path: "Sources/OS/Apple"
         ),
@@ -820,8 +820,8 @@ enum WireGuardMode {
 
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.185"
-let checksum = "6cd470bcc5d06e37f20fd31d1d4502c0d625c4d2c57b52b726757b4ec8b31fd1"
+let version = "0.99.186"
+let checksum = "9ff97849e68dd999a204838599d207145b19033adaf07a7c6a90747789082099"
 
 enum CoreDeployment: String, RawRepresentable {
     case remoteBinary
@@ -861,12 +861,16 @@ package.targets.append(contentsOf: [
 
 // MARK: - Test executables
 
-package.targets.append(
+package.targets.append(contentsOf: [
+    .executableTarget(
+        name: "test-abi",
+        dependencies: ["Partout"]
+    ),
     .executableTarget(
         name: "test-posix-socket",
         dependencies: ["PartoutInterfaces"]
     )
-)
+])
 
 if OS.current == .windows {
     package.targets.append(
