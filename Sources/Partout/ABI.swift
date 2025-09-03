@@ -113,10 +113,10 @@ public func partout_daemon_start(
         builder.activateAllModules()
         let profile = try builder.tryBuild()
 
-        // FIXME: #188, create raw C-based controller here (if applicable)
-        let controller: TunnelController? = nil
+        // Map tunnel controller to external C functions (optional)
+        let ctrl = cArgs.pointee.ctrl.map(\.pointee)
 
-        daemon = try makeDaemon(with: profile, registry: ctx.registry, controller: controller)
+        daemon = try makeDaemon(with: profile, registry: ctx.registry, ctrl: ctrl)
     } catch {
         pp_log_g(.core, .error, "Partout: Unable to create daemon: \(error)")
         return -1
