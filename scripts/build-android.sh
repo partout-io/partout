@@ -18,7 +18,7 @@ fi
 
 PP_BUILD_OS="android" \
 PP_BUILD_CORE="localSource" \
-PP_BUILD_CMAKE_OUTPUT="bin/android-arm64" \
+PP_BUILD_CMAKE_OUTPUT=".bin/android-arm64" \
 swiftly run \
 swift build \
     -c $spm_cfg \

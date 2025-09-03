@@ -19,7 +19,7 @@ let areas = Set(Area.allCases)
 let cryptoMode: CryptoMode? = .openSSL
 var wgMode: WireGuardMode? = .wgGo
 let coreDeployment = envCoreDeployment ?? .remoteBinary
-let cmakeOutput = envCMakeOutput ?? "bin/windows-arm64"
+let cmakeOutput = envCMakeOutput ?? ".bin/windows-arm64"
 
 // Must be false in production (check in CI)
 let isTestingOpenVPNDataPath = false
@@ -166,13 +166,13 @@ package.targets.append(contentsOf: [
             var list: [Target.Dependency] = ["_PartoutOSPortable"]
             switch OS.current {
             case .android:
-                list.append("_PartoutOSAndroid")
+                list.append("_PartoutOSAndroid_C")
             case .apple:
                 list.append("_PartoutOSApple")
             case .linux:
-                list.append("_PartoutOSLinux")
+                list.append("_PartoutOSLinux_C")
             case .windows:
-                list.append("_PartoutOSWindows")
+                list.append("_PartoutOSWindows_C")
             }
             return list
         }(),
@@ -638,6 +638,7 @@ package.targets.append(contentsOf: [
     ),
     .target(
         name: "_PartoutOSPortable_C",
+        dependencies: ["Partout_C"],
         path: "Sources/OS/Portable_C"
     ),
     .testTarget(
@@ -650,21 +651,13 @@ package.targets.append(contentsOf: [
 // Targets relying on OS-specific frameworks
 switch OS.current {
 case .android:
-    package.targets.append(contentsOf: [
-        .target(
-            name: "_PartoutOSAndroid",
-            dependencies: [
-                "_PartoutOSAndroid_C",
-                "_PartoutOSPortable"
-            ],
-            path: "Sources/OS/Android"
-        ),
+    package.targets.append(
         .target(
             name: "_PartoutOSAndroid_C",
             dependencies: ["_PartoutOSPortable_C"],
             path: "Sources/OS/Android_C"
         )
-    ])
+    )
 case .apple:
     package.targets.append(contentsOf: [
         .target(
@@ -721,31 +714,15 @@ case .apple:
         )
     ])
 case .linux:
-    package.targets.append(contentsOf: [
-        .target(
-            name: "_PartoutOSLinux",
-            dependencies: [
-                "_PartoutOSLinux_C",
-                "_PartoutOSPortable"
-            ],
-            path: "Sources/OS/Linux"
-        ),
+    package.targets.append(
         .target(
             name: "_PartoutOSLinux_C",
             dependencies: ["_PartoutOSPortable_C"],
             path: "Sources/OS/Linux_C"
         )
-    ])
+    )
 case .windows:
-    package.targets.append(contentsOf: [
-        .target(
-            name: "_PartoutOSWindows",
-            dependencies: [
-                "_PartoutOSWindows_C",
-                "_PartoutOSPortable"
-            ],
-            path: "Sources/OS/Windows"
-        ),
+    package.targets.append(
         .target(
             name: "_PartoutOSWindows_C",
             dependencies: [
@@ -757,7 +734,7 @@ case .windows:
                 .unsafeFlags(["-Ivendors/wintun"])
             ]
         )
-    ])
+    )
 }
 
 // MARK: - Configuration structures

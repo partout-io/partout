@@ -10,21 +10,22 @@
 
 #if !os(iOS) && !os(tvOS)
 
+import Partout_C
 #if !PARTOUT_MONOLITH
-import PartoutCore
 import _PartoutOSWrapper
+import PartoutCore
 #endif
 
 public func makeDaemon(
     with profile: Profile,
     registry: Registry,
-    controller: TunnelController?
+    ctrl: partout_tun_ctrl?
 ) throws -> SimpleConnectionDaemon {
     let ctx = PartoutLoggerContext(profile.id)
     let factory = POSIXInterfaceFactory(ctx) {
         PassthroughStream()
     }
-    let controllerImpl = try controller ?? VirtualTunnelController(ctx)
+    let controllerImpl = try VirtualTunnelController(ctx, ctrl: ctrl)
     let reachability = DummyReachabilityObserver()
     let environment = SharedTunnelEnvironment(profileId: profile.id)
     let messageHandler = DefaultMessageHandler(ctx, environment: environment)

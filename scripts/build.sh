@@ -1,12 +1,14 @@
 #!/bin/bash
 opt_configuration=Debug
+build_dir=.cmake
+bin_dir=.bin
 
 positional_args=()
 cmake_opts=()
 while [[ $# -gt 0 ]]; do
     case $1 in
         -clean)
-            rm -rf build bin
+            rm -rf $build_dir $bin_dir
             shift
             ;;
         -config)
@@ -38,7 +40,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -android)
             PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/bin:$PATH
-            rm -rf build bin/android
+            rm -rf $build_dir $bin_dir/android
             cmake_opts+=("-DPP_BUILD_FOR_ANDROID=ON")
             shift
             ;;
@@ -54,13 +56,13 @@ while [[ $# -gt 0 ]]; do
 done
 set -- "${positional_args[@]}"
 
-rm -f build/*.txt
-if [ ! -d build ]; then
-    mkdir build
+rm -f $build_dir/*.txt
+if [ ! -d $build_dir ]; then
+    mkdir $build_dir
 fi
 
 set -e
-cd build
+cd $build_dir
 rm -rf PartoutProject*
 
 cmake -G Ninja "${cmake_opts[@]}" ..

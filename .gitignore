@@ -8,5 +8,5 @@ PartoutCore
 PartoutCore.xcframework*
 Package.resolved
 .build
-build
-bin
+.bin
+.cmake

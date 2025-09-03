@@ -2,9 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if os(macOS) || os(Linux) || os(Windows)
+#if !os(iOS) && !os(tvOS)
 
 import _PartoutOSPortable_C
+import Partout_C
 #if !PARTOUT_MONOLITH
 import PartoutCore
 #endif
@@ -12,10 +13,17 @@ import PartoutCore
 public final class VirtualTunnelController: TunnelController {
     private let ctx: PartoutLoggerContext
 
+    private nonisolated(unsafe) let ctrl: partout_tun_ctrl?
+
     private let maxReadLength: Int
 
-    public init(_ ctx: PartoutLoggerContext, maxReadLength: Int = 128 * 1024) throws {
+    public init(
+        _ ctx: PartoutLoggerContext,
+        ctrl: partout_tun_ctrl?,
+        maxReadLength: Int = 128 * 1024
+    ) throws {
         self.ctx = ctx
+        self.ctrl = ctrl
         self.maxReadLength = maxReadLength
     }
 
@@ -24,8 +32,18 @@ public final class VirtualTunnelController: TunnelController {
             throw PartoutError(.notFound)
         }
 
-        // Create virtual device
-        let tun = try VirtualTunnelInterface(ctx, maxReadLength: maxReadLength)
+        // Fetch tun implementation if necessary
+        let tunImpl = ctrl.map {
+            guard let info else {
+                return $0.set_tunnel($0.thiz, nil)
+            }
+            var cInfo = partout_tun_ctrl_info()
+            cInfo.remote_fd = info.fileDescriptor.map { Int32($0) } ?? -1
+            return $0.set_tunnel($0.thiz, &cInfo)
+        } ?? nil
+
+        // Create virtual device with an optional implementation
+        let tun = try VirtualTunnelInterface(ctx, tunImpl: tunImpl, maxReadLength: maxReadLength)
 
         // FIXME: #188, add better codes for PartoutError
         // FIXME: #188, apply subnets and routes (default first, drop excluded from included)
@@ -57,13 +75,18 @@ public final class VirtualTunnelController: TunnelController {
         return tun
     }
 
-    public func clearTunnelSettings(_ tunnel: IOInterface) async {
-        guard let _ = tunnel as? VirtualTunnelInterface else {
+    public func clearTunnelSettings(_ io: IOInterface) async {
+        guard let tunnel = io as? VirtualTunnelInterface else {
             assertionFailure("Expected type is VirtualTunnelInterface")
             return
         }
         // FIXME: #188, revert settings (record)
 //        tun.deviceName
+
+        // Release tun implementation if necessary
+        if let ctrl {
+            ctrl.clear_tunnel(ctrl.thiz, tunnel.tunImpl)
+        }
     }
 
     public func setReasserting(_ reasserting: Bool) {

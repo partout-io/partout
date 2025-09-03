@@ -21,9 +21,8 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
 
     private let closesOnEmptyRead: Bool
 
-    // Synchronize manually
-    nonisolated(unsafe)
-    private var readBuf: [UInt8]
+    // FIXME: #188, how to avoid silent copy? (enforce reference)
+    private nonisolated(unsafe) var readBuf: [UInt8]
 
     private var isActive = false
 

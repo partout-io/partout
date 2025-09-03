@@ -8,8 +8,8 @@
 #include "partout.h"
 
 int main() {
-    const char *id = partout_identifier;
-    const char *ver = partout_version;
+    const char *id = PARTOUT_IDENTIFIER;
+    const char *ver = PARTOUT_VERSION;
     printf("Partout version %s (%s)\n", ver, id);
     return 0;
 }

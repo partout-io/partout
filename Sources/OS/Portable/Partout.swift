@@ -2,13 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import _PartoutOSPortable_C
+import Partout_C
 
 public enum Partout {
 
     /// The unique identifier of the library.
     public static let identifier: String = {
-        guard let str = String(cString: partout_identifier, encoding: .ascii) else {
+        guard let str = String(cString: PARTOUT_IDENTIFIER, encoding: .ascii) else {
             fatalError("NULL partout_identifier")
         }
         return str
@@ -16,7 +16,7 @@ public enum Partout {
 
     /// The library version.
     public static let version: String = {
-        guard let str = String(cString: partout_version, encoding: .ascii) else {
+        guard let str = String(cString: PARTOUT_VERSION, encoding: .ascii) else {
             fatalError("NULL partout_version")
         }
         return str

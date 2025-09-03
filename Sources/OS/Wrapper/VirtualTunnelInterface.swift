@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if os(macOS) || os(Linux) || os(Windows)
+#if !os(iOS) && !os(tvOS)
 
 import Foundation
 import _PartoutOSPortable_C
@@ -15,6 +15,8 @@ public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
 
     private nonisolated let tun: pp_tun
 
+    public let tunImpl: UnsafeMutableRawPointer?
+
     public nonisolated let deviceName: String?
 
     public nonisolated let fileDescriptor: UInt64?
@@ -23,14 +25,16 @@ public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
 
     private let writeQueue: DispatchQueue
 
+    // FIXME: #188, how to avoid silent copy? (enforce reference)
     private var readBuf: [UInt8]
 
-    public init(_ ctx: PartoutLoggerContext, maxReadLength: Int) throws {
-        guard let tun = pp_tun_create(nil) else {
+    public init(_ ctx: PartoutLoggerContext, tunImpl: UnsafeMutableRawPointer?, maxReadLength: Int) throws {
+        guard let tun = pp_tun_create(tunImpl) else {
             throw PartoutError(.linkNotActive)
         }
         self.ctx = ctx
         self.tun = tun
+        self.tunImpl = tunImpl
         if let tunName = pp_tun_name(tun) {
             deviceName = String(cString: tunName)
         } else {
