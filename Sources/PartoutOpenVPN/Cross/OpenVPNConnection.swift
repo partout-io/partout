@@ -36,6 +36,8 @@ public actor OpenVPNConnection {
 
     private var hooks: CyclingConnection.Hooks?
 
+    private var tunnelInterface: IOInterface?
+
     init(
         _ ctx: PartoutLoggerContext,
         parameters: ConnectionParameters,
@@ -196,14 +198,15 @@ extension OpenVPNConnection: OpenVPNSessionDelegate {
                 )
             )
             await session.setTunnel(tunnelInterface)
+            self.tunnelInterface = tunnelInterface
 
-            // in this suspended interval, sessionDidStop may have been called and
+            // In this suspended interval, sessionDidStop may have been called and
             // the status may have changed to .disconnected in the meantime
             //
             // sendStatus() should prevent .connected from happening when in the
             // .disconnected state, because it must go through .connecting first
 
-            // signal success and show the "VPN" icon
+            // Signal success and show the "VPN" icon
             if await backend.sendStatus(.connected) {
                 pp_log(ctx, .openvpn, .notice, "Tunnel interface is now UP")
             }
@@ -220,20 +223,26 @@ extension OpenVPNConnection: OpenVPNSessionDelegate {
             pp_log(ctx, .openvpn, .notice, "Session did stop")
         }
 
-        // if user stopped the tunnel, let it go
+        // Clean up tunnel
+        if let tunnelInterface {
+            await controller.clearTunnelSettings(tunnelInterface)
+            self.tunnelInterface = nil
+        }
+
+        // If user stopped the tunnel, let it go
         if await backend.status == .disconnecting {
             pp_log(ctx, .openvpn, .info, "User requested disconnection")
             return
         }
 
-        // if error is not recoverable, just fail
+        // If error is not recoverable, just fail
         if let error, !error.isOpenVPNRecoverable {
             pp_log(ctx, .openvpn, .error, "Disconnection is not recoverable")
             await backend.sendError(error)
             return
         }
 
-        // go back to the disconnected state (e.g. daemon will reconnect)
+        // Go back to the disconnected state (e.g. daemon will reconnect)
         await backend.sendStatus(.disconnected)
     }
 
