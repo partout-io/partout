@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@testable internal import PartoutPortable
+@testable internal import _PartoutOSPortable
 import XCTest
 
 final class CryptoPerformanceTests: XCTestCase {

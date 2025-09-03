@@ -19,7 +19,7 @@ let areas = Set(Area.allCases)
 let cryptoMode: CryptoMode? = .openSSL
 var wgMode: WireGuardMode? = .wgGo
 let coreDeployment = envCoreDeployment ?? .remoteBinary
-let cmakeOutput = envCMakeOutput ?? "bin/darwin-arm64"
+let cmakeOutput = envCMakeOutput ?? ".bin/windows-arm64"
 
 // Must be false in production (check in CI)
 let isTestingOpenVPNDataPath = false
@@ -71,6 +71,10 @@ let package = Package(
         .library(
             name: "PartoutInterfaces",
             targets: ["PartoutInterfaces"]
+        ),
+        .executable(
+            name: "partoutd",
+            targets: ["partoutd"]
         )
     ],
     targets: [
@@ -88,7 +92,7 @@ let package = Package(
                         list.append("_PartoutOpenVPNWrapper")
                     }
                 }
-                if wgMode != nil {
+                if areas.contains(.wireGuard), wgMode != nil {
                     list.append("_PartoutVendorsWireGuardImpl")
                     if areas.contains(.wireGuard) {
                         list.append("_PartoutWireGuardWrapper")
@@ -98,8 +102,7 @@ let package = Package(
             }()
         ),
         .target(
-            name: "Partout_C",
-            dependencies: ["PartoutPortable_C"]
+            name: "Partout_C"
         ),
         .target(
             name: "PartoutInterfaces",
@@ -107,8 +110,7 @@ let package = Package(
                 var list: [Target.Dependency] = []
 
                 // These are always included
-                list.append(coreDeployment.dependency)
-                list.append("PartoutPortable")
+                list.append("_PartoutOSWrapper")
                 list.append("PartoutProviders")
 
                 // Optional includes
@@ -122,15 +124,6 @@ let package = Package(
                     list.append("PartoutWireGuard")
                 }
 
-                // OS-dependent
-                switch OS.current {
-                case .apple:
-                    list.append("_PartoutVendorsApple")
-                    list.append("_PartoutVendorsAppleNE")
-                default:
-                    break
-                }
-
                 return list
             }(),
             exclude: {
@@ -140,6 +133,10 @@ let package = Package(
                 }
                 return list
             }(),
+        ),
+        .executableTarget(
+            name: "partoutd",
+            dependencies: ["Partout"]
         ),
         .testTarget(
             name: "PartoutTests",
@@ -161,32 +158,29 @@ let package = Package(
     ]
 )
 
-// MARK: Portable
-
-// Cross-platform utilities
+// Wrapper = Core + Portable + OS-specific
 package.targets.append(contentsOf: [
     .target(
-        name: "PartoutPortable",
-        dependencies: [
-            coreDeployment.dependency,
-            "PartoutPortable_C"
-        ]
+        name: "_PartoutOSWrapper",
+        dependencies: {
+            var list: [Target.Dependency] = ["_PartoutOSPortable"]
+            switch OS.current {
+            case .android:
+                list.append("_PartoutOSAndroid_C")
+            case .apple:
+                list.append("_PartoutOSApple")
+            case .linux:
+                list.append("_PartoutOSLinux_C")
+            case .windows:
+                list.append("_PartoutOSWindows_C")
+            }
+            return list
+        }(),
+        path: "Sources/OS/Wrapper"
     ),
-    .target(
-        name: "PartoutPortable_C"
-    ),
-    .testTarget(
-        name: "PartoutPortableTests",
-        dependencies: ["PartoutPortable"]
-    )
-])
-
-// MARK: Providers
-
-package.targets.append(contentsOf: [
     .target(
         name: "PartoutProviders",
-        dependencies: [coreDeployment.dependency]
+        dependencies: ["_PartoutOSPortable"]
     ),
     .testTarget(
         name: "PartoutProvidersTests",
@@ -197,7 +191,7 @@ package.targets.append(contentsOf: [
     )
 ])
 
-// MARK: API
+// MARK: - API
 
 if areas.contains(.api) {
     package.products.append(
@@ -328,7 +322,7 @@ if areas.contains(.openVPN) {
                     var list: [Target.Dependency] = [
                         "PartoutOpenVPN",
                         "_PartoutOpenVPN_C",
-                        "PartoutPortable"
+                        "_PartoutOSPortable"
                     ]
                     if isTestingOpenVPNDataPath {
                         list.append("_PartoutOpenVPNLegacy_ObjC")
@@ -341,7 +335,7 @@ if areas.contains(.openVPN) {
                     if !isTestingOpenVPNDataPath {
                         list.append("Internal/Legacy")
                     }
-                    if OS.current == .apple {
+                    if includesLegacy {
                         list.append("StandardOpenVPNParser+Default.swift")
                     }
                     return list
@@ -479,7 +473,7 @@ case .openSSL:
         .target(
             name: "_PartoutCryptoImpl_C",
             dependencies: [
-                "PartoutPortable_C",
+                "_PartoutOSPortable_C",
                 vendorTarget
             ],
             path: "Sources/Impl/CryptoOpenSSL_C",
@@ -540,7 +534,7 @@ case .native: // MbedTLS + OS
         .target(
             name: "_PartoutCryptoImpl_C",
             dependencies: [
-                "PartoutPortable_C",
+                "_PartoutOSPortable_C",
                 vendorTarget
             ],
             path: "Sources/Impl/CryptoNative_C",
@@ -565,7 +559,7 @@ if cryptoMode != nil {
             name: "PartoutCryptoTests",
             dependencies: [
                 "_PartoutCryptoImpl_C",
-                "PartoutPortable"
+                "_PartoutOSPortable"
             ],
             exclude: [
                 "CryptoPerformanceTests.swift"
@@ -574,60 +568,117 @@ if cryptoMode != nil {
     ])
 }
 
+// MARK: Wintun
+
+if OS.current == .windows {
+    package.targets.append(
+        .target(
+            name: "Wintun",
+            path: "Sources/Vendors/Wintun",
+            publicHeadersPath: ".",
+            linkerSettings: [
+                .unsafeFlags(["-Lvendors/wintun"])
+            ]
+        )
+    )
+}
+
 // MARK: WireGuard
 
 // Generic backend interface to implement
-switch wgMode {
-    case .wgGo:
-        // Use portable Go backend for WireGuard
-        switch OS.current {
-        case .apple:
-            package.dependencies.append(
-                .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.20250630")
-            )
-            package.targets.append(
-                .target(
-                    name: "_PartoutVendorsWireGuardImpl",
-                    dependencies: [
-                        "PartoutWireGuard",
-                        "wg-go-apple"
-                    ],
-                    path: "Sources/Vendors/WireGuardGo"
+if areas.contains(.wireGuard) {
+    switch wgMode {
+        case .wgGo:
+            // Use portable Go backend for WireGuard
+            switch OS.current {
+            case .apple:
+                package.dependencies.append(
+                    .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.20250630")
                 )
-            )
+                package.targets.append(
+                    .target(
+                        name: "_PartoutVendorsWireGuardImpl",
+                        dependencies: [
+                            "PartoutWireGuard",
+                            "wg-go-apple"
+                        ],
+                        path: "Sources/Vendors/WireGuardGo"
+                    )
+                )
+            default:
+                break
+            }
         default:
             break
-        }
-    default:
-        break
-}
+    }
 
-// Include back tests if supported
-if wgMode != nil {
-    package.targets.append(contentsOf: [
-        .testTarget(
-            name: "_PartoutVendorsWireGuardImplTests",
-            dependencies: ["_PartoutVendorsWireGuardImpl"],
-            path: "Tests/Vendors/WireGuard"
-        )
-    ])
+    // Include back tests if supported
+    if wgMode != nil {
+        package.targets.append(contentsOf: [
+            .testTarget(
+                name: "_PartoutVendorsWireGuardImplTests",
+                dependencies: ["_PartoutVendorsWireGuardImpl"],
+                path: "Tests/Vendors/WireGuard"
+            )
+        ])
+    }
 }
 
 // MARK: - OS
 
+// Cross-platform utilities
+package.targets.append(contentsOf: [
+    .target(
+        name: "_PartoutOSPortable",
+        dependencies: [
+            coreDeployment.dependency,
+            "_PartoutOSPortable_C"
+        ],
+        path: "Sources/OS/Portable"
+    ),
+    .target(
+        name: "_PartoutOSPortable_C",
+        dependencies: ["Partout_C"],
+        path: "Sources/OS/Portable_C"
+    ),
+    .testTarget(
+        name: "_PartoutOSPortableTests",
+        dependencies: ["_PartoutOSPortable"],
+        path: "Tests/OS/Portable"
+    )
+])
+
 // Targets relying on OS-specific frameworks
 switch OS.current {
+case .android:
+    package.targets.append(
+        .target(
+            name: "_PartoutOSAndroid_C",
+            dependencies: ["_PartoutOSPortable_C"],
+            path: "Sources/OS/Android_C"
+        )
+    )
 case .apple:
     package.targets.append(contentsOf: [
         .target(
-            name: "_PartoutVendorsApple",
-            dependencies: [coreDeployment.dependency],
-            path: "Sources/Vendors/Apple"
+            name: "_PartoutOSApple",
+            dependencies: [
+                coreDeployment.dependency,
+                "_PartoutOSApple_C",
+                "_PartoutOSAppleNE",
+                "_PartoutOSPortable"
+            ],
+            path: "Sources/OS/Apple"
         ),
         .target(
-            name: "_PartoutVendorsAppleNE",
+            name: "_PartoutOSApple_C",
+            dependencies: ["_PartoutOSPortable_C"],
+            path: "Sources/OS/Apple_C"
+        ),
+        .target(
+            name: "_PartoutOSAppleNE",
             dependencies: [coreDeployment.dependency],
-            path: "Sources/Vendors/AppleNE",
+            path: "Sources/OS/AppleNE",
             exclude: {
 #if swift(>=6.0)
                 [
@@ -643,14 +694,14 @@ case .apple:
             }()
         ),
         .testTarget(
-            name: "_PartoutVendorsAppleTests",
-            dependencies: ["_PartoutVendorsApple"],
-            path: "Tests/Vendors/Apple"
+            name: "_PartoutOSAppleTests",
+            dependencies: ["_PartoutOSApple"],
+            path: "Tests/OS/Apple"
         ),
         .testTarget(
-            name: "_PartoutVendorsAppleNETests",
-            dependencies: ["_PartoutVendorsAppleNE"],
-            path: "Tests/Vendors/AppleNE",
+            name: "_PartoutOSAppleNETests",
+            dependencies: ["_PartoutOSAppleNE"],
+            path: "Tests/OS/AppleNE",
             exclude: {
 #if swift(>=6.0)
                 [
@@ -662,8 +713,28 @@ case .apple:
             }()
         )
     ])
-default:
-    break
+case .linux:
+    package.targets.append(
+        .target(
+            name: "_PartoutOSLinux_C",
+            dependencies: ["_PartoutOSPortable_C"],
+            path: "Sources/OS/Linux_C"
+        )
+    )
+case .windows:
+    package.targets.append(
+        .target(
+            name: "_PartoutOSWindows_C",
+            dependencies: [
+                "_PartoutOSPortable_C",
+                "Wintun"
+            ],
+            path: "Sources/OS/Windows_C",
+            cSettings: [
+                .unsafeFlags(["-Ivendors/wintun"])
+            ]
+        )
+    )
 }
 
 // MARK: - Configuration structures
@@ -726,8 +797,8 @@ enum WireGuardMode {
 
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.180"
-let checksum = "a281f3495420dc55f25d7ab9b1e1335259559c9f4127c7384e1e0d0a3437fddf"
+let version = "0.99.186"
+let checksum = "9ff97849e68dd999a204838599d207145b19033adaf07a7c6a90747789082099"
 
 enum CoreDeployment: String, RawRepresentable {
     case remoteBinary
@@ -760,6 +831,29 @@ case .localSource:
 package.targets.append(contentsOf: [
     .testTarget(
         name: "PartoutCoreTests",
-        dependencies: ["PartoutCoreWrapper"]
+        dependencies: ["PartoutCoreWrapper"],
+        path: "Tests/Vendors/Core"
     )
 ])
+
+// MARK: - Test executables
+
+package.targets.append(contentsOf: [
+    .executableTarget(
+        name: "test-abi",
+        dependencies: ["Partout"]
+    ),
+    .executableTarget(
+        name: "test-posix-socket",
+        dependencies: ["PartoutInterfaces"]
+    )
+])
+
+if OS.current == .windows {
+    package.targets.append(
+        .executableTarget(
+            name: "test-wintun",
+            dependencies: ["PartoutInterfaces"]
+        )
+    )
+}

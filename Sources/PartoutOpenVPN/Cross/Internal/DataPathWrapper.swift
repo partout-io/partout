@@ -18,9 +18,9 @@ final class DataPathWrapper {
         let peerId: UInt32?
     }
 
-    let dataPath: DataPathTestingProtocol
+    let dataPath: DataPathProtocol
 
-    init(dataPath: DataPathTestingProtocol) {
+    init(dataPath: DataPathProtocol) {
         self.dataPath = dataPath
     }
 

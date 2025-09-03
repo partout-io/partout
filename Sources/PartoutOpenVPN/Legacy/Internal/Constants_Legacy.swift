@@ -5,6 +5,7 @@
 import Foundation
 #if !PARTOUT_MONOLITH
 internal import _PartoutOpenVPNLegacy_ObjC
+internal import _PartoutOSPortable
 import PartoutCore
 #endif
 

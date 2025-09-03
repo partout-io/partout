@@ -52,18 +52,6 @@ extension OpenVPNTCPLink: LinkInterface {
         link.hasBetterPath
     }
 
-    func upgraded() -> LinkInterface {
-        OpenVPNTCPLink(link: link.upgraded(), proc: proc)
-    }
-
-    func shutdown() {
-        link.shutdown()
-    }
-}
-
-// MARK: - IOInterface
-
-extension OpenVPNTCPLink {
     func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
         link.setReadHandler { [weak self] packets, error in
             guard let self else {
@@ -81,6 +69,26 @@ extension OpenVPNTCPLink {
 
             handler(processedPackets, error)
         }
+    }
+
+    func upgraded() async throws -> LinkInterface {
+        OpenVPNTCPLink(link: try await link.upgraded(), proc: proc)
+    }
+
+    func shutdown() {
+        link.shutdown()
+    }
+}
+
+// MARK: - IOInterface
+
+extension OpenVPNTCPLink {
+    var fileDescriptor: UInt64? {
+        link.fileDescriptor
+    }
+
+    func readPackets() async throws -> [Data] {
+        fatalError("readPackets() unavailable")
     }
 
     func writePackets(_ packets: [Data]) async throws {

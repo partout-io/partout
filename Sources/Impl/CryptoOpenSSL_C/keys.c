@@ -20,7 +20,7 @@ char *pp_key_decrypted_from_pkey(const EVP_PKEY *_Nonnull key) {
     }
 
     size_t dec_len = BIO_ctrl_pending(output);
-    char *dec_bytes = pp_alloc_crypto(dec_len + 1);
+    char *dec_bytes = pp_alloc(dec_len + 1);
     if (BIO_read(output, dec_bytes, (int)dec_len) < 0) {
         BIO_free(output);
         return NULL;

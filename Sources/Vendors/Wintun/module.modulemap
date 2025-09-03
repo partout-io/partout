@@ -1,0 +1,4 @@
+module _PartoutVendorsWintun [system] {
+    header "shim.h"
+    export *
+}

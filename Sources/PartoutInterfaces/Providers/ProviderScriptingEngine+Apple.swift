@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if canImport(_PartoutVendorsApple)
+#if canImport(_PartoutOSApple)
 
 #if !PARTOUT_MONOLITH
-import _PartoutVendorsApple
+import _PartoutOSApple
 #endif
 import JavaScriptCore
 

@@ -4,7 +4,7 @@
 
 import Foundation
 #if !PARTOUT_MONOLITH
-internal import PartoutPortable
+internal import _PartoutOSPortable
 import PartoutCore
 import PartoutOpenVPN
 #endif
@@ -32,11 +32,11 @@ public actor OpenVPNConnection {
 
     private let dns: DNSResolver
 
-    private let tunnelInterface: TunnelInterface
-
     // MARK: State
 
     private var hooks: CyclingConnection.Hooks?
+
+    private var tunnelInterface: IOInterface?
 
     init(
         _ ctx: PartoutLoggerContext,
@@ -59,19 +59,14 @@ public actor OpenVPNConnection {
               !endpoints.isEmpty else {
             fatalError("No OpenVPN remotes defined?")
         }
-        guard let tunnelInterface = parameters.factory.tunnelInterface() else {
-            throw PartoutError(.releasedObject)
-        }
 
-        self.configuration = try configuration.withModules(from: parameters.controller.profile)
+        self.configuration = try configuration.withModules(from: parameters.profile)
         self.sessionFactory = sessionFactory
         self.dns = dns
-        self.tunnelInterface = tunnelInterface
 
         backend = CyclingConnection(
             ctx,
             factory: parameters.factory,
-            controller: controller,
             options: options,
             endpoints: endpoints
         )
@@ -114,62 +109,63 @@ private extension OpenVPNConnection {
         let configuration = self.configuration
         let session = try await sessionFactory()
 
-        let hooks = CyclingConnection.Hooks(dns: dns) { newLink in
+        let hooks = CyclingConnection.Hooks(
+            dns: dns,
+            newLinkBlock: { newLink in
+                // Wrap new link into a specific OpenVPN link
+                newLink.openVPNLink(method: configuration.xorMethod)
+            },
+            startBlock: { newLink in
+                try await session.setLink(newLink)
+            },
+            upgradeBlock: {
+                // TODO: #143/notes, may improve this with floating
+                pp_log(ctx, .openvpn, .notice, "Link has a better path, shut down session to reconnect")
+                await session.shutdown(PartoutError(.networkChanged))
+            },
+            stopBlock: { _, timeout in
+                // Stop the OpenVPN connection on user request
+                await session.shutdown(nil, timeout: TimeInterval(timeout) / 1000.0)
 
-            // wrap new link into a specific OpenVPN link
-            newLink.openVPNLink(method: configuration.xorMethod)
-
-        } startBlock: { newLink in
-
-            try await session.setLink(newLink)
-
-        } upgradeBlock: {
-
-            // TODO: #143/notes, may improve this with floating
-            pp_log(ctx, .openvpn, .notice, "Link has a better path, shut down session to reconnect")
-            await session.shutdown(PartoutError(.networkChanged))
-
-        } stopBlock: { _, timeout in
-
-            // stop the OpenVPN connection on user request
-            await session.shutdown(nil, timeout: TimeInterval(timeout) / 1000.0)
-
-            // XXX: poll session status until link clean-up
-            // in the future, make OpenVPNSession.shutdown() wait for stop async-ly
-            let delta = 500
-            var remaining = timeout
-            while remaining > 0, await session.hasLink() {
-                pp_log(ctx, .openvpn, .notice, "Link active, wait \(delta) milliseconds more")
-                try? await Task.sleep(milliseconds: delta)
-                remaining = max(0, remaining - delta)
+                // XXX: Poll session status until link clean-up
+                // In the future, make OpenVPNSession.shutdown() wait for stop async-ly
+                let delta = 500
+                var remaining = timeout
+                while remaining > 0, await session.hasLink() {
+                    pp_log(ctx, .openvpn, .notice, "Link active, wait \(delta) milliseconds more")
+                    try? await Task.sleep(milliseconds: delta)
+                    remaining = max(0, remaining - delta)
+                }
+                if remaining > 0 {
+                    pp_log(ctx, .openvpn, .notice, "Link shut down gracefully")
+                } else {
+                    pp_log(ctx, .openvpn, .error, "Link shut down due to timeout")
+                }
+            },
+            onStatusBlock: { [weak self] status in
+                self?.onStatus(status)
+            },
+            onErrorBlock: { [weak self] error in
+                self?.onError(error)
             }
-            if remaining > 0 {
-                pp_log(ctx, .openvpn, .notice, "Link shut down gracefully")
-            } else {
-                pp_log(ctx, .openvpn, .error, "Link shut down due to timeout")
-            }
-        } onStatusBlock: { [weak self] status in
-
-            self?.onStatus(status)
-
-        } onErrorBlock: { [weak self] error in
-
-            self?.onError(error)
-        }
+        )
 
         self.hooks = hooks
         await backend.setHooks(hooks)
         await session.setDelegate(self)
-
-        // set this once
-        await session.setTunnel(tunnelInterface)
     }
 }
 
 // MARK: - OpenVPNSessionDelegate
 
 extension OpenVPNConnection: OpenVPNSessionDelegate {
-    func sessionDidStart(_ session: OpenVPNSessionProtocol, remoteAddress: String, remoteProtocol: EndpointProtocol, remoteOptions: OpenVPN.Configuration) async {
+    func sessionDidStart(
+        _ session: OpenVPNSessionProtocol,
+        remoteAddress: String,
+        remoteProtocol: EndpointProtocol,
+        remoteOptions: OpenVPN.Configuration,
+        remoteFd: UInt64?
+    ) async {
         let addressObject = Address(rawValue: remoteAddress)
         if addressObject == nil {
             pp_log(ctx, .openvpn, .error, "Unable to parse remote tunnel address")
@@ -193,19 +189,24 @@ extension OpenVPNConnection: OpenVPNSessionDelegate {
         )
         builder.print()
         do {
-            try await controller.setTunnelSettings(with: TunnelRemoteInfo(
-                originalModuleId: moduleId,
-                address: addressObject,
-                modules: builder.modules()
-            ))
+            let tunnelInterface = try await controller.setTunnelSettings(
+                with: TunnelRemoteInfo(
+                    originalModuleId: moduleId,
+                    address: addressObject,
+                    modules: builder.modules(),
+                    fileDescriptor: remoteFd
+                )
+            )
+            await session.setTunnel(tunnelInterface)
+            self.tunnelInterface = tunnelInterface
 
-            // in this suspended interval, sessionDidStop may have been called and
+            // In this suspended interval, sessionDidStop may have been called and
             // the status may have changed to .disconnected in the meantime
             //
             // sendStatus() should prevent .connected from happening when in the
             // .disconnected state, because it must go through .connecting first
 
-            // signal success and show the "VPN" icon
+            // Signal success and show the "VPN" icon
             if await backend.sendStatus(.connected) {
                 pp_log(ctx, .openvpn, .notice, "Tunnel interface is now UP")
             }
@@ -222,20 +223,26 @@ extension OpenVPNConnection: OpenVPNSessionDelegate {
             pp_log(ctx, .openvpn, .notice, "Session did stop")
         }
 
-        // if user stopped the tunnel, let it go
+        // Clean up tunnel
+        if let tunnelInterface {
+            await controller.clearTunnelSettings(tunnelInterface)
+            self.tunnelInterface = nil
+        }
+
+        // If user stopped the tunnel, let it go
         if await backend.status == .disconnecting {
             pp_log(ctx, .openvpn, .info, "User requested disconnection")
             return
         }
 
-        // if error is not recoverable, just fail
+        // If error is not recoverable, just fail
         if let error, !error.isOpenVPNRecoverable {
             pp_log(ctx, .openvpn, .error, "Disconnection is not recoverable")
             await backend.sendError(error)
             return
         }
 
-        // go back to the disconnected state (e.g. daemon will reconnect)
+        // Go back to the disconnected state (e.g. daemon will reconnect)
         await backend.sendStatus(.disconnected)
     }
 

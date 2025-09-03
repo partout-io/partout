@@ -281,6 +281,7 @@ private struct Constants {
         factory: NetworkInterfaceFactory = MockNetworkInterfaceFactory(),
         environment: TunnelEnvironment = SharedTunnelEnvironment(profileId: nil)
     ) async throws -> LegacyOpenVPNConnection {
+        let profile = try Profile.Builder().tryBuild()
         let impl = OpenVPNModule.Implementation(
             importer: StandardOpenVPNParser(),
             connectionBlock: {
@@ -296,6 +297,7 @@ private struct Constants {
         )
         let options = ConnectionParameters.Options()
         let conn = try module.newConnection(with: impl, parameters: .init(
+            profile: profile,
             controller: controller,
             factory: factory,
             environment: environment,
@@ -341,7 +343,8 @@ private final class MockOpenVPNSession: OpenVPNSessionProtocol, @unchecked Senda
                 self,
                 remoteAddress: "100.200.100.200",
                 remoteProtocol: .init(.udp, 1234),
-                remoteOptions: options
+                remoteOptions: options,
+                remoteFd: nil
             )
             onConnected()
         } catch {
@@ -354,7 +357,7 @@ private final class MockOpenVPNSession: OpenVPNSessionProtocol, @unchecked Senda
         mockHasLink
     }
 
-    func setTunnel(_ tunnel: TunnelInterface) async {
+    func setTunnel(_ tunnel: IOInterface) async {
         onSetTunnel()
     }
 

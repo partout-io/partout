@@ -32,8 +32,6 @@ public actor LegacyOpenVPNConnection {
 
     private let dns: DNSResolver
 
-    private let tunnelInterface: TunnelInterface
-
     // MARK: State
 
     private var hooks: CyclingConnection.Hooks?
@@ -59,19 +57,14 @@ public actor LegacyOpenVPNConnection {
               !endpoints.isEmpty else {
             fatalError("No OpenVPN remotes defined?")
         }
-        guard let tunnelInterface = parameters.factory.tunnelInterface() else {
-            throw PartoutError(.releasedObject)
-        }
 
-        self.configuration = try configuration.withModules(from: parameters.controller.profile)
+        self.configuration = try configuration.withModules(from: parameters.profile)
         self.sessionFactory = sessionFactory
         self.dns = dns
-        self.tunnelInterface = tunnelInterface
 
         backend = CyclingConnection(
             ctx,
             factory: parameters.factory,
-            controller: controller,
             options: options,
             endpoints: endpoints
         )
@@ -159,16 +152,19 @@ private extension LegacyOpenVPNConnection {
         self.hooks = hooks
         await backend.setHooks(hooks)
         await session.setDelegate(self)
-
-        // set this once
-        await session.setTunnel(tunnelInterface)
     }
 }
 
 // MARK: - OpenVPNSessionDelegate
 
 extension LegacyOpenVPNConnection: OpenVPNSessionDelegate {
-    nonisolated func sessionDidStart(_ session: OpenVPNSessionProtocol, remoteAddress: String, remoteProtocol: EndpointProtocol, remoteOptions: OpenVPN.Configuration) async {
+    func sessionDidStart(
+        _ session: OpenVPNSessionProtocol,
+        remoteAddress: String,
+        remoteProtocol: EndpointProtocol,
+        remoteOptions: OpenVPN.Configuration,
+        remoteFd: UInt64?
+    ) async {
         let addressObject = Address(rawValue: remoteAddress)
         if addressObject == nil {
             pp_log(ctx, .openvpn, .error, "Unable to parse remote tunnel address")
@@ -192,11 +188,15 @@ extension LegacyOpenVPNConnection: OpenVPNSessionDelegate {
         )
         builder.print()
         do {
-            try await controller.setTunnelSettings(with: TunnelRemoteInfo(
-                originalModuleId: moduleId,
-                address: addressObject,
-                modules: builder.modules()
-            ))
+            let tunnelInterface = try await controller.setTunnelSettings(
+                with: TunnelRemoteInfo(
+                    originalModuleId: moduleId,
+                    address: addressObject,
+                    modules: builder.modules(),
+                    fileDescriptor: nil
+                )
+            )
+            await session.setTunnel(tunnelInterface)
 
             // in this suspended interval, sessionDidStop may have been called and
             // the status may have changed to .disconnected in the meantime
@@ -214,7 +214,7 @@ extension LegacyOpenVPNConnection: OpenVPNSessionDelegate {
         }
     }
 
-    nonisolated func sessionDidStop(_ session: OpenVPNSessionProtocol, withError error: Error?) async {
+    func sessionDidStop(_ session: OpenVPNSessionProtocol, withError error: Error?) async {
         if let error {
             pp_log(ctx, .openvpn, .error, "Session did stop: \(error)")
         } else {

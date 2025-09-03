@@ -5,7 +5,7 @@
 internal import _PartoutOpenVPN_C
 internal import PartoutTLS_C
 #if !PARTOUT_MONOLITH
-internal import PartoutPortable
+internal import _PartoutOSPortable
 #endif
 import Foundation
 
@@ -24,7 +24,7 @@ private final class NativeTLSWrapper: TLSProtocol {
         static let bufferLength = 16 * 1024
     }
 
-    private let tls: pp_tls_ctx
+    private let tls: pp_tls
 
     private let caURL: URL
 
@@ -45,10 +45,10 @@ private final class NativeTLSWrapper: TLSProtocol {
         let keyPEM = parameters.cfg.clientKey?.pem.withCString(pp_dup)
         let hostname = parameters.cfg.sanHost?.withCString(pp_dup)
         defer {
-            free(caPath)
-            free(certPEM)
-            free(keyPEM)
-            free(hostname)
+            pp_free(caPath)
+            pp_free(certPEM)
+            pp_free(keyPEM)
+            pp_free(hostname)
         }
         let options = pp_tls_options_create(
             Int32(securityLevel ?? Constants.defaultSecurityLevel),
@@ -152,7 +152,7 @@ private final class NativeTLSWrapper: TLSProtocol {
             throw PPTLSError.encryption
         }
         defer {
-            free(buf)
+            pp_free(buf)
         }
         guard let md5 = String(cString: buf, encoding: .ascii) else {
             throw PPTLSError.encryption

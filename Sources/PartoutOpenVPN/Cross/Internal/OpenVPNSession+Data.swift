@@ -10,7 +10,7 @@ import PartoutCore
 extension OpenVPNSession {
     func handleDataPackets(
         _ packets: [Data],
-        to tunnel: TunnelInterface,
+        to tunnel: IOInterface,
         dataChannel: DataChannel
     ) {
         Task {

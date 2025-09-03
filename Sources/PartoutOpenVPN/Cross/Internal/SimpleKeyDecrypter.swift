@@ -20,7 +20,7 @@ final class SimpleKeyDecrypter: KeyDecrypter, Sendable {
         }
         let str = String(cString: buf)
         pp_zero(buf, str.count)
-        free(buf)
+        pp_free(buf)
         return str
     }
 
@@ -35,7 +35,7 @@ final class SimpleKeyDecrypter: KeyDecrypter, Sendable {
         }
         let str = String(cString: buf)
         pp_zero(buf, str.count)
-        free(buf)
+        pp_free(buf)
         return str
     }
 }

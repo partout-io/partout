@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_MONOLITH
+
 @_exported import PartoutInterfaces
 
 #if canImport(PartoutOpenVPN)
@@ -19,4 +21,6 @@
 #if canImport(PartoutWireGuardCross)
 @_exported import PartoutWireGuardCross
 #endif
+#endif
+
 #endif

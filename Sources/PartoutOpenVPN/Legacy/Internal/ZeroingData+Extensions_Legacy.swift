@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+import _PartoutOSPortable_C
 import Foundation
 #if !PARTOUT_MONOLITH
 internal import _PartoutCryptoOpenSSL_ObjC
@@ -14,7 +15,7 @@ extension PRNGProtocol {
         let randomBytes = pp_alloc_crypto(length)
         defer {
             bzero(randomBytes, length)
-            free(randomBytes)
+            pp_free(randomBytes)
         }
         guard SecRandomCopyBytes(kSecRandomDefault, length, randomBytes) == errSecSuccess else {
             fatalError("SecRandomCopyBytes failed")

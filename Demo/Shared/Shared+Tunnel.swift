@@ -12,7 +12,7 @@ extension Registry {
             OpenVPNModule.Implementation(
                 importer: StandardOpenVPNParser(),
                 connectionBlock: {
-                    let ctx = PartoutLoggerContext($0.controller.profile.id)
+                    let ctx = PartoutLoggerContext($0.profile.id)
                     return try OpenVPNConnection(
                         ctx,
                         parameters: $0,
@@ -26,7 +26,7 @@ extension Registry {
                 importer: StandardWireGuardParser(),
                 validator: StandardWireGuardParser(),
                 connectionBlock: {
-                    let ctx = PartoutLoggerContext($0.controller.profile.id)
+                    let ctx = PartoutLoggerContext($0.profile.id)
                     return try WireGuardConnection(
                         ctx,
                         parameters: $0,
