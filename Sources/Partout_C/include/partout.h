@@ -9,8 +9,8 @@
  * Failure -> int != 0 or == NULL
  */
 
-extern const char *partout_identifier;
-extern const char *partout_version;
+extern const char *PARTOUT_IDENTIFIER;
+extern const char *PARTOUT_VERSION;
 
 typedef struct {
     const char *cache_dir;

@@ -4,7 +4,6 @@ module _PartoutOSPortable_C {
     header "portable/prng.h"
     header "portable/socket.h"
     header "portable/tun.h"
-    header "portable/version.h"
     header "portable/zd.h"
     export *
 }

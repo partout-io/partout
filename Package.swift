@@ -638,6 +638,7 @@ package.targets.append(contentsOf: [
     ),
     .target(
         name: "_PartoutOSPortable_C",
+        dependencies: ["Partout_C"],
         path: "Sources/OS/Portable_C"
     ),
     .testTarget(
