@@ -32,6 +32,12 @@ static WINTUN_RELEASE_RECEIVE_PACKET_FUNC *WintunReleaseReceivePacket;
 static WINTUN_ALLOCATE_SEND_PACKET_FUNC *WintunAllocateSendPacket;
 static WINTUN_SEND_PACKET_FUNC *WintunSendPacket;
 
+#define PP_LOAD_FUNC(lib, name)                         \
+    do {                                                \
+        *(FARPROC *)&name = GetProcAddress(lib, #name); \
+        assert(name && #name " not found in DLL");      \
+    } while (0)
+
 pp_tun pp_tun_create(const void *_Nullable impl) {
     (void)impl;
     WINTUN_ADAPTER_HANDLE adapter = NULL;
@@ -45,37 +51,16 @@ pp_tun pp_tun_create(const void *_Nullable impl) {
             goto failure;
         }
         // Required DLL functions
-        WintunCreateAdapter = (WINTUN_CREATE_ADAPTER_FUNC *)
-            GetProcAddress(wintun, "WintunCreateAdapter");
-        WintunCloseAdapter = (WINTUN_CLOSE_ADAPTER_FUNC *)
-            GetProcAddress(wintun, "WintunCloseAdapter");
-        WintunGetRunningDriverVersion = (WINTUN_GET_RUNNING_DRIVER_VERSION_FUNC *)
-            GetProcAddress(wintun, "WintunGetRunningDriverVersion");
-        WintunStartSession = (WINTUN_START_SESSION_FUNC *)
-            GetProcAddress(wintun, "WintunStartSession");
-        WintunEndSession = (WINTUN_END_SESSION_FUNC *)
-            GetProcAddress(wintun, "WintunEndSession");
-        WintunGetReadWaitEvent = (WINTUN_GET_READ_WAIT_EVENT_FUNC *)
-            GetProcAddress(wintun, "WintunGetReadWaitEvent");
-        WintunReceivePacket = (WINTUN_RECEIVE_PACKET_FUNC *)
-            GetProcAddress(wintun, "WintunReceivePacket");
-        WintunReleaseReceivePacket = (WINTUN_RELEASE_RECEIVE_PACKET_FUNC *)
-            GetProcAddress(wintun, "WintunReleaseReceivePacket");
-        WintunAllocateSendPacket = (WINTUN_ALLOCATE_SEND_PACKET_FUNC *)
-            GetProcAddress(wintun, "WintunAllocateSendPacket");
-        WintunSendPacket = (WINTUN_SEND_PACKET_FUNC *)
-            GetProcAddress(wintun, "WintunSendPacket");
-
-        assert(WintunCreateAdapter);
-        assert(WintunCloseAdapter);
-        assert(WintunGetRunningDriverVersion);
-        assert(WintunStartSession);
-        assert(WintunEndSession);
-        assert(WintunGetReadWaitEvent);
-        assert(WintunReceivePacket);
-        assert(WintunReleaseReceivePacket);
-        assert(WintunAllocateSendPacket);
-        assert(WintunSendPacket);
+        PP_LOAD_FUNC(wintun, WintunCreateAdapter);
+        PP_LOAD_FUNC(wintun, WintunCloseAdapter);
+        PP_LOAD_FUNC(wintun, WintunGetRunningDriverVersion);
+        PP_LOAD_FUNC(wintun, WintunStartSession);
+        PP_LOAD_FUNC(wintun, WintunEndSession);
+        PP_LOAD_FUNC(wintun, WintunGetReadWaitEvent);
+        PP_LOAD_FUNC(wintun, WintunReceivePacket);
+        PP_LOAD_FUNC(wintun, WintunReleaseReceivePacket);
+        PP_LOAD_FUNC(wintun, WintunAllocateSendPacket);
+        PP_LOAD_FUNC(wintun, WintunSendPacket);
     }
 
     // FIXME: #188, should use profile name and UUID
