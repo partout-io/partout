@@ -84,10 +84,10 @@ $ scripts/build.sh -config Release -crypto openssl -l
 Sample output:
 
 ```
-bin/partout.h                       # The Partout ABI
-bin/darwin-arm64/libPartout.dylib   # macOS
-bin/linux-aarch64/libPartout.so     # Linux
-bin/windows-arm64/Partout.dll       # Windows
+.bin/partout.h                       # The Partout ABI
+.bin/darwin-arm64/libPartout.dylib   # macOS
+.bin/linux-aarch64/libPartout.so     # Linux
+.bin/windows-arm64/Partout.dll       # Windows
 ```
 
 This should work for all platforms, except for Android, which asks for a hybrid CMake + SwiftPM approach.
@@ -107,8 +107,8 @@ Requirements:
 The script runs on macOS, but can be adapted for other platforms with slight tweaks to `scripts/build.sh`. The Android output is consistent with the other platforms:
 
 ```
-bin/partout.h
-bin/android-arm64/libPartout.so
+.bin/partout.h
+.bin/android-arm64/libPartout.so
 ```
 
 ## Demo
