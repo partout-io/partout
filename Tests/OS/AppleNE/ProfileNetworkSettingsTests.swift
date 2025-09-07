@@ -108,7 +108,7 @@ struct ProfileNetworkSettingsTests {
             originalModuleId: bogusModule.id,
             address: Address(rawValue: "5.6.7.8")!,
             modules: [try DNSModule.Builder(servers: ["1.1.1.1"]).tryBuild()],
-            fileDescriptor: nil
+            fileDescriptors: []
         ))
 
         #expect(sut.tunnelRemoteAddress == "5.6.7.8")
@@ -134,7 +134,7 @@ struct ProfileNetworkSettingsTests {
                         ])
                 ).tryBuild()
             ],
-            fileDescriptor: nil
+            fileDescriptors: []
         )
         let ipModule = IPModule.Builder(
             ipv4: IPSettings(subnet: Subnet(rawValue: "1.2.3.4/32")!)

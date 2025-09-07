@@ -300,6 +300,7 @@ private struct Constants {
             profile: profile,
             controller: controller,
             factory: factory,
+            reachability: MockReachabilityObserver(),
             environment: environment,
             options: options
         ))
@@ -364,5 +365,16 @@ private final class MockOpenVPNSession: OpenVPNSessionProtocol, @unchecked Senda
     func shutdown(_ error: (any Error)?, timeout: TimeInterval?) async {
         await delegate?.sessionDidStop(self, withError: error)
         onStop(error)
+    }
+}
+
+final class MockReachabilityObserver: ReachabilityObserver {
+    func startObserving() {
+    }
+
+    let isReachable = true
+
+    var isReachableStream: AsyncStream<Bool> {
+        AsyncStream { nil }
     }
 }
