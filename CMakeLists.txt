@@ -6,7 +6,8 @@ include(ExternalProject)
 option(PP_BUILD_LIBRARY "Include main library" 0)
 option(PP_BUILD_FOR_ANDROID "Build for Android" 0)
 option(PP_BUILD_USE_OPENSSL "Use OpenSSL" 0)
-option(PP_BUILD_USE_MBEDTLS "Use mbedTLS" 0)
+option(PP_BUILD_USE_MBEDTLS "Use MbedTLS" 0)
+option(PP_BUILD_USE_WGGO "Use WireGuard Go" 0)
 
 # Output per platform/arch
 if(PP_BUILD_FOR_ANDROID)
@@ -25,24 +26,34 @@ message(STATUS "Option CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 message(STATUS "Option PP_BUILD_LIBRARY = ${PP_BUILD_LIBRARY}")
 message(STATUS "Option PP_BUILD_USE_OPENSSL = ${PP_BUILD_USE_OPENSSL}")
 message(STATUS "Option PP_BUILD_USE_MBEDTLS = ${PP_BUILD_USE_MBEDTLS}")
+message(STATUS "Option PP_BUILD_USE_WGGO = ${PP_BUILD_USE_WGGO}")
 message(STATUS "Option PP_BUILD_FOR_ANDROID = ${PP_BUILD_FOR_ANDROID}")
 message(STATUS "Option PP_BUILD_OUTPUT = ${PP_BUILD_OUTPUT}")
 
 # Forward args to Partout sub-project
-set(PARTOUT_CMAKE_ARGS -DPP_BUILD_OUTPUT=${PP_BUILD_OUTPUT})
+set(PARTOUT_CMAKE_ARGS
+    -DPP_BUILD_OUTPUT=${PP_BUILD_OUTPUT}
+    -DPP_BUILD_FOR_ANDROID=${PP_BUILD_FOR_ANDROID}
+)
 
 # All vendor-inherited args
-set(VENDOR_CRYPTO_DEPENDS)
+set(VENDOR_DEPENDS)
 if(PP_BUILD_USE_OPENSSL)
     include("vendors/openssl.cmake")
     ExternalProject_Get_Property(OpenSSLProject BINARY_DIR)
-    set(VENDOR_CRYPTO_DEPENDS OpenSSLProject)
+    list(APPEND VENDOR_DEPENDS OpenSSLProject)
     list(APPEND PARTOUT_CMAKE_ARGS -DOPENSSL_DIR=${OPENSSL_OUTPUT_DIR})
 elseif(PP_BUILD_USE_MBEDTLS)
     include("vendors/mbedtls.cmake")
-    ExternalProject_Get_Property(mbedTLSProject BINARY_DIR)
-    set(VENDOR_CRYPTO_DEPENDS mbedTLSProject)
+    ExternalProject_Get_Property(MbedTLSProject BINARY_DIR)
+    list(APPEND VENDOR_DEPENDS MbedTLSProject)
     list(APPEND PARTOUT_CMAKE_ARGS -DMBEDTLS_DIR=${MBEDTLS_OUTPUT_DIR})
+endif()
+if(PP_BUILD_USE_WGGO)
+    include("vendors/wg-go.cmake")
+    ExternalProject_Get_Property(WireGuardGoProject BINARY_DIR)
+    list(APPEND VENDOR_DEPENDS WireGuardGoProject)
+    list(APPEND PARTOUT_CMAKE_ARGS -DWGGO_DIR=${WGGO_OUTPUT_DIR})
 endif()
 
 # Build Partout library (opt-in), after vendored dependencies
@@ -57,6 +68,6 @@ if(PP_BUILD_LIBRARY)
         CMAKE_ARGS ${PARTOUT_CMAKE_ARGS}
         INSTALL_COMMAND ""
         COMMAND ${CMAKE_COMMAND} -E copy ${PARTOUT_ABI_HEADER} ${CMAKE_SOURCE_DIR}/${PP_BUILD_OUTPUT_UNIVERSAL}
-        DEPENDS ${VENDOR_CRYPTO_DEPENDS}
+        DEPENDS ${VENDOR_DEPENDS}
     )
 endif()

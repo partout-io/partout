@@ -7,7 +7,7 @@
 #ifndef __PARTOUT_H
 #define __PARTOUT_H
 
-#include <stdint.h>
+#include <stddef.h>
 
 /*
  * Success -> int == 0 or != NULL

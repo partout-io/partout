@@ -35,8 +35,7 @@ if(DEFINED OPENSSL_DIR)
     )
     add_static_lib(${OPENSSL_DIR}/lib ssl PARTOUT_LIBS)
     add_static_lib(${OPENSSL_DIR}/lib crypto PARTOUT_LIBS)
-endif()
-if(DEFINED MBEDTLS_DIR)
+elseif(DEFINED MBEDTLS_DIR)
     target_include_directories(Partout_C PRIVATE
         ${CMAKE_SOURCE_DIR}/Crypto/CryptoMbedTLS_C/include
         ${CMAKE_SOURCE_DIR}/Crypto/TLSMbedTLS_C/include
@@ -45,6 +44,15 @@ if(DEFINED MBEDTLS_DIR)
     add_static_lib(${MBEDTLS_DIR}/lib mbedcrypto PARTOUT_LIBS)
     add_static_lib(${MBEDTLS_DIR}/lib mbedtls PARTOUT_LIBS)
     add_static_lib(${MBEDTLS_DIR}/lib mbedx509 PARTOUT_LIBS)
+endif()
+if(DEFINED WGGO_DIR)
+    target_include_directories(Partout PRIVATE
+        ${CMAKE_SOURCE_DIR}/Vendors/WireGuardGo_C
+        ${WGGO_DIR}/include
+    )
+    if(NOT PP_BUILD_FOR_ANDROID)
+        add_static_lib(${WGGO_DIR}/lib wg-go PARTOUT_LIBS)
+    endif()
 endif()
 target_link_libraries(Partout_C PRIVATE
     ${PARTOUT_LIBS}

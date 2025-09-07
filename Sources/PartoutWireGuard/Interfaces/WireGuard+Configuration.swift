@@ -17,6 +17,11 @@ extension WireGuard {
         /// The peers.
         public let peers: [RemoteInterface]
 
+        public init(interface: LocalInterface, peers: [RemoteInterface]) {
+            self.interface = interface
+            self.peers = peers
+        }
+
         public func builder() -> Builder {
             Builder(
                 interface: interface.builder(),

@@ -74,6 +74,7 @@ The script builds the vendors as static libraries and accepts a few options:
 - `-l`: Build Partout as dynamic library (opt-in)
 - `-config (Debug|Release)`: The CMake build type
 - `-crypto (openssl|mbedtls)`: The crypto subsystem to pick between OpenSSL and mbedTLS
+- `-wireguard`: Enable support for WireGuard (requires Go)
 
 For example, this will build Partout for release with a static dependency on OpenSSL:
 
