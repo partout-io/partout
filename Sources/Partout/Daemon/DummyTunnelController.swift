@@ -14,6 +14,9 @@ final class DummyTunnelController: TunnelController {
         DummyTunnelInterface()
     }
 
+    func configureSockets(with descriptors: [UInt64]) {
+    }
+
     func clearTunnelSettings(_ tunnel: IOInterface) async {
     }
 

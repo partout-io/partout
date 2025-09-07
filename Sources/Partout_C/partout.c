@@ -4,5 +4,5 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-const char *PARTOUT_IDENTIFIER = "com.algoritmico.Partout";
-const char *PARTOUT_VERSION = "0.99.x";
+const char *const PARTOUT_IDENTIFIER = "com.algoritmico.Partout";
+const char *const PARTOUT_VERSION = "0.99.x";

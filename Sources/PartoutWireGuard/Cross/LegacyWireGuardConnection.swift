@@ -9,7 +9,7 @@
 //  Copyright © 2018-2024 WireGuard LLC. All Rights Reserved.
 
 import Foundation
-import NetworkExtension // TODO: #13, this depends on Apple unnecessarily
+import NetworkExtension
 import os
 #if !PARTOUT_MONOLITH
 internal import _PartoutVendorsWireGuardImpl
@@ -17,8 +17,7 @@ import PartoutCore
 import PartoutWireGuard
 #endif
 
-// FIXME: #13, drop @unchecked after refactoring
-public final class WireGuardConnection: Connection, @unchecked Sendable {
+public final class LegacyWireGuardConnection: Connection, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
     private let statusSubject: CurrentValueStream<ConnectionStatus>
@@ -104,21 +103,21 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
                         switch adapterError {
                         case .cannotLocateTunnelFileDescriptor:
                             pp_log(ctx, .wireguard, .error, "Starting tunnel failed: could not determine file descriptor")
-                            continuation.resume(throwing: WireGuardConnectionError.couldNotDetermineFileDescriptor)
+                            continuation.resume(throwing: LegacyWireGuardConnectionError.couldNotDetermineFileDescriptor)
 
                         case .dnsResolution(let dnsErrors):
                             let hostnamesWithDnsResolutionFailure = dnsErrors.map(\.address)
                                 .joined(separator: ", ")
                             pp_log(ctx, .wireguard, .error, "DNS resolution failed for the following hostnames: \(hostnamesWithDnsResolutionFailure)")
-                            continuation.resume(throwing: WireGuardConnectionError.dnsResolutionFailure)
+                            continuation.resume(throwing: LegacyWireGuardConnectionError.dnsResolutionFailure)
 
                         case .setNetworkSettings(let error):
                             pp_log(ctx, .wireguard, .error, "Starting tunnel failed with setTunnelNetworkSettings returning \(error.localizedDescription)")
-                            continuation.resume(throwing: WireGuardConnectionError.couldNotSetNetworkSettings)
+                            continuation.resume(throwing: LegacyWireGuardConnectionError.couldNotSetNetworkSettings)
 
                         case .startWireGuardBackend(let errorCode):
                             pp_log(ctx, .wireguard, .error, "Starting tunnel failed with wgTurnOn returning \(errorCode)")
-                            continuation.resume(throwing: WireGuardConnectionError.couldNotStartBackend)
+                            continuation.resume(throwing: LegacyWireGuardConnectionError.couldNotStartBackend)
 
                         case .invalidState:
                             // Must never happen
@@ -162,13 +161,13 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
 
 // MARK: - WireGuardAdapterDelegate
 
-private extension WireGuardConnection {
+private extension LegacyWireGuardConnection {
     final class AdapterDelegate: WireGuardAdapterDelegate {
         private let ctx: PartoutLoggerContext
 
-        private weak var connection: WireGuardConnection?
+        private weak var connection: LegacyWireGuardConnection?
 
-        init(_ ctx: PartoutLoggerContext, connection: WireGuardConnection) {
+        init(_ ctx: PartoutLoggerContext, connection: LegacyWireGuardConnection) {
             self.ctx = ctx
             self.connection = connection
         }
@@ -196,8 +195,7 @@ private extension WireGuardConnection {
                         originalModuleId: connection.moduleId,
                         address: addressObject,
                         modules: [module],
-                        // FIXME: #188, fd is required by Android
-                        fileDescriptor: nil
+                        fileDescriptors: []
                     ))
                     completionHandler?(nil)
                     pp_log(connection.ctx, .wireguard, .info, "Tunnel interface is now UP")
@@ -214,7 +212,7 @@ private extension WireGuardConnection {
 
 // MARK: - Data count
 
-private extension WireGuardConnection {
+private extension LegacyWireGuardConnection {
     func onDataCountTimer() {
         guard statusSubject.value == .connected else {
             return

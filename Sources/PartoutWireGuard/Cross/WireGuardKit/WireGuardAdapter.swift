@@ -8,7 +8,7 @@ import PartoutWireGuard
 import Foundation
 import NetworkExtension
 
-public enum WireGuardAdapterError: Error, Sendable {
+enum WireGuardAdapterError: Error, Sendable {
     /// Failure to locate tunnel file descriptor.
     case cannotLocateTunnelFileDescriptor
 
@@ -37,15 +37,14 @@ private enum State {
     case temporaryShutdown(_ settingsGenerator: PacketTunnelSettingsGenerator)
 }
 
-public protocol WireGuardAdapterDelegate: AnyObject {
+protocol WireGuardAdapterDelegate: AnyObject {
     func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool)
 
     func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: NEPacketTunnelNetworkSettings, completionHandler: (@Sendable (Error?) -> Void)?)
 }
 
-// FIXME: #13, drop @unchecked after refactoring
-public class WireGuardAdapter: @unchecked Sendable {
-    public typealias LogHandler = (WireGuardLogLevel, String) -> Void
+class WireGuardAdapter: @unchecked Sendable {
+    typealias LogHandler = (WireGuardLogLevel, String) -> Void
 
     /// Network routes monitor.
     private var networkMonitor: NWPathMonitor?
@@ -105,7 +104,7 @@ public class WireGuardAdapter: @unchecked Sendable {
 
     /// Returns the tunnel device interface name, or nil on error.
     /// - Returns: String.
-    public var interfaceName: String? {
+    var interfaceName: String? {
         guard let tunnelFileDescriptor = self.tunnelFileDescriptor else { return nil }
 
         var buffer = [UInt8](repeating: 0, count: Int(IFNAMSIZ))
@@ -136,7 +135,7 @@ public class WireGuardAdapter: @unchecked Sendable {
     ///   as a weak reference.
     /// - Parameter backend: a backend implementation.
     /// - Parameter logHandler: a log handler closure.
-    public init(with delegate: WireGuardAdapterDelegate, backend: WireGuardBackend, logHandler: @escaping LogHandler) {
+    init(with delegate: WireGuardAdapterDelegate, backend: WireGuardBackend, logHandler: @escaping LogHandler) {
         self.delegate = delegate
         self.backend = backend
         self.logHandler = logHandler
@@ -162,7 +161,7 @@ public class WireGuardAdapter: @unchecked Sendable {
 
     /// Returns a runtime configuration from WireGuard.
     /// - Parameter completionHandler: completion handler.
-    public func getRuntimeConfiguration(completionHandler: @escaping @Sendable (String?) -> Void) {
+    func getRuntimeConfiguration(completionHandler: @escaping @Sendable (String?) -> Void) {
         workQueue.async {
             guard case .started(let handle, _) = self.state else {
                 completionHandler(nil)
@@ -181,7 +180,7 @@ public class WireGuardAdapter: @unchecked Sendable {
     /// - Parameters:
     ///   - tunnelConfiguration: tunnel configuration.
     ///   - completionHandler: completion handler.
-    public func start(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping @Sendable (WireGuardAdapterError?) -> Void) {
+    func start(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping @Sendable (WireGuardAdapterError?) -> Void) {
         workQueue.async {
             guard case .stopped = self.state else {
                 completionHandler(.invalidState)
@@ -218,7 +217,7 @@ public class WireGuardAdapter: @unchecked Sendable {
 
     /// Stop the tunnel.
     /// - Parameter completionHandler: completion handler.
-    public func stop(completionHandler: @escaping @Sendable (WireGuardAdapterError?) -> Void) {
+    func stop(completionHandler: @escaping @Sendable (WireGuardAdapterError?) -> Void) {
         workQueue.async {
             switch self.state {
             case .started(let handle, _):
@@ -245,7 +244,7 @@ public class WireGuardAdapter: @unchecked Sendable {
     /// - Parameters:
     ///   - tunnelConfiguration: tunnel configuration.
     ///   - completionHandler: completion handler.
-    public func update(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping @Sendable (WireGuardAdapterError?) -> Void) {
+    func update(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping @Sendable (WireGuardAdapterError?) -> Void) {
         workQueue.async {
             if case .stopped = self.state {
                 completionHandler(.invalidState)
@@ -474,7 +473,7 @@ public class WireGuardAdapter: @unchecked Sendable {
 }
 
 /// A enum describing WireGuard log levels defined in `api-apple.go`.
-public enum WireGuardLogLevel: Int32 {
+enum WireGuardLogLevel: Int32 {
     case verbose = 0
     case error = 1
 }

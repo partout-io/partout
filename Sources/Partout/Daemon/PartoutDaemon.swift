@@ -8,6 +8,8 @@
 //#if PARTOUT_MONOLITH || canImport(_PartoutOSLinux)
 //#if PARTOUT_MONOLITH || canImport(_PartoutOSWindows)
 
+#if !os(iOS) && !os(tvOS)
+
 import Partout_C
 #if !PARTOUT_MONOLITH
 import _PartoutOSWrapper
@@ -19,9 +21,6 @@ public func makeDaemon(
     registry: Registry,
     ctrl: partout_tun_ctrl?
 ) throws -> SimpleConnectionDaemon {
-#if os(iOS) || os(tvOS)
-    fatalError("Partout cannot be launched as a daemon on iOS/tvOS")
-#else
     let ctx = PartoutLoggerContext(profile.id)
     let factory = POSIXInterfaceFactory(ctx) {
         PassthroughStream()
@@ -34,6 +33,7 @@ public func makeDaemon(
         profile: profile,
         controller: controllerImpl,
         factory: factory,
+        reachability: reachability,
         environment: environment,
         options: ConnectionParameters.Options()
     )
@@ -46,5 +46,6 @@ public func makeDaemon(
         reconnectionDelay: 3000
     )
     return try SimpleConnectionDaemon(params: params)
-#endif
 }
+
+#endif

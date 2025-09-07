@@ -3,6 +3,9 @@
 
 import Foundation
 import Network
+#if !PARTOUT_MONOLITH
+import PartoutWireGuard
+#endif
 
 public struct InterfaceConfiguration: Sendable {
     public var privateKey: PrivateKey

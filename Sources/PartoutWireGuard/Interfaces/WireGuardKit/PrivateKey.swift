@@ -4,6 +4,8 @@
 import _PartoutWireGuard_C
 import Foundation
 
+// FIXME: #118, make internal after dropping legacy
+
 /// The class describing a private key used by WireGuard.
 public class PrivateKey: BaseKey, @unchecked Sendable {
     /// Derived public key
@@ -22,7 +24,7 @@ public class PrivateKey: BaseKey, @unchecked Sendable {
     }
 
     /// Initialize new private key
-    convenience public init() {
+    public convenience init() {
         var privateKeyData = Data(repeating: 0, count: Int(WG_KEY_LEN))
         privateKeyData.withUnsafeMutableBytes { (rawBufferPointer: UnsafeMutableRawBufferPointer) in
             let privateKeyBytes = rawBufferPointer.baseAddress!.assumingMemoryBound(to: UInt8.self)
@@ -64,7 +66,7 @@ public class BaseKey: RawRepresentable, Equatable, Hashable, @unchecked Sendable
     }
 
     /// Initialize the key with existing raw representation
-    required public init?(rawValue: Data) {
+    public required init?(rawValue: Data) {
         if rawValue.count == WG_KEY_LEN {
             self.rawValue = rawValue
         } else {

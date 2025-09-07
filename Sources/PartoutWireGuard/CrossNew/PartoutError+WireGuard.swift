@@ -10,7 +10,7 @@ import PartoutWireGuard
 
 // MARK: - Mapping
 
-extension LegacyWireGuardConnectionError: PartoutErrorMappable {
+extension WireGuardConnectionError: PartoutErrorMappable {
     var asPartoutError: PartoutError {
         PartoutError(.linkNotActive, self)
     }

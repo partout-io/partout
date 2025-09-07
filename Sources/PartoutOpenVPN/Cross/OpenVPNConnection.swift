@@ -72,6 +72,10 @@ public actor OpenVPNConnection {
         )
 
     }
+
+    deinit {
+        pp_log(ctx, .openvpn, .info, "Deinit OpenVPNConnection")
+    }
 }
 
 // MARK: - Connection
@@ -194,7 +198,7 @@ extension OpenVPNConnection: OpenVPNSessionDelegate {
                     originalModuleId: moduleId,
                     address: addressObject,
                     modules: builder.modules(),
-                    fileDescriptor: remoteFd
+                    fileDescriptors: remoteFd.map { [$0] } ?? []
                 )
             )
             await session.setTunnel(tunnelInterface)
