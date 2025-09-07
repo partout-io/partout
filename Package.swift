@@ -359,6 +359,8 @@ if areas.contains(.openVPN) {
 // MARK: WireGuard
 
 if areas.contains(.wireGuard) {
+    let includesLegacy = OS.current == .apple
+
     package.products.append(
         .library(
             name: "PartoutWireGuard",
@@ -372,7 +374,7 @@ if areas.contains(.wireGuard) {
                 "PartoutCoreWrapper",
                 "_PartoutWireGuard_C"
             ],
-            path: "Sources/PartoutWireGuard/Interfaces"
+            path: "Sources/PartoutWireGuard/Interfaces",
         ),
         .target(
             name: "_PartoutWireGuard_C",
@@ -384,8 +386,6 @@ if areas.contains(.wireGuard) {
 
     // Implementation requires a WireGuard backend
     if wgMode != nil {
-        let includesLegacy = OS.current == .apple
-
         package.products.append(
             .library(
                 name: "_PartoutWireGuardWrapper",
@@ -425,7 +425,8 @@ if areas.contains(.wireGuard) {
                     "_PartoutWireGuard_C",
                     "PartoutWireGuard",
                 ],
-                path: "Sources/PartoutWireGuard/CrossNew"
+                path: "Sources/PartoutWireGuard/CrossNew",
+                exclude: includesLegacy ? ["Interfaces"] : []
             ),
             .testTarget(
                 name: "PartoutWireGuardTests",
