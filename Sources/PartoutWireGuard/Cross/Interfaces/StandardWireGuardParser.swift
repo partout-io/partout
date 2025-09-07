@@ -8,7 +8,7 @@ import PartoutCore
 import PartoutWireGuard
 #endif
 
-// FIXME: #118, this is broken, move to "Inteface" once fixed
+// FIXME: #199, this is broken, move to "Inteface" once fixed
 
 /// Parses WireGuard configurations in `wg-quick` format.
 public final class StandardWireGuardParser {

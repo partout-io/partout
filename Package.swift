@@ -409,7 +409,7 @@ if areas.contains(.wireGuard) {
                     "PartoutWireGuard",
                 ],
                 path: "Sources/PartoutWireGuard/Cross",
-                // FIXME: #118, move to "Interfaces" target once fixed
+                // FIXME: #199, move to "Interfaces" target once fixed
                 exclude: includesLegacy ? ["Interfaces"] : []
             ),
             .testTarget(

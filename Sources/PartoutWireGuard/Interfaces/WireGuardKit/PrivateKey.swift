@@ -4,7 +4,7 @@
 import _PartoutWireGuard_C
 import Foundation
 
-// FIXME: #118, make internal after dropping legacy
+// FIXME: #199, make internal after dropping legacy
 
 /// The class describing a private key used by WireGuard.
 public class PrivateKey: BaseKey, @unchecked Sendable {

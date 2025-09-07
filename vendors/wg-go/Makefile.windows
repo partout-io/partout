@@ -4,7 +4,7 @@
 # Default target
 all: clean build install
 
-# FIXME: ###, Read from go env
+# FIXME: #199, Read from go env
 HOST_GOOS=windows
 HOST_GOARCH=amd64
 BUILDMODE=c-archive
