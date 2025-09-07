@@ -401,16 +401,6 @@ if areas.contains(.wireGuard) {
                 path: "Sources/PartoutWireGuard/Wrapper"
             ),
             .target(
-                name: "PartoutWireGuardLegacy",
-                dependencies: [
-                    "_PartoutOSPortable",
-                    "_PartoutVendorsWireGuardImpl",
-                    "_PartoutWireGuard_C",
-                    "PartoutWireGuard",
-                ],
-                path: "Sources/PartoutWireGuard/Legacy"
-            ),
-            .target(
                 name: "PartoutWireGuardCross",
                 dependencies: [
                     "_PartoutOSPortable",
@@ -419,19 +409,34 @@ if areas.contains(.wireGuard) {
                     "PartoutWireGuard",
                 ],
                 path: "Sources/PartoutWireGuard/Cross",
+                // FIXME: #118, move to "Interfaces" target once fixed
                 exclude: includesLegacy ? ["Interfaces"] : []
             ),
             .testTarget(
                 name: "PartoutWireGuardTests",
                 dependencies: ["PartoutWireGuard"],
                 path: "Tests/PartoutWireGuard/Interfaces"
-            ),
-            .testTarget(
-                name: "PartoutWireGuardCrossTests",
-                dependencies: ["PartoutWireGuardLegacy"],
-                path: "Tests/PartoutWireGuard/Legacy"
             )
         ])
+        if includesLegacy {
+            package.targets.append(contentsOf: [
+                .target(
+                    name: "PartoutWireGuardLegacy",
+                    dependencies: [
+                        "_PartoutOSPortable",
+                        "_PartoutVendorsWireGuardImpl",
+                        "_PartoutWireGuard_C",
+                        "PartoutWireGuard",
+                    ],
+                    path: "Sources/PartoutWireGuard/Legacy"
+                ),
+                .testTarget(
+                    name: "PartoutWireGuardLegacyTests",
+                    dependencies: ["PartoutWireGuardLegacy"],
+                    path: "Tests/PartoutWireGuard/Legacy"
+                )
+            ])
+        }
     }
 }
 
