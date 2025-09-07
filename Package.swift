@@ -398,15 +398,24 @@ if areas.contains(.wireGuard) {
                 dependencies: {
                     var list: [Target.Dependency] = []
                     if includesLegacy {
-                        list.append("PartoutWireGuardCross")
+                        list.append("PartoutWireGuardLegacy")
                     }
-                    list.append("PartoutWireGuardCrossNew")
+                    list.append("PartoutWireGuardCross")
                     return list
                 }(),
                 path: "Sources/PartoutWireGuard/Wrapper"
             ),
             .target(
-                // FIXME: #118, rename to "Legacy"
+                name: "PartoutWireGuardLegacy",
+                dependencies: [
+                    "_PartoutOSPortable",
+                    "_PartoutVendorsWireGuardImpl",
+                    "_PartoutWireGuard_C",
+                    "PartoutWireGuard",
+                ],
+                path: "Sources/PartoutWireGuard/Legacy"
+            ),
+            .target(
                 name: "PartoutWireGuardCross",
                 dependencies: [
                     "_PartoutOSPortable",
@@ -414,18 +423,7 @@ if areas.contains(.wireGuard) {
                     "_PartoutWireGuard_C",
                     "PartoutWireGuard",
                 ],
-                path: "Sources/PartoutWireGuard/Cross"
-            ),
-            .target(
-                // FIXME: #118, rename to "Cross"
-                name: "PartoutWireGuardCrossNew",
-                dependencies: [
-                    "_PartoutOSPortable",
-                    "_PartoutVendorsWireGuardImpl",
-                    "_PartoutWireGuard_C",
-                    "PartoutWireGuard",
-                ],
-                path: "Sources/PartoutWireGuard/CrossNew",
+                path: "Sources/PartoutWireGuard/Cross",
                 exclude: includesLegacy ? ["Interfaces"] : []
             ),
             .testTarget(
@@ -435,8 +433,8 @@ if areas.contains(.wireGuard) {
             ),
             .testTarget(
                 name: "PartoutWireGuardCrossTests",
-                dependencies: ["PartoutWireGuardCross"],
-                path: "Tests/PartoutWireGuard/Cross"
+                dependencies: ["PartoutWireGuardLegacy"],
+                path: "Tests/PartoutWireGuard/Legacy"
             )
         ])
     }

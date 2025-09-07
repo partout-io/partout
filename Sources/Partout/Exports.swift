@@ -21,8 +21,8 @@
 #if canImport(PartoutWireGuardCross)
 @_exported import PartoutWireGuardCross
 #endif
-#if canImport(PartoutWireGuardCrossNew)
-@_exported import PartoutWireGuardCrossNew
+#if canImport(PartoutWireGuardLegacy)
+@_exported import PartoutWireGuardLegacy
 #endif
 #endif
 
