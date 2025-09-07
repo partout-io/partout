@@ -1,0 +1,4 @@
+module wg_go {
+    umbrella header "wireguard.h"
+    export *
+}

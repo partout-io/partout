@@ -24,11 +24,6 @@ let cmakeOutput = envCMakeOutput ?? ".bin/windows-arm64"
 // Must be false in production (check in CI)
 let isTestingOpenVPNDataPath = false
 
-// FIXME: #118, restore WireGuard when properly integrated
-if OS.current != .apple {
-    wgMode = nil
-}
-
 // MARK: - Package
 
 // PartoutCore binaries only available on Apple platforms
@@ -622,8 +617,8 @@ if areas.contains(.wireGuard) {
             )
             package.targets.append(
                 .target(
-                    name: "_PartoutVendorsWireGuardImpl",
-                    dependencies: [
+                     name: "_PartoutVendorsWireGuardImpl",
+                     dependencies: [
                         "PartoutWireGuard",
                         "wg-go-apple"
                     ],

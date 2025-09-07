@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: MIT
+# Converted for nmake (Windows)
+
+# Default target
+all: clean build install
+
+# FIXME: ###, Read from go env
+HOST_GOOS=windows
+HOST_GOARCH=amd64
+BUILDMODE=c-archive
+BUILDEXT=lib
+
+# Build output
+PREFIXDIR=windows
+BUILDDIR=build
+DESTDIR=bin\$(HOST_GOOS)-$(HOST_GOARCH)
+
+# Targets
+build: $(BUILDDIR)\wg-go.$(BUILDEXT)
+
+version-header: $(DESTDIR)\wireguard-go-version.h
+
+$(BUILDDIR)\wg-go.$(BUILDEXT): go.mod
+	@set CGO_ENABLED=1
+	go build -C $(PREFIXDIR) -ldflags=-w -trimpath -v -o "$(BUILDDIR)\wg-go.$(BUILDEXT)" -buildmode=$(BUILDMODE)
+	@if exist "$(BUILDDIR)\libwg-go.h" del "$(BUILDDIR)\libwg-go.h"
+
+$(DESTDIR)\wireguard-go-version.h: go.mod
+	# Windows PowerShell equivalent for sed:
+	powershell -Command "(Get-Content $<) -replace '.*golang\.zx2c4\.com/wireguard +v[0-9.]+-[0-9]+-([0-9a-f]{8})[0-9a-f]{4}.*', '#define WIREGUARD_GO_VERSION \"$1\"' | Set-Content $@"
+
+clean:
+	if exist "$(BUILDDIR)" rmdir /s /q "$(BUILDDIR)"
+	if exist "$(DESTDIR)" rmdir /s /q "$(DESTDIR)"
+
+install: build
+	if not exist "$(DESTDIR)\lib" mkdir "$(DESTDIR)\lib"
+	if not exist "$(DESTDIR)\include" mkdir "$(DESTDIR)\include"
+	copy "$(PREFIXDIR)\$(BUILDDIR)\wg-go.$(BUILDEXT)" "$(DESTDIR)\lib"
+	copy "wireguard.h" "$(DESTDIR)\include"

@@ -8,7 +8,7 @@ else()
 endif()
 
 ExternalProject_Add(
-    mbedTLSProject
+    MbedTLSProject
     SOURCE_DIR ${CMAKE_SOURCE_DIR}/vendors/mbedtls
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${MBEDTLS_OUTPUT_DIR} -DCMAKE_C_COMPILER=${MBEDTLS_CC}
 )
