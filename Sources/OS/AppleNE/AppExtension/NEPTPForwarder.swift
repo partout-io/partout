@@ -44,6 +44,7 @@ public actor NEPTPForwarder {
             profile: profile,
             controller: controller,
             factory: factory,
+            reachability: reachability,
             environment: environment,
             options: connectionOptions
         )

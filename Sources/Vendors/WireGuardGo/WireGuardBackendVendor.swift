@@ -20,6 +20,14 @@ public final class WireGuardBackendVendor: WireGuardBackend {
         wgTurnOn(settings.rawString, tun_fd)
     }
 
+    public func socketDescriptors(_ handle: Int32) -> [Int32] {
+#if os(Android)
+        [wgGetSocketV4(handle), wgGetSocketV6(handle)]
+#else
+        []
+#endif
+    }
+
     public func turnOff(_ handle: Int32) {
         wgTurnOff(handle)
     }

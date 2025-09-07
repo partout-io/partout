@@ -50,6 +50,7 @@ public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
     }
 
     deinit {
+        pp_log(ctx, .core, .info, "Deinit VirtualTunnelInterface")
         pp_tun_free(tun)
     }
 

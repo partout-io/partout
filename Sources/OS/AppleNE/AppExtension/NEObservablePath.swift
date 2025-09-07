@@ -40,6 +40,7 @@ extension NEObservablePath {
     }
 
     public var isReachable: Bool {
+        // XXX: WireGuard suggests including .requiresConnection
         subject.value.status == .satisfied
     }
 

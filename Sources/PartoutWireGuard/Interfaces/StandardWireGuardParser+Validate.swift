@@ -5,7 +5,6 @@
 import Foundation
 #if !PARTOUT_MONOLITH
 import PartoutCore
-import PartoutWireGuard
 #endif
 
 extension StandardWireGuardParser: ModuleBuilderValidator {
@@ -19,7 +18,7 @@ extension StandardWireGuardParser: ModuleBuilderValidator {
         }
         do {
             let quickConfig = configurationBuilder.toQuickConfig()
-            _ = try TunnelConfiguration(fromWgQuickConfig: quickConfig)
+            _ = try WireGuard.Configuration(fromWgQuickConfig: quickConfig)
         } catch {
             throw PartoutError(.parsing, error)
         }

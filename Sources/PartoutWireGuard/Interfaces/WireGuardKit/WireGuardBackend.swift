@@ -4,10 +4,12 @@
 // swiftlint:disable identifier_name
 public typealias WireGuardLoggerCallback = @convention(c) (_ context: UnsafeMutableRawPointer?, _ level: Int32, _ msg: UnsafePointer<Int8>?) -> Void
 
-public protocol WireGuardBackend {
+public protocol WireGuardBackend: AnyObject, Sendable {
     func setLogger(context: UnsafeMutableRawPointer?, logger_fn: WireGuardLoggerCallback?)
 
     func turnOn(settings: String, tun_fd: Int32) -> Int32
+
+    func socketDescriptors(_ handle: Int32) -> [Int32]
 
     func turnOff(_ handle: Int32)
 

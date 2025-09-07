@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutWireGuard
+@testable import PartoutWireGuard
 @testable import PartoutWireGuardCross
 import Foundation
 import PartoutCore

@@ -40,8 +40,8 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
         .api,
         .providers,
         //.ne,
-        .openvpn
-        //.wireguard
+        .openvpn,
+        .wireguard
     ])
     logBuilder.logsAddresses = true
     PartoutLogger.register(logBuilder.build())
@@ -58,21 +58,21 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
                     cachesURL: URL(fileURLWithPath: cacheDir)
                 )
             }
+        ),
+        // FIXME: #187, check defines for conditional areas
+        WireGuardModule.Implementation(
+            keyGenerator: StandardWireGuardKeyGenerator(),
+            importer: StandardWireGuardParser(),
+            validator: StandardWireGuardParser(),
+            connectionBlock: {
+                let ctx = PartoutLoggerContext($0.profile.id)
+                return try WireGuardConnection(
+                    ctx,
+                    parameters: $0,
+                    module: $1
+                )
+            }
         )
-        // FIXME: #118, support WireGuard
-        // WireGuardModule.Implementation(
-        //     keyGenerator: StandardWireGuardKeyGenerator(),
-        //     importer: StandardWireGuardParser(),
-        //     validator: StandardWireGuardParser(),
-        //     connectionBlock: {
-        //         let ctx = PartoutLoggerContext($0.controller.profile.id)
-        //         return try WireGuardConnection(
-        //             ctx,
-        //             parameters: $0,
-        //             module: $1
-        //         )
-        //     }
-        // )
     ])
 
     let ctx = ABIContext(registry: registry)

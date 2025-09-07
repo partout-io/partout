@@ -193,7 +193,7 @@ extension LegacyOpenVPNConnection: OpenVPNSessionDelegate {
                     originalModuleId: moduleId,
                     address: addressObject,
                     modules: builder.modules(),
-                    fileDescriptor: nil
+                    fileDescriptors: []
                 )
             )
             await session.setTunnel(tunnelInterface)

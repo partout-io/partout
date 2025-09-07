@@ -5,7 +5,6 @@
 import Foundation
 #if !PARTOUT_MONOLITH
 import PartoutCore
-import PartoutWireGuard
 #endif
 
 /// Parses WireGuard configurations in `wg-quick` format.
@@ -18,11 +17,11 @@ public final class StandardWireGuardParser {
 
 extension StandardWireGuardParser: ConfigurationCoder {
     public func configuration(from string: String) throws -> WireGuard.Configuration {
-        try WireGuard.Configuration(wgQuickConfig: string)
+        try WireGuard.Configuration(fromWgQuickConfig: string)
     }
 
-    public func string(from configuration: WireGuard.Configuration) throws -> String {
-        try configuration.toWgQuickConfig()
+    public func string(from configuration: WireGuard.Configuration) -> String {
+        configuration.asWgQuickConfig()
     }
 }
 
