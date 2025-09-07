@@ -48,7 +48,7 @@ protocol WireGuardAdapterDelegate: AnyObject, Sendable {
     func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapter, tunnel: IOInterface) async
 }
 
-// FIXME: #93, drop @unchecked after refactoring
+// FIXME: #118, drop @unchecked after refactoring
 actor WireGuardAdapter {
     typealias LogHandler = @Sendable (WireGuardLogLevel, String) -> Void
 

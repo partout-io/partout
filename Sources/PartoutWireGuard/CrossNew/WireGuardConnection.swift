@@ -14,7 +14,7 @@ import PartoutCore
 import PartoutWireGuard
 #endif
 
-// FIXME: #93, drop @unchecked after refactoring
+// FIXME: #118, drop @unchecked after refactoring
 public final class WireGuardConnection: Connection, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 

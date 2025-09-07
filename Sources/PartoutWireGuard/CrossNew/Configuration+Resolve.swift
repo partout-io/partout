@@ -23,7 +23,7 @@ extension WireGuard.Configuration {
             for endpoint in endpoints {
                 group.addTask { @Sendable in
                     do {
-                        // FIXME: #93, hardcoded DNS timeout
+                        // FIXME: #118, hardcoded DNS timeout
                         let resolvedRecords = try await resolver.resolve(endpoint.address.rawValue, timeout: 5000)
                         var currentResolved: [Endpoint] = []
                         for record in resolvedRecords {

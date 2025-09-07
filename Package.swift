@@ -406,7 +406,7 @@ if areas.contains(.wireGuard) {
                 path: "Sources/PartoutWireGuard/Wrapper"
             ),
             .target(
-                // FIXME: #93, rename to "Legacy"
+                // FIXME: #118, rename to "Legacy"
                 name: "PartoutWireGuardCross",
                 dependencies: [
                     "_PartoutOSPortable",
@@ -417,7 +417,7 @@ if areas.contains(.wireGuard) {
                 path: "Sources/PartoutWireGuard/Cross"
             ),
             .target(
-                // FIXME: #93, rename to "Cross"
+                // FIXME: #118, rename to "Cross"
                 name: "PartoutWireGuardCrossNew",
                 dependencies: [
                     "_PartoutOSPortable",
