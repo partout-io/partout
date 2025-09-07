@@ -17,6 +17,7 @@ import PartoutCore
 import PartoutWireGuard
 #endif
 
+@available(*, deprecated, message: "Use WireGuardConnection")
 public final class LegacyWireGuardConnection: Connection, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
