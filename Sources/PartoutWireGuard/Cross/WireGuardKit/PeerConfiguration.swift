@@ -2,6 +2,9 @@
 // Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
 import Foundation
+#if !PARTOUT_MONOLITH
+import PartoutWireGuard
+#endif
 
 public struct PeerConfiguration: Sendable {
     public var publicKey: PublicKey
