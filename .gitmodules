@@ -4,9 +4,6 @@
 [submodule "vendors/openssl"]
 	path = vendors/openssl
 	url = https://github.com/openssl/openssl
-[submodule "vendors/wireguard-go"]
-	path = vendors/wireguard-go
-	url = https://github.com/wireguard/wireguard-go
 [submodule "vendors/core"]
 	path = vendors/core
 	url = git@github.com:passepartoutvpn/partout-core.git

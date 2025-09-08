@@ -33,6 +33,7 @@ public func makeDaemon(
         profile: profile,
         controller: controllerImpl,
         factory: factory,
+        reachability: reachability,
         environment: environment,
         options: ConnectionParameters.Options()
     )

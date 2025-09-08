@@ -9,15 +9,12 @@
 //  Copyright © 2018-2024 WireGuard LLC. All Rights Reserved.
 
 import Foundation
-import NetworkExtension // TODO: #13, this depends on Apple unnecessarily
-import os
 #if !PARTOUT_MONOLITH
-internal import _PartoutVendorsWireGuardImpl
 import PartoutCore
 import PartoutWireGuard
 #endif
 
-// FIXME: #13, drop @unchecked after refactoring
+// FIXME: #199, drop @unchecked after refactoring
 public final class WireGuardConnection: Connection, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
@@ -27,21 +24,17 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
 
     private let controller: TunnelController
 
+    private let reachability: ReachabilityObserver
+
     private let environment: TunnelEnvironment
 
-    private let tunnelConfiguration: TunnelConfiguration
+    private let tunnelConfiguration: WireGuard.Configuration
 
     private let dataCountTimerInterval: TimeInterval
 
     private var dataCountTimer: Task<Void, Error>?
 
-    private lazy var adapter: WireGuardAdapter = {
-        WireGuardAdapter(with: delegate, backend: WireGuardBackendVendor()) { [weak self] logLevel, message in
-            pp_log(self?.ctx ?? .global, .wireguard, logLevel.debugLevel, message)
-        }
-    }()
-
-    private lazy var delegate: WireGuardAdapterDelegate = AdapterDelegate(ctx, connection: self)
+    private var adapter: WireGuardAdapter?
 
     public init(
         _ ctx: PartoutLoggerContext,
@@ -52,16 +45,19 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
         statusSubject = CurrentValueStream(.disconnected)
         moduleId = module.id
         controller = parameters.controller
+        reachability = parameters.reachability
         environment = parameters.environment
 
         guard let configuration = module.configuration else {
             fatalError("No WireGuard configuration defined?")
         }
 
-        let tweakedConfiguration = try configuration.withModules(from: parameters.profile)
-        tunnelConfiguration = try tweakedConfiguration.toWireGuardConfiguration()
-
+        tunnelConfiguration = try configuration.withModules(from: parameters.profile)
         dataCountTimerInterval = TimeInterval(parameters.options.minDataCountInterval) / 1000.0
+    }
+
+    deinit {
+        pp_log(ctx, .wireguard, .info, "Deinit WireGuardConnection")
     }
 
     public var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
@@ -69,6 +65,17 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
     }
 
     public func start() async throws -> Bool {
+        assert(adapter == nil)
+        adapter = await WireGuardAdapter(
+            ctx,
+            with: self,
+            moduleId: moduleId,
+            reachability: reachability,
+            logHandler: { [weak self] logLevel, message in
+                pp_log(self?.ctx ?? .global, .wireguard, logLevel.debugLevel, message)
+            }
+        )
+        guard let adapter else { return false }
         pp_log(ctx, .wireguard, .info, "Start tunnel")
         statusSubject.send(.connecting)
 
@@ -82,148 +89,97 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
                     pp_log(ctx, .wireguard, .debug, "Cancelled WireGuardConnection.dataCountTimer")
                     return
                 }
-                await MainActor.run { [weak self] in
-                    self?.onDataCountTimer()
-                }
+                await onDataCountTimer()
                 try await Task.sleep(interval: dataCountTimerInterval)
             }
         }
 
         do {
-            try await withUnsafeThrowingContinuation { [weak self] continuation in
-                guard let self else {
-                    continuation.resume()
-                    return
-                }
-                adapter.start(tunnelConfiguration: tunnelConfiguration) { [weak self] adapterError in
-                    guard let self else {
-                        continuation.resume()
-                        return
-                    }
-                    if let adapterError {
-                        switch adapterError {
-                        case .cannotLocateTunnelFileDescriptor:
-                            pp_log(ctx, .wireguard, .error, "Starting tunnel failed: could not determine file descriptor")
-                            continuation.resume(throwing: WireGuardConnectionError.couldNotDetermineFileDescriptor)
-
-                        case .dnsResolution(let dnsErrors):
-                            let hostnamesWithDnsResolutionFailure = dnsErrors.map(\.address)
-                                .joined(separator: ", ")
-                            pp_log(ctx, .wireguard, .error, "DNS resolution failed for the following hostnames: \(hostnamesWithDnsResolutionFailure)")
-                            continuation.resume(throwing: WireGuardConnectionError.dnsResolutionFailure)
-
-                        case .setNetworkSettings(let error):
-                            pp_log(ctx, .wireguard, .error, "Starting tunnel failed with setTunnelNetworkSettings returning \(error.localizedDescription)")
-                            continuation.resume(throwing: WireGuardConnectionError.couldNotSetNetworkSettings)
-
-                        case .startWireGuardBackend(let errorCode):
-                            pp_log(ctx, .wireguard, .error, "Starting tunnel failed with wgTurnOn returning \(errorCode)")
-                            continuation.resume(throwing: WireGuardConnectionError.couldNotStartBackend)
-
-                        case .invalidState:
-                            // Must never happen
-                            fatalError()
-                        }
-                        return
-                    }
-                    let interfaceName = self.adapter.interfaceName ?? "unknown"
-                    pp_log(ctx, .wireguard, .info, "Tunnel interface is \(interfaceName)")
-                    continuation.resume()
-                }
-            }
+            try await adapter.start(tunnelConfiguration: tunnelConfiguration)
+            let interfaceName = await adapter.interfaceName ?? "unknown"
+            pp_log(ctx, .wireguard, .info, "Tunnel interface is \(interfaceName)")
             return true
         } catch {
+            if let adapterError = error as? WireGuardAdapterError {
+                switch adapterError {
+                case .cannotLocateTunnelFileDescriptor:
+                    pp_log(ctx, .wireguard, .error, "Starting tunnel failed: could not determine file descriptor")
+                    throw WireGuardConnectionError.couldNotDetermineFileDescriptor
+                case .setNetworkSettings(let error):
+                    pp_log(ctx, .wireguard, .error, "Starting tunnel failed with setTunnelNetworkSettings returning \(error.localizedDescription)")
+                    throw WireGuardConnectionError.couldNotSetNetworkSettings
+                case .startWireGuardBackend(let errorCode):
+                    pp_log(ctx, .wireguard, .error, "Starting tunnel failed with wgTurnOn returning \(errorCode)")
+                    throw WireGuardConnectionError.couldNotStartBackend
+                case .invalidState:
+                    // Must never happen
+                    fatalError()
+                }
+            }
             statusSubject.send(.disconnected)
             throw error
         }
     }
 
     public func stop(timeout: Int) async {
+        guard let adapter else { return }
         pp_log(ctx, .wireguard, .info, "Stop tunnel")
         statusSubject.send(.disconnecting)
-
         // FIXME: #30, handle WireGuard adapter timeout
-
-        await withCheckedContinuation { [weak self] continuation in
-            guard let self else {
-                continuation.resume()
-                return
-            }
-            self.adapter.stop { error in
-                if let error {
-                    pp_log(self.ctx, .wireguard, .error, "Unable to stop WireGuard adapter: \(error.localizedDescription)")
-                }
-                continuation.resume()
-            }
+        do {
+            try await adapter.stop()
+        } catch {
+            pp_log(ctx, .wireguard, .error, "Unable to stop WireGuard adapter: \(error.localizedDescription)")
         }
         statusSubject.send(.disconnected)
+        dataCountTimer?.cancel()
+        dataCountTimer = nil
+        self.adapter = nil
     }
 }
 
 // MARK: - WireGuardAdapterDelegate
 
-private extension WireGuardConnection {
-    final class AdapterDelegate: WireGuardAdapterDelegate {
-        private let ctx: PartoutLoggerContext
-
-        private weak var connection: WireGuardConnection?
-
-        init(_ ctx: PartoutLoggerContext, connection: WireGuardConnection) {
-            self.ctx = ctx
-            self.connection = connection
+extension WireGuardConnection: WireGuardAdapterDelegate {
+    func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool) {
+        if reasserting {
+            statusSubject.send(.connecting)
         }
+    }
 
-        func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool) {
-            if reasserting {
-                connection?.statusSubject.send(.connecting)
-            }
+    func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: TunnelRemoteInfo) async throws -> IOInterface {
+        do {
+            let tunnel = try await controller.setTunnelSettings(with: settings)
+            pp_log(ctx, .wireguard, .info, "Tunnel interface is now UP")
+            statusSubject.send(.connected)
+            return tunnel
+        } catch {
+            pp_log(ctx, .wireguard, .error, "Unable to configure tunnel settings: \(error)")
+            statusSubject.send(.disconnected)
+            throw error
         }
+    }
 
-        func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: NEPacketTunnelNetworkSettings, completionHandler: (@Sendable (Error?) -> Void)?) {
-            guard let connection else {
-                pp_log(ctx, .wireguard, .error, "Lost weak reference to connection?")
-                return
-            }
-            let module = TransientModule(object: settings)
-            let addressObject = Address(rawValue: settings.tunnelRemoteAddress)
-            if addressObject == nil {
-                pp_log(ctx, .wireguard, .error, "Unable to parse remote tunnel address")
-            }
+    func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64]) {
+        controller.configureSockets(with: descriptors)
+    }
 
-            Task {
-                do {
-                    _ = try await connection.controller.setTunnelSettings(with: TunnelRemoteInfo(
-                        originalModuleId: connection.moduleId,
-                        address: addressObject,
-                        modules: [module],
-                        // FIXME: #188, fd is required by Android
-                        fileDescriptor: nil
-                    ))
-                    completionHandler?(nil)
-                    pp_log(connection.ctx, .wireguard, .info, "Tunnel interface is now UP")
-                    connection.statusSubject.send(.connected)
-                } catch {
-                    completionHandler?(error)
-                    pp_log(connection.ctx, .wireguard, .error, "Unable to configure tunnel settings: \(error)")
-                    connection.statusSubject.send(.disconnected)
-                }
-            }
-        }
+    func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapter, tunnel: IOInterface) async {
+        await controller.clearTunnelSettings(tunnel)
     }
 }
 
 // MARK: - Data count
 
 private extension WireGuardConnection {
-    func onDataCountTimer() {
-        guard statusSubject.value == .connected else {
+    func onDataCountTimer() async {
+        guard let adapter else { return }
+        guard statusSubject.value == .connected else { return }
+        guard let configurationString = await adapter.getRuntimeConfiguration(),
+              let dataCount = DataCount.from(wireGuardString: configurationString) else {
             return
         }
-        adapter.getRuntimeConfiguration { [weak self] configurationString in
-            guard let configurationString = configurationString,
-                  let dataCount = DataCount.from(wireGuardString: configurationString) else {
-                return
-            }
+        await MainActor.run { [weak self] in
             self?.environment.setEnvironmentValue(dataCount, forKey: TunnelEnvironmentKeys.dataCount)
         }
     }
@@ -233,7 +189,6 @@ private extension DataCount {
     static func from(wireGuardString string: String) -> DataCount? {
         var bytesReceived: UInt?
         var bytesSent: UInt?
-
         string.enumerateLines { line, stop in
             if bytesReceived == nil, let value = line.getPrefix("rx_bytes=") {
                 bytesReceived = value
@@ -244,11 +199,7 @@ private extension DataCount {
                 stop = true
             }
         }
-
-        guard let bytesReceived, let bytesSent else {
-            return nil
-        }
-
+        guard let bytesReceived, let bytesSent else { return nil }
         return DataCount(bytesReceived, bytesSent)
     }
 }

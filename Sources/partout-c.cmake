@@ -7,11 +7,7 @@ file(GLOB_RECURSE PARTOUT_C_SOURCES
 )
 
 # Set up exclusions
-set(EXCLUDED_PATTERNS
-    # FIXME: #118, restore WireGuard when properly integrated
-    PartoutWireGuard\/
-    Vendors\/WireGuardGo\/
-)
+set(EXCLUDED_PATTERNS "")
 
 # Header search paths from all C targets
 set(PARTOUT_C_INCLUDE_DIRS
@@ -19,6 +15,7 @@ set(PARTOUT_C_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/Partout_C/include
     ${CMAKE_SOURCE_DIR}/OS/Portable_C/include
     ${CMAKE_SOURCE_DIR}/PartoutOpenVPN/Cross_C/include
+    ${CMAKE_SOURCE_DIR}/PartoutWireGuard/Interfaces_C
 )
 
 # Filter by platform

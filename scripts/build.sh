@@ -2,6 +2,7 @@
 opt_configuration=Debug
 build_dir=.cmake
 bin_dir=.bin
+ndk_toolchain=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/bin
 
 positional_args=()
 cmake_opts=()
@@ -34,12 +35,16 @@ while [[ $# -gt 0 ]]; do
             shift
             shift
             ;;
+        -wireguard)
+            cmake_opts+=("-DPP_BUILD_USE_WGGO=ON")
+            shift
+            ;;
         -l)
             cmake_opts+=("-DPP_BUILD_LIBRARY=ON")
             shift
             ;;
         -android)
-            PATH=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/bin:$PATH
+            PATH=$ndk_toolchain:$PATH
             rm -rf $build_dir $bin_dir/android
             cmake_opts+=("-DPP_BUILD_FOR_ANDROID=ON")
             shift

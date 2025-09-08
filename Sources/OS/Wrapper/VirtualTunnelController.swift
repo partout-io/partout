@@ -33,13 +33,17 @@ public final class VirtualTunnelController: TunnelController {
         }
 
         // Fetch tun implementation if necessary
-        let tunImpl = ctrl.map {
+        let tunImpl = ctrl.map { ctrl in
             guard let info else {
-                return $0.set_tunnel($0.thiz, nil)
+                return ctrl.set_tunnel(ctrl.thiz, nil)
             }
-            var cInfo = partout_tun_ctrl_info()
-            cInfo.remote_fd = info.fileDescriptor.map { Int32($0) } ?? -1
-            return $0.set_tunnel($0.thiz, &cInfo)
+            let rawDescs = info.fileDescriptors.map(Int32.init)
+            return rawDescs.withUnsafeBufferPointer {
+                var cInfo = partout_tun_ctrl_info()
+                cInfo.remote_fds = $0.baseAddress
+                cInfo.remote_fds_len = info.fileDescriptors.count
+                return ctrl.set_tunnel(ctrl.thiz, &cInfo)
+            }
         } ?? nil
 
         // Create virtual device with an optional implementation
@@ -73,6 +77,14 @@ public final class VirtualTunnelController: TunnelController {
 //        }
 
         return tun
+    }
+
+    public func configureSockets(with descriptors: [UInt64]) {
+        if let ctrl {
+            descriptors.map(Int32.init).withUnsafeBufferPointer {
+                ctrl.configure_sockets(ctrl.thiz, $0.baseAddress, descriptors.count)
+            }
+        }
     }
 
     public func clearTunnelSettings(_ io: IOInterface) async {

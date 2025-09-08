@@ -65,6 +65,9 @@ public final class NETunnelController: TunnelController {
         return tun
     }
 
+    public func configureSockets(with descriptors: [UInt64]) {
+    }
+
     public func clearTunnelSettings(_ tunnel: IOInterface) async {
         do {
             pp_log_id(profile.id, .ne, .info, "Clear tunnel settings")
