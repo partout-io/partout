@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !os(iOS) && !os(tvOS)
+
 import _PartoutOSPortable_C
 import Foundation
 import Partout_C
@@ -152,3 +154,5 @@ public func partout_daemon_stop(cCtx: UnsafeMutableRawPointer) {
         ctx.daemon = nil
     }
 }
+
+#endif
