@@ -38,3 +38,4 @@ install: build
 	if not exist "$(DESTDIR)\include" mkdir "$(DESTDIR)\include"
 	copy "$(PREFIXDIR)\$(BUILDDIR)\wg-go.$(BUILDEXT)" "$(DESTDIR)\lib"
 	copy "wireguard.h" "$(DESTDIR)\include"
+	copy "module.modulemap" "$(DESTDIR)\include"
