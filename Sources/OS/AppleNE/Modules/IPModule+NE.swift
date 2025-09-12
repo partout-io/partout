@@ -28,12 +28,8 @@ extension IPModule: NESettingsApplying {
 private extension IPSettings {
     var neIPv4Settings: NEIPv4Settings {
         let ne = NEIPv4Settings(
-            addresses: subnet.map {
-                [$0.address.rawValue]
-            } ?? [],
-            subnetMasks: subnet.map {
-                [$0.ipv4Mask]
-            } ?? []
+            addresses: subnets.map(\.address.rawValue),
+            subnetMasks: subnets.map(\.ipv4Mask)
         )
         ne.includedRoutes = includedRoutes.map(\.neIPv4Route)
         ne.excludedRoutes = excludedRoutes.map(\.neIPv4Route)
@@ -54,12 +50,8 @@ private extension Route {
 private extension IPSettings {
     var neIPv6Settings: NEIPv6Settings {
         let ne = NEIPv6Settings(
-            addresses: subnet.map {
-                [$0.address.rawValue]
-            } ?? [],
-            networkPrefixLengths: subnet.map {
-                [$0.prefixLength as NSNumber]
-            } ?? []
+            addresses: subnets.map(\.address.rawValue),
+            networkPrefixLengths: subnets.map(\.prefixLength) as [NSNumber]
         )
         ne.includedRoutes = includedRoutes.map(\.neIPv6Route)
         ne.excludedRoutes = excludedRoutes.map(\.neIPv6Route)
@@ -81,7 +73,7 @@ private extension NEIPv4Settings {
     func merged(with ipv4: IPSettings) -> Self {
         var newAddresses = addresses
         var newMasks = subnetMasks
-        if let subnet = ipv4.subnet {
+        ipv4.subnets.forEach { subnet in
             newAddresses.append(subnet.address.rawValue)
             newMasks.append(subnet.ipv4Mask)
         }
@@ -108,7 +100,7 @@ private extension NEIPv6Settings {
     func merged(with ipv6: IPSettings) -> Self {
         var newAddresses = addresses
         var newPrefixLengths = networkPrefixLengths
-        if let subnet = ipv6.subnet {
+        ipv6.subnets.forEach { subnet in
             newAddresses.append(subnet.address.rawValue)
             newPrefixLengths.append(subnet.prefixLength as NSNumber)
         }
