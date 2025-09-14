@@ -12,15 +12,16 @@ let package = Package(
         .package(path: "..")
     ],
     targets: [
-    .executableTarget(
-        name: "test-abi",
-        dependencies: [dependency]
-    ),
-    .executableTarget(
-        name: "test-posix-socket",
-        dependencies: [dependency]
-    )
-])
+        .executableTarget(
+            name: "test-abi",
+            dependencies: [dependency]
+        ),
+        .executableTarget(
+            name: "test-posix-socket",
+            dependencies: [dependency]
+        )
+    ]
+)
 
 #if os(Windows)
 package.targets.append(
