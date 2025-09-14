@@ -832,7 +832,7 @@ enum WireGuardMode {
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
 let version = "0.99.187"
-let checksum = "8b3b706a70c35a627818809e715e4baad0f4c3951a22d0e3a543d09033305014"
+let checksum = "a90ced7bfa29f0086669920939fd55e94c3e34a354709ca6f766d64f1525d7b8"
 
 enum CoreDeployment: String, RawRepresentable {
     case remoteBinary
