@@ -40,7 +40,7 @@ final class PacketTunnelSettingsGenerator: Sendable {
 
         for peer in tunnelConfiguration.peers {
             wgSettings.append("public_key=\(peer.publicKey.rawValue.hexStringFromBase64)\n")
-            if let preSharedKey = peer.preSharedKey?.rawValue {
+            if let preSharedKey = peer.preSharedKey?.rawValue, !preSharedKey.isEmpty {
                 wgSettings.append("preshared_key=\(preSharedKey.hexStringFromBase64)\n")
             }
             guard let endpoint = peer.endpoint else { continue }
@@ -52,7 +52,10 @@ final class PacketTunnelSettingsGenerator: Sendable {
             wgSettings.append("persistent_keepalive_interval=\(persistentKeepAlive)\n")
             if !peer.allowedIPs.isEmpty {
                 wgSettings.append("replace_allowed_ips=true\n")
-                peer.allowedIPs.forEach { wgSettings.append("allowed_ip=\($0.rawValue)\n") }
+                peer.allowedIPs.forEach {
+                    guard !$0.rawValue.isEmpty else { return }
+                    wgSettings.append("allowed_ip=\($0.rawValue)\n")
+                }
             }
         }
         return wgSettings
@@ -83,11 +86,17 @@ final class PacketTunnelSettingsGenerator: Sendable {
             modules.append(dns)
         }
 
+#if os(Windows)
+        let requiresVirtualDevice = false
+#else
+        let requiresVirtualDevice = true
+#endif
         return TunnelRemoteInfo(
             originalModuleId: moduleId,
             address: remoteAddress,
             modules: modules,
-            fileDescriptors: descriptors.map(UInt64.init)
+            fileDescriptors: descriptors.map(UInt64.init),
+            requiresVirtualDevice: requiresVirtualDevice
         )
     }
 

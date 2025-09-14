@@ -5,6 +5,7 @@
  */
 
 #include <wintun.h>
+#include <objbase.h>
 #include "portable/common.h"
 #include "portable/tun.h"
 
@@ -38,16 +39,36 @@ static WINTUN_SEND_PACKET_FUNC *WintunSendPacket;
         assert(name && #name " not found in DLL");      \
     } while (0)
 
-pp_tun pp_tun_create(const void *_Nullable impl) {
+wchar_t *wstring_from_string(const char *str) {
+    int len = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0);
+    if (len == 0) {
+        return NULL;
+    }
+    wchar_t *wstr = (wchar_t *)pp_alloc(len * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, str, -1, wstr, len);
+    return wstr;
+}
+
+GUID guid_from_wstring(const wchar_t *wstr) {
+    GUID guid;
+    HRESULT hr = CLSIDFromString(wstr, &guid);
+    if (FAILED(hr)) {
+        ZeroMemory(&guid, sizeof(guid));
+    }
+    return guid;
+}
+
+pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl) {
     (void)impl;
+
     WINTUN_ADAPTER_HANDLE adapter = NULL;
     WINTUN_SESSION_HANDLE session = NULL;
 
     // Load DLL before anything (do it once)
     if (!wintun) {
-        wintun = LoadLibraryExW(L"wintun.dll", NULL, LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
+        wintun = LoadLibraryExA("wintun.dll", NULL, LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
         if (!wintun) {
-            fprintf(stderr, "LoadLibraryExW(): %lu\n", GetLastError());
+            fprintf(stderr, "LoadLibraryExA(): %lu\n", GetLastError());
             goto failure;
         }
         // Required DLL functions
@@ -63,11 +84,14 @@ pp_tun pp_tun_create(const void *_Nullable impl) {
         PP_LOAD_FUNC(wintun, WintunSendPacket);
     }
 
-    // FIXME: #188, should use profile name and UUID
+    // Use module UUID as adapter identifier
     LPCWSTR tun_type = L"Partout";
-    LPCWSTR dev_name = L"foobar";
-    GUID dev_guid = { 0xdeadbabe, 0xcafe, 0xbeef, { 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef } };
-
+    LPCWSTR dev_name = wstring_from_string(uuid);
+    if (!dev_name) {
+        fprintf(stderr, "wstring_from_string()");
+        goto failure;
+    }
+    GUID dev_guid = guid_from_wstring(dev_name);
     adapter = WintunCreateAdapter(dev_name, tun_type, &dev_guid);
     if (!adapter) {
         fprintf(stderr, "WintunCreateAdapter(): %lu\n", GetLastError());
@@ -95,6 +119,7 @@ pp_tun pp_tun_create(const void *_Nullable impl) {
 failure:
     if (session) WintunEndSession(session);
     if (adapter) WintunCloseAdapter(adapter);
+    if (dev_name) pp_free((LPWSTR)dev_name);
     if (wintun) FreeLibrary(wintun);
     return NULL;
 }

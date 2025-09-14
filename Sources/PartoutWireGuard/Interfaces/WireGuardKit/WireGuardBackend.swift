@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT
 // Copyright © 2018-2024 WireGuard LLC. All Rights Reserved.
 
-// swiftlint:disable identifier_name
 public typealias WireGuardLoggerCallback = @convention(c) (_ context: UnsafeMutableRawPointer?, _ level: Int32, _ msg: UnsafePointer<Int8>?) -> Void
 
 public protocol WireGuardBackend: AnyObject, Sendable {
     func setLogger(context: UnsafeMutableRawPointer?, logger_fn: WireGuardLoggerCallback?)
 
+#if os(Windows)
+    func turnOn(settings: String, ifname: String) -> Int32
+#else
     func turnOn(settings: String, tun_fd: Int32) -> Int32
+#endif
 
     func socketDescriptors(_ handle: Int32) -> [Int32]
 
@@ -24,4 +27,3 @@ public protocol WireGuardBackend: AnyObject, Sendable {
 
     func version() -> String?
 }
-// swiftlint:enable identifier_name

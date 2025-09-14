@@ -11,7 +11,8 @@ import PartoutCore
 public final class NEInterfaceFactory: NetworkInterfaceFactory {
     public struct Options: Sendable {
         // Enable to use NWConnection, NW* sockets were removed from NetworkExtension.
-        public var usesNetworkFramework = false
+        public var usesNETCP = false
+        public var usesNEUDP = false
 
         public var maxUDPDatagrams = 200
 
@@ -44,7 +45,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
         }
         switch endpoint.proto.socketType.plainType {
         case .udp:
-            if options.usesNetworkFramework {
+            if options.usesNEUDP {
                 let impl = NWConnection(to: endpoint.nwEndpoint, using: .udp)
                 let socketOptions = NESocketObserver.Options(
                     proto: .udp,
@@ -71,7 +72,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
             }
 
         case .tcp:
-            if options.usesNetworkFramework {
+            if options.usesNETCP {
                 let impl = NWConnection(to: endpoint.nwEndpoint, using: .tcp)
                 let socketOptions = NESocketObserver.Options(
                     proto: .tcp,

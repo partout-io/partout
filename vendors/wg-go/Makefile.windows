@@ -4,14 +4,11 @@
 # Default target
 all: clean build install
 
-# FIXME: #199, Read from go env
-HOST_GOOS=windows
-HOST_GOARCH=amd64
-BUILDMODE=c-archive
-BUILDEXT=lib
+BUILDMODE=c-shared
+BUILDEXT=dll
 
 # Build output
-PREFIXDIR=windows
+PREFIXDIR=src
 BUILDDIR=build
 DESTDIR=bin\$(HOST_GOOS)-$(HOST_GOARCH)
 
@@ -22,7 +19,10 @@ version-header: $(DESTDIR)\wireguard-go-version.h
 
 $(BUILDDIR)\wg-go.$(BUILDEXT): go.mod
 	@set CGO_ENABLED=1
-	go build -C $(PREFIXDIR) -ldflags=-w -trimpath -v -o "$(BUILDDIR)\wg-go.$(BUILDEXT)" -buildmode=$(BUILDMODE)
+	# FIXME: #199, hardcoded to aarch64
+	@set CGO_CFLAGS=--target=aarch64-windows-gnu
+	@set CGO_CXXFLAGS=--target=aarch64-windows-gnu
+	go build -C $(PREFIXDIR) -x -ldflags=-w -trimpath -v -o "$(BUILDDIR)\wg-go.$(BUILDEXT)" -buildmode=$(BUILDMODE)
 	@if exist "$(BUILDDIR)\libwg-go.h" del "$(BUILDDIR)\libwg-go.h"
 
 $(DESTDIR)\wireguard-go-version.h: go.mod
@@ -35,7 +35,5 @@ clean:
 
 install: build
 	if not exist "$(DESTDIR)\lib" mkdir "$(DESTDIR)\lib"
-	if not exist "$(DESTDIR)\include" mkdir "$(DESTDIR)\include"
 	copy "$(PREFIXDIR)\$(BUILDDIR)\wg-go.$(BUILDEXT)" "$(DESTDIR)\lib"
-	copy "wireguard.h" "$(DESTDIR)\include"
-	copy "module.modulemap" "$(DESTDIR)\include"
+	xcopy "include" "$(DESTDIR)/include" /S /E /I /Y

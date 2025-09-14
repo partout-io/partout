@@ -84,8 +84,8 @@ struct NetworkSettingsBuilderTests {
         remoteOptions.routeGateway6 = Address(rawValue: routeGw6)
 
         sut = try #require(try builtModule(ofType: IPModule.self, with: remoteOptions))
-        #expect(sut.ipv4?.subnet?.rawValue == "1.1.1.1/16")
-        #expect(sut.ipv6?.subnet?.rawValue == "1:1::1/72")
+        #expect(sut.ipv4?.subnets.map(\.rawValue) == ["1.1.1.1/16"])
+        #expect(sut.ipv6?.subnets.map(\.rawValue) == ["1:1::1/72"])
         #expect(!(sut.ipv4?.includesDefaultRoute ?? false))
         #expect(!(sut.ipv6?.includesDefaultRoute ?? false))
 
@@ -138,8 +138,8 @@ struct NetworkSettingsBuilderTests {
             with: remoteOptions,
             localOptions: localOptions
         ))
-        #expect(sut.ipv4?.subnet?.rawValue == "1.1.1.1/16")
-        #expect(sut.ipv6?.subnet?.rawValue == "1:1::1/72")
+        #expect(sut.ipv4?.subnets.map(\.rawValue) == ["1.1.1.1/16"])
+        #expect(sut.ipv6?.subnets.map(\.rawValue) == ["1:1::1/72"])
         #expect(sut.ipv4?.includesDefaultRoute ?? false)
         #expect(sut.ipv6?.includesDefaultRoute ?? false)
         #expect(sut.ipv4?.includedRoutes == [

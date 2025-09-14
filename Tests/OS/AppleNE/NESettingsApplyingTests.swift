@@ -26,7 +26,7 @@ struct NESettingsApplyingTests {
         module.apply(.global, to: &sut)
 
         let settings = try #require(sut.ipv4Settings)
-        let subnets = ipv4.subnet.map { [$0] } ?? []
+        let subnets = ipv4.subnets
         #expect(settings.addresses == subnets.map(\.address.rawValue))
         #expect(settings.subnetMasks == subnets.map(\.ipv4Mask))
         #expect(settings.includedRoutes?.count == ipv4.includedRoutes.count)
@@ -59,7 +59,7 @@ struct NESettingsApplyingTests {
         module.apply(.global, to: &sut)
 
         let settings = try #require(sut.ipv6Settings)
-        let subnets = ipv6.subnet.map { [$0] } ?? []
+        let subnets = ipv6.subnets
         #expect(settings.addresses == subnets.map(\.address.rawValue))
         #expect(settings.networkPrefixLengths.map(\.intValue) == subnets.map(\.prefixLength))
         #expect(settings.includedRoutes?.count == ipv6.includedRoutes.count)

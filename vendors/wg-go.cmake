@@ -6,15 +6,21 @@ if(PP_BUILD_FOR_ANDROID)
 else()
     set(WGGO_ANDROID "")
 endif()
-set(BUILD_CMD
-    make -C ${CMAKE_SOURCE_DIR}/vendors/wg-go
-    DESTDIR=${WGGO_OUTPUT_DIR}
-    ANDROID=${WGGO_ANDROID})
+
+if(WIN32)
+    set(WGGO_CMD nmake /f Makefile.windows DESTDIR=${WGGO_OUTPUT_DIR})
+else()
+    set(WGGO_CMD
+        make -C ${CMAKE_SOURCE_DIR}/vendors/wg-go
+        DESTDIR=${WGGO_OUTPUT_DIR}
+        ANDROID=${WGGO_ANDROID})
+endif()
 
 ExternalProject_Add(
     WireGuardGoProject
     SOURCE_DIR ${CMAKE_SOURCE_DIR}/vendors/wg-go
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND ${BUILD_CMD}
+    BUILD_COMMAND ${WGGO_CMD}
     INSTALL_COMMAND ""
+    BUILD_IN_SOURCE 1
 )

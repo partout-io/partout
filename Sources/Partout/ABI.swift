@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !os(iOS) && !os(tvOS)
+
 import _PartoutOSPortable_C
 import Foundation
 import Partout_C
@@ -44,6 +46,7 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
         .wireguard
     ])
     logBuilder.logsAddresses = true
+    logBuilder.logsModules = true
     PartoutLogger.register(logBuilder.build())
 
     let registry = Registry(withKnown: true, allImplementations: [
@@ -152,3 +155,5 @@ public func partout_daemon_stop(cCtx: UnsafeMutableRawPointer) {
         ctx.daemon = nil
     }
 }
+
+#endif

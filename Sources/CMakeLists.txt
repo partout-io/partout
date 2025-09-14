@@ -48,7 +48,6 @@ endif()
 if(DEFINED WGGO_DIR)
     target_include_directories(Partout PRIVATE
         ${CMAKE_SOURCE_DIR}/Vendors/WireGuardGo_C
-        ${WGGO_DIR}/include
     )
     if(NOT PP_BUILD_FOR_ANDROID)
         add_static_lib(${WGGO_DIR}/lib wg-go PARTOUT_LIBS)
