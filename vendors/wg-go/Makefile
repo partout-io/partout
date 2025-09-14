@@ -10,18 +10,22 @@ HOST_GOOS := $(shell go env GOOS)
 HOST_GOARCH := $(shell go env GOARCH)
 HOST_GOROOT := $(shell go env GOROOT)
 
+BUILDMODE := c-shared
+
 # Cross-build for Android
 ifeq ($(ANDROID),1)
-BUILDMODE := c-shared
-BUILDEXT := so
 HOST_GOOS := android
 HOST_GOARCH := arm64
 export GOOS := $(HOST_GOOS)
 export GOARCH := $(HOST_GOARCH)
 export CC := aarch64-linux-android24-clang
-else
-BUILDMODE := c-archive
-BUILDEXT := a
+BUILDEXT := so
+else ifeq ($(HOST_GOOS),linux)
+BUILDEXT := so
+else ifeq ($(HOST_GOOS),windows)
+BUILDEXT := dll
+else # Apple
+BUILDEXT := dylib
 endif
 
 # Build output
@@ -50,11 +54,11 @@ endif
 
 # Targets
 
-build: $(BUILDDIR)/libwg-go.$(BUILDEXT)
+build: $(BUILDDIR)/libwg-go
 version-header: $(BUILDDIR)/wireguard-go-version.h
 
-$(BUILDDIR)/libwg-go.$(BUILDEXT): export CGO_ENABLED := 1
-$(BUILDDIR)/libwg-go.$(BUILDEXT): $(GOROOT)/.prepared go.mod
+$(BUILDDIR)/libwg-go: export CGO_ENABLED := 1
+$(BUILDDIR)/libwg-go: $(GOROOT)/.prepared go.mod
 	go build -C $(MODROOT) -ldflags=-w -trimpath -v \
 		-o "$(BUILDDIR)/libwg-go.$(BUILDEXT)" \
 		-buildmode=$(BUILDMODE)
@@ -68,9 +72,7 @@ clean:
 
 install: build
 	mkdir -p "$(DESTDIR)/lib"
-	mkdir -p "$(DESTDIR)/include"
-	cp "$(BUILDDIR)/libwg-go.$(BUILDEXT)" "$(DESTDIR)/lib"
-	cp "wireguard.h" "$(DESTDIR)/include"
-	cp "module.modulemap" "$(DESTDIR)/include"
+	cp $(BUILDDIR)/libwg-go.* "$(DESTDIR)/lib"
+	cp -pR "include" "$(DESTDIR)"
 
 .PHONY: clean build version-header install

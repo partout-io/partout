@@ -233,27 +233,6 @@ actor WireGuardAdapter {
         }
     }
 
-    /// Returns the tunnel device interface name, or nil on error.
-    /// - Returns: String.
-    var interfaceName: String? {
-        guard let tunnelFileDescriptor else { return nil }
-        var buffer = [UInt8](repeating: 0, count: Int(IFNAMSIZ))
-        return buffer.withUnsafeMutableBufferPointer { mutableBufferPointer in
-            guard let baseAddress = mutableBufferPointer.baseAddress else { return nil }
-
-            var ifnameSize = socklen_t(IFNAMSIZ)
-            let result = getsockopt(
-                tunnelFileDescriptor,
-                2 /* SYSPROTO_CONTROL */,
-                2 /* UTUN_OPT_IFNAME */,
-                baseAddress,
-                &ifnameSize)
-
-            guard result == 0 else { return nil }
-            return String(cString: baseAddress)
-        }
-    }
-
     // MARK: - Private methods
 
     private func setupReachabilityTask() {
@@ -270,7 +249,7 @@ actor WireGuardAdapter {
     private func setupLogHandler() {
         let context = Unmanaged.passUnretained(self).toOpaque()
         backend.setLogger(context: context) { context, logLevel, message in
-            guard let context = context, let message = message else { return }
+            guard let context, let message else { return }
 
             let unretainedSelf = Unmanaged<WireGuardAdapter>.fromOpaque(context)
                 .takeUnretainedValue()
@@ -293,10 +272,12 @@ actor WireGuardAdapter {
     private func setNetworkSettings(_ networkSettings: TunnelRemoteInfo) async throws {
         guard let delegate else { return }
         tunnel = try await delegate.adapterShouldSetNetworkSettings(self, settings: networkSettings)
+#if !os(Windows)
         guard let tunFd = tunnel?.fileDescriptor.map(Int32.init) ?? fallbackFileDescriptor else {
             throw WireGuardAdapterError.cannotLocateTunnelFileDescriptor
         }
         tunnelFileDescriptor = tunFd
+#endif
     }
 
     /// Start WireGuard backend.
@@ -304,10 +285,17 @@ actor WireGuardAdapter {
     /// - Throws: an error of type `WireGuardAdapterError`
     /// - Returns: tunnel handle
     private func startWireGuardBackend(wgConfig: String) throws -> Int32 {
+#if os(Windows)
+        guard let interfaceName else {
+            throw WireGuardAdapterError.cannotLocateTunnelFileDescriptor
+        }
+        let handle = backend.turnOn(settings: wgConfig, ifname: interfaceName)
+#else
         guard let tunnelFileDescriptor else {
             throw WireGuardAdapterError.cannotLocateTunnelFileDescriptor
         }
         let handle = backend.turnOn(settings: wgConfig, tun_fd: tunnelFileDescriptor)
+#endif
         if handle < 0 {
             throw WireGuardAdapterError.startWireGuardBackend(handle)
         }
@@ -403,6 +391,44 @@ actor WireGuardAdapter {
 #endif
     }
 }
+
+// MARK: - Low-level
+
+#if os(Windows)
+
+extension WireGuardAdapter {
+    var interfaceName: String? {
+        moduleId.uuidString
+    }
+}
+
+#else
+
+extension WireGuardAdapter {
+
+    /// Returns the tunnel device interface name, or nil on error.
+    /// - Returns: String.
+    var interfaceName: String? {
+        guard let tunnelFileDescriptor else { return nil }
+        var buffer = [UInt8](repeating: 0, count: Int(IFNAMSIZ))
+        return buffer.withUnsafeMutableBufferPointer { mutableBufferPointer in
+            guard let baseAddress = mutableBufferPointer.baseAddress else { return nil }
+
+            var ifnameSize = socklen_t(IFNAMSIZ)
+            let result = getsockopt(
+                tunnelFileDescriptor,
+                2 /* SYSPROTO_CONTROL */,
+                2 /* UTUN_OPT_IFNAME */,
+                baseAddress,
+                &ifnameSize)
+
+            guard result == 0 else { return nil }
+            return String(cString: baseAddress)
+        }
+    }
+}
+
+#endif
 
 /// A enum describing WireGuard log levels defined in `api-apple.go`.
 enum WireGuardLogLevel: Int32 {
