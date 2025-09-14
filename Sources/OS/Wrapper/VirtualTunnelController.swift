@@ -45,7 +45,12 @@ public final class VirtualTunnelController: TunnelController {
 
         // Create virtual device with an optional implementation
         let uuid = info.originalModuleId
-        let tun = try VirtualTunnelInterface(ctx, uuid: uuid, tunImpl: tunImpl, maxReadLength: maxReadLength)
+        let tun: IOInterface
+        if info.requiresVirtualDevice {
+            tun = try VirtualTunnelInterface(ctx, uuid: uuid, tunImpl: tunImpl, maxReadLength: maxReadLength)
+        } else {
+            tun = DummyTunnelInterface()
+        }
 
         // FIXME: #188, add better codes for PartoutError
         // FIXME: #188, apply subnets and routes (default first, drop excluded from included)
