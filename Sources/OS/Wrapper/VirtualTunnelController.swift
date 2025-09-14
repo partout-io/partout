@@ -28,15 +28,12 @@ public final class VirtualTunnelController: TunnelController {
     }
 
     public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
-        guard info != nil else {
+        guard let info else {
             throw PartoutError(.notFound)
         }
 
         // Fetch tun implementation if necessary
         let tunImpl = ctrl.map { ctrl in
-            guard let info else {
-                return ctrl.set_tunnel(ctrl.thiz, nil)
-            }
             let rawDescs = info.fileDescriptors.map(Int32.init)
             return rawDescs.withUnsafeBufferPointer {
                 var cInfo = partout_tun_ctrl_info()
@@ -47,7 +44,8 @@ public final class VirtualTunnelController: TunnelController {
         } ?? nil
 
         // Create virtual device with an optional implementation
-        let tun = try VirtualTunnelInterface(ctx, tunImpl: tunImpl, maxReadLength: maxReadLength)
+        let uuid = info.originalModuleId
+        let tun = try VirtualTunnelInterface(ctx, uuid: uuid, tunImpl: tunImpl, maxReadLength: maxReadLength)
 
         // FIXME: #188, add better codes for PartoutError
         // FIXME: #188, apply subnets and routes (default first, drop excluded from included)

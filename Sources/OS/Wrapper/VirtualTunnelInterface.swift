@@ -28,8 +28,10 @@ public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
     // FIXME: #188, how to avoid silent copy? (enforce reference)
     private var readBuf: [UInt8]
 
-    public init(_ ctx: PartoutLoggerContext, tunImpl: UnsafeMutableRawPointer?, maxReadLength: Int) throws {
-        guard let tun = pp_tun_create(tunImpl) else {
+    public init(_ ctx: PartoutLoggerContext, uuid: Foundation.UUID, tunImpl: UnsafeMutableRawPointer?, maxReadLength: Int) throws {
+        guard let tun = uuid.uuidString.withCString({
+            pp_tun_create($0, tunImpl)
+        }) else {
             throw PartoutError(.linkNotActive)
         }
         self.ctx = ctx
