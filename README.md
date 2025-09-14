@@ -73,7 +73,7 @@ The script builds the vendors as static libraries and accepts a few options:
 
 - `-l`: Build Partout as dynamic library (opt-in)
 - `-config (Debug|Release)`: The CMake build type
-- `-crypto (openssl|mbedtls)`: The crypto subsystem to pick between OpenSSL and mbedTLS
+- `-crypto (openssl|native)`: The crypto subsystem to pick between OpenSSL and Native/MbedTLS
 - `-wireguard`: Enable support for WireGuard (requires Go)
 
 For example, this will build Partout for release with a static dependency on OpenSSL:
@@ -116,7 +116,7 @@ The script runs on macOS, but can be adapted for other platforms with slight twe
 
 ### Xcode
 
-Edit `Demo/Config.xcconfig` with your developer details. You must comply with all the capabilities and entitlements in the main app and the tunnel extension target.
+There is an Xcode Demo in the `Examples` directory. Edit `Demo/Config.xcconfig` with your developer details. You must comply with all the capabilities and entitlements in the main app and the tunnel extension target.
 
 Put your configuration files into `Demo/App/Files` with these names:
 
