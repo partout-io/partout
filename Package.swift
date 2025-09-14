@@ -612,52 +612,43 @@ if OS.current == .windows {
 
 // Generic backend interface to implement
 if areas.contains(.wireGuard) {
+    let implDependencies: [Target.Dependency]?
+
     switch wgMode {
         case .wgGo:
         // Use portable Go backend for WireGuard
         switch OS.current {
         case .apple:
+            implDependencies = [
+                "_PartoutOSPortable_C",
+                "wg-go-apple"
+            ]
             package.dependencies.append(
                 .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.20250630")
             )
-            package.targets.append(
-                .target(
-                     name: "_PartoutVendorsWireGuardImpl",
-                     dependencies: [
-                        "PartoutWireGuard",
-                        "wg-go-apple"
-                    ],
-                    path: "Sources/Vendors/WireGuardGo"
-                )
-            )
         default:
-            package.targets.append(contentsOf: [
-                .target(
-                    name: "wg-go-cmake",
-                    path: "Sources/Vendors/WireGuardGo_C",
-                    publicHeadersPath: "."
-                ),
-                .target(
-                    name: "_PartoutVendorsWireGuardImpl",
-                    dependencies: [
-                        "PartoutWireGuard",
-                        "wg-go-cmake"
-                    ],
-                    path: "Sources/Vendors/WireGuardGo",
-                    linkerSettings: [
-                        .unsafeFlags(["-L\(cmakeOutput)/wg-go/lib"]),
-                        .linkedLibrary("\(staticLibPrefix)wg-go")
-                    ]
-                )
-            ])
+            implDependencies = ["_PartoutOSPortable_C"]
         }
     default:
-        break
+        implDependencies = nil
     }
 
-    // Include back tests if supported
-    if wgMode != nil {
+    // Include backend and tests if supported
+    if let implDependencies {
         package.targets.append(contentsOf: [
+            .target(
+                name: "_PartoutVendorsWireGuardImpl_C",
+                dependencies: implDependencies,
+                path: "Sources/Vendors/WireGuard_C"
+            ),
+            .target(
+                name: "_PartoutVendorsWireGuardImpl",
+                dependencies: [
+                    "PartoutWireGuard",
+                    "_PartoutVendorsWireGuardImpl_C"
+                ],
+                path: "Sources/Vendors/WireGuard"
+            ),
             .testTarget(
                 name: "_PartoutVendorsWireGuardImplTests",
                 dependencies: ["_PartoutVendorsWireGuardImpl"],
@@ -840,8 +831,8 @@ enum WireGuardMode {
 
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.187"
-let checksum = "8b3b706a70c35a627818809e715e4baad0f4c3951a22d0e3a543d09033305014"
+let version = "0.99.188"
+let checksum = "287ad1083dfe88fbd34b3f219f6e4b30f63dee59bc5fb06e75ad345ef826ba3a"
 
 enum CoreDeployment: String, RawRepresentable {
     case remoteBinary

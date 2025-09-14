@@ -20,7 +20,8 @@ struct _pp_tun {
     const char *dev_name;
 };
 
-pp_tun pp_tun_create(const void *_Nullable impl) {
+pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl) {
+    (void)uuid;
     (void)impl;
     const char *dev_path = "/dev/net/tun";
     int fd = -1;

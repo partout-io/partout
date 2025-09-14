@@ -14,7 +14,8 @@ struct _pp_tun {
 };
 
 /* Impl is the pp_tun struct as is. */
-pp_tun pp_tun_create(const void *_Nullable any_impl) {
+pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable any_impl) {
+    (void)uuid;
     if (!any_impl) return NULL;
     pp_tun impl = (pp_tun)any_impl;
     assert(impl && impl->fd > 0);

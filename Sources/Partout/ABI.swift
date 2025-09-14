@@ -46,6 +46,7 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
         .wireguard
     ])
     logBuilder.logsAddresses = true
+    logBuilder.logsModules = true
     PartoutLogger.register(logBuilder.build())
 
     let registry = Registry(withKnown: true, allImplementations: [

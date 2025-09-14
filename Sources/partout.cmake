@@ -18,9 +18,10 @@ set(EXCLUDED_PATTERNS
     # Bundled API resources
     PartoutAPI\/JSON\/
     PartoutAPI\/REST\/API\\+Bundle\.swift
-    # OpenVPN legacy
+    # Legacy
     PartoutOpenVPN\/Cross\/Internal\/Legacy\/
     PartoutOpenVPN\/Legacy.*\/
+    PartoutWireGuard\/Legacy.*\/
 )
 
 # Exclude per platform
