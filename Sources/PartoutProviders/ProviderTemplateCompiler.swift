@@ -16,7 +16,7 @@ public protocol ProviderTemplateCompiler {
 
     func compiled(
         _ ctx: PartoutLoggerContext,
-        moduleId: UUID,
+        moduleId: UniqueID,
         entity: ProviderEntity,
         options: Options?,
         userInfo: UserInfo?

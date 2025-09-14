@@ -4,7 +4,7 @@
 
 import Foundation
 #if !PARTOUT_MONOLITH
-internal import _PartoutOSPortable
+internal import PartoutOS
 import PartoutCore
 import PartoutOpenVPN
 #endif

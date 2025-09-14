@@ -4,7 +4,7 @@
 
 internal import _PartoutOpenVPN_C
 #if !PARTOUT_MONOLITH
-internal import _PartoutOSPortable
+internal import PartoutOS
 #endif
 import Foundation
 

@@ -1,80 +1,65 @@
 set(ROOT_DIR ${CMAKE_SOURCE_DIR}/..)
 
-# C/C++ sources, including vendored PartoutCore
-file(GLOB_RECURSE PARTOUT_C_SOURCES
-    ${ROOT_DIR}/vendors/core/Sources/_PartoutCore_C/*.c
-    *.c
+# Base configuration
+add_library(Partout_C STATIC "")
+target_compile_options(Partout_C PRIVATE
+    -DPARTOUT_MONOLITH
 )
-
-# Set up exclusions
-set(EXCLUDED_PATTERNS "")
 
 # Header search paths from all C targets
 set(PARTOUT_C_INCLUDE_DIRS
     ${ROOT_DIR}/vendors/core/Sources/_PartoutCore_C/include
     ${CMAKE_SOURCE_DIR}/Partout_C/include
-    ${CMAKE_SOURCE_DIR}/OS/Portable_C/include
+    ${CMAKE_SOURCE_DIR}/PartoutOS_C/include
     ${CMAKE_SOURCE_DIR}/PartoutOpenVPN/Cross_C/include
-    ${CMAKE_SOURCE_DIR}/PartoutWireGuard/Interfaces_C
-    ${CMAKE_SOURCE_DIR}/Vendors/WireGuard_C/include
+    ${CMAKE_SOURCE_DIR}/PartoutWireGuard/Shared_C/include
 )
-
-# Filter by platform
-if(NOT APPLE)
-    list(APPEND EXCLUDED_PATTERNS OS\/Apple.*)
-endif()
-if(NOT LINUX)
-    list(APPEND EXCLUDED_PATTERNS OS\/Linux.*)
-endif()
 if(WIN32)
     list(APPEND PARTOUT_C_INCLUDE_DIRS ${ROOT_DIR}/vendors/wintun)
-else()
-    list(APPEND EXCLUDED_PATTERNS
-        test-wintun.*
-        OS\/Windows.*
-    )
 endif()
-# XXX: Not sure about this condition
-if(NOT BUILD_FOR_ANDROID)
-    list(APPEND EXCLUDED_PATTERNS OS\/Android.*)
-endif()
+
+# Set up exclusions
+set(EXCLUDED_PATTERNS "")
 
 # Filter by crypto vendor
 if(DEFINED OPENSSL_DIR)
-    list(APPEND PARTOUT_C_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/Impl/CryptoOpenSSL_C/include)
+    list(APPEND PARTOUT_C_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/PartoutCrypto/OpenSSL_C/include)
 else()
-    list(APPEND EXCLUDED_PATTERNS CryptoOpenSSL_C\/)
+    list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/OpenSSL_C\/)
 endif()
 if(DEFINED MBEDTLS_DIR)
-    list(APPEND PARTOUT_C_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/Impl/CryptoNative_C/include)
+    list(APPEND PARTOUT_C_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/PartoutCrypto/Native_C/include)
     if(NOT APPLE)
-        list(APPEND EXCLUDED_PATTERNS CryptoNative_C\/src/apple)
+        list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/src/apple)
     endif()
     if(NOT LINUX)
-        list(APPEND EXCLUDED_PATTERNS CryptoNative_C\/src/linux)
+        list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/src/linux)
     endif()
     if(NOT WIN32)
-        list(APPEND EXCLUDED_PATTERNS CryptoNative_C\/src/windows)
+        list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/src/windows)
     endif()
     # XXX: Not sure about this condition
     if(NOT BUILD_FOR_ANDROID)
-        list(APPEND EXCLUDED_PATTERNS CryptoNative_C\/src/android)
+        list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/src/android)
     endif()
 else()
-    list(APPEND EXCLUDED_PATTERNS CryptoNative_C\/)
+    list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/)
 endif()
 
+# C sources, including vendored PartoutCore
+file(GLOB_RECURSE PARTOUT_C_SOURCES
+    ${ROOT_DIR}/vendors/core/Sources/_PartoutCore_C/*.c
+    *.c
+)
+
+# Account for exclusions in source files
 foreach(pattern ${EXCLUDED_PATTERNS})
     list(FILTER PARTOUT_C_SOURCES EXCLUDE REGEX ${pattern})
 endforeach()
 
-# Define Partout_C sub-target for Partout
-add_library(Partout_C STATIC
-    ${PARTOUT_C_SOURCES}
-)
-target_include_directories(Partout_C PRIVATE
-    ${PARTOUT_C_INCLUDE_DIRS}
-)
+# Add computed files
+target_sources(Partout_C PRIVATE ${PARTOUT_C_SOURCES})
+target_include_directories(Partout_C PRIVATE ${PARTOUT_C_INCLUDE_DIRS})
 if(LINUX)
     target_compile_options(Partout_C PRIVATE -fPIC)
 endif()

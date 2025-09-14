@@ -4,9 +4,9 @@
 
 internal import PartoutCrypto_C
 #if !PARTOUT_MONOLITH
-internal import _PartoutOSPortable
+internal import PartoutOS
 #endif
-import _PartoutOSPortable_C
+import PartoutOS_C
 import Foundation
 
 struct CryptoKeys {

@@ -20,7 +20,7 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
 
     private let statusSubject: CurrentValueStream<ConnectionStatus>
 
-    private let moduleId: UUID
+    private let moduleId: UniqueID
 
     private let controller: TunnelController
 

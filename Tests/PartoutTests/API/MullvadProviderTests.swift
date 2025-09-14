@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-@testable import PartoutInterfaces
+@testable import Partout
 @testable import PartoutProviders
 import Testing
 
@@ -12,7 +12,7 @@ struct MullvadProviderTests: APITestSuite {
         setUpLogging()
     }
 
-#if canImport(PartoutWireGuard)
+#if PARTOUT_WIREGUARD
     @Test(arguments: [
         AuthInput( // valid token
             accessToken: "sometoken",

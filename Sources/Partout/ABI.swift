@@ -4,11 +4,11 @@
 
 #if !os(iOS) && !os(tvOS)
 
-import _PartoutOSPortable_C
+import PartoutOS_C
 import Foundation
 import Partout_C
 #if !PARTOUT_MONOLITH
-import _PartoutOSPortable
+import PartoutOS
 import PartoutCore
 #endif
 
@@ -35,49 +35,54 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
     // Global directory e.g. for temporary files
     let cacheDir = String(cString: cArgs.pointee.cache_dir)
 
+    // Logging and implementations, consider optionals
     var logBuilder = PartoutLogger.Builder()
-    // FIXME: #187, check defines for conditional areas
-    logBuilder.setDestination(NSLogDestination(), for: [
-        .core,
-        .api,
-        .providers,
-        //.ne,
-        .openvpn,
-        .wireguard
-    ])
+    var logCategories: [LoggerCategory] = [.core, .os, .providers]
+    var allImplementations: [ModuleImplementation] = []
+
+#if PARTOUT_API
+    logCategories.append(.api)
+#endif
+#if PARTOUT_OPENVPN
+    logCategories.append(.openvpn)
+    allImplementations.append(OpenVPNModule.Implementation(
+        importer: StandardOpenVPNParser(),
+        connectionBlock: {
+            let ctx = PartoutLoggerContext($0.profile.id)
+            return try OpenVPNConnection(
+                ctx,
+                parameters: $0,
+                module: $1,
+                cachesURL: URL(fileURLWithPath: cacheDir)
+            )
+        }
+    ))
+#endif
+#if PARTOUT_WIREGUARD
+    logCategories.append(.wireguard)
+    allImplementations.append(WireGuardModule.Implementation(
+        keyGenerator: StandardWireGuardKeyGenerator(),
+        importer: StandardWireGuardParser(),
+        validator: StandardWireGuardParser(),
+        connectionBlock: {
+            let ctx = PartoutLoggerContext($0.profile.id)
+            return try WireGuardConnection(
+                ctx,
+                parameters: $0,
+                module: $1
+            )
+        }
+    ))
+#endif
+
+    // Finalize configuration
+    logBuilder.setDestination(NSLogDestination(), for: logCategories)
     logBuilder.logsAddresses = true
     logBuilder.logsModules = true
     PartoutLogger.register(logBuilder.build())
+    let registry = Registry(withKnown: true, allImplementations: allImplementations)
 
-    let registry = Registry(withKnown: true, allImplementations: [
-        OpenVPNModule.Implementation(
-            importer: StandardOpenVPNParser(),
-            connectionBlock: {
-                let ctx = PartoutLoggerContext($0.profile.id)
-                return try OpenVPNConnection(
-                    ctx,
-                    parameters: $0,
-                    module: $1,
-                    cachesURL: URL(fileURLWithPath: cacheDir)
-                )
-            }
-        ),
-        // FIXME: #187, check defines for conditional areas
-        WireGuardModule.Implementation(
-            keyGenerator: StandardWireGuardKeyGenerator(),
-            importer: StandardWireGuardParser(),
-            validator: StandardWireGuardParser(),
-            connectionBlock: {
-                let ctx = PartoutLoggerContext($0.profile.id)
-                return try WireGuardConnection(
-                    ctx,
-                    parameters: $0,
-                    module: $1
-                )
-            }
-        )
-    ])
-
+    // Create global context
     let ctx = ABIContext(registry: registry)
     let cCtx = ctx.push()
     pp_log_g(.core, .debug, "Partout: Initialize with ctx: \(cCtx)")

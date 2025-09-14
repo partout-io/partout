@@ -4,7 +4,7 @@
 
 internal import PartoutCrypto_C
 #if !PARTOUT_MONOLITH
-internal import _PartoutOSPortable
+internal import PartoutOS
 #endif
 
 extension CZeroingData {

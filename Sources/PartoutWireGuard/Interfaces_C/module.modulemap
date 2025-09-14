@@ -1,4 +1,0 @@
-module _PartoutWireGuard_C {
-    umbrella header "WireGuardKitC.h"
-    export *
-}

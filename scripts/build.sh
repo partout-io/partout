@@ -19,12 +19,12 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -crypto)
-            # openssl|mbedtls
+            # openssl|native
             case $2 in
                 openssl)
                     cmake_opts+=("-DPP_BUILD_USE_OPENSSL=ON")
                     ;;
-                mbedtls)
+                native)
                     cmake_opts+=("-DPP_BUILD_USE_MBEDTLS=ON")
                     ;;
                 *)
