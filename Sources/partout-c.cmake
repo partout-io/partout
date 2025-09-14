@@ -16,6 +16,7 @@ set(PARTOUT_C_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/OS/Portable_C/include
     ${CMAKE_SOURCE_DIR}/PartoutOpenVPN/Cross_C/include
     ${CMAKE_SOURCE_DIR}/PartoutWireGuard/Interfaces_C
+    ${CMAKE_SOURCE_DIR}/Vendors/WireGuard_C/include
 )
 
 # Filter by platform
