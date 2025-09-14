@@ -32,6 +32,7 @@ int (*pp_wg_get_socket_v6)(int handle);
 /* The Apple library is statically linked as a Swift package.
  * The functions are direct pointers to the embedded symbols.
  */
+static inline
 int load_symbols() {
     pp_wg_version = wgVersion;
     pp_wg_set_logger = wgSetLogger;
@@ -53,6 +54,7 @@ static pp_lib wg = NULL;
     fn = pp_lib_load(lib, symbol); \
     if (!fn) return -1;
 
+static inline
 int load_symbols() {
     if (!wg) {
         wg = pp_lib_create("wg-go");
