@@ -12,7 +12,6 @@ import Foundation
 import NetworkExtension
 import os
 #if !PARTOUT_MONOLITH
-internal import _PartoutVendorsWireGuardImpl
 import PartoutCore
 import PartoutWireGuard
 #endif
@@ -23,7 +22,7 @@ public final class LegacyWireGuardConnection: Connection, @unchecked Sendable {
 
     private let statusSubject: CurrentValueStream<ConnectionStatus>
 
-    private let moduleId: UUID
+    private let moduleId: UniqueID
 
     private let controller: TunnelController
 

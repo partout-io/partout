@@ -61,7 +61,7 @@ final class PacketTunnelSettingsGenerator: Sendable {
         return wgSettings
     }
 
-    func generateNetworkSettings(moduleId: UUID, descriptors: [Int32]) -> TunnelRemoteInfo {
+    func generateNetworkSettings(moduleId: UniqueID, descriptors: [Int32]) -> TunnelRemoteInfo {
         /* iOS requires a tunnel endpoint, whereas in WireGuard it's valid for
          * a tunnel to have no endpoint, or for there to be many endpoints, in
          * which case, displaying a single one in settings doesn't really

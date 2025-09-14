@@ -1,0 +1,24 @@
+module PartoutOS_C {
+    header "portable/common.h"
+    header "portable/endian.h"
+    header "portable/prng.h"
+    header "portable/socket.h"
+    header "portable/tun.h"
+    header "portable/zd.h"
+    export *
+}
+
+module PartoutCrypto_C {
+    header "crypto/crypto.h"
+    header "crypto/crypto_aead.h"
+    header "crypto/crypto_cbc.h"
+    header "crypto/crypto_ctr.h"
+    header "crypto/hmac.h"
+    header "crypto/keys.h"
+    export *
+}
+
+module PartoutTLS_C {
+    header "tls/tls.h"
+    export *
+}

@@ -16,7 +16,7 @@ public actor LegacyOpenVPNConnection {
 
     private let ctx: PartoutLoggerContext
 
-    private let moduleId: UUID
+    private let moduleId: UniqueID
 
     private let controller: TunnelController
 

@@ -4,7 +4,7 @@
 
 import Foundation
 #if !PARTOUT_MONOLITH
-internal import _PartoutOSPortable
+internal import PartoutOS
 import PartoutCore
 import PartoutOpenVPN
 #endif
@@ -16,7 +16,7 @@ public actor OpenVPNConnection {
 
     private let ctx: PartoutLoggerContext
 
-    private let moduleId: UUID
+    private let moduleId: UniqueID
 
     private let controller: TunnelController
 

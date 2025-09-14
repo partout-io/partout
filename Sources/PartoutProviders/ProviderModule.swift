@@ -15,7 +15,7 @@ extension ModuleType {
 public struct ProviderModule: Module, BuildableType, Hashable, Codable {
     public static let moduleHandler = ModuleHandler(.provider, ProviderModule.self)
 
-    public let id: UUID
+    public let id: UniqueID
 
     public let providerId: ProviderID
 
@@ -28,7 +28,7 @@ public struct ProviderModule: Module, BuildableType, Hashable, Codable {
     public let entity: ProviderEntity?
 
     fileprivate init(
-        id: UUID,
+        id: UniqueID,
         providerId: ProviderID,
         providerModuleType: ModuleType,
         authentication: ProviderAuthentication?,
@@ -65,7 +65,7 @@ public struct ProviderModule: Module, BuildableType, Hashable, Codable {
 
 extension ProviderModule {
     public struct Builder: ModuleBuilder, Hashable, Sendable {
-        public let id: UUID
+        public let id: UniqueID
 
         public var providerId: ProviderID? {
             didSet {
@@ -114,7 +114,7 @@ extension ProviderModule {
         }
 
         public init(
-            id: UUID = UUID(),
+            id: UniqueID = UniqueID(),
             providerId: ProviderID? = nil,
             providerModuleType: ModuleType? = nil,
             authentication: ProviderAuthentication? = nil,
@@ -159,7 +159,7 @@ extension ProviderModule {
 }
 
 extension ProviderModule {
-    public func checkCompatible(with otherModule: Module, activeIds: Set<UUID>) throws {
+    public func checkCompatible(with otherModule: Module, activeIds: Set<UniqueID>) throws {
         precondition(otherModule.id != id)
         if !isMutuallyExclusive {
             return

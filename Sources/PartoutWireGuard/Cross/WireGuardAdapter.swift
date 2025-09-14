@@ -4,9 +4,8 @@
 import _PartoutWireGuard_C
 import Foundation
 #if !PARTOUT_MONOLITH
-import _PartoutOSPortable
-internal import _PartoutVendorsWireGuardImpl
 import PartoutCore
+import PartoutOS
 import PartoutWireGuard
 #endif
 
@@ -58,7 +57,7 @@ actor WireGuardAdapter {
     private weak var delegate: WireGuardAdapterDelegate?
 
     /// The ID of the original ``WireGuardModule``.
-    private let moduleId: UUID
+    private let moduleId: UniqueID
 
     /// Backend implementation.
     private let backend: WireGuardBackend
@@ -102,7 +101,7 @@ actor WireGuardAdapter {
     init(
         _ ctx: PartoutLoggerContext,
         with delegate: WireGuardAdapterDelegate,
-        moduleId: UUID,
+        moduleId: UniqueID,
         reachability: ReachabilityObserver,
         logHandler: @escaping LogHandler
     ) async {

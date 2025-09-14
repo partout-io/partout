@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #if !PARTOUT_MONOLITH
-internal import _PartoutOSPortable
+internal import PartoutOS
 #endif
 import Foundation
 

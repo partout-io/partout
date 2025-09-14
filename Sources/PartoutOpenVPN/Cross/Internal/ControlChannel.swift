@@ -5,7 +5,7 @@
 internal import _PartoutOpenVPN_C
 import Foundation
 #if !PARTOUT_MONOLITH
-internal import _PartoutOSPortable
+internal import PartoutOS
 import PartoutCore
 import PartoutOpenVPN
 #if canImport(_PartoutOpenVPNLegacy_ObjC)

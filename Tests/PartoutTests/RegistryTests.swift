@@ -3,20 +3,20 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-import PartoutInterfaces
+import Partout
 import Testing
 
-#if canImport(PartoutOpenVPN)
+#if PARTOUT_OPENVPN
 import PartoutOpenVPN
 #endif
-#if canImport(PartoutWireGuard)
+#if PARTOUT_WIREGUARD
 import PartoutWireGuard
 #endif
 import PartoutCore
 
 struct RegistryTests {
 
-#if canImport(PartoutOpenVPN) && canImport(PartoutWireGuard)
+#if PARTOUT_OPENVPN && PARTOUT_WIREGUARD
     @Test
     func givenKnownHandlers_whenSerializeProfile_thenIsDeserialized() throws {
         let sut = Registry()
