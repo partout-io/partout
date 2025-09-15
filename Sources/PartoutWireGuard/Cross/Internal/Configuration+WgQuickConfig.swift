@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright © 2018-2021 WireGuard LLC. All Rights Reserved.
 
-import Foundation
+#if !PARTOUT_MONOLITH
+import PartoutCore
+#endif
 
-extension TunnelConfiguration {
+extension WireGuard.Configuration {
 
     enum ParserState {
         case inInterfaceSection
@@ -12,8 +14,8 @@ extension TunnelConfiguration {
     }
 
     init(fromWgQuickConfig wgQuickConfig: String, called name: String? = nil) throws {
-        var interfaceConfiguration: InterfaceConfiguration?
-        var peerConfigurations = [PeerConfiguration]()
+        var interfaceConfiguration: WireGuard.LocalInterface?
+        var peerConfigurations = [WireGuard.RemoteInterface]()
 
         let lines = wgQuickConfig.split { $0.isNewline }
 
@@ -68,11 +70,11 @@ extension TunnelConfiguration {
             if isLastLine || lowercasedLine == "[interface]" || lowercasedLine == "[peer]" {
                 // Previous section has ended; process the attributes collected so far
                 if parserState == .inInterfaceSection {
-                    let interface = try TunnelConfiguration.collate(interfaceAttributes: attributes)
+                    let interface = try Self.collate(interfaceAttributes: attributes)
                     guard interfaceConfiguration == nil else { throw WireGuardParseError.multipleInterfaces }
                     interfaceConfiguration = interface
                 } else if parserState == .inPeerSection {
-                    let peer = try TunnelConfiguration.collate(peerAttributes: attributes)
+                    let peer = try Self.collate(peerAttributes: attributes)
                     peerConfigurations.append(peer)
                 }
             }
@@ -87,31 +89,32 @@ extension TunnelConfiguration {
         }
 
         let peerPublicKeysArray = peerConfigurations.map(\.publicKey)
-        let peerPublicKeysSet = Set<PublicKey>(peerPublicKeysArray)
+        let peerPublicKeysSet = Set(peerPublicKeysArray)
         if peerPublicKeysArray.count != peerPublicKeysSet.count {
             throw WireGuardParseError.multiplePeersWithSamePublicKey
         }
 
-        if let interfaceConfiguration = interfaceConfiguration {
-            self.init(name: name, interface: interfaceConfiguration, peers: peerConfigurations)
-        } else {
+        guard let interfaceConfiguration else {
             throw WireGuardParseError.noInterface
         }
+        self.init(interface: interfaceConfiguration, peers: peerConfigurations)
     }
 
     func asWgQuickConfig() -> String {
         var output = "[Interface]\n"
-        output.append("PrivateKey = \(interface.privateKey.base64Key)\n")
-        if let listenPort = interface.listenPort {
-            output.append("ListenPort = \(listenPort)\n")
-        }
+        output.append("PrivateKey = \(interface.privateKey.rawValue)\n")
+        // TODO: #93, listenPort not implemented
+//        if let listenPort = interface.listenPort {
+//            output.append("ListenPort = \(listenPort)\n")
+//        }
         if !interface.addresses.isEmpty {
-            let addressString = interface.addresses.map(\.stringRepresentation).joined(separator: ", ")
+            let addressString = interface.addresses.map(\.rawValue).joined(separator: ", ")
             output.append("Address = \(addressString)\n")
         }
-        if !interface.dns.isEmpty || !interface.dnsSearch.isEmpty {
-            var dnsLine = interface.dns.map(\.stringRepresentation)
-            dnsLine.append(contentsOf: interface.dnsSearch)
+        if let dns = interface.dns,
+           dns.searchDomains?.isEmpty != true || !dns.servers.isEmpty {
+            var dnsLine = dns.servers.map(\.rawValue)
+            dnsLine.append(contentsOf: dns.searchDomains?.map(\.rawValue) ?? [])
             let dnsString = dnsLine.joined(separator: ", ")
             output.append("DNS = \(dnsString)\n")
         }
@@ -121,18 +124,18 @@ extension TunnelConfiguration {
 
         for peer in peers {
             output.append("\n[Peer]\n")
-            output.append("PublicKey = \(peer.publicKey.base64Key)\n")
-            if let preSharedKey = peer.preSharedKey?.base64Key {
+            output.append("PublicKey = \(peer.publicKey.rawValue)\n")
+            if let preSharedKey = peer.preSharedKey?.rawValue {
                 output.append("PresharedKey = \(preSharedKey)\n")
             }
             if !peer.allowedIPs.isEmpty {
-                let allowedIPsString = peer.allowedIPs.map(\.stringRepresentation).joined(separator: ", ")
+                let allowedIPsString = peer.allowedIPs.map(\.rawValue).joined(separator: ", ")
                 output.append("AllowedIPs = \(allowedIPsString)\n")
             }
             if let endpoint = peer.endpoint {
-                output.append("Endpoint = \(endpoint.stringRepresentation)\n")
+                output.append("Endpoint = \(endpoint.rawValue)\n")
             }
-            if let persistentKeepAlive = peer.persistentKeepAlive {
+            if let persistentKeepAlive = peer.keepAlive {
                 output.append("PersistentKeepalive = \(persistentKeepAlive)\n")
             }
         }
@@ -140,42 +143,43 @@ extension TunnelConfiguration {
         return output
     }
 
-    private static func collate(interfaceAttributes attributes: [String: String]) throws -> InterfaceConfiguration {
+    private static func collate(interfaceAttributes attributes: [String: String]) throws -> WireGuard.LocalInterface {
         guard let privateKeyString = attributes["privatekey"] else {
             throw WireGuardParseError.interfaceHasNoPrivateKey
         }
         guard let privateKey = PrivateKey(base64Key: privateKeyString) else {
             throw WireGuardParseError.interfaceHasInvalidPrivateKey(privateKeyString)
         }
-        var interface = InterfaceConfiguration(privateKey: privateKey)
-        if let listenPortString = attributes["listenport"] {
-            guard let listenPort = UInt16(listenPortString) else {
-                throw WireGuardParseError.interfaceHasInvalidListenPort(listenPortString)
-            }
-            interface.listenPort = listenPort
-        }
+        var interface = WireGuard.LocalInterface.Builder(privateKey: privateKey.base64Key)
+        // TODO: #93, listenPort not implemented
+//        if let listenPortString = attributes["listenport"] {
+//            guard let listenPort = UInt16(listenPortString) else {
+//                throw WireGuardParseError.interfaceHasInvalidListenPort(listenPortString)
+//            }
+//            interface.listenPort = listenPort
+//        }
         if let addressesString = attributes["address"] {
-            var addresses = [IPAddressRange]()
+            var addresses = [Address]()
             for addressString in addressesString.splitToArray(trimmingCharacters: .whitespacesAndNewlines) {
-                guard let address = IPAddressRange(from: addressString) else {
+                guard let address = Address(rawValue: addressString) else {
                     throw WireGuardParseError.interfaceHasInvalidAddress(addressString)
                 }
                 addresses.append(address)
             }
-            interface.addresses = addresses
+            interface.addresses = addresses.map(\.rawValue)
         }
         if let dnsString = attributes["dns"] {
-            var dnsServers = [DNSServer]()
+            var dnsServers = [Address]()
             var dnsSearch = [String]()
             for dnsServerString in dnsString.splitToArray(trimmingCharacters: .whitespacesAndNewlines) {
-                if let dnsServer = DNSServer(from: dnsServerString) {
+                if let dnsServer = Address(rawValue: dnsServerString) {
                     dnsServers.append(dnsServer)
                 } else {
                     dnsSearch.append(dnsServerString)
                 }
             }
-            interface.dns = dnsServers
-            interface.dnsSearch = dnsSearch
+            interface.dns.servers = dnsServers.map(\.rawValue)
+            interface.dns.searchDomains = dnsSearch
         }
         if let mtuString = attributes["mtu"] {
             guard let mtu = UInt16(mtuString) else {
@@ -183,46 +187,46 @@ extension TunnelConfiguration {
             }
             interface.mtu = mtu
         }
-        return interface
+        return try interface.tryBuild()
     }
 
-    private static func collate(peerAttributes attributes: [String: String]) throws -> PeerConfiguration {
+    private static func collate(peerAttributes attributes: [String: String]) throws -> WireGuard.RemoteInterface {
         guard let publicKeyString = attributes["publickey"] else {
             throw WireGuardParseError.peerHasNoPublicKey
         }
         guard let publicKey = PublicKey(base64Key: publicKeyString) else {
             throw WireGuardParseError.peerHasInvalidPublicKey(publicKeyString)
         }
-        var peer = PeerConfiguration(publicKey: publicKey)
+        var peer = WireGuard.RemoteInterface.Builder(publicKey: publicKey.base64Key)
         if let preSharedKeyString = attributes["presharedkey"] {
             guard let preSharedKey = PreSharedKey(base64Key: preSharedKeyString) else {
                 throw WireGuardParseError.peerHasInvalidPreSharedKey(preSharedKeyString)
             }
-            peer.preSharedKey = preSharedKey
+            peer.preSharedKey = preSharedKey.base64Key
         }
         if let allowedIPsString = attributes["allowedips"] {
-            var allowedIPs = [IPAddressRange]()
+            var allowedIPs = [Subnet]()
             for allowedIPString in allowedIPsString.splitToArray(trimmingCharacters: .whitespacesAndNewlines) {
-                guard let allowedIP = IPAddressRange(from: allowedIPString) else {
+                guard let allowedIP = Subnet(rawValue: allowedIPString) else {
                     throw WireGuardParseError.peerHasInvalidAllowedIP(allowedIPString)
                 }
                 allowedIPs.append(allowedIP)
             }
-            peer.allowedIPs = allowedIPs
+            peer.allowedIPs = allowedIPs.map(\.rawValue)
         }
         if let endpointString = attributes["endpoint"] {
-            guard let endpoint = WireGuardEndpoint(from: endpointString) else {
+            // BEWARE, notation differs from init(rawValue:) in IPv6
+            guard let endpoint = Endpoint(withWgRepresentation: endpointString) else {
                 throw WireGuardParseError.peerHasInvalidEndpoint(endpointString)
             }
-            peer.endpoint = endpoint
+            peer.endpoint = endpoint.rawValue
         }
         if let persistentKeepAliveString = attributes["persistentkeepalive"] {
             guard let persistentKeepAlive = UInt16(persistentKeepAliveString) else {
                 throw WireGuardParseError.peerHasInvalidPersistentKeepAlive(persistentKeepAliveString)
             }
-            peer.persistentKeepAlive = persistentKeepAlive
+            peer.keepAlive = persistentKeepAlive
         }
-        return peer
+        return try peer.tryBuild()
     }
-
 }

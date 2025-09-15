@@ -13,7 +13,6 @@ import NetworkExtension
 import os
 #if !PARTOUT_MONOLITH
 import PartoutCore
-import PartoutWireGuard
 #endif
 
 @available(*, deprecated, message: "Use WireGuardConnection")
@@ -34,13 +33,13 @@ public final class LegacyWireGuardConnection: Connection, @unchecked Sendable {
 
     private var dataCountTimer: Task<Void, Error>?
 
-    private lazy var adapter: WireGuardAdapter = {
-        WireGuardAdapter(with: delegate, backend: WireGuardBackendVendor()) { [weak self] logLevel, message in
+    private lazy var adapter: LegacyWireGuardAdapter = {
+        LegacyWireGuardAdapter(with: delegate, backend: WireGuardBackend()) { [weak self] logLevel, message in
             pp_log(self?.ctx ?? .global, .wireguard, logLevel.debugLevel, message)
         }
     }()
 
-    private lazy var delegate: WireGuardAdapterDelegate = AdapterDelegate(ctx, connection: self)
+    private lazy var delegate: LegacyWireGuardAdapterDelegate = AdapterDelegate(ctx, connection: self)
 
     public init(
         _ ctx: PartoutLoggerContext,
@@ -162,7 +161,7 @@ public final class LegacyWireGuardConnection: Connection, @unchecked Sendable {
 // MARK: - WireGuardAdapterDelegate
 
 private extension LegacyWireGuardConnection {
-    final class AdapterDelegate: WireGuardAdapterDelegate {
+    final class AdapterDelegate: LegacyWireGuardAdapterDelegate {
         private let ctx: PartoutLoggerContext
 
         private weak var connection: LegacyWireGuardConnection?
@@ -172,13 +171,13 @@ private extension LegacyWireGuardConnection {
             self.connection = connection
         }
 
-        func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool) {
+        func adapterShouldReassert(_ adapter: LegacyWireGuardAdapter, reasserting: Bool) {
             if reasserting {
                 connection?.statusSubject.send(.connecting)
             }
         }
 
-        func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: NEPacketTunnelNetworkSettings, completionHandler: (@Sendable (Error?) -> Void)?) {
+        func adapterShouldSetNetworkSettings(_ adapter: LegacyWireGuardAdapter, settings: NEPacketTunnelNetworkSettings, completionHandler: (@Sendable (Error?) -> Void)?) {
             guard let connection else {
                 pp_log(ctx, .wireguard, .error, "Lost weak reference to connection?")
                 return
