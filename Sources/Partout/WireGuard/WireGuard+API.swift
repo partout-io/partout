@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if PARTOUT_WIREGUARD
+#if PARTOUT_API && PARTOUT_WIREGUARD
 
 import Foundation
 #if !PARTOUT_MONOLITH
