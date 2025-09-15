@@ -407,7 +407,8 @@ if areas.contains(.wireGuard) {
         ),
         .testTarget(
             name: "PartoutWireGuardTests",
-            dependencies: ["PartoutWireGuard"]
+            dependencies: ["PartoutWireGuard"],
+            exclude: !includesLegacy ? ["Legacy"] : []
         )
     ])
 }
