@@ -11,7 +11,6 @@
 import Foundation
 #if !PARTOUT_MONOLITH
 import PartoutCore
-import PartoutWireGuard
 #endif
 
 // FIXME: #199, drop @unchecked after refactoring

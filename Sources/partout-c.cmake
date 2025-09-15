@@ -12,7 +12,7 @@ set(PARTOUT_C_INCLUDE_DIRS
     ${CMAKE_SOURCE_DIR}/Partout_C/include
     ${CMAKE_SOURCE_DIR}/PartoutOS_C/include
     ${CMAKE_SOURCE_DIR}/PartoutOpenVPN/Cross_C/include
-    ${CMAKE_SOURCE_DIR}/PartoutWireGuard/Shared_C/include
+    ${CMAKE_SOURCE_DIR}/PartoutWireGuard_C/include
 )
 if(WIN32)
     list(APPEND PARTOUT_C_INCLUDE_DIRS ${ROOT_DIR}/vendors/wintun)

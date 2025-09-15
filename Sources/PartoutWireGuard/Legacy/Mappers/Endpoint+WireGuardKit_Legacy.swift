@@ -7,15 +7,15 @@ import Foundation
 import PartoutCore
 #endif
 
-extension PartoutCore.Endpoint {
-    init?(wg: Endpoint) {
+extension Endpoint {
+    init?(wg: WireGuardEndpoint) {
         guard let address = Address(rawValue: wg.host.debugDescription) else {
             return nil
         }
         self.init(address, wg.port.rawValue)
     }
 
-    func toWireGuardEndpoint() throws -> Endpoint {
+    func toWireGuardEndpoint() throws -> WireGuardEndpoint {
         let wgAddress: String
         switch address {
         case .ip(let raw, let family):
@@ -23,15 +23,15 @@ extension PartoutCore.Endpoint {
         case .hostname(let raw):
             wgAddress = raw
         }
-        guard let wg = Endpoint(from: "\(wgAddress):\(port)") else {
+        guard let wg = WireGuardEndpoint(from: "\(wgAddress):\(port)") else {
             throw PartoutError(.parsing)
         }
         return wg
     }
 }
 
-extension Endpoint {
-    var toEndpoint: PartoutCore.Endpoint? {
+extension WireGuardEndpoint {
+    var toEndpoint: Endpoint? {
         .init(wg: self)
     }
 }

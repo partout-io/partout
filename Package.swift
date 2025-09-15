@@ -84,7 +84,7 @@ let package = Package(
                     }
                 }
                 if areas.contains(.wireGuard) {
-                    list.append("_PartoutWireGuardWrapper")
+                    list.append("PartoutWireGuard")
                 }
                 return list
             }(),
@@ -362,101 +362,54 @@ if areas.contains(.openVPN), let cryptoMode {
 // MARK: WireGuard
 
 if areas.contains(.wireGuard) {
-    let vendorDependencies: [Target.Dependency]
-    let vendorCSettings: [CSetting]?
+    let includesLegacy = OS.current == .apple
     switch OS.current {
     case .apple:
         // Require static wg-go backend
-        vendorDependencies = [
-            "PartoutOS_C",
-            "wg-go-apple"
-        ]
-        vendorCSettings = nil
         package.dependencies.append(
             .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.2025063102")
         )
+        package.targets.append(
+            .target(
+                name: "PartoutWireGuard_C",
+                dependencies: [
+                    "PartoutOS_C",
+                    "wg-go-apple"
+                ]
+            )
+        )
     default:
         // Load wg-go backend dynamically
-        vendorDependencies = ["PartoutOS_C"]
-        vendorCSettings = [
-            .unsafeFlags(["-I\(cmakeOutput)/wg-go/include"])
-        ]
+        package.targets.append(
+            .target(
+                name: "PartoutWireGuard_C",
+                dependencies: ["PartoutOS_C"],
+                cSettings: [
+                    .unsafeFlags(["-I\(cmakeOutput)/wg-go/include"])
+                ]
+            )
+        )
     }
-
-    let includesLegacy = OS.current == .apple
     package.products.append(
         .library(
             name: "PartoutWireGuard",
-            targets: ["_PartoutWireGuardWrapper"]
+            targets: ["PartoutWireGuard"]
         )
     )
     package.targets.append(contentsOf: [
-        // Umbrella
-        .target(
-            name: "_PartoutWireGuardWrapper",
-            dependencies: {
-                var list: [Target.Dependency] = ["PartoutWireGuard"]
-                list.append("PartoutWireGuardCross")
-                if includesLegacy {
-                    list.append("PartoutWireGuardLegacy")
-                }
-                return list
-            }(),
-            path: "Sources/PartoutWireGuard/Wrapper"
-        ),
-        // Shared
-        .target(
-            name: "_PartoutWireGuard_C",
-            dependencies: vendorDependencies,
-            path: "Sources/PartoutWireGuard/Shared_C",
-            cSettings: vendorCSettings
-        ),
         .target(
             name: "PartoutWireGuard",
             dependencies: [
-                "_PartoutWireGuard_C",
-                "PartoutCoreWrapper"
+                "PartoutOS",
+                "PartoutWireGuard_C"
             ],
-            path: "Sources/PartoutWireGuard/Shared",
+            exclude: !includesLegacy ? ["Legacy"] : []
         ),
         .testTarget(
             name: "PartoutWireGuardTests",
-            dependencies: ["PartoutWireGuard"],
-            path: "Tests/PartoutWireGuard/Shared"
-        ),
-        // Cross-platform
-        .target(
-            name: "PartoutWireGuardCross",
-            dependencies: [
-                "_PartoutWireGuard_C",
-                "PartoutOS",
-                "PartoutWireGuard",
-            ],
-            path: "Sources/PartoutWireGuard/Cross",
-            // FIXME: #199, move to "Shared" target once fixed
-            exclude: includesLegacy ? ["Shared"] : []
+            dependencies: ["PartoutWireGuard"]
         )
     ])
-
-    // Legacy (Apple)
-    if includesLegacy {
-        package.targets.append(contentsOf: [
-            .target(
-                name: "PartoutWireGuardLegacy",
-                dependencies: [
-                    "_PartoutWireGuard_C",
-                    "PartoutOS",
-                    "PartoutWireGuard",
-                ],
-                path: "Sources/PartoutWireGuard/Legacy"
-            ),
-            .testTarget(
-                name: "PartoutWireGuardLegacyTests",
-                dependencies: ["PartoutWireGuardLegacy"],
-                path: "Tests/PartoutWireGuard/Legacy"
-            )
-        ])
-    }
 }
 
 // MARK: - Crypto
