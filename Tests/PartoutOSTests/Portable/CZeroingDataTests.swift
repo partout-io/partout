@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@testable internal import PartoutOS
+@testable import PartoutOS
 import Foundation
 import Testing
 
@@ -24,7 +24,7 @@ struct CZeroingDataTests {
         let sut = CZeroingData(string: "Hello", nullTerminated: true)
         #expect(sut.networkUInt16Value(fromOffset: 3) == 0x6c6f)
         #expect(sut.nullTerminatedString(fromOffset: 0) == "Hello")
-        #expect(sut.withOffset(3, length: 2) == CZeroingData(string: "lo", nullTerminated: false))
+        #expect(sut.withOffset(3, count: 2) == CZeroingData(string: "lo", nullTerminated: false))
     }
 
     @Test
@@ -90,7 +90,7 @@ struct CZeroingDataTests {
         let z1 = CZeroingData(count: 0)
         z1.append(CZeroingData(data: Data(hex: "12345678")))
         z1.append(CZeroingData(data: Data(hex: "abcdef")))
-        let z2 = z1.withOffset(2, length: 3) // 5678ab
+        let z2 = z1.withOffset(2, count: 3) // 5678ab
         let z3 = z2.appending(CZeroingData(data: Data(hex: "aaddcc"))) // 5678abaaddcc
 
         #expect(z1.toData() == Data(hex: "12345678abcdef"))

@@ -5,7 +5,6 @@
 import Foundation
 #if !PARTOUT_MONOLITH
 import PartoutCore
-import PartoutOpenVPN
 #endif
 
 /// Wrapper for connecting over a UDP socket.

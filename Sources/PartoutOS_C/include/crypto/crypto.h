@@ -9,7 +9,8 @@
 #include "portable/common.h"
 #include "portable/zd.h"
 
-bool pp_crypto_init_seed(const pp_zd *_Nonnull zd);
+bool pp_crypto_init_seed(const uint8_t *_Nonnull src, const size_t len);
+bool pp_crypto_init_seed_zd(const pp_zd *_Nonnull zd);
 
 typedef enum {
     PPCryptoErrorNone,

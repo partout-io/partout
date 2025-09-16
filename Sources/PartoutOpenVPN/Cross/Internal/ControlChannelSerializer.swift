@@ -7,7 +7,7 @@ import Foundation
 protocol ControlChannelSerializer {
     func reset()
 
-    func serialize(packet: CControlPacket) throws -> Data
+    func serialize(packet: CrossPacket) throws -> Data
 
-    func deserialize(data: Data, start: Int, end: Int?) throws -> CControlPacket
+    func deserialize(data: Data, start: Int, end: Int?) throws -> CrossPacket
 }

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import PartoutOS
+import PartoutOS
 import Testing
 
 struct CZeroingDataExtensionsTests {

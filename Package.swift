@@ -80,7 +80,7 @@ let package = Package(
                 if cryptoMode != nil {
                     list.append("_PartoutCryptoImpl_C")
                     if areas.contains(.openVPN) {
-                        list.append("_PartoutOpenVPNWrapper")
+                        list.append("PartoutOpenVPN")
                     }
                 }
                 if areas.contains(.wireGuard) {
@@ -234,129 +234,74 @@ if areas.contains(.openVPN), let cryptoMode {
     package.products.append(
         .library(
             name: "PartoutOpenVPN",
-            targets: ["_PartoutOpenVPNWrapper"]
+            targets: ["PartoutOpenVPN"]
         )
     )
     package.targets.append(contentsOf: [
-        // Umbrella
         .target(
-            name: "_PartoutOpenVPNWrapper",
+            name: "PartoutOpenVPN_C",
+            dependencies: ["_PartoutCryptoImpl_C"]
+        ),
+        .target(
+            name: "PartoutOpenVPN_ObjC",
+            dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
+            exclude: [
+                "lib/COPYING",
+                "lib/Makefile",
+                "lib/README.LZO",
+                "lib/testmini.c"
+            ]
+        ),
+        .target(
+            name: "PartoutOpenVPN",
             dependencies: {
-                var list: [Target.Dependency] = ["PartoutOpenVPN"]
+                var list: [Target.Dependency] = [
+                    "PartoutOpenVPN_C",
+                    "PartoutOS"
+                ]
                 if includesLegacy {
-                    list.append("PartoutOpenVPNLegacy")
-                } else {
-                    list.append("PartoutOpenVPNCross")
+                    list.append("PartoutOpenVPN_ObjC")
                 }
                 return list
             }(),
-            path: "Sources/PartoutOpenVPN/Wrapper"
-        ),
-        // Shared
-        .target(
-            name: "PartoutOpenVPN",
-            dependencies: ["PartoutCoreWrapper"],
-            path: "Sources/PartoutOpenVPN/Shared"
+            exclude: {
+                var list: [String] = []
+                if includesLegacy {
+                    list.append("Cross/StandardOpenVPNParser+Cross.swift")
+                } else {
+                    list.append("Legacy")
+                }
+                return list
+            }(),
+            swiftSettings: {
+                var list: [String] = []
+                list.append("OPENVPN_WRAPPER_NATIVE")
+                if includesLegacy {
+                    list.append("OPENVPN_LEGACY")
+                }
+                return list.map {
+                    .define($0)
+                }
+            }()
         ),
         .testTarget(
             name: "PartoutOpenVPNTests",
             dependencies: ["PartoutOpenVPN"],
-            path: "Tests/PartoutOpenVPN/Shared",
-            resources: [
-                .process("Resources")
-            ]
-        ),
-        // Cross-platform
-        .target(
-            name: "_PartoutOpenVPNCross_C",
-            dependencies: ["_PartoutCryptoImpl_C"],
-            path: "Sources/PartoutOpenVPN/Cross_C"
-        ),
-        .target(
-            name: "PartoutOpenVPNCross",
-            dependencies: {
-                var list: [Target.Dependency] = [
-                    "_PartoutOpenVPNCross_C",
-                    "PartoutOpenVPN",
-                    "PartoutOS"
-                ]
-                if isTestingOpenVPNDataPath {
-                    list.append("_PartoutOpenVPNLegacy_ObjC")
-                }
-                return list
-            }(),
-            path: "Sources/PartoutOpenVPN/Cross",
             exclude: {
                 var list: [String] = []
-                if !isTestingOpenVPNDataPath {
-                    list.append("Internal/Legacy")
+                if !includesLegacy {
+                    list.append("Legacy")
                 }
-                if includesLegacy {
-                    list.append("StandardOpenVPNParser+Default.swift")
+                if !isTestingOpenVPNDataPath {
+                    list.append("Legacy/DataPathPerformanceTests.swift")
                 }
                 return list
             }(),
-            swiftSettings: [
-                .define("OPENVPN_WRAPPED_NATIVE")
-            ]
-        ),
-        .testTarget(
-            name: "PartoutOpenVPNCrossTests",
-            dependencies: ["PartoutOpenVPNCross"],
-            path: "Tests/PartoutOpenVPN/Cross",
             resources: [
                 .process("Resources")
             ]
         )
     ])
-
-    // Legacy (Apple + OpenSSL)
-    if includesLegacy {
-        package.targets.append(contentsOf: [
-            .target(
-                name: "_PartoutCryptoOpenSSL_ObjC",
-                dependencies: ["openssl-apple"],
-                path: "Sources/PartoutOpenVPN/LegacyCryptoOpenSSL_ObjC"
-            ),
-            .target(
-                name: "_PartoutOpenVPNLegacy_ObjC",
-                dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-                path: "Sources/PartoutOpenVPN/Legacy_ObjC",
-                exclude: [
-                    "lib/COPYING",
-                    "lib/Makefile",
-                    "lib/README.LZO",
-                    "lib/testmini.c"
-                ]
-            ),
-            .target(
-                name: "PartoutOpenVPNLegacy",
-                dependencies: [
-                    "PartoutOpenVPN",
-                    "PartoutOpenVPNCross",
-                    "_PartoutOpenVPNLegacy_ObjC"
-                ],
-                path: "Sources/PartoutOpenVPN/Legacy"
-            ),
-            .testTarget(
-                name: "_PartoutCryptoOpenSSL_ObjCTests",
-                dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-                path: "Tests/PartoutOpenVPN/LegacyCryptoOpenSSL_ObjC",
-                exclude: [
-                    "CryptoPerformanceTests.swift"
-                ]
-            ),
-            .testTarget(
-                name: "PartoutOpenVPNLegacyTests",
-                dependencies: ["PartoutOpenVPNLegacy"],
-                path: "Tests/PartoutOpenVPN/Legacy",
-                exclude: isTestingOpenVPNDataPath ? [] : ["DataPathPerformanceTests.swift"],
-                resources: [
-                    .process("Resources")
-                ]
-            )
-        ])
-    }
 }
 
 // MARK: WireGuard
@@ -423,7 +368,7 @@ case .openSSL:
         package.dependencies.append(
             .package(url: "https://github.com/passepartoutvpn/openssl-apple", exact: "3.5.200")
         )
-        package.targets.append(
+        package.targets.append(contentsOf: [
             .target(
                 name: "_PartoutCryptoImpl_C",
                 dependencies: [
@@ -431,8 +376,21 @@ case .openSSL:
                     "PartoutOS_C"
                 ],
                 path: "Sources/PartoutCrypto/OpenSSL_C"
+            ),
+            // Legacy for OpenVPN
+            .target(
+                name: "_PartoutCryptoOpenSSL_ObjC",
+                dependencies: ["openssl-apple"],
+                path: "Sources/PartoutCrypto/OpenSSL_ObjC"
+            ),
+            .testTarget(
+                name: "PartoutCryptoOpenSSL_ObjCTests",
+                dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
+                exclude: [
+                    "CryptoPerformanceTests.swift"
+                ]
             )
-        )
+        ])
     default:
         package.targets.append(
             .target(

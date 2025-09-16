@@ -5,7 +5,6 @@
 import Foundation
 #if !PARTOUT_MONOLITH
 import PartoutCore
-import PartoutOpenVPN
 #endif
 
 /// Legacy ObjC version of ``OpenVPNConnection``.
@@ -57,6 +56,7 @@ public actor LegacyOpenVPNConnection {
               !endpoints.isEmpty else {
             fatalError("No OpenVPN remotes defined?")
         }
+        pp_log(ctx, .openvpn, .notice, "OpenVPN: Using legacy connection")
 
         self.configuration = try configuration.withModules(from: parameters.profile)
         self.sessionFactory = sessionFactory
@@ -127,7 +127,7 @@ private extension LegacyOpenVPNConnection {
             await session.shutdown(nil, timeout: TimeInterval(timeout) / 1000.0)
 
             // XXX: poll session status until link clean-up
-            // in the future, make OpenVPNSession.shutdown() wait for stop async-ly
+            // in the future, make LegacyOpenVPNSession.shutdown() wait for stop async-ly
             let delta = 500
             var remaining = timeout
             while remaining > 0, await session.hasLink() {
@@ -314,31 +314,10 @@ private extension LinkInterface {
     func openVPNLink(xorMethod: OpenVPN.ObfuscationMethod?) -> LinkInterface {
         switch linkType.plainType {
         case .udp:
-            return OpenVPNUDPLink(link: self, xorMethod: xorMethod)
+            return LegacyOpenVPNUDPLink(link: self, xorMethod: xorMethod)
 
         case .tcp:
-            return OpenVPNTCPLink(link: self, xorMethod: xorMethod)
+            return LegacyOpenVPNTCPLink(link: self, xorMethod: xorMethod)
         }
-    }
-}
-
-private let ppRecoverableCodes: [PartoutError.Code] = [
-    .timeout,
-    .linkFailure,
-    .networkChanged,
-    .OpenVPN.connectionFailure,
-    .OpenVPN.serverShutdown
-]
-
-extension Error {
-    var isOpenVPNRecoverable: Bool {
-        let ppError = PartoutError(self)
-        if ppRecoverableCodes.contains(ppError.code) {
-            return true
-        }
-        if case .recoverable = ppError.reason as? OpenVPNSessionError {
-            return true
-        }
-        return false
     }
 }

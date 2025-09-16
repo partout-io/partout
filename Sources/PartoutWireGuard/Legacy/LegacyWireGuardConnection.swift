@@ -55,6 +55,7 @@ public final class LegacyWireGuardConnection: Connection, @unchecked Sendable {
         guard let configuration = module.configuration else {
             fatalError("No WireGuard configuration defined?")
         }
+        pp_log(ctx, .wireguard, .notice, "WireGuard: Using legacy connection")
 
         let tweakedConfiguration = try configuration.withModules(from: parameters.profile)
         tunnelConfiguration = try tweakedConfiguration.toWireGuardConfiguration()

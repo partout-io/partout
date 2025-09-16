@@ -5,7 +5,7 @@
 import Foundation
 import NetworkExtension
 import PartoutCore
-@testable internal import PartoutOS
+@testable import PartoutOS
 import Testing
 
 struct ProfileNetworkSettingsTests {

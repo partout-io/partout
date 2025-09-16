@@ -4,9 +4,8 @@
 
 import Foundation
 #if !PARTOUT_MONOLITH
-internal import PartoutOS
 import PartoutCore
-import PartoutOpenVPN
+import PartoutOS
 #endif
 
 @OpenVPNActor
@@ -61,7 +60,7 @@ final class Negotiator {
 
     private var expectedPacketId: UInt32
 
-    private var pendingPackets: [UInt32: CControlPacket]
+    private var pendingPackets: [UInt32: CrossPacket]
 
     private var authenticator: Authenticator?
 
@@ -180,15 +179,15 @@ extension Negotiator {
         checkNegotiationTask?.cancel()
     }
 
-    func readInboundPacket(withData packet: Data, offset: Int) throws -> CControlPacket {
+    func readInboundPacket(withData packet: Data, offset: Int) throws -> CrossPacket {
         try channel.readInboundPacket(withData: packet, offset: 0)
     }
 
-    func enqueueInboundPacket(packet controlPacket: CControlPacket) -> [CControlPacket] {
+    func enqueueInboundPacket(packet controlPacket: CrossPacket) -> [CrossPacket] {
         channel.enqueueInboundPacket(packet: controlPacket)
     }
 
-    func handleControlPacket(_ packet: CControlPacket) throws {
+    func handleControlPacket(_ packet: CrossPacket) throws {
         guard packet.packetId >= expectedPacketId else {
             return
         }
@@ -211,7 +210,7 @@ extension Negotiator {
         //
     }
 
-    func sendAck(for controlPacket: CControlPacket, to link: LinkInterface) {
+    func sendAck(for controlPacket: CrossPacket, to link: LinkInterface) {
         Task {
             try await privateSendAck(for: controlPacket, to: link)
         }
@@ -315,7 +314,7 @@ private extension Negotiator {
         self.nextPushRequestDate = Date().addingTimeInterval(options.sessionOptions.pushRequestInterval)
     }
 
-    func enqueueControlPackets(code: CPacketCode, key: UInt8, payload: Data) throws {
+    func enqueueControlPackets(code: CrossPacketCode, key: UInt8, payload: Data) throws {
         try channel.enqueueOutboundPackets(
             withCode: code,
             key: key,
@@ -353,7 +352,7 @@ private extension Negotiator {
 // MARK: - Inbound
 
 private extension Negotiator {
-    func privateHandleControlPacket(_ packet: CControlPacket) throws {
+    func privateHandleControlPacket(_ packet: CrossPacket) throws {
         guard packet.key == key else {
             pp_log(ctx, .openvpn, .error, "Bad key in control packet (\(packet.key) != \(key))")
             return
@@ -446,7 +445,7 @@ private extension Negotiator {
         }
     }
 
-    func privateSendAck(for controlPacket: CControlPacket, to link: LinkInterface) async throws {
+    func privateSendAck(for controlPacket: CrossPacket, to link: LinkInterface) async throws {
         do {
             pp_log(ctx, .openvpn, .info, "Send ack for received packetId \(controlPacket.packetId)")
             let raw = try channel.writeAcks(
@@ -487,7 +486,7 @@ private extension Negotiator {
         try enqueueControlPackets(code: .controlV1, key: key, payload: cipherTextOut)
     }
 
-    func handleControlData(_ data: CZeroingData) throws {
+    func handleControlData(_ data: CrossZD) throws {
         guard let authenticator else {
             return
         }

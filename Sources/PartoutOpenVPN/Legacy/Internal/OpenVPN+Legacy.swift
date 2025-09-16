@@ -2,10 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-internal import _PartoutOpenVPNLegacy_ObjC
-import PartoutOpenVPN
-#endif
+internal import PartoutOpenVPN_ObjC
 
 extension OpenVPN.CompressionAlgorithm {
     var native: CompressionAlgorithm {

@@ -16,22 +16,10 @@
 
 #if PARTOUT_OPENVPN
 @_exported import PartoutOpenVPN
-#if canImport(PartoutOpenVPNCross)
-@_exported import PartoutOpenVPNCross
-#endif
-#if canImport(PartoutOpenVPNLegacy)
-@_exported import PartoutOpenVPNLegacy
-#endif
 #endif
 
 #if PARTOUT_WIREGUARD
 @_exported import PartoutWireGuard
-#if canImport(PartoutWireGuardCross)
-@_exported import PartoutWireGuardCross
-#endif
-#if canImport(PartoutWireGuardLegacy)
-@_exported import PartoutWireGuardLegacy
-#endif
 #endif
 
 #endif

@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutOS_C
 import Foundation
+import PartoutOS_C
 #if !PARTOUT_MONOLITH
 import PartoutCore
 #endif
@@ -109,8 +109,8 @@ extension CZeroingData {
         CZeroingData(ptr: pp_zd_make_copy(ptr))
     }
 
-    public func withOffset(_ offset: Int, length: Int) -> CZeroingData {
-        guard let slice = pp_zd_make_slice(ptr, offset, length) else {
+    public func withOffset(_ offset: Int, count: Int) -> CZeroingData {
+        guard let slice = pp_zd_make_slice(ptr, offset, count) else {
             return CZeroingData(count: 0)
         }
         return CZeroingData(ptr: slice)

@@ -2,10 +2,15 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutOpenVPN_C
 import Foundation
 #if !PARTOUT_MONOLITH
 import PartoutCore
+#endif
+
+#if !OPENVPN_LEGACY
+internal import PartoutOpenVPN_C
+#else
+internal import PartoutOpenVPN_ObjC
 #endif
 
 // TODO: #142/notes, LINK and TUN should be able to run detached in full-duplex
@@ -115,7 +120,7 @@ private extension OpenVPNSession {
                 continue
             }
 
-            let controlPacket: CControlPacket
+            let controlPacket: CrossPacket
             do {
                 let parsedPacket = try negotiator.readInboundPacket(withData: packet, offset: 0)
                 negotiator.handleAcks()

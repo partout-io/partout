@@ -11,7 +11,7 @@ set(PARTOUT_C_INCLUDE_DIRS
     ${ROOT_DIR}/vendors/core/Sources/_PartoutCore_C/include
     ${CMAKE_SOURCE_DIR}/Partout_C/include
     ${CMAKE_SOURCE_DIR}/PartoutOS_C/include
-    ${CMAKE_SOURCE_DIR}/PartoutOpenVPN/Cross_C/include
+    ${CMAKE_SOURCE_DIR}/PartoutOpenVPN_C/include
     ${CMAKE_SOURCE_DIR}/PartoutWireGuard_C/include
 )
 if(WIN32)
