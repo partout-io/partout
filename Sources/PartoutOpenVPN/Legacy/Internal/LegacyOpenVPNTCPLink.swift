@@ -27,7 +27,7 @@ final class LegacyOpenVPNTCPLink: @unchecked Sendable {
 
         self.link = link
         self.xorMethod = xorMethod
-        xorMask = xorMethod?.mask?.zData
+        xorMask = xorMethod?.mask?.legacyZData
         buffer = Data(capacity: 1024 * 1024)
     }
 }

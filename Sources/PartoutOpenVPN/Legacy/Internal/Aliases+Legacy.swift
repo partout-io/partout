@@ -68,7 +68,7 @@ func Z(_ string: String, nullTerminated: Bool) -> LegacyZD {
 }
 
 extension SecureData {
-    var zData: LegacyZD {
+    var legacyZData: LegacyZD {
         Z(toData())
     }
 }

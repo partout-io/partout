@@ -22,13 +22,13 @@ struct XORProcessor: @unchecked Sendable {
         init(_ method: OpenVPN.ObfuscationMethod) {
             switch method {
             case .xormask(let mask):
-                self = .xormask(mask: mask.zData)
+                self = .xormask(mask: mask.legacyZData)
             case .xorptrpos:
                 self = .xorptrpos
             case .reverse:
                 self = .reverse
             case .obfuscate(let mask):
-                self = .obfuscate(mask: mask.zData)
+                self = .obfuscate(mask: mask.legacyZData)
             }
         }
     }

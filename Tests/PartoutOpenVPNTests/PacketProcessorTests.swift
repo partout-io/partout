@@ -20,12 +20,12 @@ struct PacketProcessorTests {
     func givenProcessor_whenMask_thenIsExpected() {
         let sut = PacketProcessor(method: .xormask(mask: mask))
         let data = prng.data(length: rndLength)
-        let maskData = mask.zData
+        let maskData = mask.czData
         let processed = sut.processPacket(data, direction: .inbound)
         print(data.toHex())
         print(processed.toHex())
         for (i, byte) in processed.enumerated() {
-            #expect(byte == data[i] ^ maskData.bytes[i % maskData.length])
+            #expect(byte == data[i] ^ maskData.bytes[i % maskData.count])
         }
     }
 

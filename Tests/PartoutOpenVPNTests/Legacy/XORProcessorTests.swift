@@ -15,7 +15,7 @@ final class XORProcessorTests: XCTestCase {
     func test_givenProcessor_whenMask_thenIsExpected() {
         let sut = XORProcessor(method: .xormask(mask: mask))
         let data = prng.data(length: 10)
-        let maskData = mask.zData
+        let maskData = mask.legacyZData
         let processed = sut.processPacket(data, outbound: false)
         print(data.toHex())
         print(processed.toHex())
@@ -132,8 +132,8 @@ private extension XORProcessor {
 private extension PacketStream {
     static func assertReversible(_ data: Data, method: XORMethodNative, mask: SecureData? = nil) {
         var until = 0
-        let outStream = PacketStream.outboundStream(fromPacket: data, xorMethod: method, xorMask: mask?.zData)
-        let inStream = PacketStream.packets(fromInboundStream: outStream, until: &until, xorMethod: method, xorMask: mask?.zData)
+        let outStream = PacketStream.outboundStream(fromPacket: data, xorMethod: method, xorMask: mask?.legacyZData)
+        let inStream = PacketStream.packets(fromInboundStream: outStream, until: &until, xorMethod: method, xorMask: mask?.legacyZData)
         let originalData = Data(inStream.joined())
         XCTAssertEqual(data.toHex(), originalData.toHex())
     }

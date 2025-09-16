@@ -42,8 +42,8 @@ extension LegacyControlChannel {
                 digestAlgorithm: digest.rawValue,
                 cipherEncKey: nil,
                 cipherDecKey: nil,
-                hmacEncKey: key.hmacSendKey.zData,
-                hmacDecKey: key.hmacReceiveKey.zData
+                hmacEncKey: key.hmacSendKey.legacyZData,
+                hmacDecKey: key.hmacReceiveKey.legacyZData
             )
             try crypto.configure(with: cryptoOptions)
             encrypter = crypto.encrypter()

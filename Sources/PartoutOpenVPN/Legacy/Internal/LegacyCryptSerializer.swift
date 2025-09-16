@@ -37,10 +37,10 @@ extension LegacyControlChannel {
             let cryptoOptions = OpenVPNCryptoOptions(
                 cipherAlgorithm: "AES-256-CTR",
                 digestAlgorithm: "SHA256",
-                cipherEncKey: key.cipherEncryptKey.zData,
-                cipherDecKey: key.cipherDecryptKey.zData,
-                hmacEncKey: key.hmacSendKey.zData,
-                hmacDecKey: key.hmacReceiveKey.zData
+                cipherEncKey: key.cipherEncryptKey.legacyZData,
+                cipherDecKey: key.cipherDecryptKey.legacyZData,
+                hmacEncKey: key.hmacSendKey.legacyZData,
+                hmacDecKey: key.hmacReceiveKey.legacyZData
             )
             try crypto.configure(with: cryptoOptions)
             encrypter = crypto.encrypter()

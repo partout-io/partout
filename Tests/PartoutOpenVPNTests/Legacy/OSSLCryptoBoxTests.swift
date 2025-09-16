@@ -25,8 +25,8 @@ final class OSSLCryptoBoxTests: XCTestCase {
             digestAlgorithm: OpenVPN.Digest.sha1.rawValue,
             cipherEncKey: nil,
             cipherDecKey: nil,
-            hmacEncKey: key.hmacReceiveKey.zData,
-            hmacDecKey: key.hmacSendKey.zData)
+            hmacEncKey: key.hmacReceiveKey.legacyZData,
+            hmacDecKey: key.hmacSendKey.legacyZData)
         ))
 
         let hmac = Data(hex: "e67c9137933a412a711c0d0514aca6db6476d17d")
