@@ -86,6 +86,7 @@ final class Authenticator {
                 "V4",
                 "dev-type tun"
             ]
+            // FIXME: ###, port LZO to cross
             opts.append("comp-lzo")
             if let direction = options.tlsWrap?.key.direction?.rawValue {
                 opts.append("keydir \(direction)")
