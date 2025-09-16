@@ -23,12 +23,12 @@ struct CryptoKeys {
 extension CryptoKeys {
     init(emptyWithCipherLength cipherKeyLength: Int, hmacKeyLength: Int) {
         cipher = KeyPair(
-            encryptionKey: CrossZD(length: cipherKeyLength),
-            decryptionKey: CrossZD(length: cipherKeyLength)
+            encryptionKey: CrossZD(count: cipherKeyLength),
+            decryptionKey: CrossZD(count: cipherKeyLength)
         )
         digest = KeyPair(
-            encryptionKey: CrossZD(length: hmacKeyLength),
-            decryptionKey: CrossZD(length: hmacKeyLength)
+            encryptionKey: CrossZD(count: hmacKeyLength),
+            decryptionKey: CrossZD(count: hmacKeyLength)
         )
     }
 }
@@ -81,6 +81,6 @@ private extension Optional<CrossZD> {
         guard let self else {
             return pp_zd_create(0)
         }
-        return pp_zd_create_from_data(self.bytes, self.length)
+        return pp_zd_create_from_data(self.bytes, self.count)
     }
 }

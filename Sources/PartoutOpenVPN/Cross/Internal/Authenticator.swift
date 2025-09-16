@@ -10,7 +10,7 @@ import PartoutOS
 
 fileprivate extension CrossZD {
     func appendSized(_ buf: CrossZD) {
-        append(CZ(UInt16(buf.length).bigEndian))
+        append(CZ(UInt16(buf.count).bigEndian))
         append(buf)
     }
 }
@@ -137,30 +137,30 @@ final class Authenticator {
         let prefixLength = Constants.ControlChannel.tlsPrefix.count
 
         // TLS prefix + random (x2) + opts length [+ opts]
-        guard controlBuffer.length >= prefixLength + 2 * Constants.Keys.randomLength + 2 else {
+        guard controlBuffer.count >= prefixLength + 2 * Constants.Keys.randomLength + 2 else {
             return false
         }
 
-        let prefix = controlBuffer.withOffset(0, length: prefixLength)
+        let prefix = controlBuffer.withOffset(0, count: prefixLength)
         guard prefix.isEqual(to: Constants.ControlChannel.tlsPrefix) else {
             throw OpenVPNSessionError.wrongControlDataPrefix
         }
 
         var offset = Constants.ControlChannel.tlsPrefix.count
 
-        let serverRandom1 = controlBuffer.withOffset(offset, length: Constants.Keys.randomLength)
+        let serverRandom1 = controlBuffer.withOffset(offset, count: Constants.Keys.randomLength)
         offset += Constants.Keys.randomLength
 
-        let serverRandom2 = controlBuffer.withOffset(offset, length: Constants.Keys.randomLength)
+        let serverRandom2 = controlBuffer.withOffset(offset, count: Constants.Keys.randomLength)
         offset += Constants.Keys.randomLength
 
         let serverOptsLength = Int(controlBuffer.networkUInt16Value(fromOffset: offset))
         offset += 2
 
-        guard controlBuffer.length >= offset + serverOptsLength else {
+        guard controlBuffer.count >= offset + serverOptsLength else {
             return false
         }
-        let serverOpts = controlBuffer.withOffset(offset, length: serverOptsLength)
+        let serverOpts = controlBuffer.withOffset(offset, count: serverOptsLength)
         offset += serverOptsLength
 
         pp_log(ctx, .openvpn, .info, "TLS.auth: Parsed server random [\(serverRandom1.asSensitiveBytes(ctx)), \(serverRandom2.asSensitiveBytes(ctx))]")

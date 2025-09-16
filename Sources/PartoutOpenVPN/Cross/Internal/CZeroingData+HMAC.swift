@@ -31,7 +31,7 @@ extension CrossZD {
         }
         return CrossZD(
             bytes: ptr.pointee.bytes,
-            length: hmacLength
+            count: hmacLength
         )
     }
 }

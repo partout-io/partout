@@ -36,11 +36,11 @@ extension CryptoKeys {
             serverSessionId: prf.remoteSessionId,
             size: Constants.Keys.keysCount * Constants.Keys.keyLength
         ))
-        assert(keysData.length == Constants.Keys.keysCount * Constants.Keys.keyLength)
+        assert(keysData.count == Constants.Keys.keysCount * Constants.Keys.keyLength)
 
         let keysArray = (0..<Constants.Keys.keysCount).map {
             let offset = $0 * Constants.Keys.keyLength
-            return keysData.withOffset(offset, length: Constants.Keys.keyLength)
+            return keysData.withOffset(offset, count: Constants.Keys.keyLength)
         }
         self.init(
             cipher: CryptoKeys.KeyPair(
@@ -84,16 +84,16 @@ private extension CryptoKeys {
         if let ssi = input.serverSessionId {
             seed.append(CZ(ssi))
         }
-        let len = input.secret.length / 2
-        let lenx = len + (input.secret.length & 1)
-        let secret1 = input.secret.withOffset(0, length: lenx)
-        let secret2 = input.secret.withOffset(len, length: lenx)
+        let len = input.secret.count / 2
+        let lenx = len + (input.secret.count & 1)
+        let secret1 = input.secret.withOffset(0, count: lenx)
+        let secret2 = input.secret.withOffset(len, count: lenx)
 
         let hash1 = try keysHash("MD5", secret1, seed, input.size)
         let hash2 = try keysHash("SHA1", secret2, seed, input.size)
 
         let prf = CZ()
-        for i in 0..<hash1.length {
+        for i in 0..<hash1.count {
             let h1 = hash1.bytes[i]
             let h2 = hash2.bytes[i]
             prf.append(CZ(h1 ^ h2))
@@ -105,10 +105,10 @@ private extension CryptoKeys {
         let out = CZ()
         let buffer = CrossZD.forHMAC()
         var chain = try buffer.hmac(with: digestName, secret: secret, data: seed)
-        while out.length < size {
+        while out.count < size {
             out.append(try buffer.hmac(with: digestName, secret: secret, data: chain.appending(seed)))
             chain = try buffer.hmac(with: digestName, secret: secret, data: chain)
         }
-        return out.withOffset(0, length: size)
+        return out.withOffset(0, count: size)
     }
 }

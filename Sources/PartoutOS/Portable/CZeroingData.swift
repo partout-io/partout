@@ -15,12 +15,12 @@ public final class CZeroingData {
         self.ptr = ptr
     }
 
-    public init(length: Int) {
-        ptr = pp_zd_create(length)
+    public init(count: Int) {
+        ptr = pp_zd_create(count)
     }
 
-    public init(bytes: UnsafePointer<UInt8>, length: Int) {
-        ptr = pp_zd_create_from_data(bytes, length)
+    public init(bytes: UnsafePointer<UInt8>, count: Int) {
+        ptr = pp_zd_create_from_data(bytes, count)
     }
 
     public init(uInt8: UInt8) {
@@ -47,12 +47,12 @@ public final class CZeroingData {
         }
     }
 
-    public init(data: Data, offset: Int, length: Int) {
+    public init(data: Data, offset: Int, count: Int) {
         ptr = data.withUnsafeBytes {
             guard let bytes = $0.bindMemory(to: UInt8.self).baseAddress else {
                 fatalError("Could not bind to memory")
             }
-            return pp_zd_create_from_data_range(bytes, offset, length)
+            return pp_zd_create_from_data_range(bytes, offset, count)
         }
     }
 
@@ -84,7 +84,7 @@ extension CZeroingData {
         pp_zd_mutable_bytes(ptr)
     }
 
-    public var length: Int {
+    public var count: Int {
         pp_zd_length(ptr)
     }
 }
@@ -109,9 +109,9 @@ extension CZeroingData {
         CZeroingData(ptr: pp_zd_make_copy(ptr))
     }
 
-    public func withOffset(_ offset: Int, length: Int) -> CZeroingData {
-        guard let slice = pp_zd_make_slice(ptr, offset, length) else {
-            return CZeroingData(length: 0)
+    public func withOffset(_ offset: Int, count: Int) -> CZeroingData {
+        guard let slice = pp_zd_make_slice(ptr, offset, count) else {
+            return CZeroingData(count: 0)
         }
         return CZeroingData(ptr: slice)
     }
@@ -153,7 +153,7 @@ extension CZeroingData {
     public func nullTerminatedString(fromOffset offset: Int) -> String? {
         var nullOffset: Int?
         var i = offset
-        while i < length {
+        while i < count {
             if bytes[i] == 0 {
                 nullOffset = i
                 break
@@ -180,7 +180,7 @@ extension CZeroingData {
             return ""
         }
         var hexString = ""
-        for i in 0..<length {
+        for i in 0..<count {
             hexString += String(format: "%02x", bytes[i])
         }
         return hexString
@@ -197,6 +197,6 @@ extension SecureData {
 
 extension CZeroingData: SensitiveDebugStringConvertible {
     public func debugDescription(withSensitiveData: Bool) -> String {
-        withSensitiveData ? "[\(length) bytes, \(toHex())]" : "[\(length) bytes]"
+        withSensitiveData ? "[\(count) bytes, \(toHex())]" : "[\(count) bytes]"
     }
 }
