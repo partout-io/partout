@@ -4,9 +4,8 @@
 
 import Foundation
 #if !PARTOUT_MONOLITH
-internal import PartoutOS
 import PartoutCore
-import PartoutOpenVPN
+import PartoutOS
 #endif
 
 extension OpenVPNConnection {
@@ -20,6 +19,11 @@ extension OpenVPNConnection {
         guard let configuration = module.configuration else {
             fatalError("Creating session without OpenVPN configuration?")
         }
+#if OPENVPN_WRAPPER_NATIVE
+        pp_log(ctx, .openvpn, .notice, "OpenVPN: Using cross-platform connection")
+#else
+        pp_log(ctx, .openvpn, .notice, "OpenVPN: Using wrapped legacy connection")
+#endif
 
         // hardcode portable implementations
         let prng = PlatformPRNG()
@@ -38,7 +42,7 @@ extension OpenVPNConnection {
                 cachesURL: cachesURL,
                 options: options,
                 tlsFactory: {
-#if OPENVPN_WRAPPED_NATIVE
+#if OPENVPN_WRAPPER_NATIVE
                     try TLSWrapper.native(with: $0).tls
 #else
                     try TLSWrapper.legacy(with: $0).tls
@@ -46,7 +50,7 @@ extension OpenVPNConnection {
                 },
                 dpFactory: {
                     let wrapper: DataPathWrapper
-#if OPENVPN_WRAPPED_NATIVE
+#if OPENVPN_WRAPPER_NATIVE
                     wrapper = try .native(with: $0, prf: $1, prng: $2)
 #else
                     wrapper = try .legacy(with: $0, prf: $1, prng: $2)

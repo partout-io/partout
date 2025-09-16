@@ -3,15 +3,15 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import PartoutCrypto_C
-internal import PartoutOS
+import PartoutOS
 import Foundation
 
 extension CryptoWrapper {
     func encryptData(_ data: CZeroingData, flags: UnsafePointer<pp_crypto_flags>?) throws -> CZeroingData {
-        let dest = CZeroingData(count: data.count + 256)
+        let dest = CZeroingData(length: data.length + 256)
         let destLength = try encryptBytes(
             data.bytes,
-            length: data.count,
+            length: data.length,
             dest: dest,
             flags: flags
         )
@@ -22,10 +22,10 @@ extension CryptoWrapper {
 
 extension CryptoWrapper {
     func decryptData(_ data: CZeroingData, flags: UnsafePointer<pp_crypto_flags>?) throws -> CZeroingData {
-        let dest = CZeroingData(count: data.count + 256)
+        let dest = CZeroingData(length: data.length + 256)
         let destLength = try decryptBytes(
             data.bytes,
-            length: data.count,
+            length: data.length,
             dest: dest,
             flags: flags
         )
@@ -34,6 +34,6 @@ extension CryptoWrapper {
     }
 
     func verifyData(_ data: CZeroingData, flags: UnsafePointer<pp_crypto_flags>?) throws {
-        _ = try verifyBytes(data.bytes, length: data.count, flags: flags)
+        _ = try verifyBytes(data.bytes, length: data.length, flags: flags)
     }
 }

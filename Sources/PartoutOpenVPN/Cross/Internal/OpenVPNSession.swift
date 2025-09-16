@@ -5,7 +5,6 @@
 import Foundation
 #if !PARTOUT_MONOLITH
 import PartoutCore
-import PartoutOpenVPN
 #endif
 
 /// Default implementation of `OpenVPNSessionProtocol`.

@@ -2,14 +2,14 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@testable internal import PartoutOS
+@testable import PartoutOS
 import Foundation
 import Testing
 
 private let plainHex = "00112233ffddaa"
 private let expectedEncryptedHex = "6c56b501472aae003fe988286ea3e72454d1dda1c2fd6c"
-private nonisolated(unsafe) let cipherKey = CZeroingData(count: 32)
-private nonisolated(unsafe) let hmacKey = CZeroingData(count: 32)
+private nonisolated(unsafe) let cipherKey = CZeroingData(length: 32)
+private nonisolated(unsafe) let hmacKey = CZeroingData(length: 32)
 private let flags = CryptoFlags(
     iv: [0x56, 0x34, 0x12, 0x00],
     ad: [0x00, 0x12, 0x34, 0x56]

@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutOpenVPN_C
-#if !PARTOUT_MONOLITH
-internal import PartoutOS
-#endif
 import Foundation
+internal import PartoutOpenVPN_C
+#if !PARTOUT_MONOLITH
+import PartoutOS
+#endif
 
 extension CControlPacket {
     typealias SerializationFunction = (

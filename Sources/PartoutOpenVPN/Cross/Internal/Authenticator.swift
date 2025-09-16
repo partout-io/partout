@@ -4,14 +4,13 @@
 
 import Foundation
 #if !PARTOUT_MONOLITH
-internal import PartoutOS
 import PartoutCore
-import PartoutOpenVPN
+import PartoutOS
 #endif
 
-fileprivate extension CZeroingData {
-    func appendSized(_ buf: CZeroingData) {
-        append(CZ(UInt16(buf.count).bigEndian))
+fileprivate extension CrossZD {
+    func appendSized(_ buf: CrossZD) {
+        append(CZ(UInt16(buf.length).bigEndian))
         append(buf)
     }
 }
@@ -19,21 +18,21 @@ fileprivate extension CZeroingData {
 final class Authenticator {
     private let ctx: PartoutLoggerContext
 
-    private var controlBuffer: CZeroingData
+    private var controlBuffer: CrossZD
 
-    private(set) var preMaster: CZeroingData
+    private(set) var preMaster: CrossZD
 
-    private(set) var random1: CZeroingData
+    private(set) var random1: CrossZD
 
-    private(set) var random2: CZeroingData
+    private(set) var random2: CrossZD
 
-    private(set) var serverRandom1: CZeroingData?
+    private(set) var serverRandom1: CrossZD?
 
-    private(set) var serverRandom2: CZeroingData?
+    private(set) var serverRandom2: CrossZD?
 
-    private(set) var username: CZeroingData?
+    private(set) var username: CrossZD?
 
-    private(set) var password: CZeroingData?
+    private(set) var password: CrossZD?
 
     var withLocalOptions: Bool
 
@@ -41,9 +40,9 @@ final class Authenticator {
 
     init(_ ctx: PartoutLoggerContext, prng: PRNGProtocol, _ username: String?, _ password: String?) {
         self.ctx = ctx
-        preMaster = CZ(prng.data(length: Constants.Keys.preMasterLength))
-        random1 = CZ(prng.data(length: Constants.Keys.randomLength))
-        random2 = CZ(prng.data(length: Constants.Keys.randomLength))
+        preMaster = prng.safeCrossData(length: Constants.Keys.preMasterLength)
+        random1 = prng.safeCrossData(length: Constants.Keys.randomLength)
+        random2 = prng.safeCrossData(length: Constants.Keys.randomLength)
 
         // XXX: not 100% secure, can't erase input username/password
         if let username = username, let password = password {
@@ -87,6 +86,7 @@ final class Authenticator {
                 "V4",
                 "dev-type tun"
             ]
+            opts.append("comp-lzo")
             if let direction = options.tlsWrap?.key.direction?.rawValue {
                 opts.append("keydir \(direction)")
             }
@@ -123,12 +123,13 @@ final class Authenticator {
         raw.appendSized(CZ(peerInfo, nullTerminated: true))
 
         pp_log(ctx, .openvpn, .info, "TLS.auth: Put plaintext \(raw.asSensitiveBytes(ctx))")
+
         try tls.putRawPlainText(raw.toData())
     }
 
     // MARK: Server replies
 
-    func appendControlData(_ data: CZeroingData) {
+    func appendControlData(_ data: CrossZD) {
         controlBuffer.append(data)
     }
 
@@ -136,7 +137,7 @@ final class Authenticator {
         let prefixLength = Constants.ControlChannel.tlsPrefix.count
 
         // TLS prefix + random (x2) + opts length [+ opts]
-        guard controlBuffer.count >= prefixLength + 2 * Constants.Keys.randomLength + 2 else {
+        guard controlBuffer.length >= prefixLength + 2 * Constants.Keys.randomLength + 2 else {
             return false
         }
 
@@ -156,7 +157,7 @@ final class Authenticator {
         let serverOptsLength = Int(controlBuffer.networkUInt16Value(fromOffset: offset))
         offset += 2
 
-        guard controlBuffer.count >= offset + serverOptsLength else {
+        guard controlBuffer.length >= offset + serverOptsLength else {
             return false
         }
         let serverOpts = controlBuffer.withOffset(offset, length: serverOptsLength)

@@ -5,7 +5,7 @@
 import Foundation
 import NetworkExtension
 import PartoutCore
-internal import PartoutOS
+import PartoutOS
 import Testing
 
 struct NESettingsApplyingTests {

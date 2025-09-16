@@ -3,17 +3,16 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import PartoutCrypto_C
-#if !PARTOUT_MONOLITH
-internal import PartoutOS
-#endif
 import PartoutOS_C
-import Foundation
+#if !PARTOUT_MONOLITH
+import PartoutOS
+#endif
 
 struct CryptoKeys {
     struct KeyPair {
-        let encryptionKey: CZeroingData
+        let encryptionKey: CrossZD
 
-        let decryptionKey: CZeroingData
+        let decryptionKey: CrossZD
     }
 
     let cipher: KeyPair?
@@ -24,12 +23,12 @@ struct CryptoKeys {
 extension CryptoKeys {
     init(emptyWithCipherLength cipherKeyLength: Int, hmacKeyLength: Int) {
         cipher = KeyPair(
-            encryptionKey: CZeroingData(count: cipherKeyLength),
-            decryptionKey: CZeroingData(count: cipherKeyLength)
+            encryptionKey: CrossZD(length: cipherKeyLength),
+            decryptionKey: CrossZD(length: cipherKeyLength)
         )
         digest = KeyPair(
-            encryptionKey: CZeroingData(count: hmacKeyLength),
-            decryptionKey: CZeroingData(count: hmacKeyLength)
+            encryptionKey: CrossZD(length: hmacKeyLength),
+            decryptionKey: CrossZD(length: hmacKeyLength)
         )
     }
 }
@@ -77,11 +76,11 @@ private extension CryptoKeysBridge {
     }
 }
 
-private extension Optional<CZeroingData> {
+private extension Optional<CrossZD> {
     func unsafeCopy() -> UnsafeMutablePointer<pp_zd> {
         guard let self else {
             return pp_zd_create(0)
         }
-        return pp_zd_create_from_data(self.bytes, self.count)
+        return pp_zd_create_from_data(self.bytes, self.length)
     }
 }

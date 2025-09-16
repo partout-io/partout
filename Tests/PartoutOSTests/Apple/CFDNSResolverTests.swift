@@ -4,7 +4,7 @@
 
 import Foundation
 import PartoutCore
-internal import PartoutOS
+import PartoutOS
 import Testing
 
 struct CFDNSResolverTests {

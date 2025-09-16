@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutOS_C
 import Foundation
+import PartoutOS_C
 #if !PARTOUT_MONOLITH
 import PartoutCore
 #endif
@@ -15,12 +15,12 @@ public final class CZeroingData {
         self.ptr = ptr
     }
 
-    public init(count: Int) {
-        ptr = pp_zd_create(count)
+    public init(length: Int) {
+        ptr = pp_zd_create(length)
     }
 
-    public init(bytes: UnsafePointer<UInt8>, count: Int) {
-        ptr = pp_zd_create_from_data(bytes, count)
+    public init(bytes: UnsafePointer<UInt8>, length: Int) {
+        ptr = pp_zd_create_from_data(bytes, length)
     }
 
     public init(uInt8: UInt8) {
@@ -47,12 +47,12 @@ public final class CZeroingData {
         }
     }
 
-    public init(data: Data, offset: Int, count: Int) {
+    public init(data: Data, offset: Int, length: Int) {
         ptr = data.withUnsafeBytes {
             guard let bytes = $0.bindMemory(to: UInt8.self).baseAddress else {
                 fatalError("Could not bind to memory")
             }
-            return pp_zd_create_from_data_range(bytes, offset, count)
+            return pp_zd_create_from_data_range(bytes, offset, length)
         }
     }
 
@@ -84,7 +84,7 @@ extension CZeroingData {
         pp_zd_mutable_bytes(ptr)
     }
 
-    public var count: Int {
+    public var length: Int {
         pp_zd_length(ptr)
     }
 }
@@ -111,7 +111,7 @@ extension CZeroingData {
 
     public func withOffset(_ offset: Int, length: Int) -> CZeroingData {
         guard let slice = pp_zd_make_slice(ptr, offset, length) else {
-            return CZeroingData(count: 0)
+            return CZeroingData(length: 0)
         }
         return CZeroingData(ptr: slice)
     }
@@ -153,7 +153,7 @@ extension CZeroingData {
     public func nullTerminatedString(fromOffset offset: Int) -> String? {
         var nullOffset: Int?
         var i = offset
-        while i < count {
+        while i < length {
             if bytes[i] == 0 {
                 nullOffset = i
                 break
@@ -180,7 +180,7 @@ extension CZeroingData {
             return ""
         }
         var hexString = ""
-        for i in 0..<count {
+        for i in 0..<length {
             hexString += String(format: "%02x", bytes[i])
         }
         return hexString
@@ -197,6 +197,6 @@ extension SecureData {
 
 extension CZeroingData: SensitiveDebugStringConvertible {
     public func debugDescription(withSensitiveData: Bool) -> String {
-        withSensitiveData ? "[\(count) bytes, \(toHex())]" : "[\(count) bytes]"
+        withSensitiveData ? "[\(length) bytes, \(toHex())]" : "[\(length) bytes]"
     }
 }

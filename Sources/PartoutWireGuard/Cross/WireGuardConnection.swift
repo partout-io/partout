@@ -50,6 +50,7 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
         guard let configuration = module.configuration else {
             fatalError("No WireGuard configuration defined?")
         }
+        pp_log(ctx, .wireguard, .notice, "WireGuard: Using cross-platform connection")
 
         tunnelConfiguration = try configuration.withModules(from: parameters.profile)
         dataCountTimerInterval = TimeInterval(parameters.options.minDataCountInterval) / 1000.0

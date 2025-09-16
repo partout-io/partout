@@ -4,7 +4,7 @@
 
 import Foundation
 import PartoutCore
-@testable internal import PartoutOS
+@testable import PartoutOS
 import Testing
 
 struct ValueObserverTests {

@@ -9,7 +9,7 @@ target_compile_options(Partout PRIVATE
     -DPARTOUT_API
     -DPARTOUT_OPENVPN
     -DPARTOUT_WIREGUARD
-    -DOPENVPN_WRAPPED_NATIVE
+    -DOPENVPN_WRAPPER_NATIVE
 )
 
 # Swift sources, including vendored PartoutCore

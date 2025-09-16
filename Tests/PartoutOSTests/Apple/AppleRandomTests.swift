@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-internal import PartoutOS
+import PartoutOS
 import Testing
 
 struct AppleRandomTests {
