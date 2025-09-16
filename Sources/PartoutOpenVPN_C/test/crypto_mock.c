@@ -27,6 +27,7 @@ size_t mock_encrypt(void *vctx,
                     const uint8_t *in, size_t in_len,
                     const pp_crypto_flags *flags, pp_crypto_error_code *error) {
     (void)vctx;
+    (void)out_buf_len;
     (void)flags;
     (void)error;
     OPENVPN_DP_LOG("openvpn_crypto_mock_encrypt");
@@ -46,6 +47,7 @@ size_t mock_decrypt(void *vctx,
                     const uint8_t *in, size_t in_len,
                     const pp_crypto_flags *flags, pp_crypto_error_code *error) {
     (void)vctx;
+    (void)out_buf_len;
     (void)flags;
     (void)error;
     OPENVPN_DP_LOG("openvpn_crypto_mock_decrypt");

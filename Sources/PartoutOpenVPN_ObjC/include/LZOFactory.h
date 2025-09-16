@@ -11,8 +11,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface LZOFactory : NSObject
 
-//+ (NSString *)versionString;
-+ (BOOL)canCreate;
 + (nullable id<CompressionProvider>)create;
 
 @end

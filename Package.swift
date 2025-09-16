@@ -231,6 +231,10 @@ if areas.contains(.api) {
 // OpenVPN requires Crypto/TLS wrappers
 if areas.contains(.openVPN), let cryptoMode {
     let includesLegacy = OS.current == .apple && cryptoMode == .openSSL
+    let includesDeprecatedLZO = true
+    let lzoCSettings: [CSetting] = true && includesDeprecatedLZO ? [
+        .define("OPENVPN_DEPRECATED_LZO")
+    ] : []
     package.products.append(
         .library(
             name: "PartoutOpenVPN",
@@ -240,7 +244,8 @@ if areas.contains(.openVPN), let cryptoMode {
     package.targets.append(contentsOf: [
         .target(
             name: "PartoutOpenVPN_C",
-            dependencies: ["_PartoutCryptoImpl_C"]
+            dependencies: ["_PartoutCryptoImpl_C"],
+            cSettings: globalCSettings + lzoCSettings
         ),
         .target(
             name: "PartoutOpenVPN_ObjC",
@@ -250,7 +255,8 @@ if areas.contains(.openVPN), let cryptoMode {
                 "lib/Makefile",
                 "lib/README.LZO",
                 "lib/testmini.c"
-            ]
+            ],
+            cSettings: lzoCSettings
         ),
         .target(
             name: "PartoutOpenVPN",
@@ -278,6 +284,9 @@ if areas.contains(.openVPN), let cryptoMode {
                 list.append("OPENVPN_WRAPPER_NATIVE")
                 if includesLegacy {
                     list.append("OPENVPN_LEGACY")
+                }
+                if includesDeprecatedLZO {
+                    list.append("OPENVPN_DEPRECATED_LZO")
                 }
                 return list.map {
                     .define($0)

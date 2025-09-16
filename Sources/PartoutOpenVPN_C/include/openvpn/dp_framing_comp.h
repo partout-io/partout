@@ -49,11 +49,16 @@ bool openvpn_dp_framing_parse_v1(openvpn_dp_framing_parse_ctx *_Nonnull ctx) {
             break;
 
         case OpenVPNDataPacketLZOCompress:
+#ifdef OPENVPN_DEPRECATED_LZO
+            // FIXME: ###, decompress LZO packet
+            break;
+#else
             if (ctx->error) {
                 ctx->error->dp_code = OpenVPNDataPathErrorCompression;
                 ctx->error->crypto_code = PPCryptoErrorNone;
             }
             return false;
+#endif
 
         default:
             break;

@@ -86,8 +86,9 @@ final class Authenticator {
                 "V4",
                 "dev-type tun"
             ]
-            // FIXME: ###, port LZO to cross
+#if OPENVPN_DEPRECATED_LZO
             opts.append("comp-lzo")
+#endif
             if let direction = options.tlsWrap?.key.direction?.rawValue {
                 opts.append("keydir \(direction)")
             }
