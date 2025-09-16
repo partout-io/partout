@@ -43,7 +43,7 @@ default:
 }
 
 // The global settings for C targets
-let cSettings: [CSetting] = [
+let globalCSettings: [CSetting] = [
     .unsafeFlags([
         "-Wall", "-Wextra"//, "-Werror"
     ])
@@ -130,13 +130,13 @@ package.targets.append(contentsOf: [
     .target(
         name: "PartoutOS_C",
         dependencies: ["PartoutCoreWrapper"],
-        cSettings: {
+        cSettings: globalCSettings + {
             if OS.current == .windows {
                 return [
                     .unsafeFlags(["-Ivendors/wintun"])
                 ]
             }
-            return nil
+            return []
         }()
     ),
     .target(
@@ -329,7 +329,7 @@ if areas.contains(.wireGuard) {
             .target(
                 name: "PartoutWireGuard_C",
                 dependencies: ["PartoutOS_C"],
-                cSettings: [
+                cSettings: globalCSettings + [
                     .unsafeFlags(["-I\(cmakeOutput)/wg-go/include"])
                 ]
             )
@@ -397,7 +397,7 @@ case .openSSL:
                 name: "_PartoutCryptoImpl_C",
                 dependencies: ["PartoutOS_C"],
                 path: "Sources/PartoutCrypto/OpenSSL_C",
-                cSettings: [
+                cSettings: globalCSettings + [
                     .unsafeFlags(["-I\(cmakeOutput)/openssl/include"])
                 ],
                 linkerSettings: [
@@ -422,7 +422,7 @@ case .native:
                 list.remove(.current)
                 return list.map { "src/\($0.rawValue)" }
             }(),
-            cSettings: [
+            cSettings: globalCSettings + [
                 .unsafeFlags(["-I\(cmakeOutput)/mbedtls/include"])
             ],
             linkerSettings: [
