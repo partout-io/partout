@@ -9,7 +9,7 @@ import XCTest
 final class ZeroingDataExtensionsTests: XCTestCase {
     func test_givenPRNG_whenGenerateSafeData_thenHasGivenLength() {
         let sut = SimplePRNG()
-        XCTAssertEqual(sut.safeCrossData(length: 500).length, 500)
+        XCTAssertEqual(sut.safeCrossData(length: 500).count, 500)
     }
 
     func test_givenZeroingData_whenAsSensitive_thenOmitsSensitiveData() throws {

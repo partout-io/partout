@@ -8,8 +8,8 @@ import Testing
 
 private let plainHex = "00112233ffddaa"
 private let expectedEncryptedHex = "2743c16b105670b350b6a5062224a0b691fb184c6d14dc0f39eed86aa04a1ca06b79108c65ed66"
-private nonisolated(unsafe) let cipherKey = CZeroingData(length: 32)
-private nonisolated(unsafe) let hmacKey = CZeroingData(length: 32)
+private nonisolated(unsafe) let cipherKey = CZeroingData(count: 32)
+private nonisolated(unsafe) let hmacKey = CZeroingData(count: 32)
 private let flags = CryptoFlags(
     ad: [0x00, 0x12, 0x34, 0x56]
 )

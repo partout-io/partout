@@ -9,14 +9,14 @@ import Testing
 struct CZeroingDataTests {
     @Test
     func givenInput_whenInit_thenReturnsExpected() {
-        #expect(CZeroingData(length: 123).length == 123)
-        #expect(CZeroingData(bytes: [0x11, 0x22, 0x33, 0x44, 0x55], length: 3).length == 3)
-        #expect(CZeroingData(uInt8: UInt8(78)).length == 1)
-        #expect(CZeroingData(uInt16: UInt16(4756)).length == 2)
-        #expect(CZeroingData(data: Data(count: 12)).length == 12)
-        #expect(CZeroingData(data: Data(count: 12), offset: 3, length: 7).length == 7)
-        #expect(CZeroingData(string: "hello", nullTerminated: false).length == 5)
-        #expect(CZeroingData(string: "hello", nullTerminated: true).length == 6)
+        #expect(CZeroingData(count: 123).count == 123)
+        #expect(CZeroingData(bytes: [0x11, 0x22, 0x33, 0x44, 0x55], count: 3).count == 3)
+        #expect(CZeroingData(uInt8: UInt8(78)).count == 1)
+        #expect(CZeroingData(uInt16: UInt16(4756)).count == 2)
+        #expect(CZeroingData(data: Data(count: 12)).count == 12)
+        #expect(CZeroingData(data: Data(count: 12), offset: 3, count: 7).count == 7)
+        #expect(CZeroingData(string: "hello", nullTerminated: false).count == 5)
+        #expect(CZeroingData(string: "hello", nullTerminated: true).count == 6)
     }
 
     @Test
@@ -24,7 +24,7 @@ struct CZeroingDataTests {
         let sut = CZeroingData(string: "Hello", nullTerminated: true)
         #expect(sut.networkUInt16Value(fromOffset: 3) == 0x6c6f)
         #expect(sut.nullTerminatedString(fromOffset: 0) == "Hello")
-        #expect(sut.withOffset(3, length: 2) == CZeroingData(string: "lo", nullTerminated: false))
+        #expect(sut.withOffset(3, count: 2) == CZeroingData(string: "lo", nullTerminated: false))
     }
 
     @Test
@@ -44,7 +44,7 @@ struct CZeroingDataTests {
         let sut = CZeroingData(data: data)
 
         sut.resize(toSize: 5)
-        #expect(sut.length == 5)
+        #expect(sut.count == 5)
         #expect(sut.toData() == data.subdata(in: 0..<5))
     }
 
@@ -54,7 +54,7 @@ struct CZeroingDataTests {
         let sut = CZeroingData(data: data)
 
         sut.remove(untilOffset: 5)
-        #expect(sut.length == data.count - 5)
+        #expect(sut.count == data.count - 5)
         #expect(sut.toData() == data.subdata(in: 5..<data.count))
     }
 
@@ -64,7 +64,7 @@ struct CZeroingDataTests {
         let sut = CZeroingData(data: data)
 
         sut.zero()
-        #expect(sut.length == data.count)
+        #expect(sut.count == data.count)
         #expect(sut.toData() == Data(repeating: 0, count: data.count))
     }
 
@@ -79,18 +79,18 @@ struct CZeroingDataTests {
         #expect(other == other.copy())
         #expect(sut.copy() == other.copy())
 
-        sut.append(CZeroingData(length: 1))
+        sut.append(CZeroingData(count: 1))
         #expect(sut != other)
-        other.append(CZeroingData(length: 1))
+        other.append(CZeroingData(count: 1))
         #expect(sut == other)
     }
 
     @Test
     func givenData_whenManipulate_thenDataIsExpected() {
-        let z1 = CZeroingData(length: 0)
+        let z1 = CZeroingData(count: 0)
         z1.append(CZeroingData(data: Data(hex: "12345678")))
         z1.append(CZeroingData(data: Data(hex: "abcdef")))
-        let z2 = z1.withOffset(2, length: 3) // 5678ab
+        let z2 = z1.withOffset(2, count: 3) // 5678ab
         let z3 = z2.appending(CZeroingData(data: Data(hex: "aaddcc"))) // 5678abaaddcc
 
         #expect(z1.toData() == Data(hex: "12345678abcdef"))

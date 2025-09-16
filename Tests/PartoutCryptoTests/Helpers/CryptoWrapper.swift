@@ -64,7 +64,7 @@ final class CryptoWrapper {
 
     func encryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: CZeroingData, flags: UnsafePointer<pp_crypto_flags>?) throws -> Int {
         var code = PPCryptoErrorNone
-        let destLength = pp_crypto_encrypt(ptr, dest.mutableBytes, dest.length, bytes, length, flags, &code)
+        let destLength = pp_crypto_encrypt(ptr, dest.mutableBytes, dest.count, bytes, length, flags, &code)
         guard destLength > 0 else {
             throw PPCryptoError(code)
         }
@@ -77,7 +77,7 @@ final class CryptoWrapper {
 
     func decryptBytes(_ bytes: UnsafePointer<UInt8>, length: Int, dest: CZeroingData, flags: UnsafePointer<pp_crypto_flags>?) throws -> Int {
         var code = PPCryptoErrorNone
-        let destLength = pp_crypto_decrypt(ptr, dest.mutableBytes, dest.length, bytes, length, flags, &code)
+        let destLength = pp_crypto_decrypt(ptr, dest.mutableBytes, dest.count, bytes, length, flags, &code)
         guard destLength > 0 else {
             throw PPCryptoError(code)
         }
