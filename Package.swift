@@ -231,10 +231,13 @@ if areas.contains(.api) {
 // OpenVPN requires Crypto/TLS wrappers
 if areas.contains(.openVPN), let cryptoMode {
     let includesLegacy = OS.current == .apple && cryptoMode == .openSSL
+
+    // Deprecated LZO (to be deleted)
     let includesDeprecatedLZO = true
-    let lzoCSettings: [CSetting] = true && includesDeprecatedLZO ? [
-        .define("OPENVPN_DEPRECATED_LZO")
-    ] : []
+    let lzoDefine = "OPENVPN_DEPRECATED_LZO"
+    let lzoCSettings: [CSetting] = true && includesDeprecatedLZO ? [.define(lzoDefine)] : []
+    let lzoSwiftSettings: [SwiftSetting] = true && includesDeprecatedLZO ? [.define(lzoDefine)] : []
+
     package.products.append(
         .library(
             name: "PartoutOpenVPN",
@@ -244,17 +247,17 @@ if areas.contains(.openVPN), let cryptoMode {
     package.targets.append(contentsOf: [
         .target(
             name: "PartoutOpenVPN_C",
-            dependencies: ["_PartoutCryptoImpl_C"],
+            dependencies: [
+                "_LZO_C",
+                "_PartoutCryptoImpl_C"
+            ],
             cSettings: globalCSettings + lzoCSettings
         ),
         .target(
             name: "PartoutOpenVPN_ObjC",
-            dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-            exclude: [
-                "lib/COPYING",
-                "lib/Makefile",
-                "lib/README.LZO",
-                "lib/testmini.c"
+            dependencies: [
+                "_LZO_C",
+                "_PartoutCryptoOpenSSL_ObjC"
             ],
             cSettings: lzoCSettings
         ),
@@ -286,7 +289,7 @@ if areas.contains(.openVPN), let cryptoMode {
                     list.append("OPENVPN_LEGACY")
                 }
                 if includesDeprecatedLZO {
-                    list.append("OPENVPN_DEPRECATED_LZO")
+                    list.append(lzoDefine)
                 }
                 return list.map {
                     .define($0)
@@ -308,9 +311,19 @@ if areas.contains(.openVPN), let cryptoMode {
             }(),
             resources: [
                 .process("Resources")
-            ]
+            ],
+            swiftSettings: lzoSwiftSettings
         )
     ])
+    // Remove LZO ASAP
+    package.targets.append(
+        .target(
+            name: "_LZO_C",
+            path: "vendors/lzo",
+            exclude: ["COPYING"],
+            cSettings: globalCSettings
+        )
+    )
 }
 
 // MARK: WireGuard
