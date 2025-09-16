@@ -40,6 +40,25 @@ final class LegacyControlChannel {
         self.init(ctx, prng: prng, serializer: PlainSerializer(ctx))
     }
 
+    convenience init(
+        _ ctx: PartoutLoggerContext,
+        prng: PRNGProtocol,
+        crypto: OpenVPNCryptoProtocol,
+        authKey key: OpenVPN.StaticKey,
+        digest: OpenVPN.Digest
+    ) throws {
+        self.init(ctx, prng: prng, serializer: try AuthSerializer(ctx, with: crypto, key: key, digest: digest))
+    }
+
+    convenience init(
+        _ ctx: PartoutLoggerContext,
+        prng: PRNGProtocol,
+        crypto: OpenVPNCryptoProtocol,
+        cryptKey key: OpenVPN.StaticKey
+    ) throws {
+        self.init(ctx, prng: prng, serializer: try CryptSerializer(ctx, with: crypto, key: key))
+    }
+
     init(
         _ ctx: PartoutLoggerContext,
         prng: PRNGProtocol,
@@ -223,27 +242,6 @@ extension LegacyControlChannel {
         var length = 0
         try tls.pullRawPlainText(plainBuffer.mutableBytes, length: &length)
         return plainBuffer.withOffset(0, length: length)
-    }
-}
-
-extension LegacyControlChannel {
-    convenience init(
-        _ ctx: PartoutLoggerContext,
-        prng: PRNGProtocol,
-        crypto: OpenVPNCryptoProtocol,
-        authKey key: OpenVPN.StaticKey,
-        digest: OpenVPN.Digest
-    ) throws {
-        self.init(ctx, prng: prng, serializer: try AuthSerializer(ctx, with: crypto, key: key, digest: digest))
-    }
-
-    convenience init(
-        _ ctx: PartoutLoggerContext,
-        prng: PRNGProtocol,
-        crypto: OpenVPNCryptoProtocol,
-        cryptKey key: OpenVPN.StaticKey
-    ) throws {
-        self.init(ctx, prng: prng, serializer: try CryptSerializer(ctx, with: crypto, key: key))
     }
 }
 
