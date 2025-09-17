@@ -22,6 +22,7 @@ import PartoutCore
 //
 
 @_cdecl("partout_init")
+@MainActor
 public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutableRawPointer {
     pp_log_g(.core, .debug, "Partout: Initialize")
 
@@ -90,11 +91,13 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
 }
 
 @_cdecl("partout_deinit")
+@MainActor
 public func partout_deinit(cCtx: UnsafeMutableRawPointer) {
     ABIContext.pop(cCtx)
 }
 
 @_cdecl("partout_daemon_start")
+@MainActor
 public func partout_daemon_start(
     cCtx: UnsafeMutableRawPointer,
     cArgs: UnsafePointer<partout_daemon_start_args>
@@ -131,16 +134,15 @@ public func partout_daemon_start(
     }
 
     // Throws .unknownImportedModule if missing implementation
-    //let ovpnCfg = try StandardOpenVPNParser().parsed(fromContents: str).configuration
-    //let ovpn = try OpenVPNModule.Builder(configurationBuilder: ovpnCfg.builder()).tryBuild()
-    //print(ovpn)
+    // let ovpnCfg = try StandardOpenVPNParser().parsed(fromContents: str).configuration
+    // let ovpn = try OpenVPNModule.Builder(configurationBuilder: ovpnCfg.builder()).tryBuild()
+    // print(ovpn)
 
     // This task is short-lived
     Task {
+        // try await Task.sleep(interval: 3.0)
         do {
-            // try await Task.sleep(interval: 3.0)
-            try await daemon.start()
-            ctx.daemon = daemon
+            try await ctx.startDaemon(daemon)
         } catch {
             pp_log_g(.core, .error, "Partout: Unable to start daemon: \(error)")
             exit(-1)
@@ -151,13 +153,13 @@ public func partout_daemon_start(
 }
 
 @_cdecl("partout_daemon_stop")
+@MainActor
 public func partout_daemon_stop(cCtx: UnsafeMutableRawPointer) {
     pp_log_g(.core, .debug, "Partout: Stop daemon with ctx: \(cCtx)")
     let ctx = ABIContext.peek(cCtx)
     pp_log_g(.core, .debug, "Partout: Stop daemon with ctx (ABIContext): \(ctx)")
     Task {
-        await ctx.daemon?.stop()
-        ctx.daemon = nil
+        await ctx.stopDaemon()
     }
 }
 

@@ -6,17 +6,28 @@
 import PartoutCore
 #endif
 
-// FIXME: #188, @MainActor maybe
+@MainActor
 final class ABIContext {
     let registry: Registry
 
-    var daemon: SimpleConnectionDaemon?
+    private var daemon: SimpleConnectionDaemon?
 
     init(registry: Registry) {
         self.registry = registry
     }
+
+    func startDaemon(_ daemon: SimpleConnectionDaemon) async throws {
+        self.daemon = daemon
+        try await daemon.start()
+    }
+
+    func stopDaemon() async {
+        await daemon?.stop()
+        daemon = nil
+    }
 }
 
+@MainActor
 extension ABIContext {
     func push() -> UnsafeMutableRawPointer {
         Unmanaged.passRetained(self).toOpaque()
