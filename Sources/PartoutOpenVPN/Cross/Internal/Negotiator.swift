@@ -26,7 +26,11 @@ final class Negotiator {
 
     private let ctx: PartoutLoggerContext
 
+#if OPENVPN_DEPRECATED_LZO
+    private let parser = StandardOpenVPNParser(supportsLZO: true, decrypter: nil)
+#else
     private let parser = StandardOpenVPNParser(supportsLZO: false, decrypter: nil)
+#endif
 
     let key: UInt8 // 3-bit
 
@@ -643,6 +647,7 @@ private extension Negotiator {
             cipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
             digest: options.configuration.fallbackDigest,
             compressionFraming: history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming,
+            compressionAlgorithm: history.pushReply.options.compressionAlgorithm ?? options.configuration.fallbackCompressionAlgorithm,
             peerId: history.pushReply.options.peerId,
         )
         let prf = CryptoKeys.PRF(

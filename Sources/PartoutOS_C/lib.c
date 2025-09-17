@@ -6,7 +6,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <assert.h>
 #include "portable/common.h"
 #include "portable/lib.h"
 

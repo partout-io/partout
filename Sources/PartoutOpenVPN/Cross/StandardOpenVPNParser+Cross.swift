@@ -5,7 +5,7 @@
 internal import PartoutOpenVPN_C
 
 extension StandardOpenVPNParser {
-    public convenience init(supportsLZO: Bool) {
-        self.init(supportsLZO: supportsLZO, decrypter: SimpleKeyDecrypter())
+    public convenience init() {
+        self.init(supportsLZO: true, decrypter: SimpleKeyDecrypter())
     }
 }

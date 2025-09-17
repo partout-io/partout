@@ -37,7 +37,8 @@ extension DataPathWrapper {
                         Constants.DataChannel.aeadTagLength,
                         Constants.DataChannel.aeadIdLength,
                         keys,
-                        parameters.compressionFraming.cNative
+                        parameters.compressionFraming.cNative,
+                        parameters.compressionAlgorithm == .LZO
                     )
                 }
             }
@@ -45,23 +46,29 @@ extension DataPathWrapper {
             guard let digestAlgorithm else {
                 throw OpenVPNDataPathError.algorithm
             }
-            mode = digestAlgorithm.withCString { cDigest in
-                keysBridge.withUnsafeKeys { keys in
+            mode = try digestAlgorithm.withCString { cDigest in
+                try keysBridge.withUnsafeKeys { keys in
                     if let cipherAlgorithm {
-                        return cipherAlgorithm.withCString { cCipher in
-                            openvpn_dp_mode_hmac_create_cbc(
+                        return try cipherAlgorithm.withCString { cCipher in
+                            let mode = openvpn_dp_mode_hmac_create_cbc(
                                 cCipher,
                                 cDigest,
                                 keys,
-                                parameters.compressionFraming.cNative
+                                parameters.compressionFraming.cNative,
+                                parameters.compressionAlgorithm == .LZO
                             )
+                            guard let mode else {
+                                throw OpenVPNDataPathError.algorithm
+                            }
+                            return mode
                         }
                     } else {
                         return openvpn_dp_mode_hmac_create_cbc(
                             nil,
                             cDigest,
                             keys,
-                            parameters.compressionFraming.cNative
+                            parameters.compressionFraming.cNative,
+                            parameters.compressionAlgorithm == .LZO
                         )
                     }
                 }

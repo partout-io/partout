@@ -12,6 +12,8 @@ final class DataPathWrapper {
 
         let compressionFraming: OpenVPN.CompressionFraming
 
+        let compressionAlgorithm: OpenVPN.CompressionAlgorithm
+
         let peerId: UInt32?
     }
 

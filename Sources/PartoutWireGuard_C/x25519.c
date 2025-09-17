@@ -7,7 +7,6 @@
 
 #include <stdint.h>
 #include <string.h>
-#include <assert.h>
 
 #include "portable/prng.h"
 #include "wireguard/x25519.h"

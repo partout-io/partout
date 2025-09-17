@@ -65,12 +65,12 @@ public final class StandardOpenVPNParser {
         }
     }
 
-    public init(supportsLZO: Bool, decrypter: (KeyDecrypter & Sendable)?) {
+    init(supportsLZO: Bool, decrypter: (KeyDecrypter & Sendable)?) {
 #if OPENVPN_DEPRECATED_LZO
         self.supportsLZO = supportsLZO
 #else
         precondition(!supportsLZO, "LZO is not supported")
-        supportsLZO = false
+        self.supportsLZO = false
 #endif
         self.decrypter = decrypter
     }

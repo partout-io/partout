@@ -73,6 +73,7 @@ pp_socket pp_socket_open(const char *ip_addr,
 
     struct addrinfo hints, *resolved = NULL;
     char port_str[16] = { 0 };
+    os_socket_fd new_fd = OS_INVALID_SOCKET;
 
     pp_zero(&hints, sizeof(hints));
     hints.ai_family = AF_UNSPEC;   // IPv4 or IPv6
@@ -92,7 +93,6 @@ pp_socket pp_socket_open(const char *ip_addr,
     }
 
     // Loop through resolved to find first working socket
-    os_socket_fd new_fd;
     for (struct addrinfo *p = resolved; p != NULL; p = p->ai_next) {
         new_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
         if (new_fd == OS_INVALID_SOCKET) {
