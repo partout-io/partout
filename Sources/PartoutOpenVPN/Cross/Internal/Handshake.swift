@@ -2,18 +2,14 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-internal import _PartoutOSPortable
-#endif
-
 struct Handshake {
-    let preMaster: CZeroingData
+    let preMaster: CrossZD
 
-    let random1: CZeroingData
+    let random1: CrossZD
 
-    let random2: CZeroingData
+    let random2: CrossZD
 
-    let serverRandom1: CZeroingData
+    let serverRandom1: CrossZD
 
-    let serverRandom2: CZeroingData
+    let serverRandom2: CrossZD
 }

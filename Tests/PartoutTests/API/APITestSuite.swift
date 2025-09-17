@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-@testable import PartoutInterfaces
+@testable import Partout
 @testable import PartoutProviders
 
 protocol APITestSuite {

@@ -1,6 +1,0 @@
-module _PartoutVendorsOpenSSL [system] {
-    header "shim.h"
-    link "ssl"
-    link "crypto"
-    export *
-}

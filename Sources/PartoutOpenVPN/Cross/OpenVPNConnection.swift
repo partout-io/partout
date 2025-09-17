@@ -4,9 +4,8 @@
 
 import Foundation
 #if !PARTOUT_MONOLITH
-internal import _PartoutOSPortable
 import PartoutCore
-import PartoutOpenVPN
+import PartoutOS
 #endif
 
 /// Swift/C implementation of an OpenVPN ``/PartoutCore/Connection``.
@@ -16,7 +15,7 @@ public actor OpenVPNConnection {
 
     private let ctx: PartoutLoggerContext
 
-    private let moduleId: UUID
+    private let moduleId: UniqueID
 
     private let controller: TunnelController
 
@@ -331,26 +330,5 @@ private extension LinkInterface {
         case .tcp:
             return OpenVPNTCPLink(link: self, method: method)
         }
-    }
-}
-
-private let ppRecoverableCodes: [PartoutError.Code] = [
-    .timeout,
-    .linkFailure,
-    .networkChanged,
-    .OpenVPN.connectionFailure,
-    .OpenVPN.serverShutdown
-]
-
-extension Error {
-    var isOpenVPNRecoverable: Bool {
-        let ppError = PartoutError(self)
-        if ppRecoverableCodes.contains(ppError.code) {
-            return true
-        }
-        if case .recoverable = ppError.reason as? OpenVPNSessionError {
-            return true
-        }
-        return false
     }
 }

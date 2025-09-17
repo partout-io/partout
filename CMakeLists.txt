@@ -33,7 +33,6 @@ message(STATUS "Option PP_BUILD_OUTPUT = ${PP_BUILD_OUTPUT}")
 # Forward args to Partout sub-project
 set(PARTOUT_CMAKE_ARGS
     -DPP_BUILD_OUTPUT=${PP_BUILD_OUTPUT}
-    -DPP_BUILD_FOR_ANDROID=${PP_BUILD_FOR_ANDROID}
 )
 
 # All vendor-inherited args

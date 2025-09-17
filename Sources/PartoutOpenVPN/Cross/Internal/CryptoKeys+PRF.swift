@@ -2,11 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutOpenVPN_C
 import Foundation
+internal import PartoutOpenVPN_C
 #if !PARTOUT_MONOLITH
-internal import _PartoutOSPortable
-import PartoutOpenVPN
+import PartoutOS
 #endif
 
 extension CryptoKeys {
@@ -21,9 +20,9 @@ extension CryptoKeys {
     init(withPRF prf: PRF) throws {
         let masterData = try Self.prfData(with: PRFInput(
             label: Constants.Keys.label1,
-            secret: CZ(prf.handshake.preMaster),
-            clientSeed: CZ(prf.handshake.random1),
-            serverSeed: CZ(prf.handshake.serverRandom1),
+            secret: prf.handshake.preMaster,
+            clientSeed: prf.handshake.random1,
+            serverSeed: prf.handshake.serverRandom1,
             clientSessionId: nil,
             serverSessionId: nil,
             size: Constants.Keys.preMasterLength
@@ -31,8 +30,8 @@ extension CryptoKeys {
         let keysData = try Self.prfData(with: PRFInput(
             label: Constants.Keys.label2,
             secret: masterData,
-            clientSeed: CZ(prf.handshake.random2),
-            serverSeed: CZ(prf.handshake.serverRandom2),
+            clientSeed: prf.handshake.random2,
+            serverSeed: prf.handshake.serverRandom2,
             clientSessionId: prf.sessionId,
             serverSessionId: prf.remoteSessionId,
             size: Constants.Keys.keysCount * Constants.Keys.keyLength
@@ -41,7 +40,7 @@ extension CryptoKeys {
 
         let keysArray = (0..<Constants.Keys.keysCount).map {
             let offset = $0 * Constants.Keys.keyLength
-            return keysData.withOffset(offset, length: Constants.Keys.keyLength)
+            return keysData.withOffset(offset, count: Constants.Keys.keyLength)
         }
         self.init(
             cipher: CryptoKeys.KeyPair(
@@ -61,11 +60,11 @@ extension CryptoKeys {
 private struct PRFInput {
     let label: String
 
-    let secret: CZeroingData
+    let secret: CrossZD
 
-    let clientSeed: CZeroingData
+    let clientSeed: CrossZD
 
-    let serverSeed: CZeroingData
+    let serverSeed: CrossZD
 
     let clientSessionId: Data?
 
@@ -75,7 +74,7 @@ private struct PRFInput {
 }
 
 private extension CryptoKeys {
-    static func prfData(with input: PRFInput) throws -> CZeroingData {
+    static func prfData(with input: PRFInput) throws -> CrossZD {
         let seed = CZ(input.label, nullTerminated: false)
         seed.append(input.clientSeed)
         seed.append(input.serverSeed)
@@ -87,8 +86,8 @@ private extension CryptoKeys {
         }
         let len = input.secret.count / 2
         let lenx = len + (input.secret.count & 1)
-        let secret1 = input.secret.withOffset(0, length: lenx)
-        let secret2 = input.secret.withOffset(len, length: lenx)
+        let secret1 = input.secret.withOffset(0, count: lenx)
+        let secret2 = input.secret.withOffset(len, count: lenx)
 
         let hash1 = try keysHash("MD5", secret1, seed, input.size)
         let hash2 = try keysHash("SHA1", secret2, seed, input.size)
@@ -102,14 +101,14 @@ private extension CryptoKeys {
         return prf
     }
 
-    static func keysHash(_ digestName: String, _ secret: CZeroingData, _ seed: CZeroingData, _ size: Int) throws -> CZeroingData {
+    static func keysHash(_ digestName: String, _ secret: CrossZD, _ seed: CrossZD, _ size: Int) throws -> CrossZD {
         let out = CZ()
-        let buffer = CZeroingData.forHMAC()
+        let buffer = CrossZD.forHMAC()
         var chain = try buffer.hmac(with: digestName, secret: secret, data: seed)
         while out.count < size {
             out.append(try buffer.hmac(with: digestName, secret: secret, data: chain.appending(seed)))
             chain = try buffer.hmac(with: digestName, secret: secret, data: chain)
         }
-        return out.withOffset(0, length: size)
+        return out.withOffset(0, count: size)
     }
 }

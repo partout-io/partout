@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-@testable import PartoutInterfaces
+@testable import Partout
 @testable import PartoutProviders
 import Testing
 
@@ -46,7 +46,7 @@ struct HideMeProviderTests: APITestSuite {
             #expect(infra.presets.count == input.presetsCount)
             #expect(infra.servers.count == input.serversCount)
 
-#if canImport(PartoutOpenVPN)
+#if PARTOUT_OPENVPN
             try infra.presets.forEach {
                 let template = try JSONDecoder().decode(OpenVPNProviderTemplate.self, from: $0.templateData)
                 switch $0.presetId {

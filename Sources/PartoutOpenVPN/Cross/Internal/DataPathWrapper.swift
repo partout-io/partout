@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-#if !PARTOUT_MONOLITH
-import PartoutOpenVPN
-#endif
 
 final class DataPathWrapper {
     struct Parameters {
@@ -14,6 +11,8 @@ final class DataPathWrapper {
         let digest: OpenVPN.Digest?
 
         let compressionFraming: OpenVPN.CompressionFraming
+
+        let compressionAlgorithm: OpenVPN.CompressionAlgorithm
 
         let peerId: UInt32?
     }

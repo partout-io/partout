@@ -2,17 +2,14 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutOpenVPN_C
 import Foundation
+internal import PartoutOpenVPN_C
 #if !PARTOUT_MONOLITH
-internal import _PartoutOSPortable
 import PartoutCore
-import PartoutOpenVPN
-#if canImport(_PartoutOpenVPNLegacy_ObjC)
-internal import _PartoutOpenVPNLegacy_ObjC
-#endif
+import PartoutOS
 #endif
 
+@OpenVPNActor
 final class ControlChannel {
     private let ctx: PartoutLoggerContext
 
@@ -30,13 +27,11 @@ final class ControlChannel {
         }
     }
 
-    private var queue: BidirectionalState<[CControlPacket]>
+    private var queue: BidirectionalState<[CrossPacket]>
 
     private var currentPacketId: BidirectionalState<UInt32>
 
     private var pendingAcks: Set<UInt32>
-
-    private var plainBuffer: CZeroingData
 
     private var sentDates: [UInt32: Date]
 
@@ -44,24 +39,7 @@ final class ControlChannel {
         self.init(ctx, prng: prng, serializer: PlainSerializer(ctx))
     }
 
-    convenience init(
-        _ ctx: PartoutLoggerContext,
-        prng: PRNGProtocol,
-        authKey key: OpenVPN.StaticKey,
-        digest: OpenVPN.Digest
-    ) throws {
-        self.init(ctx, prng: prng, serializer: try AuthSerializer(ctx, digest: digest, key: key))
-    }
-
-    convenience init(
-        _ ctx: PartoutLoggerContext,
-        prng: PRNGProtocol,
-        cryptKey key: OpenVPN.StaticKey
-    ) throws {
-        self.init(ctx, prng: prng, serializer: try CryptSerializer(ctx, key: key))
-    }
-
-    private init(
+    init(
         _ ctx: PartoutLoggerContext,
         prng: PRNGProtocol,
         serializer: ControlChannelSerializer
@@ -74,7 +52,6 @@ final class ControlChannel {
         queue = BidirectionalState(withResetValue: [])
         currentPacketId = BidirectionalState(withResetValue: 0)
         pendingAcks = []
-        plainBuffer = CZ(count: 16 * 1024)
         sentDates = [:]
     }
 }
@@ -82,13 +59,12 @@ final class ControlChannel {
 extension ControlChannel {
     func reset(forNewSession: Bool) {
         if forNewSession {
-            sessionId = prng.data(length: _PartoutOpenVPN_C.OpenVPNPacketSessionIdLength)
+            sessionId = prng.data(length: OpenVPNPacketSessionIdLength)
             remoteSessionId = nil
         }
         queue.reset()
         currentPacketId.reset()
         pendingAcks.removeAll()
-        plainBuffer.zero()
         sentDates.removeAll()
         serializer.reset()
     }
@@ -97,7 +73,7 @@ extension ControlChannel {
         self.remoteSessionId = remoteSessionId
     }
 
-    func readInboundPacket(withData data: Data, offset: Int) throws -> CControlPacket {
+    func readInboundPacket(withData data: Data, offset: Int) throws -> CrossPacket {
         do {
             let packet = try serializer.deserialize(data: data, start: offset, end: nil)
             pp_log(ctx, .openvpn, .info, "Control: Read packet \(packet.asSensitiveBytes(ctx))")
@@ -111,15 +87,15 @@ extension ControlChannel {
         }
     }
 
-    func enqueueInboundPacket(packet: CControlPacket) -> [CControlPacket] {
-        var toHandle: [CControlPacket] = []
+    func enqueueInboundPacket(packet: CrossPacket) -> [CrossPacket] {
+        var toHandle: [CrossPacket] = []
         Self.enqueueInbound(&queue.inbound, &currentPacketId.inbound, packet) {
             toHandle.append($0)
         }
         return toHandle
     }
 
-    static func enqueueInbound<T>(_ queue: inout [T], _ currentId: inout UInt32, _ packet: T, _ handle: (T) -> Void) where T: PacketProtocol {
+    static func enqueueInbound<T>(_ queue: inout [T], _ currentId: inout UInt32, _ packet: T, _ handle: (T) -> Void) where T: CrossPacketProtocol {
         queue.append(packet)
         queue.sort {
             $0.packetId < $1.packetId
@@ -140,7 +116,7 @@ extension ControlChannel {
         }
     }
 
-    func enqueueOutboundPackets(withCode code: CPacketCode, key: UInt8, payload: Data, maxPacketSize: Int) throws {
+    func enqueueOutboundPackets(withCode code: CrossPacketCode, key: UInt8, payload: Data, maxPacketSize: Int) throws {
         guard let sessionId else {
             pp_log(ctx, .openvpn, .fault, "Control: Missing sessionId, do reset(forNewSession: true) first")
             throw OpenVPNSessionError.assertion
@@ -153,7 +129,7 @@ extension ControlChannel {
         repeat {
             let subPayloadLength = min(maxPacketSize, payload.count - offset)
             let subPayloadData = payload.subdata(offset: offset, count: subPayloadLength)
-            let packet = CControlPacket(
+            let packet = CrossPacket(
                 code: code,
                 key: key,
                 sessionId: sessionId,
@@ -230,12 +206,17 @@ extension ControlChannel {
         guard let sessionId = sessionId else {
             throw OpenVPNSessionError.missingSessionId
         }
-        let packet = CControlPacket(key: key, sessionId: sessionId, ackIds: ackPacketIds, ackRemoteSessionId: ackRemoteSessionId)
+        let packet = CrossPacket(
+            key: key,
+            sessionId: sessionId,
+            ackIds: ackPacketIds,
+            ackRemoteSessionId: ackRemoteSessionId
+        )
         pp_log(ctx, .openvpn, .info, "Control: Write ack packet \(packet.asSensitiveBytes(ctx))")
         return try serializer.serialize(packet: packet)
     }
 
-    func currentControlData(withTLS tls: TLSProtocol) throws -> CZeroingData {
+    func currentControlData(withTLS tls: TLSProtocol) throws -> CrossZD {
         CZ(try tls.pullPlainText())
     }
 }

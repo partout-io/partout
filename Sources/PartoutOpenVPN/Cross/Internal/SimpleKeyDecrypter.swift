@@ -2,10 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutOpenVPN_C
+internal import PartoutOpenVPN_C
 #if !PARTOUT_MONOLITH
 import PartoutCore
-import PartoutOpenVPN
 #endif
 
 final class SimpleKeyDecrypter: KeyDecrypter, Sendable {

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-@testable import PartoutInterfaces
+@testable import Partout
 import Testing
 
 struct ProviderModulesTests {
@@ -11,7 +11,7 @@ struct ProviderModulesTests {
 
     private let resourcesURL = Bundle.module.url(forResource: "Resources", withExtension: nil)
 
-#if canImport(PartoutOpenVPN)
+#if PARTOUT_OPENVPN
     @Test
     func givenProviderModule_whenOpenVPN_thenResolves() throws {
         var sut = ProviderModule.Builder()
@@ -35,7 +35,7 @@ struct ProviderModulesTests {
     }
 #endif
 
-#if canImport(PartoutWireGuard)
+#if PARTOUT_WIREGUARD
     @Test
     func givenProviderModule_whenWireGuard_thenResolves() throws {
         let deviceId = "device_id"
@@ -71,7 +71,7 @@ struct ProviderModulesTests {
 }
 
 private extension ProviderModulesTests {
-#if canImport(PartoutOpenVPN)
+#if PARTOUT_OPENVPN
     func openVPNEntity() throws -> ProviderEntity {
         let presetURL = try #require(resourcesURL?.appendingPathComponent("preset.openvpn.json"))
         let templateData = try Data(contentsOf: presetURL)
@@ -90,7 +90,7 @@ private extension ProviderModulesTests {
     }
 #endif
 
-#if canImport(PartoutWireGuard)
+#if PARTOUT_WIREGUARD
     func wireGuardEntity() throws -> ProviderEntity {
         let presetURL = try #require(resourcesURL?.appendingPathComponent("preset.wireguard.json"))
         let templateData = try Data(contentsOf: presetURL)
@@ -123,10 +123,10 @@ private extension ProviderModulesTests {
             ipAddresses: withIPAddresses ? [Data(hex: "01020304")] : nil, // 1.2.3.4
             supportedModuleTypes: {
                 var list: [ModuleType] = []
-#if canImport(PartoutOpenVPN)
+#if PARTOUT_OPENVPN
                 list.append(.openVPN)
 #endif
-#if canImport(PartoutWireGuard)
+#if PARTOUT_WIREGUARD
                 list.append(.wireGuard)
 #endif
                 return list

@@ -13,7 +13,7 @@ set_target_properties(Partout PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
 )
 
-# Mind platform differences about static libraries
+# Mind platform differences about libraries
 function(add_static_lib dir name out_list)
     if(WIN32)
         set(lib_path ${dir}/lib${name}.lib)
@@ -29,29 +29,26 @@ endfunction()
 set(PARTOUT_LIBS)
 if(DEFINED OPENSSL_DIR)
     target_include_directories(Partout_C PRIVATE
-        ${CMAKE_SOURCE_DIR}/Crypto/CryptoOpenSSL_C/include
-        ${CMAKE_SOURCE_DIR}/Crypto/TLSOpenSSL_C/include
         ${OPENSSL_DIR}/include
     )
     add_static_lib(${OPENSSL_DIR}/lib ssl PARTOUT_LIBS)
     add_static_lib(${OPENSSL_DIR}/lib crypto PARTOUT_LIBS)
 elseif(DEFINED MBEDTLS_DIR)
     target_include_directories(Partout_C PRIVATE
-        ${CMAKE_SOURCE_DIR}/Crypto/CryptoMbedTLS_C/include
-        ${CMAKE_SOURCE_DIR}/Crypto/TLSMbedTLS_C/include
         ${MBEDTLS_DIR}/include
     )
-    add_static_lib(${MBEDTLS_DIR}/lib mbedcrypto PARTOUT_LIBS)
-    add_static_lib(${MBEDTLS_DIR}/lib mbedtls PARTOUT_LIBS)
-    add_static_lib(${MBEDTLS_DIR}/lib mbedx509 PARTOUT_LIBS)
+    list(APPEND ${PARTOUT_LIBS}
+        ${MBEDTLS_DIR}/lib/mbedcrypto
+        ${MBEDTLS_DIR}/lib/mbedtls
+        ${MBEDTLS_DIR}/lib/mbedx509
+    )
 endif()
 if(DEFINED WGGO_DIR)
-    target_include_directories(Partout PRIVATE
-        ${CMAKE_SOURCE_DIR}/Vendors/WireGuardGo_C
+    target_include_directories(Partout_C PRIVATE
+        ${WGGO_DIR}/include
+        ${CMAKE_SOURCE_DIR}/PartoutWireGuard/Shared_C/include
     )
-    if(NOT PP_BUILD_FOR_ANDROID)
-        add_static_lib(${WGGO_DIR}/lib wg-go PARTOUT_LIBS)
-    endif()
+    # Do not link dynamic library
 endif()
 target_link_libraries(Partout_C PRIVATE
     ${PARTOUT_LIBS}

@@ -1,0 +1,21 @@
+module PartoutOpenVPN_C {
+    header "openvpn/comp.h"
+    header "openvpn/control.h"
+    header "openvpn/dp_error.h"
+    header "openvpn/dp_framing.h"
+    header "openvpn/dp_framing_comp.h"
+    header "openvpn/dp_macros.h"
+    header "openvpn/dp_mode.h"
+    header "openvpn/dp_mode_ad.h"
+    header "openvpn/dp_mode_hmac.h"
+    header "openvpn/dp_mode_shortcuts.h"
+    header "openvpn/lzo.h"
+    header "openvpn/mss_fix.h"
+    header "openvpn/obf.h"
+    header "openvpn/packet.h"
+    header "openvpn/pkt_proc.h"
+    header "openvpn/replay.h"
+    header "openvpn/test/crypto_mock.h"
+    header "openvpn/test/dp_mock.h"
+    export *
+}

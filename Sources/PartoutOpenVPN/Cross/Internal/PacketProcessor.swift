@@ -2,12 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutOpenVPN_C
 import Foundation
+internal import PartoutOpenVPN_C
 #if !PARTOUT_MONOLITH
-internal import _PartoutOSPortable
 import PartoutCore
-import PartoutOpenVPN
+import PartoutOS
 #endif
 
 /// Processes data packets according to an obfuscation method.

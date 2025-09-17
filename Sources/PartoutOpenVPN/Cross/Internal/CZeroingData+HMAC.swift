@@ -4,19 +4,19 @@
 
 internal import PartoutCrypto_C
 #if !PARTOUT_MONOLITH
-internal import _PartoutOSPortable
+import PartoutOS
 #endif
 
-extension CZeroingData {
-    static func forHMAC() -> CZeroingData {
-        CZeroingData(ptr: pp_hmac_create())
+extension CrossZD {
+    static func forHMAC() -> CrossZD {
+        CrossZD(ptr: pp_hmac_create())
     }
 
     func hmac(
         with digestName: String,
-        secret: CZeroingData,
-        data: CZeroingData
-    ) throws -> CZeroingData {
+        secret: CrossZD,
+        data: CrossZD
+    ) throws -> CrossZD {
         let hmacLength = digestName.withCString { cDigest in
             var ctx = pp_hmac_ctx(
                 dst: ptr,
@@ -29,7 +29,7 @@ extension CZeroingData {
         guard hmacLength > 0 else {
             throw PPCryptoError.hmac
         }
-        return CZeroingData(
+        return CrossZD(
             bytes: ptr.pointee.bytes,
             count: hmacLength
         )

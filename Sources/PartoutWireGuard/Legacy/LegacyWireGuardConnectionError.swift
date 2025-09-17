@@ -8,7 +8,9 @@
 //  SPDX-License-Identifier: MIT
 //  Copyright © 2018-2024 WireGuard LLC. All Rights Reserved.
 
-import Foundation
+#if !PARTOUT_MONOLITH
+import PartoutCore
+#endif
 
 enum LegacyWireGuardConnectionError: Error {
     case dnsResolutionFailure
@@ -18,4 +20,10 @@ enum LegacyWireGuardConnectionError: Error {
     case couldNotDetermineFileDescriptor
 
     case couldNotSetNetworkSettings
+}
+
+extension LegacyWireGuardConnectionError: PartoutErrorMappable {
+    var asPartoutError: PartoutError {
+        PartoutError(.linkNotActive, self)
+    }
 }

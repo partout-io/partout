@@ -19,9 +19,14 @@ version-header: $(DESTDIR)\wireguard-go-version.h
 
 $(BUILDDIR)\wg-go.$(BUILDEXT): go.mod
 	@set CGO_ENABLED=1
-	# FIXME: #199, hardcoded to aarch64
-	@set CGO_CFLAGS=--target=aarch64-windows-gnu
-	@set CGO_CXXFLAGS=--target=aarch64-windows-gnu
+	@if "%GOARCH%"=="arm64" set TARGET=aarch64-windows-gnu
+	@if "%GOARCH%"=="amd64" set TARGET=x86_64-windows-gnu
+	@if not defined TARGET (
+		echo Unsupported GOARCH=%GOARCH%
+		exit /b 1
+	)
+	@set CGO_CFLAGS=--target=%TARGET%
+	@set CGO_CXXFLAGS=--target=%TARGET%
 	go build -C $(PREFIXDIR) -x -ldflags=-w -trimpath -v -o "$(BUILDDIR)\wg-go.$(BUILDEXT)" -buildmode=$(BUILDMODE)
 	@if exist "$(BUILDDIR)\libwg-go.h" del "$(BUILDDIR)\libwg-go.h"
 

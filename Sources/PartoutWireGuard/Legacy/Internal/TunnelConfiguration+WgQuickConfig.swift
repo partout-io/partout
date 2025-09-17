@@ -2,9 +2,6 @@
 // Copyright © 2018-2021 WireGuard LLC. All Rights Reserved.
 
 import Foundation
-#if !PARTOUT_MONOLITH
-import PartoutWireGuard
-#endif
 
 extension TunnelConfiguration {
 
@@ -214,7 +211,7 @@ extension TunnelConfiguration {
             peer.allowedIPs = allowedIPs
         }
         if let endpointString = attributes["endpoint"] {
-            guard let endpoint = Endpoint(from: endpointString) else {
+            guard let endpoint = WireGuardEndpoint(from: endpointString) else {
                 throw WireGuardParseError.peerHasInvalidEndpoint(endpointString)
             }
             peer.endpoint = endpoint

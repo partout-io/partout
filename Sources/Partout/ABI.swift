@@ -4,11 +4,11 @@
 
 #if !os(iOS) && !os(tvOS)
 
-import _PartoutOSPortable_C
 import Foundation
 import Partout_C
+import PartoutOS_C
 #if !PARTOUT_MONOLITH
-import _PartoutOSPortable
+import PartoutOS
 import PartoutCore
 #endif
 
@@ -22,6 +22,7 @@ import PartoutCore
 //
 
 @_cdecl("partout_init")
+@MainActor
 public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutableRawPointer {
     pp_log_g(.core, .debug, "Partout: Initialize")
 
@@ -35,49 +36,54 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
     // Global directory e.g. for temporary files
     let cacheDir = String(cString: cArgs.pointee.cache_dir)
 
+    // Logging and implementations, consider optionals
     var logBuilder = PartoutLogger.Builder()
-    // FIXME: #187, check defines for conditional areas
-    logBuilder.setDestination(NSLogDestination(), for: [
-        .core,
-        .api,
-        .providers,
-        //.ne,
-        .openvpn,
-        .wireguard
-    ])
+    var logCategories: [LoggerCategory] = [.core, .os, .providers]
+    var allImplementations: [ModuleImplementation] = []
+
+#if PARTOUT_API
+    logCategories.append(.api)
+#endif
+#if PARTOUT_OPENVPN
+    logCategories.append(.openvpn)
+    allImplementations.append(OpenVPNModule.Implementation(
+        importerBlock: { StandardOpenVPNParser() },
+        connectionBlock: {
+            let ctx = PartoutLoggerContext($0.profile.id)
+            return try OpenVPNConnection(
+                ctx,
+                parameters: $0,
+                module: $1,
+                cachesURL: URL(fileURLWithPath: cacheDir)
+            )
+        }
+    ))
+#endif
+#if PARTOUT_WIREGUARD
+    logCategories.append(.wireguard)
+    allImplementations.append(WireGuardModule.Implementation(
+        keyGenerator: StandardWireGuardKeyGenerator(),
+        importerBlock: { StandardWireGuardParser() },
+        validatorBlock: { StandardWireGuardParser() },
+        connectionBlock: {
+            let ctx = PartoutLoggerContext($0.profile.id)
+            return try WireGuardConnection(
+                ctx,
+                parameters: $0,
+                module: $1
+            )
+        }
+    ))
+#endif
+
+    // Finalize configuration
+    logBuilder.setDestination(NSLogDestination(), for: logCategories)
     logBuilder.logsAddresses = true
     logBuilder.logsModules = true
     PartoutLogger.register(logBuilder.build())
+    let registry = Registry(withKnown: true, allImplementations: allImplementations)
 
-    let registry = Registry(withKnown: true, allImplementations: [
-        OpenVPNModule.Implementation(
-            importer: StandardOpenVPNParser(),
-            connectionBlock: {
-                let ctx = PartoutLoggerContext($0.profile.id)
-                return try OpenVPNConnection(
-                    ctx,
-                    parameters: $0,
-                    module: $1,
-                    cachesURL: URL(fileURLWithPath: cacheDir)
-                )
-            }
-        ),
-        // FIXME: #187, check defines for conditional areas
-        WireGuardModule.Implementation(
-            keyGenerator: StandardWireGuardKeyGenerator(),
-            importer: StandardWireGuardParser(),
-            validator: StandardWireGuardParser(),
-            connectionBlock: {
-                let ctx = PartoutLoggerContext($0.profile.id)
-                return try WireGuardConnection(
-                    ctx,
-                    parameters: $0,
-                    module: $1
-                )
-            }
-        )
-    ])
-
+    // Create global context
     let ctx = ABIContext(registry: registry)
     let cCtx = ctx.push()
     pp_log_g(.core, .debug, "Partout: Initialize with ctx: \(cCtx)")
@@ -85,11 +91,13 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
 }
 
 @_cdecl("partout_deinit")
+@MainActor
 public func partout_deinit(cCtx: UnsafeMutableRawPointer) {
     ABIContext.pop(cCtx)
 }
 
 @_cdecl("partout_daemon_start")
+@MainActor
 public func partout_daemon_start(
     cCtx: UnsafeMutableRawPointer,
     cArgs: UnsafePointer<partout_daemon_start_args>
@@ -126,16 +134,15 @@ public func partout_daemon_start(
     }
 
     // Throws .unknownImportedModule if missing implementation
-    //let ovpnCfg = try StandardOpenVPNParser().parsed(fromContents: str).configuration
-    //let ovpn = try OpenVPNModule.Builder(configurationBuilder: ovpnCfg.builder()).tryBuild()
-    //print(ovpn)
+    // let ovpnCfg = try StandardOpenVPNParser().parsed(fromContents: str).configuration
+    // let ovpn = try OpenVPNModule.Builder(configurationBuilder: ovpnCfg.builder()).tryBuild()
+    // print(ovpn)
 
     // This task is short-lived
     Task {
+        // try await Task.sleep(interval: 3.0)
         do {
-            // try await Task.sleep(interval: 3.0)
-            try await daemon.start()
-            ctx.daemon = daemon
+            try await ctx.startDaemon(daemon)
         } catch {
             pp_log_g(.core, .error, "Partout: Unable to start daemon: \(error)")
             exit(-1)
@@ -146,13 +153,13 @@ public func partout_daemon_start(
 }
 
 @_cdecl("partout_daemon_stop")
+@MainActor
 public func partout_daemon_stop(cCtx: UnsafeMutableRawPointer) {
     pp_log_g(.core, .debug, "Partout: Stop daemon with ctx: \(cCtx)")
     let ctx = ABIContext.peek(cCtx)
     pp_log_g(.core, .debug, "Partout: Stop daemon with ctx (ABIContext): \(ctx)")
     Task {
-        await ctx.daemon?.stop()
-        ctx.daemon = nil
+        await ctx.stopDaemon()
     }
 }
 
