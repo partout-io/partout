@@ -171,11 +171,12 @@ extension WireGuard.Configuration {
         if let dnsString = attributes["dns"] {
             var dnsServers = [Address]()
             var dnsSearch = [String]()
-            for dnsServerString in dnsString.splitToArray(trimmingCharacters: .whitespacesAndNewlines) {
-                if let dnsServer = Address(rawValue: dnsServerString) {
-                    dnsServers.append(dnsServer)
+            for line in dnsString.splitToArray(trimmingCharacters: .whitespacesAndNewlines) {
+                guard let addr = Address(rawValue: line) else { continue }
+                if addr.isIPAddress {
+                    dnsServers.append(addr)
                 } else {
-                    dnsSearch.append(dnsServerString)
+                    dnsSearch.append(addr.rawValue)
                 }
             }
             interface.dns.servers = dnsServers.map(\.rawValue)

@@ -20,7 +20,6 @@ extension StandardWireGuardParser: ModuleBuilderValidator {
             let quickConfig = configurationBuilder.toQuickConfig()
             _ = try WireGuard.Configuration(fromWgQuickConfig: quickConfig)
         } catch {
-            NSLog(">>> error: \(error)")
             throw PartoutError(.parsing, error)
         }
     }
