@@ -12,7 +12,7 @@ import PartoutOS
 /// - Throws: an error of type `WireGuardAdapterError`.
 /// - Returns: The list of resolved endpoints.
 extension WireGuard.Configuration {
-    func resolvePeers(logHandler: @escaping WireGuardAdapter.LogHandler) async -> [Address: [Endpoint]] {
+    func resolvePeers(timeout: Int, logHandler: @escaping WireGuardAdapter.LogHandler) async -> [Address: [Endpoint]] {
         let endpoints = peers.compactMap(\.endpoint)
         let resolver = SimpleDNSResolver(strategy: {
             POSIXDNSStrategy(hostname: $0)
@@ -22,8 +22,10 @@ extension WireGuard.Configuration {
             for endpoint in endpoints {
                 group.addTask { @Sendable in
                     do {
-                        // FIXME: #199, Pick WireGuard DNS timeout from ConnectionParameters
-                        let resolvedRecords = try await resolver.resolve(endpoint.address.rawValue, timeout: 5000)
+                        let resolvedRecords = try await resolver.resolve(
+                            endpoint.address.rawValue,
+                            timeout: timeout
+                        )
                         var currentResolved: [Endpoint] = []
                         for record in resolvedRecords {
                             let newEndpoint = try Endpoint(record.address, endpoint.port)

@@ -17,8 +17,11 @@ import PartoutCore
 final class TunnelRemoteInfoGenerator: Sendable {
     private let tunnelConfiguration: WireGuard.Configuration
 
-    init(tunnelConfiguration: WireGuard.Configuration) {
+    private let dnsTimeout: Int
+
+    init(tunnelConfiguration: WireGuard.Configuration, dnsTimeout: Int) {
         self.tunnelConfiguration = tunnelConfiguration
+        self.dnsTimeout = dnsTimeout
     }
 
     func uapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async throws -> String {
@@ -35,7 +38,7 @@ final class TunnelRemoteInfoGenerator: Sendable {
         }
 
         // address: String -> resolvedEndpoints: [Endpoint]
-        let resolutionMap = await tunnelConfiguration.resolvePeers {
+        let resolutionMap = await tunnelConfiguration.resolvePeers(timeout: dnsTimeout) {
             logHandler($0, $1)
         }
 

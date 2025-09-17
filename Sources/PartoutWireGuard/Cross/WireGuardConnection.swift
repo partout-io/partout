@@ -26,6 +26,8 @@ public actor WireGuardConnection: Connection {
 
     private let environment: TunnelEnvironment
 
+    private let dnsTimeout: Int
+
     private let tunnelConfiguration: WireGuard.Configuration
 
     private let dataCountTimerInterval: TimeInterval
@@ -45,6 +47,7 @@ public actor WireGuardConnection: Connection {
         controller = parameters.controller
         reachability = parameters.reachability
         environment = parameters.environment
+        dnsTimeout = parameters.options.dnsTimeout
 
         guard let configuration = module.configuration else {
             fatalError("No WireGuard configuration defined?")
@@ -69,6 +72,7 @@ public actor WireGuardConnection: Connection {
             ctx,
             with: self,
             moduleId: moduleId,
+            dnsTimeout: dnsTimeout,
             reachability: reachability,
             logHandler: { [weak self] logLevel, message in
                 pp_log(self?.ctx ?? .global, .wireguard, logLevel.debugLevel, message)

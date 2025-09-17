@@ -43,6 +43,8 @@ actor WireGuardAdapter {
     /// The ID of the original ``WireGuardModule``.
     private let moduleId: UniqueID
 
+    private let dnsTimeout: Int
+
     /// Backend implementation.
     private let backend: WireGuardBackend
 
@@ -86,12 +88,14 @@ actor WireGuardAdapter {
         _ ctx: PartoutLoggerContext,
         with delegate: WireGuardAdapterDelegate,
         moduleId: UniqueID,
+        dnsTimeout: Int,
         reachability: ReachabilityObserver,
         logHandler: @escaping LogHandler
     ) async {
         self.ctx = ctx
         self.delegate = delegate
         self.moduleId = moduleId
+        self.dnsTimeout = dnsTimeout
         backend = WireGuardBackend()
         self.reachability = reachability
         reachabilityTask = nil
@@ -299,7 +303,7 @@ actor WireGuardAdapter {
     /// - Parameter tunnelConfiguration: an instance of type `WireGuard.Configuration`.
     /// - Returns: an instance of type `TunnelRemoteInfoGenerator`.
     private func makeSettingsGenerator(with tunnelConfiguration: WireGuard.Configuration) -> TunnelRemoteInfoGenerator {
-        TunnelRemoteInfoGenerator(tunnelConfiguration: tunnelConfiguration)
+        TunnelRemoteInfoGenerator(tunnelConfiguration: tunnelConfiguration, dnsTimeout: dnsTimeout)
     }
 
     private func didUpdateReachable(isReachable: Bool) async throws {
