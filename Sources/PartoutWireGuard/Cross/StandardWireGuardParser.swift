@@ -8,7 +8,6 @@ import PartoutCore
 #endif
 
 /// Parses WireGuard configurations in `wg-quick` format.
-// FIXME: #199, This is still broken, do not use in production
 public final class StandardWireGuardParser {
     public init() {
     }
