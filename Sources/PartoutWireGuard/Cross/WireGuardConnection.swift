@@ -13,7 +13,7 @@ import Foundation
 import PartoutCore
 #endif
 
-// FIXME: #199, drop @unchecked after refactoring
+// FIXME: #171, drop @unchecked after using Swift 6.1
 public final class WireGuardConnection: Connection, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
@@ -125,7 +125,7 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
         guard let adapter else { return }
         pp_log(ctx, .wireguard, .info, "Stop tunnel")
         statusSubject.send(.disconnecting)
-        // FIXME: #30, handle WireGuard adapter timeout
+        // FIXME: #199, handle WireGuard adapter timeout
         do {
             try await adapter.stop()
         } catch {

@@ -141,7 +141,7 @@ public final class LegacyWireGuardConnection: Connection, @unchecked Sendable {
         pp_log(ctx, .wireguard, .info, "Stop tunnel")
         statusSubject.send(.disconnecting)
 
-        // FIXME: #30, handle WireGuard adapter timeout
+        // XXX: WireGuard adapter timeout unhandled (done in Cross though)
 
         await withCheckedContinuation { [weak self] continuation in
             guard let self else {

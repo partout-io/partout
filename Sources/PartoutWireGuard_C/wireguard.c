@@ -86,7 +86,7 @@ int load_symbols() {
 
 int pp_wg_init() {
     if (load_symbols() != 0) return -1;
-    // FIXME: #199, fprintf
+    // FIXME: #205, fprintf
     fprintf(stderr, "wg-go version: %s\n", pp_wg_version());
     return 0;
 }

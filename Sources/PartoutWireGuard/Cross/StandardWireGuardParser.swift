@@ -7,10 +7,8 @@ import Foundation
 import PartoutCore
 #endif
 
-// FIXME: #199, this is broken, move to "Inteface" once fixed
-
 /// Parses WireGuard configurations in `wg-quick` format.
-@available(*, deprecated, message: "FIXME: #199, Do not used it yet in production")
+// FIXME: #199, This is still broken, do not use in production
 public final class StandardWireGuardParser {
     public init() {
     }

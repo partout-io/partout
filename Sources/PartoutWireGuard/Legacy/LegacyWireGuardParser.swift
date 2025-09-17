@@ -8,7 +8,7 @@ import PartoutCore
 #endif
 
 /// Parses WireGuard configurations in `wg-quick` format.
-//@available(*, deprecated, message: "FIXME: #199, Use StandardWireGuardParser")
+@available(*, deprecated, message: "Use StandardWireGuardParser")
 public final class LegacyWireGuardParser {
     public init() {
     }
