@@ -8,7 +8,7 @@ import PartoutCore
 import Testing
 
 @Suite
-struct StandardOpenVPNParserTests {
+struct OpenVPNParserTests {
     private let parser = StandardOpenVPNParser(supportsLZO: true, decrypter: nil)
 
     @Test
@@ -213,7 +213,7 @@ struct StandardOpenVPNParserTests {
 import PartoutOpenVPN_ObjC
 #endif
 
-private extension StandardOpenVPNParserTests {
+private extension OpenVPNParserTests {
     func url(withName name: String) -> URL {
         guard let url = Bundle.module.url(forResource: name, withExtension: "ovpn") else {
             fatalError("Cannot find URL in bundle")
