@@ -13,8 +13,7 @@ import Foundation
 import PartoutCore
 #endif
 
-// FIXME: #171, drop @unchecked after using Swift 6.1
-public final class WireGuardConnection: Connection, @unchecked Sendable {
+public actor WireGuardConnection: Connection {
     private let ctx: PartoutLoggerContext
 
     private let statusSubject: CurrentValueStream<ConnectionStatus>
@@ -60,7 +59,7 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
         pp_log(ctx, .wireguard, .info, "Deinit WireGuardConnection")
     }
 
-    public var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
+    public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
         statusSubject.subscribeThrowing()
     }
 
@@ -141,7 +140,7 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
 // MARK: - WireGuardAdapterDelegate
 
 extension WireGuardConnection: WireGuardAdapterDelegate {
-    func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool) {
+    nonisolated func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool) {
         if reasserting {
             statusSubject.send(.connecting)
         }
@@ -160,7 +159,7 @@ extension WireGuardConnection: WireGuardAdapterDelegate {
         }
     }
 
-    func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64]) {
+    nonisolated func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64]) {
         controller.configureSockets(with: descriptors)
     }
 
