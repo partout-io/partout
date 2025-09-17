@@ -127,7 +127,7 @@ actor WireGuardAdapter {
         }
         return await Task.detached { [weak self] in
             guard let self else { return nil }
-            guard let settings = await backend.getConfig(handle) else { return nil }
+            guard let settings = backend.getConfig(handle) else { return nil }
             return settings
         }.value
     }

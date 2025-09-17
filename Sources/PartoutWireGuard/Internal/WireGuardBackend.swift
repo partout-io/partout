@@ -10,7 +10,7 @@ enum WireGuardLogLevel: Int32 {
     case error = 1
 }
 
-final class WireGuardBackend {
+final class WireGuardBackend: @unchecked Sendable {
     typealias LoggerCallback = @convention(c) (_ context: UnsafeMutableRawPointer?, _ level: Int32, _ msg: UnsafePointer<Int8>?) -> Void
 
     init() {
