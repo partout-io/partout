@@ -7,6 +7,7 @@ import Foundation
 import PartoutCore
 import Testing
 
+@Suite
 struct StandardOpenVPNParserTests {
     private let parser = StandardOpenVPNParser(supportsLZO: true, decrypter: nil)
 
@@ -165,7 +166,7 @@ struct StandardOpenVPNParserTests {
 
     // MARK: PKCS
 
-    @Test(arguments: allParsers())
+    @Test(arguments: allParsers)
     func givenPKCS1_whenParse_thenFails(sut: StandardOpenVPNParser) {
         let cfgURL = url(withName: "tunnelbear.enc.1")
         do {
@@ -176,13 +177,13 @@ struct StandardOpenVPNParserTests {
         }
     }
 
-    @Test(arguments: allParsers())
+    @Test(arguments: allParsers)
     func givenPKCS1_whenParseWithPassphrase_thenSucceeds(sut: StandardOpenVPNParser) throws {
         let cfgURL = url(withName: "tunnelbear.enc.1")
         _ = try sut.parsed(fromURL: cfgURL, passphrase: "foobar")
     }
 
-    @Test(arguments: allParsers())
+    @Test(arguments: allParsers)
     func givenPKCS8_whenParse_thenFails(sut: StandardOpenVPNParser) {
         let cfgURL = url(withName: "tunnelbear.enc.8")
         do {
@@ -193,7 +194,7 @@ struct StandardOpenVPNParserTests {
         }
     }
 
-    @Test(arguments: allParsers())
+    @Test(arguments: allParsers)
     func givenPKCS8_whenParseWithPassphrase_thenSucceeds(sut: StandardOpenVPNParser) throws {
         let cfgURL = url(withName: "tunnelbear.enc.8")
         do {
@@ -208,6 +209,10 @@ struct StandardOpenVPNParserTests {
 
 // MARK: - Helpers
 
+#if canImport(PartoutOpenVPN_ObjC)
+import PartoutOpenVPN_ObjC
+#endif
+
 private extension StandardOpenVPNParserTests {
     func url(withName name: String) -> URL {
         guard let url = Bundle.module.url(forResource: name, withExtension: "ovpn") else {
@@ -215,21 +220,17 @@ private extension StandardOpenVPNParserTests {
         }
         return url
     }
-}
 
-#if canImport(PartoutOpenVPN_ObjC)
-import PartoutOpenVPN_ObjC
-#endif
-
-private func allParsers() -> [StandardOpenVPNParser] {
+    static var allParsers: [StandardOpenVPNParser] {
 #if OPENVPN_DEPRECATED_LZO
-    let supportsLZO = true
+        let supportsLZO = true
 #else
-    let supportsLZO = false
+        let supportsLZO = false
 #endif
-    var list = [StandardOpenVPNParser(supportsLZO: supportsLZO, decrypter: SimpleKeyDecrypter())]
+        var list = [StandardOpenVPNParser(supportsLZO: supportsLZO, decrypter: SimpleKeyDecrypter())]
 #if canImport(PartoutOpenVPN_ObjC)
-    list.append(StandardOpenVPNParser(supportsLZO: supportsLZO, decrypter: OSSLTLSBox()))
+        list.append(StandardOpenVPNParser(supportsLZO: supportsLZO, decrypter: OSSLTLSBox()))
 #endif
-    return list
+        return list
+    }
 }
