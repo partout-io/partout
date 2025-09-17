@@ -7,7 +7,6 @@ import Foundation
 import PartoutCore
 import Testing
 
-@Suite
 struct OpenVPNParserTests {
     private let parser = StandardOpenVPNParser(supportsLZO: true, decrypter: nil)
 
@@ -163,11 +162,15 @@ struct OpenVPNParserTests {
         #expect(cfg.warning == nil)
         #expect(cfg4.configuration.xorMethod == .obfuscate(mask: multiMask))
     }
+}
 
-    // MARK: PKCS
+// MARK: PKCS
 
-    @Test(arguments: allParsers)
-    func givenPKCS1_whenParse_thenFails(sut: StandardOpenVPNParser) {
+// Use the .serialized workaround to run these tests in Xcode
+// https://github.com/swiftlang/swift-testing/issues/749#issuecomment-2396267228
+extension OpenVPNParserTests {
+    @Test(.serialized, arguments: allParsers())
+    func givenParser_whenParsePKCS1_thenFails(sut: StandardOpenVPNParser) {
         let cfgURL = url(withName: "tunnelbear.enc.1")
         do {
             _ = try sut.parsed(fromURL: cfgURL)
@@ -177,14 +180,14 @@ struct OpenVPNParserTests {
         }
     }
 
-    @Test(arguments: allParsers)
-    func givenPKCS1_whenParseWithPassphrase_thenSucceeds(sut: StandardOpenVPNParser) throws {
+    @Test(.serialized, arguments: allParsers())
+    func givenParser_whenParsePKCS1WithPassphrase_thenSucceeds(sut: StandardOpenVPNParser) throws {
         let cfgURL = url(withName: "tunnelbear.enc.1")
         _ = try sut.parsed(fromURL: cfgURL, passphrase: "foobar")
     }
 
-    @Test(arguments: allParsers)
-    func givenPKCS8_whenParse_thenFails(sut: StandardOpenVPNParser) {
+    @Test(.serialized, arguments: allParsers())
+    func givenParser_whenParsePKCS8_thenFails(sut: StandardOpenVPNParser) {
         let cfgURL = url(withName: "tunnelbear.enc.8")
         do {
             _ = try sut.parsed(fromURL: cfgURL)
@@ -194,8 +197,8 @@ struct OpenVPNParserTests {
         }
     }
 
-    @Test(arguments: allParsers)
-    func givenPKCS8_whenParseWithPassphrase_thenSucceeds(sut: StandardOpenVPNParser) throws {
+    @Test(.serialized, arguments: allParsers())
+    func givenParser_whenParsePKCS8WithPassphrase_thenSucceeds(sut: StandardOpenVPNParser) throws {
         let cfgURL = url(withName: "tunnelbear.enc.8")
         do {
             _ = try sut.parsed(fromURL: cfgURL)
@@ -221,7 +224,7 @@ private extension OpenVPNParserTests {
         return url
     }
 
-    static var allParsers: [StandardOpenVPNParser] {
+    static func allParsers() -> [StandardOpenVPNParser] {
 #if OPENVPN_DEPRECATED_LZO
         let supportsLZO = true
 #else
