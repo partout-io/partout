@@ -13,8 +13,7 @@ import Foundation
 import PartoutCore
 #endif
 
-// FIXME: #199, drop @unchecked after refactoring
-public final class WireGuardConnection: Connection, @unchecked Sendable {
+public actor WireGuardConnection: Connection {
     private let ctx: PartoutLoggerContext
 
     private let statusSubject: CurrentValueStream<ConnectionStatus>
@@ -26,6 +25,8 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
     private let reachability: ReachabilityObserver
 
     private let environment: TunnelEnvironment
+
+    private let dnsTimeout: Int
 
     private let tunnelConfiguration: WireGuard.Configuration
 
@@ -46,6 +47,7 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
         controller = parameters.controller
         reachability = parameters.reachability
         environment = parameters.environment
+        dnsTimeout = parameters.options.dnsTimeout
 
         guard let configuration = module.configuration else {
             fatalError("No WireGuard configuration defined?")
@@ -60,7 +62,7 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
         pp_log(ctx, .wireguard, .info, "Deinit WireGuardConnection")
     }
 
-    public var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
+    public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
         statusSubject.subscribeThrowing()
     }
 
@@ -70,6 +72,7 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
             ctx,
             with: self,
             moduleId: moduleId,
+            dnsTimeout: dnsTimeout,
             reachability: reachability,
             logHandler: { [weak self] logLevel, message in
                 pp_log(self?.ctx ?? .global, .wireguard, logLevel.debugLevel, message)
@@ -125,7 +128,7 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
         guard let adapter else { return }
         pp_log(ctx, .wireguard, .info, "Stop tunnel")
         statusSubject.send(.disconnecting)
-        // FIXME: #30, handle WireGuard adapter timeout
+        // XXX: Ignore timeout, the stop call is typically snappy
         do {
             try await adapter.stop()
         } catch {
@@ -141,7 +144,7 @@ public final class WireGuardConnection: Connection, @unchecked Sendable {
 // MARK: - WireGuardAdapterDelegate
 
 extension WireGuardConnection: WireGuardAdapterDelegate {
-    func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool) {
+    nonisolated func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool) {
         if reasserting {
             statusSubject.send(.connecting)
         }
@@ -160,7 +163,7 @@ extension WireGuardConnection: WireGuardAdapterDelegate {
         }
     }
 
-    func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64]) {
+    nonisolated func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64]) {
         controller.configureSockets(with: descriptors)
     }
 

@@ -43,6 +43,8 @@ actor WireGuardAdapter {
     /// The ID of the original ``WireGuardModule``.
     private let moduleId: UniqueID
 
+    private let dnsTimeout: Int
+
     /// Backend implementation.
     private let backend: WireGuardBackend
 
@@ -86,12 +88,14 @@ actor WireGuardAdapter {
         _ ctx: PartoutLoggerContext,
         with delegate: WireGuardAdapterDelegate,
         moduleId: UniqueID,
+        dnsTimeout: Int,
         reachability: ReachabilityObserver,
         logHandler: @escaping LogHandler
     ) async {
         self.ctx = ctx
         self.delegate = delegate
         self.moduleId = moduleId
+        self.dnsTimeout = dnsTimeout
         backend = WireGuardBackend()
         self.reachability = reachability
         reachabilityTask = nil
@@ -123,7 +127,7 @@ actor WireGuardAdapter {
         }
         return await Task.detached { [weak self] in
             guard let self else { return nil }
-            guard let settings = await backend.getConfig(handle) else { return nil }
+            guard let settings = backend.getConfig(handle) else { return nil }
             return settings
         }.value
     }
@@ -138,7 +142,7 @@ actor WireGuardAdapter {
         }
         do {
             let settingsGenerator = makeSettingsGenerator(with: tunnelConfiguration)
-            let wgConfig = await settingsGenerator.uapiConfiguration(logHandler: logHandler)
+            let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
             try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
                 moduleId: moduleId,
                 descriptors: socketDescriptors
@@ -191,7 +195,7 @@ actor WireGuardAdapter {
 
         do {
             let settingsGenerator = makeSettingsGenerator(with: tunnelConfiguration)
-            let wgConfig = await settingsGenerator.uapiConfiguration(logHandler: logHandler)
+            let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
             try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
                 moduleId: moduleId,
                 descriptors: socketDescriptors
@@ -223,7 +227,11 @@ actor WireGuardAdapter {
             guard let self else { return }
             for await isReachable in reachability.isReachableStream {
                 guard !Task.isCancelled else { return }
-                await didUpdateReachable(isReachable: isReachable)
+                do {
+                    try await didUpdateReachable(isReachable: isReachable)
+                } catch {
+                    pp_log(ctx, .wireguard, .error, "Unable to update reachability: \(error)")
+                }
             }
         }
     }
@@ -295,17 +303,17 @@ actor WireGuardAdapter {
     /// - Parameter tunnelConfiguration: an instance of type `WireGuard.Configuration`.
     /// - Returns: an instance of type `TunnelRemoteInfoGenerator`.
     private func makeSettingsGenerator(with tunnelConfiguration: WireGuard.Configuration) -> TunnelRemoteInfoGenerator {
-        TunnelRemoteInfoGenerator(tunnelConfiguration: tunnelConfiguration)
+        TunnelRemoteInfoGenerator(tunnelConfiguration: tunnelConfiguration, dnsTimeout: dnsTimeout)
     }
 
-    private func didUpdateReachable(isReachable: Bool) async {
+    private func didUpdateReachable(isReachable: Bool) async throws {
 //        logHandler(.verbose, "Network change detected with \(path.status) route and interface order \(path.availableInterfaces)")
         logHandler(.verbose, "Network change detected, reachable: \(isReachable)")
 
         switch state {
         case .started(let handle, let settingsGenerator):
             if isReachable {
-                let wgConfig = await settingsGenerator.uapiConfiguration(logHandler: logHandler)
+                let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
 
                 backend.setConfig(handle, settings: wgConfig)
                 backend.disableSomeRoamingForBrokenMobileSemantics(handle)
@@ -321,7 +329,7 @@ actor WireGuardAdapter {
             guard isReachable else { return }
             logHandler(.verbose, "Connectivity online, resuming backend.")
             do {
-                let wgConfig = await settingsGenerator.uapiConfiguration(logHandler: logHandler)
+                let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
                 try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
                     moduleId: moduleId,
                     descriptors: socketDescriptors

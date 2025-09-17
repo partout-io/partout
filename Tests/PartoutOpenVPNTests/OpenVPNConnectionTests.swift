@@ -317,7 +317,9 @@ private struct Constants {
     ) async throws -> OpenVPNConnection {
         let profile = try Profile.Builder().tryBuild()
         let impl = OpenVPNModule.Implementation(
-            importer: StandardOpenVPNParser(supportsLZO: false, decrypter: nil),
+            importerBlock: {
+                StandardOpenVPNParser(supportsLZO: false, decrypter: nil)
+            },
             connectionBlock: {
                 try OpenVPNConnection(
                     .global,
