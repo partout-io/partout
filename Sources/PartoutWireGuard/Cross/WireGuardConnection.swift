@@ -128,7 +128,7 @@ public actor WireGuardConnection: Connection {
         guard let adapter else { return }
         pp_log(ctx, .wireguard, .info, "Stop tunnel")
         statusSubject.send(.disconnecting)
-        // FIXME: #199, handle WireGuard adapter timeout
+        // XXX: Ignore timeout, the stop call is typically snappy
         do {
             try await adapter.stop()
         } catch {
