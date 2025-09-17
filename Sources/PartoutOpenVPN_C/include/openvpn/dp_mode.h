@@ -279,6 +279,6 @@ pp_zd *_Nullable openvpn_dp_mode_decrypt_and_parse(openvpn_dp_mode *_Nonnull mod
     return dst;
 
 failure:
-    pp_zd_free(dst);
+    if (dst) pp_zd_free(dst);
     return NULL;
 }
