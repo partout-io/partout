@@ -10,5 +10,6 @@
 
 // WARNING: retains crypto
 openvpn_dp_mode *_Nonnull openvpn_dp_mode_ad_create(pp_crypto_ctx _Nonnull crypto,
-                                      pp_crypto_free_fn _Nonnull pp_crypto_free,
-                                      openvpn_compression_framing comp_f);
+                                                    pp_crypto_free_fn _Nonnull pp_crypto_free,
+                                                    openvpn_compression_framing comp_f,
+                                                    bool with_lzo);

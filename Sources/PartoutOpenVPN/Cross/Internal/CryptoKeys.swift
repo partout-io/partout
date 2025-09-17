@@ -56,8 +56,8 @@ final class CryptoKeysBridge {
         pp_zd_free(hmacDecKey)
     }
 
-    func withUnsafeKeys<T>(_ body: (UnsafePointer<pp_crypto_keys>) -> T) -> T {
-        withUnsafePointer(to: cKeys, body)
+    func withUnsafeKeys<T>(_ body: (UnsafePointer<pp_crypto_keys>) throws -> T) rethrows -> T {
+        try withUnsafePointer(to: cKeys, body)
     }
 }
 

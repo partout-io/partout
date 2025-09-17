@@ -93,7 +93,7 @@ uint32_t pp_tun_proto_for(uint8_t byte) {
         case 6:
             return AF_INET6;
         default:
-            assert(false);
+            pp_assert(false);
             return 0;
     }
 }
@@ -109,7 +109,7 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
 
     const int read_len = (int)readv(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
     if (read_len < 0) return -1;
-    if (read_len < sizeof(pi)) {
+    if (read_len < (int)sizeof(pi)) {
         fputs("Missing 4-byte utun packet header\n", stderr);
         return -1;
     }
@@ -128,7 +128,7 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
 
     const int written_len = (int)writev(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
     if (written_len < 0) return -1;
-    if (written_len != pi_len + src_len) return -2;
+    if (written_len != (int)(pi_len + src_len)) return -2;
     return written_len;
 }
 

@@ -596,11 +596,13 @@ private extension LegacyNegotiator {
                     break
 
                 case .LZO:
-                    if !LZOFactory.canCreate() {
-                        let error = OpenVPNSessionError.serverCompression
-                        pp_log(ctx, .openvpn, .fault, "Server has LZO compression enabled and this was not built into the library (framing=\(framing)): \(error)")
-                        throw error
-                    }
+#if OPENVPN_DEPRECATED_LZO
+                    break
+#else
+                    let error = OpenVPNSessionError.serverCompression
+                    pp_log(ctx, .openvpn, .fault, "Server has LZO compression enabled and this was not built into the library (framing=\(framing)): \(error)")
+                    throw error
+#endif
 
                 default:
                     let error = OpenVPNSessionError.serverCompression

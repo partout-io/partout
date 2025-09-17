@@ -43,9 +43,9 @@ default:
 }
 
 // The global settings for C targets
-let cSettings: [CSetting] = [
+let globalCSettings: [CSetting] = [
     .unsafeFlags([
-        "-Wall", "-Wextra"//, "-Werror"
+        "-Wall", "-Wextra"//, "-pedantic", "-Werror"
     ])
 ]
 
@@ -130,13 +130,13 @@ package.targets.append(contentsOf: [
     .target(
         name: "PartoutOS_C",
         dependencies: ["PartoutCoreWrapper"],
-        cSettings: {
+        cSettings: globalCSettings + {
             if OS.current == .windows {
                 return [
                     .unsafeFlags(["-Ivendors/wintun"])
                 ]
             }
-            return nil
+            return []
         }()
     ),
     .target(
@@ -231,6 +231,13 @@ if areas.contains(.api) {
 // OpenVPN requires Crypto/TLS wrappers
 if areas.contains(.openVPN), let cryptoMode {
     let includesLegacy = OS.current == .apple && cryptoMode == .openSSL
+
+    // Deprecated LZO (to be deleted)
+    let includesDeprecatedLZO = true
+    let lzoDefine = "OPENVPN_DEPRECATED_LZO"
+    let lzoCSettings: [CSetting] = true && includesDeprecatedLZO ? [.define(lzoDefine)] : []
+    let lzoSwiftSettings: [SwiftSetting] = true && includesDeprecatedLZO ? [.define(lzoDefine)] : []
+
     package.products.append(
         .library(
             name: "PartoutOpenVPN",
@@ -240,17 +247,19 @@ if areas.contains(.openVPN), let cryptoMode {
     package.targets.append(contentsOf: [
         .target(
             name: "PartoutOpenVPN_C",
-            dependencies: ["_PartoutCryptoImpl_C"]
+            dependencies: [
+                "_LZO_C",
+                "_PartoutCryptoImpl_C"
+            ],
+            cSettings: globalCSettings + lzoCSettings
         ),
         .target(
             name: "PartoutOpenVPN_ObjC",
-            dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-            exclude: [
-                "lib/COPYING",
-                "lib/Makefile",
-                "lib/README.LZO",
-                "lib/testmini.c"
-            ]
+            dependencies: [
+                "_LZO_C",
+                "_PartoutCryptoOpenSSL_ObjC"
+            ],
+            cSettings: lzoCSettings
         ),
         .target(
             name: "PartoutOpenVPN",
@@ -279,6 +288,9 @@ if areas.contains(.openVPN), let cryptoMode {
                 if includesLegacy {
                     list.append("OPENVPN_LEGACY")
                 }
+                if includesDeprecatedLZO {
+                    list.append(lzoDefine)
+                }
                 return list.map {
                     .define($0)
                 }
@@ -299,9 +311,19 @@ if areas.contains(.openVPN), let cryptoMode {
             }(),
             resources: [
                 .process("Resources")
-            ]
+            ],
+            swiftSettings: lzoSwiftSettings
         )
     ])
+    // Remove LZO ASAP
+    package.targets.append(
+        .target(
+            name: "_LZO_C",
+            path: "vendors/lzo",
+            exclude: ["COPYING"],
+            cSettings: globalCSettings
+        )
+    )
 }
 
 // MARK: WireGuard
@@ -329,7 +351,7 @@ if areas.contains(.wireGuard) {
             .target(
                 name: "PartoutWireGuard_C",
                 dependencies: ["PartoutOS_C"],
-                cSettings: [
+                cSettings: globalCSettings + [
                     .unsafeFlags(["-I\(cmakeOutput)/wg-go/include"])
                 ]
             )
@@ -397,7 +419,7 @@ case .openSSL:
                 name: "_PartoutCryptoImpl_C",
                 dependencies: ["PartoutOS_C"],
                 path: "Sources/PartoutCrypto/OpenSSL_C",
-                cSettings: [
+                cSettings: globalCSettings + [
                     .unsafeFlags(["-I\(cmakeOutput)/openssl/include"])
                 ],
                 linkerSettings: [
@@ -422,7 +444,7 @@ case .native:
                 list.remove(.current)
                 return list.map { "src/\($0.rawValue)" }
             }(),
-            cSettings: [
+            cSettings: globalCSettings + [
                 .unsafeFlags(["-I\(cmakeOutput)/mbedtls/include"])
             ],
             linkerSettings: [

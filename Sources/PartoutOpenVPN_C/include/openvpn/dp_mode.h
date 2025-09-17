@@ -11,6 +11,7 @@
 #include "crypto/crypto.h"
 #include "openvpn/comp.h"
 #include "openvpn/dp_framing.h"
+#include "openvpn/dp_lzo.h"
 
 // MARK: Outbound
 
@@ -21,6 +22,7 @@ typedef struct {
     pp_zd *_Nonnull dst;
     const uint8_t *_Nonnull src;
     size_t src_len;
+    pp_lzo _Nullable lzo;
 } openvpn_dp_mode_assemble_ctx;
 
 // encrypt -> SEND
@@ -53,6 +55,7 @@ typedef struct {
     uint8_t *_Nonnull dst_header;
     uint8_t *_Nonnull src; // allow parse in place
     size_t src_len;
+    pp_lzo _Nullable lzo;
     openvpn_dp_error *_Nullable error;
 } openvpn_dp_mode_parse_ctx;
 
@@ -105,6 +108,7 @@ typedef struct {
     openvpn_compression_framing comp_f;
     uint32_t peer_id;
     uint16_t mss_val;
+    bool with_lzo;
 } openvpn_dp_mode_options;
 
 typedef struct {
@@ -240,31 +244,41 @@ size_t openvpn_dp_mode_parse(openvpn_dp_mode *_Nonnull mode,
 
 static inline
 pp_zd *_Nullable openvpn_dp_mode_decrypt_and_parse(openvpn_dp_mode *_Nonnull mode,
-                                                    pp_zd *_Nonnull buf,
-                                                    uint32_t *_Nonnull dst_packet_id,
-                                                    uint8_t *_Nonnull dst_header,
-                                                    bool *_Nonnull dst_keep_alive,
-                                                    const uint8_t *_Nonnull src,
-                                                    size_t src_len,
-                                                    openvpn_dp_error *_Nullable error) {
+                                                   pp_zd *_Nonnull buf,
+                                                   uint32_t *_Nonnull dst_packet_id,
+                                                   uint8_t *_Nonnull dst_header,
+                                                   bool *_Nonnull dst_keep_alive,
+                                                   const uint8_t *_Nonnull src,
+                                                   size_t src_len,
+                                                   openvpn_dp_error *_Nullable error) {
 
     pp_assert(buf->length >= src_len);
+    pp_zd *dst = NULL;
     const size_t dec_len = openvpn_dp_mode_decrypt(mode, buf, dst_packet_id,
-                                           src, src_len, error);
-    if (!dec_len) {
-        return NULL;
+                                                   src, src_len, error);
+    if (dec_len == 0) {
+        goto failure;
     }
-    pp_zd *dst = pp_zd_create(dec_len);
+    dst = pp_zd_create(dec_len);
     const size_t dst_len = openvpn_dp_mode_parse(mode, dst, dst_header,
-                                         buf->bytes, dec_len, error);
-    if (!dst_len) {
-        pp_zd_free(dst);
-        return NULL;
+                                                 buf->bytes, dec_len, error);
+    if (dst_len == 0) {
+        goto failure;
     }
-    pp_zd_resize(dst, dst_len);
-    pp_assert(dst->length == dst_len);
+    bool is_compressed = false;
+    if (!openvpn_dp_lzo_parse(mode->parse_ctx.lzo, mode->opt.comp_f,
+                              *dst_header, dst, dst_len, &is_compressed)) {
+        goto failure;
+    }
+    if (!is_compressed) {
+        pp_zd_resize(dst, dst_len);
+    }
     if (openvpn_packet_is_ping(dst->bytes, dst->length)) {
         *dst_keep_alive = true;
     }
     return dst;
+
+failure:
+    if (dst) pp_zd_free(dst);
+    return NULL;
 }

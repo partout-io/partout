@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #import "StandardLZO.h"
-#import "lib/minilzo.h"
+#import "minilzo.h"
 
 NSString *const PassepartoutLZOErrorDomain = @"PassepartoutLZO";
 

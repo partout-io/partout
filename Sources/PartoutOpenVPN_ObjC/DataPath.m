@@ -89,10 +89,12 @@
         [self.encrypter setPeerId:peerId];
         [self.decrypter setPeerId:peerId];
         [self setCompressionFraming:compressionFraming];
-        
-        if ([LZOFactory canCreate] && (compressionAlgorithm == CompressionAlgorithmLZO)) {
+
+#ifdef OPENVPN_DEPRECATED_LZO
+        if (compressionAlgorithm == CompressionAlgorithmLZO) {
             self.lzo = [LZOFactory create];
         }
+#endif
     }
     return self;
 }

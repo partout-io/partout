@@ -14,11 +14,6 @@ static Class LZOClass(void)
 
 @implementation LZOFactory
 
-+ (BOOL)canCreate
-{
-    return LZOClass() != nil;
-}
-
 + (id<CompressionProvider>)create
 {
     Class clazz = LZOClass();

@@ -38,7 +38,7 @@ static WINTUN_SEND_PACKET_FUNC *WintunSendPacket;
 #define PP_LOAD_FUNC(lib, name)                         \
     do {                                                \
         *(FARPROC *)&name = GetProcAddress(lib, #name); \
-        assert(name && #name " not found in DLL");      \
+        pp_assert(name && #name " not found in DLL");      \
     } while (0)
 
 wchar_t *wstring_from_string(const char *str) {
@@ -155,7 +155,7 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     // FIXME: #188, dst_len must accomodate max packet_len (can we know the MTU beforehand?)
     // WINTUN_MAX_IP_PACKET_SIZE
     // printf(">>> tun_read read %lu bytes\n", packet_len);
-    assert(dst_len >= packet_len);
+    pp_assert(dst_len >= packet_len);
     if (dst_len >= packet_len) {
         memcpy(dst, packet, packet_len);
     }

@@ -17,22 +17,14 @@
 
 #define MINILZO_VERSION         0x20a0  /* 2.10 */
 
-#if defined(__LZOCONF_H_INCLUDED)
-#  error "you cannot use both LZO and miniLZO"
-#endif
-
-/* internal Autoconf configuration file - only used when building miniLZO */
-#ifdef MINILZO_HAVE_CONFIG_H
-#  include <config.h>
-#endif
 #include <limits.h>
 #include <stddef.h>
 
 #ifndef __LZODEFS_H_INCLUDED
-#include "lzodefs.h"
+#include <lzo/lzodefs.h>
 #endif
 #undef LZO_HAVE_CONFIG_H
-#include "lzoconf.h"
+#include <lzo/lzoconf.h>
 
 #if !defined(LZO_VERSION) || (LZO_VERSION != MINILZO_VERSION)
 #  error "version mismatch in header files"

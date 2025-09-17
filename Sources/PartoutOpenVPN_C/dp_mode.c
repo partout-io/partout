@@ -25,19 +25,27 @@ openvpn_dp_mode *openvpn_dp_mode_create_opt(pp_crypto_ctx crypto,
         mode->opt.comp_f = OpenVPNCompressionFramingDisabled;
         mode->opt.peer_id = OpenVPNPacketPeerIdDisabled;
         mode->opt.mss_val = 0;
+        mode->opt.with_lzo = false;
     }
 
-    // extend with raw crypto functions
+    // Extend with raw crypto functions
     mode->enc = *enc;
     mode->dec = *dec;
     mode->enc.raw_encrypt = crypto->base.encrypter.encrypt;
     mode->dec.raw_decrypt = crypto->base.decrypter.decrypt;
 
+    // Allocate LZO context for assemble and parse
+    if (mode->opt.with_lzo) {
+        mode->assemble_ctx.lzo = pp_lzo_create();
+        mode->parse_ctx.lzo = pp_lzo_create();
+    }
     return mode;
 }
 
 void openvpn_dp_mode_free(openvpn_dp_mode *mode) {
     OPENVPN_DP_LOG("openvpn_dp_mode_free");
+    if (mode->assemble_ctx.lzo) pp_lzo_free(mode->assemble_ctx.lzo);
+    if (mode->parse_ctx.lzo) pp_lzo_free(mode->parse_ctx.lzo);
     mode->pp_crypto_free(mode->crypto);
     pp_free(mode);
 }

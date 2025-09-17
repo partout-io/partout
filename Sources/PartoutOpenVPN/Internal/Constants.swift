@@ -70,12 +70,9 @@ extension Constants.ControlChannel {
             "IV_NCP=2",
             "IV_LZO_STUB=1"
         ]
-#if OPENVPN_LEGACY
-        if LZOFactory.canCreate() {
-            info.append("IV_LZO=1")
-        }
+#if OPENVPN_DEPRECATED_LZO
+        info.append("IV_LZO=1")
 #else
-        // FIXME: ###, port LZO to cross
         info.append("IV_LZO=0")
 #endif
         // XXX: always do --push-peer-info

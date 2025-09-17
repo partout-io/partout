@@ -162,6 +162,48 @@ struct StandardOpenVPNParserTests {
         #expect(cfg.warning == nil)
         #expect(cfg4.configuration.xorMethod == .obfuscate(mask: multiMask))
     }
+
+    // MARK: PKCS
+
+    @Test(arguments: allParsers())
+    func givenPKCS1_whenParse_thenFails(sut: StandardOpenVPNParser) {
+        let cfgURL = url(withName: "tunnelbear.enc.1")
+        do {
+            _ = try sut.parsed(fromURL: cfgURL)
+            #expect(Bool(false))
+        } catch {
+            //
+        }
+    }
+
+    @Test(arguments: allParsers())
+    func givenPKCS1_whenParseWithPassphrase_thenSucceeds(sut: StandardOpenVPNParser) throws {
+        let cfgURL = url(withName: "tunnelbear.enc.1")
+        _ = try sut.parsed(fromURL: cfgURL, passphrase: "foobar")
+    }
+
+    @Test(arguments: allParsers())
+    func givenPKCS8_whenParse_thenFails(sut: StandardOpenVPNParser) {
+        let cfgURL = url(withName: "tunnelbear.enc.8")
+        do {
+            _ = try sut.parsed(fromURL: cfgURL)
+            #expect(Bool(false))
+        } catch {
+            //
+        }
+    }
+
+    @Test(arguments: allParsers())
+    func givenPKCS8_whenParseWithPassphrase_thenSucceeds(sut: StandardOpenVPNParser) throws {
+        let cfgURL = url(withName: "tunnelbear.enc.8")
+        do {
+            _ = try sut.parsed(fromURL: cfgURL)
+            #expect(Bool(false))
+        } catch {
+            //
+        }
+        _ = try sut.parsed(fromURL: cfgURL, passphrase: "foobar")
+    }
 }
 
 // MARK: - Helpers
@@ -173,4 +215,21 @@ private extension StandardOpenVPNParserTests {
         }
         return url
     }
+}
+
+#if canImport(PartoutOpenVPN_ObjC)
+import PartoutOpenVPN_ObjC
+#endif
+
+private func allParsers() -> [StandardOpenVPNParser] {
+#if OPENVPN_DEPRECATED_LZO
+    let supportsLZO = true
+#else
+    let supportsLZO = false
+#endif
+    var list = [StandardOpenVPNParser(supportsLZO: supportsLZO, decrypter: SimpleKeyDecrypter())]
+#if canImport(PartoutOpenVPN_ObjC)
+    list.append(StandardOpenVPNParser(supportsLZO: supportsLZO, decrypter: OSSLTLSBox()))
+#endif
+    return list
 }

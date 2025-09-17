@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if PARTOUT_OPENVPN
+#if PARTOUT_API && PARTOUT_OPENVPN
 
 import Foundation
 #if !PARTOUT_MONOLITH
