@@ -21,9 +21,11 @@ final class TunnelRemoteInfoGenerator: Sendable {
         self.tunnelConfiguration = tunnelConfiguration
     }
 
-    func uapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async -> String {
+    func uapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async throws -> String {
+        let privateKey = try tunnelConfiguration.interface.privateKey.rawValue.hexStringFromBase64()
+
         var wgSettings = ""
-        wgSettings.append("private_key=\(tunnelConfiguration.interface.privateKey.rawValue.hexStringFromBase64)\n")
+        wgSettings.append("private_key=\(privateKey)\n")
         // TODO: #93, listenPort not implemented
 //        if let listenPort = tunnelConfiguration.interface.listenPort {
 //            wgSettings.append("listen_port=\(listenPort)\n")
@@ -38,9 +40,11 @@ final class TunnelRemoteInfoGenerator: Sendable {
         }
 
         for peer in tunnelConfiguration.peers {
-            wgSettings.append("public_key=\(peer.publicKey.rawValue.hexStringFromBase64)\n")
-            if let preSharedKey = peer.preSharedKey?.rawValue, !preSharedKey.isEmpty {
-                wgSettings.append("preshared_key=\(preSharedKey.hexStringFromBase64)\n")
+            let publicKey = try peer.publicKey.rawValue.hexStringFromBase64()
+            wgSettings.append("public_key=\(publicKey)\n")
+            if let preSharedKeyBase64 = peer.preSharedKey?.rawValue, !preSharedKeyBase64.isEmpty {
+                let preSharedKey = try preSharedKeyBase64.hexStringFromBase64()
+                wgSettings.append("preshared_key=\(preSharedKey)\n")
             }
             guard let endpoint = peer.endpoint else { continue }
             for resolvedEndpoint in resolutionMap[endpoint.address] ?? [] {
