@@ -171,8 +171,8 @@ extension WireGuard.Configuration {
         if let dnsString = attributes["dns"] {
             var dnsServers = [Address]()
             var dnsSearch = [String]()
-            for line in dnsString.splitToArray(trimmingCharacters: .whitespacesAndNewlines) {
-                guard let addr = Address(rawValue: line) else { continue }
+            for entry in dnsString.splitToArray(trimmingCharacters: .whitespacesAndNewlines) {
+                guard let addr = Address(rawValue: entry) else { continue }
                 if addr.isIPAddress {
                     dnsServers.append(addr)
                 } else {
