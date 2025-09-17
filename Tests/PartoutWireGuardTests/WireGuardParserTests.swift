@@ -6,15 +6,20 @@ import PartoutCore
 import PartoutWireGuard
 import Testing
 
+@Suite
 struct WireGuardParserTests {
-    private let parser = LegacyWireGuardParser()
+    private static let crossParser = StandardWireGuardParser()
+    private static let legacyParser = LegacyWireGuardParser()
+    private static var allParsers: [ModuleBuilderValidator] {
+        [crossParser, legacyParser]
+    }
 
     private let keyGenerator = StandardWireGuardKeyGenerator()
 
     // MARK: - Interface
 
-    @Test
-    func givenParser_whenGoodBuilder_thenDoesNotThrow() throws {
+    @Test(arguments: allParsers)
+    func givenParser_whenGoodBuilder_thenDoesNotThrow(parser: ModuleBuilderValidator) throws {
         var sut = newBuilder()
         sut.interface.addresses = ["1.2.3.4"]
 
@@ -27,11 +32,11 @@ struct WireGuardParserTests {
         try parser.validate(builder)
     }
 
-    @Test
-    func givenParser_whenBadPrivateKey_thenThrows() {
+    @Test(arguments: allParsers)
+    func givenParser_whenBadPrivateKey_thenThrows(parser: ModuleBuilderValidator) {
         let sut = WireGuard.Configuration.Builder(privateKey: "")
         do {
-            try assertValidationFailure(sut)
+            try assertValidationFailure(parser, sut)
         } catch {
             assertParseError(error) {
                 guard case .interfaceHasInvalidPrivateKey = $0 else {
@@ -42,12 +47,12 @@ struct WireGuardParserTests {
         }
     }
 
-    @Test
-    func givenParser_whenBadAddresses_thenThrows() {
+    @Test(arguments: allParsers)
+    func givenParser_whenBadAddresses_thenThrows(parser: ModuleBuilderValidator) {
         var sut = newBuilder()
         sut.interface.addresses = ["dsfds"]
         do {
-            try assertValidationFailure(sut)
+            try assertValidationFailure(parser, sut)
         } catch {
             assertParseError(error) {
                 guard case .interfaceHasInvalidAddress = $0 else {
@@ -83,15 +88,15 @@ struct WireGuardParserTests {
 
     // MARK: - Peers
 
-    @Test
-    func givenParser_whenBadPeerPublicKey_thenThrows() {
+    @Test(arguments: allParsers)
+    func givenParser_whenBadPeerPublicKey_thenThrows(parser: ModuleBuilderValidator) {
         var sut = newBuilder(withInterface: true)
 
         let peer = WireGuard.RemoteInterface.Builder(publicKey: "")
         sut.peers = [peer]
 
         do {
-            try assertValidationFailure(sut)
+            try assertValidationFailure(parser, sut)
         } catch {
             assertParseError(error) {
                 guard case .peerHasInvalidPublicKey = $0 else {
@@ -102,15 +107,15 @@ struct WireGuardParserTests {
         }
     }
 
-    @Test
-    func givenParser_whenBadPeerPresharedKey_thenThrows() {
+    @Test(arguments: allParsers)
+    func givenParser_whenBadPeerPresharedKey_thenThrows(parser: ModuleBuilderValidator) {
         var sut = newBuilder(withInterface: true, withPeer: true)
         var peer = sut.peers[0]
         peer.preSharedKey = "fdsfokn.,x"
         sut.peers = [peer]
 
         do {
-            try assertValidationFailure(sut)
+            try assertValidationFailure(parser, sut)
         } catch {
             assertParseError(error) {
                 guard case .peerHasInvalidPreSharedKey = $0 else {
@@ -121,15 +126,15 @@ struct WireGuardParserTests {
         }
     }
 
-    @Test
-    func givenParser_whenBadPeerEndpoint_thenThrows() {
+    @Test(arguments: allParsers)
+    func givenParser_whenBadPeerEndpoint_thenThrows(parser: ModuleBuilderValidator) {
         var sut = newBuilder(withInterface: true, withPeer: true)
         var peer = sut.peers[0]
         peer.endpoint = "fdsfokn.,x"
         sut.peers = [peer]
 
         do {
-            try assertValidationFailure(sut)
+            try assertValidationFailure(parser, sut)
         } catch {
             assertParseError(error) {
                 guard case .peerHasInvalidEndpoint = $0 else {
@@ -140,15 +145,15 @@ struct WireGuardParserTests {
         }
     }
 
-    @Test
-    func givenParser_whenBadPeerAllowedIPs_thenThrows() {
+    @Test(arguments: allParsers)
+    func givenParser_whenBadPeerAllowedIPs_thenThrows(parser: ModuleBuilderValidator) {
         var sut = newBuilder(withInterface: true, withPeer: true)
         var peer = sut.peers[0]
         peer.allowedIPs = ["fdsfokn.,x"]
         sut.peers = [peer]
 
         do {
-            try assertValidationFailure(sut)
+            try assertValidationFailure(parser, sut)
         } catch {
             assertParseError(error) {
                 guard case .peerHasInvalidAllowedIP = $0 else {
@@ -183,7 +188,7 @@ private extension WireGuardParserTests {
         return builder
     }
 
-    func assertValidationFailure(_ wgBuilder: WireGuard.Configuration.Builder) throws {
+    func assertValidationFailure(_ parser: ModuleBuilderValidator, _ wgBuilder: WireGuard.Configuration.Builder) throws {
         let builder = WireGuardModule.Builder(configurationBuilder: wgBuilder)
         #expect(throws: Error.self) {
             try parser.validate(builder)
