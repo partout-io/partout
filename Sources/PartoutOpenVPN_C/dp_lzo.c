@@ -37,7 +37,7 @@ bool openvpn_dp_lzo_parse(pp_lzo lzo,
                                                         dst->bytes,
                                                         dst_len); // Not dst->length, not resized yet
             if (!dst_comp) {
-                OPENVPN_DP_LOG("openvpn_dp_mode_decrypt_and_parse: LZO decompression failed");
+                OPENVPN_DP_LOG("openvpn_dp_lzo_parse: LZO decompression failed");
                 return false;
             }
             pp_zd_resize(dst, dst_comp_len);
