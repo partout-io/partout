@@ -93,7 +93,7 @@ uint32_t pp_tun_proto_for(uint8_t byte) {
         case 6:
             return AF_INET6;
         default:
-            assert(false);
+            pp_assert(false);
             return 0;
     }
 }
