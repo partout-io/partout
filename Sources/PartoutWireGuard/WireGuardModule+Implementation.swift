@@ -13,21 +13,21 @@ extension WireGuardModule {
 
         public let keyGenerator: WireGuardKeyGenerator
 
-        public let importer: ModuleImporter
+        public let importerBlock: @Sendable () -> ModuleImporter
 
-        public let validator: ModuleBuilderValidator
+        public let validatorBlock: @Sendable () -> ModuleBuilderValidator
 
         public let connectionBlock: @Sendable (ConnectionParameters, WireGuardModule) throws -> Connection
 
         public init(
             keyGenerator: WireGuardKeyGenerator,
-            importer: ModuleImporter,
-            validator: ModuleBuilderValidator,
+            importerBlock: @escaping @Sendable () -> ModuleImporter,
+            validatorBlock: @escaping @Sendable () -> ModuleBuilderValidator,
             connectionBlock: @escaping @Sendable (ConnectionParameters, WireGuardModule) throws -> Connection
         ) {
             self.keyGenerator = keyGenerator
-            self.importer = importer
-            self.validator = validator
+            self.importerBlock = importerBlock
+            self.validatorBlock = validatorBlock
             self.connectionBlock = connectionBlock
         }
     }
@@ -35,12 +35,12 @@ extension WireGuardModule {
 
 extension WireGuardModule.Implementation: ModuleImporter {
     public func module(fromContents contents: String, object: Any?) throws -> Module {
-        try importer.module(fromContents: contents, object: object)
+        try importerBlock().module(fromContents: contents, object: object)
     }
 }
 
 extension WireGuardModule.Implementation: ModuleBuilderValidator {
     public func validate(_ builder: any ModuleBuilder) throws {
-        try validator.validate(builder)
+        try validatorBlock().validate(builder)
     }
 }

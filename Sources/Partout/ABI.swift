@@ -46,7 +46,7 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
 #if PARTOUT_OPENVPN
     logCategories.append(.openvpn)
     allImplementations.append(OpenVPNModule.Implementation(
-        importer: StandardOpenVPNParser(),
+        importerBlock: { StandardOpenVPNParser() },
         connectionBlock: {
             let ctx = PartoutLoggerContext($0.profile.id)
             return try OpenVPNConnection(
@@ -62,8 +62,8 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
     logCategories.append(.wireguard)
     allImplementations.append(WireGuardModule.Implementation(
         keyGenerator: StandardWireGuardKeyGenerator(),
-        importer: StandardWireGuardParser(),
-        validator: StandardWireGuardParser(),
+        importerBlock: { StandardWireGuardParser() },
+        validatorBlock: { StandardWireGuardParser() },
         connectionBlock: {
             let ctx = PartoutLoggerContext($0.profile.id)
             return try WireGuardConnection(
