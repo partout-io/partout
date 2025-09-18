@@ -454,14 +454,14 @@ private extension LegacyOpenVPNSession {
         pendingPingTask?.cancel()
         pendingPingTask = runInActor(after: interval) { [weak self] in
             do {
-                try self?.ping()
+                try await self?.ping()
             } catch {
                 await self?.shutdown(error)
             }
         }
     }
 
-    func ping() throws {
+    func ping() async throws {
         guard !isStopped else {
             pp_log(ctx, .openvpn, .debug, "Ping cancelled, session stopped")
             return
@@ -481,7 +481,7 @@ private extension LegacyOpenVPNSession {
         // is keep-alive enabled?
         if keepAliveInterval != nil {
             pp_log(ctx, .openvpn, .debug, "Send ping")
-            sendDataPackets(
+            try await sendDataPackets(
                 [Constants.DataChannel.pingString],
                 to: link,
                 dataChannel: currentDataChannel

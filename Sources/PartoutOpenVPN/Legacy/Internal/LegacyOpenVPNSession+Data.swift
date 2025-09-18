@@ -12,24 +12,22 @@ extension LegacyOpenVPNSession {
         _ packets: [Data],
         to tunnel: IOInterface,
         dataChannel: LegacyDataChannel
-    ) {
-        Task {
-            do {
-                guard let decryptedPackets = try dataChannel.decrypt(packets: packets) else {
-                    pp_log(ctx, .openvpn, .error, "Unable to decrypt packets, is SessionKey properly configured (dataPath, peerId)?")
-                    return
-                }
-                guard !decryptedPackets.isEmpty else {
-                    return
-                }
-                reportInboundDataCount(decryptedPackets.flatCount)
-                try await tunnel.writePackets(decryptedPackets)
-            } catch {
-                if let nativeError = error.asNativeOpenVPNError {
-                    throw nativeError
-                }
-                throw OpenVPNSessionError.recoverable(error)
+    ) async throws {
+        do {
+            guard let decryptedPackets = try dataChannel.decrypt(packets: packets) else {
+                pp_log(ctx, .openvpn, .error, "Unable to decrypt packets, is SessionKey properly configured (dataPath, peerId)?")
+                return
             }
+            guard !decryptedPackets.isEmpty else {
+                return
+            }
+            reportInboundDataCount(decryptedPackets.flatCount)
+            try await tunnel.writePackets(decryptedPackets)
+        } catch {
+            if let nativeError = error.asNativeOpenVPNError {
+                throw nativeError
+            }
+            throw OpenVPNSessionError.recoverable(error)
         }
     }
 
@@ -37,25 +35,23 @@ extension LegacyOpenVPNSession {
         _ packets: [Data],
         to link: LinkInterface,
         dataChannel: LegacyDataChannel
-    ) {
-        Task {
-            do {
-                guard let encryptedPackets = try dataChannel.encrypt(packets: packets) else {
-                    pp_log(ctx, .openvpn, .error, "Unable to encrypt packets, is SessionKey properly configured (dataPath, peerId)?")
-                    return
-                }
-                guard !encryptedPackets.isEmpty else {
-                    return
-                }
-                reportOutboundDataCount(encryptedPackets.flatCount)
-                try await link.writePackets(encryptedPackets)
-            } catch {
-                if let nativeError = error.asNativeOpenVPNError {
-                    throw nativeError
-                }
-                pp_log(ctx, .openvpn, .error, "Data: Failed LINK write during send data: \(error)")
-                await shutdown(PartoutError(.linkFailure, error))
+    ) async throws {
+        do {
+            guard let encryptedPackets = try dataChannel.encrypt(packets: packets) else {
+                pp_log(ctx, .openvpn, .error, "Unable to encrypt packets, is SessionKey properly configured (dataPath, peerId)?")
+                return
             }
+            guard !encryptedPackets.isEmpty else {
+                return
+            }
+            reportOutboundDataCount(encryptedPackets.flatCount)
+            try await link.writePackets(encryptedPackets)
+        } catch {
+            if let nativeError = error.asNativeOpenVPNError {
+                throw nativeError
+            }
+            pp_log(ctx, .openvpn, .error, "Data: Failed LINK write during send data: \(error)")
+            await shutdown(PartoutError(.linkFailure, error))
         }
     }
 }
