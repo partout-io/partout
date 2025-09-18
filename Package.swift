@@ -257,7 +257,8 @@ if areas.contains(.openVPN), let cryptoMode {
             name: "PartoutOpenVPN_ObjC",
             dependencies: [
                 "_LZO_C",
-                "_PartoutCryptoOpenSSL_ObjC"
+                "_PartoutCryptoOpenSSL_ObjC",
+                "PartoutOpenVPN_C"
             ],
             cSettings: lzoCSettings
         ),
