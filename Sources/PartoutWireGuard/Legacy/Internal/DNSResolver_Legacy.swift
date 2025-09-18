@@ -123,9 +123,9 @@ extension WireGuardEndpoint {
 
         let addrInfo = result!.pointee
         if let ipv4Address = IPv4Address(addrInfo: addrInfo) {
-            return Endpoint(host: .ipv4(ipv4Address), port: port)
+            return WireGuardEndpoint(host: .ipv4(ipv4Address), port: port)
         } else if let ipv6Address = IPv6Address(addrInfo: addrInfo) {
-            return Endpoint(host: .ipv6(ipv6Address), port: port)
+            return WireGuardEndpoint(host: .ipv6(ipv6Address), port: port)
         } else {
             fatalError()
         }

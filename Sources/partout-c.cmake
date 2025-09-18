@@ -4,11 +4,13 @@ set(ROOT_DIR ${CMAKE_SOURCE_DIR}/..)
 add_library(Partout_C STATIC "")
 target_compile_options(Partout_C PRIVATE
     -DPARTOUT_MONOLITH
+    -DOPENVPN_DEPRECATED_LZO
 )
 
 # Header search paths from all C targets
 set(PARTOUT_C_INCLUDE_DIRS
     ${ROOT_DIR}/vendors/core/Sources/_PartoutCore_C/include
+    ${ROOT_DIR}/vendors/lzo/include
     ${CMAKE_SOURCE_DIR}/Partout_C/include
     ${CMAKE_SOURCE_DIR}/PartoutOS_C/include
     ${CMAKE_SOURCE_DIR}/PartoutOpenVPN_C/include
@@ -46,9 +48,10 @@ else()
     list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/)
 endif()
 
-# C sources, including vendored PartoutCore
+# C sources, including vendored PartoutCore and LZO
 file(GLOB_RECURSE PARTOUT_C_SOURCES
     ${ROOT_DIR}/vendors/core/Sources/_PartoutCore_C/*.c
+    ${ROOT_DIR}/vendors/lzo/*.c
     *.c
 )
 
