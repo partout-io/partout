@@ -176,7 +176,7 @@ private actor NESocket: LinkInterface {
                 try await asyncWritePacket(joinedPacket)
             }
         }
-        nwConnection.betterPathUpdateHandler = { isBetter in
+        nwConnection.betterPathUpdateHandler = { [weak self] isBetter in
             Task { [weak self] in
                 await self?.onBetterPath(isBetter)
             }
