@@ -61,7 +61,11 @@ extension LegacyOpenVPNTCPLink: LinkInterface {
                 return
             }
 
-            buffer += packets.joined()
+            // FIXME: #190, This is very inefficient (TCP)
+            buffer.reserveCapacity(buffer.count + packets.flatCount)
+            for p in packets {
+                buffer += p
+            }
             var until = 0
             let processedPackets = PacketStream.packets(
                 fromInboundStream: buffer,

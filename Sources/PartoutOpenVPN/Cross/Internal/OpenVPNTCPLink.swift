@@ -62,7 +62,10 @@ extension OpenVPNTCPLink: LinkInterface {
             }
 
             // FIXME: #190, This is very inefficient (TCP)
-            buffer += packets.joined()
+            buffer.reserveCapacity(buffer.count + packets.flatCount)
+            for p in packets {
+                buffer += p
+            }
             var until = 0
             let processedPackets = proc.packets(fromStream: buffer, until: &until)
             buffer = buffer.subdata(in: until..<buffer.count)
