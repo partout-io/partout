@@ -61,6 +61,7 @@ extension OpenVPNTCPLink: LinkInterface {
                 return
             }
 
+            // FIXME: #190, This is very inefficient (TCP)
             buffer += packets.joined()
             var until = 0
             let processedPackets = proc.packets(fromStream: buffer, until: &until)
@@ -92,6 +93,7 @@ extension OpenVPNTCPLink {
 
     func writePackets(_ packets: [Data]) async throws {
         let stream = proc.stream(fromPackets: packets)
+        guard !stream.isEmpty else { return }
         try await link.writePackets([stream])
     }
 }

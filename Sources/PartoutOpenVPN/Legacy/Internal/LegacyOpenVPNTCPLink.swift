@@ -101,6 +101,7 @@ extension LegacyOpenVPNTCPLink {
             xorMethod: xorMethod?.native ?? .none,
             xorMask: xorMask
         )
+        guard !stream.isEmpty else { return }
         try await link.writePackets([stream])
     }
 }
