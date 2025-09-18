@@ -26,7 +26,7 @@ extension LegacyOpenVPNSession {
                     pp_log(ctx, .openvpn, .debug, "Exit TUN loop after empty packets")
                     return
                 }
-                try receiveTunnel(packets: packets)
+                try await receiveTunnel(packets: packets)
             } catch {
                 pp_log(ctx, .openvpn, .error, "Failed TUN read: \(error)")
                 await shutdown(error)
@@ -52,7 +52,7 @@ extension LegacyOpenVPNSession {
                     return
                 }
                 do {
-                    try self.receiveLink(packets: packets)
+                    try await self.receiveLink(packets: packets)
                 } catch {
                     await self.shutdown(error)
                 }
@@ -64,7 +64,7 @@ extension LegacyOpenVPNSession {
 // MARK: - Private
 
 private extension LegacyOpenVPNSession {
-    func receiveLink(packets: [Data]) throws {
+    func receiveLink(packets: [Data]) async throws {
         guard !isStopped, let link else {
             return
         }
@@ -161,7 +161,7 @@ private extension LegacyOpenVPNSession {
                     pp_log(ctx, .openvpn, .error, "Accounted a data packet for which the cryptographic key hadn't been found")
                     continue
                 }
-                handleDataPackets(
+                try await handleDataPackets(
                     dataPackets,
                     to: tunnel,
                     dataChannel: dataChannel
@@ -170,7 +170,7 @@ private extension LegacyOpenVPNSession {
         }
     }
 
-    func receiveTunnel(packets: [Data]) throws {
+    func receiveTunnel(packets: [Data]) async throws {
         guard !isStopped else {
             return
         }
@@ -184,7 +184,7 @@ private extension LegacyOpenVPNSession {
 
         try checkPingTimeout()
 
-        sendDataPackets(
+        try await sendDataPackets(
             packets,
             to: negotiator.link,
             dataChannel: currentDataChannel
