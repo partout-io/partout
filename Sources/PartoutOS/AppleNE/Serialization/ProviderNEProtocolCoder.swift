@@ -33,6 +33,7 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
         proto.providerConfiguration = [Self.providerKey: encoded]
         proto.serverAddress = NEProtocolCoderServerAddress
         proto.disconnectOnSleep = profile.disconnectsOnSleep
+        proto.includeAllNetworks = profile.includesAllNetworks
         return proto
     }
 

@@ -42,6 +42,7 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
         proto.serverAddress = NEProtocolCoderServerAddress
         proto.passwordReference = passwordReference
         proto.disconnectOnSleep = profile.disconnectsOnSleep
+        proto.includeAllNetworks = profile.includesAllNetworks
         return proto
     }
 
