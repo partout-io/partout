@@ -547,8 +547,8 @@ enum CryptoMode {
 
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.191"
-let checksum = "14d87114c8650bf5b474e44ee687078a252eee3ae7b8ea88d88f1510752f7b9d"
+let version = "0.99.192"
+let checksum = "4b036db6006bf71b7eccc7035ba8474a543e7124c431dfa741940c6959ee4a6b"
 
 enum CoreDeployment: String, RawRepresentable {
     case remoteBinary
