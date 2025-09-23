@@ -10,7 +10,9 @@ extension Registry {
         withKnown: true,
         allImplementations: [
             OpenVPNModule.Implementation(
-                importer: StandardOpenVPNParser(),
+                importerBlock: {
+                    StandardOpenVPNParser()
+                },
                 connectionBlock: {
                     let ctx = PartoutLoggerContext($0.profile.id)
                     return try OpenVPNConnection(
@@ -23,8 +25,12 @@ extension Registry {
             ),
             WireGuardModule.Implementation(
                 keyGenerator: StandardWireGuardKeyGenerator(),
-                importer: StandardWireGuardParser(),
-                validator: StandardWireGuardParser(),
+                importerBlock: {
+                    StandardWireGuardParser()
+                },
+                validatorBlock: {
+                    StandardWireGuardParser()
+                },
                 connectionBlock: {
                     let ctx = PartoutLoggerContext($0.profile.id)
                     return try WireGuardConnection(
