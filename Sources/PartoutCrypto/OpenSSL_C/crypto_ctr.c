@@ -35,7 +35,7 @@ static
 size_t local_encryption_capacity(const void *vctx, size_t len) {
     const pp_crypto_ctr *ctx = vctx;
     pp_assert(ctx);
-    return pp_alloc_crypto_capacity(len, ctx->payload_len + ctx->ns_tag_len);
+    return pp_crypto_encryption_base_capacity(len, ctx->payload_len + ctx->ns_tag_len);
 }
 
 static

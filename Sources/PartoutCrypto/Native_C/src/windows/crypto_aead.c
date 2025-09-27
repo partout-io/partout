@@ -29,7 +29,7 @@ typedef struct {
 size_t local_encryption_capacity(const void *vctx, size_t len) {
     const pp_crypto_aead *ctx = vctx;
     pp_assert(ctx);
-    return pp_alloc_crypto_capacity(len, ctx->crypto.meta.tag_len);
+    return pp_crypto_encryption_base_capacity(len, ctx->crypto.meta.tag_len);
 }
 
 static
