@@ -58,7 +58,7 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "Partout",
+            name: "partout",
             type: libraryType,
             targets: ["Partout"]
         )
