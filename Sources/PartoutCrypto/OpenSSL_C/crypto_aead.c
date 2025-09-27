@@ -60,6 +60,7 @@ size_t local_encrypt(void *vctx,
     pp_assert(ctx->ctx_enc);
     pp_assert(flags);
     pp_assert(flags->ad_len >= ctx->id_len);
+    pp_assert_encryption_length(out_buf_len, in_len);
 
     EVP_CIPHER_CTX *ossl = ctx->ctx_enc;
     const size_t cipher_iv_len = ctx->crypto.meta.cipher_iv_len;
@@ -104,6 +105,7 @@ size_t local_decrypt(void *vctx,
     pp_assert(ctx->ctx_dec);
     pp_assert(flags);
     pp_assert(flags->ad_len >= ctx->id_len);
+    pp_assert_decryption_length(out_buf_len, in_len);
 
     EVP_CIPHER_CTX *ossl = ctx->ctx_dec;
     const size_t cipher_iv_len = ctx->crypto.meta.cipher_iv_len;

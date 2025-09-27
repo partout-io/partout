@@ -161,3 +161,14 @@ static inline
 pp_crypto_meta pp_crypto_meta_of(pp_crypto_ctx _Nonnull ctx) {
     return ctx->base.meta;
 }
+
+static inline
+void pp_assert_encryption_length(size_t out_len, size_t in_len) {
+    const size_t out_min_len = pp_alloc_crypto_capacity(in_len, 0);
+    pp_assert(out_len >= out_min_len);
+}
+
+static inline
+void pp_assert_decryption_length(size_t out_len, size_t in_len) {
+    pp_assert(out_len >= in_len);
+}
