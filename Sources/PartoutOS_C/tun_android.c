@@ -28,6 +28,7 @@ pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable any_impl) 
 
 /* Do nothing, impl and fd are managed externally. */
 void pp_tun_free(pp_tun tun) {
+    (void)tun;
 }
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
@@ -43,6 +44,7 @@ int pp_tun_fd(const pp_tun tun) {
 }
 
 const char *pp_tun_name(const pp_tun tun) {
+    (void)tun;
     return NULL;
 }
 
