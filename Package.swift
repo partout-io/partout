@@ -254,15 +254,6 @@ if areas.contains(.openVPN), let cryptoMode {
             cSettings: globalCSettings + lzoCSettings
         ),
         .target(
-            name: "PartoutOpenVPN_ObjC",
-            dependencies: [
-                "_LZO_C",
-                "_PartoutCryptoOpenSSL_ObjC",
-                "PartoutOpenVPN_C"
-            ],
-            cSettings: lzoCSettings
-        ),
-        .target(
             name: "PartoutOpenVPN",
             dependencies: {
                 var list: [Target.Dependency] = [
@@ -316,7 +307,7 @@ if areas.contains(.openVPN), let cryptoMode {
             swiftSettings: lzoSwiftSettings
         )
     ])
-    // Remove LZO ASAP
+    // Remove these ASAP
     package.targets.append(
         .target(
             name: "_LZO_C",
@@ -325,6 +316,19 @@ if areas.contains(.openVPN), let cryptoMode {
             cSettings: globalCSettings
         )
     )
+    if includesLegacy {
+        package.targets.append(
+            .target(
+                name: "PartoutOpenVPN_ObjC",
+                dependencies: [
+                    "_LZO_C",
+                    "_PartoutCryptoOpenSSL_ObjC",
+                    "PartoutOpenVPN_C"
+                ],
+                cSettings: lzoCSettings
+            )
+        )
+    }
 }
 
 // MARK: WireGuard
