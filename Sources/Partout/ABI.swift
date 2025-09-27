@@ -14,8 +14,7 @@ import PartoutCore
 
 @globalActor
 actor ABIActor {
-    actor Shared {}
-    static let shared = Shared()
+    static let shared = ABIActor()
 }
 
 // FIXME: #188, ABI is still optimistic

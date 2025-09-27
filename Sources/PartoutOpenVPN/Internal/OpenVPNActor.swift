@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @globalActor
-final class OpenVPNActor {
-    actor Shared {}
-
-    static let shared = Shared()
+actor OpenVPNActor {
+    static let shared = OpenVPNActor()
 }
