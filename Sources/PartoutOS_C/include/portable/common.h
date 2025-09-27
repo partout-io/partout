@@ -35,19 +35,6 @@ void pp_free(void *_Nullable ptr) {
     free(ptr);
 }
 
-/// - Parameters:
-///   - size: The base number of bytes.
-///   - overhead: The extra number of bytes.
-/// - Returns: The number of bytes to store a crypto buffer safely.
-static inline
-size_t pp_alloc_crypto_capacity(size_t size, size_t overhead) {
-
-#define PP_ALLOC_MAX_BLOCK_SIZE 16  // AES only, block is 128-bit
-
-    // encryption, byte-alignment, overhead (e.g. IV, digest)
-    return 2 * size + PP_ALLOC_MAX_BLOCK_SIZE + overhead;
-}
-
 static inline
 void pp_zero(void *_Nonnull ptr, size_t count) {
 #ifdef bzero

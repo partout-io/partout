@@ -36,7 +36,7 @@ static
 size_t local_encryption_capacity(const void *vctx, size_t input_len) {
     const pp_crypto_cbc *ctx = vctx;
     pp_assert(ctx);
-    return pp_alloc_crypto_capacity(input_len, ctx->crypto.meta.digest_len + ctx->crypto.meta.cipher_iv_len);
+    return pp_crypto_encryption_base_capacity(input_len, ctx->crypto.meta.digest_len + ctx->crypto.meta.cipher_iv_len);
 }
 
 static

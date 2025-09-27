@@ -7,7 +7,6 @@
 #pragma once
 
 #include "crypto.h"
-#include "portable/zd.h"
 
 pp_crypto_ctx _Nullable pp_crypto_ctr_create(const char *_Nonnull cipher_name,
                                        const char *_Nonnull digest_name,
