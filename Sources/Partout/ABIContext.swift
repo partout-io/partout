@@ -6,7 +6,7 @@
 import PartoutCore
 #endif
 
-@MainActor
+@ABIActor
 final class ABIContext {
     let registry: Registry
 
@@ -27,7 +27,7 @@ final class ABIContext {
     }
 }
 
-@MainActor
+@ABIActor
 extension ABIContext {
     func push() -> UnsafeMutableRawPointer {
         Unmanaged.passRetained(self).toOpaque()

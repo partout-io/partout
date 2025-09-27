@@ -12,6 +12,12 @@ import PartoutOS
 import PartoutCore
 #endif
 
+@globalActor
+actor ABIActor {
+    actor Shared {}
+    static let shared = Shared()
+}
+
 // FIXME: #188, ABI is still optimistic
 //
 // - should receive callback arguments for completion and error handling
@@ -22,7 +28,7 @@ import PartoutCore
 //
 
 @_cdecl("partout_init")
-@MainActor
+@ABIActor
 public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutableRawPointer {
     pp_log_g(.core, .debug, "Partout: Initialize")
 
@@ -91,13 +97,13 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
 }
 
 @_cdecl("partout_deinit")
-@MainActor
+@ABIActor
 public func partout_deinit(cCtx: UnsafeMutableRawPointer) {
     ABIContext.pop(cCtx)
 }
 
 @_cdecl("partout_daemon_start")
-@MainActor
+@ABIActor
 public func partout_daemon_start(
     cCtx: UnsafeMutableRawPointer,
     cArgs: UnsafePointer<partout_daemon_start_args>
@@ -153,7 +159,7 @@ public func partout_daemon_start(
 }
 
 @_cdecl("partout_daemon_stop")
-@MainActor
+@ABIActor
 public func partout_daemon_stop(cCtx: UnsafeMutableRawPointer) {
     pp_log_g(.core, .debug, "Partout: Stop daemon with ctx: \(cCtx)")
     let ctx = ABIContext.peek(cCtx)
