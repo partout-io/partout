@@ -350,11 +350,11 @@ extension CDataPath {
 
 private extension CDataPath {
     func resize(_ buf: UnsafeMutablePointer<pp_zd>, for count: Int) {
-        guard buf.pointee.length < count else {
+        var newCount = count + resizeStep
+        newCount += newCount % resizeStep // Align to step boundary
+        guard buf.pointee.length < newCount else {
             return
         }
-        var newCount = count + resizeStep
-        newCount -= newCount % resizeStep // align to step boundary
         pp_zd_resize(buf, newCount)
     }
 }
