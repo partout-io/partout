@@ -8,7 +8,7 @@
 
 # Partout
 
-A scalable framework to build modern network configuration apps.
+The easiest way to build cross-platform tunnel apps.
 
 __DISCLAIMER: the library is still undergoing deep architectural changes.__
 
