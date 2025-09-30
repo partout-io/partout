@@ -33,9 +33,7 @@ dependencies: [
 targets: [
     .target(
         name: "MyTarget",
-        dependencies: [
-            .product(name: "Partout", package: "partout"),
-        ]
+        dependencies: ["partout"]
     )
 ]
 ```
