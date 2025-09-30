@@ -14,7 +14,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 5
     steps:
-      - uses: passepartoutvpn/action-prepare-xcode-build@master
+      - uses: partout-io/action-prepare-xcode-build@master
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Ensure remote Core binary
