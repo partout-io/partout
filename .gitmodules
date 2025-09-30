@@ -6,4 +6,4 @@
 	url = https://github.com/openssl/openssl
 [submodule "vendors/core"]
 	path = vendors/core
-	url = git@github.com:passepartoutvpn/partout-core.git
+	url = git@github.com:partout-io/partout-core.git

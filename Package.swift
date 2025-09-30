@@ -339,7 +339,7 @@ if areas.contains(.wireGuard) {
     case .apple:
         // Require static wg-go backend
         package.dependencies.append(
-            .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.2025063102")
+            .package(url: "https://github.com/partout-io/wg-go-apple", from: "0.0.2025063102")
         )
         package.targets.append(
             .target(
@@ -393,7 +393,7 @@ case .openSSL:
     switch OS.current {
     case .apple:
         package.dependencies.append(
-            .package(url: "https://github.com/passepartoutvpn/openssl-apple", exact: "3.5.200")
+            .package(url: "https://github.com/partout-io/openssl-apple", exact: "3.5.200")
         )
         package.targets.append(contentsOf: [
             .target(
@@ -563,7 +563,7 @@ switch coreDeployment {
 case .remoteBinary:
     package.targets.append(.binaryTarget(
         name: "PartoutCoreWrapper",
-        url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(binaryFilename)",
+        url: "https://github.com/partout-io/partout/releases/download/\(version)/\(binaryFilename)",
         checksum: checksum
     ))
 case .localSource:
