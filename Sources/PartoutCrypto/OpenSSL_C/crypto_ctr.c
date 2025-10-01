@@ -35,7 +35,7 @@ static
 size_t local_encryption_capacity(const void *vctx, size_t len) {
     const pp_crypto_ctr *ctx = vctx;
     pp_assert(ctx);
-    return pp_alloc_crypto_capacity(len, ctx->payload_len + ctx->ns_tag_len);
+    return pp_crypto_encryption_base_capacity(len, ctx->payload_len + ctx->ns_tag_len);
 }
 
 static
@@ -64,6 +64,7 @@ size_t local_encrypt(void *vctx,
     pp_assert(ctx->ctx_enc);
     pp_assert(ctx->hmac_key_enc);
     pp_assert(flags);
+    pp_assert_encryption_length(out_buf_len, in_len);
 
     uint8_t *out_encrypted = out + ctx->ns_tag_len;
     size_t mac_len = 0;
@@ -112,6 +113,7 @@ size_t local_decrypt(void *vctx,
     pp_assert(ctx->ctx_dec);
     pp_assert(ctx->hmac_key_dec);
     pp_assert(flags);
+    pp_assert_decryption_length(out_buf_len, in_len);
 
     const uint8_t *iv = in;
     const uint8_t *encrypted = in + ctx->ns_tag_len;

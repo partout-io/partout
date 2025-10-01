@@ -47,8 +47,12 @@ extension Profile {
             }
         }
 
-        let isGatewayIPv4 = neSettings.ipv4Settings?.includedRoutes?.contains(.default()) ?? false
-        let isGatewayIPv6 = neSettings.ipv6Settings?.includedRoutes?.contains(.default()) ?? false
+        let isGatewayIPv4 = neSettings.ipv4Settings?.includedRoutes?.contains {
+            $0.hasSameDestination(as: .default())
+        } ?? false
+        let isGatewayIPv6 = neSettings.ipv6Settings?.includedRoutes?.contains {
+            $0.hasSameDestination(as: .default())
+        } ?? false
         let isGateway = isGatewayIPv4 || isGatewayIPv6
         pp_log(ctx, .os, .info, "\tVPN is default gateway: \(isGateway)")
 

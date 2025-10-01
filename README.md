@@ -3,12 +3,12 @@
 ![tvOS 17+](https://img.shields.io/badge/tvos-17+-green.svg)
 [![License GPLv3](https://img.shields.io/badge/license-GPLv3-lightgray.svg)](LICENSE)
 
-[![Unit Tests](https://github.com/passepartoutvpn/partout/actions/workflows/test.yml/badge.svg)](https://github.com/passepartoutvpn/partout/actions/workflows/test.yml)
-[![Core](https://github.com/passepartoutvpn/partout/actions/workflows/release_core.yml/badge.svg)](https://github.com/passepartoutvpn/partout/actions/workflows/release_core.yml)
+[![Unit Tests](https://github.com/partout-io/partout/actions/workflows/test.yml/badge.svg)](https://github.com/partout-io/partout/actions/workflows/test.yml)
+[![Core](https://github.com/partout-io/partout/actions/workflows/release_core.yml/badge.svg)](https://github.com/partout-io/partout/actions/workflows/release_core.yml)
 
 # Partout
 
-A scalable framework to build modern network configuration apps.
+The easiest way to build cross-platform tunnel apps.
 
 __DISCLAIMER: the library is still undergoing deep architectural changes.__
 
@@ -28,14 +28,12 @@ Import the library as a SwiftPM dependency:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/passepartoutvpn/partout", branch: "master")
+    .package(url: "https://github.com/partout-io/partout", branch: "master")
 ],
 targets: [
     .target(
         name: "MyTarget",
-        dependencies: [
-            .product(name: "Partout", package: "partout"),
-        ]
+        dependencies: ["partout"]
     )
 ]
 ```
@@ -155,18 +153,18 @@ By contributing to this project you are agreeing to the terms stated in the [Con
 
 Twitter: [@keeshux][about-twitter]
 
-Website: [passepartoutvpn.app][about-website]
+Website: [partout.io][about-website]
 
 [license-gpl]: LICENSE.gpl
 [license-mit]: LICENSE.mit
-[license-contact]: mailto:license@passepartoutvpn.app
+[license-contact]: mailto:license@partout.io
 [contrib-cla]: CLA.rst
 [contrib-readme]: CONTRIBUTING.md
 
-[github-releases]: https://github.com/passepartoutvpn/partout/releases
+[github-releases]: https://github.com/partout-io/partout/releases
 [credits-genericjson]: https://github.com/iwill/generic-json-swift
 [credits-tmthecoder]: https://github.com/tmthecoder
-[credits-tmthecoder-xor]: https://github.com/passepartoutvpn/tunnelkit/pull/255
+[credits-tmthecoder-xor]: https://github.com/partout-io/tunnelkit/pull/255
 
 [about-twitter]: https://twitter.com/keeshux
-[about-website]: https://passepartoutvpn.app
+[about-website]: https://github.com/partout-io

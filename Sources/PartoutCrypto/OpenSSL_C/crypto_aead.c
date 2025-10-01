@@ -33,7 +33,7 @@ void local_prepare_iv(void *vctx, uint8_t *_Nonnull iv, const pp_zd *_Nonnull hm
 size_t local_encryption_capacity(const void *vctx, size_t len) {
     const pp_crypto_aead *ctx = vctx;
     pp_assert(ctx);
-    return pp_alloc_crypto_capacity(len, ctx->crypto.meta.tag_len);
+    return pp_crypto_encryption_base_capacity(len, ctx->crypto.meta.tag_len);
 }
 
 static
@@ -60,6 +60,7 @@ size_t local_encrypt(void *vctx,
     pp_assert(ctx->ctx_enc);
     pp_assert(flags);
     pp_assert(flags->ad_len >= ctx->id_len);
+    pp_assert_encryption_length(out_buf_len, in_len);
 
     EVP_CIPHER_CTX *ossl = ctx->ctx_enc;
     const size_t cipher_iv_len = ctx->crypto.meta.cipher_iv_len;
@@ -104,6 +105,7 @@ size_t local_decrypt(void *vctx,
     pp_assert(ctx->ctx_dec);
     pp_assert(flags);
     pp_assert(flags->ad_len >= ctx->id_len);
+    pp_assert_decryption_length(out_buf_len, in_len);
 
     EVP_CIPHER_CTX *ossl = ctx->ctx_dec;
     const size_t cipher_iv_len = ctx->crypto.meta.cipher_iv_len;

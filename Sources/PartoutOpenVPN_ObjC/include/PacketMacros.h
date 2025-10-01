@@ -5,17 +5,18 @@
  */
 
 #import <Foundation/Foundation.h>
+#import "openvpn/packet.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
-#define OpenVPNPacketOpcodeLength          ((NSInteger)1)
-#define OpenVPNPacketIdLength              ((NSInteger)4)
-#define OpenVPNPacketSessionIdLength       ((NSInteger)8)
-#define OpenVPNPacketAckLengthLength       ((NSInteger)1)
-#define OpenVPNPacketPeerIdLength          ((NSInteger)3)
-#define OpenVPNPacketPeerIdDisabled        ((uint32_t)0xffffffu)
-#define OpenVPNPacketReplayIdLength        ((NSInteger)4)
-#define OpenVPNPacketReplayTimestampLength ((NSInteger)4)
+//#define OpenVPNPacketOpcodeLength          ((NSInteger)1)
+//#define OpenVPNPacketIdLength              ((NSInteger)4)
+//#define OpenVPNPacketSessionIdLength       ((NSInteger)8)
+//#define OpenVPNPacketAckLengthLength       ((NSInteger)1)
+//#define OpenVPNPacketPeerIdLength          ((NSInteger)3)
+//#define OpenVPNPacketPeerIdDisabled        ((uint32_t)0xffffffu)
+//#define OpenVPNPacketReplayIdLength        ((NSInteger)4)
+//#define OpenVPNPacketReplayTimestampLength ((NSInteger)4)
 
 typedef NS_ENUM(uint8_t, PacketCode) {
     PacketCodeSoftResetV1           = 0x03,

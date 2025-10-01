@@ -9,6 +9,17 @@ import PartoutCore
 import Testing
 
 struct ProfileNetworkSettingsTests {
+    @Test
+    func givenRoutes_whenDefaultGateway_thenContains() {
+        var routes: [NEIPv4Route] = []
+        let gw: NEIPv4Route = .default().cloned()
+        gw.gatewayAddress = "10.8.0.1"
+        routes.append(gw)
+        #expect(!routes.contains(.default()))
+        #expect(routes.contains {
+            $0.hasSameDestination(as: .default())
+        })
+    }
 
     // MARK: Plain
 

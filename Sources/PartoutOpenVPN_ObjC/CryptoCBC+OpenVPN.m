@@ -74,7 +74,7 @@
 
 - (NSData *)encryptedDataPacketWithKey:(uint8_t)key packetId:(uint32_t)packetId packetBytes:(const uint8_t *)packetBytes packetLength:(NSInteger)packetLength error:(NSError *__autoreleasing *)error
 {
-    OPENVPN_DP_ENCRYPT_BEGIN(self.peerId)
+    OPENVPN_LEGACY_DP_ENCRYPT_BEGIN(self.peerId)
 
     const int capacity = headerLength + (int)[self.crypto encryptionCapacityWithLength:packetLength];
     NSMutableData *encryptedPacket = [[NSMutableData alloc] initWithLength:capacity];
@@ -109,7 +109,7 @@
 {
     NSAssert(packet.length > 0, @"Decrypting an empty packet, how did it get this far?");
 
-    OPENVPN_DP_DECRYPT_BEGIN(packet)
+    OPENVPN_LEGACY_DP_DECRYPT_BEGIN(packet)
     if (packet.length < headerLength + self.crypto.digestLength + self.crypto.cipherIVLength) {
         return NO;
     }

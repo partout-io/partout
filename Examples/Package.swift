@@ -3,8 +3,6 @@
 
 import PackageDescription
 
-let dependency: Target.Dependency = .product(name: "Partout", package: "partout")
-
 let package = Package(
     name: "PartoutExamples",
     platforms: [.macOS(.v14)],
@@ -14,11 +12,11 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "test-abi",
-            dependencies: [dependency]
+            dependencies: ["partout"]
         ),
         .executableTarget(
             name: "test-posix-socket",
-            dependencies: [dependency]
+            dependencies: ["partout"]
         )
     ]
 )
@@ -27,7 +25,7 @@ let package = Package(
 package.targets.append(
     .executableTarget(
         name: "test-wintun",
-        dependencies: [dependency]
+        dependencies: ["partout"]
     )
 )
 #endif

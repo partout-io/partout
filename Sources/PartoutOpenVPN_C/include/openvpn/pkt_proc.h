@@ -39,8 +39,8 @@ typedef struct {
 } openvpn_pkt_proc;
 
 openvpn_pkt_proc *_Nonnull openvpn_pkt_proc_create(openvpn_pkt_proc_method method,
-                                     const uint8_t *_Nullable mask,
-                                     size_t mask_len);
+                                                   const uint8_t *_Nullable mask,
+                                                   size_t mask_len);
 
 void openvpn_pkt_proc_free(openvpn_pkt_proc *_Nonnull proc);
 
@@ -48,9 +48,9 @@ void openvpn_pkt_proc_free(openvpn_pkt_proc *_Nonnull proc);
 
 static inline
 void openvpn_pkt_proc_recv(const openvpn_pkt_proc *_Nonnull proc,
-                   uint8_t *_Nonnull dst,
-                   const uint8_t *_Nonnull src,
-                   size_t src_len) {
+                           uint8_t *_Nonnull dst,
+                           const uint8_t *_Nonnull src,
+                           size_t src_len) {
 
     const openvpn_pkt_proc_alg_ctx ctx = {
         dst, 0,
@@ -63,9 +63,9 @@ void openvpn_pkt_proc_recv(const openvpn_pkt_proc *_Nonnull proc,
 
 static inline
 void openvpn_pkt_proc_send(const openvpn_pkt_proc *_Nonnull proc,
-                   uint8_t *_Nonnull dst,
-                   const uint8_t *_Nonnull src,
-                   size_t src_len) {
+                           uint8_t *_Nonnull dst,
+                           const uint8_t *_Nonnull src,
+                           size_t src_len) {
 
     const openvpn_pkt_proc_alg_ctx ctx = {
         dst, 0,
@@ -84,9 +84,9 @@ void openvpn_pkt_proc_send(const openvpn_pkt_proc *_Nonnull proc,
 // stream -> parse packet and return new offset
 static inline
 pp_zd *_Nullable openvpn_pkt_proc_stream_recv(const void *_Nonnull vproc,
-                                               const uint8_t *_Nonnull src,
-                                               size_t src_len,
-                                               size_t *_Nullable src_rcvd) {
+                                              const uint8_t *_Nonnull src,
+                                              size_t src_len,
+                                              size_t *_Nullable src_rcvd) {
 
     if (src_len < OpenVPNPktProcStreamHeaderLength) {
         return NULL;
@@ -101,13 +101,7 @@ pp_zd *_Nullable openvpn_pkt_proc_stream_recv(const void *_Nonnull vproc,
 
     const openvpn_pkt_proc *proc = vproc;
     pp_zd *dst = pp_zd_create(buf_len);
-    const openvpn_pkt_proc_alg_ctx ctx = {
-        dst->bytes, 0,
-        buf_payload, 0, buf_len,
-        proc->mask ? proc->mask->bytes : NULL,
-        proc->mask ? proc->mask->length : 0
-    };
-    proc->recv(&ctx);
+    openvpn_pkt_proc_recv(proc, dst->bytes, buf_payload, buf_len);
     if (src_rcvd) {
         *src_rcvd = OpenVPNPktProcStreamHeaderLength + buf_len;
     }
@@ -121,10 +115,10 @@ size_t openvpn_pkt_proc_stream_send_bufsize(const int num, const size_t len) {
 
 static inline
 size_t openvpn_pkt_proc_stream_send(const void *_Nonnull vproc,
-                            pp_zd *_Nonnull dst,
-                            size_t dst_offset,
-                            const uint8_t *_Nonnull src,
-                            size_t src_len) {
+                                    pp_zd *_Nonnull dst,
+                                    size_t dst_offset,
+                                    const uint8_t *_Nonnull src,
+                                    size_t src_len) {
 
     const size_t buf_len = OpenVPNPktProcStreamHeaderLength + src_len;
     pp_assert(dst->length >= dst_offset + buf_len);
@@ -134,12 +128,6 @@ size_t openvpn_pkt_proc_stream_send(const void *_Nonnull vproc,
     ptr += OpenVPNPktProcStreamHeaderLength;
 
     const openvpn_pkt_proc *proc = vproc;
-    const openvpn_pkt_proc_alg_ctx ctx = {
-        ptr, 0,
-        src, 0, src_len,
-        proc->mask ? proc->mask->bytes : NULL,
-        proc->mask ? proc->mask->length : 0
-    };
-    proc->send(&ctx);
+    openvpn_pkt_proc_send(proc, ptr, src, src_len);
     return dst_offset + buf_len;
 }

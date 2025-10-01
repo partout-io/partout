@@ -9,10 +9,10 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     steps:
-      - uses: passepartoutvpn/action-prepare-xcode-build@master
+      - uses: partout-io/action-prepare-xcode-build@master
         with:
           access_token: ${{ secrets.ACCESS_TOKEN }}
-      - uses: passepartoutvpn/action-release-binary-package@master
+      - uses: partout-io/action-release-binary-package@master
         env:
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
         with:

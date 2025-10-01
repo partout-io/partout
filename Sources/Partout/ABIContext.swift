@@ -2,11 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !os(iOS) && !os(tvOS)
+
 #if !PARTOUT_MONOLITH
 import PartoutCore
 #endif
 
-@MainActor
+@ABIActor
 final class ABIContext {
     let registry: Registry
 
@@ -27,7 +29,7 @@ final class ABIContext {
     }
 }
 
-@MainActor
+@ABIActor
 extension ABIContext {
     func push() -> UnsafeMutableRawPointer {
         Unmanaged.passRetained(self).toOpaque()
@@ -41,3 +43,5 @@ extension ABIContext {
         Unmanaged.fromOpaque(raw).takeUnretainedValue()
     }
 }
+
+#endif

@@ -9,6 +9,19 @@
 #include "portable/common.h"
 #include "portable/zd.h"
 
+/// - Parameters:
+///   - size: The base number of bytes.
+///   - overhead: The extra number of bytes.
+/// - Returns: The number of bytes to store a crypto buffer safely.
+static inline
+size_t pp_crypto_encryption_base_capacity(size_t size, size_t overhead) {
+
+#define PP_CRYPTO_MAX_BLOCK_SIZE 16  // AES only, block is 128-bit
+
+    // encryption, byte-alignment, overhead (e.g. IV, digest)
+    return 2 * size + PP_CRYPTO_MAX_BLOCK_SIZE + overhead;
+}
+
 bool pp_crypto_init_seed(const uint8_t *_Nonnull src, const size_t len);
 bool pp_crypto_init_seed_zd(const pp_zd *_Nonnull zd);
 
@@ -160,4 +173,15 @@ bool pp_crypto_verify(pp_crypto_ctx _Nonnull ctx,
 static inline
 pp_crypto_meta pp_crypto_meta_of(pp_crypto_ctx _Nonnull ctx) {
     return ctx->base.meta;
+}
+
+static inline
+void pp_assert_encryption_length(size_t out_len, size_t in_len) {
+    const size_t out_min_len = pp_crypto_encryption_base_capacity(in_len, 0);
+    pp_assert(out_len >= out_min_len);
+}
+
+static inline
+void pp_assert_decryption_length(size_t out_len, size_t in_len) {
+    pp_assert(out_len >= in_len);
 }

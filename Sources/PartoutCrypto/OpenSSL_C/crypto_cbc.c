@@ -36,7 +36,7 @@ static
 size_t local_encryption_capacity(const void *vctx, size_t input_len) {
     const pp_crypto_cbc *ctx = vctx;
     pp_assert(ctx);
-    return pp_alloc_crypto_capacity(input_len, ctx->crypto.meta.digest_len + ctx->crypto.meta.cipher_iv_len);
+    return pp_crypto_encryption_base_capacity(input_len, ctx->crypto.meta.digest_len + ctx->crypto.meta.cipher_iv_len);
 }
 
 static
@@ -65,6 +65,7 @@ size_t local_encrypt(void *vctx,
     pp_assert(ctx);
     pp_assert(!ctx->cipher || ctx->ctx_enc);
     pp_assert(ctx->hmac_key_enc);
+    pp_assert_encryption_length(out_buf_len, in_len);
 
     // output = [-digest-|-iv-|-payload-]
     const size_t digest_len = ctx->crypto.meta.digest_len;
@@ -127,6 +128,7 @@ size_t local_decrypt(void *vctx,
     pp_assert(ctx);
     pp_assert(!ctx->cipher || ctx->ctx_dec);
     pp_assert(ctx->hmac_key_dec);
+    pp_assert_decryption_length(out_buf_len, in_len);
 
     const size_t digest_len = ctx->crypto.meta.digest_len;
     const size_t cipher_iv_len = ctx->crypto.meta.cipher_iv_len;

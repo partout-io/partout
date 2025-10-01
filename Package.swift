@@ -58,7 +58,7 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "Partout",
+            name: "partout",
             type: libraryType,
             targets: ["Partout"]
         )
@@ -254,14 +254,6 @@ if areas.contains(.openVPN), let cryptoMode {
             cSettings: globalCSettings + lzoCSettings
         ),
         .target(
-            name: "PartoutOpenVPN_ObjC",
-            dependencies: [
-                "_LZO_C",
-                "_PartoutCryptoOpenSSL_ObjC"
-            ],
-            cSettings: lzoCSettings
-        ),
-        .target(
             name: "PartoutOpenVPN",
             dependencies: {
                 var list: [Target.Dependency] = [
@@ -315,7 +307,7 @@ if areas.contains(.openVPN), let cryptoMode {
             swiftSettings: lzoSwiftSettings
         )
     ])
-    // Remove LZO ASAP
+    // Remove these ASAP
     package.targets.append(
         .target(
             name: "_LZO_C",
@@ -324,6 +316,19 @@ if areas.contains(.openVPN), let cryptoMode {
             cSettings: globalCSettings
         )
     )
+    if includesLegacy {
+        package.targets.append(
+            .target(
+                name: "PartoutOpenVPN_ObjC",
+                dependencies: [
+                    "_LZO_C",
+                    "_PartoutCryptoOpenSSL_ObjC",
+                    "PartoutOpenVPN_C"
+                ],
+                cSettings: lzoCSettings
+            )
+        )
+    }
 }
 
 // MARK: WireGuard
@@ -334,7 +339,7 @@ if areas.contains(.wireGuard) {
     case .apple:
         // Require static wg-go backend
         package.dependencies.append(
-            .package(url: "https://github.com/passepartoutvpn/wg-go-apple", from: "0.0.2025063102")
+            .package(url: "https://github.com/partout-io/wg-go-apple", from: "0.0.2025063102")
         )
         package.targets.append(
             .target(
@@ -388,7 +393,7 @@ case .openSSL:
     switch OS.current {
     case .apple:
         package.dependencies.append(
-            .package(url: "https://github.com/passepartoutvpn/openssl-apple", exact: "3.5.200")
+            .package(url: "https://github.com/partout-io/openssl-apple", exact: "3.5.200")
         )
         package.targets.append(contentsOf: [
             .target(
@@ -546,8 +551,8 @@ enum CryptoMode {
 
 // action-release-binary-package (PartoutCore)
 let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.191"
-let checksum = "14d87114c8650bf5b474e44ee687078a252eee3ae7b8ea88d88f1510752f7b9d"
+let version = "0.99.193"
+let checksum = "3207ab3ecd6ed89194e01b000b9acd92bb4d4abf3acb9c0c3dfe8403e86ac4b4"
 
 enum CoreDeployment: String, RawRepresentable {
     case remoteBinary
@@ -558,7 +563,7 @@ switch coreDeployment {
 case .remoteBinary:
     package.targets.append(.binaryTarget(
         name: "PartoutCoreWrapper",
-        url: "https://github.com/passepartoutvpn/partout/releases/download/\(version)/\(binaryFilename)",
+        url: "https://github.com/partout-io/partout/releases/download/\(version)/\(binaryFilename)",
         checksum: checksum
     ))
 case .localSource:
