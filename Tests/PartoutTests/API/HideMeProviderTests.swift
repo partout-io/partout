@@ -12,6 +12,8 @@ struct HideMeProviderTests: APITestSuite {
         setUpLogging()
     }
 
+    let providerId: ProviderID = .hideme
+
     @Test(arguments: [
         FetchInput(
             cache: nil,
@@ -36,10 +38,10 @@ struct HideMeProviderTests: APITestSuite {
     ])
     func whenFetchInfrastructure_thenReturns(input: FetchInput) async throws {
         let sut = try newAPIMapper(input.hijacked ? { @Sendable in
-            hijacker(forFetchURL: $1)
+            providerId.hijacker(forFetchURL: $1)
         } : nil)
         do {
-            let module = try ProviderModule(emptyWithProviderId: .hideme)
+            let module = try ProviderModule(emptyWithProviderId: providerId)
             let infra = try await sut.infrastructure(for: module, cache: input.cache)
             #expect(infra.presets.count == input.presetsCount)
             #expect(infra.servers.count == input.serversCount)
@@ -69,32 +71,6 @@ struct HideMeProviderTests: APITestSuite {
             }
         } catch {
             #expect(Bool(false), "Failed: \(error)")
-        }
-    }
-}
-
-extension HideMeProviderTests {
-    struct FetchInput {
-        let cache: ProviderCache?
-
-        let presetsCount: Int
-
-        let serversCount: Int
-
-        let isCached: Bool
-
-        var hijacked = true
-    }
-
-    func hijacker(forFetchURL urlString: String) -> (Int, Data) {
-        guard let url = Bundle.module.url(forResource: "Resources/hideme/fetch", withExtension: "json") else {
-            fatalError("Unable to find fetch.json")
-        }
-        do {
-            let data = try Data(contentsOf: url)
-            return (200, data)
-        } catch {
-            fatalError("Unable to read JSON contents: \(error)")
         }
     }
 }
