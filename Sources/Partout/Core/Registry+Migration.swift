@@ -18,44 +18,8 @@ extension Registry {
         do {
             switch profile.version {
             case nil:
-                var builder = profile.builder(withNewId: false, forUpgrade: true)
-
-#if PARTOUT_OPENVPN
-                // look for OpenVPN provider modules
-                let ovpnPairs: [(offset: Int, module: OpenVPNModule)] = profile.modules
-                    .enumerated()
-                    .compactMap {
-                        guard let module = $0.element as? OpenVPNModule,
-                              module.providerSelection != nil else {
-                            return nil
-                        }
-                        return ($0.offset, module)
-                    }
-
-                // convert provider modules to ProviderModule of type .openVPN
-                try ovpnPairs.forEach {
-                    guard let selection = $0.module.providerSelection else {
-                        return
-                    }
-
-                    var providerBuilder = ProviderModule.Builder()
-                    providerBuilder.providerId = ProviderID(rawValue: selection.id.rawValue)
-                    providerBuilder.providerModuleType = .openVPN
-                    providerBuilder.entity = try selection.entity?.upgraded()
-
-                    var options = OpenVPNProviderTemplate.Options()
-                    options.credentials = $0.module.credentials
-                    try providerBuilder.setOptions(options, for: .openVPN)
-                    let provider = try providerBuilder.tryBuild()
-
-                    // replace old module
-                    builder.modules[$0.offset] = provider
-                    builder.activeModulesIds.insert(provider.id)
-                    builder.activeModulesIds.remove($0.module.id)
-                }
-#endif
-
-                // set new version at the very least
+                // Set new version at the very least
+                let builder = profile.builder(withNewId: false, forUpgrade: true)
                 return try builder.tryBuild()
             default:
                 return nil
