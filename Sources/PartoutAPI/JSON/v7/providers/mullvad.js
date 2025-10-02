@@ -34,15 +34,15 @@ function authenticate(module, deviceId) {
 
     const newModule = module;
 
-    // 1. auth via credentials/token
+    // 1. Authenticate via credentials/token
 
-    // assert required input
+    // Assert required input
     const auth = module.authentication;
     if (!auth) {
         return api.errorResponse("missing authentication");
     }
 
-    // check token validity
+    // Check token validity
     if (auth.token) {
         const expiry = new Date(api.timestampToISO(auth.token.expiryDate));
         const now = new Date();
@@ -55,10 +55,12 @@ function authenticate(module, deviceId) {
         }
     }
 
-    // authenticate if needed
+    // Authenticate if needed
     if (auth.token) {
-        // token is valid, go ahead
-    } else if (auth.credentials) {
+        // Token is not expired, go ahead
+    }
+    // Token is expired, redo auth with credentials
+    else if (auth.credentials) {
         api.debug("JS.authenticate: Authenticate with credentials");
         const body = api.jsonToBase64({
             "account_number": auth.credentials.username
@@ -77,7 +79,9 @@ function authenticate(module, deviceId) {
             accessToken: response.access_token,
             expiryDate: api.timestampFromISO(response.expiry)
         };
-    } else {
+    }
+    // Invalid token and missing credentials
+    else {
         return api.errorResponse("authentication failed");
     }
 
@@ -86,7 +90,7 @@ function authenticate(module, deviceId) {
 
     // 2. WireGuard session registration
 
-    // stop here if another type
+    // No need to go further if module type is not WireGuard
     const wgType = "WireGuard";
     if (module.providerModuleType != wgType) {
         return {
@@ -114,17 +118,17 @@ function authenticate(module, deviceId) {
         api.debug(`JS.authenticate: Session peer = ${JSON.stringify(session.peer)}`);
     }
 
-    // if subsequent calls return 401, rather than re-authenticating, just
-    // fail and inform the user. this should be rare and managing a potentially
-    // infinite auth loop is really not worth the deal
+    // If subsequent calls return 401, rather than re-authenticating, just
+    // fail and inform the user. This should be rare and managing a potentially
+    // infinite auth loop is really not worth the deal.
 
-    // authenticate with token from now on
+    // Authenticate with token from now on
     const headers = {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${auth.token.accessToken}`
     };
 
-    // get list of devices
+    // Get list of all registered devices
     const devicesURL = `${baseURL}/accounts/v1/devices`;
     const json = api.getResult("GET", devicesURL, headers);
     if (json.status != 200) {
@@ -134,12 +138,12 @@ function authenticate(module, deviceId) {
     api.debug(`JS.authenticate: Session public key = ${session.publicKey}`);
     const devices = JSON.parse(json.response);
 
-    // look up own device
+    // Look up registered device by peer ID
     let myDevice = devices.find(d => session.peer && d.id == session.peer.id);
     if (myDevice) {
         api.debug(`JS.authenticate: Device found = ${JSON.stringify(myDevice)}`);
 
-        // key differs, update remote
+        // Public key differs, replace remote key with local
         if (myDevice.pubkey != session.publicKey) {
             api.debug(`JS.authenticate: Update public key from '${myDevice.pubkey}' to '${session.publicKey}'`);
             const body = api.jsonToBase64({
@@ -153,22 +157,22 @@ function authenticate(module, deviceId) {
             api.debug(`JS.authenticate: Device updated = ${json.response}`);
             myDevice = JSON.parse(json.response);
         }
-        // key is up-to-date, refresh local
+        // The public key is up-to-date, refresh local
         else {
             api.debug("JS.authenticate: Public key is up to date");
         }
     }
-    // register new device
+    // Peer not found, register as new device
     else {
         api.debug(`JS.authenticate: Device not found, register with public key '${session.publicKey}'`);
         const body = api.jsonToBase64({
             "pubkey": session.publicKey
         });
 
-        // WARNING: fails with 400 if:
+        // WARNING: Fails with HTTP 400 if:
         //
-        // - pubkey is used by another device
-        // - pubkey is used by a device that was recently deleted
+        // - publicKey is used by another device
+        // - publicKey is used by a device that was recently deleted
         //
         const json = api.getResult("POST", devicesURL, headers, body);
         if (json.status != 201) {
@@ -178,7 +182,7 @@ function authenticate(module, deviceId) {
         myDevice = JSON.parse(json.response);
     }
 
-    // update storage
+    // Update storage
     const peer = {
         id: myDevice.id,
         creationDate: api.timestampFromISO(myDevice.created),
@@ -227,9 +231,9 @@ function getInfrastructure(module, headers) {
     const locations = json.response.locations;
     const servers = [];
 
-    // the following code relies on OpenVPN/WireGuard servers not
-    // overlapping. each server is either OpenVPN or WireGuard, but
-    // not both
+    // The following code relies on OpenVPN/WireGuard servers not
+    // overlapping. Each server is either OpenVPN or WireGuard, but
+    // not both.
     const processRelay = function(relay, moduleType) {
         if (!relay.active) return;
         if (moduleType == wireGuard.moduleType && !relay.public_key) return;
