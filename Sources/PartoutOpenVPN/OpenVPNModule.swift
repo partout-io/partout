@@ -19,9 +19,6 @@ public struct OpenVPNModule: Module, BuildableType, Hashable, Codable {
 
     public let configuration: OpenVPN.Configuration?
 
-    @available(*, deprecated)
-    public private(set) var providerSelection: OpenVPNLegacyProviderSelection?
-
     public let credentials: OpenVPN.Credentials?
 
     private let requiresInteractiveCredentials: Bool?
