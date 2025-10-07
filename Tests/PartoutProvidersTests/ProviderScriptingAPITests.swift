@@ -16,16 +16,17 @@ struct ProviderScriptingAPITests {
 
     @Test
     func givenAPI_whenProviderGetResult_thenIsMapped() {
-        let sut = DefaultProviderScriptingAPI(.global, timeout: 3.0) {
-            #expect($0 == "GET")
-            #expect($1 == "doesntmatter")
-            do {
-                let url = try #require(Bundle.module.url(forResource: "mapped", withExtension: "txt"))
-                let data = try Data(contentsOf: url)
+        let sut: ProviderScriptingAPI
+        do {
+            let url = try #require(Bundle.module.url(forResource: "mapped", withExtension: "txt"))
+            let data = try Data(contentsOf: url)
+            sut = DefaultProviderScriptingAPI(.global, timeout: 3.0) {
+                #expect($0 == "GET")
+                #expect($1 == "doesntmatter")
                 return (200, data)
-            } catch {
-                fatalError("Unable to return bundle resource: \(error)")
             }
+        } catch {
+            fatalError("Unable to return bundle resource: \(error)")
         }
         let map = sut.getText(urlString: "doesntmatter", headers: nil)
         #expect(map["response"] as? String == "mapped content\n")
