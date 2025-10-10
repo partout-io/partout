@@ -40,12 +40,10 @@ struct RegistryTests {
         profileBuilder.modules.append(try WireGuardModule.Builder(configurationBuilder: wgBuilder).tryBuild())
         let profile = try profileBuilder.tryBuild()
 
-        let coder = CodableProfileCoder()
-
-        let encoded = try sut.encodedProfile(profile, with: coder)
+        let encoded = try sut.encodedProfile(profile)
         print(encoded)
 
-        let decoded = try sut.decodedProfile(from: encoded, with: coder)
+        let decoded = try sut.decodedProfile(from: encoded)
         #expect(profile == decoded)
     }
 #endif

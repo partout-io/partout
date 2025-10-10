@@ -10,11 +10,6 @@ import PartoutCore
 import PartoutOpenVPN
 #endif
 
-// FIXME: #507/passepartout, ridiculously complex
-extension OpenVPNModule: ProviderCustomizationSupporting {
-    public static let providerCustomizationType = OpenVPN.ProviderCustomization.self
-}
-
 extension OpenVPN {
     public struct ProviderCustomization {
         public struct Credentials {
@@ -39,12 +34,9 @@ extension OpenVPN {
     }
 }
 
-extension OpenVPN.ProviderCustomization: UserInfoCodable {
-    public init?(userInfo: AnyHashable?) {
-        guard let userInfo else {
-            return nil
-        }
-        guard let json = userInfo as? JSON else {
+extension OpenVPN.ProviderCustomization {
+    public init?(userInfo: JSON?) {
+        guard let json = userInfo else {
             assertionFailure("Expected JSON object from PartoutAPI 'metadata.configurations'")
             return nil
         }
@@ -70,7 +62,7 @@ extension OpenVPN.ProviderCustomization: UserInfoCodable {
         }
     }
 
-    public var userInfo: AnyHashable? {
+    public var userInfo: JSON? {
         var credentialsMap: [String: AnyHashable] = [:]
         credentialsMap["purpose"] = credentials.purpose.rawValue
         if let options = credentials.options {
@@ -79,7 +71,7 @@ extension OpenVPN.ProviderCustomization: UserInfoCodable {
         if let url = credentials.url {
             credentialsMap["url"] = url.absoluteString
         }
-        return ["credentials": credentialsMap]
+        return try? JSON(["credentials": credentialsMap])
     }
 }
 

@@ -14,8 +14,7 @@ struct NEProtocolCoderTests {
         let sut = ProviderNEProtocolCoder(
             .global,
             tunnelBundleIdentifier: bundleIdentifier,
-            registry: newRegistry(),
-            coder: CodableProfileCoder()
+            registry: newRegistry()
         )
 
         let proto = try sut.protocolConfiguration(from: profile, title: \.name)
@@ -33,7 +32,6 @@ struct NEProtocolCoderTests {
             .global,
             tunnelBundleIdentifier: bundleIdentifier,
             registry: newRegistry(),
-            coder: CodableProfileCoder(),
             keychain: MockKeychain()
         )
 

@@ -16,17 +16,14 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
 
     private let registry: Registry
 
-    private let coder: ProfileCoder
-
-    public init(_ ctx: PartoutLoggerContext, tunnelBundleIdentifier: String, registry: Registry, coder: ProfileCoder) {
+    public init(_ ctx: PartoutLoggerContext, tunnelBundleIdentifier: String, registry: Registry) {
         self.ctx = ctx
         self.tunnelBundleIdentifier = tunnelBundleIdentifier
         self.registry = registry
-        self.coder = coder
     }
 
     public func protocolConfiguration(from profile: Profile, title: (Profile) -> String) throws -> NETunnelProviderProtocol {
-        let encoded = try registry.encodedProfile(profile, with: coder)
+        let encoded = try registry.encodedProfile(profile)
 
         let proto = NETunnelProviderProtocol()
         proto.providerBundleIdentifier = tunnelBundleIdentifier
@@ -43,7 +40,7 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
         guard let encoded = protocolConfiguration.providerConfiguration?[Self.providerKey] as? String else {
             throw PartoutError(.decoding)
         }
-        return try registry.decodedProfile(from: encoded, with: coder)
+        return try registry.decodedProfile(from: encoded)
     }
 
     public func removeProfile(withId profileId: Profile.ID) throws {
