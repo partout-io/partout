@@ -15,7 +15,7 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
 
     private let writeQueue: DispatchQueue
 
-    private nonisolated(unsafe) let sock: pp_socket
+    private let sock: pp_socket
 
     private let endpoint: ExtendedEndpoint?
 
@@ -165,3 +165,6 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
         pp_socket_free(sock)
     }
 }
+
+// XXX: Suppress warnings for safe cross-Task usage (struct is immutable)
+extension pp_socket: @retroactive @unchecked Sendable {}

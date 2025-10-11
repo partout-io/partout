@@ -13,7 +13,7 @@ import PartoutCore
 public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
-    private nonisolated(unsafe) let tun: pp_tun
+    private nonisolated let tun: pp_tun
 
     public let tunImpl: UnsafeMutableRawPointer?
 
