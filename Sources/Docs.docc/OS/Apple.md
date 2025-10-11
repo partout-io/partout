@@ -10,5 +10,6 @@ Specific implementations for iOS, macOS, and tvOS.
 - ``_PartoutOSApple/AppleKeychain``
 - ``_PartoutOSApple/AppleRandom``
 - ``_PartoutOSApple/BundleConfiguration``
+- ``_PartoutOSApple/CFDNSStrategy``
 - ``_PartoutOSApple/OSLogDestination``
 - ``_PartoutOSApple/UserDefaultsEnvironment``
