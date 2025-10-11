@@ -16,20 +16,17 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
 
     private let registry: Registry
 
-    private let coder: ProfileCoder
-
     private let keychain: Keychain
 
-    public init(_ ctx: PartoutLoggerContext, tunnelBundleIdentifier: String, registry: Registry, coder: ProfileCoder, keychain: Keychain) {
+    public init(_ ctx: PartoutLoggerContext, tunnelBundleIdentifier: String, registry: Registry, keychain: Keychain) {
         self.ctx = ctx
         self.tunnelBundleIdentifier = tunnelBundleIdentifier
         self.registry = registry
-        self.coder = coder
         self.keychain = keychain
     }
 
     public func protocolConfiguration(from profile: Profile, title: (Profile) -> String) throws -> NETunnelProviderProtocol {
-        let encoded = try registry.encodedProfile(profile, with: coder)
+        let encoded = try registry.encodedProfile(profile)
 
         let passwordReference = try keychain.set(
             password: encoded,
@@ -53,7 +50,7 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
             throw PartoutError(.decoding)
         }
         let encoded = try keychain.password(forReference: passwordReference)
-        return try registry.decodedProfile(from: encoded, with: coder)
+        return try registry.decodedProfile(from: encoded)
     }
 
     public func removeProfile(withId profileId: Profile.ID) throws {

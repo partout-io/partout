@@ -43,10 +43,7 @@ extension Provider {
         metadata.keys.contains(moduleType.moduleHandler.id)
     }
 
-    public func customization<M>(for moduleType: M.Type) -> M.ProviderCustomization? where M: Module, M: ProviderCustomizationSupporting {
-        guard let cfg = metadata[moduleType.moduleHandler.id] else {
-            return nil
-        }
-        return M.ProviderCustomization(userInfo: cfg.userInfo)
+    public func metadata<M>(for moduleType: M.Type) -> Metadata? where M: Module {
+        metadata[moduleType.moduleHandler.id]
     }
 }
