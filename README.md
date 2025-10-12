@@ -84,9 +84,9 @@ Sample output:
 
 ```
 .bin/partout.h                       # The Partout ABI
-.bin/darwin-arm64/libPartout.dylib   # macOS
-.bin/linux-aarch64/libPartout.so     # Linux
-.bin/windows-arm64/Partout.dll       # Windows
+.bin/darwin-arm64/libpartout.dylib   # macOS
+.bin/linux-aarch64/libpartout.so     # Linux
+.bin/windows-arm64/partout.dll       # Windows
 ```
 
 This should work for all platforms, except for Android, which asks for a hybrid CMake + SwiftPM approach.
@@ -107,7 +107,7 @@ The script runs on macOS, but can be adapted for other platforms with slight twe
 
 ```
 .bin/partout.h
-.bin/android-arm64/libPartout.so
+.bin/android-arm64/libpartout.so
 ```
 
 ## Demo
