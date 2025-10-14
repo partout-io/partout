@@ -5,8 +5,8 @@
 import Foundation
 internal import PartoutOpenVPN_C
 #if !PARTOUT_MONOLITH
-import PartoutOS
 import PartoutCore
+import PartoutOS
 #endif
 
 extension ControlChannel {

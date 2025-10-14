@@ -8,7 +8,7 @@ internal import PartoutOpenVPN_ObjC
 import PartoutCore
 #endif
 
-extension LegacyPacket: @retroactive SensitiveDebugStringConvertible {
+extension LegacyPacket: SensitiveDebugStringConvertible {
     func debugDescription(withSensitiveData: Bool) -> String {
         var msg: [String] = ["\(code) | \(key)"]
         msg.append("sid: \(sessionId.toHex())")

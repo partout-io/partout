@@ -5,7 +5,7 @@
 import Foundation
 internal import PartoutOpenVPN_C
 #if !PARTOUT_MONOLITH
-import PartoutOS
+import PartoutCore
 #endif
 
 extension CryptoKeys {

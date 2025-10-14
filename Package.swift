@@ -10,25 +10,18 @@ import PackageDescription
 // Optional overrides from environment
 let env = ProcessInfo.processInfo.environment
 let envOS = env["PP_BUILD_OS"]
-let envCoreDeployment = env["PP_BUILD_CORE"].map(CoreDeployment.init(rawValue:)) ?? nil
 let envCMakeOutput = env["PP_BUILD_CMAKE_OUTPUT"]
 
 // MARK: Configuration
 
 let areas = Set(Area.allCases)
 let cryptoMode: CryptoMode? = .openSSL
-let coreDeployment = envCoreDeployment ?? .remoteBinary
 let cmakeOutput = envCMakeOutput ?? ".bin/windows-arm64"
 
 // Must be false in production (check in CI)
 let isTestingOpenVPNDataPath = false
 
 // MARK: - Package
-
-// PartoutCore binaries only available on Apple platforms
-guard OS.current == .apple || coreDeployment != .remoteBinary else {
-    fatalError("Core binary only available on Apple platforms")
-}
 
 // Build dynamic library on Android
 var libraryType: Product.Library.LibraryType? = nil
@@ -69,14 +62,9 @@ let package = Package(
             dependencies: {
                 // These are always included
                 var list: [Target.Dependency] = [
-                    "Partout_C",
-                    "PartoutOS",
-                    "PartoutProviders"
+                    "PartoutCore",
+                    "PartoutOS"
                 ]
-                // Optional
-                if areas.contains(.api) {
-                    list.append("PartoutAPI")
-                }
                 if cryptoMode != nil {
                     list.append("_PartoutCryptoImpl_C")
                     if areas.contains(.openVPN) {
@@ -88,36 +76,16 @@ let package = Package(
                 }
                 return list
             }(),
-            exclude: {
-                var list: [String] = []
-                if !areas.contains(.api) {
-                    list.append("API")
-                }
-                return list
-            }(),
             swiftSettings: areas.compactMap(\.define).map {
                 .define($0)
             }
         ),
         .target(
-            name: "Partout_C"
+            name: "PartoutABI_C"
         ),
         .testTarget(
             name: "PartoutTests",
             dependencies: ["Partout"],
-            exclude: {
-                var list: [String] = []
-                if !areas.contains(.api) {
-                    list.append("API")
-                }
-                if OS.current != .apple {
-                    list.append("ProviderScriptingEngineTests.swift")
-                }
-                return list
-            }(),
-            resources: [
-                .copy("Resources")
-            ],
             swiftSettings: areas.compactMap(\.define).map {
                 .define($0)
             }
@@ -125,11 +93,22 @@ let package = Package(
     ]
 )
 
-// Wrapper = Core + OS/Portable + Providers
+// Wrapper = Core + OS
 package.targets.append(contentsOf: [
     .target(
-        name: "PartoutOS_C",
-        dependencies: ["PartoutCoreWrapper"],
+        name: "GenericJSON"
+    ),
+    .target(
+        name: "PartoutCore",
+        dependencies: [
+            "GenericJSON",
+            "PartoutABI_C",
+            "PartoutCore_C"
+        ]
+    ),
+    .target(
+        name: "PartoutCore_C",
+        dependencies: [],
         cSettings: globalCSettings + {
             if OS.current == .windows {
                 return [
@@ -141,10 +120,7 @@ package.targets.append(contentsOf: [
     ),
     .target(
         name: "PartoutOS",
-        dependencies: [
-            "Partout_C",
-            "PartoutOS_C"
-        ],
+        dependencies: ["PartoutCore"],
         exclude: {
             var list: [String] = []
             switch OS.current {
@@ -164,9 +140,9 @@ package.targets.append(contentsOf: [
             return list
         }()
     ),
-    .target(
-        name: "PartoutProviders",
-        dependencies: ["PartoutOS"]
+    .testTarget(
+        name: "PartoutCoreTests",
+        dependencies: ["PartoutCore"]
     ),
     .testTarget(
         name: "PartoutOSTests",
@@ -183,13 +159,6 @@ package.targets.append(contentsOf: [
             }
             return list
         }()
-    ),
-    .testTarget(
-        name: "PartoutProvidersTests",
-        dependencies: ["PartoutProviders"],
-        resources: [
-            .process("Resources")
-        ]
     )
 ])
 
@@ -201,30 +170,6 @@ package.targets.append(
         path: "Executables/partoutd"
     )
 )
-
-// MARK: - API
-
-if areas.contains(.api) {
-    package.products.append(
-        .library(
-            name: "PartoutAPI",
-            targets: ["PartoutAPI"]
-        )
-    )
-    package.targets.append(contentsOf: [
-        .target(
-            name: "PartoutAPI",
-            dependencies: ["PartoutProviders"],
-            resources: [
-                .copy("JSON")
-            ]
-        ),
-        .testTarget(
-            name: "PartoutAPITests",
-            dependencies: ["PartoutAPI"]
-        )
-    ])
-}
 
 // MARK: OpenVPN
 
@@ -345,7 +290,7 @@ if areas.contains(.wireGuard) {
             .target(
                 name: "PartoutWireGuard_C",
                 dependencies: [
-                    "PartoutOS_C",
+                    "PartoutCore_C",
                     "wg-go-apple"
                 ]
             )
@@ -355,7 +300,7 @@ if areas.contains(.wireGuard) {
         package.targets.append(
             .target(
                 name: "PartoutWireGuard_C",
-                dependencies: ["PartoutOS_C"],
+                dependencies: ["PartoutCore_C"],
                 cSettings: globalCSettings + [
                     .unsafeFlags(["-I\(cmakeOutput)/wg-go/include"])
                 ]
@@ -400,7 +345,7 @@ case .openSSL:
                 name: "_PartoutCryptoImpl_C",
                 dependencies: [
                     "openssl-apple",
-                    "PartoutOS_C"
+                    "PartoutCore_C"
                 ],
                 path: "Sources/PartoutCrypto/OpenSSL_C"
             ),
@@ -422,7 +367,7 @@ case .openSSL:
         package.targets.append(
             .target(
                 name: "_PartoutCryptoImpl_C",
-                dependencies: ["PartoutOS_C"],
+                dependencies: ["PartoutCore_C"],
                 path: "Sources/PartoutCrypto/OpenSSL_C",
                 cSettings: globalCSettings + [
                     .unsafeFlags(["-I\(cmakeOutput)/openssl/include"])
@@ -441,7 +386,7 @@ case .native:
     package.targets.append(
         .target(
             name: "_PartoutCryptoImpl_C",
-            dependencies: ["PartoutOS_C"],
+            dependencies: ["PartoutCore_C"],
             path: "Sources/PartoutCrypto/Native_C",
             exclude: {
                 // Pick current OS by removing it from exclusions
@@ -490,13 +435,11 @@ if cryptoMode != nil {
 // MARK: - Configuration structures
 
 enum Area: CaseIterable {
-    case api
     case openVPN
     case wireGuard
 
     var define: String? {
         switch self {
-        case .api: "PARTOUT_API"
         case .openVPN: cryptoMode != nil ? "PARTOUT_OPENVPN" : nil
         case .wireGuard: "PARTOUT_WIREGUARD"
         }
@@ -544,42 +487,3 @@ enum CryptoMode {
     case openSSL
     case native
 }
-
-// MARK: - Core
-
-// MARK: Auto-generated (do not modify)
-
-// action-release-binary-package (PartoutCore)
-let binaryFilename = "PartoutCore.xcframework.zip"
-let version = "0.99.200"
-let checksum = "bd6279e3f8d42e3bbd1262455ae8e65677233a58490f54261d3fd63c3ccedb7f"
-
-enum CoreDeployment: String, RawRepresentable {
-    case remoteBinary
-    case localSource
-}
-
-switch coreDeployment {
-case .remoteBinary:
-    package.targets.append(.binaryTarget(
-        name: "PartoutCoreWrapper",
-        url: "https://github.com/partout-io/partout/releases/download/\(version)/\(binaryFilename)",
-        checksum: checksum
-    ))
-case .localSource:
-    package.dependencies.append(
-        .package(path: "vendors/core")
-    )
-    package.targets.append(.target(
-        name: "PartoutCoreWrapper",
-        dependencies: [
-            .product(name: "PartoutCore", package: "core")
-        ]
-    ))
-}
-package.targets.append(contentsOf: [
-    .testTarget(
-        name: "PartoutCoreWrapperTests",
-        dependencies: ["PartoutCoreWrapper"]
-    )
-])
