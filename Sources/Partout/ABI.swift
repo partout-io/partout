@@ -26,6 +26,7 @@ actor ABIActor {
 // - doesn't handle interrupts/signals (should exit or at least handle them)
 //
 
+/// Initializes the library and returns a opaque context for use with subsequent calls.
 @_cdecl("partout_init")
 @ABIActor
 public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutableRawPointer {
@@ -92,12 +93,14 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
     return cCtx
 }
 
+/// Deinitializes the library context created with ``partout_init(cArgs:)``.
 @_cdecl("partout_deinit")
 @ABIActor
 public func partout_deinit(cCtx: UnsafeMutableRawPointer) {
     ABIContext.pop(cCtx)
 }
 
+/// Starts the connection daemon.
 @_cdecl("partout_daemon_start")
 @ABIActor
 public func partout_daemon_start(
@@ -154,6 +157,7 @@ public func partout_daemon_start(
     return 0
 }
 
+/// Stops the connection daemon.
 @_cdecl("partout_daemon_stop")
 @ABIActor
 public func partout_daemon_stop(cCtx: UnsafeMutableRawPointer) {

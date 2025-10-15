@@ -4,6 +4,7 @@
 
 import Foundation
 
+/// Provides validation logic for a ``ModuleBuilder``.
 public protocol ModuleBuilderValidator: Sendable {
     func validate(_ builder: any ModuleBuilder) throws
 }

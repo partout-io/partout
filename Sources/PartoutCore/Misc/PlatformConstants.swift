@@ -4,8 +4,6 @@
 
 import Foundation
 
-public typealias UniqueID = Foundation.UUID
-
 #if os(Android)
 @_exported import Android
 #elseif os(Windows)

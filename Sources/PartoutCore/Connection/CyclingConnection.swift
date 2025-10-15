@@ -55,6 +55,7 @@ extension CyclingConnection {
 /// Automates cycling through a list of endpoints until a connection is successfully established. The connection creation implementation is provided by a ``NetworkInterfaceFactory``, while internal behavior is defined with the use of a ``CyclingConnection/Hooks`` object.
 ///
 /// Make sure to only access this entity within the same actor.
+@available(*, deprecated, message: "Merge into OpenVPNConnection")
 public actor CyclingConnection {
 
     // MARK: Initialization

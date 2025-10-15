@@ -5,7 +5,7 @@
 import Foundation
 import PartoutCore_C
 
-/// Implementation of ``/PartoutCore/PRNGProtocol`` with the OS C library.
+/// Implementation of ``PRNGProtocol`` with the OS C library.
 public final class PlatformPRNG: PRNGProtocol {
     public init() {
     }

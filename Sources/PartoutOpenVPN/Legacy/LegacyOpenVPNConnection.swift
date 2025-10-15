@@ -7,7 +7,7 @@ import Foundation
 import PartoutCore
 #endif
 
-/// Legacy ObjC version of ``OpenVPNConnection``.
+/// Legacy ObjC version of ``OpenVPNConnection``. Apple-only.
 @available(*, deprecated, message: "Use OpenVPNConnection")
 public actor LegacyOpenVPNConnection {
 

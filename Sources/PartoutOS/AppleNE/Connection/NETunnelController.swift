@@ -23,7 +23,7 @@ extension Profile {
     }
 }
 
-/// Implementation of a ``/PartoutCore/TunnelController`` via `NEPacketTunnelProvider`.
+/// A controller based on `NEPacketTunnelProvider`.
 public final class NETunnelController: TunnelController {
     public struct Options: Sendable {
         public var dnsFallbackServers: [String]

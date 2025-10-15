@@ -8,7 +8,7 @@ import Foundation
 import PartoutCore
 #endif
 
-/// Implementation of ``/PartoutCore/TunnelStrategy`` based on `NETunnelProviderManager`.
+/// A tunnel strategy based on `NETunnelProviderManager`.
 public actor NETunnelStrategy {
     public enum Option: Sendable {
         case multiple

@@ -4,6 +4,7 @@
 
 import Foundation
 
+/// Replacement of `CurrentValueSubject`.
 public final class CurrentValueStream<T>: @unchecked Sendable where T: Sendable {
     let queue = DispatchQueue(label: "CurrentValueStream")
 

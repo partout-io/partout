@@ -7,7 +7,7 @@ import Foundation
 import PartoutCore
 #endif
 
-/// The Apple ``/PartoutCore/Keychain``.
+/// The Apple Keychain.
 public final class AppleKeychain: Keychain {
     private let ctx: PartoutLoggerContext
 

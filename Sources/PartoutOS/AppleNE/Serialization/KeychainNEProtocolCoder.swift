@@ -8,7 +8,7 @@ import NetworkExtension
 import PartoutCore
 #endif
 
-/// ``NEProtocolCoder`` encoding to and from a ``/PartoutCore/Keychain``.
+/// ``NEProtocolCoder`` encoding to and from a keychain.
 public struct KeychainNEProtocolCoder: NEProtocolCoder {
     private let ctx: PartoutLoggerContext
 

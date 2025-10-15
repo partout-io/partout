@@ -138,16 +138,16 @@ extension WireGuardEndpoint {
 }
 
 /// An error type describing DNS resolution error
-public struct DNSResolutionError: LocalizedError {
-    public let errorCode: Int32
-    public let address: String
+struct DNSResolutionError: LocalizedError {
+    let errorCode: Int32
+    let address: String
 
     init(errorCode: Int32, address: String) {
         self.errorCode = errorCode
         self.address = address
     }
 
-    public var errorDescription: String? {
+    var errorDescription: String? {
         return String(cString: gai_strerror(errorCode))
     }
 }

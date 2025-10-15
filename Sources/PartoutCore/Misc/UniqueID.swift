@@ -4,7 +4,10 @@
 
 import Foundation
 
-/// Any entity that can be identified with an UniqueID.
+/// Alias for a unique identifier.
+public typealias UniqueID = Foundation.UUID
+
+/// Any entity that can be identified with an ``UniqueID``.
 public protocol UniquelyIdentifiable {
     var id: UniqueID { get }
 }

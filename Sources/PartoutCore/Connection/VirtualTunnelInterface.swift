@@ -7,6 +7,7 @@
 import Foundation
 import PartoutCore_C
 
+/// An ``IOInterface`` that interact with a Layer 3 virtual tun device, commonly found on UNIX-like systems.
 public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 

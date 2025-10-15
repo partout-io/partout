@@ -8,7 +8,7 @@ import NetworkExtension
 import PartoutCore
 #endif
 
-/// Implementation of a ``/PartoutCore/TunnelInterface`` via `NEPacketTunnelFlow`.
+/// A tunnel interface based on `NEPacketTunnelFlow`.
 public final class NETunnelInterface: IOInterface {
     private let ctx: PartoutLoggerContext
 

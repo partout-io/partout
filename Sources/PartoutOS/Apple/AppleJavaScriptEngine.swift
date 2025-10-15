@@ -8,7 +8,7 @@ import Foundation
 import PartoutCore
 #endif
 
-/// Implementation of ``/PartoutCore/ScriptingEngine`` based on the `JavaScriptCore` framework. This class is not actor-safe.
+/// A scripting engine based on the JavaScriptCore framework. This class is not actor-safe.
 public final class AppleJavaScriptEngine: ScriptingEngine, @unchecked Sendable {
     private let engine: JSContext
 

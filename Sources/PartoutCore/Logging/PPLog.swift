@@ -4,6 +4,7 @@
 
 import Foundation
 
+/// Logs to the context of a ``Profile``.
 public func pp_log_id(
     _ profileId: Profile.ID?,
     _ category: LoggerCategory,
@@ -16,6 +17,7 @@ public func pp_log_id(
     pp_log(ctx, category, level, message)
 }
 
+/// Logs to the global context.
 public func pp_log_g(
     _ category: LoggerCategory,
     _ level: DebugLog.Level,
@@ -24,6 +26,7 @@ public func pp_log_g(
     pp_log(.global, category, level, message)
 }
 
+/// Logs to a specific context.
 public func pp_log(
     _ ctx: PartoutLoggerContext,
     _ category: LoggerCategory,

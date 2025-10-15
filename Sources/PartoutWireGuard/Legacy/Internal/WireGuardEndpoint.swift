@@ -4,31 +4,31 @@
 import Foundation
 import Network
 
-public struct WireGuardEndpoint: Sendable {
-    public let host: NWEndpoint.Host
-    public let port: NWEndpoint.Port
+struct WireGuardEndpoint: Sendable {
+    let host: NWEndpoint.Host
+    let port: NWEndpoint.Port
 
-    public init(host: NWEndpoint.Host, port: NWEndpoint.Port) {
+    init(host: NWEndpoint.Host, port: NWEndpoint.Port) {
         self.host = host
         self.port = port
     }
 }
 
 extension WireGuardEndpoint: Equatable {
-    public static func == (lhs: WireGuardEndpoint, rhs: WireGuardEndpoint) -> Bool {
+    static func == (lhs: WireGuardEndpoint, rhs: WireGuardEndpoint) -> Bool {
         return lhs.host == rhs.host && lhs.port == rhs.port
     }
 }
 
 extension WireGuardEndpoint: Hashable {
-    public func hash(into hasher: inout Hasher) {
+    func hash(into hasher: inout Hasher) {
         hasher.combine(host)
         hasher.combine(port)
     }
 }
 
 extension WireGuardEndpoint {
-    public var stringRepresentation: String {
+    var stringRepresentation: String {
         switch host {
         case .name(let hostname, _):
             return "\(hostname):\(port)"
@@ -41,7 +41,7 @@ extension WireGuardEndpoint {
         }
     }
 
-    public init?(from string: String) {
+    init?(from string: String) {
         // Separation of host and port is based on 'parse_endpoint' function in
         // https://git.zx2c4.com/wireguard-tools/tree/src/config.c
         guard !string.isEmpty else { return nil }
@@ -73,7 +73,7 @@ extension WireGuardEndpoint {
 }
 
 extension WireGuardEndpoint {
-    public func hasHostAsIPAddress() -> Bool {
+    func hasHostAsIPAddress() -> Bool {
         switch host {
         case .name:
             return false
@@ -86,7 +86,7 @@ extension WireGuardEndpoint {
         }
     }
 
-    public func hostname() -> String? {
+    func hostname() -> String? {
         switch host {
         case .name(let hostname, _):
             return hostname

@@ -4,30 +4,30 @@
 import Foundation
 import Network
 
-public struct IPAddressRange: Sendable {
-    public let address: IPAddress
-    public let networkPrefixLength: UInt8
+struct IPAddressRange: Sendable {
+    let address: IPAddress
+    let networkPrefixLength: UInt8
 }
 
 extension IPAddressRange: Equatable {
-    public static func == (lhs: IPAddressRange, rhs: IPAddressRange) -> Bool {
+    static func == (lhs: IPAddressRange, rhs: IPAddressRange) -> Bool {
         return lhs.address.rawValue == rhs.address.rawValue && lhs.networkPrefixLength == rhs.networkPrefixLength
     }
 }
 
 extension IPAddressRange: Hashable {
-    public func hash(into hasher: inout Hasher) {
+    func hash(into hasher: inout Hasher) {
         hasher.combine(address.rawValue)
         hasher.combine(networkPrefixLength)
     }
 }
 
 extension IPAddressRange {
-    public var stringRepresentation: String {
+    var stringRepresentation: String {
         return "\(address)/\(networkPrefixLength)"
     }
 
-    public init?(from string: String) {
+    init?(from string: String) {
         guard let parsed = IPAddressRange.parseAddressString(string) else { return nil }
         address = parsed.0
         networkPrefixLength = parsed.1
@@ -60,7 +60,7 @@ extension IPAddressRange {
         return (address, networkPrefixLength)
     }
 
-    public func subnetMask() -> IPAddress {
+    func subnetMask() -> IPAddress {
         if address is IPv4Address {
             let mask = networkPrefixLength > 0 ? ~UInt32(0) << (32 - networkPrefixLength) : UInt32(0)
             let bytes = Data([
@@ -90,7 +90,7 @@ extension IPAddressRange {
         fatalError()
     }
 
-    public func maskedAddress() -> IPAddress {
+    func maskedAddress() -> IPAddress {
         let subnet = subnetMask().rawValue
         var masked = Data(address.rawValue)
         if subnet.count != masked.count {

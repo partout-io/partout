@@ -7,7 +7,7 @@ import NetworkExtension
 import PartoutCore
 #endif
 
-/// Implementation of a ``/PartoutCore/LinkObserver`` via `NWTCPConnection`.
+/// A link observer based on `NWConnection`, for both UDP and TCP.
 public final class NESocketObserver: LinkObserver, @unchecked Sendable {
     public struct Options: Sendable {
         public let proto: IPSocketType

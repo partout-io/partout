@@ -7,7 +7,7 @@ import Foundation
 import PartoutCore
 #endif
 
-/// A ``/PartoutCore/TunnelEnvironment`` that stores data to `UserDefaults`.
+/// A tunnel environment that stores data to `UserDefaults`.
 public final class UserDefaultsEnvironment: TunnelEnvironment, @unchecked Sendable {
     private let profileId: Profile.ID?
 

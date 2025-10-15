@@ -8,7 +8,7 @@ import Network
 import PartoutCore
 #endif
 
-/// A ``/PartoutCore/ReachabilityObserver`` that publishes updates from a `NWPathMonitor`.
+/// An observer that publishes updates from a `NWPathMonitor`.
 public final class NEObservablePath: ReachabilityObserver {
     private let ctx: PartoutLoggerContext
 

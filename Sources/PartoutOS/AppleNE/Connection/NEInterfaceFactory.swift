@@ -7,7 +7,7 @@
 import PartoutCore
 #endif
 
-/// A ``/PartoutCore/NetworkInterfaceFactory`` that spawns ``/PartoutCore/LinkInterface`` and ``/PartoutCore/TunnelInterface`` objects from a `NEPacketTunnelProvider`.
+/// A factory that spawns link and tunnel interfaces from a `NEPacketTunnelProvider`.
 public final class NEInterfaceFactory: NetworkInterfaceFactory {
     public struct Options: Sendable {
         // Enable to use NWConnection, NW* sockets were removed from NetworkExtension.

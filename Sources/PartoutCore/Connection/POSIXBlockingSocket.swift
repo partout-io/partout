@@ -5,6 +5,7 @@
 import Foundation
 import PartoutCore_C
 
+/// An ``IOInterface`` based on a POSIX socket with blocking I/O.
 public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 

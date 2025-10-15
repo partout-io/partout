@@ -11,7 +11,7 @@ extension ModuleType {
     public static let wireGuard = ModuleType("WireGuard")
 }
 
-/// A ``/PartoutCore/ConnectionModule`` providing a WireGuard connection.
+/// A connection module providing a WireGuard connection.
 public struct WireGuardModule: Module, BuildableType, Hashable, Codable {
     public static let moduleHandler = ModuleHandler(.wireGuard, WireGuardModule.self)
 

@@ -4,7 +4,7 @@
 
 import Foundation
 
-/// Implementation of ``/PartoutCore/SimpleDNSStrategy`` with the POSIX C library.
+/// Implementation of ``SimpleDNSStrategy`` with the POSIX C library.
 public actor POSIXDNSStrategy: SimpleDNSStrategy {
     private let hostname: String
 

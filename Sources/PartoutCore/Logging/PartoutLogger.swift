@@ -4,6 +4,7 @@
 
 import Foundation
 
+/// The context of a log message.
 public struct PartoutLoggerContext: Sendable {
     public static let global = PartoutLoggerContext()
 
@@ -22,6 +23,7 @@ public struct PartoutLoggerContext: Sendable {
     }
 }
 
+/// The common interface of a logger.
 public protocol PartoutLoggerProtocol {
     var logsAddresses: Bool { get }
 
@@ -32,6 +34,7 @@ public protocol PartoutLoggerProtocol {
     var assertsMissingLoggingCategory: Bool { get }
 }
 
+/// The global entity in charge of all the logging. Use a ``Builder`` to create one.
 public final class PartoutLogger: PartoutLoggerProtocol, Sendable {
     public typealias PrintFunction = @Sendable (PartoutLoggerContext, String) -> String
 
@@ -48,8 +51,10 @@ public final class PartoutLogger: PartoutLoggerProtocol, Sendable {
     /// Enables logging of raw bytes (default to false).
     public let logsRawBytes: Bool
 
+    /// Throws an assertion if logging to an unregistered category.
     public let assertsMissingLoggingCategory: Bool
 
+    /// The print function.
     public let willPrint: PrintFunction
 
     fileprivate init(
@@ -71,7 +76,7 @@ public final class PartoutLogger: PartoutLoggerProtocol, Sendable {
     }
 
     deinit {
-        // do NOT use pp_log here, it might be self!
+        // Do NOT use pp_log here, it might be self!
         NSLog("Partout: Deinit PartoutLogger")
     }
 
@@ -96,6 +101,7 @@ extension PartoutLogger {
 }
 
 extension PartoutLogger {
+    /// Registers a new ``PartoutLogger`` globally.
     public static func register(_ logger: PartoutLogger) {
         queue.sync {
             NSLog("Partout: Set global logger")
@@ -131,6 +137,8 @@ extension PartoutLogger {
 // MARK: - Builder
 
 extension PartoutLogger {
+
+    /// The way to create a ``PartoutLogger``.
     public struct Builder: PartoutLoggerProtocol, Sendable {
         private var destinations: [LoggerCategory: LoggerDestination] = [:]
 

@@ -8,7 +8,7 @@ import NetworkExtension
 import PartoutCore
 #endif
 
-/// A transient ``/PartoutCore/Module`` that embeds a full set of `NEPacketTunnelNetworkSettings`.
+/// A transient module that embeds a full set of `NEPacketTunnelNetworkSettings`.
 public struct NESettingsModule: Module, @unchecked Sendable {
     public let id: UniqueID
 

@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+/// An ``IOInterface`` suitable for representing a socket.
 public protocol SocketIOInterface: IOInterface {
     func shutdown() async
 }
