@@ -12,13 +12,25 @@ import PartoutOS
 /// - Throws: an error of type `WireGuardAdapterError`.
 /// - Returns: The list of resolved endpoints.
 extension WireGuard.Configuration {
+    private actor ResolvedMap {
+        private var map: [Address: [Endpoint]] = [:]
+
+        func setEndpoints(_ endpoints: [Endpoint], for address: Address) {
+            map[address] = endpoints
+        }
+
+        func toMap() -> [Address: [Endpoint]] {
+            map
+        }
+    }
+
     func resolvePeers(timeout: Int, logHandler: @escaping WireGuardAdapter.LogHandler) async -> [Address: [Endpoint]] {
         let endpoints = peers.compactMap(\.endpoint)
         let resolver = SimpleDNSResolver(strategy: {
             POSIXDNSStrategy(hostname: $0)
         })
         return await withTaskGroup(returning: [Address: [Endpoint]].self) { group in
-            nonisolated(unsafe) var allResolved: [Address: [Endpoint]] = [:]
+            let allResolved = ResolvedMap()
             for endpoint in endpoints {
                 group.addTask { @Sendable in
                     do {
@@ -37,14 +49,14 @@ extension WireGuard.Configuration {
                                 logHandler(.verbose, "DNS64: mapped \(endpoint.address) to \(record.address)")
                             }
                         }
-                        allResolved[endpoint.address] = currentResolved
+                        await allResolved.setEndpoints(currentResolved, for: endpoint.address)
                     } catch {
                         logHandler(.error, "Failed to resolve endpoint \(endpoint.address): \(error.localizedDescription)")
                     }
                 }
             }
             await group.waitForAll()
-            return allResolved
+            return await allResolved.toMap()
         }
     }
 }
