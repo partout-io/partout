@@ -13,7 +13,8 @@ import PartoutCore
 public final class VirtualTunnelController: TunnelController {
     private let ctx: PartoutLoggerContext
 
-    private nonisolated(unsafe) let ctrl: partout_tun_ctrl?
+    nonisolated(unsafe)
+    private let ctrl: partout_tun_ctrl?
 
     private let maxReadLength: Int
 
