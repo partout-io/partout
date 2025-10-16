@@ -15,14 +15,16 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
 
     private let writeQueue: DispatchQueue
 
-    private nonisolated(unsafe) let sock: pp_socket
+    nonisolated(unsafe)
+    private let sock: pp_socket
 
     private let endpoint: ExtendedEndpoint?
 
     private let closesOnEmptyRead: Bool
 
     // FIXME: #188, how to avoid silent copy? (enforce reference)
-    private nonisolated(unsafe) var readBuf: [UInt8]
+    nonisolated(unsafe)
+    private var readBuf: [UInt8]
 
     private var isActive = false
 
