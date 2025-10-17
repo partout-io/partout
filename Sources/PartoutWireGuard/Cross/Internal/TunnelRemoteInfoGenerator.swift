@@ -83,7 +83,16 @@ final class TunnelRemoteInfoGenerator: Sendable {
             .including(routes: ipv4IncludedRoutes)
         let ipv6 = IPSettings(subnets: ipv6Addresses)
             .including(routes: ipv6IncludedRoutes)
-        let mtu = tunnelConfiguration.interface.mtu ?? 0
+
+        // XXX: Be more tolerant when the MTU is unspecified
+        let mtu: UInt16
+#if os(iOS) || os(tvOS)
+        mtu = tunnelConfiguration.interface.mtu ?? 1280
+#elseif os(macOS)
+        mtu = 1400 // Slightly less than 1500 - overhead = (1500 - 80) = 1420
+#else
+        mtu = 0 // Default
+#endif
         let ipModule = IPModule.Builder(ipv4: ipv4, ipv6: ipv6, mtu: Int(mtu)).tryBuild()
 
         var modules: [Module] = []
