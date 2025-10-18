@@ -125,6 +125,7 @@ private extension NESocketObserver {
 
 // MARK: - NESocket
 
+// FIXME: #190, Deprecated NEUDPSocket/NETCPSocket use far less CPU %
 private actor NESocket: LinkInterface {
     private let queue: DispatchQueue
 

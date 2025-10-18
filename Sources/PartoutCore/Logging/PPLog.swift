@@ -42,3 +42,16 @@ public func pp_log(
     }
     logger.appendLog(level, message: ctxMessage)
 }
+
+/// Logs to the global context from C code.
+@_cdecl("pp_clog")
+func pp_clog(
+    _ cCategory: UnsafePointer<CChar>,
+    _ cLevel: Int,
+    _ cMessage: UnsafePointer<CChar>
+) {
+    let category = LoggerCategory(rawValue: String(cString: cCategory))
+    let level = DebugLog.Level(rawValue: cLevel) ?? .info
+    let message = String(cString: cMessage)
+    pp_log_g(category, level, message)
+}

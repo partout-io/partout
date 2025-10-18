@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include "openvpn/logging.h"
 #include "openvpn/packet.h"
 
 #define OPENVPN_DP_ENCRYPT_BEGIN(peerId) \
@@ -34,8 +35,8 @@
     }
 
 #ifdef OPENVPN_DP_DEBUG
-#define OPENVPN_DP_LOG(msg)         fprintf(stderr, "%s\n", msg)
-#define OPENVPN_DP_LOG_F(fmt, ...)  fprintf(stderr, fmt, __VA_ARGS__)
+#define OPENVPN_DP_LOG(msg)         pp_clog_v(PPLogCategoryOpenVPN, PPLogLevelInfo, "%s", msg)
+#define OPENVPN_DP_LOG_F(fmt, ...)  pp_clog_v(PPLogCategoryOpenVPN, PPLogLevelInfo, fmt, __VA_ARGS__)
 #else
 #define OPENVPN_DP_LOG(msg)         (void)0
 #define OPENVPN_DP_LOG_F(fmt, ...)  (void)0

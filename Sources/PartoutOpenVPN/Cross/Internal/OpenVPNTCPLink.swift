@@ -61,7 +61,7 @@ extension OpenVPNTCPLink: LinkInterface {
                 return
             }
 
-            // FIXME: #190, This is very inefficient (TCP)
+            // FIXME: #214, TCP is very slow
             buffer.reserveCapacity(buffer.count + packets.flatCount)
             for p in packets {
                 buffer += p

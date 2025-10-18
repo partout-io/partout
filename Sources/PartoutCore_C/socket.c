@@ -11,7 +11,7 @@
 #define OS_INVALID_SOCKET INVALID_SOCKET
 #define os_close_socket closesocket
 #define SOCKET_PRINT_ERROR(msg) \
-    fprintf(stderr, "%s failed with error %d\n", msg, WSAGetLastError())
+    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed with error %d", msg, WSAGetLastError())
 #else
 #include <unistd.h>
 #include <sys/types.h>
@@ -22,7 +22,7 @@
 #define OS_INVALID_SOCKET -1
 #define os_close_socket close
 #define SOCKET_PRINT_ERROR(msg) \
-    fprintf(stderr, "%s failed: %s\n", msg, strerror(errno))
+    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed: %s", msg, strerror(errno))
 #endif
 
 #include <stdio.h>
