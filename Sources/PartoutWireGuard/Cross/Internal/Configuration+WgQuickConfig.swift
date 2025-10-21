@@ -188,7 +188,7 @@ extension WireGuard.Configuration {
             }
             interface.mtu = mtu
         }
-        return try interface.tryBuild()
+        return try interface.build()
     }
 
     private static func collate(peerAttributes attributes: [String: String]) throws -> WireGuard.RemoteInterface {
@@ -228,6 +228,6 @@ extension WireGuard.Configuration {
             }
             peer.keepAlive = persistentKeepAlive
         }
-        return try peer.tryBuild()
+        return try peer.build()
     }
 }

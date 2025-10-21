@@ -12,7 +12,7 @@ struct HTTPProxyModuleTests {
             address: "1.2.3.4",
             port: 8080
         )
-        #expect(try sut.tryBuild().builder() == sut)
+        #expect(try sut.build().builder() == sut)
     }
 
     @Test
@@ -21,7 +21,7 @@ struct HTTPProxyModuleTests {
             secureAddress: "1.2.3.4",
             securePort: 8080
         )
-        #expect(try sut.tryBuild().builder() == sut)
+        #expect(try sut.build().builder() == sut)
     }
 
     @Test
@@ -32,7 +32,7 @@ struct HTTPProxyModuleTests {
             secureAddress: "1.2.3.4",
             securePort: 8080
         )
-        #expect(try sut.tryBuild().builder() == sut)
+        #expect(try sut.build().builder() == sut)
     }
 
     @Test
@@ -42,7 +42,7 @@ struct HTTPProxyModuleTests {
             port: 12345
         )
         #expect(throws: Error.self) {
-            try sut.tryBuild()
+            try sut.build()
         }
     }
 
@@ -54,7 +54,7 @@ struct HTTPProxyModuleTests {
             bypassDomains: ["1.1.1.1"]
         )
         #expect(throws: Error.self) {
-            try sut.tryBuild()
+            try sut.build()
         }
     }
 
@@ -63,7 +63,7 @@ struct HTTPProxyModuleTests {
         let sut = HTTPProxyModule.Builder(
             pacURLString: "https://some.pac"
         )
-        #expect(try sut.tryBuild().builder() == sut)
+        #expect(try sut.build().builder() == sut)
     }
 
     @Test
@@ -73,7 +73,7 @@ struct HTTPProxyModuleTests {
             bypassDomains: ["1.1.1.1"]
         )
         #expect(throws: Error.self) {
-            try sut.tryBuild()
+            try sut.build()
         }
     }
 }

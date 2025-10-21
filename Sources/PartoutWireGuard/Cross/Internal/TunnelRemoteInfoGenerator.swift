@@ -101,7 +101,7 @@ final class TunnelRemoteInfoGenerator: Sendable {
             }
             return specified
         }()
-        let ipModule = IPModule.Builder(ipv4: ipv4, ipv6: ipv6, mtu: Int(mtu)).tryBuild()
+        let ipModule = IPModule.Builder(ipv4: ipv4, ipv6: ipv6, mtu: Int(mtu)).build()
 
         var modules: [Module] = []
         modules.append(ipModule)

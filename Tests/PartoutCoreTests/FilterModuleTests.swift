@@ -17,7 +17,7 @@ struct FilterModuleTests {
                 .mtu
             ]
         )
-        let module = sut.tryBuild()
+        let module = sut.build()
         #expect(sut == module.builder())
     }
 }

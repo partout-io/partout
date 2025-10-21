@@ -12,7 +12,7 @@ struct DNSModuleTests {
             protocolType: .cleartext,
             servers: ["1.2.3.4"]
         )
-        let module = try sut.tryBuild()
+        let module = try sut.build()
         #expect(sut == module.builder())
     }
 
@@ -23,7 +23,7 @@ struct DNSModuleTests {
             servers: ["1.2.3.4"],
             dohURL: "https://1.2.3.4/"
         )
-        let module = try sut.tryBuild()
+        let module = try sut.build()
         #expect(sut == module.builder())
     }
 
@@ -34,7 +34,7 @@ struct DNSModuleTests {
             servers: ["1.2.3.4"],
             dotHostname: "example.com"
         )
-        let module = try sut.tryBuild()
+        let module = try sut.build()
         #expect(sut == module.builder())
     }
 
@@ -45,7 +45,7 @@ struct DNSModuleTests {
             servers: ["1.2.3.4"]
         )
         #expect(throws: Error.self) {
-            try sut.tryBuild()
+            try sut.build()
         }
     }
 
@@ -56,7 +56,7 @@ struct DNSModuleTests {
             servers: ["1.2.3.4"]
         )
         #expect(throws: Error.self) {
-            try sut.tryBuild()
+            try sut.build()
         }
     }
 }

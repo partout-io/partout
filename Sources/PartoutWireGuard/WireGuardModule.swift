@@ -50,13 +50,13 @@ extension WireGuardModule {
             self.configurationBuilder = configurationBuilder
         }
 
-        public func tryBuild() throws -> WireGuardModule {
+        public func build() throws -> WireGuardModule {
             guard let configurationBuilder else {
                 throw PartoutError(.incompleteModule, self)
             }
             return WireGuardModule(
                 id: id,
-                configuration: try configurationBuilder.tryBuild()
+                configuration: try configurationBuilder.build()
             )
         }
     }

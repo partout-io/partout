@@ -189,7 +189,7 @@ extension StandardOpenVPNParser: ModuleImporter {
             let result = try parsed(fromContents: contents, passphrase: passphrase)
             var builder = OpenVPNModule.Builder(configurationBuilder: result.configuration.builder())
             builder.credentials = result.credentials
-            return try builder.tryBuild()
+            return try builder.build()
         } catch let error as StandardOpenVPNParserError {
             switch error {
             case .encryptionPassphrase:

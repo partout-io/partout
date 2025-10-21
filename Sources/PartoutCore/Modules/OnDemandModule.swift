@@ -76,7 +76,7 @@ extension OnDemandModule {
             withOtherNetworks = []
         }
 
-        public func tryBuild() -> OnDemandModule {
+        public func build() -> OnDemandModule {
             OnDemandModule(
                 id: id,
                 policy: policy,

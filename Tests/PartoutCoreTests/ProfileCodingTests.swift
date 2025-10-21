@@ -9,8 +9,8 @@ struct ProfileCodingTests {
     @Test
     func givenRegistry_whenEncodeProfileWithUnknownModule_thenFailsToDecode() throws {
         let sut = Registry(allHandlers: [])
-        let module = try DNSModule.Builder().tryBuild()
-        let profile = try Profile.Builder(modules: [module]).tryBuild()
+        let module = try DNSModule.Builder().build()
+        let profile = try Profile.Builder(modules: [module]).build()
         do {
             let encoded = try sut.encodedProfile(profile)
             _ = try sut.decodedProfile(from: encoded, fallingBack: false)
@@ -25,15 +25,15 @@ struct ProfileCodingTests {
     @Test
     func givenRegistry_whenEncodeProfileWithRegisteredModule_thenIsDecoded() throws {
         let sut = Registry(allHandlers: [DNSModule.moduleHandler])
-        let module = try DNSModule.Builder().tryBuild()
-        let profile = try Profile.Builder(modules: [module]).tryBuild()
+        let module = try DNSModule.Builder().build()
+        let profile = try Profile.Builder(modules: [module]).build()
         expectNoThrow(try sut.encodedProfile(profile))
     }
 
     @Test
     func givenRegistry_whenEncodeModule_thenIsDecoded() throws {
         let sut = Registry(allHandlers: [DNSModule.moduleHandler])
-        let module = try DNSModule.Builder().tryBuild()
+        let module = try DNSModule.Builder().build()
 
         let encoded = try JSONEncoder().encode(CodableModule(wrappedModule: module))
         let encodedString = try #require(String(data: encoded, encoding: .utf8))
@@ -48,8 +48,8 @@ struct ProfileCodingTests {
     @Test
     func givenRegistry_whenEncodeProfile_thenIsDecoded() throws {
         let sut = Registry(allHandlers: [DNSModule.moduleHandler])
-        let module = try DNSModule.Builder().tryBuild()
-        let profile = try Profile.Builder(modules: [module]).tryBuild()
+        let module = try DNSModule.Builder().build()
+        let profile = try Profile.Builder(modules: [module]).build()
 
         let encoded = try sut.encodedProfile(profile)
         let decoded = try sut.decodedProfile(from: encoded, fallingBack: false)
@@ -66,12 +66,12 @@ struct ProfileCodingTests {
             protocolType: .tls,
             servers: ["1.1.1.1", "4.4.4.4"],
             dotHostname: "hay.com"
-        ).tryBuild()
-        let ipModule = IPModule.Builder(mtu: 1234).tryBuild()
+        ).build()
+        let ipModule = IPModule.Builder(mtu: 1234).build()
         let profile = try Profile.Builder(
             modules: [dnsModule, ipModule],
             userInfo: ["foo": "bar", "zen": 12]
-        ).tryBuild()
+        ).build()
 
         let encodedJSON = try sut.json(fromProfile: profile)
         print(encodedJSON)

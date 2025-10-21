@@ -77,7 +77,7 @@ private enum Serialization {
             behavior: encoded.behavior,
             userInfo: userInfoJSON
         )
-        return try builder.tryBuild()
+        return try builder.build()
     }
 
     static func decodedModule(

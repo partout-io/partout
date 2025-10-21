@@ -122,7 +122,7 @@ extension Registry {
         copy.modules = try copy.modules.map {
             try resolvedModule($0, in: profile)
         }
-        return try copy.tryBuild()
+        return try copy.build()
     }
 
     public func resolvedModule(_ module: Module, in profile: Profile?) throws -> Module {

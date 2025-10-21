@@ -271,7 +271,7 @@ private extension WireGuard.Configuration {
                     }
             }
 
-        return try newBuilder.tryBuild()
+        return try newBuilder.build()
     }
 }
 

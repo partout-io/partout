@@ -10,7 +10,7 @@ struct TunnelTests {
     @Test
     func givenTunnel_whenNoActiveModules_thenFailsToConnect() async throws {
         let sut = newTunnel()
-        let profile = try Profile.Builder().tryBuild()
+        let profile = try Profile.Builder().build()
 
         try await sut.prepare(purge: false)
         do {
@@ -24,8 +24,8 @@ struct TunnelTests {
     @Test
     func givenTunnel_whenOperate_thenStatusFollows() async throws {
         let sut = newTunnel()
-        let module = try DNSModule.Builder().tryBuild()
-        let profile = try Profile.Builder(modules: [module], activatingModules: true).tryBuild()
+        let module = try DNSModule.Builder().build()
+        let profile = try Profile.Builder(modules: [module], activatingModules: true).build()
         let stream = sut.activeProfilesStream.removeDuplicates()
 
         let expected: [TunnelStatus] = [

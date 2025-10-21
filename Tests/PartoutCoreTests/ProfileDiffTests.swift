@@ -10,23 +10,23 @@ struct ProfileDiffTests {
     func givenProfile_whenChangeBaseFields_thenDiffIsExpected() throws {
         var sut = Profile.Builder()
         sut.name = "original"
-        let original = try sut.tryBuild()
+        let original = try sut.build()
         #expect(original.name == "original")
 
         sut.name = "newname"
-        #expect(try sut.tryBuild().differences(from: original) == [
+        #expect(try sut.build().differences(from: original) == [
             .changedName
         ])
 
         var behavior = ProfileBehavior()
         behavior.disconnectsOnSleep = true
         sut.behavior = behavior
-        #expect(try sut.tryBuild().differences(from: original) == [
+        #expect(try sut.build().differences(from: original) == [
             .changedName,
             .changedBehavior
         ])
         sut.name = "original"
-        #expect(try sut.tryBuild().differences(from: original) == [
+        #expect(try sut.build().differences(from: original) == [
             .changedBehavior
         ])
     }
@@ -34,14 +34,14 @@ struct ProfileDiffTests {
     @Test
     func givenProfile_whenChangeModules_thenDiffIsExpected() throws {
         var sut = Profile.Builder()
-        let original = try sut.tryBuild()
+        let original = try sut.build()
         #expect(original.modules.isEmpty)
 
         var diff: Set<Profile.DiffResult>
 
-        let dnsModule = try DNSModule.Builder().tryBuild()
+        let dnsModule = try DNSModule.Builder().build()
         sut.modules = [dnsModule]
-        let profileWithDNS = try sut.tryBuild()
+        let profileWithDNS = try sut.build()
         diff = profileWithDNS.differences(from: original)
         print(diff)
         #expect(diff == [
@@ -49,7 +49,7 @@ struct ProfileDiffTests {
         ])
 
         sut.modules = []
-        let profileWithoutDNS = try sut.tryBuild()
+        let profileWithoutDNS = try sut.build()
         diff = profileWithoutDNS.differences(from: original)
         print(diff)
         #expect(diff.isEmpty)
@@ -60,12 +60,12 @@ struct ProfileDiffTests {
         ])
 
         sut.activeModulesIds = [dnsModule.id]
-        diff = try sut.tryBuild().differences(from: original)
+        diff = try sut.build().differences(from: original)
         print(diff)
         #expect(diff.isEmpty)
 
         sut.modules = [dnsModule]
-        diff = try sut.tryBuild().differences(from: original)
+        diff = try sut.build().differences(from: original)
         print(diff)
         #expect(diff == [
             .addedModules([dnsModule.id]),
@@ -73,7 +73,7 @@ struct ProfileDiffTests {
         ])
 
         sut.modules = [] // also clears stale ID in activeModulesIds
-        diff = try sut.tryBuild().differences(from: original)
+        diff = try sut.build().differences(from: original)
         print(diff)
         #expect(diff.isEmpty)
     }

@@ -139,7 +139,7 @@ extension Profile {
             }
         }
 
-        public func tryBuild() throws -> Profile {
+        public func build() throws -> Profile {
             try checkCompatibility()
 
             let allIds = Set(modules.map(\.id))
@@ -200,13 +200,13 @@ extension Profile {
     public func duplicate(withSuffix suffix: String) throws -> Profile {
         var copy = builder(withNewId: true)
         copy.name += suffix
-        return try copy.tryBuild()
+        return try copy.build()
     }
 
     public func withoutUserInfo() throws -> Self {
         var copy = builder()
         copy.userInfo = nil
-        return try copy.tryBuild()
+        return try copy.build()
     }
 }
 

@@ -11,7 +11,7 @@ struct IPModuleTests {
         let sut = IPModule.Builder(
             ipv4: IPSettings(subnet: Subnet(rawValue: "1.2.3.4/16")!)
         )
-        #expect(sut.tryBuild().builder() == sut)
+        #expect(sut.build().builder() == sut)
     }
 
     @Test
@@ -19,6 +19,6 @@ struct IPModuleTests {
         let sut = IPModule.Builder(
             ipv6: IPSettings(subnet: Subnet(rawValue: "1:2:3::4/120")!)
         )
-        #expect(sut.tryBuild().builder() == sut)
+        #expect(sut.build().builder() == sut)
     }
 }

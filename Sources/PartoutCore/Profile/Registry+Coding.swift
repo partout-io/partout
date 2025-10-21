@@ -41,7 +41,7 @@ extension Registry {
             behavior: codableProfile.behavior,
             userInfo: codableProfile.userInfo
         )
-        let profile = try builder.tryBuild()
+        let profile = try builder.build()
         return postDecodeBlock?(profile) ?? profile
     }
 }

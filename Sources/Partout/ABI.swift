@@ -127,7 +127,7 @@ public func partout_daemon_start(
         var builder = Profile.Builder()
         builder.modules = [module]
         builder.activateAllModules()
-        let profile = try builder.tryBuild()
+        let profile = try builder.build()
 
         // Map tunnel controller to external C functions (optional)
         let ctrl = cArgs.pointee.ctrl.map(\.pointee)
@@ -140,7 +140,7 @@ public func partout_daemon_start(
 
     // Throws .unknownImportedModule if missing implementation
     // let ovpnCfg = try StandardOpenVPNParser().parsed(fromContents: str).configuration
-    // let ovpn = try OpenVPNModule.Builder(configurationBuilder: ovpnCfg.builder()).tryBuild()
+    // let ovpn = try OpenVPNModule.Builder(configurationBuilder: ovpnCfg.builder()).build()
     // print(ovpn)
 
     // This task is short-lived
