@@ -13,7 +13,7 @@ __DISCLAIMER: the library is still undergoing deep architectural changes.__
 
 ## Usage
 
-**As per the GPL, the public license is not suitable for the App Store and other closed-source distributions. If you want to use Partout for proprietary or commercial purposes, please [contact me privately][license-contact].**
+**As per the GPL, the public license is not suitable for the App Store and other closed-source distributions. If you want to use Partout for proprietary or commercial purposes, please [obtain a proper license][license-website].**
 
 ### Swift
 
@@ -147,7 +147,7 @@ Twitter: [@keeshux][about-twitter]
 Website: [partout.io][about-website]
 
 [license]: LICENSE
-[license-contact]: mailto:license@partout.io
+[license-website]: https://partout.io/license
 [contrib-cla]: CLA.rst
 [contrib-readme]: CONTRIBUTING.md
 
