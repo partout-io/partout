@@ -4,8 +4,6 @@
 **/*.xcodeproj/project.xcworkspace
 **/xcuserdata
 **/.swiftpm/xcode
-PartoutCore
-PartoutCore.xcframework*
 Package.resolved
 .build
 .bin

@@ -196,7 +196,6 @@
 				0EC332D12B8A1808000B9C2F /* PBXTargetDependency */,
 			);
 			name = PartoutDemo;
-			productName = PassepartoutKit;
 			productReference = 0E06D18F2B87629100176E1D /* PartoutDemo.app */;
 			productType = "com.apple.product-type.application";
 		};
@@ -214,7 +213,6 @@
 			);
 			name = PartoutDemoTunnel;
 			packageProductDependencies = (
-				0E7AACD82E77107200608756 /* Partout */,
 				0EAEA5162E9A61760076596F /* partout */,
 			);
 			productName = Tunnel;

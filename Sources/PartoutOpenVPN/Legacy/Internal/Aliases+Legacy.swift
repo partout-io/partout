@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 @_exported import _PartoutCryptoOpenSSL_ObjC
+import Foundation
 internal import PartoutOpenVPN_ObjC
 #if !PARTOUT_MONOLITH
 import PartoutCore
@@ -29,7 +29,7 @@ extension PRNGProtocol {
     }
 }
 
-extension LegacyZD: @retroactive SensitiveDebugStringConvertible {
+extension LegacyZD: SensitiveDebugStringConvertible {
     public func debugDescription(withSensitiveData: Bool) -> String {
         withSensitiveData ? "[\(length) bytes, \(toHex())]" : "[\(length) bytes]"
     }

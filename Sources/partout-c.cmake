@@ -1,18 +1,17 @@
 set(ROOT_DIR ${CMAKE_SOURCE_DIR}/..)
 
 # Base configuration
-add_library(Partout_C STATIC "")
-target_compile_options(Partout_C PRIVATE
+add_library(partout_c STATIC "")
+target_compile_options(partout_c PRIVATE
     -DPARTOUT_MONOLITH
     -DOPENVPN_DEPRECATED_LZO
 )
 
 # Header search paths from all C targets
 set(PARTOUT_C_INCLUDE_DIRS
-    ${ROOT_DIR}/vendors/core/Sources/_PartoutCore_C/include
     ${ROOT_DIR}/vendors/lzo/include
-    ${CMAKE_SOURCE_DIR}/Partout_C/include
-    ${CMAKE_SOURCE_DIR}/PartoutOS_C/include
+    ${CMAKE_SOURCE_DIR}/PartoutABI_C/include
+    ${CMAKE_SOURCE_DIR}/PartoutCore_C/include
     ${CMAKE_SOURCE_DIR}/PartoutOpenVPN_C/include
     ${CMAKE_SOURCE_DIR}/PartoutWireGuard_C/include
 )
@@ -50,7 +49,6 @@ endif()
 
 # C sources, including vendored PartoutCore and LZO
 file(GLOB_RECURSE PARTOUT_C_SOURCES
-    ${ROOT_DIR}/vendors/core/Sources/_PartoutCore_C/*.c
     ${ROOT_DIR}/vendors/lzo/*.c
     *.c
 )
@@ -61,8 +59,8 @@ foreach(pattern ${EXCLUDED_PATTERNS})
 endforeach()
 
 # Add computed files
-target_sources(Partout_C PRIVATE ${PARTOUT_C_SOURCES})
-target_include_directories(Partout_C PRIVATE ${PARTOUT_C_INCLUDE_DIRS})
+target_sources(partout_c PRIVATE ${PARTOUT_C_SOURCES})
+target_include_directories(partout_c PRIVATE ${PARTOUT_C_INCLUDE_DIRS})
 if(LINUX)
-    target_compile_options(Partout_C PRIVATE -fPIC)
+    target_compile_options(partout_c PRIVATE -fPIC)
 endif()

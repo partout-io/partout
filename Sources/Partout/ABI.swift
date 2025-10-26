@@ -5,11 +5,11 @@
 #if !os(iOS) && !os(tvOS)
 
 import Foundation
-import Partout_C
-import PartoutOS_C
+import PartoutABI_C
+import PartoutCore_C
 #if !PARTOUT_MONOLITH
-import PartoutOS
 import PartoutCore
+import PartoutOS
 #endif
 
 @globalActor
@@ -43,12 +43,9 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
 
     // Logging and implementations, consider optionals
     var logBuilder = PartoutLogger.Builder()
-    var logCategories: [LoggerCategory] = [.core, .os, .providers]
+    var logCategories: [LoggerCategory] = [.core, .os]
     var allImplementations: [ModuleImplementation] = []
 
-#if PARTOUT_API
-    logCategories.append(.api)
-#endif
 #if PARTOUT_OPENVPN
     logCategories.append(.openvpn)
     allImplementations.append(OpenVPNModule.Implementation(

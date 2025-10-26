@@ -1,23 +1,14 @@
 #!/bin/bash
-core_src="../partout-core/Sources"
-core_dst="PartoutCore"
 web_src=".build/plugins/Swift-DocC/outputs/partout.doccarchive"
 web_dst=".build/docs"
 
 set -e
 
-rm -rf "$core_dst"
-mkdir "$core_dst"
-cp -rp "$core_src/PartoutCore" \
-    "$core_src/_PartoutCore_C" \
-    "$core_dst"
-
 PP_BUILD_DOCS="1" swift package generate-documentation \
     --enable-experimental-combined-documentation \
     --target Partout \
-    --target PartoutAPI \
     --target PartoutCore \
-    --target PartoutProviders \
+    --target PartoutOS \
     --target PartoutOpenVPN \
     --target PartoutWireGuard
 

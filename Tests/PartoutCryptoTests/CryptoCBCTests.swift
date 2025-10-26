@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@testable import PartoutOS
 import Foundation
+import PartoutCore
 import Testing
 
 private let plainHex = "00112233ffddaa"

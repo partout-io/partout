@@ -4,7 +4,6 @@
 [![License GPLv3](https://img.shields.io/badge/license-GPLv3-lightgray.svg)](LICENSE)
 
 [![Unit Tests](https://github.com/partout-io/partout/actions/workflows/test.yml/badge.svg)](https://github.com/partout-io/partout/actions/workflows/test.yml)
-[![Core](https://github.com/partout-io/partout/actions/workflows/release_core.yml/badge.svg)](https://github.com/partout-io/partout/actions/workflows/release_core.yml)
 
 # [Partout](https://partout.io)
 
@@ -14,15 +13,9 @@ __DISCLAIMER: the library is still undergoing deep architectural changes.__
 
 ## Usage
 
+**As per the GPL, the public license is not suitable for the App Store and other closed-source distributions. If you want to use Partout for proprietary or commercial purposes, please [contact me privately][license-contact].**
+
 ### Swift
-
-The public library supports development on these architectures:
-
-- macosx
-- iphonesimulator
-- appletvsimulator
-
-Therefore, it __will not build__ on your iOS/tvOS physical devices. If you want to use it for proprietary or commercial purposes, please [contact me privately][license-contact].
 
 Import the library as a SwiftPM dependency:
 
@@ -40,7 +33,7 @@ targets: [
 
 ### Other languages (ABI)
 
-The C ABI is a work in progress and for private use, as the `vendors/core` submodule is currently a private repository.
+The C ABI is a work in progress.
 
 #### Requirements
 
@@ -93,7 +86,7 @@ This should work for all platforms, except for Android, which asks for a hybrid 
 
 #### Build for Android
 
-Building for Android requires access to the Swift Android SDK, and this is not straightforward from CMake. That's why the `scripts/build-android.sh` script does the heavy-lifting in two steps:
+Building for Android requires access to a Swift Android SDK, and this is not straightforward from CMake. That's why the `scripts/build-android.sh` script does the heavy-lifting in two steps:
 
 - Cross-compile the vendored static libraries with CMake for Android
 - Embed the static libraries in SwiftPM to generate a dynamic library with the Swift Android SDK
@@ -128,9 +121,7 @@ Open `Demo.xcodeproj` and run the `PartoutDemo` target.
 
 Copyright (c) 2025 Davide De Rosa. All rights reserved.
 
-The core package is distributed as a binary framework in [GitHub Releases][github-releases] and is licensed under the [MIT][license-mit].
-
-Anything else is licensed under the [GPLv3][license-gpl].
+The library is licensed under the [GPLv3][license].
 
 ### Contributing
 
@@ -155,8 +146,7 @@ Twitter: [@keeshux][about-twitter]
 
 Website: [partout.io][about-website]
 
-[license-gpl]: LICENSE.gpl
-[license-mit]: LICENSE.mit
+[license]: LICENSE
 [license-contact]: mailto:license@partout.io
 [contrib-cla]: CLA.rst
 [contrib-readme]: CONTRIBUTING.md
