@@ -9,8 +9,6 @@
 
 The easiest way to build cross-platform tunnel apps.
 
-__DISCLAIMER: the library is still undergoing deep architectural changes.__
-
 ## Usage
 
 **As per the GPL, the public license is not suitable for the App Store and other closed-source distributions. If you want to use Partout for proprietary or commercial purposes, please [obtain a proper license][license-website].**
