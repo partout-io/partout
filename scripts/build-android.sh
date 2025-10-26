@@ -17,9 +17,8 @@ fi
 # 2. Build SwiftPM with Android SDK
 
 PP_BUILD_OS="android" \
-PP_BUILD_CORE="localSource" \
 PP_BUILD_CMAKE_OUTPUT=".bin/android-arm64" \
 swiftly run \
 swift build \
     -c $spm_cfg \
-    --swift-sdk aarch64-unknown-linux-android24
+    --swift-sdk aarch64-unknown-linux-android28
