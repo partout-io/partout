@@ -4,14 +4,22 @@
 
 import Foundation
 
-#if os(Android)
+#if canImport(Android)
 @_exported import Android
-#elseif os(Windows)
+#elseif canImport(Darwin)
+@_exported import Darwin
+#elseif canImport(Linux)
+@_exported import Linux
+#elseif canImport(WinSDK)
+@_exported import WinSDK
+#endif
+
+#if canImport(WinSDK)
 public let AF_INET: Int32 = 2
 public let AF_INET6: Int32 = 10
 #endif
 
-#if !os(Darwin)
+#if !canImport(Darwin)
 let NSEC_PER_MSEC: UInt64 = 1000000
 let NSEC_PER_SEC: UInt64 = 1000000000
 #endif
