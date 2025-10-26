@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include "portable/lib.h"
+#include "wireguard/logging.h"
 #include "wireguard/wireguard.h"
 
 /* The WireGuard API is declared as local function pointers, so
@@ -86,8 +87,7 @@ int load_symbols() {
 
 int pp_wg_init() {
     if (load_symbols() != 0) return -1;
-    // FIXME: #205, fprintf
-    fprintf(stderr, "wg-go version: %s\n", pp_wg_version());
+    pp_clog_v(PPLogCategoryWireGuard, PPLogLevelInfo, "wg-go version: %s", pp_wg_version());
     return 0;
 }
 

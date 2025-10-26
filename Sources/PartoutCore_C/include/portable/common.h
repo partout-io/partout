@@ -12,6 +12,27 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Logging counterpart of Swift pp_log
+
+typedef enum {
+    PPLogLevelDebug,
+    PPLogLevelInfo,
+    PPLogLevelNotice,
+    PPLogLevelError,
+    PPLogLevelFault
+} pp_log_level;
+
+typedef const char *_Nonnull pp_log_category;
+extern pp_log_category PPLogCategoryCore;
+
+extern void pp_clog(pp_log_category category,
+                    pp_log_level level,
+                    const char *_Nonnull message);
+
+void pp_clog_v(pp_log_category category,
+               pp_log_level level,
+               const char *_Nonnull fmt, ...);
+
 // Use inline rather than #define to make available to Swift
 
 static inline
@@ -23,7 +44,7 @@ static inline
 void *_Nonnull pp_alloc(size_t size) {
     void *memory = calloc(1, size);
     if (!memory) {
-        fputs("pp_alloc: malloc() call failed", stderr);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_alloc: malloc() call failed");
         abort();
     }
     return memory;
@@ -52,7 +73,7 @@ char *_Nonnull pp_dup(const char *_Nonnull str) {
     char *ptr = strdup(str);
 #endif
     if (!ptr) {
-        fputs("pp_dup: strdup() call failed", stderr);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_dup: strdup() call failed");
         abort();
     }
     return ptr;
