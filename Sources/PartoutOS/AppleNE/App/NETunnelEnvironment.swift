@@ -7,7 +7,7 @@ import Foundation
 import PartoutCore
 #endif
 
-/// A ``/PartoutCore/TunnelEnvironmentReader`` that updates via Network Extension messaging.
+/// A tunnel environment reader that updates via Network Extension messaging.
 public final class NETunnelEnvironment: TunnelEnvironmentReader, @unchecked Sendable {
     private let queue: DispatchQueue
 

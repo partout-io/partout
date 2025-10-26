@@ -7,6 +7,7 @@ import Foundation
 /// The central store of tunnel environment values.
 public typealias TunnelEnvironment = AnyObject & TunnelEnvironmentReader & TunnelEnvironmentWriter
 
+/// Able to read an environment.
 public protocol TunnelEnvironmentReader: Sendable {
     var onUpdate: AsyncStream<Void> { get }
 
@@ -15,6 +16,7 @@ public protocol TunnelEnvironmentReader: Sendable {
     func snapshot(excludingKeys excluded: Set<String>?) -> [String: Data]
 }
 
+/// Able to edit an environment.
 public protocol TunnelEnvironmentWriter: Sendable {
     func setEnvironmentValue<T>(_ value: T, forKey key: TunnelEnvironmentKey<T>) where T: Encodable
 
@@ -32,6 +34,7 @@ public struct TunnelEnvironmentKey<T>: TunnelEnvironmentKeyProtocol, Sendable {
     }
 }
 
+/// The common interface of tunnel environment keys.
 public protocol TunnelEnvironmentKeyProtocol {
     var keyString: String { get }
 }

@@ -11,6 +11,7 @@ import PackageDescription
 let env = ProcessInfo.processInfo.environment
 let envOS = env["PP_BUILD_OS"]
 let envCMakeOutput = env["PP_BUILD_CMAKE_OUTPUT"]
+let envDocs = env["PP_BUILD_DOCS"] == "1"
 
 // MARK: Configuration
 
@@ -92,6 +93,13 @@ let package = Package(
         )
     ]
 )
+
+// Swift-DocC for documentation, do not include by default
+if envDocs {
+    package.dependencies.append(
+        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.1.0")
+    )
+}
 
 // Wrapper = Core + OS
 package.targets.append(contentsOf: [

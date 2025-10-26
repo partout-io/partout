@@ -5,7 +5,7 @@
 import Foundation
 import PartoutCore_C
 
-/// Codable wrapper of `AutoerasingData`.
+/// Wrapper of a byte array with safe encoding capabilities.
 public struct SecureData: Hashable, Codable, @unchecked Sendable {
     private let innerData: [UInt8]
 

@@ -74,8 +74,3 @@ public protocol Keychain: Sendable {
      **/
     func password(forReference reference: Data) throws -> String
 }
-
-/// Provides a keychain.
-public protocol KeychainProviding {
-    var keychain: Keychain { get }
-}

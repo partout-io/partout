@@ -5,6 +5,7 @@
 import Foundation
 import PartoutCore_C
 
+/// Wrapper of binary data that zeroes out itself on deallocation.
 public final class CZeroingData {
     public let ptr: UnsafeMutablePointer<pp_zd>
 

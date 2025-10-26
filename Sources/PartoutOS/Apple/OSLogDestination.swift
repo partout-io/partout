@@ -8,7 +8,7 @@ import Foundation
 import PartoutCore
 #endif
 
-/// Represents a ``/PartoutCore/LoggerDestination`` based on `OSLog`.
+/// A logger destination based on `OSLog`.
 public struct OSLogDestination: LoggerDestination {
     private static var subsystem: String {
         Partout.identifier

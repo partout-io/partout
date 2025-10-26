@@ -6,6 +6,7 @@
 
 import Foundation
 
+@available(*, deprecated, message: "Not cross-platform")
 public func stream<O, V>(
     for keyPath: KeyPath<O, V>,
     of object: O,

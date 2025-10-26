@@ -8,7 +8,7 @@ import NetworkExtension
 import PartoutCore
 #endif
 
-/// Implementation of a ``/PartoutCore/LinkObserver`` via `NWUDPSession`.
+/// An observer based on `NWUDPSession`.
 @available(*, deprecated, message: "Use NESocketObserver")
 public final class NEUDPObserver: LinkObserver {
     public struct Options: Sendable {

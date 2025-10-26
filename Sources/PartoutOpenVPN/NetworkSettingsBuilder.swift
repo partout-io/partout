@@ -9,7 +9,7 @@ import PartoutCore
 
 /// Merges local and remote settings.
 ///
-/// OpenVPN settings may be set locally, but may also received from a remote server. This object merges the local and remote ``OpenVPN/Configuration`` into a digestible list of `Module`.
+/// OpenVPN settings may be set locally, but may also received from a remote server. This object merges the local and remote ``OpenVPN/Configuration`` into a digestible list of modules.
 public struct NetworkSettingsBuilder {
     private let ctx: PartoutLoggerContext
 
@@ -25,7 +25,7 @@ public struct NetworkSettingsBuilder {
         self.remoteOptions = remoteOptions
     }
 
-    /// A list of `Module` mapped from ``localOptions`` and ``remoteOptions``.
+    /// A list of `Module` mapped from `localOptions` and `remoteOptions`.
     public func modules() -> [Module] {
         pp_log(ctx, .openvpn, .info, "Build modules from local/remote options")
 

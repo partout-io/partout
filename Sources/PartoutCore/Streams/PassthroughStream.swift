@@ -4,6 +4,7 @@
 
 import Foundation
 
+/// Replacement of `PassthroughSubject`.
 public final class PassthroughStream<T>: @unchecked Sendable where T: Sendable {
     let queue = DispatchQueue(label: "PassthroughStream")
 

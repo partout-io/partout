@@ -7,6 +7,7 @@ import Foundation
 import PartoutCore
 #endif
 
+/// Default implementation of ``WireGuardKeyGenerator``.
 public final class StandardWireGuardKeyGenerator: WireGuardKeyGenerator {
     public init() {
     }

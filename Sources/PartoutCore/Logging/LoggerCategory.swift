@@ -4,6 +4,7 @@
 
 import Foundation
 
+/// A logging category, expressed as a unique raw string.
 public struct LoggerCategory: RawRepresentable, Hashable, Sendable {
     public let rawValue: String
 

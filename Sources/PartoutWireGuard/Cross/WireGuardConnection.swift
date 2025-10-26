@@ -13,6 +13,7 @@ import Foundation
 import PartoutCore
 #endif
 
+/// Establishes a WireGuard connection.
 public actor WireGuardConnection: Connection {
     private let ctx: PartoutLoggerContext
 

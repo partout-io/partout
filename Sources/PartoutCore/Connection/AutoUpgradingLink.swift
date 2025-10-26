@@ -4,6 +4,7 @@
 
 import Foundation
 
+/// A ``LinkInterface`` able to upgrade to a new instance.
 public final class AutoUpgradingLink: LinkInterface {
     public typealias IOBlock = @Sendable (ExtendedEndpoint) async throws -> SocketIOInterface
 

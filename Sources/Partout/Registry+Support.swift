@@ -31,12 +31,12 @@ extension Registry {
         return handlers
     }()
 
-    /// Returns a ``/PartoutCore/Registry`` with the known module handlers and resolvers and an empty device ID.
+    /// Returns a ``Registry`` with the known module handlers and resolvers and an empty device ID.
     public convenience init() {
         self.init(withKnown: true)
     }
 
-    /// Returns a ``/PartoutCore/Registry`` that optionally includes the known module handlers and resolvers.
+    /// Returns a ``Registry`` that optionally includes the known module handlers and resolvers.
     public convenience init(
         withKnown: Bool,
         customHandlers: [ModuleHandler] = [],

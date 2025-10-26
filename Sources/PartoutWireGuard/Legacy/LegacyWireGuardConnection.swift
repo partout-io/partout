@@ -15,6 +15,7 @@ import os
 import PartoutCore
 #endif
 
+/// Establishes a WireGuard connection. Legacy Apple-only implementation.
 @available(*, deprecated, message: "Use WireGuardConnection")
 public final class LegacyWireGuardConnection: Connection, @unchecked Sendable {
     private let ctx: PartoutLoggerContext

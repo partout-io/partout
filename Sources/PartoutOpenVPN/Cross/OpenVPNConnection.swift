@@ -8,7 +8,7 @@ import PartoutCore
 import PartoutOS
 #endif
 
-/// Swift/C implementation of an OpenVPN ``/PartoutCore/Connection``.
+/// Swift/C implementation of an OpenVPN connection.
 public actor OpenVPNConnection {
 
     // MARK: Initialization

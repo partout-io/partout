@@ -4,6 +4,7 @@
 
 import Foundation
 
+/// The most basic Swift PRNG.
 public final class SimplePRNG: PRNGProtocol {
     public init() {
     }

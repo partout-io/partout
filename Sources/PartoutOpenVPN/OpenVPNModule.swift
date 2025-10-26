@@ -11,7 +11,7 @@ extension ModuleType {
     public static let openVPN = ModuleType("OpenVPN")
 }
 
-/// A ``/PartoutCore/ConnectionModule`` providing an OpenVPN connection.
+/// A connection module providing an OpenVPN connection.
 public struct OpenVPNModule: Module, BuildableType, Hashable, Codable {
     public static let moduleHandler = ModuleHandler(.openVPN, OpenVPNModule.self)
 

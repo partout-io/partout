@@ -4,12 +4,14 @@
 
 import Foundation
 
+/// Replacement of completion values.
 public enum SubjectStreamCompletion {
     case finished
 
     case failure(_ error: Error)
 }
 
+/// Replacement of `Subject`.
 public protocol SubjectStream: AnyObject, Sendable {
     associatedtype T
 

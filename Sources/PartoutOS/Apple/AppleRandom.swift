@@ -8,7 +8,7 @@ import PartoutCore
 #endif
 import Security.SecRandom
 
-/// Implementation of ``/PartoutCore/PRNGProtocol`` based on the `Security` framework.
+/// A PRNG based on the Security framework.
 public final class AppleRandom: PRNGProtocol {
     public init() {
     }

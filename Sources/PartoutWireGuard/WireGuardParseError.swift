@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+/// List of all WireGuard parsing errors.
 public enum WireGuardParseError: Error {
     case invalidLine(String.SubSequence)
     case noInterface

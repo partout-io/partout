@@ -5,6 +5,7 @@
 import Foundation
 import PartoutCore_C
 
+/// A ``LinkObserver`` spawning POSIX sockets.
 public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
