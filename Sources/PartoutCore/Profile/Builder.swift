@@ -8,7 +8,7 @@ import Foundation
 public protocol BuilderType {
     associatedtype BuiltType
 
-    func tryBuild() throws -> BuiltType
+    func build() throws -> BuiltType
 }
 
 /// A type that can be built with a ``BuilderType``.

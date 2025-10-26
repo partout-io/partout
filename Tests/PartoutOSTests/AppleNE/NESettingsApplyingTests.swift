@@ -20,7 +20,7 @@ struct NESettingsApplyingTests {
                 Route(Subnet(rawValue: "7.7.7.7/16")!, Address(rawValue: "70.70.70.70")!),
                 Route(Subnet(rawValue: "8.8.8.8/24")!, Address(rawValue: "80.80.80.80")!)
             ])
-        let module = IPModule.Builder(ipv4: ipv4).tryBuild()
+        let module = IPModule.Builder(ipv4: ipv4).build()
 
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
         module.apply(.global, to: &sut)
@@ -53,7 +53,7 @@ struct NESettingsApplyingTests {
                 Route(Subnet(rawValue: "::7/64")!, Address(rawValue: "::70")!),
                 Route(Subnet(rawValue: "::8/80")!, Address(rawValue: "::80")!)
             ])
-        let module = IPModule.Builder(ipv6: ipv6).tryBuild()
+        let module = IPModule.Builder(ipv6: ipv6).build()
 
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
         module.apply(.global, to: &sut)
@@ -84,7 +84,7 @@ struct NESettingsApplyingTests {
             securePort: 8080,
             pacURLString: "http://proxy.pac",
             bypassDomains: ["one.com", "two.com"]
-        ).tryBuild()
+        ).build()
 
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
         module.apply(.global, to: &sut)
@@ -108,7 +108,7 @@ struct NESettingsApplyingTests {
             servers: ["1.1.1.1", "2.2.2.2"],
             domainName: "domain.com",
             searchDomains: ["one.com", "two.com"]
-        ).tryBuild()
+        ).build()
 
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
         module.apply(.global, to: &sut)
@@ -126,7 +126,7 @@ struct NESettingsApplyingTests {
             protocolType: .https,
             servers: ["1.1.1.1", "2.2.2.2"],
             dohURL: "https://1.1.1.1/dns-query"
-        ).tryBuild()
+        ).build()
 
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
         module.apply(.global, to: &sut)
@@ -147,7 +147,7 @@ struct NESettingsApplyingTests {
             protocolType: .tls,
             servers: ["1.1.1.1", "2.2.2.2"],
             dotHostname: "domain.com"
-        ).tryBuild()
+        ).build()
 
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
         module.apply(.global, to: &sut)
@@ -189,7 +189,7 @@ struct NESettingsApplyingTests {
 
         let filterModule = FilterModule.Builder(
             disabledMask: [.ipv4, .ipv6, .dns, .proxy, .mtu]
-        ).tryBuild()
+        ).build()
         filterModule.apply(.global, to: &sut)
         #expect(sut.ipv4Settings == nil)
         #expect(sut.ipv6Settings == nil)

@@ -68,7 +68,7 @@ extension WireGuard.RemoteInterface {
             allowedIPs = []
         }
 
-        public func tryBuild() throws -> WireGuard.RemoteInterface {
+        public func build() throws -> WireGuard.RemoteInterface {
             guard let validPublicKey = WireGuard.Key(rawValue: publicKey) else {
                 throw PartoutError.invalidFields(["publicKey": publicKey])
             }

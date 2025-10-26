@@ -13,7 +13,7 @@ struct SimpleConnectionDaemonTests {
     @Test
     func givenNoConnection_whenStartDaemon_thenStarts() async throws {
         let profile = try Profile.Builder()
-            .tryBuild()
+            .build()
 
         let sut = try await newDaemon(with: profile)
         do {
@@ -29,7 +29,7 @@ struct SimpleConnectionDaemonTests {
         let profile = try Profile.Builder(
             modules: [connectionModule],
             activeModulesIds: [connectionModule.id]
-        ).tryBuild()
+        ).build()
         #expect(profile.activeConnectionModule != nil)
 
         let reachability = MockReachabilityObserver()
@@ -49,7 +49,7 @@ struct SimpleConnectionDaemonTests {
         let profile = try Profile.Builder(
             modules: [connectionModule],
             activeModulesIds: [connectionModule.id]
-        ).tryBuild()
+        ).build()
         #expect(profile.activeConnectionModule != nil)
 
         let environment = SharedTunnelEnvironment(profileId: profile.id)
@@ -69,7 +69,7 @@ struct SimpleConnectionDaemonTests {
         let profile = try Profile.Builder(
             modules: [connectionModule],
             activeModulesIds: [connectionModule.id]
-        ).tryBuild()
+        ).build()
         #expect(profile.activeConnectionModule != nil)
 
         let sut = try await newDaemon(with: profile)
@@ -86,7 +86,7 @@ struct SimpleConnectionDaemonTests {
         let profile = try Profile.Builder(
             modules: [connectionModule],
             activeModulesIds: [connectionModule.id]
-        ).tryBuild()
+        ).build()
         #expect(profile.activeConnectionModule != nil)
 
         let reachability = MockReachabilityObserver()
@@ -121,7 +121,7 @@ struct SimpleConnectionDaemonTests {
         let profile = try Profile.Builder(
             modules: [connectionModule],
             activeModulesIds: [connectionModule.id]
-        ).tryBuild()
+        ).build()
         #expect(profile.activeConnectionModule != nil)
 
         let reachability = MockReachabilityObserver()
@@ -150,7 +150,7 @@ struct SimpleConnectionDaemonTests {
         let profile = try Profile.Builder(
             modules: [connectionModule],
             activeModulesIds: [connectionModule.id]
-        ).tryBuild()
+        ).build()
         #expect(profile.activeConnectionModule != nil)
 
         let reachability = MockReachabilityObserver()

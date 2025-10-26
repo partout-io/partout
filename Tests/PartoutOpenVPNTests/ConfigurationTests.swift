@@ -18,7 +18,7 @@ struct ConfigurationTests {
             try? ExtendedEndpoint(ipv4, .init(.udp4, 3333))
         ].compactMap { $0 }
         builder.randomizeHostnames = true
-        let cfg = try builder.tryBuild(isClient: false)
+        let cfg = try builder.build(isClient: false)
 
         try cfg.processedRemotes(prng: MockPRNG())?
             .forEach {

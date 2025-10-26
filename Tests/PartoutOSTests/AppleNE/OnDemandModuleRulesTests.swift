@@ -14,7 +14,7 @@ struct OnDemandModuleRulesTests {
         var module = OnDemandModule.Builder()
         module.policy = .any
 
-        let sut = module.tryBuild()
+        let sut = module.build()
 
         #expect(sut.neRules == [
             NEOnDemandRuleConnect()
@@ -26,7 +26,7 @@ struct OnDemandModuleRulesTests {
         var module = OnDemandModule.Builder()
         module.policy = .excluding
 
-        let sut = module.tryBuild()
+        let sut = module.build()
 
         #expect(sut.neRules == [
             NEOnDemandRuleConnect()
@@ -45,7 +45,7 @@ struct OnDemandModuleRulesTests {
             "yep": false
         ]
 
-        let sut = module.tryBuild()
+        let sut = module.build()
 
         let computedRules = {
             var rules: [NEOnDemandRule] = []
@@ -82,7 +82,7 @@ struct OnDemandModuleRulesTests {
             "yep": false
         ]
 
-        let sut = module.tryBuild()
+        let sut = module.build()
 
         let computedRules = {
             var rules: [NEOnDemandRule] = []

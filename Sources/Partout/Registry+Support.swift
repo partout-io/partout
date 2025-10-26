@@ -62,7 +62,7 @@ private extension Registry {
             case nil:
                 // Set new version at the very least
                 let builder = profile.builder(withNewId: false, forUpgrade: true)
-                return try builder.tryBuild()
+                return try builder.build()
             default:
                 return nil
             }

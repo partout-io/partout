@@ -82,13 +82,13 @@ extension OpenVPNModule {
             self.isInteractive = isInteractive
         }
 
-        public func tryBuild() throws -> OpenVPNModule {
+        public func build() throws -> OpenVPNModule {
             guard configurationBuilder != nil else {
                 throw PartoutError(.incompleteModule, self)
             }
             var builder = configurationBuilder
             builder?.staticChallenge = isInteractive
-            let configuration = try builder?.tryBuild(isClient: true)
+            let configuration = try builder?.build(isClient: true)
             return OpenVPNModule(
                 id: id,
                 configuration: configuration,

@@ -63,7 +63,7 @@ extension IPModule {
             self.mtu = mtu
         }
 
-        public func tryBuild() -> IPModule {
+        public func build() -> IPModule {
             IPModule(
                 id: id,
                 ipv4: ipv4?.nilIfEmpty,

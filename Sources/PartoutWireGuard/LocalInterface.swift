@@ -62,7 +62,7 @@ extension WireGuard.LocalInterface {
             addresses = []
         }
 
-        public func tryBuild() throws -> WireGuard.LocalInterface {
+        public func build() throws -> WireGuard.LocalInterface {
             guard let validPrivateKey = WireGuard.Key(rawValue: privateKey) else {
                 throw PartoutError.invalidFields(["privateKey": privateKey])
             }
@@ -75,7 +75,7 @@ extension WireGuard.LocalInterface {
             return WireGuard.LocalInterface(
                 privateKey: validPrivateKey,
                 addresses: validAddresses,
-                dns: try dns.tryBuild(),
+                dns: try dns.build(),
                 mtu: mtu
             )
         }

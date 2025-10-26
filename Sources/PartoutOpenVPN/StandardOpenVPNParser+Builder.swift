@@ -751,7 +751,7 @@ extension StandardOpenVPNParser.Builder {
 
         //
 
-        let configuration = try builder.tryBuild(isClient: isClient)
+        let configuration = try builder.build(isClient: isClient)
         return StandardOpenVPNParser.Result(
             url: nil,
             configuration: configuration,

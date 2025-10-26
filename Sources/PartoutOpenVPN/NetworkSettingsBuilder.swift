@@ -164,7 +164,7 @@ private extension NetworkSettingsBuilder {
             ipv4: ipv4,
             ipv6: ipv6,
             mtu: mtu
-        ).tryBuild()
+        ).build()
     }
 
     var ipv4Settings: IPSettings? {
@@ -245,7 +245,7 @@ private extension NetworkSettingsBuilder {
         }
 
         do {
-            return try dnsSettings.tryBuild()
+            return try dnsSettings.build()
         } catch {
             pp_log(ctx, .openvpn, .error, "DNS: Unable to build settings: \(error)")
             return nil
@@ -291,7 +291,7 @@ private extension NetworkSettingsBuilder {
         }
 
         do {
-            return try proxySettings?.tryBuild()
+            return try proxySettings?.build()
         } catch {
             pp_log(ctx, .openvpn, .error, "HTTPProxy: Unable to build settings: \(error)")
             return nil

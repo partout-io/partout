@@ -87,7 +87,7 @@ extension HTTPProxyModule {
             self.bypassDomains = bypassDomains
         }
 
-        public func tryBuild() throws -> HTTPProxyModule {
+        public func build() throws -> HTTPProxyModule {
             var proxy: Endpoint?
             var secureProxy: Endpoint?
             var pacURL: URL?

@@ -35,14 +35,14 @@ struct ProfileNetworkSettingsTests {
                 .including(routes: [
                     Route(defaultWithGateway: Address(rawValue: "10:20::30:40")!)
                 ])
-        ).tryBuild()
+        ).build()
         let dnsModule = try DNSModule.Builder(
             servers: ["1.1.1.1", "2.2.2.2", "::100"]
-        ).tryBuild()
+        ).build()
         let profile = try Profile.Builder(
             modules: [connModule, ipModule, dnsModule],
             activatingModules: true
-        ).tryBuild()
+        ).build()
 
         let sut = profile.networkSettings(with: nil)
 
@@ -71,7 +71,7 @@ struct ProfileNetworkSettingsTests {
         let ipModule = IPModule.Builder(
             ipv4: IPSettings(subnet: Subnet(rawValue: "1.2.3.4/32")!),
             ipv6: IPSettings(subnet: Subnet(rawValue: "::1/32")!)
-        ).tryBuild()
+        ).build()
         var dnsModuleBuilder = DNSModule.Builder(
             servers: ["1.1.1.1", "2.2.2.2", "::100"]
         )
@@ -80,9 +80,9 @@ struct ProfileNetworkSettingsTests {
         //
 
         let profile = try Profile.Builder(
-            modules: [connectionModule, ipModule, try dnsModuleBuilder.tryBuild()],
+            modules: [connectionModule, ipModule, try dnsModuleBuilder.build()],
             activatingModules: true
-        ).tryBuild()
+        ).build()
         sut = profile.networkSettings(with: nil)
 
         let ipV4Settings = try #require(sut.ipv4Settings)
@@ -98,9 +98,9 @@ struct ProfileNetworkSettingsTests {
 
         dnsModuleBuilder.searchDomains = ["domain.com"]
         sut = try Profile.Builder(
-            modules: [connectionModule, ipModule, try dnsModuleBuilder.tryBuild()],
+            modules: [connectionModule, ipModule, try dnsModuleBuilder.build()],
             activatingModules: true
-        ).tryBuild().networkSettings(with: nil)
+        ).build().networkSettings(with: nil)
 
         #expect(sut.dnsSettings?.matchDomains == [""])
     }
@@ -109,16 +109,16 @@ struct ProfileNetworkSettingsTests {
 
     @Test
     func givenProfile_whenGetNetworkSettingsWithInfo_thenAppliesInfo() throws {
-        let bogusModule = try DNSModule.Builder().tryBuild()
+        let bogusModule = try DNSModule.Builder().build()
         let profile = try Profile.Builder(
             modules: [bogusModule],
             activeModulesIds: [bogusModule.id]
-        ).tryBuild()
+        ).build()
 
         let sut = profile.networkSettings(with: .init(
             originalModuleId: bogusModule.id,
             address: Address(rawValue: "5.6.7.8")!,
-            modules: [try DNSModule.Builder(servers: ["1.1.1.1"]).tryBuild()],
+            modules: [try DNSModule.Builder(servers: ["1.1.1.1"]).build()],
             fileDescriptors: []
         ))
 
@@ -143,7 +143,7 @@ struct ProfileNetworkSettingsTests {
                         .including(routes: [
                             Route(defaultWithGateway: nil)
                         ])
-                ).tryBuild()
+                ).build()
             ],
             fileDescriptors: []
         )
@@ -156,11 +156,11 @@ struct ProfileNetworkSettingsTests {
                 .excluding(routes: [
                     Route(defaultWithGateway: nil)
                 ])
-        ).tryBuild()
+        ).build()
         let profile = try Profile.Builder(
             modules: [connectionModule, ipModule],
             activatingModules: true
-        ).tryBuild()
+        ).build()
 
         let sut = profile.networkSettings(with: remoteInfo)
 

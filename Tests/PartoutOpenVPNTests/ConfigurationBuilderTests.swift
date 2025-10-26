@@ -12,7 +12,7 @@ struct ConfigurationBuilderTests {
         var sut = OpenVPN.Configuration.Builder()
         sut.ca = .init(pem: "")
         sut.remotes = [.init(rawValue: "1.2.3.4:UDP:1000")!]
-        let cfg = try sut.tryBuild(isClient: true)
+        let cfg = try sut.build(isClient: true)
         #expect(cfg.cipher == .aes128cbc)
         #expect(cfg.digest == nil)
         #expect(cfg.compressionFraming == nil)
@@ -22,7 +22,7 @@ struct ConfigurationBuilderTests {
     @Test
     func givenBuilder_whenNonClient_thenHasNoFallbackValues() throws {
         let sut = OpenVPN.Configuration.Builder()
-        let cfg = try sut.tryBuild(isClient: false)
+        let cfg = try sut.build(isClient: false)
         #expect(cfg.cipher == nil)
         #expect(cfg.digest == nil)
         #expect(cfg.compressionFraming == nil)

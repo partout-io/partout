@@ -22,7 +22,7 @@ struct ProfileTests {
         var p1 = Profile.Builder()
         let m1 = DNSModule.Builder()
         p1.name = "One"
-        p1.modules = [try m1.tryBuild()]
+        p1.modules = [try m1.build()]
 
         var p2 = p1
         #expect(p1 == p2)
@@ -35,7 +35,7 @@ struct ProfileTests {
         m2.dotHostname = "some.com"
         #expect(m1 != m2)
 
-        p2.modules = [try m2.tryBuild()]
+        p2.modules = [try m2.build()]
         #expect(p1 != p2)
         #expect(m1 != m2)
     }
@@ -44,10 +44,10 @@ struct ProfileTests {
     func givenProfile_whenRebuild_thenIsEqual() throws {
         var pb1 = Profile.Builder()
         pb1.name = "One"
-        let p1 = try pb1.tryBuild()
+        let p1 = try pb1.build()
 
         let pb2 = p1.builder()
-        let p2 = try pb2.tryBuild()
+        let p2 = try pb2.build()
         #expect(pb1 == pb2)
         #expect(p1 == p2)
     }
@@ -56,10 +56,10 @@ struct ProfileTests {
     func givenProfile_whenRebuildWithNewId_thenIsNotEqual() throws {
         var pb1 = Profile.Builder()
         pb1.name = "One"
-        let p1 = try pb1.tryBuild()
+        let p1 = try pb1.build()
 
         let pb2 = p1.builder(withNewId: true)
-        let p2 = try pb2.tryBuild()
+        let p2 = try pb2.build()
         #expect(pb1 != pb2)
         #expect(p1 != p2)
     }
@@ -67,7 +67,7 @@ struct ProfileTests {
     @Test
     func givenProfile_whenBuild_thenDisconnectsOnSleepIsDisabled() throws {
         let pb = Profile.Builder()
-        let sut = try pb.tryBuild()
+        let sut = try pb.build()
         #expect(!sut.disconnectsOnSleep)
     }
 
@@ -75,8 +75,8 @@ struct ProfileTests {
     func givenProfileWithBehavior_whenBuild_thenAppliesBehavior() throws {
         var pb = Profile.Builder()
         pb.behavior = ProfileBehavior()
-        #expect(!(try pb.tryBuild().disconnectsOnSleep))
+        #expect(!(try pb.build().disconnectsOnSleep))
         pb.behavior?.disconnectsOnSleep = true
-        #expect(try pb.tryBuild().disconnectsOnSleep)
+        #expect(try pb.build().disconnectsOnSleep)
     }
 }

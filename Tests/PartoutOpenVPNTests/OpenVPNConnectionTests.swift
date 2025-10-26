@@ -303,7 +303,7 @@ private struct Constants {
         cfg.cipher = .aes128cbc
         cfg.remotes = [ExtendedEndpoint(rawValue: "\(hostname):UDP:1194")!]
         do {
-            module = try OpenVPNModule.Builder(configurationBuilder: cfg).tryBuild()
+            module = try OpenVPNModule.Builder(configurationBuilder: cfg).build()
         } catch {
             fatalError("Cannot build OpenVPNModule: \(error)")
         }
@@ -315,7 +315,7 @@ private struct Constants {
         factory: NetworkInterfaceFactory = MockNetworkInterfaceFactory(),
         environment: TunnelEnvironment = SharedTunnelEnvironment(profileId: nil)
     ) async throws -> OpenVPNConnection {
-        let profile = try Profile.Builder().tryBuild()
+        let profile = try Profile.Builder().build()
         let impl = OpenVPNModule.Implementation(
             importerBlock: {
                 StandardOpenVPNParser(supportsLZO: false, decrypter: nil)
@@ -347,7 +347,7 @@ private struct Constants {
 private final class MockOpenVPNSession: OpenVPNSessionProtocol, @unchecked Sendable {
     private let options: OpenVPN.Configuration = {
         do {
-            return try OpenVPN.Configuration.Builder().tryBuild(isClient: false)
+            return try OpenVPN.Configuration.Builder().build(isClient: false)
         } catch {
             fatalError("Cannot build remote options: \(error)")
         }

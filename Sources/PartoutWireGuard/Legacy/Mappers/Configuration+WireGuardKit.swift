@@ -24,7 +24,7 @@ extension WireGuard.Configuration {
                 $0.builder()
             }
         )
-        self = try builder.tryBuild()
+        self = try builder.build()
     }
 
     func toWireGuardConfiguration() throws -> TunnelConfiguration {

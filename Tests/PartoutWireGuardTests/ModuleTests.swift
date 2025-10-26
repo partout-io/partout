@@ -14,10 +14,10 @@ struct ModuleTests {
 
         var sut = WireGuardModule.Builder()
         sut.configurationBuilder = WireGuard.Configuration.Builder(privateKey: pvtkey)
-        #expect(throws: PartoutError.self, performing: { try sut.tryBuild() })
+        #expect(throws: PartoutError.self, performing: { try sut.build() })
 
         sut.configurationBuilder?.peers = [.init(publicKey: pubkey)]
-        let module = try sut.tryBuild()
+        let module = try sut.build()
 
         #expect(module.configuration?.interface.privateKey.rawValue == pvtkey)
         #expect(module.configuration?.peers.first?.publicKey.rawValue == pubkey)

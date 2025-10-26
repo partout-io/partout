@@ -33,7 +33,7 @@ extension LegacyWireGuardParser: ModuleImporter {
         do {
             let cfg = try configuration(from: contents)
             let builder = WireGuardModule.Builder(configurationBuilder: cfg.builder())
-            return try builder.tryBuild()
+            return try builder.build()
         } catch WireGuardParseError.invalidLine {
             throw PartoutError(.unknownImportedModule)
         } catch {

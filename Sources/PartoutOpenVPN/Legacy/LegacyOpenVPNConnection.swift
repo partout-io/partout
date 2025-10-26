@@ -267,7 +267,7 @@ private extension OpenVPN.Configuration {
             }
             newBuilder.routingPolicies = policies
         }
-        return try newBuilder.tryBuild(isClient: true)
+        return try newBuilder.build(isClient: true)
     }
 }
 

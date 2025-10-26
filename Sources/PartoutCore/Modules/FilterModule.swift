@@ -59,7 +59,7 @@ extension FilterModule {
             self.disabledMask = disabledMask
         }
 
-        public func tryBuild() -> FilterModule {
+        public func build() -> FilterModule {
             FilterModule(
                 id: id,
                 disabledMask: disabledMask

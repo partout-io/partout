@@ -114,7 +114,7 @@ extension DNSModule {
             self.routesThroughVPN = routesThroughVPN
         }
 
-        public func tryBuild() throws -> DNSModule {
+        public func build() throws -> DNSModule {
             let validServers = try servers.compactMap {
                 guard !$0.isEmpty else {
                     return nil as Address?

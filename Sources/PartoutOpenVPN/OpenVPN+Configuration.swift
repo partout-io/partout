@@ -445,7 +445,7 @@ extension OpenVPN.Configuration {
          - Returns: A ``OpenVPN/Configuration`` object with this builder.
          - Throws: If `isClient` is `true` and some required options are missing.
          */
-        public func tryBuild(isClient: Bool) throws -> OpenVPN.Configuration {
+        public func build(isClient: Bool) throws -> OpenVPN.Configuration {
             let fallbackCipher: OpenVPN.Cipher?
             if isClient {
                 guard ca != nil else {

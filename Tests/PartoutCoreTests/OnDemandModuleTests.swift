@@ -18,19 +18,19 @@ struct OnDemandModuleTests {
         ]
         sut.withMobileNetwork = true
         sut.withEthernetNetwork = true
-        #expect(sut.tryBuild().builder() == sut)
+        #expect(sut.build().builder() == sut)
 
         sut.policy = .including
-        #expect(sut.tryBuild().builder() == sut)
+        #expect(sut.build().builder() == sut)
 
         sut.policy = .excluding
-        #expect(sut.tryBuild().builder() == sut)
+        #expect(sut.build().builder() == sut)
 
         sut.withSSIDs = [:]
         sut.withMobileNetwork = false
         sut.withEthernetNetwork = false
         #expect(sut.withOtherNetworks == [])
-        #expect(sut.tryBuild().builder() == sut)
+        #expect(sut.build().builder() == sut)
     }
 
     @Test
