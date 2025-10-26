@@ -4,7 +4,7 @@
 [![License GPLv3](https://img.shields.io/badge/license-GPLv3-lightgray.svg)](LICENSE)
 
 [![Unit Tests](https://github.com/partout-io/partout/actions/workflows/test.yml/badge.svg)](https://github.com/partout-io/partout/actions/workflows/test.yml)
-[![Release](https://github.com/partout-io/partout/actions/workflows/release.yml/badge.svg)](https://github.com/partout-io/partout/actions/workflows/release.yml)
+[![Release](https://github.com/partout-io/partout/actions/workflows/publish_release.yml/badge.svg)](https://github.com/partout-io/partout/actions/workflows/publish_release.yml)
 
 # [Partout](https://partout.io)
 
