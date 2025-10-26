@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: partout-io/action-prepare-xcode-build@master
         with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
+          access-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Ensure not development
         run: |
           expected="let isTestingOpenVPNDataPath = false"
