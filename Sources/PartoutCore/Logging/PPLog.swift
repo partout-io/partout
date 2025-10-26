@@ -45,7 +45,7 @@ public func pp_log(
 
 /// Logs to the global context from C code.
 @_cdecl("pp_clog")
-func pp_clog(
+public func pp_clog(
     _ cCategory: UnsafePointer<CChar>,
     _ cLevel: Int,
     _ cMessage: UnsafePointer<CChar>
