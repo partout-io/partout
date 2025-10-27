@@ -3,12 +3,11 @@
 
 import _PartoutWireGuard_C
 import Foundation
+import PartoutCore_C
 #if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutOS
 #endif
-
-let AF_SYSTEM = 32
 
 protocol WireGuardAdapterDelegate: AnyObject, Sendable {
     func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool)

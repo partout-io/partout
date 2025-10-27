@@ -13,6 +13,10 @@
 #include <WinSock2.h>
 #else
 #include <arpa/inet.h>
+#include <net/if.h>
+#include <netdb.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
 #endif
 
 typedef enum {
