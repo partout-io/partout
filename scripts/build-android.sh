@@ -11,7 +11,7 @@ set -e
 # 1. Build CMake vendors (if release)
 
 if [ "$is_release" == 1 ]; then
-    scripts/build.sh -config $cmake_cfg -android
+    scripts/build.sh -android -config $cmake_cfg -crypto openssl -wireguard
 fi
 
 # 2. Build SwiftPM with Android SDK
