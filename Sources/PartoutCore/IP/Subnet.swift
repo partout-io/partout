@@ -39,14 +39,15 @@ public struct Subnet: Hashable, Codable, Sendable {
         default:
             throw PartoutError.invalidFields(["rawAddress": rawAddress])
         }
-        self.init(address, prefixLength)
+        // Should never fail because the preconditions are checked here
+        self.init(address, prefixLength)!
     }
 
     public init(_ rawAddress: String, _ ipv4Mask: String) throws {
         try self.init(rawAddress, ipv4Mask.asPrefixLength)
     }
 
-    public init(_ address: Address) {
+    public init?(_ address: Address) {
         switch address.family {
         case .v4:
             self.init(address, 32)
@@ -57,12 +58,14 @@ public struct Subnet: Hashable, Codable, Sendable {
         }
     }
 
-    public init(_ address: Address, _ prefixLength: Int) {
+    public init?(_ address: Address, _ prefixLength: Int) {
         guard case .ip(_, let family) = address else {
             preconditionFailure()
         }
         let maxPrefixLength = family == .v6 ? 128 : 32
-        precondition(prefixLength >= 0 && prefixLength <= maxPrefixLength)
+        guard prefixLength >= 0 && prefixLength <= maxPrefixLength else {
+            return nil
+        }
         self.address = address
         self.prefixLength = prefixLength
     }
