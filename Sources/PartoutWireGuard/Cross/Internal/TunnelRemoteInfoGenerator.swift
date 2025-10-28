@@ -137,7 +137,10 @@ final class TunnelRemoteInfoGenerator: Sendable {
                      * very bad, if various network parameters were actually relying on that subnet being
                      * intentionally small. TODO: talk about this with upstream iOS devs.
                      */
-                    ipv6.append(Subnet(subnet.address, min(120, subnet.prefixLength)))
+                    guard let clampedSubnet = Subnet(subnet.address, min(120, subnet.prefixLength)) else {
+                        fatalError("Could not clamp subnet prefix for WireGuard workaround")
+                    }
+                    ipv6.append(clampedSubnet)
                 }
             default:
                 break
