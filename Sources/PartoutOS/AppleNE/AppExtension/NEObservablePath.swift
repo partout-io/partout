@@ -57,7 +57,8 @@ extension NEObservablePath {
                         pp_log(self.ctx, .os, .debug, "Cancelled NEObservablePath.isReachableStream")
                         break
                     }
-                    let reachable = path.status == .satisfied
+                    let reachable = path.status.isSatisfiable
+                    // Strip dups, is this ideal?
                     guard reachable != previous else {
                         continue
                     }
@@ -66,6 +67,19 @@ extension NEObservablePath {
                 }
                 continuation.finish()
             }
+        }
+    }
+}
+
+private extension NWPath.Status {
+    var isSatisfiable: Bool {
+        switch self {
+        case .requiresConnection, .satisfied:
+            return true
+        case .unsatisfied:
+            return false
+        @unknown default:
+            return true
         }
     }
 }
