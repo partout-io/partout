@@ -98,10 +98,8 @@ actor WireGuardAdapter {
         self.dnsTimeout = dnsTimeout
         backend = WireGuardBackend()
         self.reachability = reachability
-        reachabilityTask = nil
         self.logHandler = logHandler
 
-        setupReachabilityTask()
         setupLogHandler()
     }
 
@@ -140,6 +138,7 @@ actor WireGuardAdapter {
         guard case .stopped = state else {
             throw WireGuardAdapterError.invalidState
         }
+        setupReachabilityTask()
         do {
             let settingsGenerator = makeSettingsGenerator(with: tunnelConfiguration)
             let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
@@ -223,6 +222,7 @@ actor WireGuardAdapter {
     // MARK: - Private methods
 
     private func setupReachabilityTask() {
+        reachabilityTask?.cancel()
         reachabilityTask = Task { [weak self] in
             guard let self else { return }
             for await isReachable in reachability.isReachableStream {
