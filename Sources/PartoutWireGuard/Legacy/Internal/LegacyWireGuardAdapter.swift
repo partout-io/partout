@@ -220,57 +220,6 @@ class LegacyWireGuardAdapter: @unchecked Sendable {
         }
     }
 
-    /// Update runtime configuration.
-    /// - Parameters:
-    ///   - tunnelConfiguration: tunnel configuration.
-    ///   - completionHandler: completion handler.
-    func update(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping @Sendable (LegacyWireGuardAdapterError?) -> Void) {
-        workQueue.async {
-            if case .stopped = self.state {
-                completionHandler(.invalidState)
-                return
-            }
-
-            // Tell the system that the tunnel is going to reconnect using new WireGuard
-            // configuration.
-            // This will broadcast the `NEVPNStatusDidChange` notification to the GUI process.
-            self.delegate?.adapterShouldReassert(self, reasserting: true)
-            defer {
-                self.delegate?.adapterShouldReassert(self, reasserting: false)
-            }
-
-            do {
-                let settingsGenerator = try self.makeSettingsGenerator(with: tunnelConfiguration)
-                try self.setNetworkSettings(settingsGenerator.generateNetworkSettings())
-
-                switch self.state {
-                case .started(let handle, _):
-                    let (wgConfig, resolutionResults) = settingsGenerator.uapiConfiguration()
-                    self.logEndpointResolutionResults(resolutionResults)
-
-                    self.backend.setConfig(handle, settings: wgConfig)
-                    #if os(iOS)
-                    self.backend.disableSomeRoamingForBrokenMobileSemantics(handle)
-                    #endif
-
-                    self.state = .started(handle, settingsGenerator)
-
-                case .temporaryShutdown:
-                    self.state = .temporaryShutdown(settingsGenerator)
-
-                case .stopped:
-                    fatalError()
-                }
-
-                completionHandler(nil)
-            } catch let error as LegacyWireGuardAdapterError {
-                completionHandler(error)
-            } catch {
-                fatalError()
-            }
-        }
-    }
-
     // MARK: - Private methods
 
     /// Setup WireGuard log handler.
