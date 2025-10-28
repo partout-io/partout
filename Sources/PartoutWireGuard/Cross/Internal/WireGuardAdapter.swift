@@ -177,49 +177,6 @@ actor WireGuardAdapter {
         }
     }
 
-    /// Update runtime configuration.
-    /// - Parameters:
-    ///   - tunnelConfiguration: tunnel configuration.
-    func update(tunnelConfiguration: WireGuard.Configuration) async throws {
-        if case .stopped = state {
-            throw WireGuardAdapterError.invalidState
-        }
-
-        // Tell the system that the tunnel is going to reconnect using new WireGuard
-        // configuration.
-        // This will broadcast the `NEVPNStatusDidChange` notification to the GUI process.
-        delegate?.adapterShouldReassert(self, reasserting: true)
-        defer {
-            delegate?.adapterShouldReassert(self, reasserting: false)
-        }
-
-        do {
-            let settingsGenerator = makeSettingsGenerator(with: tunnelConfiguration)
-            let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
-            try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
-                moduleId: moduleId,
-                descriptors: socketDescriptors
-            ))
-
-            switch state {
-            case .started(let handle, _):
-                backend.setConfig(handle, settings: wgConfig)
-#if os(iOS)
-                backend.disableSomeRoamingForBrokenMobileSemantics(handle)
-#endif
-                state = .started(handle, settingsGenerator)
-            case .temporaryShutdown:
-                state = .temporaryShutdown(settingsGenerator)
-            case .stopped:
-                fatalError()
-            }
-        } catch let error as WireGuardAdapterError {
-            throw error
-        } catch {
-            fatalError()
-        }
-    }
-
     // MARK: - Private methods
 
     private func setupReachabilityTask() {
