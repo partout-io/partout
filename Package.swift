@@ -27,11 +27,13 @@ let isTestingOpenVPNDataPath = false
 // Build dynamic library on Android
 var libraryType: Product.Library.LibraryType? = nil
 var staticLibPrefix = ""
+var openSSLLibs = "lib"
 switch OS.current {
 case .android:
     libraryType = .dynamic
 case .windows:
     staticLibPrefix = "lib"
+    openSSLLibs = "bin"
 default:
     break
 }
@@ -381,7 +383,7 @@ case .openSSL:
                     .unsafeFlags(["-I\(cmakeOutput)/openssl/include"])
                 ],
                 linkerSettings: [
-                    .unsafeFlags(["-L\(cmakeOutput)/openssl/lib"]),
+                    .unsafeFlags(["-L\(cmakeOutput)/openssl/\(openSSLLibs)"]),
                     // WARNING: order matters, ssl then crypto
                     .linkedLibrary("\(staticLibPrefix)ssl"),
                     .linkedLibrary("\(staticLibPrefix)crypto")
