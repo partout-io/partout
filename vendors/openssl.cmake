@@ -8,7 +8,7 @@ else()
 endif()
 
 # Configure flags
-set(OPENSSL_CFG_FLAGS no-apps no-docs no-dsa no-engine no-gost no-legacy no-shared no-ssl no-tests no-zlib)
+set(OPENSSL_CFG_FLAGS no-apps no-docs no-dsa no-engine no-gost no-legacy shared no-ssl no-tests no-zlib)
 
 # Add some flags if -DANDROID (requires NDK tools in the PATH)
 if(PP_BUILD_FOR_ANDROID)
