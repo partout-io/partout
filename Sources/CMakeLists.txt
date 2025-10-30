@@ -14,13 +14,13 @@ set_target_properties(partout PROPERTIES
 )
 
 # Mind platform differences about libraries
-function(add_static_lib dir name out_list)
+function(add_dynamic_lib dir name out_list)
     if(WIN32)
-        set(lib_path ${dir}/lib${name}.lib)
+        set(lib_path ${dir}/lib${name}.dll)
     elseif(APPLE)
-        set(lib_path ${dir}/lib${name}.a)
+        set(lib_path ${dir}/lib${name}.dylib)
     else()
-        set(lib_path ${dir}/lib${name}.a)
+        set(lib_path ${dir}/lib${name}.so)
     endif()
     set(${out_list} ${${out_list}} ${lib_path} PARENT_SCOPE)
 endfunction()
@@ -31,8 +31,13 @@ if(DEFINED OPENSSL_DIR)
     target_include_directories(partout_c PRIVATE
         ${OPENSSL_DIR}/include
     )
-    add_static_lib(${OPENSSL_DIR}/lib ssl PARTOUT_LIBS)
-    add_static_lib(${OPENSSL_DIR}/lib crypto PARTOUT_LIBS)
+    if(WIN32)
+        add_dynamic_lib(${OPENSSL_DIR}/bin ssl PARTOUT_LIBS)
+        add_dynamic_lib(${OPENSSL_DIR}/bin crypto PARTOUT_LIBS)
+    else()
+        add_dynamic_lib(${OPENSSL_DIR}/lib ssl PARTOUT_LIBS)
+        add_dynamic_lib(${OPENSSL_DIR}/lib crypto PARTOUT_LIBS)
+    endif()
 elseif(DEFINED MBEDTLS_DIR)
     target_include_directories(partout_c PRIVATE
         ${MBEDTLS_DIR}/include
