@@ -40,8 +40,7 @@ extension NEObservablePath {
     }
 
     public var isReachable: Bool {
-        // XXX: WireGuard suggests including .requiresConnection
-        subject.value.status == .satisfied
+        subject.value.isSatisfiable
     }
 
     public var isReachableStream: AsyncStream<Bool> {
@@ -65,15 +64,15 @@ extension NEObservablePath {
     }
 }
 
-private extension NWPath.Status {
+private extension NWPath {
     var isSatisfiable: Bool {
-        switch self {
-        case .requiresConnection, .satisfied:
-            return true
-        case .unsatisfied:
-            return false
-        @unknown default:
-            return true
+        let target: [NWInterface.InterfaceType] = [
+            .cellular, .wifi, .wiredEthernet
+        ]
+        let isAvailable = target.contains {
+            usesInterfaceType($0)
         }
+        guard isAvailable else { return false }
+        return status == .satisfied
     }
 }
