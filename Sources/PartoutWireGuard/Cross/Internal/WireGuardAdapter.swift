@@ -341,21 +341,12 @@ actor WireGuardAdapter {
 
 // MARK: - Low-level
 
+extension WireGuardAdapter {
+    /// Returns the tunnel device interface name, or nil if unsupported or on error.
+    var interfaceName: String? {
 #if os(Windows)
-
-extension WireGuardAdapter {
-    var interfaceName: String? {
         moduleId.uuidString
-    }
-}
-
-#else
-
-extension WireGuardAdapter {
-
-    /// Returns the tunnel device interface name, or nil on error.
-    /// - Returns: String.
-    var interfaceName: String? {
+#elseif canImport(Darwin)
         guard let tunnelFileDescriptor else { return nil }
         var buffer = [UInt8](repeating: 0, count: Int(IFNAMSIZ))
         return buffer.withUnsafeMutableBufferPointer { mutableBufferPointer in
@@ -364,15 +355,16 @@ extension WireGuardAdapter {
             var ifnameSize = socklen_t(IFNAMSIZ)
             let result = getsockopt(
                 tunnelFileDescriptor,
-                2 /* SYSPROTO_CONTROL */,
-                2 /* UTUN_OPT_IFNAME */,
+                SYSPROTO_CONTROL,
+                UTUN_OPT_IFNAME,
                 baseAddress,
                 &ifnameSize)
 
             guard result == 0 else { return nil }
             return String(cString: baseAddress)
         }
+#else
+        nil
+#endif
     }
 }
-
-#endif
