@@ -187,6 +187,7 @@ actor WireGuardAdapter {
                     try await didUpdateReachable(isReachable: isReachable)
                 } catch {
                     pp_log(ctx, .wireguard, .error, "Unable to update reachability: \(error)")
+                    try? await stop()
                 }
             }
         }
@@ -249,7 +250,13 @@ actor WireGuardAdapter {
 #if os(iOS)
         backend.disableSomeRoamingForBrokenMobileSemantics(handle)
 #endif
-        let socketFds = backend.socketDescriptors(handle)
+        let socketFds = {
+            var rawFds = backend.socketDescriptors(handle)
+            if rawFds.isEmpty {
+                rawFds = fallbackFileDescriptor.map { [$0] } ?? []
+            }
+            return rawFds
+        }()
         pp_log(ctx, .wireguard, .info, "Socket descriptors: \(socketFds)")
         delegate?.adapterShouldConfigureSockets(self, descriptors: socketFds.map(UInt64.init))
         return handle

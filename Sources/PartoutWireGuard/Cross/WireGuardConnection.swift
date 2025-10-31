@@ -279,8 +279,7 @@ private extension WireGuardLogLevel {
     var debugLevel: DebugLog.Level {
         switch self {
         case .verbose:
-            return .debug
-
+            return .info
         case .error:
             return .error
         }

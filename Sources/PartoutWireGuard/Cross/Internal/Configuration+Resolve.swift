@@ -16,6 +16,7 @@ extension WireGuard.Configuration {
         private var map: [Address: [Endpoint]] = [:]
 
         func setEndpoints(_ endpoints: [Endpoint], for address: Address) {
+            assert(!endpoints.isEmpty, "Assigning empty resolved endpoints")
             map[address] = endpoints
         }
 
@@ -26,9 +27,9 @@ extension WireGuard.Configuration {
 
     func resolvePeers(timeout: Int, logHandler: @escaping WireGuardAdapter.LogHandler) async -> [Address: [Endpoint]] {
         let endpoints = peers.compactMap(\.endpoint)
-        let resolver = SimpleDNSResolver(strategy: {
+        let resolver = SimpleDNSResolver {
             POSIXDNSStrategy(hostname: $0)
-        })
+        }
         return await withTaskGroup(returning: [Address: [Endpoint]].self) { group in
             let allResolved = ResolvedMap()
             for endpoint in endpoints {
@@ -49,6 +50,7 @@ extension WireGuard.Configuration {
                                 logHandler(.verbose, "DNS64: mapped \(endpoint.address) to \(record.address)")
                             }
                         }
+                        guard !currentResolved.isEmpty else { return }
                         await allResolved.setEndpoints(currentResolved, for: endpoint.address)
                     } catch {
                         logHandler(.error, "Failed to resolve endpoint \(endpoint.address): \(error.localizedDescription)")

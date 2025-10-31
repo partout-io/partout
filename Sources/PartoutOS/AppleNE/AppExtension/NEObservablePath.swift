@@ -27,7 +27,7 @@ public final class NEObservablePath: ReachabilityObserver {
             guard let self else {
                 return
             }
-            pp_log(ctx, .os, .debug, "Path updated: \(path.debugDescription)")
+            pp_log(ctx, .os, .info, "Path updated: \(path.debugDescription)")
             subject.send(path)
         }
         monitor.start(queue: .global())
@@ -40,8 +40,7 @@ extension NEObservablePath {
     }
 
     public var isReachable: Bool {
-        // XXX: WireGuard suggests including .requiresConnection
-        subject.value.status == .satisfied
+        subject.value.isSatisfiable
     }
 
     public var isReachableStream: AsyncStream<Bool> {
@@ -51,19 +50,13 @@ extension NEObservablePath {
                     continuation.finish()
                     return
                 }
-                var previous: Bool?
                 for await path in self.stream {
                     guard !Task.isCancelled else {
                         pp_log(self.ctx, .os, .debug, "Cancelled NEObservablePath.isReachableStream")
                         break
                     }
-                    let reachable = path.status.isSatisfiable
-                    // Strip dups, is this ideal?
-                    guard reachable != previous else {
-                        continue
-                    }
+                    let reachable = path.isSatisfiable
                     continuation.yield(reachable)
-                    previous = reachable
                 }
                 continuation.finish()
             }
@@ -71,15 +64,15 @@ extension NEObservablePath {
     }
 }
 
-private extension NWPath.Status {
+private extension NWPath {
     var isSatisfiable: Bool {
-        switch self {
-        case .requiresConnection, .satisfied:
-            return true
-        case .unsatisfied:
-            return false
-        @unknown default:
-            return true
+        let target: [NWInterface.InterfaceType] = [
+            .cellular, .wifi, .wiredEthernet
+        ]
+        let isAvailable = target.contains {
+            usesInterfaceType($0)
         }
+        guard isAvailable else { return false }
+        return status == .satisfied
     }
 }
