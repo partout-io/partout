@@ -355,8 +355,8 @@ extension WireGuardAdapter {
             var ifnameSize = socklen_t(IFNAMSIZ)
             let result = getsockopt(
                 tunnelFileDescriptor,
-                SYSPROTO_CONTROL,
-                UTUN_OPT_IFNAME,
+                2 /* SYSPROTO_CONTROL */,
+                2 /* UTUN_OPT_IFNAME */,
                 baseAddress,
                 &ifnameSize)
 
