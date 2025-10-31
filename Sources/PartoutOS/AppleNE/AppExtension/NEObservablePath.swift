@@ -27,7 +27,7 @@ public final class NEObservablePath: ReachabilityObserver {
             guard let self else {
                 return
             }
-            pp_log(ctx, .os, .debug, "Path updated: \(path.debugDescription)")
+            pp_log(ctx, .os, .info, "Path updated: \(path.debugDescription)")
             subject.send(path)
         }
         monitor.start(queue: .global())
