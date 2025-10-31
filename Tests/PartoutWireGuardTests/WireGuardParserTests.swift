@@ -9,10 +9,16 @@ import Testing
 @Suite
 struct WireGuardParserTests {
     private static let crossParser = StandardWireGuardParser()
+#if PARTOUT_WIREGUARD
     private static let legacyParser = LegacyWireGuardParser()
     private static var allParsers: [ModuleBuilderValidator] {
         [crossParser, legacyParser]
     }
+#else
+    private static var allParsers: [ModuleBuilderValidator] {
+        [crossParser]
+    }
+#endif
 
     private let keyGenerator = StandardWireGuardKeyGenerator()
 
