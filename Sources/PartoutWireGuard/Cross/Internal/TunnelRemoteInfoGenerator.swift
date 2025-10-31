@@ -24,6 +24,30 @@ final class TunnelRemoteInfoGenerator: Sendable {
         self.dnsTimeout = dnsTimeout
     }
 
+    // Only updates peer endpoints
+    func endpointUapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async throws -> String {
+        var wgSettings = ""
+
+        // address: String -> resolvedEndpoints: [Endpoint]
+        let resolutionMap = await tunnelConfiguration.resolvePeers(timeout: dnsTimeout) {
+            logHandler($0, $1)
+        }
+        guard !resolutionMap.isEmpty else {
+            throw PartoutError(.dnsFailure)
+        }
+        for peer in tunnelConfiguration.peers {
+            let publicKey = try peer.publicKey.rawValue.hexStringFromBase64()
+            wgSettings.append("public_key=\(publicKey)\n")
+            guard let endpoint = peer.endpoint else { continue }
+            for resolvedEndpoint in resolutionMap[endpoint.address] ?? [] {
+                if case .hostname = resolvedEndpoint.address { assert(false, "Endpoint is not resolved") }
+                wgSettings.append("endpoint=\(resolvedEndpoint.wgRepresentation)\n")
+            }
+        }
+        return wgSettings
+    }
+
+    // Updates full configuration
     func uapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async throws -> String {
         let privateKey = try tunnelConfiguration.interface.privateKey.rawValue.hexStringFromBase64()
 

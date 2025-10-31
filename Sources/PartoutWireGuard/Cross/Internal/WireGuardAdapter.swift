@@ -276,7 +276,7 @@ actor WireGuardAdapter {
         switch state {
         case .started(let handle, let settingsGenerator):
             if isReachable {
-                let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
+                let wgConfig = try await settingsGenerator.endpointUapiConfiguration(logHandler: logHandler)
 
                 backend.setConfig(handle, settings: wgConfig)
                 backend.disableSomeRoamingForBrokenMobileSemantics(handle)
