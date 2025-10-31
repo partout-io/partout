@@ -51,19 +51,13 @@ extension NEObservablePath {
                     continuation.finish()
                     return
                 }
-                var previous: Bool?
                 for await path in self.stream {
                     guard !Task.isCancelled else {
                         pp_log(self.ctx, .os, .debug, "Cancelled NEObservablePath.isReachableStream")
                         break
                     }
-                    let reachable = path.status.isSatisfiable
-                    // Strip dups, is this ideal?
-                    guard reachable != previous else {
-                        continue
-                    }
+                    let reachable = path.isSatisfiable
                     continuation.yield(reachable)
-                    previous = reachable
                 }
                 continuation.finish()
             }
