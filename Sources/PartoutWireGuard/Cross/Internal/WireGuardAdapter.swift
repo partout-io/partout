@@ -187,6 +187,7 @@ actor WireGuardAdapter {
                     try await didUpdateReachable(isReachable: isReachable)
                 } catch {
                     pp_log(ctx, .wireguard, .error, "Unable to update reachability: \(error)")
+                    try? await stop()
                 }
             }
         }

@@ -41,6 +41,9 @@ final class TunnelRemoteInfoGenerator: Sendable {
         let resolutionMap = await tunnelConfiguration.resolvePeers(timeout: dnsTimeout) {
             logHandler($0, $1)
         }
+        guard !resolutionMap.isEmpty else {
+            throw PartoutError(.dnsFailure)
+        }
 
         for peer in tunnelConfiguration.peers {
             let publicKey = try peer.publicKey.rawValue.hexStringFromBase64()
