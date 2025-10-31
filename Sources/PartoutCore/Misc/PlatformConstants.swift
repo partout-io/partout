@@ -14,11 +14,6 @@ import Foundation
 @_exported import WinSDK
 #endif
 
-#if canImport(WinSDK)
-public let AF_INET: Int32 = 2
-public let AF_INET6: Int32 = 10
-#endif
-
 #if !canImport(Darwin)
 let NSEC_PER_MSEC: UInt64 = 1000000
 let NSEC_PER_SEC: UInt64 = 1000000000
