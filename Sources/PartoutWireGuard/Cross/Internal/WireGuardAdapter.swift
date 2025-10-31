@@ -303,7 +303,7 @@ actor WireGuardAdapter {
     }
 
     private nonisolated var fallbackFileDescriptor: Int32? {
-#if os(macOS) || os(iOS) || os(tvOS)
+#if canImport(Darwin)
         var ctlInfo = ctl_info()
         withUnsafeMutablePointer(to: &ctlInfo.ctl_name) {
             $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: $0.pointee)) {
