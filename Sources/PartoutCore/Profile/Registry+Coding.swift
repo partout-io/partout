@@ -5,20 +5,18 @@
 import Foundation
 
 extension Registry {
+    public func json(fromProfiles profiles: [Profile]) throws -> String {
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(profiles.map(\.asCodableProfile))
+        guard let json = String(data: data, encoding: .utf8) else {
+            throw PartoutError(.encoding)
+        }
+        return json
+    }
+
     public func json(fromProfile profile: Profile) throws -> String {
         let encoder = JSONEncoder()
-        let codableProfile = CodableProfile(
-            version: Profile.Builder.currentVersion,
-            id: profile.id,
-            name: profile.name,
-            modules: profile.modules.map {
-                CodableModule(wrappedModule: $0)
-            },
-            activeModulesIds: profile.activeModulesIds,
-            behavior: profile.behavior,
-            userInfo: profile.userInfo
-        )
-        let data = try encoder.encode(codableProfile)
+        let data = try encoder.encode(profile.asCodableProfile)
         guard let json = String(data: data, encoding: .utf8) else {
             throw PartoutError(.encoding)
         }
@@ -32,17 +30,26 @@ extension Registry {
         let decoder = JSONDecoder()
         decoder.userInfo = [.moduleDecoder: self]
         let codableProfile = try decoder.decode(CodableProfile.self, from: data)
-        let builder = Profile.Builder(
-            version: codableProfile.version,
-            id: codableProfile.id,
-            name: codableProfile.name,
-            modules: codableProfile.modules.map(\.wrappedModule),
-            activeModulesIds: codableProfile.activeModulesIds,
-            behavior: codableProfile.behavior,
-            userInfo: codableProfile.userInfo
-        )
-        let profile = try builder.build()
+        let profile = try Profile(codableProfile: codableProfile)
         return postDecodeBlock?(profile) ?? profile
+    }
+
+    public func profiles(fromJSON json: String) throws -> [Profile] {
+        guard let data = json.data(using: .utf8) else {
+            throw PartoutError(.decoding, "Not a UTF-8 input")
+        }
+        let decoder = JSONDecoder()
+        decoder.userInfo = [.moduleDecoder: self]
+        let codableProfiles: [CodableProfile]
+        do {
+            codableProfiles = try decoder.decode([CodableProfile].self, from: data)
+        } catch {
+            codableProfiles = [try decoder.decode(CodableProfile.self, from: data)]
+        }
+        return try codableProfiles.map {
+            let profile = try Profile(codableProfile: $0)
+            return postDecodeBlock?(profile) ?? profile
+        }
     }
 }
 
@@ -52,7 +59,35 @@ extension CodingUserInfoKey {
 
 // MARK: - Codable helpers
 
-struct CodableProfile: ProfileType, Codable {
+private extension Profile {
+    init(codableProfile: CodableProfile) throws {
+        self = try Profile.Builder(
+            version: codableProfile.version,
+            id: codableProfile.id,
+            name: codableProfile.name,
+            modules: codableProfile.modules.map(\.wrappedModule),
+            activeModulesIds: codableProfile.activeModulesIds,
+            behavior: codableProfile.behavior,
+            userInfo: codableProfile.userInfo
+        ).build()
+    }
+
+    var asCodableProfile: CodableProfile {
+        CodableProfile(
+            version: Profile.Builder.currentVersion,
+            id: id,
+            name: name,
+            modules: modules.map {
+                CodableModule(wrappedModule: $0)
+            },
+            activeModulesIds: activeModulesIds,
+            behavior: behavior,
+            userInfo: userInfo
+        )
+    }
+}
+
+private struct CodableProfile: ProfileType, Codable {
     let version: Int?
 
     let id: UniqueID
