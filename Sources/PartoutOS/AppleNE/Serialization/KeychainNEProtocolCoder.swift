@@ -26,7 +26,7 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
     }
 
     public func protocolConfiguration(from profile: Profile, title: (Profile) -> String) throws -> NETunnelProviderProtocol {
-        let encoded = try registry.encodedProfile(profile)
+        let encoded = try registry.json(fromProfile: profile)
 
         let passwordReference = try keychain.set(
             password: encoded,
@@ -50,7 +50,7 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
             throw PartoutError(.decoding)
         }
         let encoded = try keychain.password(forReference: passwordReference)
-        return try registry.decodedProfile(from: encoded)
+        return try registry.compatibleProfile(fromString: encoded)
     }
 
     public func removeProfile(withId profileId: Profile.ID) throws {

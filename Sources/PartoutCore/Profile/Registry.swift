@@ -97,26 +97,6 @@ extension Registry {
 // MARK: Serialization
 
 extension Registry {
-    public func encodedProfile(_ profile: Profile) throws -> String {
-        try json(fromProfile: profile)
-    }
-
-    // Tolerate older encoding
-    public func decodedProfile(from string: String, fallingBack: Bool = true) throws -> Profile {
-        let decoded: Profile
-        do {
-            decoded = try profile(fromJSON: string)
-        } catch {
-            guard fallingBack else {
-                throw error
-            }
-            decoded = try CodableProfileCoder().decodedProfile(from: string, with: self)
-        }
-        return postDecodeBlock?(decoded) ?? decoded
-    }
-}
-
-extension Registry {
     public func resolvedProfile(_ profile: Profile) throws -> Profile {
         var copy = profile.builder()
         copy.modules = try copy.modules.map {
