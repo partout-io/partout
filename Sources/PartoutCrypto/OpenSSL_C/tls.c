@@ -44,10 +44,11 @@ int pp_tls_verify_peer(int ok, X509_STORE_CTX *_Nonnull ctx) {
                   "pp_tls_verify_peer: error %d", X509_STORE_CTX_get_error(ctx));
         SSL *ssl = X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
         pp_tls tls = SSL_get_ex_data(ssl, PPTLSExDataIdx);
-        assert(tls);
-        if (tls) {
-            tls->opt->on_verify_failure();
+        if (!tls) {
+            pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tls_verify_peer: NULL tls");
+            abort();
         }
+        tls->opt->on_verify_failure();
     }
     return ok;
 }
