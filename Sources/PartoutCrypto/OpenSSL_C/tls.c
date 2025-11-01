@@ -39,9 +39,19 @@ BIO *create_BIO_from_PEM(const char *_Nonnull pem) {
 
 static
 int pp_tls_verify_peer(int ok, X509_STORE_CTX *_Nonnull ctx) {
-    if (!ok) {
+    if (ok == 0) {
+        pp_clog_v(PPLogCategoryCore, PPLogLevelError,
+                  "pp_tls_verify_peer: error %d", X509_STORE_CTX_get_error(ctx));
         SSL *ssl = X509_STORE_CTX_get_ex_data(ctx, SSL_get_ex_data_X509_STORE_CTX_idx());
+        if (!ssl) {
+            pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tls_verify_peer: NULL ssl");
+            abort();
+        }
         pp_tls tls = SSL_get_ex_data(ssl, PPTLSExDataIdx);
+        if (!tls) {
+            pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tls_verify_peer: NULL tls");
+            abort();
+        }
         tls->opt->on_verify_failure();
     }
     return ok;
@@ -174,6 +184,9 @@ bool pp_tls_start(pp_tls _Nonnull tls) {
     BIO_set_ssl(tls->bio_plain, tls->ssl, BIO_NOCLOSE);
 
     // attach custom object
+    if (PPTLSExDataIdx == -1) {
+        PPTLSExDataIdx = SSL_get_ex_new_index(0, NULL, NULL, NULL, NULL);
+    }
     SSL_set_ex_data(tls->ssl, PPTLSExDataIdx, tls);
 
     return SSL_do_handshake(tls->ssl);
