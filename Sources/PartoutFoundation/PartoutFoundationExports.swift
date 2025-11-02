@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-// FIXME: #228, Until Foundation is dropped
+// TODO: #228, Until Foundation is dropped
 //#if canImport(Android)
 //@_exported import Android
 //#elseif canImport(Darwin)

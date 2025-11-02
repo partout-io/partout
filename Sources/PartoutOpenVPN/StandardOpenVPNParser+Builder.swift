@@ -354,6 +354,7 @@ extension StandardOpenVPNParser.Builder {
             args.removeFirst()
             let routeEntryArguments = args
 
+            // FIXME: #263
             let address = routeEntryArguments[0]
             let mask = (routeEntryArguments.count > 1) ? routeEntryArguments[1] : "255.255.255.255"
             var gateway = (routeEntryArguments.count > 2) ? routeEntryArguments[2] : nil // defaultGateway4

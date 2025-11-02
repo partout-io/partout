@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-// FIXME: #228, CRASHES HERE
-
 #if canImport(Darwin)
 
 extension Data {
@@ -45,6 +43,7 @@ extension RegularExpression {
         }
     }
 
+    // FIXME: #263
     public func groups(in string: String) -> [String] {
         var results: [String] = []
         enumerateMatches(in: string) { match in
@@ -53,6 +52,7 @@ extension RegularExpression {
         return results
     }
 
+    // FIXME: #263
     public func enumerateMatches(in string: String, using block: @escaping (String) -> Void) {
         enumerateMatches(
             in: string,
@@ -70,6 +70,7 @@ extension RegularExpression {
         )
     }
 
+    // FIXME: #263
     public func replacingMatches(in string: String, withTemplate template: String) -> String {
         let replaced = NSMutableString(string: string)
         replaceMatches(
@@ -82,6 +83,8 @@ extension RegularExpression {
 }
 
 #else
+
+// TODO: #228
 
 extension Data {
     public init(bytesNoCopy: UnsafeMutablePointer<UInt8>, count: Int) {

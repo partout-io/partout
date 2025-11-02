@@ -137,7 +137,7 @@ package.targets.append(contentsOf: [
     .target(
         name: "PartoutFoundation",
         exclude: ["Cross"]
-        // FIXME: #228, Until Foundation is dropped
+        // TODO: #228, Until Foundation is dropped
 //        exclude: {
 //            guard OS.current != .apple else {
 //                return ["Cross"]
