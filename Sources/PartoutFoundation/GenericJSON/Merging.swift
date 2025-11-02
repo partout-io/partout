@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-import Foundation
-
 extension JSON {
 
     /// Return a new JSON value by merging two other ones
