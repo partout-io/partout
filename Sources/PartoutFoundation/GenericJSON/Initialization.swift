@@ -28,8 +28,26 @@ extension JSON {
             self = .number(num)
         case let num as Float:
             self = .number(Double(num))
-        case let num as Int:
-            self = .number(Double(num))
+        case let n as Int:
+            self = .number(Double(n))
+        case let n as Int8:
+            self = .number(Double(n))
+        case let n as Int16:
+            self = .number(Double(n))
+        case let n as Int32:
+            self = .number(Double(n))
+        case let n as Int64:
+            self = .number(Double(n))
+        case let n as UInt:
+            self = .number(Double(n))
+        case let n as UInt8:
+            self = .number(Double(n))
+        case let n as UInt16:
+            self = .number(Double(n))
+        case let n as UInt32:
+            self = .number(Double(n))
+        case let n as UInt64:
+            self = .number(Double(n))
         default:
             throw InitializationError()
         }
