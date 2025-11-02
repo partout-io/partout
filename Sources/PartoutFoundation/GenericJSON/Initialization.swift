@@ -10,9 +10,11 @@ extension JSON {
     ///
     /// Argument has to be a valid JSON structure: A `Double`, `Int`, `String`,
     /// `Bool`, an `Array` of those types or a `Dictionary` of those types.
-    ///
-    /// You can also pass `nil` or `NSNull`, both will be treated as `.null`.
     public init(_ value: Any) throws {
+        // The insane verbosity of the Int variants versus the
+        // use of NSNumber is preferred to avoid a heavy dependency
+        // on Foundation. Likewise, nulls are not handled either
+        // to avoid NSNull.
         switch value {
         case let opt as Any? where opt == nil:
             self = .null
@@ -24,6 +26,30 @@ extension JSON {
             self = .array(try array.map(JSON.init))
         case let dict as [String: Any]:
             self = .object(try dict.mapValues(JSON.init))
+        case let n as Double:
+            self = .number(n)
+        case let n as Float:
+            self = .number(Double(n))
+        case let n as Int:
+            self = .number(Double(n))
+        case let n as Int8:
+            self = .number(Double(n))
+        case let n as Int16:
+            self = .number(Double(n))
+        case let n as Int32:
+            self = .number(Double(n))
+        case let n as Int64:
+            self = .number(Double(n))
+        case let n as UInt:
+            self = .number(Double(n))
+        case let n as UInt8:
+            self = .number(Double(n))
+        case let n as UInt16:
+            self = .number(Double(n))
+        case let n as UInt32:
+            self = .number(Double(n))
+        case let n as UInt64:
+            self = .number(Double(n))
         default:
             throw InitializationError()
         }
