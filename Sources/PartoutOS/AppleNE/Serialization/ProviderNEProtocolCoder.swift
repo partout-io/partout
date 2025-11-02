@@ -23,7 +23,7 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
     }
 
     public func protocolConfiguration(from profile: Profile, title: (Profile) -> String) throws -> NETunnelProviderProtocol {
-        let encoded = try registry.encodedProfile(profile)
+        let encoded = try registry.json(fromProfile: profile)
 
         let proto = NETunnelProviderProtocol()
         proto.providerBundleIdentifier = tunnelBundleIdentifier
@@ -40,7 +40,7 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
         guard let encoded = protocolConfiguration.providerConfiguration?[Self.providerKey] as? String else {
             throw PartoutError(.decoding)
         }
-        return try registry.decodedProfile(from: encoded)
+        return try registry.compatibleProfile(fromString: encoded)
     }
 
     public func removeProfile(withId profileId: Profile.ID) throws {

@@ -12,8 +12,8 @@ struct ProfileCodingTests {
         let module = try DNSModule.Builder().build()
         let profile = try Profile.Builder(modules: [module]).build()
         do {
-            let encoded = try sut.encodedProfile(profile)
-            _ = try sut.decodedProfile(from: encoded, fallingBack: false)
+            let encoded = try sut.json(fromProfile: profile)
+            _ = try sut.profile(fromJSON: encoded)
             #expect(Bool(false))
         } catch let error as PartoutError {
             #expect(error.code == .unknownModuleHandler)
@@ -27,7 +27,7 @@ struct ProfileCodingTests {
         let sut = Registry(allHandlers: [DNSModule.moduleHandler])
         let module = try DNSModule.Builder().build()
         let profile = try Profile.Builder(modules: [module]).build()
-        expectNoThrow(try sut.encodedProfile(profile))
+        expectNoThrow(try sut.json(fromProfile: profile))
     }
 
     @Test
@@ -51,8 +51,8 @@ struct ProfileCodingTests {
         let module = try DNSModule.Builder().build()
         let profile = try Profile.Builder(modules: [module]).build()
 
-        let encoded = try sut.encodedProfile(profile)
-        let decoded = try sut.decodedProfile(from: encoded, fallingBack: false)
+        let encoded = try sut.json(fromProfile: profile)
+        let decoded = try sut.profile(fromJSON: encoded)
         #expect(decoded == profile)
     }
 
