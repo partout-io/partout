@@ -72,7 +72,7 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
 
 extension DNSModule {
     public struct Builder: ModuleBuilder, Hashable {
-        public let id: UniqueID
+        public var id: UniqueID
 
         public var protocolType: DNSProtocol
 

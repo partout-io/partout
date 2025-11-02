@@ -6,7 +6,7 @@
 ///
 /// A module builder comes with a builder able to create its ``Module`` counterpart.
 /// - Seealso: Have a look at ``DNSModule/Builder`` inside ``DNSModule`` for an example.
-public protocol ModuleBuilder: Sendable, UniquelyIdentifiable, BuilderType where BuiltType: Module {
+public protocol ModuleBuilder: Sendable, MutableUniquelyIdentifiable, BuilderType where BuiltType: Module {
     static func empty() -> Self
 }
 

@@ -37,7 +37,7 @@ public struct IPModule: Module, BuildableType, Hashable, Codable {
 
 extension IPModule {
     public struct Builder: ModuleBuilder, Hashable {
-        public let id: UniqueID
+        public var id: UniqueID
 
         public var ipv4: IPSettings?
 

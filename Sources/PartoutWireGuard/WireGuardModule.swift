@@ -33,7 +33,7 @@ public struct WireGuardModule: Module, BuildableType, Hashable, Codable {
 
 extension WireGuardModule {
     public struct Builder: ModuleBuilder, Hashable {
-        public let id: UniqueID
+        public var id: UniqueID
 
         public var configurationBuilder: WireGuard.Configuration.Builder?
 

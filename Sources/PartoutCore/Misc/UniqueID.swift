@@ -9,3 +9,7 @@ public typealias UniqueID = UUID
 public protocol UniquelyIdentifiable {
     var id: UniqueID { get }
 }
+
+public protocol MutableUniquelyIdentifiable: UniquelyIdentifiable {
+    var id: UniqueID { get set }
+}

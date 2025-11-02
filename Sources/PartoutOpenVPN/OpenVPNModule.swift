@@ -57,7 +57,7 @@ private extension OpenVPNModule {
 
 extension OpenVPNModule {
     public struct Builder: ModuleBuilder, Hashable {
-        public let id: UniqueID
+        public var id: UniqueID
 
         public var configurationBuilder: OpenVPN.Configuration.Builder?
 

@@ -41,7 +41,7 @@ public struct FilterModule: Module, BuildableType, Hashable, Codable {
 
 extension FilterModule {
     public struct Builder: ModuleBuilder, Hashable {
-        public let id: UniqueID
+        public var id: UniqueID
 
         public var disabledMask: Set<IgnoreBit>
 
