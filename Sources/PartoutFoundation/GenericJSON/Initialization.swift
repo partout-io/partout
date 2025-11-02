@@ -10,9 +10,11 @@ extension JSON {
     ///
     /// Argument has to be a valid JSON structure: A `Double`, `Int`, `String`,
     /// `Bool`, an `Array` of those types or a `Dictionary` of those types.
-    ///
-    /// You can also pass `nil` or `NSNull`, both will be treated as `.null`.
     public init(_ value: Any) throws {
+        // The insane verbosity of the Int variants versus the
+        // use of NSNumber is preferred to avoid a heavy dependency
+        // on Foundation. Likewise, nulls are not handled either
+        // to avoid NSNull.
         switch value {
         case let opt as Any? where opt == nil:
             self = .null
