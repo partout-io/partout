@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 internal import PartoutOpenVPN_ObjC
 #if !PARTOUT_MONOLITH
 import PartoutCore

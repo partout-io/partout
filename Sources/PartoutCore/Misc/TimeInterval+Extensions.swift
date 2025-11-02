@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 extension TimeInterval {
     public var asTimeString: String {
         var ticks = Int(self)

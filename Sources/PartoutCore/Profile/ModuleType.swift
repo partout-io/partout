@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Raw type univocally associated to each ``Module`` implementation.
 public struct ModuleType: RawRepresentable, Identifiable, Hashable, Codable, Sendable {
     public let rawValue: String

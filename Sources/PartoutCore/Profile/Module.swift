@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Highly scalable representation of a network configuration.
 ///
 /// Modules are the building blocks of a ``Profile``. Must be actor-safe, and possibly `struct`.

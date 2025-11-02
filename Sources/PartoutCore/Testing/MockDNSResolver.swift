@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 public final class MockDNSResolver: DNSResolver, @unchecked Sendable {
     public var resolvedRecords: [String: [DNSRecord]] = [:]
 

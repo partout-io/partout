@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// The strategy for a ``SimpleDNSResolver``.
 public protocol SimpleDNSStrategy: Sendable {
     func startResolution() async throws

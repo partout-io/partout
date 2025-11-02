@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// A pair of received/sent bytes count.
 public struct DataCount: Hashable, Codable, Sendable {
 

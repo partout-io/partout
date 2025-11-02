@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 extension LocalLogger {
     public final class FileStrategy: LocalLogger.Strategy {
         public init() {
@@ -37,10 +35,7 @@ extension LocalLogger {
             let parent = url.deletingLastPathComponent()
             let prefix = url.lastPathComponent
             do {
-                let contents = try FileManager.default.contentsOfDirectory(
-                    at: parent,
-                    includingPropertiesForKeys: nil
-                )
+                let contents = try FileManager.default.contentsOfDirectory(at: parent)
                 return try contents.reduce(into: [:]) { found, item in
                     let filename = item.lastPathComponent
                     guard filename.hasPrefix(prefix) else {

@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Encodes a configuration into a string.
 public protocol ConfigurationEncoder {
     associatedtype EncodedConfiguration

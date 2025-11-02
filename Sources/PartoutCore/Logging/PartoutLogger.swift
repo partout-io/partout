@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
+import Dispatch
 
 /// The context of a log message.
 public struct PartoutLoggerContext: Sendable {

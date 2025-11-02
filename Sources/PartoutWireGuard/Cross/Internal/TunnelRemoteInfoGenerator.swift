@@ -9,7 +9,6 @@
 //  Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
 import _PartoutWireGuard_C
-import Foundation
 #if !PARTOUT_MONOLITH
 import PartoutCore
 #endif

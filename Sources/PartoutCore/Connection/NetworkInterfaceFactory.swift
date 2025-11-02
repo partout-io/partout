@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Generalizes the creation of network interfaces.
 public protocol NetworkInterfaceFactory: Sendable {
 

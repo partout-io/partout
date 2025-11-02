@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// A ``TunnelEnvironmentReader`` made of immutable values.
 public struct StaticTunnelEnvironment: TunnelEnvironmentReader, Hashable, Codable, Sendable {
     private let profileId: Profile.ID?

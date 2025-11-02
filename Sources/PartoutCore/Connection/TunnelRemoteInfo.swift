@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// A set of extra info that a ``Connection`` may signal to the tunnel to complete the configuration stage.
 public struct TunnelRemoteInfo: Sendable {
 

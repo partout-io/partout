@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 import PartoutCore_C
 
 /// Wrapper of binary data that zeroes out itself on deallocation.

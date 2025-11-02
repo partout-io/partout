@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 public final class MockNetworkInterfaceFactory: NetworkInterfaceFactory, @unchecked Sendable {
     public var observerBlock: (MockLinkObserver) -> Void = { _ in }
 

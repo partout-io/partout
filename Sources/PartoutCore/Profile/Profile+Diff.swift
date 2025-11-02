@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 extension Profile {
     public enum DiffResult: Hashable, Sendable {
         case changedName

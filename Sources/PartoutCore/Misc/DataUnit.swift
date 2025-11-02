@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Helps expressing integers in shortened data units (e.g. kB).
 @frozen
 public enum DataUnit: UInt {

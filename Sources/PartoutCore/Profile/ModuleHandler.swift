@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Contains the necessary info for module handling and serialization.
 public struct ModuleHandler: Identifiable, Sendable {
     public typealias DecodingBlock = @Sendable (Decoder) throws -> Module

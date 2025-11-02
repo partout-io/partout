@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// The container of all environment keys.
 public enum TunnelEnvironmentKeys {
 }

@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Builds a ``Module`` via an internal builder.
 ///
 /// A module builder comes with a builder able to create its ``Module`` counterpart.

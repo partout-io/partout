@@ -4,7 +4,6 @@
 
 #if OPENVPN_DEPRECATED_LZO
 
-import Foundation
 internal import PartoutOpenVPN_C
 #if !PARTOUT_MONOLITH
 import PartoutCore

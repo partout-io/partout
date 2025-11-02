@@ -5,10 +5,10 @@
 import PartoutCore
 import Testing
 
-struct NSRegularExpressionTests {
+struct RegularExpressionTests {
     @Test
     func givenRegex_whenGetGroups_thenAreParsedCorrectly() {
-        let sut = NSRegularExpression("([0-9]+)([A-z]+)([0-9]+)")
+        let sut = RegularExpression("([0-9]+)([A-z]+)([0-9]+)")
         #expect(sut.groups(in: "12some80") == ["12", "some", "80"])
     }
 }

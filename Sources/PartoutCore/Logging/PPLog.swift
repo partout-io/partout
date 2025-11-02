@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Logs to the context of a ``Profile``.
 public func pp_log_id(
     _ profileId: Profile.ID?,

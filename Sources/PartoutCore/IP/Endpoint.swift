@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Represents an endpoint.
 public struct Endpoint: Hashable, Codable, Sendable {
 

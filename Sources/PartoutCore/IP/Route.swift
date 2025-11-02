@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Represents a  route in the routing table.
 public struct Route: Hashable, Codable, Sendable {
 

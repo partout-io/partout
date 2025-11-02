@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 #if !PARTOUT_MONOLITH
 import PartoutCore
 #endif
@@ -20,15 +19,8 @@ struct PushReply {
 
 extension PushReply: CustomStringConvertible {
     var description: String {
-        let stripped = NSMutableString(string: original)
-        let rx = NSRegularExpression(OpenVPN.Option.authToken.rawValue)
-        _ = rx.replaceMatches(
-            in: stripped,
-            options: [],
-            range: NSRange(location: 0, length: stripped.length),
-            withTemplate: "auth-token"
-        )
-        return stripped as String
+        let rx = RegularExpression(OpenVPN.Option.authToken.rawValue)
+        return rx.replacingMatches(in: original, withTemplate: "auth-token")
     }
 }
 

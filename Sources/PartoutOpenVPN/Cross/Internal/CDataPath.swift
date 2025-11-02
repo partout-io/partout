@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 internal import PartoutOpenVPN_C
+#if !PARTOUT_MONOLITH
+import PartoutCore
+#endif
 
 // TODO: #155, move more logic to C (replay protection, byte-aligned enc/dec zd)
 

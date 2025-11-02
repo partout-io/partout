@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Keeps track of known ``Module`` types and their associated logic.
 public final class Registry: Sendable {
     public typealias PostDecodeBlock = @Sendable (Profile) -> Profile?

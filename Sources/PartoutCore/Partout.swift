@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #if !PARTOUT_MONOLITH
-@_exported import GenericJSON
+@_exported import PartoutFoundation
 #endif
 import PartoutABI_C
 

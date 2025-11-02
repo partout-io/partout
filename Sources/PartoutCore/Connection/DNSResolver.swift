@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Result of ``DNSResolver/resolve(_:timeout:)``.
 public struct DNSRecord: Hashable, Codable, Sendable {
 

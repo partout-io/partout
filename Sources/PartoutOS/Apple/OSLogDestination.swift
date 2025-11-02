@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 @preconcurrency import OSLog
 #if !PARTOUT_MONOLITH
 import PartoutCore

@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 extension TunnelEnvironmentKeys {
     public static let connectionStatus = TunnelEnvironmentKey<ConnectionStatus>("connectionStatus")
 

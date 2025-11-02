@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// The status of a ``Tunnel``.
 @frozen
 public enum TunnelStatus: String {

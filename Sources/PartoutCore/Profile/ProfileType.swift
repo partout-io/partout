@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Generic representation of a profile.
 public protocol ProfileType: UniquelyIdentifiable {
     associatedtype GenericModuleType

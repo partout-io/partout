@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 internal import PartoutOpenVPN_ObjC
 #if !PARTOUT_MONOLITH
 import PartoutCore
@@ -44,8 +43,6 @@ final class LegacyOpenVPNSession {
     // MARK: Persistent state
 
     private let controlChannel: LegacyControlChannel
-
-    private var tlsObserver: NSObjectProtocol?
 
     private weak var delegate: OpenVPNSessionDelegate?
 

@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Abstracts tunnel configuration.
 public protocol TunnelController: AnyObject, Sendable {
     func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface

@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 import PartoutCore_C
 
 extension Data {
@@ -11,7 +10,7 @@ extension Data {
         self.init(
             bytesNoCopy: zd.pointee.bytes,
             count: count,
-            deallocator: .custom { _, _ in
+            customDeallocator: {
                 pp_zd_free(zd)
             }
         )

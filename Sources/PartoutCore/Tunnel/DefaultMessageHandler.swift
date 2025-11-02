@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// A default implementation of ``MessageHandler``.
 public struct DefaultMessageHandler: MessageHandler {
     private let ctx: PartoutLoggerContext

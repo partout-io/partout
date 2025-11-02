@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Facilitates module logging.
 public struct LoggableModule {
     private let ctx: PartoutLoggerContext

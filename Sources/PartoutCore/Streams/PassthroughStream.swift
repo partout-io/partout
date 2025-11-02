@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
+import Dispatch
 
 /// Replacement of `PassthroughSubject`.
 public final class PassthroughStream<T>: @unchecked Sendable where T: Sendable {

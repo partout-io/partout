@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 extension EndpointResolver {
     struct Resolvable: Sendable {
         private let ctx: PartoutLoggerContext

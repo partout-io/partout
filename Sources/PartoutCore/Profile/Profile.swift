@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Coordinates a set of ``Module`` to provide extensible networking capabilities.
 public struct Profile: ProfileType, BuildableType, Identifiable, @unchecked Sendable {
     public let version: Int?

@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 extension PRNGProtocol {
 
     /// Generates a random suite of data, usually for testing purposes.

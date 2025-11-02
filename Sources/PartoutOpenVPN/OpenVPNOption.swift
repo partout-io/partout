@@ -2,7 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
+#if !PARTOUT_MONOLITH
+import PartoutCore
+#endif
 
 extension OpenVPN {
 
@@ -115,8 +117,8 @@ extension OpenVPN {
 }
 
 extension OpenVPN.Option {
-    public func regularExpression() throws -> NSRegularExpression {
-        try NSRegularExpression(pattern: rawValue)
+    public func regularExpression() throws -> RegularExpression {
+        try RegularExpression(pattern: rawValue)
     }
 }
 

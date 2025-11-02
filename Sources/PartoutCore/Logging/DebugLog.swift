@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Wraps up a timestamped debug log.
 public struct DebugLog: Hashable, Codable, Sendable {
 

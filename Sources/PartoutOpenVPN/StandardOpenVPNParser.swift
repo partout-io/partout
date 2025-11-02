@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 #if !PARTOUT_MONOLITH
 import PartoutCore
 #endif
@@ -55,7 +54,7 @@ public final class StandardOpenVPNParser {
     /// The decrypter for private keys.
     private let decrypter: (KeyDecrypter & Sendable)?
 
-    private let rxOptions: [(option: OpenVPN.Option, rx: NSRegularExpression)] = OpenVPN.Option.allCases.compactMap {
+    private let rxOptions: [(option: OpenVPN.Option, rx: RegularExpression)] = OpenVPN.Option.allCases.compactMap {
         do {
             let rx = try $0.regularExpression()
             return ($0, rx)
@@ -232,19 +231,10 @@ private extension StandardOpenVPNParser {
     }
 }
 
-extension NSRegularExpression {
+extension RegularExpression {
     func enumerateSpacedComponents(in string: String, using block: @escaping ([String]) -> Void) -> Bool {
         var found = false
-        enumerateMatches(
-            in: string,
-            options: [],
-            range: NSRange(location: 0, length: string.count)
-        ) { result, _, _ in
-            guard let result else {
-                return
-            }
-            let match = (string as NSString)
-                .substring(with: result.range)
+        enumerateMatches(in: string) { match in
             let components = match
                 .components(separatedBy: " ")
                 .filter {

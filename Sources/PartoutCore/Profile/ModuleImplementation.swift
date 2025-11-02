@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Marker for ``Module`` internal implementations. Must be actor-safe.
 /// - Seealso: Implementations are managed by a ``Registry``.
 public protocol ModuleImplementation: AnyObject, Sendable {

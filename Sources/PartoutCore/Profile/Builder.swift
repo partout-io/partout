@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// A failable builder.
 public protocol BuilderType {
     associatedtype BuiltType

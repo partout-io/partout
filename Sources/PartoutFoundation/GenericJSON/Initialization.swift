@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-import Foundation
-
 private struct InitializationError: Error {}
 
 extension JSON {
@@ -16,16 +14,8 @@ extension JSON {
     /// You can also pass `nil` or `NSNull`, both will be treated as `.null`.
     public init(_ value: Any) throws {
         switch value {
-        case _ as NSNull:
-            self = .null
         case let opt as Any? where opt == nil:
             self = .null
-        case let num as NSNumber:
-            if num.isBool {
-                self = .bool(num.boolValue)
-            } else {
-                self = .number(num.doubleValue)
-            }
         case let str as String:
             self = .string(str)
         case let bool as Bool:
@@ -102,27 +92,3 @@ extension JSON: ExpressibleByStringLiteral {
         self = .string(value)
     }
 }
-
-// MARK: - NSNumber
-
-extension NSNumber {
-
-    /// Boolean value indicating whether this `NSNumber` wraps a boolean.
-    ///
-    /// For example, when using `NSJSONSerialization` Bool values are converted into `NSNumber` instances.
-    ///
-    /// - seealso: https://stackoverflow.com/a/49641315/3589408
-    fileprivate var isBool: Bool {
-        let objCType = String(cString: self.objCType)
-        if (self.compare(trueNumber) == .orderedSame && objCType == trueObjCType) || (self.compare(falseNumber) == .orderedSame && objCType == falseObjCType) {
-            return true
-        } else {
-            return false
-        }
-    }
-}
-
-private let trueNumber = NSNumber(value: true)
-private let falseNumber = NSNumber(value: false)
-private let trueObjCType = String(cString: trueNumber.objCType)
-private let falseObjCType = String(cString: falseNumber.objCType)

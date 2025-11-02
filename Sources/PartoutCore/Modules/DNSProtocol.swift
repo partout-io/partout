@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// The protocol used in DNS servers.
 public enum DNSProtocol: String, Hashable, Codable, Sendable {
 

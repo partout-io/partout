@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 private let transientModuleHandler = ModuleHandler(ModuleType("TransientModule"))
 
 extension Module {

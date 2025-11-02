@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// A generic structure holding a pair of inbound/outbound states.
 public struct BidirectionalState<T> {
     private let resetValue: T

@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-import Foundation
-
 public extension JSON {
 
     /// Return the string value if this is a `.string`, otherwise `nil`

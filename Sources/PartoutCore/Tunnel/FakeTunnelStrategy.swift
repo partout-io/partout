@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Implementation of ``TunnelObservableStrategy`` to fake VPN operation on simulators.
 public actor FakeTunnelStrategy: TunnelObservableStrategy, Sendable {
     private nonisolated let activeProfileSubject: CurrentValueStream<TunnelActiveProfile?>

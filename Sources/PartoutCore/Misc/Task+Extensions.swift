@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 extension Task where Success == Never, Failure == Never {
     public static func sleep(milliseconds: Int) async throws {
         try await Self.sleep(nanoseconds: UInt64(milliseconds) * NSEC_PER_MSEC)

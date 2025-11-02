@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Observes changes in the network.
 public final class NetworkObserver: @unchecked Sendable {
     private let ctx: PartoutLoggerContext

@@ -48,8 +48,8 @@ let globalCSettings: [CSetting] = [
 let package = Package(
     name: "partout",
     platforms: [
-        .iOS(.v15),
-        .macOS(.v12),
+        .iOS(.v16),
+        .macOS(.v13),
         .tvOS(.v17)
     ],
     products: [
@@ -104,21 +104,27 @@ if envDocs {
 }
 
 // Wrapper = Core + OS
-package.targets.append(contentsOf: [
-    .target(
-        name: "GenericJSON"
+package.products.append(contentsOf: [
+    .library(
+        name: "PartoutCore",
+        targets: ["PartoutCore"]
     ),
+    .library(
+        name: "PartoutOS",
+        targets: ["PartoutOS"]
+    )
+])
+package.targets.append(contentsOf: [
     .target(
         name: "PartoutCore",
         dependencies: [
-            "GenericJSON",
             "PartoutABI_C",
-            "PartoutCore_C"
+            "PartoutCore_C",
+            "PartoutFoundation"
         ]
     ),
     .target(
         name: "PartoutCore_C",
-        dependencies: [],
         cSettings: globalCSettings + {
             if OS.current == .windows {
                 return [
@@ -127,6 +133,17 @@ package.targets.append(contentsOf: [
             }
             return []
         }()
+    ),
+    .target(
+        name: "PartoutFoundation",
+        // TODO: #228, Until Foundation is dropped
+        exclude: ["Cross"]
+//        exclude: {
+//            guard OS.current != .apple else {
+//                return ["Cross"]
+//            }
+//            return []
+//        }()
     ),
     .target(
         name: "PartoutOS",

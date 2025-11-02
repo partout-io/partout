@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
+import Dispatch
 
 /// A ``TunnelEnvironment`` that stores data in memory.
 public final class SharedTunnelEnvironment: TunnelEnvironment, @unchecked Sendable {

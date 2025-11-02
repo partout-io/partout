@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Defines the communication protocol of an endpoint.
 public struct EndpointProtocol: Hashable, Sendable {
 

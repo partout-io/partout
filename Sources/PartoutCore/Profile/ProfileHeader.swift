@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Holds the metadata of a ``Profile``, where ``Profile/modules`` are the hash values of the profile modules.
 public struct ProfileHeader: ProfileType, Identifiable, Hashable, Sendable {
     public let version: Int?

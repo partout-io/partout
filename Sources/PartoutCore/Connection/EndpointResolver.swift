@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Cycles through a list of DNS-resolvable endpoints.
 public struct EndpointResolver: Sendable {
     private let ctx: PartoutLoggerContext

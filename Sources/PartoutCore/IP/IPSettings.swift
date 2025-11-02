@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// IP settings and routes.
 public struct IPSettings: Hashable, Codable, Sendable {
 

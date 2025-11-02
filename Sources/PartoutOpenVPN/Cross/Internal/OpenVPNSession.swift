@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 #if !PARTOUT_MONOLITH
 import PartoutCore
 #endif
@@ -41,8 +40,6 @@ final class OpenVPNSession {
     // MARK: Persistent state
 
     private let controlChannel: ControlChannel
-
-    private var tlsObserver: NSObjectProtocol?
 
     private weak var delegate: OpenVPNSessionDelegate?
 

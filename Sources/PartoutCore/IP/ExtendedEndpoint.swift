@@ -2,14 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 import PartoutCore_C
 
 /// Aggregates an address and an ``EndpointProtocol``.
 public struct ExtendedEndpoint: Hashable, Codable, Sendable {
 
     // XXX: simplistic match
-    private static let rx = NSRegularExpression("^([^\\s]+):(UDP[46]?|TCP[46]?):(\\d+)$")
+    private static let rx = RegularExpression("^([^\\s]+):(UDP[46]?|TCP[46]?):(\\d+)$")
 
     public let address: Address
 
