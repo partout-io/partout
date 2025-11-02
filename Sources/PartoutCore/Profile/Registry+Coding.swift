@@ -25,16 +25,15 @@ extension Registry {
 
     // Tolerate older encoding
     public func compatibleProfile(fromString string: String, fallingBack: Bool = true) throws -> Profile {
-        let decoded: Profile
         do {
-            decoded = try profile(fromJSON: string)
+            return try profile(fromJSON: string)
         } catch {
             guard fallingBack else {
                 throw error
             }
-            decoded = try CodableProfileCoder().decodedProfile(from: string, with: self)
+            let decoded = try CodableProfileCoder().decodedProfile(from: string, with: self)
+            return postDecodeBlock?(decoded) ?? decoded
         }
-        return postDecodeBlock?(decoded) ?? decoded
     }
 
     public func profile(fromJSON json: String) throws -> Profile {
