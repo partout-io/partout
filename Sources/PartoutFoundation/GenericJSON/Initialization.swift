@@ -26,6 +26,8 @@ extension JSON {
             self = .object(try dict.mapValues(JSON.init))
         case let num as Double:
             self = .number(num)
+        case let num as Float:
+            self = .number(Double(num))
         case let num as Int:
             self = .number(Double(num))
         default:
