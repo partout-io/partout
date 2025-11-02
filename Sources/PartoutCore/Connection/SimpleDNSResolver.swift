@@ -15,32 +15,33 @@ public protocol SimpleDNSStrategy: Sendable {
 public actor SimpleDNSResolver: DNSResolver {
     private let strategy: (String) -> SimpleDNSStrategy
 
-    private var pendingStrategy: SimpleDNSStrategy?
+    private var pendingResolutions: [String: Task<[DNSRecord], Error>]
 
     public init(strategy: @escaping (String) -> SimpleDNSStrategy) {
         self.strategy = strategy
+        pendingResolutions = [:]
     }
 
     public func resolve(_ hostname: String, timeout: Int) async throws -> [DNSRecord] {
-        if pendingStrategy != nil {
-            await pendingStrategy?.cancelResolution()
-            _ = try? await pendingStrategy?.waitForResolution()
+        if let pendingResolutionTask = pendingResolutions[hostname] {
+            return try await pendingResolutionTask.value
         }
-
         let newStrategy = strategy(hostname)
         let timeoutTask = Task {
             try await Task.sleep(milliseconds: timeout)
-            guard !Task.isCancelled else {
-                return
-            }
+            guard !Task.isCancelled else { return }
             await newStrategy.cancelResolution()
         }
-
-        self.pendingStrategy = newStrategy
-        try await newStrategy.startResolution()
-        let result = try await newStrategy.waitForResolution()
-        timeoutTask.cancel()
-        pendingStrategy = nil
-        return result
+        let resolutionTask = Task {
+            try await newStrategy.startResolution()
+            let result = try await newStrategy.waitForResolution()
+            timeoutTask.cancel()
+            return result
+        }
+        pendingResolutions[hostname] = resolutionTask
+        defer {
+            pendingResolutions.removeValue(forKey: hostname)
+        }
+        return try await resolutionTask.value
     }
 }
