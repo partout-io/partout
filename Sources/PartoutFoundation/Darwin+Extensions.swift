@@ -46,9 +46,7 @@ extension RegularExpression {
     public func groups(in string: String) -> [String] {
         var results: [String] = []
         enumerateMatches(in: string, range: NSRange(location: 0, length: string.count)) { result, _, _ in
-            guard let result else {
-                return
-            }
+            guard let result else { return }
             for i in 1..<result.numberOfRanges {
                 let subrange = result.range(at: i)
                 let match = (string as NSString).substring(with: subrange)
@@ -59,20 +57,13 @@ extension RegularExpression {
     }
 
     public func enumerateMatches(in string: String, using block: @escaping (String) -> Void) {
-        enumerateMatches(
-            in: string,
-            range: NSRange(location: 0, length: string.count),
-            using: { result, _, _ in
-                guard let result else {
-                    return
-                }
-                let match = (string as NSString).substring(with: result.range)
-                block(match)
-            }
-        )
+        enumerateMatches(in: string, range: NSRange(location: 0, length: string.count)) { result, _, _ in
+            guard let result else { return }
+            let match = (string as NSString).substring(with: result.range)
+            block(match)
+        }
     }
 
-    // FIXME: #263
     public func replacingMatches(in string: String, withTemplate template: String) -> String {
         let replaced = NSMutableString(string: string)
         replaceMatches(
