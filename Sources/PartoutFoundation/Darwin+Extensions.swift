@@ -43,16 +43,21 @@ extension RegularExpression {
         }
     }
 
-    // FIXME: #263
     public func groups(in string: String) -> [String] {
         var results: [String] = []
-        enumerateMatches(in: string) { match in
-            results.append(match)
+        enumerateMatches(in: string, range: NSRange(location: 0, length: string.count)) { result, _, _ in
+            guard let result else {
+                return
+            }
+            for i in 1..<result.numberOfRanges {
+                let subrange = result.range(at: i)
+                let match = (string as NSString).substring(with: subrange)
+                results.append(match)
+            }
         }
         return results
     }
 
-    // FIXME: #263
     public func enumerateMatches(in string: String, using block: @escaping (String) -> Void) {
         enumerateMatches(
             in: string,
@@ -61,11 +66,8 @@ extension RegularExpression {
                 guard let result else {
                     return
                 }
-                for i in 1..<result.numberOfRanges {
-                    let subrange = result.range(at: i)
-                    let match = (string as NSString).substring(with: subrange)
-                    block(match)
-                }
+                let match = (string as NSString).substring(with: result.range)
+                block(match)
             }
         )
     }
