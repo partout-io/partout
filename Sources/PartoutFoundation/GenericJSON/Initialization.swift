@@ -24,6 +24,10 @@ extension JSON {
             self = .array(try array.map(JSON.init))
         case let dict as [String: Any]:
             self = .object(try dict.mapValues(JSON.init))
+        case let num as Double:
+            self = .number(num)
+        case let num as Int:
+            self = .number(Double(num))
         default:
             throw InitializationError()
         }
