@@ -47,6 +47,7 @@ Generic entities and helpers.
 - ``DataUnit``
 - ``DataUnitRepresentable``
 - ``Keychain``
+- ``MutableUniquelyIdentifiable``
 - ``ScriptingEngine``
 - ``Timestamp``
 - ``UniqueID``

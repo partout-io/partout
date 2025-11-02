@@ -22,6 +22,10 @@ Use these entities to track and troubleshoot the internal library activities.
 - ``DebugLog``
 - ``SensitiveDebugStringConvertible``
 
+### Printing messages (C)
+
+- ``pp_clog(_:_:_:)``
+
 ### Errors
 
 - ``PartoutError``
