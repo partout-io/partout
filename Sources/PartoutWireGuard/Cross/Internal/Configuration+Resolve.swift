@@ -53,7 +53,7 @@ extension WireGuard.Configuration {
                         guard !currentResolved.isEmpty else { return }
                         await allResolved.setEndpoints(currentResolved, for: endpoint.address)
                     } catch {
-                        logHandler(.error, "Failed to resolve endpoint \(endpoint.address): \(error.localizedDescription)")
+                        logHandler(.error, "Failed to resolve endpoint \(endpoint.address.asSensitiveAddress(.global)): \(error.localizedDescription)")
                     }
                 }
             }
