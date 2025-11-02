@@ -340,7 +340,7 @@ class LegacyWireGuardAdapter: @unchecked Sendable {
                     self.logHandler(.verbose, "DNS64: mapped \(sourceEndpoint.host) to \(resolvedEndpoint.host)")
                 }
             case .failure(let resolutionError):
-                self.logHandler(.error, "Failed to resolve endpoint \(resolutionError.address): \(resolutionError.errorDescription ?? "(nil)")")
+                self.logHandler(.error, "Failed to resolve endpoint \(resolutionError.address.asSensitiveAddress(.global)): \(resolutionError.errorDescription ?? "(nil)")")
             }
         }
     }
