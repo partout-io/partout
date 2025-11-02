@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// The I/O interface of a message handler.
 public enum Message {
     public enum Input: Hashable, Codable, Sendable {

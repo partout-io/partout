@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Returns a `String` representation optionally containing sensitive data.
 public protocol SensitiveDebugStringConvertible {
     func debugDescription(withSensitiveData: Bool) -> String

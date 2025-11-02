@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Represents an I/O interface able to read and write data.
 public protocol IOInterface: AnyObject, Sendable {
 

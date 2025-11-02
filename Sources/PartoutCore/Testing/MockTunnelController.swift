@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 public final class MockTunnelController: TunnelController, @unchecked Sendable {
     public var onSetTunnelSettings: (TunnelRemoteInfo?) async throws -> Void = { _ in }
 

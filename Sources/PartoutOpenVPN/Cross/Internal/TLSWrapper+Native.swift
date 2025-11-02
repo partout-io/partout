@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 internal import PartoutOpenVPN_C
 internal import PartoutTLS_C
 #if !PARTOUT_MONOLITH
+import PartoutCore
 import PartoutOS
 #endif
 
@@ -28,7 +28,7 @@ private final class NativeTLSWrapper: TLSProtocol {
 
     private let caURL: URL
 
-    private let verificationObserver: NSObjectProtocol
+    private let verificationObserver: Any
 
     init(parameters: TLSWrapper.Parameters) throws {
         guard let ca = parameters.cfg.ca else {
@@ -60,7 +60,7 @@ private final class NativeTLSWrapper: TLSProtocol {
             keyPEM,
             hostname,
             {
-                NotificationCenter.default.post(name: .tlsDidFailVerificationNotification, object: nil)
+                NotificationCenter.default.post(name: .tlsDidFailVerificationNotification)
             }
         )
         var error = PPTLSErrorNone
@@ -74,9 +74,7 @@ private final class NativeTLSWrapper: TLSProtocol {
 
         verificationObserver = NotificationCenter.default.addObserver(
             forName: .tlsDidFailVerificationNotification,
-            object: nil,
-            queue: nil,
-            using: { _ in
+            using: {
                 parameters.onVerificationFailure()
             }
         )

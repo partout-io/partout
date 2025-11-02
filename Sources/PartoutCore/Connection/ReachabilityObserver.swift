@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Publishes path updates.
 public protocol ReachabilityObserver: AnyObject, Sendable {
 

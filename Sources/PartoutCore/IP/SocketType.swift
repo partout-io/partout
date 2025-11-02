@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// A socket type between UDP and TCP.
 @frozen
 public enum SocketType: String, Sendable {

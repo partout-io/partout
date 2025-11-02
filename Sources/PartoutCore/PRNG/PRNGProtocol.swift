@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 /// Pseudo-random number generator.
 public protocol PRNGProtocol: Sendable {
 

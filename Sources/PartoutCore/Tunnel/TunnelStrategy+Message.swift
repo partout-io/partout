@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 extension TunnelStrategy {
     public func sendMessage(_ input: Message.Input, to profileId: Profile.ID) async throws -> Message.Output? {
         let encoded = try JSONEncoder().encode(input)

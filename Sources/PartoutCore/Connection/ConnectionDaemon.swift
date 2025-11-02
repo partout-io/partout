@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Connection daemon handling async I/O.
 public protocol ConnectionDaemon {
     func start() async throws

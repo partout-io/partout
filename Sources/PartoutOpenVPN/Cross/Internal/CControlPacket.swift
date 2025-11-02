@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 internal import PartoutOpenVPN_C
 #if !PARTOUT_MONOLITH
 import PartoutCore
@@ -48,15 +47,15 @@ final class CControlPacket {
 
         self.pkt = pkt
         self.code = code
-        self.sessionId = Data(bytesNoCopy: pkt.pointee.session_id, count: OpenVPNPacketSessionIdLength, deallocator: .none)
+        self.sessionId = Data(bytesNoCopy: pkt.pointee.session_id, count: OpenVPNPacketSessionIdLength)
         self.payload = pkt.pointee.payload.map {
-            Data(bytesNoCopy: $0, count: pkt.pointee.payload_len, deallocator: .none)
+            Data(bytesNoCopy: $0, count: pkt.pointee.payload_len)
         }
         self.ackIds = pkt.pointee.ack_ids.map {
             Array(UnsafeBufferPointer(start: $0, count: pkt.pointee.ack_ids_len))
         }
         self.ackRemoteSessionId = pkt.pointee.ack_remote_session_id.map {
-            Data(bytesNoCopy: $0, count: OpenVPNPacketSessionIdLength, deallocator: .none)
+            Data(bytesNoCopy: $0, count: OpenVPNPacketSessionIdLength)
         }
     }
 

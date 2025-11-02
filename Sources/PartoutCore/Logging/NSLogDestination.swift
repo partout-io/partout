@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// A ``LoggerDestination`` that prints messages via `NSLog`.
 public struct NSLogDestination: LoggerDestination {
     public init() {

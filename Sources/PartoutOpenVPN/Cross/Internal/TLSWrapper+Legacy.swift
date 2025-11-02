@@ -4,7 +4,6 @@
 
 #if OPENVPN_LEGACY
 
-import Foundation
 internal import PartoutOpenVPN_ObjC
 
 extension TLSWrapper {

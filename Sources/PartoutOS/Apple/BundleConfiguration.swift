@@ -2,7 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
+#if !PARTOUT_MONOLITH
+import PartoutCore
+#endif
 
 /// Reads configuration values from the Info.plist of a `Bundle`.
 public struct BundleConfiguration: @unchecked Sendable {

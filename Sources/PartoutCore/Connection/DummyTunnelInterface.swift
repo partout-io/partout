@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 final class DummyTunnelInterface: IOInterface {
     var fileDescriptor: UInt64? {
         nil

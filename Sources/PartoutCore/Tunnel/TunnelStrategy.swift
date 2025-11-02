@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Defines the current tunnel profile.
 public struct TunnelActiveProfile: Hashable, Sendable, CustomStringConvertible {
     public let id: Profile.ID

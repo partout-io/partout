@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 import PartoutCore_C
 
 /// An IPv4/v6 subnet.

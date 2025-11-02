@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Advanced flags affecting the behavior of a ``Profile``.
 public struct ProfileBehavior: Hashable, Codable, Sendable {
 

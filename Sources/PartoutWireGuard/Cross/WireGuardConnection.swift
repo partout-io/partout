@@ -8,7 +8,6 @@
 //  SPDX-License-Identifier: MIT
 //  Copyright © 2018-2024 WireGuard LLC. All Rights Reserved.
 
-import Foundation
 #if !PARTOUT_MONOLITH
 import PartoutCore
 #endif

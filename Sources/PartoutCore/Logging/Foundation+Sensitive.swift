@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 extension Data: SensitiveDebugStringConvertible {
     public func debugDescription(withSensitiveData: Bool) -> String {
         withSensitiveData ? "[\(count) bytes, \(toHex())]" : "[\(count) bytes]"

@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 extension CodingUserInfoKey {
     public static let redactingSensitiveData = CodingUserInfoKey(rawValue: "redactingSensitiveData")!
 }
@@ -28,7 +26,7 @@ extension Encodable {
                 encoder.userInfo = [.redactingSensitiveData: true]
             }
             if sortingKeys {
-                encoder.outputFormatting = .sortedKeys
+                encoder.outputFormatting = [.sortedKeys]
             }
             let encoded = try encoder.encode(self)
             return String(data: encoded, encoding: .utf8)

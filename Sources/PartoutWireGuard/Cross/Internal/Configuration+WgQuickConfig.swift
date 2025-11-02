@@ -24,7 +24,7 @@ extension WireGuard.Configuration {
 
         for (lineIndex, line) in lines.enumerated() {
             var trimmedLine: String
-            if let commentRange = line.range(of: "#") {
+            if let commentRange = line.ranges(of: "#").first {
                 trimmedLine = String(line[..<commentRange.lowerBound])
             } else {
                 trimmedLine = String(line)

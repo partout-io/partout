@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Transient settings, not serialized.
 public struct TransientModule: Module, @unchecked Sendable {
     public let id: UniqueID

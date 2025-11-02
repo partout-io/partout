@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
+import Dispatch
 
 /// Replacement of `CurrentValueSubject`.
 public final class CurrentValueStream<T>: @unchecked Sendable where T: Sendable {

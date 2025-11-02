@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Observes activity to eventually return a ``LinkInterface``.
 public protocol LinkObserver {
 

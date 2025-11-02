@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 #if !PARTOUT_MONOLITH
 import PartoutCore
 #endif
@@ -23,7 +22,7 @@ extension OpenVPN {
         }
 
         public init(pem: String) {
-            guard let beginRange = pem.range(of: CryptoContainer.begin) else {
+            guard let beginRange = pem.ranges(of: CryptoContainer.begin).first else {
                 self.pem = ""
                 return
             }

@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 // Label -> Name
 // Description -> Kind
 // Service -> Where

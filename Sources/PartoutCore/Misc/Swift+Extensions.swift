@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 extension Collection {
     public func first<T>(ofType type: T.Type) -> T? {
         first { $0 is T } as? T

@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Represents a specific I/O interface meant to work at the link layer (e.g. TCP/IP).
 public protocol LinkInterface: IOInterface {
     nonisolated var linkDescription: String { get }

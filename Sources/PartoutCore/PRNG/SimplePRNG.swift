@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// The most basic Swift PRNG.
 public final class SimplePRNG: PRNGProtocol {
     public init() {

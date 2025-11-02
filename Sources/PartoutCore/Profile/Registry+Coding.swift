@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 extension Registry {
     public func json(fromProfiles profiles: [Profile]) throws -> String {
         let encoder = JSONEncoder()

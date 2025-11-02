@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-// MARK: - Hex processing
+// MARK: Hex processing
 
 // hex -> Data conversion code from: http://stackoverflow.com/questions/32231926/nsdata-from-hex-string
 // Data -> hex conversion code from: http://stackoverflow.com/questions/39075043/how-to-convert-data-to-hex-string-in-swift
@@ -211,46 +210,5 @@ extension UnsafeMutableRawBufferPointer {
             fatalError("Cannot bind to self")
         }
         return address
-    }
-}
-
-// MARK: - Less performant versions
-
-private extension Data {
-    @available(*, deprecated)
-    func UInt16ValueFromPointers(from: Int) -> UInt16 {
-        subdata(in: from..<(from + 2)).withUnsafeBytes { $0.pointee }
-    }
-
-    @available(*, deprecated)
-    func UInt16ValueFromReboundPointers(from: Int) -> UInt16 {
-        let data = subdata(in: from..<(from + 2))
-        let value = data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> UInt16 in
-            bytes.withMemoryRebound(to: UInt16.self, capacity: 1) {
-                $0.pointee
-            }
-        }
-        return value
-    }
-
-    @available(*, deprecated)
-    func UInt32ValueFromBuffer(from: Int) -> UInt32 {
-        var value: UInt32 = 0
-        for i in 0..<4 {
-            let byte = self[from + i]
-            value |= (UInt32(byte) << UInt32(8 * i))
-        }
-        return value
-    }
-
-    @available(*, deprecated)
-    func UInt32ValueFromReboundPointers(from: Int) -> UInt32 {
-        let data = subdata(in: from..<(from + 4))
-        let value = data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> UInt32 in
-            bytes.withMemoryRebound(to: UInt32.self, capacity: 1) {
-                $0.pointee
-            }
-        }
-        return value
     }
 }

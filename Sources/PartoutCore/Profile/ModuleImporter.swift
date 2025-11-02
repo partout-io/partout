@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// Imports a ``Module`` from a text content.
 public protocol ModuleImporter: Sendable {
     func module(fromContents contents: String, object: Any?) throws -> Module

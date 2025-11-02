@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-
 /// The status of a ``Connection``.
 @frozen
 public enum ConnectionStatus: String, Codable {
