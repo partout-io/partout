@@ -24,10 +24,10 @@ extension JSON {
             self = .array(try array.map(JSON.init))
         case let dict as [String: Any]:
             self = .object(try dict.mapValues(JSON.init))
-        case let num as Double:
-            self = .number(num)
-        case let num as Float:
-            self = .number(Double(num))
+        case let n as Double:
+            self = .number(n)
+        case let n as Float:
+            self = .number(Double(n))
         case let n as Int:
             self = .number(Double(n))
         case let n as Int8:
