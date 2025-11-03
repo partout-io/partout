@@ -4,10 +4,7 @@
 
 /// Advanced flags affecting the behavior of a ``Profile``.
 public struct ProfileBehavior: Hashable, Codable, Sendable {
-    public static let `default` = ProfileBehavior(
-        disconnectsOnSleep: false,
-        includesAllNetworks: false
-    )
+    public static let `default` = ProfileBehavior()
 
     /// Disconnects when the device goes to sleep.
     public var disconnectsOnSleep: Bool
@@ -15,12 +12,8 @@ public struct ProfileBehavior: Hashable, Codable, Sendable {
     /// Attempts to route as much traffic as possible through the tunnel.
     public var includesAllNetworks: Bool?
 
-    private init(disconnectsOnSleep: Bool, includesAllNetworks: Bool) {
-        self.disconnectsOnSleep = disconnectsOnSleep
-        self.includesAllNetworks = includesAllNetworks
-    }
-
     public init() {
-        self = .default
+        disconnectsOnSleep = false
+        includesAllNetworks = false
     }
 }
