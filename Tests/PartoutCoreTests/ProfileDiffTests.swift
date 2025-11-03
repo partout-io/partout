@@ -23,11 +23,11 @@ struct ProfileDiffTests {
         sut.behavior = behavior
         #expect(try sut.build().differences(from: original) == [
             .changedName,
-            .changedBehavior
+            .changedBehavior([.disconnectsOnSleep])
         ])
         sut.name = "original"
         #expect(try sut.build().differences(from: original) == [
-            .changedBehavior
+            .changedBehavior([.disconnectsOnSleep])
         ])
     }
 
