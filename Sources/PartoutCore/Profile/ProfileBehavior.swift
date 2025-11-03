@@ -4,6 +4,7 @@
 
 /// Advanced flags affecting the behavior of a ``Profile``.
 public struct ProfileBehavior: Hashable, Codable, Sendable {
+    public static let `default` = ProfileBehavior()
 
     /// Disconnects when the device goes to sleep.
     public var disconnectsOnSleep: Bool
