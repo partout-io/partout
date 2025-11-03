@@ -4,8 +4,13 @@
 
 extension Profile {
     public enum DiffResult: Hashable, Sendable {
+        public enum BehaviorChange: Hashable, Sendable {
+            case disconnectsOnSleep
+            case includesAllNetworks
+        }
+
         case changedName
-        case changedBehavior
+        case changedBehavior([BehaviorChange])
         case changedActiveModules
         case addedModules([UniqueID])
         case removedModules([UniqueID])
@@ -18,7 +23,14 @@ extension Profile {
             diff.append(.changedName)
         }
         if previous.behavior != behavior {
-            diff.append(.changedBehavior)
+            var changes: [DiffResult.BehaviorChange] = []
+            if previous.behavior?.disconnectsOnSleep != behavior?.disconnectsOnSleep {
+                changes.append(.disconnectsOnSleep)
+            }
+            if previous.behavior?.includesAllNetworks != behavior?.includesAllNetworks {
+                changes.append(.includesAllNetworks)
+            }
+            diff.append(.changedBehavior(changes))
         }
         if previous.activeModulesIds != activeModulesIds {
             diff.append(.changedActiveModules)
