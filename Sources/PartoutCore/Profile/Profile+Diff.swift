@@ -24,10 +24,12 @@ extension Profile {
         }
         if previous.behavior != behavior {
             var changes: [DiffResult.BehaviorChange] = []
-            if previous.behavior?.disconnectsOnSleep != behavior?.disconnectsOnSleep {
+            let previousBehavior = previous.behavior ?? .default
+            let thisBehavior = behavior ?? .default
+            if previousBehavior.disconnectsOnSleep != thisBehavior.disconnectsOnSleep {
                 changes.append(.disconnectsOnSleep)
             }
-            if previous.behavior?.includesAllNetworks != behavior?.includesAllNetworks {
+            if previousBehavior.includesAllNetworks != thisBehavior.includesAllNetworks {
                 changes.append(.includesAllNetworks)
             }
             diff.append(.changedBehavior(changes))
