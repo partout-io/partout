@@ -50,7 +50,7 @@ public actor WireGuardConnection: Connection {
         dnsTimeout = parameters.options.dnsTimeout
 
         guard let configuration = module.configuration else {
-            fatalError("No WireGuard configuration defined?")
+            throw PartoutError(.incompleteModule)
         }
         pp_log(ctx, .wireguard, .notice, "WireGuard: Using cross-platform connection")
 

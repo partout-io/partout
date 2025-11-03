@@ -49,7 +49,7 @@ public actor LegacyOpenVPNConnection {
         options = parameters.options
 
         guard let configuration = module.configuration else {
-            fatalError("No OpenVPN configuration defined?")
+            throw PartoutError(.incompleteModule)
         }
         guard let endpoints = configuration.processedRemotes(prng: prng),
               !endpoints.isEmpty else {

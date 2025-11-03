@@ -53,7 +53,7 @@ public final class LegacyWireGuardConnection: Connection, @unchecked Sendable {
         environment = parameters.environment
 
         guard let configuration = module.configuration else {
-            fatalError("No WireGuard configuration defined?")
+            throw PartoutError(.incompleteModule)
         }
         pp_log(ctx, .wireguard, .notice, "WireGuard: Using legacy connection")
 
