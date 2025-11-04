@@ -5,4 +5,4 @@
  */
 
 const char *const PARTOUT_IDENTIFIER = "io.partout";
-const char *const PARTOUT_VERSION = "0.100.0";
+const char *const PARTOUT_VERSION = "0.101.0";
