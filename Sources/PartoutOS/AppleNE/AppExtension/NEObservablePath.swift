@@ -22,11 +22,13 @@ public final class NEObservablePath: ReachabilityObserver {
     }
 
     public func startObserving() {
+        var wasSatifiable: Bool?
         monitor.pathUpdateHandler = { [weak self] path in
-            guard let self else {
-                return
-            }
-            pp_log(ctx, .os, .info, "Path updated: \(path.debugDescription)")
+            guard let self else { return }
+            let didChangeSatisfiability = path.isSatisfiable != wasSatifiable
+            let level: DebugLog.Level = didChangeSatisfiability ? .info : .debug
+            pp_log(ctx, .os, level, "Path updated: \(path.debugDescription)")
+            wasSatifiable = path.isSatisfiable
             subject.send(path)
         }
         monitor.start(queue: .global())
