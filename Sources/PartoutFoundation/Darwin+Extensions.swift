@@ -27,7 +27,7 @@ extension NotificationCenter {
         post(name: name, object: nil)
     }
 
-    public func addObserver(forName name: Notification.Name, using block: @escaping () -> Void) {
+    public func addObserver(forName name: Notification.Name, using block: @escaping @Sendable () -> Void) {
         addObserver(forName: name, object: nil, queue: nil, using: { _ in
             block()
         })
