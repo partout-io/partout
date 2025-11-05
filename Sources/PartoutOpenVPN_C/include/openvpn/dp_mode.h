@@ -11,7 +11,6 @@
 #include "crypto/crypto.h"
 #include "openvpn/comp.h"
 #include "openvpn/dp_framing.h"
-#include "openvpn/dp_lzo.h"
 
 // MARK: Outbound
 
@@ -22,7 +21,6 @@ typedef struct {
     pp_zd *_Nonnull dst;
     const uint8_t *_Nonnull src;
     size_t src_len;
-    pp_lzo _Nullable lzo;
 } openvpn_dp_mode_assemble_ctx;
 
 // encrypt -> SEND
@@ -55,7 +53,6 @@ typedef struct {
     uint8_t *_Nonnull dst_header;
     uint8_t *_Nonnull src; // allow parse in place
     size_t src_len;
-    pp_lzo _Nullable lzo;
     openvpn_dp_error *_Nullable error;
 } openvpn_dp_mode_parse_ctx;
 
@@ -108,7 +105,6 @@ typedef struct {
     openvpn_compression_framing comp_f;
     uint32_t peer_id;
     uint16_t mss_val;
-    bool with_lzo;
 } openvpn_dp_mode_options;
 
 typedef struct {
@@ -265,14 +261,7 @@ pp_zd *_Nullable openvpn_dp_mode_decrypt_and_parse(openvpn_dp_mode *_Nonnull mod
     if (dst_len == 0) {
         goto failure;
     }
-    bool is_compressed = false;
-    if (!openvpn_dp_lzo_parse(mode->parse_ctx.lzo, mode->opt.comp_f,
-                              *dst_header, dst, dst_len, &is_compressed)) {
-        goto failure;
-    }
-    if (!is_compressed) {
-        pp_zd_resize(dst, dst_len);
-    }
+    pp_zd_resize(dst, dst_len);
     if (openvpn_packet_is_ping(dst->bytes, dst->length)) {
         *dst_keep_alive = true;
     }

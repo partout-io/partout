@@ -63,11 +63,7 @@ extension Constants.ControlChannel {
             "IV_NCP=2",
             "IV_LZO_STUB=1"
         ]
-#if OPENVPN_DEPRECATED_LZO
-        info.append("IV_LZO=1")
-#else
         info.append("IV_LZO=0")
-#endif
         // XXX: always do --push-peer-info
         // however, MAC is inaccessible and IFAD is deprecated, skip IV_HWADDR
         if let sslVersion {

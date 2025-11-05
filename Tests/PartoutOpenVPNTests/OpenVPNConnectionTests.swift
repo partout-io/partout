@@ -318,7 +318,7 @@ private struct Constants {
         let profile = try Profile.Builder().build()
         let impl = OpenVPNModule.Implementation(
             importerBlock: {
-                StandardOpenVPNParser(supportsLZO: false, decrypter: nil)
+                StandardOpenVPNParser(decrypter: nil)
             },
             connectionBlock: {
                 try OpenVPNConnection(

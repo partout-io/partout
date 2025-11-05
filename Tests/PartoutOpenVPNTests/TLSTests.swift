@@ -13,7 +13,7 @@ struct TLSTests {
 extension TLSTests {
     func newConfiguration() throws -> OpenVPN.Configuration {
         let url = try #require(Bundle.module.url(forResource: "tunnelbear", withExtension: "ovpn"))
-        return try StandardOpenVPNParser(supportsLZO: false, decrypter: SimpleKeyDecrypter())
+        return try StandardOpenVPNParser(decrypter: SimpleKeyDecrypter())
             .parsed(fromURL: url, passphrase: "foobar")
             .configuration
     }

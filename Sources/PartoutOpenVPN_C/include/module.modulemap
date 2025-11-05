@@ -9,7 +9,6 @@ module PartoutOpenVPN_C {
     header "openvpn/dp_mode_ad.h"
     header "openvpn/dp_mode_hmac.h"
     header "openvpn/dp_mode_shortcuts.h"
-    header "openvpn/lzo.h"
     header "openvpn/mss_fix.h"
     header "openvpn/obf.h"
     header "openvpn/packet.h"

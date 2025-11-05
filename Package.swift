@@ -201,13 +201,6 @@ package.targets.append(
 
 // OpenVPN requires Crypto/TLS wrappers
 if areas.contains(.openVPN), cryptoMode != nil {
-
-    // Deprecated LZO (to be deleted)
-    let includesDeprecatedLZO = true
-    let lzoDefine = "OPENVPN_DEPRECATED_LZO"
-    let lzoCSettings: [CSetting] = true && includesDeprecatedLZO ? [.define(lzoDefine)] : []
-    let lzoSwiftSettings: [SwiftSetting] = true && includesDeprecatedLZO ? [.define(lzoDefine)] : []
-
     package.products.append(
         .library(
             name: "PartoutOpenVPN",
@@ -217,27 +210,15 @@ if areas.contains(.openVPN), cryptoMode != nil {
     package.targets.append(contentsOf: [
         .target(
             name: "PartoutOpenVPN_C",
-            dependencies: [
-                "_LZO_C",
-                "_PartoutCryptoImpl_C"
-            ],
-            cSettings: globalCSettings + lzoCSettings
+            dependencies: ["_PartoutCryptoImpl_C"],
+            cSettings: globalCSettings
         ),
         .target(
             name: "PartoutOpenVPN",
             dependencies: [
                 "PartoutOpenVPN_C",
                 "PartoutOS"
-            ],
-            swiftSettings: {
-                var list: [String] = []
-                if includesDeprecatedLZO {
-                    list.append(lzoDefine)
-                }
-                return list.map {
-                    .define($0)
-                }
-            }()
+            ]
         ),
         .testTarget(
             name: "PartoutOpenVPNTests",
@@ -245,19 +226,9 @@ if areas.contains(.openVPN), cryptoMode != nil {
             exclude: ["DataPathPerformanceTests.swift"],
             resources: [
                 .process("Resources")
-            ],
-            swiftSettings: lzoSwiftSettings
+            ]
         )
     ])
-    // Remove these ASAP
-    package.targets.append(
-        .target(
-            name: "_LZO_C",
-            path: "vendors/lzo",
-            exclude: ["COPYING"],
-            cSettings: globalCSettings
-        )
-    )
 }
 
 // MARK: WireGuard
