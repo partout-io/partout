@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if canImport(Darwin)
+// TODO: #228, Until Foundation is dropped
+#if true || canImport(Darwin)
 
 extension Data {
     public init(bytesNoCopy: UnsafeMutablePointer<UInt8>, count: Int) {
@@ -27,10 +28,10 @@ extension NotificationCenter {
         post(name: name, object: nil)
     }
 
-    public func addObserver(forName name: Notification.Name, using block: @escaping @Sendable () -> Void) {
-        addObserver(forName: name, object: nil, queue: nil, using: { _ in
+    public func addObserver(forName name: Notification.Name, using block: @escaping @Sendable () -> Void) -> Any {
+        addObserver(forName: name, object: nil, queue: nil) { _ in
             block()
-        })
+        }
     }
 }
 
@@ -66,7 +67,7 @@ extension RegularExpression {
 
     public func replacingMatches(in string: String, withTemplate template: String) -> String {
         let replaced = NSMutableString(string: string)
-        replaceMatches(
+        _ = replaceMatches(
             in: replaced,
             range: NSRange(location: 0, length: replaced.length),
             withTemplate: template
@@ -100,13 +101,13 @@ extension NotificationCenter {
         fatalError()
     }
 
-    public func addObserver(forName: Notification.Name, using block: @escaping () -> Void) {
+    public func addObserver(forName: Notification.Name, using block: @escaping @Sendable () -> Void) -> Any {
         fatalError()
     }
 }
 
 extension RegularExpression {
-    public convenience init(pattern: String) {
+    public convenience init(pattern: String) throws {
         fatalError()
     }
 
