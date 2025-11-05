@@ -122,11 +122,20 @@ public func partout_daemon_start(
         } else {
             throw PartoutError(.notFound)
         }
-        let module = try ctx.registry.module(fromContents: contents, object: nil)
-        var builder = Profile.Builder()
-        builder.modules = [module]
-        builder.activateAllModules()
-        let profile = try builder.build()
+
+        // Parse profile first, then module
+        let profile: Profile
+        do {
+            profile = try ctx.registry.profile(fromJSON: contents)
+        } catch {
+            pp_log_g(.core, .error, "Partout: Unable to parse profile, trying module: \(error)")
+
+            let module = try ctx.registry.module(fromContents: contents, object: nil)
+            var builder = Profile.Builder()
+            builder.modules = [module]
+            builder.activateAllModules()
+            profile = try builder.build()
+        }
 
         // Map tunnel controller to external C functions (optional)
         let ctrl = cArgs.pointee.ctrl.map(\.pointee)
