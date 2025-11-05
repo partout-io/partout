@@ -198,7 +198,7 @@ package.targets.append(
 // MARK: OpenVPN
 
 // OpenVPN requires Crypto/TLS wrappers
-if areas.contains(.openVPN), let cryptoMode {
+if areas.contains(.openVPN), cryptoMode != nil {
 
     // Deprecated LZO (to be deleted)
     let includesDeprecatedLZO = true
