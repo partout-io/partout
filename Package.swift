@@ -19,9 +19,6 @@ let areas = Set(Area.allCases)
 let cryptoMode: CryptoMode? = .openSSL
 let cmakeOutput = envCMakeOutput ?? ".bin/windows-arm64"
 
-// Must be false in production (check in CI)
-let isTestingOpenVPNDataPath = false
-
 // MARK: - Package
 
 // Build dynamic library on Android
@@ -202,7 +199,6 @@ package.targets.append(
 
 // OpenVPN requires Crypto/TLS wrappers
 if areas.contains(.openVPN), let cryptoMode {
-    let includesLegacy = OS.current == .apple && cryptoMode == .openSSL
 
     // Deprecated LZO (to be deleted)
     let includesDeprecatedLZO = true
@@ -232,26 +228,11 @@ if areas.contains(.openVPN), let cryptoMode {
                     "PartoutOpenVPN_C",
                     "PartoutOS"
                 ]
-                if includesLegacy {
-                    list.append("PartoutOpenVPN_ObjC")
-                }
-                return list
-            }(),
-            exclude: {
-                var list: [String] = []
-                if includesLegacy {
-                    list.append("Cross/StandardOpenVPNParser+Cross.swift")
-                } else {
-                    list.append("Legacy")
-                }
                 return list
             }(),
             swiftSettings: {
                 var list: [String] = []
                 list.append("OPENVPN_WRAPPER_NATIVE")
-                if includesLegacy {
-                    list.append("OPENVPN_LEGACY")
-                }
                 if includesDeprecatedLZO {
                     list.append(lzoDefine)
                 }
@@ -263,16 +244,6 @@ if areas.contains(.openVPN), let cryptoMode {
         .testTarget(
             name: "PartoutOpenVPNTests",
             dependencies: ["PartoutOpenVPN"],
-            exclude: {
-                var list: [String] = []
-                if !includesLegacy {
-                    list.append("Legacy")
-                }
-                if !isTestingOpenVPNDataPath {
-                    list.append("Legacy/DataPathPerformanceTests.swift")
-                }
-                return list
-            }(),
             resources: [
                 .process("Resources")
             ],
@@ -288,25 +259,11 @@ if areas.contains(.openVPN), let cryptoMode {
             cSettings: globalCSettings
         )
     )
-    if includesLegacy {
-        package.targets.append(
-            .target(
-                name: "PartoutOpenVPN_ObjC",
-                dependencies: [
-                    "_LZO_C",
-                    "_PartoutCryptoOpenSSL_ObjC",
-                    "PartoutOpenVPN_C"
-                ],
-                cSettings: lzoCSettings
-            )
-        )
-    }
 }
 
 // MARK: WireGuard
 
 if areas.contains(.wireGuard) {
-    let includesLegacy = OS.current == .apple
     switch OS.current {
     case .apple:
         // Require static wg-go backend
@@ -346,13 +303,11 @@ if areas.contains(.wireGuard) {
             dependencies: [
                 "PartoutOS",
                 "PartoutWireGuard_C"
-            ],
-            exclude: !includesLegacy ? ["Legacy"] : []
+            ]
         ),
         .testTarget(
             name: "PartoutWireGuardTests",
-            dependencies: ["PartoutWireGuard"],
-            exclude: !includesLegacy ? ["Legacy"] : []
+            dependencies: ["PartoutWireGuard"]
         )
     ])
 }
@@ -375,19 +330,6 @@ case .openSSL:
                     "PartoutCore_C"
                 ],
                 path: "Sources/PartoutCrypto/OpenSSL_C"
-            ),
-            // Legacy for OpenVPN
-            .target(
-                name: "_PartoutCryptoOpenSSL_ObjC",
-                dependencies: ["openssl-apple"],
-                path: "Sources/PartoutCrypto/OpenSSL_ObjC"
-            ),
-            .testTarget(
-                name: "PartoutCryptoOpenSSL_ObjCTests",
-                dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-                exclude: [
-                    "CryptoPerformanceTests.swift"
-                ]
             )
         ])
     default:

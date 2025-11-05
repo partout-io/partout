@@ -17,14 +17,6 @@ file(GLOB_RECURSE PARTOUT_SOURCES
     *.swift
 )
 
-# Set up global exclusions
-set(EXCLUDED_PATTERNS
-    # Legacy
-    PartoutOpenVPN\/Cross\/Internal\/Legacy\/
-    PartoutOpenVPN\/Legacy.*\/
-    PartoutWireGuard\/Legacy.*\/
-)
-
 # Exclude Swift implementations on non-Apple
 if(NOT APPLE)
     list(APPEND EXCLUDED_PATTERNS PartoutOS\/Apple.*)
