@@ -17,6 +17,8 @@ let envDocs = env["PP_BUILD_DOCS"] == "1"
 
 let areas = Set(Area.allCases)
 let cryptoMode: CryptoMode? = .openSSL
+let openSSLVersion: Version = "3.5.500"
+let wgGoVersion: Version = "0.0.2025063103"
 let cmakeOutput = envCMakeOutput ?? ".bin/windows-arm64"
 
 // MARK: - Package
@@ -264,7 +266,7 @@ if areas.contains(.wireGuard) {
     case .apple:
         // Require static wg-go backend
         package.dependencies.append(
-            .package(url: "https://github.com/partout-io/wg-go-apple", from: "0.0.2025063103")
+            .package(url: "https://github.com/partout-io/wg-go-apple", from: wgGoVersion)
         )
         package.targets.append(
             .target(
@@ -316,7 +318,7 @@ case .openSSL:
     switch OS.current {
     case .apple:
         package.dependencies.append(
-            .package(url: "https://github.com/partout-io/openssl-apple", from: "3.5.500")
+            .package(url: "https://github.com/partout-io/openssl-apple", from: openSSLVersion)
         )
         package.targets.append(contentsOf: [
             .target(
