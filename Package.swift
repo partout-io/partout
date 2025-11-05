@@ -223,16 +223,12 @@ if areas.contains(.openVPN), let cryptoMode {
         ),
         .target(
             name: "PartoutOpenVPN",
-            dependencies: {
-                var list: [Target.Dependency] = [
-                    "PartoutOpenVPN_C",
-                    "PartoutOS"
-                ]
-                return list
-            }(),
+            dependencies: [
+                "PartoutOpenVPN_C",
+                "PartoutOS"
+            ],
             swiftSettings: {
                 var list: [String] = []
-                list.append("OPENVPN_WRAPPER_NATIVE")
                 if includesDeprecatedLZO {
                     list.append(lzoDefine)
                 }
