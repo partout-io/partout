@@ -16,6 +16,8 @@ file(GLOB_RECURSE PARTOUT_SOURCES
     *.swift
 )
 
+# Exclude Foundation replacements until done
+list(APPEND EXCLUDED_PATTERNS PartoutFoundation\/Cross)
 # Exclude Swift implementations on non-Apple
 if(NOT APPLE)
     list(APPEND EXCLUDED_PATTERNS PartoutOS\/Apple.*)
