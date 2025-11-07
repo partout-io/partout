@@ -212,10 +212,6 @@ extension OpenVPNParserTests {
 
 // MARK: - Helpers
 
-#if canImport(PartoutOpenVPN_ObjC)
-import PartoutOpenVPN_ObjC
-#endif
-
 private extension OpenVPNParserTests {
     func url(withName name: String) -> URL {
         guard let url = Bundle.module.url(forResource: name, withExtension: "ovpn") else {
@@ -230,10 +226,6 @@ private extension OpenVPNParserTests {
 #else
         let supportsLZO = false
 #endif
-        var list = [StandardOpenVPNParser(supportsLZO: supportsLZO, decrypter: SimpleKeyDecrypter())]
-#if canImport(PartoutOpenVPN_ObjC)
-        list.append(StandardOpenVPNParser(supportsLZO: supportsLZO, decrypter: OSSLTLSBox()))
-#endif
-        return list
+        return [StandardOpenVPNParser(supportsLZO: supportsLZO, decrypter: SimpleKeyDecrypter())]
     }
 }

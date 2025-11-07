@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import PartoutOpenVPN_C
-#if OPENVPN_LEGACY
-internal import PartoutOpenVPN_ObjC
-#endif
 internal import PartoutTLS_C
 
 extension OpenVPNSessionError {

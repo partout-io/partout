@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !OPENVPN_LEGACY
 enum OpenVPNErrorCode: Int {
     case cryptoRandomGenerator       = 101
     case cryptoHMAC                  = 102
@@ -29,4 +28,3 @@ extension OpenVPNErrorCode: CustomDebugStringConvertible {
         rawValue.description
     }
 }
-#endif
