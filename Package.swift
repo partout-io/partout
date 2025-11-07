@@ -242,6 +242,7 @@ if areas.contains(.openVPN), cryptoMode != nil {
         .testTarget(
             name: "PartoutOpenVPNTests",
             dependencies: ["PartoutOpenVPN"],
+            exclude: ["DataPathPerformanceTests.swift"],
             resources: [
                 .process("Resources")
             ],
