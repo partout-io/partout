@@ -74,6 +74,10 @@ public final class StandardOpenVPNParser {
         self.decrypter = decrypter
     }
 
+    public convenience init() {
+        self.init(supportsLZO: true, decrypter: SimpleKeyDecrypter())
+    }
+
     /// Parses a configuration from a .ovpn file.
     ///
     /// - Parameters:
