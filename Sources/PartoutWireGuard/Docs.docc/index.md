@@ -21,11 +21,9 @@ Bridge to the official WireGuard® implementation provided by WireGuardGo.
 
 ### Parser
 
-- ``LegacyWireGuardParser``
 - ``StandardWireGuardParser``
 - ``WireGuardParseError``
 
 ### Connection
 
-- ``LegacyWireGuardConnection``
 - ``WireGuardConnection``

@@ -73,7 +73,6 @@ See ``OpenVPN/ObfuscationMethod`` for more details.
 
 ### Connection
 
-- ``LegacyOpenVPNConnection``
 - ``NetworkSettingsBuilder``
 - ``OpenVPNConnection``
 
