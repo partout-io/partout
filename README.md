@@ -8,7 +8,11 @@
 
 # [Partout](https://partout.io)
 
-The easiest way to build cross-platform tunnel apps.
+_The easiest way to build cross-platform tunnel apps_.
+
+Partout is a _multilanguage_ library using [Swift][swift] and C at its core. It provides VPN functionality through the [Network Extension][network-extension] framework on Apple platforms, but it partially works on Android, Linux, and Windows (with [Wintun][wintun]). I'm documenting the long journey of making Partout fully cross-platform [in a blog series][blog], where I write about the challenges of Swift on non-Apple targets, and how I'm overcoming them.
+
+Partout is the backbone of [Passepartout][passepartout].
 
 ## Usage
 
@@ -145,6 +149,11 @@ Twitter: [@keeshux][about-twitter]
 
 Website: [partout.io][about-website]
 
+[passepartout]: https://passepartoutvpn.app/
+[swift]: https://swift.org/
+[network-extension]: https://developer.apple.com/documentation/networkextension/
+[wintun]: https://git.zx2c4.com/wintun/about/
+[blog]: https://davidederosa.com/cross-platform-swift/
 [license]: LICENSE
 [license-website]: https://partout.io/license
 [contrib-cla]: CLA.rst
