@@ -8,7 +8,7 @@ import PartoutCore
 import Testing
 
 struct OpenVPNParserTests {
-    private let parser = StandardOpenVPNParser(supportsLZO: true, decrypter: nil)
+    private let parser = StandardOpenVPNParser(decrypter: nil)
 
     @Test
     func givenOption_whenEnumerateComponents_thenAreParsedCorrectly() throws {
@@ -21,12 +21,31 @@ struct OpenVPNParserTests {
     // MARK: Lines
 
     @Test
-    func givenLZO_whenParse_thenIsHandled() throws {
-        #expect(try parser.parsed(fromLines: ["comp-lzo"]).warning == nil)
+    func givenLZO_whenParseDisabled_thenSucceeds() throws {
         _ = try parser.parsed(fromLines: ["comp-lzo no"])
-        _ = try parser.parsed(fromLines: ["comp-lzo yes"])
         _ = try parser.parsed(fromLines: ["compress"])
-        _ = try parser.parsed(fromLines: ["compress lzo"])
+    }
+
+    @Test
+    func givenLZO_whenParseEnabled_thenFails() throws {
+        do {
+            _ = try parser.parsed(fromLines: ["comp-lzo"])
+            #expect(Bool(false))
+        } catch {
+            //
+        }
+        do {
+            _ = try parser.parsed(fromLines: ["comp-lzo yes"])
+            #expect(Bool(false))
+        } catch {
+            //
+        }
+        do {
+            _ = try parser.parsed(fromLines: ["compress lzo"])
+            #expect(Bool(false))
+        } catch {
+            //
+        }
     }
 
     @Test
@@ -221,11 +240,6 @@ private extension OpenVPNParserTests {
     }
 
     static func allParsers() -> [StandardOpenVPNParser] {
-#if OPENVPN_DEPRECATED_LZO
-        let supportsLZO = true
-#else
-        let supportsLZO = false
-#endif
-        return [StandardOpenVPNParser(supportsLZO: supportsLZO, decrypter: SimpleKeyDecrypter())]
+        [StandardOpenVPNParser(decrypter: SimpleKeyDecrypter())]
     }
 }

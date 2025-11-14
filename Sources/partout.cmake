@@ -8,7 +8,6 @@ target_compile_options(partout PRIVATE
     -DPARTOUT_MONOLITH
     -DPARTOUT_OPENVPN
     -DPARTOUT_WIREGUARD
-    -DOPENVPN_DEPRECATED_LZO
 )
 
 # Swift sources, including vendored PartoutCore

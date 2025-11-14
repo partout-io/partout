@@ -10,7 +10,6 @@
 #include <stdint.h>
 #include "openvpn/comp.h"
 #include "openvpn/dp_error.h"
-#include "openvpn/lzo.h"
 
 typedef struct {
     uint8_t *_Nonnull dst;
@@ -18,7 +17,6 @@ typedef struct {
     const uint8_t *_Nonnull src;
     size_t src_len;
     uint16_t mss_val;
-    pp_lzo _Nullable lzo;
 } openvpn_dp_framing_assemble_ctx;
 
 typedef struct {
@@ -28,7 +26,6 @@ typedef struct {
     size_t *_Nonnull dst_header_len;
     const uint8_t *_Nonnull src;
     size_t src_len;
-    pp_lzo _Nullable lzo;
     openvpn_dp_error *_Nullable error;
 } openvpn_dp_framing_parse_ctx;
 

@@ -7,7 +7,7 @@ import PartoutCore
 import Testing
 
 struct PushReplyTests {
-    private let parser = StandardOpenVPNParser(supportsLZO: false, decrypter: nil)
+    private let parser = StandardOpenVPNParser(decrypter: nil)
 
     @Test
     func givenMessage_whenNoOptions_thenHasNoFallbackValues() throws {

@@ -20,14 +20,11 @@ extension OpenVPNConnection {
         }
         pp_log(ctx, .openvpn, .notice, "OpenVPN: Using cross-platform connection")
 
-        // hardcode portable implementations
+        // Hardcode portable implementations
         let prng = PlatformPRNG()
         let dns = SimpleDNSResolver {
             POSIXDNSStrategy(hostname: $0)
         }
-
-        // native: Swift/C
-        // legacy: Swift/ObjC
         let sessionFactory = {
             try await OpenVPNSession(
                 ctx,

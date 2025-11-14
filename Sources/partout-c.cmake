@@ -4,7 +4,6 @@ set(ROOT_DIR ${CMAKE_SOURCE_DIR}/..)
 add_library(partout_c STATIC "")
 target_compile_options(partout_c PRIVATE
     -DPARTOUT_MONOLITH
-    -DOPENVPN_DEPRECATED_LZO
 )
 
 # Header search paths from all C targets

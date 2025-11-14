@@ -64,18 +64,13 @@ public final class StandardOpenVPNParser {
         }
     }
 
-    init(supportsLZO: Bool, decrypter: (KeyDecrypter & Sendable)?) {
-#if OPENVPN_DEPRECATED_LZO
-        self.supportsLZO = supportsLZO
-#else
-        precondition(!supportsLZO, "LZO is not supported")
-        self.supportsLZO = false
-#endif
+    init(decrypter: (KeyDecrypter & Sendable)?) {
+        supportsLZO = false
         self.decrypter = decrypter
     }
 
     public convenience init() {
-        self.init(supportsLZO: true, decrypter: SimpleKeyDecrypter())
+        self.init(decrypter: SimpleKeyDecrypter())
     }
 
     /// Parses a configuration from a .ovpn file.

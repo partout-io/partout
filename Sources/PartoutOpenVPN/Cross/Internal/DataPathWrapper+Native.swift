@@ -36,8 +36,7 @@ extension DataPathWrapper {
                         Constants.DataChannel.aeadTagLength,
                         Constants.DataChannel.aeadIdLength,
                         keys,
-                        parameters.compressionFraming.cNative,
-                        parameters.compressionAlgorithm == .LZO
+                        parameters.compressionFraming.cNative
                     )
                 }
             }
@@ -53,8 +52,7 @@ extension DataPathWrapper {
                                 cCipher,
                                 cDigest,
                                 keys,
-                                parameters.compressionFraming.cNative,
-                                parameters.compressionAlgorithm == .LZO
+                                parameters.compressionFraming.cNative
                             )
                             guard let mode else {
                                 throw OpenVPNDataPathError.algorithm
@@ -66,8 +64,7 @@ extension DataPathWrapper {
                             nil,
                             cDigest,
                             keys,
-                            parameters.compressionFraming.cNative,
-                            parameters.compressionAlgorithm == .LZO
+                            parameters.compressionFraming.cNative
                         )
                     }
                 }

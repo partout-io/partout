@@ -30,7 +30,6 @@ size_t dp_assemble(void *vmode) {
         assemble.src = ctx->src;
         assemble.src_len = ctx->src_len;
         assemble.mss_val = mode->opt.mss_val;
-        assemble.lzo = ctx->lzo;
         mode->enc.framing_assemble(&assemble);
         dst_len += packet_len_offset;
     }
@@ -168,7 +167,6 @@ size_t dp_parse(void *vmode) {
     parse.dst_header_len = &payload_header_len;
     parse.src = ctx->src;
     parse.src_len = ctx->src_len;
-    parse.lzo = ctx->lzo;
     parse.error = ctx->error;
     if (!mode->dec.framing_parse(&parse)) {
         return 0;
@@ -182,9 +180,7 @@ size_t dp_parse(void *vmode) {
 
 openvpn_dp_mode *openvpn_dp_mode_ad_create(pp_crypto_ctx crypto,
                                            pp_crypto_free_fn pp_crypto_free,
-                                           openvpn_compression_framing comp_f,
-                                           bool with_lzo) {
-
+                                           openvpn_compression_framing comp_f) {
     OPENVPN_DP_LOG("openvpn_dp_mode_ad_create");
 
     const openvpn_dp_framing *frm = openvpn_dp_framing_of(comp_f);
@@ -203,8 +199,7 @@ openvpn_dp_mode *openvpn_dp_mode_ad_create(pp_crypto_ctx crypto,
     const openvpn_dp_mode_options opt = {
         comp_f,
         OpenVPNPacketPeerIdDisabled,
-        0,
-        with_lzo
+        0
     };
     return openvpn_dp_mode_create_opt(crypto, pp_crypto_free, &enc, &dec, &opt);
 }

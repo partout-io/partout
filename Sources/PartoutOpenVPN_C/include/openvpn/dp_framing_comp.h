@@ -8,7 +8,6 @@
 
 #include <string.h>
 #include "openvpn/dp_framing.h"
-#include "openvpn/dp_lzo.h"
 #include "openvpn/mss_fix.h"
 #include "openvpn/packet.h"
 
@@ -42,25 +41,17 @@ bool openvpn_dp_framing_parse_v1(openvpn_dp_framing_parse_ctx *_Nonnull ctx) {
             *ctx->dst_payload_offset = 1;
             *ctx->dst_header_len = 1;
             break;
-
         case OpenVPNDataPacketNoCompressSwap:
             ctx->dst_payload[0] = ctx->src[ctx->src_len - 1];
             *ctx->dst_payload_offset = 0;
             *ctx->dst_header_len = 1;
             break;
-
         case OpenVPNDataPacketLZOCompress:
-            if (!ctx->lzo) {
-                if (ctx->error) {
-                    ctx->error->dp_code = OpenVPNDataPathErrorCompression;
-                    ctx->error->crypto_code = PPCryptoErrorNone;
-                }
-                return false;
+            if (ctx->error) {
+                ctx->error->dp_code = OpenVPNDataPathErrorCompression;
+                ctx->error->crypto_code = PPCryptoErrorNone;
             }
-            *ctx->dst_payload_offset = 1;
-            *ctx->dst_header_len = 1;
-            break;
-
+            return false;
         default:
             break;
     }
@@ -94,10 +85,6 @@ bool openvpn_dp_framing_parse_v2(openvpn_dp_framing_parse_ctx *_Nonnull ctx) {
 
 static
 void openvpn_dp_framing_assemble_lzo(openvpn_dp_framing_assemble_ctx *_Nonnull ctx) {
-    if (ctx->lzo) {
-        openvpn_dp_lzo_assemble(ctx);
-        return;
-    }
     ctx->dst[0] = OpenVPNDataPacketNoCompress;
     *ctx->dst_len_offset = 1;
     memcpy(ctx->dst + 1, ctx->src, ctx->src_len);
@@ -113,10 +100,6 @@ bool openvpn_dp_framing_parse_lzo(openvpn_dp_framing_parse_ctx *_Nonnull ctx) {
 
 static
 void openvpn_dp_framing_assemble_compress(openvpn_dp_framing_assemble_ctx *_Nonnull ctx) {
-    if (ctx->lzo) {
-        openvpn_dp_lzo_assemble(ctx);
-        return;
-    }
     *ctx->dst_len_offset = 1;
     memcpy(ctx->dst, ctx->src, ctx->src_len);
     if (ctx->mss_val) {

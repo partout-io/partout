@@ -25,11 +25,7 @@ final class Negotiator {
 
     private let ctx: PartoutLoggerContext
 
-#if OPENVPN_DEPRECATED_LZO
-    private let parser = StandardOpenVPNParser(supportsLZO: true, decrypter: nil)
-#else
-    private let parser = StandardOpenVPNParser(supportsLZO: false, decrypter: nil)
-#endif
+    private let parser = StandardOpenVPNParser(decrypter: nil)
 
     let key: UInt8 // 3-bit
 
@@ -575,14 +571,10 @@ private extension Negotiator {
                 case .disabled:
                     break
                 case .LZO:
-#if OPENVPN_DEPRECATED_LZO
-                    break
-#else
                     let error = OpenVPNSessionError.serverCompression
                     pp_log(ctx, .openvpn, .fault, "Server has LZO compression enabled and this was not built into the library (framing=\(framing)): \(error)"
 )
                     throw error
-#endif
                 default:
                     let error = OpenVPNSessionError.serverCompression
                     pp_log(ctx, .openvpn, .fault, "Server has compression enabled (\(compression)) and this is not supported (framing=\(framing)): \(error)")
