@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 /// `Codable` implementation of ``ProfileCoder``.
-@available(*, deprecated)
+@available(*, deprecated, message: "#273")
 final class CodableProfileCoder {
     init() {
     }
@@ -12,7 +12,7 @@ final class CodableProfileCoder {
 // MARK: Decoder
 
 extension CodableProfileCoder {
-    @available(*, deprecated)
+    @available(*, deprecated, message: "#273")
     func decodedProfile(from base64Encoded: String, with registry: Registry) throws -> Profile {
         guard let data = Data(base64Encoded: base64Encoded) else {
             throw PartoutError(.decoding)
@@ -26,7 +26,7 @@ extension CodableProfileCoder {
         })
     }
 
-    @available(*, deprecated)
+    @available(*, deprecated, message: "#273")
     func decodedModule(from data: Data, with registry: Registry) throws -> Module {
         let decoder = JSONDecoder()
         let wrapper = try decoder.decode(LegacyModuleWrapper.self, from: data)
@@ -37,7 +37,7 @@ extension CodableProfileCoder {
         return try Serialization.decodedModule(from: decoder, wrapper: wrapper, with: handlers)
     }
 
-    @available(*, deprecated)
+    @available(*, deprecated, message: "#273")
     func decodedModule<T>(_ type: T.Type, from data: Data, with registry: Registry) throws -> T where T: Module {
         guard let result = try decodedModule(from: data, with: registry) as? T else {
             throw PartoutError(.decoding)
