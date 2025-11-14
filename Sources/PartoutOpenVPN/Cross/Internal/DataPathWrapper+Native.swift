@@ -119,7 +119,7 @@ private extension DataPathWrapper {
 
 // MARK: -
 
-extension CDataPath: DataPathProtocol, DataPathLegacyProtocol {
+extension CDataPath: DataPathProtocol {
     func encryptPackets(_ packets: [Data], key: UInt8) throws -> [Data] {
         try encrypt(packets, key: key)
     }

@@ -44,7 +44,6 @@ struct SubjectTests {
     func givenPassthrough_whenStream_thenMatches() async throws {
         let sut = PassthroughSubject<Int, Error>()
         let expected = [5, 7, 67]
-        var isReady = false
         let stream = sut.stream()
         Task {
             for num in expected {
@@ -102,7 +101,7 @@ struct SubjectTests {
         let sequence = [5, 7, 67]
         let expected = [100] + sequence
         let stream = sut.stream()
-        let task = Task {
+        Task {
             for num in sequence {
                 sut.send(num)
                 try await Task.sleep(for: .milliseconds(100))

@@ -60,18 +60,3 @@ enum OpenVPNSessionError: Error {
     /// Errors from the internal layer.
     case native(code: OpenVPNErrorCode)
 }
-
-#if OPENVPN_LEGACY
-internal import PartoutOpenVPN_ObjC
-
-extension Error {
-    /// NSError from the Objective-C layer.
-    var asNativeOpenVPNError: OpenVPNSessionError? {
-        let nativeError = self as NSError
-        guard nativeError.domain == OpenVPNErrorDomain, let code = OpenVPNErrorCode(rawValue: nativeError.code) else {
-            return nil
-        }
-        return .native(code: code)
-    }
-}
-#endif

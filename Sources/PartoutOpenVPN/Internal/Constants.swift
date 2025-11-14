@@ -6,13 +6,7 @@
 import PartoutCore
 import PartoutOS
 #endif
-
-// Avoid duplicates
-#if !OPENVPN_LEGACY
 internal import PartoutOpenVPN_C
-#else
-internal import PartoutOpenVPN_ObjC
-#endif
 
 struct Constants {
     enum Keys {

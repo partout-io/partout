@@ -17,10 +17,9 @@ let envDocs = env["PP_BUILD_DOCS"] == "1"
 
 let areas = Set(Area.allCases)
 let cryptoMode: CryptoMode? = .openSSL
+let openSSLVersion: Version = "3.5.500"
+let wgGoVersion: Version = "0.0.2025063103"
 let cmakeOutput = envCMakeOutput ?? ".bin/windows-arm64"
-
-// Must be false in production (check in CI)
-let isTestingOpenVPNDataPath = false
 
 // MARK: - Package
 
@@ -201,8 +200,7 @@ package.targets.append(
 // MARK: OpenVPN
 
 // OpenVPN requires Crypto/TLS wrappers
-if areas.contains(.openVPN), let cryptoMode {
-    let includesLegacy = OS.current == .apple && cryptoMode == .openSSL
+if areas.contains(.openVPN), cryptoMode != nil {
 
     // Deprecated LZO (to be deleted)
     let includesDeprecatedLZO = true
@@ -227,31 +225,12 @@ if areas.contains(.openVPN), let cryptoMode {
         ),
         .target(
             name: "PartoutOpenVPN",
-            dependencies: {
-                var list: [Target.Dependency] = [
-                    "PartoutOpenVPN_C",
-                    "PartoutOS"
-                ]
-                if includesLegacy {
-                    list.append("PartoutOpenVPN_ObjC")
-                }
-                return list
-            }(),
-            exclude: {
-                var list: [String] = []
-                if includesLegacy {
-                    list.append("Cross/StandardOpenVPNParser+Cross.swift")
-                } else {
-                    list.append("Legacy")
-                }
-                return list
-            }(),
+            dependencies: [
+                "PartoutOpenVPN_C",
+                "PartoutOS"
+            ],
             swiftSettings: {
                 var list: [String] = []
-                list.append("OPENVPN_WRAPPER_NATIVE")
-                if includesLegacy {
-                    list.append("OPENVPN_LEGACY")
-                }
                 if includesDeprecatedLZO {
                     list.append(lzoDefine)
                 }
@@ -263,16 +242,7 @@ if areas.contains(.openVPN), let cryptoMode {
         .testTarget(
             name: "PartoutOpenVPNTests",
             dependencies: ["PartoutOpenVPN"],
-            exclude: {
-                var list: [String] = []
-                if !includesLegacy {
-                    list.append("Legacy")
-                }
-                if !isTestingOpenVPNDataPath {
-                    list.append("Legacy/DataPathPerformanceTests.swift")
-                }
-                return list
-            }(),
+            exclude: ["DataPathPerformanceTests.swift"],
             resources: [
                 .process("Resources")
             ],
@@ -288,30 +258,16 @@ if areas.contains(.openVPN), let cryptoMode {
             cSettings: globalCSettings
         )
     )
-    if includesLegacy {
-        package.targets.append(
-            .target(
-                name: "PartoutOpenVPN_ObjC",
-                dependencies: [
-                    "_LZO_C",
-                    "_PartoutCryptoOpenSSL_ObjC",
-                    "PartoutOpenVPN_C"
-                ],
-                cSettings: lzoCSettings
-            )
-        )
-    }
 }
 
 // MARK: WireGuard
 
 if areas.contains(.wireGuard) {
-    let includesLegacy = OS.current == .apple
     switch OS.current {
     case .apple:
         // Require static wg-go backend
         package.dependencies.append(
-            .package(url: "https://github.com/partout-io/wg-go-apple", from: "0.0.2025063103")
+            .package(url: "https://github.com/partout-io/wg-go-apple", from: wgGoVersion)
         )
         package.targets.append(
             .target(
@@ -346,13 +302,11 @@ if areas.contains(.wireGuard) {
             dependencies: [
                 "PartoutOS",
                 "PartoutWireGuard_C"
-            ],
-            exclude: !includesLegacy ? ["Legacy"] : []
+            ]
         ),
         .testTarget(
             name: "PartoutWireGuardTests",
-            dependencies: ["PartoutWireGuard"],
-            exclude: !includesLegacy ? ["Legacy"] : []
+            dependencies: ["PartoutWireGuard"]
         )
     ])
 }
@@ -365,7 +319,7 @@ case .openSSL:
     switch OS.current {
     case .apple:
         package.dependencies.append(
-            .package(url: "https://github.com/partout-io/openssl-apple", from: "3.5.500")
+            .package(url: "https://github.com/partout-io/openssl-apple", from: openSSLVersion)
         )
         package.targets.append(contentsOf: [
             .target(
@@ -375,19 +329,6 @@ case .openSSL:
                     "PartoutCore_C"
                 ],
                 path: "Sources/PartoutCrypto/OpenSSL_C"
-            ),
-            // Legacy for OpenVPN
-            .target(
-                name: "_PartoutCryptoOpenSSL_ObjC",
-                dependencies: ["openssl-apple"],
-                path: "Sources/PartoutCrypto/OpenSSL_ObjC"
-            ),
-            .testTarget(
-                name: "PartoutCryptoOpenSSL_ObjCTests",
-                dependencies: ["_PartoutCryptoOpenSSL_ObjC"],
-                exclude: [
-                    "CryptoPerformanceTests.swift"
-                ]
             )
         ])
     default:

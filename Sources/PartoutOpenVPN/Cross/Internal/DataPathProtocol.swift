@@ -41,13 +41,6 @@ protocol DataPathProtocol {
     func decrypt(_ packets: [Data]) throws -> (packets: [Data], keepAlive: Bool)
 }
 
-// old ObjC protocol
-protocol DataPathLegacyProtocol {
-    func encryptPackets(_ packets: [Data], key: UInt8) throws -> [Data]
-
-    func decryptPackets(_ packets: [Data], keepAlive: UnsafeMutablePointer<Bool>?) throws -> [Data]
-}
-
 protocol DataPathTestingProtocol: DataPathProtocol {
     func assemble(packetId: UInt32, payload: Data) -> Data
 

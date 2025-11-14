@@ -74,11 +74,6 @@ extension OpenVPNSessionError: PartoutErrorMappable {
             case .cryptoAlgorithm:
                 return .OpenVPN.unsupportedAlgorithm
 
-#if OPENVPN_LEGACY
-            case .tlscaRead:
-                return .OpenVPN.tlsFailure
-#endif
-
             case .tlscaUse, .tlscaPeerVerification,
                     .tlsClientCertificateRead, .tlsClientCertificateUse,
                     .tlsClientKeyRead, .tlsClientKeyUse,
@@ -99,15 +94,3 @@ extension OpenVPNSessionError: PartoutErrorMappable {
         return .OpenVPN.connectionFailure
     }
 }
-
-// MARK: - Debugging
-
-#if OPENVPN_LEGACY
-internal import PartoutOpenVPN_ObjC
-
-extension OpenVPNErrorCode: @retroactive CustomDebugStringConvertible {
-    var debugDescription: String {
-        rawValue.description
-    }
-}
-#endif

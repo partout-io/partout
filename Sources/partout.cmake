@@ -8,7 +8,6 @@ target_compile_options(partout PRIVATE
     -DPARTOUT_MONOLITH
     -DPARTOUT_OPENVPN
     -DPARTOUT_WIREGUARD
-    -DOPENVPN_WRAPPER_NATIVE
     -DOPENVPN_DEPRECATED_LZO
 )
 
@@ -17,14 +16,8 @@ file(GLOB_RECURSE PARTOUT_SOURCES
     *.swift
 )
 
-# Set up global exclusions
-set(EXCLUDED_PATTERNS
-    # Legacy
-    PartoutOpenVPN\/Cross\/Internal\/Legacy\/
-    PartoutOpenVPN\/Legacy.*\/
-    PartoutWireGuard\/Legacy.*\/
-)
-
+# Exclude Foundation replacements until done
+list(APPEND EXCLUDED_PATTERNS PartoutFoundation\/Cross)
 # Exclude Swift implementations on non-Apple
 if(NOT APPLE)
     list(APPEND EXCLUDED_PATTERNS PartoutOS\/Apple.*)

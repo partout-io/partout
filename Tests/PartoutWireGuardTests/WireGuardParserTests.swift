@@ -3,24 +3,60 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import PartoutCore
-import PartoutWireGuard
+@testable import PartoutWireGuard
 import Testing
 
 @Suite
 struct WireGuardParserTests {
     private static let crossParser = StandardWireGuardParser()
-#if PARTOUT_WIREGUARD
-    private static let legacyParser = LegacyWireGuardParser()
-    private static var allParsers: [ModuleBuilderValidator] {
-        [crossParser, legacyParser]
-    }
-#else
     private static var allParsers: [ModuleBuilderValidator] {
         [crossParser]
     }
-#endif
 
     private let keyGenerator = StandardWireGuardKeyGenerator()
+
+    // MARK: - Single entities
+
+    @Test
+    func givenEndpointString_whenMapped_thenReverts() throws {
+        let sut = [
+            "1.2.3.4:10000",
+            "[1:2:3::4]:10000"
+        ]
+        let expected: [(String, UInt16)] = [
+            ("1.2.3.4", 10000),
+            ("1:2:3::4", 10000)
+        ]
+        for (i, raw) in sut.enumerated() {
+            let wg = try #require(Endpoint(withWgRepresentation: raw))
+            let pair = expected[i]
+            #expect(wg.address.rawValue == pair.0)
+            #expect(wg.port == pair.1)
+        }
+    }
+
+    @Test
+    func givenConfigurationWithAllowedIPs_whenMapped_thenReverts() throws {
+        let quickConfig = """
+[Interface]
+PrivateKey = 4hBza7JtPKZFKwqtEmDR0iZyru1kqpQta/DRduMbHQw=
+Address = 10.8.0.6/24
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = muwialz9E36nXp9qgbGIxwMrH+5Ovr8d7cutH8JHdvE=
+PresharedKey = 4hBza7JtPKZFKwqtEmDR0iZyru1kqpQta/DRduMbHQw=
+AllowedIPs = 8.8.4.0/24, 8.8.8.0/24, 8.34.208.0/20, 8.35.192.0/20, 23.236.48.0/20, 23.251.128.0/19, 212.188.34.209/32, 172.217.169.138/32, 142.250.187.106/32, 142.250.186.33/32, 172.217.17.23/32
+PersistentKeepalive = 0
+Endpoint = 1.2.3.4:12345
+"""
+        let sut = try WireGuard.Configuration(fromWgQuickConfig: quickConfig)
+        #expect(sut.peers.first?.allowedIPs.map(\.rawValue) == [
+            "8.8.4.0/24", "8.8.8.0/24", "8.34.208.0/20", "8.35.192.0/20",
+            "23.236.48.0/20", "23.251.128.0/19", "212.188.34.209/32", "172.217.169.138/32",
+            "142.250.187.106/32", "142.250.186.33/32", "172.217.17.23/32"
+        ])
+    }
 
     // MARK: - Interface
 

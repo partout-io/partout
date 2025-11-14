@@ -40,24 +40,3 @@ public final class AppleRandom: PRNGProtocol {
         return randomData
     }
 }
-
-// MARK: - Less performant versions
-
-extension AppleRandom {
-
-    @available(*, deprecated)
-    func uint32FromBuffer() throws -> UInt32 {
-        var randomBuffer = [UInt8](repeating: 0, count: 4)
-
-        guard SecRandomCopyBytes(kSecRandomDefault, 4, &randomBuffer) == 0 else {
-            fatalError("SecRandomCopyBytes failed")
-        }
-
-        var randomNumber: UInt32 = 0
-        for i in 0..<4 {
-            let byte = randomBuffer[i]
-            randomNumber |= (UInt32(byte) << UInt32(8 * i))
-        }
-        return randomNumber
-    }
-}
