@@ -14,28 +14,34 @@ import PartoutCore
 #endif
 
 final class TunnelRemoteInfoGenerator: Sendable {
+    private let ctx: PartoutLoggerContext
+
     private let tunnelConfiguration: WireGuard.Configuration
 
     private let dnsTimeout: Int
 
-    init(tunnelConfiguration: WireGuard.Configuration, dnsTimeout: Int) {
+    init(_ ctx: PartoutLoggerContext, tunnelConfiguration: WireGuard.Configuration, dnsTimeout: Int) {
+        self.ctx = ctx
         self.tunnelConfiguration = tunnelConfiguration
         self.dnsTimeout = dnsTimeout
     }
 
     // Only updates peer endpoints
-    func endpointUapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async throws -> String {
+    func endpointUapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async -> String {
         var wgSettings = ""
 
         // address: String -> resolvedEndpoints: [Endpoint]
         let resolutionMap = await tunnelConfiguration.resolvePeers(timeout: dnsTimeout) {
             logHandler($0, $1)
         }
-        guard !resolutionMap.isEmpty else {
-            throw PartoutError(.dnsFailure)
-        }
         for peer in tunnelConfiguration.peers {
-            let publicKey = try peer.publicKey.rawValue.hexStringFromBase64()
+            let publicKey: String
+            do {
+                publicKey = try peer.publicKey.rawValue.hexStringFromBase64()
+            } catch {
+                pp_log(ctx, .wireguard, .error, "Unable to parse peer public key: \(peer.publicKey.rawValue)")
+                continue
+            }
             wgSettings.append("public_key=\(publicKey)\n")
             guard let endpoint = peer.endpoint else { continue }
             for resolvedEndpoint in resolutionMap[endpoint.address] ?? [] {
