@@ -182,12 +182,7 @@ actor WireGuardAdapter {
             guard let self else { return }
             for await isReachable in reachability.isReachableStream {
                 guard !Task.isCancelled else { return }
-                do {
-                    try await didUpdateReachable(isReachable: isReachable)
-                } catch {
-                    pp_log(ctx, .wireguard, .error, "Unable to update reachability: \(error)")
-                    try? await stop()
-                }
+                await didUpdateReachable(isReachable: isReachable)
             }
         }
     }
@@ -265,17 +260,17 @@ actor WireGuardAdapter {
     /// - Parameter tunnelConfiguration: an instance of type `WireGuard.Configuration`.
     /// - Returns: an instance of type `TunnelRemoteInfoGenerator`.
     private func makeSettingsGenerator(with tunnelConfiguration: WireGuard.Configuration) -> TunnelRemoteInfoGenerator {
-        TunnelRemoteInfoGenerator(tunnelConfiguration: tunnelConfiguration, dnsTimeout: dnsTimeout)
+        TunnelRemoteInfoGenerator(ctx, tunnelConfiguration: tunnelConfiguration, dnsTimeout: dnsTimeout)
     }
 
-    private func didUpdateReachable(isReachable: Bool) async throws {
+    private func didUpdateReachable(isReachable: Bool) async {
 //        logHandler(.verbose, "Network change detected with \(path.status) route and interface order \(path.availableInterfaces)")
         logHandler(.verbose, "Network change detected, reachable: \(isReachable)")
 
         switch state {
         case .started(let handle, let settingsGenerator):
             if isReachable {
-                let wgConfig = try await settingsGenerator.endpointUapiConfiguration(logHandler: logHandler)
+                let wgConfig = await settingsGenerator.endpointUapiConfiguration(logHandler: logHandler)
 
                 backend.setConfig(handle, settings: wgConfig)
                 backend.disableSomeRoamingForBrokenMobileSemantics(handle)
