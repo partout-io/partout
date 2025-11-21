@@ -2,13 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutCore_C
+internal import PartoutCore_C
 
 /// Wrapper of binary data that zeroes out itself on deallocation.
 public final class CZeroingData {
-    public let ptr: UnsafeMutablePointer<pp_zd>
+    private let ptr: UnsafeMutablePointer<pp_zd>
 
-    public init(ptr: UnsafeMutablePointer<pp_zd>) {
+    init(ptr: UnsafeMutablePointer<pp_zd>) {
         self.ptr = ptr
     }
 

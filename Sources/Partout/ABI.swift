@@ -5,7 +5,7 @@
 #if !os(iOS) && !os(tvOS)
 
 import PartoutABI_C
-import PartoutCore_C
+internal import PartoutCore_C
 #if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutOS

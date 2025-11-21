@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutCore_C
+internal import PartoutCore_C
 
 /// Wrapper of a byte array with safe encoding capabilities.
 public struct SecureData: Hashable, Codable, @unchecked Sendable {

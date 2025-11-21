@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import PartoutOpenVPN_C
+internal import _PartoutOpenVPN_C
 #if !PARTOUT_MONOLITH
 import PartoutCore
 #endif
@@ -208,7 +208,7 @@ extension CDataPath {
             guard let zd else {
                 throw CDataPathError.error(for: error)
             }
-            return Data(zeroing: zd)
+            return Data.zeroing(zd)
         }
     }
 
@@ -236,7 +236,7 @@ extension CDataPath {
             guard let zd else {
                 throw CDataPathError.error(for: error)
             }
-            let data = Data(zeroing: zd)
+            let data = Data.zeroing(zd)
             return DataPathDecryptedAndParsedTuple(packetId, header, keepAlive, data)
         }
     }

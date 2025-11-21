@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutCore_C
+internal import PartoutCore_C
 
 /// An ``IOInterface`` based on a POSIX socket with blocking I/O.
 public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
@@ -56,7 +56,7 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
 
     // Assumes fd to be an open socket descriptor. The socket is not
     // closed on deinit (isOwned is false).
-    public init(
+    init(
         _ ctx: PartoutLoggerContext,
         sock: pp_socket,
         closesOnEmptyRead: Bool,

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import PartoutOpenVPN_C
+internal import _PartoutOpenVPN_C
 internal import PartoutTLS_C
 
 enum PPTLSError: Error {

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutCore_C
+internal import PartoutCore_C
 
 /// A ``LinkObserver`` spawning POSIX sockets.
 public final class POSIXSocketObserver: LinkObserver, @unchecked Sendable {

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutCore_C
+internal import PartoutCore_C
 
 /// A hostname or IP address.
 @frozen

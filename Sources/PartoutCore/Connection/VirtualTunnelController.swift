@@ -5,7 +5,7 @@
 #if !os(iOS) && !os(tvOS)
 
 import PartoutABI_C
-import PartoutCore_C
+internal import PartoutCore_C
 
 /// A ``TunnelController`` that operates on a virtual tun interface like ``VirtualTunnelInterface``.
 public final class VirtualTunnelController: TunnelController {

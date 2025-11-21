@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import PartoutOpenVPN_C
+internal import _PartoutOpenVPN_C
 #if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutOS
@@ -91,7 +91,7 @@ final class PacketProcessor: @unchecked Sendable {
                 guard let zd else {
                     break
                 }
-                let packet = Data(zeroing: zd)
+                let packet = Data.zeroing(zd)
                 packets.append(packet)
                 until += rcvd
             }
@@ -108,7 +108,7 @@ final class PacketProcessor: @unchecked Sendable {
                 src.bytePointer, packet.count
             )
         }
-        return Data(zeroing: dst)
+        return Data.zeroing(dst)
     }
 
     func stream(fromPackets packets: [Data]) -> Data {
@@ -123,6 +123,6 @@ final class PacketProcessor: @unchecked Sendable {
                 )
             }
         }
-        return Data(zeroing: dst)
+        return Data.zeroing(dst)
     }
 }

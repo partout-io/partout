@@ -6,7 +6,7 @@
 import PartoutCore
 import PartoutOS
 #endif
-internal import PartoutOpenVPN_C
+internal import _PartoutOpenVPN_C
 
 struct Constants {
     enum Keys {

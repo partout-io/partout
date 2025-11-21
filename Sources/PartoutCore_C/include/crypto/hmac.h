@@ -10,10 +10,13 @@
 #include "portable/zd.h"
 
 typedef struct {
-    pp_zd *_Nonnull dst;
+    uint8_t *_Nonnull dst;
+    size_t dst_len;
     const char *_Nonnull digest_name;
-    const pp_zd *_Nonnull secret;
-    const pp_zd *_Nonnull data;
+    const uint8_t *_Nonnull secret;
+    size_t secret_len;
+    const uint8_t *_Nonnull data;
+    size_t data_len;
 } pp_hmac_ctx;
 
 pp_zd *_Nonnull pp_hmac_create();

@@ -8,8 +8,11 @@ import PartoutOS
 #endif
 
 extension CrossZD {
+    // Must match HMACMaxLength in hmac.c
+    private static let hmacMaxLength = 128
+
     static func forHMAC() -> CrossZD {
-        CrossZD(ptr: pp_hmac_create())
+        CrossZD(count: hmacMaxLength)
     }
 
     func hmac(
@@ -19,10 +22,13 @@ extension CrossZD {
     ) throws -> CrossZD {
         let hmacLength = digestName.withCString { cDigest in
             var ctx = pp_hmac_ctx(
-                dst: ptr,
+                dst: mutableBytes,
+                dst_len: count,
                 digest_name: cDigest,
-                secret: secret.ptr,
-                data: data.ptr
+                secret: secret.mutableBytes,
+                secret_len: secret.count,
+                data: data.mutableBytes,
+                data_len: data.count
             )
             return pp_hmac_do(&ctx)
         }
@@ -30,7 +36,7 @@ extension CrossZD {
             throw PPCryptoError.hmac
         }
         return CrossZD(
-            bytes: ptr.pointee.bytes,
+            bytes: bytes,
             count: hmacLength
         )
     }

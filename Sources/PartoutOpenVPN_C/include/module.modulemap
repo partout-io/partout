@@ -1,4 +1,4 @@
-module PartoutOpenVPN_C {
+module _PartoutOpenVPN_C {
     header "openvpn/comp.h"
     header "openvpn/control.h"
     header "openvpn/dp_error.h"
