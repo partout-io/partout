@@ -25,7 +25,7 @@ func makeDaemon(
     let factory = POSIXInterfaceFactory(ctx) {
         PassthroughStream()
     }
-    let controllerImpl = try VirtualTunnelController(ctx, ctrl: ctrl)
+    let controllerImpl = try VirtualTunnelController(ctx, ctrl: ctrl?.asPartoutCtrl)
     let reachability = DummyReachabilityObserver()
     let environment = SharedTunnelEnvironment(profileId: profile.id)
     let messageHandler = DefaultMessageHandler(ctx, environment: environment)
