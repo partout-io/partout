@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import PartoutOpenVPN_C
+internal import _PartoutOpenVPN_C
 #if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutOS
@@ -15,7 +15,7 @@ extension DataPathWrapper {
     }
 
     static func native(with parameters: Parameters, prf: CryptoKeys.PRF, seed: CrossZD) throws -> DataPathWrapper {
-        pp_crypto_init_seed_zd(seed.ptr)
+        pp_crypto_init_seed(seed.bytes, seed.count)
         let keys = try CryptoKeys(withPRF: prf)
         return try .native(with: parameters, keys: keys)
     }

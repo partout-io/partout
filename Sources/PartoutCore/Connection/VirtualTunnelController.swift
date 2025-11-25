@@ -4,21 +4,20 @@
 
 #if !os(iOS) && !os(tvOS)
 
-import PartoutABI_C
-import PartoutCore_C
+internal import _PartoutCore_C
 
 /// A ``TunnelController`` that operates on a virtual tun interface like ``VirtualTunnelInterface``.
 public final class VirtualTunnelController: TunnelController {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
-    private let ctrl: partout_tun_ctrl?
+    private let ctrl: VirtualTunnelControllerImpl?
 
     private let maxReadLength: Int
 
     public init(
         _ ctx: PartoutLoggerContext,
-        ctrl: partout_tun_ctrl?,
+        ctrl: VirtualTunnelControllerImpl?,
         maxReadLength: Int = 128 * 1024
     ) throws {
         self.ctx = ctx
@@ -32,14 +31,8 @@ public final class VirtualTunnelController: TunnelController {
         }
 
         // Fetch tun implementation if necessary
-        let tunImpl = ctrl.map { ctrl in
-            let rawDescs = info.fileDescriptors.map(Int32.init)
-            return rawDescs.withUnsafeBufferPointer {
-                var cInfo = partout_tun_ctrl_info()
-                cInfo.remote_fds = $0.baseAddress
-                cInfo.remote_fds_len = info.fileDescriptors.count
-                return ctrl.set_tunnel(ctrl.thiz, &cInfo)
-            }
+        let tunImpl = ctrl.map {
+            $0.setTunnel($0.thiz, info)
         } ?? nil
 
         // Create virtual device with an optional implementation
@@ -83,9 +76,7 @@ public final class VirtualTunnelController: TunnelController {
 
     public func configureSockets(with descriptors: [UInt64]) {
         if let ctrl {
-            descriptors.map(Int32.init).withUnsafeBufferPointer {
-                ctrl.configure_sockets(ctrl.thiz, $0.baseAddress, descriptors.count)
-            }
+            ctrl.configureSockets(ctrl.thiz, descriptors)
         }
     }
 
@@ -99,7 +90,7 @@ public final class VirtualTunnelController: TunnelController {
 
         // Release tun implementation if necessary
         if let ctrl {
-            ctrl.clear_tunnel(ctrl.thiz, tunnel.tunImpl)
+            ctrl.clearTunnel(ctrl.thiz, tunnel.tunImpl)
         }
     }
 

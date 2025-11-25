@@ -4,7 +4,7 @@
 
 import Foundation
 @testable import PartoutOpenVPN
-import PartoutOpenVPN_C
+import _PartoutOpenVPN_C
 import Testing
 
 private func cryptoFree(_: pp_crypto_ctx) {

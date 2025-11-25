@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutCore_C
+internal import _PartoutCore_C
 
 /// Implementation of ``PRNGProtocol`` with the OS C library.
 public final class PlatformPRNG: PRNGProtocol {
@@ -19,6 +19,6 @@ public final class PlatformPRNG: PRNGProtocol {
         guard pp_prng_do(randomData.pointee.bytes, length) else {
             fatalError("pp_prng_do() failed")
         }
-        return Data(zeroing: randomData)
+        return Data.zeroing(randomData)
     }
 }

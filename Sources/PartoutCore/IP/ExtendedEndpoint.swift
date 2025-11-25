@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutCore_C
+internal import _PartoutCore_C
 
 /// Aggregates an address and an ``EndpointProtocol``.
 public struct ExtendedEndpoint: Hashable, Codable, Sendable {

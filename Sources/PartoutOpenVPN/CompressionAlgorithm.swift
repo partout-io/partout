@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-
 extension OpenVPN {
 
     /// Defines the type of compression algorithm.

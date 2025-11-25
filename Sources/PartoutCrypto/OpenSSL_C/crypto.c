@@ -15,8 +15,3 @@ bool pp_crypto_init_seed(const uint8_t *_Nonnull src, const size_t len) {
     RAND_seed(src, (int)len);
     return true;
 }
-
-bool pp_crypto_init_seed_zd(const pp_zd *seed) {
-    if (!seed) return false;
-    return pp_crypto_init_seed(seed->bytes, seed->length);
-}

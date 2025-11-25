@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import PartoutOpenVPN_C
-internal import PartoutTLS_C
+internal import _PartoutOpenVPN_C
+internal import _PartoutTLS_C
 #if !PARTOUT_MONOLITH
 import PartoutCore
 import PartoutOS
@@ -131,7 +131,7 @@ private final class NativeTLSWrapper: TLSProtocol {
             }
             throw PPTLSError.noData
         }
-        return Data(zeroing: zd)
+        return Data.zeroing(zd)
     }
 
     func pullCipherText() throws -> Data {
@@ -142,7 +142,7 @@ private final class NativeTLSWrapper: TLSProtocol {
             }
             throw PPTLSError.noData
         }
-        return Data(zeroing: zd)
+        return Data.zeroing(zd)
     }
 
     func caMD5() throws -> String {
