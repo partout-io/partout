@@ -1,6 +1,5 @@
 set(WINTUN_DIR ${PP_BUILD_OUTPUT}/wintun)
 
-# Use nmake on Windows
 if(WIN32)
     set(WINTUN_VERSION "0.14.1")
     set(WINTUN_URL "https://www.wintun.net/builds/wintun-${WINTUN_VERSION}.zip")
