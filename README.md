@@ -83,7 +83,7 @@ Sample output:
 ```
 bin/<platform-arch>/partout.h       # The Partout ABI
 bin/darwin-arm64/libpartout.a       # macOS
-bin/linux-aarch64/libpartout.a      # Linux
+bin/linux-aarch64/libpartout.so     # Linux
 bin/windows-arm64/libpartout.lib    # Windows
 ```
 
@@ -99,8 +99,8 @@ Building for Android requires access to external SDKs:
 The CMake configuration is done with the `android.cmake` toolchain. The script runs on macOS, but can be adapted for other platforms with slight tweaks to `scripts/build.sh`. The Android output is consistent with the other platforms:
 
 ```
-bin/android-arm64/partout.h
-bin/android-arm64/libpartout.so
+bin/android-aarch64/partout.h
+bin/android-aarch64/libpartout.so
 ```
 
 ## Demo
