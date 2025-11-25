@@ -61,6 +61,7 @@ endif()
 
 # Fetch wintun.dll on Windows
 if(WIN32)
+    set(WINTUN_VERSION "0.14.1")
     include("vendors/wintun.cmake")
 endif()
 
