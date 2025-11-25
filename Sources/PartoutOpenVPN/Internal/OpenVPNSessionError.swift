@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-
 /// Thrown during `OpenVPNSession` operation.
 enum OpenVPNSessionError: Error {
 
