@@ -34,7 +34,6 @@ else()
 endif()
 if(DEFINED MBEDTLS_DIR)
     list(APPEND PARTOUT_C_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCrypto/Native_C/include)
-    # FIXME: Use defines in C code
     if(NOT APPLE)
         list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/src/apple)
     endif()
