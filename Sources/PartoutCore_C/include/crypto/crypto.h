@@ -23,7 +23,6 @@ size_t pp_crypto_encryption_base_capacity(size_t size, size_t overhead) {
 }
 
 bool pp_crypto_init_seed(const uint8_t *_Nonnull src, const size_t len);
-bool pp_crypto_init_seed_zd(const pp_zd *_Nonnull zd);
 
 typedef enum {
     PPCryptoErrorNone,
