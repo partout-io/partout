@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import PartoutCore_C
+internal import _PartoutCore_C
 
 /// Implementation of ``PRNGProtocol`` with the OS C library.
 public final class PlatformPRNG: PRNGProtocol {

@@ -1,4 +1,4 @@
-module PartoutCore_C {
+module _PartoutCore_C {
     header "portable/common.h"
     header "portable/endian.h"
     header "portable/network.h"
@@ -9,7 +9,7 @@ module PartoutCore_C {
     export *
 }
 
-module PartoutCrypto_C {
+module _PartoutCrypto_C {
     header "crypto/crypto.h"
     header "crypto/crypto_aead.h"
     header "crypto/crypto_cbc.h"
@@ -19,7 +19,7 @@ module PartoutCrypto_C {
     export *
 }
 
-module PartoutTLS_C {
+module _PartoutTLS_C {
     header "tls/tls.h"
     export *
 }

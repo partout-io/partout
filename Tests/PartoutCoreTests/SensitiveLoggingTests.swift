@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @testable import PartoutCore
-internal import PartoutCore_C
+internal import _PartoutCore_C
 import Testing
 
 struct SensitiveLoggingTests {

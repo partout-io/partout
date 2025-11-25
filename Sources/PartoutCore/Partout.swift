@@ -5,7 +5,7 @@
 #if !PARTOUT_MONOLITH
 @_exported import PartoutFoundation
 #endif
-import PartoutABI_C
+import _PartoutABI_C
 
 public enum Partout {
 

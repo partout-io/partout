@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import _PartoutOpenVPN_C
-internal import PartoutTLS_C
+internal import _PartoutTLS_C
 
 enum PPTLSError: Error {
     case missingCA
