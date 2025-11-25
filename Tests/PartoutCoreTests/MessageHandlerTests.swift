@@ -21,10 +21,13 @@ struct MessageHandlerTests {
             SharedTunnelEnvironment(profileId: nil)
         }
 
-        let expOutput = try await sut.sendMessage(
-            Message.Input.debugLog(sinceLast: 60.0, maxLevel: .debug),
+        let inputMessage = Message.Input.debugLog(sinceLast: 60.0, maxLevel: .debug)
+        let input = try JSONEncoder().encode(inputMessage)
+        let expOutputMessage = try #require(try await sut.sendMessage(
+            input,
             to: UniqueID() // unused
-        )
+        ))
+        let expOutput = try JSONDecoder().decode(Message.Output.self, from: expOutputMessage)
         #expect(expOutput == output)
     }
 }

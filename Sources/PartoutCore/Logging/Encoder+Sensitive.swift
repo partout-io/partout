@@ -12,12 +12,20 @@ extension Encoder {
     }
 }
 
-extension JSONEncoder {
+extension SensitiveDebugStringConvertible {
+    public func encodeSensitiveDescription(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(debugDescription(withSensitiveData: encoder.shouldEncodeSensitiveData))
+    }
+}
+
+extension PartoutLogger {
     public static let redactedValue = "<redacted>"
 
     public static let malformedValue = "<malformed>"
 }
 
+#if !PARTOUT_FOUNDATION_COMPAT
 extension Encodable {
     public func asJSON(_ ctx: PartoutLoggerContext, withSensitiveData: Bool, sortingKeys: Bool = false) -> String? {
         do {
@@ -36,10 +44,4 @@ extension Encodable {
         }
     }
 }
-
-extension SensitiveDebugStringConvertible {
-    public func encodeSensitiveDescription(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(debugDescription(withSensitiveData: encoder.shouldEncodeSensitiveData))
-    }
-}
+#endif

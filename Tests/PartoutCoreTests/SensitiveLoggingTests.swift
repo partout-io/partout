@@ -32,6 +32,6 @@ struct SensitiveLoggingTests {
     func givenString_whenAsSensitive_thenOmitsSensitiveData() throws {
         let sut = "some string"
         #expect(sut.debugDescription(withSensitiveData: true) == sut)
-        #expect(sut.debugDescription(withSensitiveData: false) == JSONEncoder.redactedValue)
+        #expect(sut.debugDescription(withSensitiveData: false) == PartoutLogger.redactedValue)
     }
 }

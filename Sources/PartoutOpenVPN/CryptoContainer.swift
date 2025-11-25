@@ -58,6 +58,6 @@ extension OpenVPN.CryptoContainer: Codable {
 
 extension OpenVPN.CryptoContainer: SensitiveDebugStringConvertible {
     public func debugDescription(withSensitiveData: Bool) -> String {
-        withSensitiveData ? pem : JSONEncoder.redactedValue
+        withSensitiveData ? pem : PartoutLogger.redactedValue
     }
 }

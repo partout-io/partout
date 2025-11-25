@@ -20,6 +20,8 @@ let cryptoMode: CryptoMode? = .openSSL
 let openSSLVersion: Version = "3.5.500"
 let wgGoVersion: Version = "0.0.2025063103"
 let cmakeOutput = envCMakeOutput ?? ".bin/windows-arm64"
+let useFoundationCompatibility: FoundationCompatibility = .off
+// let useFoundationCompatibility: FoundationCompatibility = OS.current != .apple ? .on : .off
 
 // MARK: - Package
 
@@ -27,7 +29,7 @@ let cmakeOutput = envCMakeOutput ?? ".bin/windows-arm64"
 var libraryType: Product.Library.LibraryType? = nil
 var staticLibPrefix = ""
 switch OS.current {
-case .android:
+case .android, .linux:
     libraryType = .dynamic
 case .windows:
     staticLibPrefix = "lib"
@@ -76,6 +78,7 @@ let package = Package(
                 }
                 return list
             }(),
+            exclude: useFoundationCompatibility.partoutExclude,
             swiftSettings: areas.compactMap(\.define).map {
                 .define($0)
             }
@@ -86,6 +89,7 @@ let package = Package(
         .testTarget(
             name: "PartoutTests",
             dependencies: ["Partout"],
+            exclude: useFoundationCompatibility.partoutTestsExclude,
             swiftSettings: areas.compactMap(\.define).map {
                 .define($0)
             }
@@ -118,7 +122,9 @@ package.targets.append(contentsOf: [
             "PartoutABI_C",
             "PartoutCore_C",
             "PartoutFoundation"
-        ]
+        ],
+        exclude: useFoundationCompatibility.partoutCoreExclude,
+        swiftSettings: useFoundationCompatibility.swiftSettings
     ),
     .target(
         name: "PartoutCore_C",
@@ -133,14 +139,8 @@ package.targets.append(contentsOf: [
     ),
     .target(
         name: "PartoutFoundation",
-        // TODO: #228, Until Foundation is dropped
-        exclude: ["Cross"]
-//        exclude: {
-//            guard OS.current != .apple else {
-//                return ["Cross"]
-//            }
-//            return []
-//        }()
+        exclude: useFoundationCompatibility.foundationExclude,
+        swiftSettings: useFoundationCompatibility.swiftSettings
     ),
     .target(
         name: "PartoutOS",
@@ -162,11 +162,13 @@ package.targets.append(contentsOf: [
                 list.append(contentsOf: ["Apple", "AppleNE"])
             }
             return list
-        }()
+        }(),
+        swiftSettings: useFoundationCompatibility.swiftSettings
     ),
     .testTarget(
         name: "PartoutCoreTests",
-        dependencies: ["PartoutCore"]
+        dependencies: ["PartoutCore"],
+        exclude: useFoundationCompatibility.coreTestsExclude
     ),
     .testTarget(
         name: "PartoutOSTests",
@@ -187,13 +189,15 @@ package.targets.append(contentsOf: [
 ])
 
 // Standalone executables
-package.targets.append(
-    .executableTarget(
-        name: "partoutd",
-        dependencies: ["Partout"],
-        path: "Executables/partoutd"
+if useFoundationCompatibility == .off {
+    package.targets.append(
+        .executableTarget(
+            name: "partoutd",
+            dependencies: ["Partout"],
+            path: "Executables/partoutd"
+        )
     )
-)
+}
 
 // MARK: OpenVPN
 
@@ -221,7 +225,7 @@ if areas.contains(.openVPN), cryptoMode != nil {
         .testTarget(
             name: "PartoutOpenVPNTests",
             dependencies: ["PartoutOpenVPN"],
-            exclude: ["DataPathPerformanceTests.swift"],
+            exclude: useFoundationCompatibility.openVPNTestsExclude + ["DataPathPerformanceTests.swift"],
             resources: [
                 .process("Resources")
             ]
@@ -423,4 +427,75 @@ enum OS: String, CaseIterable {
 enum CryptoMode {
     case openSSL
     case native
+}
+
+// TODO: #228, Re-enable code and tests after making PartoutFoundation functional
+enum FoundationCompatibility {
+    case off
+    case on
+
+    var foundationExclude: [String] {
+        switch self {
+        case .off: ["Compat"]
+        case .on: OS.current == .apple ? ["Compat"] : []
+        }
+    }
+
+    var partoutExclude: [String] {
+        switch self {
+        case .off: []
+        case .on: [
+            "ABI.swift",
+            "ABIContext.swift"
+        ]
+        }
+    }
+
+    var partoutCoreExclude: [String] {
+        switch self {
+        case .off: []
+        case .on: [
+            "Streams/NSObject+Stream.swift"
+        ]
+        }
+    }
+
+    var partoutTestsExclude: [String] {
+        switch self {
+        case .off: []
+        case .on: ["RegistryTests.swift"]
+        }
+    }
+
+    var coreTestsExclude: [String] {
+        switch self {
+        case .off: []
+        case .on: [
+            "MessageHandlerTests.swift",
+            "PartoutErrorTests.swift",
+            "ProfileCodingTests.swift",
+            "SecureDataTests.swift",
+            "SensitiveEncoderTests.swift"
+        ]
+        }
+    }
+
+    var openVPNTestsExclude: [String] {
+        switch self {
+        case .off: []
+        case .on: [
+            "JSONTests.swift",
+            "KeyDecrypterTests.swift",
+            "OpenVPNParserTests.swift",
+            "TLSTests.swift"
+        ]
+        }
+    }
+
+    var swiftSettings: [SwiftSetting] {
+        switch self {
+        case .off: []
+        case .on: [.define("PARTOUT_FOUNDATION_COMPAT")]
+        }
+    }
 }

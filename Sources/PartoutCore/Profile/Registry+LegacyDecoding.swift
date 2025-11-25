@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_FOUNDATION_COMPAT
+
 /// `Codable` implementation of ``ProfileCoder``.
 @available(*, deprecated, message: "#273")
 final class CodableProfileCoder {
@@ -120,3 +122,5 @@ private struct LegacyCodableProfile: ProfileType, Codable {
 
     let userInfo: Data?
 }
+
+#endif

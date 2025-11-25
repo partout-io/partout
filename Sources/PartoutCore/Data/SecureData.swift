@@ -30,7 +30,7 @@ public struct SecureData: Hashable, Codable, @unchecked Sendable {
         if encoder.shouldEncodeSensitiveData {
             try container.encode(Data(innerData))
         } else {
-            try container.encode(JSONEncoder.redactedValue)
+            try container.encode(PartoutLogger.redactedValue)
         }
     }
 }
@@ -55,6 +55,6 @@ extension SecureData {
 
 extension SecureData: SensitiveDebugStringConvertible {
     public func debugDescription(withSensitiveData: Bool) -> String {
-        withSensitiveData ? toHex() : JSONEncoder.redactedValue
+        withSensitiveData ? toHex() : PartoutLogger.redactedValue
     }
 }

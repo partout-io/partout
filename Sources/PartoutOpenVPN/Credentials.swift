@@ -70,10 +70,10 @@ extension OpenVPN.Credentials: Codable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(encoder.shouldEncodeSensitiveData ? username : JSONEncoder.redactedValue, forKey: .username)
-        try container.encode(encoder.shouldEncodeSensitiveData ? password : JSONEncoder.redactedValue, forKey: .password)
+        try container.encode(encoder.shouldEncodeSensitiveData ? username : PartoutLogger.redactedValue, forKey: .username)
+        try container.encode(encoder.shouldEncodeSensitiveData ? password : PartoutLogger.redactedValue, forKey: .password)
         try container.encode(otpMethod, forKey: .otpMethod)
-        try container.encode(encoder.shouldEncodeSensitiveData ? otp : JSONEncoder.redactedValue, forKey: .otp)
+        try container.encode(encoder.shouldEncodeSensitiveData ? otp : PartoutLogger.redactedValue, forKey: .otp)
     }
 }
 

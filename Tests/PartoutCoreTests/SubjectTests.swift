@@ -5,7 +5,7 @@
 #if canImport(Combine)
 
 @preconcurrency import Combine
-import Foundation
+import PartoutCore
 import Testing
 
 struct SubjectTests {

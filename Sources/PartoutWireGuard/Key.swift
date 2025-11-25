@@ -29,6 +29,6 @@ extension WireGuard.Key: SensitiveDebugStringConvertible {
     }
 
     public func debugDescription(withSensitiveData: Bool) -> String {
-        withSensitiveData ? rawValue : JSONEncoder.redactedValue
+        withSensitiveData ? rawValue : PartoutLogger.redactedValue
     }
 }

@@ -59,7 +59,7 @@ extension Address: RawRepresentable {
         case .v6:
             self = .ip(baseValue, .v6)
         default:
-            guard baseValue != JSONEncoder.redactedValue else {
+            guard baseValue != PartoutLogger.redactedValue else {
                 return nil
             }
             self = .hostname(baseValue)
@@ -188,6 +188,6 @@ extension Address: SensitiveDebugStringConvertible {
     }
 
     public func debugDescription(withSensitiveData: Bool) -> String {
-        withSensitiveData ? rawValue : JSONEncoder.redactedValue
+        withSensitiveData ? rawValue : PartoutLogger.redactedValue
     }
 }

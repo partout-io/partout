@@ -2,9 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutOpenVPN
-import Foundation
 import PartoutCore
+import PartoutOpenVPN
 import Testing
 
 struct NetworkSettingsBuilderTests {

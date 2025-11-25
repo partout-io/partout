@@ -11,6 +11,7 @@ import PartoutCore
 import PartoutOS
 #endif
 
+/// The actor that all ABI methods execute on.
 @globalActor
 public actor ABIActor {
     public static let shared = ABIActor()
