@@ -6,7 +6,7 @@ internal import _PartoutCore_C
 
 /// Wrapper of binary data that zeroes out itself on deallocation.
 public final class CZeroingData {
-    private let ptr: UnsafeMutablePointer<pp_zd>
+    let ptr: UnsafeMutablePointer<pp_zd>
 
     init(ptr: UnsafeMutablePointer<pp_zd>) {
         self.ptr = ptr
