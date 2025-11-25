@@ -6,9 +6,8 @@ internal import _PartoutCore_C
 
 extension Data {
     public static func zeroing(_ zd: UnsafeMutableRawPointer) -> Self {
-        zd.withMemoryRebound(to: pp_zd.self, capacity: 1) { ptr in
-            Data(rawZeroing: ptr)
-        }
+        let ptr = zd.assumingMemoryBound(to: pp_zd.self)
+        return Data(rawZeroing: ptr)
     }
 
     init(rawZeroing zd: UnsafeMutablePointer<pp_zd>) {
