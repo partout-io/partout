@@ -1,8 +1,5 @@
 included:
   - Sources
-excluded:
-  - Sources/OpenVPN/OpenVPNOpenSSL_ObjC
-  - Sources/Crypto/OpenSSL_ObjC
 analyzer_rules:
   - unused_declaration
   - unused_import
