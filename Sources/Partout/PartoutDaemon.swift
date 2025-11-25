@@ -48,4 +48,32 @@ func makeDaemon(
     return try SimpleConnectionDaemon(params: params)
 }
 
+private extension partout_tun_ctrl {
+    var asPartoutCtrl: VirtualTunnelControllerImpl {
+        VirtualTunnelControllerImpl(
+            thiz: thiz,
+            setTunnel: { thiz, info in
+                let rawDescs = info.fileDescriptors.map(Int32.init)
+                return rawDescs.withUnsafeBufferPointer {
+                    var cInfo = partout_tun_ctrl_info()
+                    cInfo.remote_fds = $0.baseAddress
+                    cInfo.remote_fds_len = info.fileDescriptors.count
+                    return set_tunnel(thiz, &cInfo)
+                }
+            },
+            configureSockets: { thiz, fds in
+                fds.map(Int32.init).withUnsafeBufferPointer {
+                    configure_sockets(thiz, $0.baseAddress, $0.count)
+                }
+            },
+            clearTunnel: { thiz, tun in
+                clear_tunnel(thiz, tun)
+            },
+            testCallback: { thiz in
+                test_callback(thiz)
+            }
+        )
+    }
+}
+
 #endif
