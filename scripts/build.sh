@@ -4,13 +4,15 @@ build_dir=.cmake
 bin_dir=bin
 
 #export ANDROID_NDK_ROOT=
+export ANDROID_NDK_API=28
+ANDROID_NDK_TARGET=darwin-x86_64
+ANDROID_ARCH=aarch64
 export SWIFT_ANDROID_SDK=~/.swiftpm/swift-sdks/swift-6.2-RELEASE-android-0.1.artifactbundle
 
 # These are derived from the above
-export ANDROID_NDK_TOOLCHAIN=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/bin
-export ANDROID_NDK_SYSROOT=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/sysroot
-export ANDROID_NDK_API=28
-export SWIFT_ANDROID_RESOURCE_DIR=$SWIFT_ANDROID_SDK/swift-android/swift-resources/usr/lib/swift-aarch64
+export ANDROID_NDK_TOOLCHAIN=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/$ANDROID_NDK_TARGET/bin
+export ANDROID_NDK_SYSROOT=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/$ANDROID_NDK_TARGET/sysroot
+export SWIFT_ANDROID_RESOURCE_DIR=$SWIFT_ANDROID_SDK/swift-android/swift-resources/usr/lib/swift-$ANDROID_ARCH
 
 positional_args=()
 cmake_opts=()
