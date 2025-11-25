@@ -16,7 +16,7 @@ extension OpenVPN {
             let builder = result.configuration.builder()
             var module = OpenVPNModule.Builder(configurationBuilder: builder)
             module.credentials = Constants.demoCredentials
-            return try module.tryBuild()
+            return try module.build()
         } catch {
             fatalError("Unable to build: \(error)")
         }

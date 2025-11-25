@@ -14,7 +14,7 @@ extension WireGuard {
             let wg = try String(contentsOf: url)
             let builder = try StandardWireGuardParser().configuration(from: wg).builder()
             let module = WireGuardModule.Builder(configurationBuilder: builder)
-            return try module.tryBuild()
+            return try module.build()
         } catch {
             fatalError("Unable to build: \(error)")
         }

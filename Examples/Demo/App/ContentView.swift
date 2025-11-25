@@ -207,7 +207,7 @@ private extension ContentView {
             builder.toggleModule(withId: module.id)
         }
         do {
-            profile = try builder.tryBuild()
+            profile = try builder.build()
         } catch {
             print("Unable to toggle module: \(error)")
         }

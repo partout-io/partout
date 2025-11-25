@@ -26,7 +26,7 @@ extension Profile {
             dns.protocolType = .https
             dns.servers = ["1.1.1.1"]
             dns.dohURL = "https://1.1.1.1/dns-query"
-            profile.modules.append(try dns.tryBuild())
+            profile.modules.append(try dns.build())
 
             var ip = IPModule.Builder()
             ip.ipv4 = IPSettings(subnet: nil)
@@ -35,16 +35,16 @@ extension Profile {
 //                .excluding(routes: [
 //                    .init(Subnet(rawValue: "192.168.43.0/24"), nil)
 //                ])
-            profile.modules.append(ip.tryBuild())
+            profile.modules.append(ip.build())
 //
 //            var onDemand = OnDemandModule.Builder()
 //            onDemand.policy = .excluding
 //            onDemand.withSSIDs = ["iPhonx": true]
-//            profile.modules.append(onDemand.tryBuild())
+//            profile.modules.append(onDemand.build())
 //
 //            var filterModule = FilterModule.Builder()
 //            filterModule.disabledMask = [.dns]
-//            profile.modules.append(filterModule.tryBuild())
+//            profile.modules.append(filterModule.build())
 
             profile.activeModulesIds = [dns.id]
 
@@ -55,7 +55,7 @@ extension Profile {
                 profile.activeModulesIds.insert(vpnModule.id)
             }
 
-            return try profile.tryBuild()
+            return try profile.build()
         } catch {
             fatalError("Cannot build: \(error)")
         }
