@@ -1,8 +1,16 @@
 #!/bin/bash
 opt_configuration=Debug
 build_dir=.cmake
-bin_dir=.bin
-ndk_toolchain=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/bin
+bin_dir=bin
+
+#export ANDROID_NDK_ROOT=
+export SWIFT_ANDROID_SDK=~/.swiftpm/swift-sdks/swift-6.2-RELEASE-android-0.1.artifactbundle
+
+# These are derived from the above
+export ANDROID_NDK_TOOLCHAIN=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/bin
+export ANDROID_NDK_SYSROOT=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/darwin-x86_64/sysroot
+export ANDROID_NDK_API=28
+export SWIFT_ANDROID_RESOURCE_DIR=$SWIFT_ANDROID_SDK/swift-android/swift-resources/usr/lib/swift-aarch64
 
 positional_args=()
 cmake_opts=()
@@ -16,6 +24,12 @@ while [[ $# -gt 0 ]]; do
             # Debug|Release
             cmake_opts+=("-DCMAKE_BUILD_TYPE=$2")
             shift
+            shift
+            ;;
+        -a)
+            cmake_opts+=("-DPP_BUILD_LIBRARY=ON")
+            cmake_opts+=("-DPP_BUILD_USE_OPENSSL=ON")
+            cmake_opts+=("-DPP_BUILD_USE_WGGO=ON")
             shift
             ;;
         -crypto)
@@ -44,9 +58,8 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -android)
-            PATH=$ndk_toolchain:$PATH
-            rm -rf $build_dir $bin_dir/android
-            cmake_opts+=("-DPP_BUILD_FOR_ANDROID=ON")
+            PATH=$ANDROID_NDK_TOOLCHAIN:$PATH
+            cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=android.cmake")
             shift
             ;;
         -*|--*)
@@ -61,14 +74,11 @@ while [[ $# -gt 0 ]]; do
 done
 set -- "${positional_args[@]}"
 
-rm -f $build_dir/*.txt
+set -e
 if [ ! -d $build_dir ]; then
     mkdir $build_dir
 fi
-
-set -e
 cd $build_dir
-rm -rf PartoutProject*
-
+rm -f *.txt
 cmake -G Ninja "${cmake_opts[@]}" ..
 cmake --build .

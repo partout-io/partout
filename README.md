@@ -65,45 +65,42 @@ Then, you will use one of the `scripts/build.*` variants based on the host platf
 
 The script builds the vendors as static libraries and accepts a few options: 
 
-- `-l`: Build Partout as dynamic library (opt-in)
+- `-a`: Build everything
 - `-config (Debug|Release)`: The CMake build type
-- `-crypto (openssl|native)`: The crypto subsystem to pick between OpenSSL and Native/MbedTLS
+- `-android`: Build for Android
+- `-l`: Build the Partout library (opt-in)
+- `-crypto (openssl|native)`: Pick a crypto subsystem between OpenSSL and Native/MbedTLS (WIP)
 - `-wireguard`: Enable support for WireGuard (requires Go)
 
 For example, this will build Partout for release with a static dependency on OpenSSL:
 
 ```shell
-$ scripts/build.sh -config Release -crypto openssl -l
+$ scripts/build.sh -config Release -l -crypto openssl
 ```
 
 Sample output:
 
 ```
-.bin/partout.h                       # The Partout ABI
-.bin/darwin-arm64/libpartout.dylib   # macOS
-.bin/linux-aarch64/libpartout.so     # Linux
-.bin/windows-arm64/partout.dll       # Windows
+bin/<platform-arch>/partout.h       # The Partout ABI
+bin/darwin-arm64/libpartout.a       # macOS
+bin/linux-aarch64/libpartout.a      # Linux
+bin/windows-arm64/libpartout.lib    # Windows
 ```
 
 This should work for all platforms, except for Android, which asks for a hybrid CMake + SwiftPM approach.
 
 #### Build for Android
 
-Building for Android requires access to a Swift Android SDK, and this is not straightforward from CMake. That's why the `scripts/build-android.sh` script does the heavy-lifting in two steps:
+Building for Android requires access to external SDKs:
 
-- Cross-compile the vendored static libraries with CMake for Android
-- Embed the static libraries in SwiftPM to generate a dynamic library with the Swift Android SDK
+- `$ANDROID_NDK_ROOT` to point to your Android NDK installation
+- `$SWIFT_ANDROID_SDK` to point to your Swift for Android SDK installation (e.g. in `~/.swiftpm/swift-sdks`)
 
-Requirements:
-
-- Set `$ANDROID_NDK_ROOT` to point to your Android NDK installation
-- Add the NDK toolchain to the `$PATH`
-
-The script runs on macOS, but can be adapted for other platforms with slight tweaks to `scripts/build.sh`. The Android output is consistent with the other platforms:
+The CMake configuration is done with the `android.cmake` toolchain. The script runs on macOS, but can be adapted for other platforms with slight tweaks to `scripts/build.sh`. The Android output is consistent with the other platforms:
 
 ```
-.bin/partout.h
-.bin/android-arm64/libpartout.so
+bin/android-arm64/partout.h
+bin/android-arm64/libpartout.so
 ```
 
 ## Demo

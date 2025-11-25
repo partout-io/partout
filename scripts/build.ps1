@@ -1,6 +1,6 @@
 $cwd = Get-Location
 $build_dir = ".cmake"
-$bin_dir = ".bin"
+$bin_dir = "bin"
 
 try {
     # Remove all .txt files in the build folder
@@ -11,13 +11,13 @@ try {
         New-Item -ItemType Directory -Path "$build_dir" | Out-Null
     }
 
-    # Change directory to build and remove PartoutProject* folders/files
+    # Change directory to build
     Set-Location -Path "$build_dir"
-    Get-ChildItem -Path "PartoutProject*" -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    Get-ChildItem -Path "*.txt" -Recurse -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
-    # Run CMake with ninja for Swift
-    # cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DPP_BUILD_USE_OPENSSL=ON -DPP_BUILD_USE_WGGO=ON ..
-    cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DPP_BUILD_USE_OPENSSL=ON -DPP_BUILD_USE_WGGO=ON -DPP_BUILD_LIBRARY=ON ..
+    # Run CMake
+    #cmake -G "Visual Studio 17 2022" -DPP_BUILD_USE_OPENSSL=ON -DPP_BUILD_USE_WGGO=ON -DPP_BUILD_LIBRARY=ON ..
+    cmake -G "Ninja" -DPP_BUILD_USE_OPENSSL=ON -DPP_BUILD_USE_WGGO=ON -DPP_BUILD_LIBRARY=ON ..
 
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

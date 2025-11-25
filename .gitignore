@@ -6,5 +6,5 @@
 **/.swiftpm/xcode
 Package.resolved
 .build
-.bin
 .cmake
+bin
