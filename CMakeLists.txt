@@ -1,25 +1,23 @@
 cmake_minimum_required(VERSION 3.27)
 project(Partout)
 include(ExternalProject)
+include(FetchContent)
 
 # Command line options
 option(PP_BUILD_LIBRARY "Include main library" 0)
-option(PP_BUILD_FOR_ANDROID "Build for Android" 0)
 option(PP_BUILD_USE_OPENSSL "Use OpenSSL" 0)
 option(PP_BUILD_USE_MBEDTLS "Use MbedTLS" 0)
 option(PP_BUILD_USE_WGGO "Use WireGuard Go" 0)
 
 # Output per platform/arch
-if(PP_BUILD_FOR_ANDROID)
-    set(PLATFORM_NAME "android")
+string(TOLOWER ${CMAKE_SYSTEM_NAME} PLATFORM_NAME)
+string(TOLOWER ${CMAKE_SYSTEM_PROCESSOR} ARCH_NAME)
+if(DEFINED PP_BUILD_OUTPUT)
+    set(PP_BUILD_OUTPUT_UNIVERSAL "${PP_BUILD_OUTPUT}")
 else()
-    set(PLATFORM_NAME ${CMAKE_SYSTEM_NAME})
-    string(TOLOWER ${PLATFORM_NAME} PLATFORM_NAME)
+    set(PP_BUILD_OUTPUT_UNIVERSAL "${CMAKE_CURRENT_SOURCE_DIR}/bin")
+    set(PP_BUILD_OUTPUT "${PP_BUILD_OUTPUT_UNIVERSAL}/${PLATFORM_NAME}-${ARCH_NAME}")
 endif()
-set(ARCH_NAME ${CMAKE_SYSTEM_PROCESSOR})
-string(TOLOWER ${ARCH_NAME} ARCH_NAME)
-set(PP_BUILD_OUTPUT_UNIVERSAL ".bin")
-set(PP_BUILD_OUTPUT "${PP_BUILD_OUTPUT_UNIVERSAL}/${PLATFORM_NAME}-${ARCH_NAME}")
 
 # Options
 message(STATUS "Option CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
@@ -27,13 +25,19 @@ message(STATUS "Option PP_BUILD_LIBRARY = ${PP_BUILD_LIBRARY}")
 message(STATUS "Option PP_BUILD_USE_OPENSSL = ${PP_BUILD_USE_OPENSSL}")
 message(STATUS "Option PP_BUILD_USE_MBEDTLS = ${PP_BUILD_USE_MBEDTLS}")
 message(STATUS "Option PP_BUILD_USE_WGGO = ${PP_BUILD_USE_WGGO}")
-message(STATUS "Option PP_BUILD_FOR_ANDROID = ${PP_BUILD_FOR_ANDROID}")
 message(STATUS "Option PP_BUILD_OUTPUT = ${PP_BUILD_OUTPUT}")
 
 # Forward args to Partout sub-project
 set(PARTOUT_CMAKE_ARGS
-    -DPP_BUILD_OUTPUT=${PP_BUILD_OUTPUT}
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DOUTPUT_DIR=${PP_BUILD_OUTPUT}/partout
 )
+if(DEFINED CMAKE_TOOLCHAIN_FILE)
+    list(APPEND PARTOUT_CMAKE_ARGS
+        -DCMAKE_Swift_COMPILER=${CMAKE_CURRENT_SOURCE_DIR}/scripts/swiftc-wrapper.sh
+        -DCMAKE_TOOLCHAIN_FILE:FILEPATH=${CMAKE_TOOLCHAIN_FILE}
+    )
+endif()
 
 # All vendor-inherited args
 set(VENDOR_DEPENDS)
@@ -41,32 +45,33 @@ if(PP_BUILD_USE_OPENSSL)
     include("vendors/openssl.cmake")
     ExternalProject_Get_Property(OpenSSLProject BINARY_DIR)
     list(APPEND VENDOR_DEPENDS OpenSSLProject)
-    list(APPEND PARTOUT_CMAKE_ARGS -DOPENSSL_DIR=${OPENSSL_OUTPUT_DIR})
+    list(APPEND PARTOUT_CMAKE_ARGS -DOPENSSL_DIR=${OPENSSL_DIR})
 elseif(PP_BUILD_USE_MBEDTLS)
     include("vendors/mbedtls.cmake")
     ExternalProject_Get_Property(MbedTLSProject BINARY_DIR)
     list(APPEND VENDOR_DEPENDS MbedTLSProject)
-    list(APPEND PARTOUT_CMAKE_ARGS -DMBEDTLS_DIR=${MBEDTLS_OUTPUT_DIR})
+    list(APPEND PARTOUT_CMAKE_ARGS -DMBEDTLS_DIR=${MBEDTLS_DIR})
 endif()
 if(PP_BUILD_USE_WGGO)
     include("vendors/wg-go.cmake")
     ExternalProject_Get_Property(WireGuardGoProject BINARY_DIR)
     list(APPEND VENDOR_DEPENDS WireGuardGoProject)
-    list(APPEND PARTOUT_CMAKE_ARGS -DWGGO_DIR=${WGGO_OUTPUT_DIR})
+    list(APPEND PARTOUT_CMAKE_ARGS -DWGGO_DIR=${WGGO_DIR})
+endif()
+
+# Fetch wintun.dll on Windows
+if(WIN32)
+    include("vendors/wintun.cmake")
 endif()
 
 # Build Partout library (opt-in), after vendored dependencies
 if(PP_BUILD_LIBRARY)
-
-    # Bundle library with ABI header
-    set(PARTOUT_ABI_HEADER ${CMAKE_SOURCE_DIR}/Sources/PartoutABI_C/include/partout.h)
-
     ExternalProject_Add(
         PartoutProject
-        SOURCE_DIR ${CMAKE_SOURCE_DIR}/Sources
+        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Sources
         CMAKE_ARGS ${PARTOUT_CMAKE_ARGS}
         INSTALL_COMMAND ""
-        COMMAND ${CMAKE_COMMAND} -E copy ${PARTOUT_ABI_HEADER} ${CMAKE_SOURCE_DIR}/${PP_BUILD_OUTPUT_UNIVERSAL}
+        BUILD_ALWAYS 1
         DEPENDS ${VENDOR_DEPENDS}
     )
 endif()

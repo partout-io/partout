@@ -12,8 +12,8 @@ import PartoutOS
 #endif
 
 @globalActor
-actor ABIActor {
-    static let shared = ABIActor()
+public actor ABIActor {
+    public static let shared = ABIActor()
 }
 
 // FIXME: #188, ABI is still optimistic

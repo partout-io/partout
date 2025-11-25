@@ -7,7 +7,7 @@
 #endif
 import _PartoutABI_C
 
-public enum Partout {
+public enum PartoutConstants {
 
     /// The unique identifier of the library.
     public static let identifier: String = {

@@ -26,13 +26,11 @@ let cmakeOutput = envCMakeOutput ?? ".bin/windows-arm64"
 // Build dynamic library on Android
 var libraryType: Product.Library.LibraryType? = nil
 var staticLibPrefix = ""
-var openSSLLibs = "lib"
 switch OS.current {
 case .android:
     libraryType = .dynamic
 case .windows:
     staticLibPrefix = "lib"
-    openSSLLibs = "bin"
 default:
     break
 }
@@ -127,7 +125,7 @@ package.targets.append(contentsOf: [
         cSettings: globalCSettings + {
             if OS.current == .windows {
                 return [
-                    .unsafeFlags(["-Ivendors/wintun"])
+                    .unsafeFlags(["-I\(cmakeOutput)/../../vendors/wintun"])
                 ]
             }
             return []
@@ -312,7 +310,7 @@ case .openSSL:
                     .unsafeFlags(["-I\(cmakeOutput)/openssl/include"])
                 ],
                 linkerSettings: [
-                    .unsafeFlags(["-L\(cmakeOutput)/openssl/\(openSSLLibs)"]),
+                    .unsafeFlags(["-L\(cmakeOutput)/openssl/lib"]),
                     // WARNING: order matters, ssl then crypto
                     .linkedLibrary("\(staticLibPrefix)ssl"),
                     .linkedLibrary("\(staticLibPrefix)crypto")

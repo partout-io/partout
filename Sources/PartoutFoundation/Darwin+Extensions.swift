@@ -28,7 +28,7 @@ extension NotificationCenter {
         post(name: name, object: nil)
     }
 
-    public func addObserver(forName name: Notification.Name, using block: @escaping @Sendable () -> Void) -> Any {
+    public func addObserver(forName name: Notification.Name, using block: @escaping @Sendable () -> Void) -> AnyObject {
         addObserver(forName: name, object: nil, queue: nil) { _ in
             block()
         }
@@ -101,7 +101,7 @@ extension NotificationCenter {
         fatalError()
     }
 
-    public func addObserver(forName: Notification.Name, using block: @escaping @Sendable () -> Void) -> Any {
+    public func addObserver(forName: Notification.Name, using block: @escaping @Sendable () -> Void) -> AnyObject {
         fatalError()
     }
 }
@@ -109,10 +109,6 @@ extension NotificationCenter {
 extension RegularExpression {
     public convenience init(pattern: String) throws {
         fatalError()
-    }
-
-    public convenience init(_ pattern: String) {
-        self.init(pattern: pattern)
     }
 
     public func groups(in string: String) -> [String] {
