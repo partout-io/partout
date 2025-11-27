@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutCore_C
-internal import _PartoutCrypto_C
+@_implementationOnly import _PartoutCore_C
+@_implementationOnly import _PartoutCrypto_C
 #if !PARTOUT_MONOLITH
 import PartoutOS
 #endif

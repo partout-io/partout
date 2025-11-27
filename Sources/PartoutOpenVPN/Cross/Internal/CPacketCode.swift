@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutOpenVPN_C
+@_implementationOnly import _PartoutOpenVPN_C
 
 enum CPacketCode: UInt8 {
     case softResetV1           = 0x03

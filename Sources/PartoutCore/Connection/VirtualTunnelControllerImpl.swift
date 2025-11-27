@@ -4,7 +4,7 @@
 
 #if !os(iOS) && !os(tvOS)
 
-internal import _PartoutCore_C
+@_implementationOnly import _PartoutCore_C
 
 public struct VirtualTunnelControllerImpl {
     let thiz: UnsafeMutableRawPointer

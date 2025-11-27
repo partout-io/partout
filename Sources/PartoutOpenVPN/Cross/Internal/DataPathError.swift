@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutOpenVPN_C
+@_implementationOnly import _PartoutOpenVPN_C
 
 enum OpenVPNDataPathError: Error {
     case creation

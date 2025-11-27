@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutCore_C
+@_implementationOnly import _PartoutCore_C
 
 extension Data {
     public var asIPAddress: String? {

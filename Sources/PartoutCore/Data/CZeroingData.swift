@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutCore_C
+@_implementationOnly import _PartoutCore_C
 
 /// Wrapper of binary data that zeroes out itself on deallocation.
 public final class CZeroingData {

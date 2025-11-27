@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import PartoutCore
-internal import _PartoutCrypto_C
+@_implementationOnly import _PartoutCrypto_C
 import Foundation
 
 extension CryptoWrapper {

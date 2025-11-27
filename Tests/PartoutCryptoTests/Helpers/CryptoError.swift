@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutCrypto_C
+@_implementationOnly import _PartoutCrypto_C
 
 enum PPCryptoError: Error {
     case creation
