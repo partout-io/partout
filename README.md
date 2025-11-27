@@ -129,7 +129,16 @@ By contributing to this project you are agreeing to the terms stated in the [Con
 
 ## Credits
 
+Libraries:
+
 - [GenericJSON][credits-genericjson]
+- [MbedTLS][credits-mbedtls]
+- [OpenSSL][credits-openssl]
+- [Wintun][credits-wintun]
+- [WireGuard (Go)][credits-wireguard-go]
+
+Special contributors:
+
 - [Tejas Mehta][credits-tmthecoder] for the implementation of the [OpenVPN XOR patch][credits-tmthecoder-xor]
 
 ### OpenVPN
@@ -158,8 +167,12 @@ Website: [partout.io][about-website]
 
 [github-releases]: https://github.com/partout-io/partout/releases
 [credits-genericjson]: https://github.com/iwill/generic-json-swift
+[credits-mbedtls]: https://github.com/Mbed-TLS/mbedtls
+[credits-openssl]: https://github.com/openssl/openssl
 [credits-tmthecoder]: https://github.com/tmthecoder
 [credits-tmthecoder-xor]: https://github.com/partout-io/tunnelkit/pull/255
+[credits-wintun]: https://github.com/wireguard/wintun
+[credits-wireguard-go]: https://github.com/wireguard/wireguard-go
 
 [about-twitter]: https://twitter.com/keeshux
 [about-website]: https://github.com/partout-io
