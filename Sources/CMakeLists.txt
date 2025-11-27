@@ -10,7 +10,6 @@ set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 add_library(partout_c STATIC "")
 target_compile_options(partout_c PRIVATE
     -DPARTOUT_MONOLITH
-    -DPARTOUT_FOUNDATION_COMPAT
 )
 
 # Header search paths from all C targets
@@ -81,6 +80,7 @@ target_compile_options(partout PRIVATE
     -DPARTOUT_MONOLITH
     -DPARTOUT_OPENVPN
     -DPARTOUT_WIREGUARD
+    -DPARTOUT_FOUNDATION_COMPAT
     -enable-library-evolution
 )
 
