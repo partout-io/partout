@@ -171,11 +171,12 @@ if(DEFINED WGGO_DIR)
 endif()
 
 # Copy ABI header
-set(ABI_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/PartoutABI_C/include/partout.h)
+set(ABI_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/PartoutABI_C/include)
 add_custom_command(
     TARGET partout
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${ABI_HEADER} ${OUTPUT_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy ${ABI_INCLUDE}/partout.h ${OUTPUT_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy ${ABI_INCLUDE}/module.modulemap ${OUTPUT_DIR}
 )
 
 if(WIN32)
