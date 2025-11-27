@@ -10,6 +10,7 @@ set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 add_library(partout_c STATIC "")
 target_compile_options(partout_c PRIVATE
     -DPARTOUT_MONOLITH
+    -DPARTOUT_FOUNDATION_COMPAT
 )
 
 # Header search paths from all C targets
@@ -89,8 +90,8 @@ file(GLOB_RECURSE PARTOUT_SOURCES
 )
 
 set(EXCLUDED_PATTERNS
-    # Exclude Foundation replacements until done
-    PartoutFoundation\/Cross
+    # TODO: #228, Exclude Foundation replacements until done
+    PartoutFoundation\/Compat
 )
 
 # Exclude Swift implementations on non-Apple
