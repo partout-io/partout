@@ -189,7 +189,7 @@ package.targets.append(contentsOf: [
 ])
 
 // Standalone executables
-if useFoundationCompatibility == .off {
+if useFoundationCompatibility.supportsPartoutd {
     package.targets.append(
         .executableTarget(
             name: "partoutd",
@@ -497,5 +497,9 @@ enum FoundationCompatibility {
         case .off: []
         case .on: [.define("PARTOUT_FOUNDATION_COMPAT")]
         }
+    }
+
+    var supportsPartoutd: Bool {
+        self == .off
     }
 }
