@@ -69,8 +69,8 @@ private extension NETunnelEnvironment {
     }
 }
 
-private extension TunnelStrategy {
-    func sendMessage(_ input: Message.Input, to profileId: Profile.ID) async throws -> Message.Output? {
+extension TunnelStrategy {
+    public func sendMessage(_ input: Message.Input, to profileId: Profile.ID) async throws -> Message.Output? {
         let encoded = try JSONEncoder().encode(input)
         guard let output = try await sendMessage(encoded, to: profileId) else {
             return nil
