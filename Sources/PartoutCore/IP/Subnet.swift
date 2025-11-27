@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@_implementationOnly import _PartoutCore_C
+internal import _PartoutCore_C
 
 /// An IPv4/v6 subnet.
 public struct Subnet: Hashable, Codable, Sendable {

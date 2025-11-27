@@ -4,7 +4,7 @@
 
 #if !os(iOS) && !os(tvOS)
 
-@_implementationOnly import _PartoutCore_C
+internal import _PartoutCore_C
 
 /// An ``IOInterface`` that interact with a Layer 3 virtual tun device, commonly found on UNIX-like systems.
 public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {

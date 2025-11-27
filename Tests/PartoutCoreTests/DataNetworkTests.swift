@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import PartoutCore
-@_implementationOnly import _PartoutCore_C
+internal import _PartoutCore_C
 #if canImport(Network)
 import Network
 #endif
