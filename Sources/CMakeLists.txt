@@ -85,17 +85,13 @@ target_compile_options(partout PRIVATE
 )
 
 # Swift sources, including vendored PartoutCore
-file(GLOB_RECURSE PARTOUT_SOURCES
-    *.swift
-)
+file(GLOB_RECURSE PARTOUT_SOURCES *.swift)
 
-set(EXCLUDED_PATTERNS
-    # TODO: #228, Exclude Foundation replacements until done
-    PartoutFoundation\/Compat
-)
-
-# Exclude Swift implementations on non-Apple
-if(NOT APPLE)
+if(APPLE)
+    # Exclude Foundation compatibility layer (TODO: #228, Still broken)
+    set(EXCLUDED_PATTERNS PartoutFoundation\/Compat)
+else()
+    # Exclude Apple-specific Swift implementations elsewhere
     list(APPEND EXCLUDED_PATTERNS PartoutOS\/Apple.*)
 endif()
 
