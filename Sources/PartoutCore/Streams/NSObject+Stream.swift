@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if canImport(ObjectiveC)
+#if !PARTOUT_FOUNDATION_COMPAT
 
 @available(*, deprecated, message: "Not cross-platform")
 public func stream<O, V>(

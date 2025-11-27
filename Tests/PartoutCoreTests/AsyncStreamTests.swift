@@ -52,7 +52,7 @@ struct AsyncStreamTests {
 
 #if canImport(ObjectiveC)
 
-import Foundation
+import PartoutCore
 
 extension AsyncStreamTests {
     @Test

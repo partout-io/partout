@@ -6,6 +6,7 @@
 
 internal import _PartoutCore_C
 
+/// Configures a ``VirtualTunnelController`` with a raw C interface.
 public struct VirtualTunnelControllerImpl {
     let thiz: UnsafeMutableRawPointer
     let setTunnel: (_ thiz: UnsafeMutableRawPointer, TunnelRemoteInfo) -> UnsafeMutableRawPointer?

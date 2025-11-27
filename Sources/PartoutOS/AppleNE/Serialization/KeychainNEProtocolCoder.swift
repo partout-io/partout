@@ -49,7 +49,7 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
             throw PartoutError(.decoding)
         }
         let encoded = try keychain.password(forReference: passwordReference)
-        return try registry.compatibleProfile(fromString: encoded)
+        return try registry.fallbackProfile(fromString: encoded)
     }
 
     public func removeProfile(withId profileId: Profile.ID) throws {

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
+import PartoutCore
 @testable import PartoutOpenVPN
 import Testing
 

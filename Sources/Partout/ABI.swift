@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !PARTOUT_FOUNDATION_COMPAT
 #if !os(iOS) && !os(tvOS)
 
 import PartoutABI_C
@@ -11,6 +12,7 @@ import PartoutCore
 import PartoutOS
 #endif
 
+/// The actor that all ABI methods execute on.
 @globalActor
 public actor ABIActor {
     public static let shared = ABIActor()
@@ -177,4 +179,5 @@ public func partout_daemon_stop(cCtx: UnsafeMutableRawPointer) {
     }
 }
 
+#endif
 #endif

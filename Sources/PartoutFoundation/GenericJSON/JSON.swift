@@ -61,8 +61,8 @@ extension JSON: Codable {
     }
 }
 
+#if !PARTOUT_FOUNDATION_COMPAT
 extension JSON: CustomDebugStringConvertible {
-
     public var debugDescription: String {
         switch self {
         case .string(let str):
@@ -80,5 +80,6 @@ extension JSON: CustomDebugStringConvertible {
         }
     }
 }
+#endif
 
 extension JSON: Hashable {}

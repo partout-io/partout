@@ -10,12 +10,12 @@ extension Data: SensitiveDebugStringConvertible {
 
 extension String: SensitiveDebugStringConvertible {
     public func debugDescription(withSensitiveData: Bool) -> String {
-        withSensitiveData ? self : JSONEncoder.redactedValue
+        withSensitiveData ? self : PartoutLogger.redactedValue
     }
 }
 
 extension URL: SensitiveDebugStringConvertible {
     public func debugDescription(withSensitiveData: Bool) -> String {
-        withSensitiveData ? absoluteString : JSONEncoder.redactedValue
+        withSensitiveData ? absoluteString : PartoutLogger.redactedValue
     }
 }

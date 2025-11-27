@@ -94,6 +94,39 @@ extension Registry {
 
 // MARK: Serialization
 
+extension CodingUserInfoKey {
+    static let moduleDecoder = CodingUserInfoKey(rawValue: "moduleDecoder")!
+}
+
+extension Registry {
+    public func string(fromProfiles profiles: [Profile], encoder: TextEncoder) throws -> String {
+        try encoder.encode(profiles.map(\.asCodableProfile))
+    }
+
+    public func string(fromProfile profile: Profile, encoder: TextEncoder) throws -> String {
+        try encoder.encode(profile.asCodableProfile)
+    }
+
+    public func profile(fromString string: String, decoder: TextDecoder) throws -> Profile {
+        let codableProfile = try decoder.decode(CodableProfile.self, string: string)
+        let profile = try Profile(codableProfile: codableProfile)
+        return postDecodeBlock?(profile) ?? profile
+    }
+
+    public func profiles(fromString string: String, decoder: TextDecoder) throws -> [Profile] {
+        let codableProfiles: [CodableProfile]
+        do {
+            codableProfiles = try decoder.decode([CodableProfile].self, string: string)
+        } catch {
+            codableProfiles = [try decoder.decode(CodableProfile.self, string: string)]
+        }
+        return try codableProfiles.map {
+            let profile = try Profile(codableProfile: $0)
+            return postDecodeBlock?(profile) ?? profile
+        }
+    }
+}
+
 extension Registry {
     public func resolvedProfile(_ profile: Profile) throws -> Profile {
         var copy = profile.builder()

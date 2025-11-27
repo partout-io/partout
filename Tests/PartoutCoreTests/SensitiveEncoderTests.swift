@@ -21,7 +21,7 @@ struct SensitiveEncoderTests {
             try decoder.decode(SecureData.self, from: data)
         }
         let string = try decoder.decode(String.self, from: data)
-        #expect(string == JSONEncoder.redactedValue)
+        #expect(string == PartoutLogger.redactedValue)
     }
 
     @Test
@@ -31,7 +31,7 @@ struct SensitiveEncoderTests {
             try decoder.decode(Address.self, from: data)
         }
         let string = try decoder.decode(String.self, from: data)
-        #expect(string == JSONEncoder.redactedValue)
+        #expect(string == PartoutLogger.redactedValue)
     }
 
     @Test
@@ -41,7 +41,7 @@ struct SensitiveEncoderTests {
             try decoder.decode(Endpoint.self, from: data)
         }
         let string = try decoder.decode(String.self, from: data)
-        #expect(string == "\(JSONEncoder.redactedValue):12345")
+        #expect(string == "\(PartoutLogger.redactedValue):12345")
     }
 
     @Test
@@ -51,7 +51,7 @@ struct SensitiveEncoderTests {
             try decoder.decode(ExtendedEndpoint.self, from: data)
         }
         let string = try decoder.decode(String.self, from: data)
-        #expect(string == "\(JSONEncoder.redactedValue):UDP:12345")
+        #expect(string == "\(PartoutLogger.redactedValue):UDP:12345")
     }
 
     @Test
@@ -61,14 +61,14 @@ struct SensitiveEncoderTests {
             try decoder.decode(Subnet.self, from: data)
         }
         let string = try decoder.decode(String.self, from: data)
-        #expect(string == "\(JSONEncoder.redactedValue)/16")
+        #expect(string == "\(PartoutLogger.redactedValue)/16")
     }
 
     @Test
     func givenEncodable_whenJSON_thenReturnsJSON() throws {
         let encodable = SomeEncodable(foo: 123, secureBar: "hello")
         #expect(encodable.asJSON(.global, withSensitiveData: true, sortingKeys: true) == "{\"foo\":123,\"secureBar\":\"hello\"}")
-        #expect(encodable.asJSON(.global, withSensitiveData: false, sortingKeys: true) == "{\"foo\":123,\"secureBar\":\"\(JSONEncoder.redactedValue)\"}")
+        #expect(encodable.asJSON(.global, withSensitiveData: false, sortingKeys: true) == "{\"foo\":123,\"secureBar\":\"\(PartoutLogger.redactedValue)\"}")
     }
 }
 
@@ -89,7 +89,7 @@ private struct SomeEncodable: Encodable {
         if encoder.shouldEncodeSensitiveData {
             try container.encode(secureBar, forKey: .secureBar)
         } else {
-            try container.encode(JSONEncoder.redactedValue, forKey: .secureBar)
+            try container.encode(PartoutLogger.redactedValue, forKey: .secureBar)
         }
     }
 }

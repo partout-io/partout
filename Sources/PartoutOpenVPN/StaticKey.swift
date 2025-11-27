@@ -185,14 +185,6 @@ extension OpenVPN {
             return secureData.withOffset(at * size, count: size)
         }
 
-        public static func deserialized(_ data: Data) throws -> StaticKey {
-            try JSONDecoder().decode(StaticKey.self, from: data)
-        }
-
-        public func serialized() -> Data? {
-            try? JSONEncoder().encode(self)
-        }
-
         public var hexString: String {
             secureData.toHex()
         }

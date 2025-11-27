@@ -80,21 +80,18 @@ target_compile_options(partout PRIVATE
     -DPARTOUT_MONOLITH
     -DPARTOUT_OPENVPN
     -DPARTOUT_WIREGUARD
+    -DPARTOUT_FOUNDATION_COMPAT
     -enable-library-evolution
 )
 
 # Swift sources, including vendored PartoutCore
-file(GLOB_RECURSE PARTOUT_SOURCES
-    *.swift
-)
+file(GLOB_RECURSE PARTOUT_SOURCES *.swift)
 
-set(EXCLUDED_PATTERNS
-    # Exclude Foundation replacements until done
-    PartoutFoundation\/Cross
-)
-
-# Exclude Swift implementations on non-Apple
-if(NOT APPLE)
+if(APPLE)
+    # Exclude Foundation compatibility layer (TODO: #228, Still broken)
+    set(EXCLUDED_PATTERNS PartoutFoundation\/Compat)
+else()
+    # Exclude Apple-specific Swift implementations elsewhere
     list(APPEND EXCLUDED_PATTERNS PartoutOS\/Apple.*)
 endif()
 

@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
 import PartoutCore
 @testable import PartoutOpenVPN
 import Testing
@@ -56,19 +55,19 @@ struct JSONTests {
         let pair = try subjectPair(withSensitiveData: false)
         let sut = pair.json
 
-        #expect(sut["ca"] as? String == JSONEncoder.redactedValue)
+        #expect(sut["ca"] as? String == PartoutLogger.redactedValue)
 
         let tlsWrap = try #require(sut["tlsWrap"] as? [String: Any])
         let tlsWrapKey = try #require(tlsWrap["key"] as? [String: Any])
-        #expect(tlsWrapKey["data"] as? String == JSONEncoder.redactedValue)
+        #expect(tlsWrapKey["data"] as? String == PartoutLogger.redactedValue)
 
         let xorMethod = try #require(sut["xorMethod"] as? [String: Any])
         let xorMethodObfuscate = try #require(xorMethod["obfuscate"] as? [String: Any])
-        #expect(xorMethodObfuscate["mask"] as? String == JSONEncoder.redactedValue)
+        #expect(xorMethodObfuscate["mask"] as? String == PartoutLogger.redactedValue)
 
         let remotes = try #require(sut["remotes"] as? [String])
         remotes.forEach {
-            #expect($0.contains(JSONEncoder.redactedValue))
+            #expect($0.contains(PartoutLogger.redactedValue))
         }
     }
 }

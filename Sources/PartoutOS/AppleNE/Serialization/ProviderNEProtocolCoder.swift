@@ -39,7 +39,7 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
         guard let encoded = protocolConfiguration.providerConfiguration?[Self.providerKey] as? String else {
             throw PartoutError(.decoding)
         }
-        return try registry.compatibleProfile(fromString: encoded)
+        return try registry.fallbackProfile(fromString: encoded)
     }
 
     public func removeProfile(withId profileId: Profile.ID) throws {

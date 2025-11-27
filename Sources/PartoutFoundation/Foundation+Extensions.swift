@@ -2,8 +2,16 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-// TODO: #228, Until Foundation is dropped
-#if true || canImport(Darwin)
+#if !canImport(Darwin)
+@_exported import Dispatch
+public let NSEC_PER_MSEC: UInt64 = 1000000
+public let NSEC_PER_SEC: UInt64 = 1000000000
+#endif
+
+#if !PARTOUT_FOUNDATION_COMPAT
+
+@_exported import Foundation
+public typealias RegularExpression = NSRegularExpression
 
 extension Data {
     public init(bytesNoCopy: UnsafeMutablePointer<UInt8>, count: Int) {
@@ -76,7 +84,28 @@ extension RegularExpression {
     }
 }
 
+extension Dictionary where Key == String, Value == Data {
+    public func decode<T>(_ type: T.Type, forKey key: String) throws -> T? where T: Decodable {
+        guard let data = self[key] else {
+            return nil
+        }
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    public mutating func encode<T>(_ value: T, forKey key: String) throws where T: Encodable {
+        self[key] = try JSONEncoder().encode(value)
+    }
+}
+
 #else
+
+#if canImport(Android)
+@_exported import Android
+#elseif canImport(Linux)
+@_exported import Linux
+#elseif canImport(WinSDK)
+@_exported import WinSDK
+#endif
 
 // TODO: #228
 
@@ -111,6 +140,10 @@ extension RegularExpression {
         fatalError()
     }
 
+    public convenience init(_ pattern: String) {
+        fatalError()
+    }
+
     public func groups(in string: String) -> [String] {
         fatalError()
     }
@@ -120,6 +153,16 @@ extension RegularExpression {
     }
 
     public func replacingMatches(in string: String, withTemplate template: String) -> String {
+        fatalError()
+    }
+}
+
+extension Dictionary where Key == String, Value == Data {
+    public func decode<T>(_ type: T.Type, forKey key: String) throws -> T? where T: Decodable {
+        fatalError()
+    }
+
+    public mutating func encode<T>(_ value: T, forKey key: String) throws where T: Encodable {
         fatalError()
     }
 }
