@@ -78,7 +78,6 @@ let package = Package(
                 }
                 return list
             }(),
-            exclude: useFoundationCompatibility.partoutExclude,
             swiftSettings: areas.compactMap(\.define).map {
                 .define($0)
             }
@@ -123,7 +122,6 @@ package.targets.append(contentsOf: [
             "PartoutCore_C",
             "PartoutFoundation"
         ],
-        exclude: useFoundationCompatibility.partoutCoreExclude,
         swiftSettings: useFoundationCompatibility.swiftSettings
     ),
     .target(
@@ -438,25 +436,6 @@ enum FoundationCompatibility {
         switch self {
         case .off: ["Compat"]
         case .on: OS.current == .apple ? ["Compat"] : []
-        }
-    }
-
-    var partoutExclude: [String] {
-        switch self {
-        case .off: []
-        case .on: [
-            "ABI.swift",
-            "ABIContext.swift"
-        ]
-        }
-    }
-
-    var partoutCoreExclude: [String] {
-        switch self {
-        case .off: []
-        case .on: [
-            "Streams/NSObject+Stream.swift"
-        ]
         }
     }
 
