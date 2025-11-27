@@ -80,6 +80,7 @@ target_compile_options(partout PRIVATE
     -DPARTOUT_MONOLITH
     -DPARTOUT_OPENVPN
     -DPARTOUT_WIREGUARD
+    -enable-library-evolution
 )
 
 # Swift sources, including vendored PartoutCore
