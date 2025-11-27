@@ -1,4 +1,4 @@
-module _PartoutABI_C {
+module PartoutABI_C {
     header "partout.h"
     export *
 }
