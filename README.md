@@ -141,6 +141,10 @@ Special contributors:
 
 - [Tejas Mehta][credits-tmthecoder] for the implementation of the [OpenVPN XOR patch][credits-tmthecoder-xor]
 
+### OpenSSL
+
+This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit (http://www.openssl.org/)
+
 ### OpenVPN
 
 © Copyright 2025 OpenVPN | OpenVPN is a registered trademark of OpenVPN, Inc.
