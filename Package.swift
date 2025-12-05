@@ -80,7 +80,7 @@ let package = Package(
             }(),
             swiftSettings: areas.compactMap(\.define).map {
                 .define($0)
-            }
+            } + useFoundationCompatibility.swiftSettings
         ),
         .target(
             name: "PartoutABI_C"
@@ -91,7 +91,7 @@ let package = Package(
             exclude: useFoundationCompatibility.partoutTestsExclude,
             swiftSettings: areas.compactMap(\.define).map {
                 .define($0)
-            }
+            } + useFoundationCompatibility.swiftSettings
         )
     ]
 )
@@ -118,9 +118,9 @@ package.targets.append(contentsOf: [
     .target(
         name: "PartoutCore",
         dependencies: [
+            "MiniFoundation",
             "PartoutABI_C",
-            "PartoutCore_C",
-            "PartoutFoundation"
+            "PartoutCore_C"
         ],
         swiftSettings: useFoundationCompatibility.swiftSettings
     ),
@@ -134,11 +134,6 @@ package.targets.append(contentsOf: [
             }
             return []
         }()
-    ),
-    .target(
-        name: "PartoutFoundation",
-        exclude: useFoundationCompatibility.foundationExclude,
-        swiftSettings: useFoundationCompatibility.swiftSettings
     ),
     .target(
         name: "PartoutOS",
@@ -166,7 +161,8 @@ package.targets.append(contentsOf: [
     .testTarget(
         name: "PartoutCoreTests",
         dependencies: ["PartoutCore"],
-        exclude: useFoundationCompatibility.coreTestsExclude
+        exclude: useFoundationCompatibility.coreTestsExclude,
+        swiftSettings: useFoundationCompatibility.swiftSettings
     ),
     .testTarget(
         name: "PartoutOSTests",
@@ -226,7 +222,8 @@ if areas.contains(.openVPN), cryptoMode != nil {
             exclude: useFoundationCompatibility.openVPNTestsExclude + ["DataPathPerformanceTests.swift"],
             resources: [
                 .process("Resources")
-            ]
+            ],
+            swiftSettings: useFoundationCompatibility.swiftSettings
         )
     ])
 }
@@ -277,7 +274,8 @@ if areas.contains(.wireGuard) {
         ),
         .testTarget(
             name: "PartoutWireGuardTests",
-            dependencies: ["PartoutWireGuard"]
+            dependencies: ["PartoutWireGuard"],
+            exclude: useFoundationCompatibility.wireGuardTestsExclude
         )
     ])
 }
@@ -371,6 +369,56 @@ if cryptoMode != nil {
     ])
 }
 
+// MARK: - MiniFoundation
+
+package.products.append(
+    .library(
+        name: "MiniFoundation",
+        type: .static,
+        targets: ["MiniFoundation"]
+    )
+)
+package.targets.append(contentsOf: [
+    .target(
+        name: "MiniFoundation",
+        dependencies: [
+            useFoundationCompatibility == .on ?
+                .target(name: "MiniFoundationCompat") :
+                .target(name: "MiniFoundationNative")
+        ],
+        swiftSettings: useFoundationCompatibility.swiftSettings
+    ),
+    .target(
+        name: "MiniFoundationCore",
+        dependencies: ["MiniFoundationCore_C"]
+    ),
+    .target(
+        name: "MiniFoundationCore_C"
+    ),
+    .target(
+        name: "MiniFoundationCompat",
+        dependencies: ["MiniFoundationCore"]
+    ),
+    .executableTarget(
+        name: "MiniFoundationExample",
+        dependencies: ["MiniFoundation"]
+    ),
+    .testTarget(
+        name: "MiniFoundationTests",
+        dependencies: ["MiniFoundation"],
+        swiftSettings: useFoundationCompatibility.swiftSettings
+    )
+])
+
+if useFoundationCompatibility == .off {
+    package.targets.append(
+        .target(
+            name: "MiniFoundationNative",
+            dependencies: ["MiniFoundationCore"]
+        )
+    )
+}
+
 // MARK: - Configuration structures
 
 enum Area: CaseIterable {
@@ -427,17 +475,9 @@ enum CryptoMode {
     case native
 }
 
-// TODO: #228, Re-enable code and tests after making PartoutFoundation functional
 enum FoundationCompatibility {
     case off
     case on
-
-    var foundationExclude: [String] {
-        switch self {
-        case .off: ["Compat"]
-        case .on: OS.current == .apple ? ["Compat"] : []
-        }
-    }
 
     var partoutTestsExclude: [String] {
         switch self {
@@ -471,10 +511,19 @@ enum FoundationCompatibility {
         }
     }
 
+    var wireGuardTestsExclude: [String] {
+        switch self {
+        case .off: []
+        case .on: [
+            "BackendTests.swift"
+        ]
+        }
+    }
+
     var swiftSettings: [SwiftSetting] {
         switch self {
         case .off: []
-        case .on: [.define("PARTOUT_FOUNDATION_COMPAT")]
+        case .on: [.define("MINI_FOUNDATION_COMPAT")]
         }
     }
 

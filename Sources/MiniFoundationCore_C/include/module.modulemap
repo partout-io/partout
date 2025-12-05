@@ -1,0 +1,4 @@
+module _MiniFoundationCore_C {
+    header "mini_foundation.h"
+    export *
+}

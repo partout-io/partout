@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.27)
-project(PartoutProject LANGUAGES Swift C)
+project(PartoutProject LANGUAGES Swift C CXX)
 
 # Package root is up one level, output dir from option
 set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
@@ -9,11 +9,13 @@ set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 # Base configuration
 add_library(partout_c STATIC "")
 target_compile_options(partout_c PRIVATE
+    -DMINI_FOUNDATION_MONOLITH
     -DPARTOUT_MONOLITH
 )
 
 # Header search paths from all C targets
 set(PARTOUT_C_INCLUDE_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/MiniFoundationCore_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutABI_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCore_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutOpenVPN_C/include
@@ -51,7 +53,7 @@ else()
 endif()
 
 # C sources
-file(GLOB_RECURSE PARTOUT_C_SOURCES *.c)
+file(GLOB_RECURSE PARTOUT_C_SOURCES *.c *.cc)
 
 # Account for exclusions in source files
 foreach(pattern ${EXCLUDED_PATTERNS})
@@ -68,7 +70,7 @@ endif()
 # Partout_Swift ########################################
 
 # Partout library base configuration
-if(LINUX OR ANDROID)
+if(ANDROID)
     set(DYNLIBS 1)
     add_library(partout SHARED "")
 else()
@@ -77,23 +79,35 @@ endif()
 
 # Define symbols to skip Swift imports and legacy code
 target_compile_options(partout PRIVATE
+    -DMINI_FOUNDATION_MONOLITH
     -DPARTOUT_MONOLITH
     -DPARTOUT_OPENVPN
     -DPARTOUT_WIREGUARD
-    -DPARTOUT_FOUNDATION_COMPAT
     -enable-library-evolution
 )
 
-# Swift sources, including vendored PartoutCore
+# Use Foundation on Apple, compatible otherwise
+if(NOT APPLE)
+    target_compile_options(partout PRIVATE
+        -DMINI_FOUNDATION_COMPAT
+    )
+endif()
+
+# Swift sources
 file(GLOB_RECURSE PARTOUT_SOURCES *.swift)
 
+# Exclude Apple-specific Swift implementations elsewhere
 if(APPLE)
-    # Exclude Foundation compatibility layer (TODO: #228, Still broken)
-    set(EXCLUDED_PATTERNS PartoutFoundation\/Compat)
+    set(EXCLUDED_PATTERNS
+        MiniFoundationCompat.*
+    )
 else()
-    # Exclude Apple-specific Swift implementations elsewhere
-    list(APPEND EXCLUDED_PATTERNS PartoutOS\/Apple.*)
+    set(EXCLUDED_PATTERNS
+        MiniFoundationNative.*
+        PartoutOS\/Apple.*
+    )
 endif()
+list(APPEND EXCLUDED_PATTERNS MiniFoundationExample.*)
 
 foreach(pattern ${EXCLUDED_PATTERNS})
     list(FILTER PARTOUT_SOURCES EXCLUDE REGEX ${pattern})
