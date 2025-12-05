@@ -23,7 +23,7 @@ extension DNSModule: NESettingsApplying {
 
         case .https(let url):
             let specificSettings = NEDNSOverHTTPSSettings(servers: rawServers)
-            specificSettings.serverURL = url.foundationURL
+            specificSettings.serverURL = url
             dnsSettings = specificSettings
             pp_log(ctx, .os, .info, "\t\tServers: \(servers.map { $0.asSensitiveAddress(ctx) })")
             pp_log(ctx, .os, .info, "\t\tDoH URL: \(url.absoluteString.asSensitiveAddress(ctx))")

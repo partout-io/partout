@@ -12,10 +12,7 @@ import MiniFoundationCore
 
 // MARK: Types
 
-// Override Foundation
-public typealias FileManager = NativeFileManager
 public typealias RegularExpression = NativeRegularExpression
-public typealias URL = NativeURL
 
 // MARK: - Extensions
 

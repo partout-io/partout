@@ -232,10 +232,10 @@ extension OpenVPNParserTests {
 
 private extension OpenVPNParserTests {
     func url(withName name: String) -> URL {
-        guard let foundationURL = Bundle.module.url(forResource: name, withExtension: "ovpn") else {
+        guard let url = Bundle.module.url(forResource: name, withExtension: "ovpn") else {
             fatalError("Cannot find URL in bundle")
         }
-        return URL(foundationURL)
+        return url
     }
 
     static func allParsers() -> [StandardOpenVPNParser] {
