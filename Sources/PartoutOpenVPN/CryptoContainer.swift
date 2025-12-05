@@ -30,7 +30,7 @@ extension OpenVPN {
         }
 
         public func write(to url: URL) throws {
-            try pem.write(toFile: url.path, encoding: .ascii)
+            try pem.write(toFile: url.filePath(), encoding: .ascii)
         }
 
         public func decrypted(with decrypter: KeyDecrypter, passphrase: String) throws -> CryptoContainer {

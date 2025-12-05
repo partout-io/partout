@@ -29,7 +29,7 @@ struct URLTests {
         #expect(url.scheme == scheme)
         #expect(url.host == host)
         #expect(url.port == port)
-        #expect(url.path == path)
+        #expect(url.filePath() == path)
         #expect(url.lastPathComponent == lastPath)
         #expect(url.query == query)
         #expect(url.fragment == fragment)
