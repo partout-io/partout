@@ -88,23 +88,24 @@ target_compile_options(partout PRIVATE
 
 # Use Foundation on Apple, compatible otherwise
 if(NOT APPLE)
-    target_compile_options(partout PRIVATE
-        -DMINI_FOUNDATION_COMPAT
-    )
+    set(USE_COMPAT ON)
 endif()
 
 # Swift sources
 file(GLOB_RECURSE PARTOUT_SOURCES *.swift)
 
-# Exclude Apple-specific Swift implementations elsewhere
-if(APPLE)
-    set(EXCLUDED_PATTERNS
-        MiniFoundationCompat.*
+# Exclude Foundation if compatibility is on
+if(USE_COMPAT)
+    target_compile_options(partout PRIVATE
+        -DMINI_FOUNDATION_COMPAT
     )
-else()
     set(EXCLUDED_PATTERNS
         MiniFoundationNative.*
         PartoutOS\/Apple.*
+    )
+else()
+    set(EXCLUDED_PATTERNS
+        MiniFoundationCompat.*
     )
 endif()
 list(APPEND EXCLUDED_PATTERNS MiniFoundationExample.*)
