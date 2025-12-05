@@ -49,7 +49,7 @@ extension Compat.FileManager: MiniFileManager {
         return result
     }
 
-    public func attributesOfItem(atPath path: String) throws -> [MiniFileAttribute: Any] {
+    public func miniAttributesOfItem(atPath path: String) throws -> [MiniFileAttribute: Any] {
         var statBuf = stat()
         guard stat(path, &statBuf) == 0 else {
             throw MiniFoundationError.file(.failedToStat(path))

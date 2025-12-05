@@ -30,8 +30,7 @@ extension String {
         if Array(decodedUtf8.utf8) == bytes {
             usedEncoding = .utf8
             self = decodedUtf8
-        }
-        else if bytes.allSatisfy({ $0 < 128 }) {
+        } else if bytes.allSatisfy({ $0 < 128 }) {
             // Try ASCII (strict)
             usedEncoding = .ascii
             self = bytes.map {
@@ -263,7 +262,7 @@ extension Compat {
 extension FileBuffer {
     public init?(string: String, encoding: Compat.StringEncoding) {
         guard let bytes = string.data(using: encoding)?.bytes else { return nil }
-        self.bytes = bytes
+        self.init(bytes: bytes)
     }
 
     public var string: String {
