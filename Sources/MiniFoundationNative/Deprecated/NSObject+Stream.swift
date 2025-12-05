@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+#if canImport(Combine) && !MINI_FOUNDATION_COMPAT
 import Foundation
 
 @available(*, deprecated, message: "Not cross-platform")
@@ -21,3 +22,4 @@ public func stream<O, V>(
         }
     }
 }
+#endif
