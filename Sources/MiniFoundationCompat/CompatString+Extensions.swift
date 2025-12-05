@@ -11,7 +11,7 @@ extension String {
     // MARK: Initializers
 
     public init(contentsOfFile path: String, encoding: Compat.StringEncoding) throws {
-        let bytes = try Compat.FileBuffer(contentsOfFile: path).bytes
+        let bytes = try FileBuffer(contentsOfFile: path).bytes
         guard let decoded = encoding.decode(bytes) else {
             throw MiniFoundationError.encoding
         }
@@ -24,7 +24,7 @@ extension String {
     }
 
     public init(contentsOfFile path: String, usedEncoding: inout Compat.StringEncoding) throws {
-        let bytes = try Compat.FileBuffer(contentsOfFile: path).bytes
+        let bytes = try FileBuffer(contentsOfFile: path).bytes
         // Try strict UTF-8 first
         let decodedUtf8 = String(decoding: bytes, as: UTF8.self)
         if Array(decodedUtf8.utf8) == bytes {
@@ -145,14 +145,14 @@ extension String {
     }
 
     public func write(toFile path: String, encoding: Compat.StringEncoding) throws {
-        guard let file = Compat.FileBuffer(string: self, encoding: encoding) else {
+        guard let file = FileBuffer(string: self, encoding: encoding) else {
             throw MiniFoundationError.decoding
         }
         try file.write(toFile: path)
     }
 
     public func append(toFile path: String, encoding: Compat.StringEncoding) throws {
-        guard let file = Compat.FileBuffer(string: self, encoding: encoding) else {
+        guard let file = FileBuffer(string: self, encoding: encoding) else {
             throw MiniFoundationError.decoding
         }
         try file.append(toFile: path)
@@ -260,7 +260,7 @@ extension Compat {
 
 // MARK: - Helpers
 
-extension Compat.FileBuffer {
+extension FileBuffer {
     public init?(string: String, encoding: Compat.StringEncoding) {
         guard let bytes = string.data(using: encoding)?.bytes else { return nil }
         self.bytes = bytes
