@@ -96,6 +96,10 @@ public final class LocalLogger: @unchecked Sendable {
         }
     }
 
+    func currentLog(sinceLast: TimeInterval, maxLevel: DebugLog.Level) -> [String] {
+        currentLines(sinceLast: sinceLast, maxLevel: maxLevel).map(mapper)
+    }
+
     func save() {
         queue.sync {
             unsafeSave()
