@@ -260,6 +260,17 @@ extension Compat {
 
 // MARK: - Helpers
 
+extension Compat.FileBuffer {
+    public init?(string: String, encoding: Compat.StringEncoding) {
+        guard let bytes = string.data(using: encoding)?.bytes else { return nil }
+        self.bytes = bytes
+    }
+
+    public var string: String {
+        String(decoding: bytes, as: UTF8.self)
+    }
+}
+
 private extension Compat.StringEncoding {
     // FIXME: #228, Test, probably inefficient
     // Return `String?` — nil if decoding failed (invalid for that encoding)

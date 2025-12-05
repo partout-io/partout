@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 import Foundation
+#if !MINI_FOUNDATION_MONOLITH
+import MiniFoundationCore
+#endif
 
 extension Data {
     public init(bytesNoCopy: UnsafeMutablePointer<UInt8>, count: Int) {
@@ -26,7 +29,7 @@ extension Data {
     }
 
     public func write(toFile path: String) throws {
-        let url = Foundation.URL(fileURLWithPath: path)
+        let url = URL(fileURLWithPath: path)
         try write(to: url, options: .atomic)
     }
 }
