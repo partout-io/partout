@@ -9,7 +9,7 @@ import MiniFoundationCore
 
 extension FileManager: MiniFileManager {
     public func makeTemporaryPath(filename: String) -> String {
-        temporaryDirectory.appending(component: filename).path()
+        temporaryDirectory.appending(component: filename).filePath()
     }
 
     public func miniAttributesOfItem(atPath path: String) throws -> [MiniFileAttribute: Any] {

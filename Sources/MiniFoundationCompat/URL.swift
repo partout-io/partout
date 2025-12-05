@@ -41,7 +41,7 @@ extension Compat {
             return port > 0 ? Int(port) : nil
         }
 
-        public var path: String {
+        public func filePath() -> String {
             guard let str = minif_url_get_path(impl) else { return "" }
             return "/" + String(cString: str)
         }

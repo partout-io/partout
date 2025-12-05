@@ -7,4 +7,9 @@ import Foundation
 import MiniFoundationCore
 #endif
 
-extension URL: MiniURLProtocol {}
+extension URL: MiniURLProtocol {
+    public func filePath() -> String {
+        // FIXME: #228, Is this the same as deprecated .path ?
+        path()
+    }
+}
