@@ -10,12 +10,12 @@ import MiniFoundationCore
 public final class NativeFileManager: MiniFileManager {
     public static let `default`: MiniFileManager = NativeFileManager()
 
-    public static var foundationManager: FileManager {
+    public static var foundationManager: Foundation.FileManager {
         .default
     }
 
-    private var fm: FileManager {
-        .default
+    private var fm: Foundation.FileManager {
+        NativeFileManager.foundationManager
     }
 
     private init() {

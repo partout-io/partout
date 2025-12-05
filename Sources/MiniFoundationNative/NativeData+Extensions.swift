@@ -26,7 +26,7 @@ extension Data {
     }
 
     public func write(toFile path: String) throws {
-        let url = URL(fileURLWithPath: path)
+        let url = Foundation.URL(fileURLWithPath: path)
         try write(to: url, options: .atomic)
     }
 }
