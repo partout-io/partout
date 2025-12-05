@@ -36,9 +36,8 @@ private final class NativeTLSWrapper: TLSProtocol {
         guard let ca = parameters.cfg.ca else {
             throw PPTLSError.missingCA
         }
-        // FIXME: #228, encoding: .ascii
         caPath = parameters.cachesPath.appendingPathComponent(Constants.caFilename)
-        try ca.pem.write(toFile: caPath)
+        try ca.pem.write(toFile: caPath, encoding: .ascii)
 
         let securityLevel = parameters.cfg.tlsSecurityLevel
         let checksEKU = parameters.cfg.checksEKU ?? false

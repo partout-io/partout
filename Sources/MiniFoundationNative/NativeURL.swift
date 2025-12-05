@@ -32,7 +32,7 @@ public struct NativeURL: MiniURLProtocol, Equatable, Hashable, Codable, Sendable
     }
 
     public var path: String {
-        // FIXME: #228, Is this equal to deprecated .path ?
+        // FIXME: #228, Test that this is equal to deprecated .path
         foundationURL.path(percentEncoded: true)
     }
 

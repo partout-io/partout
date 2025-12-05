@@ -7,7 +7,7 @@ internal import _MiniFoundationCore_C
 import MiniFoundationCore
 #endif
 
-// FIXME: #228, Not tested
+// FIXME: #228, Test file I/O, esp. on Windows
 
 extension Compat {
     public final class FileManager {

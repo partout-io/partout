@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-// FIXME: #228, Test these properly
+// FIXME: #228, Test everything here, esp. on Windows
 
 extension String {
     public static var pathSeparator: String {

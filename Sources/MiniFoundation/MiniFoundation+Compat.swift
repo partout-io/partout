@@ -40,12 +40,12 @@ extension MiniFoundation {
 
 extension Dictionary where Key == String, Value == Compat.Data {
     public func decode<T>(_ type: T.Type, forKey key: String) throws -> T? where T: Decodable {
-        // FIXME: #228, Decode
+        // FIXME: #228, Implement native/compat agnostic with TextDecoder
         nil
     }
 
     public mutating func encode<T>(_ value: T, forKey key: String) throws where T: Encodable {
-        // FIXME: #228, Encode
+        // FIXME: #228, Implement native/compat agnostic with TextEncoder
     }
 }
 

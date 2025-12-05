@@ -14,8 +14,8 @@ extension Compat {
             self.bytes = bytes
         }
 
-        public init?(string: String) {
-            guard let bytes = string.data(using: .utf8)?.bytes else { return nil }
+        public init?(string: String, encoding: Compat.StringEncoding) {
+            guard let bytes = string.data(using: encoding)?.bytes else { return nil }
             self.bytes = bytes
         }
 

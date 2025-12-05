@@ -78,10 +78,10 @@ private extension LocalLogger.FileStrategy {
             let mf = FileManager.default
             let textToAppend = (lines + [""]).joined(separator: "\n")
             guard mf.fileExists(atPath: path) else {
-                try textToAppend.write(toFile: path)
+                try textToAppend.write(toFile: path, encoding: .utf8)
                 return
             }
-            try textToAppend.append(toFile: path)
+            try textToAppend.append(toFile: path, encoding: .utf8)
         } catch {
             NSLog("LocalLogger: Unable to save log to disk: \(error)")
         }

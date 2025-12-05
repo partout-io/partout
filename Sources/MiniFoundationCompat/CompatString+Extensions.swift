@@ -10,10 +10,6 @@ import MiniFoundationCore
 extension String {
     // MARK: Initializers
 
-    public init(contentsOfFile path: String) throws {
-        try self.init(contentsOfFile: path, encoding: .utf8)
-    }
-
     public init(contentsOfFile path: String, encoding: Compat.StringEncoding) throws {
         let bytes = try Compat.FileBuffer(contentsOfFile: path).bytes
         guard let decoded = encoding.decode(bytes) else {
@@ -148,15 +144,15 @@ extension String {
         return nil
     }
 
-    public func write(toFile path: String) throws {
-        guard let file = Compat.FileBuffer(string: self) else {
+    public func write(toFile path: String, encoding: Compat.StringEncoding) throws {
+        guard let file = Compat.FileBuffer(string: self, encoding: encoding) else {
             throw MiniFoundationError.decoding
         }
         try file.write(toFile: path)
     }
 
-    public func append(toFile path: String) throws {
-        guard let file = Compat.FileBuffer(string: self) else {
+    public func append(toFile path: String, encoding: Compat.StringEncoding) throws {
+        guard let file = Compat.FileBuffer(string: self, encoding: encoding) else {
             throw MiniFoundationError.decoding
         }
         try file.append(toFile: path)
@@ -177,7 +173,7 @@ extension Substring {
 // MARK: - Formatting
 
 extension String {
-    // FIXME: #228, Review this accurately
+    // FIXME: #228, Test, look for memory leaks
     public init(format: String, _ args: Any...) {
         // Convert Swift Any -> CVarArg (only the types we support)
         let cArgs: [CVarArg] = args.map { arg in
@@ -215,9 +211,8 @@ extension String {
 
         // Convert format to C string
         let cFormat = strdup(format.replacingOccurrences(of: "%@", with: "%s")) ?? UnsafeMutablePointer<CChar>.allocate(capacity: 1)
-
-        defer { free(cFormat) }
         defer {
+            free(cFormat)
             // free strdup’d string args
             for a in cArgs {
                 if let p = a as? UnsafePointer<CChar> {
@@ -266,21 +261,18 @@ extension Compat {
 // MARK: - Helpers
 
 private extension Compat.StringEncoding {
+    // FIXME: #228, Test, probably inefficient
     // Return `String?` — nil if decoding failed (invalid for that encoding)
     func decode(_ bytes: [UInt8]) -> String? {
         switch self {
         case .ascii:
-            // Fail if any byte >= 128 (not ASCII)
-            if bytes.contains(where: { $0 >= 128 }) { return nil }
+            guard !bytes.contains(where: { $0 >= 128 }) else { return nil }
             return String(bytes.map { Character(UnicodeScalar($0)) })
         case .utf8:
             // Decode using stdlib, then validate by round-trip
             let decoded = String(decoding: bytes, as: UTF8.self)
-            if Array(decoded.utf8) == bytes {
-                return decoded
-            } else {
-                return nil
-            }
+            guard Array(decoded.utf8) == bytes else { return nil }
+            return decoded
         }
     }
 
@@ -288,7 +280,7 @@ private extension Compat.StringEncoding {
         switch self {
         case .ascii:
             let bytes = Array(string.utf8)
-            if bytes.contains(where: { $0 >= 128 }) { return nil }
+            guard !bytes.contains(where: { $0 >= 128 }) else { return nil }
             return bytes
         case .utf8:
             return Array(string.utf8)
