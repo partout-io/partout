@@ -7,12 +7,13 @@ import PartoutCore
 import Testing
 
 struct TLSTests {
-    let cachesURL = FileManager.default.temporaryDirectory
+    let cachesPath = FileManager.default.makeTemporaryPath(filename: "")
 }
 
 extension TLSTests {
     func newConfiguration() throws -> OpenVPN.Configuration {
-        let url = try #require(Bundle.module.url(forResource: "tunnelbear", withExtension: "ovpn"))
+        let foundationURL = try #require(Bundle.module.url(forResource: "tunnelbear", withExtension: "ovpn"))
+        let url = URL(foundationURL)
         return try StandardOpenVPNParser(decrypter: SimpleKeyDecrypter())
             .parsed(fromURL: url, passphrase: "foobar")
             .configuration
@@ -20,7 +21,7 @@ extension TLSTests {
 
     func emptyParameters() throws -> TLSWrapper.Parameters {
         TLSWrapper.Parameters(
-            cachesURL: cachesURL,
+            cachesPath: cachesPath,
             cfg: try newConfiguration(),
             onVerificationFailure: {}
         )

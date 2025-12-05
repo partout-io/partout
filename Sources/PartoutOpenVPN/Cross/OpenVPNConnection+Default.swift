@@ -12,7 +12,7 @@ extension OpenVPNConnection {
         _ ctx: PartoutLoggerContext,
         parameters: ConnectionParameters,
         module: OpenVPNModule,
-        cachesURL: URL,
+        cachesPath: String,
         options: OpenVPN.ConnectionOptions = .init()
     ) throws {
         guard let configuration = module.configuration else {
@@ -31,7 +31,7 @@ extension OpenVPNConnection {
                 configuration: configuration,
                 credentials: module.credentials,
                 prng: prng,
-                cachesURL: cachesURL,
+                cachesPath: cachesPath,
                 options: options,
                 tlsFactory: {
                     try TLSWrapper.native(with: $0).tls

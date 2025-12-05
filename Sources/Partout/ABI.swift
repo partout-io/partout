@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_FOUNDATION_COMPAT
+#if !MINI_FOUNDATION_COMPAT
 #if !os(iOS) && !os(tvOS)
 
 import PartoutABI_C
@@ -58,7 +58,7 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
                 ctx,
                 parameters: $0,
                 module: $1,
-                cachesURL: URL(fileURLWithPath: cacheDir)
+                cachesPath: cacheDir
             )
         }
     ))

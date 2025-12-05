@@ -26,21 +26,24 @@ private final class NativeTLSWrapper: TLSProtocol {
 
     private let tls: pp_tls
 
-    private let caURL: URL
+    private let caPath: String
 
-    private let verificationObserver: Any
+    private let didFailVerification: PassthroughStream<UniqueID, Void>
+
+    private var verificationObserver: Task<Void, Never>?
 
     init(parameters: TLSWrapper.Parameters) throws {
         guard let ca = parameters.cfg.ca else {
             throw PPTLSError.missingCA
         }
-        caURL = parameters.cachesURL.appendingPathComponent(Constants.caFilename)
-        try ca.pem.write(to: caURL, atomically: true, encoding: .ascii)
+        // FIXME: #228, encoding: .ascii
+        caPath = parameters.cachesPath.appendingPathComponent(Constants.caFilename)
+        try ca.pem.write(toFile: caPath)
 
         let securityLevel = parameters.cfg.tlsSecurityLevel
         let checksEKU = parameters.cfg.checksEKU ?? false
         let checksSANHost = parameters.cfg.checksSANHost ?? false
-        let caPath = caURL.path.withCString(pp_dup)
+        let caPath = caPath.withCString(pp_dup)
         let certPEM = parameters.cfg.clientCertificate?.pem.withCString(pp_dup)
         let keyPEM = parameters.cfg.clientKey?.pem.withCString(pp_dup)
         let hostname = parameters.cfg.sanHost?.withCString(pp_dup)
@@ -50,6 +53,8 @@ private final class NativeTLSWrapper: TLSProtocol {
             pp_free(keyPEM)
             pp_free(hostname)
         }
+
+        let didFailVerification = PassthroughStream<UniqueID, Void>()
         let options = pp_tls_options_create(
             Int32(securityLevel ?? Constants.defaultSecurityLevel),
             Constants.bufferLength,
@@ -59,31 +64,36 @@ private final class NativeTLSWrapper: TLSProtocol {
             certPEM,
             keyPEM,
             hostname,
-            {
-                NotificationCenter.default.post(name: .tlsDidFailVerificationNotification)
+            Unmanaged.passUnretained(didFailVerification).toOpaque(),
+            { ctx in
+                guard let ctx else { return }
+                let stream = Unmanaged<PassthroughStream<UniqueID, Void>>
+                    .fromOpaque(ctx)
+                    .takeUnretainedValue()
+                stream.send()
             }
         )
         var error = PPTLSErrorNone
         guard let tls = pp_tls_create(options, &error) else {
             pp_tls_options_free(options)
-            try? FileManager.default.removeItem(at: caURL)
+            try? FileManager.default.removeItem(atPath: self.caPath)
 
             throw CTLSError(error)
         }
         self.tls = tls
 
-        verificationObserver = NotificationCenter.default.addObserver(
-            forName: .tlsDidFailVerificationNotification,
-            using: {
+        self.didFailVerification = didFailVerification
+        verificationObserver = Task { [weak didFailVerification] in
+            guard let didFailVerification else { return }
+            for await _ in didFailVerification.subscribe() {
                 parameters.onVerificationFailure()
             }
-        )
+        }
     }
 
     deinit {
-        NotificationCenter.default.removeObserver(verificationObserver)
         pp_tls_free(tls)
-        try? FileManager.default.removeItem(at: caURL)
+        try? FileManager.default.removeItem(atPath: caPath)
     }
 
     func start() throws {

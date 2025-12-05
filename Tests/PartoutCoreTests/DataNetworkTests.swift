@@ -22,7 +22,8 @@ struct DataNetworkTests {
         let sut = "1.2.3.4"
         let addr = Network.IPv4Address(sut)
         let ipv4 = try #require(addr)
-        #expect(ipv4.rawValue.asIPAddress == sut)
+        let bytes = [UInt8](ipv4.rawValue)
+        #expect(Data(bytes).asIPAddress == sut)
     }
 
     @Test
@@ -30,7 +31,8 @@ struct DataNetworkTests {
         let sut = "11:2::3:4"
         let addr = Network.IPv6Address(sut)
         let ipv6 = try #require(addr)
-        #expect(ipv6.rawValue.asIPAddress == sut)
+        let bytes = [UInt8](ipv6.rawValue)
+        #expect(Data(bytes).asIPAddress == sut)
     }
 #endif
 }

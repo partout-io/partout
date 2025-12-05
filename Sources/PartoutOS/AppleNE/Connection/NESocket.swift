@@ -137,7 +137,7 @@ private actor NESocket: LinkInterface {
 
     let remoteProtocol: EndpointProtocol
 
-    private let betterPathStream: PassthroughStream<Void>
+    private let betterPathStream: PassthroughStream<UniqueID, Void>
 
     private var writeBlock: (@Sendable ([Data]) async throws -> Void)?
 

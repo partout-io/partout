@@ -16,7 +16,7 @@ import PartoutCore
 public actor WireGuardConnection: Connection {
     private let ctx: PartoutLoggerContext
 
-    private let statusSubject: CurrentValueStream<ConnectionStatus>
+    private let statusSubject: CurrentValueStream<UniqueID, ConnectionStatus>
 
     private let moduleId: UniqueID
 

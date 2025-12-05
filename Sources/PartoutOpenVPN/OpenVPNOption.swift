@@ -6,6 +6,8 @@
 import PartoutCore
 #endif
 
+// FIXME: #228, Use compile-time Regex after Swift 6
+
 extension OpenVPN {
 
     /// The supported options of an OpenVPN configuration file.
@@ -117,8 +119,8 @@ extension OpenVPN {
 }
 
 extension OpenVPN.Option {
-    public func regularExpression() throws -> RegularExpression {
-        try RegularExpression(pattern: rawValue)
+    public func regularExpression() -> RegularExpression {
+        RegularExpression(rawValue)
     }
 }
 

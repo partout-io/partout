@@ -2,10 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutABI_C
 #if !PARTOUT_MONOLITH
-@_exported import PartoutFoundation
+@_exported import MiniFoundation
 #endif
+import PartoutABI_C
 
 public enum PartoutConstants {
 

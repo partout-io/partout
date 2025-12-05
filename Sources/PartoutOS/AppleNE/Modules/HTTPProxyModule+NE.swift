@@ -23,7 +23,7 @@ extension HTTPProxyModule: NESettingsApplying {
         }
         pacURL.map {
             proxySettings.autoProxyConfigurationEnabled = true
-            proxySettings.proxyAutoConfigurationURL = $0
+            proxySettings.proxyAutoConfigurationURL = $0.foundationURL
             pp_log(ctx, .os, .info, "\t\tPAC URL: \($0.absoluteString.asSensitiveAddress(ctx))")
         }
         proxySettings.exceptionList = bypassDomains.map(\.rawValue)

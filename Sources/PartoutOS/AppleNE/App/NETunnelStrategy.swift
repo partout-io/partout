@@ -21,7 +21,7 @@ public actor NETunnelStrategy {
 
     private let options: Set<Option>
 
-    private nonisolated let managersSubject: CurrentValueStream<[Profile.ID: NETunnelProviderManager]>
+    private nonisolated let managersSubject: CurrentValueStream<UniqueID, [Profile.ID: NETunnelProviderManager]>
 
     private var allManagers: [Profile.ID: NETunnelProviderManager] {
         didSet {

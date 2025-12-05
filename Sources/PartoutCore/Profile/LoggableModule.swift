@@ -19,7 +19,7 @@ extension LoggableModule: SensitiveDebugStringConvertible {
         if let sensitive = module as? SensitiveDebugStringConvertible {
             return sensitive.debugDescription(withSensitiveData: withSensitiveData)
         } else if let encodable = module as? Encodable {
-#if !PARTOUT_FOUNDATION_COMPAT
+#if !MINI_FOUNDATION_COMPAT
             return encodable.asJSON(ctx, withSensitiveData: withSensitiveData) ?? PartoutLogger.malformedValue
 #else
             return module.moduleHandler.id.debugDescription

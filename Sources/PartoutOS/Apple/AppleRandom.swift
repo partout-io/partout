@@ -12,20 +12,6 @@ public final class AppleRandom: PRNGProtocol {
     public init() {
     }
 
-    public func uint32() -> UInt32 {
-        var randomNumber: UInt32 = 0
-
-        withUnsafeMutablePointer(to: &randomNumber) {
-            $0.withMemoryRebound(to: UInt8.self, capacity: 4) { (randomBytes: UnsafeMutablePointer<UInt8>) in
-                guard SecRandomCopyBytes(kSecRandomDefault, 4, randomBytes) == errSecSuccess else {
-                    fatalError("SecRandomCopyBytes failed")
-                }
-            }
-        }
-
-        return randomNumber
-    }
-
     public func data(length: Int) -> Data {
         precondition(length > 0)
         var randomData = Data(count: length)

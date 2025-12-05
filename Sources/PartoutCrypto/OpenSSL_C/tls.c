@@ -52,7 +52,7 @@ int pp_tls_verify_peer(int ok, X509_STORE_CTX *_Nonnull ctx) {
             pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tls_verify_peer: NULL tls");
             abort();
         }
-        tls->opt->on_verify_failure();
+        tls->opt->on_verify_failure(tls->opt->ctx);
     }
     return ok;
 }

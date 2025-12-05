@@ -96,7 +96,7 @@ struct NESettingsApplyingTests {
         #expect(proxySettings.httpsServer?.address == module.secureProxy?.address.rawValue)
         #expect(proxySettings.httpsServer?.port == module.secureProxy.map { Int($0.port) })
         #expect(proxySettings.autoProxyConfigurationEnabled)
-        #expect(proxySettings.proxyAutoConfigurationURL == module.pacURL)
+        #expect(proxySettings.proxyAutoConfigurationURL == module.pacURL?.foundationURL)
         #expect(proxySettings.exceptionList == module.bypassDomains.map(\.rawValue))
     }
 
@@ -137,7 +137,7 @@ struct NESettingsApplyingTests {
             #expect(Bool(false), "Wrong protocolType")
             return
         }
-        #expect(dnsSettings.serverURL == url)
+        #expect(dnsSettings.serverURL == url.foundationURL)
     }
 
     @Test

@@ -6,13 +6,9 @@
 import PartoutCore
 #endif
 
-extension Notification.Name {
-    static let tlsDidFailVerificationNotification = Notification.Name("TLSDidFailVerificationNotification")
-}
-
 final class TLSWrapper {
     struct Parameters: Sendable {
-        let cachesURL: URL
+        let cachesPath: String
 
         let cfg: OpenVPN.Configuration
 

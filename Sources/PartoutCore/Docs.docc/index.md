@@ -20,7 +20,7 @@ The app controls the tunnel daemon with the ``Tunnel`` class, observes its statu
 
 ### Utilities
 
-Partout features a set of [general-purpose entities](<doc:Misc>), including [loggers and error handlers](<doc:LoggingErrors>), and cross-platform [Combine replacements](<doc:Streams>). Unless specified otherwise, integer time values are expressed in milliseconds in the whole library.
+Partout features a set of [general-purpose entities](<doc:Misc>), including [loggers and error handlers](<doc:LoggingErrors>). Unless specified otherwise, integer time values are expressed in milliseconds in the whole library.
 
 ## Topics
 
@@ -29,6 +29,5 @@ Partout features a set of [general-purpose entities](<doc:Misc>), including [log
 - <doc:StartingTunnel>
 - <doc:ManagingTunnel>
 - <doc:LoggingErrors>
-- <doc:Streams>
 - <doc:Misc>
 - <doc:Testing>

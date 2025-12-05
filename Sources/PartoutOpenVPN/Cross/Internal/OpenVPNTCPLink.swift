@@ -63,7 +63,7 @@ extension OpenVPNTCPLink: LinkInterface {
             // FIXME: #214, TCP is very slow
             buffer.reserveCapacity(buffer.count + packets.flatCount)
             for p in packets {
-                buffer += p
+                buffer.append(p)
             }
             var until = 0
             let processedPackets = proc.packets(fromStream: buffer, until: &until)

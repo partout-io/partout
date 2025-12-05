@@ -40,6 +40,7 @@ struct PacketProcessorTests {
         }
     }
 
+#if !MINI_FOUNDATION_COMPAT
     @Test
     func givenProcessor_whenReverse_thenIsExpected() {
         let sut = PacketProcessor(method: .reverse)
@@ -67,6 +68,7 @@ struct PacketProcessorTests {
 //            #expect(byte, data[i])
 //        }
     }
+#endif
 
     //
     // original = "832ae7598dfa0378bc19"
@@ -138,7 +140,8 @@ struct PacketProcessorTests {
         let processed1 = sut.packets(fromStream: stream1, until: &until)
         #expect(until == 7)
 
-        let stream1Plus2 = stream1.subdata(offset: until, count: stream1.count - until) + stream2
+        var stream1Plus2 = stream1.subdata(offset: until, count: stream1.count - until)
+        stream1Plus2.append(stream2)
         let processed2 = sut.packets(fromStream: stream1Plus2, until: &until)
         #expect(until == stream1Plus2.count)
 
