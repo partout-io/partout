@@ -63,7 +63,7 @@ endforeach()
 # Add computed files
 target_sources(partout_c PRIVATE ${PARTOUT_C_SOURCES})
 target_include_directories(partout_c PRIVATE ${PARTOUT_C_INCLUDE_DIRS})
-if(LINUX)
+if(LINUX OR ANDROID)
     target_compile_options(partout_c PRIVATE -fPIC)
 endif()
 
