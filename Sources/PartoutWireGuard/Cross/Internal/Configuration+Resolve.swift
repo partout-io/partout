@@ -12,7 +12,7 @@ import PartoutOS
 /// - Throws: an error of type `WireGuardAdapterError`.
 /// - Returns: The list of resolved endpoints.
 extension WireGuard.Configuration {
-    private actor ResolvedMap {
+    actor ResolvedMap {
         private let preferringIPv4: Bool
         private var map: [Address: [Endpoint]] = [:]
 
@@ -25,7 +25,7 @@ extension WireGuard.Configuration {
             if preferringIPv4 {
                 let targetEndpoint: Endpoint? = {
                     // All resolved IPv4 addresses
-                    var allV4 = endpoints.filter {
+                    let allV4 = endpoints.filter {
                         $0.address.family == .v4
                     }
                     // Pick first IPv4 address if any
@@ -38,9 +38,9 @@ extension WireGuard.Configuration {
                     return firstEndpoint
                 }()
                 guard let targetEndpoint else { return }
-                map[address] = [targetEndpoint]
+                map = [address: [targetEndpoint]]
             } else {
-                map[address] = endpoints
+                map = [address: endpoints]
             }
         }
 
