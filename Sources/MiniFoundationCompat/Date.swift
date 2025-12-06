@@ -51,11 +51,21 @@ extension Compat {
 }
 
 extension Compat.Date {
+    private static let appleEpoch: Compat.TimeInterval = 978_307_200
+
     public static var distantPast: Self {
         Self(timeIntervalSince1970: -.infinity)
     }
 
     public static var distantFuture: Self {
         Self(timeIntervalSince1970: .infinity)
+    }
+
+    public init(timeIntervalSinceReferenceDate interval: Compat.TimeInterval) {
+        self.init(timeIntervalSince1970: interval + Self.appleEpoch)
+    }
+
+    public var timeIntervalSinceReferenceDate: Compat.TimeInterval {
+        secondsSinceEpoch - Self.appleEpoch
     }
 }
