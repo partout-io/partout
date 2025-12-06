@@ -70,7 +70,7 @@ endif()
 # Partout_Swift ########################################
 
 # Partout library base configuration
-if(ANDROID)
+if(LINUX OR ANDROID)
     set(DYNLIBS 1)
     add_library(partout SHARED "")
 else()
