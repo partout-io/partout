@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !MINI_FOUNDATION_COMPAT
-
 extension Registry {
     public func json(fromProfiles profiles: [Profile]) throws -> String {
         try RegistryJSONEncoder(self).encode(profiles.map(\.asCodableProfile))
@@ -21,6 +19,7 @@ extension Registry {
         try profiles(fromString: json, decoder: RegistryJSONEncoder(self))
     }
 
+#if !MINI_FOUNDATION_COMPAT
     // Tolerate older encoding
     public func fallbackProfile(fromString string: String, fallingBack: Bool = true) throws -> Profile {
         do {
@@ -33,6 +32,7 @@ extension Registry {
             return postDecodeBlock?(decoded) ?? decoded
         }
     }
+#endif
 }
 
 private final class RegistryJSONEncoder: TextEncoder, TextDecoder {
@@ -51,13 +51,10 @@ private final class RegistryJSONEncoder: TextEncoder, TextDecoder {
     }
 
     func decode<T>(_ type: T.Type, string: String) throws -> T where T: Decodable {
-        let decoder = JSONDecoder()
-        decoder.userInfo = [.moduleDecoder: registry]
+        let decoder = JSONDecoder(userInfo: [.moduleDecoder: registry])
         guard let json = string.data(using: .utf8) else {
             throw PartoutError(.decoding, "Not a UTF-8 input")
         }
         return try decoder.decode(type, from: json)
     }
 }
-
-#endif

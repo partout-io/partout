@@ -17,6 +17,8 @@ public typealias Data = Compat.Data
 public typealias Date = Compat.Date
 public typealias FileManager = Compat.FileManager
 public typealias IndexSet = [Int]
+public typealias JSONDecoder = Compat.JSONDecoder
+public typealias JSONEncoder = Compat.JSONEncoder
 public typealias RegularExpression = Compat.RegularExpression
 public typealias TimeInterval = Compat.TimeInterval
 public typealias URL = Compat.URL
@@ -35,17 +37,6 @@ extension MiniFoundation {
             minor: Int(minor),
             patch: Int(patch)
         )
-    }
-}
-
-extension Dictionary where Key == String, Value == Compat.Data {
-    public func decode<T>(_ type: T.Type, forKey key: String) throws -> T? where T: Decodable {
-        // FIXME: #228, Implement native/compat agnostic with TextDecoder
-        nil
-    }
-
-    public mutating func encode<T>(_ value: T, forKey key: String) throws where T: Encodable {
-        // FIXME: #228, Implement native/compat agnostic with TextEncoder
     }
 }
 

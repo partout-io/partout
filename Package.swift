@@ -490,7 +490,6 @@ enum FoundationCompatibility {
         switch self {
         case .off: []
         case .on: [
-            "MessageHandlerTests.swift",
             "PartoutErrorTests.swift",
             "ProfileCodingTests.swift",
             "SecureDataTests.swift",
