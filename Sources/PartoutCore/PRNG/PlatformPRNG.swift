@@ -10,6 +10,6 @@ public final class PlatformPRNG: PRNGProtocol {
     }
 
     public func data(length: Int) -> Data {
-        Data(PRNG().data(length: length))
+        Data(PRNG().bytes(length: length))
     }
 }

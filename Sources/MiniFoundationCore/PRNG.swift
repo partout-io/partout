@@ -8,7 +8,7 @@ public final class PRNG {
     public init() {
     }
 
-    public func data(length: Int) -> [UInt8] {
+    public func bytes(length: Int) -> [UInt8] {
         precondition(length > 0)
         var randomData = [UInt8](repeating: 0, count: length)
         randomData.withUnsafeMutableBytes {
