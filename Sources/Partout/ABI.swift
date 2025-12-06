@@ -58,7 +58,7 @@ public func partout_init(cArgs: UnsafePointer<partout_init_args>) -> UnsafeMutab
                 ctx,
                 parameters: $0,
                 module: $1,
-                cachesPath: cacheDir
+                cachesURL: URL(fileURLWithPath: cacheDir)
             )
         }
     ))

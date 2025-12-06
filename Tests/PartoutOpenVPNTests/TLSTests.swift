@@ -7,7 +7,7 @@ import PartoutCore
 import Testing
 
 struct TLSTests {
-    let cachesPath = FileManager.default.makeTemporaryPath(filename: "")
+    let cachesURL = URL(fileURLWithPath: FileManager.default.makeTemporaryPath(filename: ""))
 }
 
 extension TLSTests {
@@ -20,7 +20,7 @@ extension TLSTests {
 
     func emptyParameters() throws -> TLSWrapper.Parameters {
         TLSWrapper.Parameters(
-            cachesPath: cachesPath,
+            cachesURL: cachesURL,
             cfg: try newConfiguration(),
             onVerificationFailure: {}
         )

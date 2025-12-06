@@ -8,7 +8,7 @@ import PartoutCore
 
 final class TLSWrapper {
     struct Parameters: Sendable {
-        let cachesPath: String
+        let cachesURL: URL
 
         let cfg: OpenVPN.Configuration
 

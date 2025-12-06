@@ -26,7 +26,7 @@ private final class NativeTLSWrapper: TLSProtocol {
 
     private let tls: pp_tls
 
-    private let caPath: String
+    private let caURL: URL
 
     private let didFailVerification: PassthroughStream<UniqueID, Void>
 
@@ -36,13 +36,14 @@ private final class NativeTLSWrapper: TLSProtocol {
         guard let ca = parameters.cfg.ca else {
             throw PPTLSError.missingCA
         }
-        caPath = parameters.cachesPath.appendingPathComponent(Constants.caFilename)
-        try ca.pem.write(toFile: caPath, encoding: .ascii)
+        caURL = parameters.cachesURL.appendingPathComponent(Constants.caFilename)
+        let caURLFilePath = caURL.filePath()
+        try ca.pem.write(toFile: caURLFilePath, encoding: .ascii)
 
         let securityLevel = parameters.cfg.tlsSecurityLevel
         let checksEKU = parameters.cfg.checksEKU ?? false
         let checksSANHost = parameters.cfg.checksSANHost ?? false
-        let caPath = caPath.withCString(pp_dup)
+        let caPath = caURLFilePath.withCString(pp_dup)
         let certPEM = parameters.cfg.clientCertificate?.pem.withCString(pp_dup)
         let keyPEM = parameters.cfg.clientKey?.pem.withCString(pp_dup)
         let hostname = parameters.cfg.sanHost?.withCString(pp_dup)
@@ -75,7 +76,7 @@ private final class NativeTLSWrapper: TLSProtocol {
         var error = PPTLSErrorNone
         guard let tls = pp_tls_create(options, &error) else {
             pp_tls_options_free(options)
-            try? FileManager.default.removeItem(atPath: self.caPath)
+            try? FileManager.default.removeItem(at: self.caURL)
 
             throw CTLSError(error)
         }
@@ -92,7 +93,7 @@ private final class NativeTLSWrapper: TLSProtocol {
 
     deinit {
         pp_tls_free(tls)
-        try? FileManager.default.removeItem(atPath: caPath)
+        try? FileManager.default.removeItem(at: caURL)
     }
 
     func start() throws {

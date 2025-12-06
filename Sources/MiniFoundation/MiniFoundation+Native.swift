@@ -27,6 +27,7 @@ extension MiniFoundation {
     }
 }
 
+// FIXME: #228, Generalize this with TextEncoding
 extension Dictionary where Key == String, Value == Data {
     public func decode<T>(_ type: T.Type, forKey key: String) throws -> T? where T: Decodable {
         guard let data = self[key] else {

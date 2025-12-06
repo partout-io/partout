@@ -29,7 +29,7 @@ final class OpenVPNSession {
 
     private let prng: PRNGProtocol
 
-    let cachesPath: String
+    let cachesURL: URL
 
     let options: OpenVPN.ConnectionOptions
 
@@ -103,7 +103,7 @@ final class OpenVPNSession {
         configuration: OpenVPN.Configuration,
         credentials: OpenVPN.Credentials?,
         prng: PRNGProtocol,
-        cachesPath: String,
+        cachesURL: URL,
         options: OpenVPN.ConnectionOptions = .init(),
         tlsFactory: @escaping TLSFactory,
         dpFactory: @escaping DataPathFactory
@@ -112,7 +112,7 @@ final class OpenVPNSession {
         self.configuration = configuration
         self.credentials = try credentials?.forAuthentication()
         self.prng = prng
-        self.cachesPath = cachesPath
+        self.cachesURL = cachesURL
         self.options = options
         self.tlsFactory = tlsFactory
         self.dpFactory = dpFactory
@@ -297,7 +297,7 @@ extension OpenVPNSession {
             }
         )
         let tlsParameters = TLSWrapper.Parameters(
-            cachesPath: cachesPath,
+            cachesURL: cachesURL,
             cfg: configuration,
             onVerificationFailure: { [weak self] in
                 Task {
