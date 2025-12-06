@@ -27,13 +27,13 @@ struct WireGuardAdapterTests {
         let targetAnyObject = try Endpoint(targetAny, port)
 
         let withEnabled = newMap(preferringIPv4: true)
-        let withDisabled = newMap(preferringIPv4: false)
         await withEnabled.setEndpoints(endpointObjects, for: address)
-        await withDisabled.setEndpoints(endpointObjects, for: address)
         let enabledMap = await withEnabled.toMap()
-        let disabledMap = await withDisabled.toMap()
-
         #expect(enabledMap[address] == [targetIPv4Object])
+
+        let withDisabled = newMap(preferringIPv4: false)
+        await withDisabled.setEndpoints(endpointObjects, for: address)
+        let disabledMap = await withDisabled.toMap()
         #expect(disabledMap[address] == endpointObjects)
         #expect(disabledMap[address]?.first == targetAnyObject)
     }
