@@ -6,7 +6,7 @@
 import PartoutCore
 #endif
 
-// FIXME: #228, Use compile-time Regex after Swift 6
+// FIXME: #171, Use compile-time Regex after Swift 6
 
 extension OpenVPN {
 
