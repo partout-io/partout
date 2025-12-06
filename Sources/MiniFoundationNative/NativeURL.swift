@@ -18,7 +18,7 @@ extension URL: MiniURLProtocol {
     }
 
     public func miniAppending(path: String) -> URL {
-        appending(path: path)
+        appendingPathComponent(path)
     }
 
     public func miniAppending(pathExtension: String) -> URL {
