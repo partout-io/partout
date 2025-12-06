@@ -12,12 +12,36 @@ import PartoutOS
 /// - Throws: an error of type `WireGuardAdapterError`.
 /// - Returns: The list of resolved endpoints.
 extension WireGuard.Configuration {
-    private actor ResolvedMap {
+    actor ResolvedMap {
+        private let preferringIPv4: Bool
         private var map: [Address: [Endpoint]] = [:]
+
+        init(preferringIPv4: Bool) {
+            self.preferringIPv4 = preferringIPv4
+        }
 
         func setEndpoints(_ endpoints: [Endpoint], for address: Address) {
             assert(!endpoints.isEmpty, "Assigning empty resolved endpoints")
-            map[address] = endpoints
+            if preferringIPv4 {
+                let targetEndpoint: Endpoint? = {
+                    // All resolved IPv4 addresses
+                    let allV4 = endpoints.filter {
+                        $0.address.family == .v4
+                    }
+                    // Pick first IPv4 address if any
+                    if let firstV4 = allV4.first {
+                        return firstV4
+                    }
+                    // Pick first address otherwise (expect IPv6, never hostname)
+                    guard let firstEndpoint = endpoints.first else { return nil }
+                    assert(firstEndpoint.address.family == .v6)
+                    return firstEndpoint
+                }()
+                guard let targetEndpoint else { return }
+                map = [address: [targetEndpoint]]
+            } else {
+                map = [address: endpoints]
+            }
         }
 
         func toMap() -> [Address: [Endpoint]] {
@@ -25,13 +49,17 @@ extension WireGuard.Configuration {
         }
     }
 
-    func resolvePeers(timeout: Int, logHandler: @escaping WireGuardAdapter.LogHandler) async -> [Address: [Endpoint]] {
+    func resolvePeers(
+        preferringIPv4: Bool,
+        timeout: Int,
+        logHandler: @escaping WireGuardAdapter.LogHandler
+    ) async -> [Address: [Endpoint]] {
         let endpoints = peers.compactMap(\.endpoint)
         let resolver = SimpleDNSResolver {
             POSIXDNSStrategy(hostname: $0)
         }
         return await withTaskGroup(returning: [Address: [Endpoint]].self) { group in
-            let allResolved = ResolvedMap()
+            let allResolved = ResolvedMap(preferringIPv4: preferringIPv4)
             for endpoint in endpoints {
                 group.addTask { @Sendable in
                     do {
@@ -50,7 +78,6 @@ extension WireGuard.Configuration {
                                 logHandler(.verbose, "DNS64: mapped \(endpoint.address) to \(record.address)")
                             }
                         }
-                        guard !currentResolved.isEmpty else { return }
                         await allResolved.setEndpoints(currentResolved, for: endpoint.address)
                     } catch {
                         logHandler(.error, "Failed to resolve endpoint \(endpoint.address.asSensitiveAddress(.global)): \(error.localizedDescription)")

@@ -20,6 +20,8 @@ public actor WireGuardConnection: Connection {
 
     private let moduleId: UniqueID
 
+    private let preferringIPv4: Bool
+
     private let controller: TunnelController
 
     private let reachability: ReachabilityObserver
@@ -39,11 +41,13 @@ public actor WireGuardConnection: Connection {
     public init(
         _ ctx: PartoutLoggerContext,
         parameters: ConnectionParameters,
-        module: WireGuardModule
+        module: WireGuardModule,
+        preferringIPv4: Bool
     ) throws {
         self.ctx = ctx
         statusSubject = CurrentValueStream(.disconnected)
         moduleId = module.id
+        self.preferringIPv4 = preferringIPv4
         controller = parameters.controller
         reachability = parameters.reachability
         environment = parameters.environment
@@ -72,6 +76,7 @@ public actor WireGuardConnection: Connection {
             ctx,
             with: self,
             moduleId: moduleId,
+            preferringIPv4: preferringIPv4,
             dnsTimeout: dnsTimeout,
             reachability: reachability,
             logHandler: { [weak self] logLevel, message in
