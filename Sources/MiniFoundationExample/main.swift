@@ -5,7 +5,7 @@
 import MiniFoundation
 
 print(MiniFoundation.operatingSystemVersion())
-let list = try FileManager.default.contentsOfDirectory(atPath: ".")
+let list = try FileManager.default.miniContentsOfDirectory(at: URL(fileURLWithPath: "."))
 print(list)
 // let data = try JSONEncoder().encode(url)
 // let json = String(data: data, encoding: .utf8)

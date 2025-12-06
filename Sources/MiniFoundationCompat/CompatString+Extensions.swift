@@ -10,6 +10,14 @@ import MiniFoundationCore
 extension String {
     // MARK: Initializers
 
+    public init(contentsOf url: Compat.URL, encoding: Compat.StringEncoding) throws {
+        let bytes = try FileBuffer(contentsOfFile: url.filePath()).bytes
+        guard let decoded = encoding.decode(bytes) else {
+            throw MiniFoundationError.encoding
+        }
+        self = decoded
+    }
+
     public init(contentsOfFile path: String, encoding: Compat.StringEncoding) throws {
         let bytes = try FileBuffer(contentsOfFile: path).bytes
         guard let decoded = encoding.decode(bytes) else {

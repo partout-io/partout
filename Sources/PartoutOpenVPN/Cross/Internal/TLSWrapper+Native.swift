@@ -76,7 +76,7 @@ private final class NativeTLSWrapper: TLSProtocol {
         var error = PPTLSErrorNone
         guard let tls = pp_tls_create(options, &error) else {
             pp_tls_options_free(options)
-            try? FileManager.default.removeItem(at: self.caURL)
+            try? FileManager.default.miniRemoveItem(at: self.caURL)
 
             throw CTLSError(error)
         }
@@ -93,7 +93,7 @@ private final class NativeTLSWrapper: TLSProtocol {
 
     deinit {
         pp_tls_free(tls)
-        try? FileManager.default.removeItem(at: caURL)
+        try? FileManager.default.miniRemoveItem(at: caURL)
     }
 
     func start() throws {

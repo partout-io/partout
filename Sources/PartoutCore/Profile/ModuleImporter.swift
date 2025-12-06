@@ -13,7 +13,7 @@ extension ModuleImporter {
     }
 
     public func module(fromURL url: URL, object: Any? = nil) throws -> Module {
-        let contents = try String(contentsOf: url)
+        let contents = try String(contentsOf: url, encoding: .utf8)
         return try module(fromContents: contents, object: object)
     }
 

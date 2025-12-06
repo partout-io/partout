@@ -21,7 +21,7 @@ extension LocalLogger {
             let suffix = Int(Date().timeIntervalSince1970).description
             let rotatedURL = url.appendingPathExtension(suffix)
 
-            try FileManager.default.moveItem(at: url, to: rotatedURL)
+            try FileManager.default.miniMoveItem(at: url, to: rotatedURL)
             if let oldLines {
                 try write(lines: oldLines, to: rotatedURL)
             }
@@ -36,7 +36,7 @@ extension LocalLogger {
             let prefix = url.lastPathComponent
             do {
                 let fm = FileManager.default
-                let contents = try fm.contentsOfDirectory(at: parent, includingPropertiesForKeys: nil)
+                let contents = try fm.miniContentsOfDirectory(at: parent)
                 return try contents.reduce(into: [:]) { found, item in
                     let filename = item.lastPathComponent
                     guard filename.hasPrefix(prefix) else {
@@ -46,7 +46,11 @@ extension LocalLogger {
                     guard let mdate = attrs[.modificationDate] as? Date else {
                         return
                     }
-                    found[mdate] = item
+                    guard let itemURL = item as? URL else {
+                        assertionFailure("Wrong URL type from MiniFoundation?")
+                        return
+                    }
+                    found[mdate] = itemURL
                 }
             } catch {
                 return [:]
@@ -64,7 +68,7 @@ extension LocalLogger {
                     return
                 }
                 guard minDate == nil || date >= minDate! else {
-                    try? FileManager.default.removeItem(at: logURL)
+                    try? FileManager.default.miniRemoveItem(at: logURL)
                     return
                 }
             }

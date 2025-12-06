@@ -41,17 +41,6 @@ extension Compat {
             return port > 0 ? Int(port) : nil
         }
 
-        public func filePath() -> String {
-            guard let str = minif_url_get_path(impl) else { return "" }
-            return "/" + String(cString: str)
-        }
-
-        public var lastPathComponent: String {
-            guard let str = minif_url_alloc_last_path(impl) else { return "" }
-            defer { str.deallocate() }
-            return String(cString: str)
-        }
-
         public var query: String? {
             guard let str = minif_url_get_query(impl) else { return nil }
             return String(cString: str)
@@ -65,6 +54,8 @@ extension Compat {
         public var absoluteString: String {
             String(cString: minif_url_get_string(impl))
         }
+
+        // MARK: CustomStringConvertible
 
         public var description: String {
             absoluteString
@@ -98,8 +89,44 @@ extension Compat.URL {
     }
 }
 
-// FIXME: #228, Test everything here, esp. on Windows
-private extension String {
+// MARK: File URLs
+
+// FIXME: #228, Implement and test everything here, esp. on Windows
+
+extension Compat.URL {
+    public convenience init(fileURLWithPath path: String) {
+        self.init(string: "file://\(path)")!
+    }
+
+    public func filePath() -> String {
+        guard let str = minif_url_get_path(impl) else { return "" }
+        return "/" + String(cString: str)
+    }
+
+    public var lastPathComponent: String {
+        guard let str = minif_url_alloc_last_path(impl) else { return "" }
+        defer { str.deallocate() }
+        return String(cString: str)
+    }
+
+    public func appendingPathExtension(_ extension: String) -> Self {
+        let newPath = "\(filePath()).\(`extension`)"
+        return Self(string: newPath)!
+    }
+
+    public func appendingPathComponent(_ component: String) -> Self {
+        let newPath = "\(filePath())\(String.pathSeparator).\(component)"
+        return Self(string: newPath)!
+    }
+
+    public func deletingLastPathComponent() -> Self {
+        var pathComponents = filePath().components(separatedBy: String.pathSeparator)
+        pathComponents.removeLast()
+        return Self(string: pathComponents.joined(separator: String.pathSeparator))!
+    }
+}
+
+extension String {
     static var pathSeparator: String {
 #if os(Windows)
         "\\"
@@ -116,9 +143,5 @@ private extension String {
         var comps = components(separatedBy: Self.pathSeparator)
         comps.removeLast()
         return comps.joined(separator: Self.pathSeparator)
-    }
-
-    var lastPathComponent: String {
-        components(separatedBy: Self.pathSeparator).last ?? ""
     }
 }

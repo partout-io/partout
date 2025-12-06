@@ -29,7 +29,8 @@ extension Compat {
 #if !os(Windows)
 
 extension Compat.FileManager: MiniFileManager {
-    public func contentsOfDirectory(atPath path: String) throws -> [String] {
+    public func miniContentsOfDirectory(at url: MiniURLProtocol) throws -> [MiniURLProtocol] {
+        let path = url.filePath()
         guard let dir = opendir(path) else {
             throw MiniFoundationError.file(.failedToOpenDirectory(path))
         }
@@ -46,10 +47,27 @@ extension Compat.FileManager: MiniFileManager {
             guard name != "." && name != ".." else { continue }
             result.append(name)
         }
-        return result
+        return result.map {
+            Compat.URL(fileURLWithPath: path.appendingPathComponent($0))
+        }
     }
 
-    public func miniAttributesOfItem(atPath path: String) throws -> [MiniFileAttribute: Any] {
+    public func miniMoveItem(at url: MiniURLProtocol, to: MiniURLProtocol) throws {
+        let path = url.filePath()
+        let toPath = to.filePath()
+        guard rename(path, toPath) == 0 else {
+            throw MiniFoundationError.file(.failedToMove(path, toPath))
+        }
+    }
+
+    public func miniRemoveItem(at url: MiniURLProtocol) throws {
+        let path = url.filePath()
+        guard unlink(path) == 0 else {
+            throw MiniFoundationError.file(.failedToRemove(path))
+        }
+    }
+
+    public func attributesOfItem(atPath path: String) throws -> [MiniFileAttribute: Any] {
         var statBuf = stat()
         guard stat(path, &statBuf) == 0 else {
             throw MiniFoundationError.file(.failedToStat(path))
@@ -66,18 +84,6 @@ extension Compat.FileManager: MiniFileManager {
         attributes[.creationDate] = Compat.Date(timeIntervalSince1970: Compat.TimeInterval(ctime))
         attributes[.modificationDate] = Compat.Date(timeIntervalSince1970: Compat.TimeInterval(mtime))
         return attributes
-    }
-
-    public func moveItem(atPath path: String, toPath: String) throws {
-        guard rename(path, toPath) == 0 else {
-            throw MiniFoundationError.file(.failedToMove(path, toPath))
-        }
-    }
-
-    public func removeItem(atPath path: String) throws {
-        guard unlink(path) == 0 else {
-            throw MiniFoundationError.file(.failedToRemove(path))
-        }
     }
 
     public func fileExists(atPath path: String) -> Bool {
@@ -110,7 +116,7 @@ extension Compat.FileManager {
         return result
     }
 
-    public func attributesOfItem(atPath path: String) throws -> [MiniFileAttribute: Any] {
+    public func miniAttributesOfItem(atPath path: String) throws -> [MiniFileAttribute: Any] {
         var attr = WIN32_FILE_ATTRIBUTE_DATA()
         guard GetFileAttributesExW(path.wideCString, GetFileExInfoStandard, &attr) != 0 else {
             throw MiniFoundationError.file(.failedToStat(path))
