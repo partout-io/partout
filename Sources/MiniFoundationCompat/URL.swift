@@ -114,8 +114,13 @@ extension Compat.URL {
         return Self(string: newPath)!
     }
 
-    public func appendingPathComponent(_ component: String) -> Self {
+    public func miniAppending(component: String) -> Self {
         let newPath = "\(filePath())\(String.pathSeparator).\(component)"
+        return Self(string: newPath)!
+    }
+
+    public func miniAppending(path: String) -> Self {
+        let newPath = "\(filePath())\(String.pathSeparator).\(path)"
         return Self(string: newPath)!
     }
 

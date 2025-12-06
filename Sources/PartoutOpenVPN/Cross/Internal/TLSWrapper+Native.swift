@@ -36,7 +36,7 @@ private final class NativeTLSWrapper: TLSProtocol {
         guard let ca = parameters.cfg.ca else {
             throw PPTLSError.missingCA
         }
-        caURL = parameters.cachesURL.appendingPathComponent(Constants.caFilename)
+        caURL = parameters.cachesURL.miniAppending(component: Constants.caFilename)
         let caURLFilePath = caURL.filePath()
         try ca.pem.write(toFile: caURLFilePath, encoding: .ascii)
 

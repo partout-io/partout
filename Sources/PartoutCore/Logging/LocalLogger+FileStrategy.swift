@@ -9,7 +9,7 @@ extension LocalLogger {
 
         public func size(of url: URL) -> UInt64 {
             do {
-                let attrs = try FileManager.default.attributesOfItem(atPath: url.filePath())
+                let attrs = try FileManager.default.miniAttributesOfItem(atPath: url.filePath())
                 return attrs[.size] as? UInt64 ?? 0
             } catch {
                 NSLog("LocalLogger: Unable to read current log size: \(error)")
@@ -42,7 +42,7 @@ extension LocalLogger {
                     guard filename.hasPrefix(prefix) else {
                         return
                     }
-                    let attrs = try fm.attributesOfItem(atPath: item.filePath())
+                    let attrs = try fm.miniAttributesOfItem(atPath: item.filePath())
                     guard let mdate = attrs[.modificationDate] as? Date else {
                         return
                     }

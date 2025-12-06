@@ -12,4 +12,12 @@ extension URL: MiniURLProtocol {
         // FIXME: #228, Is .path(percentEncoded: false|true) the same?
         path
     }
+
+    public func miniAppending(component: String) -> URL {
+        appending(component: component)
+    }
+
+    public func miniAppending(path: String) -> URL {
+        appending(path: path)
+    }
 }
