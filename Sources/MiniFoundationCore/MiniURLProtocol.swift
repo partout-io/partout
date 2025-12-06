@@ -12,8 +12,8 @@ public protocol MiniURLProtocol: Sendable {
     // File URLs
     func filePath() -> String
     var lastPathComponent: String { get }
-    func appendingPathExtension(_ extension: String) -> Self
     func miniAppending(component: String) -> Self
     func miniAppending(path: String) -> Self
-    func deletingLastPathComponent() -> Self
+    func miniAppending(pathExtension: String) -> Self
+    func miniDeletingLastPathComponent() -> Self
 }

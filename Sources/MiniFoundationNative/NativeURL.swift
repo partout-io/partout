@@ -20,4 +20,12 @@ extension URL: MiniURLProtocol {
     public func miniAppending(path: String) -> URL {
         appending(path: path)
     }
+
+    public func miniAppending(pathExtension: String) -> URL {
+        appendingPathExtension(pathExtension)
+    }
+
+    public func miniDeletingLastPathComponent() -> URL {
+        deletingLastPathComponent()
+    }
 }

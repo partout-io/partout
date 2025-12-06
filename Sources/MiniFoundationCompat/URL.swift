@@ -91,7 +91,7 @@ extension Compat.URL {
 
 // MARK: File URLs
 
-// FIXME: #228, Implement and test everything here, esp. on Windows
+// FIXME: #228, Optimistic, implement and test everything here, esp. on Windows
 
 extension Compat.URL {
     public convenience init(fileURLWithPath path: String) {
@@ -109,11 +109,6 @@ extension Compat.URL {
         return String(cString: str)
     }
 
-    public func appendingPathExtension(_ extension: String) -> Self {
-        let newPath = "\(filePath()).\(`extension`)"
-        return Self(string: newPath)!
-    }
-
     public func miniAppending(component: String) -> Self {
         let newPath = "\(filePath())\(String.pathSeparator).\(component)"
         return Self(string: newPath)!
@@ -124,7 +119,12 @@ extension Compat.URL {
         return Self(string: newPath)!
     }
 
-    public func deletingLastPathComponent() -> Self {
+    public func miniAppending(pathExtension: String) -> Self {
+        let newPath = "\(filePath()).\(pathExtension)"
+        return Self(string: newPath)!
+    }
+
+    public func miniDeletingLastPathComponent() -> Self {
         var pathComponents = filePath().components(separatedBy: String.pathSeparator)
         pathComponents.removeLast()
         return Self(string: pathComponents.joined(separator: String.pathSeparator))!

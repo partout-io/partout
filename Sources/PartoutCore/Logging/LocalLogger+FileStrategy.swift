@@ -19,7 +19,7 @@ extension LocalLogger {
 
         public func rotate(url: URL, withLines oldLines: [String]?) throws {
             let suffix = Int(Date().timeIntervalSince1970).description
-            let rotatedURL = url.appendingPathExtension(suffix)
+            let rotatedURL = url.miniAppending(pathExtension: suffix)
 
             try FileManager.default.miniMoveItem(at: url, to: rotatedURL)
             if let oldLines {
@@ -32,7 +32,7 @@ extension LocalLogger {
         }
 
         public func availableLogs(at url: URL) -> [Date: URL] {
-            let parent = url.deletingLastPathComponent()
+            let parent = url.miniDeletingLastPathComponent()
             let prefix = url.lastPathComponent
             do {
                 let fm = FileManager.default

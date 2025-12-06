@@ -38,12 +38,12 @@ struct URLTests {
 //    @Test
 //    func building() throws {
 //        var url = try #require(URL(string: "https://abi.com?foobar"))
-//        url = url.appending(component: "jesuschrist")
+//        url = url.miniAppending(component: "jesuschrist")
 //        #expect(url.absoluteString == "https://abi.com/jesuschrist?foobar")
-//        url = url.appendingPathExtension("json")
+//        url = url.miniAppending(pathExtension: "json")
 //        #expect(url.absoluteString == "https://abi.com/jesuschrist.json?foobar")
-//        url = url.appending(component: "/")
-//        url = url.appendingPathExtension("hi")
+//        url = url.miniAppending(component: "/")
+//        url = url.miniAppending(pathExtension: "hi")
 //        #expect(url.absoluteString == "https://abi.com/jesuschrist.json/.hi/?foobar")
 //    }
 }
