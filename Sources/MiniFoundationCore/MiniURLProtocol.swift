@@ -6,11 +6,12 @@ public protocol MiniURLProtocol: Sendable {
     var scheme: String? { get }
     var host: String? { get }
     var port: Int? { get }
-    var lastPathComponent: String { get }
     var query: String? { get }
     var fragment: String? { get }
     var absoluteString: String { get }
+    // File URLs
     func filePath() -> String
+    var lastPathComponent: String { get }
     func appendingPathExtension(_ extension: String) -> Self
     func appendingPathComponent(_ component: String) -> Self
     func deletingLastPathComponent() -> Self

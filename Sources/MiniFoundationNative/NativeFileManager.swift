@@ -12,6 +12,30 @@ extension FileManager: MiniFileManager {
         temporaryDirectory.appending(component: filename).filePath()
     }
 
+    public func miniContentsOfDirectory(at url: MiniURLProtocol) throws -> [MiniURLProtocol] {
+        guard let url = url as? URL else {
+            assertionFailure("Unexpected URL type")
+            return []
+        }
+        return try contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+    }
+
+    public func miniMoveItem(at url: MiniURLProtocol, to: MiniURLProtocol) throws {
+        guard let url = url as? URL, let to = to as? URL else {
+            assertionFailure("Unexpected URL type")
+            return
+        }
+        try moveItem(at: url, to: to)
+    }
+
+    public func miniRemoveItem(at url: MiniURLProtocol) throws {
+        guard let url = url as? URL else {
+            assertionFailure("Unexpected URL type")
+            return
+        }
+        try removeItem(at: url)
+    }
+
     public func miniAttributesOfItem(atPath path: String) throws -> [MiniFileAttribute: Any] {
         try attributesOfItem(atPath: path)
             .reduce(into: [:]) {

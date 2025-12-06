@@ -7,7 +7,7 @@ public protocol MiniFileManager: AnyObject, Sendable {
     func miniContentsOfDirectory(at url: MiniURLProtocol) throws -> [MiniURLProtocol]
     func miniMoveItem(at url: MiniURLProtocol, to: MiniURLProtocol) throws
     func miniRemoveItem(at url: MiniURLProtocol) throws
-    func attributesOfItem(atPath path: String) throws -> [MiniFileAttribute: Any]
+    func miniAttributesOfItem(atPath path: String) throws -> [MiniFileAttribute: Any]
     func fileExists(atPath path: String) -> Bool
 }
 
