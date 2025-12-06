@@ -20,6 +20,9 @@ public typealias IndexSet = [Int]
 public typealias JSONDecoder = Compat.JSONDecoder
 public typealias JSONEncoder = Compat.JSONEncoder
 public typealias RegularExpression = Compat.RegularExpression
+extension String {
+    public typealias Encoding = Compat.StringEncoding
+}
 public typealias TimeInterval = Compat.TimeInterval
 public typealias URL = Compat.URL
 public typealias UUID = Compat.UUID
