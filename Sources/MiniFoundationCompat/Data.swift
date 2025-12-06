@@ -34,6 +34,13 @@ extension Compat {
             backend = Array(UnsafeBufferPointer(start: bytes, count: count))
         }
 
+        // FIXME: #228, Ensure file URL
+//        public init(contentsOf url: URL) throws {
+//            precondition(url.is)
+//            let buf = try FileBuffer(contentsOfFile: url.filePath())
+//            self.init(buf.bytes)
+//        }
+
         public init(_ slice: ArraySlice<UInt8>) {
             backend = Array(slice)
         }

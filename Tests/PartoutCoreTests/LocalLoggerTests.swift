@@ -51,7 +51,7 @@ private extension LocalLoggerTests {
 
         return LocalLogger(
             strategy: strategy,
-            path: "foobar",
+            url: URL(fileURLWithPath: "foobar"),
             options: .init(
                 maxLevel: logLevel,
                 maxSize: maxSize,
@@ -69,38 +69,38 @@ private final class MockStrategy: LocalLogger.Strategy {
 
     var moveCount = 0
 
-    var newPath: String?
+    var newURL: URL?
 
     var oldLines: Int?
 
     var newLines: Int?
 
-    func size(of path: String) -> UInt64 {
+    func size(of url: URL) -> UInt64 {
         currentSize
     }
 
-    func rotate(path: String, withLines _: [String]?) throws {
+    func rotate(url: URL, withLines _: [String]?) throws {
         moveCount += 1
         currentSize = 0
-        newPath = path
+        newURL = url
         oldLines = 0
     }
 
-    func append(lines: [String], to path: String) throws {
+    func append(lines: [String], to url: URL) throws {
         currentSize += UInt64(lines.reduce(0, {
             $0 + $1.count + 1 // "\n"
         }))
-        if path == newPath {
+        if url == newURL {
             newLines = lines.count
         } else {
             oldLines = lines.count
         }
     }
 
-    func availableLogs(at path: String) -> [Date : String] {
+    func availableLogs(at url: URL) -> [Date: URL] {
         [:]
     }
 
-    func purgeLogs(at path: String, beyond maxAge: TimeInterval?, includingCurrent: Bool) {
+    func purgeLogs(at url: URL, beyond maxAge: TimeInterval?, includingCurrent: Bool) {
     }
 }

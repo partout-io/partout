@@ -7,9 +7,9 @@ extension LocalLogger {
         public init() {
         }
 
-        public func size(of path: String) -> UInt64 {
+        public func size(of url: URL) -> UInt64 {
             do {
-                let attrs = try FileManager.default.attributesOfItem(atPath: path)
+                let attrs = try FileManager.default.attributesOfItem(atPath: url.filePath())
                 return attrs[.size] as? UInt64 ?? 0
             } catch {
                 NSLog("LocalLogger: Unable to read current log size: \(error)")
@@ -17,32 +17,32 @@ extension LocalLogger {
             }
         }
 
-        public func rotate(path: String, withLines oldLines: [String]?) throws {
+        public func rotate(url: URL, withLines oldLines: [String]?) throws {
             let suffix = Int(Date().timeIntervalSince1970).description
-            let rotatedPath = "\(path).\(suffix)"
+            let rotatedURL = url.appendingPathExtension(suffix)
 
-            try FileManager.default.moveItem(atPath: path, toPath: rotatedPath)
+            try FileManager.default.moveItem(at: url, to: rotatedURL)
             if let oldLines {
-                try write(lines: oldLines, to: rotatedPath)
+                try write(lines: oldLines, to: rotatedURL)
             }
         }
 
-        public func append(lines: [String], to path: String) throws {
-            try write(lines: lines, to: path)
+        public func append(lines: [String], to url: URL) throws {
+            try write(lines: lines, to: url)
         }
 
-        public func availableLogs(at path: String) -> [Date: String] {
-            let parent = path.deletingLastPathComponent()
-            let prefix = path.lastPathComponent
+        public func availableLogs(at url: URL) -> [Date: URL] {
+            let parent = url.deletingLastPathComponent()
+            let prefix = url.lastPathComponent
             do {
                 let fm = FileManager.default
-                let contents = try fm.contentsOfDirectory(atPath: parent)
+                let contents = try fm.contentsOfDirectory(at: parent, includingPropertiesForKeys: nil)
                 return try contents.reduce(into: [:]) { found, item in
                     let filename = item.lastPathComponent
                     guard filename.hasPrefix(prefix) else {
                         return
                     }
-                    let attrs = try fm.attributesOfItem(atPath: item)
+                    let attrs = try fm.attributesOfItem(atPath: item.filePath())
                     guard let mdate = attrs[.modificationDate] as? Date else {
                         return
                     }
@@ -53,18 +53,18 @@ extension LocalLogger {
             }
         }
 
-        public func purgeLogs(at path: String, beyond maxAge: TimeInterval?, includingCurrent: Bool) {
-            let logs = availableLogs(at: path)
+        public func purgeLogs(at url: URL, beyond maxAge: TimeInterval?, includingCurrent: Bool) {
+            let logs = availableLogs(at: url)
             // Filter max age if provided, else purge everything (no date is >= .max)
             let minDate = maxAge.map {
                 Date(timeIntervalSince1970: -$0)
             }
-            logs.forEach { date, logPath in
-                guard includingCurrent || logPath != path else { // skip current log
+            logs.forEach { date, logURL in
+                guard includingCurrent || logURL != url else { // skip current log
                     return
                 }
                 guard minDate == nil || date >= minDate! else {
-                    try? FileManager.default.removeItem(atPath: logPath)
+                    try? FileManager.default.removeItem(at: logURL)
                     return
                 }
             }
@@ -73,10 +73,11 @@ extension LocalLogger {
 }
 
 private extension LocalLogger.FileStrategy {
-    func write(lines: [String], to path: String) throws {
+    func write(lines: [String], to url: URL) throws {
         do {
             let mf = FileManager.default
             let textToAppend = (lines + [""]).joined(separator: "\n")
+            let path = url.filePath()
             guard mf.fileExists(atPath: path) else {
                 try textToAppend.write(toFile: path, encoding: .utf8)
                 return

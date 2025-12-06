@@ -9,7 +9,7 @@ import MiniFoundationCore
 
 extension URL: MiniURLProtocol {
     public func filePath() -> String {
-        // FIXME: #228, Is this the same as deprecated .path ?
-        path()
+        // FIXME: #228, Is .path(percentEncoded: false|true) the same?
+        path
     }
 }

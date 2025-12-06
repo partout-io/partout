@@ -117,8 +117,8 @@ extension PartoutLogger {
         localLogger != nil
     }
 
-    public var localLoggerPath: String? {
-        localLogger?.path
+    public var localLoggerURL: URL? {
+        localLogger?.url
     }
 
     public func appendLog(_ level: DebugLog.Level, message: String) {
@@ -169,11 +169,11 @@ extension PartoutLogger {
 
         /// Enables the local logger in addition to OSLog. Only use for troubleshooting.
         public mutating func setLocalLogger(
-            path: String,
+            url: URL,
             options: LocalLogger.Options,
             mapper: @escaping (DebugLog.Line) -> String
         ) {
-            localLogger = LocalLogger(path: path, options: options, mapper: mapper)
+            localLogger = LocalLogger(url: url, options: options, mapper: mapper)
         }
 
         public func build() -> PartoutLogger {
