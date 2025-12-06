@@ -64,12 +64,11 @@ extension LocalLogger {
                 Date(timeIntervalSince1970: -$0)
             }
             logs.forEach { date, logURL in
-                guard includingCurrent || logURL != url else { // skip current log
+                guard includingCurrent || logURL != url else { // Skip current log
                     return
                 }
-                guard minDate == nil || date >= minDate! else {
+                if minDate == nil || date < minDate! {
                     try? FileManager.default.miniRemoveItem(at: logURL)
-                    return
                 }
             }
         }
