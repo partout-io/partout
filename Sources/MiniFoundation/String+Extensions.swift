@@ -3,29 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 extension String {
-    // FIXME: #228, Test everything here, esp. on Windows
-//    public static var pathSeparator: String {
-//#if os(Windows)
-//        "\\"
-//#else
-//        "/"
-//#endif
-//    }
-//
-//    public func appendingPathComponent(_ component: String) -> String {
-//        "\(self)\(Self.pathSeparator)\(component)"
-//    }
-//
-//    public func deletingLastPathComponent() -> String {
-//        var comps = components(separatedBy: Self.pathSeparator)
-//        comps.removeLast()
-//        return comps.joined(separator: Self.pathSeparator)
-//    }
-//
-//    public var lastPathComponent: String {
-//        components(separatedBy: Self.pathSeparator).last ?? ""
-//    }
-
     public func hexData() -> Data? {
         let len = self.count
         guard len % 2 == 0 else { return nil } // must be even length

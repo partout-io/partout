@@ -97,3 +97,28 @@ extension Compat.URL {
         hasher.combine(absoluteString)
     }
 }
+
+// FIXME: #228, Test everything here, esp. on Windows
+private extension String {
+    static var pathSeparator: String {
+#if os(Windows)
+        "\\"
+#else
+        "/"
+#endif
+    }
+
+    func appendingPathComponent(_ component: String) -> String {
+        "\(self)\(Self.pathSeparator)\(component)"
+    }
+
+    func deletingLastPathComponent() -> String {
+        var comps = components(separatedBy: Self.pathSeparator)
+        comps.removeLast()
+        return comps.joined(separator: Self.pathSeparator)
+    }
+
+    var lastPathComponent: String {
+        components(separatedBy: Self.pathSeparator).last ?? ""
+    }
+}
