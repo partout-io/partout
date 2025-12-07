@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     branches:
-      - master
+      - bugfix/release-workflow
     paths:
       - Sources/PartoutABI_C/partout.c
 
