@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - Sources/PartoutABI_C/partout.c
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish_release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse version
+        id: parse_version
+        env:
+          ABI_SOURCE: Sources/PartoutABI_C/partout.c
+        run: |
+          version=`sed -nE "s/^.*PARTOUT_VERSION = \"(.*)\".*$/\1/p" $ABI_SOURCE`
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.parse_version.outputs.version }}
+          tag_name: ${{ steps.parse_version.outputs.version }}
