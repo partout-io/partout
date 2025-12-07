@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - bugfix/release-workflow
-    paths:
-      - Sources/PartoutABI_C/partout.c
+    #paths:
+    #  - Sources/PartoutABI_C/partout.c
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
