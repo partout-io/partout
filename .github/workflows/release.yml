@@ -16,6 +16,7 @@ jobs:
     name: Publish Release
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Parse version
         id: parse_version
         env:
