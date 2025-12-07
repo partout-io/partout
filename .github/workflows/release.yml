@@ -29,3 +29,4 @@ jobs:
         with:
           name: ${{ steps.parse_version.outputs.version }}
           tag_name: ${{ steps.parse_version.outputs.version }}
+          generate_release_notes: true
