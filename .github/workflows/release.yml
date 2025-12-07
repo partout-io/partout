@@ -3,9 +3,9 @@ name: Release
 on:
   push:
     branches:
-      - bugfix/release-workflow
-    #paths:
-    #  - Sources/PartoutABI_C/partout.c
+      - master
+    paths:
+      - Sources/PartoutABI_C/partout.c
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
