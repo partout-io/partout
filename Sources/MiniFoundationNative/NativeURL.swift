@@ -10,7 +10,8 @@ import MiniFoundationCore
 extension URL: MiniURLProtocol {
     public func filePath() -> String {
         // FIXME: #228, Is .path(percentEncoded: false|true) the same?
-        path
+        assert(isFileURL)
+        return path
     }
 
     public func miniAppending(component: String) -> URL {
