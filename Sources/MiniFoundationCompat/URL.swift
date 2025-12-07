@@ -41,6 +41,17 @@ extension Compat {
             return port > 0 ? Int(port) : nil
         }
 
+        public var path: String {
+            guard let str = minif_url_get_path(impl) else { return "" }
+            return "/" + String(cString: str)
+        }
+
+        public var lastPathComponent: String {
+            guard let str = minif_url_alloc_last_path(impl) else { return "" }
+            defer { str.deallocate() }
+            return String(cString: str)
+        }
+
         public var query: String? {
             guard let str = minif_url_get_query(impl) else { return nil }
             return String(cString: str)
@@ -100,14 +111,7 @@ extension Compat.URL {
     }
 
     public func filePath() -> String {
-        guard let str = minif_url_get_path(impl) else { return "" }
-        return "/" + String(cString: str)
-    }
-
-    public var lastPathComponent: String {
-        guard let str = minif_url_alloc_last_path(impl) else { return "" }
-        defer { str.deallocate() }
-        return String(cString: str)
+        path
     }
 
     public func miniAppending(component: String) -> Self {
