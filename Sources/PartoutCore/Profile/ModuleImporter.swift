@@ -19,7 +19,8 @@ extension ModuleImporter {
     }
 
     public func module(fromPath path: String, object: Any? = nil) throws -> Module {
-        let contents = try String(contentsOfFile: path, encoding: .utf8)
+        var encoding: String.Encoding = .utf8
+        let contents = try String(contentsOfFile: path, usedEncoding: &encoding)
         return try module(fromContents: contents, object: object)
     }
 }

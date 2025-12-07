@@ -33,7 +33,8 @@ typedef struct {
     const char *_Nullable cert_pem;
     const char *_Nullable key_pem;
     const char *_Nullable hostname;
-    void (*_Nonnull on_verify_failure)();
+    void *_Nullable ctx;
+    void (*_Nonnull on_verify_failure)(void *_Nullable ctx);
 } pp_tls_options;
 
 typedef struct _pp_tls *pp_tls;
@@ -46,7 +47,8 @@ pp_tls_options *_Nonnull pp_tls_options_create(int sec_level,
                                                const char *_Nullable cert_pem,
                                                const char *_Nullable key_pem,
                                                const char *_Nullable hostname,
-                                               void (*_Nonnull on_verify_failure)());
+                                               void *_Nullable ctx,
+                                               void (*_Nonnull on_verify_failure)(void *_Nullable ctx));
 
 void pp_tls_options_free(pp_tls_options *_Nonnull opt);
 

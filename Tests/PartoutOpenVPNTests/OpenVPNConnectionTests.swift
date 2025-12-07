@@ -237,7 +237,7 @@ struct OpenVPNConnectionTests {
     func givenStartedConnection_whenUpgraded_thenDisconnectsWithNetworkChanged() async throws {
         let session = MockOpenVPNSession()
         var status: ConnectionStatus
-        let hasBetterPath = PassthroughStream<Void>()
+        let hasBetterPath = PassthroughStream<UniqueID, Void>()
         let factory = MockNetworkInterfaceFactory()
         factory.linkBlock = {
             $0.hasBetterPath = hasBetterPath.subscribe()

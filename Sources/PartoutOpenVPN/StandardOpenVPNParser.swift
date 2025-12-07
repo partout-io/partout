@@ -54,14 +54,9 @@ public final class StandardOpenVPNParser {
     /// The decrypter for private keys.
     private let decrypter: (KeyDecrypter & Sendable)?
 
-    private let rxOptions: [(option: OpenVPN.Option, rx: RegularExpression)] = OpenVPN.Option.allCases.compactMap {
-        do {
-            let rx = try $0.regularExpression()
-            return ($0, rx)
-        } catch {
-            assertionFailure("Unable to build regex for '\($0.rawValue)': \(error)")
-            return nil
-        }
+    private let rxOptions: [(option: OpenVPN.Option, rx: RegularExpression)] = OpenVPN.Option.allCases.map {
+        let rx = $0.regularExpression()
+        return ($0, rx)
     }
 
     init(decrypter: (KeyDecrypter & Sendable)?) {
@@ -250,8 +245,7 @@ private extension String {
     func trimmedLines() -> [String] {
         components(separatedBy: .newlines)
             .map {
-                $0.trimmingCharacters(in: .whitespacesAndNewlines)
-                    .replacingOccurrences(of: "\\s", with: " ", options: .regularExpression)
+                $0.strippingWhitespaces()
             }
             .filter {
                 !$0.isEmpty

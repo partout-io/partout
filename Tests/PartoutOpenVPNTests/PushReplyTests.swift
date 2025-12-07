@@ -208,6 +208,14 @@ struct PushReplyTests {
         ])
         #expect(reply?.options.routeGateway4?.rawValue == "10.8.0.1")
     }
+
+    @Test
+    func givenPushReply_whenGetDescription_thenIsStripped() throws {
+        let msg = "PUSH_REPLY,ifconfig 10.8.0.2,auth-token somethingsecret,cipher AES-128-CBC"
+        let reply = try parser.pushReply(with: msg)
+        reply?.debug()
+        #expect(reply?.description == "PUSH_REPLY,ifconfig 10.8.0.2,auth-token,cipher AES-128-CBC")
+    }
 }
 
 // MARK: - Helpers

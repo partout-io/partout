@@ -7,8 +7,16 @@ internal import _PartoutCore_C
 /// Aggregates an address and an ``EndpointProtocol``.
 public struct ExtendedEndpoint: Hashable, Codable, Sendable {
 
-    // XXX: simplistic match
-    private static let rx = RegularExpression("^([^\\s]+):(UDP[46]?|TCP[46]?):(\\d+)$")
+    // XXX: Simplistic match
+    nonisolated(unsafe)
+    private static let rx: Regex = {
+        let pattern = "^([^\\s]+):(UDP[46]?|TCP[46]?):(\\d+)$"
+        do {
+            return try Regex<(Substring, Substring, Substring, Substring)>(pattern)
+        } catch {
+            fatalError("Invalid pattern: \(pattern), \(error)")
+        }
+    }()
 
     public let address: Address
 
@@ -45,18 +53,22 @@ public struct ExtendedEndpoint: Hashable, Codable, Sendable {
 
 extension ExtendedEndpoint: RawRepresentable {
     public init?(rawValue: String) {
-        let components = Self.rx.groups(in: rawValue)
-        guard components.count == 3 else {
+        do {
+            guard let match = try Self.rx.wholeMatch(in: rawValue) else {
+                return nil
+            }
+            let rawAddress = String(match.1)
+            guard let socketType = IPSocketType(rawValue: String(match.2)) else {
+                return nil
+            }
+            guard let port = UInt16(match.3) else {
+                return nil
+            }
+            try self.init(rawAddress, EndpointProtocol(socketType, port))
+        } catch {
+            print(error)
             return nil
         }
-        let rawAddress = components[0]
-        guard let socketType = IPSocketType(rawValue: components[1]) else {
-            return nil
-        }
-        guard let port = UInt16(components[2]) else {
-            return nil
-        }
-        try? self.init(rawAddress, EndpointProtocol(socketType, port))
     }
 
     public var rawValue: String {

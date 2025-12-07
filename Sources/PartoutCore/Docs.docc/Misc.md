@@ -54,6 +54,5 @@ Generic entities and helpers.
 - ``Keychain``
 - ``MutableUniquelyIdentifiable``
 - ``ScriptingEngine``
-- ``Timestamp``
 - ``UniqueID``
 - ``UniquelyIdentifiable``

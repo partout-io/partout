@@ -123,7 +123,8 @@ extension ControlChannel {
                     memcpy(dst, src, headerLength)
                 }
             }
-            decryptedPacket.count = headerLength + decryptedCount
+            assert(headerLength + decryptedCount <= decryptedPacket.count)
+            decryptedPacket.shrink(to: headerLength + decryptedCount)
 
             // XXX: validate replay packet id
 

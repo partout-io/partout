@@ -8,8 +8,8 @@ import Testing
 struct NetworkObserverTests {
     @Test
     func givenUnboundStatus_whenAnyStatus_thenObserverFires() async throws {
-        let reachability = PassthroughStream<Bool>()
-        let status = PassthroughStream<ConnectionStatus>()
+        let reachability = PassthroughStream<UniqueID, Bool>()
+        let status = PassthroughStream<UniqueID, ConnectionStatus>()
 
         let sut = NetworkObserver(
             .global,
@@ -35,8 +35,8 @@ struct NetworkObserverTests {
 
     @Test
     func givenBoundStatus_whenStatusMatches_thenObserverFires() async throws {
-        let reachability = PassthroughStream<Bool>()
-        let status = PassthroughStream<ConnectionStatus>()
+        let reachability = PassthroughStream<UniqueID, Bool>()
+        let status = PassthroughStream<UniqueID, ConnectionStatus>()
 
         let sut = NetworkObserver(
             .global,
@@ -72,8 +72,8 @@ struct NetworkObserverTests {
 
     @Test
     func givenBoundStatus_whenStatusMatches_thenObserverFiresAfterEnabling() async {
-        let reachability = PassthroughStream<Bool>()
-        let status = PassthroughStream<ConnectionStatus>()
+        let reachability = PassthroughStream<UniqueID, Bool>()
+        let status = PassthroughStream<UniqueID, ConnectionStatus>()
         let reachabilityStream = reachability.subscribe()
         let statusStream = status.subscribe()
 

@@ -17,7 +17,7 @@ public final class LocalLogger: @unchecked Sendable {
 
         func availableLogs(at url: URL) -> [Date: URL]
 
-        func purgeLogs(at url: URL, beyond maxAge: TimeInterval, includingCurrent: Bool)
+        func purgeLogs(at url: URL, beyond maxAge: TimeInterval?, includingCurrent: Bool)
     }
 
     /// The options to configure the local logger.
@@ -96,6 +96,10 @@ public final class LocalLogger: @unchecked Sendable {
         }
     }
 
+    func currentLog(sinceLast: TimeInterval, maxLevel: DebugLog.Level) -> [String] {
+        currentLines(sinceLast: sinceLast, maxLevel: maxLevel).map(mapper)
+    }
+
     func save() {
         queue.sync {
             unsafeSave()
@@ -113,7 +117,7 @@ public final class LocalLogger: @unchecked Sendable {
 
 extension LocalLogger.Strategy {
     public func purgeLogs(at url: URL) {
-        purgeLogs(at: url, beyond: -.infinity, includingCurrent: true)
+        purgeLogs(at: url, beyond: nil, includingCurrent: true)
     }
 }
 

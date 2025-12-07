@@ -1,0 +1,25 @@
+// SPDX-FileCopyrightText: 2025 Davide De Rosa
+//
+// SPDX-License-Identifier: MIT
+
+#if canImport(Combine) && !MINI_FOUNDATION_COMPAT
+import Foundation
+
+@available(*, deprecated, message: "Not cross-platform")
+public func stream<O, V>(
+    for keyPath: KeyPath<O, V>,
+    of object: O,
+    filter: @escaping @Sendable (V) -> Bool
+) -> AsyncStream<V> where O: NSObject, V: Sendable {
+    AsyncStream { [weak object] continuation in
+        let observation = object?.observe(keyPath, options: [.initial, .new]) { _, change in
+            if let newValue = change.newValue, filter(newValue) {
+                continuation.yield(newValue)
+            }
+        }
+        continuation.onTermination = { @Sendable _ in
+            observation?.invalidate()
+        }
+    }
+}
+#endif

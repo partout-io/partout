@@ -51,7 +51,7 @@ private extension LocalLoggerTests {
 
         return LocalLogger(
             strategy: strategy,
-            url: URL(string: "foobar")!,
+            url: URL(fileURLWithPath: "foobar"),
             options: .init(
                 maxLevel: logLevel,
                 maxSize: maxSize,
@@ -101,6 +101,6 @@ private final class MockStrategy: LocalLogger.Strategy {
         [:]
     }
 
-    func purgeLogs(at url: URL, beyond maxAge: TimeInterval, includingCurrent: Bool) {
+    func purgeLogs(at url: URL, beyond maxAge: TimeInterval?, includingCurrent: Bool) {
     }
 }

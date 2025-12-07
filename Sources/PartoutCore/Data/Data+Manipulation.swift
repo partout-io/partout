@@ -173,12 +173,6 @@ extension Data {
     }
 }
 
-extension Data {
-    public func subdata(offset: Int, count: Int) -> Data {
-        subdata(in: offset..<(offset + count))
-    }
-}
-
 // MARK: - Collections
 
 extension Collection where Element == Data {

@@ -129,6 +129,10 @@ extension PartoutLogger {
         localLogger?.currentLines(sinceLast: sinceLast, maxLevel: maxLevel) ?? []
     }
 
+    public func currentLog(sinceLast: TimeInterval, maxLevel: DebugLog.Level) -> [String] {
+        localLogger?.currentLog(sinceLast: sinceLast, maxLevel: maxLevel) ?? []
+    }
+
     public func flushLog() {
         localLogger?.save()
     }

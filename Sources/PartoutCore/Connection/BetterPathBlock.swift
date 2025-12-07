@@ -2,5 +2,5 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-/// Returns a ``PassthroughStream`` to observe events about better network paths.
-public typealias BetterPathBlock = @Sendable () throws -> PassthroughStream<Void>
+/// Returns a stream to observe events about better network paths.
+public typealias BetterPathBlock = @Sendable () throws -> PassthroughStream<UniqueID, Void>

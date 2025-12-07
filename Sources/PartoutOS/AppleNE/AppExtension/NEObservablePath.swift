@@ -13,7 +13,7 @@ public final class NEObservablePath: ReachabilityObserver {
 
     private let monitor: NWPathMonitor
 
-    private nonisolated let subject: CurrentValueStream<NWPath>
+    private nonisolated let subject: CurrentValueStream<UniqueID, NWPath>
 
     public init(_ ctx: PartoutLoggerContext) {
         self.ctx = ctx

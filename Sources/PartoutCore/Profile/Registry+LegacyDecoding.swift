@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_FOUNDATION_COMPAT
+#if !MINI_FOUNDATION_COMPAT
 
 /// `Codable` implementation of ``ProfileCoder``.
 @available(*, deprecated, message: "#273")

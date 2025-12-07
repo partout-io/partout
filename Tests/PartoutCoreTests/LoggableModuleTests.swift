@@ -17,6 +17,7 @@ struct LoggableModuleTests {
         )
     }
 
+#if !MINI_FOUNDATION_COMPAT
     @Test
     func givenEncodableModule_whenLog_thenDoesNotReturnHandlerID() {
         let sut = SomeEncodableModule()
@@ -27,6 +28,7 @@ struct LoggableModuleTests {
             sut.moduleHandler.id.debugDescription
         )
     }
+#endif
 
     @Test
     func givenDebuggableModule_whenLog_thenReturnsDebugDescription() {

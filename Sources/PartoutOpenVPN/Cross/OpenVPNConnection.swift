@@ -68,7 +68,6 @@ public actor OpenVPNConnection {
             options: options,
             endpoints: endpoints
         )
-
     }
 
     deinit {

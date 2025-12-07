@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_FOUNDATION_COMPAT
+#if !MINI_FOUNDATION_COMPAT
 #if !os(iOS) && !os(tvOS)
 
 import PartoutABI_C
@@ -108,7 +108,7 @@ public func partout_deinit(cCtx: UnsafeMutableRawPointer) {
 public func partout_daemon_start(
     cCtx: UnsafeMutableRawPointer,
     cArgs: UnsafePointer<partout_daemon_start_args>
-) -> Int {
+) -> Bool {
     pp_log_g(.core, .debug, "Partout: Start daemon with ctx: \(cCtx)")
     let ctx = ABIContext.peek(cCtx)
     pp_log_g(.core, .debug, "Partout: Start daemon with ctx (ABIContext): \(ctx)")
@@ -146,7 +146,7 @@ public func partout_daemon_start(
         daemon = try makeDaemon(with: profile, registry: ctx.registry, ctrl: ctrl)
     } catch {
         pp_log_g(.core, .error, "Partout: Unable to create daemon: \(error)")
-        return -1
+        return false
     }
 
     // Throws .unknownImportedModule if missing implementation
@@ -165,7 +165,7 @@ public func partout_daemon_start(
         }
     }
 
-    return 0
+    return true
 }
 
 /// Stops the connection daemon.

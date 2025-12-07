@@ -19,8 +19,14 @@ struct PushReply {
 
 extension PushReply: CustomStringConvertible {
     var description: String {
-        let rx = RegularExpression(OpenVPN.Option.authToken.rawValue)
-        return rx.replacingMatches(in: original, withTemplate: "auth-token")
+        do {
+            // Drop leading "^" to match containment
+            let containing = String(OpenVPN.Option.authToken.rawValue.dropFirst())
+            let rx = try Regex(containing)
+            return original.replacing(rx, with: "auth-token")
+        } catch {
+            return original
+        }
     }
 }
 

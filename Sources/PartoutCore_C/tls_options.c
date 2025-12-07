@@ -8,14 +8,15 @@
 #include "tls/tls.h"
 
 pp_tls_options *_Nonnull pp_tls_options_create(int sec_level,
-                                                         size_t buf_len,
-                                                         bool eku,
-                                                         bool san_host,
-                                                         const char *_Nonnull ca_path,
-                                                         const char *_Nullable cert_pem,
-                                                         const char *_Nullable key_pem,
-                                                         const char *_Nullable hostname,
-                                                         void (*_Nonnull on_verify_failure)()) {
+                                               size_t buf_len,
+                                               bool eku,
+                                               bool san_host,
+                                               const char *_Nonnull ca_path,
+                                               const char *_Nullable cert_pem,
+                                               const char *_Nullable key_pem,
+                                               const char *_Nullable hostname,
+                                               void *ctx,
+                                               void (*_Nonnull on_verify_failure)(void *ctx)) {
 
     pp_assert(ca_path && on_verify_failure);
 
@@ -28,6 +29,7 @@ pp_tls_options *_Nonnull pp_tls_options_create(int sec_level,
     opt->cert_pem = cert_pem ? pp_dup(cert_pem) : NULL;
     opt->key_pem = key_pem ? pp_dup(key_pem) : NULL;
     opt->hostname = hostname ? pp_dup(hostname) : NULL;
+    opt->ctx = ctx;
     opt->on_verify_failure = on_verify_failure;
     return opt;
 }
