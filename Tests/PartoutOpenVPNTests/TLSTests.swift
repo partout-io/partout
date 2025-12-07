@@ -7,7 +7,7 @@ import PartoutCore
 import Testing
 
 struct TLSTests {
-    let cachesURL = URL(fileURLWithPath: FileManager.default.makeTemporaryPath(filename: ""))
+    let cachesURL = FileManager.default.makeTemporaryURL(filename: "")
 }
 
 extension TLSTests {

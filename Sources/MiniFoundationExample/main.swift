@@ -16,4 +16,4 @@ guard let url = URL(string: "https://abi.com/one///two?foobar") else {
 print("URL: \(url)")
 print("Path: \(url.filePath())")
 print("Last path component: \(url.lastPathComponent)")
-print(FileManager.default.makeTemporaryPath(filename: "hello.world"))
+print(FileManager.default.makeTemporaryURL(filename: "hello.world"))

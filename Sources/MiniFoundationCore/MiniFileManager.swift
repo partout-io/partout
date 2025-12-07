@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 public protocol MiniFileManager: AnyObject, Sendable {
-    func makeTemporaryPath(filename: String) -> String
+    func makeTemporaryURL(filename: String) -> MiniURLProtocol
     func miniContentsOfDirectory(at url: MiniURLProtocol) throws -> [MiniURLProtocol]
     func miniMoveItem(at url: MiniURLProtocol, to: MiniURLProtocol) throws
     func miniRemoveItem(at url: MiniURLProtocol) throws

@@ -8,8 +8,8 @@ import MiniFoundationCore
 #endif
 
 extension FileManager: MiniFileManager {
-    public func makeTemporaryPath(filename: String) -> String {
-        temporaryDirectory.miniAppending(component: filename).filePath()
+    public func makeTemporaryURL(filename: String) -> MiniURLProtocol {
+        temporaryDirectory.appending(component: filename)
     }
 
     public func miniContentsOfDirectory(at url: MiniURLProtocol) throws -> [MiniURLProtocol] {
