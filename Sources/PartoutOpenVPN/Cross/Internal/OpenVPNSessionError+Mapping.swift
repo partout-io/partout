@@ -25,6 +25,10 @@ private extension OpenVPNSessionError {
                     return .cryptoAlgorithm
                 }
             }
+            // PPTLSError
+            else if let tlsError = rawError as? PPTLSError {
+                return .tlsHandshake
+            }
             // CCryptoError
             else if let cryptoError = rawError as? CCryptoError {
                 switch cryptoError.code {
