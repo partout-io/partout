@@ -9,3 +9,4 @@ set -e
 sed -i '' -E "s/PARTOUT_VERSION = \"(.*)\"/PARTOUT_VERSION = \"$version\"/" $abi
 git add "$abi"
 git commit -m "Bump version"
+git tag -as "$version" -m "$version"
