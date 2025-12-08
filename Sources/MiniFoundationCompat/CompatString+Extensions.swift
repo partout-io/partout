@@ -188,7 +188,7 @@ extension String {
         let cArgs: [CVarArg] = args.map { arg in
             switch arg {
             case let s as String:
-                return UnsafePointer<CChar>(strdup(s))
+                return UnsafePointer<CChar>(minif_strdup(s))
             case let i as Int:
                 return i
             case let i as Int8:
@@ -214,12 +214,12 @@ extension String {
             default:
                 // Fall back to debugDescription
                 let s = "\(arg)"
-                return UnsafePointer<CChar>(strdup(s))
+                return UnsafePointer<CChar>(minif_strdup(s))
             }
         }
 
         // Convert format to C string
-        let cFormat = strdup(format.replacingOccurrences(of: "%@", with: "%s")) ?? UnsafeMutablePointer<CChar>.allocate(capacity: 1)
+        let cFormat = minif_strdup(format.replacingOccurrences(of: "%@", with: "%s"))
         defer {
             free(cFormat)
             // free strdup’d string args

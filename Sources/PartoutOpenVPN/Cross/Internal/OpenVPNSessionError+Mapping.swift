@@ -19,14 +19,11 @@ private extension OpenVPNSessionError {
     init(rawError: Error) {
         let code: OpenVPNErrorCode = {
             // PPCryptoError
-            if let cryptoError = rawError as? PPCryptoError {
-                switch cryptoError {
-                case .creation, .hmac:
-                    return .cryptoAlgorithm
-                }
+            if rawError is PPCryptoError {
+                return .cryptoAlgorithm
             }
             // PPTLSError
-            else if let tlsError = rawError as? PPTLSError {
+            else if rawError is PPTLSError {
                 return .tlsHandshake
             }
             // CCryptoError

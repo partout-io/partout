@@ -19,7 +19,7 @@ let areas = Set(Area.allCases)
 let cryptoMode: CryptoMode? = .openSSL
 let openSSLVersion: Version = "3.5.500"
 let wgGoVersion: Version = "0.0.2025063103"
-let cmakeOutput = envCMakeOutput ?? ".bin/windows-arm64"
+let cmakeOutput = envCMakeOutput ?? "bin/windows-arm64"
 let useFoundationCompatibility: FoundationCompatibility = .off
 // let useFoundationCompatibility: FoundationCompatibility = OS.current != .apple ? .on : .off
 
@@ -129,7 +129,7 @@ package.targets.append(contentsOf: [
         cSettings: globalCSettings + {
             if OS.current == .windows {
                 return [
-                    .unsafeFlags(["-I\(cmakeOutput)/../../vendors/wintun"])
+                    .unsafeFlags(["-I\(cmakeOutput)/wintun"])
                 ]
             }
             return []
@@ -254,6 +254,9 @@ if areas.contains(.wireGuard) {
                 dependencies: ["PartoutCore_C"],
                 cSettings: globalCSettings + [
                     .unsafeFlags(["-I\(cmakeOutput)/wg-go/include"])
+                ],
+                linkerSettings: [
+                    .unsafeFlags(["-L\(cmakeOutput)/wg-go/lib"])
                 ]
             )
         )
@@ -310,10 +313,7 @@ case .openSSL:
                     .unsafeFlags(["-I\(cmakeOutput)/openssl/include"])
                 ],
                 linkerSettings: [
-                    .unsafeFlags(["-L\(cmakeOutput)/openssl/lib"]),
-                    // WARNING: order matters, ssl then crypto
-                    .linkedLibrary("\(staticLibPrefix)ssl"),
-                    .linkedLibrary("\(staticLibPrefix)crypto")
+                    .unsafeFlags(["-L\(cmakeOutput)/openssl/lib"])
                 ]
             )
         )
@@ -335,11 +335,7 @@ case .native:
                 .unsafeFlags(["-I\(cmakeOutput)/mbedtls/include"])
             ],
             linkerSettings: [
-                .unsafeFlags(["-L\(cmakeOutput)/mbedtls/lib"]),
-                // WARNING: order matters
-                .linkedLibrary("mbedtls"),
-                .linkedLibrary("mbedx509"),
-                .linkedLibrary("mbedcrypto")
+                .unsafeFlags(["-L\(cmakeOutput)/mbedtls/lib"])
             ]
         )
     )
@@ -513,9 +509,7 @@ enum FoundationCompatibility {
     var wireGuardTestsExclude: [String] {
         switch self {
         case .off: []
-        case .on: [
-            "BackendTests.swift"
-        ]
+        case .on: []
         }
     }
 

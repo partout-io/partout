@@ -59,6 +59,10 @@ pp_socket pp_socket_open(const char *ip_addr,
                          uint16_t port,
                          bool blocking,
                          int timeout_ms) {
+    struct addrinfo hints, *resolved = NULL;
+    char port_str[16] = { 0 };
+    os_socket_fd new_fd = OS_INVALID_SOCKET;
+
 #ifdef _WIN32
     static int wsa_initialized = 0;
     if (!wsa_initialized) {
@@ -70,10 +74,6 @@ pp_socket pp_socket_open(const char *ip_addr,
         wsa_initialized = 1;
     }
 #endif
-
-    struct addrinfo hints, *resolved = NULL;
-    char port_str[16] = { 0 };
-    os_socket_fd new_fd = OS_INVALID_SOCKET;
 
     pp_zero(&hints, sizeof(hints));
     hints.ai_family = AF_UNSPEC;   // IPv4 or IPv6

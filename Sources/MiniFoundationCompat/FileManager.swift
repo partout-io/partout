@@ -94,8 +94,9 @@ extension Compat.FileManager: MiniFileManager {
 
 #else
 
-extension Compat.FileManager {
-    public func contentsOfDirectory(atPath path: String) throws -> [String] {
+extension Compat.FileManager: MiniFileManager {
+    public func miniContentsOfDirectory(at url: MiniURLProtocol) throws -> [MiniURLProtocol] {
+        let path = url.filePath()
         var findData = WIN32_FIND_DATAW()
         let searchPath = path + "\\*"
         let handle = searchPath.withWideCString { ptr in
@@ -108,56 +109,75 @@ extension Compat.FileManager {
 
         var result: [String] = []
         repeat {
-            let name = String(decodingCString: &findData.cFileName.0, as: UTF16.self)
+            let name = withUnsafePointer(to: &findData.cFileName.0) { ptr in
+                let len = wcslen(ptr)
+                let buf = UnsafeBufferPointer(start: ptr, count: Int(len))
+                return String(decoding: buf, as: UTF16.self)
+            }
             if name != "." && name != ".." {
                 result.append(name)
             }
-        } while FindNextFileW(handle, &findData) != 0
-        return result
+        } while FindNextFileW(handle, &findData)
+        return result.map {
+            Compat.URL(fileURLWithPath: $0)
+        }
+    }
+
+    public func miniMoveItem(at url: MiniURLProtocol, to: MiniURLProtocol) throws {
+        let fromPath = url.filePath()
+        let toPath = url.filePath()
+        try fromPath.withWideCString { wfrom in
+            try toPath.withWideCString { wto in
+                guard MoveFileW(wfrom, wto) else {
+                    throw MiniFoundationError.file(.failedToMove(fromPath, toPath))
+                }
+            }
+        }
+    }
+
+    public func miniRemoveItem(at url: MiniURLProtocol) throws {
+        let path = url.filePath()
+        try path.withWideCString { wpath in
+            guard DeleteFileW(wpath) else {
+                throw MiniFoundationError.file(.failedToRemove(path))
+            }
+        }
     }
 
     public func miniAttributesOfItem(atPath path: String) throws -> [MiniFileAttribute: Any] {
         var attr = WIN32_FILE_ATTRIBUTE_DATA()
-        guard GetFileAttributesExW(path.wideCString, GetFileExInfoStandard, &attr) != 0 else {
-            throw MiniFoundationError.file(.failedToStat(path))
+        try path.withWideCString { wpath in
+            guard GetFileAttributesExW(wpath, GetFileExInfoStandard, &attr) else {
+                throw MiniFoundationError.file(.failedToStat(path))
+            }
         }
-        let creation = Date(timeIntervalSince1970: filetimeToUnixTime(attr.ftCreationTime))
-        let modification = Date(timeIntervalSince1970: filetimeToUnixTime(attr.ftLastWriteTime))
+        let creation = Compat.Date(timeIntervalSince1970: filetimeToUnixTime(attr.ftCreationTime))
+        let modification = Compat.Date(timeIntervalSince1970: filetimeToUnixTime(attr.ftLastWriteTime))
         let size = UInt64(attr.nFileSizeHigh) << 32 | UInt64(attr.nFileSizeLow)
         return [.size: size, .creationDate: creation, .modificationDate: modification]
     }
 
-    public func moveItem(atPath path: String, toPath: String) throws {
-        guard MoveFileW(path.wideCString, toPath.wideCString) != 0 else {
-            throw MiniFoundationError.file(.failedToMove(path, toPath))
-        }
-    }
-
-    public func removeItem(atPath path: String) throws {
-        guard DeleteFileW(path.wideCString) != 0 else {
-            throw MiniFoundationError.file(.failedToRemove(path))
-        }
-    }
-
     public func fileExists(atPath path: String) -> Bool {
-        let attr = GetFileAttributesW(path.wideCString)
-        return attr != INVALID_FILE_ATTRIBUTES
+        path.withWideCString { wpath in
+            let attr = GetFileAttributesW(wpath)
+            return attr != INVALID_FILE_ATTRIBUTES
+        }
     }
 }
 
 private extension String {
-    func withWideCString<Result>(_ body: (UnsafePointer<WCHAR>) -> Result) -> Result {
-        var utf16 = Array(self.utf16) + [0] // Null-terminated
-        return utf16.withUnsafeBufferPointer { ptr in
-            body(ptr.baseAddress!)
+    func withWideCString<Result>(_ body: (UnsafePointer<UInt16>) throws -> Result) rethrows -> Result {
+        let utf16 = Array(self.utf16) + [0] // Null-terminated
+        return try utf16.withUnsafeBufferPointer { ptr in
+            try body(ptr.baseAddress!)
         }
     }
 }
 
-private func filetimeToUnixTime(_ ft: FILETIME) -> TimeInterval {
+private func filetimeToUnixTime(_ ft: FILETIME) -> Compat.TimeInterval {
     let fileTime = UInt64(ft.dwLowDateTime) | (UInt64(ft.dwHighDateTime) << 32)
     // FILETIME is in 100-nanosecond intervals since Jan 1, 1601
-    return TimeInterval(fileTime) / 10_000_000 - 11_644_473_600
+    return Compat.TimeInterval(fileTime) / 10_000_000 - 11_644_473_600
 }
 
 #endif
