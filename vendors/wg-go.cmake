@@ -26,11 +26,3 @@ ExternalProject_Add(
     INSTALL_COMMAND ""
     BUILD_IN_SOURCE 1
 )
-
-if(APPLE)
-    add_custom_command(
-        TARGET WireGuardGoProject
-        POST_BUILD
-        COMMAND install_name_tool -id "@rpath/libwg-go.dylib" "${WGGO_DIR}/lib/libwg-go.dylib"
-    )
-endif()

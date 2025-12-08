@@ -85,17 +85,17 @@ bin/<platform-arch>/partout.h       # The Partout ABI
 bin/darwin-arm64/libpartout.a       # macOS
 bin/linux-aarch64/libpartout.a      # Linux
 bin/windows-arm64/libpartout.lib    # Windows
-bin/android-aarch64/libpartout.so   # Android emits a shared library
+bin/android-aarch64/libpartout.a    # Android
 ```
 
-All binaries must be bundled with the Swift runtime to work.
+Additionally, `libpartout_c` and the shared vendored libs must also be linked. Partout must be bundled with the Swift runtime to work.
 
 Building for Android requires access to external SDKs:
 
 - `$ANDROID_NDK_ROOT` to point to your Android NDK installation
 - `$SWIFT_ANDROID_SDK` to point to your Swift for Android SDK installation (e.g. in `~/.swiftpm/swift-sdks`)
 
-The CMake configuration is done with the `android.cmake` toolchain. The script runs on macOS, but can be adapted for other platforms with slight tweaks to `scripts/build.sh`.
+The CMake configuration is done with the `android.toolchain.cmake` toolchain. The script runs on macOS, but can be adapted for other platforms with slight tweaks to `scripts/build.sh`.
 
 ## Demo
 

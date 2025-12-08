@@ -29,11 +29,10 @@ static int (*fn_get_socket_v4)(int handle);
 static int (*fn_get_socket_v6)(int handle);
 #endif
 
-/* The Apple library is statically linked as a Swift package, except
- * when built as monolith in CMake. The functions are direct pointers
- * to the embedded symbols.
+/* The library is statically linked on Apple and Linux. The functions
+ * are direct pointers to the embedded symbols.
  */
-#if defined(__APPLE__) && !defined(PARTOUT_MONOLITH)
+#if defined(__APPLE__) || defined(__linux__)
 
 #include "wg_go.h"
 

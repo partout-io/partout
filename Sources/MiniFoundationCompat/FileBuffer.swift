@@ -15,7 +15,7 @@ struct FileBuffer {
     }
 
     init(contentsOfFile path: String) throws {
-        guard let file = fopen(path, "rb") else { throw lastError }
+        guard let file = minif_fopen(path, "rb") else { throw lastError }
         defer { fclose(file) }
         fseek(file, 0, SEEK_END)
         let size = Int(ftell(file))
@@ -30,7 +30,7 @@ struct FileBuffer {
     }
 
     func write(toFile path: String) throws {
-        guard let file = fopen(path, "wb") else { throw lastError }
+        guard let file = minif_fopen(path, "wb") else { throw lastError }
         defer { fclose(file) }
         let written = fwrite(bytes, 1, bytes.count, file)
         guard written == bytes.count else {
@@ -39,7 +39,7 @@ struct FileBuffer {
     }
 
     func append(toFile path: String) throws {
-        guard let file = fopen(path, "ab") else { throw lastError }
+        guard let file = minif_fopen(path, "ab") else { throw lastError }
         defer { fclose(file) }
         let written = fwrite(bytes, 1, bytes.count, file)
         guard written == bytes.count else {
@@ -49,5 +49,9 @@ struct FileBuffer {
 }
 
 private var lastError: Error {
+#if !os(Windows)
     MiniFoundationError.io(Int(errno))
+#else
+    MiniFoundationError.io()
+#endif
 }

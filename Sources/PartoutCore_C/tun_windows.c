@@ -65,6 +65,8 @@ pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl) {
 
     WINTUN_ADAPTER_HANDLE adapter = NULL;
     WINTUN_SESSION_HANDLE session = NULL;
+    LPCWSTR tun_type = NULL;
+    LPCWSTR dev_name = NULL;
 
     // Load DLL before anything (do it once)
     if (!wintun) {
@@ -87,8 +89,8 @@ pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl) {
     }
 
     // Use module UniqueID as adapter identifier
-    LPCWSTR tun_type = L"Partout";
-    LPCWSTR dev_name = wstring_from_string(uuid);
+    tun_type = L"Partout";
+    dev_name = wstring_from_string(uuid);
     if (!dev_name) {
         pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "wstring_from_string()");
         goto failure;
@@ -183,10 +185,12 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
 }
 
 int pp_tun_fd(const pp_tun tun) {
+    (void)tun;
     return -1;
 }
 
 const char *pp_tun_name(const pp_tun tun) {
+    (void)tun;
     return NULL;
 }
 

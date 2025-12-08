@@ -10,22 +10,21 @@ HOST_GOOS := $(shell go env GOOS)
 HOST_GOARCH := $(shell go env GOARCH)
 HOST_GOROOT := $(shell go env GOROOT)
 
-BUILDMODE := c-shared
+BUILDMODE := c-archive
 
 # Cross-build for Android
 ifeq ($(ANDROID),1)
+BUILDMODE := c-shared
 HOST_GOOS := android
 HOST_GOARCH := arm64
 export GOOS := $(HOST_GOOS)
 export GOARCH := $(HOST_GOARCH)
 export CC := aarch64-linux-android24-clang
 BUILDEXT := so
-else ifeq ($(HOST_GOOS),linux)
-BUILDEXT := so
 else ifeq ($(HOST_GOOS),windows)
 BUILDEXT := dll
-else # Apple
-BUILDEXT := dylib
+else # Apple, Linux
+BUILDEXT := a
 endif
 
 # Build output

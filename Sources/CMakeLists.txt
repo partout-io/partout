@@ -70,12 +70,7 @@ endif()
 # Partout_Swift ########################################
 
 # Partout library base configuration
-if(LINUX OR ANDROID)
-    set(DYNLIBS 1)
-    add_library(partout SHARED "")
-else()
-    add_library(partout STATIC "")
-endif()
+add_library(partout STATIC "")
 
 # Define symbols to skip Swift imports and legacy code
 target_compile_options(partout PRIVATE
@@ -147,26 +142,11 @@ set_target_properties(partout_c PROPERTIES
 if(DEFINED OPENSSL_DIR)
     target_include_directories(partout_c PRIVATE ${OPENSSL_DIR}/include)
     target_link_directories(partout_c PRIVATE ${OPENSSL_DIR}/lib)
-    if(DYNLIBS)
-        target_link_libraries(partout_c
-            ${OPENSSL_DIR}/lib/libssl.so
-            ${OPENSSL_DIR}/lib/libcrypto.so
-        )
-    else()
-        target_link_libraries(partout_c ssl crypto)
-    endif()
+    target_link_libraries(partout_c PRIVATE ssl crypto)
 elseif(DEFINED MBEDTLS_DIR)
     target_include_directories(partout_c PRIVATE ${MBEDTLS_DIR}/include)
     target_link_directories(partout_c PRIVATE ${MBEDTLS_DIR}/lib)
-    if(DYNLIBS)
-        target_link_libraries(partout_c
-            ${MBEDTLS_DIR}/lib/libmbedx509.so
-            ${MBEDTLS_DIR}/lib/libmbedtls.so
-            ${MBEDTLS_DIR}/lib/libmbedcrypto.so
-        )
-    else()
-        target_link_libraries(partout_c mbedcrypto mbedtls mbedx509)
-    endif()
+    target_link_libraries(partout_c PRIVATE mbedcrypto mbedtls mbedx509)
 endif()
 if(DEFINED WGGO_DIR)
     target_include_directories(partout_c PRIVATE
@@ -174,13 +154,7 @@ if(DEFINED WGGO_DIR)
         ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuard/Shared_C/include
     )
     target_link_directories(partout_c PRIVATE ${WGGO_DIR}/lib)
-    if(DYNLIBS)
-        target_link_libraries(partout_c
-            ${WGGO_DIR}/lib/libwg-go.so
-        )
-    else()
-        target_link_libraries(partout_c wg-go)
-    endif()
+    target_link_libraries(partout_c PRIVATE wg-go)
 endif()
 
 # Copy ABI header

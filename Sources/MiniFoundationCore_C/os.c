@@ -30,16 +30,10 @@ const char *minif_os_temp_dir() {
 #else
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <stdio.h>
 
-void minif_get_os_version(int *major, int *minor, int *patch) {
+void minif_os_get_version(int *major, int *minor, int *patch) {
     OSVERSIONINFOEXW v = { 0 };
     v.dwOSVersionInfoSize = sizeof(v);
-    if (RtlGetVersion == NULL) {
-        *major = *minor = *patch = 0;
-        return;
-    }
-    // RtlGetVersion always returns true version (unlike GetVersionEx)
     typedef LONG (WINAPI *RtlGetVersionPtr)(PRTL_OSVERSIONINFOW);
     HMODULE h = GetModuleHandleW(L"ntdll.dll");
     RtlGetVersionPtr rtlGetVersion = (RtlGetVersionPtr)GetProcAddress(h, "RtlGetVersion");
@@ -55,7 +49,7 @@ const char *minif_os_temp_dir() {
     char path[MAX_PATH];
     DWORD n = GetTempPathA(MAX_PATH, path);
     if (n <= 0 || n >= MAX_PATH) {
-        strncpy(path, "C:\\Temp", sizeof(path));
+        strncpy_s(path, sizeof(path), "C:\\Temp", _TRUNCATE);
     }
     return minif_strdup(path);
 }

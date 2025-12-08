@@ -9,7 +9,7 @@ public enum Compat {}
 #elseif canImport(Glibc)
 @_exported import Glibc
 #elseif canImport(WinSDK)
-@_exported import MSVCRT
+@_exported import ucrt
 @_exported import WinSDK
 #endif
 
