@@ -88,7 +88,7 @@ bin/windows-arm64/libpartout.lib    # Windows
 bin/android-aarch64/libpartout.a    # Android
 ```
 
-Additionally, `libpartout_c` and the shared vendored libs must also be linked. Partout must be bundled with the Swift runtime to work.
+Additionally, `libpartout_c` must be linked. Partout must be bundled with the shared vendored libraries and the Swift runtime to work.
 
 Building for Android requires access to external SDKs:
 
