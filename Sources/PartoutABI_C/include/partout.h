@@ -11,8 +11,8 @@
 #include <stddef.h>
 
 /*
- * Success -> int == 0 or != NULL
- * Failure -> int != 0 or == NULL
+ * Success -> true or != NULL
+ * Failure -> false or == NULL
  */
 
 extern const char *const PARTOUT_IDENTIFIER;
