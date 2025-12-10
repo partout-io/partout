@@ -16,11 +16,15 @@ extension Compat {
         private init() {
         }
 
+        public var miniTemporaryDirectory: MiniURLProtocol {
+            let dir = minif_os_temp_dir()
+            defer { dir.deallocate() }
+            return URL(fileURLWithPath: "\(String(cString: dir))")
+        }
+
         public func makeTemporaryURL(filename: String) -> MiniURLProtocol {
             let dir = minif_os_temp_dir()
-            defer {
-                dir.deallocate()
-            }
+            defer { dir.deallocate() }
             return URL(fileURLWithPath: "\(String(cString: dir))/\(filename)")
         }
     }
