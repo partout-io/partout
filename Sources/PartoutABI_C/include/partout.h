@@ -18,6 +18,8 @@
 extern const char *const PARTOUT_IDENTIFIER;
 extern const char *const PARTOUT_VERSION;
 
+const char *partout_version();
+
 typedef struct {
     const char *cache_dir;
     void (*test_callback)();
@@ -47,5 +49,7 @@ typedef struct {
 
 bool partout_daemon_start(void *ctx, const partout_daemon_start_args *args);
 void partout_daemon_stop(void *ctx);
+
+void partout_log(int level, const char *msg);
 
 #endif
