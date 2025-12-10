@@ -153,8 +153,9 @@ if(DEFINED WGGO_DIR)
         ${WGGO_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuard/Shared_C/include
     )
-    target_link_directories(partout_c PRIVATE ${WGGO_DIR}/lib)
-    target_link_libraries(partout_c PRIVATE wg-go)
+    # wg-go is loaded with dl_open()
+    # target_link_directories(partout_c PRIVATE ${WGGO_DIR}/lib)
+    # target_link_libraries(partout_c PRIVATE wg-go)
 endif()
 
 # Copy ABI header
