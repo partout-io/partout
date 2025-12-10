@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !MINI_FOUNDATION_COMPAT
 #if !os(iOS) && !os(tvOS)
 
 #if !PARTOUT_MONOLITH
@@ -45,5 +44,4 @@ extension ABIContext {
     }
 }
 
-#endif
 #endif
