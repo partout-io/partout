@@ -257,6 +257,7 @@ if areas.contains(.wireGuard) {
                 ],
                 linkerSettings: [
                     .unsafeFlags(["-L\(cmakeOutput)/wg-go/lib"])
+                    // Not linked, loaded with dl_open()
                 ]
             )
         )
@@ -313,7 +314,10 @@ case .openSSL:
                     .unsafeFlags(["-I\(cmakeOutput)/openssl/include"])
                 ],
                 linkerSettings: [
-                    .unsafeFlags(["-L\(cmakeOutput)/openssl/lib"])
+                    .unsafeFlags(["-L\(cmakeOutput)/openssl/lib"]),
+                    // WARNING: order matters, ssl then crypto
+                    .linkedLibrary("\(staticLibPrefix)ssl"),
+                    .linkedLibrary("\(staticLibPrefix)crypto")
                 ]
             )
         )
@@ -335,7 +339,11 @@ case .native:
                 .unsafeFlags(["-I\(cmakeOutput)/mbedtls/include"])
             ],
             linkerSettings: [
-                .unsafeFlags(["-L\(cmakeOutput)/mbedtls/lib"])
+                .unsafeFlags(["-L\(cmakeOutput)/mbedtls/lib"]),
+                 // WARNING: order matters
+                .linkedLibrary("mbedtls"),
+                .linkedLibrary("mbedx509"),
+                .linkedLibrary("mbedcrypto")
             ]
         )
     )
@@ -509,7 +517,9 @@ enum FoundationCompatibility {
     var wireGuardTestsExclude: [String] {
         switch self {
         case .off: []
-        case .on: []
+        case .on: [
+            "BackendTests.swift"
+        ]
         }
     }
 
