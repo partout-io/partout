@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !MINI_FOUNDATION_COMPAT
 #if !os(iOS) && !os(tvOS)
 
 import PartoutABI_C
@@ -180,5 +179,4 @@ public func partout_daemon_stop(cCtx: UnsafeMutableRawPointer) {
     }
 }
 
-#endif
 #endif
