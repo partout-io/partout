@@ -19,6 +19,7 @@ extern const char *const PARTOUT_IDENTIFIER;
 extern const char *const PARTOUT_VERSION;
 
 const char *partout_version();
+void partout_log(int level, const char *msg);
 
 typedef struct {
     const char *cache_dir;
@@ -29,27 +30,12 @@ void *partout_init(const partout_init_args *args);
 void partout_deinit(void *ctx);
 
 typedef struct {
-    const int *remote_fds;
-    size_t remote_fds_len;
-} partout_tun_ctrl_info;
-
-typedef struct {
-    void *thiz;
-    void *(*set_tunnel)(void *thiz, const partout_tun_ctrl_info *info);
-    void (*configure_sockets)(void *thiz, const int *fds, size_t fds_len);
-    void (*clear_tunnel)(void *thiz, void *tun_impl);
-    void (*test_callback)(void *thiz);
-} partout_tun_ctrl;
-
-typedef struct {
     const char *profile;
     const char *profile_path;
-    partout_tun_ctrl *ctrl;
+    void *ctrl_impl;
 } partout_daemon_start_args;
 
 bool partout_daemon_start(void *ctx, const partout_daemon_start_args *args);
 void partout_daemon_stop(void *ctx);
-
-void partout_log(int level, const char *msg);
 
 #endif

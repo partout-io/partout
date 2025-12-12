@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef _WIN32
@@ -33,15 +34,12 @@ int main(int argc, char *argv[]) {
     partout_init_args init_args = { 0 };
     init_args.cache_dir = cache_dir;
     void *ctx = partout_init(&init_args);
-    if (!ctx) {
-        puts("Unable to initialize");
-        goto failure;
-    }
+    assert(ctx);
 
     // Start daemon
     partout_daemon_start_args start_args = { 0 };
     start_args.profile_path = profile_path;
-    if (partout_daemon_start(ctx, &start_args) != 0) {
+    if (!partout_daemon_start(ctx, &start_args)) {
         puts("Unable to start daemon");
         goto failure;
     }

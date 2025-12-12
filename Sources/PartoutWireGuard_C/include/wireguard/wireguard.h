@@ -23,7 +23,7 @@ int64_t pp_wg_set_config(int handle, const char *settings);
 char *pp_wg_get_config(int handle);
 void pp_wg_bump_sockets(int handle);
 void pp_wg_tweak_mobile_roaming(int handle);
-#ifdef __ANDROID_API__
+#ifdef __ANDROID__
 int pp_wg_get_socket_v4(int handle);
 int pp_wg_get_socket_v6(int handle);
 #endif

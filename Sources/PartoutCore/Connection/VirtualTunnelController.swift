@@ -11,18 +11,22 @@ public final class VirtualTunnelController: TunnelController {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
-    private let ctrl: VirtualTunnelControllerImpl?
+    private let impl: UnsafeMutableRawPointer?
 
     private let maxReadLength: Int
 
     public init(
         _ ctx: PartoutLoggerContext,
-        ctrl: VirtualTunnelControllerImpl?,
+        impl: UnsafeMutableRawPointer?,
         maxReadLength: Int = 128 * 1024
     ) throws {
         self.ctx = ctx
-        self.ctrl = ctrl
+        self.impl = impl
         self.maxReadLength = maxReadLength
+
+        if let thiz = impl {
+            pp_tun_ctrl_test_working_wrapper(thiz)
+        }
     }
 
     public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
@@ -31,8 +35,14 @@ public final class VirtualTunnelController: TunnelController {
         }
 
         // Fetch tun implementation if necessary
-        let tunImpl = ctrl.map {
-            $0.setTunnel($0.thiz, info)
+        let tunImpl = impl.map { thiz in
+            let rawDescs = info.fileDescriptors.map(Int32.init)
+            return rawDescs.withUnsafeBufferPointer {
+                var cInfo = pp_tun_ctrl_info()
+                cInfo.remote_fds = $0.baseAddress
+                cInfo.remote_fds_len = info.fileDescriptors.count
+                return pp_tun_ctrl_set_tunnel(thiz, &cInfo)
+            }
         } ?? nil
 
         // Create virtual device with an optional implementation
@@ -75,8 +85,10 @@ public final class VirtualTunnelController: TunnelController {
     }
 
     public func configureSockets(with descriptors: [UInt64]) {
-        if let ctrl {
-            ctrl.configureSockets(ctrl.thiz, descriptors)
+        if let thiz = impl {
+            descriptors.map(Int32.init).withUnsafeBufferPointer {
+                pp_tun_ctrl_configure_sockets(thiz, $0.baseAddress, $0.count)
+            }
         }
     }
 
@@ -89,8 +101,8 @@ public final class VirtualTunnelController: TunnelController {
 //        tun.deviceName
 
         // Release tun implementation if necessary
-        if let ctrl {
-            ctrl.clearTunnel(ctrl.thiz, tunnel.tunImpl)
+        if let thiz = impl {
+            pp_tun_ctrl_clear_tunnel(thiz, tunnel.tunImpl)
         }
     }
 

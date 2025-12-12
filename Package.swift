@@ -256,8 +256,8 @@ if areas.contains(.wireGuard) {
                     .unsafeFlags(["-I\(cmakeOutput)/wg-go/include"])
                 ],
                 linkerSettings: [
-                    .unsafeFlags(["-L\(cmakeOutput)/wg-go/lib"])
-                    // Not linked, loaded with dl_open()
+                    .unsafeFlags(["-L\(cmakeOutput)/wg-go/lib"]),
+                    .linkedLibrary("\(staticLibPrefix)wg-go")
                 ]
             )
         )
@@ -531,6 +531,6 @@ enum FoundationCompatibility {
     }
 
     var supportsPartoutd: Bool {
-        self == .off
+        true
     }
 }

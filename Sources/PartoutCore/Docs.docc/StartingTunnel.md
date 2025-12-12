@@ -58,4 +58,3 @@ Given the main app and the daemon:
 - ``TunnelController``
 - ``TunnelRemoteInfo``
 - ``VirtualTunnelController``
-- ``VirtualTunnelControllerImpl``

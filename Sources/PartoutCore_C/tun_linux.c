@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#if defined(__linux__) && !defined(__ANDROID_API__)
+#if defined(__linux__) && !defined(__ANDROID__)
 
 #include <stdio.h>
 #include <stdlib.h>

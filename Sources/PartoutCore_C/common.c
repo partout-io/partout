@@ -22,3 +22,38 @@ void pp_clog_v(pp_log_category category,
     pp_clog(category, level, msg);
     pp_free(msg);
 }
+
+#ifdef __ANDROID__
+#include <android/log.h>
+void pp_log_simple_append(pp_log_level level, const char *_Nonnull message) {
+    const char *log_tag = "Partout";
+    int android_level = 0;
+    switch (level) {
+    case PPLogLevelDebug:
+        android_level = ANDROID_LOG_VERBOSE;
+    case PPLogLevelInfo:
+        android_level = ANDROID_LOG_DEBUG;
+    case PPLogLevelNotice:
+        android_level = ANDROID_LOG_INFO;
+    case PPLogLevelError:
+        android_level = ANDROID_LOG_WARN;
+    case PPLogLevelFault:
+        android_level = ANDROID_LOG_FATAL;
+    }
+    __android_log_print(android_level, log_tag, "%s", message);
+}
+#else
+void pp_log_simple_append(pp_log_level level, const char *_Nonnull message) {
+    FILE *out = NULL;
+    switch (level) {
+    case PPLogLevelError:
+    case PPLogLevelFault:
+        out = stderr;
+        break;
+    default:
+        out = stdout;
+        break;
+    }
+    fprintf(out, "Partout[%d]: %s\n", level, message);
+}
+#endif

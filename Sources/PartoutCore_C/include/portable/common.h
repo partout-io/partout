@@ -33,6 +33,8 @@ void pp_clog_v(pp_log_category category,
                pp_log_level level,
                const char *_Nonnull fmt, ...);
 
+void pp_log_simple_append(pp_log_level level, const char *_Nonnull message);
+
 // Use inline rather than #define to make available to Swift
 
 static inline

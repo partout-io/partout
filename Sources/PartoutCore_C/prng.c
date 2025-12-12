@@ -44,7 +44,7 @@ bool pp_prng_do(uint8_t *_Nonnull dst, size_t len) {
 #include <sys/random.h>
 
 bool pp_prng_do(uint8_t *dst, size_t len) {
-#ifdef __ANDROID_API__
+#ifdef __ANDROID__
     arc4random_buf(dst, len);
     return true;
 #else
