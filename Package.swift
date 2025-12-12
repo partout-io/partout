@@ -531,6 +531,6 @@ enum FoundationCompatibility {
     }
 
     var supportsPartoutd: Bool {
-        self == .off
+        true
     }
 }
