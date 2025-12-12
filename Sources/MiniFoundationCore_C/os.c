@@ -46,7 +46,7 @@ void minif_os_get_version(int *major, int *minor, int *patch) {
 }
 
 const char *minif_os_temp_dir() {
-    char path[MAX_PATH];
+    char path[MAX_PATH] = { 0 };
     DWORD n = GetTempPathA(MAX_PATH, path);
     if (n <= 0 || n >= MAX_PATH) {
         strncpy_s(path, sizeof(path), "C:\\Temp", _TRUNCATE);
