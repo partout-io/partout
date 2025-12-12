@@ -24,7 +24,7 @@ static int64_t (*fn_set_config)(int handle, const char *settings);
 static char *(*fn_get_config)(int handle);
 static void (*fn_bump_sockets)(int handle);
 static void (*fn_tweak_mobile_roaming)(int handle);
-#ifdef __ANDROID_API__
+#ifdef __ANDROID__
 static int (*fn_get_socket_v4)(int handle);
 static int (*fn_get_socket_v6)(int handle);
 #endif
@@ -76,7 +76,7 @@ int load_symbols() {
         LOAD_OR_FAIL(wg, fn_get_config, "wgGetConfig");
         LOAD_OR_FAIL(wg, fn_bump_sockets, "wgBumpSockets");
         LOAD_OR_FAIL(wg, fn_tweak_mobile_roaming, "wgDisableSomeRoamingForBrokenMobileSemantics");
-#ifdef __ANDROID_API__
+#ifdef __ANDROID__
         LOAD_OR_FAIL(wg, fn_get_socket_v4, "wgGetSocketV4");
         LOAD_OR_FAIL(wg, fn_get_socket_v6, "wgGetSocketV6");
 #endif
@@ -129,7 +129,7 @@ void pp_wg_tweak_mobile_roaming(int handle) {
     return fn_tweak_mobile_roaming(handle);
 }
 
-#ifdef __ANDROID_API__
+#ifdef __ANDROID__
 int pp_wg_get_socket_v4(int handle) {
     return fn_get_socket_v4(handle);
 }

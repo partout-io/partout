@@ -36,7 +36,7 @@ bool minif_prng_do(void *dst, size_t len) {
 #include <sys/random.h>
 
 bool minif_prng_do(void *dst, size_t len) {
-#ifdef __ANDROID_API__
+#ifdef __ANDROID__
     arc4random_buf(dst, len);
     return true;
 #else

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#ifdef __ANDROID_API__
+#ifdef __ANDROID__
 
 #include <unistd.h>
 #include "portable/common.h"
