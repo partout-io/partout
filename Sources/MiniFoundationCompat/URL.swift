@@ -8,6 +8,7 @@ import MiniFoundationCore
 #endif
 
 extension Compat {
+    // FIXME: #228, Copying will copy the impl pointer, and deinit will result in N free()
     public final class URL: MiniURLProtocol, Hashable, Codable, @unchecked Sendable, CustomStringConvertible {
         private let impl: OpaquePointer
 
