@@ -18,13 +18,13 @@ extension Compat {
 
         public var miniTemporaryDirectory: MiniURLProtocol {
             let dir = minif_os_temp_dir()
-            defer { dir.deallocate() }
+            defer { free(UnsafeMutableRawPointer(mutating: dir)) }
             return URL(fileURLWithPath: "\(String(cString: dir))")
         }
 
         public func makeTemporaryURL(filename: String) -> MiniURLProtocol {
             let dir = minif_os_temp_dir()
-            defer { dir.deallocate() }
+            defer { free(UnsafeMutableRawPointer(mutating: dir)) }
             return URL(fileURLWithPath: "\(String(cString: dir))/\(filename)")
         }
     }

@@ -48,7 +48,7 @@ extension Compat {
 
         public var lastPathComponent: String {
             guard let str = minif_url_alloc_last_path(impl) else { return "" }
-            defer { str.deallocate() }
+            defer { free(UnsafeMutableRawPointer(mutating: str)) }
             return String(cString: str)
         }
 
