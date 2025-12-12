@@ -13,7 +13,7 @@ extension Compat {
                 fatalError("minif_uuid_create() failed")
             }
             uuidString = String(cString: str).uppercased()
-            str.deallocate()
+            free(UnsafeMutableRawPointer(mutating: str))
         }
 
         public init?(uuidString: String) {

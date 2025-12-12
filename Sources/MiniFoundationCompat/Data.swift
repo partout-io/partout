@@ -154,7 +154,7 @@ extension Compat.Data {
         }
         guard let bytes else { return nil }
         backend = Array(UnsafeBufferPointer(start: bytes, count: count))
-        bytes.deallocate()
+        free(bytes)
     }
 
     public func base64EncodedString() -> String {
@@ -186,8 +186,8 @@ extension Array where Element == UInt8 {
             return ""
         }
         let encoded = String(cString: str)
+        free(str)
         assert(encoded.count == encodedCount)
-        str.deallocate()
         return encoded
     }
 }

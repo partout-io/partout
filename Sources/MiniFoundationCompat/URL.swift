@@ -8,6 +8,7 @@ import MiniFoundationCore
 #endif
 
 extension Compat {
+    // FIXME: #228, Copying will copy the impl pointer, and deinit will result in N free()
     public final class URL: MiniURLProtocol, Hashable, Codable, @unchecked Sendable, CustomStringConvertible {
         private let impl: OpaquePointer
 
@@ -48,7 +49,7 @@ extension Compat {
 
         public var lastPathComponent: String {
             guard let str = minif_url_alloc_last_path(impl) else { return "" }
-            defer { str.deallocate() }
+            defer { free(UnsafeMutableRawPointer(mutating: str)) }
             return String(cString: str)
         }
 
