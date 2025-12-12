@@ -15,8 +15,10 @@ extern int wgTurnOn(const char *settings, const char *ifname);
 #else
 extern int wgTurnOn(const char *settings, int32_t tun_fd);
 #endif
+#ifdef __ANDROID__
 extern int wgGetSocketV4(int handle);
 extern int wgGetSocketV6(int handle);
+#endif
 extern void wgTurnOff(int handle);
 extern int64_t wgSetConfig(int handle, const char *settings);
 extern char *wgGetConfig(int handle);
