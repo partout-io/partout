@@ -2,13 +2,17 @@
 //
 // SPDX-License-Identifier: MIT
 
+#if !MINI_FOUNDATION_COMPAT
+import MiniFoundationCore
+#endif
+
 extension Compat {
     public final class JSONEncoder: Sendable {
         public init() {}
 
         public func encode<T>(_ value: T) throws -> Compat.Data where T: Encodable {
             // FIXME: #228, JSONEncoder
-            fatalError()
+            throw MiniFoundationError.encoding
         }
     }
 
@@ -21,7 +25,7 @@ extension Compat {
 
         public func decode<T>(_ type: T.Type, from data: Compat.Data) throws -> T where T: Decodable {
             // FIXME: #228, JSONDecoder
-            fatalError()
+            throw MiniFoundationError.decoding
         }
     }
 }
