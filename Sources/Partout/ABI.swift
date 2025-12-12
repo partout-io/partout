@@ -35,14 +35,7 @@ public func c_partout_version() -> UnsafePointer<CChar>! {
 @_cdecl("partout_init")
 @ABIActor
 public func c_partout_init(cArgs: UnsafePointer<partout_init_args>!) -> UnsafeMutableRawPointer! {
-    pp_log_g(.core, .debug, "Partout: Initialize")
-
-    // Test callback
-    if let callback = cArgs.pointee.test_callback {
-        pp_log_g(.core, .debug, "Partout: Test callback...")
-        callback()
-        pp_log_g(.core, .debug, "Partout: Callback successful!")
-    }
+    pp_log_g(.core, .debug, "Initialize")
 
     // Global directory e.g. for temporary files
     let cacheDir = String(cString: cArgs.pointee.cache_dir)
@@ -86,16 +79,23 @@ public func c_partout_init(cArgs: UnsafePointer<partout_init_args>!) -> UnsafeMu
 #endif
 
     // Finalize configuration
-    logBuilder.setDestination(NSLogDestination(), for: logCategories)
+    logBuilder.setDestination(SimpleLogDestination(), for: logCategories)
     logBuilder.logsAddresses = true
     logBuilder.logsModules = true
     PartoutLogger.register(logBuilder.build())
-    let registry = Registry(withKnown: true, allImplementations: allImplementations)
+
+    // Test callback
+    if let callback = cArgs.pointee.test_callback {
+        pp_log_g(.core, .debug, "Test callback...")
+        callback()
+        pp_log_g(.core, .debug, "Callback successful!")
+    }
 
     // Create global context
+    let registry = Registry(withKnown: true, allImplementations: allImplementations)
     let ctx = ABIContext(registry: registry)
     let cCtx = ctx.push()
-    pp_log_g(.core, .debug, "Partout: Initialize with ctx: \(cCtx)")
+    pp_log_g(.core, .debug, "Initialize with ctx: \(cCtx)")
     return cCtx
 }
 
@@ -113,9 +113,9 @@ public func c_partout_daemon_start(
     cCtx: UnsafeMutableRawPointer!,
     cArgs: UnsafePointer<partout_daemon_start_args>!
 ) -> Bool {
-    pp_log_g(.core, .debug, "Partout: Start daemon with ctx: \(cCtx)")
+    pp_log_g(.core, .debug, "Start daemon with ctx: \(cCtx.debugDescription)")
     let ctx = ABIContext.peek(cCtx)
-    pp_log_g(.core, .debug, "Partout: Start daemon with ctx (ABIContext): \(ctx)")
+    pp_log_g(.core, .debug, "Start daemon with ctx (ABIContext): \(ctx)")
 
     // Profile is a command line argument
     let daemon: SimpleConnectionDaemon
@@ -135,7 +135,7 @@ public func c_partout_daemon_start(
         do {
             profile = try ctx.registry.profile(fromJSON: contents)
         } catch {
-            pp_log_g(.core, .error, "Partout: Unable to parse profile, trying module: \(error)")
+            pp_log_g(.core, .error, "Unable to parse profile, trying module: \(error)")
 
             let module = try ctx.registry.module(fromContents: contents, object: nil)
             var builder = Profile.Builder()
@@ -144,12 +144,12 @@ public func c_partout_daemon_start(
             profile = try builder.build()
         }
 
-        // Map tunnel controller to external C functions (optional)
-        let ctrl = cArgs.pointee.ctrl.map(\.pointee)
+        // Optional reference to tunnel controller implementation (e.g. JNI wrapper)
+        let ctrlImpl = cArgs.pointee.ctrl_impl
 
-        daemon = try makeDaemon(with: profile, registry: ctx.registry, ctrl: ctrl)
+        daemon = try makeDaemon(with: profile, registry: ctx.registry, ctrlImpl: ctrlImpl)
     } catch {
-        pp_log_g(.core, .error, "Partout: Unable to create daemon: \(error)")
+        pp_log_g(.core, .error, "Unable to create daemon: \(error)")
         return false
     }
 
@@ -164,7 +164,7 @@ public func c_partout_daemon_start(
         do {
             try await ctx.startDaemon(daemon)
         } catch {
-            pp_log_g(.core, .error, "Partout: Unable to start daemon: \(error)")
+            pp_log_g(.core, .error, "Unable to start daemon: \(error)")
             exit(-1)
         }
     }
@@ -176,9 +176,9 @@ public func c_partout_daemon_start(
 @_cdecl("partout_daemon_stop")
 @ABIActor
 public func c_partout_daemon_stop(cCtx: UnsafeMutableRawPointer!) {
-    pp_log_g(.core, .debug, "Partout: Stop daemon with ctx: \(cCtx)")
+    pp_log_g(.core, .debug, "Stop daemon with ctx: \(cCtx.debugDescription)")
     let ctx = ABIContext.peek(cCtx)
-    pp_log_g(.core, .debug, "Partout: Stop daemon with ctx (ABIContext): \(ctx)")
+    pp_log_g(.core, .debug, "Stop daemon with ctx (ABIContext): \(ctx)")
     Task {
         await ctx.stopDaemon()
     }
