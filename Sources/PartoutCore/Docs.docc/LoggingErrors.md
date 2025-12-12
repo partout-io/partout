@@ -12,7 +12,7 @@ Use these entities to track and troubleshoot the internal library activities.
 - ``LoggerCategory``
 - ``LoggerDestination``
 - ``LocalLogger``
-- ``NSLogDestination``
+- ``SimpleLogDestination``
 
 ### Printing messages
 
