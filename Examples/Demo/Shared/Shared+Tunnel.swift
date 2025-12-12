@@ -36,7 +36,8 @@ extension Registry {
                     return try WireGuardConnection(
                         ctx,
                         parameters: $0,
-                        module: $1
+                        module: $1,
+                        preferringIPv4: true
                     )
                 }
             )
