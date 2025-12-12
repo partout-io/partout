@@ -33,4 +33,11 @@ if(APPLE)
         POST_BUILD
         COMMAND install_name_tool -id "@rpath/libwg-go.dylib" "${WGGO_DIR}/lib/libwg-go.dylib"
     )
+elseif(WIN32)
+    add_custom_command(
+        TARGET WireGuardGoProject
+        POST_BUILD
+        COMMAND gendef "${WGGO_DIR}/lib/wg-go.dll"
+        COMMAND dlltool -d wg-go.def -l "${WGGO_DIR}/lib/libwg-go.lib"
+    )
 endif()
