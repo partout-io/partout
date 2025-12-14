@@ -27,14 +27,14 @@ public actor ABIActor {
 //
 
 @_cdecl("partout_version")
-public func c_partout_version() -> UnsafePointer<CChar>! {
+public func __partout_version() -> UnsafePointer<CChar>! {
     PARTOUT_VERSION
 }
 
 /// Initializes the library and returns a opaque context for use with subsequent calls.
 @_cdecl("partout_init")
 @ABIActor
-public func c_partout_init(cArgs: UnsafePointer<partout_init_args>!) -> UnsafeMutableRawPointer! {
+public func __partout_init(cArgs: UnsafePointer<partout_init_args>!) -> UnsafeMutableRawPointer! {
     pp_log_g(.core, .debug, "Initialize")
 
     // Global directory e.g. for temporary files
@@ -102,14 +102,14 @@ public func c_partout_init(cArgs: UnsafePointer<partout_init_args>!) -> UnsafeMu
 /// Deinitializes the library context created with ``partout_init(cArgs:)``.
 @_cdecl("partout_deinit")
 @ABIActor
-public func c_partout_deinit(cCtx: UnsafeMutableRawPointer!) {
+public func __partout_deinit(cCtx: UnsafeMutableRawPointer!) {
     ABIContext.pop(cCtx)
 }
 
 /// Starts the connection daemon.
 @_cdecl("partout_daemon_start")
 @ABIActor
-public func c_partout_daemon_start(
+public func __partout_daemon_start(
     cCtx: UnsafeMutableRawPointer!,
     cArgs: UnsafePointer<partout_daemon_start_args>!
 ) -> Bool {
@@ -175,7 +175,7 @@ public func c_partout_daemon_start(
 /// Stops the connection daemon.
 @_cdecl("partout_daemon_stop")
 @ABIActor
-public func c_partout_daemon_stop(cCtx: UnsafeMutableRawPointer!) {
+public func __partout_daemon_stop(cCtx: UnsafeMutableRawPointer!) {
     pp_log_g(.core, .debug, "Stop daemon with ctx: \(cCtx.debugDescription)")
     let ctx = ABIContext.peek(cCtx)
     pp_log_g(.core, .debug, "Stop daemon with ctx (ABIContext): \(ctx)")
@@ -187,7 +187,7 @@ public func c_partout_daemon_stop(cCtx: UnsafeMutableRawPointer!) {
 /// Logs to the global context from C code.
 @_cdecl("partout_log")
 @ABIActor
-public func c_partout_log(cLevel: Int32, cMessage: UnsafePointer<CChar>!) {
+public func __partout_log(cLevel: Int32, cMessage: UnsafePointer<CChar>!) {
     let category: LoggerCategory = .abi
     let level = DebugLog.Level(rawValue: Int(cLevel)) ?? .info
     let message = String(cString: cMessage)
