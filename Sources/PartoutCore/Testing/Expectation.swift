@@ -35,9 +35,11 @@ public actor Expectation {
             }
 
             // Task 2: timeout
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(timeout) * NSEC_PER_MSEC)
-                throw TimeoutError()
+            if timeout < .max {
+                group.addTask {
+                    try await Task.sleep(nanoseconds: UInt64(timeout) * NSEC_PER_MSEC)
+                    throw TimeoutError()
+                }
             }
 
             _ = try await group.next()
