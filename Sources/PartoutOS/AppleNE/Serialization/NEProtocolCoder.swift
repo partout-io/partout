@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import NetworkExtension
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
 
 /// Encodes and decodes a profile to and from `NETunnelProviderProtocol`.
 public typealias NEProtocolCoder = NEProtocolEncoder & NEProtocolDecoder

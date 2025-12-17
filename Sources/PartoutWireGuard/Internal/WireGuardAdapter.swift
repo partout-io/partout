@@ -3,10 +3,6 @@
 
 internal import _PartoutCore_C
 internal import _PartoutWireGuard_C
-#if !PARTOUT_MONOLITH
-import PartoutCore
-import PartoutOS
-#endif
 
 protocol WireGuardAdapterDelegate: AnyObject, Sendable {
     func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool)

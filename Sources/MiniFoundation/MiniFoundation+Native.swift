@@ -2,13 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-#if !MINI_FOUNDATION_COMPAT
-
-@_exported import Foundation
-#if !MINI_FOUNDATION_MONOLITH
-import MiniFoundationCore
-@_exported import MiniFoundationNative
-#endif
+#if !MINIF_COMPAT
 
 // MARK: Types
 

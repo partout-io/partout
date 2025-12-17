@@ -3,10 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 // Use newer C-based implementation, which comes with extensions
-#if !PARTOUT_MONOLITH
-import PartoutCore
-import PartoutOS
-#endif
 
 typealias CrossPacket = CControlPacket
 typealias CrossPacketCode = CPacketCode

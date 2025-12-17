@@ -17,7 +17,7 @@ struct LoggableModuleTests {
         )
     }
 
-#if !MINI_FOUNDATION_COMPAT
+#if !MINIF_COMPAT
     @Test
     func givenEncodableModule_whenLog_thenDoesNotReturnHandlerID() {
         let sut = SomeEncodableModule()

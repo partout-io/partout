@@ -9,8 +9,7 @@ set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 # Base configuration
 add_library(partout_c STATIC "")
 target_compile_options(partout_c PRIVATE
-    -DMINI_FOUNDATION_MONOLITH
-    -DPARTOUT_MONOLITH
+    -DUSE_CMAKE
 )
 
 # Header search paths from all C targets
@@ -74,8 +73,7 @@ add_library(partout STATIC "")
 
 # Define symbols to skip Swift imports and legacy code
 target_compile_options(partout PRIVATE
-    -DMINI_FOUNDATION_MONOLITH
-    -DPARTOUT_MONOLITH
+    -DUSE_CMAKE
     -DPARTOUT_OPENVPN
     -DPARTOUT_WIREGUARD
     -enable-library-evolution
@@ -92,7 +90,7 @@ file(GLOB_RECURSE PARTOUT_SOURCES *.swift)
 # Exclude Foundation if compatibility is on
 if(USE_COMPAT)
     target_compile_options(partout PRIVATE
-        -DMINI_FOUNDATION_COMPAT
+        -DMINIF_COMPAT
     )
     set(EXCLUDED_PATTERNS
         MiniFoundationNative.*

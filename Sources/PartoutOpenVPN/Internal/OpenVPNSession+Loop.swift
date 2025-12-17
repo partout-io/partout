@@ -2,9 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
 internal import _PartoutOpenVPN_C
 
 // TODO: #142/notes, LINK and TUN should be able to run detached in full-duplex

@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import NetworkExtension
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
 
 /// A link observer based on `NWConnection`, for both UDP and TCP.
 public final class NESocketObserver: LinkObserver, @unchecked Sendable {

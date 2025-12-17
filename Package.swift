@@ -526,7 +526,7 @@ enum FoundationCompatibility {
     var swiftSettings: [SwiftSetting] {
         switch self {
         case .off: []
-        case .on: [.define("MINI_FOUNDATION_COMPAT")]
+        case .on: [.define("MINIF_COMPAT")]
         }
     }
 

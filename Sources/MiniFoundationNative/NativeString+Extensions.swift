@@ -2,11 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-import Foundation
-#if !MINI_FOUNDATION_MONOLITH
-import MiniFoundationCore
-#endif
-
 extension String {
     public func write(toFile path: String, encoding: String.Encoding) throws {
         try write(toFile: path, atomically: true, encoding: encoding)

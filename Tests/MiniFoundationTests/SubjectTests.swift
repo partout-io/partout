@@ -70,7 +70,7 @@ struct SubjectTests {
         while !isDone {} // spinlock
     }
 
-#if !MINI_FOUNDATION_COMPAT
+#if !MINIF_COMPAT
     @Test
     func givenPassthrough_whenStream_thenMatches() async throws {
         let sut = PassthroughSubject<Int, Error>()

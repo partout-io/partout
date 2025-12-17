@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 /// Provides methods to parse a ``OpenVPN/Configuration`` from an .ovpn configuration file.
 ///
 /// The parser recognizes most of the relevant options and normally you should not face big limitations.

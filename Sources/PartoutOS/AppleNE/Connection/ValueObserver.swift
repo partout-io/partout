@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 /// Observes KVO updates asynchronously.
 @available(*, deprecated, message: "Required by the deprecated NEUDPObserver and NETCPObserver. Use NESocketObserver instead")
 actor ValueObserver<O> where O: NSObject {

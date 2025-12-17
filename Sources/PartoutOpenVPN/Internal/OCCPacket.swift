@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 enum OCCPacket: UInt8 {
     case exit = 0x06
 

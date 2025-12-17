@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import _PartoutCrypto_C
-#if !PARTOUT_MONOLITH
-import PartoutOS
-#endif
 
 extension CrossZD {
     // Must match HMACMaxLength in hmac.c

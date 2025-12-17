@@ -2,8 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
+#if !USE_CMAKE
+@_exported import PartoutCore
+@_exported import PartoutOS
 #endif
 
 extension LoggerCategory {

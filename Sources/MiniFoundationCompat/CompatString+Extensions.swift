@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 internal import _MiniFoundationCore_C
-#if !MINI_FOUNDATION_MONOLITH
-import MiniFoundationCore
-#endif
 
 extension String {
     // MARK: Initializers

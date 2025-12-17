@@ -25,7 +25,7 @@ extension PartoutLogger {
     public static let malformedValue = "<malformed>"
 }
 
-#if !MINI_FOUNDATION_COMPAT
+#if !MINIF_COMPAT
 extension Encodable {
     public func asJSON(_ ctx: PartoutLoggerContext, withSensitiveData: Bool, sortingKeys: Bool = false) -> String? {
         do {

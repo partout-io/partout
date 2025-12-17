@@ -2,11 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-import PartoutOS
-#endif
-
 fileprivate extension CrossZD {
     func appendSized(_ buf: CrossZD) {
         append(CZ(UInt16(buf.count).bigEndian))

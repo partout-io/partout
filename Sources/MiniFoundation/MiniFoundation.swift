@@ -2,8 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-#if !MINI_FOUNDATION_MONOLITH
-@_exported import MiniFoundationCore
+#if !USE_CMAKE
+#if canImport(MiniFoundationNative)
+@_exported import MiniFoundationNative
+#elseif canImport(MiniFoundationCompat)
+@_exported import MiniFoundationCompat
+#endif
 #endif
 
 extension UUID: RandomlyInitialized {}

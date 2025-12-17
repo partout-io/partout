@@ -19,7 +19,7 @@ extension Registry {
         try profiles(fromString: json, decoder: RegistryJSONEncoder(self))
     }
 
-#if !MINI_FOUNDATION_COMPAT
+#if !MINIF_COMPAT
     // Tolerate older encoding
     public func fallbackProfile(fromString string: String, fallingBack: Bool = true) throws -> Profile {
         do {

@@ -2,11 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-import Foundation
-#if !MINI_FOUNDATION_MONOLITH
-import MiniFoundationCore
-#endif
-
 extension FileManager: MiniFileManager {
     public var miniTemporaryDirectory: MiniURLProtocol {
         temporaryDirectory

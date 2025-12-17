@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 /// A tunnel environment reader that updates via Network Extension messaging.
 public final class NETunnelEnvironment: TunnelEnvironmentReader, @unchecked Sendable {
     private let queue: DispatchQueue

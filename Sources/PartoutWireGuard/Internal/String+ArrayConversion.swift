@@ -1,12 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright © 2018-2021 WireGuard LLC. All Rights Reserved.
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 extension String {
-
     func splitToArray(separator: Character = ",", trimmingCharacters: CharacterSet? = nil) -> [String] {
         return split(separator: separator)
             .map {

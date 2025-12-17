@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import NetworkExtension
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
 
 /// Able to apply its own settings to `NEPacketTunnelNetworkSettings`.
 public protocol NESettingsApplying {

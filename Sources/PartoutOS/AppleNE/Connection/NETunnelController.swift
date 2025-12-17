@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @preconcurrency import NetworkExtension
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
 
 extension Profile {
     public init(withNEProvider provider: NETunnelProvider, decoder: NEProtocolDecoder) throws {

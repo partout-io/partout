@@ -2,11 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-import PartoutOS
-#endif
-
 @OpenVPNActor
 final class Negotiator {
     struct Options {

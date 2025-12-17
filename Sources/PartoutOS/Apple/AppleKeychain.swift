@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 /// The Apple Keychain.
 public final class AppleKeychain: Keychain {
     private let ctx: PartoutLoggerContext

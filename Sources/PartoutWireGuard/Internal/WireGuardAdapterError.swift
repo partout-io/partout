@@ -2,10 +2,6 @@
 // Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
 internal import _PartoutWireGuard_C
-#if !PARTOUT_MONOLITH
-import PartoutCore
-import PartoutOS
-#endif
 
 enum WireGuardAdapterError: Error, Sendable {
     /// Failure to locate tunnel file descriptor.

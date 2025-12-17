@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 extension String {
     func hexStringFromBase64() throws -> String {
         guard let data = Data(base64Encoded: self) else {

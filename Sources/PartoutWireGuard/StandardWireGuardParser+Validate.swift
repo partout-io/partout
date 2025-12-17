@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 extension StandardWireGuardParser: ModuleBuilderValidator {
     public func validate(_ builder: any ModuleBuilder) throws {
         guard let builder = builder as? WireGuardModule.Builder else {

@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #if !USE_CMAKE
-@_exported import PartoutCore
+@_exported import Foundation
+@_exported import MiniFoundationCore
 #endif
-
-extension LoggerCategory {
-    public static let os = Self(rawValue: "os")
-}

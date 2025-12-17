@@ -56,7 +56,7 @@ extension JSON {
     }
 }
 
-#if !MINI_FOUNDATION_COMPAT
+#if !MINIF_COMPAT
 extension JSON {
 
     /// Create a JSON value from an `Encodable`. This will give you access to the “raw”
