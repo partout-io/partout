@@ -10,7 +10,6 @@ set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 add_library(partout_c STATIC "")
 target_compile_options(partout_c PRIVATE
     -DUSE_CMAKE
-    -DPARTOUT_MONOLITH
 )
 
 # Header search paths from all C targets
@@ -75,7 +74,6 @@ add_library(partout STATIC "")
 # Define symbols to skip Swift imports and legacy code
 target_compile_options(partout PRIVATE
     -DUSE_CMAKE
-    -DPARTOUT_MONOLITH
     -DPARTOUT_OPENVPN
     -DPARTOUT_WIREGUARD
     -enable-library-evolution
