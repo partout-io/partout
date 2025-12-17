@@ -4,10 +4,6 @@
 
 #if !os(iOS) && !os(tvOS)
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 @ABIActor
 final class ABIContext {
     let registry: Registry

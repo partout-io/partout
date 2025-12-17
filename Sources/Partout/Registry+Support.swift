@@ -2,16 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#if PARTOUT_OPENVPN
-import PartoutOpenVPN
-#endif
-#if PARTOUT_WIREGUARD
-import PartoutWireGuard
-#endif
-#endif
-
 extension Registry {
     private static let knownHandlers: [ModuleHandler] = {
         var handlers: [ModuleHandler] = [

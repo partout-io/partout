@@ -3,18 +3,14 @@
 // SPDX-License-Identifier: GPL-3.0
 
 // Wrap in OS target conditionals when each daemon will have its implementation
-// #if PARTOUT_MONOLITH || canImport(Darwin)
-// #if PARTOUT_MONOLITH || os(Android)
-// #if PARTOUT_MONOLITH || os(Linux)
-// #if PARTOUT_MONOLITH || os(Windows)
+// #if canImport(Darwin)
+// #if os(Android)
+// #if os(Linux)
+// #if os(Windows)
 
 #if !os(iOS) && !os(tvOS)
 
 internal import _PartoutCore_C
-#if !PARTOUT_MONOLITH
-import PartoutCore
-import PartoutOS
-#endif
 
 func makeDaemon(
     with profile: Profile,

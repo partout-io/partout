@@ -6,10 +6,6 @@
 
 import PartoutABI_C
 internal import _PartoutCore_C
-#if !PARTOUT_MONOLITH
-import PartoutCore
-import PartoutOS
-#endif
 
 /// The actor that all ABI methods execute on.
 @globalActor
