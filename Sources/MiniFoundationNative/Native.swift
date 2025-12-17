@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !MINIF_MONOLITH
+#if !USE_CMAKE
 @_exported import Foundation
 @_exported import MiniFoundationCore
 #endif

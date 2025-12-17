@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-#if !MINIF_MONOLITH
+#if !USE_CMAKE
 #if canImport(MiniFoundationNative)
 @_exported import MiniFoundationNative
 #elseif canImport(MiniFoundationCompat)
