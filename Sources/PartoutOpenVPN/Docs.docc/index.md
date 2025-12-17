@@ -26,12 +26,10 @@ The client is known to work with OpenVPN® 2.3+ servers.
 - [x] Compression framing
     - Via `--comp-lzo` (deprecated in 2.4)
     - Via `--compress`
-- [x] Compression algorithms
-    - LZO (via `--comp-lzo` or `--compress lzo`)
 - [x] Key renegotiation
 - [x] Replay protection (hardcoded window)
 
-The library therefore supports compression framing, just not newer compression. Remember to match server-side compression and framing, otherwise the client will shut down with an error. E.g. if server has `comp-lzo no`, client must use `compressionFraming = .compLZO`.
+The library therefore supports compression framing, just not compression. Remember to match server-side compression framing, otherwise the client will shut down with an error. E.g. if server has `comp-lzo no`, client must use `compressionFraming = .compLZO`.
 
 ### Support for .ovpn files
 
