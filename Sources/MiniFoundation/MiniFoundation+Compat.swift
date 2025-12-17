@@ -23,6 +23,7 @@ public typealias RegularExpression = Compat.RegularExpression
 extension String {
     public typealias Encoding = Compat.StringEncoding
 }
+public typealias StringEncoding = Compat.StringEncoding
 public typealias TimeInterval = Compat.TimeInterval
 public typealias URL = Compat.URL
 public typealias UUID = Compat.UUID

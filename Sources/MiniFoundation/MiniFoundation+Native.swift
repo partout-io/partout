@@ -13,6 +13,7 @@ import MiniFoundationCore
 // MARK: Types
 
 public typealias RegularExpression = NativeRegularExpression
+public typealias StringEncoding = String.Encoding
 
 // MARK: - Extensions
 
