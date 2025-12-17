@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-import Foundation
-
 extension JSONDecoder {
     public convenience init(userInfo: [CodingUserInfoKey: Sendable] = [:]) {
         self.init()

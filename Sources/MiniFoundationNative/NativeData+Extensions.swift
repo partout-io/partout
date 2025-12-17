@@ -2,11 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-import Foundation
-#if !MINI_FOUNDATION_MONOLITH
-import MiniFoundationCore
-#endif
-
 extension Data {
     public init(bytesNoCopy: UnsafeMutablePointer<UInt8>, count: Int) {
         self.init(bytesNoCopy: bytesNoCopy, count: count, deallocator: .none)

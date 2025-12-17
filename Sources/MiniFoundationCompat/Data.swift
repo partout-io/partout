@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 internal import _MiniFoundationCore_C
-#if !MINI_FOUNDATION_MONOLITH
-import MiniFoundationCore
-#endif
 
 // FIXME: #228, Implement with pp_zd maybe, use @inline, beware of performance
 

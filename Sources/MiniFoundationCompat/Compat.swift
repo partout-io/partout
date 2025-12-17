@@ -16,3 +16,7 @@ public enum Compat {}
 @_exported import Dispatch
 public let NSEC_PER_MSEC: UInt64 = 1000000
 public let NSEC_PER_SEC: UInt64 = 1000000000
+
+#if !MINIF_MONOLITH
+@_exported import MiniFoundationCore
+#endif

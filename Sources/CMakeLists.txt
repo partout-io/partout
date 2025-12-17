@@ -9,7 +9,7 @@ set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 # Base configuration
 add_library(partout_c STATIC "")
 target_compile_options(partout_c PRIVATE
-    -DMINI_FOUNDATION_MONOLITH
+    -DMINIF_MONOLITH
     -DPARTOUT_MONOLITH
 )
 
@@ -74,7 +74,7 @@ add_library(partout STATIC "")
 
 # Define symbols to skip Swift imports and legacy code
 target_compile_options(partout PRIVATE
-    -DMINI_FOUNDATION_MONOLITH
+    -DMINIF_MONOLITH
     -DPARTOUT_MONOLITH
     -DPARTOUT_OPENVPN
     -DPARTOUT_WIREGUARD

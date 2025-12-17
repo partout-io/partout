@@ -5,10 +5,6 @@
 #if MINI_FOUNDATION_COMPAT
 
 internal import _MiniFoundationCore_C
-#if !MINI_FOUNDATION_MONOLITH
-@_exported import MiniFoundationCompat
-import MiniFoundationCore
-#endif
 
 // MARK: Types
 
