@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-#if MINI_FOUNDATION_COMPAT
+#if MINIF_COMPAT
 
 internal import _MiniFoundationCore_C
 

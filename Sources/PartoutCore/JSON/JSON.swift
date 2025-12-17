@@ -61,7 +61,7 @@ extension JSON: Codable {
     }
 }
 
-#if !MINI_FOUNDATION_COMPAT
+#if !MINIF_COMPAT
 extension JSON: CustomDebugStringConvertible {
     public var debugDescription: String {
         switch self {

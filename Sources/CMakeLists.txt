@@ -90,7 +90,7 @@ file(GLOB_RECURSE PARTOUT_SOURCES *.swift)
 # Exclude Foundation if compatibility is on
 if(USE_COMPAT)
     target_compile_options(partout PRIVATE
-        -DMINI_FOUNDATION_COMPAT
+        -DMINIF_COMPAT
     )
     set(EXCLUDED_PATTERNS
         MiniFoundationNative.*

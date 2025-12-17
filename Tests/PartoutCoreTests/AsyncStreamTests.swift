@@ -50,7 +50,7 @@ struct AsyncStreamTests {
     }
 }
 
-#if !MINI_FOUNDATION_COMPAT
+#if !MINIF_COMPAT
 
 import Foundation
 import PartoutCore

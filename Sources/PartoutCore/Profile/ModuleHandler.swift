@@ -6,7 +6,7 @@
 public struct ModuleHandler: Identifiable, Sendable {
     public typealias DecodingBlock = @Sendable (Decoder) throws -> Module
 
-#if !MINI_FOUNDATION_COMPAT
+#if !MINIF_COMPAT
     public typealias LegacyDecodingBlock = @Sendable (JSONDecoder, Data) throws -> Module
 #else
     public typealias LegacyDecodingBlock = @Sendable (Any, Any) -> Void
@@ -29,7 +29,7 @@ public struct ModuleHandler: Identifiable, Sendable {
                 try M(from: $0)
             },
             legacyDecoder: {
-#if !MINI_FOUNDATION_COMPAT
+#if !MINIF_COMPAT
                 try $0.decode(moduleType, from: $1)
 #endif
             },

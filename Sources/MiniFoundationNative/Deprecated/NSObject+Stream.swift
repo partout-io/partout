@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-#if canImport(Combine) && !MINI_FOUNDATION_COMPAT
+#if canImport(Combine) && !MINIF_COMPAT
 import Foundation
 
 @available(*, deprecated, message: "Not cross-platform")

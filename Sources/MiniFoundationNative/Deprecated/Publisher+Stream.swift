@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-#if canImport(Combine) && !MINI_FOUNDATION_COMPAT
+#if canImport(Combine) && !MINIF_COMPAT
 @preconcurrency import Combine
 extension Publisher where Output: Sendable {
     @available(*, deprecated, message: "This may produce a retain cycle if the Publisher was created from KVO .publisher(for:)")
