@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 // FIXME: #171, Use compile-time Regex after Swift 6
 
 extension OpenVPN {

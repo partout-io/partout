@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 extension OpenVPN {
 
     /// Represents an OpenVPN static key file (as generated with --genkey)

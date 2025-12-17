@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import NetworkExtension
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
 
 /// A transient module that embeds a full set of `NEPacketTunnelNetworkSettings`.
 public struct NESettingsModule: Module, @unchecked Sendable {

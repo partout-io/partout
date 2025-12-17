@@ -2,11 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-import PartoutOS
-#endif
-
 /// Resolve peers of the given tunnel configuration.
 /// - Parameter tunnelConfiguration: tunnel configuration.
 /// - Throws: an error of type `WireGuardAdapterError`.

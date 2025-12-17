@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 typealias TLSFactory = @Sendable (TLSWrapper.Parameters) throws -> TLSProtocol
 
 typealias DataPathFactory = @Sendable (

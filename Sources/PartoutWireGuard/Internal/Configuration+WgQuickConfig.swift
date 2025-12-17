@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright © 2018-2021 WireGuard LLC. All Rights Reserved.
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 extension WireGuard.Configuration {
 
     enum ParserState {

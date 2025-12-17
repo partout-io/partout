@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Network
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
 
 /// An observer that publishes updates from a `NWPathMonitor`.
 public final class NEObservablePath: ReachabilityObserver {

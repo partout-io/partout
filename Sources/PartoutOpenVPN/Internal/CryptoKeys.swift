@@ -4,9 +4,6 @@
 
 internal import _PartoutCore_C
 internal import _PartoutCrypto_C
-#if !PARTOUT_MONOLITH
-import PartoutOS
-#endif
 
 struct CryptoKeys {
     struct KeyPair {

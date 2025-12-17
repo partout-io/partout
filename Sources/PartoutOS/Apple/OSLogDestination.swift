@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @preconcurrency import OSLog
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
 
 /// A logger destination based on `OSLog`.
 public struct OSLogDestination: LoggerDestination {

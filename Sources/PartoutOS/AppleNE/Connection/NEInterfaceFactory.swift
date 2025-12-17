@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @preconcurrency import NetworkExtension
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
 
 /// A factory that spawns link and tunnel interfaces from a `NEPacketTunnelProvider`.
 public final class NEInterfaceFactory: NetworkInterfaceFactory {

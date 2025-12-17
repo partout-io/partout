@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 /// Observes major events notified by a `OpenVPNSessionProtocol`.
 protocol OpenVPNSessionDelegate: AnyObject, Sendable {
 

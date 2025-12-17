@@ -2,11 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-import PartoutOS
-#endif
-
 /// Swift/C implementation of an OpenVPN connection.
 public actor OpenVPNConnection {
 

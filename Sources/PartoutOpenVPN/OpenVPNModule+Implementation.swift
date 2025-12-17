@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 extension OpenVPNModule {
     public final class Implementation: ModuleImplementation, Sendable {
         public let moduleHandlerId: ModuleType = .openVPN

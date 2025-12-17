@@ -8,10 +8,6 @@
 //  SPDX-License-Identifier: MIT
 //  Copyright © 2018-2024 WireGuard LLC. All Rights Reserved.
 
-#if !PARTOUT_MONOLITH
-import PartoutCore
-#endif
-
 /// Establishes a WireGuard connection.
 public actor WireGuardConnection: Connection {
     private let ctx: PartoutLoggerContext

@@ -4,10 +4,6 @@
 
 internal import _PartoutOpenVPN_C
 internal import _PartoutTLS_C
-#if !PARTOUT_MONOLITH
-import PartoutCore
-import PartoutOS
-#endif
 
 extension TLSWrapper {
     static func native(with parameters: Parameters) throws -> TLSWrapper {
