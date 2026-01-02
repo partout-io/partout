@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 /// Connection daemon handling async I/O.
-public protocol ConnectionDaemon {
-    var profile: Profile { get }
+public protocol ConnectionDaemon: Sendable {
+    nonisolated var profile: Profile { get }
 
     func start() async throws
 
