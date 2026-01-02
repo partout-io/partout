@@ -4,6 +4,8 @@
 
 /// Connection daemon handling async I/O.
 public protocol ConnectionDaemon {
+    var profile: Profile { get }
+
     func start() async throws
 
     func stop() async
