@@ -357,15 +357,15 @@ extension SimpleConnectionDaemon {
             connectionParameters: ConnectionParameters,
             reachability: ReachabilityObserver,
             messageHandler: MessageHandler,
-            stopDelay: Int,
-            reconnectionDelay: Int
+            stopDelay: Int? = nil,
+            reconnectionDelay: Int? = nil
         ) {
             self.registry = registry
             self.connectionParameters = connectionParameters
             self.reachability = reachability
             self.messageHandler = messageHandler
-            self.stopDelay = stopDelay
-            self.reconnectionDelay = reconnectionDelay
+            self.stopDelay = stopDelay ?? 2000
+            self.reconnectionDelay = reconnectionDelay ?? 2000
         }
     }
 }
