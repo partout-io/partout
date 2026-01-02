@@ -8,5 +8,7 @@ public protocol ConnectionDaemon {
 
     func stop() async
 
+    func hold() async
+
     func sendMessage(_ message: Message.Input) async throws -> Message.Output?
 }
