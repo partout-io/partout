@@ -26,8 +26,8 @@ public actor NEPTPForwarder {
         environment: TunnelEnvironment,
         factoryOptions: NEInterfaceFactory.Options = .init(),
         connectionOptions: ConnectionParameters.Options = .init(),
-        stopDelay: Int = 2000,
-        reconnectionDelay: Int = 2000
+        stopDelay: Int? = nil,
+        reconnectionDelay: Int? = nil
     ) throws {
         guard let provider = controller.provider else {
             pp_log(ctx, .os, .info, "NEPTPForwarder: NEPacketTunnelProvider released")

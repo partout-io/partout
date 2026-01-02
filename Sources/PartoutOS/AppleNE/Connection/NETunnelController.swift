@@ -42,7 +42,7 @@ public final class NETunnelController: TunnelController {
         provider: NEPacketTunnelProvider,
         profile: Profile,
         options: Options
-    ) async throws {
+    ) {
         self.provider = provider
         self.profile = profile
         self.options = options
