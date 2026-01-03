@@ -51,7 +51,7 @@ public final class LocalLogger: @unchecked Sendable {
 
     private let options: Options
 
-    private let mapper: (DebugLog.Line) -> String
+    private let mapper: @Sendable (DebugLog.Line) -> String
 
     private var lines: [DebugLog.Line]
 
@@ -59,7 +59,7 @@ public final class LocalLogger: @unchecked Sendable {
         strategy: Strategy = FileStrategy(),
         url: URL,
         options: Options,
-        mapper: @escaping (DebugLog.Line) -> String
+        mapper: @escaping @Sendable (DebugLog.Line) -> String
     ) {
         queue = DispatchQueue(label: "LocalLogger")
         self.strategy = strategy

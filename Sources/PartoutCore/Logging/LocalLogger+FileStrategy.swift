@@ -21,7 +21,7 @@ extension LocalLogger {
             let suffix = Int(Date().timeIntervalSince1970).description
             let rotatedURL = url.miniAppending(pathExtension: suffix)
 
-            try FileManager.default.miniMoveItem(at: url, to: rotatedURL)
+            try? FileManager.default.miniMoveItem(at: url, to: rotatedURL)
             if let oldLines {
                 try write(lines: oldLines, to: rotatedURL)
             }
