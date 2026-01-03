@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
  *
- * Copyright (C) 2025 Davide De Rosa. All Rights Reserved.
+ * Copyright (C) 2026 Davide De Rosa. All Rights Reserved.
  */
 
 //go:build !windows

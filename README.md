@@ -113,7 +113,7 @@ Open `Demo.xcodeproj` and run the `PartoutDemo` target.
 
 ## License
 
-Copyright (c) 2025 Davide De Rosa. All rights reserved.
+Copyright (c) 2026 Davide De Rosa. All rights reserved.
 
 The library is licensed under the [GPLv3][license]. The `MiniFoundation` targets are MIT-licensed.
 
@@ -143,11 +143,11 @@ This product includes software developed by the OpenSSL Project for use in the O
 
 ### OpenVPN
 
-© Copyright 2025 OpenVPN | OpenVPN is a registered trademark of OpenVPN, Inc.
+© Copyright 2026 OpenVPN | OpenVPN is a registered trademark of OpenVPN, Inc.
 
 ### WireGuard
 
-© Copyright 2015-2025 Jason A. Donenfeld. All Rights Reserved. "WireGuard" and the "WireGuard" logo are registered trademarks of Jason A. Donenfeld.
+© Copyright 2015-2026 Jason A. Donenfeld. All Rights Reserved. "WireGuard" and the "WireGuard" logo are registered trademarks of Jason A. Donenfeld.
 
 ## Contacts
 
