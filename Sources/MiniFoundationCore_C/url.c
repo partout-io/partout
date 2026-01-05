@@ -112,7 +112,7 @@ char *minif_url_alloc_decoded(const char *str, size_t len, size_t *dec_len) {
     // Force unsafe cast as url_percent_decode() has no side-effect
     URL_String comp = { (char *)str, (int)len };
     *dec_len = url_percent_decode(comp, NULL, 0);
-    char *dec_str = (char *)calloc(1, dec_len);
+    char *dec_str = (char *)calloc(1, *dec_len);
     const size_t redec_len = url_percent_decode(comp, dec_str, (int)*dec_len);
     assert(redec_len == *dec_len);
     return dec_str;
