@@ -37,8 +37,6 @@ actor WireGuardAdapter {
     /// The ID of the original ``WireGuardModule``.
     private let moduleId: UniqueID
 
-    private let preferringIPv4: Bool
-
     private let dnsTimeout: Int
 
     /// Backend implementation.
@@ -84,7 +82,6 @@ actor WireGuardAdapter {
         _ ctx: PartoutLoggerContext,
         with delegate: WireGuardAdapterDelegate,
         moduleId: UniqueID,
-        preferringIPv4: Bool,
         dnsTimeout: Int,
         reachability: ReachabilityObserver,
         logHandler: @escaping LogHandler
@@ -92,7 +89,6 @@ actor WireGuardAdapter {
         self.ctx = ctx
         self.delegate = delegate
         self.moduleId = moduleId
-        self.preferringIPv4 = preferringIPv4
         self.dnsTimeout = dnsTimeout
         backend = WireGuardBackend()
         self.reachability = reachability
@@ -263,7 +259,6 @@ actor WireGuardAdapter {
         TunnelRemoteInfoGenerator(
             ctx,
             tunnelConfiguration: tunnelConfiguration,
-            preferringIPv4: preferringIPv4,
             dnsTimeout: dnsTimeout
         )
     }
