@@ -126,9 +126,9 @@ By contributing to this project you are agreeing to the terms stated in the [Con
 Libraries:
 
 - [GenericJSON][credits-genericjson]
-- [libyuarel][credits-libyuarel]
 - [MbedTLS][credits-mbedtls]
 - [OpenSSL][credits-openssl]
+- [url.c][credits-url.c]
 - [uuidv4][credits-uuidv4]
 - [Wintun][credits-wintun]
 - [WireGuard (Go)][credits-wireguard-go]
@@ -168,11 +168,11 @@ Website: [partout.io][about-website]
 
 [github-releases]: https://github.com/partout-io/partout/releases
 [credits-genericjson]: https://github.com/iwill/generic-json-swift
-[credits-libyuarel]: https://github.com/jacketizer/libyuarel
 [credits-mbedtls]: https://github.com/Mbed-TLS/mbedtls
 [credits-openssl]: https://github.com/openssl/openssl
 [credits-tmthecoder]: https://github.com/tmthecoder
 [credits-tmthecoder-xor]: https://github.com/partout-io/tunnelkit/pull/255
+[credits-url.c]: https://github.com/cozis/url.c
 [credits-uuidv4]: https://github.com/rxi/uuid4
 [credits-wintun]: https://github.com/wireguard/wintun
 [credits-wireguard-go]: https://github.com/wireguard/wireguard-go
