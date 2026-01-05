@@ -6,6 +6,7 @@
 
 #include "mini_foundation.h"
 #include <stdlib.h>
+#include <assert.h>
 #include "url.h"
 
 #define URL_SEPARATOR '/'
@@ -105,6 +106,16 @@ const char *minif_url_get_last_path_component(minif_url *url, size_t *len) {
     const size_t offset = p - url->impl.path.ptr;
     *len = url->impl.path.len - offset;
     return p;
+}
+
+char *minif_url_alloc_decoded(const char *str, size_t len, size_t *dec_len) {
+    // Force unsafe cast as url_percent_decode() has no side-effect
+    URL_String comp = { (char *)str, (int)len };
+    *dec_len = url_percent_decode(comp, NULL, 0);
+    char *dec_str = (char *)calloc(1, dec_len);
+    const size_t redec_len = url_percent_decode(comp, dec_str, (int)*dec_len);
+    assert(redec_len == *dec_len);
+    return dec_str;
 }
 
 const char *memrchr(const char *s, int c, size_t n) {

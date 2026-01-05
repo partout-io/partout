@@ -13,6 +13,7 @@ struct URLTests {
         ("gopher://[2001::4]/dns", "gopher", "2001::4", nil, "/dns", "dns", nil, nil),
         ("http://[2001:4860:0:2001::68]/foo/bar?a=123", "http", "2001:4860:0:2001::68", nil, "/foo/bar", "bar", "a=123", nil),
         ("file:///home/john/file.txt", "file", nil, nil, "/home/john/file.txt", "file.txt", nil, nil),
+        ("file:///home/john%20wick/file.txt", "file", nil, nil, "/home/john wick/file.txt", "file.txt", nil, nil),
         // Foundation only trims the last slash, minif trims them all
 //        ("file:///home/john/file.txt///", "file", nil, nil, "/home/john/file.txt", "file.txt", nil, nil)
     ])

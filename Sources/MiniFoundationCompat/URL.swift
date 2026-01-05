@@ -44,8 +44,12 @@ extension Compat {
 
         public var path: String {
             var count = 0
+            var decodedCount = 0
             guard let str = minif_url_get_path(impl, &count) else { return "" }
-            return str.sizedString(count: count)
+            let decoded = minif_url_alloc_decoded(str, count, &decodedCount)
+            let decodedString = UnsafePointer(decoded).sizedString(count: decodedCount)
+            free(decoded)
+            return decodedString
         }
 
         public var lastPathComponent: String {
