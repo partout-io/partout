@@ -6,20 +6,20 @@
 
 #include "mini_foundation.h"
 #include <stdlib.h>
-#include "yuarel.h"
+#include "url.h"
 
 struct _minif_url {
     const char *original;
     const char *subject;
-    struct yuarel impl;
+    URL impl;
 };
 
 minif_url *minif_url_create(const char *string) {
-    struct yuarel impl = { 0 };
+    URL impl = { 0 };
     char *original = minif_strdup(string);
     char *subject = minif_strdup(string);
     if (!original || !subject) goto failure;
-    if (yuarel_parse(&impl, subject) != 0) goto failure;
+    if (url_parse(subject, (int)strlen(subject), NULL, &impl, 0) < 0) goto failure;
     minif_url *url = (minif_url *)calloc(1, sizeof(*url));
     url->original = original;
     url->subject = subject;
@@ -43,11 +43,11 @@ const char *minif_url_get_string(minif_url *url) {
 }
 
 const char *minif_url_get_scheme(minif_url *url) {
-    return url->impl.scheme;
+    return url->impl.scheme.ptr;
 }
 
 const char *minif_url_get_host(minif_url *url) {
-    return url->impl.host;
+    return url->impl.host_text.ptr;
 }
 
 int minif_url_get_port(minif_url *url) {
@@ -55,7 +55,7 @@ int minif_url_get_port(minif_url *url) {
 }
 
 const char *minif_url_get_path(minif_url *url) {
-    return url->impl.path;
+    return url->impl.path.ptr;
 }
 
 const char *minif_url_alloc_last_path(minif_url *url) {
@@ -73,9 +73,9 @@ failure:
 }
 
 const char *minif_url_get_query(minif_url *url) {
-    return url->impl.query;
+    return url->impl.query.ptr;
 }
 
 const char *_Nullable minif_url_get_fragment(minif_url *url) {
-    return url->impl.fragment;
+    return url->impl.fragment.ptr;
 }
