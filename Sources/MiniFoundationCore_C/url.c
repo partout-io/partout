@@ -45,11 +45,13 @@ const char *minif_url_get_string(minif_url *url) {
 }
 
 const char *minif_url_get_scheme(minif_url *url, size_t *len) {
+    if (url->impl.scheme.len == 0) return NULL;
     *len = url->impl.scheme.len;
     return url->impl.scheme.ptr;
 }
 
 const char *minif_url_get_host(minif_url *url, size_t *len) {
+    if (url->impl.host_text.len == 0) return NULL;
     if (url->impl.host_type == URL_HOST_IPV6) {
         *len = url->impl.host_text.len - 2;
         return url->impl.host_text.ptr + 1;
@@ -63,22 +65,25 @@ int minif_url_get_port(minif_url *url) {
 }
 
 const char *minif_url_get_path(minif_url *url, size_t *len) {
+    if (url->impl.path.len == 0) return NULL;
     *len = url->impl.path.len;
     return url->impl.path.ptr;
 }
 
 const char *minif_url_get_query(minif_url *url, size_t *len) {
+    if (url->impl.query.len == 0) return NULL;
     *len = url->impl.query.len;
     return url->impl.query.ptr;
 }
 
-const char *_Nullable minif_url_get_fragment(minif_url *url, size_t *len) {
+const char *minif_url_get_fragment(minif_url *url, size_t *len) {
+    if (url->impl.fragment.len == 0) return NULL;
     *len = url->impl.fragment.len;
     return url->impl.fragment.ptr;
 }
 
 const char *minif_url_get_last_path_component(minif_url *url, size_t *len) {
-    if (!url->impl.path.ptr) return NULL;
+    if (url->impl.path.len == 0) return NULL;
     const char *p = memrchr(url->impl.path.ptr, '/', url->impl.path.len);
     // Return the full path
     if (!p) {
