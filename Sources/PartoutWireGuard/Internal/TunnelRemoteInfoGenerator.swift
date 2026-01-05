@@ -15,14 +15,11 @@ final class TunnelRemoteInfoGenerator: Sendable {
 
     private let tunnelConfiguration: WireGuard.Configuration
 
-    private let preferringIPv4: Bool
-
     private let dnsTimeout: Int
 
-    init(_ ctx: PartoutLoggerContext, tunnelConfiguration: WireGuard.Configuration, preferringIPv4: Bool, dnsTimeout: Int) {
+    init(_ ctx: PartoutLoggerContext, tunnelConfiguration: WireGuard.Configuration, dnsTimeout: Int) {
         self.ctx = ctx
         self.tunnelConfiguration = tunnelConfiguration
-        self.preferringIPv4 = preferringIPv4
         self.dnsTimeout = dnsTimeout
     }
 
@@ -32,7 +29,6 @@ final class TunnelRemoteInfoGenerator: Sendable {
 
         // address: String -> resolvedEndpoints: [Endpoint]
         let resolutionMap = await tunnelConfiguration.resolvePeers(
-            preferringIPv4: preferringIPv4,
             timeout: dnsTimeout,
             logHandler: logHandler
         )
@@ -70,7 +66,6 @@ final class TunnelRemoteInfoGenerator: Sendable {
 
         // address: String -> resolvedEndpoints: [Endpoint]
         let resolutionMap = await tunnelConfiguration.resolvePeers(
-            preferringIPv4: preferringIPv4,
             timeout: dnsTimeout,
             logHandler: logHandler
         )

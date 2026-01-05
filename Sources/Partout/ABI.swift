@@ -67,8 +67,7 @@ public func __partout_init(cArgs: UnsafePointer<partout_init_args>!) -> UnsafeMu
             return try WireGuardConnection(
                 ctx,
                 parameters: $0,
-                module: $1,
-                preferringIPv4: true
+                module: $1
             )
         }
     ))
