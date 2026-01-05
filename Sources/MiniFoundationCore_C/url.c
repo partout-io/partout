@@ -48,6 +48,10 @@ const char *minif_url_get_scheme(minif_url *url, size_t *len) {
 }
 
 const char *minif_url_get_host(minif_url *url, size_t *len) {
+    if (url->impl.host_type == URL_HOST_IPV6) {
+        *len = url->impl.host_text.len - 2;
+        return url->impl.host_text.ptr + 1;
+    }
     *len = url->impl.host_text.len;
     return url->impl.host_text.ptr;
 }
