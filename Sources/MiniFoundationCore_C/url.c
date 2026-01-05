@@ -59,16 +59,16 @@ const char *minif_url_get_path(minif_url *url) {
 }
 
 const char *minif_url_alloc_last_path(minif_url *url) {
-    if (!url->impl.path) return NULL;
-    char *parts[256];
-    char *subject = minif_strdup(url->impl.path);
-    const int num = yuarel_split_path(subject, parts, sizeof(parts));
-    if (num <= 0) goto failure;
-    const char *last_part = minif_strdup(parts[num - 1]);
-    free(subject);
-    return last_part;
-failure:
-    free(subject);
+//    if (!url->impl.path.ptr) return NULL;
+//    char *parts[256];
+//    char *subject = minif_strdup(url->impl.path.ptr);
+//    const int num = yuarel_split_path(subject, parts, sizeof(parts));
+//    if (num <= 0) goto failure;
+//    const char *last_part = minif_strdup(parts[num - 1]);
+//    free(subject);
+//    return last_part;
+//failure:
+//    free(subject);
     return NULL;
 }
 
