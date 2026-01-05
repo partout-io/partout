@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include "url.h"
 
+#define URL_SEPARATOR '/'
+
 const char *memrchr(const char *s, int c, size_t n);
 
 struct _minif_url {
@@ -21,7 +23,15 @@ minif_url *minif_url_create(const char *string) {
     char *original = minif_strdup(string);
     char *subject = minif_strdup(string);
     if (!original || !subject) goto failure;
-    if (url_parse(subject, (int)strlen(subject), NULL, &impl, 0) < 0) goto failure;
+    int len = (int)strlen(subject);
+    if (len > 1) {
+        const char *trailing = subject + len - 1;
+        while (trailing != subject && *trailing == URL_SEPARATOR) {
+            --len;
+            --trailing;
+        }
+    }
+    if (url_parse(subject, len, NULL, &impl, 0) < 0) goto failure;
     minif_url *url = (minif_url *)calloc(1, sizeof(*url));
     url->original = original;
     url->subject = subject;
@@ -84,13 +94,13 @@ const char *minif_url_get_fragment(minif_url *url, size_t *len) {
 
 const char *minif_url_get_last_path_component(minif_url *url, size_t *len) {
     if (url->impl.path.len == 0) return NULL;
-    const char *p = memrchr(url->impl.path.ptr, '/', url->impl.path.len);
+    const char *p = memrchr(url->impl.path.ptr, URL_SEPARATOR, url->impl.path.len);
     // Return the full path
     if (!p) {
         *len = url->impl.path.len;
         return url->impl.path.ptr;
     }
-    // Return the path after the '/'
+    // Return the path after the URL_SEPARATOR
     ++p;
     const size_t offset = p - url->impl.path.ptr;
     *len = url->impl.path.len - offset;
