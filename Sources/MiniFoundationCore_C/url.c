@@ -42,11 +42,13 @@ const char *minif_url_get_string(minif_url *url) {
     return url->original;
 }
 
-const char *minif_url_get_scheme(minif_url *url) {
+const char *minif_url_get_scheme(minif_url *url, size_t *len) {
+    *len = url->impl.scheme.len;
     return url->impl.scheme.ptr;
 }
 
-const char *minif_url_get_host(minif_url *url) {
+const char *minif_url_get_host(minif_url *url, size_t *len) {
+    *len = url->impl.host_text.len;
     return url->impl.host_text.ptr;
 }
 
@@ -54,7 +56,8 @@ int minif_url_get_port(minif_url *url) {
     return url->impl.port;
 }
 
-const char *minif_url_get_path(minif_url *url) {
+const char *minif_url_get_path(minif_url *url, size_t *len) {
+    *len = url->impl.path.len;
     return url->impl.path.ptr;
 }
 
@@ -72,10 +75,12 @@ const char *minif_url_alloc_last_path(minif_url *url) {
     return NULL;
 }
 
-const char *minif_url_get_query(minif_url *url) {
+const char *minif_url_get_query(minif_url *url, size_t *len) {
+    *len = url->impl.query.len;
     return url->impl.query.ptr;
 }
 
-const char *_Nullable minif_url_get_fragment(minif_url *url) {
+const char *_Nullable minif_url_get_fragment(minif_url *url, size_t *len) {
+    *len = url->impl.fragment.len;
     return url->impl.fragment.ptr;
 }

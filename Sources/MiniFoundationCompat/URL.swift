@@ -24,13 +24,17 @@ extension Compat {
         }
 
         public var scheme: String? {
-            guard let str = minif_url_get_scheme(impl) else { return nil }
-            return String(cString: str)
+            var count = 0
+            guard let str = minif_url_get_scheme(impl, &count) else { return nil }
+            return str.sizedString(count: count)
         }
 
         public var host: String? {
-            guard let str = minif_url_get_host(impl) else { return nil }
-            return String(cString: str)
+            var count = 0
+            guard let str = minif_url_get_host(impl, &count) else { return nil }
+            let host = str.sizedString(count: count)
+            guard !host.isEmpty else { return nil }
+            return host
         }
 
         public var port: Int? {
@@ -39,10 +43,12 @@ extension Compat {
         }
 
         public var path: String {
-            guard let str = minif_url_get_path(impl) else { return "" }
-            return "/" + String(cString: str)
+            var count = 0
+            guard let str = minif_url_get_path(impl, &count) else { return "" }
+            return str.sizedString(count: count)
         }
 
+        // FIXME: ###
         public var lastPathComponent: String {
             guard let str = minif_url_alloc_last_path(impl) else { return "" }
             defer { free(UnsafeMutableRawPointer(mutating: str)) }
@@ -50,13 +56,15 @@ extension Compat {
         }
 
         public var query: String? {
-            guard let str = minif_url_get_query(impl) else { return nil }
-            return String(cString: str)
+            var count = 0
+            guard let str = minif_url_get_query(impl, &count) else { return nil }
+            return str.sizedString(count: count)
         }
 
         public var fragment: String? {
-            guard let str = minif_url_get_fragment(impl) else { return nil }
-            return String(cString: str)
+            var count = 0
+            guard let str = minif_url_get_fragment(impl, &count) else { return nil }
+            return str.sizedString(count: count)
         }
 
         public var absoluteString: String {
@@ -150,5 +158,14 @@ extension String {
         var comps = components(separatedBy: Self.pathSeparator)
         comps.removeLast()
         return comps.joined(separator: Self.pathSeparator)
+    }
+}
+
+private extension UnsafePointer where Pointee == CChar {
+    func sizedString(count: Int) -> String {
+        withMemoryRebound(to: UInt8.self, capacity: count) {
+            let buf = UnsafeBufferPointer(start: $0, count: count)
+            return String(decoding: buf, as: UTF8.self)
+        }
     }
 }
