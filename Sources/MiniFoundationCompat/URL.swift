@@ -48,11 +48,10 @@ extension Compat {
             return str.sizedString(count: count)
         }
 
-        // FIXME: ###
         public var lastPathComponent: String {
-            guard let str = minif_url_alloc_last_path(impl) else { return "" }
-            defer { free(UnsafeMutableRawPointer(mutating: str)) }
-            return String(cString: str)
+            var count = 0
+            guard let str = minif_url_get_last_path_component(impl, &count) else { return "" }
+            return str.sizedString(count: count)
         }
 
         public var query: String? {

@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include "url.h"
 
+const char *memrchr(const char *s, int c, size_t n);
+
 struct _minif_url {
     const char *original;
     const char *subject;
@@ -65,20 +67,6 @@ const char *minif_url_get_path(minif_url *url, size_t *len) {
     return url->impl.path.ptr;
 }
 
-const char *minif_url_alloc_last_path(minif_url *url) {
-//    if (!url->impl.path.ptr) return NULL;
-//    char *parts[256];
-//    char *subject = minif_strdup(url->impl.path.ptr);
-//    const int num = yuarel_split_path(subject, parts, sizeof(parts));
-//    if (num <= 0) goto failure;
-//    const char *last_part = minif_strdup(parts[num - 1]);
-//    free(subject);
-//    return last_part;
-//failure:
-//    free(subject);
-    return NULL;
-}
-
 const char *minif_url_get_query(minif_url *url, size_t *len) {
     *len = url->impl.query.len;
     return url->impl.query.ptr;
@@ -87,4 +75,27 @@ const char *minif_url_get_query(minif_url *url, size_t *len) {
 const char *_Nullable minif_url_get_fragment(minif_url *url, size_t *len) {
     *len = url->impl.fragment.len;
     return url->impl.fragment.ptr;
+}
+
+const char *minif_url_get_last_path_component(minif_url *url, size_t *len) {
+    if (!url->impl.path.ptr) return NULL;
+    const char *p = memrchr(url->impl.path.ptr, '/', url->impl.path.len);
+    // Return the full path
+    if (!p) {
+        *len = url->impl.path.len;
+        return url->impl.path.ptr;
+    }
+    // Return the path after the '/'
+    ++p;
+    const size_t offset = p - url->impl.path.ptr;
+    *len = url->impl.path.len - offset;
+    return p;
+}
+
+const char *memrchr(const char *s, int c, size_t n) {
+    const char *p = (const char *)s + n;
+    while (n--) {
+        if (*--p == (char)c) return p;
+    }
+    return NULL;
 }

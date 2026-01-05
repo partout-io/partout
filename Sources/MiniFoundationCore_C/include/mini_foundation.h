@@ -56,9 +56,9 @@ const char *_Nullable minif_url_get_scheme(minif_url *url, size_t *len);
 const char *_Nullable minif_url_get_host(minif_url *url, size_t *len);
 int minif_url_get_port(minif_url *url);
 const char *_Nullable minif_url_get_path(minif_url *url, size_t *len);
-const char *_Nullable minif_url_alloc_last_path(minif_url *url);
 const char *_Nullable minif_url_get_query(minif_url *url, size_t *len);
 const char *_Nullable minif_url_get_fragment(minif_url *url, size_t *len);
+const char *_Nullable minif_url_get_last_path_component(minif_url *url, size_t *len);
 
 char *_Nullable minif_base64_encode(const uint8_t *data, size_t len, size_t *out_len);
 uint8_t *_Nullable minif_base64_decode(const char *str, size_t len, size_t *out_len);
