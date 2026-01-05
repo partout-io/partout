@@ -811,7 +811,7 @@ static void append_port(Builder *b, URL_u16 port)
     while (ptr < buf + sizeof(buf)-1 && *ptr == '0')
         ptr++;
 
-    append(b, (URL_String) { ptr, 5 - (ptr - buf) });
+    append(b, (URL_String) { ptr, (int)(5 - (ptr - buf)) });
 }
 
 static void append_authority(Builder *b, URL url)
