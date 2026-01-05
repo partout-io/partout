@@ -24,7 +24,6 @@ struct WireGuardAdapterTests {
             try Endpoint($0, port)
         }
         let targetIPv4Object = try Endpoint(targetIPv4, port)
-        let targetAnyObject = try Endpoint(targetAny, port)
 
         let withEnabled = WireGuard.Configuration.ResolvedMap()
         await withEnabled.setEndpoints(endpointObjects, for: address)
