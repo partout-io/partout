@@ -31,7 +31,7 @@ minif_url *minif_url_create(const char *string) {
             --trailing;
         }
     }
-    if (url_parse(subject, len, NULL, &impl, 0) < 0) goto failure;
+    if (url_parse(subject, len, NULL, &impl, URL_FLAG_RFC3986) < 0) goto failure;
     minif_url *url = (minif_url *)calloc(1, sizeof(*url));
     url->original = original;
     url->subject = subject;
