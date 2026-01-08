@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 //
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 
 public actor Expectation {
     private var fulfilled = false
@@ -37,7 +37,7 @@ public actor Expectation {
             // Task 2: timeout
             if timeout < .max {
                 group.addTask {
-                    try await Task.sleep(nanoseconds: UInt64(timeout) * NSEC_PER_MSEC)
+                    try await Task.sleep(for: .milliseconds(timeout))
                     throw TimeoutError()
                 }
             }
