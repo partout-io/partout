@@ -79,13 +79,18 @@ extension OpenVPNConnection: Connection {
 
     @discardableResult
     public func start() async throws -> Bool {
+        var session: OpenVPNSessionProtocol?
         do {
-            try await bindIfNeeded()
+            session = try await bindIfNeeded()
             return try await backend.start()
         } catch let error as PartoutError {
+            await session?.shutdown(error)
             if error.code == .exhaustedEndpoints, let reason = error.reason {
                 throw reason
             }
+            throw error
+        } catch {
+            await session?.shutdown(error)
             throw error
         }
     }
@@ -96,9 +101,9 @@ extension OpenVPNConnection: Connection {
 }
 
 private extension OpenVPNConnection {
-    func bindIfNeeded() async throws {
+    func bindIfNeeded() async throws -> OpenVPNSessionProtocol? {
         guard hooks == nil else {
-            return
+            return nil
         }
 
         let ctx = self.ctx
@@ -149,6 +154,7 @@ private extension OpenVPNConnection {
         self.hooks = hooks
         await backend.setHooks(hooks)
         await session.setDelegate(self)
+        return session
     }
 }
 
