@@ -96,9 +96,6 @@ extension NETunnelStrategy: TunnelObservableStrategy {
         try await saveAtomically(manager) {
             $0.isOnDemandEnabled = false
         }
-        // XXX: Mitigate races where the on-demand flag, despite saveToPreferences(),
-        // is not disabled yet, thus causing the tunnel to reconnect
-        try await Task.sleep(for: .milliseconds(200))
         manager.connection.stopVPNTunnel()
         await manager.connection.waitForDisconnection()
     }
