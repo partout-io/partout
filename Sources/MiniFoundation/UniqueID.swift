@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 //
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 
 /// Alias for a unique identifier.
 public typealias UniqueID = UUID
