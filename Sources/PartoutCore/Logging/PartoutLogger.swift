@@ -171,7 +171,7 @@ extension PartoutLogger {
         public mutating func setLocalLogger(
             url: URL,
             options: LocalLogger.Options,
-            mapper: @escaping (DebugLog.Line) -> String
+            mapper: @escaping @Sendable (DebugLog.Line) -> String
         ) {
             localLogger = LocalLogger(url: url, options: options, mapper: mapper)
         }

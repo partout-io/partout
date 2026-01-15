@@ -9,7 +9,7 @@ import Testing
 struct AppleJavaScriptEngineTests {
     @Test
     func givenEngine_whenInject_thenReturns() async throws {
-        let sut = AppleJavaScriptEngine(.global)
+        let sut = AppleJavaScriptEngine()
         sut.inject("triple", object: {
             3 * $0
         } as @convention(block) (Int) -> Int)
