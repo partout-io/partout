@@ -8,10 +8,10 @@
 public final class AppleJavaScriptEngine: ScriptingEngine, @unchecked Sendable {
     private let engine: JSContext
 
-    public init(_ ctx: PartoutLoggerContext) {
+    public init() {
         engine = JSContext()
         engine.exceptionHandler = { _, exception in
-            pp_log(ctx, .core, .error, "AppleJavaScriptEngine: \(exception?.toString() ?? "unknown error")")
+            pp_log_g(.core, .error, "AppleJavaScriptEngine: \(exception?.toString() ?? "unknown error")")
         }
     }
 
