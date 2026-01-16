@@ -212,40 +212,44 @@ if useFoundationCompatibility.supportsPartoutd {
 // MARK: OpenVPN
 
 // OpenVPN requires Crypto/TLS wrappers
-if areas.contains(.openVPN), cryptoMode != nil {
+if areas.contains(.openVPN) {
     package.products.append(
         .library(
             name: "PartoutOpenVPN",
             targets: ["PartoutOpenVPN"]
         )
     )
-    package.targets.append(contentsOf: [
-        .target(
-            name: "PartoutOpenVPN_C",
-            dependencies: ["_PartoutCryptoImpl_C"],
-            cSettings: globalCSettings
-        ),
+    package.targets.append(
         .target(
             name: "PartoutOpenVPN",
             dependencies: ["PartoutOS"]
-        ),
-        .target(
-            name: "PartoutOpenVPNConnection",
-            dependencies: [
-                "PartoutOpenVPN",
-                "PartoutOpenVPN_C"
-            ]
-        ),
-        .testTarget(
-            name: "PartoutOpenVPNTests",
-            dependencies: ["PartoutOpenVPNConnection"],
-            exclude: useFoundationCompatibility.openVPNTestsExclude + ["DataPathPerformanceTests.swift"],
-            resources: [
-                .process("Resources")
-            ],
-            swiftSettings: useFoundationCompatibility.swiftSettings
         )
-    ])
+    )
+    if cryptoMode != nil {
+        package.targets.append(contentsOf: [
+            .target(
+                name: "PartoutOpenVPN_C",
+                dependencies: ["_PartoutCryptoImpl_C"],
+                cSettings: globalCSettings
+            ),
+            .target(
+                name: "PartoutOpenVPNConnection",
+                dependencies: [
+                    "PartoutOpenVPN",
+                    "PartoutOpenVPN_C"
+                ]
+            ),
+            .testTarget(
+                name: "PartoutOpenVPNTests",
+                dependencies: ["PartoutOpenVPNConnection"],
+                exclude: useFoundationCompatibility.openVPNTestsExclude + ["DataPathPerformanceTests.swift"],
+                resources: [
+                    .process("Resources")
+                ],
+                swiftSettings: useFoundationCompatibility.swiftSettings
+            )
+        ])
+    }
 }
 
 // MARK: WireGuard
@@ -257,21 +261,25 @@ if areas.contains(.wireGuard) {
         package.dependencies.append(
             .package(url: "https://github.com/partout-io/wg-go-apple", from: wgGoVersion)
         )
-        package.targets.append(
+        package.targets.append(contentsOf: [
             .target(
                 name: "PartoutWireGuard_C",
-                dependencies: [
-                    "PartoutCore_C",
-                    "wg-go-apple"
-                ]
+                dependencies: ["PartoutCore_C"]
+            ),
+            .target(
+                name: "PartoutWireGuardConnection_C",
+                dependencies: ["wg-go-apple"]
             )
-        )
+        ])
     default:
         // Load wg-go backend dynamically
-        package.targets.append(
+        package.targets.append(contentsOf: [
             .target(
                 name: "PartoutWireGuard_C",
-                dependencies: ["PartoutCore_C"],
+                dependencies: ["PartoutCore_C"]
+            ),
+            .target(
+                name: "PartoutWireGuardConnection_C",
                 cSettings: globalCSettings + [
                     .unsafeFlags(["-I\(cmakeOutput)/wg-go/include"])
                 ],
@@ -280,7 +288,7 @@ if areas.contains(.wireGuard) {
                     .linkedLibrary("\(staticLibPrefix)wg-go")
                 ]
             )
-        )
+        ])
     }
     package.products.append(
         .library(
