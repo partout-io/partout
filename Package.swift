@@ -463,7 +463,7 @@ enum Area: CaseIterable {
 
     var define: String? {
         switch self {
-        case .openVPN: cryptoMode != nil ? "PARTOUT_OPENVPN" : nil
+        case .openVPN: "PARTOUT_OPENVPN"
         case .wireGuard: "PARTOUT_WIREGUARD"
         }
     }
