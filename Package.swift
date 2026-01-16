@@ -238,7 +238,7 @@ if areas.contains(.openVPN), cryptoMode != nil {
         ),
         .testTarget(
             name: "PartoutOpenVPNTests",
-            dependencies: ["PartoutOpenVPN"],
+            dependencies: ["PartoutOpenVPNConnection"],
             exclude: useFoundationCompatibility.openVPNTestsExclude + ["DataPathPerformanceTests.swift"],
             resources: [
                 .process("Resources")
@@ -302,7 +302,7 @@ if areas.contains(.wireGuard) {
         ),
         .testTarget(
             name: "PartoutWireGuardTests",
-            dependencies: ["PartoutWireGuard"],
+            dependencies: ["PartoutWireGuardConnection"],
             exclude: useFoundationCompatibility.wireGuardTestsExclude
         )
     ])
