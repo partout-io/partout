@@ -11,7 +11,7 @@ struct OpenVPNParserTests {
 
     @Test
     func givenOption_whenEnumerateComponents_thenAreParsedCorrectly() throws {
-        let sut = try OpenVPN.Option.remote.regularExpression()
+        let sut = OpenVPN.Option.remote.regularExpression()
         _ = sut.enumerateSpacedComponents(in: "remote    one.two.com   12345   tcp") {
             #expect($0 == ["remote", "one.two.com", "12345", "tcp"])
         }

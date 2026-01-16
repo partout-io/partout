@@ -35,3 +35,9 @@ final class SimpleKeyDecrypter: KeyDecrypter, Sendable {
         return str
     }
 }
+
+extension StandardOpenVPNParser {
+    public convenience init() {
+        self.init(decrypter: SimpleKeyDecrypter())
+    }
+}

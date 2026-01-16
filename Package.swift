@@ -15,7 +15,7 @@ let envDocs = env["PP_BUILD_DOCS"] == "1"
 
 // MARK: Configuration
 
-let areas = Set(Area.allCases)
+let areas = Area.allCases
 let cryptoMode: CryptoMode? = .openSSL
 let openSSLVersion: Version = "3.5.500"
 let wgGoVersion: Version = "0.0.2025063103"
@@ -56,6 +56,10 @@ let package = Package(
             name: "partout",
             type: libraryType,
             targets: ["Partout"]
+        ),
+        .library(
+            name: "partout-previews",
+            targets: ["PartoutPreviews"]
         )
     ],
     targets: [
@@ -70,14 +74,26 @@ let package = Package(
                 if cryptoMode != nil {
                     list.append("_PartoutCryptoImpl_C")
                     if areas.contains(.openVPN) {
-                        list.append("PartoutOpenVPN")
+                        list.append("PartoutOpenVPNConnection")
                     }
                 }
                 if areas.contains(.wireGuard) {
-                    list.append("PartoutWireGuard")
+                    list.append("PartoutWireGuardConnection")
                 }
                 return list
             }(),
+            swiftSettings: areas.compactMap(\.define).map {
+                .define($0)
+            } + useFoundationCompatibility.swiftSettings
+        ),
+        .target(
+            name: "PartoutPreviews",
+            dependencies: [
+                "PartoutCore",
+                "PartoutOS",
+                "PartoutOpenVPN",
+                "PartoutWireGuard"
+            ],
             swiftSettings: areas.compactMap(\.define).map {
                 .define($0)
             } + useFoundationCompatibility.swiftSettings
@@ -211,9 +227,13 @@ if areas.contains(.openVPN), cryptoMode != nil {
         ),
         .target(
             name: "PartoutOpenVPN",
+            dependencies: ["PartoutOS"]
+        ),
+        .target(
+            name: "PartoutOpenVPNConnection",
             dependencies: [
-                "PartoutOpenVPN_C",
-                "PartoutOS"
+                "PartoutOpenVPN",
+                "PartoutOpenVPN_C"
             ]
         ),
         .testTarget(
@@ -275,6 +295,10 @@ if areas.contains(.wireGuard) {
                 "PartoutOS",
                 "PartoutWireGuard_C"
             ]
+        ),
+        .target(
+            name: "PartoutWireGuardConnection",
+            dependencies: ["PartoutWireGuard"]
         ),
         .testTarget(
             name: "PartoutWireGuardTests",
