@@ -261,25 +261,21 @@ if areas.contains(.wireGuard) {
         package.dependencies.append(
             .package(url: "https://github.com/partout-io/wg-go-apple", from: wgGoVersion)
         )
-        package.targets.append(contentsOf: [
-            .target(
-                name: "PartoutWireGuard_C",
-                dependencies: ["PartoutCore_C"]
-            ),
+        package.targets.append(
             .target(
                 name: "PartoutWireGuardConnection_C",
-                dependencies: ["wg-go-apple"]
+                dependencies: [
+                    "PartoutWireGuard_C",
+                    "wg-go-apple"
+                ]
             )
-        ])
+        )
     default:
         // Load wg-go backend dynamically
-        package.targets.append(contentsOf: [
-            .target(
-                name: "PartoutWireGuard_C",
-                dependencies: ["PartoutCore_C"]
-            ),
+        package.targets.append(
             .target(
                 name: "PartoutWireGuardConnection_C",
+                dependencies: ["PartoutWireGuard_C"],
                 cSettings: globalCSettings + [
                     .unsafeFlags(["-I\(cmakeOutput)/wg-go/include"])
                 ],
@@ -288,7 +284,7 @@ if areas.contains(.wireGuard) {
                     .linkedLibrary("\(staticLibPrefix)wg-go")
                 ]
             )
-        ])
+        )
     }
     package.products.append(
         .library(
@@ -305,8 +301,15 @@ if areas.contains(.wireGuard) {
             ]
         ),
         .target(
+            name: "PartoutWireGuard_C",
+            dependencies: ["PartoutCore_C"]
+        ),
+        .target(
             name: "PartoutWireGuardConnection",
-            dependencies: ["PartoutWireGuard"]
+            dependencies: [
+                "PartoutWireGuard",
+                "PartoutWireGuardConnection_C"
+            ]
         ),
         .testTarget(
             name: "PartoutWireGuardTests",
