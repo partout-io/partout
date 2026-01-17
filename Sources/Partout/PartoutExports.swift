@@ -11,12 +11,16 @@
 
 #if PARTOUT_OPENVPN
 @_exported import PartoutOpenVPN
+#if !PARTOUT_FOR_PREVIEWS
 @_exported import PartoutOpenVPNConnection
+#endif
 #endif
 
 #if PARTOUT_WIREGUARD
 @_exported import PartoutWireGuard
+#if !PARTOUT_FOR_PREVIEWS
 @_exported import PartoutWireGuardConnection
+#endif
 #endif
 
 #endif

@@ -22,6 +22,7 @@ let wgGoVersion: Version = "0.0.2025063103"
 let cmakeOutput = envCMakeOutput ?? "bin/windows-arm64"
 let useFoundationCompatibility: FoundationCompatibility = .off
 // let useFoundationCompatibility: FoundationCompatibility = OS.current != .apple ? .on : .off
+let forPreviews = false
 
 // MARK: - Package
 
@@ -56,10 +57,6 @@ let package = Package(
             name: "partout",
             type: libraryType,
             targets: ["Partout"]
-        ),
-        .library(
-            name: "partout-previews",
-            targets: ["PartoutPreviews"]
         )
     ],
     targets: [
@@ -74,29 +71,32 @@ let package = Package(
                 if cryptoMode != nil {
                     list.append("_PartoutCryptoImpl_C")
                     if areas.contains(.openVPN) {
-                        list.append("PartoutOpenVPNConnection")
+                        if forPreviews {
+                            list.append("PartoutOpenVPN")
+                        } else {
+                            list.append("PartoutOpenVPNConnection")
+                        }
                     }
                 }
                 if areas.contains(.wireGuard) {
-                    list.append("PartoutWireGuardConnection")
+                    if forPreviews {
+                        list.append("PartoutWireGuard")
+                    } else {
+                        list.append("PartoutWireGuardConnection")
+                    }
                 }
                 return list
             }(),
-            swiftSettings: areas.compactMap(\.define).map {
-                .define($0)
-            } + useFoundationCompatibility.swiftSettings
-        ),
-        .target(
-            name: "PartoutPreviews",
-            dependencies: [
-                "PartoutCore",
-                "PartoutOS",
-                "PartoutOpenVPN",
-                "PartoutWireGuard"
-            ],
-            swiftSettings: areas.compactMap(\.define).map {
-                .define($0)
-            } + useFoundationCompatibility.swiftSettings
+            swiftSettings: {
+                var list: [SwiftSetting] = areas.compactMap(\.define).map {
+                    .define($0)
+                }
+                if forPreviews {
+                    list.append(.define("PARTOUT_FOR_PREVIEWS"))
+                }
+                list.append(contentsOf: useFoundationCompatibility.swiftSettings)
+                return list
+            }()
         ),
         .target(
             name: "PartoutABI_C"
