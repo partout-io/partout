@@ -73,6 +73,12 @@ public final class LocalLogger: @unchecked Sendable {
         currentURL
     }
 
+    func restart(from logger: LocalLogger) {
+        queue.sync {
+            lines = logger.lines
+        }
+    }
+
     func append(_ level: DebugLog.Level, message: String) {
         queue.sync {
             lines.append(DebugLog.Line(
