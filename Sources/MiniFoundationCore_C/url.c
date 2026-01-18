@@ -11,7 +11,7 @@
 
 #define URL_SEPARATOR '/'
 
-const char *memrchr(const char *s, int c, size_t n);
+const char *__memrchr(const char *s, int c, size_t n);
 
 struct _minif_url {
     const char *original;
@@ -95,7 +95,7 @@ const char *minif_url_get_fragment(minif_url *url, size_t *len) {
 
 const char *minif_url_get_last_path_component(minif_url *url, size_t *len) {
     if (url->impl.path.len == 0) return NULL;
-    const char *p = memrchr(url->impl.path.ptr, URL_SEPARATOR, url->impl.path.len);
+    const char *p = __memrchr(url->impl.path.ptr, URL_SEPARATOR, url->impl.path.len);
     // Return the full path
     if (!p) {
         *len = url->impl.path.len;
@@ -118,7 +118,7 @@ char *minif_url_alloc_decoded(const char *str, size_t len, size_t *dec_len) {
     return dec_str;
 }
 
-const char *memrchr(const char *s, int c, size_t n) {
+const char *__memrchr(const char *s, int c, size_t n) {
     const char *p = (const char *)s + n;
     while (n--) {
         if (*--p == (char)c) return p;
