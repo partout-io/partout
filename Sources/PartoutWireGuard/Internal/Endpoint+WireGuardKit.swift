@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 extension Endpoint {
-    var wgRepresentation: String {
+    public var wgRepresentation: String {
         switch address {
         case .hostname(let hostname):
             return "\(hostname):\(port)"

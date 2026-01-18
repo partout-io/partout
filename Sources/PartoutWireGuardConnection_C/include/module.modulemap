@@ -1,0 +1,4 @@
+module _PartoutWireGuardConnection_C {
+    header "wireguard/wireguard.h"
+    export *
+}

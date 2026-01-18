@@ -19,6 +19,7 @@ set(PARTOUT_C_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCore_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutOpenVPN_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuard_C/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuardConnection_C/include
 )
 if(WIN32)
     list(APPEND PARTOUT_C_INCLUDE_DIRS ${PP_BUILD_OUTPUT}/wintun)

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !os(iOS) && !os(tvOS)
+#if !PARTOUT_FOR_PREVIEWS && !os(iOS) && !os(tvOS)
 
 @ABIActor
 final class ABIContext {

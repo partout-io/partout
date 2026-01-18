@@ -1,7 +1,6 @@
 module _PartoutWireGuard_C {
     header "wireguard/key.h"
     header "wireguard/sys.h"
-    header "wireguard/wireguard.h"
     header "wireguard/x25519.h"
     export *
 }
