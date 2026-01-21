@@ -6,7 +6,6 @@ extension Registry {
     private static let knownHandlers: [ModuleHandler] = {
         var handlers: [ModuleHandler] = [
             DNSModule.moduleHandler,
-            FilterModule.moduleHandler,
             HTTPProxyModule.moduleHandler,
             IPModule.moduleHandler,
             OnDemandModule.moduleHandler
