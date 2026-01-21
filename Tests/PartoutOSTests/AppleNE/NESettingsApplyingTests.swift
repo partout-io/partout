@@ -176,27 +176,6 @@ struct NESettingsApplyingTests {
 
         #expect(sut == settings)
     }
-
-    @Test
-    func givenNESettings_whenApplyFilter_thenDisablesSettings() throws {
-        var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "1.2.3.4")
-        sut.ipv4Settings = NEIPv4Settings(addresses: ["6.6.6.6"], subnetMasks: ["255.0.0.0"])
-        sut.dnsSettings = NEDNSSettings(servers: ["1.1.1.1"])
-        sut.proxySettings = NEProxySettings()
-        sut.proxySettings?.proxyAutoConfigurationURL = URL(string: "hello.com")!
-        sut.mtu = 1200
-
-        let filterModule = FilterModule.Builder(
-            disabledMask: [.ipv4, .ipv6, .dns, .proxy, .mtu]
-        ).build()
-        filterModule.apply(.global, to: &sut)
-        #expect(sut.ipv4Settings == nil)
-        #expect(sut.ipv6Settings == nil)
-        #expect(sut.dnsSettings == nil)
-        #expect(sut.proxySettings == nil)
-        #expect(sut.mtu == nil)
-        #expect(sut.tunnelOverheadBytes == nil)
-    }
 }
 
 // MARK: - Helpers

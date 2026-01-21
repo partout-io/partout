@@ -41,7 +41,6 @@ Profiles are the foundations of Partout, and profiles are made of modules. A bas
 
 - ``DNSModule``
 - ``DNSProtocol``
-- ``FilterModule``
 - ``HTTPProxyModule``
 - ``IPModule``
 - ``OnDemandModule``
