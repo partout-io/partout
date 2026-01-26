@@ -6,7 +6,6 @@ internal import _PartoutCore_C
 
 /// Aggregates an address and an ``EndpointProtocol``.
 public struct ExtendedEndpoint: Hashable, Codable, Sendable {
-
     // XXX: Simplistic match
     nonisolated(unsafe)
     private static let rx: Regex = {

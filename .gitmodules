@@ -4,3 +4,6 @@
 [submodule "vendors/openssl"]
 	path = vendors/openssl
 	url = https://github.com/openssl/openssl
+[submodule "vendors/swon"]
+	path = vendors/swon
+	url = https://github.com/keeshux/swon

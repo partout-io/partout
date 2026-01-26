@@ -5,7 +5,6 @@
 /// A socket type between UDP and TCP.
 @frozen
 public enum SocketType: String, Sendable {
-
     /// UDP socket type.
     case udp = "UDP"
 
@@ -16,7 +15,6 @@ public enum SocketType: String, Sendable {
 /// A socket type with optional info about the IP endpoint.
 @frozen
 public enum IPSocketType: String, Sendable {
-
     /// UDP socket type.
     case udp = "UDP"
 

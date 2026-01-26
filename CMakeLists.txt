@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.27)
-project(Partout)
+project(Partout LANGUAGES Swift C CXX)
 include(ExternalProject)
 include(FetchContent)
 
@@ -27,11 +27,13 @@ message(STATUS "Option PP_BUILD_USE_MBEDTLS = ${PP_BUILD_USE_MBEDTLS}")
 message(STATUS "Option PP_BUILD_USE_WGGO = ${PP_BUILD_USE_WGGO}")
 message(STATUS "Option PP_BUILD_OUTPUT = ${PP_BUILD_OUTPUT}")
 
-# Forward args to Partout sub-project
-set(PARTOUT_CMAKE_ARGS
-    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-    -DOUTPUT_DIR=${PP_BUILD_OUTPUT}/partout
-)
+# Include SWON macros
+add_subdirectory("vendors/swon")
+
+# FIXME: Forward args to Partout subdirectory
+# CMAKE_BUILD_TYPE (inherited from cmd line)
+# CMAKE_Swift_COMPILER=${CMAKE_CURRENT_SOURCE_DIR}/scripts/swiftc-wrapper.sh
+# CMAKE_TOOLCHAIN_FILE:FILEPATH=${CMAKE_TOOLCHAIN_FILE}
 if(DEFINED CMAKE_TOOLCHAIN_FILE)
     list(APPEND PARTOUT_CMAKE_ARGS
         -DCMAKE_Swift_COMPILER=${CMAKE_CURRENT_SOURCE_DIR}/scripts/swiftc-wrapper.sh
@@ -45,18 +47,18 @@ if(PP_BUILD_USE_OPENSSL)
     include("vendors/openssl.cmake")
     ExternalProject_Get_Property(OpenSSLProject BINARY_DIR)
     list(APPEND VENDOR_DEPENDS OpenSSLProject)
-    list(APPEND PARTOUT_CMAKE_ARGS -DOPENSSL_DIR=${OPENSSL_DIR})
+    # Exports OPENSSL_DIR
 elseif(PP_BUILD_USE_MBEDTLS)
     include("vendors/mbedtls.cmake")
     ExternalProject_Get_Property(MbedTLSProject BINARY_DIR)
     list(APPEND VENDOR_DEPENDS MbedTLSProject)
-    list(APPEND PARTOUT_CMAKE_ARGS -DMBEDTLS_DIR=${MBEDTLS_DIR})
+    # Exports MBEDTLS_DIR
 endif()
 if(PP_BUILD_USE_WGGO)
     include("vendors/wg-go.cmake")
     ExternalProject_Get_Property(WireGuardGoProject BINARY_DIR)
     list(APPEND VENDOR_DEPENDS WireGuardGoProject)
-    list(APPEND PARTOUT_CMAKE_ARGS -DWGGO_DIR=${WGGO_DIR})
+    # Exports WGGO_DIR
 endif()
 
 # Fetch wintun.dll on Windows
@@ -67,12 +69,7 @@ endif()
 
 # Build Partout library (opt-in), after vendored dependencies
 if(PP_BUILD_LIBRARY)
-    ExternalProject_Add(
-        PartoutProject
-        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/Sources
-        CMAKE_ARGS ${PARTOUT_CMAKE_ARGS}
-        INSTALL_COMMAND ""
-        BUILD_ALWAYS 1
-        DEPENDS ${VENDOR_DEPENDS}
-    )
+    add_subdirectory(Sources)
+    add_dependencies(partout_c ${VENDOR_DEPENDS})
+    target_link_libraries(partout PRIVATE SWONInterface)
 endif()

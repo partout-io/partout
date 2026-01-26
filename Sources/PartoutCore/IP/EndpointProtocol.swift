@@ -4,7 +4,6 @@
 
 /// Defines the communication protocol of an endpoint.
 public struct EndpointProtocol: Hashable, Sendable {
-
     /// The socket type.
     public let socketType: IPSocketType
 

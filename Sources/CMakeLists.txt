@@ -1,8 +1,6 @@
-cmake_minimum_required(VERSION 3.27)
-project(PartoutProject LANGUAGES Swift C CXX)
-
 # Package root is up one level, output dir from option
 set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set(OUTPUT_DIR ${PP_BUILD_OUTPUT}/partout)
 
 # Partout_C ############################################
 

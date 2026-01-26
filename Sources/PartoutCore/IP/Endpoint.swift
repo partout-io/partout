@@ -4,7 +4,6 @@
 
 /// Represents an endpoint.
 public struct Endpoint: Hashable, Codable, Sendable {
-
     /// The address.
     public let address: Address
 
