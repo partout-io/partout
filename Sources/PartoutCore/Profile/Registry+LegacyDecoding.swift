@@ -96,7 +96,7 @@ private enum Serialization {
     }
 }
 
-@available(*, deprecated, message: "#1594")
+@available(*, deprecated, message: "#273")
 private struct LegacyModuleWrapper: Codable {
     let id: ModuleType
 
@@ -108,7 +108,7 @@ private struct LegacyModuleWrapper: Codable {
     }
 }
 
-@available(*, deprecated, message: "#1594")
+@available(*, deprecated, message: "#273")
 private struct LegacyCodableProfile: ProfileType, Codable {
     let version: Int?
 
