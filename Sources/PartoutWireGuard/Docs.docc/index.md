@@ -23,7 +23,3 @@ Bridge to the official WireGuard® implementation provided by WireGuardGo.
 
 - ``StandardWireGuardParser``
 - ``WireGuardParseError``
-
-### Connection
-
-- ``WireGuardConnection``

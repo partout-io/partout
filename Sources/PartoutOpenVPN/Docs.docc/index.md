@@ -69,10 +69,5 @@ See ``OpenVPN/ObfuscationMethod`` for more details.
 - ``StandardOpenVPNParser``
 - ``StandardOpenVPNParserError``
 
-### Connection
-
-- ``NetworkSettingsBuilder``
-- ``OpenVPNConnection``
-
 [dep-openvpn]: https://openvpn.net/index.php/open-source/overview.html
 [dep-tunnelblick-xor]: https://tunnelblick.net/cOpenvpn_xorpatch.html
