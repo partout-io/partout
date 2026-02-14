@@ -52,7 +52,4 @@ Generic entities and helpers.
 - ``DataUnit``
 - ``DataUnitRepresentable``
 - ``Keychain``
-- ``MutableUniquelyIdentifiable``
 - ``ScriptingEngine``
-- ``UniqueID``
-- ``UniquelyIdentifiable``
