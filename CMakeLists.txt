@@ -30,17 +30,6 @@ message(STATUS "Option PP_BUILD_OUTPUT = ${PP_BUILD_OUTPUT}")
 # Include SWON macros
 add_subdirectory("vendors/swon")
 
-# FIXME: Forward args to Partout subdirectory
-# CMAKE_BUILD_TYPE (inherited from cmd line)
-# CMAKE_Swift_COMPILER=${CMAKE_CURRENT_SOURCE_DIR}/scripts/swiftc-wrapper.sh
-# CMAKE_TOOLCHAIN_FILE:FILEPATH=${CMAKE_TOOLCHAIN_FILE}
-if(DEFINED CMAKE_TOOLCHAIN_FILE)
-    list(APPEND PARTOUT_CMAKE_ARGS
-        -DCMAKE_Swift_COMPILER=${CMAKE_CURRENT_SOURCE_DIR}/scripts/swiftc-wrapper.sh
-        -DCMAKE_TOOLCHAIN_FILE:FILEPATH=${CMAKE_TOOLCHAIN_FILE}
-    )
-endif()
-
 # All vendor-inherited args
 set(VENDOR_DEPENDS)
 if(PP_BUILD_USE_OPENSSL)
