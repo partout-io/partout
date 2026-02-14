@@ -27,9 +27,6 @@ message(STATUS "Option PP_BUILD_USE_MBEDTLS = ${PP_BUILD_USE_MBEDTLS}")
 message(STATUS "Option PP_BUILD_USE_WGGO = ${PP_BUILD_USE_WGGO}")
 message(STATUS "Option PP_BUILD_OUTPUT = ${PP_BUILD_OUTPUT}")
 
-# Include SWON macros
-add_subdirectory("vendors/swon")
-
 # All vendor-inherited args
 set(VENDOR_DEPENDS)
 if(PP_BUILD_USE_OPENSSL)
@@ -49,6 +46,10 @@ if(PP_BUILD_USE_WGGO)
     list(APPEND VENDOR_DEPENDS WireGuardGoProject)
     # Exports WGGO_DIR
 endif()
+
+# Include SWON macros
+include("vendors/swon.cmake")
+list(APPEND VENDOR_DEPENDS SWONProject)
 
 # Fetch wintun.dll on Windows
 if(WIN32)
