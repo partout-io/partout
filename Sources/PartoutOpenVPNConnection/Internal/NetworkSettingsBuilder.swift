@@ -5,7 +5,7 @@
 /// Merges local and remote settings.
 ///
 /// OpenVPN settings may be set locally, but may also received from a remote server. This object merges the local and remote ``OpenVPN/Configuration`` into a digestible list of modules.
-public struct NetworkSettingsBuilder {
+struct NetworkSettingsBuilder {
     private let ctx: PartoutLoggerContext
 
     /// The client options.
@@ -14,14 +14,14 @@ public struct NetworkSettingsBuilder {
     /// The server options.
     private let remoteOptions: OpenVPN.Configuration
 
-    public init(_ ctx: PartoutLoggerContext, localOptions: OpenVPN.Configuration, remoteOptions: OpenVPN.Configuration) {
+    init(_ ctx: PartoutLoggerContext, localOptions: OpenVPN.Configuration, remoteOptions: OpenVPN.Configuration) {
         self.ctx = ctx
         self.localOptions = localOptions
         self.remoteOptions = remoteOptions
     }
 
     /// A list of `Module` mapped from `localOptions` and `remoteOptions`.
-    public func modules() -> [Module] {
+    func modules() -> [Module] {
         pp_log(ctx, .openvpn, .info, "Build modules from local/remote options")
 
         return [
@@ -31,7 +31,7 @@ public struct NetworkSettingsBuilder {
         ].compactMap { $0 }
     }
 
-    public func print() {
+    func print() {
         pp_log(ctx, .openvpn, .notice, "Negotiated options (remote overrides local)")
         if let negCipher = remoteOptions.cipher {
             pp_log(ctx, .openvpn, .notice, "\tCipher: \(negCipher.rawValue)")
