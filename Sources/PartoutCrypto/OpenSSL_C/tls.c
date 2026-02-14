@@ -93,6 +93,8 @@ pp_tls pp_tls_create(const pp_tls_options *opt, pp_tls_error_code *error) {
         }
         X509_free(cert);
         BIO_free(cert_bio);
+        cert = NULL;
+        cert_bio = NULL;
 
         if (opt->key_pem) {
             pkey_bio = create_BIO_from_PEM(opt->key_pem);
