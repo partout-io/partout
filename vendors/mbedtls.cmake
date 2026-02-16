@@ -1,7 +1,6 @@
 set(MBEDTLS_DIR ${PP_BUILD_OUTPUT}/mbedtls)
 
-ExternalProject_Add(
-    MbedTLSProject
+ExternalProject_Add(MbedTLSProject
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/mbedtls
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${MBEDTLS_DIR}
 )

@@ -1,7 +1,6 @@
 set(WINTUN_DIR ${PP_BUILD_OUTPUT}/wintun)
 set(WINTUN_URL "https://www.wintun.net/builds/wintun-${WINTUN_VERSION}.zip")
-FetchContent_Declare(
-    wintun
+FetchContent_Declare(wintun
     URL ${WINTUN_URL}
     SOURCE_DIR ${CMAKE_BINARY_DIR}/wintun-src
 )

@@ -18,8 +18,7 @@ else()
         ANDROID=${WGGO_ANDROID})
 endif()
 
-ExternalProject_Add(
-    WireGuardGoProject
+ExternalProject_Add(WireGuardGoProject
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/wg-go
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ${WGGO_CMD}

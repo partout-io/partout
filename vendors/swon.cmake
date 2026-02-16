@@ -1,5 +1,4 @@
-ExternalProject_Add(
-    SWONProject
+ExternalProject_Add(SWONProject
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/swon
     BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/vendors/swon
     INSTALL_COMMAND ""
