@@ -48,8 +48,7 @@ if(PP_BUILD_USE_WGGO)
 endif()
 
 # Include SWON macros
-include("vendors/swon.cmake")
-list(APPEND VENDOR_DEPENDS SWONProject)
+add_subdirectory("vendors/swon")
 
 # Fetch wintun.dll on Windows
 if(WIN32)
