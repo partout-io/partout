@@ -135,14 +135,6 @@ set_target_properties(partout_c PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
 )
 
-# Link to vendor-specific dependencies
-if(PP_BUILD_USE_WGGO)
-    target_include_directories(partout_c PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuard/Shared_C/include
-    )
-    # wg-go is loaded with dl_open()
-endif()
-
 # Copy ABI header
 set(ABI_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/PartoutABI_C/include)
 add_custom_command(
