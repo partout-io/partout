@@ -28,23 +28,13 @@ message(STATUS "Option PP_BUILD_USE_WGGO = ${PP_BUILD_USE_WGGO}")
 message(STATUS "Option PP_BUILD_OUTPUT = ${PP_BUILD_OUTPUT}")
 
 # All vendor-inherited args
-set(VENDOR_DEPENDS)
 if(PP_BUILD_USE_OPENSSL)
     include("vendors/openssl.cmake")
-    ExternalProject_Get_Property(OpenSSLProject BINARY_DIR)
-    list(APPEND VENDOR_DEPENDS OpenSSLProject)
-    # Exports OPENSSL_DIR
 elseif(PP_BUILD_USE_MBEDTLS)
     include("vendors/mbedtls.cmake")
-    ExternalProject_Get_Property(MbedTLSProject BINARY_DIR)
-    list(APPEND VENDOR_DEPENDS MbedTLSProject)
-    # Exports MBEDTLS_DIR
 endif()
 if(PP_BUILD_USE_WGGO)
     include("vendors/wg-go.cmake")
-    ExternalProject_Get_Property(WireGuardGoProject BINARY_DIR)
-    list(APPEND VENDOR_DEPENDS WireGuardGoProject)
-    # Exports WGGO_DIR
 endif()
 
 # Include SWON macros
@@ -59,6 +49,13 @@ endif()
 # Build Partout library (opt-in), after vendored dependencies
 if(PP_BUILD_LIBRARY)
     add_subdirectory(Sources)
-    add_dependencies(partout_c ${VENDOR_DEPENDS})
+    if(PP_BUILD_USE_OPENSSL)
+        target_link_libraries(partout_c PUBLIC OpenSSLInterface)
+    elseif(PP_BUILD_USE_MBEDTLS)
+        target_link_libraries(partout_c PUBLIC MbedTLSInterface)
+    endif()
+    if(PP_BUILD_USE_WGGO)
+        target_link_libraries(partout_c PUBLIC WireGuardGoInterface)
+    endif()
     target_link_libraries(partout PUBLIC SWONInterface)
 endif()

@@ -45,3 +45,9 @@ if(APPLE)
             "${OPENSSL_DIR}/lib/libssl.3.dylib"
     )
 endif()
+
+add_library(OpenSSLInterface INTERFACE)
+add_dependencies(OpenSSLInterface OpenSSLProject)
+target_include_directories(OpenSSLInterface INTERFACE ${OPENSSL_DIR}/include)
+target_link_directories(OpenSSLInterface INTERFACE ${OPENSSL_DIR}/lib)
+target_link_libraries(OpenSSLInterface INTERFACE ssl crypto)

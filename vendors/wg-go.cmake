@@ -40,3 +40,9 @@ elseif(WIN32)
         COMMAND dlltool -d wg-go.def -l "${WGGO_DIR}/lib/libwg-go.lib"
     )
 endif()
+
+add_library(WireGuardGoInterface INTERFACE)
+add_dependencies(WireGuardGoInterface OpenSSLProject)
+target_include_directories(WireGuardGoInterface INTERFACE ${WGGO_DIR}/include)
+target_link_directories(WireGuardGoInterface INTERFACE ${WGGO_DIR}/lib)
+target_link_libraries(WireGuardGoInterface INTERFACE wg-go)
