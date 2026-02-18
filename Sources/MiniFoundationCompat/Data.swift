@@ -4,7 +4,7 @@
 
 internal import _MiniFoundationCore_C
 
-// FIXME: #228, Implement with pp_zd maybe, use @inline, beware of performance
+// FIXME: #303, Implement with pp_zd maybe, use @inline, beware of performance
 
 extension Compat {
     public struct Data: Hashable, Codable, Sendable {
@@ -161,12 +161,12 @@ extension Compat.Data {
 
 extension Compat.Data {
     public init(bytesNoCopy: UnsafeMutablePointer<UInt8>, count: Int) {
-        // FIXME: #228, DO NOT COPY BYTES
+        // FIXME: #303, DO NOT COPY BYTES
         self.init(bytes: bytesNoCopy, count: count)
     }
 
     public init(bytesNoCopy: UnsafeMutablePointer<UInt8>, count: Int, customDeallocator: @escaping () -> Void) {
-        // FIXME: #228, DO NOT COPY BYTES
+        // FIXME: #303, DO NOT COPY BYTES
         self.init(bytes: bytesNoCopy, count: count)
     }
 }

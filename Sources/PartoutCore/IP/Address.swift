@@ -13,9 +13,8 @@ public enum Address: Hashable, Codable, Sendable {
 }
 
 extension Address: RawRepresentable {
-
     @frozen
-    public enum Family: Sendable {
+    public enum Family: String, Sendable {
         case v4
 
         case v6

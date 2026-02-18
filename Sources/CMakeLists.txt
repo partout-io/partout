@@ -1,8 +1,6 @@
-cmake_minimum_required(VERSION 3.27)
-project(PartoutProject LANGUAGES Swift C CXX)
-
 # Package root is up one level, output dir from option
 set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set(OUTPUT_DIR ${PP_BUILD_OUTPUT}/partout)
 
 # Partout_C ############################################
 
@@ -136,26 +134,6 @@ set_target_properties(partout_c PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY ${OUTPUT_DIR}
     RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
 )
-
-# Link to vendor-specific dependencies
-if(DEFINED OPENSSL_DIR)
-    target_include_directories(partout_c PRIVATE ${OPENSSL_DIR}/include)
-    target_link_directories(partout_c PRIVATE ${OPENSSL_DIR}/lib)
-    target_link_libraries(partout_c PRIVATE ssl crypto)
-elseif(DEFINED MBEDTLS_DIR)
-    target_include_directories(partout_c PRIVATE ${MBEDTLS_DIR}/include)
-    target_link_directories(partout_c PRIVATE ${MBEDTLS_DIR}/lib)
-    target_link_libraries(partout_c PRIVATE mbedcrypto mbedtls mbedx509)
-endif()
-if(DEFINED WGGO_DIR)
-    target_include_directories(partout_c PRIVATE
-        ${WGGO_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuard/Shared_C/include
-    )
-    # wg-go is loaded with dl_open()
-    # target_link_directories(partout_c PRIVATE ${WGGO_DIR}/lib)
-    # target_link_libraries(partout_c PRIVATE wg-go)
-endif()
 
 # Copy ABI header
 set(ABI_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/PartoutABI_C/include)

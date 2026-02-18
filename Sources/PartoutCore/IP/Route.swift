@@ -4,7 +4,6 @@
 
 /// Represents a  route in the routing table.
 public struct Route: Hashable, Codable, Sendable {
-
     /// The destination subnet or `nil` if default.
     public let destination: Subnet?
 

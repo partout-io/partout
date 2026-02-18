@@ -112,6 +112,11 @@ let package = Package(
     ]
 )
 
+// SWON macros (submodule)
+package.dependencies.append(
+    .package(path: "vendors/swon")
+)
+
 // Swift-DocC for documentation, do not include by default
 if envDocs {
     package.dependencies.append(
@@ -136,7 +141,8 @@ package.targets.append(contentsOf: [
         dependencies: [
             "MiniFoundation",
             "PartoutABI_C",
-            "PartoutCore_C"
+            "PartoutCore_C",
+            "swon"
         ],
         swiftSettings: useFoundationCompatibility.swiftSettings
     ),

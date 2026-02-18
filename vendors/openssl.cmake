@@ -26,8 +26,7 @@ set(CFG_ARGS
     ${OPENSSL_SYMBOLS}
     ${OPENSSL_CFG_FLAGS}
 )
-ExternalProject_Add(
-    OpenSSLProject
+ExternalProject_Add(OpenSSLProject
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl
     CONFIGURE_COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl/Configure ${CFG_ARGS}
     BUILD_COMMAND ${OPENSSL_BUILD_CMD}
@@ -46,3 +45,9 @@ if(APPLE)
             "${OPENSSL_DIR}/lib/libssl.3.dylib"
     )
 endif()
+
+add_library(OpenSSLInterface INTERFACE)
+add_dependencies(OpenSSLInterface OpenSSLProject)
+target_include_directories(OpenSSLInterface INTERFACE ${OPENSSL_DIR}/include)
+target_link_directories(OpenSSLInterface INTERFACE ${OPENSSL_DIR}/lib)
+target_link_libraries(OpenSSLInterface INTERFACE ssl crypto)

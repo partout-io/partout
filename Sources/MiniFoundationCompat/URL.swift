@@ -110,10 +110,10 @@ extension Compat.URL {
 
 // MARK: File URLs
 
-// FIXME: #228, Optimistic, implement and test everything here, esp. on Windows
+// FIXME: #303, Optimistic, implement and test everything here, esp. on Windows
 
 extension Compat.URL {
-    // FIXME: #228, Paths can be relative
+    // FIXME: #303, Paths can be relative
     public convenience init(fileURLWithPath path: String) {
         self.init(string: "file://\(path)")!
     }

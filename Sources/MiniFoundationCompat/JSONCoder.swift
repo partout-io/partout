@@ -11,7 +11,7 @@ extension Compat {
         public init() {}
 
         public func encode<T>(_ value: T) throws -> Compat.Data where T: Encodable {
-            // FIXME: #228, JSONEncoder
+            // FIXME: #293, JSONEncoder
             throw MiniFoundationError.encoding
         }
     }
@@ -24,7 +24,7 @@ extension Compat {
         }
 
         public func decode<T>(_ type: T.Type, from data: Compat.Data) throws -> T where T: Decodable {
-            // FIXME: #228, JSONDecoder
+            // FIXME: #293, JSONDecoder
             throw MiniFoundationError.decoding
         }
     }

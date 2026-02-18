@@ -4,7 +4,6 @@
 
 /// IP settings and routes.
 public struct IPSettings: Hashable, Codable, Sendable {
-
     /// The subnets.
     public private(set) var subnets: [Subnet]
 

@@ -17,6 +17,10 @@ jobs:
       - uses: partout-io/action-prepare-xcode-build@master
         with:
           access-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch SWON submodule
+        run: |
+          git submodule init vendors/swon
+          git submodule update --depth 1 vendors/swon
       - name: Ensure previews are off
         run: |
           expected="let forPreviews = false"

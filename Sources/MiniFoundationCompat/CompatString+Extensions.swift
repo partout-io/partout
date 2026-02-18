@@ -7,12 +7,12 @@ internal import _MiniFoundationCore_C
 extension String {
     // MARK: Initializers
 
-    // FIXME: #228, Only on file URLs
+    // FIXME: #303, Only on file URLs
     public init(contentsOf url: Compat.URL, encoding: Compat.StringEncoding) throws {
         try self.init(contentsOfFile: url.filePath(), encoding: encoding)
     }
 
-    // FIXME: #228, Only on file URLs
+    // FIXME: #303, Only on file URLs
     public init(contentsOf url: Compat.URL, usedEncoding: inout Compat.StringEncoding) throws {
         try self.init(contentsOfFile: url.filePath(), usedEncoding: &usedEncoding)
     }
@@ -179,7 +179,7 @@ extension Substring {
 // MARK: - Formatting
 
 extension String {
-    // FIXME: #228, Test, look for memory leaks
+    // FIXME: #303, Test, look for memory leaks
     public init(format: String, _ args: Any...) {
         // Convert Swift Any -> CVarArg (only the types we support)
         let cArgs: [CVarArg] = args.map { arg in
@@ -278,7 +278,7 @@ extension FileBuffer {
 }
 
 private extension Compat.StringEncoding {
-    // FIXME: #228, Test, probably inefficient
+    // FIXME: #303, Test, probably inefficient
     // Return `String?` — nil if decoding failed (invalid for that encoding)
     func decode(_ bytes: [UInt8]) -> String? {
         switch self {
