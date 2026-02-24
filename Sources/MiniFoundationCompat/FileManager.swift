@@ -4,8 +4,6 @@
 
 internal import _MiniFoundationCore_C
 
-// FIXME: #303, Test file I/O, esp. on Windows
-
 extension Compat {
     public final class FileManager {
         public static let `default`: MiniFileManager = FileManager()
