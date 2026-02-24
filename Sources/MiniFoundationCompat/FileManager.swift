@@ -63,7 +63,7 @@ extension Compat.FileManager: MiniFileManager {
 
     public func miniRemoveItem(at url: MiniURLProtocol) throws {
         let path = url.filePath()
-        guard unlink(path) == 0 else {
+        guard remove(path) == 0 else {
             throw MiniFoundationError.file(.failedToRemove(path))
         }
     }
