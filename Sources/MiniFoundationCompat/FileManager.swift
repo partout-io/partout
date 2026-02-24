@@ -40,9 +40,9 @@ extension Compat.FileManager: MiniFileManager {
         }
         var result: [String] = []
         while let entry = readdir(dir) {
-            let name = withUnsafePointer(to: &entry.pointee.d_name) {
-                $0.withMemoryRebound(to: CChar.self, capacity: 1) { ptr in
-                    String(cString: ptr)
+            let name = withUnsafePointer(to: entry.pointee.d_name) {
+                $0.withMemoryRebound(to: CChar.self, capacity: Int(NAME_MAX)) {
+                    String(cString: $0)
                 }
             }
             guard name != "." && name != ".." else { continue }
