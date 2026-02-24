@@ -118,8 +118,9 @@ extension Compat.URL {
         guard path.rangeOfCharacter(from: Compat.CharacterSet(charactersIn: forbidden)) == nil else {
             fatalError("Path contains forbidden characters (\(forbidden)): \(path)")
         }
+        // FIXME: #303, Does not handle Windows drive unit and backslashes
         let absPath: String
-        if path.hasPrefix("/") {
+        if path.hasPrefix(String.pathSeparator) {
             absPath = path
         } else {
             let cwd = minif_os_alloc_current_dir()
