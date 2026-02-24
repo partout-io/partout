@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/utsname.h>
+#include <unistd.h>
 
 void minif_os_get_version(int *major, int *minor, int *patch) {
     struct utsname uts;
@@ -19,6 +20,13 @@ void minif_os_get_version(int *major, int *minor, int *patch) {
     }
     // uts.release looks like: "6.8.0-41-generic"
     sscanf(uts.release, "%d.%d.%d", major, minor, patch);
+}
+
+// Dynamically allocated
+const char *minif_os_alloc_current_dir() {
+    char *buf = getcwd(NULL, 0);
+    if (!buf) abort();
+    return buf;
 }
 
 // Dynamically allocated
@@ -46,6 +54,22 @@ void minif_os_get_version(int *major, int *minor, int *patch) {
     *patch = v.dwBuildNumber;
 }
 
+// Dynamically allocated
+const char *minif_os_alloc_current_dir() {
+    char *buf = NULL;
+    DWORD size = GetCurrentDirectoryA(0, NULL);
+    if (size == 0) goto failure;
+    buf = (char *)malloc(size);
+    if (!buf) goto failure;
+    DWORD result = GetCurrentDirectoryA(size, buf);
+    if (result == 0 || result >= size) goto failure;
+    return buf;
+failure:
+    if (buf) free(buf);
+    abort();
+}
+
+// Dynamically allocated
 const char *minif_os_alloc_temp_dir() {
     char path[MAX_PATH] = { 0 };
     DWORD n = GetTempPathA(MAX_PATH, path);

@@ -42,6 +42,7 @@ extern "C" {
 #endif
 
 void minif_os_get_version(int *major, int *minor, int *patch);
+const char *minif_os_alloc_current_dir();
 const char *minif_os_alloc_temp_dir();
 bool minif_prng_do(void *dst, size_t len);
 
