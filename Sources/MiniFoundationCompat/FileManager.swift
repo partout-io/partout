@@ -126,7 +126,7 @@ extension Compat.FileManager: MiniFileManager {
 
     public func miniMoveItem(at url: MiniURLProtocol, to: MiniURLProtocol) throws {
         let fromPath = url.filePath()
-        let toPath = url.filePath()
+        let toPath = to.filePath()
         try fromPath.withWideCString { wfrom in
             try toPath.withWideCString { wto in
                 guard MoveFileW(wfrom, wto) else {
