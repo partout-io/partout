@@ -70,7 +70,7 @@ extension Compat.FileManager: MiniFileManager {
 
     public func miniAttributesOfItem(atPath path: String) throws -> [MiniFileAttribute: Any] {
         var statBuf = stat()
-        guard stat(path, &statBuf) == 0 else {
+        guard lstat(path, &statBuf) == 0 else {
             throw MiniFoundationError.file(.failedToStat(path))
         }
         var attributes: [MiniFileAttribute: Any] = [:]
@@ -89,7 +89,7 @@ extension Compat.FileManager: MiniFileManager {
 
     public func fileExists(atPath path: String) -> Bool {
         var statBuf = stat()
-        return stat(path, &statBuf) == 0
+        return lstat(path, &statBuf) == 0
     }
 }
 
