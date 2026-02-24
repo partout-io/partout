@@ -21,7 +21,8 @@ void minif_os_get_version(int *major, int *minor, int *patch) {
     sscanf(uts.release, "%d.%d.%d", major, minor, patch);
 }
 
-const char *minif_os_temp_dir() {
+// Dynamically allocated
+const char *minif_os_alloc_temp_dir() {
     const char *dir = getenv("TMPDIR");
     if (!dir) dir = P_tmpdir;
     if (!dir) dir = "/tmp";
@@ -45,7 +46,7 @@ void minif_os_get_version(int *major, int *minor, int *patch) {
     *patch = v.dwBuildNumber;
 }
 
-const char *minif_os_temp_dir() {
+const char *minif_os_alloc_temp_dir() {
     char path[MAX_PATH] = { 0 };
     DWORD n = GetTempPathA(MAX_PATH, path);
     if (n <= 0 || n >= MAX_PATH) {

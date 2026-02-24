@@ -9,6 +9,7 @@
 #include <ctype.h>
 #include <string.h>
 
+// Dynamically allocated
 const char *minif_uuid_create() {
     char buf[UUID4_LEN];
     uuid4_init();

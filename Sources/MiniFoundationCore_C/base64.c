@@ -31,6 +31,7 @@ static const int8_t base64_dec_table[256] = {
     ['8'] = 60, ['9'] = 61, ['+'] = 62, ['/'] = 63,
 };
 
+// Dynamically allocated
 char *minif_base64_encode(const uint8_t *data, size_t len, size_t *out_len) {
     size_t enc_len = 4 * ((len + 2) / 3); // 4 chars per 3 bytes
     char *enc = malloc(enc_len + 1);
@@ -63,6 +64,7 @@ char *minif_base64_encode(const uint8_t *data, size_t len, size_t *out_len) {
     return enc;
 }
 
+// Dynamically allocated
 uint8_t *minif_base64_decode(const char *str, size_t len, size_t *out_len) {
     if (len % 4 != 0) return NULL;
 

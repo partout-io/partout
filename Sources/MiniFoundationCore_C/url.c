@@ -108,6 +108,7 @@ const char *minif_url_get_last_path_component(minif_url *url, size_t *len) {
     return p;
 }
 
+// Dynamically allocated
 char *minif_url_alloc_decoded(const char *str, size_t len, size_t *dec_len) {
     // Force unsafe cast as url_percent_decode() has no side-effect
     URL_String comp = { (char *)str, (int)len };
