@@ -4,7 +4,8 @@
 
 extension URL: MiniURLProtocol {
     public func filePath() -> String {
-        // FIXME: #303, Is .path(percentEncoded: false|true) the same?
+        // XXX: This should be equal to .path(percentEncoded: false)
+        // i.e. false means "not percent encoded" = "after decoding percents"
         assert(isFileURL)
         return path
     }

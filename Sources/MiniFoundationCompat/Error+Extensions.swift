@@ -4,7 +4,7 @@
 
 extension Error {
     public var localizedDescription: String {
-        // FIXME: #303, No clue, but error description _should_ fall back to a string representation
+        // XXX: No clue, but error description _should_ fall back to a string representation
         String(describing: self)
     }
 }
