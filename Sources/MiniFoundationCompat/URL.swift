@@ -113,9 +113,21 @@ extension Compat.URL {
 // FIXME: #303, Optimistic, implement and test everything here, esp. on Windows
 
 extension Compat.URL {
-    // FIXME: #303, Paths can be relative
     public convenience init(fileURLWithPath path: String) {
-        self.init(string: "file://\(path)")!
+        let forbidden = "#?"
+        guard path.rangeOfCharacter(from: Compat.CharacterSet(charactersIn: forbidden)) == nil else {
+            fatalError("Path contains forbidden characters (\(forbidden)): \(path)")
+        }
+        let absPath: String
+        if path.hasPrefix("/") {
+            absPath = path
+        } else {
+            let cwd = minif_os_alloc_current_dir()
+            absPath = String(cString: cwd) + "/" + path
+            free(UnsafeMutableRawPointer(mutating: cwd));
+        }
+        let urlString = "file://\(absPath)"
+        self.init(string: urlString)!
     }
 
     public func filePath() -> String {
