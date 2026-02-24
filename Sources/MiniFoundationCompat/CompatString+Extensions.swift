@@ -179,13 +179,15 @@ extension Substring {
 // MARK: - Formatting
 
 extension String {
-    // FIXME: #303, Test, look for memory leaks
     public init(format: String, _ args: Any...) {
         // Convert Swift Any -> CVarArg (only the types we support)
+        var allocations: [UnsafeMutablePointer<CChar>] = []
         let cArgs: [CVarArg] = args.map { arg in
             switch arg {
             case let s as String:
-                return UnsafePointer<CChar>(minif_strdup(s))
+                let ptr = minif_strdup(s)
+                allocations.append(ptr)
+                return UnsafePointer<CChar>(ptr)
             case let i as Int:
                 return i
             case let i as Int8:
@@ -211,21 +213,15 @@ extension String {
             default:
                 // Fall back to debugDescription
                 let s = "\(arg)"
-                return UnsafePointer<CChar>(minif_strdup(s))
+                let ptr = minif_strdup(s)
+                allocations.append(ptr)
+                return UnsafePointer<CChar>(ptr)
             }
         }
 
         // Convert format to C string
         let cFormat = minif_strdup(format.replacingOccurrences(of: "%@", with: "%s"))
-        defer {
-            free(cFormat)
-            // free strdup’d string args
-            for a in cArgs {
-                if let p = a as? UnsafePointer<CChar> {
-                    free(UnsafeMutablePointer(mutating: p))
-                }
-            }
-        }
+        allocations.append(cFormat)
 
         // Determine output size (+ '\0')
         let size = withVaList(cArgs) { va -> Int32 in
@@ -233,7 +229,10 @@ extension String {
         } + 1
 
         let buffer = UnsafeMutablePointer<CChar>.allocate(capacity: Int(size))
-        defer { buffer.deallocate() }
+        defer {
+            buffer.deallocate()
+            for ptr in allocations { free(ptr) }
+        }
         _ = withVaList(cArgs) { va in
             vsnprintf(buffer, Int(size), cFormat, va)
         }
