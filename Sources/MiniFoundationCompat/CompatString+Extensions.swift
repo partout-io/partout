@@ -277,7 +277,7 @@ extension FileBuffer {
 }
 
 private extension Compat.StringEncoding {
-    // FIXME: #303, Test, probably inefficient
+    // XXX: Inefficient
     // Return `String?` — nil if decoding failed (invalid for that encoding)
     func decode(_ bytes: [UInt8]) -> String? {
         switch self {
@@ -293,13 +293,13 @@ private extension Compat.StringEncoding {
     }
 
     func encode(_ string: String) -> [UInt8]? {
+        let bytes = Array(string.utf8)
         switch self {
         case .ascii:
-            let bytes = Array(string.utf8)
             guard !bytes.contains(where: { $0 >= 128 }) else { return nil }
             return bytes
         case .utf8:
-            return Array(string.utf8)
+            return bytes
         }
     }
 }
