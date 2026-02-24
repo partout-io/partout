@@ -120,7 +120,7 @@ extension Compat.FileManager: MiniFileManager {
             }
         } while FindNextFileW(handle, &findData)
         return result.map {
-            Compat.URL(fileURLWithPath: $0)
+            Compat.URL(fileURLWithPath: path.appendingPathComponent($0))
         }
     }
 
