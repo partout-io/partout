@@ -7,13 +7,13 @@ internal import _MiniFoundationCore_C
 extension String {
     // MARK: Initializers
 
-    // FIXME: #303, Only on file URLs
     public init(contentsOf url: Compat.URL, encoding: Compat.StringEncoding) throws {
+        guard url.scheme == "file" else { throw MiniFoundationError.notFileURL }
         try self.init(contentsOfFile: url.filePath(), encoding: encoding)
     }
 
-    // FIXME: #303, Only on file URLs
     public init(contentsOf url: Compat.URL, usedEncoding: inout Compat.StringEncoding) throws {
+        guard url.scheme == "file" else { throw MiniFoundationError.notFileURL }
         try self.init(contentsOfFile: url.filePath(), usedEncoding: &usedEncoding)
     }
 
