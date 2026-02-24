@@ -451,6 +451,9 @@ package.targets.append(contentsOf: [
     .testTarget(
         name: "MiniFoundationTests",
         dependencies: ["MiniFoundation"],
+        resources: [
+            .process("Resources")
+        ],
         swiftSettings: useFoundationCompatibility.swiftSettings
     )
 ])

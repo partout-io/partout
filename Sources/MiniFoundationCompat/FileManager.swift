@@ -4,8 +4,6 @@
 
 internal import _MiniFoundationCore_C
 
-// FIXME: #303, Test file I/O, esp. on Windows
-
 extension Compat {
     public final class FileManager {
         public static let `default`: MiniFileManager = FileManager()
@@ -14,13 +12,13 @@ extension Compat {
         }
 
         public var miniTemporaryDirectory: MiniURLProtocol {
-            let dir = minif_os_temp_dir()
+            let dir = minif_os_alloc_temp_dir()
             defer { free(UnsafeMutableRawPointer(mutating: dir)) }
             return URL(fileURLWithPath: "\(String(cString: dir))")
         }
 
         public func makeTemporaryURL(filename: String) -> MiniURLProtocol {
-            let dir = minif_os_temp_dir()
+            let dir = minif_os_alloc_temp_dir()
             defer { free(UnsafeMutableRawPointer(mutating: dir)) }
             return URL(fileURLWithPath: "\(String(cString: dir))/\(filename)")
         }
@@ -40,9 +38,9 @@ extension Compat.FileManager: MiniFileManager {
         }
         var result: [String] = []
         while let entry = readdir(dir) {
-            let name = withUnsafePointer(to: &entry.pointee.d_name) {
-                $0.withMemoryRebound(to: CChar.self, capacity: 1) { ptr in
-                    String(cString: ptr)
+            let name = withUnsafePointer(to: entry.pointee.d_name) {
+                $0.withMemoryRebound(to: CChar.self, capacity: Int(NAME_MAX)) {
+                    String(cString: $0)
                 }
             }
             guard name != "." && name != ".." else { continue }
@@ -63,14 +61,14 @@ extension Compat.FileManager: MiniFileManager {
 
     public func miniRemoveItem(at url: MiniURLProtocol) throws {
         let path = url.filePath()
-        guard unlink(path) == 0 else {
+        guard remove(path) == 0 else {
             throw MiniFoundationError.file(.failedToRemove(path))
         }
     }
 
     public func miniAttributesOfItem(atPath path: String) throws -> [MiniFileAttribute: Any] {
         var statBuf = stat()
-        guard stat(path, &statBuf) == 0 else {
+        guard lstat(path, &statBuf) == 0 else {
             throw MiniFoundationError.file(.failedToStat(path))
         }
         var attributes: [MiniFileAttribute: Any] = [:]
@@ -89,7 +87,7 @@ extension Compat.FileManager: MiniFileManager {
 
     public func fileExists(atPath path: String) -> Bool {
         var statBuf = stat()
-        return stat(path, &statBuf) == 0
+        return lstat(path, &statBuf) == 0
     }
 }
 
@@ -120,13 +118,13 @@ extension Compat.FileManager: MiniFileManager {
             }
         } while FindNextFileW(handle, &findData)
         return result.map {
-            Compat.URL(fileURLWithPath: $0)
+            Compat.URL(fileURLWithPath: path.appendingPathComponent($0))
         }
     }
 
     public func miniMoveItem(at url: MiniURLProtocol, to: MiniURLProtocol) throws {
         let fromPath = url.filePath()
-        let toPath = url.filePath()
+        let toPath = to.filePath()
         try fromPath.withWideCString { wfrom in
             try toPath.withWideCString { wto in
                 guard MoveFileW(wfrom, wto) else {

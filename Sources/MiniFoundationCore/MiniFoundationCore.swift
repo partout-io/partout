@@ -10,6 +10,7 @@ public enum MiniFoundationError: Error {
     case encoding
     case decoding
     case file(MiniFileManagerError)
+    case notFileURL
 }
 
 public enum MiniFileManagerError: Error {
