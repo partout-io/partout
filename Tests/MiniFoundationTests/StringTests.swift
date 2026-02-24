@@ -28,7 +28,7 @@ struct StringTests {
         #expect(foundContents == expectedContents)
     }
 
-#if canImport(MiniFoundationCompat)
+#if !canImport(MiniFoundationNative)
     @Test(arguments: [
         ("file://nonexisting.txt", true),
         ("https://nonexisting/path", false)
