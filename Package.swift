@@ -114,7 +114,7 @@ let package = Package(
 
 // SWON macros (submodule)
 package.dependencies.append(
-    .package(path: "vendors/swon")
+    .package(url: "https://github.com/keeshux/swon", from: "0.1.0")
 )
 
 // Swift-DocC for documentation, do not include by default
