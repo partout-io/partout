@@ -37,9 +37,6 @@ if(PP_BUILD_USE_WGGO)
     include("vendors/wg-go.cmake")
 endif()
 
-# Include SWON macros
-add_subdirectory("vendors/swon")
-
 # Fetch wintun.dll on Windows
 if(WIN32)
     set(WINTUN_VERSION "0.14.1")
@@ -57,5 +54,4 @@ if(PP_BUILD_LIBRARY)
     if(PP_BUILD_USE_WGGO)
         target_link_libraries(partout_c PUBLIC WireGuardGoInterface)
     endif()
-    target_link_libraries(partout PUBLIC SWONInterface)
 endif()

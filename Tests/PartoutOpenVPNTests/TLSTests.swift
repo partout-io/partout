@@ -20,7 +20,7 @@ extension TLSTests {
 
     func emptyParameters() throws -> TLSWrapper.Parameters {
         TLSWrapper.Parameters(
-            cachesURL: cachesURL as! URL,
+            cachesURL: cachesURL,
             cfg: try newConfiguration(),
             onVerificationFailure: {}
         )

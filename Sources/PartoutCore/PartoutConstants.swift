@@ -5,7 +5,6 @@
 import PartoutABI_C
 
 public enum PartoutConstants {
-
     /// The unique identifier of the library.
     public static let identifier: String = {
         guard let str = String(cString: PARTOUT_IDENTIFIER, encoding: .ascii) else {

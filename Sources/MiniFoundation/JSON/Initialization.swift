@@ -56,7 +56,6 @@ extension JSON {
     }
 }
 
-#if !MINIF_COMPAT
 extension JSON {
 
     /// Create a JSON value from an `Encodable`. This will give you access to the “raw”
@@ -66,7 +65,6 @@ extension JSON {
         self = try JSONDecoder().decode(JSON.self, from: encoded)
     }
 }
-#endif
 
 extension JSON: ExpressibleByBooleanLiteral {
 

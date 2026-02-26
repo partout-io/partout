@@ -34,7 +34,7 @@ struct StringTests {
         ("https://nonexisting/path", false)
     ])
     func urlContents(string: String, isFile: Bool) throws {
-        let url = try #require(Compat.URL(string: string))
+        let url = try #require(URL(string: string))
         do {
             _ = try String(contentsOf: url, encoding: .utf8)
             #expect(isFile)

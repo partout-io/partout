@@ -12,7 +12,7 @@ target_compile_options(partout_c PRIVATE
 
 # Header search paths from all C targets
 set(PARTOUT_C_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/MiniFoundationCore_C/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/MiniFoundation_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutABI_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCore_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutOpenVPN_C/include
@@ -92,15 +92,9 @@ if(USE_COMPAT)
         -DMINIF_COMPAT
     )
     set(EXCLUDED_PATTERNS
-        MiniFoundationNative.*
         PartoutOS\/Apple.*
     )
-else()
-    set(EXCLUDED_PATTERNS
-        MiniFoundationCompat.*
-    )
 endif()
-list(APPEND EXCLUDED_PATTERNS MiniFoundationExample.*)
 
 foreach(pattern ${EXCLUDED_PATTERNS})
     list(FILTER PARTOUT_SOURCES EXCLUDE REGEX ${pattern})

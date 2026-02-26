@@ -9,7 +9,7 @@ extension LocalLogger {
 
         public func size(of url: URL) -> UInt64 {
             do {
-                let attrs = try FileManager.default.miniAttributesOfItem(atPath: url.filePath())
+                let attrs = try FileManager.default.attributesOfItem(atPath: url.filePath())
                 return attrs[.size] as? UInt64 ?? 0
             } catch {
                 NSLog("LocalLogger: Unable to read current log size: \(error)")
@@ -19,9 +19,9 @@ extension LocalLogger {
 
         public func rotate(url: URL, withLines oldLines: [String]?) throws {
             let suffix = Int(Date().timeIntervalSince1970).description
-            let rotatedURL = url.miniAppending(pathExtension: suffix)
+            let rotatedURL = url.appendingPathExtension(suffix)
 
-            try? FileManager.default.miniMoveItem(at: url, to: rotatedURL)
+            try? FileManager.default.moveItem(at: url, to: rotatedURL)
             if let oldLines {
                 try write(lines: oldLines, to: rotatedURL)
             }
@@ -32,25 +32,21 @@ extension LocalLogger {
         }
 
         public func availableLogs(at url: URL) -> [Date: URL] {
-            let parent = url.miniDeletingLastPathComponent()
+            let parent = url.deletingLastPathComponent()
             let prefix = url.lastPathComponent
             do {
                 let fm = FileManager.default
-                let contents = try fm.miniContentsOfDirectory(at: parent)
+                let contents = try fm.contentsOfDirectory(at: parent)
                 return try contents.reduce(into: [:]) { found, item in
                     let filename = item.lastPathComponent
                     guard filename.hasPrefix(prefix) else {
                         return
                     }
-                    let attrs = try fm.miniAttributesOfItem(atPath: item.filePath())
+                    let attrs = try fm.attributesOfItem(atPath: item.filePath())
                     guard let mdate = attrs[.modificationDate] as? Date else {
                         return
                     }
-                    guard let itemURL = item as? URL else {
-                        assertionFailure("Wrong URL type from MiniFoundation?")
-                        return
-                    }
-                    found[mdate] = itemURL
+                    found[mdate] = item
                 }
             } catch {
                 return [:]
@@ -68,7 +64,7 @@ extension LocalLogger {
                     return
                 }
                 if minDate == nil || date < minDate! {
-                    try? FileManager.default.miniRemoveItem(at: logURL)
+                    try? FileManager.default.removeItem(at: logURL)
                 }
             }
         }
