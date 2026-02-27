@@ -129,7 +129,6 @@ Libraries:
 - [MbedTLS][credits-mbedtls]
 - [OpenSSL][credits-openssl]
 - [url.c][credits-url.c]
-- [uuidv4][credits-uuidv4]
 - [Wintun][credits-wintun]
 - [WireGuard (Go)][credits-wireguard-go]
 
