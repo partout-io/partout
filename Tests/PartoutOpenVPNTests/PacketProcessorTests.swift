@@ -40,7 +40,6 @@ struct PacketProcessorTests {
         }
     }
 
-#if !MINIF_COMPAT
     @Test
     func givenProcessor_whenReverse_thenIsExpected() {
         let sut = PacketProcessor(method: .reverse)
@@ -68,7 +67,6 @@ struct PacketProcessorTests {
 //            #expect(byte, data[i])
 //        }
     }
-#endif
 
     //
     // original = "832ae7598dfa0378bc19"

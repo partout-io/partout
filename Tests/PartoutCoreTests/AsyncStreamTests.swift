@@ -50,9 +50,8 @@ struct AsyncStreamTests {
     }
 }
 
-#if !MINIF_COMPAT
-
-import Foundation
+#if canImport(Combine)
+import Combine
 import PartoutCore
 
 extension AsyncStreamTests {
@@ -85,5 +84,4 @@ private final class KVOObject: NSObject {
     override init() {
     }
 }
-
 #endif

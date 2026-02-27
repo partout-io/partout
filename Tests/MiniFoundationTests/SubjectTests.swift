@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 #if canImport(Combine)
-
 @preconcurrency import Combine
 import MiniFoundation
 import Testing
@@ -70,7 +69,6 @@ struct SubjectTests {
         while !isDone {} // spinlock
     }
 
-#if !MINIF_COMPAT
     @Test
     func givenPassthrough_whenStream_thenMatches() async throws {
         let sut = PassthroughSubject<Int, Error>()
@@ -119,7 +117,5 @@ struct SubjectTests {
             i += 1
         }
     }
-#endif
 }
-
 #endif
