@@ -32,6 +32,34 @@ extension String {
 // MARK: - Tokenization
 
 extension String {
+    public func strippingWhitespaces() -> String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: .whitespaces, with: " ")
+    }
+
+    private func replacingOccurrences(of charset: CharacterSet, with replacement: String) -> String {
+        var out = String()
+        out.reserveCapacity(self.count)
+        var shouldReplace = false
+        for char in self {
+            // A Character can be made of multiple scalars.
+            // If *any* scalar is in the set → replace.
+            shouldReplace = false
+            for scalar in char.unicodeScalars {
+                if charset.contains(scalar) {
+                    shouldReplace = true
+                    break
+                }
+            }
+            if shouldReplace {
+                out.append(replacement)
+            } else {
+                out.append(char)
+            }
+        }
+        return out
+    }
+
     public func trimmingCharacters(in charset: CharacterSet) -> String {
         var scalars = self.unicodeScalars
         while let first = scalars.first, charset.contains(first) {

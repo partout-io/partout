@@ -4,6 +4,11 @@
 
 #if !MINIF_COMPAT
 extension String {
+    public func strippingWhitespaces() -> String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+    }
+
     public func write(toFile path: String, encoding: String.Encoding) throws {
         try write(toFile: path, atomically: true, encoding: encoding)
     }
