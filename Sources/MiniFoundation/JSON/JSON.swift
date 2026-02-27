@@ -61,7 +61,6 @@ extension JSON: Codable {
     }
 }
 
-#if !MINIF_COMPAT
 extension JSON: CustomDebugStringConvertible {
     public var debugDescription: String {
         switch self {
@@ -80,6 +79,5 @@ extension JSON: CustomDebugStringConvertible {
         }
     }
 }
-#endif
 
 extension JSON: Hashable {}

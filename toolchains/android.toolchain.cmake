@@ -8,7 +8,7 @@ set(CMAKE_CXX_COMPILER_TARGET $ENV{ANDROID_NDK_ARCH}-unknown-linux-android$ENV{A
 set(CMAKE_Swift_COMPILER ${CMAKE_CURRENT_LIST_DIR}/swiftc-wrapper.sh)
 set(CMAKE_Swift_COMPILER_TARGET $ENV{ANDROID_NDK_ARCH}-unknown-linux-android$ENV{ANDROID_NDK_API})
 set(CMAKE_C_FLAGS "-fPIC")
-set(CMAKE_Swift_FLAGS "-target $ENV{ANDROID_NDK_ARCH}-unknown-linux-android$ENV{ANDROID_NDK_API} -tools-directory $ENV{ANDROID_NDK_TOOLCHAIN} -sdk $ENV{ANDROID_NDK_SYSROOT} -resource-dir $ENV{SWIFT_RESOURCE_DIR} -enable-library-evolution -disallow-use-new-driver -lc++_shared -llog -lm")
+set(CMAKE_Swift_FLAGS "-target $ENV{ANDROID_NDK_ARCH}-unknown-linux-android$ENV{ANDROID_NDK_API} -tools-directory $ENV{ANDROID_NDK_TOOLCHAIN} -sdk $ENV{ANDROID_NDK_SYSROOT} -resource-dir $ENV{SWIFT_RESOURCE_DIR} -enable-library-evolution -disallow-use-new-driver -lc++_shared -llog -lm -lFoundationEssentials -l_FoundationCollections -l_FoundationCShims -lswiftSynchronization")
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)

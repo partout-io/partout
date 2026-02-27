@@ -112,11 +112,6 @@ let package = Package(
     ]
 )
 
-// SWON macros (submodule)
-package.dependencies.append(
-    .package(url: "https://github.com/keeshux/swon", from: "0.1.0")
-)
-
 // Swift-DocC for documentation, do not include by default
 if envDocs {
     package.dependencies.append(
@@ -141,8 +136,7 @@ package.targets.append(contentsOf: [
         dependencies: [
             "MiniFoundation",
             "PartoutABI_C",
-            "PartoutCore_C",
-            "swon"
+            "PartoutCore_C"
         ],
         swiftSettings: useFoundationCompatibility.swiftSettings
     ),
@@ -426,27 +420,11 @@ package.products.append(
 package.targets.append(contentsOf: [
     .target(
         name: "MiniFoundation",
-        dependencies: [
-            useFoundationCompatibility == .on ?
-                .target(name: "MiniFoundationCompat") :
-                .target(name: "MiniFoundationNative")
-        ],
+        dependencies: ["MiniFoundation_C"],
         swiftSettings: useFoundationCompatibility.swiftSettings
     ),
     .target(
-        name: "MiniFoundationCore",
-        dependencies: ["MiniFoundationCore_C"]
-    ),
-    .target(
-        name: "MiniFoundationCore_C"
-    ),
-    .target(
-        name: "MiniFoundationCompat",
-        dependencies: ["MiniFoundationCore"]
-    ),
-    .executableTarget(
-        name: "MiniFoundationExample",
-        dependencies: ["MiniFoundation"]
+        name: "MiniFoundation_C"
     ),
     .testTarget(
         name: "MiniFoundationTests",
@@ -457,15 +435,6 @@ package.targets.append(contentsOf: [
         swiftSettings: useFoundationCompatibility.swiftSettings
     )
 ])
-
-if useFoundationCompatibility == .off {
-    package.targets.append(
-        .target(
-            name: "MiniFoundationNative",
-            dependencies: ["MiniFoundationCore"]
-        )
-    )
-}
 
 // MARK: - Configuration structures
 

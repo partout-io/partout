@@ -67,7 +67,7 @@ extension Constants.ControlChannel {
         }
         if withPlatform {
             let platform: String
-            let platformVersion = MiniFoundation.operatingSystemVersion()
+            let platformVersion = ProcessInfo.processInfo.operatingSystemVersion
 #if os(iOS)
             platform = "ios"
 #elseif os(tvOS)
@@ -84,7 +84,7 @@ extension Constants.ControlChannel {
             platform = "unknown"
 #endif
             info.append("IV_PLAT=\(platform)")
-            info.append("IV_PLAT_VER=\(platformVersion.major).\(platformVersion.minor)")
+            info.append("IV_PLAT_VER=\(platformVersion.majorVersion).\(platformVersion.minorVersion)")
         }
         if let extra {
             info.append(contentsOf: extra.map {

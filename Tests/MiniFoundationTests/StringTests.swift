@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-import Foundation
 import MiniFoundation
 import Testing
 
@@ -27,23 +26,4 @@ struct StringTests {
         print(foundContents)
         #expect(foundContents == expectedContents)
     }
-
-#if MINIF_COMPAT
-    @Test(arguments: [
-        ("file://nonexisting.txt", true),
-        ("https://nonexisting/path", false)
-    ])
-    func urlContents(string: String, isFile: Bool) throws {
-        let url = try #require(Compat.URL(string: string))
-        do {
-            _ = try String(contentsOf: url, encoding: .utf8)
-            #expect(isFile)
-        } catch let mfError as MiniFoundationError {
-            switch mfError {
-            case .notFileURL: #expect(!isFile) // Non-file URL stops at this error
-            default: #expect(isFile) // File URL stops at I/O (non-existing file)
-            }
-        }
-    }
-#endif
 }
