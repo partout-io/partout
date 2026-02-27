@@ -42,7 +42,7 @@ elseif(WIN32)
 endif()
 
 add_library(WireGuardGoInterface INTERFACE)
-add_dependencies(WireGuardGoInterface OpenSSLProject)
+add_dependencies(WireGuardGoInterface WireGuardGoProject)
 target_include_directories(WireGuardGoInterface INTERFACE ${WGGO_DIR}/include)
 target_link_directories(WireGuardGoInterface INTERFACE ${WGGO_DIR}/lib)
 target_link_libraries(WireGuardGoInterface INTERFACE wg-go)
