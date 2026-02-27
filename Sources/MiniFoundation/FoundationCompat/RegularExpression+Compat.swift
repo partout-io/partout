@@ -12,7 +12,7 @@ public final class RegularExpression: EnumeratingRegex {
         self.pattern = pattern
     }
 
-    public func enumerateMatches(in string: String, using block: @escaping @Sendable (String) -> Void) {
+    public func enumerateMatches(in string: String, using block: @escaping (String) -> Void) {
         guard let result = minif_rx_matches(pattern, string) else { return }
         defer { minif_rx_result_free(result) }
         let count = minif_rx_result_get_items_count(result)

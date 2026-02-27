@@ -3,5 +3,5 @@
 // SPDX-License-Identifier: MIT
 
 public protocol EnumeratingRegex: Sendable {
-    func enumerateMatches(in string: String, using block: @escaping @Sendable (String) -> Void)
+    func enumerateMatches(in string: String, using block: @escaping (String) -> Void)
 }

@@ -14,7 +14,7 @@ public final class RegularExpression: EnumeratingRegex {
         }
     }
 
-    public func enumerateMatches(in string: String, using block: @escaping @Sendable (String) -> Void) {
+    public func enumerateMatches(in string: String, using block: @escaping (String) -> Void) {
         impl.enumerateMatches(in: string, range: NSRange(location: 0, length: string.count)) { result, _, _ in
             guard let result else { return }
             let match = (string as NSString).substring(with: result.range)
