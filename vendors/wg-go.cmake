@@ -37,7 +37,7 @@ elseif(WIN32)
         TARGET WireGuardGoProject
         POST_BUILD
         COMMAND gendef "${WGGO_DIR}/lib/wg-go.dll"
-        COMMAND dlltool -d wg-go.def -l "${WGGO_DIR}/lib/libwg-go.lib"
+        COMMAND dlltool -d wg-go.def -l "${WGGO_DIR}/lib/wg-go.lib"
     )
 endif()
 
