@@ -17,6 +17,7 @@ Given the main app and the daemon:
 
 - ``ConnectionDaemon``
 - ``DefaultMessageHandler``
+- ``DummyReachabilityObserver``
 - ``MessageHandler``
 - ``NetworkObserver``
 - ``ReachabilityObserver``

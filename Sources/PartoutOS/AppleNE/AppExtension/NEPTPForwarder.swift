@@ -49,7 +49,6 @@ public actor NEPTPForwarder {
         let params = SimpleConnectionDaemon.Parameters(
             registry: registry,
             connectionParameters: connectionParameters,
-            reachability: reachability,
             messageHandler: messageHandler,
             stopDelay: stopDelay,
             reconnectionDelay: reconnectionDelay

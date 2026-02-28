@@ -15,9 +15,9 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private let controller: TunnelController
 
-    private let messageHandler: MessageHandler
-
     private let reachability: ReachabilityObserver
+
+    private let messageHandler: MessageHandler
 
     private let stopDelay: Int
 
@@ -56,8 +56,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         environment = params.connectionParameters.environment
         registry = params.registry
         controller = params.connectionParameters.controller
+        reachability = params.connectionParameters.reachability
         messageHandler = params.messageHandler
-        reachability = params.reachability
         stopDelay = params.stopDelay
         reconnectionDelay = params.reconnectionDelay
 
@@ -344,8 +344,6 @@ extension SimpleConnectionDaemon {
 
         let connectionParameters: ConnectionParameters
 
-        let reachability: ReachabilityObserver
-
         let messageHandler: MessageHandler
 
         let stopDelay: Int
@@ -355,14 +353,12 @@ extension SimpleConnectionDaemon {
         public init(
             registry: Registry,
             connectionParameters: ConnectionParameters,
-            reachability: ReachabilityObserver,
             messageHandler: MessageHandler,
             stopDelay: Int? = nil,
             reconnectionDelay: Int? = nil
         ) {
             self.registry = registry
             self.connectionParameters = connectionParameters
-            self.reachability = reachability
             self.messageHandler = messageHandler
             self.stopDelay = stopDelay ?? 2000
             self.reconnectionDelay = reconnectionDelay ?? 2000

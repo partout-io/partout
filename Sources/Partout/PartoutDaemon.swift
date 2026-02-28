@@ -36,7 +36,6 @@ func makeDaemon(
     let params = SimpleConnectionDaemon.Parameters(
         registry: registry,
         connectionParameters: connParams,
-        reachability: reachability,
         messageHandler: messageHandler,
         stopDelay: 2000,
         reconnectionDelay: 3000
