@@ -15,11 +15,11 @@
 // Logging counterpart of Swift pp_log
 
 typedef enum {
-    PPLogLevelDebug,
-    PPLogLevelInfo,
-    PPLogLevelNotice,
+    PPLogLevelFault,
     PPLogLevelError,
-    PPLogLevelFault
+    PPLogLevelNotice,
+    PPLogLevelInfo,
+    PPLogLevelDebug
 } pp_log_level;
 
 typedef const char *_Nonnull pp_log_category;
