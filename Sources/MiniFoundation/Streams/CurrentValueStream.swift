@@ -5,12 +5,12 @@
 import Dispatch
 
 /// Replacement for `CurrentValueSubject`.
-public final class CurrentValueStream<OID, T>: @unchecked Sendable where OID: RandomlyInitialized, T: Sendable {
+public final class CurrentValueStream<T>: @unchecked Sendable where T: Sendable {
     let queue = DispatchQueue(label: "CurrentValueStream")
 
-    var observers: [OID: AsyncStream<T>.Continuation] = [:]
+    var observers: [UniqueID: AsyncStream<T>.Continuation] = [:]
 
-    var throwingObservers: [OID: AsyncThrowingStream<T, Error>.Continuation] = [:]
+    var throwingObservers: [UniqueID: AsyncThrowingStream<T, Error>.Continuation] = [:]
 
     var isFinished = false
 
@@ -30,7 +30,7 @@ public final class CurrentValueStream<OID, T>: @unchecked Sendable where OID: Ra
     }
 
     public func subscribe() -> AsyncStream<T> {
-        let id = OID() // best-effort, assume nonexistent observer id
+        let id = UniqueID() // Best-effort, assume nonexistent observer id
         return AsyncStream { [weak self] continuation in
             guard let self else {
                 return
@@ -48,7 +48,7 @@ public final class CurrentValueStream<OID, T>: @unchecked Sendable where OID: Ra
     }
 
     public func subscribeThrowing() -> AsyncThrowingStream<T, Error> {
-        let id = OID() // Best-effort, assume nonexistent observer id
+        let id = UniqueID() // Best-effort, assume nonexistent observer id
         return AsyncThrowingStream { [weak self] continuation in
             guard let self else {
                 return

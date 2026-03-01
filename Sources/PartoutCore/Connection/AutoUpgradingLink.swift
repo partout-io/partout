@@ -14,7 +14,7 @@ public final class AutoUpgradingLink: LinkInterface {
 
     private let io: SocketIOInterface
 
-    private let betterPathStream: PassthroughStream<UniqueID, Void>
+    private let betterPathStream: PassthroughStream<Void>
 
     public init(
         endpoint: ExtendedEndpoint,

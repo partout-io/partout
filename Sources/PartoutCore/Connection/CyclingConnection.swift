@@ -66,7 +66,7 @@ public actor CyclingConnection {
 
     private let endpoints: [ExtendedEndpoint]
 
-    private nonisolated let statusSubject: CurrentValueStream<UniqueID, ConnectionStatus>
+    private nonisolated let statusSubject: CurrentValueStream<ConnectionStatus>
 
     private var hooks: Hooks
 

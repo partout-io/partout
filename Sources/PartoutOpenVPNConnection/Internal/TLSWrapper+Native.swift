@@ -24,7 +24,7 @@ private final class NativeTLSWrapper: TLSProtocol {
 
     private let caURL: URL
 
-    private let didFailVerification: PassthroughStream<UniqueID, Void>
+    private let didFailVerification: PassthroughStream<Void>
 
     private var verificationObserver: Task<Void, Never>?
 
@@ -50,7 +50,7 @@ private final class NativeTLSWrapper: TLSProtocol {
             pp_free(hostname)
         }
 
-        let didFailVerification = PassthroughStream<UniqueID, Void>()
+        let didFailVerification = PassthroughStream<Void>()
         let options = pp_tls_options_create(
             Int32(securityLevel ?? Constants.defaultSecurityLevel),
             Constants.bufferLength,
@@ -63,7 +63,7 @@ private final class NativeTLSWrapper: TLSProtocol {
             Unmanaged.passUnretained(didFailVerification).toOpaque(),
             { ctx in
                 guard let ctx else { return }
-                let stream = Unmanaged<PassthroughStream<UniqueID, Void>>
+                let stream = Unmanaged<PassthroughStream<Void>>
                     .fromOpaque(ctx)
                     .takeUnretainedValue()
                 stream.send()

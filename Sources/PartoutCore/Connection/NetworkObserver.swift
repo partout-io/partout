@@ -8,12 +8,12 @@ public final class NetworkObserver: @unchecked Sendable {
 
     private let state: AtomicState
 
-    private let signalSubject: CurrentValueStream<UniqueID, Bool>
+    private let signalSubject: CurrentValueStream<Bool>
 
     private let isStatusReady: (ConnectionStatus) -> Bool
 
     /// Publishes when the network state is ready for reconnection.
-    public let onReady: PassthroughStream<UniqueID, Void>
+    public let onReady: PassthroughStream<Void>
 
     private var subscriptions: [Task<Void, Never>]
 

@@ -8,7 +8,7 @@ import Testing
 struct AsyncStreamTests {
     @Test
     func givenPassthrough_whenEmit_thenMatches() async throws {
-        let sut = PassthroughStream<UniqueID, Int>()
+        let sut = PassthroughStream<Int>()
         let expected = [5, 7, 67]
         let stream = sut.subscribe()
         Task {
@@ -29,7 +29,7 @@ struct AsyncStreamTests {
 
     @Test
     func givenCurrentValue_whenEmit_thenMatches() async throws {
-        let sut = CurrentValueStream<UniqueID, Int>(100)
+        let sut = CurrentValueStream<Int>(100)
         let sequence = [5, 7, 67]
         let expected = [100] + sequence
         let stream = sut.subscribe()

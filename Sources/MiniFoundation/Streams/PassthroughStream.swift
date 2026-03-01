@@ -5,12 +5,12 @@
 import Dispatch
 
 /// Replacement for `PassthroughSubject`.
-public final class PassthroughStream<OID, T>: @unchecked Sendable where OID: RandomlyInitialized, T: Sendable {
+public final class PassthroughStream<T>: @unchecked Sendable where T: Sendable {
     let queue = DispatchQueue(label: "PassthroughStream")
 
-    var observers: [OID: AsyncStream<T>.Continuation] = [:]
+    var observers: [UniqueID: AsyncStream<T>.Continuation] = [:]
 
-    var throwingObservers: [OID: AsyncThrowingStream<T, Error>.Continuation] = [:]
+    var throwingObservers: [UniqueID: AsyncThrowingStream<T, Error>.Continuation] = [:]
 
     var isFinished = false
 
@@ -27,7 +27,7 @@ public final class PassthroughStream<OID, T>: @unchecked Sendable where OID: Ran
     }
 
     public func subscribe() -> AsyncStream<T> {
-        let id = OID() // Best-effort, assume nonexistent observer id
+        let id = UniqueID() // Best-effort, assume nonexistent observer id
         return AsyncStream { [weak self] continuation in
             guard let self else {
                 return
@@ -44,7 +44,7 @@ public final class PassthroughStream<OID, T>: @unchecked Sendable where OID: Ran
     }
 
     public func subscribeThrowing() -> AsyncThrowingStream<T, Error> {
-        let id = OID() // Best-effort, assume nonexistent observer id
+        let id = UniqueID() // Best-effort, assume nonexistent observer id
         return AsyncThrowingStream { [weak self] continuation in
             guard let self else {
                 return
