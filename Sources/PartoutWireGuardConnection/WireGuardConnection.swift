@@ -41,30 +41,20 @@ public actor WireGuardConnection: Connection {
         parameters: ConnectionParameters,
         module: WireGuardModule
     ) throws {
-        print(">>> PRE WG INIT BEGIN")
         self.ctx = ctx
-        print(">>> PRE WG INIT 1")
         statusSubject = CurrentValueStream(.disconnected)
-        print(">>> PRE WG INIT 2")
         moduleId = module.id
-        print(">>> PRE WG INIT 3")
         controller = parameters.controller
-        print(">>> PRE WG INIT 4")
         reachability = parameters.reachability
-        print(">>> PRE WG INIT 5")
         environment = parameters.environment
-        print(">>> PRE WG INIT 6")
         dnsTimeout = parameters.options.dnsTimeout
 
-        print(">>> PRE WG CFG")
         guard let configuration = module.configuration else {
             throw PartoutError(.incompleteModule)
         }
         pp_log(ctx, .wireguard, .notice, "WireGuard: Using cross-platform connection")
-        print(">>> POST WG CFG")
 
         tunnelConfiguration = try configuration.withModules(from: parameters.profile)
-        print(">>> POST TUNNEL CFG")
         dataCountTimerInterval = TimeInterval(parameters.options.minDataCountInterval) / 1000.0
     }
 

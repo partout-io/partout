@@ -36,11 +36,6 @@ public final class VirtualTunnelController: TunnelController {
 
         // Fetch tun implementation if necessary
         let tunImpl = impl.map { thiz in
-
-            // FIXME: ###, pass info as JSON
-//            info.
-//            cInfo.info_json = info
-
             let rawDescs = info.fileDescriptors.map(Int32.init)
             return rawDescs.withUnsafeBufferPointer {
                 var cInfo = pp_tun_ctrl_info()
