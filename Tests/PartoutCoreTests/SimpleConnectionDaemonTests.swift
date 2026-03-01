@@ -207,7 +207,7 @@ private extension SimpleConnectionDaemonTests {
 }
 
 private final class MockReachabilityObserver: ReachabilityObserver, @unchecked Sendable {
-    private nonisolated let isReachableSubject = PassthroughStream<UniqueID, Bool>()
+    private nonisolated let isReachableSubject = PassthroughStream<Bool>()
 
     func startObserving() {
         isReachable = true
@@ -248,7 +248,7 @@ private final class MockConnection: Connection {
 
     let options: Options
 
-    private let statusSubject = CurrentValueStream<UniqueID, ConnectionStatus>(.disconnected)
+    private let statusSubject = CurrentValueStream<ConnectionStatus>(.disconnected)
 
     var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
         statusSubject.subscribeThrowing()

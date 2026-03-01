@@ -16,7 +16,7 @@ public final class Tunnel {
 
     private let strategy: TunnelObservableStrategy
 
-    private let activeProfilesSubject: CurrentValueStream<UniqueID, [Profile.ID: TunnelActiveProfile]>
+    private let activeProfilesSubject: CurrentValueStream<[Profile.ID: TunnelActiveProfile]>
 
     private let environmentFactory: (Profile.ID) -> TunnelEnvironmentReader
 

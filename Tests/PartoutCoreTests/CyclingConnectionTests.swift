@@ -149,7 +149,7 @@ struct CyclingConnectionTests {
 
     @Test
     func givenLink_whenStartThenGetsBetterLink_thenReconnects() async throws {
-        let hasBetterPath = PassthroughStream<UniqueID, Void>()
+        let hasBetterPath = PassthroughStream<Void>()
         let factory = MockNetworkInterfaceFactory()
         factory.linkBlock = {
             $0.hasBetterPath = hasBetterPath.subscribe()

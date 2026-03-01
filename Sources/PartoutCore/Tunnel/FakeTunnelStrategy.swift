@@ -4,7 +4,7 @@
 
 /// Implementation of ``TunnelObservableStrategy`` to fake VPN operation on simulators.
 public actor FakeTunnelStrategy: TunnelObservableStrategy, Sendable {
-    private nonisolated let activeProfileSubject: CurrentValueStream<UniqueID, TunnelActiveProfile?>
+    private nonisolated let activeProfileSubject: CurrentValueStream<TunnelActiveProfile?>
 
     private var status: TunnelStatus {
         get {
