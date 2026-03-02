@@ -31,6 +31,10 @@ ExternalProject_Add(OpenSSLProject
     CONFIGURE_COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl/Configure ${CFG_ARGS}
     BUILD_COMMAND ${OPENSSL_BUILD_CMD}
     INSTALL_COMMAND ${OPENSSL_BUILD_CMD} install
+    INSTALL_DIR ${OPENSSL_DIR}
+    BUILD_BYPRODUCTS
+        <INSTALL_DIR>/lib/libssl.${LIBEXT}
+        <INSTALL_DIR>/lib/libcrypto.${LIBEXT}
 )
 
 if(APPLE)
@@ -46,15 +50,34 @@ if(APPLE)
     )
 endif()
 
-add_library(OpenSSLInterface INTERFACE)
-add_dependencies(OpenSSLInterface OpenSSLProject)
-target_include_directories(OpenSSLInterface INTERFACE ${OPENSSL_DIR}/include)
+# XXX: Use absolute paths to fix linking clash with system OpenSSL/BoringSSL
+ExternalProject_Get_Property(OpenSSLProject install_dir)
+add_library(OpenSSL::SSL SHARED IMPORTED GLOBAL)
+add_library(OpenSSL::Crypto SHARED IMPORTED GLOBAL)
 if(WIN32)
-    target_link_libraries(OpenSSLInterface INTERFACE
-        ${OPENSSL_DIR}/lib/libssl.lib
-        ${OPENSSL_DIR}/lib/libcrypto.lib
+    set_target_properties(OpenSSL::SSL PROPERTIES
+        IMPORTED_LOCATION ${install_dir}/bin/libssl.dll
+        IMPORTED_IMPLIB ${install_dir}/lib/libssl.${LIBEXT}
+    )
+    set_target_properties(OpenSSL::Crypto PROPERTIES
+        IMPORTED_LOCATION ${install_dir}/bin/libcrypto.dll
+        IMPORTED_IMPLIB ${install_dir}/lib/libcrypto.${LIBEXT}
     )
 else()
-    target_link_directories(OpenSSLInterface INTERFACE ${OPENSSL_DIR}/lib)
-    target_link_libraries(OpenSSLInterface INTERFACE ssl crypto)
+    set_target_properties(OpenSSL::SSL PROPERTIES
+        IMPORTED_LOCATION ${install_dir}/lib/libssl.${LIBEXT}
+    )
+    set_target_properties(OpenSSL::Crypto PROPERTIES
+        IMPORTED_LOCATION ${install_dir}/lib/libcrypto.${LIBEXT}
+    )
 endif()
+add_dependencies(OpenSSL::SSL OpenSSLProject)
+add_dependencies(OpenSSL::Crypto OpenSSLProject)
+
+add_library(OpenSSLInterface INTERFACE)
+add_dependencies(OpenSSLInterface OpenSSLProject)
+target_include_directories(OpenSSLInterface INTERFACE ${install_dir}/include)
+target_link_libraries(OpenSSLInterface INTERFACE
+    OpenSSL::SSL
+    OpenSSL::Crypto
+)

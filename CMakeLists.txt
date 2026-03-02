@@ -28,6 +28,13 @@ message(STATUS "Option PP_BUILD_USE_WGGO = ${PP_BUILD_USE_WGGO}")
 message(STATUS "Option PP_BUILD_OUTPUT = ${PP_BUILD_OUTPUT}")
 
 # All vendor-inherited args
+if(WIN32)
+    set(LIBEXT lib)
+elseif(APPLE)
+    set(LIBEXT dylib)
+else()
+    set(LIBEXT so)
+endif()
 if(PP_BUILD_USE_OPENSSL)
     include("vendors/openssl.cmake")
 elseif(PP_BUILD_USE_MBEDTLS)
