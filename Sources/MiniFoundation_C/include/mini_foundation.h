@@ -14,33 +14,12 @@
 
 #pragma clang assume_nonnull begin
 
-static inline
-char *minif_strdup(const char *string) {
-#ifdef _WIN32
-    char *copy = _strdup(string);
-#else
-    char *copy = strdup(string);
-#endif
-    if (!copy) abort();
-    return copy;
-}
-
-static inline
-FILE *_Nullable minif_fopen(const char *filename, const char *mode) {
-#ifdef _WIN32
-    FILE *file_ret = NULL;
-    errno_t file_err = fopen_s(&file_ret, filename, mode);
-    if (file_err == 0) return NULL;
-    return file_ret;
-#else
-    return fopen(filename, mode);
-#endif
-}
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+char *minif_strdup(const char *string);
+FILE *_Nullable minif_fopen(const char *filename, const char *mode);
 bool minif_prng_do(void *dst, size_t len);
 
 typedef struct _minif_rx_result minif_rx_result;
