@@ -1,9 +1,9 @@
 set(MBEDTLS_DIR ${PP_BUILD_OUTPUT}/mbedtls)
 
 # Output
-set(LIBTLS lib/libmbedtls${LIBEXT_STATIC})
-set(LIBX509 lib/libmbedx509${LIBEXT_STATIC})
-set(LIBCRYPTO lib/libmbedcrypto${LIBEXT_STATIC})
+set(LIBTLS lib/${LIBPFX_STATIC}mbedtls${LIBEXT_STATIC})
+set(LIBX509 lib/${LIBPFX_STATIC}mbedx509${LIBEXT_STATIC})
+set(LIBCRYPTO lib/${LIBPFX_STATIC}mbedcrypto${LIBEXT_STATIC})
 
 ExternalProject_Add(MbedTLSProject
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/mbedtls
