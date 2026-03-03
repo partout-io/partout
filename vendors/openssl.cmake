@@ -11,13 +11,6 @@ else()
     set(LIBCRYPTO lib/libcrypto${LIBEXT})
 endif()
 
-# Use nmake on Windows
-if(WIN32)
-    set(OPENSSL_BUILD_CMD nmake)
-else()
-    set(OPENSSL_BUILD_CMD make)
-endif()
-
 # Configure flags
 set(OPENSSL_CFG_FLAGS no-apps no-docs no-dsa no-engine no-gost no-legacy shared no-ssl no-tests no-zlib)
 
@@ -40,8 +33,8 @@ set(CFG_ARGS
 ExternalProject_Add(OpenSSLProject
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl
     CONFIGURE_COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl/Configure ${CFG_ARGS}
-    BUILD_COMMAND ${OPENSSL_BUILD_CMD}
-    INSTALL_COMMAND ${OPENSSL_BUILD_CMD} install
+    BUILD_COMMAND ${MAKE_CMD}
+    INSTALL_COMMAND ${MAKE_CMD} install
     INSTALL_DIR ${OPENSSL_DIR}
     BUILD_BYPRODUCTS
         <INSTALL_DIR>/${LIBSSL}
