@@ -1,5 +1,6 @@
 set(OPENSSL_DIR ${PP_BUILD_OUTPUT}/openssl)
 
+# Output
 if(WIN32)
     set(LIBSSL bin/libssl${LIBEXT})
     set(LIBCRYPTO bin/libcrypto${LIBEXT})
