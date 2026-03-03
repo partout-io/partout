@@ -6,6 +6,6 @@
 
 #include "crypto/crypto.h"
 
-bool pp_crypto_init_seed(const pp_zd *seed) {
+bool pp_crypto_init_seed(const uint8_t *_Nonnull src, const size_t len) {
     return true;
 }
