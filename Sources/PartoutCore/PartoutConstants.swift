@@ -11,4 +11,10 @@ public enum PartoutConstants {
 
     /// The computed version identifier.
     public static let versionIdentifier: String = "\(identifier) \(version)"
+
+    /// The C flavor of ``versionIdentifier``.
+    public static var cVersionIdentifier: UnsafePointer<CChar> {
+        // This is safe because the subject is statically allocated.
+        versionIdentifier.withCString(\.self)
+    }
 }
