@@ -13,7 +13,6 @@ target_compile_options(partout_c PRIVATE
 # Header search paths from all C targets
 set(PARTOUT_C_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/MiniFoundation_C/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/PartoutABI_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCore_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutOpenVPN_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuard_C/include
@@ -127,15 +126,6 @@ set_target_properties(partout_c PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${OUTPUT_DIR}
     ARCHIVE_OUTPUT_DIRECTORY ${OUTPUT_DIR}
     RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
-)
-
-# Copy ABI header
-set(ABI_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/PartoutABI_C/include)
-add_custom_command(
-    TARGET partout
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${ABI_INCLUDE}/partout.h ${OUTPUT_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy ${ABI_INCLUDE}/module.modulemap ${OUTPUT_DIR}
 )
 
 if(WIN32)

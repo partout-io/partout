@@ -98,9 +98,6 @@ let package = Package(
                 return list
             }()
         ),
-        .target(
-            name: "PartoutABI_C"
-        ),
         .testTarget(
             name: "PartoutTests",
             dependencies: ["Partout"],
@@ -135,7 +132,6 @@ package.targets.append(contentsOf: [
         name: "PartoutCore",
         dependencies: [
             "MiniFoundation",
-            "PartoutABI_C",
             "PartoutCore_C"
         ],
         swiftSettings: useFoundationCompatibility.swiftSettings
