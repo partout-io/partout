@@ -29,6 +29,7 @@ message(STATUS "Option PP_BUILD_OUTPUT = ${PP_BUILD_OUTPUT}")
 
 # All vendor-inherited args
 set(LIBEXT ${CMAKE_SHARED_LIBRARY_SUFFIX})
+set(LIBEXT_IMP ${CMAKE_IMPORT_LIBRARY_SUFFIX})
 if(PP_BUILD_USE_OPENSSL)
     include("vendors/openssl.cmake")
 elseif(PP_BUILD_USE_MBEDTLS)

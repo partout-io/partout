@@ -1,6 +1,14 @@
 set(OPENSSL_DIR ${PP_BUILD_OUTPUT}/openssl)
-set(LIBSSL libssl${LIBEXT})
-set(LIBCRYPTO libcrypto${LIBEXT})
+
+if(WIN32)
+    set(LIBSSL bin/libssl${LIBEXT})
+    set(LIBCRYPTO bin/libcrypto${LIBEXT})
+    set(LIBSSL_IMP lib/libssl${LIBEXT_IMP})
+    set(LIBCRYPTO_IMP lib/libcrypto${LIBEXT_IMP})
+else()
+    set(LIBSSL lib/libssl${LIBEXT})
+    set(LIBCRYPTO lib/libcrypto${LIBEXT})
+endif()
 
 # Use nmake on Windows
 if(WIN32)
@@ -35,8 +43,8 @@ ExternalProject_Add(OpenSSLProject
     INSTALL_COMMAND ${OPENSSL_BUILD_CMD} install
     INSTALL_DIR ${OPENSSL_DIR}
     BUILD_BYPRODUCTS
-        <INSTALL_DIR>/lib/${LIBSSL}
-        <INSTALL_DIR>/lib/${LIBCRYPTO}
+        <INSTALL_DIR>/${LIBSSL}
+        <INSTALL_DIR>/${LIBCRYPTO}
 )
 
 if(APPLE)
@@ -58,19 +66,19 @@ add_library(OpenSSL::SSL SHARED IMPORTED GLOBAL)
 add_library(OpenSSL::Crypto SHARED IMPORTED GLOBAL)
 if(WIN32)
     set_target_properties(OpenSSL::SSL PROPERTIES
-        IMPORTED_LOCATION ${install_dir}/bin/${LIBSSL}
-        IMPORTED_IMPLIB ${install_dir}/lib/libssl${CMAKE_IMPORT_LIBRARY_SUFFIX}
+        IMPORTED_LOCATION ${install_dir}/${LIBSSL}
+        IMPORTED_IMPLIB ${install_dir}/${LIBSSL_IMP}
     )
     set_target_properties(OpenSSL::Crypto PROPERTIES
-        IMPORTED_LOCATION ${install_dir}/bin/${LIBCRYPTO}
-        IMPORTED_IMPLIB ${install_dir}/lib/libcrypto${CMAKE_IMPORT_LIBRARY_SUFFIX}
+        IMPORTED_LOCATION ${install_dir}/${LIBCRYPTO}
+        IMPORTED_IMPLIB ${install_dir}/${LIBCRYPTO_IMP}
     )
 else()
     set_target_properties(OpenSSL::SSL PROPERTIES
-        IMPORTED_LOCATION ${install_dir}/lib/${LIBSSL}
+        IMPORTED_LOCATION ${install_dir}/${LIBSSL}
     )
     set_target_properties(OpenSSL::Crypto PROPERTIES
-        IMPORTED_LOCATION ${install_dir}/lib/${LIBCRYPTO}
+        IMPORTED_LOCATION ${install_dir}/${LIBCRYPTO}
     )
 endif()
 add_dependencies(OpenSSL::SSL OpenSSLProject)
