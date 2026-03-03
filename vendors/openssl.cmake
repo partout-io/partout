@@ -58,12 +58,12 @@ add_library(OpenSSL::SSL SHARED IMPORTED GLOBAL)
 add_library(OpenSSL::Crypto SHARED IMPORTED GLOBAL)
 if(WIN32)
     set_target_properties(OpenSSL::SSL PROPERTIES
-        IMPORTED_LOCATION ${install_dir}/bin/libssl.dll
-        IMPORTED_IMPLIB ${install_dir}/lib/${LIBSSL}
+        IMPORTED_LOCATION ${install_dir}/bin/${LIBSSL}
+        IMPORTED_IMPLIB ${install_dir}/lib/libssl${CMAKE_IMPORT_LIBRARY_SUFFIX}
     )
     set_target_properties(OpenSSL::Crypto PROPERTIES
-        IMPORTED_LOCATION ${install_dir}/bin/libcrypto.dll
-        IMPORTED_IMPLIB ${install_dir}/lib/${LIBCRYPTO}
+        IMPORTED_LOCATION ${install_dir}/bin/${LIBCRYPTO}
+        IMPORTED_IMPLIB ${install_dir}/lib/libcrypto${CMAKE_IMPORT_LIBRARY_SUFFIX}
     )
 else()
     set_target_properties(OpenSSL::SSL PROPERTIES
