@@ -194,17 +194,6 @@ package.targets.append(contentsOf: [
     )
 ])
 
-// Standalone executables
-if useFoundationCompatibility.supportsPartoutd {
-    package.targets.append(
-        .executableTarget(
-            name: "partoutd",
-            dependencies: ["Partout"],
-            path: "Executables/partoutd"
-        )
-    )
-}
-
 // MARK: OpenVPN
 
 // OpenVPN requires Crypto/TLS wrappers
@@ -537,9 +526,5 @@ enum FoundationCompatibility {
         case .off: []
         case .on: [.define("MINIF_COMPAT")]
         }
-    }
-
-    var supportsPartoutd: Bool {
-        true
     }
 }
