@@ -1,27 +1,32 @@
 set(MBEDTLS_DIR ${PP_BUILD_OUTPUT}/mbedtls)
 
+# Output
+set(LIBTLS lib/${LIBPFX_STATIC}mbedtls${LIBEXT_STATIC})
+set(LIBX509 lib/${LIBPFX_STATIC}mbedx509${LIBEXT_STATIC})
+set(LIBCRYPTO lib/${LIBPFX_STATIC}mbedcrypto${LIBEXT_STATIC})
+
 ExternalProject_Add(MbedTLSProject
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/mbedtls
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${MBEDTLS_DIR}
     INSTALL_DIR ${MBEDTLS_DIR}
     BUILD_BYPRODUCTS
-        <INSTALL_DIR>/lib/libmbedtls.${LIBEXT}
-        <INSTALL_DIR>/lib/libmbedx509.${LIBEXT}
-        <INSTALL_DIR>/lib/libmbedcrypto.${LIBEXT}
+        <INSTALL_DIR>/${LIBTLS}
+        <INSTALL_DIR>/${LIBX509}
+        <INSTALL_DIR>/${LIBCRYPTO}
 )
 
 ExternalProject_Get_Property(MbedTLSProject install_dir)
-add_library(MbedTLS::TLS SHARED IMPORTED GLOBAL)
-add_library(MbedTLS::X509 SHARED IMPORTED GLOBAL)
-add_library(MbedTLS::Crypto SHARED IMPORTED GLOBAL)
+add_library(MbedTLS::TLS STATIC IMPORTED GLOBAL)
+add_library(MbedTLS::X509 STATIC IMPORTED GLOBAL)
+add_library(MbedTLS::Crypto STATIC IMPORTED GLOBAL)
 set_target_properties(MbedTLS::TLS PROPERTIES
-    IMPORTED_LOCATION ${install_dir}/lib/libmbedtls.${LIBEXT}
+    IMPORTED_LOCATION ${install_dir}/${LIBTLS}
 )
 set_target_properties(MbedTLS::X509 PROPERTIES
-    IMPORTED_LOCATION ${install_dir}/lib/libmbedx509.${LIBEXT}
+    IMPORTED_LOCATION ${install_dir}/${LIBX509}
 )
 set_target_properties(MbedTLS::Crypto PROPERTIES
-    IMPORTED_LOCATION ${install_dir}/lib/libmbedcrypto.${LIBEXT}
+    IMPORTED_LOCATION ${install_dir}/${LIBCRYPTO}
 )
 add_dependencies(MbedTLS::TLS MbedTLSProject)
 add_dependencies(MbedTLS::X509 MbedTLSProject)

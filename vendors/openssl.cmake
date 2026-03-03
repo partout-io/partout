@@ -1,10 +1,14 @@
 set(OPENSSL_DIR ${PP_BUILD_OUTPUT}/openssl)
 
-# Use nmake on Windows
+# Output
 if(WIN32)
-    set(OPENSSL_BUILD_CMD nmake)
+    set(LIBSSL bin/libssl${LIBEXT})
+    set(LIBCRYPTO bin/libcrypto${LIBEXT})
+    set(LIBSSL_IMP lib/libssl${LIBEXT_IMP})
+    set(LIBCRYPTO_IMP lib/libcrypto${LIBEXT_IMP})
 else()
-    set(OPENSSL_BUILD_CMD make)
+    set(LIBSSL lib/libssl${LIBEXT})
+    set(LIBCRYPTO lib/libcrypto${LIBEXT})
 endif()
 
 # Configure flags
@@ -29,12 +33,12 @@ set(CFG_ARGS
 ExternalProject_Add(OpenSSLProject
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl
     CONFIGURE_COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl/Configure ${CFG_ARGS}
-    BUILD_COMMAND ${OPENSSL_BUILD_CMD}
-    INSTALL_COMMAND ${OPENSSL_BUILD_CMD} install
+    BUILD_COMMAND ${MAKE_CMD}
+    INSTALL_COMMAND ${MAKE_CMD} install
     INSTALL_DIR ${OPENSSL_DIR}
     BUILD_BYPRODUCTS
-        <INSTALL_DIR>/lib/libssl.${LIBEXT}
-        <INSTALL_DIR>/lib/libcrypto.${LIBEXT}
+        <INSTALL_DIR>/${LIBSSL}
+        <INSTALL_DIR>/${LIBCRYPTO}
 )
 
 if(APPLE)
@@ -56,19 +60,19 @@ add_library(OpenSSL::SSL SHARED IMPORTED GLOBAL)
 add_library(OpenSSL::Crypto SHARED IMPORTED GLOBAL)
 if(WIN32)
     set_target_properties(OpenSSL::SSL PROPERTIES
-        IMPORTED_LOCATION ${install_dir}/bin/libssl.dll
-        IMPORTED_IMPLIB ${install_dir}/lib/libssl.${LIBEXT}
+        IMPORTED_LOCATION ${install_dir}/${LIBSSL}
+        IMPORTED_IMPLIB ${install_dir}/${LIBSSL_IMP}
     )
     set_target_properties(OpenSSL::Crypto PROPERTIES
-        IMPORTED_LOCATION ${install_dir}/bin/libcrypto.dll
-        IMPORTED_IMPLIB ${install_dir}/lib/libcrypto.${LIBEXT}
+        IMPORTED_LOCATION ${install_dir}/${LIBCRYPTO}
+        IMPORTED_IMPLIB ${install_dir}/${LIBCRYPTO_IMP}
     )
 else()
     set_target_properties(OpenSSL::SSL PROPERTIES
-        IMPORTED_LOCATION ${install_dir}/lib/libssl.${LIBEXT}
+        IMPORTED_LOCATION ${install_dir}/${LIBSSL}
     )
     set_target_properties(OpenSSL::Crypto PROPERTIES
-        IMPORTED_LOCATION ${install_dir}/lib/libcrypto.${LIBEXT}
+        IMPORTED_LOCATION ${install_dir}/${LIBCRYPTO}
     )
 endif()
 add_dependencies(OpenSSL::SSL OpenSSLProject)
