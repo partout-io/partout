@@ -194,11 +194,10 @@ private extension SimpleConnectionDaemonTests {
                 profile: profile,
                 controller: controller,
                 factory: MockNetworkInterfaceFactory(),
-                reachability: MockReachabilityObserver(),
+                reachability: reachability,
                 environment: environment,
                 options: options
             ),
-            reachability: reachability,
             messageHandler: DefaultMessageHandler(.global, environment: environment),
             stopDelay: stopDelay,
             reconnectionDelay: reconnectionDelay

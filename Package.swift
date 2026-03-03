@@ -98,9 +98,6 @@ let package = Package(
                 return list
             }()
         ),
-        .target(
-            name: "PartoutABI_C"
-        ),
         .testTarget(
             name: "PartoutTests",
             dependencies: ["Partout"],
@@ -135,7 +132,6 @@ package.targets.append(contentsOf: [
         name: "PartoutCore",
         dependencies: [
             "MiniFoundation",
-            "PartoutABI_C",
             "PartoutCore_C"
         ],
         swiftSettings: useFoundationCompatibility.swiftSettings
@@ -197,17 +193,6 @@ package.targets.append(contentsOf: [
         }()
     )
 ])
-
-// Standalone executables
-if useFoundationCompatibility.supportsPartoutd {
-    package.targets.append(
-        .executableTarget(
-            name: "partoutd",
-            dependencies: ["Partout"],
-            path: "Executables/partoutd"
-        )
-    )
-}
 
 // MARK: OpenVPN
 
@@ -541,9 +526,5 @@ enum FoundationCompatibility {
         case .off: []
         case .on: [.define("MINIF_COMPAT")]
         }
-    }
-
-    var supportsPartoutd: Bool {
-        true
     }
 }

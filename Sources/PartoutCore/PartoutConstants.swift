@@ -2,27 +2,19 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutABI_C
-
 public enum PartoutConstants {
     /// The unique identifier of the library.
-    public static let identifier: String = {
-        guard let str = String(cString: PARTOUT_IDENTIFIER, encoding: .ascii) else {
-            fatalError("NULL partout_identifier")
-        }
-        return str
-    }()
+    public static let identifier = "io.partout"
 
     /// The library version.
-    public static let version: String = {
-        guard let str = String(cString: PARTOUT_VERSION, encoding: .ascii) else {
-            fatalError("NULL partout_version")
-        }
-        return str
-    }()
+    public static let version = "0.110.0"
 
     /// The computed version identifier.
-    public static var versionIdentifier: String {
-        "\(identifier) \(version)"
+    public static let versionIdentifier: String = "\(identifier) \(version)"
+
+    /// The C flavor of ``versionIdentifier``.
+    public static var cVersionIdentifier: UnsafePointer<CChar> {
+        // This is safe because the subject is statically allocated.
+        versionIdentifier.withCString(\.self)
     }
 }

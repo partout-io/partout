@@ -18,7 +18,7 @@ Partout is the backbone of [Passepartout][passepartout]. The footprint is kept i
 
 **As per the GPL, the public license is not suitable for the App Store and other closed-source distributions. If you want to use Partout for proprietary or commercial purposes, please [obtain a proper license][license-website].**
 
-### Swift
+### SwiftPM
 
 Import the library as a SwiftPM dependency:
 
@@ -34,9 +34,9 @@ targets: [
 ]
 ```
 
-### Other languages (ABI)
+### CMake
 
-The C ABI is a work in progress.
+Partout can be imported as a CMake project. The exported target is `partout`.
 
 #### Requirements
 
