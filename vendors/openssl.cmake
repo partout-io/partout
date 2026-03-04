@@ -6,9 +6,19 @@ if(WIN32)
     set(LIBCRYPTO bin/libcrypto${LIBEXT})
     set(LIBSSL_IMP lib/libssl${LIBEXT_IMP})
     set(LIBCRYPTO_IMP lib/libcrypto${LIBEXT_IMP})
+    set(OPENSSL_BYPRODUCTS
+        <INSTALL_DIR>/${LIBSSL}
+        <INSTALL_DIR>/${LIBSSL_IMP}
+        <INSTALL_DIR>/${LIBCRYPTO}
+        <INSTALL_DIR>/${LIBCRYPTO_IMP}
+    )
 else()
     set(LIBSSL lib/libssl${LIBEXT})
     set(LIBCRYPTO lib/libcrypto${LIBEXT})
+    set(OPENSSL_BYPRODUCTS
+        <INSTALL_DIR>/${LIBSSL}
+        <INSTALL_DIR>/${LIBCRYPTO}
+    )
 endif()
 
 # Configure flags
@@ -36,9 +46,7 @@ ExternalProject_Add(OpenSSLProject
     BUILD_COMMAND ${MAKE_CMD}
     INSTALL_COMMAND ${MAKE_CMD} install
     INSTALL_DIR ${OPENSSL_DIR}
-    BUILD_BYPRODUCTS
-        <INSTALL_DIR>/${LIBSSL}
-        <INSTALL_DIR>/${LIBCRYPTO}
+    BUILD_BYPRODUCTS ${OPENSSL_BYPRODUCTS}
 )
 
 if(APPLE)
