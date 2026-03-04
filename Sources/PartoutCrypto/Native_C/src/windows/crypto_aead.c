@@ -164,8 +164,8 @@ size_t local_decrypt(void *vctx,
 // MARK: -
 
 pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
-                              size_t tag_len, size_t id_len,
-                              const pp_crypto_keys *keys) {
+                                    size_t tag_len, size_t id_len,
+                                    const pp_crypto_keys *keys) {
     pp_assert(cipher_name);
 
     size_t cipher_key_len;

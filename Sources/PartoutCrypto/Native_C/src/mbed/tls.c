@@ -7,7 +7,7 @@
 #include "portable/common.h"
 #include "tls/tls.h"
 
-// FIXME: #108, implement with mbedTLS
+// FIXME: #108, Implement with mbedTLS
 
 //static const char *const TLSBoxClientEKU = "TLS Web Client Authentication";
 static const char *const TLSBoxServerEKU = "TLS Web Server Authentication";
