@@ -182,9 +182,7 @@ private extension WireGuardConnection {
               let dataCount = DataCount.from(wireGuardString: configurationString) else {
             return
         }
-        await MainActor.run { [weak self] in
-            self?.environment.setEnvironmentValue(dataCount, forKey: TunnelEnvironmentKeys.dataCount)
-        }
+        environment.setEnvironmentValue(dataCount, forKey: TunnelEnvironmentKeys.dataCount)
     }
 }
 
