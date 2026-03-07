@@ -18,8 +18,9 @@ public final class TunnelObservable {
         Task { [weak self] in
             guard let self else { return }
             do {
+                let stream = tunnel.activeProfilesStream
                 try await tunnel.prepare(purge: false)
-                for await active in tunnel.activeProfilesStream {
+                for await active in stream {
                     activeProfiles = active
                 }
             } catch {
