@@ -110,7 +110,7 @@ extension Tunnel {
         }
     }
 
-    public var activeProfilesStream: AsyncStream<[Profile.ID: TunnelActiveProfile]> {
+    public nonisolated var activeProfilesStream: AsyncStream<[Profile.ID: TunnelActiveProfile]> {
         activeProfilesSubject.subscribe()
     }
 

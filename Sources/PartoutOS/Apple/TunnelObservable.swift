@@ -19,7 +19,7 @@ public final class TunnelObservable {
             let stream: AsyncStream<[Profile.ID: TunnelActiveProfile]>
             do {
                 try await tunnel.prepare(purge: false)
-                stream = await tunnel.activeProfilesStream
+                stream = tunnel.activeProfilesStream
                 for await active in stream {
                     statuses = active.mapValues(\.status)
                 }
