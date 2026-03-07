@@ -14,7 +14,7 @@ public final class TunnelObservable {
 
     public init(tunnel: Tunnel) {
         self.tunnel = tunnel
-        statuses = [:]
+        activeProfiles = [:]
         Task {
             let stream: AsyncStream<[Profile.ID: TunnelActiveProfile]>
             do {
