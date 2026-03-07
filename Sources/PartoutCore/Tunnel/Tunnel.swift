@@ -2,16 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if canImport(Combine)
-import Combine
-
-extension Tunnel: ObservableObject {
-}
-#endif
+// FIXME: ###, Split into Tunnel (Core) and TunnelObservable (in PartoutOS/Apple)
 
 /// Manages a tunnel and observes its status.
-@MainActor
-public final class Tunnel {
+public actor Tunnel {
     private let ctx: PartoutLoggerContext
 
     private let strategy: TunnelObservableStrategy
@@ -36,8 +30,6 @@ public final class Tunnel {
         self.environmentFactory = environmentFactory
         activeProfilesSubject = CurrentValueStream([:])
         environments = [:]
-
-        observeObjects()
     }
 }
 
@@ -45,6 +37,7 @@ public final class Tunnel {
 
 extension Tunnel: TunnelStrategy {
     public func prepare(purge: Bool) async throws {
+        observeObjects()
         pp_log(ctx, .core, .info, "Prepare tunnel (purge: \(purge))...")
         try await strategy.prepare(purge: purge)
     }
@@ -113,9 +106,6 @@ extension Tunnel {
             activeProfilesSubject.value
         }
         set {
-#if canImport(Combine)
-            objectWillChange.send()
-#endif
             activeProfilesSubject.send(newValue)
         }
     }
@@ -147,38 +137,35 @@ extension Tunnel {
 
 private extension Tunnel {
     func observeObjects() {
-        strategySubscription?.cancel()
         strategySubscription = Task { [weak self] in
-            guard let self else {
-                return
-            }
+            guard let self else { return }
             for await activeProfiles in strategy.didUpdateActiveProfiles {
                 guard !Task.isCancelled else {
                     pp_log(ctx, .core, .debug, "Cancelled Tunnel.strategy.didUpdateActiveProfiles (observed)")
                     return
                 }
-
-                guard activeProfiles != self.activeProfiles else {
-                    continue
-                }
-                pp_log(ctx, .core, .info, "Active profiles: \(activeProfiles.values.description)")
-                let activeIds = activeProfiles.keys
-
-                // create new environments if needed
-                for profileId in activeIds {
-                    if environments[profileId] == nil {
-                        environments[profileId] = environmentFactory(profileId)
-                    }
-                }
-
-                // destroy environments no longer present
-                environments = environments.filter {
-                    activeIds.contains($0.key)
-                }
-
-                // notify .activeProfilesStream observers now
-                self.activeProfiles = activeProfiles
+                await handleNewActiveProfiles(activeProfiles)
             }
         }
+    }
+
+    func handleNewActiveProfiles(_ activeProfiles: [Profile.ID: TunnelActiveProfile]) {
+        guard activeProfiles != self.activeProfiles else {
+            return
+        }
+        pp_log(ctx, .core, .info, "Active profiles: \(activeProfiles.values.description)")
+        let activeIds = activeProfiles.keys
+        // Create new environments if needed
+        for profileId in activeIds {
+            if environments[profileId] == nil {
+                environments[profileId] = environmentFactory(profileId)
+            }
+        }
+        // Destroy environments no longer present
+        environments = environments.filter {
+            activeIds.contains($0.key)
+        }
+        // Notify .activeProfilesStream observers now
+        self.activeProfiles = activeProfiles
     }
 }
