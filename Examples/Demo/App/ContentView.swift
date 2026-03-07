@@ -40,6 +40,9 @@ struct ContentView: View {
     @State
     private var destination: Destination?
 
+    @State
+    private var environment: TunnelEnvironmentReader?
+
     private let timer = Timer.publish(every: 2.0, on: .main, in: .common)
         .autoconnect()
 
@@ -151,29 +154,31 @@ private extension ContentView {
     }
 
     var serverConfigurationView: some View {
-//#if !os(tvOS)
-//        NavigationStack {
-//            VStack {
-//                vpn
-//                    .environment(for: profile.id)?
-//                    .environmentValue(forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
-//                    .map { cfg in
-//                        TextEditor(text: .constant(String(describing: cfg)))
-//                            .monospaced()
-//                            .padding()
-//                    }
-//            }
-//            .navigationTitle("Server configuration")
-//            .toolbar {
-//                closeButton
-//            }
-//#if os(macOS)
-//            .frame(minWidth: 600.0, minHeight: 400.0)
-//#endif
-//        }
-//#else
+#if !os(tvOS)
+        NavigationStack {
+            VStack {
+                environment?
+                    .environmentValue(forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
+                    .map { cfg in
+                        TextEditor(text: .constant(String(describing: cfg)))
+                            .monospaced()
+                            .padding()
+                    }
+            }
+            .navigationTitle("Server configuration")
+            .toolbar {
+                closeButton
+            }
+            .task {
+                environment = await vpn.environment(for: profile.id)
+            }
+#if os(macOS)
+            .frame(minWidth: 600.0, minHeight: 400.0)
+#endif
+        }
+#else
         EmptyView()
-//#endif
+#endif
     }
 }
 
