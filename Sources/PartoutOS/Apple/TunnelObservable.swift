@@ -15,12 +15,11 @@ public final class TunnelObservable {
     public init(tunnel: Tunnel) {
         self.tunnel = tunnel
         activeProfiles = [:]
-        Task {
-            let stream: AsyncStream<[Profile.ID: TunnelActiveProfile]>
+        Task { [weak self] in
+            guard let self else { return }
             do {
                 try await tunnel.prepare(purge: false)
-                stream = tunnel.activeProfilesStream
-                for await active in stream {
+                for await active in tunnel.activeProfilesStream {
                     activeProfiles = active
                 }
             } catch {
