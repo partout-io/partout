@@ -18,7 +18,7 @@ public actor Tunnel {
 
     private var strategySubscription: Task<Void, Never>?
 
-    public init(
+    public nonisolated init(
         _ ctx: PartoutLoggerContext,
         strategy: TunnelObservableStrategy,
         environmentFactory: @escaping (Profile.ID) -> TunnelEnvironmentReader
@@ -93,6 +93,11 @@ extension Tunnel {
         title: @escaping @Sendable (Profile) -> String
     ) async throws {
         try await install(profile, connect: connect, options: nil, title: title)
+    }
+
+    public func sendMessage(_ message: Message.Input) async throws -> Message.Output? {
+        guard let profileId = activeProfiles.keys.first else { return nil }
+        return try await sendMessage(message, to: profileId)
     }
 }
 
