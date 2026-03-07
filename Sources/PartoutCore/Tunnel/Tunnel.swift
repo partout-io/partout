@@ -18,7 +18,7 @@ public actor Tunnel {
 
     private var strategySubscription: Task<Void, Never>?
 
-    public nonisolated init(
+    public init(
         _ ctx: PartoutLoggerContext,
         strategy: TunnelObservableStrategy,
         environmentFactory: @escaping (Profile.ID) -> TunnelEnvironmentReader
@@ -28,6 +28,7 @@ public actor Tunnel {
         self.environmentFactory = environmentFactory
         activeProfilesSubject = CurrentValueStream([:])
         environments = [:]
+        observeObjects()
     }
 }
 
@@ -35,7 +36,6 @@ public actor Tunnel {
 
 extension Tunnel: TunnelStrategy {
     public func prepare(purge: Bool) async throws {
-        observeObjects()
         pp_log(ctx, .core, .info, "Prepare tunnel (purge: \(purge))...")
         try await strategy.prepare(purge: purge)
     }
