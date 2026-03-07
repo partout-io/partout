@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-// FIXME: ###, Split into Tunnel (Core) and TunnelObservable (in PartoutOS/Apple)
-
 /// Manages a tunnel and observes its status.
 public actor Tunnel {
     private let ctx: PartoutLoggerContext
