@@ -10,7 +10,7 @@ import Observation
 public final class TunnelObservable {
     private let tunnel: Tunnel
 
-    public private(set) var statuses: [Profile.ID: TunnelStatus]
+    public private(set) var activeProfiles: [Profile.ID: TunnelActiveProfile]
 
     public init(tunnel: Tunnel) {
         self.tunnel = tunnel
@@ -21,7 +21,7 @@ public final class TunnelObservable {
                 try await tunnel.prepare(purge: false)
                 stream = tunnel.activeProfilesStream
                 for await active in stream {
-                    statuses = active.mapValues(\.status)
+                    activeProfiles = active
                 }
             } catch {
                 pp_log_g(.core, .fault, "Unable to prepare tunnel: \(error)")
@@ -29,8 +29,12 @@ public final class TunnelObservable {
         }
     }
 
+    public var statuses: [Profile.ID: TunnelStatus] {
+        activeProfiles.mapValues(\.status)
+    }
+
     public var status: TunnelStatus {
-        statuses.first?.value ?? .inactive
+        activeProfiles.values.first?.status ?? .inactive
     }
 
     public func install(_ profile: Profile, title: @escaping @Sendable (Profile) -> String) async throws {
