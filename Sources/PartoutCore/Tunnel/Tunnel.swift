@@ -137,6 +137,7 @@ extension Tunnel {
 
 private extension Tunnel {
     func observeObjects() {
+        strategySubscription?.cancel()
         strategySubscription = Task { [weak self] in
             guard let self else { return }
             for await activeProfiles in strategy.didUpdateActiveProfiles {
