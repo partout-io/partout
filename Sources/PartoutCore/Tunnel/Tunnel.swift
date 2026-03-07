@@ -117,6 +117,10 @@ extension Tunnel {
         activeProfilesSubject.subscribe()
     }
 
+    public func allEnvironments() -> [Profile.ID: TunnelEnvironmentReader] {
+        environments
+    }
+
     public func environment(for profileId: Profile.ID) -> TunnelEnvironmentReader? {
         environments[profileId]
     }
