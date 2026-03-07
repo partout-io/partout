@@ -15,11 +15,11 @@ extension Registry {
     static let shared = Registry()
 }
 
-extension Tunnel {
-    static let shared: Tunnel = {
+extension TunnelObservable {
+    static let shared: TunnelObservable = {
 #if targetEnvironment(simulator)
         let strategy = FakeTunnelStrategy()
-        return Tunnel(.global, strategy: strategy) {
+        let tunnel = Tunnel(.global, strategy: strategy) {
             SharedTunnelEnvironment(profileId: $0)
         }
 #else
@@ -28,9 +28,10 @@ extension Tunnel {
             bundleIdentifier: Demo.tunnelBundleIdentifier,
             coder: Demo.neProtocolCoder
         )
-        return Tunnel(.global, strategy: strategy) {
+        let tunnel = Tunnel(.global, strategy: strategy) {
             NETunnelEnvironment(strategy: strategy, profileId: $0)
         }
 #endif
+        return TunnelObservable(tunnel: tunnel)
     }()
 }

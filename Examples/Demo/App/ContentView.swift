@@ -25,8 +25,8 @@ struct ContentView: View {
     @State
     private var profile: Profile = .demo
 
-    @StateObject
-    private var vpn: Tunnel = .shared
+    @State
+    private var vpn: TunnelObservable = .shared
 
     @State
     private var dataCount: DataCount?
@@ -55,8 +55,10 @@ struct ContentView: View {
                 dataCount = nil
                 return
             }
-            let environment = vpn.environment(for: profile.id)
-            dataCount = environment?.environmentValue(forKey: TunnelEnvironmentKeys.dataCount)
+            Task {
+                let environment = await vpn.environment(for: profile.id)
+                dataCount = environment?.environmentValue(forKey: TunnelEnvironmentKeys.dataCount)
+            }
         }
         .sheet(item: $destination) {
             switch $0 {
@@ -64,13 +66,6 @@ struct ContentView: View {
                 debugLogView
             case .serverConfiguration:
                 serverConfigurationView
-            }
-        }
-        .task {
-            do {
-                try await vpn.prepare(purge: false)
-            } catch {
-                print(error.localizedDescription)
             }
         }
     }
@@ -156,29 +151,29 @@ private extension ContentView {
     }
 
     var serverConfigurationView: some View {
-#if !os(tvOS)
-        NavigationStack {
-            VStack {
-                vpn
-                    .environment(for: profile.id)?
-                    .environmentValue(forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
-                    .map { cfg in
-                        TextEditor(text: .constant(String(describing: cfg)))
-                            .monospaced()
-                            .padding()
-                    }
-            }
-            .navigationTitle("Server configuration")
-            .toolbar {
-                closeButton
-            }
-#if os(macOS)
-            .frame(minWidth: 600.0, minHeight: 400.0)
-#endif
-        }
-#else
+//#if !os(tvOS)
+//        NavigationStack {
+//            VStack {
+//                vpn
+//                    .environment(for: profile.id)?
+//                    .environmentValue(forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
+//                    .map { cfg in
+//                        TextEditor(text: .constant(String(describing: cfg)))
+//                            .monospaced()
+//                            .padding()
+//                    }
+//            }
+//            .navigationTitle("Server configuration")
+//            .toolbar {
+//                closeButton
+//            }
+//#if os(macOS)
+//            .frame(minWidth: 600.0, minHeight: 400.0)
+//#endif
+//        }
+//#else
         EmptyView()
-#endif
+//#endif
     }
 }
 
@@ -218,7 +213,7 @@ private extension ContentView {
             do {
                 switch buttonAction {
                 case .connect:
-                    try await vpn.install(profile, connect: true) {
+                    try await vpn.connect(to: profile) {
                         "PartoutDemo: \($0.name)"
                     }
 

@@ -19,7 +19,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
             let environment = Demo.tunnelEnvironment
 
             // NetworkExtension specifics
-            let controller = try await NETunnelController(
+            let controller = NETunnelController(
                 provider: self,
                 profile: profile,
                 options: .init()

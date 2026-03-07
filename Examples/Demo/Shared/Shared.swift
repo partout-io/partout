@@ -59,6 +59,7 @@ extension Demo {
 
         static let saveInterval = 60000
 
+        @Sendable
         static func formattedLine(_ line: DebugLog.Line) -> String {
             let ts = line.timestamp
                 .formatted(
