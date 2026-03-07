@@ -33,6 +33,10 @@ public final class TunnelObservable {
         statuses.first?.value ?? .inactive
     }
 
+    public func install(_ profile: Profile, title: @escaping @Sendable (Profile) -> String) async throws {
+        try await tunnel.install(profile, connect: false, title: title)
+    }
+
     public func connect(to profile: Profile, title: @escaping @Sendable (Profile) -> String) async throws {
         try await tunnel.install(profile, connect: true, title: title)
     }
