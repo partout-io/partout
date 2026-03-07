@@ -46,12 +46,14 @@ public final class SharedTunnelEnvironment: TunnelEnvironment, @unchecked Sendab
     }
 
     public func snapshot(excludingKeys excluded: Set<String>?) -> [String: Data] {
-        if let excluded {
-            return values.filter {
-                !excluded.contains($0.key)
+        queue.sync {
+            if let excluded {
+                return values.filter {
+                    !excluded.contains($0.key)
+                }
             }
+            return values
         }
-        return values
     }
 
     public func reset() {
