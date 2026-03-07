@@ -27,7 +27,6 @@ private enum Constants {
     static let demoURL = Bundle.main.url(forResource: "Files/test-sample", withExtension: "ovpn")
 
     static let demoCredentials: OpenVPN.Credentials = {
-
         var builder = OpenVPN.Credentials.Builder()
         if let url = Bundle.main.url(forResource: "Files/test-sample", withExtension: "txt"),
            let content = try? String(contentsOf: url, encoding: .utf8) {

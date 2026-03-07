@@ -5,7 +5,6 @@
 @testable import PartoutCore
 import Testing
 
-@MainActor
 struct TunnelTests {
     @Test
     func givenTunnel_whenNoActiveModules_thenFailsToConnect() async throws {

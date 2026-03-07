@@ -25,8 +25,8 @@ struct ContentView: View {
     @State
     private var profile: Profile = .demo
 
-    @StateObject
-    private var vpn: Tunnel = .shared
+    @State
+    private var vpn: TunnelObservable = .shared
 
     @State
     private var dataCount: DataCount?
@@ -39,6 +39,9 @@ struct ContentView: View {
 
     @State
     private var destination: Destination?
+
+    @State
+    private var environment: TunnelEnvironmentReader?
 
     private let timer = Timer.publish(every: 2.0, on: .main, in: .common)
         .autoconnect()
@@ -55,8 +58,10 @@ struct ContentView: View {
                 dataCount = nil
                 return
             }
-            let environment = vpn.environment(for: profile.id)
-            dataCount = environment?.environmentValue(forKey: TunnelEnvironmentKeys.dataCount)
+            Task {
+                let environment = await vpn.environment(for: profile.id)
+                dataCount = environment?.environmentValue(forKey: TunnelEnvironmentKeys.dataCount)
+            }
         }
         .sheet(item: $destination) {
             switch $0 {
@@ -64,13 +69,6 @@ struct ContentView: View {
                 debugLogView
             case .serverConfiguration:
                 serverConfigurationView
-            }
-        }
-        .task {
-            do {
-                try await vpn.prepare(purge: false)
-            } catch {
-                print(error.localizedDescription)
             }
         }
     }
@@ -159,8 +157,7 @@ private extension ContentView {
 #if !os(tvOS)
         NavigationStack {
             VStack {
-                vpn
-                    .environment(for: profile.id)?
+                environment?
                     .environmentValue(forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
                     .map { cfg in
                         TextEditor(text: .constant(String(describing: cfg)))
@@ -171,6 +168,9 @@ private extension ContentView {
             .navigationTitle("Server configuration")
             .toolbar {
                 closeButton
+            }
+            .task {
+                environment = await vpn.environment(for: profile.id)
             }
 #if os(macOS)
             .frame(minWidth: 600.0, minHeight: 400.0)
@@ -218,7 +218,7 @@ private extension ContentView {
             do {
                 switch buttonAction {
                 case .connect:
-                    try await vpn.install(profile, connect: true) {
+                    try await vpn.connect(to: profile) {
                         "PartoutDemo: \($0.name)"
                     }
 
