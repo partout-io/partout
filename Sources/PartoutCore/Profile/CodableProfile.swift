@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 /// Wrapper of ``Profile`` with encoding capabilities.
-public struct CodableProfile: ProfileType, Codable {
+public struct CodableProfile: ProfileType, Codable, Sendable {
     public let version: Int?
 
     public let id: UniqueID
@@ -58,7 +58,7 @@ public struct CodableModule: Codable {
 }
 
 extension Profile {
-    init(codableProfile: CodableProfile) throws {
+    public init(codableProfile: CodableProfile) throws {
         self = try Profile.Builder(
             version: codableProfile.version,
             id: codableProfile.id,
@@ -70,7 +70,7 @@ extension Profile {
         ).build()
     }
 
-    var asCodableProfile: CodableProfile {
+    public var asCodableProfile: CodableProfile {
         CodableProfile(
             version: Profile.Builder.currentVersion,
             id: id,
