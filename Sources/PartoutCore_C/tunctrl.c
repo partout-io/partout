@@ -14,13 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static JavaVM *jvm = NULL;
-
-JNIEXPORT jint JNICALL
-JNI_OnLoad(JavaVM* localVM, void* reserved) {
-    jvm = localVM;
-    return JNI_VERSION_1_6;
-}
+extern JavaVM *jvm;
 
 // This must match Partout pp_tun tun_android.c
 typedef struct {
