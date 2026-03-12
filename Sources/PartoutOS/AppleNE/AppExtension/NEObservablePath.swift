@@ -12,6 +12,9 @@ public final class NEObservablePath: ReachabilityObserver {
 
     private nonisolated let subject: CurrentValueStream<NWPath>
 
+    nonisolated(unsafe)
+    private var wasSatisfiable: Bool?
+
     public init(_ ctx: PartoutLoggerContext) {
         self.ctx = ctx
         monitor = NWPathMonitor()
@@ -19,13 +22,12 @@ public final class NEObservablePath: ReachabilityObserver {
     }
 
     public func startObserving() {
-        var wasSatifiable: Bool?
         monitor.pathUpdateHandler = { [weak self] path in
             guard let self else { return }
-            let didChangeSatisfiability = path.isSatisfiable != wasSatifiable
+            let didChangeSatisfiability = path.isSatisfiable != wasSatisfiable
             let level: DebugLog.Level = didChangeSatisfiability ? .info : .debug
             pp_log(ctx, .os, level, "Path updated: \(path.debugDescription)")
-            wasSatifiable = path.isSatisfiable
+            wasSatisfiable = path.isSatisfiable
             subject.send(path)
         }
         monitor.start(queue: .global())
