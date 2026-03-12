@@ -6,7 +6,10 @@ internal import _PartoutCore_C
 
 /// A ``LoggerDestination`` that prints messages to the default platform logger.
 public struct SimpleLogDestination: LoggerDestination {
-    public init() {
+    private let tag: String?
+
+    public init(tag: String?) {
+        self.tag = tag
     }
 
     public func append(_ level: DebugLog.Level, _ msg: String) {
@@ -18,7 +21,13 @@ public struct SimpleLogDestination: LoggerDestination {
 #else
         let cLevel = pp_log_level(UInt32(level.rawValue))
 #endif
-        pp_log_simple_append(cLevel, msg)
+        if let tag {
+            tag.withCString {
+                pp_log_simple_append($0, cLevel, msg)
+            }
+        } else {
+            pp_log_simple_append(nil, cLevel, msg)
+        }
 #endif
     }
 }

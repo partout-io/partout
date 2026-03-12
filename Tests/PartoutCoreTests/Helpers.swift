@@ -9,7 +9,7 @@ import Testing
 
 func setUpLogging() {
     var logger = PartoutLogger.Builder()
-    logger.setDestination(SimpleLogDestination(), for: [.core])
+    logger.setDestination(SimpleLogDestination(tag: nil), for: [.core])
     PartoutLogger.register(logger.build())
 }
 
