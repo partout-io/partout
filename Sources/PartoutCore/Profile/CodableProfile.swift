@@ -20,7 +20,7 @@ public struct CodableProfile: ProfileType, Codable, Sendable {
 }
 
 /// Wrapper of ``Module`` with encoding capabilities.
-public struct CodableModule: Codable {
+public struct CodableModule: Codable, Sendable {
     enum CodingKeys: CodingKey {
         case moduleType
         case payload
