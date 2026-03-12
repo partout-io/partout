@@ -31,14 +31,19 @@ void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonn
     switch (level) {
     case PPLogLevelDebug:
         android_level = ANDROID_LOG_VERBOSE;
+        break;
     case PPLogLevelInfo:
         android_level = ANDROID_LOG_DEBUG;
+        break;
     case PPLogLevelNotice:
         android_level = ANDROID_LOG_INFO;
+        break;
     case PPLogLevelError:
         android_level = ANDROID_LOG_WARN;
+        break;
     case PPLogLevelFault:
         android_level = ANDROID_LOG_FATAL;
+        break;
     }
     __android_log_print(android_level, log_tag, "%s", message);
 }
