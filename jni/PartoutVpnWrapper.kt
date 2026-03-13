@@ -1,4 +1,4 @@
-package io.partout
+package io.partout.jni
 
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
