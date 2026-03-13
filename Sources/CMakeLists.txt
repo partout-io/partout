@@ -91,6 +91,8 @@ if(USE_COMPAT)
         -DMINIF_COMPAT
     )
     set(EXCLUDED_PATTERNS
+        partout-codegen.*
+        PartoutCodegen.*
         PartoutOS\/Apple.*
     )
 endif()
