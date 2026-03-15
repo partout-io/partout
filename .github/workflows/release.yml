@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - Sources/PartoutABI_C/partout.c
+      - Sources/PartoutCore/PartoutConstants.swift
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -20,9 +20,9 @@ jobs:
       - name: Parse version
         id: parse_version
         env:
-          ABI_SOURCE: Sources/PartoutABI_C/partout.c
+          ABI_SOURCE: Sources/PartoutCore/PartoutConstants.swift
         run: |
-          version=`sed -nE "s/^.*PARTOUT_VERSION = \"(.*)\".*$/\1/p" $ABI_SOURCE`
+          version=`sed -nE "s/^.*version = \"(.*)\".*$/\1/p" $ABI_SOURCE`
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Publish release
         uses: softprops/action-gh-release@v2
