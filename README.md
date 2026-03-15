@@ -81,7 +81,6 @@ $ scripts/build.sh -config Release -l -crypto openssl
 Sample output:
 
 ```
-bin/<platform-arch>/partout.h       # The Partout ABI
 bin/darwin-arm64/libpartout.a       # macOS
 bin/linux-aarch64/libpartout.a      # Linux
 bin/windows-arm64/libpartout.lib    # Windows
@@ -96,6 +95,18 @@ Building for Android requires access to external SDKs:
 - `$SWIFT_ANDROID_SDK` to point to your Swift for Android SDK installation (e.g. in `~/.swiftpm/swift-sdks`)
 
 The CMake configuration is done with the `android.toolchain.cmake` toolchain. The script runs on macOS, but can be adapted for other platforms with slight tweaks to `scripts/build.sh`.
+
+#### Codegen
+
+A custom code generator is supplied to translate Swift data entities for interop with other programming languages.
+
+```
+swift run partout-codegen
+```
+
+The program is crafted around the Partout entities and does not pretend to be a full-fledged Swift transpiler. It's a poor-man [protobuf][protobuf] that however retains Swift as the source of truth, and makes several assumptions to keep the scanner logic essential.
+
+`partout-codegen` uses [swift-syntax][credits-swift-syntax] to build an intermediate representation (IR) of the Swift data entities, then proceeds to generate the output code in a different language. Currently, the codegen only supports [Kotlin][kotlin] for Android.
 
 ## Demo
 
@@ -115,7 +126,7 @@ Open `Demo.xcodeproj` and run the `PartoutDemo` target.
 
 Copyright (c) 2026 Davide De Rosa. All rights reserved.
 
-The library is licensed under the [GPLv3][license]. The `MiniFoundation` targets are MIT-licensed.
+The library is licensed under the [GPLv3][license]. The `MiniFoundation` and `partout-codegen` targets are MIT-licensed.
 
 ### Contributing
 
@@ -128,6 +139,7 @@ Libraries:
 - [GenericJSON][credits-genericjson]
 - [MbedTLS][credits-mbedtls]
 - [OpenSSL][credits-openssl]
+- [SwiftSyntax][credits-swift-syntax]
 - [url.c][credits-url.c]
 - [Wintun][credits-wintun]
 - [WireGuard (Go)][credits-wireguard-go]
@@ -158,6 +170,8 @@ Website: [partout.io][about-website]
 [swift]: https://swift.org/
 [swift-android-sdk]: https://github.com/swift-android-sdk/swift-android-sdk
 [network-extension]: https://developer.apple.com/documentation/networkextension/
+[protobuf]: https://protobuf.dev/
+[kotlin]: https://kotlinlang.org/
 [wintun]: https://git.zx2c4.com/wintun/about/
 [blog]: https://davidederosa.com/cross-platform-swift/
 [license]: LICENSE
@@ -169,6 +183,7 @@ Website: [partout.io][about-website]
 [credits-genericjson]: https://github.com/iwill/generic-json-swift
 [credits-mbedtls]: https://github.com/Mbed-TLS/mbedtls
 [credits-openssl]: https://github.com/openssl/openssl
+[credits-swift-syntax]: https://github.com/swiftlang/swift-syntax
 [credits-tmthecoder]: https://github.com/tmthecoder
 [credits-tmthecoder-xor]: https://github.com/partout-io/tunnelkit/pull/255
 [credits-url.c]: https://github.com/cozis/url.c
