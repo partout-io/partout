@@ -2,37 +2,37 @@
 //
 // SPDX-License-Identifier: MIT
 
-public struct KotlinSealedMetadata {
-    let classes: [KotlinSealedClass]
-    let baseClass: (_ fqTypeName: String) -> String?
-    public init(classes: [KotlinSealedClass], baseClass: @escaping (_: String) -> String?) {
-        self.classes = classes
-        self.baseClass = baseClass
+public final class KotlinEncoder {
+    public struct SealedMetadata {
+        let classes: [SealedClass]
+        let baseClass: (_ fqTypeName: String) -> String?
+        public init(classes: [SealedClass], baseClass: @escaping (_: String) -> String?) {
+            self.classes = classes
+            self.baseClass = baseClass
+        }
     }
-}
 
-public struct KotlinSealedClass {
-    let name: String
-    let discriminator: String
-    public init(name: String, discriminator: String) {
-        self.name = name
-        self.discriminator = discriminator
+    public struct SealedClass {
+        let name: String
+        let discriminator: String
+        public init(name: String, discriminator: String) {
+            self.name = name
+            self.discriminator = discriminator
+        }
     }
-}
 
-final class KotlinEncoder: IREncoder {
     private let packageName: String
     private let preamble: String?
-    private let sealed: KotlinSealedMetadata?
+    private let sealed: SealedMetadata?
     private let replacement: ((String) -> String?)?
     private let skipsProperty: ((_ name: String, _ fqModelName: String) -> Bool)?
 
-    init(
+    public init(
         packageName: String,
-        preamble: String?,
-        sealed: KotlinSealedMetadata?,
-        replacement: ((String) -> String?)?,
-        skipsProperty: ((_ name: String, _ fqTypeName: String) -> Bool)?
+        preamble: String? = nil,
+        sealed: SealedMetadata? = nil,
+        replacement: ((String) -> String?)? = nil,
+        skipsProperty: ((_ name: String, _ fqTypeName: String) -> Bool)? = nil
     ) {
         self.packageName = packageName
         self.preamble = preamble
@@ -40,7 +40,9 @@ final class KotlinEncoder: IREncoder {
         self.replacement = replacement
         self.skipsProperty = skipsProperty
     }
+}
 
+extension KotlinEncoder {
     func encodePreamble() -> String? {
         var desc = """
 package \(packageName)

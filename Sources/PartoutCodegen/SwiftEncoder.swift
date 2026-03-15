@@ -4,7 +4,11 @@
 
 // This is only a showcase to get the hang of the
 // encoding process. It may break from time to time.
-final class SwiftEncoder: IREncoder {
+public final class SwiftEncoder {
+    public init() {}
+}
+
+extension SwiftEncoder {
     func encode(_ model: IRModel, ctx: IRContext) -> String {
         var desc: [String] = []
         let fqTypeName = model.fqTypeName.normalizedTypeName

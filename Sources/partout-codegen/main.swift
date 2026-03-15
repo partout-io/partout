@@ -16,12 +16,12 @@ do {
     }
     let encoderName = args[1]
 
-    let codegen: Codegen
+    let encoder: CodegenEncoder
     switch Codegen.Output(rawValue: encoderName) {
     case .swift:
-        codegen = .forSwift()
+        encoder = SwiftEncoder()
     case .kotlin:
-        codegen = .forKotlin(
+        encoder = KotlinEncoder(
             packageName: "io.partout.abi"
         )
     case .cxx:
@@ -29,6 +29,7 @@ do {
     default:
         fatalError("Unknown encoder '\(encoderName)'")
     }
+    let codegen = Codegen(encoder: encoder)
     let output = try codegen.generate(
         from: PartoutCodegen.paths.map { "Sources/\($0)" },
         entities: PartoutCodegen.entities

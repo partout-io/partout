@@ -5,10 +5,25 @@
 import Foundation
 import SwiftParser
 
+public protocol CodegenEncoder {}
+
+// Dummy to enforce internal conformance
+extension SwiftEncoder: CodegenEncoder, IREncoder {}
+extension KotlinEncoder: CodegenEncoder, IREncoder {}
+
 public final class Codegen {
+    public enum Output: String, CaseIterable {
+        case swift
+        case kotlin
+        case cxx
+    }
+
     private let encoder: IREncoder
 
-    init(encoder: IREncoder) {
+    public init(encoder: CodegenEncoder) {
+        guard let encoder = encoder as? IREncoder else {
+            fatalError("\(encoder) is not a IREncoder")
+        }
         self.encoder = encoder
     }
 
