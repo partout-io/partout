@@ -7,7 +7,7 @@ import SwiftParser
 
 public protocol CodegenEncoder {}
 
-// Dummy to enforce internal conformance
+// Rough way to imply CodegenEncoder from IREncoder conformance
 extension SwiftEncoder: CodegenEncoder, IREncoder {}
 extension KotlinEncoder: CodegenEncoder, IREncoder {}
 
