@@ -25,6 +25,13 @@ jobs:
         run: |
           expected="let useFoundationCompatibility: FoundationCompatibility = .off"
           grep "^$expected" Package.swift
+      - name: Verify generated OpenAPI is up to date
+        run: |
+          swift run partout-codegen openapi codegen
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git status --short
+            exit 1
+          fi
       - name: Run tests
         run: |
           swift test
