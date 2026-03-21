@@ -24,3 +24,10 @@ public protocol Module: UniquelyIdentifiable, Sendable {
 
     func checkCompatible(with otherModule: Module, activeIds: Set<UniqueID>) throws
 }
+
+extension Module {
+    /// A unique identifier for this ``Module`` type.
+    public var moduleType: ModuleType {
+        moduleHandler.id
+    }
+}
