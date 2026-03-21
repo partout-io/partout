@@ -2,30 +2,36 @@
 //
 // SPDX-License-Identifier: MIT
 
-struct IRModel {
-    enum Kind: String {
+public struct IRModel {
+    public enum Kind {
         case `struct`
-        case `enum`
+        case `enum`(String)
     }
-    let name: String
-    let kind: Kind
-    let properties: [IRProperty]
-    let parents: [IRScope]
+    public let name: String
+    public let kind: Kind
+    public let properties: [IRProperty]
+    public let parents: [IRScope]
 }
 
-struct IRAlias {
-    let name: String
-    let kind: IRType
-    let parents: [IRScope]
+public struct IRAlias {
+    public let name: String
+    public let kind: IRType
+    public let parents: [IRScope]
 }
 
-struct IRProperty {
-    let name: String
-    let type: IRType
-    let scope: [IRScope]
+public struct IRProperty {
+    public let name: String
+    public let serializedName: String?
+    public let type: IRType
+    public let scope: [IRScope]
+    public let associatedProperties: [IRProperty]
+
+    public var effectiveSerializedName: String {
+        serializedName ?? name
+    }
 }
 
-indirect enum IRType {
+public indirect enum IRType {
     case string
     case int
     case double
@@ -44,7 +50,7 @@ indirect enum IRType {
     case custom(search: (IRContext) -> String?, fallback: String)
 }
 
-enum IRScope {
+public enum IRScope {
     case `extension`(String)
     case `struct`(String)
     case `enum`(String)
@@ -62,9 +68,9 @@ enum IRScope {
 
 // MARK: - Encoder
 
-struct IRContext {
-    var models: [IRModel] = []
-    var aliases: [IRAlias] = []
+public struct IRContext {
+    public var models: [IRModel] = []
+    public var aliases: [IRAlias] = []
     func merging(_ other: IRContext) -> IRContext {
         var copy = self
         copy.models += other.models
@@ -78,6 +84,7 @@ struct IRContext {
 
 protocol IREncoder {
     func encodePreamble() -> String?
+    func encodeDocument(ctx: IRContext) -> String?
     func encode(_ model: IRModel, ctx: IRContext) -> String
     func encode(_ alias: IRAlias, ctx: IRContext) -> String
     func encode(_ type: IRType, ctx: IRContext) -> String
@@ -85,11 +92,12 @@ protocol IREncoder {
 
 extension IREncoder {
     func encodePreamble() -> String? { nil }
+    func encodeDocument(ctx: IRContext) -> String? { nil }
 }
 
 // MARK: - Extensions
 
-protocol IRWithParents {
+public protocol IRWithParents {
     var typeName: String { get }
     var parents: [IRScope] { get }
 }
@@ -99,19 +107,19 @@ extension IRWithParents {
         parents.map(\.stringValue) + [typeName]
     }
 
-    var fqTypeName: String {
+    public var fqTypeName: String {
         fqType.joined(separator: ".")
     }
 }
 
 extension IRModel: IRWithParents {
-    var typeName: String {
+    public var typeName: String {
         name
     }
 }
 
 extension IRAlias: IRWithParents {
-    var typeName: String {
+    public var typeName: String {
         name
     }
 }
@@ -119,13 +127,19 @@ extension IRAlias: IRWithParents {
 // MARK: - Descriptions
 
 extension IRModel.Kind: CustomDebugStringConvertible {
-    var debugDescription: String {
-        rawValue
+    public var debugDescription: String {
+        switch self {
+        case .struct:
+            "struct"
+        case .enum(let rawType):
+            "enum(\(rawType))"
+        }
     }
 }
 
 extension IRProperty: CustomDebugStringConvertible {
-    var debugDescription: String {
-        "\(name): \(type)"
+    public var debugDescription: String {
+        let serializedSuffix = serializedName.map { " => \($0)" } ?? ""
+        return "\(name)\(serializedSuffix): \(type)"
     }
 }

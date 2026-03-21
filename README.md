@@ -101,7 +101,7 @@ The CMake configuration is done with the `android.toolchain.cmake` toolchain. Th
 A custom code generator is supplied to translate Swift data entities for interop with other programming languages.
 
 ```
-swift run partout-codegen
+swift run partout-codegen <openapi/schema> <output>
 ```
 
 The program is crafted around the Partout entities and does not pretend to be a full-fledged Swift transpiler. It's a poor-man [protobuf][protobuf] that however retains Swift as the source of truth, and makes several assumptions to keep the scanner logic essential.

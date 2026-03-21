@@ -4,6 +4,7 @@
 
 public enum PartoutCodegen {
     public static let paths: [String] = [
+        "PartoutCore/Connection",
         "PartoutCore/IP",
         "PartoutCore/Modules",
         "PartoutCore/Profile",
@@ -26,7 +27,6 @@ public enum PartoutCodegen {
 //        "SecureData",
         "SocketType",
         "Subnet",
-//        "TunnelRemoteInfo",
         //
         "DNSModule",
         "DNSModule.ProtocolType",
