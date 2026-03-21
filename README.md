@@ -98,15 +98,13 @@ The CMake configuration is done with the `android.toolchain.cmake` toolchain. Th
 
 #### Codegen
 
-A custom code generator is supplied to translate Swift data entities for interop with other programming languages.
+A custom code generator is supplied to translate Swift data entities to the OpenAPI specification for interop with other programming languages.
 
 ```
-swift run partout-codegen <openapi/schema> <output>
+swift run partout-codegen <openapi> <output>
 ```
 
-The program is crafted around the Partout entities and does not pretend to be a full-fledged Swift transpiler. It's a poor-man [protobuf][protobuf] that however retains Swift as the source of truth, and makes several assumptions to keep the scanner logic essential.
-
-`partout-codegen` uses [swift-syntax][credits-swift-syntax] to build an intermediate representation (IR) of the Swift data entities, then proceeds to generate the output code in a different language. Currently, the codegen only supports [Kotlin][kotlin] for Android.
+`partout-codegen` uses [swift-syntax][credits-swift-syntax] to build an intermediate representation (IR) of the Swift data entities, then proceeds to map it to the OpenAPI format. `openapi-generator` can eventually be used to generate the Partout data models for other languages.
 
 ## Demo
 
