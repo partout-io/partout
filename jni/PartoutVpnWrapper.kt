@@ -3,7 +3,15 @@ package io.partout.jni
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import io.partout.abi.CodableTunnelRemoteInfo
+import io.partout.abi.TaggedModuledns
+import io.partout.abi.TaggedModulehttpProxy
+import io.partout.abi.TaggedModuleip
+import io.partout.abi.TaggedModuleonDemand
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
 
+// WARNING: These methods are called from a JNI background thread
 class PartoutVpnWrapper: AutoCloseable {
     private val logTag = "Partout"
     private val service: VpnService
@@ -24,8 +32,35 @@ class PartoutVpnWrapper: AutoCloseable {
         builder.addAddress(address, prefix)
     }
 
-    fun build(remoteFds: Array<Int>): Int? {
+    fun build(infoJSON: String): Int? {
         assert(descriptor == null)
+
+        // Decode info
+        Log.e(logTag, ">>> PartoutVpnWrapper: infoJSON = $infoJSON")
+        val info: CodableTunnelRemoteInfo = try {
+            Json.decodeFromString(infoJSON)
+        } catch (e: SerializationException) {
+            Log.e(logTag, ">>> PartoutVpnWrapper: Failed to decode tunnel info JSON", e)
+            return null
+        }
+        val remoteFds = info.fileDescriptors
+
+        info.modules?.forEach {
+            when (it) {
+                is TaggedModuledns -> {
+                    Log.i(logTag, "DNS: ${it.value}")
+                }
+                is TaggedModuleip -> {
+                    Log.i(logTag, "IP: ${it.value}")
+                }
+                is TaggedModulehttpProxy -> {
+                    Log.i(logTag, "HTTP Proxy: ${it.value}")
+                }
+                is TaggedModuleonDemand -> {
+                    Log.i(logTag, "OnDemand: ${it.value}")
+                }
+            }
+        }
 
         // Protect remote socket to escape tunnel
         Log.e(logTag, ">>> PartoutVpnWrapper: Building with remoteFds = " + remoteFds + " (" + remoteFds.size + ")")

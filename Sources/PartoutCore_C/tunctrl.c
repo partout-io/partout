@@ -33,28 +33,21 @@ void pp_tun_ctrl_test_working_wrapper(void *jni_ref) {
     (*env)->CallVoidMethod(env, jni_ref, testWorkingMethod);
 }
 
-void *pp_tun_ctrl_set_tunnel(void *jni_ref, const pp_tun_ctrl_info *info) {
+void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
     assert(jni_ref);
     pp_clog(PPLogCategoryCore, PPLogLevelInfo, "set_tunnel()");
 
     JNIEnv *env;
     (*jvm)->AttachCurrentThread(jvm, &env, NULL);
 
-    // Build input array with remote fds
-    jclass integerCls = (*env)->FindClass(env, "java/lang/Integer");
-    jmethodID integerCtor = (*env)->GetMethodID(env, integerCls, "<init>", "(I)V");
-    const jsize len = info->remote_fds_len;
-    jobjectArray remoteFdsObj = (*env)->NewObjectArray(env, len, integerCls, NULL);
-    for (jsize i = 0; i < len; i++) {
-        jobject elem = (*env)->NewObject(env, integerCls, integerCtor, (jint)(info->remote_fds[i]));
-        (*env)->SetObjectArrayElement(env, remoteFdsObj, i, elem);
-        (*env)->DeleteLocalRef(env, elem);
-    }
-
     // Call VpnWrapper.build(), returns optional fd (Int?)
     jclass cls = (*env)->GetObjectClass(env, jni_ref);
-    jmethodID buildMethod = (*env)->GetMethodID(env, cls, "build", "([Ljava/lang/Integer;)Ljava/lang/Integer;");
-    jobject fdObj = (*env)->CallObjectMethod(env, jni_ref, buildMethod, remoteFdsObj);
+    jstring infoJson = info_json ? (*env)->NewStringUTF(env, info_json) : NULL;
+    jmethodID buildMethod = (*env)->GetMethodID(env, cls, "build", "(Ljava/lang/String;)Ljava/lang/Integer;");
+    jobject fdObj = (*env)->CallObjectMethod(env, jni_ref, buildMethod, infoJson);
+    if (infoJson != NULL) {
+        (*env)->DeleteLocalRef(env, infoJson);
+    }
     if (fdObj == NULL) {
         return NULL;
     }
@@ -114,9 +107,9 @@ void pp_tun_ctrl_test_working_wrapper(void *ref) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "[dummy] test_working_wrapper(%p), ref");
 }
 
-void *pp_tun_ctrl_set_tunnel(void *ref, const pp_tun_ctrl_info *info) {
+void *pp_tun_ctrl_set_tunnel(void *ref, const char *info_json) {
     (void)ref;
-    (void)info;
+    (void)info_json;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "[dummy] set_tunnel(%p)", ref);
     return NULL;
 }
