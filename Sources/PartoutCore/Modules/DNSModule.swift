@@ -170,21 +170,101 @@ extension DNSModule {
     }
 }
 
+// MARK: - Custom Codable
+
 extension DNSModule.ProtocolType {
+    typealias Discriminator = DNSProtocol
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case url
+        case hostname
+    }
+
+    enum LegacyCodingKeys: String, CodingKey {
+        case cleartext
+        case https
+        case tls
+    }
+
+    enum LegacyHTTPSCodingKeys: String, CodingKey {
+        case url
+    }
+
+    enum LegacyTLSCodingKeys: String, CodingKey {
+        case hostname
+    }
+
+    public init(from decoder: any Decoder) throws {
+        if let value = try Self.fromTagged(decoder: decoder) {
+            self = value
+            return
+        }
+        self = try Self.fromLegacy(decoder: decoder)
+    }
+
+    private static func fromTagged(decoder: any Decoder) throws -> Self? {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        guard let discriminator = try container.decodeIfPresent(
+            Discriminator.self,
+            forKey: .type
+        ) else {
+            return nil
+        }
+        switch discriminator {
+        case .cleartext:
+            return .cleartext
+        case .https:
+            let url = try container.decode(URL.self, forKey: .url)
+            return .https(url: url)
+        case .tls:
+            let hostname = try container.decode(String.self, forKey: .hostname)
+            return .tls(hostname: hostname)
+        }
+    }
+
+    private static func fromLegacy(decoder: any Decoder) throws -> Self {
+        let container = try decoder.container(keyedBy: LegacyCodingKeys.self)
+        if container.contains(.cleartext) {
+            return .cleartext
+        }
+        if container.contains(.https) {
+            let map = try container.superDecoder(forKey: .https)
+            let sub = try map.container(keyedBy: LegacyHTTPSCodingKeys.self)
+            let url = try sub.decode(URL.self, forKey: .url)
+            return .https(url: url)
+        }
+        if container.contains(.tls) {
+            let map = try container.superDecoder(forKey: .tls)
+            let sub = try map.container(keyedBy: LegacyTLSCodingKeys.self)
+            let hostname = try sub.decode(String.self, forKey: .hostname)
+            return .tls(hostname: hostname)
+        }
+        throw PartoutError(.decoding)
+    }
+
     public func encode(to encoder: any Encoder) throws {
-        var container = encoder.singleValueContainer()
-        let map: [String: [String: String]]
+        var container = encoder.container(keyedBy: CodingKeys.self)
         let isSensitive = encoder.shouldEncodeSensitiveData
+        let discriminator: Discriminator
+        var url: String?
+        var hostname: String?
         switch self {
         case .cleartext:
-            map = ["cleartext": [:]]
-
-        case .https(let url):
-            map = ["https": ["url": url.debugDescription(withSensitiveData: isSensitive)]]
-
-        case .tls(let hostname):
-            map = ["tls": ["hostname": hostname.debugDescription(withSensitiveData: isSensitive)]]
+            discriminator = .cleartext
+        case .https(let arg):
+            discriminator = .https
+            url = arg.debugDescription(withSensitiveData: isSensitive)
+        case .tls(let arg):
+            discriminator = .tls
+            hostname = arg.debugDescription(withSensitiveData: isSensitive)
         }
-        try container.encode(map)
+        try container.encode(discriminator, forKey: .type)
+        if let url {
+            try container.encode(url, forKey: .url)
+        }
+        if let hostname {
+            try container.encode(hostname, forKey: .hostname)
+        }
     }
 }

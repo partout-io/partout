@@ -17,7 +17,7 @@ struct MessageHandlerTests {
         let strategy = FakeTunnelStrategy { _ in
             (try? JSONEncoder().encode(output)) ?? Data()
         }
-        let sut = await Tunnel(.global, strategy: strategy) { _ in
+        let sut = Tunnel(.global, strategy: strategy) { _ in
             SharedTunnelEnvironment(profileId: nil)
         }
 

@@ -34,3 +34,107 @@ extension OpenVPN {
         }
     }
 }
+
+// MARK: - Custom Codable
+
+extension OpenVPN.ObfuscationMethod {
+    enum Discriminator: String, Codable {
+        case xormask
+        case xorptrpos
+        case reverse
+        case obfuscate
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case mask
+    }
+
+    enum LegacyCodingKeys: String, CodingKey {
+        case xormask
+        case xorptrpos
+        case reverse
+        case obfuscate
+    }
+
+    enum LegacyMaskCodingKeys: String, CodingKey {
+        case mask
+    }
+
+    public init(from decoder: any Decoder) throws {
+        if let value = try Self.fromTagged(decoder: decoder) {
+            self = value
+            return
+        }
+        self = try Self.fromLegacy(decoder: decoder)
+    }
+
+    private static func fromTagged(decoder: any Decoder) throws -> Self? {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        guard let discriminator = try container.decodeIfPresent(
+            Discriminator.self,
+            forKey: .type
+        ) else {
+            return nil
+        }
+        switch discriminator {
+        case .xormask:
+            let mask = try container.decode(SecureData.self, forKey: .mask)
+            return .xormask(mask: mask)
+        case .xorptrpos:
+            return .xorptrpos
+        case .reverse:
+            return .reverse
+        case .obfuscate:
+            let mask = try container.decode(SecureData.self, forKey: .mask)
+            return .obfuscate(mask: mask)
+        }
+    }
+
+    private static func fromLegacy(decoder: any Decoder) throws -> Self {
+        let container = try decoder.container(keyedBy: LegacyCodingKeys.self)
+        if container.contains(.xormask) {
+            let map = try container.superDecoder(forKey: .xormask)
+            let sub = try map.container(keyedBy: LegacyMaskCodingKeys.self)
+            let mask = try sub.decode(SecureData.self, forKey: .mask)
+            return .xormask(mask: mask)
+        }
+        if container.contains(.xorptrpos) {
+            return .xorptrpos
+        }
+        if container.contains(.reverse) {
+            return .reverse
+        }
+        if container.contains(.obfuscate) {
+            let map = try container.superDecoder(forKey: .obfuscate)
+            let sub = try map.container(keyedBy: LegacyMaskCodingKeys.self)
+            let mask = try sub.decode(SecureData.self, forKey: .mask)
+            return .obfuscate(mask: mask)
+        }
+        throw PartoutError(.decoding)
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        let discriminator: Discriminator
+        let mask: SecureData?
+        switch self {
+        case .xormask(let arg):
+            discriminator = .xormask
+            mask = arg
+        case .xorptrpos:
+            discriminator = .xorptrpos
+            mask = nil
+        case .reverse:
+            discriminator = .reverse
+            mask = nil
+        case .obfuscate(let arg):
+            discriminator = .obfuscate
+            mask = arg
+        }
+        try container.encode(discriminator, forKey: .type)
+        if let mask {
+            try container.encode(mask, forKey: .mask)
+        }
+    }
+}
