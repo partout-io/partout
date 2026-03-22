@@ -42,6 +42,7 @@ private extension TaggedModule {
         case value
     }
 
+    // WARNING: Must match TaggedModule case
     enum Discriminator: String {
         case dns
         case httpProxy
