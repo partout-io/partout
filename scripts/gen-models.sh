@@ -29,8 +29,8 @@ case $mode in
             -o $models_dir \
             -g kotlin \
             --global-property=models,modelDocs=false,modelTests=false \
-            --schema-mappings URI=String \
-            --import-mappings String=kotlin.String \
+            --type-mappings number=Double,URI=String \
+            --import-mappings Double=kotlin.Double,String=kotlin.String \
             --additional-properties=serializationLibrary=kotlinx_serialization \
             --additional-properties=packageName=$package_name \
             --additional-properties=modelPackage=$package_name
