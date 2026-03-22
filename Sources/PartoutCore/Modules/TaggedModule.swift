@@ -2,25 +2,31 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+// WARNING: These must all match 100% in case
+//
+// - ModuleType
+// - TaggedModule
+// - TaggedModule.Discriminator
+
 /// An encodable wrapper for core modules.
 enum TaggedModule: Sendable {
-    case dns(DNSModule)
-    case httpProxy(HTTPProxyModule)
-    case ip(IPModule)
-    case onDemand(OnDemandModule)
+    case DNS(DNSModule)
+    case HTTPProxy(HTTPProxyModule)
+    case IP(IPModule)
+    case OnDemand(OnDemandModule)
 }
 
 extension Module {
     var taggedModule: TaggedModule? {
         switch self {
         case let module as DNSModule:
-            return .dns(module)
+            return .DNS(module)
         case let module as HTTPProxyModule:
-            return .httpProxy(module)
+            return .HTTPProxy(module)
         case let module as IPModule:
-            return .ip(module)
+            return .IP(module)
         case let module as OnDemandModule:
-            return .onDemand(module)
+            return .OnDemand(module)
         default:
             assertionFailure("Unhandled Core module: \(self)")
             return nil
@@ -42,32 +48,31 @@ private extension TaggedModule {
         case value
     }
 
-    // WARNING: Must match TaggedModule case
     enum Discriminator: String {
-        case dns
-        case httpProxy
-        case ip
-        case onDemand
+        case DNS
+        case HTTPProxy
+        case IP
+        case OnDemand
     }
 
     var discriminator: Discriminator {
         switch self {
-        case .dns: .dns
-        case .httpProxy: .httpProxy
-        case .ip: .ip
-        case .onDemand: .onDemand
+        case .DNS: .DNS
+        case .HTTPProxy: .HTTPProxy
+        case .IP: .IP
+        case .OnDemand: .OnDemand
         }
     }
 
     func encodePayload(to container: inout KeyedEncodingContainer<CodingKeys>) throws {
         switch self {
-        case .dns(let module):
+        case .DNS(let module):
             try container.encode(module, forKey: .value)
-        case .httpProxy(let module):
+        case .HTTPProxy(let module):
             try container.encode(module, forKey: .value)
-        case .ip(let module):
+        case .IP(let module):
             try container.encode(module, forKey: .value)
-        case .onDemand(let module):
+        case .OnDemand(let module):
             try container.encode(module, forKey: .value)
         }
     }

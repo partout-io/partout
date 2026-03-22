@@ -519,10 +519,10 @@ components:
     TaggedModule:
       discriminator:
         mapping:
-          dns: "#/components/schemas/TaggedModule.dns"
-          httpProxy: "#/components/schemas/TaggedModule.httpProxy"
-          ip: "#/components/schemas/TaggedModule.ip"
-          onDemand: "#/components/schemas/TaggedModule.onDemand"
+          DNS: "#/components/schemas/TaggedModule.DNS"
+          HTTPProxy: "#/components/schemas/TaggedModule.HTTPProxy"
+          IP: "#/components/schemas/TaggedModule.IP"
+          OnDemand: "#/components/schemas/TaggedModule.OnDemand"
         propertyName: type
       properties:
         type:
@@ -530,13 +530,13 @@ components:
       required:
         - type
       type: object
-    TaggedModule.dns:
+    TaggedModule.DNS:
       additionalProperties: false
       allOf:
         - "$ref": "#/components/schemas/TaggedModule"
       properties:
         type:
-          const: dns
+          const: DNS
           type: string
         value:
           "$ref": "#/components/schemas/DNSModule"
@@ -544,13 +544,13 @@ components:
         - type
         - value
       type: object
-    TaggedModule.httpProxy:
+    TaggedModule.HTTPProxy:
       additionalProperties: false
       allOf:
         - "$ref": "#/components/schemas/TaggedModule"
       properties:
         type:
-          const: httpProxy
+          const: HTTPProxy
           type: string
         value:
           "$ref": "#/components/schemas/HTTPProxyModule"
@@ -558,13 +558,13 @@ components:
         - type
         - value
       type: object
-    TaggedModule.ip:
+    TaggedModule.IP:
       additionalProperties: false
       allOf:
         - "$ref": "#/components/schemas/TaggedModule"
       properties:
         type:
-          const: ip
+          const: IP
           type: string
         value:
           "$ref": "#/components/schemas/IPModule"
@@ -572,13 +572,13 @@ components:
         - type
         - value
       type: object
-    TaggedModule.onDemand:
+    TaggedModule.OnDemand:
       additionalProperties: false
       allOf:
         - "$ref": "#/components/schemas/TaggedModule"
       properties:
         type:
-          const: onDemand
+          const: OnDemand
           type: string
         value:
           "$ref": "#/components/schemas/OnDemandModule"
