@@ -27,7 +27,7 @@ jobs:
           grep "^$expected" Package.swift
       - name: Verify generated OpenAPI is up to date
         run: |
-          swift run partout-codegen --manifest scripts/manifest.yaml --output scripts
+          swift run partout-codegen --manifest scripts/manifest.yaml >scripts/openapi.yaml
           if [[ -n "$(git status --porcelain)" ]]; then
             git status --short
             exit 1

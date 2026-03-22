@@ -18,7 +18,7 @@ models_dir=$2
 dest_dir=$3
 
 # First, update the OpenAPI metadata
-swift run partout-codegen --manifest scripts/manifest.yaml --output scripts
+swift run partout-codegen --manifest scripts/manifest.yaml >scripts/openapi.yaml
 
 case $mode in
     kotlin)
