@@ -23,9 +23,7 @@ swift run partout-codegen --manifest scripts/manifest.yaml >scripts/openapi.yaml
 case $mode in
     kotlin)
         package_name=io.partout.abi
-        src=$models_dir/src/main/kotlin/io/partout/abi
-        dst=$dest_dir/src/main/java/io/partout/abi
-
+        rm -rf $models_dir/src/main/kotlin/io/partout/abi
         openapi-generator generate \
             -i $infile \
             -o $models_dir \
@@ -36,11 +34,6 @@ case $mode in
             --additional-properties=serializationLibrary=kotlinx_serialization \
             --additional-properties=packageName=$package_name \
             --additional-properties=modelPackage=$package_name
-
-        rm -rf $dst
-        mkdir -p $dst
-        cp $src/*.kt $dst
-        rm -rf $models_dir
         ;;
     cpp)
         echo "cpp mode is not implemented yet; exiting."
