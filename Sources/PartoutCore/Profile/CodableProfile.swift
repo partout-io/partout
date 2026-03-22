@@ -22,8 +22,9 @@ public struct CodableProfile: ProfileType, Codable, Sendable {
 /// Wrapper of ``Module`` with encoding capabilities.
 public struct CodableModule: Codable, Sendable {
     enum CodingKeys: CodingKey {
-        case moduleType
+        case type
         case payload
+        case moduleType
     }
 
     let moduleType: ModuleType
@@ -40,20 +41,26 @@ public struct CodableModule: Codable, Sendable {
             throw PartoutError(.decoding, "Missing module decoder from .userInfo")
         }
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        moduleType = try container.decode(ModuleType.self, forKey: .moduleType)
-        let payloadDecoder = try container.superDecoder(forKey: .payload)
-        let module = try moduleDecoder.decodedModule(from: payloadDecoder, ofType: moduleType)
+        moduleType = try container.decodeIfPresent(ModuleType.self, forKey: .type)
+            ?? container.decode(ModuleType.self, forKey: .moduleType)
+        let module: Module
+        if container.contains(.payload) {
+            let payloadDecoder = try container.superDecoder(forKey: .payload)
+            module = try moduleDecoder.decodedModule(from: payloadDecoder, ofType: moduleType)
+        } else {
+            module = try moduleDecoder.decodedModule(from: decoder, ofType: moduleType)
+        }
         assert(module.moduleHandler.id == moduleType, "Deserialized type mismatch")
         wrappedModule = module
     }
 
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(moduleType, forKey: .moduleType)
+        try container.encode(moduleType, forKey: .type)
         guard let encodableModule = wrappedModule as? Encodable else {
             throw PartoutError(.encoding, "Module not encodable")
         }
-        try container.encode(encodableModule, forKey: .payload)
+        try encodableModule.encode(to: encoder)
     }
 }
 
