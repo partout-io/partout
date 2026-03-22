@@ -17,6 +17,9 @@ mode=$1
 models_dir=$2
 dest_dir=$3
 
+# First, generate the OpenAPI metadata
+swift run codegen --manifest scripts/manifest.yaml --output scripts
+
 case $mode in
     kotlin)
         package_name=io.partout.abi
