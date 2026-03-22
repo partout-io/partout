@@ -5,7 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 infile="$script_dir/openapi.yaml"
 
 usage() {
-    echo "Usage: $0 <lang:kotlin|cpp> <ir-output-dir> <lang-dest-dir>"
+    echo "Usage: $0 <lang:kotlin|cpp> <models-dir> <dest-dir>"
     exit 1
 }
 
@@ -14,18 +14,18 @@ if [ "$#" -ne 3 ]; then
 fi
 
 mode=$1
-outdir=$2
-dstdir=$3
+models_dir=$2
+dest_dir=$3
 
 case $mode in
     kotlin)
         package_name=io.partout.abi
-        src=$outdir/src/main/kotlin/io/partout/abi
-        dst=$dstdir/src/main/java/io/partout/abi
+        src=$models_dir/src/main/kotlin/io/partout/abi
+        dst=$dest_dir/src/main/java/io/partout/abi
 
         openapi-generator generate \
             -i $infile \
-            -o $outdir \
+            -o $models_dir \
             -g kotlin \
             --global-property=models,modelDocs=false,modelTests=false \
             --schema-mappings URI=String \
@@ -37,7 +37,7 @@ case $mode in
         rm -rf $dst
         mkdir -p $dst
         cp $src/*.kt $dst
-        rm -rf $outdir
+        rm -rf $models_dir
         ;;
     cpp)
         echo "cpp mode is not implemented yet; exiting."
