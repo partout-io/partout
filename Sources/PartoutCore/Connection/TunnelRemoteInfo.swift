@@ -29,22 +29,30 @@ public struct TunnelRemoteInfo: Sendable {
     }
 }
 
-struct CodableTunnelRemoteInfo: Encodable, Sendable {
-    let originalModuleId: UniqueID
+extension TunnelRemoteInfo: Encodable {
+    struct Companion: Encodable, Sendable {
+        let originalModuleId: UniqueID
 
-    let address: Address?
+        let address: Address?
 
-    let fileDescriptors: [UInt64]
+        let fileDescriptors: [UInt64]
 
-    let requiresVirtualDevice: Bool
+        let requiresVirtualDevice: Bool
 
-    let modules: [TaggedModule]?
+        let modules: [TaggedModule]?
 
-    init(_ info: TunnelRemoteInfo) {
-        originalModuleId = info.originalModuleId
-        address = info.address
-        fileDescriptors = info.fileDescriptors
-        requiresVirtualDevice = info.requiresVirtualDevice
-        modules = info.modules?.compactMap(\.taggedModule)
+        init(_ info: TunnelRemoteInfo) {
+            originalModuleId = info.originalModuleId
+            address = info.address
+            fileDescriptors = info.fileDescriptors
+            requiresVirtualDevice = info.requiresVirtualDevice
+            modules = info.modules?.compactMap(\.taggedModule)
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        let wrapper = Companion(self)
+        try container.encode(wrapper)
     }
 }

@@ -2,28 +2,6 @@ components:
   schemas:
     Address:
       type: string
-    CodableTunnelRemoteInfo:
-      additionalProperties: false
-      properties:
-        address:
-          "$ref": "#/components/schemas/Address"
-        fileDescriptors:
-          items:
-            "$ref": "#/components/schemas/UInt64"
-          type: array
-        modules:
-          items:
-            "$ref": "#/components/schemas/TaggedModule"
-          type: array
-        originalModuleId:
-          "$ref": "#/components/schemas/UniqueID"
-        requiresVirtualDevice:
-          type: boolean
-      required:
-        - originalModuleId
-        - fileDescriptors
-        - requiresVirtualDevice
-      type: object
     DNSModule:
       additionalProperties: false
       properties:
@@ -607,6 +585,28 @@ components:
       required:
         - type
         - value
+      type: object
+    TunnelRemoteInfo:
+      additionalProperties: false
+      properties:
+        address:
+          "$ref": "#/components/schemas/Address"
+        fileDescriptors:
+          items:
+            "$ref": "#/components/schemas/UInt64"
+          type: array
+        modules:
+          items:
+            title: Module
+          type: array
+        originalModuleId:
+          "$ref": "#/components/schemas/UniqueID"
+        requiresVirtualDevice:
+          type: boolean
+      required:
+        - originalModuleId
+        - fileDescriptors
+        - requiresVirtualDevice
       type: object
     UInt16:
       type: integer

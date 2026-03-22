@@ -3,11 +3,11 @@ package io.partout.jni
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
-import io.partout.abi.CodableTunnelRemoteInfo
 import io.partout.abi.TaggedModuledns
 import io.partout.abi.TaggedModulehttpProxy
 import io.partout.abi.TaggedModuleip
 import io.partout.abi.TaggedModuleonDemand
+import io.partout.abi.TunnelRemoteInfo
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
@@ -37,7 +37,7 @@ class PartoutVpnWrapper: AutoCloseable {
 
         // Decode info
         Log.e(logTag, ">>> PartoutVpnWrapper: infoJSON = $infoJSON")
-        val info: CodableTunnelRemoteInfo = try {
+        val info: TunnelRemoteInfo = try {
             Json.decodeFromString(infoJSON)
         } catch (e: SerializationException) {
             Log.e(logTag, ">>> PartoutVpnWrapper: Failed to decode tunnel info JSON", e)

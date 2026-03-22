@@ -34,8 +34,7 @@ public final class VirtualTunnelController: TunnelController {
             throw PartoutError(.notFound)
         }
         let infoJSON: String = try {
-            let codable = CodableTunnelRemoteInfo(info)
-            let data = try JSONEncoder().encode(codable)
+            let data = try JSONEncoder().encode(info)
             guard let json = String(data: data, encoding: .utf8) else {
                 throw PartoutError(.notFound)
             }

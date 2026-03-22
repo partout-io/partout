@@ -38,7 +38,7 @@ public enum PartoutCodegen {
         "OnDemandModule.Policy",
         //
         "TaggedModule",
-        "CodableTunnelRemoteInfo",
+        "TunnelRemoteInfo",
         //
         "OpenVPNModule",
         "OpenVPN.Cipher",
