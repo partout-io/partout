@@ -7,7 +7,7 @@ import io.partout.abi.TaggedModuledns
 import io.partout.abi.TaggedModulehttpProxy
 import io.partout.abi.TaggedModuleip
 import io.partout.abi.TaggedModuleonDemand
-import io.partout.abi.TunnelRemoteInfo
+import io.partout.abi.TunnelRemoteInfoWrapper
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
@@ -37,7 +37,7 @@ class PartoutVpnWrapper: AutoCloseable {
 
         // Decode info
         Log.e(logTag, ">>> PartoutVpnWrapper: infoJSON = $infoJSON")
-        val info: TunnelRemoteInfo = try {
+        val info: TunnelRemoteInfoWrapper = try {
             Json.decodeFromString(infoJSON)
         } catch (e: SerializationException) {
             Log.e(logTag, ">>> PartoutVpnWrapper: Failed to decode tunnel info JSON", e)

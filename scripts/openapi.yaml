@@ -586,7 +586,7 @@ components:
         - type
         - value
       type: object
-    TunnelRemoteInfo:
+    TunnelRemoteInfoWrapper:
       additionalProperties: false
       properties:
         address:
@@ -597,7 +597,7 @@ components:
           type: array
         modules:
           items:
-            title: Module
+            "$ref": "#/components/schemas/TaggedModule"
           type: array
         originalModuleId:
           "$ref": "#/components/schemas/UniqueID"
