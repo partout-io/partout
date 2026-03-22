@@ -101,7 +101,7 @@ The CMake configuration is done with the `android.toolchain.cmake` toolchain. Th
 A custom code generator is supplied to translate Swift data entities to the OpenAPI specification for interop with other programming languages.
 
 ```
-swift run partout-codegen <openapi> <output>
+swift run partout-codegen <openapi> <output> [root]
 ```
 
 `partout-codegen` uses [swift-syntax][credits-swift-syntax] to build an intermediate representation (IR) of the Swift data entities, then proceeds to map it to the OpenAPI format. `openapi-generator` can eventually be used to generate the Partout data models for other languages.
