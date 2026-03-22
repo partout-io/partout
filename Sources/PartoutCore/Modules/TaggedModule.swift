@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 /// An encodable wrapper for core modules.
-public enum TaggedModule: Sendable {
+enum TaggedModule: Sendable {
     case dns(DNSModule)
     case httpProxy(HTTPProxyModule)
     case ip(IPModule)
@@ -11,7 +11,7 @@ public enum TaggedModule: Sendable {
 }
 
 extension Module {
-    public var taggedModule: TaggedModule? {
+    var taggedModule: TaggedModule? {
         switch self {
         case let module as DNSModule:
             .dns(module)
@@ -28,7 +28,7 @@ extension Module {
 }
 
 extension TaggedModule: Encodable {
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(discriminator.rawValue, forKey: .type)
         try encodePayload(to: &container)
