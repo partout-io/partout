@@ -42,7 +42,7 @@ entities:
   - SocketType
   - Subnet
   - TaggedModule
-  - TunnelRemoteInfo
+  - TunnelRemoteInfoWrapper
   - WireGuard.Configuration
   - WireGuard.Key
   - WireGuard.LocalInterface

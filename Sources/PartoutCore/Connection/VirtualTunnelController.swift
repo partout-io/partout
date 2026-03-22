@@ -34,7 +34,8 @@ public final class VirtualTunnelController: TunnelController {
             throw PartoutError(.notFound)
         }
         let infoJSON: String = try {
-            let data = try JSONEncoder().encode(info)
+            let wrapped = TunnelRemoteInfoWrapper(info)
+            let data = try JSONEncoder().encode(wrapped)
             guard let json = String(data: data, encoding: .utf8) else {
                 throw PartoutError(.notFound)
             }
