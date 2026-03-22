@@ -532,25 +532,5 @@ enum FoundationCompatibility {
 // MARK: - Codegen
 
 package.dependencies.append(
-    .package(url: "https://github.com/swiftlang/swift-syntax", from: "602.0.0")
+    .package(url: "https://github.com/partout-io/codegen", branch: "master")
 )
-package.products.append(
-    .library(
-        name: "PartoutCodegen",
-        targets: ["PartoutCodegen"]
-    )
-)
-package.targets.append(contentsOf: [
-    .target(
-        name: "PartoutCodegen",
-        dependencies: [
-            "Partout",
-            .product(name: "SwiftParser", package: "swift-syntax"),
-            .product(name: "SwiftSyntax", package: "swift-syntax")
-        ]
-    ),
-    .executableTarget(
-        name: "partout-codegen",
-        dependencies: ["PartoutCodegen"]
-    )
-])
