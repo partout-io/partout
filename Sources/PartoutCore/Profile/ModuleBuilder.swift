@@ -23,3 +23,9 @@ extension ModuleBuilder {
         BuiltType.self is ConnectionModule.Type
     }
 }
+
+extension ModuleBuilder {
+    public var moduleType: ModuleType {
+        moduleHandler.id
+    }
+}
