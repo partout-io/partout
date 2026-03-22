@@ -41,8 +41,8 @@ struct JSONTests {
         #expect(tlsWrapKey["data"] as? String == cfg.tlsWrap?.key.secureData.toData().base64EncodedString())
 
         let xorMethod = try #require(sut["xorMethod"] as? [String: Any])
-        let xorMethodObfuscate = try #require(xorMethod["obfuscate"] as? [String: Any])
-        #expect(xorMethodObfuscate["mask"] as? String == cfg.xorMethod?.mask?.toData().base64EncodedString())
+        #expect(xorMethod["type"] as? String == "obfuscate")
+        #expect(xorMethod["mask"] as? String == cfg.xorMethod?.mask?.toData().base64EncodedString())
 
         let remotes = try #require(sut["remotes"] as? [String])
         let rawRemotes = Set(remotes)
@@ -62,8 +62,8 @@ struct JSONTests {
         #expect(tlsWrapKey["data"] as? String == PartoutLogger.redactedValue)
 
         let xorMethod = try #require(sut["xorMethod"] as? [String: Any])
-        let xorMethodObfuscate = try #require(xorMethod["obfuscate"] as? [String: Any])
-        #expect(xorMethodObfuscate["mask"] as? String == PartoutLogger.redactedValue)
+        #expect(xorMethod["type"] as? String == "obfuscate")
+        #expect(xorMethod["mask"] as? String == PartoutLogger.redactedValue)
 
         let remotes = try #require(sut["remotes"] as? [String])
         remotes.forEach {

@@ -33,15 +33,18 @@ public final class VirtualTunnelController: TunnelController {
         guard let info else {
             throw PartoutError(.notFound)
         }
+        let infoJSON: String = try {
+            let data = try JSONEncoder().encode(info)
+            guard let json = String(data: data, encoding: .utf8) else {
+                throw PartoutError(.notFound)
+            }
+            return json
+        }()
 
         // Fetch tun implementation if necessary
         let tunImpl = impl.map { thiz in
-            let rawDescs = info.fileDescriptors.map(Int32.init)
-            return rawDescs.withUnsafeBufferPointer {
-                var cInfo = pp_tun_ctrl_info()
-                cInfo.remote_fds = $0.baseAddress
-                cInfo.remote_fds_len = info.fileDescriptors.count
-                return pp_tun_ctrl_set_tunnel(thiz, &cInfo)
+            infoJSON.withCString {
+                pp_tun_ctrl_set_tunnel(thiz, $0)
             }
         } ?? nil
 

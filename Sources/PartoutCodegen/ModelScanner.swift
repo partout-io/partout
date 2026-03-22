@@ -53,7 +53,10 @@ private extension ModelScanner {
             return
         }
         let newParents = parents + [.struct(name)]
-        let props = node.memberBlock.parseProperties(parents: newParents)
+        let props = node.memberBlock.parseProperties(
+            parents: newParents,
+            codingKeys: node.memberBlock.parseCodingKeys()
+        )
         results.models.append(IRModel(
             name: name,
             kind: .struct,
@@ -71,10 +74,11 @@ private extension ModelScanner {
 
     func doVisit(_ node: EnumDeclSyntax, parents: [IRScope]) {
         let name = node.name.text
+        let rawType = node.inferredRawTypeName
         let props = node.parseCases(parents: parents)
         results.models.append(IRModel(
             name: name,
-            kind: .enum,
+            kind: .enum(rawType),
             properties: props,
             parents: parents
         ))
@@ -106,15 +110,31 @@ private extension ModelScanner {
 // MARK: - Syntax
 
 private extension EnumDeclSyntax {
+    var inferredRawTypeName: String {
+        guard let inheritedTypes = inheritanceClause?.inheritedTypes else {
+            return "String"
+        }
+        let rawTypes = Set(["String", "Int", "Bool", "Double"])
+        if let rawType = inheritedTypes.first(where: {
+            rawTypes.contains($0.type.trimmedDescription)
+        }) {
+            return rawType.type.trimmedDescription
+        }
+        return "String"
+    }
+
     func parseCases(parents: [IRScope]) -> [IRProperty] {
         var cases: [IRProperty] = []
         for member in memberBlock.members {
             guard let enumCase = member.decl.as(EnumCaseDeclSyntax.self) else { continue }
             for element in enumCase.elements {
+                let associatedProperties = element.irAssociatedProperties(parents: parents)
                 cases.append(IRProperty(
                     name: element.name.text,
-                    type: .enumType(name.text),
-                    scope: parents
+                    serializedName: nil,
+                    type: element.irAssociatedType(associatedProperties: associatedProperties, parents: parents) ?? .enumType(name.text),
+                    scope: parents,
+                    associatedProperties: associatedProperties
                 ))
             }
         }
@@ -123,7 +143,11 @@ private extension EnumDeclSyntax {
 }
 
 private extension MemberBlockSyntax {
-    func parseProperties(parents: [IRScope], includingComputed: Bool = false) -> [IRProperty] {
+    func parseProperties(
+        parents: [IRScope],
+        includingComputed: Bool = false,
+        codingKeys: [String: String] = [:]
+    ) -> [IRProperty] {
         var props: [IRProperty] = []
         for member in members {
             guard let varDecl = member.decl.as(VariableDeclSyntax.self) else { continue }
@@ -138,12 +162,98 @@ private extension MemberBlockSyntax {
                 let irType = typeSyntax.irType(parents: parents)
                 props.append(IRProperty(
                     name: name,
+                    serializedName: codingKeys[name],
                     type: irType,
-                    scope: parents
+                    scope: parents,
+                    associatedProperties: []
                 ))
             }
         }
         return props
+    }
+
+    func parseCodingKeys() -> [String: String] {
+        guard let codingKeysDecl = members
+            .compactMap({ $0.decl.as(EnumDeclSyntax.self) })
+            .first(where: { $0.name.text == "CodingKeys" }) else {
+            return [:]
+        }
+
+        var codingKeys: [String: String] = [:]
+        for member in codingKeysDecl.memberBlock.members {
+            guard let enumCase = member.decl.as(EnumCaseDeclSyntax.self) else { continue }
+            for element in enumCase.elements {
+                let keyName = element.name.text
+                codingKeys[keyName] = element.serializedStringLiteral ?? keyName
+            }
+        }
+        return codingKeys
+    }
+}
+
+private extension EnumCaseElementSyntax {
+    func irAssociatedType(associatedProperties: [IRProperty], parents: [IRScope]) -> IRType? {
+        guard !associatedProperties.isEmpty else {
+            return nil
+        }
+        if associatedProperties.count == 1, let first = associatedProperties.first {
+            return first.type
+        }
+        guard let parameterClause else {
+            return nil
+        }
+        return .custom(withName: parameterClause.trimmedDescription, scope: parents)
+    }
+
+    func irAssociatedProperties(parents: [IRScope]) -> [IRProperty] {
+        guard let parameterClause else {
+            return []
+        }
+        return Array(parameterClause.parameters.enumerated()).map { index, parameter in
+            let parameterName = parameter.irParameterName(at: index)
+            return IRProperty(
+                name: parameterName,
+                serializedName: nil,
+                type: parameter.type.irType(parents: parents),
+                scope: parents,
+                associatedProperties: []
+            )
+        }
+    }
+
+    var serializedStringLiteral: String? {
+        guard let rawValue else { return nil }
+        return rawValue.value.trimmedDescription.unquotedSwiftStringLiteral
+    }
+}
+
+private extension EnumCaseParameterSyntax {
+    func irParameterName(at index: Int) -> String {
+        let candidates = [
+            firstName?.text,
+            secondName?.text
+        ]
+        for candidate in candidates {
+            guard let candidate, !candidate.isEmpty, candidate != "_" else {
+                continue
+            }
+            return candidate
+        }
+        if index == 0 {
+            return "value"
+        }
+        return "value\(index + 1)"
+    }
+}
+
+private extension String {
+    var unquotedSwiftStringLiteral: String? {
+        guard count >= 2, first == "\"", last == "\"" else {
+            return nil
+        }
+        let start = index(after: startIndex)
+        let end = index(before: endIndex)
+        return String(self[start..<end])
     }
 }
 

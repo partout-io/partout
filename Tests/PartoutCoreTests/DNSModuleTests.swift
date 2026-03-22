@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @testable import PartoutCore
+import Foundation
 import Testing
 
 struct DNSModuleTests {
@@ -58,5 +59,65 @@ struct DNSModuleTests {
         #expect(throws: Error.self) {
             try sut.build()
         }
+    }
+
+    @Test
+    func givenCleartext_whenEncodeDecode_thenIsReversible() throws {
+        try assertRoundTrip(.cleartext)
+    }
+
+    @Test
+    func givenTaggedHTTPS_whenEncodeDecode_thenIsReversible() throws {
+        try assertRoundTrip(.https(url: try #require(URL(string: "https://1.2.3.4/"))))
+    }
+
+    @Test
+    func givenTaggedTLS_whenEncodeDecode_thenIsReversible() throws {
+        try assertRoundTrip(.tls(hostname: "example.com"))
+    }
+
+    @Test
+    func givenLegacyHTTPSPayload_whenDecode_thenRestoresValue() throws {
+        let data = #"{"https":{"url":"https://1.2.3.4/"}}"#.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(DNSModule.ProtocolType.self, from: data)
+        #expect(decoded == .https(url: try #require(URL(string: "https://1.2.3.4/"))))
+    }
+
+    @Test
+    func givenLegacyCleartextPayload_whenDecode_thenRestoresValue() throws {
+        let data = #"{"cleartext":{}}"#.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(DNSModule.ProtocolType.self, from: data)
+        #expect(decoded == .cleartext)
+    }
+
+    @Test
+    func givenLegacyTLSPayload_whenDecode_thenRestoresValue() throws {
+        let data = #"{"tls":{"hostname":"example.com"}}"#.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(DNSModule.ProtocolType.self, from: data)
+        #expect(decoded == .tls(hostname: "example.com"))
+    }
+
+    @Test
+    func givenMalformedTaggedHTTPSPayload_whenDecode_thenFailsWithoutLegacyFallback() {
+        let data = #"{"type":"https","hostname":"example.com"}"#.data(using: .utf8)!
+        #expect(throws: Error.self) {
+            try JSONDecoder().decode(DNSModule.ProtocolType.self, from: data)
+        }
+    }
+
+    @Test
+    func givenMalformedLegacyHTTPSPayload_whenDecode_thenFailsWithoutTryingOtherLegacyCases() {
+        let data = #"{"https":{"hostname":"example.com"}}"#.data(using: .utf8)!
+        #expect(throws: Error.self) {
+            try JSONDecoder().decode(DNSModule.ProtocolType.self, from: data)
+        }
+    }
+}
+
+private extension DNSModuleTests {
+    func assertRoundTrip(_ value: DNSModule.ProtocolType) throws {
+        let encoded = try JSONEncoder().encode(value)
+        let decoded = try JSONDecoder().decode(DNSModule.ProtocolType.self, from: encoded)
+        #expect(decoded == value)
     }
 }

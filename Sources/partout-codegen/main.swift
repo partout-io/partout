@@ -8,33 +8,55 @@ import SwiftParser
 
 do {
     let args = CommandLine.arguments
-    guard args.count > 1 else {
+    guard args.count > 2 else {
         let known = Codegen.Output.allCases
             .map(\.rawValue)
             .joined(separator: "|")
-        fatalError("Missing encoder name (\(known))")
+        fatalError("Missing arguments: <encoder (\(known))> <output-dir> [root]")
     }
     let encoderName = args[1]
+    let outputPath = args[2]
+    let root = args.count > 3 ? args[3] : "."
 
+    let output: Codegen.Output
     let encoder: CodegenEncoder
     switch Codegen.Output(rawValue: encoderName) {
-    case .swift:
-        encoder = SwiftEncoder()
-    case .kotlin:
-        encoder = KotlinEncoder(
-            packageName: "io.partout.abi"
-        )
-    case .cxx:
-        fatalError("C++ encoder not implemented")
+    case .openapi:
+        output = .openapi
+        encoder = OpenAPIEncoder()
     default:
         fatalError("Unknown encoder '\(encoderName)'")
     }
-    let codegen = Codegen(encoder: encoder)
-    let output = try codegen.generate(
-        from: PartoutCodegen.paths.map { "Sources/\($0)" },
+    let codegen = try Codegen(
+        from: PartoutCodegen.paths.map {
+            "\(root)/Sources/\($0)"
+        },
         entities: PartoutCodegen.entities
     )
-    print(output)
+    let fm: FileManager = .default
+    let outputURL = URL(fileURLWithPath: outputPath, isDirectory: true)
+    try fm.createDirectory(at: outputURL, withIntermediateDirectories: true)
+    switch output {
+    case .openapi:
+        let generated = try codegen.generate(encoder: encoder)
+        let fileURL = outputURL
+            .appendingPathComponent(output.fileName)
+            .appendingPathExtension(output.fileExtension)
+        try generated.write(to: fileURL, atomically: true, encoding: .utf8)
+    }
 } catch {
     print(error)
+}
+
+private extension Codegen.Output {
+    var fileName: String {
+        rawValue
+    }
+
+    var fileExtension: String {
+        switch self {
+        case .openapi:
+            "yaml"
+        }
+    }
 }

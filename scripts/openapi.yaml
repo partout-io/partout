@@ -1,0 +1,684 @@
+components:
+  schemas:
+    Address:
+      type: string
+    DNSModule:
+      additionalProperties: false
+      properties:
+        domainName:
+          "$ref": "#/components/schemas/Address"
+        id:
+          "$ref": "#/components/schemas/UniqueID"
+        protocolType:
+          "$ref": "#/components/schemas/DNSModule.ProtocolType"
+        routesThroughVPN:
+          type: boolean
+        searchDomains:
+          items:
+            "$ref": "#/components/schemas/Address"
+          type: array
+        servers:
+          items:
+            "$ref": "#/components/schemas/Address"
+          type: array
+      required:
+        - id
+        - protocolType
+        - servers
+      type: object
+    DNSModule.ProtocolType:
+      discriminator:
+        mapping:
+          cleartext: "#/components/schemas/DNSModule.ProtocolType.cleartext"
+          https: "#/components/schemas/DNSModule.ProtocolType.https"
+          tls: "#/components/schemas/DNSModule.ProtocolType.tls"
+        propertyName: type
+      properties:
+        type:
+          type: string
+      required:
+        - type
+      type: object
+    DNSModule.ProtocolType.cleartext:
+      additionalProperties: false
+      allOf:
+        - "$ref": "#/components/schemas/DNSModule.ProtocolType"
+      properties:
+        type:
+          const: cleartext
+          type: string
+      required:
+        - type
+      type: object
+    DNSModule.ProtocolType.https:
+      additionalProperties: false
+      allOf:
+        - "$ref": "#/components/schemas/DNSModule.ProtocolType"
+      properties:
+        type:
+          const: https
+          type: string
+        url:
+          format: uri
+          type: string
+      required:
+        - type
+        - url
+      type: object
+    DNSModule.ProtocolType.tls:
+      additionalProperties: false
+      allOf:
+        - "$ref": "#/components/schemas/DNSModule.ProtocolType"
+      properties:
+        hostname:
+          type: string
+        type:
+          const: tls
+          type: string
+      required:
+        - type
+        - hostname
+      type: object
+    DNSProtocol:
+      enum:
+        - cleartext
+        - https
+        - tls
+      type: string
+    Endpoint:
+      type: string
+    EndpointProtocol:
+      type: string
+    ExtendedEndpoint:
+      type: string
+    HTTPProxyModule:
+      additionalProperties: false
+      properties:
+        bypassDomains:
+          items:
+            "$ref": "#/components/schemas/Address"
+          type: array
+        id:
+          "$ref": "#/components/schemas/UniqueID"
+        pacURL:
+          format: uri
+          type: string
+        proxy:
+          "$ref": "#/components/schemas/Endpoint"
+        secureProxy:
+          "$ref": "#/components/schemas/Endpoint"
+      required:
+        - id
+        - bypassDomains
+      type: object
+    IPModule:
+      additionalProperties: false
+      properties:
+        id:
+          "$ref": "#/components/schemas/UniqueID"
+        ipv4:
+          "$ref": "#/components/schemas/IPSettings"
+        ipv6:
+          "$ref": "#/components/schemas/IPSettings"
+        mtu:
+          type: integer
+      required:
+        - id
+      type: object
+    IPSettings:
+      additionalProperties: false
+      properties:
+        excludedRoutes:
+          items:
+            "$ref": "#/components/schemas/Route"
+          type: array
+        includedRoutes:
+          items:
+            "$ref": "#/components/schemas/Route"
+          type: array
+        legacySingleSubnet:
+          "$ref": "#/components/schemas/Subnet"
+        subnets:
+          items:
+            "$ref": "#/components/schemas/Subnet"
+          type: array
+      required:
+        - subnets
+        - includedRoutes
+        - excludedRoutes
+      type: object
+    IPSocketType:
+      enum:
+        - udp
+        - tcp
+        - udp4
+        - tcp4
+        - udp6
+        - tcp6
+      type: string
+    ModuleType:
+      type: string
+    OnDemandModule:
+      additionalProperties: false
+      properties:
+        id:
+          "$ref": "#/components/schemas/UniqueID"
+        policy:
+          "$ref": "#/components/schemas/OnDemandModule.Policy"
+        withOtherNetworks:
+          items:
+            "$ref": "#/components/schemas/OnDemandModule.OtherNetwork"
+          type: array
+          uniqueItems: true
+        withSSIDs:
+          additionalProperties:
+            type: boolean
+          type: object
+      required:
+        - id
+        - policy
+        - withSSIDs
+        - withOtherNetworks
+      type: object
+    OnDemandModule.OtherNetwork:
+      enum:
+        - mobile
+        - ethernet
+      type: string
+    OnDemandModule.Policy:
+      enum:
+        - any
+        - including
+        - excluding
+      type: string
+    OpenVPN.Cipher:
+      enum:
+        - aes128cbc
+        - aes192cbc
+        - aes256cbc
+        - aes128gcm
+        - aes192gcm
+        - aes256gcm
+      type: string
+    OpenVPN.CompressionAlgorithm:
+      enum:
+        - 0
+        - 1
+        - 2
+      type: integer
+      x-enum-varnames:
+        - disabled
+        - LZO
+        - other
+    OpenVPN.CompressionFraming:
+      enum:
+        - 0
+        - 1
+        - 2
+        - 3
+      type: integer
+      x-enum-varnames:
+        - disabled
+        - compLZO
+        - compress
+        - compressV2
+    OpenVPN.Configuration:
+      additionalProperties: false
+      properties:
+        authToken:
+          type: string
+        authUserPass:
+          type: boolean
+        ca:
+          "$ref": "#/components/schemas/OpenVPN.CryptoContainer"
+        checksEKU:
+          type: boolean
+        checksSANHost:
+          type: boolean
+        cipher:
+          "$ref": "#/components/schemas/OpenVPN.Cipher"
+        clientCertificate:
+          "$ref": "#/components/schemas/OpenVPN.CryptoContainer"
+        clientKey:
+          "$ref": "#/components/schemas/OpenVPN.CryptoContainer"
+        compressionAlgorithm:
+          "$ref": "#/components/schemas/OpenVPN.CompressionAlgorithm"
+        compressionFraming:
+          "$ref": "#/components/schemas/OpenVPN.CompressionFraming"
+        dataCiphers:
+          items:
+            "$ref": "#/components/schemas/OpenVPN.Cipher"
+          type: array
+        digest:
+          "$ref": "#/components/schemas/OpenVPN.Digest"
+        dnsDomain:
+          type: string
+        dnsServers:
+          items:
+            type: string
+          type: array
+        httpProxy:
+          "$ref": "#/components/schemas/Endpoint"
+        httpsProxy:
+          "$ref": "#/components/schemas/Endpoint"
+        ipv4:
+          "$ref": "#/components/schemas/IPSettings"
+        ipv6:
+          "$ref": "#/components/schemas/IPSettings"
+        keepAliveInterval:
+          type: number
+        keepAliveTimeout:
+          type: number
+        mtu:
+          type: integer
+        noPullMask:
+          items:
+            "$ref": "#/components/schemas/OpenVPN.PullMask"
+          type: array
+        peerId:
+          "$ref": "#/components/schemas/UInt32"
+        proxyAutoConfigurationURL:
+          format: uri
+          type: string
+        proxyBypassDomains:
+          items:
+            type: string
+          type: array
+        randomizeEndpoint:
+          type: boolean
+        randomizeHostnames:
+          type: boolean
+        remotes:
+          items:
+            "$ref": "#/components/schemas/ExtendedEndpoint"
+          type: array
+        renegotiatesAfter:
+          type: number
+        routeGateway4:
+          "$ref": "#/components/schemas/Address"
+        routeGateway6:
+          "$ref": "#/components/schemas/Address"
+        routes4:
+          items:
+            "$ref": "#/components/schemas/Route"
+          type: array
+        routes6:
+          items:
+            "$ref": "#/components/schemas/Route"
+          type: array
+        routingPolicies:
+          items:
+            "$ref": "#/components/schemas/OpenVPN.RoutingPolicy"
+          type: array
+        sanHost:
+          type: string
+        searchDomains:
+          items:
+            type: string
+          type: array
+        staticChallenge:
+          type: boolean
+        tlsSecurityLevel:
+          type: integer
+        tlsWrap:
+          "$ref": "#/components/schemas/OpenVPN.TLSWrap"
+        usesPIAPatches:
+          type: boolean
+        xorMethod:
+          "$ref": "#/components/schemas/OpenVPN.ObfuscationMethod"
+      type: object
+    OpenVPN.Credentials:
+      additionalProperties: false
+      properties:
+        otp:
+          type: string
+        otpMethod:
+          "$ref": "#/components/schemas/OpenVPN.Credentials.OTPMethod"
+        password:
+          type: string
+        username:
+          type: string
+      required:
+        - username
+        - password
+        - otpMethod
+      type: object
+    OpenVPN.Credentials.OTPMethod:
+      enum:
+        - none
+        - append
+        - encode
+      type: string
+    OpenVPN.CryptoContainer:
+      additionalProperties: false
+      properties:
+        pem:
+          type: string
+      required:
+        - pem
+      type: object
+    OpenVPN.Digest:
+      enum:
+        - sha1
+        - sha224
+        - sha256
+        - sha384
+        - sha512
+      type: string
+    OpenVPN.ObfuscationMethod:
+      discriminator:
+        mapping:
+          obfuscate: "#/components/schemas/OpenVPN.ObfuscationMethod.obfuscate"
+          reverse: "#/components/schemas/OpenVPN.ObfuscationMethod.reverse"
+          xormask: "#/components/schemas/OpenVPN.ObfuscationMethod.xormask"
+          xorptrpos: "#/components/schemas/OpenVPN.ObfuscationMethod.xorptrpos"
+        propertyName: type
+      properties:
+        type:
+          type: string
+      required:
+        - type
+      type: object
+    OpenVPN.ObfuscationMethod.obfuscate:
+      additionalProperties: false
+      allOf:
+        - "$ref": "#/components/schemas/OpenVPN.ObfuscationMethod"
+      properties:
+        mask:
+          "$ref": "#/components/schemas/SecureData"
+        type:
+          const: obfuscate
+          type: string
+      required:
+        - type
+        - mask
+      type: object
+    OpenVPN.ObfuscationMethod.reverse:
+      additionalProperties: false
+      allOf:
+        - "$ref": "#/components/schemas/OpenVPN.ObfuscationMethod"
+      properties:
+        type:
+          const: reverse
+          type: string
+      required:
+        - type
+      type: object
+    OpenVPN.ObfuscationMethod.xormask:
+      additionalProperties: false
+      allOf:
+        - "$ref": "#/components/schemas/OpenVPN.ObfuscationMethod"
+      properties:
+        mask:
+          "$ref": "#/components/schemas/SecureData"
+        type:
+          const: xormask
+          type: string
+      required:
+        - type
+        - mask
+      type: object
+    OpenVPN.ObfuscationMethod.xorptrpos:
+      additionalProperties: false
+      allOf:
+        - "$ref": "#/components/schemas/OpenVPN.ObfuscationMethod"
+      properties:
+        type:
+          const: xorptrpos
+          type: string
+      required:
+        - type
+      type: object
+    OpenVPN.PullMask:
+      enum:
+        - routes
+        - dns
+        - proxy
+      type: string
+    OpenVPN.RoutingPolicy:
+      enum:
+        - IPv4
+        - IPv6
+        - blockLocal
+      type: string
+    OpenVPN.StaticKey:
+      additionalProperties: false
+      properties:
+        data:
+          "$ref": "#/components/schemas/SecureData"
+        dir:
+          "$ref": "#/components/schemas/OpenVPN.StaticKey.Direction"
+      required:
+        - data
+      type: object
+    OpenVPN.StaticKey.Direction:
+      enum:
+        - 0
+        - 1
+      type: integer
+      x-enum-varnames:
+        - server
+        - client
+    OpenVPN.TLSWrap:
+      additionalProperties: false
+      properties:
+        key:
+          "$ref": "#/components/schemas/OpenVPN.StaticKey"
+        strategy:
+          "$ref": "#/components/schemas/OpenVPN.TLSWrap.Strategy"
+      required:
+        - strategy
+        - key
+      type: object
+    OpenVPN.TLSWrap.Strategy:
+      enum:
+        - auth
+        - crypt
+      type: string
+    OpenVPNModule:
+      additionalProperties: false
+      properties:
+        configuration:
+          "$ref": "#/components/schemas/OpenVPN.Configuration"
+        credentials:
+          "$ref": "#/components/schemas/OpenVPN.Credentials"
+        id:
+          "$ref": "#/components/schemas/UniqueID"
+        requiresInteractiveCredentials:
+          type: boolean
+      required:
+        - id
+      type: object
+    ProfileBehavior:
+      additionalProperties: false
+      properties:
+        disconnectsOnSleep:
+          type: boolean
+        includesAllNetworks:
+          type: boolean
+      required:
+        - disconnectsOnSleep
+      type: object
+    Route:
+      additionalProperties: false
+      properties:
+        destination:
+          "$ref": "#/components/schemas/Subnet"
+        gateway:
+          "$ref": "#/components/schemas/Address"
+      type: object
+    SecureData:
+      type: string
+    SocketType:
+      enum:
+        - udp
+        - tcp
+      type: string
+    Subnet:
+      type: string
+    TaggedModule:
+      discriminator:
+        mapping:
+          dns: "#/components/schemas/TaggedModule.dns"
+          httpProxy: "#/components/schemas/TaggedModule.httpProxy"
+          ip: "#/components/schemas/TaggedModule.ip"
+          onDemand: "#/components/schemas/TaggedModule.onDemand"
+        propertyName: type
+      properties:
+        type:
+          type: string
+      required:
+        - type
+      type: object
+    TaggedModule.dns:
+      additionalProperties: false
+      allOf:
+        - "$ref": "#/components/schemas/TaggedModule"
+      properties:
+        type:
+          const: dns
+          type: string
+        value:
+          "$ref": "#/components/schemas/DNSModule"
+      required:
+        - type
+        - value
+      type: object
+    TaggedModule.httpProxy:
+      additionalProperties: false
+      allOf:
+        - "$ref": "#/components/schemas/TaggedModule"
+      properties:
+        type:
+          const: httpProxy
+          type: string
+        value:
+          "$ref": "#/components/schemas/HTTPProxyModule"
+      required:
+        - type
+        - value
+      type: object
+    TaggedModule.ip:
+      additionalProperties: false
+      allOf:
+        - "$ref": "#/components/schemas/TaggedModule"
+      properties:
+        type:
+          const: ip
+          type: string
+        value:
+          "$ref": "#/components/schemas/IPModule"
+      required:
+        - type
+        - value
+      type: object
+    TaggedModule.onDemand:
+      additionalProperties: false
+      allOf:
+        - "$ref": "#/components/schemas/TaggedModule"
+      properties:
+        type:
+          const: onDemand
+          type: string
+        value:
+          "$ref": "#/components/schemas/OnDemandModule"
+      required:
+        - type
+        - value
+      type: object
+    TunnelRemoteInfo:
+      additionalProperties: false
+      properties:
+        address:
+          "$ref": "#/components/schemas/Address"
+        fileDescriptors:
+          items:
+            "$ref": "#/components/schemas/UInt64"
+          type: array
+        modules:
+          items:
+            title: Module
+          type: array
+        originalModuleId:
+          "$ref": "#/components/schemas/UniqueID"
+        requiresVirtualDevice:
+          type: boolean
+      required:
+        - originalModuleId
+        - fileDescriptors
+        - requiresVirtualDevice
+      type: object
+    UInt16:
+      type: integer
+    UInt32:
+      type: integer
+    UInt64:
+      type: integer
+    UniqueID:
+      type: string
+    WireGuard.Configuration:
+      additionalProperties: false
+      properties:
+        interface:
+          "$ref": "#/components/schemas/WireGuard.LocalInterface"
+        peers:
+          items:
+            "$ref": "#/components/schemas/WireGuard.RemoteInterface"
+          type: array
+      required:
+        - interface
+        - peers
+      type: object
+    WireGuard.Key:
+      type: string
+    WireGuard.LocalInterface:
+      additionalProperties: false
+      properties:
+        addresses:
+          items:
+            "$ref": "#/components/schemas/Subnet"
+          type: array
+        dns:
+          "$ref": "#/components/schemas/DNSModule"
+        mtu:
+          "$ref": "#/components/schemas/UInt16"
+        privateKey:
+          "$ref": "#/components/schemas/WireGuard.Key"
+      required:
+        - privateKey
+        - addresses
+      type: object
+    WireGuard.RemoteInterface:
+      additionalProperties: false
+      properties:
+        allowedIPs:
+          items:
+            "$ref": "#/components/schemas/Subnet"
+          type: array
+        endpoint:
+          "$ref": "#/components/schemas/Endpoint"
+        keepAlive:
+          "$ref": "#/components/schemas/UInt16"
+        preSharedKey:
+          "$ref": "#/components/schemas/WireGuard.Key"
+        publicKey:
+          "$ref": "#/components/schemas/WireGuard.Key"
+      required:
+        - publicKey
+        - allowedIPs
+      type: object
+    WireGuardModule:
+      additionalProperties: false
+      properties:
+        configuration:
+          "$ref": "#/components/schemas/WireGuard.Configuration"
+        id:
+          "$ref": "#/components/schemas/UniqueID"
+      required:
+        - id
+      type: object
+info:
+  title: codegen
+  version: 1.0.0
+openapi: 3.1.0
+paths: {}
