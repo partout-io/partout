@@ -5,20 +5,19 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 infile="$script_dir/openapi.yaml"
 
 usage() {
-    echo "Usage: $0 <lang:kotlin|cpp> <models-dir> <dest-dir>"
+    echo "Usage: $0 <lang:kotlin|cpp> <models-dir>"
     exit 1
 }
 
-if [ "$#" -ne 3 ]; then
+if [ "$#" -ne 2 ]; then
     usage
 fi
 
 mode=$1
 models_dir=$2
-dest_dir=$3
 
 # First, update the OpenAPI metadata
-swift run partout-codegen --manifest scripts/manifest.yaml >scripts/openapi.yaml
+$script_dir/gen-api.sh
 
 case $mode in
     kotlin)
