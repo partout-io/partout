@@ -31,17 +31,34 @@ struct ProfileCodingTests {
     }
 
     @Test
-    func givenRegistry_whenEncodeModule_thenIsDecoded() throws {
+    func givenRegistry_whenEncodeModule_thenIsInternallyTaggedAndDecoded() throws {
         let sut = Registry(allHandlers: [DNSModule.moduleHandler])
         let module = try DNSModule.Builder().build()
 
         let encoded = try JSONEncoder().encode(CodableModule(wrappedModule: module))
         let encodedString = try #require(String(data: encoded, encoding: .utf8))
         print(encodedString)
+        #expect(encodedString.contains(#""type":"DNS""#))
+        #expect(!encodedString.contains(#""payload""#))
 
         let decoder = JSONDecoder()
         decoder.userInfo = [.moduleDecoder: sut]
         let decoded = try decoder.decode(CodableModule.self, from: encoded)
+        #expect(decoded.wrappedModule as? DNSModule == module)
+    }
+
+    @Test
+    func givenRegistry_whenDecodeLegacyModuleShape_thenStillWorks() throws {
+        let sut = Registry(allHandlers: [DNSModule.moduleHandler])
+        let module = try DNSModule.Builder().build()
+        let payload = try JSONEncoder().encode(module)
+        let payloadString = try #require(String(data: payload, encoding: .utf8))
+        let legacyJSON = #"{"moduleType":"DNS","payload":\#(payloadString)}"#
+        let legacyData = try #require(legacyJSON.data(using: .utf8))
+
+        let decoder = JSONDecoder()
+        decoder.userInfo = [.moduleDecoder: sut]
+        let decoded = try decoder.decode(CodableModule.self, from: legacyData)
         #expect(decoded.wrappedModule as? DNSModule == module)
     }
 
