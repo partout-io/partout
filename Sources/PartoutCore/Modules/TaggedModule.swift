@@ -14,15 +14,16 @@ extension Module {
     var taggedModule: TaggedModule? {
         switch self {
         case let module as DNSModule:
-            .dns(module)
+            return .dns(module)
         case let module as HTTPProxyModule:
-            .httpProxy(module)
+            return .httpProxy(module)
         case let module as IPModule:
-            .ip(module)
+            return .ip(module)
         case let module as OnDemandModule:
-            .onDemand(module)
+            return .onDemand(module)
         default:
-            nil
+            assertionFailure("Unhandled Core module: \(self)")
+            return nil
         }
     }
 }
