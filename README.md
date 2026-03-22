@@ -98,13 +98,13 @@ The CMake configuration is done with the `android.toolchain.cmake` toolchain. Th
 
 #### Codegen
 
-A custom code generator is supplied to translate Swift data entities to the OpenAPI specification for interop with other programming languages.
+Partout comes with a [code generator][partout-codegen] that translates Swift data entities to a formal OpenAPI specification for non-Swift consumers.
 
 ```
-swift run partout-codegen <openapi> <output> [root]
+swift run partout-codegen --manifest scripts/manifest.yaml
 ```
 
-`partout-codegen` uses [swift-syntax][credits-swift-syntax] to build an intermediate representation (IR) of the Swift data entities, then proceeds to map it to the OpenAPI format. `openapi-generator` can eventually be used to generate the Partout data models for other languages.
+`partout-codegen` uses [swift-syntax][credits-swift-syntax] to build an intermediate representation (IR) of the Swift data entities, then proceeds to map it to the OpenAPI format. [openapi-generator][openapi-generator] can eventually be used to generate the Partout data models for other languages.
 
 ## Demo
 
@@ -124,7 +124,7 @@ Open `Demo.xcodeproj` and run the `PartoutDemo` target.
 
 Copyright (c) 2026 Davide De Rosa. All rights reserved.
 
-The library is licensed under the [GPLv3][license]. The `MiniFoundation` and `partout-codegen` targets are MIT-licensed.
+The library is licensed under the [GPLv3][license]. The `MiniFoundation` targets are MIT-licensed.
 
 ### Contributing
 
@@ -176,6 +176,8 @@ Website: [partout.io][about-website]
 [license-website]: https://partout.io/license
 [contrib-cla]: CLA.rst
 [contrib-readme]: CONTRIBUTING.md
+[partout-codegen]: https://github.com/partout-io/codegen
+[openapi-generator]: https://openapi-generator.tech/
 
 [github-releases]: https://github.com/partout-io/partout/releases
 [credits-genericjson]: https://github.com/iwill/generic-json-swift
