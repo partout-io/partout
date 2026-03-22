@@ -31,7 +31,7 @@ extension Module {
 extension TaggedModule: Encodable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(discriminator, forKey: .type)
+        try container.encode(discriminator.rawValue, forKey: .type)
         try encodePayload(to: &container)
     }
 }
@@ -42,13 +42,20 @@ private extension TaggedModule {
         case value
     }
 
-    // WARNING: Must match TaggedModule case (used in OpenAPI)
-    var discriminator: String {
+    // WARNING: Must match TaggedModule case
+    enum Discriminator: String {
+        case dns
+        case httpProxy
+        case ip
+        case onDemand
+    }
+
+    var discriminator: Discriminator {
         switch self {
-        case .dns: "dns"
-        case .httpProxy: "httpProxy"
-        case .ip: "ip"
-        case .onDemand: "onDemand"
+        case .dns: .dns
+        case .httpProxy: .httpProxy
+        case .ip: .ip
+        case .onDemand: .onDemand
         }
     }
 
