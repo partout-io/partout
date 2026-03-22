@@ -19,10 +19,10 @@ struct TaggedModuleTests {
         let data = try encoder.encode(taggedModules)
         let json = String(decoding: data, as: UTF8.self)
         print(json)
-        #expect(json.contains(#""type" : "dns""#))
-        #expect(json.contains(#""type" : "httpProxy""#))
-        #expect(json.contains(#""type" : "ip""#))
-        #expect(json.contains(#""type" : "onDemand""#))
+        #expect(json.contains(#""type" : "DNS""#))
+        #expect(json.contains(#""type" : "HTTPProxy""#))
+        #expect(json.contains(#""type" : "IP""#))
+        #expect(json.contains(#""type" : "OnDemand""#))
     }
 
     private func makeTaggedModules() throws -> [TaggedModule] {
@@ -31,10 +31,10 @@ struct TaggedModuleTests {
         let ipModule = IPModule.Builder(id: IDs.ip).build()
         let onDemandModule = OnDemandModule.Builder(id: IDs.onDemand).build()
         return [
-            .dns(dnsModule),
-            .httpProxy(httpProxyModule),
-            .ip(ipModule),
-            .onDemand(onDemandModule)
+            .DNS(dnsModule),
+            .HTTPProxy(httpProxyModule),
+            .IP(ipModule),
+            .OnDemand(onDemandModule)
         ]
     }
 }

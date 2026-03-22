@@ -64,16 +64,25 @@ private extension TaggedModule {
         }
     }
 
-    func encodePayload(to container: inout KeyedEncodingContainer<CodingKeys>) throws {
+    var containedModule: Module & Encodable {
         switch self {
-        case .DNS(let module):
-            try container.encode(module, forKey: .value)
-        case .HTTPProxy(let module):
-            try container.encode(module, forKey: .value)
-        case .IP(let module):
-            try container.encode(module, forKey: .value)
-        case .OnDemand(let module):
-            try container.encode(module, forKey: .value)
+        case .DNS(let module): module
+        case .HTTPProxy(let module): module
+        case .IP(let module): module
+        case .OnDemand(let module): module
         }
+    }
+
+    func encodePayload(to container: inout KeyedEncodingContainer<CodingKeys>) throws {
+        let module = containedModule
+        assert(
+            module.moduleType.rawValue == discriminator.rawValue,
+            "Module has type '\(module.moduleType)' but discriminator '\(discriminator.rawValue)'"
+        )
+        try container.encode(module, forKey: .value)
+    }
+
+    func assertDiscriminator(_ module: Module) {
+        assert(module.moduleType.rawValue == discriminator.rawValue)
     }
 }
