@@ -121,13 +121,21 @@ extension OpenVPN.ObfuscationMethod {
             let map: [String: [String: String]]
             switch self {
             case .xormask(let mask):
-                map = ["xormask": ["mask": mask.toData().base64EncodedString()]]
+                map = [
+                    LegacyCodingKeys.xormask.rawValue: [
+                        LegacyMaskCodingKeys.mask.rawValue: mask.toData().base64EncodedString()
+                    ]
+                ]
             case .xorptrpos:
-                map = ["xorptrpos": [:]]
+                map = [LegacyCodingKeys.xorptrpos.rawValue: [:]]
             case .reverse:
-                map = ["reverse": [:]]
+                map = [LegacyCodingKeys.reverse.rawValue: [:]]
             case .obfuscate(let mask):
-                map = ["obfuscate": ["mask": mask.toData().base64EncodedString()]]
+                map = [
+                    LegacyCodingKeys.obfuscate.rawValue: [
+                        LegacyMaskCodingKeys.mask.rawValue: mask.toData().base64EncodedString()
+                    ]
+                ]
             }
             try container.encode(map)
             return

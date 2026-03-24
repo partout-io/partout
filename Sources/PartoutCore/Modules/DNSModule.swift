@@ -251,11 +251,19 @@ extension DNSModule.ProtocolType {
             let isSensitive = encoder.shouldEncodeSensitiveData
             switch self {
             case .cleartext:
-                map = ["cleartext": [:]]
+                map = [Discriminator.cleartext.rawValue: [:]]
             case .https(let url):
-                map = ["https": ["url": url.debugDescription(withSensitiveData: isSensitive)]]
+                map = [
+                    Discriminator.https.rawValue: [
+                        LegacyHTTPSCodingKeys.url.rawValue: url.debugDescription(withSensitiveData: isSensitive)
+                    ]
+                ]
             case .tls(let hostname):
-                map = ["tls": ["hostname": hostname.debugDescription(withSensitiveData: isSensitive)]]
+                map = [
+                    Discriminator.tls.rawValue: [
+                        LegacyTLSCodingKeys.hostname.rawValue: hostname.debugDescription(withSensitiveData: isSensitive)
+                    ]
+                ]
             }
             try container.encode(map)
             return
