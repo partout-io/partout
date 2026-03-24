@@ -99,6 +99,12 @@ extension CodingUserInfoKey {
     public static let legacySwiftEncoding = CodingUserInfoKey(rawValue: "legacySwiftEncoding")!
 }
 
+extension Dictionary where Key == CodingUserInfoKey, Value == Any {
+    public var usesLegacySwiftEncoding: Bool {
+        self[.legacySwiftEncoding] as? Bool == true
+    }
+}
+
 extension Registry {
     public func string(fromProfiles profiles: [Profile], encoder: TextEncoder) throws -> String {
         try encoder.encode(profiles.map(\.asCodableProfile))

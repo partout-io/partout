@@ -37,9 +37,11 @@ extension Registry {
 
 private final class RegistryJSONEncoder: TextEncoder, TextDecoder {
     private let registry: Registry
+    private let withLegacyEncoding: Bool
 
-    init(_ registry: Registry) {
+    init(_ registry: Registry, withLegacyEncoding: Bool = false) {
         self.registry = registry
+        self.withLegacyEncoding = withLegacyEncoding
     }
 
     func encode<T>(_ value: T) throws -> String where T: Encodable {
@@ -52,7 +54,8 @@ private final class RegistryJSONEncoder: TextEncoder, TextDecoder {
 
     func decode<T>(_ type: T.Type, string: String) throws -> T where T: Decodable {
         let decoder = JSONDecoder(userInfo: [
-            .moduleDecoder: registry
+            .moduleDecoder: registry,
+            .legacySwiftEncoding: withLegacyEncoding
         ])
         guard let json = string.data(using: .utf8) else {
             throw PartoutError(.decoding, "Not a UTF-8 input")

@@ -61,7 +61,7 @@ public struct CodableModule: Codable, Sendable {
             throw PartoutError(.encoding, "Module not encodable")
         }
         // Legacy Swift encoding
-        if encoder.userInfo.keys.contains(.legacySwiftEncoding) {
+        if encoder.userInfo.usesLegacySwiftEncoding {
             try container.encode(moduleType, forKey: .moduleType)
             try container.encode(encodableModule, forKey: .payload)
             return

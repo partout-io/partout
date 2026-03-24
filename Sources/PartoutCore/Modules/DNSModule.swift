@@ -245,7 +245,7 @@ extension DNSModule.ProtocolType {
 
     public func encode(to encoder: any Encoder) throws {
         // Legacy Swift encoding (incompatible with cross)
-        if encoder.userInfo.keys.contains(.legacySwiftEncoding) {
+        if encoder.userInfo.usesLegacySwiftEncoding {
             var container = encoder.singleValueContainer()
             let map: [String: [String: String]]
             let isSensitive = encoder.shouldEncodeSensitiveData
