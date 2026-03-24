@@ -14,15 +14,18 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
 
     private let keychain: Keychain
 
-    public init(_ ctx: PartoutLoggerContext, tunnelBundleIdentifier: String, registry: Registry, keychain: Keychain) {
+    private let withLegacyEncoding: Bool
+
+    public init(_ ctx: PartoutLoggerContext, tunnelBundleIdentifier: String, registry: Registry, keychain: Keychain, withLegacyEncoding: Bool) {
         self.ctx = ctx
         self.tunnelBundleIdentifier = tunnelBundleIdentifier
         self.registry = registry
         self.keychain = keychain
+        self.withLegacyEncoding = withLegacyEncoding
     }
 
     public func protocolConfiguration(from profile: Profile, title: (Profile) -> String) throws -> NETunnelProviderProtocol {
-        let encoded = try registry.json(fromProfile: profile)
+        let encoded = try registry.json(fromProfile: profile, withLegacyEncoding: withLegacyEncoding)
 
         let passwordReference = try keychain.set(
             password: encoded,

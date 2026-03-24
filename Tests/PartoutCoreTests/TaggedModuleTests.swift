@@ -7,16 +7,18 @@ import Foundation
 import Testing
 
 struct TaggedModuleTests {
-    private let encoder: JSONEncoder = {
+    private func encoder(withLegacyEncoding: Bool) -> JSONEncoder {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
+        encoder.userInfo = [.legacySwiftEncoding: withLegacyEncoding]
         return encoder
-    }()
+    }
 
-    @Test
-    func givenTaggedModules_whenEncode_thenTypeDiscriminatorsAreIncluded() throws {
+    @Test(arguments: [false, true])
+    func givenTaggedModules_whenEncode_thenTypeDiscriminatorsAreIncluded(withLegacyEncoding: Bool) throws {
         let taggedModules = try makeTaggedModules()
-        let data = try encoder.encode(taggedModules)
+        let data = try encoder(withLegacyEncoding: withLegacyEncoding)
+            .encode(taggedModules)
         let json = String(decoding: data, as: UTF8.self)
         print(json)
         #expect(json.contains(#""type" : "DNS""#))
@@ -26,7 +28,11 @@ struct TaggedModuleTests {
     }
 
     private func makeTaggedModules() throws -> [TaggedModule] {
-        let dnsModule = try DNSModule.Builder(id: IDs.dns).build()
+        let dnsModule = try DNSModule.Builder(
+            id: IDs.dns,
+            protocolType: .https,
+            dohURL: "https://foobar.com/dns"
+        ).build()
         let httpProxyModule = try HTTPProxyModule.Builder(id: IDs.httpProxy).build()
         let ipModule = IPModule.Builder(id: IDs.ip).build()
         let onDemandModule = OnDemandModule.Builder(id: IDs.onDemand).build()

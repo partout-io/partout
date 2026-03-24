@@ -6,13 +6,13 @@
 import Testing
 
 struct ProfileCodingTests {
-    @Test
-    func givenRegistry_whenEncodeProfileWithUnknownModule_thenFailsToDecode() throws {
+    @Test(arguments: [false, true])
+    func givenRegistry_whenEncodeProfileWithUnknownModule_thenFailsToDecode(withLegacyEncoding: Bool) throws {
         let sut = Registry(allHandlers: [])
         let module = try DNSModule.Builder().build()
         let profile = try Profile.Builder(modules: [module]).build()
         do {
-            let encoded = try sut.json(fromProfile: profile)
+            let encoded = try sut.json(fromProfile: profile, withLegacyEncoding: withLegacyEncoding)
             _ = try sut.profile(fromJSON: encoded)
             #expect(Bool(false))
         } catch let error as PartoutError {
@@ -22,12 +22,12 @@ struct ProfileCodingTests {
         }
     }
 
-    @Test
-    func givenRegistry_whenEncodeProfileWithRegisteredModule_thenIsDecoded() throws {
+    @Test(arguments: [false, true])
+    func givenRegistry_whenEncodeProfileWithRegisteredModule_thenIsDecoded(withLegacyEncoding: Bool) throws {
         let sut = Registry(allHandlers: [DNSModule.moduleHandler])
         let module = try DNSModule.Builder().build()
         let profile = try Profile.Builder(modules: [module]).build()
-        expectNoThrow(try sut.json(fromProfile: profile))
+        expectNoThrow(try sut.json(fromProfile: profile, withLegacyEncoding: withLegacyEncoding))
     }
 
     @Test
@@ -62,19 +62,19 @@ struct ProfileCodingTests {
         #expect(decoded.wrappedModule as? DNSModule == module)
     }
 
-    @Test
-    func givenRegistry_whenEncodeProfile_thenIsDecoded() throws {
+    @Test(arguments: [false, true])
+    func givenRegistry_whenEncodeProfile_thenIsDecoded(withLegacyEncoding: Bool) throws {
         let sut = Registry(allHandlers: [DNSModule.moduleHandler])
         let module = try DNSModule.Builder().build()
         let profile = try Profile.Builder(modules: [module]).build()
 
-        let encoded = try sut.json(fromProfile: profile)
+        let encoded = try sut.json(fromProfile: profile, withLegacyEncoding: withLegacyEncoding)
         let decoded = try sut.profile(fromJSON: encoded)
         #expect(decoded == profile)
     }
 
-    @Test
-    func givenRegistry_whenEncodeProfile_thenDecodesToEqual() throws {
+    @Test(arguments: [false, true])
+    func givenRegistry_whenEncodeProfile_thenDecodesToEqual(withLegacyEncoding: Bool) throws {
         let sut = Registry(allHandlers: [
             DNSModule.moduleHandler,
             IPModule.moduleHandler
@@ -90,7 +90,7 @@ struct ProfileCodingTests {
             userInfo: ["foo": "bar", "zen": 12]
         ).build()
 
-        let encodedJSON = try sut.json(fromProfile: profile)
+        let encodedJSON = try sut.json(fromProfile: profile, withLegacyEncoding: withLegacyEncoding)
         print(encodedJSON)
         let decodedProfile = try sut.profile(fromJSON: encodedJSON)
         print(decodedProfile)

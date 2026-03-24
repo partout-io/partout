@@ -44,6 +44,7 @@ public struct CodableModule: Codable, Sendable {
         moduleType = try container.decodeIfPresent(ModuleType.self, forKey: .type)
             ?? container.decode(ModuleType.self, forKey: .moduleType)
         let module: Module
+        // Legacy Swift encoding
         if container.contains(.payload) {
             let payloadDecoder = try container.superDecoder(forKey: .payload)
             module = try moduleDecoder.decodedModule(from: payloadDecoder, ofType: moduleType)
@@ -56,10 +57,16 @@ public struct CodableModule: Codable, Sendable {
 
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(moduleType, forKey: .type)
         guard let encodableModule = wrappedModule as? Encodable else {
             throw PartoutError(.encoding, "Module not encodable")
         }
+        // Legacy Swift encoding
+        if encoder.userInfo.usesLegacySwiftEncoding {
+            try container.encode(moduleType, forKey: .moduleType)
+            try container.encode(encodableModule, forKey: .payload)
+            return
+        }
+        try container.encode(moduleType, forKey: .type)
         try encodableModule.encode(to: encoder)
     }
 }

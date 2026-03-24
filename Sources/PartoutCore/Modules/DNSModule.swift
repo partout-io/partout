@@ -244,6 +244,32 @@ extension DNSModule.ProtocolType {
     }
 
     public func encode(to encoder: any Encoder) throws {
+        // Legacy Swift encoding (incompatible with cross)
+        if encoder.userInfo.usesLegacySwiftEncoding {
+            var container = encoder.singleValueContainer()
+            let map: [String: [String: String]]
+            let isSensitive = encoder.shouldEncodeSensitiveData
+            switch self {
+            case .cleartext:
+                map = [Discriminator.cleartext.rawValue: [:]]
+            case .https(let url):
+                map = [
+                    Discriminator.https.rawValue: [
+                        LegacyHTTPSCodingKeys.url.rawValue: url.debugDescription(withSensitiveData: isSensitive)
+                    ]
+                ]
+            case .tls(let hostname):
+                map = [
+                    Discriminator.tls.rawValue: [
+                        LegacyTLSCodingKeys.hostname.rawValue: hostname.debugDescription(withSensitiveData: isSensitive)
+                    ]
+                ]
+            }
+            try container.encode(map)
+            return
+        }
+
+        // Tagged union (cross friendly)
         var container = encoder.container(keyedBy: CodingKeys.self)
         let isSensitive = encoder.shouldEncodeSensitiveData
         let discriminator: Discriminator

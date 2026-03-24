@@ -8,3 +8,10 @@ extension JSONDecoder {
         self.userInfo = userInfo
     }
 }
+
+extension JSONEncoder {
+    public convenience init(userInfo: [CodingUserInfoKey: Sendable] = [:]) {
+        self.init()
+        self.userInfo = userInfo
+    }
+}
