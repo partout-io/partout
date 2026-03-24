@@ -14,10 +14,12 @@ extension Registry {
     }
 
     public func profile(fromJSON json: String) throws -> Profile {
+        // withLegacyEncoding irrelevant here
         try profile(fromString: json, decoder: RegistryJSONEncoder(self, withLegacyEncoding: false))
     }
 
     public func profiles(fromJSON json: String) throws -> [Profile] {
+        // withLegacyEncoding irrelevant here
         try profiles(fromString: json, decoder: RegistryJSONEncoder(self, withLegacyEncoding: false))
     }
 
@@ -47,7 +49,8 @@ private final class RegistryJSONEncoder: TextEncoder, TextDecoder {
     }
 
     func encode<T>(_ value: T) throws -> String where T: Encodable {
-        let data = try JSONEncoder().encode(value)
+        let encoder = JSONEncoder(userInfo: [.legacySwiftEncoding: withLegacyEncoding])
+        let data = try encoder.encode(value)
         guard let json = String(data: data, encoding: .utf8) else {
             throw PartoutError(.encoding, "Not a UTF-8 input")
         }
@@ -55,10 +58,7 @@ private final class RegistryJSONEncoder: TextEncoder, TextDecoder {
     }
 
     func decode<T>(_ type: T.Type, string: String) throws -> T where T: Decodable {
-        let decoder = JSONDecoder(userInfo: [
-            .moduleDecoder: registry,
-            .legacySwiftEncoding: withLegacyEncoding
-        ])
+        let decoder = JSONDecoder(userInfo: [.moduleDecoder: registry])
         guard let json = string.data(using: .utf8) else {
             throw PartoutError(.decoding, "Not a UTF-8 input")
         }
