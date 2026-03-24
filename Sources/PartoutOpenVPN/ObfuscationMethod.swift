@@ -115,6 +115,26 @@ extension OpenVPN.ObfuscationMethod {
     }
 
     public func encode(to encoder: any Encoder) throws {
+        // Legacy Swift encoding (incompatible with cross)
+        if encoder.userInfo.keys.contains(.legacySwiftEncoding) {
+            var container = encoder.singleValueContainer()
+            let map: [String: [String: String]]
+            let isSensitive = encoder.shouldEncodeSensitiveData
+            switch self {
+            case .xormask(let mask):
+                map = ["xormask": ["mask": mask.toData().base64EncodedString()]]
+            case .xorptrpos:
+                map = ["xorptrpos": [:]]
+            case .reverse:
+                map = ["reverse": [:]]
+            case .obfuscate(let mask):
+                map = ["obfuscate": ["mask": mask.toData().base64EncodedString()]]
+            }
+            try container.encode(map)
+            return
+        }
+
+        // Tagged union (cross friendly)
         var container = encoder.container(keyedBy: CodingKeys.self)
         let discriminator: Discriminator
         let mask: SecureData?
