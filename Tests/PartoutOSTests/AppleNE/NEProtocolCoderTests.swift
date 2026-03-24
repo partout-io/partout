@@ -7,13 +7,14 @@ import PartoutCore
 import Testing
 
 struct NEProtocolCoderTests {
-    @Test
-    func givenProfile_whenEncodeToProvider_thenDecodes() throws {
+    @Test(arguments: [false, true])
+    func givenProfile_whenEncodeToProvider_thenDecodes(withLegacyEncoding: Bool) throws {
         let profile = try newProfile()
         let sut = ProviderNEProtocolCoder(
             .global,
             tunnelBundleIdentifier: bundleIdentifier,
-            registry: newRegistry()
+            registry: newRegistry(),
+            withLegacyEncoding: withLegacyEncoding
         )
 
         let proto = try sut.protocolConfiguration(from: profile, title: \.name)
@@ -24,14 +25,15 @@ struct NEProtocolCoderTests {
         #expect(decodedProfile == profile)
     }
 
-    @Test
-    func givenProfile_whenEncodeToKeychain_thenDecodes() throws {
+    @Test(arguments: [false, true])
+    func givenProfile_whenEncodeToKeychain_thenDecodes(withLegacyEncoding: Bool) throws {
         let profile = try newProfile()
         let sut = KeychainNEProtocolCoder(
             .global,
             tunnelBundleIdentifier: bundleIdentifier,
             registry: newRegistry(),
-            keychain: MockKeychain()
+            keychain: MockKeychain(),
+            withLegacyEncoding: withLegacyEncoding
         )
 
         let proto = try sut.protocolConfiguration(from: profile, title: \.name)

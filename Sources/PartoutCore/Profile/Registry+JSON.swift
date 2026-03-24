@@ -3,20 +3,22 @@
 // SPDX-License-Identifier: GPL-3.0
 
 extension Registry {
-    public func json(fromProfiles profiles: [Profile]) throws -> String {
-        try RegistryJSONEncoder(self).encode(profiles.map(\.asCodableProfile))
+    public func json(fromProfiles profiles: [Profile], withLegacyEncoding: Bool) throws -> String {
+        try RegistryJSONEncoder(self, withLegacyEncoding: withLegacyEncoding)
+            .encode(profiles.map(\.asCodableProfile))
     }
 
-    public func json(fromProfile profile: Profile) throws -> String {
-        try RegistryJSONEncoder(self).encode(profile.asCodableProfile)
+    public func json(fromProfile profile: Profile, withLegacyEncoding: Bool) throws -> String {
+        try RegistryJSONEncoder(self, withLegacyEncoding: withLegacyEncoding)
+            .encode(profile.asCodableProfile)
     }
 
     public func profile(fromJSON json: String) throws -> Profile {
-        try profile(fromString: json, decoder: RegistryJSONEncoder(self))
+        try profile(fromString: json, decoder: RegistryJSONEncoder(self, withLegacyEncoding: false))
     }
 
     public func profiles(fromJSON json: String) throws -> [Profile] {
-        try profiles(fromString: json, decoder: RegistryJSONEncoder(self))
+        try profiles(fromString: json, decoder: RegistryJSONEncoder(self, withLegacyEncoding: false))
     }
 
 #if !MINIF_COMPAT
@@ -39,7 +41,7 @@ private final class RegistryJSONEncoder: TextEncoder, TextDecoder {
     private let registry: Registry
     private let withLegacyEncoding: Bool
 
-    init(_ registry: Registry, withLegacyEncoding: Bool = false) {
+    init(_ registry: Registry, withLegacyEncoding: Bool) {
         self.registry = registry
         self.withLegacyEncoding = withLegacyEncoding
     }

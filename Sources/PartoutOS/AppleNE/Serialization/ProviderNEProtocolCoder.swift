@@ -12,14 +12,22 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
 
     private let registry: Registry
 
-    public init(_ ctx: PartoutLoggerContext, tunnelBundleIdentifier: String, registry: Registry) {
+    private let withLegacyEncoding: Bool
+
+    public init(
+        _ ctx: PartoutLoggerContext,
+        tunnelBundleIdentifier: String,
+        registry: Registry,
+        withLegacyEncoding: Bool
+    ) {
         self.ctx = ctx
         self.tunnelBundleIdentifier = tunnelBundleIdentifier
         self.registry = registry
+        self.withLegacyEncoding = withLegacyEncoding
     }
 
     public func protocolConfiguration(from profile: Profile, title: (Profile) -> String) throws -> NETunnelProviderProtocol {
-        let encoded = try registry.json(fromProfile: profile)
+        let encoded = try registry.json(fromProfile: profile, withLegacyEncoding: withLegacyEncoding)
 
         let proto = NETunnelProviderProtocol()
         proto.providerBundleIdentifier = tunnelBundleIdentifier
