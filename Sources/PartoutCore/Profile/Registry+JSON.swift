@@ -51,7 +51,9 @@ private final class RegistryJSONEncoder: TextEncoder, TextDecoder {
     }
 
     func decode<T>(_ type: T.Type, string: String) throws -> T where T: Decodable {
-        let decoder = JSONDecoder(userInfo: [.moduleDecoder: registry])
+        let decoder = JSONDecoder(userInfo: [
+            .moduleDecoder: registry
+        ])
         guard let json = string.data(using: .utf8) else {
             throw PartoutError(.decoding, "Not a UTF-8 input")
         }

@@ -96,6 +96,7 @@ extension Registry {
 
 extension CodingUserInfoKey {
     static let moduleDecoder = CodingUserInfoKey(rawValue: "moduleDecoder")!
+    public static let legacySwiftEncoding = CodingUserInfoKey(rawValue: "legacySwiftEncoding")!
 }
 
 extension Registry {
