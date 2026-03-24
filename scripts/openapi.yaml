@@ -156,6 +156,14 @@ components:
         - udp6
         - tcp6
       type: string
+    Int16:
+      type: integer
+    Int32:
+      type: integer
+    Int64:
+      type: integer
+    Int8:
+      type: integer
     ModuleType:
       type: string
     OnDemandModule:
@@ -613,6 +621,8 @@ components:
     UInt32:
       type: integer
     UInt64:
+      type: integer
+    UInt8:
       type: integer
     UniqueID:
       type: string
