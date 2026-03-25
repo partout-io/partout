@@ -43,7 +43,9 @@ final class TunnelRemoteInfoGenerator: Sendable {
             wgSettings.append("public_key=\(publicKey)\n")
             guard let endpoint = peer.endpoint else { continue }
             for resolvedEndpoint in resolutionMap[endpoint.address] ?? [] {
-                if case .hostname = resolvedEndpoint.address { assert(false, "Endpoint is not resolved") }
+                if case .hostname = resolvedEndpoint.address {
+                    assertionFailure("Endpoint is not resolved")
+                }
                 wgSettings.append("endpoint=\(resolvedEndpoint.wgRepresentation)\n")
             }
         }
@@ -82,7 +84,9 @@ final class TunnelRemoteInfoGenerator: Sendable {
             }
             guard let endpoint = peer.endpoint else { continue }
             for resolvedEndpoint in resolutionMap[endpoint.address] ?? [] {
-                if case .hostname = resolvedEndpoint.address { assert(false, "Endpoint is not resolved") }
+                if case .hostname = resolvedEndpoint.address {
+                    assertionFailure("Endpoint is not resolved")
+                }
                 wgSettings.append("endpoint=\(resolvedEndpoint.wgRepresentation)\n")
             }
             let persistentKeepAlive = peer.keepAlive ?? 0
