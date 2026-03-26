@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutOpenVPN_C
+internal import _PartoutOpenVPNConnection_C
 
 // TODO: #142/notes, LINK and TUN should be able to run detached in full-duplex
 extension OpenVPNSession {

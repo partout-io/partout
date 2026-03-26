@@ -201,7 +201,7 @@ package.targets.append(
 if areas.contains(.openVPN), cryptoMode != nil {
     package.targets.append(contentsOf: [
         .target(
-            name: "PartoutOpenVPN_C",
+            name: "PartoutOpenVPNConnection_C",
             dependencies: ["_PartoutCryptoImpl_C"],
             cSettings: globalCSettings
         ),
@@ -209,7 +209,7 @@ if areas.contains(.openVPN), cryptoMode != nil {
             name: "PartoutOpenVPNConnection",
             dependencies: [
                 "PartoutOpenVPN",
-                "PartoutOpenVPN_C"
+                "PartoutOpenVPNConnection_C"
             ]
         ),
         .testTarget(

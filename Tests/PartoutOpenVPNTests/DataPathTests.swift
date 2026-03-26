@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import _PartoutOpenVPN_C
+import _PartoutOpenVPNConnection_C
 import PartoutCore
 @testable import PartoutOpenVPNConnection
 import Testing
