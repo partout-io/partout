@@ -8,12 +8,25 @@
 // - TaggedModule
 // - TaggedModule.Discriminator
 
-/// An encodable wrapper for core modules.
-enum TaggedModule: Sendable {
+/// A codable wrapper for statically known modules.
+public enum TaggedModule: Hashable, Sendable {
     case DNS(DNSModule)
     case HTTPProxy(HTTPProxyModule)
     case IP(IPModule)
     case OnDemand(OnDemandModule)
+    case OpenVPN(OpenVPNModule)
+    case WireGuard(WireGuardModule)
+
+    var containedModule: Module & Codable {
+        switch self {
+        case .DNS(let module): module
+        case .HTTPProxy(let module): module
+        case .IP(let module): module
+        case .OnDemand(let module): module
+        case .OpenVPN(let module): module
+        case .WireGuard(let module): module
+        }
+    }
 }
 
 extension Module {
@@ -27,15 +40,41 @@ extension Module {
             return .IP(module)
         case let module as OnDemandModule:
             return .OnDemand(module)
+        case let module as OpenVPNModule:
+            return .OpenVPN(module)
+        case let module as WireGuardModule:
+            return .WireGuard(module)
         default:
-            assertionFailure("Unhandled Core module: \(self)")
+            assertionFailure("Unhandled module: \(self)")
             return nil
         }
     }
 }
 
-extension TaggedModule: Encodable {
-    func encode(to encoder: Encoder) throws {
+extension TaggedModule: Codable {
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let rawType = try container.decode(String.self, forKey: .type)
+        guard let type = Discriminator(rawValue: rawType) else {
+            throw PartoutError(.decoding, "Unknown discriminator '\(rawType)'")
+        }
+        switch type {
+        case .DNS:
+            self = .DNS(try DNSModule(from: decoder))
+        case .HTTPProxy:
+            self = .HTTPProxy(try HTTPProxyModule(from: decoder))
+        case .IP:
+            self = .IP(try IPModule(from: decoder))
+        case .OnDemand:
+            self = .OnDemand(try OnDemandModule(from: decoder))
+        case .OpenVPN:
+            self = .OpenVPN(try OpenVPNModule(from: decoder))
+        case .WireGuard:
+            self = .WireGuard(try WireGuardModule(from: decoder))
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(discriminator.rawValue, forKey: .type)
         try encodePayload(to: &container)
@@ -53,6 +92,8 @@ private extension TaggedModule {
         case HTTPProxy
         case IP
         case OnDemand
+        case OpenVPN
+        case WireGuard
     }
 
     var discriminator: Discriminator {
@@ -61,15 +102,8 @@ private extension TaggedModule {
         case .HTTPProxy: .HTTPProxy
         case .IP: .IP
         case .OnDemand: .OnDemand
-        }
-    }
-
-    var containedModule: Module & Encodable {
-        switch self {
-        case .DNS(let module): module
-        case .HTTPProxy(let module): module
-        case .IP(let module): module
-        case .OnDemand(let module): module
+        case .OpenVPN: .OpenVPN
+        case .WireGuard: .WireGuard
         }
     }
 

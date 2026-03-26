@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@testable import PartoutCore
 import Foundation
+import Partout
 import Testing
 
 struct TaggedModuleTests {

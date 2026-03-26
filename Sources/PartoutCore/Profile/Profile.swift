@@ -77,8 +77,8 @@ extension Profile {
 
         public var check: ((Self) throws -> Void)?
 
-        init(
-            version: Int?,
+        public init(
+            version: Int? = nil,
             id: UniqueID = UniqueID(),
             name: String = "",
             modules: [Module] = [],
@@ -86,32 +86,13 @@ extension Profile {
             behavior: ProfileBehavior? = nil,
             userInfo: JSON? = nil
         ) {
-            self.version = version
+            self.version = version ?? Self.currentVersion
             self.id = id
             self.name = name
             self.modules = modules
             self.activeModulesIds = activeModulesIds
             self.behavior = behavior
             self.userInfo = userInfo
-        }
-
-        public init(
-            id: UniqueID = UniqueID(),
-            name: String = "",
-            modules: [Module] = [],
-            activeModulesIds: Set<UniqueID> = [],
-            behavior: ProfileBehavior? = nil,
-            userInfo: JSON? = nil
-        ) {
-            self.init(
-                version: Self.currentVersion,
-                id: id,
-                name: name,
-                modules: modules,
-                activeModulesIds: activeModulesIds,
-                behavior: behavior,
-                userInfo: userInfo
-            )
         }
 
         public init(
