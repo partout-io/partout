@@ -417,7 +417,12 @@ enum Area: CaseIterable {
     case openVPN
     case wireGuard
 
-    var define: String? { nil }
+    var define: String? {
+        switch self {
+        case .openVPN: "PARTOUT_OPENVPN"
+        case .wireGuard: "PARTOUT_WIREGUARD"
+        }
+    }
 }
 
 enum OS: String, CaseIterable {
