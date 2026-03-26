@@ -3,21 +3,14 @@
 // SPDX-License-Identifier: GPL-3.0
 
 extension Registry {
-    private static let knownHandlers: [ModuleHandler] = {
-        var handlers: [ModuleHandler] = [
-            DNSModule.moduleHandler,
-            HTTPProxyModule.moduleHandler,
-            IPModule.moduleHandler,
-            OnDemandModule.moduleHandler
-        ]
-#if PARTOUT_OPENVPN
-        handlers.append(OpenVPNModule.moduleHandler)
-#endif
-#if PARTOUT_WIREGUARD
-        handlers.append(WireGuardModule.moduleHandler)
-#endif
-        return handlers
-    }()
+    private static let knownHandlers: [ModuleHandler] = [
+        DNSModule.moduleHandler,
+        HTTPProxyModule.moduleHandler,
+        IPModule.moduleHandler,
+        OnDemandModule.moduleHandler,
+        OpenVPNModule.moduleHandler,
+        WireGuardModule.moduleHandler
+    ]
 
     /// Returns a ``Registry`` with the known module handlers and resolvers and an empty device ID.
     public convenience init() {

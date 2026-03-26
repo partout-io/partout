@@ -72,8 +72,6 @@ add_library(partout STATIC "")
 # Define symbols to skip Swift imports and legacy code
 target_compile_options(partout PRIVATE
     -DUSE_CMAKE
-    -DPARTOUT_OPENVPN
-    -DPARTOUT_WIREGUARD
     -enable-library-evolution
 )
 

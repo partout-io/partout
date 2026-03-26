@@ -5,17 +5,11 @@
 import Partout
 import Testing
 
-#if PARTOUT_OPENVPN
-import PartoutOpenVPN
-#endif
-#if PARTOUT_WIREGUARD
-import PartoutWireGuard
-#endif
 import PartoutCore
+import PartoutOpenVPN
+import PartoutWireGuard
 
 struct RegistryTests {
-
-#if PARTOUT_OPENVPN && PARTOUT_WIREGUARD
     @Test(arguments: [false, true])
     func givenKnownHandlers_whenSerializeProfile_thenIsDeserialized(withLegacyEncoding: Bool) throws {
         let sut = Registry()
@@ -45,5 +39,4 @@ struct RegistryTests {
         let decoded = try sut.profile(fromJSON: encoded)
         #expect(profile == decoded)
     }
-#endif
 }
