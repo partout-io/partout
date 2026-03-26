@@ -14,7 +14,7 @@ target_compile_options(partout_c PRIVATE
 set(PARTOUT_C_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/MiniFoundation_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCore_C/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/PartoutOpenVPN_C/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/PartoutOpenVPNConnection_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuard_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuardConnection_C/include
 )
@@ -72,8 +72,6 @@ add_library(partout STATIC "")
 # Define symbols to skip Swift imports and legacy code
 target_compile_options(partout PRIVATE
     -DUSE_CMAKE
-    -DPARTOUT_OPENVPN
-    -DPARTOUT_WIREGUARD
     -enable-library-evolution
 )
 

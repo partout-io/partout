@@ -9,18 +9,14 @@
 
 // MARK: - Optional
 
-#if PARTOUT_OPENVPN
 @_exported import PartoutOpenVPN
-#if !PARTOUT_FOR_PREVIEWS
+#if PARTOUT_OPENVPN
 @_exported import PartoutOpenVPNConnection
 #endif
-#endif
 
-#if PARTOUT_WIREGUARD
 @_exported import PartoutWireGuard
-#if !PARTOUT_FOR_PREVIEWS
+#if PARTOUT_WIREGUARD
 @_exported import PartoutWireGuardConnection
-#endif
 #endif
 
 #endif

@@ -22,7 +22,6 @@ let wgGoVersion: Version = "0.0.2025063103"
 let cmakeOutput = envCMakeOutput ?? "bin/windows-arm64"
 let useFoundationCompatibility: FoundationCompatibility = .off
 // let useFoundationCompatibility: FoundationCompatibility = OS.current != .apple ? .on : .off
-let forPreviews = false
 
 // MARK: - Package
 
@@ -71,32 +70,21 @@ let package = Package(
                 if cryptoMode != nil {
                     list.append("_PartoutCryptoImpl_C")
                     if areas.contains(.openVPN) {
-                        if forPreviews {
-                            list.append("PartoutOpenVPN")
-                        } else {
-                            list.append("PartoutOpenVPNConnection")
-                        }
+                        list.append("PartoutOpenVPNConnection")
+                    } else {
+                        list.append("PartoutOpenVPN")
                     }
                 }
                 if areas.contains(.wireGuard) {
-                    if forPreviews {
-                        list.append("PartoutWireGuard")
-                    } else {
-                        list.append("PartoutWireGuardConnection")
-                    }
+                    list.append("PartoutWireGuardConnection")
+                } else {
+                    list.append("PartoutWireGuard")
                 }
                 return list
             }(),
-            swiftSettings: {
-                var list: [SwiftSetting] = areas.compactMap(\.define).map {
-                    .define($0)
-                }
-                if forPreviews {
-                    list.append(.define("PARTOUT_FOR_PREVIEWS"))
-                }
-                list.append(contentsOf: useFoundationCompatibility.swiftSettings)
-                return list
-            }()
+            swiftSettings: areas.compactMap(\.define).map {
+                .define($0)
+            } + useFoundationCompatibility.swiftSettings
         ),
         .testTarget(
             name: "PartoutTests",
@@ -196,48 +184,67 @@ package.targets.append(contentsOf: [
 
 // MARK: OpenVPN
 
+package.products.append(
+    .library(
+        name: "PartoutOpenVPN",
+        targets: ["PartoutOpenVPN"]
+    )
+)
+package.targets.append(
+    .target(
+        name: "PartoutOpenVPN",
+        dependencies: ["PartoutOS"]
+    )
+)
+
 // OpenVPN requires Crypto/TLS wrappers
-if areas.contains(.openVPN) {
-    package.products.append(
-        .library(
-            name: "PartoutOpenVPN",
-            targets: ["PartoutOpenVPN"]
-        )
-    )
-    package.targets.append(
+if areas.contains(.openVPN), cryptoMode != nil {
+    package.targets.append(contentsOf: [
         .target(
-            name: "PartoutOpenVPN",
-            dependencies: ["PartoutOS"]
+            name: "PartoutOpenVPNConnection_C",
+            dependencies: ["_PartoutCryptoImpl_C"],
+            cSettings: globalCSettings
+        ),
+        .target(
+            name: "PartoutOpenVPNConnection",
+            dependencies: [
+                "PartoutOpenVPN",
+                "PartoutOpenVPNConnection_C"
+            ]
+        ),
+        .testTarget(
+            name: "PartoutOpenVPNTests",
+            dependencies: ["PartoutOpenVPNConnection"],
+            exclude: useFoundationCompatibility.openVPNTestsExclude + ["DataPathPerformanceTests.swift"],
+            resources: [
+                .process("Resources")
+            ],
+            swiftSettings: useFoundationCompatibility.swiftSettings
         )
-    )
-    if cryptoMode != nil {
-        package.targets.append(contentsOf: [
-            .target(
-                name: "PartoutOpenVPN_C",
-                dependencies: ["_PartoutCryptoImpl_C"],
-                cSettings: globalCSettings
-            ),
-            .target(
-                name: "PartoutOpenVPNConnection",
-                dependencies: [
-                    "PartoutOpenVPN",
-                    "PartoutOpenVPN_C"
-                ]
-            ),
-            .testTarget(
-                name: "PartoutOpenVPNTests",
-                dependencies: ["PartoutOpenVPNConnection"],
-                exclude: useFoundationCompatibility.openVPNTestsExclude + ["DataPathPerformanceTests.swift"],
-                resources: [
-                    .process("Resources")
-                ],
-                swiftSettings: useFoundationCompatibility.swiftSettings
-            )
-        ])
-    }
+    ])
 }
 
 // MARK: WireGuard
+
+package.products.append(
+    .library(
+        name: "PartoutWireGuard",
+        targets: ["PartoutWireGuard"]
+    )
+)
+package.targets.append(contentsOf: [
+    .target(
+        name: "PartoutWireGuard",
+        dependencies: [
+            "PartoutOS",
+            "PartoutWireGuard_C"
+        ]
+    ),
+    .target(
+        name: "PartoutWireGuard_C",
+        dependencies: ["PartoutCore_C"]
+    )
+])
 
 if areas.contains(.wireGuard) {
     switch OS.current {
@@ -271,24 +278,7 @@ if areas.contains(.wireGuard) {
             )
         )
     }
-    package.products.append(
-        .library(
-            name: "PartoutWireGuard",
-            targets: ["PartoutWireGuard"]
-        )
-    )
     package.targets.append(contentsOf: [
-        .target(
-            name: "PartoutWireGuard",
-            dependencies: [
-                "PartoutOS",
-                "PartoutWireGuard_C"
-            ]
-        ),
-        .target(
-            name: "PartoutWireGuard_C",
-            dependencies: ["PartoutCore_C"]
-        ),
         .target(
             name: "PartoutWireGuardConnection",
             dependencies: [
@@ -427,12 +417,7 @@ enum Area: CaseIterable {
     case openVPN
     case wireGuard
 
-    var define: String? {
-        switch self {
-        case .openVPN: "PARTOUT_OPENVPN"
-        case .wireGuard: "PARTOUT_WIREGUARD"
-        }
-    }
+    var define: String? { nil }
 }
 
 enum OS: String, CaseIterable {
