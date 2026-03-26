@@ -5,16 +5,16 @@
 #if !USE_CMAKE
 
 @_exported import PartoutCore
+@_exported import PartoutOpenVPN
 @_exported import PartoutOS
+@_exported import PartoutWireGuard
 
 // MARK: - Optional
 
-@_exported import PartoutOpenVPN
 #if PARTOUT_OPENVPN
 @_exported import PartoutOpenVPNConnection
 #endif
 
-@_exported import PartoutWireGuard
 #if PARTOUT_WIREGUARD
 @_exported import PartoutWireGuardConnection
 #endif

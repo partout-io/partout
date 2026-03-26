@@ -3,10 +3,10 @@ package io.partout.jni
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
-import io.partout.abi.TaggedModuledns
-import io.partout.abi.TaggedModulehttpProxy
-import io.partout.abi.TaggedModuleip
-import io.partout.abi.TaggedModuleonDemand
+import io.partout.abi.TaggedModuleDNS
+import io.partout.abi.TaggedModuleHTTPProxy
+import io.partout.abi.TaggedModuleIP
+import io.partout.abi.TaggedModuleOnDemand
 import io.partout.abi.TunnelRemoteInfoWrapper
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
@@ -47,18 +47,19 @@ class PartoutVpnWrapper: AutoCloseable {
 
         info.modules?.forEach {
             when (it) {
-                is TaggedModuledns -> {
+                is TaggedModuleDNS -> {
                     Log.i(logTag, "DNS: ${it.value}")
                 }
-                is TaggedModuleip -> {
+                is TaggedModuleIP -> {
                     Log.i(logTag, "IP: ${it.value}")
                 }
-                is TaggedModulehttpProxy -> {
+                is TaggedModuleHTTPProxy -> {
                     Log.i(logTag, "HTTP Proxy: ${it.value}")
                 }
-                is TaggedModuleonDemand -> {
+                is TaggedModuleOnDemand -> {
                     Log.i(logTag, "OnDemand: ${it.value}")
                 }
+                else -> {}
             }
         }
 

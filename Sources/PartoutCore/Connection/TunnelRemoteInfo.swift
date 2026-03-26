@@ -28,23 +28,3 @@ public struct TunnelRemoteInfo: Sendable {
         self.requiresVirtualDevice = requiresVirtualDevice
     }
 }
-
-struct TunnelRemoteInfoWrapper: Encodable, Sendable {
-    let originalModuleId: UniqueID
-
-    let address: Address?
-
-    let fileDescriptors: [UInt64]
-
-    let requiresVirtualDevice: Bool
-
-    let modules: [TaggedModule]?
-
-    init(_ info: TunnelRemoteInfo) {
-        originalModuleId = info.originalModuleId
-        address = info.address
-        fileDescriptors = info.fileDescriptors
-        requiresVirtualDevice = info.requiresVirtualDevice
-        modules = info.modules?.compactMap(\.taggedModule)
-    }
-}

@@ -531,6 +531,8 @@ components:
           HTTPProxy: "#/components/schemas/TaggedModule.HTTPProxy"
           IP: "#/components/schemas/TaggedModule.IP"
           OnDemand: "#/components/schemas/TaggedModule.OnDemand"
+          OpenVPN: "#/components/schemas/TaggedModule.OpenVPN"
+          WireGuard: "#/components/schemas/TaggedModule.WireGuard"
         propertyName: type
       properties:
         type:
@@ -593,6 +595,61 @@ components:
       required:
         - type
         - value
+      type: object
+    TaggedModule.OpenVPN:
+      additionalProperties: false
+      allOf:
+        - "$ref": "#/components/schemas/TaggedModule"
+      properties:
+        type:
+          const: OpenVPN
+          type: string
+        value:
+          "$ref": "#/components/schemas/OpenVPNModule"
+      required:
+        - type
+        - value
+      type: object
+    TaggedModule.WireGuard:
+      additionalProperties: false
+      allOf:
+        - "$ref": "#/components/schemas/TaggedModule"
+      properties:
+        type:
+          const: WireGuard
+          type: string
+        value:
+          "$ref": "#/components/schemas/WireGuardModule"
+      required:
+        - type
+        - value
+      type: object
+    TaggedProfile:
+      additionalProperties: false
+      properties:
+        activeModulesIds:
+          items:
+            "$ref": "#/components/schemas/UniqueID"
+          type: array
+          uniqueItems: true
+        behavior:
+          "$ref": "#/components/schemas/ProfileBehavior"
+        id:
+          "$ref": "#/components/schemas/UniqueID"
+        modules:
+          items:
+            "$ref": "#/components/schemas/TaggedModule"
+          type: array
+        name:
+          type: string
+        userInfo: {}
+        version:
+          type: integer
+      required:
+        - id
+        - name
+        - modules
+        - activeModulesIds
       type: object
     TunnelRemoteInfoWrapper:
       additionalProperties: false

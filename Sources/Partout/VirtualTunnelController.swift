@@ -120,3 +120,36 @@ public final class VirtualTunnelController: TunnelController {
 }
 
 #endif
+
+final class DummyTunnelInterface: IOInterface {
+    var fileDescriptor: UInt64? {
+        nil
+    }
+
+    func readPackets() async throws -> [Data] {
+        []
+    }
+
+    func writePackets(_ packets: [Data]) async throws {
+    }
+}
+
+struct TunnelRemoteInfoWrapper: Encodable, Sendable {
+    let originalModuleId: UniqueID
+
+    let address: Address?
+
+    let fileDescriptors: [UInt64]
+
+    let requiresVirtualDevice: Bool
+
+    let modules: [TaggedModule]?
+
+    init(_ info: TunnelRemoteInfo) {
+        originalModuleId = info.originalModuleId
+        address = info.address
+        fileDescriptors = info.fileDescriptors
+        requiresVirtualDevice = info.requiresVirtualDevice
+        modules = info.modules?.compactMap(\.taggedModule)
+    }
+}
