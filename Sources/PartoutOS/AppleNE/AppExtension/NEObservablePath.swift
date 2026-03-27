@@ -66,13 +66,13 @@ extension NEObservablePath {
 
 private extension NWPath {
     var isSatisfiable: Bool {
-        let target: [NWInterface.InterfaceType] = [
-            .cellular, .wifi, .wiredEthernet
-        ]
-        let isAvailable = target.contains {
-            usesInterfaceType($0)
+        switch status {
+        case .requiresConnection, .satisfied:
+            return true
+        case .unsatisfied:
+            return false
+        @unknown default:
+            return true
         }
-        guard isAvailable else { return false }
-        return status == .satisfied
     }
 }
