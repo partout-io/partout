@@ -45,10 +45,17 @@ final class TunnelRemoteInfoGenerator: Sendable {
                   let resolvedEndpoint = resolutionMap[endpoint] else {
                 continue
             }
-            if case .hostname = resolvedEndpoint.address {
+            let reresolvedEndpoint: Endpoint
+            do {
+                reresolvedEndpoint = try resolvedEndpoint.withReresolvedIP()
+            } catch {
+                pp_log(ctx, .wireguard, .error, "Unable to re-resolve endpoint: \(error)")
+                reresolvedEndpoint = resolvedEndpoint
+            }
+            if case .hostname = reresolvedEndpoint.address {
                 assertionFailure("Endpoint is not resolved")
             }
-            wgSettings.append("endpoint=\(resolvedEndpoint.wgRepresentation)\n")
+            wgSettings.append("endpoint=\(reresolvedEndpoint.wgRepresentation)\n")
         }
         return wgSettings
     }
@@ -87,10 +94,17 @@ final class TunnelRemoteInfoGenerator: Sendable {
                   let resolvedEndpoint = resolutionMap[endpoint] else {
                 continue
             }
-            if case .hostname = resolvedEndpoint.address {
+            let reresolvedEndpoint: Endpoint
+            do {
+                reresolvedEndpoint = try resolvedEndpoint.withReresolvedIP()
+            } catch {
+                pp_log(ctx, .wireguard, .error, "Unable to re-resolve endpoint: \(error)")
+                reresolvedEndpoint = resolvedEndpoint
+            }
+            if case .hostname = reresolvedEndpoint.address {
                 assertionFailure("Endpoint is not resolved")
             }
-            wgSettings.append("endpoint=\(resolvedEndpoint.wgRepresentation)\n")
+            wgSettings.append("endpoint=\(reresolvedEndpoint.wgRepresentation)\n")
             let persistentKeepAlive = peer.keepAlive ?? 0
             wgSettings.append("persistent_keepalive_interval=\(persistentKeepAlive)\n")
             if !peer.allowedIPs.isEmpty {
@@ -216,5 +230,69 @@ final class TunnelRemoteInfoGenerator: Sendable {
             }
         }
         return (ipv4IncludedRoutes, ipv6IncludedRoutes)
+    }
+}
+
+private extension Endpoint {
+    func withReresolvedIP() throws -> Endpoint {
+#if os(iOS) || os(tvOS)
+        let hostname = address.rawValue
+
+        var hints = addrinfo()
+        hints.ai_family = AF_UNSPEC
+        hints.ai_socktype = SOCK_DGRAM
+        hints.ai_protocol = IPPROTO_UDP
+        hints.ai_flags = 0
+
+        var resultPointer: UnsafeMutablePointer<addrinfo>?
+        defer {
+            resultPointer.flatMap {
+                freeaddrinfo($0)
+            }
+        }
+
+        let errorCode = getaddrinfo(hostname, "\(port)", &hints, &resultPointer)
+        if errorCode != 0 {
+            throw PartoutError(.dnsFailure)
+        }
+
+        var next = resultPointer
+        while let addrInfo = next?.pointee {
+            if let endpoint = Self.endpoint(from: addrInfo, port: port) {
+                return endpoint
+            }
+            next = addrInfo.ai_next
+        }
+        throw PartoutError(.dnsFailure)
+#else
+        return self
+#endif
+    }
+
+    private static func endpoint(from addrInfo: addrinfo, port: UInt16) -> Endpoint? {
+        guard let addr = addrInfo.ai_addr else {
+            return nil
+        }
+        var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+#if os(Windows)
+        let hostBufferLength = DWORD(hostBuffer.count)
+#elseif os(Android)
+        let hostBufferLength = Int(hostBuffer.count)
+#else
+        let hostBufferLength = socklen_t(hostBuffer.count)
+#endif
+        let result = getnameinfo(
+            addr,
+            socklen_t(addrInfo.ai_addrlen),
+            &hostBuffer,
+            hostBufferLength,
+            nil,
+            0,
+            NI_NUMERICHOST
+        )
+        guard result == 0 else {
+            return nil
+        }
+        return try? Endpoint(hostBuffer.string, port)
     }
 }
