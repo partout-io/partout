@@ -7,10 +7,10 @@
 /// - Throws: an error of type `WireGuardAdapterError`.
 /// - Returns: The list of resolved endpoints.
 extension WireGuard.Configuration {
-    actor ResolvedMap {
-        private var map: [Address: [Endpoint]] = [:]
+    actor ResolvedMapV2 {
+        private var map: [Endpoint: Endpoint] = [:]
 
-        func setEndpoints(_ endpoints: [Endpoint], for address: Address) {
+        func setEndpoints(_ endpoints: [Endpoint], for sourceEndpoint: Endpoint) {
             assert(!endpoints.isEmpty, "Assigning empty resolved endpoints")
             let targetEndpoint: Endpoint? = {
                 // All resolved IPv4 addresses
@@ -27,24 +27,24 @@ extension WireGuard.Configuration {
                 return firstEndpoint
             }()
             guard let targetEndpoint else { return }
-            map = [address: [targetEndpoint]]
+            map[sourceEndpoint] = targetEndpoint
         }
 
-        func toMap() -> [Address: [Endpoint]] {
+        func toMap() -> [Endpoint: Endpoint] {
             map
         }
     }
 
-    func resolvePeers(
+    func resolvePeersV2(
         timeout: Int,
         logHandler: @escaping WireGuardAdapter.LogHandler
-    ) async -> [Address: [Endpoint]] {
+    ) async -> [Endpoint: Endpoint] {
         let endpoints = peers.compactMap(\.endpoint)
         let resolver = SimpleDNSResolver {
             POSIXDNSStrategy(hostname: $0)
         }
-        return await withTaskGroup(returning: [Address: [Endpoint]].self) { group in
-            let allResolved = ResolvedMap()
+        return await withTaskGroup(returning: [Endpoint: Endpoint].self) { group in
+            let allResolved = ResolvedMapV2()
             for endpoint in endpoints {
                 group.addTask { @Sendable in
                     do {
@@ -63,7 +63,7 @@ extension WireGuard.Configuration {
                                 logHandler(.verbose, "DNS64: mapped \(endpoint.address) to \(record.address)")
                             }
                         }
-                        await allResolved.setEndpoints(currentResolved, for: endpoint.address)
+                        await allResolved.setEndpoints(currentResolved, for: endpoint)
                     } catch {
                         logHandler(.error, "Failed to resolve endpoint \(endpoint.address.asSensitiveAddress(.global)): \(error.localizedDescription)")
                     }

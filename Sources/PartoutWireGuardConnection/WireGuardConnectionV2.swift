@@ -13,7 +13,7 @@
 #endif
 
 /// Establishes a WireGuard connection.
-public actor WireGuardConnection: Connection {
+public actor WireGuardConnectionV2: Connection {
     private let ctx: PartoutLoggerContext
 
     private let statusSubject: CurrentValueStream<ConnectionStatus>
@@ -34,7 +34,7 @@ public actor WireGuardConnection: Connection {
 
     private var dataCountTimer: Task<Void, Error>?
 
-    private var adapter: WireGuardAdapter?
+    private var adapter: WireGuardAdapterV2?
 
     public init(
         _ ctx: PartoutLoggerContext,
@@ -52,14 +52,14 @@ public actor WireGuardConnection: Connection {
         guard let configuration = module.configuration else {
             throw PartoutError(.incompleteModule)
         }
-        pp_log(ctx, .wireguard, .notice, "WireGuard: Using cross-platform connection")
+        pp_log(ctx, .wireguard, .notice, "WireGuard: Using cross-platform connection V2")
 
-        tunnelConfiguration = try configuration.withModules(from: parameters.profile)
+        tunnelConfiguration = try configuration.withModulesV2(from: parameters.profile)
         dataCountTimerInterval = TimeInterval(parameters.options.minDataCountInterval) / 1000.0
     }
 
     deinit {
-        pp_log(ctx, .wireguard, .info, "Deinit WireGuardConnection")
+        pp_log(ctx, .wireguard, .info, "Deinit WireGuardConnectionV2")
     }
 
     public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
@@ -68,14 +68,14 @@ public actor WireGuardConnection: Connection {
 
     public func start() async throws -> Bool {
         assert(adapter == nil)
-        adapter = await WireGuardAdapter(
+        adapter = await WireGuardAdapterV2(
             ctx,
             with: self,
             moduleId: moduleId,
             dnsTimeout: dnsTimeout,
             reachability: reachability,
             logHandler: { [weak self] logLevel, message in
-                pp_log(self?.ctx ?? .global, .wireguard, logLevel.debugLevel, message)
+                pp_log(self?.ctx ?? .global, .wireguard, logLevel.debugLevelV2, message)
             }
         )
         guard let adapter else { return false }
@@ -89,7 +89,7 @@ public actor WireGuardConnection: Connection {
                     return
                 }
                 guard !Task.isCancelled else {
-                    pp_log(ctx, .wireguard, .debug, "Cancelled WireGuardConnection.dataCountTimer")
+                    pp_log(ctx, .wireguard, .debug, "Cancelled WireGuardConnectionV2.dataCountTimer")
                     return
                 }
                 await onDataCountTimer()
@@ -141,16 +141,27 @@ public actor WireGuardConnection: Connection {
     }
 }
 
+private extension WireGuardLogLevel {
+    var debugLevelV2: DebugLog.Level {
+        switch self {
+        case .verbose:
+            return .debug
+        case .error:
+            return .error
+        }
+    }
+}
+
 // MARK: - WireGuardAdapterDelegate
 
-extension WireGuardConnection: WireGuardAdapterDelegate {
-    nonisolated func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool) {
+extension WireGuardConnectionV2: WireGuardAdapterV2Delegate {
+    nonisolated func adapterShouldReassert(_ adapter: WireGuardAdapterV2, reasserting: Bool) {
         if reasserting {
             statusSubject.send(.connecting)
         }
     }
 
-    func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: TunnelRemoteInfo) async throws -> IOInterface {
+    func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapterV2, settings: TunnelRemoteInfo) async throws -> IOInterface {
         do {
             let tunnel = try await controller.setTunnelSettings(with: settings)
             pp_log(ctx, .wireguard, .info, "Tunnel interface is now UP")
@@ -163,23 +174,23 @@ extension WireGuardConnection: WireGuardAdapterDelegate {
         }
     }
 
-    nonisolated func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64]) {
+    nonisolated func adapterShouldConfigureSockets(_ adapter: WireGuardAdapterV2, descriptors: [UInt64]) {
         controller.configureSockets(with: descriptors)
     }
 
-    func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapter, tunnel: IOInterface) async {
+    func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapterV2, tunnel: IOInterface) async {
         await controller.clearTunnelSettings(tunnel)
     }
 }
 
 // MARK: - Data count
 
-private extension WireGuardConnection {
+private extension WireGuardConnectionV2 {
     func onDataCountTimer() async {
         guard let adapter else { return }
         guard statusSubject.value == .connected else { return }
         guard let configurationString = await adapter.getRuntimeConfiguration(),
-              let dataCount = DataCount.from(wireGuardString: configurationString) else {
+              let dataCount = DataCount.fromWireGuardStringV2(configurationString) else {
             return
         }
         environment.setEnvironmentValue(dataCount, forKey: TunnelEnvironmentKeys.dataCount)
@@ -187,13 +198,13 @@ private extension WireGuardConnection {
 }
 
 private extension DataCount {
-    static func from(wireGuardString string: String) -> DataCount? {
+    static func fromWireGuardStringV2(_ string: String) -> DataCount? {
         var bytesReceived: UInt?
         var bytesSent: UInt?
         string.enumerateLines { line, stop in
-            if bytesReceived == nil, let value = line.getPrefix("rx_bytes=") {
+            if bytesReceived == nil, let value = line.getPrefixV2("rx_bytes=") {
                 bytesReceived = value
-            } else if bytesSent == nil, let value = line.getPrefix("tx_bytes=") {
+            } else if bytesSent == nil, let value = line.getPrefixV2("tx_bytes=") {
                 bytesSent = value
             }
             if bytesReceived != nil, bytesSent != nil {
@@ -206,7 +217,7 @@ private extension DataCount {
 }
 
 private extension String {
-    func getPrefix(_ prefixKey: String) -> UInt? {
+    func getPrefixV2(_ prefixKey: String) -> UInt? {
         guard hasPrefix(prefixKey) else {
             return nil
         }
@@ -217,7 +228,7 @@ private extension String {
 // MARK: - Helpers
 
 private extension WireGuard.Configuration {
-    func withModules(from profile: Profile) throws -> Self {
+    func withModulesV2(from profile: Profile) throws -> Self {
         var newBuilder = builder()
 
         // add IPModule.*.includedRoutes to AllowedIPs
@@ -226,9 +237,9 @@ private extension WireGuard.Configuration {
                 $0 as? IPModule
             }
             .forEach { ipModule in
-                newBuilder.peers = peers
+                newBuilder.peers = newBuilder.peers
                     .map { oldPeer in
-                        var peer = oldPeer.builder()
+                        var peer = oldPeer
                         ipModule.ipv4?.includedRoutes.forEach { route in
                             peer.allowedIPs.append(route.destination?.rawValue ?? "0.0.0.0/0")
                         }
@@ -248,9 +259,9 @@ private extension WireGuard.Configuration {
                 $0.routesThroughVPN == true
             }
             .forEach { dnsModule in
-                newBuilder.peers = peers
+                newBuilder.peers = newBuilder.peers
                     .map { oldPeer in
-                        var peer = oldPeer.builder()
+                        var peer = oldPeer
                         dnsModule.servers.forEach {
                             switch $0 {
                             case .ip(let addr, let family):
@@ -269,16 +280,5 @@ private extension WireGuard.Configuration {
             }
 
         return try newBuilder.build()
-    }
-}
-
-private extension WireGuardLogLevel {
-    var debugLevel: DebugLog.Level {
-        switch self {
-        case .verbose:
-            return .debug
-        case .error:
-            return .error
-        }
     }
 }

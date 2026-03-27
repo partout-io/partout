@@ -10,7 +10,7 @@
 
 internal import _PartoutWireGuard_C
 
-final class TunnelRemoteInfoGenerator: Sendable {
+final class TunnelRemoteInfoGeneratorV2: Sendable {
     private let ctx: PartoutLoggerContext
 
     private let tunnelConfiguration: WireGuard.Configuration
@@ -28,7 +28,7 @@ final class TunnelRemoteInfoGenerator: Sendable {
         var wgSettings = ""
 
         // address: String -> resolvedEndpoints: [Endpoint]
-        let resolutionMap = await tunnelConfiguration.resolvePeers(
+        let resolutionMap = await tunnelConfiguration.resolvePeersV2(
             timeout: dnsTimeout,
             logHandler: logHandler
         )
@@ -41,11 +41,21 @@ final class TunnelRemoteInfoGenerator: Sendable {
                 continue
             }
             wgSettings.append("public_key=\(publicKey)\n")
-            guard let endpoint = peer.endpoint else { continue }
-            for resolvedEndpoint in resolutionMap[endpoint.address] ?? [] {
-                if case .hostname = resolvedEndpoint.address { assert(false, "Endpoint is not resolved") }
-                wgSettings.append("endpoint=\(resolvedEndpoint.wgRepresentation)\n")
+            guard let endpoint = peer.endpoint,
+                  let resolvedEndpoint = resolutionMap[endpoint] else {
+                continue
             }
+            let reresolvedEndpoint: Endpoint
+            do {
+                reresolvedEndpoint = try resolvedEndpoint.withReresolvedIP()
+            } catch {
+                pp_log(ctx, .wireguard, .error, "Unable to re-resolve endpoint: \(error)")
+                reresolvedEndpoint = resolvedEndpoint
+            }
+            if case .hostname = reresolvedEndpoint.address {
+                assertionFailure("Endpoint is not resolved")
+            }
+            wgSettings.append("endpoint=\(reresolvedEndpoint.wgRepresentation)\n")
         }
         return wgSettings
     }
@@ -57,15 +67,15 @@ final class TunnelRemoteInfoGenerator: Sendable {
         var wgSettings = ""
         wgSettings.append("private_key=\(privateKey)\n")
         // TODO: #93, listenPort not implemented
-//        if let listenPort = tunnelConfiguration.interface.listenPort {
-//            wgSettings.append("listen_port=\(listenPort)\n")
-//        }
+        //        if let listenPort = tunnelConfiguration.interface.listenPort {
+        //            wgSettings.append("listen_port=\(listenPort)\n")
+        //        }
         if !tunnelConfiguration.peers.isEmpty {
             wgSettings.append("replace_peers=true\n")
         }
 
         // address: String -> resolvedEndpoints: [Endpoint]
-        let resolutionMap = await tunnelConfiguration.resolvePeers(
+        let resolutionMap = await tunnelConfiguration.resolvePeersV2(
             timeout: dnsTimeout,
             logHandler: logHandler
         )
@@ -80,11 +90,21 @@ final class TunnelRemoteInfoGenerator: Sendable {
                 let preSharedKey = try preSharedKeyBase64.hexStringFromBase64()
                 wgSettings.append("preshared_key=\(preSharedKey)\n")
             }
-            guard let endpoint = peer.endpoint else { continue }
-            for resolvedEndpoint in resolutionMap[endpoint.address] ?? [] {
-                if case .hostname = resolvedEndpoint.address { assert(false, "Endpoint is not resolved") }
-                wgSettings.append("endpoint=\(resolvedEndpoint.wgRepresentation)\n")
+            guard let endpoint = peer.endpoint,
+                  let resolvedEndpoint = resolutionMap[endpoint] else {
+                continue
             }
+            let reresolvedEndpoint: Endpoint
+            do {
+                reresolvedEndpoint = try resolvedEndpoint.withReresolvedIP()
+            } catch {
+                pp_log(ctx, .wireguard, .error, "Unable to re-resolve endpoint: \(error)")
+                reresolvedEndpoint = resolvedEndpoint
+            }
+            if case .hostname = reresolvedEndpoint.address {
+                assertionFailure("Endpoint is not resolved")
+            }
+            wgSettings.append("endpoint=\(reresolvedEndpoint.wgRepresentation)\n")
             let persistentKeepAlive = peer.keepAlive ?? 0
             wgSettings.append("persistent_keepalive_interval=\(persistentKeepAlive)\n")
             if !peer.allowedIPs.isEmpty {
@@ -153,8 +173,10 @@ final class TunnelRemoteInfoGenerator: Sendable {
             requiresVirtualDevice: requiresVirtualDevice
         )
     }
+}
 
-    private func addresses() -> ([Subnet], [Subnet]) {
+private extension TunnelRemoteInfoGeneratorV2 {
+    func addresses() -> ([Subnet], [Subnet]) {
         var ipv4: [Subnet] = []
         var ipv6: [Subnet] = []
         for subnet in tunnelConfiguration.interface.addresses {
@@ -180,13 +202,13 @@ final class TunnelRemoteInfoGenerator: Sendable {
         return (ipv4, ipv6)
     }
 
-    private func includedRoutes() -> ([Route], [Route]) {
+    func includedRoutes() -> ([Route], [Route]) {
         var ipv4IncludedRoutes: [Route] = []
         var ipv6IncludedRoutes: [Route] = []
         for subnet in tunnelConfiguration.interface.addresses {
             switch subnet.address {
             case .ip(_, let family):
-                let route = Route(subnet, subnet.address)
+                let route = Route(subnet.maskedSubnet, subnet.address)
                 switch family {
                 case .v4: ipv4IncludedRoutes.append(route)
                 case .v6: ipv6IncludedRoutes.append(route)
@@ -210,5 +232,87 @@ final class TunnelRemoteInfoGenerator: Sendable {
             }
         }
         return (ipv4IncludedRoutes, ipv6IncludedRoutes)
+    }
+}
+
+private extension Subnet {
+    var maskedSubnet: Subnet {
+        let maskedAddress: Address? = switch address.family {
+        case .v4:
+            address.network(with: ipv4Mask)
+        case .v6:
+            address.network(with: prefixLength)
+        case nil:
+            nil
+        }
+        guard let maskedAddress,
+              let maskedSubnet = Subnet(maskedAddress, prefixLength) else {
+            fatalError("Could not derive masked route subnet from interface address")
+        }
+        return maskedSubnet
+    }
+}
+
+private extension Endpoint {
+    func withReresolvedIP() throws -> Endpoint {
+#if os(iOS) || os(tvOS)
+        let hostname = address.rawValue
+
+        var hints = addrinfo()
+        hints.ai_family = AF_UNSPEC
+        hints.ai_socktype = SOCK_DGRAM
+        hints.ai_protocol = IPPROTO_UDP
+        hints.ai_flags = 0
+
+        var resultPointer: UnsafeMutablePointer<addrinfo>?
+        defer {
+            resultPointer.flatMap {
+                freeaddrinfo($0)
+            }
+        }
+
+        let errorCode = getaddrinfo(hostname, "\(port)", &hints, &resultPointer)
+        if errorCode != 0 {
+            throw PartoutError(.dnsFailure)
+        }
+
+        var next = resultPointer
+        while let addrInfo = next?.pointee {
+            if let endpoint = Self.endpoint(from: addrInfo, port: port) {
+                return endpoint
+            }
+            next = addrInfo.ai_next
+        }
+        throw PartoutError(.dnsFailure)
+#else
+        return self
+#endif
+    }
+
+    private static func endpoint(from addrInfo: addrinfo, port: UInt16) -> Endpoint? {
+        guard let addr = addrInfo.ai_addr else {
+            return nil
+        }
+        var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+#if os(Windows)
+        let hostBufferLength = DWORD(hostBuffer.count)
+#elseif os(Android)
+        let hostBufferLength = Int(hostBuffer.count)
+#else
+        let hostBufferLength = socklen_t(hostBuffer.count)
+#endif
+        let result = getnameinfo(
+            addr,
+            socklen_t(addrInfo.ai_addrlen),
+            &hostBuffer,
+            hostBufferLength,
+            nil,
+            0,
+            NI_NUMERICHOST
+        )
+        guard result == 0 else {
+            return nil
+        }
+        return try? Endpoint(hostBuffer.string, port)
     }
 }
