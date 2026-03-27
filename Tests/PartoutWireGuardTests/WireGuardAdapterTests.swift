@@ -45,4 +45,33 @@ struct WireGuardAdapterTests {
         #expect(enabledMap[sourceEndpoint1] == resolvedEndpoint1)
         #expect(enabledMap[sourceEndpoint2] == resolvedEndpoint2)
     }
+
+    @Test
+    func givenInterfaceAddresses_whenGeneratingRemoteInfo_thenMasksInterfaceRoutes() throws {
+        let pvtkey = "SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs="
+        let pubkey = "BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw="
+
+        var builder = WireGuard.Configuration.Builder(privateKey: pvtkey)
+        builder.interface.addresses = [
+            "10.0.0.2/24",
+            "fd00::2/64"
+        ]
+        builder.peers = [.init(publicKey: pubkey)]
+
+        let configuration = try builder.build()
+        let sut = TunnelRemoteInfoGenerator(
+            .global,
+            tunnelConfiguration: configuration,
+            dnsTimeout: 1
+        )
+        let info = sut.generateRemoteInfo(moduleId: UniqueID(), descriptors: [])
+        let ipModule = try #require(info.modules?.compactMap {
+            $0 as? IPModule
+        }.first)
+
+        #expect(ipModule.ipv4?.includedRoutes.first?.destination?.rawValue == "10.0.0.0/24")
+        #expect(ipModule.ipv4?.includedRoutes.first?.gateway?.rawValue == "10.0.0.2")
+        #expect(ipModule.ipv6?.includedRoutes.first?.destination?.rawValue == "fd00::/64")
+        #expect(ipModule.ipv6?.includedRoutes.first?.gateway?.rawValue == "fd00::2")
+    }
 }

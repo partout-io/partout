@@ -67,9 +67,9 @@ final class TunnelRemoteInfoGenerator: Sendable {
         var wgSettings = ""
         wgSettings.append("private_key=\(privateKey)\n")
         // TODO: #93, listenPort not implemented
-//        if let listenPort = tunnelConfiguration.interface.listenPort {
-//            wgSettings.append("listen_port=\(listenPort)\n")
-//        }
+        //        if let listenPort = tunnelConfiguration.interface.listenPort {
+        //            wgSettings.append("listen_port=\(listenPort)\n")
+        //        }
         if !tunnelConfiguration.peers.isEmpty {
             wgSettings.append("replace_peers=true\n")
         }
@@ -173,8 +173,10 @@ final class TunnelRemoteInfoGenerator: Sendable {
             requiresVirtualDevice: requiresVirtualDevice
         )
     }
+}
 
-    private func addresses() -> ([Subnet], [Subnet]) {
+private extension TunnelRemoteInfoGenerator {
+    func addresses() -> ([Subnet], [Subnet]) {
         var ipv4: [Subnet] = []
         var ipv6: [Subnet] = []
         for subnet in tunnelConfiguration.interface.addresses {
@@ -200,13 +202,13 @@ final class TunnelRemoteInfoGenerator: Sendable {
         return (ipv4, ipv6)
     }
 
-    private func includedRoutes() -> ([Route], [Route]) {
+    func includedRoutes() -> ([Route], [Route]) {
         var ipv4IncludedRoutes: [Route] = []
         var ipv6IncludedRoutes: [Route] = []
         for subnet in tunnelConfiguration.interface.addresses {
             switch subnet.address {
             case .ip(_, let family):
-                let route = Route(subnet, subnet.address)
+                let route = Route(subnet.maskedSubnet, subnet.address)
                 switch family {
                 case .v4: ipv4IncludedRoutes.append(route)
                 case .v6: ipv6IncludedRoutes.append(route)
@@ -230,6 +232,24 @@ final class TunnelRemoteInfoGenerator: Sendable {
             }
         }
         return (ipv4IncludedRoutes, ipv6IncludedRoutes)
+    }
+}
+
+private extension Subnet {
+    var maskedSubnet: Subnet {
+        let maskedAddress: Address? = switch address.family {
+        case .v4:
+            address.network(with: ipv4Mask)
+        case .v6:
+            address.network(with: prefixLength)
+        case nil:
+            nil
+        }
+        guard let maskedAddress,
+              let maskedSubnet = Subnet(maskedAddress, prefixLength) else {
+            fatalError("Could not derive masked route subnet from interface address")
+        }
+        return maskedSubnet
     }
 }
 
