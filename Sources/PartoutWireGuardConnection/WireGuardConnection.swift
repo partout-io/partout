@@ -216,7 +216,7 @@ private extension String {
 
 // MARK: - Helpers
 
-private extension WireGuard.Configuration {
+extension WireGuard.Configuration {
     func withModules(from profile: Profile) throws -> Self {
         var newBuilder = builder()
 
@@ -226,9 +226,9 @@ private extension WireGuard.Configuration {
                 $0 as? IPModule
             }
             .forEach { ipModule in
-                newBuilder.peers = peers
+                newBuilder.peers = newBuilder.peers
                     .map { oldPeer in
-                        var peer = oldPeer.builder()
+                        var peer = oldPeer
                         ipModule.ipv4?.includedRoutes.forEach { route in
                             peer.allowedIPs.append(route.destination?.rawValue ?? "0.0.0.0/0")
                         }
@@ -248,9 +248,9 @@ private extension WireGuard.Configuration {
                 $0.routesThroughVPN == true
             }
             .forEach { dnsModule in
-                newBuilder.peers = peers
+                newBuilder.peers = newBuilder.peers
                     .map { oldPeer in
-                        var peer = oldPeer.builder()
+                        var peer = oldPeer
                         dnsModule.servers.forEach {
                             switch $0 {
                             case .ip(let addr, let family):
