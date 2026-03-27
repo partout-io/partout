@@ -41,13 +41,14 @@ final class TunnelRemoteInfoGenerator: Sendable {
                 continue
             }
             wgSettings.append("public_key=\(publicKey)\n")
-            guard let endpoint = peer.endpoint else { continue }
-            for resolvedEndpoint in resolutionMap[endpoint.address] ?? [] {
-                if case .hostname = resolvedEndpoint.address {
-                    assertionFailure("Endpoint is not resolved")
-                }
-                wgSettings.append("endpoint=\(resolvedEndpoint.wgRepresentation)\n")
+            guard let endpoint = peer.endpoint,
+                  let resolvedEndpoint = resolutionMap[endpoint] else {
+                continue
             }
+            if case .hostname = resolvedEndpoint.address {
+                assertionFailure("Endpoint is not resolved")
+            }
+            wgSettings.append("endpoint=\(resolvedEndpoint.wgRepresentation)\n")
         }
         return wgSettings
     }
@@ -82,13 +83,14 @@ final class TunnelRemoteInfoGenerator: Sendable {
                 let preSharedKey = try preSharedKeyBase64.hexStringFromBase64()
                 wgSettings.append("preshared_key=\(preSharedKey)\n")
             }
-            guard let endpoint = peer.endpoint else { continue }
-            for resolvedEndpoint in resolutionMap[endpoint.address] ?? [] {
-                if case .hostname = resolvedEndpoint.address {
-                    assertionFailure("Endpoint is not resolved")
-                }
-                wgSettings.append("endpoint=\(resolvedEndpoint.wgRepresentation)\n")
+            guard let endpoint = peer.endpoint,
+                  let resolvedEndpoint = resolutionMap[endpoint] else {
+                continue
             }
+            if case .hostname = resolvedEndpoint.address {
+                assertionFailure("Endpoint is not resolved")
+            }
+            wgSettings.append("endpoint=\(resolvedEndpoint.wgRepresentation)\n")
             let persistentKeepAlive = peer.keepAlive ?? 0
             wgSettings.append("persistent_keepalive_interval=\(persistentKeepAlive)\n")
             if !peer.allowedIPs.isEmpty {

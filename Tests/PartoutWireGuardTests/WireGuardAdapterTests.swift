@@ -18,16 +18,31 @@ struct WireGuardAdapterTests {
         targetIPv4: String,
         targetAny: String
     ) async throws {
-        let address: Address = .hostname("foobar.com")
-        let port: UInt16 = 1080
+        let sourceEndpoint = try Endpoint("foobar.com", 1080)
         let endpointObjects = try endpoints.map {
-            try Endpoint($0, port)
+            try Endpoint($0, sourceEndpoint.port)
         }
-        let targetIPv4Object = try Endpoint(targetIPv4, port)
+        let targetIPv4Object = try Endpoint(targetIPv4, sourceEndpoint.port)
 
         let withEnabled = WireGuard.Configuration.ResolvedMap()
-        await withEnabled.setEndpoints(endpointObjects, for: address)
+        await withEnabled.setEndpoints(endpointObjects, for: sourceEndpoint)
         let enabledMap = await withEnabled.toMap()
-        #expect(enabledMap[address] == [targetIPv4Object])
+        #expect(enabledMap[sourceEndpoint] == targetIPv4Object)
+    }
+
+    @Test
+    func givenSameHostnameWithDifferentPorts_whenResolved_thenKeepsBothPeers() async throws {
+        let sourceEndpoint1 = try Endpoint("foobar.com", 1080)
+        let sourceEndpoint2 = try Endpoint("foobar.com", 2080)
+        let resolvedEndpoint1 = try Endpoint("1.2.3.4", sourceEndpoint1.port)
+        let resolvedEndpoint2 = try Endpoint("5.6.7.8", sourceEndpoint2.port)
+
+        let withEnabled = WireGuard.Configuration.ResolvedMap()
+        await withEnabled.setEndpoints([resolvedEndpoint1], for: sourceEndpoint1)
+        await withEnabled.setEndpoints([resolvedEndpoint2], for: sourceEndpoint2)
+        let enabledMap = await withEnabled.toMap()
+
+        #expect(enabledMap[sourceEndpoint1] == resolvedEndpoint1)
+        #expect(enabledMap[sourceEndpoint2] == resolvedEndpoint2)
     }
 }
