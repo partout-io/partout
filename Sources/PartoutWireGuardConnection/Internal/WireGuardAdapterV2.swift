@@ -4,38 +4,35 @@
 internal import _PartoutCore_C
 internal import _PartoutWireGuard_C
 
-@available(*, deprecated, renamed: "WireGuardAdapterV2Delegate")
-protocol WireGuardAdapterDelegate: AnyObject, Sendable {
-    func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool)
+protocol WireGuardAdapterV2Delegate: AnyObject, Sendable {
+    func adapterShouldReassert(_ adapter: WireGuardAdapterV2, reasserting: Bool)
 
-    func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: TunnelRemoteInfo) async throws -> IOInterface
+    func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapterV2, settings: TunnelRemoteInfo) async throws -> IOInterface
 
-    func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64])
+    func adapterShouldConfigureSockets(_ adapter: WireGuardAdapterV2, descriptors: [UInt64])
 
-    func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapter, tunnel: IOInterface) async
+    func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapterV2, tunnel: IOInterface) async
 }
 
-/// Enum representing internal state of the `WireGuardAdapter`
-@available(*, deprecated, renamed: "WireGuardAdapterV2State")
-private enum WireGuardAdapterState {
+/// Enum representing internal state of the `WireGuardAdapterV2`
+private enum WireGuardAdapterV2State {
     /// The tunnel is stopped
     case stopped
 
     /// The tunnel is up and running
-    case started(_ handle: Int32, _ settingsGenerator: TunnelRemoteInfoGenerator)
+    case started(_ handle: Int32, _ settingsGenerator: TunnelRemoteInfoGeneratorV2)
 
     /// The tunnel is temporarily shutdown due to device going offline
-    case temporaryShutdown(_ settingsGenerator: TunnelRemoteInfoGenerator)
+    case temporaryShutdown(_ settingsGenerator: TunnelRemoteInfoGeneratorV2)
 }
 
-@available(*, deprecated, renamed: "WireGuardAdapterV2")
-actor WireGuardAdapter {
+actor WireGuardAdapterV2 {
     typealias LogHandler = @Sendable (WireGuardLogLevel, String) -> Void
 
     private let ctx: PartoutLoggerContext
 
     /// Adapter delegate.
-    private weak var delegate: WireGuardAdapterDelegate?
+    private weak var delegate: WireGuardAdapterV2Delegate?
 
     /// The ID of the original ``WireGuardModule``.
     private let moduleId: UniqueID
@@ -58,7 +55,7 @@ actor WireGuardAdapter {
     private var tunnel: IOInterface?
 
     /// Adapter state.
-    private var state: WireGuardAdapterState = .stopped
+    private var state: WireGuardAdapterV2State = .stopped
 
     private var socketDescriptors: [Int32] {
         guard case .started(let handle, _) = state else { return [] }
@@ -83,7 +80,7 @@ actor WireGuardAdapter {
     /// Designated initializer.
     init(
         _ ctx: PartoutLoggerContext,
-        with delegate: WireGuardAdapterDelegate,
+        with delegate: WireGuardAdapterV2Delegate,
         moduleId: UniqueID,
         dnsTimeout: Int,
         reachability: ReachabilityObserver,
@@ -103,7 +100,7 @@ actor WireGuardAdapter {
     }
 
     deinit {
-        pp_log(ctx, .wireguard, .info, "Deinit WireGuardAdapter")
+        pp_log(ctx, .wireguard, .info, "Deinit WireGuardAdapterV2")
 
         // Force remove logger to make sure that no further calls to the instance of this class
         // can happen after deallocation.
@@ -192,7 +189,7 @@ actor WireGuardAdapter {
         backend.setLogger(context: context) { context, logLevel, message in
             guard let context, let message else { return }
 
-            let unretainedSelf = Unmanaged<WireGuardAdapter>.fromOpaque(context)
+            let unretainedSelf = Unmanaged<WireGuardAdapterV2>.fromOpaque(context)
                 .takeUnretainedValue()
 
             let swiftString = String(cString: message).trimmingCharacters(in: .newlines)
@@ -257,9 +254,9 @@ actor WireGuardAdapter {
 
     /// Resolves the hostnames in the given tunnel configuration and return settings generator.
     /// - Parameter tunnelConfiguration: an instance of type `WireGuard.Configuration`.
-    /// - Returns: an instance of type `TunnelRemoteInfoGenerator`.
-    private func makeSettingsGenerator(with tunnelConfiguration: WireGuard.Configuration) -> TunnelRemoteInfoGenerator {
-        TunnelRemoteInfoGenerator(
+    /// - Returns: an instance of type `TunnelRemoteInfoGeneratorV2`.
+    private func makeSettingsGenerator(with tunnelConfiguration: WireGuard.Configuration) -> TunnelRemoteInfoGeneratorV2 {
+        TunnelRemoteInfoGeneratorV2(
             ctx,
             tunnelConfiguration: tunnelConfiguration,
             dnsTimeout: dnsTimeout
@@ -345,7 +342,7 @@ actor WireGuardAdapter {
 
 // MARK: - Low-level
 
-extension WireGuardAdapter {
+extension WireGuardAdapterV2 {
     /// Returns the tunnel device interface name, or nil if unsupported or on error.
     var interfaceName: String? {
 #if os(Windows)

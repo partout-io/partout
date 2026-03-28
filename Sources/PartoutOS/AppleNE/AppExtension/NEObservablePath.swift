@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+import Dispatch
 import Network
 
 /// An observer that publishes updates from a `NWPathMonitor`.
@@ -9,6 +10,8 @@ public final class NEObservablePath: ReachabilityObserver {
     private let ctx: PartoutLoggerContext
 
     private let monitor: NWPathMonitor
+
+    private let monitorQueue: DispatchQueue
 
     private nonisolated let subject: CurrentValueStream<NWPath>
 
@@ -18,19 +21,20 @@ public final class NEObservablePath: ReachabilityObserver {
     public init(_ ctx: PartoutLoggerContext) {
         self.ctx = ctx
         monitor = NWPathMonitor()
+        monitorQueue = DispatchQueue(label: "NEObservablePath")
         subject = CurrentValueStream(monitor.currentPath)
     }
 
     public func startObserving() {
         monitor.pathUpdateHandler = { [weak self] path in
             guard let self else { return }
-            let didChangeSatisfiability = path.isSatisfiable != wasSatisfiable
+            let didChangeSatisfiability = path.isSatisfiable != self.wasSatisfiable
             let level: DebugLog.Level = didChangeSatisfiability ? .info : .debug
-            pp_log(ctx, .os, level, "Path updated: \(path.debugDescription)")
-            wasSatisfiable = path.isSatisfiable
-            subject.send(path)
+            pp_log(self.ctx, .os, level, "Path updated: \(path.debugDescription)")
+            self.wasSatisfiable = path.isSatisfiable
+            self.subject.send(path)
         }
-        monitor.start(queue: .global())
+        monitor.start(queue: monitorQueue)
     }
 }
 
@@ -45,12 +49,13 @@ extension NEObservablePath {
 
     public var isReachableStream: AsyncStream<Bool> {
         AsyncStream { [weak self] continuation in
-            Task { [weak self] in
+            let relayTask = Task { [weak self] in
                 guard let self else {
                     continuation.finish()
                     return
                 }
-                for await path in self.stream {
+                let pathStream = self.stream
+                for await path in pathStream {
                     guard !Task.isCancelled else {
                         pp_log(self.ctx, .os, .debug, "Cancelled NEObservablePath.isReachableStream")
                         break
@@ -60,19 +65,22 @@ extension NEObservablePath {
                 }
                 continuation.finish()
             }
+            continuation.onTermination = { _ in
+                relayTask.cancel()
+            }
         }
     }
 }
 
 private extension NWPath {
     var isSatisfiable: Bool {
-        let target: [NWInterface.InterfaceType] = [
-            .cellular, .wifi, .wiredEthernet
-        ]
-        let isAvailable = target.contains {
-            usesInterfaceType($0)
+        switch status {
+        case .requiresConnection, .satisfied:
+            return true
+        case .unsatisfied:
+            return false
+        @unknown default:
+            return true
         }
-        guard isAvailable else { return false }
-        return status == .satisfied
     }
 }
