@@ -14,7 +14,7 @@ Control the daemon started in <doc:StartingTunnel> and be informed about its cur
 - ``TunnelStrategy``
 - ``TunnelObservableStrategy``
 - ``TunnelStatus``
-- ``TunnelActiveProfile``
+- ``TunnelSnapshot``
 - ``FakeTunnelStrategy``
 - ``Message``
 

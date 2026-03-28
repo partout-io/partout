@@ -123,7 +123,7 @@ extension NETunnelStrategy: TunnelObservableStrategy {
         }
     }
 
-    public nonisolated var didUpdateActiveProfiles: AsyncStream<[Profile.ID: TunnelActiveProfile]> {
+    public nonisolated var didUpdateActiveProfiles: AsyncStream<[Profile.ID: TunnelSnapshot]> {
         AsyncStream { [weak self] continuation in
             Task { [weak self] in
                 guard let self else {
@@ -347,9 +347,9 @@ private extension NETunnelStrategy {
 // MARK: - Active managers
 
 private extension NETunnelStrategy {
-    nonisolated var activeProfilesStream: AsyncStream<[Profile.ID: TunnelActiveProfile]> {
+    nonisolated var activeProfilesStream: AsyncStream<[Profile.ID: TunnelSnapshot]> {
         let stream = managersSubject.subscribe()
-        let mappedStream: AsyncStream<[Profile.ID: TunnelActiveProfile]>
+        let mappedStream: AsyncStream<[Profile.ID: TunnelSnapshot]>
 
         if options.contains(.multiple) {
             mappedStream = stream
@@ -520,11 +520,11 @@ extension NETunnelProviderManager: @retroactive @unchecked Sendable {
 }
 
 private extension NETunnelProviderManager {
-    var asActiveProfile: TunnelActiveProfile? {
+    var asActiveProfile: TunnelSnapshot? {
         guard let profileId else {
             return nil
         }
-        return TunnelActiveProfile(
+        return TunnelSnapshot(
             id: profileId,
             status: connection.status.asTunnelStatus,
             onDemand: isEnabled && isOnDemandEnabled

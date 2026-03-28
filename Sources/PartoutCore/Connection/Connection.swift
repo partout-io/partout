@@ -4,9 +4,11 @@
 
 /// Represents a network connection.
 public protocol Connection: AnyObject, Sendable {
-
     /// Publishes the ``ConnectionStatus`` of the connection.
     var statusStream: AsyncThrowingStream<ConnectionStatus, Error> { get }
+
+    /// The associated ``IOInterface``.
+    func tunnel() async -> IOInterface?
 
     /// Starts the connection.
     ///

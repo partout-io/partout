@@ -253,6 +253,10 @@ private final class MockConnection: Connection {
         statusSubject.subscribeThrowing()
     }
 
+    func tunnel() -> IOInterface? {
+        nil
+    }
+
     nonisolated(unsafe)
     private var sleepTask: Task<Void, Never>?
 
