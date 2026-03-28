@@ -21,6 +21,10 @@ public struct WireGuardModule: Module, BuildableType, Hashable, Codable {
             configurationBuilder: configuration?.builder()
         )
     }
+
+    public func serialized() throws -> String? {
+        try configuration?.serialized()
+    }
 }
 
 extension WireGuardModule {
