@@ -10,6 +10,7 @@
 
 internal import _PartoutWireGuard_C
 
+@available(*, deprecated, renamed: "TunnelRemoteInfoGeneratorV2")
 final class TunnelRemoteInfoGenerator: Sendable {
     private let ctx: PartoutLoggerContext
 

@@ -13,6 +13,7 @@
 #endif
 
 /// Establishes a WireGuard connection.
+@available(*, deprecated, renamed: "WireGuardConnectionV2")
 public actor WireGuardConnection: Connection {
     private let ctx: PartoutLoggerContext
 

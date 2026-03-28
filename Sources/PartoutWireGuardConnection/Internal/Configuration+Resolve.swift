@@ -7,6 +7,7 @@
 /// - Throws: an error of type `WireGuardAdapterError`.
 /// - Returns: The list of resolved endpoints.
 extension WireGuard.Configuration {
+    @available(*, deprecated, renamed: "ResolvedMapV2")
     actor ResolvedMap {
         private var map: [Address: [Endpoint]] = [:]
 
