@@ -141,14 +141,23 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     }
 
     public func hold() async {
+        assert(!onHold, "Daemon already on hold")
         onHold = true
         if let tunnel = await connection?.tunnel() ?? heldTunnel {
             await controller.clearTunnelSettings(tunnel)
         }
-        await stop()
+        await stop(clearingEnvironment: false)
     }
 
     public func stop() async {
+        guard !onHold else {
+            clearEnvironment()
+            return
+        }
+        await stop(clearingEnvironment: true)
+    }
+
+    private func stop(clearingEnvironment: Bool) async {
         assert(isStarted || onHold, "Daemon not started or on hold")
         guard isStarted else { return }
         pp_log_id(profile.id, .core, .notice, "Stop daemon (\(onHold ? "keep" : "clear") environment)")
@@ -165,7 +174,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         }
 
         // make sure to clear environment on stop, especially last error code
-        clearEnvironment()
+        if clearingEnvironment { clearEnvironment() }
 
         // cancel pending tasks to avoid leaks
         statusSubscription?.cancel()
@@ -192,9 +201,6 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
 private extension SimpleConnectionDaemon {
     func clearEnvironment() {
-        guard !onHold else {
-            return
-        }
         pp_log_id(profile.id, .core, .notice, "Clear connection environment")
         environment.removeEnvironmentValue(forKey: TunnelEnvironmentKeys.connectionStatus)
         environment.removeEnvironmentValue(forKey: TunnelEnvironmentKeys.dataCount)
