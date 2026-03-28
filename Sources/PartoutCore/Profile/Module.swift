@@ -25,24 +25,21 @@ public protocol Module: UniquelyIdentifiable, Sendable {
     var isMutuallyExclusive: Bool { get }
 
     func checkCompatible(with otherModule: Module, activeIds: Set<UniqueID>) throws
-
-    /// True if the module can be serialized as a textual configuration.
-    var supportsSerialization: Bool { get }
-
-    func serialized() throws -> String?
 }
 
 extension Module {
     public var moduleType: ModuleType {
         Self.moduleType
     }
+}
 
-    /// Returns a textual representation of this module, if supported.
-    public func serialized() throws -> String? {
-        nil
-    }
+/// A module that can be serialized as a textual profile.
+public protocol SerializableModule: Module {
+    /// Preferred file extension for serialized output.
+    var preferredExtension: String { get }
 
-    public var supportsSerialization: Bool {
-        false
-    }
+    func serialized() throws -> String
+}
+
+extension SerializableModule {
 }

@@ -64,7 +64,7 @@ MIIE
         builder.configurationBuilder = configuration
 
         let module = try builder.build()
-        let serialized = try #require(try module.serialized())
+        let serialized = try module.serialized()
         let parsed = try StandardOpenVPNParser(decrypter: nil).parsed(fromContents: serialized).configuration
 
         #expect(parsed.cipher == .aes256cbc)

@@ -38,6 +38,7 @@ Profiles are the foundations of Partout, and profiles are made of modules. A bas
 - ``ConfigurationDecoder``
 - ``ConfigurationEncoder``
 - ``SerializableConfiguration``
+- ``SerializableModule``
 - ``ProfileCoder``
 - ``ProfileEncoder``
 - ``ProfileDecoder``

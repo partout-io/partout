@@ -39,7 +39,7 @@ struct ModuleTests {
         ]
 
         let module = try sut.build()
-        let serialized = try #require(try module.serialized())
+        let serialized = try module.serialized()
         let parsed = try StandardWireGuardParser().configuration(from: serialized)
 
         #expect(parsed.interface.privateKey.rawValue == pvtkey)

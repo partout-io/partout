@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 /// A connection module providing a WireGuard connection.
-public struct WireGuardModule: Module, BuildableType, Hashable, Codable {
+public struct WireGuardModule: SerializableModule, BuildableType, Hashable, Codable {
     public static let moduleType = ModuleType("WireGuard")
 
     public let id: UniqueID
@@ -22,12 +22,15 @@ public struct WireGuardModule: Module, BuildableType, Hashable, Codable {
         )
     }
 
-    public var supportsSerialization: Bool {
-        true
+    public var preferredExtension: String {
+        "conf"
     }
 
-    public func serialized() throws -> String? {
-        try configuration?.serialized()
+    public func serialized() throws -> String {
+        guard let configuration else {
+            throw PartoutError(.incompleteModule, self)
+        }
+        return try configuration.serialized()
     }
 }
 
