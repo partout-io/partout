@@ -69,7 +69,10 @@ extension Profile {
             // are provided. Here we add some fake IP settings to work around
             // this behavior.
             if neSettings.ipv4Settings == nil {
-                neSettings.ipv4Settings = .fakeLoopbackIP
+                neSettings.ipv4Settings = .fakeLoopback
+            }
+            if neSettings.ipv6Settings == nil {
+                neSettings.ipv6Settings = .fakeLoopback
             }
             pp_log(ctx, .os, .info, "\tRoute DNS-only settings with empty matchDomains")
         }
