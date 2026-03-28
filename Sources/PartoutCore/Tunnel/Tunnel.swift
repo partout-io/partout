@@ -169,9 +169,9 @@ private extension Tunnel {
                 environments[profileId] = environmentFactory(profileId)
             }
         }
-        // Destroy environments no longer present
+        // Discard environments of inactive profiles
         environments = environments.filter {
-            activeIds.contains($0.key)
+            activeProfiles[$0.key]?.isActive == true
         }
         // Notify .activeProfilesStream observers now
         self.activeProfiles = activeProfiles
