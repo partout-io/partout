@@ -10,7 +10,7 @@ extension Profile {
         options: NETunnelController.Options? = nil
     ) -> NEPacketTunnelNetworkSettings {
         let ctx = PartoutLoggerContext(id)
-        let tunnelRemoteAddress = info?.address?.rawValue ?? "127.0.0.1"
+        let tunnelRemoteAddress = info?.address?.rawValue ?? NEPacketTunnelNetworkSettings.fakeRemoteAddress
         var neSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: tunnelRemoteAddress)
 
         pp_log(ctx, .os, .info, "Build NetworkExtension settings from Profile")
@@ -65,16 +65,12 @@ extension Profile {
         // 5. configure DNS for non-connection profiles
 
         if activeConnectionModule == nil {
-
-            // TODO: #314/partout-core, this seems fixed in macOS 15
-            // the tunnel takes several seconds to stop if
-            // only DNS settings are provided. here we add some fake IP
-            // settings to work around this behavior
+            // XXX: The tunnel takes several seconds to stop if only DNS settings
+            // are provided. Here we add some fake IP settings to work around
+            // this behavior.
             if neSettings.ipv4Settings == nil {
-                let ipv4Settings = NEIPv4Settings(addresses: ["127.0.0.1"], subnetMasks: ["255.255.255.255"])
-                neSettings.ipv4Settings = ipv4Settings
+                neSettings.ipv4Settings = .fakeLoopbackIP
             }
-
             pp_log(ctx, .os, .info, "\tRoute DNS-only settings with empty matchDomains")
         }
 

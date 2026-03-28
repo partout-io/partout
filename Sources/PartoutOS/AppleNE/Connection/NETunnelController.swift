@@ -66,9 +66,8 @@ public final class NETunnelController: TunnelController {
 
     public func clearTunnelSettings(_ tunnel: IOInterface) async {
         do {
-            pp_log_id(profile.id, .os, .info, "Clear tunnel settings")
-            let dummy = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
-            try await provider?.setTunnelNetworkSettings(dummy)
+            pp_log_id(profile.id, .os, .info, "Clear tunnel settings (remove VPN status icon)")
+            try await provider?.removeVPNStatusIcon()
         } catch {
             pp_log_id(profile.id, .os, .error, "Unable to clear tunnel settings: \(error)")
         }
