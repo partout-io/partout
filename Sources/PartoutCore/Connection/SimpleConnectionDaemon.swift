@@ -142,9 +142,6 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     public func hold() async {
         onHold = true
-        if let tunnel = await connection?.tunnel() ?? heldTunnel {
-            await controller.clearTunnelSettings(tunnel)
-        }
         await stop()
     }
 
@@ -162,6 +159,10 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             await connection.stop(timeout: stopDelay)
         } else {
             pp_log_id(profile.id, .core, .notice, "Non-connection profile, nothing to disconnect from")
+        }
+        // clear tunnel settings
+        if let tunnel = await connection?.tunnel() ?? heldTunnel {
+            await controller.clearTunnelSettings(tunnel)
         }
 
         // make sure to clear environment on stop, especially last error code
