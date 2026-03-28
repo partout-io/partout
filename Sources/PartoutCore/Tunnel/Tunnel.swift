@@ -162,16 +162,16 @@ private extension Tunnel {
             return
         }
         pp_log(ctx, .core, .info, "Snapshots: \(snapshots.values.description)")
+        let activeIds = snapshots.keys
         // Create new environments if needed
-        for pair in snapshots {
-            let profileId = pair.key
+        for profileId in activeIds {
             if environments[profileId] == nil {
                 environments[profileId] = environmentFactory(profileId)
             }
         }
         // Destroy environments no longer present
         environments = environments.filter {
-            snapshots[$0.key] != nil
+            activeIds.contains($0.key)
         }
         // Notify .snapshotsStream observers now
         self.snapshots = snapshots
