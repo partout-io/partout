@@ -163,9 +163,9 @@ private extension Tunnel {
         }
         pp_log(ctx, .core, .info, "Snapshots: \(snapshots.values.description)")
         // Create new environments if needed
-        let active = snapshots.filter(\.value.isActive)
-        for item in active {
-            let profileId = item.key
+        let activeSnapshots = snapshots.map(\.value).filter(\.isActive)
+        for snapshot in activeSnapshots {
+            let profileId = snapshot.id
             if environments[profileId] == nil {
                 environments[profileId] = environmentFactory(profileId)
             }
