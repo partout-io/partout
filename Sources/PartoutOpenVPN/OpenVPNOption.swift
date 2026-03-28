@@ -24,7 +24,7 @@ extension OpenVPN {
 
         case fragment = "^fragment"
 
-        case tlsCryptV2 = "tls-crypt-v2"
+        case tlsCryptV2 = "^tls-crypt-v2( +[^\\s]+( +(force-cookie|allow-noncookie))?)?"
 
         // MARK: General
 

@@ -12,6 +12,8 @@ enum CPacketCode: UInt8 {
     case hardResetClientV2     = 0x07
     case hardResetServerV2     = 0x08
     case dataV2                = 0x09
+    case hardResetClientV3     = 0x0a
+    case controlWkcV1          = 0x0b
     case unknown               = 0xff
 }
 
@@ -25,6 +27,8 @@ extension CPacketCode: CustomDebugStringConvertible {
         case .hardResetClientV2:    return "HARD_RESET_CLIENT_V2"
         case .hardResetServerV2:    return "HARD_RESET_SERVER_V2"
         case .dataV2:               return "DATA_V2"
+        case .hardResetClientV3:    return "HARD_RESET_CLIENT_V3"
+        case .controlWkcV1:         return "CONTROL_WKC_V1"
         case .unknown:              return "UNKNOWN(\(rawValue))"
         @unknown default:           return "UNKNOWN(\(rawValue))"
         }
@@ -41,6 +45,8 @@ extension CPacketCode {
         case .hardResetClientV2:    OpenVPNPacketCodeHardResetClientV2
         case .hardResetServerV2:    OpenVPNPacketCodeHardResetServerV2
         case .dataV2:               OpenVPNPacketCodeDataV2
+        case .hardResetClientV3:    OpenVPNPacketCodeHardResetClientV3
+        case .controlWkcV1:         OpenVPNPacketCodeControlWkcV1
         case .unknown:              OpenVPNPacketCodeUnknown
         }
     }

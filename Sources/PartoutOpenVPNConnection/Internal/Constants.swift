@@ -22,6 +22,10 @@ struct Constants {
     enum ControlChannel {
         static let maxPacketSize = 1000
 
+        static let earlyNegotiationFlagsType: UInt16 = 0x0001
+
+        static let earlyNegotiationResendWrappedKey: UInt16 = 0x0001
+
         // UInt32(0) + UInt8(KeyMethod = 2)
         static let tlsPrefix = Data(hex: "0000000002")
 

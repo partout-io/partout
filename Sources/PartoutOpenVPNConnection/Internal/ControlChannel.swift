@@ -112,6 +112,24 @@ extension ControlChannel {
     }
 
     func enqueueOutboundPackets(withCode code: CrossPacketCode, key: UInt8, payload: Data, maxPacketSize: Int) throws {
+        try enqueueOutboundPackets(
+            withLeadingCode: code,
+            trailingCode: code,
+            key: key,
+            payload: payload,
+            leadingMaxPacketSize: maxPacketSize,
+            maxPacketSize: maxPacketSize
+        )
+    }
+
+    func enqueueOutboundPackets(
+        withLeadingCode leadingCode: CrossPacketCode,
+        trailingCode: CrossPacketCode,
+        key: UInt8,
+        payload: Data,
+        leadingMaxPacketSize: Int,
+        maxPacketSize: Int
+    ) throws {
         guard let sessionId else {
             pp_log(ctx, .openvpn, .fault, "Control: Missing sessionId, do reset(forNewSession: true) first")
             throw OpenVPNSessionError.assertion
@@ -120,12 +138,16 @@ extension ControlChannel {
         let oldIdOut = currentPacketId.outbound
         var queuedCount = 0
         var offset = 0
+        var isLeadingPacket = true
 
-        repeat {
-            let subPayloadLength = min(maxPacketSize, payload.count - offset)
+        while true {
+            let packetCode = isLeadingPacket ? leadingCode : trailingCode
+            let packetMaxPacketSize = isLeadingPacket ? max(0, leadingMaxPacketSize) : maxPacketSize
+            let remainingPayloadLength = payload.count - offset
+            let subPayloadLength = min(packetMaxPacketSize, remainingPayloadLength)
             let subPayloadData = payload.subdata(offset: offset, count: subPayloadLength)
             let packet = CrossPacket(
-                code: code,
+                code: packetCode,
                 key: key,
                 sessionId: sessionId,
                 packetId: currentPacketId.outbound,
@@ -136,9 +158,14 @@ extension ControlChannel {
 
             queue.outbound.append(packet)
             currentPacketId.outbound += 1
-            offset += maxPacketSize
+            offset += subPayloadLength
             queuedCount += subPayloadLength
-        } while offset < payload.count
+
+            if offset >= payload.count {
+                break
+            }
+            isLeadingPacket = false
+        }
 
         assert(queuedCount == payload.count)
 

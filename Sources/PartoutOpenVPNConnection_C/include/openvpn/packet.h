@@ -30,6 +30,8 @@ typedef enum {
     OpenVPNPacketCodeHardResetClientV2     = 0x07,
     OpenVPNPacketCodeHardResetServerV2     = 0x08,
     OpenVPNPacketCodeDataV2                = 0x09,
+    OpenVPNPacketCodeHardResetClientV3     = 0x0a,
+    OpenVPNPacketCodeControlWkcV1          = 0x0b,
     OpenVPNPacketCodeUnknown               = 0xff
 } openvpn_packet_code;
 

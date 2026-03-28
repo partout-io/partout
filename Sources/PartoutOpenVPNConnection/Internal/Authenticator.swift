@@ -87,7 +87,7 @@ final class Authenticator {
             opts.append("auth \(options.fallbackDigest.rawValue)")
             opts.append("keysize \(options.fallbackCipher.keySize)")
             if let strategy = options.tlsWrap?.strategy {
-                opts.append("tls-\(strategy)")
+                opts.append("tls-\(strategy.rawValue)")
             }
             opts.append("key-method 2")
             opts.append("tls-client")

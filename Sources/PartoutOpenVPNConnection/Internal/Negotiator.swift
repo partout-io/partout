@@ -64,6 +64,8 @@ final class Negotiator {
 
     private var checkNegotiationTask: Task<Void, Never>?
 
+    private var shouldResendWrappedKey: Bool
+
     // MARK: Init
 
     convenience init(
@@ -117,6 +119,7 @@ final class Negotiator {
         state = .idle
         expectedPacketId = 0
         pendingPackets = [:]
+        shouldResendWrappedKey = false
     }
 
     func forRenegotiation(initiatedBy newRenegotiation: RenegotiationType) -> Negotiator {
@@ -165,7 +168,8 @@ extension Negotiator {
             break
 
         default:
-            try enqueueControlPackets(code: .hardResetClientV2, key: key, payload: hardResetPayload() ?? Data())
+            let code: CrossPacketCode = (options.configuration.tlsWrap?.strategy == .cryptV2) ? .hardResetClientV3 : .hardResetClientV2
+            try enqueueControlPackets(code: code, key: key, payload: hardResetPayload() ?? Data())
         }
     }
 
@@ -309,10 +313,27 @@ private extension Negotiator {
     }
 
     func enqueueControlPackets(code: CrossPacketCode, key: UInt8, payload: Data) throws {
+        let leadingCode: CrossPacketCode
+        let trailingCode: CrossPacketCode
+        let leadingMaxPacketSize: Int
+        if code == .controlV1, shouldResendWrappedKey {
+            shouldResendWrappedKey = false
+            leadingCode = .controlWkcV1
+            trailingCode = .controlV1
+            let wrappedKeyLength = options.configuration.tlsWrap?.wrappedKey?.count ?? 0
+            leadingMaxPacketSize = max(0, Constants.ControlChannel.maxPacketSize - wrappedKeyLength)
+        } else {
+            leadingCode = code
+            trailingCode = code
+            leadingMaxPacketSize = Constants.ControlChannel.maxPacketSize
+        }
+
         try channel.enqueueOutboundPackets(
-            withCode: code,
+            withLeadingCode: leadingCode,
+            trailingCode: trailingCode,
             key: key,
             payload: payload,
+            leadingMaxPacketSize: leadingMaxPacketSize,
             maxPacketSize: Constants.ControlChannel.maxPacketSize
         )
         try flushControlQueue()
@@ -341,6 +362,33 @@ private extension Negotiator {
             }
         }
     }
+
+    func requestsWrappedKeyResend(from payload: Data?) -> Bool {
+        guard let payload, !payload.isEmpty else {
+            return false
+        }
+
+        var offset = 0
+        while offset + 4 <= payload.count {
+            let type = payload.networkUInt16Value(from: offset)
+            offset += 2
+
+            let length = Int(payload.networkUInt16Value(from: offset))
+            offset += 2
+
+            guard offset + length <= payload.count else {
+                pp_log(ctx, .openvpn, .error, "Malformed early-negotiation payload in HARD_RESET")
+                return false
+            }
+
+            if type == Constants.ControlChannel.earlyNegotiationFlagsType, length >= 2 {
+                let flags = payload.networkUInt16Value(from: offset)
+                return (flags & Constants.ControlChannel.earlyNegotiationResendWrappedKey) != 0
+            }
+            offset += length
+        }
+        return false
+    }
 }
 
 // MARK: - Inbound
@@ -362,6 +410,7 @@ private extension Negotiator {
                     pp_log(ctx, .openvpn, .error, "Sent SOFT_RESET but received HARD_RESET?")
                 }
                 channel.setRemoteSessionId(packet.sessionId)
+                shouldResendWrappedKey = requestsWrappedKeyResend(from: packet.payload)
             }
             guard let remoteSessionId = channel.remoteSessionId else {
                 let error = OpenVPNSessionError.missingSessionId
