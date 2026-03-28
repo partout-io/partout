@@ -16,10 +16,6 @@ public struct TunnelSnapshot: Hashable, Sendable, CustomStringConvertible {
         self.onDemand = onDemand
     }
 
-    public var isActive: Bool {
-        status != .inactive || onDemand
-    }
-
     public var description: String {
         "{\(id.uuidString), status=\(status), onDemand=\(onDemand)}"
     }
