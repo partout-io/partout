@@ -22,6 +22,10 @@ public struct WireGuardModule: Module, BuildableType, Hashable, Codable {
         )
     }
 
+    public var supportsSerialization: Bool {
+        true
+    }
+
     public func serialized() throws -> String? {
         try configuration?.serialized()
     }

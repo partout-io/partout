@@ -21,6 +21,10 @@ public struct OpenVPNModule: Module, BuildableType, Hashable, Codable {
         return configuration?.staticChallenge ?? requiresInteractiveCredentials ?? false
     }
 
+    public var supportsSerialization: Bool {
+        true
+    }
+
     fileprivate init(id: UniqueID, configuration: OpenVPN.Configuration?, credentials: OpenVPN.Credentials?, requiresInteractiveCredentials: Bool?) {
         self.id = id
         self.configuration = configuration

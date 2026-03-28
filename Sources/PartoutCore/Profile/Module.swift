@@ -26,6 +26,9 @@ public protocol Module: UniquelyIdentifiable, Sendable {
 
     func checkCompatible(with otherModule: Module, activeIds: Set<UniqueID>) throws
 
+    /// True if the module can be serialized as a textual configuration.
+    var supportsSerialization: Bool { get }
+
     func serialized() throws -> String?
 }
 
@@ -37,5 +40,9 @@ extension Module {
     /// Returns a textual representation of this module, if supported.
     public func serialized() throws -> String? {
         nil
+    }
+
+    public var supportsSerialization: Bool {
+        false
     }
 }
