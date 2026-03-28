@@ -289,7 +289,7 @@ private extension Endpoint {
 #endif
     }
 
-    private static func endpoint(from addrInfo: addrinfo, port: UInt16) -> Endpoint? {
+    static func endpoint(from addrInfo: addrinfo, port: UInt16) -> Endpoint? {
         guard let addr = addrInfo.ai_addr else {
             return nil
         }
