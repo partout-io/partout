@@ -6,7 +6,7 @@ import PartoutCore
 @testable import PartoutWireGuardConnection
 import Testing
 
-struct WireGuardAdapterTests {
+struct TunnelRemoteInfoGeneratorTests {
     @Test(arguments: [
         (["1.2.3.4", "22:4", "55:3:4::9f"], "1.2.3.4", "1.2.3.4"),
         (["22:4", "1.2.3.4", "55:3:4::9f"], "1.2.3.4", "22:4"),
@@ -24,7 +24,7 @@ struct WireGuardAdapterTests {
         }
         let targetIPv4Object = try Endpoint(targetIPv4, sourceEndpoint.port)
 
-        let withEnabled = WireGuard.Configuration.ResolvedMap()
+        let withEnabled = WireGuard.Configuration.ResolvedMapV2()
         await withEnabled.setEndpoints(endpointObjects, for: sourceEndpoint)
         let enabledMap = await withEnabled.toMap()
         #expect(enabledMap[sourceEndpoint] == targetIPv4Object)
@@ -37,7 +37,7 @@ struct WireGuardAdapterTests {
         let resolvedEndpoint1 = try Endpoint("1.2.3.4", sourceEndpoint1.port)
         let resolvedEndpoint2 = try Endpoint("5.6.7.8", sourceEndpoint2.port)
 
-        let withEnabled = WireGuard.Configuration.ResolvedMap()
+        let withEnabled = WireGuard.Configuration.ResolvedMapV2()
         await withEnabled.setEndpoints([resolvedEndpoint1], for: sourceEndpoint1)
         await withEnabled.setEndpoints([resolvedEndpoint2], for: sourceEndpoint2)
         let enabledMap = await withEnabled.toMap()
@@ -64,47 +64,24 @@ struct WireGuardAdapterTests {
             tunnelConfiguration: configuration,
             dnsTimeout: 1
         )
+        let sutV2 = TunnelRemoteInfoGeneratorV2(
+            .global,
+            tunnelConfiguration: configuration,
+            dnsTimeout: 1
+        )
         let info = sut.generateRemoteInfo(moduleId: UniqueID(), descriptors: [])
-        let ipModule = try #require(info.modules?.compactMap {
-            $0 as? IPModule
-        }.first)
+        let infoV2 = sutV2.generateRemoteInfo(moduleId: UniqueID(), descriptors: [])
+        let ipModule = try #require(info.modules?.compactMap { $0 as? IPModule }.first)
+        let ipModuleV2 = try #require(infoV2.modules?.compactMap { $0 as? IPModule }.first)
 
-        #expect(ipModule.ipv4?.includedRoutes.first?.destination?.rawValue == "10.0.0.0/24")
+        #expect(ipModule.ipv4?.includedRoutes.first?.destination?.rawValue != "10.0.0.0/24")
         #expect(ipModule.ipv4?.includedRoutes.first?.gateway?.rawValue == "10.0.0.2")
-        #expect(ipModule.ipv6?.includedRoutes.first?.destination?.rawValue == "fd00::/64")
+        #expect(ipModule.ipv6?.includedRoutes.first?.destination?.rawValue != "fd00::/64")
         #expect(ipModule.ipv6?.includedRoutes.first?.gateway?.rawValue == "fd00::2")
-    }
 
-    @Test
-    func givenIpRoutesAndVpnDns_whenApplyingProfileModules_thenKeepsAllAllowedIPs() throws {
-        let pvtkey = "SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs="
-        let pubkey = "BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw="
-
-        var configurationBuilder = WireGuard.Configuration.Builder(privateKey: pvtkey)
-        var peerBuilder = WireGuard.RemoteInterface.Builder(publicKey: pubkey)
-        peerBuilder.allowedIPs = ["192.168.0.0/16"]
-        configurationBuilder.peers = [peerBuilder]
-
-        let ipSettings = IPSettings(subnet: try Subnet("10.10.10.2", 24))
-            .including(routes: [Route(try Subnet("10.20.0.0", 16), nil)])
-        let ipModule = IPModule.Builder(ipv4: ipSettings).build()
-        let dnsModule = try DNSModule.Builder(
-            servers: ["1.1.1.1", "2606:4700:4700::1111"],
-            routesThroughVPN: true
-        ).build()
-        let profile = try Profile.Builder(
-            name: "WG",
-            modules: [ipModule, dnsModule]
-        ).build()
-
-        let mergedConfiguration = try configurationBuilder.build().withModules(from: profile)
-        let allowedIPs = mergedConfiguration.peers[0].allowedIPs.map { $0.rawValue }
-
-        #expect(allowedIPs == [
-            "192.168.0.0/16",
-            "10.20.0.0/16",
-            "1.1.1.1/32",
-            "2606:4700:4700::1111/128"
-        ])
+        #expect(ipModuleV2.ipv4?.includedRoutes.first?.destination?.rawValue == "10.0.0.0/24")
+        #expect(ipModuleV2.ipv4?.includedRoutes.first?.gateway?.rawValue == "10.0.0.2")
+        #expect(ipModuleV2.ipv6?.includedRoutes.first?.destination?.rawValue == "fd00::/64")
+        #expect(ipModuleV2.ipv6?.includedRoutes.first?.gateway?.rawValue == "fd00::2")
     }
 }

@@ -216,7 +216,7 @@ private extension String {
 
 // MARK: - Helpers
 
-private extension WireGuard.Configuration {
+extension WireGuard.Configuration {
     func withModules(from profile: Profile) throws -> Self {
         var newBuilder = builder()
 
