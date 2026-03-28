@@ -302,7 +302,7 @@ private extension ButtonAction {
 
 private extension Tunnel {
     var status: TunnelStatus {
-        activeProfiles.first?.value.status ?? .inactive
+        snapshots.first?.value.status ?? .inactive
     }
 }
 

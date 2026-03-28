@@ -82,7 +82,8 @@ extension Demo {
             .global,
             tunnelBundleIdentifier: Demo.tunnelBundleIdentifier,
             registry: .shared,
-            keychain: AppleKeychain(.global, group: "\(teamIdentifier).\(appGroupIdentifier)")
+            keychain: AppleKeychain(.global, group: "\(teamIdentifier).\(appGroupIdentifier)"),
+            withLegacyEncoding: false
         )
     }
 
