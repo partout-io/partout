@@ -13,10 +13,12 @@ extension NEPacketTunnelProvider {
             tunnelRemoteAddress: NEPacketTunnelNetworkSettings.fakeRemoteAddress
         )
         // XXX: This is to speed up tunnel stop, like in Profile+NE
-        fake.ipv4Settings = .fakeLoopbackIP
+        fake.ipv4Settings = .fakeLoopback
+        fake.ipv6Settings = .fakeLoopback
         // Block the Internet
         if withKillSwitch {
             fake.ipv4Settings?.includedRoutes = [.default()]
+            fake.ipv6Settings?.includedRoutes = [.default()]
         }
         setTunnelNetworkSettings(fake)
     }
@@ -27,10 +29,19 @@ extension NEPacketTunnelNetworkSettings {
 }
 
 extension NEIPv4Settings {
-    static var fakeLoopbackIP: NEIPv4Settings {
+    static var fakeLoopback: NEIPv4Settings {
         NEIPv4Settings(
             addresses: ["127.0.0.1"],
             subnetMasks: ["255.255.255.255"]
+        )
+    }
+}
+
+extension NEIPv6Settings {
+    static var fakeLoopback: NEIPv6Settings {
+        NEIPv6Settings(
+            addresses: ["::1"],
+            networkPrefixLengths: [128]
         )
     }
 }
