@@ -474,6 +474,8 @@ components:
           "$ref": "#/components/schemas/OpenVPN.StaticKey"
         strategy:
           "$ref": "#/components/schemas/OpenVPN.TLSWrap.Strategy"
+        wrappedKey:
+          "$ref": "#/components/schemas/SecureData"
       required:
         - strategy
         - key
@@ -482,6 +484,7 @@ components:
       enum:
         - auth
         - crypt
+        - cryptV2
       type: string
     OpenVPNModule:
       additionalProperties: false
