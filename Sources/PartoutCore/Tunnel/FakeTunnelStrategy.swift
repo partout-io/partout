@@ -4,7 +4,7 @@
 
 /// Implementation of ``TunnelObservableStrategy`` to fake VPN operation on simulators.
 public actor FakeTunnelStrategy: TunnelObservableStrategy, Sendable {
-    private nonisolated let activeProfileSubject: CurrentValueStream<TunnelActiveProfile?>
+    private nonisolated let activeProfileSubject: CurrentValueStream<TunnelSnapshot?>
 
     private var status: TunnelStatus {
         get {
@@ -22,18 +22,18 @@ public actor FakeTunnelStrategy: TunnelObservableStrategy, Sendable {
         }
     }
 
-    public nonisolated var activeProfiles: [Profile.ID: TunnelActiveProfile] {
+    public nonisolated var activeProfiles: [Profile.ID: TunnelSnapshot] {
         guard let current = activeProfileSubject.value else {
             return [:]
         }
         return [current.id: current]
     }
 
-    public nonisolated var activeProfile: TunnelActiveProfile? {
+    public nonisolated var activeProfile: TunnelSnapshot? {
         activeProfileSubject.value
     }
 
-    public nonisolated var didUpdateActiveProfiles: AsyncStream<[Profile.ID: TunnelActiveProfile]> {
+    public nonisolated var didUpdateActiveProfiles: AsyncStream<[Profile.ID: TunnelSnapshot]> {
         activeProfileSubject
             .subscribe()
             .map {
@@ -74,13 +74,13 @@ public actor FakeTunnelStrategy: TunnelObservableStrategy, Sendable {
             await doDisconnect()
         }
         if isOnDemand {
-            activeProfileSubject.send(TunnelActiveProfile(
+            activeProfileSubject.send(TunnelSnapshot(
                 id: profile.id,
                 status: .inactive,
                 onDemand: true
             ))
         } else {
-            activeProfileSubject.send(TunnelActiveProfile(
+            activeProfileSubject.send(TunnelSnapshot(
                 id: profile.id,
                 status: .inactive,
                 onDemand: false
@@ -100,7 +100,7 @@ public actor FakeTunnelStrategy: TunnelObservableStrategy, Sendable {
 
     public func disconnect(from profileId: Profile.ID) async throws {
         await doDisconnect()
-        activeProfileSubject.send(TunnelActiveProfile(
+        activeProfileSubject.send(TunnelSnapshot(
             id: profileId,
             status: .inactive,
             onDemand: false

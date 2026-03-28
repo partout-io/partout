@@ -25,7 +25,7 @@ struct TunnelTests {
         let sut = newTunnel()
         let module = try DNSModule.Builder().build()
         let profile = try Profile.Builder(modules: [module], activatingModules: true).build()
-        let stream = sut.activeProfilesStream.removeDuplicates()
+        let stream = sut.snapshotsStream.removeDuplicates()
 
         let expected: [TunnelStatus] = [
             .inactive,
@@ -40,11 +40,11 @@ struct TunnelTests {
 
         let pending = Task {
             var emitted: [TunnelStatus] = []
-            for await activeProfiles in stream {
+            for await snapshots in stream {
                 if emitted.count == expected.count {
                     return emitted
                 }
-                guard let status = activeProfiles.first?.value.status else {
+                guard let status = snapshots.first?.value.status else {
                     continue
                 }
                 emitted.append(status)

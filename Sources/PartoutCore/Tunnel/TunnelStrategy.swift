@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-/// Defines the current tunnel profile.
-public struct TunnelActiveProfile: Hashable, Sendable, CustomStringConvertible {
+/// Returns a tunnel-specific snapshot of a ``Profile``.
+public struct TunnelSnapshot: Hashable, Sendable, CustomStringConvertible {
     public let id: Profile.ID
 
     public let status: TunnelStatus
@@ -71,9 +71,8 @@ public protocol TunnelStrategy: Sendable {
 
 /// Extends a strategy with observability.
 public protocol TunnelObservableStrategy: TunnelStrategy {
-
     /// Publishes the unique changes in the current profiles.
-    nonisolated var didUpdateActiveProfiles: AsyncStream<[Profile.ID: TunnelActiveProfile]> { get }
+    nonisolated var didUpdateActiveProfiles: AsyncStream<[Profile.ID: TunnelSnapshot]> { get }
 }
 
 extension TunnelStrategy {

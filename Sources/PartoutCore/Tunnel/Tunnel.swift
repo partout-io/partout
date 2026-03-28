@@ -8,7 +8,7 @@ public actor Tunnel {
 
     private let strategy: TunnelObservableStrategy
 
-    private let activeProfilesSubject: CurrentValueStream<[Profile.ID: TunnelActiveProfile]>
+    private let snapshotsSubject: CurrentValueStream<[Profile.ID: TunnelSnapshot]>
 
     private let environmentFactory: (Profile.ID) -> TunnelEnvironmentReader
 
@@ -26,7 +26,7 @@ public actor Tunnel {
         self.ctx = ctx
         self.strategy = strategy
         self.environmentFactory = environmentFactory
-        activeProfilesSubject = CurrentValueStream([:])
+        snapshotsSubject = CurrentValueStream([:])
         environments = [:]
         observeObjects()
     }
@@ -96,7 +96,7 @@ extension Tunnel {
     }
 
     public func sendMessage(_ message: Message.Input) async throws -> Message.Output? {
-        guard let profileId = activeProfiles.keys.first else { return nil }
+        guard let profileId = snapshots.keys.first else { return nil }
         return try await sendMessage(message, to: profileId)
     }
 }
@@ -104,17 +104,17 @@ extension Tunnel {
 // MARK: - State
 
 extension Tunnel {
-    public private(set) var activeProfiles: [Profile.ID: TunnelActiveProfile] {
+    public private(set) var snapshots: [Profile.ID: TunnelSnapshot] {
         get {
-            activeProfilesSubject.value
+            snapshotsSubject.value
         }
         set {
-            activeProfilesSubject.send(newValue)
+            snapshotsSubject.send(newValue)
         }
     }
 
-    public nonisolated var activeProfilesStream: AsyncStream<[Profile.ID: TunnelActiveProfile]> {
-        activeProfilesSubject.subscribe()
+    public nonisolated var snapshotsStream: AsyncStream<[Profile.ID: TunnelSnapshot]> {
+        snapshotsSubject.subscribe()
     }
 
     public func allEnvironments() -> [Profile.ID: TunnelEnvironmentReader] {
@@ -130,12 +130,12 @@ extension Tunnel {
 
 #if os(iOS) || os(tvOS)
 extension Tunnel {
-    public var activeProfile: TunnelActiveProfile? {
-        activeProfiles.first?.value
+    public var snapshot: TunnelSnapshot? {
+        snapshots.first?.value
     }
 
     public var status: TunnelStatus {
-        activeProfile?.status ?? .inactive
+        snapshot?.status ?? .inactive
     }
 }
 #endif
@@ -147,33 +147,34 @@ private extension Tunnel {
         strategySubscription?.cancel()
         strategySubscription = Task { [weak self] in
             guard let self else { return }
-            for await activeProfiles in strategy.didUpdateActiveProfiles {
+            for await snapshots in strategy.didUpdateActiveProfiles {
                 guard !Task.isCancelled else {
                     pp_log(ctx, .core, .debug, "Cancelled Tunnel.strategy.didUpdateActiveProfiles (observed)")
                     return
                 }
-                await handleNewActiveProfiles(activeProfiles)
+                await handleNewSnapshots(snapshots)
             }
         }
     }
 
-    func handleNewActiveProfiles(_ activeProfiles: [Profile.ID: TunnelActiveProfile]) {
-        guard activeProfiles != self.activeProfiles else {
+    func handleNewSnapshots(_ snapshots: [Profile.ID: TunnelSnapshot]) {
+        guard snapshots != self.snapshots else {
             return
         }
-        pp_log(ctx, .core, .info, "Active profiles: \(activeProfiles.values.description)")
-        let activeIds = activeProfiles.keys
+        pp_log(ctx, .core, .info, "Snapshots: \(snapshots.values.description)")
         // Create new environments if needed
-        for profileId in activeIds {
+        let active = snapshots.filter(\.value.isActive)
+        for item in active {
+            let profileId = item.key
             if environments[profileId] == nil {
                 environments[profileId] = environmentFactory(profileId)
             }
         }
         // Discard environments of inactive profiles
         environments = environments.filter {
-            activeProfiles[$0.key]?.isActive == true
+            snapshots[$0.key]?.isActive == true
         }
-        // Notify .activeProfilesStream observers now
-        self.activeProfiles = activeProfiles
+        // Notify .snapshotsStream observers now
+        self.snapshots = snapshots
     }
 }
