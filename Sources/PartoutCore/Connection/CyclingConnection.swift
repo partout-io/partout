@@ -108,7 +108,7 @@ public actor CyclingConnection {
 
 // MARK: - Connection
 
-extension CyclingConnection: Connection {
+extension CyclingConnection {
     public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
         statusSubject
             .subscribeThrowing()

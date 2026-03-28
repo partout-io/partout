@@ -37,6 +37,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private var onHold: Bool
 
+    private var heldTunnel: IOInterface?
+
     private var statusSubscription: Task<Void, Never>?
 
     private var networkSubscription: Task<Void, Never>?
@@ -126,7 +128,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             }
             // otherwise, configure the tunnel immediately
             else {
-                _ = try await controller.setTunnelSettings(with: nil)
+                heldTunnel = try await controller.setTunnelSettings(with: nil)
             }
 
             pp_log_id(profile.id, .core, .notice, "Daemon started successfully")
@@ -140,11 +142,14 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     public func hold() async {
         onHold = true
+        if let tunnel = await connection?.tunnel() ?? heldTunnel {
+            await controller.clearTunnelSettings(tunnel)
+        }
         await stop()
     }
 
     public func stop() async {
-        assert(isStarted, "Daemon not started")
+        assert(isStarted || onHold, "Daemon not started or on hold")
         guard isStarted else { return }
         pp_log_id(profile.id, .core, .notice, "Stop daemon (\(onHold ? "keep" : "clear") environment)")
 
