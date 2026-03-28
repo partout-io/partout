@@ -86,4 +86,21 @@ extension OpenVPN.TLSWrap {
         let wrappedKey = SecureData(keyData.subdata(in: 256..<keyData.count))
         return (staticKey, wrappedKey)
     }
+
+    func asClientKeyV2FileContents() -> String {
+        precondition(strategy == .cryptV2)
+        let wrappedKey = wrappedKey?.toData() ?? Data()
+        let data = key.secureData.toData() + wrappedKey
+        let base64 = data.base64EncodedString()
+        let base64Lines = stride(from: 0, to: base64.count, by: 64).map { start -> String in
+            let begin = base64.index(base64.startIndex, offsetBy: start)
+            let end = base64.index(begin, offsetBy: 64, limitedBy: base64.endIndex) ?? base64.endIndex
+            return String(base64[begin..<end])
+        }
+        return ([
+            "-----BEGIN OpenVPN tls-crypt-v2 client key-----"
+        ] + base64Lines + [
+            "-----END OpenVPN tls-crypt-v2 client key-----"
+        ]).joined(separator: "\n")
+    }
 }

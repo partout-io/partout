@@ -36,6 +36,13 @@ public struct OpenVPNModule: Module, BuildableType, Hashable, Codable {
             isInteractive: requiresInteractiveCredentials ?? false
         )
     }
+
+    public func serialized() throws -> String? {
+        guard let configuration else {
+            return nil
+        }
+        return try configuration.serialized()
+    }
 }
 
 private extension OpenVPNModule {

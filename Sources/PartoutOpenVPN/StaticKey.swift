@@ -185,6 +185,22 @@ extension OpenVPN {
             secureData.toHex()
         }
 
+        /// Serializes the key as a `tls-auth`/`tls-crypt` static key file.
+        public func asFileContents() -> String {
+            let hex = hexString
+            let keyLines = stride(from: 0, to: hex.count, by: 32).map { start -> String in
+                let begin = hex.index(hex.startIndex, offsetBy: start)
+                let end = hex.index(begin, offsetBy: 32, limitedBy: hex.endIndex) ?? hex.endIndex
+                return String(hex[begin..<end])
+            }
+            return ([
+                "# 2048 bit OpenVPN static key",
+                StaticKey.fileHead,
+            ] + keyLines + [
+                StaticKey.fileFoot
+            ]).joined(separator: "\n")
+        }
+
         // MARK: Equatable
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
