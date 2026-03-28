@@ -25,10 +25,17 @@ public protocol Module: UniquelyIdentifiable, Sendable {
     var isMutuallyExclusive: Bool { get }
 
     func checkCompatible(with otherModule: Module, activeIds: Set<UniqueID>) throws
+
+    func serialized() throws -> String?
 }
 
 extension Module {
     public var moduleType: ModuleType {
         Self.moduleType
+    }
+
+    /// Returns a textual representation of this module, if supported.
+    public func serialized() throws -> String? {
+        nil
     }
 }
