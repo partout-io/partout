@@ -38,10 +38,7 @@ public struct OpenVPNModule: Module, BuildableType, Hashable, Codable {
     }
 
     public func serialized() throws -> String? {
-        guard let configuration else {
-            return nil
-        }
-        return try configuration.serialized()
+        try configuration?.serialized()
     }
 }
 
