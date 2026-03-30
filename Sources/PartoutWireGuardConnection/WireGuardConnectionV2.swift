@@ -54,7 +54,7 @@ public actor WireGuardConnectionV2: Connection {
         }
         pp_log(ctx, .wireguard, .notice, "WireGuard: Using cross-platform connection V2")
 
-        tunnelConfiguration = try configuration.withModulesV2(from: parameters.profile)
+        tunnelConfiguration = try configuration.withModules(from: parameters.profile)
         dataCountTimerInterval = TimeInterval(parameters.options.minDataCountInterval) / 1000.0
     }
 
@@ -226,63 +226,5 @@ private extension String {
             return nil
         }
         return UInt(dropFirst(prefixKey.count))
-    }
-}
-
-// MARK: - Helpers
-
-extension WireGuard.Configuration {
-    func withModulesV2(from profile: Profile) throws -> Self {
-        var newBuilder = builder()
-
-        // add IPModule.*.includedRoutes to AllowedIPs
-        profile.activeModules
-            .compactMap {
-                $0 as? IPModule
-            }
-            .forEach { ipModule in
-                newBuilder.peers = newBuilder.peers
-                    .map { oldPeer in
-                        var peer = oldPeer
-                        ipModule.ipv4?.includedRoutes.forEach { route in
-                            peer.allowedIPs.append(route.destination?.rawValue ?? "0.0.0.0/0")
-                        }
-                        ipModule.ipv6?.includedRoutes.forEach { route in
-                            peer.allowedIPs.append(route.destination?.rawValue ?? "::/0")
-                        }
-                        return peer
-                    }
-            }
-
-        // if routesThroughVPN, add DNSModule.servers to AllowedIPs
-        profile.activeModules
-            .compactMap {
-                $0 as? DNSModule
-            }
-            .filter {
-                $0.routesThroughVPN == true
-            }
-            .forEach { dnsModule in
-                newBuilder.peers = newBuilder.peers
-                    .map { oldPeer in
-                        var peer = oldPeer
-                        dnsModule.servers.forEach {
-                            switch $0 {
-                            case .ip(let addr, let family):
-                                switch family {
-                                case .v4:
-                                    peer.allowedIPs.append("\(addr)/32")
-                                case .v6:
-                                    peer.allowedIPs.append("\(addr)/128")
-                                }
-                            case .hostname:
-                                break
-                            }
-                        }
-                        return peer
-                    }
-            }
-
-        return try newBuilder.build()
     }
 }
