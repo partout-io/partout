@@ -6,7 +6,7 @@
 
 internal import _PartoutCore_C
 
-/// A ``TunnelController`` that operates on a virtual tun interface like ``VirtualTunnelInterface``.
+/// A controller that operates on a virtual tun interface.
 public final class VirtualTunnelController: TunnelController {
     private let ctx: PartoutLoggerContext
 
