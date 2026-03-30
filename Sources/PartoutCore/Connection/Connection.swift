@@ -7,9 +7,6 @@ public protocol Connection: AnyObject, Sendable {
     /// Publishes the ``ConnectionStatus`` of the connection.
     var statusStream: AsyncThrowingStream<ConnectionStatus, Error> { get }
 
-    /// The associated ``IOInterface``.
-    func tunnel() async -> IOInterface?
-
     /// Starts the connection.
     ///
     /// - Postcondition: The status stream must go through `.connecting` to eventually reach `.connected` (on success), `.disconnected` (on recoverable failure) or `completion: .failure` (on unrecoverable failure).

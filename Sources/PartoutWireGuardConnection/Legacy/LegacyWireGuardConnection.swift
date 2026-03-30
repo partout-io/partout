@@ -67,10 +67,6 @@ public final class LegacyWireGuardConnection: Connection, @unchecked Sendable {
         statusSubject.subscribeThrowing()
     }
 
-    public func tunnel() async -> IOInterface? {
-        nil
-    }
-
     public func start() async throws -> Bool {
         pp_log(ctx, .wireguard, .info, "Start tunnel")
         statusSubject.send(.connecting)

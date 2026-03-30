@@ -9,18 +9,22 @@ extension NEPacketTunnelProvider {
         // XXX: We want to remove the VPN status icon on iOS/tvOS
         // and calling .setTunnelNetworkSettings(nil) doesn't seem
         // to do it. Feeding fake IPv4 settings does the trick.
-        let fake = NEPacketTunnelNetworkSettings(
-            tunnelRemoteAddress: NEPacketTunnelNetworkSettings.fakeRemoteAddress
-        )
-        // XXX: This is to speed up tunnel stop, like in Profile+NE
-        fake.ipv4Settings = .fakeLoopback
-        fake.ipv6Settings = .fakeLoopback
-        // Block the Internet
         if withKillSwitch {
-            fake.ipv4Settings?.includedRoutes = [.default()]
-            fake.ipv6Settings?.includedRoutes = [.default()]
+            let fake = NEPacketTunnelNetworkSettings(
+                tunnelRemoteAddress: NEPacketTunnelNetworkSettings.fakeRemoteAddress
+            )
+            // XXX: This is to speed up tunnel stop, like in Profile+NE
+            fake.ipv4Settings = .fakeLoopback
+            fake.ipv6Settings = .fakeLoopback
+            // Block the Internet
+            if withKillSwitch {
+                fake.ipv4Settings?.includedRoutes = [.default()]
+                fake.ipv6Settings?.includedRoutes = [.default()]
+            }
+            try await setTunnelNetworkSettings(fake)
+            return
         }
-        try await setTunnelNetworkSettings(fake)
+        try await setTunnelNetworkSettings(nil)
     }
 }
 

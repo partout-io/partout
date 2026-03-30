@@ -66,10 +66,6 @@ public actor WireGuardConnection: Connection {
         statusSubject.subscribeThrowing()
     }
 
-    public func tunnel() -> IOInterface? {
-        nil
-    }
-
     public func start() async throws -> Bool {
         assert(adapter == nil)
         adapter = await WireGuardAdapter(
