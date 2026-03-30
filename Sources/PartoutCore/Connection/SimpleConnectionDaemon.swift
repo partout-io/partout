@@ -120,7 +120,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             if connection != nil {
                 environment.setEnvironmentValue(.disconnected, forKey: TunnelEnvironmentKeys.connectionStatus)
 
-                // monitor network events
+                // Monitor network events
                 observeEvents()
 
                 // Start the first connection right away
@@ -159,6 +159,11 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             await connection.stop(timeout: stopDelay)
         } else {
             pp_log_id(profile.id, .core, .notice, "Non-connection profile, nothing to disconnect from")
+        }
+
+        // Clear tunnel settings
+        if let settingsOnlyTunnel {
+            await controller.clearTunnelSettings(settingsOnlyTunnel, withKillSwitch: false)
         }
 
         // Make sure to clear environment on stop, especially last error code

@@ -81,10 +81,6 @@ extension OpenVPNConnection: Connection {
         backend.statusStream
     }
 
-    public func tunnel() async -> IOInterface? {
-        tunnelInterface
-    }
-
     @discardableResult
     public func start() async throws -> Bool {
         var session: OpenVPNSessionProtocol?
