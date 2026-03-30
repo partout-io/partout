@@ -13,7 +13,6 @@
 #endif
 
 /// Establishes a WireGuard connection.
-@available(*, deprecated, renamed: "WireGuardConnectionV2")
 public actor WireGuardConnection: Connection {
     private let ctx: PartoutLoggerContext
 
@@ -184,7 +183,7 @@ private extension WireGuardConnection {
         guard let adapter else { return }
         guard statusSubject.value == .connected else { return }
         guard let configurationString = await adapter.getRuntimeConfiguration(),
-              let dataCount = DataCount.from(wireGuardString: configurationString) else {
+              let dataCount = DataCount.fromWireGuardString(configurationString) else {
             return
         }
         environment.setEnvironmentValue(dataCount, forKey: TunnelEnvironmentKeys.dataCount)
@@ -192,7 +191,7 @@ private extension WireGuardConnection {
 }
 
 private extension DataCount {
-    static func from(wireGuardString string: String) -> DataCount? {
+    static func fromWireGuardString(_ string: String) -> DataCount? {
         var bytesReceived: UInt?
         var bytesSent: UInt?
         string.enumerateLines { line, stop in
@@ -216,74 +215,5 @@ private extension String {
             return nil
         }
         return UInt(dropFirst(prefixKey.count))
-    }
-}
-
-// MARK: - Helpers
-
-extension WireGuard.Configuration {
-    func withModules(from profile: Profile) throws -> Self {
-        var newBuilder = builder()
-
-        // add IPModule.*.includedRoutes to AllowedIPs
-        profile.activeModules
-            .compactMap {
-                $0 as? IPModule
-            }
-            .forEach { ipModule in
-                newBuilder.peers = peers
-                    .map { oldPeer in
-                        var peer = oldPeer.builder()
-                        ipModule.ipv4?.includedRoutes.forEach { route in
-                            peer.allowedIPs.append(route.destination?.rawValue ?? "0.0.0.0/0")
-                        }
-                        ipModule.ipv6?.includedRoutes.forEach { route in
-                            peer.allowedIPs.append(route.destination?.rawValue ?? "::/0")
-                        }
-                        return peer
-                    }
-            }
-
-        // if routesThroughVPN, add DNSModule.servers to AllowedIPs
-        profile.activeModules
-            .compactMap {
-                $0 as? DNSModule
-            }
-            .filter {
-                $0.routesThroughVPN == true
-            }
-            .forEach { dnsModule in
-                newBuilder.peers = peers
-                    .map { oldPeer in
-                        var peer = oldPeer.builder()
-                        dnsModule.servers.forEach {
-                            switch $0 {
-                            case .ip(let addr, let family):
-                                switch family {
-                                case .v4:
-                                    peer.allowedIPs.append("\(addr)/32")
-                                case .v6:
-                                    peer.allowedIPs.append("\(addr)/128")
-                                }
-                            case .hostname:
-                                break
-                            }
-                        }
-                        return peer
-                    }
-            }
-
-        return try newBuilder.build()
-    }
-}
-
-private extension WireGuardLogLevel {
-    var debugLevel: DebugLog.Level {
-        switch self {
-        case .verbose:
-            return .debug
-        case .error:
-            return .error
-        }
     }
 }

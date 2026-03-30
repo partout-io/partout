@@ -67,3 +67,61 @@ extension WireGuard.Configuration {
         }
     }
 }
+
+// MARK: - Helpers
+
+extension WireGuard.Configuration {
+    public func withModules(from profile: Profile) throws -> Self {
+        var newBuilder = builder()
+
+        // Add IPModule.*.includedRoutes to AllowedIPs
+        profile.activeModules
+            .compactMap {
+                $0 as? IPModule
+            }
+            .forEach { ipModule in
+                newBuilder.peers = newBuilder.peers
+                    .map { oldPeer in
+                        var peer = oldPeer
+                        ipModule.ipv4?.includedRoutes.forEach { route in
+                            peer.allowedIPs.append(route.destination?.rawValue ?? "0.0.0.0/0")
+                        }
+                        ipModule.ipv6?.includedRoutes.forEach { route in
+                            peer.allowedIPs.append(route.destination?.rawValue ?? "::/0")
+                        }
+                        return peer
+                    }
+            }
+
+        // If routesThroughVPN, add DNSModule.servers to AllowedIPs
+        profile.activeModules
+            .compactMap {
+                $0 as? DNSModule
+            }
+            .filter {
+                $0.routesThroughVPN == true
+            }
+            .forEach { dnsModule in
+                newBuilder.peers = newBuilder.peers
+                    .map { oldPeer in
+                        var peer = oldPeer
+                        dnsModule.servers.forEach {
+                            switch $0 {
+                            case .ip(let addr, let family):
+                                switch family {
+                                case .v4:
+                                    peer.allowedIPs.append("\(addr)/32")
+                                case .v6:
+                                    peer.allowedIPs.append("\(addr)/128")
+                                }
+                            case .hostname:
+                                break
+                            }
+                        }
+                        return peer
+                    }
+            }
+
+        return try newBuilder.build()
+    }
+}
