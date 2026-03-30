@@ -160,10 +160,6 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         } else {
             pp_log_id(profile.id, .core, .notice, "Non-connection profile, nothing to disconnect from")
         }
-        // Clear tunnel settings
-        if let tunnel = await connection?.tunnel() ?? settingsOnlyTunnel {
-            await controller.clearTunnelSettings(tunnel, withKillSwitch: onHold)
-        }
 
         // Make sure to clear environment on stop, especially last error code
         clearEnvironment()
