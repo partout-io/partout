@@ -263,17 +263,3 @@ private extension String {
         return UInt(dropFirst(prefixKey.count))
     }
 }
-
-// MARK: - Helpers
-
-private extension WireGuardLogLevel {
-    var debugLevel: DebugLog.Level {
-        switch self {
-        case .verbose:
-            return .debug
-
-        case .error:
-            return .error
-        }
-    }
-}

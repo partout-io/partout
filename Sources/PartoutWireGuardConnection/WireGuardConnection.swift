@@ -145,17 +145,6 @@ public actor WireGuardConnection: Connection {
     }
 }
 
-private extension WireGuardLogLevel {
-    var debugLevel: DebugLog.Level {
-        switch self {
-        case .verbose:
-            return .debug
-        case .error:
-            return .error
-        }
-    }
-}
-
 // MARK: - WireGuardAdapterDelegate
 
 extension WireGuardConnection: WireGuardAdapterDelegate {
