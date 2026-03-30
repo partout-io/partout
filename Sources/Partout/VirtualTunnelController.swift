@@ -96,7 +96,7 @@ public final class VirtualTunnelController: TunnelController {
         }
     }
 
-    public func clearTunnelSettings(_ io: IOInterface) async {
+    public func clearTunnelSettings(_ io: IOInterface, withKillSwitch: Bool) async {
         guard let tunnel = io as? VirtualTunnelInterface else {
             assertionFailure("Expected type is VirtualTunnelInterface")
             return
