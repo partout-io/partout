@@ -37,7 +37,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private var onHold: Bool
 
-    private var heldTunnel: IOInterface?
+    private var settingsOnlyTunnel: IOInterface?
 
     private var statusSubscription: Task<Void, Never>?
 
@@ -128,7 +128,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             }
             // Otherwise, configure the tunnel immediately
             else {
-                heldTunnel = try await controller.setTunnelSettings(with: nil)
+                settingsOnlyTunnel = try await controller.setTunnelSettings(with: nil)
             }
 
             pp_log_id(profile.id, .core, .notice, "Daemon started successfully")
@@ -161,8 +161,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             pp_log_id(profile.id, .core, .notice, "Non-connection profile, nothing to disconnect from")
         }
         // Clear tunnel settings
-        if let tunnel = await connection?.tunnel() ?? heldTunnel {
-            await controller.clearTunnelSettings(tunnel)
+        if let tunnel = await connection?.tunnel() ?? settingsOnlyTunnel {
+            await controller.clearTunnelSettings(tunnel, withKillSwitch: onHold)
         }
 
         // Make sure to clear environment on stop, especially last error code

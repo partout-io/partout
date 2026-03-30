@@ -67,7 +67,7 @@ public final class NETunnelController: TunnelController {
     public func clearTunnelSettings(_ tunnel: IOInterface, withKillSwitch: Bool) async {
         do {
             pp_log_id(profile.id, .os, .info, "Clear tunnel settings (remove VPN status icon)")
-            try await provider?.clearTunnelSettings(withKillSwitch: true)
+            try await provider?.clearTunnelSettings(withKillSwitch: withKillSwitch)
         } catch {
             pp_log_id(profile.id, .os, .error, "Unable to clear tunnel settings: \(error)")
         }
