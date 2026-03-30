@@ -32,8 +32,6 @@ struct WireGuardConfigurationTests {
         let cfg = try configurationBuilder.build()
         let mergedConfiguration = try cfg.withModules(from: profile)
         let allowedIPs = mergedConfiguration.peers[0].allowedIPs.map(\.rawValue)
-        let mergedConfigurationV2 = try cfg.withModulesV2(from: profile)
-        let allowedIPsV2 = mergedConfigurationV2.peers[0].allowedIPs.map(\.rawValue)
 
         let expectedAllowedIPs = [
             "192.168.0.0/16",
@@ -41,7 +39,6 @@ struct WireGuardConfigurationTests {
             "1.1.1.1/32",
             "2606:4700:4700::1111/128"
         ]
-        #expect(allowedIPs != expectedAllowedIPs)
-        #expect(allowedIPsV2 == expectedAllowedIPs)
+        #expect(allowedIPs == expectedAllowedIPs)
     }
 }

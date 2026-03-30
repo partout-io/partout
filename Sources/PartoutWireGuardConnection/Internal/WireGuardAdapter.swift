@@ -4,7 +4,6 @@
 internal import _PartoutCore_C
 internal import _PartoutWireGuard_C
 
-@available(*, deprecated, renamed: "WireGuardAdapterV2Delegate")
 protocol WireGuardAdapterDelegate: AnyObject, Sendable {
     func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool)
 
@@ -16,7 +15,6 @@ protocol WireGuardAdapterDelegate: AnyObject, Sendable {
 }
 
 /// Enum representing internal state of the `WireGuardAdapter`
-@available(*, deprecated, renamed: "WireGuardAdapterV2State")
 private enum WireGuardAdapterState {
     /// The tunnel is stopped
     case stopped
@@ -28,7 +26,6 @@ private enum WireGuardAdapterState {
     case temporaryShutdown(_ settingsGenerator: TunnelRemoteInfoGenerator)
 }
 
-@available(*, deprecated, renamed: "WireGuardAdapterV2")
 actor WireGuardAdapter {
     typealias LogHandler = @Sendable (WireGuardLogLevel, String) -> Void
 

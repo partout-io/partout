@@ -13,7 +13,6 @@
 #endif
 
 /// Establishes a WireGuard connection.
-@available(*, deprecated, renamed: "WireGuardConnectionV2")
 public actor WireGuardConnection: Connection {
     private let ctx: PartoutLoggerContext
 
@@ -146,6 +145,17 @@ public actor WireGuardConnection: Connection {
     }
 }
 
+private extension WireGuardLogLevel {
+    var debugLevel: DebugLog.Level {
+        switch self {
+        case .verbose:
+            return .debug
+        case .error:
+            return .error
+        }
+    }
+}
+
 // MARK: - WireGuardAdapterDelegate
 
 extension WireGuardConnection: WireGuardAdapterDelegate {
@@ -184,7 +194,7 @@ private extension WireGuardConnection {
         guard let adapter else { return }
         guard statusSubject.value == .connected else { return }
         guard let configurationString = await adapter.getRuntimeConfiguration(),
-              let dataCount = DataCount.from(wireGuardString: configurationString) else {
+              let dataCount = DataCount.fromWireGuardString(configurationString) else {
             return
         }
         environment.setEnvironmentValue(dataCount, forKey: TunnelEnvironmentKeys.dataCount)
@@ -192,7 +202,7 @@ private extension WireGuardConnection {
 }
 
 private extension DataCount {
-    static func from(wireGuardString string: String) -> DataCount? {
+    static func fromWireGuardString(_ string: String) -> DataCount? {
         var bytesReceived: UInt?
         var bytesSent: UInt?
         string.enumerateLines { line, stop in
@@ -216,18 +226,5 @@ private extension String {
             return nil
         }
         return UInt(dropFirst(prefixKey.count))
-    }
-}
-
-// MARK: - Helpers
-
-private extension WireGuardLogLevel {
-    var debugLevel: DebugLog.Level {
-        switch self {
-        case .verbose:
-            return .debug
-        case .error:
-            return .error
-        }
     }
 }

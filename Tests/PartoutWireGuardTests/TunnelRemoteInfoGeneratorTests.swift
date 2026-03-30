@@ -24,7 +24,7 @@ struct TunnelRemoteInfoGeneratorTests {
         }
         let targetIPv4Object = try Endpoint(targetIPv4, sourceEndpoint.port)
 
-        let withEnabled = WireGuard.Configuration.ResolvedMapV2()
+        let withEnabled = WireGuard.Configuration.ResolvedMap()
         await withEnabled.setEndpoints(endpointObjects, for: sourceEndpoint)
         let enabledMap = await withEnabled.toMap()
         #expect(enabledMap[sourceEndpoint] == targetIPv4Object)
@@ -37,7 +37,7 @@ struct TunnelRemoteInfoGeneratorTests {
         let resolvedEndpoint1 = try Endpoint("1.2.3.4", sourceEndpoint1.port)
         let resolvedEndpoint2 = try Endpoint("5.6.7.8", sourceEndpoint2.port)
 
-        let withEnabled = WireGuard.Configuration.ResolvedMapV2()
+        let withEnabled = WireGuard.Configuration.ResolvedMap()
         await withEnabled.setEndpoints([resolvedEndpoint1], for: sourceEndpoint1)
         await withEnabled.setEndpoints([resolvedEndpoint2], for: sourceEndpoint2)
         let enabledMap = await withEnabled.toMap()
@@ -64,24 +64,12 @@ struct TunnelRemoteInfoGeneratorTests {
             tunnelConfiguration: configuration,
             dnsTimeout: 1
         )
-        let sutV2 = TunnelRemoteInfoGeneratorV2(
-            .global,
-            tunnelConfiguration: configuration,
-            dnsTimeout: 1
-        )
         let info = sut.generateRemoteInfo(moduleId: UniqueID(), descriptors: [])
-        let infoV2 = sutV2.generateRemoteInfo(moduleId: UniqueID(), descriptors: [])
         let ipModule = try #require(info.modules?.compactMap { $0 as? IPModule }.first)
-        let ipModuleV2 = try #require(infoV2.modules?.compactMap { $0 as? IPModule }.first)
 
-        #expect(ipModule.ipv4?.includedRoutes.first?.destination?.rawValue != "10.0.0.0/24")
+        #expect(ipModule.ipv4?.includedRoutes.first?.destination?.rawValue == "10.0.0.0/24")
         #expect(ipModule.ipv4?.includedRoutes.first?.gateway?.rawValue == "10.0.0.2")
-        #expect(ipModule.ipv6?.includedRoutes.first?.destination?.rawValue != "fd00::/64")
+        #expect(ipModule.ipv6?.includedRoutes.first?.destination?.rawValue == "fd00::/64")
         #expect(ipModule.ipv6?.includedRoutes.first?.gateway?.rawValue == "fd00::2")
-
-        #expect(ipModuleV2.ipv4?.includedRoutes.first?.destination?.rawValue == "10.0.0.0/24")
-        #expect(ipModuleV2.ipv4?.includedRoutes.first?.gateway?.rawValue == "10.0.0.2")
-        #expect(ipModuleV2.ipv6?.includedRoutes.first?.destination?.rawValue == "fd00::/64")
-        #expect(ipModuleV2.ipv6?.includedRoutes.first?.gateway?.rawValue == "fd00::2")
     }
 }
