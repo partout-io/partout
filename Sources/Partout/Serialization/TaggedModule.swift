@@ -77,16 +77,14 @@ extension TaggedModule: Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(discriminator.rawValue, forKey: .type)
-
-        let module = containedModule
-        assertDiscriminator(module)
-        try module.encode(to: encoder)
+        try encodePayload(to: &container)
     }
 }
 
 private extension TaggedModule {
     enum CodingKeys: String, CodingKey {
         case type
+        case value
     }
 
     enum Discriminator: String {
@@ -109,10 +107,12 @@ private extension TaggedModule {
         }
     }
 
-    func assertDiscriminator(_ module: Module) {
+    func encodePayload(to container: inout KeyedEncodingContainer<CodingKeys>) throws {
+        let module = containedModule
         assert(
             module.moduleType.rawValue == discriminator.rawValue,
             "Module has type '\(module.moduleType)' but discriminator '\(discriminator.rawValue)'"
         )
+        try container.encode(module, forKey: .value)
     }
 }
