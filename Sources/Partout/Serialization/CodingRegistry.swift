@@ -12,12 +12,11 @@ public final class CodingRegistry {
 
     public init(
         registry: Registry,
-        withLegacyEncoding: @escaping () -> Bool,
-        postDecodeBlock: PostDecodeBlock? = nil
+        withLegacyEncoding: @escaping () -> Bool
     ) {
         self.registry = registry
         self.withLegacyEncoding = withLegacyEncoding
-        self.postDecodeBlock = postDecodeBlock ?? Self.migratedProfile
+        postDecodeBlock = Self.migratedProfile
     }
 }
 
