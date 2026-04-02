@@ -187,9 +187,7 @@ private extension SimpleConnectionDaemonTests {
         let options = ConnectionParameters.Options()
         let environment = environment ?? SharedTunnelEnvironment(profileId: profile.id)
         return try SimpleConnectionDaemon(params: .init(
-            connectionFactory: Registry(allHandlers: [
-                MockConnectionModule.moduleHandler
-            ]),
+            connectionFactory: MockConnectionFactory(),
             connectionParameters: .init(
                 profile: profile,
                 controller: controller,
@@ -202,6 +200,12 @@ private extension SimpleConnectionDaemonTests {
             stopDelay: stopDelay,
             reconnectionDelay: reconnectionDelay
         ))
+    }
+}
+
+private final class MockConnectionFactory: ConnectionFactory {
+    func connection(for connectionModule: any ConnectionModule, parameters: ConnectionParameters) throws -> any Connection {
+        MockConnection(options: .init())
     }
 }
 

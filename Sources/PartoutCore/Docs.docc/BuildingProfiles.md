@@ -23,7 +23,7 @@ Profiles are the foundations of Partout, and profiles are made of modules. A bas
 - ``ModuleType``
 - ``ConnectionModule``
 
-### Central registry
+### Strategies
 
 - ``ModuleBuilderValidator``
 - ``ModuleHandler``
@@ -32,7 +32,6 @@ Profiles are the foundations of Partout, and profiles are made of modules. A bas
 - ``ModuleRegistry``
 - ``ConnectionFactory``
 - ``Resolver``
-- ``Registry``
 
 ### Serialization
 
