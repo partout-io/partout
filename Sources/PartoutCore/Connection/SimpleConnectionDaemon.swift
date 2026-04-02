@@ -11,7 +11,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     public nonisolated let environment: TunnelEnvironment
 
-    private let registry: Registry
+    private let connectionFactory: ConnectionFactory
 
     private let controller: TunnelController
 
@@ -56,7 +56,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     public init(params: Parameters) throws {
         profile = params.connectionParameters.profile
         environment = params.connectionParameters.environment
-        registry = params.registry
+        connectionFactory = params.connectionFactory
         controller = params.connectionParameters.controller
         reachability = params.connectionParameters.reachability
         messageHandler = params.messageHandler
@@ -83,7 +83,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         }
 
         // Create the associated connection
-        let connection = try registry.connection(
+        let connection = try connectionFactory.connection(
             for: connectionModule,
             parameters: params.connectionParameters
         )
@@ -347,7 +347,7 @@ extension SimpleConnectionDaemon {
 
 extension SimpleConnectionDaemon {
     public final class Parameters: Sendable {
-        let registry: Registry
+        let connectionFactory: ConnectionFactory
 
         let connectionParameters: ConnectionParameters
 
@@ -358,13 +358,13 @@ extension SimpleConnectionDaemon {
         let reconnectionDelay: Int
 
         public init(
-            registry: Registry,
+            connectionFactory: ConnectionFactory,
             connectionParameters: ConnectionParameters,
             messageHandler: MessageHandler,
             stopDelay: Int? = nil,
             reconnectionDelay: Int? = nil
         ) {
-            self.registry = registry
+            self.connectionFactory = connectionFactory
             self.connectionParameters = connectionParameters
             self.messageHandler = messageHandler
             self.stopDelay = stopDelay ?? 2000
