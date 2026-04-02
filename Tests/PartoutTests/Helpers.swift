@@ -6,6 +6,6 @@ import Partout
 
 extension Registry {
     func withLegacyEncoding(_ legacy: Bool) -> CodingRegistry {
-        CodingRegistry(registry: self, withLegacyEncoding: legacy)
+        CodingRegistry(registry: self, withLegacyEncoding: { legacy })
     }
 }

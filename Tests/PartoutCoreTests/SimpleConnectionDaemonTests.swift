@@ -187,7 +187,7 @@ private extension SimpleConnectionDaemonTests {
         let options = ConnectionParameters.Options()
         let environment = environment ?? SharedTunnelEnvironment(profileId: profile.id)
         return try SimpleConnectionDaemon(params: .init(
-            registry: Registry(allHandlers: [
+            connectionFactory: Registry(allHandlers: [
                 MockConnectionModule.moduleHandler
             ]),
             connectionParameters: .init(
