@@ -8,11 +8,10 @@ Profiles are the foundations of Partout, and profiles are made of modules. A bas
 
 ## Topics
 
-### Profile management
+### Profile structure
 
 - ``Profile``
 - ``ProfileHeader``
-- ``Registry``
 - ``ProfileType``
 - ``MutableProfileType``
 - ``ProfileBehavior``
@@ -21,21 +20,29 @@ Profiles are the foundations of Partout, and profiles are made of modules. A bas
 
 - ``Module``
 - ``ModuleBuilder``
-- ``ModuleBuilderValidator``
 - ``ModuleType``
+- ``ConnectionModule``
+
+### Central registry
+
+- ``ModuleBuilderValidator``
 - ``ModuleHandler``
 - ``ModuleImplementation``
-- ``ConnectionModule``
-- ``LoggableModule``
 - ``ModuleImporter``
-- ``ConfigurationCoder``
-- ``ConfigurationEncoder``
-- ``ConfigurationDecoder``
+- ``ModuleRegistry``
+- ``ConnectionFactory``
+- ``Resolver``
+- ``Registry``
 
 ### Serialization
 
-- ``CodableProfile``
-- ``CodableModule``
+- ``ConfigurationCoder``
+- ``ConfigurationDecoder``
+- ``ConfigurationEncoder``
+- ``ProfileCoder``
+- ``ProfileEncoder``
+- ``ProfileDecoder``
+- ``LegacyModuleDecoder``
 
 ### Bundled modules
 
@@ -44,6 +51,7 @@ Profiles are the foundations of Partout, and profiles are made of modules. A bas
 - ``HTTPProxyModule``
 - ``IPModule``
 - ``OnDemandModule``
+- ``TransientModule``
 
 ### Builder pattern
 

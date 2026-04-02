@@ -13,6 +13,7 @@ Use these entities to track and troubleshoot the internal library activities.
 - ``LoggerDestination``
 - ``LocalLogger``
 - ``SimpleLogDestination``
+- ``LoggableModule``
 
 ### Printing messages
 
