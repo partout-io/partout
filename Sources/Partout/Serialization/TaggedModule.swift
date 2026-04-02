@@ -77,7 +77,12 @@ extension TaggedModule: Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(discriminator.rawValue, forKey: .type)
-        try encodePayload(to: &container)
+        let module = containedModule
+        assert(
+            module.moduleType.rawValue == discriminator.rawValue,
+            "Module has type '\(module.moduleType)' but discriminator '\(discriminator.rawValue)'"
+        )
+        try container.encode(module, forKey: .value)
     }
 }
 
@@ -105,14 +110,5 @@ private extension TaggedModule {
         case .OpenVPN: .OpenVPN
         case .WireGuard: .WireGuard
         }
-    }
-
-    func encodePayload(to container: inout KeyedEncodingContainer<CodingKeys>) throws {
-        let module = containedModule
-        assert(
-            module.moduleType.rawValue == discriminator.rawValue,
-            "Module has type '\(module.moduleType)' but discriminator '\(discriminator.rawValue)'"
-        )
-        try container.encode(module, forKey: .value)
     }
 }
