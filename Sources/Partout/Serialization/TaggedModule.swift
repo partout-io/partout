@@ -58,19 +58,20 @@ extension TaggedModule: Codable {
         guard let type = Discriminator(rawValue: rawType) else {
             throw PartoutError(.decoding, "Unknown discriminator '\(rawType)'")
         }
+        let value = try container.superDecoder(forKey: .value)
         switch type {
         case .DNS:
-            self = .DNS(try DNSModule(from: decoder))
+            self = .DNS(try DNSModule(from: value))
         case .HTTPProxy:
-            self = .HTTPProxy(try HTTPProxyModule(from: decoder))
+            self = .HTTPProxy(try HTTPProxyModule(from: value))
         case .IP:
-            self = .IP(try IPModule(from: decoder))
+            self = .IP(try IPModule(from: value))
         case .OnDemand:
-            self = .OnDemand(try OnDemandModule(from: decoder))
+            self = .OnDemand(try OnDemandModule(from: value))
         case .OpenVPN:
-            self = .OpenVPN(try OpenVPNModule(from: decoder))
+            self = .OpenVPN(try OpenVPNModule(from: value))
         case .WireGuard:
-            self = .WireGuard(try WireGuardModule(from: decoder))
+            self = .WireGuard(try WireGuardModule(from: value))
         }
     }
 
