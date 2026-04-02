@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#if !MINIF_COMPAT
+
 @available(*, deprecated, message: "#273")
 final class LegacyProfileEncoderV1 {
     init() {
@@ -121,3 +123,5 @@ struct LegacyCodableProfile: ProfileType, Codable {
 
     let userInfo: Data?
 }
+
+#endif
