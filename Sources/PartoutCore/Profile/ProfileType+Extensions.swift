@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-// MARK: - Header
+// MARK: Header
 
 extension ProfileType where GenericModuleType == Module {
 

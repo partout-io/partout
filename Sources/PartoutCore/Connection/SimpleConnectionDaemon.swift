@@ -11,7 +11,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     public nonisolated let environment: TunnelEnvironment
 
-    private let registry: Registry
+    private let connectionFactory: ConnectionFactory
 
     private let controller: TunnelController
 
@@ -37,7 +37,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private var onHold: Bool
 
-    private var heldTunnel: IOInterface?
+    private var settingsOnlyTunnel: IOInterface?
 
     private var statusSubscription: Task<Void, Never>?
 
@@ -56,7 +56,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     public init(params: Parameters) throws {
         profile = params.connectionParameters.profile
         environment = params.connectionParameters.environment
-        registry = params.registry
+        connectionFactory = params.connectionFactory
         controller = params.connectionParameters.controller
         reachability = params.connectionParameters.reachability
         messageHandler = params.messageHandler
@@ -73,7 +73,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             throw PartoutError(.nonFinalModules)
         }
 
-        // stop here unless there is a connection module
+        // Stop here unless there is a connection module
         guard let connectionModule = profile.activeConnectionModule else {
             connection = nil
             networkObserver = nil
@@ -82,13 +82,13 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             return
         }
 
-        // create the associated connection
-        let connection = try registry.connection(
+        // Create the associated connection
+        let connection = try connectionFactory.connection(
             for: connectionModule,
             parameters: params.connectionParameters
         )
 
-        // detect network changes while the connection is in
+        // Detect network changes while the connection is in
         // the .disconnected status
         let networkObserver = NetworkObserver(
             PartoutLoggerContext(profile.id),
@@ -116,19 +116,19 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             pp_log_id(profile.id, .core, .notice, "Start daemon")
             clearEnvironment()
 
-            // connection-based, start first connection and monitor for reconnections
+            // Connection-based, start first connection and monitor for reconnections
             if connection != nil {
                 environment.setEnvironmentValue(.disconnected, forKey: TunnelEnvironmentKeys.connectionStatus)
 
-                // monitor network events
+                // Monitor network events
                 observeEvents()
 
-                // start the first connection right away
+                // Start the first connection right away
                 await evaluateConnection()
             }
-            // otherwise, configure the tunnel immediately
+            // Otherwise, configure the tunnel immediately
             else {
-                heldTunnel = try await controller.setTunnelSettings(with: nil)
+                settingsOnlyTunnel = try await controller.setTunnelSettings(with: nil)
             }
 
             pp_log_id(profile.id, .core, .notice, "Daemon started successfully")
@@ -150,25 +150,26 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         guard isStarted else { return }
         pp_log_id(profile.id, .core, .notice, "Stop daemon (\(onHold ? "keep" : "clear") environment)")
 
-        // prevent reconnection
+        // Prevent reconnection
         networkObserver?.setEnabled(false)
 
-        // if there is a connection, disconnect with a timeout
+        // If there is a connection, disconnect with a timeout
         if let connection {
             pp_log_id(profile.id, .core, .notice, "Connection profile, disconnect with a timeout of \(stopDelay) milliseconds")
             await connection.stop(timeout: stopDelay)
         } else {
             pp_log_id(profile.id, .core, .notice, "Non-connection profile, nothing to disconnect from")
         }
-        // clear tunnel settings
-        if let tunnel = await connection?.tunnel() ?? heldTunnel {
-            await controller.clearTunnelSettings(tunnel)
+
+        // Clear tunnel settings
+        if let settingsOnlyTunnel {
+            await controller.clearTunnelSettings(settingsOnlyTunnel, withKillSwitch: false)
         }
 
-        // make sure to clear environment on stop, especially last error code
+        // Make sure to clear environment on stop, especially last error code
         clearEnvironment()
 
-        // cancel pending tasks to avoid leaks
+        // Cancel pending tasks to avoid leaks
         statusSubscription?.cancel()
         networkSubscription?.cancel()
         networkObserverTask?.cancel()
@@ -217,7 +218,7 @@ extension SimpleConnectionDaemon {
         assert(statusSubscription == nil)
         assert(networkSubscription == nil)
 
-        // observe the connection status (except the initial .disconnected)
+        // Observe the connection status (except the initial .disconnected)
         statusSubscription = Task { [weak self] in
             guard let self else { return }
             do {
@@ -233,7 +234,7 @@ extension SimpleConnectionDaemon {
             }
         }
 
-        // observe the network for starting the connection
+        // Observe the network for starting the connection
         networkSubscription = Task { [weak self] in
             guard let self else { return }
             for await _ in networkObserver.onReady.subscribe() {
@@ -246,7 +247,7 @@ extension SimpleConnectionDaemon {
             }
         }
 
-        // start monitoring
+        // Start monitoring
         reachability.startObserving()
     }
 
@@ -256,7 +257,7 @@ extension SimpleConnectionDaemon {
             return
         }
 
-        // do not perform more than once
+        // Do not perform more than once
         guard !isEvaluatingConnection else {
             pp_log_id(profile.id, .core, .debug, "Ignore evaluation, another one pending")
             return
@@ -268,12 +269,12 @@ extension SimpleConnectionDaemon {
 
         testEvaluateConnection?()
 
-        // do not connect if on hold
+        // Do not connect if on hold
         guard !onHold else {
             pp_log_id(profile.id, .core, .info, "Ignore evaluation, daemon on hold")
             return
         }
-        // do not connect if unreachable
+        // Do not connect if unreachable
         guard reachability.isReachable else {
             pp_log_id(profile.id, .core, .info, "Ignore evaluation, wait for reachable network")
             networkObserver.setEnabled(true)
@@ -283,7 +284,7 @@ extension SimpleConnectionDaemon {
         pp_log_id(profile.id, .core, .info, "Pause network observer during reconnection")
         networkObserver.setEnabled(false)
 
-        // try to connect if conditions are met
+        // Try to connect if conditions are met
         let didStart: Bool
         do {
             pp_log_id(profile.id, .core, .notice, "Start connection")
@@ -346,7 +347,7 @@ extension SimpleConnectionDaemon {
 
 extension SimpleConnectionDaemon {
     public final class Parameters: Sendable {
-        let registry: Registry
+        let connectionFactory: ConnectionFactory
 
         let connectionParameters: ConnectionParameters
 
@@ -357,13 +358,13 @@ extension SimpleConnectionDaemon {
         let reconnectionDelay: Int
 
         public init(
-            registry: Registry,
+            connectionFactory: ConnectionFactory,
             connectionParameters: ConnectionParameters,
             messageHandler: MessageHandler,
             stopDelay: Int? = nil,
             reconnectionDelay: Int? = nil
         ) {
-            self.registry = registry
+            self.connectionFactory = connectionFactory
             self.connectionParameters = connectionParameters
             self.messageHandler = messageHandler
             self.stopDelay = stopDelay ?? 2000

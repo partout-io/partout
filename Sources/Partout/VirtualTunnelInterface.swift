@@ -6,18 +6,18 @@
 
 internal import _PartoutCore_C
 
-/// An ``IOInterface`` that interact with a Layer 3 virtual tun device, commonly found on UNIX-like systems.
-public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
+/// An interface that interacts with a Layer 3 virtual tun device, commonly found in UNIX-like systems.
+final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
     private let tun: pp_tun
 
-    public let tunImpl: UnsafeMutableRawPointer?
+    let tunImpl: UnsafeMutableRawPointer?
 
-    public nonisolated let deviceName: String?
+    nonisolated let deviceName: String?
 
-    public nonisolated let fileDescriptor: UInt64?
+    nonisolated let fileDescriptor: UInt64?
 
     private let readQueue: DispatchQueue
 
@@ -26,7 +26,7 @@ public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
     // FIXME: #188, how to avoid silent copy? (enforce reference)
     private var readBuf: [UInt8]
 
-    public init(_ ctx: PartoutLoggerContext, uuid: UniqueID, tunImpl: UnsafeMutableRawPointer?, maxReadLength: Int) throws {
+    init(_ ctx: PartoutLoggerContext, uuid: UniqueID, tunImpl: UnsafeMutableRawPointer?, maxReadLength: Int) throws {
         guard let tun = uuid.uuidString.withCString({
             pp_tun_create($0, tunImpl)
         }) else {
@@ -54,7 +54,7 @@ public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
         pp_tun_free(tun)
     }
 
-    public func readPackets() async throws -> [Data] {
+    func readPackets() async throws -> [Data] {
         do {
             return try await withCheckedThrowingContinuation { continuation in
                 readQueue.async { [weak self] in
@@ -77,7 +77,7 @@ public final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
         }
     }
 
-    public func writePackets(_ packets: [Data]) async throws {
+    func writePackets(_ packets: [Data]) async throws {
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 writeQueue.async { [weak self] in

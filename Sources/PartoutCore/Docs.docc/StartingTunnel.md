@@ -52,10 +52,8 @@ Given the main app and the daemon:
 - ``POSIXBlockingSocket``
 - ``POSIXSocketObserver``
 - ``SocketIOInterface``
-- ``VirtualTunnelInterface``
 
 ### Applying network settings
 
 - ``TunnelController``
 - ``TunnelRemoteInfo``
-- ``VirtualTunnelController``

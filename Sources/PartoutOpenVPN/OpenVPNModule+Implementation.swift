@@ -4,7 +4,7 @@
 
 extension OpenVPNModule {
     public final class Implementation: ModuleImplementation, Sendable {
-        public let moduleHandlerId: ModuleType = .openVPN
+        public let moduleType: ModuleType = .openVPN
 
         public let importerBlock: @Sendable () -> ModuleImporter
 

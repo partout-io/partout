@@ -13,7 +13,7 @@ struct LoggableModuleTests {
         #expect(
             loggable.debugDescription(withSensitiveData: true)
             ==
-            sut.moduleHandler.id.debugDescription
+            sut.moduleType.debugDescription
         )
     }
 
@@ -24,7 +24,7 @@ struct LoggableModuleTests {
         #expect(
             loggable.debugDescription(withSensitiveData: true)
             !=
-            sut.moduleHandler.id.debugDescription
+            sut.moduleType.debugDescription
         )
     }
 

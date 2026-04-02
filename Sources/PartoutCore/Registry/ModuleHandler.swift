@@ -6,11 +6,7 @@
 public struct ModuleHandler: Identifiable, Sendable {
     public typealias DecodingBlock = @Sendable (Decoder) throws -> Module
 
-#if !MINIF_COMPAT
     public typealias LegacyDecodingBlock = @Sendable (JSONDecoder, Data) throws -> Module
-#else
-    public typealias LegacyDecodingBlock = @Sendable (Any, Any) -> Void
-#endif
 
     public typealias FactoryBlock = @Sendable () -> any ModuleBuilder
 
@@ -29,9 +25,7 @@ public struct ModuleHandler: Identifiable, Sendable {
                 try M(from: $0)
             },
             legacyDecoder: {
-#if !MINIF_COMPAT
                 try $0.decode(moduleType, from: $1)
-#endif
             },
             factory: {
                 M.B.empty()

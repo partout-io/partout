@@ -10,24 +10,20 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
 
     private let tunnelBundleIdentifier: String
 
-    private let registry: Registry
-
-    private let withLegacyEncoding: Bool
+    private let coder: ProfileCoder
 
     public init(
         _ ctx: PartoutLoggerContext,
         tunnelBundleIdentifier: String,
-        registry: Registry,
-        withLegacyEncoding: Bool
+        coder: ProfileCoder
     ) {
         self.ctx = ctx
         self.tunnelBundleIdentifier = tunnelBundleIdentifier
-        self.registry = registry
-        self.withLegacyEncoding = withLegacyEncoding
+        self.coder = coder
     }
 
     public func protocolConfiguration(from profile: Profile, title: (Profile) -> String) throws -> NETunnelProviderProtocol {
-        let encoded = try registry.json(fromProfile: profile, withLegacyEncoding: withLegacyEncoding)
+        let encoded = try coder.string(fromProfile: profile)
 
         let proto = NETunnelProviderProtocol()
         proto.providerBundleIdentifier = tunnelBundleIdentifier
@@ -44,7 +40,7 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
         guard let encoded = protocolConfiguration.providerConfiguration?[Self.providerKey] as? String else {
             throw PartoutError(.decoding)
         }
-        return try registry.fallbackProfile(fromString: encoded)
+        return try coder.profile(fromString: encoded)
     }
 
     public func removeProfile(withId profileId: Profile.ID) throws {

@@ -41,11 +41,6 @@ Generic entities and helpers.
 - ``SimplePRNG``
 - ``PlatformPRNG``
 
-### Serialization
-
-- ``TextDecoder``
-- ``TextEncoder``
-
 ### Other
 
 - ``BidirectionalState``

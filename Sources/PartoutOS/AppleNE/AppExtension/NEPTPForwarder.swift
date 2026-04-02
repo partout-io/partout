@@ -21,7 +21,7 @@ public actor NEPTPForwarder {
     public init(
         _ ctx: PartoutLoggerContext,
         profile: Profile,
-        registry: Registry,
+        connectionFactory: ConnectionFactory,
         controller: NETunnelController,
         environment: TunnelEnvironment,
         factoryOptions: NEInterfaceFactory.Options = .init(),
@@ -47,7 +47,7 @@ public actor NEPTPForwarder {
         let messageHandler = DefaultMessageHandler(ctx, environment: environment)
 
         let params = SimpleConnectionDaemon.Parameters(
-            registry: registry,
+            connectionFactory: connectionFactory,
             connectionParameters: connectionParameters,
             messageHandler: messageHandler,
             stopDelay: stopDelay,

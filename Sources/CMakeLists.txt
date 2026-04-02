@@ -92,6 +92,7 @@ if(USE_COMPAT)
         partout-codegen.*
         PartoutCodegen.*
         PartoutOS\/Apple.*
+        PartoutWireGuardConnection\/Legacy.*
     )
 endif()
 

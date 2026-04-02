@@ -6,7 +6,7 @@
 
 internal import _PartoutCore_C
 
-/// A ``TunnelController`` that operates on a virtual tun interface like ``VirtualTunnelInterface``.
+/// A controller that operates on a virtual tun interface.
 public final class VirtualTunnelController: TunnelController {
     private let ctx: PartoutLoggerContext
 
@@ -96,7 +96,7 @@ public final class VirtualTunnelController: TunnelController {
         }
     }
 
-    public func clearTunnelSettings(_ io: IOInterface) async {
+    public func clearTunnelSettings(_ io: IOInterface, withKillSwitch: Bool) async {
         guard let tunnel = io as? VirtualTunnelInterface else {
             assertionFailure("Expected type is VirtualTunnelInterface")
             return

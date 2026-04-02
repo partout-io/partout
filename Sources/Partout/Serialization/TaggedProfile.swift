@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-/// A codable wrapper for a profile with statically known modules.
+/// A codable wrapper for a profile with all known modules.
 public struct TaggedProfile: ProfileType, Hashable, Codable, Sendable {
     public let version: Int?
 

@@ -67,6 +67,17 @@ final class WireGuardBackend: @unchecked Sendable {
     }
 }
 
+extension WireGuardLogLevel {
+    var debugLevel: DebugLog.Level {
+        switch self {
+        case .verbose:
+            return .debug
+        case .error:
+            return .error
+        }
+    }
+}
+
 private extension String {
     init?(unsafeCString: UnsafePointer<CChar>?) {
         guard let unsafeCString else { return nil }

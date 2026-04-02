@@ -64,10 +64,10 @@ public final class NETunnelController: TunnelController {
     public func configureSockets(with descriptors: [UInt64]) {
     }
 
-    public func clearTunnelSettings(_ tunnel: IOInterface) async {
+    public func clearTunnelSettings(_ tunnel: IOInterface, withKillSwitch: Bool) async {
         do {
-            pp_log_id(profile.id, .os, .info, "Clear tunnel settings (remove VPN status icon)")
-            try await provider?.clearTunnelSettings(withKillSwitch: true)
+            pp_log_id(profile.id, .os, .info, "Clear tunnel settings (kill switch = \(withKillSwitch))")
+            try await provider?.clearTunnelSettings(withKillSwitch: withKillSwitch)
         } catch {
             pp_log_id(profile.id, .os, .error, "Unable to clear tunnel settings: \(error)")
         }

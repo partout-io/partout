@@ -11,4 +11,5 @@ Specific implementations for iOS, macOS, and tvOS.
 - ``AppleRandom``
 - ``BundleConfiguration``
 - ``OSLogDestination``
+- ``TunnelObservable``
 - ``UserDefaultsEnvironment``
