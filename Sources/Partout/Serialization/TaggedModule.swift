@@ -8,7 +8,7 @@
 // - TaggedModule
 // - TaggedModule.Discriminator
 
-/// A codable wrapper for statically known modules.
+/// A codable wrapper for all known modules.
 public enum TaggedModule: Hashable, Sendable {
     case DNS(DNSModule)
     case HTTPProxy(HTTPProxyModule)
@@ -77,14 +77,16 @@ extension TaggedModule: Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(discriminator.rawValue, forKey: .type)
-        try encodePayload(to: &container)
+
+        let module = containedModule
+        assertDiscriminator(module)
+        try module.encode(to: encoder)
     }
 }
 
 private extension TaggedModule {
     enum CodingKeys: String, CodingKey {
         case type
-        case value
     }
 
     enum Discriminator: String {
@@ -107,16 +109,10 @@ private extension TaggedModule {
         }
     }
 
-    func encodePayload(to container: inout KeyedEncodingContainer<CodingKeys>) throws {
-        let module = containedModule
+    func assertDiscriminator(_ module: Module) {
         assert(
             module.moduleType.rawValue == discriminator.rawValue,
             "Module has type '\(module.moduleType)' but discriminator '\(discriminator.rawValue)'"
         )
-        try container.encode(module, forKey: .value)
-    }
-
-    func assertDiscriminator(_ module: Module) {
-        assert(module.moduleType.rawValue == discriminator.rawValue)
     }
 }
