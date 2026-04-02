@@ -8,5 +8,5 @@ constants="Sources/PartoutCore/PartoutConstants.swift"
 set -e
 sed -i '' -E "s/version = \"(.*)\"/version = \"$version\"/" $constants
 git add "$constants"
-git commit -m "Bump version"
+git commit --allow-empty -m "Bump version"
 git tag -as "$version" -m "$version"
