@@ -23,3 +23,10 @@ Bridge to the official WireGuard® implementation provided by WireGuardGo.
 
 - ``StandardWireGuardParser``
 - ``WireGuardParseError``
+
+### Legacy (internal use)
+
+- ``BaseKey``
+- ``PreSharedKey``
+- ``PrivateKey``
+- ``PublicKey``
