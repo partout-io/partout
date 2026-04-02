@@ -12,7 +12,9 @@ struct ProfileModulesTests {
             OneModule(),
             UniqueModule()
         ], activatingModules: true)
-        expectNoThrow(try sut.build())
+        #expect(throws: Never.self) {
+            try sut.build()
+        }
     }
 
     @Test
@@ -33,7 +35,9 @@ struct ProfileModulesTests {
             OneModule(),
             IntolerantModule()
         ], activatingModules: true)
-        expectNoThrow(try sut.build())
+        #expect(throws: Never.self) {
+            try sut.build()
+        }
     }
 
     @Test
@@ -54,7 +58,9 @@ struct ProfileModulesTests {
             SomeConnectionModule(),
             SomeConnectionModule()
         ], activatingModules: false)
-        expectNoThrow(try sut.build())
+        #expect(throws: Never.self) {
+            try sut.build()
+        }
         sut.activeModulesIds = Set(sut.modules.map(\.id))
         #expect(throws: Error.self) {
             try sut.build()
@@ -68,7 +74,9 @@ struct ProfileModulesTests {
             modules: [SomeConnectionModule(), ipModule],
             activatingModules: true
         )
-        expectNoThrow(try sut.build())
+        #expect(throws: Never.self) {
+            try sut.build()
+        }
     }
 
     @Test
@@ -78,7 +86,9 @@ struct ProfileModulesTests {
             modules: [ipModule],
             activatingModules: true
         )
-        expectNoThrow(try sut.build())
+        #expect(throws: Never.self) {
+            try sut.build()
+        }
     }
 
     @Test

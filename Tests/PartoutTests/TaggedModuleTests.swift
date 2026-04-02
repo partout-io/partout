@@ -7,14 +7,7 @@ import Partout
 import Testing
 
 struct TaggedModuleTests {
-    private func encoder(withLegacyEncoding: Bool) -> JSONEncoder {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
-        encoder.userInfo = [.legacySwiftEncoding: withLegacyEncoding]
-        return encoder
-    }
-
-    @Test(arguments: [false, true])
+    @Test(arguments: [true, false])
     func givenTaggedModules_whenEncode_thenTypeDiscriminatorsAreIncluded(withLegacyEncoding: Bool) throws {
         let taggedModules = try makeTaggedModules()
         let data = try encoder(withLegacyEncoding: withLegacyEncoding)
@@ -26,8 +19,10 @@ struct TaggedModuleTests {
         #expect(json.contains(#""type" : "IP""#))
         #expect(json.contains(#""type" : "OnDemand""#))
     }
+}
 
-    private func makeTaggedModules() throws -> [TaggedModule] {
+private extension TaggedModuleTests {
+    func makeTaggedModules() throws -> [TaggedModule] {
         let dnsModule = try DNSModule.Builder(
             id: IDs.dns,
             protocolType: .https,
@@ -42,6 +37,13 @@ struct TaggedModuleTests {
             .IP(ipModule),
             .OnDemand(onDemandModule)
         ]
+    }
+
+    func encoder(withLegacyEncoding: Bool) -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
+        encoder.userInfo = [.legacySwiftEncoding: withLegacyEncoding]
+        return encoder
     }
 }
 
