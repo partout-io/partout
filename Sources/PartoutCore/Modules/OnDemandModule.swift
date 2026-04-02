@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-extension ModuleType {
-    public static let onDemand = ModuleType("OnDemand")
-}
-
 /// On-demand settings.
 public struct OnDemandModule: Module, BuildableType, Hashable, Codable {
     public enum Policy: String, Codable, Sendable {
@@ -22,7 +18,7 @@ public struct OnDemandModule: Module, BuildableType, Hashable, Codable {
         case ethernet
     }
 
-    public static let moduleHandler = ModuleHandler(.onDemand, OnDemandModule.self)
+    public static let moduleType = ModuleType("OnDemand")
 
     public let id: UniqueID
 

@@ -2,12 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-/// Keeps track of known ``Module`` types and their associated logic.
+/// Keeps track of known module types and their associated logic.
 public final class Registry: Sendable {
     public typealias ResolvedModuleBlock = @Sendable (Module, Profile?) throws -> Module?
 
-    // Make private after dropping LegacyModuleDecoder
-    let allHandlers: [ModuleType: ModuleHandler]
+    // Handlers are only needed for legacy decoding. These
+    // can be removed after switching to TaggedModule.
+    private let allHandlers: [ModuleType: ModuleHandler]
 
     private let allImplementations: [ModuleType: ModuleImplementation]
 
@@ -43,7 +44,7 @@ extension Registry: ConnectionFactory {
 
 extension Registry: ModuleRegistry {
     public func newModuleBuilder(withModuleType moduleType: ModuleType) -> (any ModuleBuilder)? {
-        handler(withId: moduleType)?.factory?()
+        moduleType.builderType?.empty()
     }
 
     public func implementation(for moduleBuilder: any ModuleBuilder) -> ModuleImplementation? {
@@ -104,6 +105,7 @@ extension Registry: Resolver {
 
 // MARK: - Helpers
 
+@available(*, deprecated, message: "ModuleHandler is deprecated")
 extension Registry {
     public func handler(withId id: ModuleType) -> ModuleHandler? {
         allHandlers[id]

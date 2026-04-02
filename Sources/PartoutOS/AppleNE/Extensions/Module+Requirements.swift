@@ -4,6 +4,6 @@
 
 extension Module {
     public var requiresConnection: Bool {
-        [.httpProxy, .ip].contains(moduleType)
+        self is HTTPProxyModule || self is IPModule
     }
 }

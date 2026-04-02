@@ -4,7 +4,7 @@
 
 extension WireGuardModule {
     public final class Implementation: ModuleImplementation, Sendable {
-        public let moduleType: ModuleType = .wireGuard
+        public let moduleType = WireGuardModule.moduleType
 
         public let keyGenerator: WireGuardKeyGenerator
 
