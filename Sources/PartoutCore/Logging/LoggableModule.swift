@@ -21,7 +21,7 @@ extension LoggableModule: SensitiveDebugStringConvertible {
         } else if let encodable = module as? Encodable {
             return encodable.asJSON(ctx, withSensitiveData: withSensitiveData) ?? PartoutLogger.malformedValue
         } else {
-            return module.moduleHandler.id.debugDescription
+            return module.moduleType.debugDescription
         }
     }
 }
