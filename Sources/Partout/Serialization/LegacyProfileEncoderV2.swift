@@ -2,15 +2,41 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-/// Wrapper of ``Profile`` with encoding capabilities.
-public struct CodableProfile: ProfileType, Codable, Sendable {
+@available(*, deprecated)
+final class LegacyProfileEncoderV2 {
+    private let registry: Registry
+
+    init(_ registry: Registry) {
+        self.registry = registry
+    }
+
+    func encode(_ value: LegacyCodableProfileV2) throws -> String {
+        let encoder = JSONEncoder(userInfo: [.legacySwiftEncoding: true])
+        let data = try encoder.encode(value)
+        guard let json = String(data: data, encoding: .utf8) else {
+            throw PartoutError(.encoding, "Not a UTF-8 output")
+        }
+        return json
+    }
+
+    func decode(_ string: String) throws -> LegacyCodableProfileV2 {
+        let decoder = JSONDecoder(userInfo: [.moduleDecoder: registry])
+        guard let json = string.data(using: .utf8) else {
+            throw PartoutError(.decoding, "Not a UTF-8 input")
+        }
+        return try decoder.decode(LegacyCodableProfileV2.self, from: json)
+    }
+}
+
+@available(*, deprecated)
+public struct LegacyCodableProfileV2: ProfileType, Codable, Sendable {
     public let version: Int?
 
     public let id: UniqueID
 
     public let name: String
 
-    public let modules: [CodableModule]
+    public let modules: [LegacyCodableModuleV2]
 
     public let activeModulesIds: Set<UniqueID>
 
@@ -19,8 +45,8 @@ public struct CodableProfile: ProfileType, Codable, Sendable {
     public let userInfo: JSON?
 }
 
-/// Wrapper of ``Module`` with encoding capabilities.
-public struct CodableModule: Codable, Sendable {
+@available(*, deprecated)
+public struct LegacyCodableModuleV2: Codable, Sendable {
     enum CodingKeys: CodingKey {
         case type
         case payload
@@ -37,7 +63,7 @@ public struct CodableModule: Codable, Sendable {
     }
 
     public init(from decoder: Decoder) throws {
-        guard let moduleDecoder = decoder.userInfo[.moduleDecoder] as? ModuleDecoder else {
+        guard let moduleDecoder = decoder.userInfo[.moduleDecoder] as? LegacyModuleDecoder else {
             throw PartoutError(.decoding, "Missing module decoder from .userInfo")
         }
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -71,8 +97,9 @@ public struct CodableModule: Codable, Sendable {
     }
 }
 
+@available(*, deprecated)
 extension Profile {
-    public init(codableProfile: CodableProfile) throws {
+    init(codableProfileV2 codableProfile: LegacyCodableProfileV2) throws {
         self = try Profile.Builder(
             version: codableProfile.version,
             id: codableProfile.id,
@@ -84,13 +111,13 @@ extension Profile {
         ).build()
     }
 
-    public var asCodableProfile: CodableProfile {
-        CodableProfile(
+    var asCodableProfileV2: LegacyCodableProfileV2 {
+        LegacyCodableProfileV2(
             version: Profile.Builder.currentVersion,
             id: id,
             name: name,
             modules: modules.map {
-                CodableModule(wrappedModule: $0)
+                LegacyCodableModuleV2(wrappedModule: $0)
             },
             activeModulesIds: activeModulesIds,
             behavior: behavior,

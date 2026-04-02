@@ -28,28 +28,7 @@ extension Registry {
         self.init(
             allHandlers: handlers,
             allImplementations: allImplementations,
-            postDecodeBlock: Self.migratedProfile,
             resolvedModuleBlock: resolvedModuleBlock
         )
-    }
-}
-
-private extension Registry {
-
-    @Sendable
-    static func migratedProfile(_ profile: Profile) -> Profile? {
-        do {
-            switch profile.version {
-            case nil:
-                // Set new version at the very least
-                let builder = profile.builder(withNewId: false, forUpgrade: true)
-                return try builder.build()
-            default:
-                return nil
-            }
-        } catch {
-            pp_log_id(profile.id, .core, .error, "Unable to migrate profile \(profile.id): \(error)")
-            return nil
-        }
     }
 }

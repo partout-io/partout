@@ -2,18 +2,15 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !MINIF_COMPAT
-
-/// `Codable` implementation of ``ProfileCoder``.
 @available(*, deprecated, message: "#273")
-final class CodableProfileCoder {
+final class LegacyProfileEncoderV1 {
     init() {
     }
 }
 
 // MARK: Decoder
 
-extension CodableProfileCoder {
+extension LegacyProfileEncoderV1 {
     @available(*, deprecated, message: "#273")
     func decodedProfile(from base64Encoded: String, with registry: Registry) throws -> Profile {
         guard let data = Data(base64Encoded: base64Encoded) else {
@@ -97,7 +94,7 @@ private enum Serialization {
 }
 
 @available(*, deprecated, message: "#273")
-private struct LegacyModuleWrapper: Codable {
+struct LegacyModuleWrapper: Codable {
     let id: ModuleType
 
     let data: Data
@@ -109,7 +106,7 @@ private struct LegacyModuleWrapper: Codable {
 }
 
 @available(*, deprecated, message: "#273")
-private struct LegacyCodableProfile: ProfileType, Codable {
+struct LegacyCodableProfile: ProfileType, Codable {
     let version: Int?
 
     let id: UniqueID
@@ -124,5 +121,3 @@ private struct LegacyCodableProfile: ProfileType, Codable {
 
     let userInfo: Data?
 }
-
-#endif
