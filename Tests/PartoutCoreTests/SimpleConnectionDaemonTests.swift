@@ -205,7 +205,7 @@ private extension SimpleConnectionDaemonTests {
 
 private final class MockConnectionFactory: ConnectionFactory {
     func connection(for connectionModule: any ConnectionModule, parameters: ConnectionParameters) throws -> any Connection {
-        MockConnection(options: .init())
+        try connectionModule.newConnection(with: nil, parameters: parameters)
     }
 }
 
