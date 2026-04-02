@@ -10,22 +10,19 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
 
     private let tunnelBundleIdentifier: String
 
-    private let registry: Registry
+    private let coder: ProfileCoder
 
     private let keychain: Keychain
 
-    private let withLegacyEncoding: Bool
-
-    public init(_ ctx: PartoutLoggerContext, tunnelBundleIdentifier: String, registry: Registry, keychain: Keychain, withLegacyEncoding: Bool) {
+    public init(_ ctx: PartoutLoggerContext, tunnelBundleIdentifier: String, coder: ProfileCoder, keychain: Keychain) {
         self.ctx = ctx
         self.tunnelBundleIdentifier = tunnelBundleIdentifier
-        self.registry = registry
+        self.coder = coder
         self.keychain = keychain
-        self.withLegacyEncoding = withLegacyEncoding
     }
 
     public func protocolConfiguration(from profile: Profile, title: (Profile) -> String) throws -> NETunnelProviderProtocol {
-        let encoded = try registry.json(fromProfile: profile, withLegacyEncoding: withLegacyEncoding)
+        let encoded = try coder.string(fromProfile: profile)
 
         let passwordReference = try keychain.set(
             password: encoded,
@@ -49,7 +46,7 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
             throw PartoutError(.decoding)
         }
         let encoded = try keychain.password(forReference: passwordReference)
-        return try registry.fallbackProfile(fromString: encoded)
+        return try coder.profile(fromString: encoded)
     }
 
     public func removeProfile(withId profileId: Profile.ID) throws {

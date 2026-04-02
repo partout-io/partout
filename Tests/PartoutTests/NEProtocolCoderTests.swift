@@ -2,19 +2,23 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutCore
+#if canImport(NetworkExtension)
+
+import Partout
 @testable import PartoutOS
 import Testing
 
 struct NEProtocolCoderTests {
-    @Test(arguments: [false, true])
-    func givenProfile_whenEncodeToProvider_thenDecodes(withLegacyEncoding: Bool) throws {
+    let registry = Registry(withKnown: true)
+
+    @Test(arguments: [true, false])
+    func givenProfile_whenEncodeToProvider_thenDecodes(legacy: Bool) throws {
         let profile = try newProfile()
+        let coder = registry.withLegacyEncoding(legacy)
         let sut = ProviderNEProtocolCoder(
             .global,
             tunnelBundleIdentifier: bundleIdentifier,
-            registry: newRegistry(),
-            withLegacyEncoding: withLegacyEncoding
+            coder: coder
         )
 
         let proto = try sut.protocolConfiguration(from: profile, title: \.name)
@@ -25,15 +29,15 @@ struct NEProtocolCoderTests {
         #expect(decodedProfile == profile)
     }
 
-    @Test(arguments: [false, true])
-    func givenProfile_whenEncodeToKeychain_thenDecodes(withLegacyEncoding: Bool) throws {
+    @Test(arguments: [true, false])
+    func givenProfile_whenEncodeToKeychain_thenDecodes(legacy: Bool) throws {
         let profile = try newProfile()
+        let coder = registry.withLegacyEncoding(legacy)
         let sut = KeychainNEProtocolCoder(
             .global,
             tunnelBundleIdentifier: bundleIdentifier,
-            registry: newRegistry(),
-            keychain: MockKeychain(),
-            withLegacyEncoding: withLegacyEncoding
+            coder: coder,
+            keychain: MockKeychain()
         )
 
         let proto = try sut.protocolConfiguration(from: profile, title: \.name)
@@ -50,15 +54,6 @@ struct NEProtocolCoderTests {
 private extension NEProtocolCoderTests {
     var bundleIdentifier: String {
         "com.example.MyTunnel"
-    }
-
-    func newRegistry() -> Registry {
-        Registry(allHandlers: [
-            DNSModule.moduleHandler,
-            HTTPProxyModule.moduleHandler,
-            IPModule.moduleHandler,
-            OnDemandModule.moduleHandler
-        ])
     }
 
     func newProfile() throws -> Profile {
@@ -107,3 +102,5 @@ private final class MockKeychain: Keychain {
         return string
     }
 }
+
+#endif

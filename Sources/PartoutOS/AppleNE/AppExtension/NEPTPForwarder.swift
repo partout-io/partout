@@ -47,7 +47,7 @@ public actor NEPTPForwarder {
         let messageHandler = DefaultMessageHandler(ctx, environment: environment)
 
         let params = SimpleConnectionDaemon.Parameters(
-            registry: registry,
+            connectionFactory: registry,
             connectionParameters: connectionParameters,
             messageHandler: messageHandler,
             stopDelay: stopDelay,
