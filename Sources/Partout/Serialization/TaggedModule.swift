@@ -58,35 +58,39 @@ extension TaggedModule: Codable {
         guard let type = Discriminator(rawValue: rawType) else {
             throw PartoutError(.decoding, "Unknown discriminator '\(rawType)'")
         }
+        let value = try container.superDecoder(forKey: .value)
         switch type {
         case .DNS:
-            self = .DNS(try DNSModule(from: decoder))
+            self = .DNS(try DNSModule(from: value))
         case .HTTPProxy:
-            self = .HTTPProxy(try HTTPProxyModule(from: decoder))
+            self = .HTTPProxy(try HTTPProxyModule(from: value))
         case .IP:
-            self = .IP(try IPModule(from: decoder))
+            self = .IP(try IPModule(from: value))
         case .OnDemand:
-            self = .OnDemand(try OnDemandModule(from: decoder))
+            self = .OnDemand(try OnDemandModule(from: value))
         case .OpenVPN:
-            self = .OpenVPN(try OpenVPNModule(from: decoder))
+            self = .OpenVPN(try OpenVPNModule(from: value))
         case .WireGuard:
-            self = .WireGuard(try WireGuardModule(from: decoder))
+            self = .WireGuard(try WireGuardModule(from: value))
         }
     }
 
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(discriminator.rawValue, forKey: .type)
-
         let module = containedModule
-        assertDiscriminator(module)
-        try module.encode(to: encoder)
+        assert(
+            module.moduleType.rawValue == discriminator.rawValue,
+            "Module has type '\(module.moduleType)' but discriminator '\(discriminator.rawValue)'"
+        )
+        try container.encode(module, forKey: .value)
     }
 }
 
 private extension TaggedModule {
     enum CodingKeys: String, CodingKey {
         case type
+        case value
     }
 
     enum Discriminator: String {
@@ -107,12 +111,5 @@ private extension TaggedModule {
         case .OpenVPN: .OpenVPN
         case .WireGuard: .WireGuard
         }
-    }
-
-    func assertDiscriminator(_ module: Module) {
-        assert(
-            module.moduleType.rawValue == discriminator.rawValue,
-            "Module has type '\(module.moduleType)' but discriminator '\(discriminator.rawValue)'"
-        )
     }
 }
