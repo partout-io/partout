@@ -2,11 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-// WARNING: These must all match 100% in case
-//
-// - ModuleType
-// - TaggedModule
-// - TaggedModule.Discriminator
+// WARNING: TaggedModule enum must match case of ModuleType.rawValue
 
 /// A codable wrapper for all known modules.
 public enum TaggedModule: Hashable, Sendable {
@@ -45,7 +41,7 @@ extension Module {
         case let module as WireGuardModule:
             return .WireGuard(module)
         default:
-            assertionFailure("Unhandled module: \(self)")
+            assertionFailure("Untaggable module: \(self)")
             return nil
         }
     }
@@ -55,9 +51,7 @@ extension TaggedModule: Codable {
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let rawType = try container.decode(String.self, forKey: .type)
-        guard let type = Discriminator(rawValue: rawType) else {
-            throw PartoutError(.decoding, "Unknown discriminator '\(rawType)'")
-        }
+        let type = ModuleType(rawType)
         let value = try container.superDecoder(forKey: .value)
         switch type {
         case .DNS:
@@ -72,6 +66,8 @@ extension TaggedModule: Codable {
             self = .OpenVPN(try OpenVPNModule(from: value))
         case .WireGuard:
             self = .WireGuard(try WireGuardModule(from: value))
+        default:
+            throw PartoutError(.decoding, "Unknown discriminator '\(rawType)'")
         }
     }
 
@@ -93,16 +89,7 @@ private extension TaggedModule {
         case value
     }
 
-    enum Discriminator: String {
-        case DNS
-        case HTTPProxy
-        case IP
-        case OnDemand
-        case OpenVPN
-        case WireGuard
-    }
-
-    var discriminator: Discriminator {
+    var discriminator: ModuleType {
         switch self {
         case .DNS: .DNS
         case .HTTPProxy: .HTTPProxy

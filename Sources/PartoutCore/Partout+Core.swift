@@ -52,16 +52,17 @@ extension PartoutError.Code {
     /// The profile has non-final modules that must be resolved to final modules first.
     public static let nonFinalModules = Self("nonFinalModules")
 
-    /// A handler with the same ID was already registered.
-    public static let registeredModuleHandler = Self("registeredModuleHandler")
-
     /// Missing a required implementation.
     public static let requiredImplementation = Self("requiredImplementation")
+
+    /// Module type is unexpected
+    public static let unexpectedModuleType = Self("unexpectedModuleType")
 
     /// Module content is unknown for the importer.
     public static let unknownImportedModule = Self("unknownImportedModule")
 
     /// Module handler is unknown.
+    @available(*, deprecated, message: "Legacy decoding")
     public static let unknownModuleHandler = Self("unknownModuleHandler")
 }
 
@@ -70,6 +71,7 @@ extension PartoutError {
         Self(.incompatibleModules, [module, otherModule])
     }
 
+    @available(*, deprecated, message: "Legacy decoding")
     public static func unknownModuleHandler(moduleType: ModuleType) -> Self {
         Self(.unknownModuleHandler, moduleType.debugDescription)
     }

@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-extension ModuleType {
-    public static let dns = ModuleType("DNS")
-}
-
 /// DNS settings.
 public struct DNSModule: Module, BuildableType, Hashable, Codable {
     public enum ProtocolType: Hashable, Codable, Sendable {
@@ -16,7 +12,7 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
         case tls(hostname: String)
     }
 
-    public static let moduleHandler = ModuleHandler(.dns, DNSModule.self)
+    public static let moduleType = ModuleType("DNS")
 
     public let id: UniqueID
 

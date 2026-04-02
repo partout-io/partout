@@ -6,8 +6,10 @@
 ///
 /// Modules are the building blocks of a ``Profile``. Must be actor-safe, and possibly `struct`.
 public protocol Module: UniquelyIdentifiable, Sendable {
-    static var moduleHandler: ModuleHandler { get }
+    /// Unique ``ModuleType`` for this module.
+    static var moduleType: ModuleType { get }
 
+    /// A deterministic fingerprint.
     var fingerprint: Int { get }
 
     /// True if builds a ``Connection``.
@@ -26,8 +28,7 @@ public protocol Module: UniquelyIdentifiable, Sendable {
 }
 
 extension Module {
-    /// A unique identifier for this ``Module`` type.
     public var moduleType: ModuleType {
-        moduleHandler.id
+        Self.moduleType
     }
 }

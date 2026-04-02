@@ -2,13 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-extension ModuleType {
-    public static let ip = ModuleType("IP")
-}
-
 /// IP and routes.
 public struct IPModule: Module, BuildableType, Hashable, Codable {
-    public static let moduleHandler = ModuleHandler(.ip, IPModule.self)
+    public static let moduleType = ModuleType("IP")
 
     public let id: UniqueID
 

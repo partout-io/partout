@@ -5,7 +5,7 @@
 extension StandardWireGuardParser: ModuleBuilderValidator {
     public func validate(_ builder: any ModuleBuilder) throws {
         guard let builder = builder as? WireGuardModule.Builder else {
-            throw PartoutError(.unknownModuleHandler)
+            throw PartoutError(.unexpectedModuleType)
         }
         guard let configurationBuilder = builder.configurationBuilder else {
             // assume provider configurations to be valid

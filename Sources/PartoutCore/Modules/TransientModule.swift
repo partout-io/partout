@@ -5,6 +5,8 @@
 /// Transient settings, not serialized.
 @available(*, deprecated)
 public struct TransientModule: Module, @unchecked Sendable {
+    public static let moduleType = ModuleType("Transient")
+
     public let id: UniqueID
 
     public let object: Any

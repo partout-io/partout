@@ -2,13 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-extension ModuleType {
-    public static let wireGuard = ModuleType("WireGuard")
-}
-
 /// A connection module providing a WireGuard connection.
 public struct WireGuardModule: Module, BuildableType, Hashable, Codable {
-    public static let moduleHandler = ModuleHandler(.wireGuard, WireGuardModule.self)
+    public static let moduleType = ModuleType("WireGuard")
 
     public let id: UniqueID
 

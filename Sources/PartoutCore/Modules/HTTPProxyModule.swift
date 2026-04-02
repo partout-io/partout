@@ -2,13 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-extension ModuleType {
-    public static let httpProxy = ModuleType("HTTPProxy")
-}
-
 /// HTTP proxy settings.
 public struct HTTPProxyModule: Module, BuildableType, Hashable, Codable {
-    public static let moduleHandler = ModuleHandler(.httpProxy, HTTPProxyModule.self)
+    public static let moduleType = ModuleType("HTTPProxy")
 
     public let id: UniqueID
 
