@@ -24,7 +24,7 @@ public final class Registry: Sendable {
             }
         self.allImplementations = allImplementations
             .reduce(into: [:]) {
-                $0[$1.moduleHandlerId] = $1
+                $0[$1.moduleType] = $1
             }
         self.resolvedModuleBlock = resolvedModuleBlock
     }

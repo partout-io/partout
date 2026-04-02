@@ -6,17 +6,3 @@
 public protocol LegacyModuleDecoder {
     func decodedModule(from decoder: Decoder, ofType moduleType: ModuleType) throws -> Module
 }
-
-
-extension Registry: LegacyModuleDecoder {
-    public func decodedModule(from decoder: Decoder, ofType moduleType: ModuleType) throws -> Module {
-        guard let handler = allHandlers[moduleType] else {
-            throw PartoutError(.unknownModuleHandler)
-        }
-        guard let handlerDecoder = handler.decoder else {
-            throw PartoutError(.decoding, "Missing decoder")
-        }
-        return try handlerDecoder(decoder)
-    }
-}
-
