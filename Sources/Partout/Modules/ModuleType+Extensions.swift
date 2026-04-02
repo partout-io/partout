@@ -10,25 +10,3 @@ extension ModuleType {
     public static let OpenVPN = OpenVPNModule.moduleType
     public static let WireGuard = WireGuardModule.moduleType
 }
-
-extension ModuleType {
-    public var builderType: (any ModuleBuilder.Type)? {
-        switch self {
-        case .DNS:
-            return DNSModule.Builder.self
-        case .HTTPProxy:
-            return HTTPProxyModule.Builder.self
-        case .IP:
-            return IPModule.Builder.self
-        case .OnDemand:
-            return OnDemandModule.Builder.self
-        case .OpenVPN:
-            return OpenVPNModule.Builder.self
-        case .WireGuard:
-            return WireGuardModule.Builder.self
-        default:
-            assertionFailure("ModuleType '\(rawValue)' has no ModuleBuilder associated")
-            return nil
-        }
-    }
-}

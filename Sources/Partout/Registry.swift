@@ -43,10 +43,6 @@ extension Registry: ConnectionFactory {
 // MARK: ModuleRegistry
 
 extension Registry: ModuleRegistry {
-    public func newModuleBuilder(withModuleType moduleType: ModuleType) -> (any ModuleBuilder)? {
-        moduleType.builderType?.empty()
-    }
-
     public func implementation(for moduleBuilder: any ModuleBuilder) -> ModuleImplementation? {
         allImplementations[moduleBuilder.moduleType]
     }

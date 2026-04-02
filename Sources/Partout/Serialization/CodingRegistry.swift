@@ -147,10 +147,6 @@ extension CodingRegistry: ModuleImporter {
 }
 
 extension CodingRegistry: ModuleRegistry {
-    public func newModuleBuilder(withModuleType moduleType: ModuleType) -> (any ModuleBuilder)? {
-        registry.newModuleBuilder(withModuleType: moduleType)
-    }
-
     public func implementation(for moduleType: ModuleType) -> (any ModuleImplementation)? {
         registry.implementation(for: moduleType)
     }
