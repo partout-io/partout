@@ -20,9 +20,13 @@ extension OpenVPN {
 
         case connectionProxy = "^\\w+-proxy"
 
-        case externalFiles = "^(auth-user-pass|ca|cert|key|tls-auth|tls-crypt) "
+        case externalFiles = "^(auth-user-pass|ca|cert|key) "
 
         case fragment = "^fragment"
+
+        case tlsAuth = "^tls-auth( +[^\\s]+( +\\d)?)?"
+
+        case tlsCrypt = "^tls-crypt(?!-v2)( +[^\\s]+)?"
 
         case tlsCryptV2 = "^tls-crypt-v2( +[^\\s]+( +(force-cookie|allow-noncookie))?)?"
 

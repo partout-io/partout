@@ -84,6 +84,28 @@ extension StandardOpenVPNParser.Builder {
             throw StandardOpenVPNParserError.unsupportedConfiguration(option: "proxy: \"\(line)\"")
         case .externalFiles:
             throw StandardOpenVPNParserError.unsupportedConfiguration(option: "external file: \"\(line)\"")
+        case .tlsAuth:
+            if components.count > 1 {
+                let keyRef = components[1]
+                guard keyRef == "inline" || keyRef == "[inline]" else {
+                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: "external file: \"\(line)\"")
+                }
+                if components.count > 2 {
+                    guard let direction = Int(components[2]) else {
+                        throw StandardOpenVPNParserError.malformed(option: "tls-auth key direction must be numeric")
+                    }
+                    optKeyDirection = OpenVPN.StaticKey.Direction(rawValue: direction)
+                }
+            }
+            optTLSStrategy = .auth
+        case .tlsCrypt:
+            if components.count > 1 {
+                let keyRef = components[1]
+                guard keyRef == "inline" || keyRef == "[inline]" else {
+                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: "external file: \"\(line)\"")
+                }
+            }
+            optTLSStrategy = .crypt
         case .tlsCryptV2:
             if components.count > 1 {
                 let keyRef = components[1]
