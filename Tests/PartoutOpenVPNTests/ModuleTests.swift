@@ -39,6 +39,8 @@ MIIE
         ]
         configuration.authUserPass = true
         configuration.checksEKU = true
+        configuration.checksSANHost = true
+        configuration.sanHost = "vpn.example.com"
         configuration.randomizeEndpoint = true
         configuration.randomizeHostnames = true
         configuration.mtu = 1400
@@ -78,6 +80,8 @@ MIIE
         ])
         #expect(parsed.authUserPass == true)
         #expect(parsed.checksEKU == true)
+        #expect(parsed.checksSANHost == true)
+        #expect(parsed.sanHost == "vpn.example.com")
         #expect(parsed.randomizeEndpoint == true)
         #expect(parsed.randomizeHostnames == true)
         #expect(parsed.mtu == 1400)

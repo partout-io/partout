@@ -86,6 +86,9 @@ extension OpenVPN.Configuration {
         guard !(staticChallenge ?? false) else {
             throw PartoutError(.encoding, "OpenVPN static challenge export requires challenge text and echo flag")
         }
+        guard !(checksSANHost ?? false) || sanHost != nil else {
+            throw PartoutError(.encoding, "OpenVPN SAN host verification requires a hostname")
+        }
 
         append("client")
         append("dev tun")
@@ -139,6 +142,9 @@ extension OpenVPN.Configuration {
 
         if checksEKU ?? false {
             append("remote-cert-tls server")
+        }
+        if checksSANHost ?? false, let sanHost {
+            append("verify-x509-name \(sanHost) name")
         }
         if randomizeEndpoint ?? false {
             append("remote-random")

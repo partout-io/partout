@@ -30,6 +30,7 @@ extension StandardOpenVPNParser {
         private var authUserPass = false
         private var staticChallenge = false
         private var optChecksEKU: Bool?
+        private var optSANHost: String?
         private var optRandomizeEndpoint: Bool?
         private var optRandomizeHostnames: Bool?
         private var optMTU: Int?
@@ -325,6 +326,16 @@ extension StandardOpenVPNParser.Builder {
 
         case .eku:
             optChecksEKU = true
+
+        case .verifyX509Name:
+            guard components.count >= 2 else {
+                break
+            }
+            let type = components.count > 2 ? components[2] : "subject"
+            guard type == "name" else {
+                throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
+            }
+            optSANHost = components[1]
 
         case .remoteRandom:
             optRandomizeEndpoint = true
@@ -644,6 +655,10 @@ extension StandardOpenVPNParser.Builder {
 
         builder.authUserPass = authUserPass
         builder.checksEKU = optChecksEKU
+        if let optSANHost {
+            builder.checksSANHost = true
+            builder.sanHost = optSANHost
+        }
         builder.randomizeEndpoint = optRandomizeEndpoint
         builder.randomizeHostnames = optRandomizeHostnames
         builder.mtu = optMTU
