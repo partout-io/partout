@@ -6,6 +6,7 @@
 
 /// A codable wrapper for all known modules.
 public enum TaggedModule: Hashable, Sendable {
+    case Custom(CustomModule)
     case DNS(DNSModule)
     case HTTPProxy(HTTPProxyModule)
     case IP(IPModule)
@@ -15,6 +16,7 @@ public enum TaggedModule: Hashable, Sendable {
 
     var containedModule: Module & Codable {
         switch self {
+        case .Custom(let module): module
         case .DNS(let module): module
         case .HTTPProxy(let module): module
         case .IP(let module): module
@@ -41,8 +43,17 @@ extension Module {
         case let module as WireGuardModule:
             return .WireGuard(module)
         default:
-            assertionFailure("Untaggable module: \(self)")
-            return nil
+            guard let module = self as? Module & Codable else {
+                assertionFailure("Untaggable module: \(self)")
+                return nil
+            }
+            do {
+                let custom = try CustomModule(module)
+                return .Custom(custom)
+            } catch {
+                assertionFailure("Unable to encode custom module: \(error)")
+                return nil
+            }
         }
     }
 }
@@ -54,6 +65,8 @@ extension TaggedModule: Codable {
         let type = ModuleType(rawType)
         let value = try container.superDecoder(forKey: .value)
         switch type {
+        case .Custom:
+            self = .Custom(try CustomModule(from: value))
         case .DNS:
             self = .DNS(try DNSModule(from: value))
         case .HTTPProxy:
@@ -91,6 +104,7 @@ private extension TaggedModule {
 
     var discriminator: ModuleType {
         switch self {
+        case .Custom: .Custom
         case .DNS: .DNS
         case .HTTPProxy: .HTTPProxy
         case .IP: .IP
