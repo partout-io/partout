@@ -71,7 +71,6 @@ extension StandardOpenVPNParser {
 // MARK: - Parsing
 
 extension StandardOpenVPNParser.Builder {
-
     @inlinable
     mutating func putOption(_ option: OpenVPN.Option, line: String, components: [String]) throws {
         switch option {
@@ -88,10 +87,7 @@ extension StandardOpenVPNParser.Builder {
             throw StandardOpenVPNParserError.unsupportedConfiguration(option: "external file: \"\(line)\"")
         case .tlsAuth:
             if components.count > 1 {
-                let keyRef = components[1]
-                guard keyRef == "inline" || keyRef == "[inline]" else {
-                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: "external file: \"\(line)\"")
-                }
+                try Self.ensureInlineBlock(in: components, line: line)
                 if components.count > 2 {
                     guard let direction = Int(components[2]) else {
                         throw StandardOpenVPNParserError.malformed(option: "tls-auth key direction must be numeric")
@@ -105,18 +101,12 @@ extension StandardOpenVPNParser.Builder {
             optTLSStrategy = .auth
         case .tlsCrypt:
             if components.count > 1 {
-                let keyRef = components[1]
-                guard keyRef == "inline" || keyRef == "[inline]" else {
-                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: "external file: \"\(line)\"")
-                }
+                try Self.ensureInlineBlock(in: components, line: line)
             }
             optTLSStrategy = .crypt
         case .tlsCryptV2:
             if components.count > 1 {
-                let keyRef = components[1]
-                guard keyRef == "inline" || keyRef == "[inline]" else {
-                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: "external file: \"\(line)\"")
-                }
+                try Self.ensureInlineBlock(in: components, line: line)
                 if components.count > 2 {
                     let policy = components[2]
                     guard policy == "force-cookie" || policy == "allow-noncookie" else {
@@ -176,7 +166,7 @@ extension StandardOpenVPNParser.Builder {
                 optClientCertificate = OpenVPN.CryptoContainer(pem: currentBlock.joined(separator: "\n"))
 
             case "key":
-                normalizeEncryptedPEMBlock(block: &currentBlock)
+                Self.normalizeEncryptedPEMBlock(block: &currentBlock)
                 optClientKey = OpenVPN.CryptoContainer(pem: currentBlock.joined(separator: "\n"))
 
             case "tls-auth":
@@ -880,15 +870,23 @@ private extension IPSocketType {
     }
 }
 
-private func normalizeEncryptedPEMBlock(block: inout [String]) {
-//    if block.count >= 1 && block[0].contains("ENCRYPTED") {
-//        return true
-//    }
-
-    // XXX: restore blank line after encryption header (easier than tweaking trimmedLines)
-    if block.count >= 3 && block[1].contains("Proc-Type") {
-        block.insert("", at: 3)
-//        return true
+private extension StandardOpenVPNParser.Builder {
+    static func ensureInlineBlock(in components: [String], line: String) throws {
+        let keyRef = components[1]
+        guard keyRef == "inline" || keyRef == "[inline]" else {
+            throw StandardOpenVPNParserError.unsupportedConfiguration(option: "external file: \"\(line)\"")
+        }
     }
-//    return false
+
+    static func normalizeEncryptedPEMBlock(block: inout [String]) {
+//        if block.count >= 1 && block[0].contains("ENCRYPTED") {
+//            return true
+//        }
+        // XXX: Restore blank line after encryption header (easier than tweaking trimmedLines)
+        if block.count >= 3 && block[1].contains("Proc-Type") {
+            block.insert("", at: 3)
+//            return true
+        }
+//        return false
+    }
 }
