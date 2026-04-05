@@ -178,6 +178,16 @@ struct OpenVPNParserTests {
     }
 
     @Test
+    func givenQuotedVerifyX509NameSubject_whenParse_thenStripsQuotes() throws {
+        let parsed = try parser.parsed(fromLines: [
+            "verify-x509-name 'C=KG, ST=NA, L=Bishkek, CN=Server-1' subject"
+        ]).configuration
+        #expect(parsed.checksX509Subject == true)
+        #expect(parsed.x509Subject == "C=KG, ST=NA, L=Bishkek, CN=Server-1")
+        #expect(parsed.checksSANHost != true)
+    }
+
+    @Test
     func givenMalformedRouteAndGatewayOptions_whenPutOption_thenAreIgnoredSafely() throws {
         var builder = StandardOpenVPNParser.Builder(supportsLZO: false, decrypter: nil)
 

@@ -342,9 +342,9 @@ extension StandardOpenVPNParser.Builder {
             }
             switch type {
             case "name":
-                optSANHost = value
+                optSANHost = value.removingOpenVPNArgumentQuotes()
             case "subject":
-                optX509Subject = value
+                optX509Subject = value.removingOpenVPNArgumentQuotes()
             default:
                 throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
             }

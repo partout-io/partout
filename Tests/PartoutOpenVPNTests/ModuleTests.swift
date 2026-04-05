@@ -149,7 +149,7 @@ MIIB
 
         let module = try builder.build()
         let serialized = try module.serialized()
-        #expect(serialized.contains("verify-x509-name \(subject) subject"))
+        #expect(serialized.contains("verify-x509-name '\(subject)' subject"))
 
         let parsed = try StandardOpenVPNParser(decrypter: nil).parsed(fromContents: serialized).configuration
         #expect(parsed.checksX509Subject == true)

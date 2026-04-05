@@ -152,7 +152,7 @@ extension OpenVPN.Configuration {
         if checksSANHost ?? false, let sanHost {
             append("verify-x509-name \(sanHost) name")
         } else if checksX509Subject ?? false, let x509Subject {
-            append("verify-x509-name \(x509Subject) subject")
+            append("verify-x509-name \(x509Subject.asOpenVPNQuotedArgument()) subject")
         }
         if randomizeEndpoint ?? false {
             append("remote-random")
