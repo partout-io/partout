@@ -168,7 +168,7 @@ extension Negotiator {
             break
 
         default:
-            let code: CrossPacketCode = (options.configuration.tlsWrap?.strategy == .cryptV2) ? .hardResetClientV3 : .hardResetClientV2
+            let code: CrossPacketCode = usesTLSCryptV2 ? .hardResetClientV3 : .hardResetClientV2
             try enqueueControlPackets(code: code, key: key, payload: hardResetPayload() ?? Data())
         }
     }
@@ -391,6 +391,10 @@ private extension Negotiator {
 // MARK: - Inbound
 
 private extension Negotiator {
+    var usesTLSCryptV2: Bool {
+        options.configuration.tlsWrap?.strategy == .cryptV2
+    }
+
     func privateHandleControlPacket(_ packet: CrossPacket) throws {
         guard packet.key == key else {
             pp_log(ctx, .openvpn, .error, "Bad key in control packet (\(packet.key) != \(key))")
@@ -407,7 +411,6 @@ private extension Negotiator {
                     pp_log(ctx, .openvpn, .error, "Sent SOFT_RESET but received HARD_RESET?")
                 }
                 channel.setRemoteSessionId(packet.sessionId)
-                let usesTLSCryptV2 = options.configuration.tlsWrap?.strategy == .cryptV2
                 shouldResendWrappedKey = usesTLSCryptV2 && requestsWrappedKeyResend(from: packet.payload)
             }
             guard let remoteSessionId = channel.remoteSessionId else {
