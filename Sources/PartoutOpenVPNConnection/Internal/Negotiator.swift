@@ -154,6 +154,10 @@ extension Negotiator {
         renegotiation != nil && state != .connected
     }
 
+    var usesTLSCryptV2: Bool {
+        options.configuration.tlsWrap?.strategy == .cryptV2
+    }
+
     func start() throws {
         channel.reset(forNewSession: renegotiation == nil)
 
@@ -391,10 +395,6 @@ private extension Negotiator {
 // MARK: - Inbound
 
 private extension Negotiator {
-    var usesTLSCryptV2: Bool {
-        options.configuration.tlsWrap?.strategy == .cryptV2
-    }
-
     func privateHandleControlPacket(_ packet: CrossPacket) throws {
         guard packet.key == key else {
             pp_log(ctx, .openvpn, .error, "Bad key in control packet (\(packet.key) != \(key))")
