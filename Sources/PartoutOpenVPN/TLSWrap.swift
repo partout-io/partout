@@ -45,40 +45,26 @@ extension OpenVPN.TLSWrap {
     static func clientKeyV2(lines: [Substring]) -> (key: OpenVPN.StaticKey, wrappedKey: SecureData)? {
         var isHead = true
         var base64Lines: [Substring] = []
-
         for line in lines {
             if isHead {
-                guard !line.hasPrefix("#") else {
-                    continue
-                }
-                guard !line.isEmpty else {
-                    continue
-                }
-                guard line == Self.clientV2FileHead else {
-                    return nil
-                }
+                guard !line.hasPrefix("#") else { continue }
+                guard !line.isEmpty else { continue }
+                guard line == Self.clientV2FileHead else { return nil }
                 isHead = false
                 continue
             }
-
-            guard let first = line.first else {
-                continue
-            }
+            guard let first = line.first else { continue }
             if first == "-" {
-                guard line == Self.clientV2FileFoot else {
-                    return nil
-                }
+                guard line == Self.clientV2FileFoot else { return nil }
                 break
             }
             base64Lines.append(line)
         }
-
         let base64 = String(base64Lines.joined())
         guard let keyData = Data(base64Encoded: base64, options: [.ignoreUnknownCharacters]),
               keyData.count > 256 else {
             return nil
         }
-
         let staticKey = OpenVPN.StaticKey(
             data: keyData.subdata(in: 0..<256),
             direction: .client
@@ -98,9 +84,9 @@ extension OpenVPN.TLSWrap {
             return String(base64[begin..<end])
         }
         return ([
-            "-----BEGIN OpenVPN tls-crypt-v2 client key-----"
+            Self.clientV2FileHead
         ] + base64Lines + [
-            "-----END OpenVPN tls-crypt-v2 client key-----"
+            Self.clientV2FileFoot
         ]).joined(separator: "\n")
     }
 }
