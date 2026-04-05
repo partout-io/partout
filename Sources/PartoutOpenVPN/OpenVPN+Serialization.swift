@@ -83,6 +83,10 @@ extension OpenVPN.Configuration {
             return Int(interval.rounded())
         }
 
+        guard !(staticChallenge ?? false) else {
+            throw PartoutError(.encoding, "OpenVPN static challenge export requires challenge text and echo flag")
+        }
+
         append("client")
         append("dev tun")
         append("nobind")
@@ -154,9 +158,6 @@ extension OpenVPN.Configuration {
 
         if authUserPass ?? false {
             append("auth-user-pass")
-        }
-        if staticChallenge ?? false {
-            append("static-challenge")
         }
 
         if let authToken {
