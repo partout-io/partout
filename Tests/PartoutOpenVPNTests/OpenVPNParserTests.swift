@@ -172,9 +172,8 @@ struct OpenVPNParserTests {
         let parsed = try parser.parsed(fromLines: [
             "verify-x509-name C=KG, ST=NA, L=Bishkek, CN=Server-1"
         ]).configuration
-        #expect(parsed.checksX509Subject == true)
-        #expect(parsed.x509Subject == "C=KG, ST=NA, L=Bishkek, CN=Server-1")
-        #expect(parsed.checksSANHost != true)
+        #expect(parsed.verifyX509 == .subject)
+        #expect(parsed.verifyX509Value == "C=KG, ST=NA, L=Bishkek, CN=Server-1")
     }
 
     @Test
@@ -182,9 +181,8 @@ struct OpenVPNParserTests {
         let parsed = try parser.parsed(fromLines: [
             "verify-x509-name 'C=KG, ST=NA, L=Bishkek, CN=Server-1' subject"
         ]).configuration
-        #expect(parsed.checksX509Subject == true)
-        #expect(parsed.x509Subject == "C=KG, ST=NA, L=Bishkek, CN=Server-1")
-        #expect(parsed.checksSANHost != true)
+        #expect(parsed.verifyX509 == .subject)
+        #expect(parsed.verifyX509Value == "C=KG, ST=NA, L=Bishkek, CN=Server-1")
     }
 
     @Test

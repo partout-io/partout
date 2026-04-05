@@ -70,6 +70,41 @@ struct JSONTests {
             #expect($0.contains(PartoutLogger.redactedValue))
         }
     }
+
+    @Test
+    func givenVerifyX509Configuration_whenEncode_thenUsesRenamedKeys() throws {
+        var builder = OpenVPN.Configuration.Builder()
+        builder.ca = OpenVPN.CryptoContainer(pem: """
+-----BEGIN CERTIFICATE-----
+MIIB
+-----END CERTIFICATE-----
+""")
+        builder.remotes = [
+            try ExtendedEndpoint("vpn.example.com", .init(.udp, 1194))
+        ]
+        builder.verifyX509 = .subject
+        builder.verifyX509Value = "C=KG, ST=NA, L=Bishkek, CN=Server-1"
+
+        let cfg = try builder.build(isClient: true)
+        let data = try JSONEncoder().encode(cfg)
+        let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        #expect(json["verifyX509"] as? String == "subject")
+        #expect(json["verifyX509Value"] as? String == "C=KG, ST=NA, L=Bishkek, CN=Server-1")
+        #expect(json["checksX509Subject"] == nil)
+        #expect(json["x509Subject"] == nil)
+    }
+
+    @Test
+    func givenLegacySanHostJSON_whenDecode_thenMapsToVerifyX509() throws {
+        let data = try #require("""
+{"checksSANHost":true,"sanHost":"vpn.example.com"}
+""".data(using: .utf8))
+
+        let cfg = try JSONDecoder().decode(OpenVPN.Configuration.self, from: data)
+        #expect(cfg.verifyX509 == .name)
+        #expect(cfg.verifyX509Value == "vpn.example.com")
+    }
 }
 
 // MARK: - Helpers

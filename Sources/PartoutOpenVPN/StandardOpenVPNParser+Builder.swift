@@ -30,8 +30,8 @@ extension StandardOpenVPNParser {
         private var authUserPass = false
         private var staticChallenge = false
         private var optChecksEKU: Bool?
-        private var optSANHost: String?
-        private var optX509Subject: String?
+        private var optVerifyX509: OpenVPN.VerifyX509?
+        private var optVerifyX509Value: String?
         private var optRandomizeEndpoint: Bool?
         private var optRandomizeHostnames: Bool?
         private var optMTU: Int?
@@ -342,9 +342,11 @@ extension StandardOpenVPNParser.Builder {
             }
             switch type {
             case "name":
-                optSANHost = value.removingOpenVPNArgumentQuotes()
+                optVerifyX509 = .name
+                optVerifyX509Value = value.removingOpenVPNArgumentQuotes()
             case "subject":
-                optX509Subject = value.removingOpenVPNArgumentQuotes()
+                optVerifyX509 = .subject
+                optVerifyX509Value = value.removingOpenVPNArgumentQuotes()
             default:
                 throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
             }
@@ -678,14 +680,8 @@ extension StandardOpenVPNParser.Builder {
 
         builder.authUserPass = authUserPass
         builder.checksEKU = optChecksEKU
-        if let optSANHost {
-            builder.checksSANHost = true
-            builder.sanHost = optSANHost
-        }
-        if let optX509Subject {
-            builder.checksX509Subject = true
-            builder.x509Subject = optX509Subject
-        }
+        builder.verifyX509 = optVerifyX509
+        builder.verifyX509Value = optVerifyX509Value
         builder.randomizeEndpoint = optRandomizeEndpoint
         builder.randomizeHostnames = optRandomizeHostnames
         builder.mtu = optMTU

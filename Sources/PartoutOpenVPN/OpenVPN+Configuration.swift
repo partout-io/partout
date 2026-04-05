@@ -103,6 +103,12 @@ extension OpenVPN {
         /// Proxy settings.
         case proxy
     }
+
+    /// Verification target for `verify-x509-name`.
+    public enum VerifyX509: String, Hashable, Codable, Sendable {
+        case name
+        case subject
+    }
 }
 
 // MARK: - Configuration
@@ -166,17 +172,11 @@ extension OpenVPN {
         /// - Seealso: `Configuration.Builder.checksEKU`
         public let checksEKU: Bool?
 
-        /// - Seealso: `Configuration.Builder.checksSANHost`
-        public let checksSANHost: Bool?
+        /// - Seealso: `Configuration.Builder.verifyX509`
+        public let verifyX509: VerifyX509?
 
-        /// - Seealso: `Configuration.Builder.sanHost`
-        public let sanHost: String?
-
-        /// - Seealso: `Configuration.Builder.checksX509Subject`
-        public let checksX509Subject: Bool?
-
-        /// - Seealso: `Configuration.Builder.x509Subject`
-        public let x509Subject: String?
+        /// - Seealso: `Configuration.Builder.verifyX509Value`
+        public let verifyX509Value: String?
 
         /// - Seealso: `Configuration.Builder.randomizeEndpoint`
         public let randomizeEndpoint: Bool?
@@ -270,6 +270,188 @@ extension OpenVPN {
     }
 }
 
+extension OpenVPN.Configuration {
+    @available(*, deprecated, message: "Use verifyX509 == .name")
+    public var checksSANHost: Bool? {
+        verifyX509 == .name ? true : nil
+    }
+
+    @available(*, deprecated, message: "Use verifyX509Value together with verifyX509 = .name")
+    public var sanHost: String? {
+        guard verifyX509 == .name else {
+            return nil
+        }
+        return verifyX509Value
+    }
+
+    @available(*, deprecated, message: "Use verifyX509 == .subject")
+    public var checksX509Subject: Bool? {
+        verifyX509 == .subject ? true : nil
+    }
+
+    @available(*, deprecated, message: "Use verifyX509Value together with verifyX509 = .subject")
+    public var x509Subject: String? {
+        guard verifyX509 == .subject else {
+            return nil
+        }
+        return verifyX509Value
+    }
+}
+
+extension OpenVPN.Configuration {
+    enum CodingKeys: String, CodingKey {
+        case cipher
+        case dataCiphers
+        case digest
+        case compressionFraming
+        case compressionAlgorithm
+        case ca
+        case clientCertificate
+        case clientKey
+        case tlsWrap
+        case tlsSecurityLevel
+        case keepAliveInterval
+        case keepAliveTimeout
+        case renegotiatesAfter
+        case remotes
+        case checksEKU
+        case verifyX509
+        case verifyX509Value
+        case randomizeEndpoint
+        case randomizeHostnames
+        case usesPIAPatches
+        case mtu
+        case authUserPass
+        case staticChallenge
+        case authToken
+        case peerId
+        case ipv4
+        case ipv6
+        case routes4
+        case routes6
+        case routeGateway4
+        case routeGateway6
+        case dnsServers
+        case dnsDomain
+        case searchDomains
+        case httpProxy
+        case httpsProxy
+        case proxyAutoConfigurationURL
+        case proxyBypassDomains
+        case routingPolicies
+        case noPullMask
+        case xorMethod
+    }
+
+    private enum LegacyCodingKeys: String, CodingKey {
+        case checksSANHost
+        case sanHost
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let legacy = try decoder.container(keyedBy: LegacyCodingKeys.self)
+
+        let cipher = try container.decodeIfPresent(OpenVPN.Cipher.self, forKey: .cipher)
+        let dataCiphers = try container.decodeIfPresent([OpenVPN.Cipher].self, forKey: .dataCiphers)
+        let digest = try container.decodeIfPresent(OpenVPN.Digest.self, forKey: .digest)
+        let compressionFraming = try container.decodeIfPresent(OpenVPN.CompressionFraming.self, forKey: .compressionFraming)
+        let compressionAlgorithm = try container.decodeIfPresent(OpenVPN.CompressionAlgorithm.self, forKey: .compressionAlgorithm)
+        let ca = try container.decodeIfPresent(OpenVPN.CryptoContainer.self, forKey: .ca)
+        let clientCertificate = try container.decodeIfPresent(OpenVPN.CryptoContainer.self, forKey: .clientCertificate)
+        let clientKey = try container.decodeIfPresent(OpenVPN.CryptoContainer.self, forKey: .clientKey)
+        let tlsWrap = try container.decodeIfPresent(OpenVPN.TLSWrap.self, forKey: .tlsWrap)
+        let tlsSecurityLevel = try container.decodeIfPresent(Int.self, forKey: .tlsSecurityLevel)
+        let keepAliveInterval = try container.decodeIfPresent(TimeInterval.self, forKey: .keepAliveInterval)
+        let keepAliveTimeout = try container.decodeIfPresent(TimeInterval.self, forKey: .keepAliveTimeout)
+        let renegotiatesAfter = try container.decodeIfPresent(TimeInterval.self, forKey: .renegotiatesAfter)
+        let remotes = try container.decodeIfPresent([ExtendedEndpoint].self, forKey: .remotes)
+        let checksEKU = try container.decodeIfPresent(Bool.self, forKey: .checksEKU)
+        let verifyX509 = try container.decodeIfPresent(OpenVPN.VerifyX509.self, forKey: .verifyX509)
+            ?? {
+                if try legacy.decodeIfPresent(Bool.self, forKey: .checksSANHost) == true {
+                    return .name
+                }
+                return nil
+            }()
+        let verifyX509Value = try container.decodeIfPresent(String.self, forKey: .verifyX509Value)
+            ?? {
+                guard verifyX509 == .name else {
+                    return nil
+                }
+                return try legacy.decodeIfPresent(String.self, forKey: .sanHost)
+            }()
+        let randomizeEndpoint = try container.decodeIfPresent(Bool.self, forKey: .randomizeEndpoint)
+        let randomizeHostnames = try container.decodeIfPresent(Bool.self, forKey: .randomizeHostnames)
+        let usesPIAPatches = try container.decodeIfPresent(Bool.self, forKey: .usesPIAPatches)
+        let mtu = try container.decodeIfPresent(Int.self, forKey: .mtu)
+        let authUserPass = try container.decodeIfPresent(Bool.self, forKey: .authUserPass)
+        let staticChallenge = try container.decodeIfPresent(Bool.self, forKey: .staticChallenge)
+        let authToken = try container.decodeIfPresent(String.self, forKey: .authToken)
+        let peerId = try container.decodeIfPresent(UInt32.self, forKey: .peerId)
+        let ipv4 = try container.decodeIfPresent(IPSettings.self, forKey: .ipv4)
+        let ipv6 = try container.decodeIfPresent(IPSettings.self, forKey: .ipv6)
+        let routes4 = try container.decodeIfPresent([Route].self, forKey: .routes4)
+        let routes6 = try container.decodeIfPresent([Route].self, forKey: .routes6)
+        let routeGateway4 = try container.decodeIfPresent(Address.self, forKey: .routeGateway4)
+        let routeGateway6 = try container.decodeIfPresent(Address.self, forKey: .routeGateway6)
+        let dnsServers = try container.decodeIfPresent([String].self, forKey: .dnsServers)
+        let dnsDomain = try container.decodeIfPresent(String.self, forKey: .dnsDomain)
+        let searchDomains = try container.decodeIfPresent([String].self, forKey: .searchDomains)
+        let httpProxy = try container.decodeIfPresent(Endpoint.self, forKey: .httpProxy)
+        let httpsProxy = try container.decodeIfPresent(Endpoint.self, forKey: .httpsProxy)
+        let proxyAutoConfigurationURL = try container.decodeIfPresent(URL.self, forKey: .proxyAutoConfigurationURL)
+        let proxyBypassDomains = try container.decodeIfPresent([String].self, forKey: .proxyBypassDomains)
+        let routingPolicies = try container.decodeIfPresent([OpenVPN.RoutingPolicy].self, forKey: .routingPolicies)
+        let noPullMask = try container.decodeIfPresent([OpenVPN.PullMask].self, forKey: .noPullMask)
+        let xorMethod = try container.decodeIfPresent(OpenVPN.ObfuscationMethod.self, forKey: .xorMethod)
+
+        self = OpenVPN.Configuration(
+            cipher: cipher,
+            dataCiphers: dataCiphers,
+            digest: digest,
+            compressionFraming: compressionFraming,
+            compressionAlgorithm: compressionAlgorithm,
+            ca: ca,
+            clientCertificate: clientCertificate,
+            clientKey: clientKey,
+            tlsWrap: tlsWrap,
+            tlsSecurityLevel: tlsSecurityLevel,
+            keepAliveInterval: keepAliveInterval,
+            keepAliveTimeout: keepAliveTimeout,
+            renegotiatesAfter: renegotiatesAfter,
+            remotes: remotes,
+            checksEKU: checksEKU,
+            verifyX509: verifyX509,
+            verifyX509Value: verifyX509Value,
+            randomizeEndpoint: randomizeEndpoint,
+            randomizeHostnames: randomizeHostnames,
+            usesPIAPatches: usesPIAPatches,
+            mtu: mtu,
+            authUserPass: authUserPass,
+            staticChallenge: staticChallenge,
+            authToken: authToken,
+            peerId: peerId,
+            ipv4: ipv4,
+            ipv6: ipv6,
+            routes4: routes4,
+            routes6: routes6,
+            routeGateway4: routeGateway4,
+            routeGateway6: routeGateway6,
+            dnsServers: dnsServers,
+            dnsDomain: dnsDomain,
+            searchDomains: searchDomains,
+            httpProxy: httpProxy,
+            httpsProxy: httpsProxy,
+            proxyAutoConfigurationURL: proxyAutoConfigurationURL,
+            proxyBypassDomains: proxyBypassDomains,
+            routingPolicies: routingPolicies,
+            noPullMask: noPullMask,
+            xorMethod: xorMethod
+        )
+    }
+}
+
 extension OpenVPN.Configuration: SerializableConfiguration {
     public func serialized() throws -> String {
         try asOvpnConfig()
@@ -332,17 +514,11 @@ extension OpenVPN.Configuration {
         /// If true, checks EKU of server certificate.
         public var checksEKU: Bool?
 
-        /// If true, checks if hostname (sanHost) is present in certificates SAN.
-        public var checksSANHost: Bool?
+        /// Which `verify-x509-name` check to apply.
+        public var verifyX509: OpenVPN.VerifyX509?
 
-        /// The server hostname used for checking certificate SAN.
-        public var sanHost: String?
-
-        /// If true, checks if certificate subject matches `x509Subject`.
-        public var checksX509Subject: Bool?
-
-        /// The exact subject DN used for `verify-x509-name ... subject`.
-        public var x509Subject: String?
+        /// The value used by `verify-x509-name`.
+        public var verifyX509Value: String?
 
         /// Picks endpoint from `remotes` randomly.
         public var randomizeEndpoint: Bool?
@@ -467,17 +643,8 @@ extension OpenVPN.Configuration {
                 guard !(remotes?.isEmpty ?? true) else {
                     throw PartoutError.invalidFields(["remotes": nil])
                 }
-                guard !(checksSANHost ?? false) || sanHost != nil else {
-                    throw PartoutError.invalidFields(["sanHost": nil])
-                }
-                guard !(checksX509Subject ?? false) || x509Subject != nil else {
-                    throw PartoutError.invalidFields(["x509Subject": nil])
-                }
-                guard !((checksSANHost ?? false) && (checksX509Subject ?? false)) else {
-                    throw PartoutError.invalidFields([
-                        "checksSANHost": "conflicts with checksX509Subject",
-                        "checksX509Subject": "conflicts with checksSANHost"
-                    ])
+                guard verifyX509 == nil || verifyX509Value != nil else {
+                    throw PartoutError.invalidFields(["verifyX509Value": nil])
                 }
                 fallbackCipher = cipher ?? .aes128cbc
             } else {
@@ -499,10 +666,8 @@ extension OpenVPN.Configuration {
                 renegotiatesAfter: renegotiatesAfter,
                 remotes: remotes,
                 checksEKU: checksEKU,
-                checksSANHost: checksSANHost,
-                sanHost: sanHost,
-                checksX509Subject: checksX509Subject,
-                x509Subject: x509Subject,
+                verifyX509: verifyX509,
+                verifyX509Value: verifyX509Value,
                 randomizeEndpoint: randomizeEndpoint,
                 randomizeHostnames: randomizeHostnames,
                 usesPIAPatches: usesPIAPatches,
@@ -528,6 +693,66 @@ extension OpenVPN.Configuration {
                 noPullMask: noPullMask,
                 xorMethod: xorMethod
             )
+        }
+    }
+}
+
+extension OpenVPN.Configuration.Builder {
+    @available(*, deprecated, message: "Use verifyX509 == .name")
+    public var checksSANHost: Bool? {
+        get {
+            verifyX509 == .name ? true : nil
+        }
+        set {
+            guard newValue == true else {
+                if verifyX509 == .name {
+                    verifyX509 = nil
+                }
+                return
+            }
+            verifyX509 = .name
+        }
+    }
+
+    @available(*, deprecated, message: "Use verifyX509Value together with verifyX509 = .name")
+    public var sanHost: String? {
+        get {
+            guard verifyX509 == .name else {
+                return nil
+            }
+            return verifyX509Value
+        }
+        set {
+            verifyX509Value = newValue
+        }
+    }
+
+    @available(*, deprecated, message: "Use verifyX509 == .subject")
+    public var checksX509Subject: Bool? {
+        get {
+            verifyX509 == .subject ? true : nil
+        }
+        set {
+            guard newValue == true else {
+                if verifyX509 == .subject {
+                    verifyX509 = nil
+                }
+                return
+            }
+            verifyX509 = .subject
+        }
+    }
+
+    @available(*, deprecated, message: "Use verifyX509Value together with verifyX509 = .subject")
+    public var x509Subject: String? {
+        get {
+            guard verifyX509 == .subject else {
+                return nil
+            }
+            return verifyX509Value
+        }
+        set {
+            verifyX509Value = newValue
         }
     }
 }
@@ -559,10 +784,8 @@ extension OpenVPN.Configuration {
         builder.renegotiatesAfter = renegotiatesAfter
         builder.remotes = remotes
         builder.checksEKU = checksEKU
-        builder.checksSANHost = checksSANHost
-        builder.sanHost = sanHost
-        builder.checksX509Subject = checksX509Subject
-        builder.x509Subject = x509Subject
+        builder.verifyX509 = verifyX509
+        builder.verifyX509Value = verifyX509Value
         builder.randomizeEndpoint = randomizeEndpoint
         builder.randomizeHostnames = randomizeHostnames
         builder.usesPIAPatches = usesPIAPatches
@@ -669,15 +892,22 @@ extension OpenVPN.Configuration {
         } else if isLocal {
             pp_log(ctx, .openvpn, .notice, "\tServer EKU verification: disabled")
         }
-        if checksSANHost ?? false {
-            pp_log(ctx, .openvpn, .notice, "\tHost SAN verification: enabled (\(sanHost?.asSensitiveAddress(ctx) ?? "-"))")
-        } else if isLocal {
-            pp_log(ctx, .openvpn, .notice, "\tHost SAN verification: disabled")
-        }
-        if checksX509Subject ?? false {
-            pp_log(ctx, .openvpn, .notice, "\tSubject DN verification: enabled (\(x509Subject ?? "-"))")
-        } else if isLocal {
-            pp_log(ctx, .openvpn, .notice, "\tSubject DN verification: disabled")
+        switch verifyX509 {
+        case .name:
+            pp_log(ctx, .openvpn, .notice, "\tHost SAN verification: enabled (\(verifyX509Value?.asSensitiveAddress(ctx) ?? "-"))")
+            if isLocal {
+                pp_log(ctx, .openvpn, .notice, "\tSubject DN verification: disabled")
+            }
+        case .subject:
+            if isLocal {
+                pp_log(ctx, .openvpn, .notice, "\tHost SAN verification: disabled")
+            }
+            pp_log(ctx, .openvpn, .notice, "\tSubject DN verification: enabled (\(verifyX509Value ?? "-"))")
+        case nil:
+            if isLocal {
+                pp_log(ctx, .openvpn, .notice, "\tHost SAN verification: disabled")
+                pp_log(ctx, .openvpn, .notice, "\tSubject DN verification: disabled")
+            }
         }
 
         if randomizeEndpoint ?? false {

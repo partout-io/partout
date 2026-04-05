@@ -43,12 +43,12 @@ private final class NativeTLSWrapper: TLSProtocol {
         let certPEM = parameters.cfg.clientCertificate?.pem.withCString(pp_dup)
         let keyPEM = parameters.cfg.clientKey?.pem.withCString(pp_dup)
         let x509Name: UnsafeMutablePointer<CChar>?
-        if parameters.cfg.checksX509Subject ?? false {
+        if parameters.cfg.verifyX509 == .subject {
             x509NameType = PPTLSX509NameSubject
-            x509Name = parameters.cfg.x509Subject?.withCString(pp_dup)
-        } else if parameters.cfg.checksSANHost ?? false {
+            x509Name = parameters.cfg.verifyX509Value?.withCString(pp_dup)
+        } else if parameters.cfg.verifyX509 == .name {
             x509NameType = PPTLSX509NameSANHost
-            x509Name = parameters.cfg.sanHost?.withCString(pp_dup)
+            x509Name = parameters.cfg.verifyX509Value?.withCString(pp_dup)
         } else {
             x509NameType = PPTLSX509NameNone
             x509Name = nil

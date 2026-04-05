@@ -39,8 +39,8 @@ MIIE
         ]
         configuration.authUserPass = true
         configuration.checksEKU = true
-        configuration.checksSANHost = true
-        configuration.sanHost = "vpn.example.com"
+        configuration.verifyX509 = .name
+        configuration.verifyX509Value = "vpn.example.com"
         configuration.randomizeEndpoint = true
         configuration.randomizeHostnames = true
         configuration.mtu = 1400
@@ -86,8 +86,8 @@ MIIE
         ])
         #expect(parsed.authUserPass == true)
         #expect(parsed.checksEKU == true)
-//        #expect(parsed.checksSANHost == true)
-//        #expect(parsed.sanHost == "vpn.example.com")
+        #expect(parsed.verifyX509 == .name)
+        #expect(parsed.verifyX509Value == "vpn.example.com")
         #expect(parsed.randomizeEndpoint == true)
         #expect(parsed.randomizeHostnames == true)
         #expect(parsed.mtu == 1400)
@@ -143,8 +143,8 @@ MIIB
         configuration.remotes = [
             try ExtendedEndpoint("vpn.example.com", .init(.udp, 1194))
         ]
-        configuration.checksX509Subject = true
-        configuration.x509Subject = subject
+        configuration.verifyX509 = .subject
+        configuration.verifyX509Value = subject
         builder.configurationBuilder = configuration
 
         let module = try builder.build()
@@ -152,8 +152,7 @@ MIIB
         #expect(serialized.contains("verify-x509-name '\(subject)' subject"))
 
         let parsed = try StandardOpenVPNParser(decrypter: nil).parsed(fromContents: serialized).configuration
-        #expect(parsed.checksX509Subject == true)
-        #expect(parsed.x509Subject == subject)
-        #expect(parsed.checksSANHost != true)
+        #expect(parsed.verifyX509 == .subject)
+        #expect(parsed.verifyX509Value == subject)
     }
 }

@@ -86,14 +86,8 @@ extension OpenVPN.Configuration {
         guard !(staticChallenge ?? false) else {
             throw PartoutError(.encoding, "OpenVPN static challenge export requires challenge text and echo flag")
         }
-        guard !(checksSANHost ?? false) || sanHost != nil else {
-            throw PartoutError(.encoding, "OpenVPN SAN host verification requires a hostname")
-        }
-        guard !(checksX509Subject ?? false) || x509Subject != nil else {
-            throw PartoutError(.encoding, "OpenVPN subject verification requires a subject DN")
-        }
-        guard !((checksSANHost ?? false) && (checksX509Subject ?? false)) else {
-            throw PartoutError(.encoding, "OpenVPN cannot export SAN and subject verification simultaneously")
+        guard verifyX509 == nil || verifyX509Value != nil else {
+            throw PartoutError(.encoding, "OpenVPN X.509 verification requires a verification value")
         }
 
         append("client")
@@ -149,10 +143,17 @@ extension OpenVPN.Configuration {
         if checksEKU ?? false {
             append("remote-cert-tls server")
         }
-        if checksSANHost ?? false, let sanHost {
-            append("verify-x509-name \(sanHost) name")
-        } else if checksX509Subject ?? false, let x509Subject {
-            append("verify-x509-name \(x509Subject.asOpenVPNQuotedArgument()) subject")
+        switch verifyX509 {
+        case .name:
+            if let verifyX509Value {
+                append("verify-x509-name \(verifyX509Value) name")
+            }
+        case .subject:
+            if let verifyX509Value {
+                append("verify-x509-name \(verifyX509Value.asOpenVPNQuotedArgument()) subject")
+            }
+        case nil:
+            break
         }
         if randomizeEndpoint ?? false {
             append("remote-random")
