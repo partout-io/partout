@@ -38,23 +38,10 @@ extension OpenVPN {
             self.key = key
             self.wrappedKey = wrappedKey
         }
-
-        /// Initializes from a tls-crypt-v2 client key file.
-        public init?(clientKeyV2File file: String) {
-            guard let pair = Self.clientKeyV2(file: file) else {
-                return nil
-            }
-            self.init(strategy: .cryptV2, key: pair.key, wrappedKey: pair.wrappedKey)
-        }
     }
 }
 
 extension OpenVPN.TLSWrap {
-    static func clientKeyV2(file: String) -> (key: OpenVPN.StaticKey, wrappedKey: SecureData)? {
-        let lines = file.split(separator: "\n")
-        return clientKeyV2(lines: lines)
-    }
-
     static func clientKeyV2(lines: [Substring]) -> (key: OpenVPN.StaticKey, wrappedKey: SecureData)? {
         var isHead = true
         var base64Lines: [Substring] = []
