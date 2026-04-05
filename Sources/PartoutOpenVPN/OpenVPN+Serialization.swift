@@ -140,6 +140,9 @@ extension OpenVPN.Configuration {
         if checksEKU ?? false {
             append("remote-cert-tls server")
         }
+        if checksSANHost ?? false, let sanHost {
+            append("verify-x509-name \(sanHost) name")
+        }
         if randomizeEndpoint ?? false {
             append("remote-random")
         }
