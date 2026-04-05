@@ -4,6 +4,8 @@
 
 /// A codable wrapper for a profile with all known modules.
 public struct TaggedProfile: ProfileType, Hashable, Codable, Sendable {
+    public typealias CustomModuleHandler = @Sendable (CustomModule) throws -> Module
+
     public let version: Int?
 
     public let id: UniqueID
@@ -18,12 +20,24 @@ public struct TaggedProfile: ProfileType, Hashable, Codable, Sendable {
 
     public let userInfo: JSON?
 
-    public func asProfile() throws -> Profile {
-        try Profile.Builder(
+    public func asProfile(customHandler: CustomModuleHandler? = nil) throws -> Profile {
+        let finalModules: [Module]
+        if let customHandler {
+            finalModules = try modules.map {
+                let inner = $0.containedModule
+                if let custom = inner as? CustomModule {
+                    return try customHandler(custom)
+                }
+                return inner
+            }
+        } else {
+            finalModules = modules.map(\.containedModule)
+        }
+        return try Profile.Builder(
             version: version,
             id: id,
             name: name,
-            modules: modules.compactMap(\.containedModule),
+            modules: finalModules,
             activeModulesIds: activeModulesIds,
             behavior: behavior,
             userInfo: userInfo

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 extension ModuleType {
+    public static let Custom = CustomModule.moduleType
     public static let DNS = DNSModule.moduleType
     public static let HTTPProxy = HTTPProxyModule.moduleType
     public static let IP = IPModule.moduleType
