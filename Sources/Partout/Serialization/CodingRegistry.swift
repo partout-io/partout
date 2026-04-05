@@ -8,14 +8,17 @@ public final class CodingRegistry {
 
     private let registry: Registry
     private let withLegacyEncoding: @Sendable () -> Bool
+    private let customModuleHandler: TaggedProfile.CustomModuleHandler?
     private let postDecodeBlock: PostDecodeBlock?
 
     public init(
         registry: Registry,
-        withLegacyEncoding: @escaping @Sendable () -> Bool
+        withLegacyEncoding: @escaping @Sendable () -> Bool,
+        customModuleHandler: TaggedProfile.CustomModuleHandler? = nil
     ) {
         self.registry = registry
         self.withLegacyEncoding = withLegacyEncoding
+        self.customModuleHandler = customModuleHandler
         postDecodeBlock = Self.migratedProfile
     }
 }
@@ -66,7 +69,7 @@ extension CodingRegistry {
     func rawProfileV3(fromString string: String) throws -> Profile {
         try ProfileEncoderV3()
             .decode(string)
-            .asProfile()
+            .asProfile(customHandler: customModuleHandler)
     }
 }
 
