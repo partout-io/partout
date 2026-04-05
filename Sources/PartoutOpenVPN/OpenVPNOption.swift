@@ -24,11 +24,11 @@ extension OpenVPN {
 
         case fragment = "^fragment"
 
-        case tlsAuth = "^tls-auth( +[^\\s]+( +\\d)?)?"
+        case tlsAuth = "^tls-auth( +.+)?"
 
-        case tlsCrypt = "^tls-crypt(?!-v2)( +[^\\s]+)?"
+        case tlsCrypt = "^tls-crypt(?!-v2)( +.+)?"
 
-        case tlsCryptV2 = "^tls-crypt-v2( +[^\\s]+( +(force-cookie|allow-noncookie))?)?"
+        case tlsCryptV2 = "^tls-crypt-v2( +.+)?"
 
         // MARK: General
 

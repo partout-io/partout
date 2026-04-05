@@ -610,6 +610,19 @@ extension StandardOpenVPNParser.Builder {
             builder.clientKey = optClientKey
         }
 
+        if let strategy = optTLSStrategy, optTLSKeyLines == nil {
+            switch strategy {
+            case .auth:
+                throw StandardOpenVPNParserError.malformed(option: "tls-auth requires inline key block")
+            case .crypt:
+                throw StandardOpenVPNParserError.malformed(option: "tls-crypt requires inline key block")
+            case .cryptV2:
+                throw StandardOpenVPNParserError.malformed(option: "tls-crypt-v2 requires inline key block")
+            @unknown default:
+                break
+            }
+        }
+
         if let keyLines = optTLSKeyLines, let strategy = optTLSStrategy {
             switch strategy {
             case .auth:

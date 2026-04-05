@@ -127,6 +127,47 @@ struct OpenVPNParserTests {
     }
 
     @Test
+    func givenBareTLSAuthDirective_whenParse_thenFails() {
+        #expect(throws: Error.self) {
+            _ = try parser.parsed(fromLines: ["tls-auth"])
+        }
+    }
+
+    @Test
+    func givenBareTLSAuthDirectiveWithInlineBlock_whenParse_thenSucceeds() throws {
+        let lines = [
+            "tls-auth",
+            "<tls-auth>",
+            OpenVPN.StaticKey(
+                data: Data((0..<256).map(UInt8.init)),
+                direction: .client
+            ).asFileContents(),
+            "</tls-auth>"
+        ].flatMap {
+            $0.components(separatedBy: .newlines)
+        }
+
+        let cfg = try parser.parsed(fromLines: lines).configuration
+        let tlsWrap = try #require(cfg.tlsWrap)
+        #expect(tlsWrap.strategy == .auth)
+        #expect(tlsWrap.key.direction == nil)
+    }
+
+    @Test
+    func givenBareTLSCryptDirective_whenParse_thenFails() {
+        #expect(throws: Error.self) {
+            _ = try parser.parsed(fromLines: ["tls-crypt"])
+        }
+    }
+
+    @Test
+    func givenBareTLSCryptV2Directive_whenParse_thenFails() {
+        #expect(throws: Error.self) {
+            _ = try parser.parsed(fromLines: ["tls-crypt-v2"])
+        }
+    }
+
+    @Test
     func givenMalformedRouteAndGatewayOptions_whenPutOption_thenAreIgnoredSafely() throws {
         var builder = StandardOpenVPNParser.Builder(supportsLZO: false, decrypter: nil)
 
