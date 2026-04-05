@@ -126,6 +126,16 @@ struct OpenVPNParserTests {
         #expect(tlsWrap.wrappedKey?.toData() == wrappedKey)
     }
 
+    @Test
+    func givenMalformedRouteAndGatewayOptions_whenPutOption_thenAreIgnoredSafely() throws {
+        var builder = StandardOpenVPNParser.Builder(supportsLZO: false, decrypter: nil)
+
+        try builder.putOption(.route, line: "route", components: ["route"])
+        try builder.putOption(.route6, line: "route-ipv6", components: ["route-ipv6"])
+        try builder.putOption(.gateway, line: "route-gateway", components: ["route-gateway"])
+        try builder.putOption(.gateway6, line: "route-ipv6-gateway", components: ["route-ipv6-gateway"])
+    }
+
     // MARK: URL
 
     @Test

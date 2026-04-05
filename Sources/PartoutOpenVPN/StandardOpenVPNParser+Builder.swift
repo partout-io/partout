@@ -311,9 +311,7 @@ extension StandardOpenVPNParser.Builder {
             optDefaultPort = UInt16(str)
 
         case .remote:
-            guard components.count > 1 else {
-                break
-            }
+            guard components.count > 1 else { break }
             let hostname = components[1]
             var port: UInt16?
             var proto: IPSocketType?
@@ -380,22 +378,19 @@ extension StandardOpenVPNParser.Builder {
             optTopology = components[1]
 
         case .ifconfig:
-            guard components.count > 1 else {
-                break
-            }
+            guard components.count > 1 else { break }
             var args = components
             args.removeFirst()
             optIfconfig4Arguments = args
 
         case .ifconfig6:
-            guard components.count > 1 else {
-                break
-            }
+            guard components.count > 1 else { break }
             var args = components
             args.removeFirst()
             optIfconfig6Arguments = args
 
         case .route:
+            guard components.count > 1 else { break }
             var args = components
             args.removeFirst()
             let routeEntryArguments = args
@@ -412,6 +407,7 @@ extension StandardOpenVPNParser.Builder {
             optRoutes4?.append((address, mask, gateway))
 
         case .route6:
+            guard components.count > 1 else { break }
             var args = components
             args.removeFirst()
             let routeEntryArguments = args
@@ -435,11 +431,13 @@ extension StandardOpenVPNParser.Builder {
             optRoutes6?.append((destination, prefix, gateway))
 
         case .gateway:
+            guard components.count > 1 else { break }
             var args = components
             args.removeFirst()
             optGateway4Arguments = args
 
         case .gateway6:
+            guard components.count > 1 else { break }
             var args = components
             args.removeFirst()
             optGateway6Arguments = args
@@ -524,10 +522,7 @@ extension StandardOpenVPNParser.Builder {
             // MARK: Extra
 
         case .xorInfo:
-            guard components.count > 1 else {
-                break
-            }
-
+            guard components.count > 1 else { break }
             switch components[1] {
             case "xormask":
                 if components.count > 2, let mask = SecureData(components[2]) {
