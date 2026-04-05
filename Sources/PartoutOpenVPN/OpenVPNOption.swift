@@ -100,6 +100,8 @@ extension OpenVPN {
 
         case gateway = "^route-gateway +[\\d\\.]+"
 
+        case gateway6 = "^route-ipv6-gateway +[\\da-fA-F:]+"
+
         case dns = "^dhcp-option +DNS6? +[\\d\\.a-fA-F:]+"
 
         case domain = "^dhcp-option +DOMAIN +[^ ]+"

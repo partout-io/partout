@@ -46,6 +46,8 @@ MIIE
         configuration.mtu = 1400
         configuration.keepAliveInterval = 15
         configuration.keepAliveTimeout = 60
+        configuration.routeGateway4 = Address(rawValue: "10.8.0.1")
+        configuration.routeGateway6 = Address(rawValue: "2001:db8::1")
         configuration.routingPolicies = [.IPv4, .blockLocal]
         configuration.dnsServers = ["1.1.1.1", "8.8.8.8"]
         configuration.dnsDomain = "example.org"
@@ -67,6 +69,10 @@ MIIE
 
         let module = try builder.build()
         let serialized = try module.serialized()
+        #expect(serialized.contains("tls-auth [inline]"))
+        #expect(serialized.contains("verify-x509-name vpn.example.com name"))
+        #expect(serialized.contains("route-gateway 10.8.0.1"))
+        #expect(serialized.contains("route-ipv6-gateway 2001:db8::1"))
         let parsed = try StandardOpenVPNParser(decrypter: nil).parsed(fromContents: serialized).configuration
 
         #expect(parsed.cipher == .aes256cbc)
@@ -87,6 +93,8 @@ MIIE
         #expect(parsed.mtu == 1400)
         #expect(parsed.keepAliveInterval == 15)
         #expect(parsed.keepAliveTimeout == 60)
+        #expect(parsed.routeGateway4?.rawValue == "10.8.0.1")
+        #expect(parsed.routeGateway6?.rawValue == "2001:db8::1")
         #expect(Set(parsed.routingPolicies ?? []) == Set([.IPv4, .blockLocal]))
         #expect(parsed.dnsServers == ["1.1.1.1", "8.8.8.8"])
         #expect(parsed.dnsDomain == "example.org")
@@ -98,5 +106,26 @@ MIIE
         #expect(parsed.xorMethod == .xorptrpos)
         #expect(parsed.tlsWrap?.strategy == .auth)
         #expect(parsed.tlsWrap?.key.direction == .client)
+    }
+
+    @Test
+    func givenModuleWithStaticChallenge_whenSerialize_thenFails() throws {
+        var builder = OpenVPNModule.Builder()
+        var configuration = OpenVPN.Configuration.Builder()
+        configuration.ca = OpenVPN.CryptoContainer(pem: """
+-----BEGIN CERTIFICATE-----
+MIIB
+-----END CERTIFICATE-----
+""")
+        configuration.remotes = [
+            try ExtendedEndpoint("vpn.example.com", .init(.udp, 1194))
+        ]
+        builder.configurationBuilder = configuration
+        builder.isInteractive = true
+
+        let module = try builder.build()
+        #expect(throws: Error.self) {
+            try module.serialized()
+        }
     }
 }

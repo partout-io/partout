@@ -42,6 +42,7 @@ extension StandardOpenVPNParser {
         private var optIfconfig4Arguments: [String]?
         private var optIfconfig6Arguments: [String]?
         private var optGateway4Arguments: [String]?
+        private var optGateway6Arguments: [String]?
         private var optRoutes4: [Route4Group]?
         private var optRoutes6: [Route6Group]?
         private var optDNSServers: [String]?
@@ -438,6 +439,11 @@ extension StandardOpenVPNParser.Builder {
             args.removeFirst()
             optGateway4Arguments = args
 
+        case .gateway6:
+            var args = components
+            args.removeFirst()
+            optGateway6Arguments = args
+
         case .dns:
             guard components.count == 3 else {
                 break
@@ -730,7 +736,8 @@ extension StandardOpenVPNParser.Builder {
             let gateway = tuple.gateway.map(Address.init(rawValue:)) ?? nil
             return Route(subnet, gateway)
         }
-        builder.routeGateway4 = defaultGateway4.map(Address.init(rawValue:)) ?? nil
+        let routeGateway4 = defaultGateway4 ?? optGateway4Arguments?.first
+        builder.routeGateway4 = routeGateway4.map(Address.init(rawValue:)) ?? nil
 
         let defaultGateway6: String?
         if let ifconfig6Arguments = optIfconfig6Arguments {
@@ -765,7 +772,8 @@ extension StandardOpenVPNParser.Builder {
             let gateway = tuple.gateway.map(Address.init(rawValue:)) ?? nil
             return Route(subnet, gateway)
         }
-        builder.routeGateway6 = defaultGateway6.map(Address.init(rawValue:)) ?? nil
+        let routeGateway6 = defaultGateway6 ?? optGateway6Arguments?.first
+        builder.routeGateway6 = routeGateway6.map(Address.init(rawValue:)) ?? nil
 
         builder.dnsServers = optDNSServers
         builder.dnsDomain = optDomain

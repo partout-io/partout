@@ -177,6 +177,13 @@ extension OpenVPN.Configuration {
             appendRoutingPolicies(routingPolicies)
         }
 
+        if let routeGateway4 {
+            append("route-gateway \(routeGateway4.rawValue)")
+        }
+        if let routeGateway6 {
+            append("route-ipv6-gateway \(routeGateway6.rawValue)")
+        }
+
         if let dnsServers, !dnsServers.isEmpty {
             for server in dnsServers {
                 append("dhcp-option DNS \(server)")
