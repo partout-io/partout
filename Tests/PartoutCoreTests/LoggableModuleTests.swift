@@ -7,7 +7,7 @@ import Testing
 
 struct LoggableModuleTests {
     @Test
-    func givenModule_whenLog_thenReturnsHandlerID() {
+    func givenModule_whenLog_thenReturnsModuleType() {
         let sut = SomeModule()
         let loggable = LoggableModule(.global, sut)
         #expect(
@@ -18,7 +18,7 @@ struct LoggableModuleTests {
     }
 
     @Test
-    func givenEncodableModule_whenLog_thenDoesNotReturnHandlerID() {
+    func givenEncodableModule_whenLog_thenDoesNotReturnModuleType() {
         let sut = SomeEncodableModule()
         let loggable = LoggableModule(.global, sut)
         #expect(
@@ -51,14 +51,9 @@ struct LoggableModuleTests {
     }
 }
 
-private struct SomeModule: Module {
-    static var moduleHandler: ModuleHandler {
-        ModuleHandler(ModuleType("SomeHandler"), factory: nil)
-    }
-}
+private struct SomeModule: Module {}
 
-private struct SomeEncodableModule: Module, Encodable {
-}
+private struct SomeEncodableModule: Module, Encodable {}
 
 private struct SomeDebuggableModule: Module, SensitiveDebugStringConvertible {
     func debugDescription(withSensitiveData: Bool) -> String {

@@ -2,23 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-private let transientModuleHandler = ModuleHandler(ModuleType("TransientModule"))
+private let undefinedModuleType = ModuleType("Undefined")
 
 extension Module {
-    public static var moduleHandler: ModuleHandler {
-        transientModuleHandler
+    public static var moduleType: ModuleType {
+        undefinedModuleType
     }
 
-    public var moduleHandler: ModuleHandler {
-        Self.moduleHandler
-    }
-
-    public var isTransient: Bool {
-        moduleHandler.decoder == nil
-    }
-}
-
-extension Module {
     public var id: UniqueID {
         UniqueID(uuidString: "00000000-0000-0000-0000-000000000000")!
     }

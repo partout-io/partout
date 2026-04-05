@@ -3,12 +3,11 @@
 // SPDX-License-Identifier: GPL-3.0
 
 /// Contains the necessary info for module handling and serialization.
+@available(*, deprecated, message: "Superseded by ModuleType and TaggedModule")
 public struct ModuleHandler: Identifiable, Sendable {
     public typealias DecodingBlock = @Sendable (Decoder) throws -> Module
 
     public typealias LegacyDecodingBlock = @Sendable (JSONDecoder, Data) throws -> Module
-
-    public typealias FactoryBlock = @Sendable () -> any ModuleBuilder
 
     public let id: ModuleType
 
@@ -16,9 +15,7 @@ public struct ModuleHandler: Identifiable, Sendable {
 
     public let legacyDecoder: LegacyDecodingBlock?
 
-    public let factory: FactoryBlock?
-
-    public init<M>(_ id: ModuleType, _ moduleType: M.Type) where M: Module & BuildableType & Decodable, M.B: ModuleBuilder {
+    public init<M>(_ id: ModuleType, _ moduleType: M.Type) where M: Module & Decodable {
         self.init(
             id,
             decoder: {
@@ -26,9 +23,6 @@ public struct ModuleHandler: Identifiable, Sendable {
             },
             legacyDecoder: {
                 try $0.decode(moduleType, from: $1)
-            },
-            factory: {
-                M.B.empty()
             }
         )
     }
@@ -36,13 +30,11 @@ public struct ModuleHandler: Identifiable, Sendable {
     public init(
         _ id: ModuleType,
         decoder: DecodingBlock? = nil,
-        legacyDecoder: LegacyDecodingBlock? = nil,
-        factory: FactoryBlock? = nil
+        legacyDecoder: LegacyDecodingBlock? = nil
     ) {
         self.id = id
         self.decoder = decoder
         self.legacyDecoder = legacyDecoder
-        self.factory = factory
     }
 }
 

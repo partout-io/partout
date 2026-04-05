@@ -2,13 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-extension ModuleType {
-    public static let openVPN = ModuleType("OpenVPN")
-}
-
 /// A connection module providing an OpenVPN connection.
 public struct OpenVPNModule: Module, BuildableType, Hashable, Codable {
-    public static let moduleHandler = ModuleHandler(.openVPN, OpenVPNModule.self)
+    public static let moduleType = ModuleType("OpenVPN")
 
     public let id: UniqueID
 

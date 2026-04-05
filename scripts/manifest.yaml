@@ -1,6 +1,6 @@
 paths:
   - Partout
-  - Partout/Serialization
+  - Partout/Modules
   - PartoutCore/Connection
   - PartoutCore/IP
   - PartoutCore/Modules

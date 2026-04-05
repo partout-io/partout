@@ -4,6 +4,5 @@
 
 /// Provides ``Module`` centralized operations.
 public protocol ModuleRegistry: Sendable {
-    func newModuleBuilder(withModuleType moduleType: ModuleType) -> (any ModuleBuilder)?
     func implementation(for moduleType: ModuleType) -> ModuleImplementation?
 }

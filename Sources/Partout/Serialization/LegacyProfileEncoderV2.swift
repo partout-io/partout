@@ -58,7 +58,7 @@ public struct LegacyCodableModuleV2: Codable, Sendable {
     let wrappedModule: Module
 
     init(wrappedModule: Module) {
-        moduleType = wrappedModule.moduleHandler.id
+        moduleType = wrappedModule.moduleType
         self.wrappedModule = wrappedModule
     }
 
@@ -77,7 +77,7 @@ public struct LegacyCodableModuleV2: Codable, Sendable {
         } else {
             module = try moduleDecoder.decodedModule(from: decoder, ofType: moduleType)
         }
-        assert(module.moduleHandler.id == moduleType, "Deserialized type mismatch")
+        assert(module.moduleType == moduleType, "Deserialized type mismatch")
         wrappedModule = module
     }
 
@@ -128,7 +128,7 @@ extension Profile {
 
 extension Registry: LegacyModuleDecoder {
     public func decodedModule(from decoder: Decoder, ofType moduleType: ModuleType) throws -> Module {
-        guard let handler = allHandlers[moduleType] else {
+        guard let handler = handler(withId: moduleType) else {
             throw PartoutError(.unknownModuleHandler)
         }
         guard let handlerDecoder = handler.decoder else {

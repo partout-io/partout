@@ -102,7 +102,7 @@ struct LegacyModuleWrapper: Codable {
     let data: Data
 
     init(_ module: Module & Encodable) throws {
-        id = module.moduleHandler.id
+        id = module.moduleType
         data = try JSONEncoder().encode(module)
     }
 }

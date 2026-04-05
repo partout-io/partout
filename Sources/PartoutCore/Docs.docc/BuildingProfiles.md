@@ -26,7 +26,6 @@ Profiles are the foundations of Partout, and profiles are made of modules. A bas
 ### Strategies
 
 - ``ModuleBuilderValidator``
-- ``ModuleHandler``
 - ``ModuleImplementation``
 - ``ModuleImporter``
 - ``ModuleRegistry``

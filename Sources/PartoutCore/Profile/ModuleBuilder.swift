@@ -11,21 +11,15 @@ public protocol ModuleBuilder: Sendable, MutableUniquelyIdentifiable, BuilderTyp
 }
 
 extension ModuleBuilder {
-    public static var moduleHandler: ModuleHandler {
-        BuiltType.moduleHandler
+    public static var moduleType: ModuleType {
+        BuiltType.moduleType
     }
 
-    public var moduleHandler: ModuleHandler {
-        Self.moduleHandler
+    public var moduleType: ModuleType {
+        Self.moduleType
     }
 
     public var buildsConnectionModule: Bool {
         BuiltType.self is ConnectionModule.Type
-    }
-}
-
-extension ModuleBuilder {
-    public var moduleType: ModuleType {
-        moduleHandler.id
     }
 }
