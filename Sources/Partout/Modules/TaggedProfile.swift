@@ -46,11 +46,13 @@ public struct TaggedProfile: ProfileType, Hashable, Codable, Sendable {
 }
 
 extension Profile {
+    private static let currentTaggedVersion = 3
+
     public var asTaggedProfile: TaggedProfile {
         let taggedModules = modules.compactMap(\.taggedModule)
         assert(taggedModules.count == modules.count)
         return TaggedProfile(
-            version: version,
+            version: Self.currentTaggedVersion,
             id: id,
             name: name,
             modules: modules.compactMap(\.taggedModule),
