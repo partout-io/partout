@@ -537,11 +537,12 @@ components:
       enum:
         - auth
         - crypt
-        - cryptV2
+        - "crypt-v2"
       type: string
       x-enum-varnames:
         - auth
         - crypt
+        - cryptV2
     OpenVPNModule:
       additionalProperties: false
       properties:
