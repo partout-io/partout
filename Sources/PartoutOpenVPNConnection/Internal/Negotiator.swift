@@ -368,20 +368,16 @@ private extension Negotiator {
         guard let payload, !payload.isEmpty else {
             return false
         }
-
         var offset = 0
         while offset + 4 <= payload.count {
             let type = payload.networkUInt16Value(from: offset)
             offset += 2
-
             let length = Int(payload.networkUInt16Value(from: offset))
             offset += 2
-
             guard offset + length <= payload.count else {
                 pp_log(ctx, .openvpn, .error, "Malformed early-negotiation payload in HARD_RESET")
                 return false
             }
-
             if type == Constants.ControlChannel.earlyNegotiationFlagsType, length >= 2 {
                 let flags = payload.networkUInt16Value(from: offset)
                 return (flags & Constants.ControlChannel.earlyNegotiationResendWrappedKey) != 0
@@ -411,7 +407,8 @@ private extension Negotiator {
                     pp_log(ctx, .openvpn, .error, "Sent SOFT_RESET but received HARD_RESET?")
                 }
                 channel.setRemoteSessionId(packet.sessionId)
-                shouldResendWrappedKey = requestsWrappedKeyResend(from: packet.payload)
+                let usesTLSCryptV2 = options.configuration.tlsWrap?.strategy == .cryptV2
+                shouldResendWrappedKey = usesTLSCryptV2 && requestsWrappedKeyResend(from: packet.payload)
             }
             guard let remoteSessionId = channel.remoteSessionId else {
                 let error = OpenVPNSessionError.missingSessionId
