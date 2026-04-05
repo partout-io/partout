@@ -77,10 +77,12 @@ extension OpenVPN.TLSWrap {
         )
     }
 
-    func asClientKeyV2FileContents() -> String {
+    func asCryptV2KeyContents() -> String {
         precondition(strategy == .cryptV2)
-        let wrappedKey = wrappedKey?.toData() ?? Data()
-        let data = key.secureData.toData() + wrappedKey
+        guard let wrappedKey else {
+            preconditionFailure("TLSWrap.cryptV2 requires a wrappedKey")
+        }
+        let data = key.secureData.toData() + wrappedKey.toData()
         let base64 = data.base64EncodedString()
         let base64Lines = stride(from: 0, to: base64.count, by: 64).map { start -> String in
             let begin = base64.index(base64.startIndex, offsetBy: start)

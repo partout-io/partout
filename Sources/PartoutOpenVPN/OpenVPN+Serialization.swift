@@ -27,7 +27,7 @@ extension OpenVPN.Configuration {
                 append("tls-crypt [inline]")
             case .cryptV2:
                 append("tls-crypt-v2 [inline]")
-                appendBlock(tag: tag, contents: wrap.asClientKeyV2FileContents())
+                appendBlock(tag: tag, contents: wrap.asCryptV2KeyContents())
                 return
             }
             appendBlock(tag: tag, contents: wrap.key.asFileContents())
