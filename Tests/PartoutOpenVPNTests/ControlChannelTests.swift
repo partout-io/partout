@@ -24,6 +24,93 @@ struct ControlChannelTests {
     }
 
     @Test
+    func givenPlainChannel_whenSplitControlPacket_thenKeepsOriginalCodeOnAllPackets() throws {
+        let channel = ControlChannel(.global, prng: MockPRNG())
+        let payload = Data(Array(repeating: 1, count: 6))
+
+        channel.reset(forNewSession: true)
+        try channel.enqueueOutboundPackets(
+            withCode: .controlV1,
+            key: 0,
+            payload: payload,
+            maxPayloadBytesPerPacket: 4
+        )
+
+        let packets = try channel.writeOutboundPackets(resendAfter: 0)
+        #expect(packets.count == 2)
+        #expect(packets[0].first.map { $0 >> 3 } == CPacketCode.controlV1.rawValue)
+        #expect(packets[1].first.map { $0 >> 3 } == CPacketCode.controlV1.rawValue)
+    }
+
+    @Test
+    func givenTLSAuthChannel_whenSplitControlPacket_thenRoundTripsPayload() throws {
+        let keyData = Data((0..<256).map(UInt8.init))
+        let clientChannel = try ControlChannel(
+            .global,
+            prng: MockPRNG(),
+            authKey: .init(data: keyData, direction: .client),
+            digest: .sha256
+        )
+        let serverChannel = try ControlChannel(
+            .global,
+            prng: MockPRNG(),
+            authKey: .init(data: keyData, direction: .server),
+            digest: .sha256
+        )
+        let payload = Data(Array(repeating: 7, count: 6))
+
+        clientChannel.reset(forNewSession: true)
+        try clientChannel.enqueueOutboundPackets(
+            withCode: .controlV1,
+            key: 0,
+            payload: payload,
+            maxPayloadBytesPerPacket: 4
+        )
+
+        let rawPackets = try clientChannel.writeOutboundPackets(resendAfter: 0)
+        let decodedPackets = try rawPackets.map {
+            try serverChannel.readInboundPacket(withData: $0, offset: 0)
+        }
+
+        #expect(decodedPackets.count == 2)
+        #expect(decodedPackets.allSatisfy { $0.code == .controlV1 })
+        #expect(reassembledPayload(from: decodedPackets) == payload)
+    }
+
+    @Test
+    func givenTLSCryptChannel_whenSplitControlPacket_thenRoundTripsPayload() throws {
+        let keyData = Data((0..<256).map(UInt8.init))
+        let clientChannel = try ControlChannel(
+            .global,
+            prng: MockPRNG(),
+            cryptKey: .init(data: keyData, direction: .client)
+        )
+        let serverChannel = try ControlChannel(
+            .global,
+            prng: MockPRNG(),
+            cryptKey: .init(data: keyData, direction: .server)
+        )
+        let payload = Data(Array(repeating: 9, count: 6))
+
+        clientChannel.reset(forNewSession: true)
+        try clientChannel.enqueueOutboundPackets(
+            withCode: .controlV1,
+            key: 0,
+            payload: payload,
+            maxPayloadBytesPerPacket: 4
+        )
+
+        let rawPackets = try clientChannel.writeOutboundPackets(resendAfter: 0)
+        let decodedPackets = try rawPackets.map {
+            try serverChannel.readInboundPacket(withData: $0, offset: 0)
+        }
+
+        #expect(decodedPackets.count == 2)
+        #expect(decodedPackets.allSatisfy { $0.code == .controlV1 })
+        #expect(reassembledPayload(from: decodedPackets) == payload)
+    }
+
+    @Test
     func givenTLSCryptV2Channel_whenWriteResetPacket_thenAppendsWrappedKey() throws {
         let wrappedKey = SecureData(Data([0xde, 0xad, 0xbe, 0xef]))
         let channel = try ControlChannel(
@@ -111,6 +198,14 @@ private extension ControlChannelTests {
         }
 
         return handled
+    }
+
+    func reassembledPayload(from packets: [CrossPacket]) -> Data {
+        packets.reduce(into: Data()) { data, packet in
+            if let payload = packet.payload {
+                data.append(payload)
+            }
+        }
     }
 }
 
