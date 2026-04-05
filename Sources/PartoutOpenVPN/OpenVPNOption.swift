@@ -72,6 +72,8 @@ extension OpenVPN {
 
         case eku = "^remote-cert-tls +server"
 
+        case verifyX509Name = "^verify-x509-name +.+"
+
         case remoteRandom = "^remote-random$"
 
         case remoteRandomHostname = "^remote-random-hostname"

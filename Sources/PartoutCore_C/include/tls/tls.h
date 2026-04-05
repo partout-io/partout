@@ -24,15 +24,21 @@ typedef enum {
     PPTLSErrorServerHost
 } pp_tls_error_code;
 
+typedef enum {
+    PPTLSX509NameNone,
+    PPTLSX509NameSANHost,
+    PPTLSX509NameSubject
+} pp_tls_x509_name_type;
+
 typedef struct {
     int sec_level;
     size_t buf_len;
     bool eku;
-    bool san_host;
+    pp_tls_x509_name_type x509_name_type;
     const char *_Nonnull ca_path;
     const char *_Nullable cert_pem;
     const char *_Nullable key_pem;
-    const char *_Nullable hostname;
+    const char *_Nullable x509_name;
     void *_Nullable ctx;
     void (*_Nonnull on_verify_failure)(void *_Nullable ctx);
 } pp_tls_options;
@@ -42,11 +48,11 @@ typedef struct _pp_tls *pp_tls;
 pp_tls_options *_Nonnull pp_tls_options_create(int sec_level,
                                                size_t buf_len,
                                                bool eku,
-                                               bool san_host,
+                                               pp_tls_x509_name_type x509_name_type,
                                                const char *_Nonnull ca_path,
                                                const char *_Nullable cert_pem,
                                                const char *_Nullable key_pem,
-                                               const char *_Nullable hostname,
+                                               const char *_Nullable x509_name,
                                                void *_Nullable ctx,
                                                void (*_Nonnull on_verify_failure)(void *_Nullable ctx));
 

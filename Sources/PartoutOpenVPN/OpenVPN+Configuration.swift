@@ -172,6 +172,12 @@ extension OpenVPN {
         /// - Seealso: `Configuration.Builder.sanHost`
         public let sanHost: String?
 
+        /// - Seealso: `Configuration.Builder.checksX509Subject`
+        public let checksX509Subject: Bool?
+
+        /// - Seealso: `Configuration.Builder.x509Subject`
+        public let x509Subject: String?
+
         /// - Seealso: `Configuration.Builder.randomizeEndpoint`
         public let randomizeEndpoint: Bool?
 
@@ -332,6 +338,12 @@ extension OpenVPN.Configuration {
         /// The server hostname used for checking certificate SAN.
         public var sanHost: String?
 
+        /// If true, checks if certificate subject matches `x509Subject`.
+        public var checksX509Subject: Bool?
+
+        /// The exact subject DN used for `verify-x509-name ... subject`.
+        public var x509Subject: String?
+
         /// Picks endpoint from `remotes` randomly.
         public var randomizeEndpoint: Bool?
 
@@ -455,6 +467,18 @@ extension OpenVPN.Configuration {
                 guard !(remotes?.isEmpty ?? true) else {
                     throw PartoutError.invalidFields(["remotes": nil])
                 }
+                guard !(checksSANHost ?? false) || sanHost != nil else {
+                    throw PartoutError.invalidFields(["sanHost": nil])
+                }
+                guard !(checksX509Subject ?? false) || x509Subject != nil else {
+                    throw PartoutError.invalidFields(["x509Subject": nil])
+                }
+                guard !((checksSANHost ?? false) && (checksX509Subject ?? false)) else {
+                    throw PartoutError.invalidFields([
+                        "checksSANHost": "conflicts with checksX509Subject",
+                        "checksX509Subject": "conflicts with checksSANHost"
+                    ])
+                }
                 fallbackCipher = cipher ?? .aes128cbc
             } else {
                 fallbackCipher = cipher
@@ -477,6 +501,8 @@ extension OpenVPN.Configuration {
                 checksEKU: checksEKU,
                 checksSANHost: checksSANHost,
                 sanHost: sanHost,
+                checksX509Subject: checksX509Subject,
+                x509Subject: x509Subject,
                 randomizeEndpoint: randomizeEndpoint,
                 randomizeHostnames: randomizeHostnames,
                 usesPIAPatches: usesPIAPatches,
@@ -535,6 +561,8 @@ extension OpenVPN.Configuration {
         builder.checksEKU = checksEKU
         builder.checksSANHost = checksSANHost
         builder.sanHost = sanHost
+        builder.checksX509Subject = checksX509Subject
+        builder.x509Subject = x509Subject
         builder.randomizeEndpoint = randomizeEndpoint
         builder.randomizeHostnames = randomizeHostnames
         builder.usesPIAPatches = usesPIAPatches
@@ -645,6 +673,11 @@ extension OpenVPN.Configuration {
             pp_log(ctx, .openvpn, .notice, "\tHost SAN verification: enabled (\(sanHost?.asSensitiveAddress(ctx) ?? "-"))")
         } else if isLocal {
             pp_log(ctx, .openvpn, .notice, "\tHost SAN verification: disabled")
+        }
+        if checksX509Subject ?? false {
+            pp_log(ctx, .openvpn, .notice, "\tSubject DN verification: enabled (\(x509Subject ?? "-"))")
+        } else if isLocal {
+            pp_log(ctx, .openvpn, .notice, "\tSubject DN verification: disabled")
         }
 
         if randomizeEndpoint ?? false {

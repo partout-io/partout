@@ -38,16 +38,26 @@ private final class NativeTLSWrapper: TLSProtocol {
 
         let securityLevel = parameters.cfg.tlsSecurityLevel
         let checksEKU = parameters.cfg.checksEKU ?? false
-        let checksSANHost = parameters.cfg.checksSANHost ?? false
+        let x509NameType: pp_tls_x509_name_type
         let caPath = caURLFilePath.withCString(pp_dup)
         let certPEM = parameters.cfg.clientCertificate?.pem.withCString(pp_dup)
         let keyPEM = parameters.cfg.clientKey?.pem.withCString(pp_dup)
-        let hostname = parameters.cfg.sanHost?.withCString(pp_dup)
+        let x509Name: UnsafeMutablePointer<CChar>?
+        if parameters.cfg.checksX509Subject ?? false {
+            x509NameType = PPTLSX509NameSubject
+            x509Name = parameters.cfg.x509Subject?.withCString(pp_dup)
+        } else if parameters.cfg.checksSANHost ?? false {
+            x509NameType = PPTLSX509NameSANHost
+            x509Name = parameters.cfg.sanHost?.withCString(pp_dup)
+        } else {
+            x509NameType = PPTLSX509NameNone
+            x509Name = nil
+        }
         defer {
             pp_free(caPath)
             pp_free(certPEM)
             pp_free(keyPEM)
-            pp_free(hostname)
+            pp_free(x509Name)
         }
 
         let didFailVerification = PassthroughStream<Void>()
@@ -55,11 +65,11 @@ private final class NativeTLSWrapper: TLSProtocol {
             Int32(securityLevel ?? Constants.defaultSecurityLevel),
             Constants.bufferLength,
             checksEKU,
-            checksSANHost,
+            x509NameType,
             caPath,
             certPEM,
             keyPEM,
-            hostname,
+            x509Name,
             Unmanaged.passUnretained(didFailVerification).toOpaque(),
             { ctx in
                 guard let ctx else { return }

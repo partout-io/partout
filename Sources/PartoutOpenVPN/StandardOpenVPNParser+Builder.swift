@@ -30,6 +30,8 @@ extension StandardOpenVPNParser {
         private var authUserPass = false
         private var staticChallenge = false
         private var optChecksEKU: Bool?
+        private var optSANHost: String?
+        private var optX509Subject: String?
         private var optRandomizeEndpoint: Bool?
         private var optRandomizeHostnames: Bool?
         private var optMTU: Int?
@@ -317,6 +319,35 @@ extension StandardOpenVPNParser.Builder {
 
         case .eku:
             optChecksEKU = true
+
+        case .verifyX509Name:
+            let prefix = "verify-x509-name "
+            guard line.hasPrefix(prefix) else {
+                break
+            }
+            let argument = String(line.dropFirst(prefix.count))
+            let type: String
+            let value: String
+            if argument.hasSuffix(" name") {
+                type = "name"
+                value = String(argument.dropLast(" name".count))
+            } else if argument.hasSuffix(" subject") {
+                type = "subject"
+                value = String(argument.dropLast(" subject".count))
+            } else if argument.hasSuffix(" name-prefix") {
+                throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
+            } else {
+                type = "subject"
+                value = argument
+            }
+            switch type {
+            case "name":
+                optSANHost = value
+            case "subject":
+                optX509Subject = value
+            default:
+                throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
+            }
 
         case .remoteRandom:
             optRandomizeEndpoint = true
@@ -647,6 +678,14 @@ extension StandardOpenVPNParser.Builder {
 
         builder.authUserPass = authUserPass
         builder.checksEKU = optChecksEKU
+        if let optSANHost {
+            builder.checksSANHost = true
+            builder.sanHost = optSANHost
+        }
+        if let optX509Subject {
+            builder.checksX509Subject = true
+            builder.x509Subject = optX509Subject
+        }
         builder.randomizeEndpoint = optRandomizeEndpoint
         builder.randomizeHostnames = optRandomizeHostnames
         builder.mtu = optMTU

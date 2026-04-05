@@ -128,4 +128,32 @@ MIIB
             try module.serialized()
         }
     }
+
+    @Test
+    func givenModuleWithSubjectVerification_whenSerialize_thenPreservesSubject() throws {
+        let subject = "C=KG, ST=NA, L=Bishkek, CN=Server-1"
+
+        var builder = OpenVPNModule.Builder()
+        var configuration = OpenVPN.Configuration.Builder()
+        configuration.ca = OpenVPN.CryptoContainer(pem: """
+-----BEGIN CERTIFICATE-----
+MIIB
+-----END CERTIFICATE-----
+""")
+        configuration.remotes = [
+            try ExtendedEndpoint("vpn.example.com", .init(.udp, 1194))
+        ]
+        configuration.checksX509Subject = true
+        configuration.x509Subject = subject
+        builder.configurationBuilder = configuration
+
+        let module = try builder.build()
+        let serialized = try module.serialized()
+        #expect(serialized.contains("verify-x509-name \(subject) subject"))
+
+        let parsed = try StandardOpenVPNParser(decrypter: nil).parsed(fromContents: serialized).configuration
+        #expect(parsed.checksX509Subject == true)
+        #expect(parsed.x509Subject == subject)
+        #expect(parsed.checksSANHost != true)
+    }
 }

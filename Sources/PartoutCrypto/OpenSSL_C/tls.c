@@ -202,6 +202,7 @@ bool pp_tls_is_connected(pp_tls _Nonnull tls) {
 
 bool pp_tls_verify_ssl_eku(SSL *_Nonnull ssl);
 bool pp_tls_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hostname);
+bool pp_tls_verify_ssl_subject(SSL *_Nonnull ssl, const char *_Nonnull subject);
 
 pp_zd *_Nullable pp_tls_pull_cipher(pp_tls _Nonnull tls,
                                                   pp_tls_error_code *_Nullable error) {
@@ -220,9 +221,17 @@ pp_zd *_Nullable pp_tls_pull_cipher(pp_tls _Nonnull tls,
             }
             return NULL;
         }
-        if (tls->opt->san_host) {
-            pp_assert(tls->opt->hostname);
-            if (!pp_tls_verify_ssl_san_host(tls->ssl, tls->opt->hostname)) {
+        if (tls->opt->x509_name_type == PPTLSX509NameSANHost) {
+            pp_assert(tls->opt->x509_name);
+            if (!pp_tls_verify_ssl_san_host(tls->ssl, tls->opt->x509_name)) {
+                if (error) {
+                    *error = PPTLSErrorServerHost;
+                }
+                return NULL;
+            }
+        } else if (tls->opt->x509_name_type == PPTLSX509NameSubject) {
+            pp_assert(tls->opt->x509_name);
+            if (!pp_tls_verify_ssl_subject(tls->ssl, tls->opt->x509_name)) {
                 if (error) {
                     *error = PPTLSErrorServerHost;
                 }
@@ -422,6 +431,45 @@ bool pp_tls_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hostname
 
 failure:
     if (names) GENERAL_NAMES_free(names);
+    if (cert) X509_free(cert);
+    return false;
+}
+
+bool pp_tls_verify_ssl_subject(SSL *_Nonnull ssl, const char *_Nonnull subject) {
+    X509 *cert = NULL;
+    BIO *bio = NULL;
+    BUF_MEM *buffer = NULL;
+
+    cert = SSL_get1_peer_certificate(ssl);
+    if (!cert) {
+        goto failure;
+    }
+    bio = BIO_new(BIO_s_mem());
+    if (!bio) {
+        goto failure;
+    }
+    if (X509_NAME_print_ex(
+        bio,
+        X509_get_subject_name(cert),
+        0,
+        XN_FLAG_SEP_CPLUS_SPC | XN_FLAG_FN_SN | ASN1_STRFLGS_UTF8_CONVERT | ASN1_STRFLGS_ESC_CTRL
+    ) < 0) {
+        goto failure;
+    }
+    BIO_get_mem_ptr(bio, &buffer);
+    if (!buffer || !buffer->data) {
+        goto failure;
+    }
+    const size_t subject_len = strlen(subject);
+    const bool is_valid = subject_len == buffer->length
+        && strncmp(buffer->data, subject, subject_len) == 0;
+
+    BIO_free(bio);
+    X509_free(cert);
+    return is_valid;
+
+failure:
+    if (bio) BIO_free(bio);
     if (cert) X509_free(cert);
     return false;
 }
