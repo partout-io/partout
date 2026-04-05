@@ -42,7 +42,7 @@ extension OpenVPN {
 }
 
 extension OpenVPN.TLSWrap {
-    static func clientKeyV2(lines: [Substring]) -> (key: OpenVPN.StaticKey, wrappedKey: SecureData)? {
+    public init?(withCryptV2KeyLines lines: [Substring]) {
         var isHead = true
         var base64Lines: [Substring] = []
         for line in lines {
@@ -70,7 +70,11 @@ extension OpenVPN.TLSWrap {
             direction: .client
         )
         let wrappedKey = SecureData(keyData.subdata(in: 256..<keyData.count))
-        return (staticKey, wrappedKey)
+        self.init(
+            strategy: .cryptV2,
+            key: staticKey,
+            wrappedKey: wrappedKey
+        )
     }
 
     func asClientKeyV2FileContents() -> String {

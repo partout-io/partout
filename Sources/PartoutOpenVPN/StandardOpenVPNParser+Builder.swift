@@ -625,12 +625,8 @@ extension StandardOpenVPNParser.Builder {
                 }
 
             case .cryptV2:
-                if let v2Key = OpenVPN.TLSWrap.clientKeyV2(lines: keyLines) {
-                    builder.tlsWrap = OpenVPN.TLSWrap(
-                        strategy: strategy,
-                        key: v2Key.key,
-                        wrappedKey: v2Key.wrappedKey
-                    )
+                if let tlsWrap = OpenVPN.TLSWrap(withCryptV2KeyLines: keyLines) {
+                    builder.tlsWrap = tlsWrap
                 }
 
             @unknown default:
