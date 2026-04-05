@@ -20,7 +20,8 @@ struct Constants {
     }
 
     enum ControlChannel {
-        static let maxPacketSize = 1000
+        // Applies to control payload bytes before control/TLS framing overhead is added.
+        static let maxPayloadBytesPerPacket = 1000
 
         static let earlyNegotiationFlagsType: UInt16 = 0x0001
 

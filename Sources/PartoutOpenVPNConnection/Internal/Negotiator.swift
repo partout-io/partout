@@ -315,17 +315,18 @@ private extension Negotiator {
     func enqueueControlPackets(code: CrossPacketCode, key: UInt8, payload: Data) throws {
         let leadingCode: CrossPacketCode
         let trailingCode: CrossPacketCode
-        let leadingMaxPacketSize: Int
+        let leadingPayloadByteLimit: Int
         if code == .controlV1, shouldResendWrappedKey {
             shouldResendWrappedKey = false
             leadingCode = .controlWkcV1
             trailingCode = .controlV1
             let wrappedKeyLength = options.configuration.tlsWrap?.wrappedKey?.count ?? 0
-            leadingMaxPacketSize = max(0, Constants.ControlChannel.maxPacketSize - wrappedKeyLength)
+            // The budget is expressed in ciphertext payload bytes before control/TLS framing.
+            leadingPayloadByteLimit = Constants.ControlChannel.maxPayloadBytesPerPacket - wrappedKeyLength
         } else {
             leadingCode = code
             trailingCode = code
-            leadingMaxPacketSize = Constants.ControlChannel.maxPacketSize
+            leadingPayloadByteLimit = Constants.ControlChannel.maxPayloadBytesPerPacket
         }
 
         try channel.enqueueOutboundPackets(
@@ -333,8 +334,8 @@ private extension Negotiator {
             trailingCode: trailingCode,
             key: key,
             payload: payload,
-            leadingMaxPacketSize: leadingMaxPacketSize,
-            maxPacketSize: Constants.ControlChannel.maxPacketSize
+            leadingPayloadByteLimit: leadingPayloadByteLimit,
+            trailingPayloadByteLimit: Constants.ControlChannel.maxPayloadBytesPerPacket
         )
         try flushControlQueue()
     }

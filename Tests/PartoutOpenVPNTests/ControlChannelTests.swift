@@ -38,7 +38,7 @@ struct ControlChannelTests {
             withCode: .hardResetClientV3,
             key: 0,
             payload: Data(),
-            maxPacketSize: Constants.ControlChannel.maxPacketSize
+            maxPayloadBytesPerPacket: Constants.ControlChannel.maxPayloadBytesPerPacket
         )
 
         let raw = try #require(channel.writeOutboundPackets(resendAfter: 0).first)
@@ -63,8 +63,8 @@ struct ControlChannelTests {
             trailingCode: .controlV1,
             key: 0,
             payload: payload,
-            leadingMaxPacketSize: 1,
-            maxPacketSize: 4
+            leadingPayloadByteLimit: 1,
+            trailingPayloadByteLimit: 4
         )
 
         let packets = try channel.writeOutboundPackets(resendAfter: 0)
@@ -75,6 +75,23 @@ struct ControlChannelTests {
         #expect(packets[0].suffix(wrappedKey.count) == wrappedKey.toData())
         #expect(packets[1].suffix(wrappedKey.count) != wrappedKey.toData())
         #expect(packets[2].suffix(wrappedKey.count) != wrappedKey.toData())
+    }
+
+    @Test
+    func givenNonPositiveLeadingPayloadBudget_whenSplitPackets_thenFails() throws {
+        let channel = ControlChannel(.global, prng: MockPRNG())
+
+        channel.reset(forNewSession: true)
+        #expect(throws: Error.self) {
+            try channel.enqueueOutboundPackets(
+                withLeadingCode: .controlWkcV1,
+                trailingCode: .controlV1,
+                key: 0,
+                payload: Data([1]),
+                leadingPayloadByteLimit: 0,
+                trailingPayloadByteLimit: 4
+            )
+        }
     }
 }
 
