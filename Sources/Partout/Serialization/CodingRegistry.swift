@@ -14,7 +14,7 @@ public final class CodingRegistry {
     public init(
         registry: Registry,
         withLegacyEncoding: @escaping @Sendable () -> Bool,
-        customModuleHandler: TaggedProfile.CustomModuleHandler?
+        customModuleHandler: TaggedProfile.CustomModuleHandler? = nil
     ) {
         self.registry = registry
         self.withLegacyEncoding = withLegacyEncoding
