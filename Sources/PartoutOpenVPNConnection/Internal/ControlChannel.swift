@@ -168,10 +168,7 @@ extension ControlChannel {
             currentPacketId.outbound += 1
             offset += subPayloadLength
             queuedPayloadByteCount += subPayloadLength
-
-            if offset >= payload.count {
-                break
-            }
+            guard offset < payload.count else { break }
             isLeadingPacket = false
         }
 
