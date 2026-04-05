@@ -95,6 +95,10 @@ components:
         - https
         - tls
       type: string
+      x-enum-varnames:
+        - cleartext
+        - https
+        - tls
     Endpoint:
       type: string
     EndpointProtocol:
@@ -159,13 +163,20 @@ components:
       type: object
     IPSocketType:
       enum:
+        - UDP
+        - TCP
+        - UDP4
+        - TCP4
+        - UDP6
+        - TCP6
+      type: string
+      x-enum-varnames:
         - udp
         - tcp
         - udp4
         - tcp4
         - udp6
         - tcp6
-      type: string
     Int16:
       type: integer
     Int32:
@@ -203,21 +214,35 @@ components:
         - mobile
         - ethernet
       type: string
+      x-enum-varnames:
+        - mobile
+        - ethernet
     OnDemandModule.Policy:
       enum:
         - any
         - including
         - excluding
       type: string
+      x-enum-varnames:
+        - any
+        - including
+        - excluding
     OpenVPN.Cipher:
       enum:
+        - "AES-128-CBC"
+        - "AES-192-CBC"
+        - "AES-256-CBC"
+        - "AES-128-GCM"
+        - "AES-192-GCM"
+        - "AES-256-GCM"
+      type: string
+      x-enum-varnames:
         - aes128cbc
         - aes192cbc
         - aes256cbc
         - aes128gcm
         - aes192gcm
         - aes256gcm
-      type: string
     OpenVPN.CompressionAlgorithm:
       enum:
         - 0
@@ -367,6 +392,10 @@ components:
         - append
         - encode
       type: string
+      x-enum-varnames:
+        - none
+        - append
+        - encode
     OpenVPN.CryptoContainer:
       additionalProperties: false
       properties:
@@ -377,12 +406,18 @@ components:
       type: object
     OpenVPN.Digest:
       enum:
+        - SHA1
+        - SHA224
+        - SHA256
+        - SHA384
+        - SHA512
+      type: string
+      x-enum-varnames:
         - sha1
         - sha224
         - sha256
         - sha384
         - sha512
-      type: string
     OpenVPN.ObfuscationMethod:
       discriminator:
         mapping:
@@ -453,12 +488,20 @@ components:
         - dns
         - proxy
       type: string
+      x-enum-varnames:
+        - routes
+        - dns
+        - proxy
     OpenVPN.RoutingPolicy:
       enum:
         - IPv4
         - IPv6
         - blockLocal
       type: string
+      x-enum-varnames:
+        - IPv4
+        - IPv6
+        - blockLocal
     OpenVPN.StaticKey:
       additionalProperties: false
       properties:
@@ -493,6 +536,9 @@ components:
         - auth
         - crypt
       type: string
+      x-enum-varnames:
+        - auth
+        - crypt
     OpenVPNModule:
       additionalProperties: false
       properties:
@@ -529,9 +575,12 @@ components:
       type: string
     SocketType:
       enum:
+        - UDP
+        - TCP
+      type: string
+      x-enum-varnames:
         - udp
         - tcp
-      type: string
     Subnet:
       type: string
     TaggedModule:

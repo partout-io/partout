@@ -523,4 +523,5 @@ enum FoundationCompatibility {
 
 package.dependencies.append(
     .package(url: "https://github.com/partout-io/codegen", branch: "master")
+    // .package(path: "../../../codegen")
 )
