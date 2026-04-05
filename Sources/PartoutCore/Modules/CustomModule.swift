@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-/// A type-erased ``Module`` for external implementors.
+/// A type-erased ``Module`` for encoding external implementations.
 public struct CustomModule: Module, Hashable, Codable {
     public static let moduleType = ModuleType("Custom")
 
