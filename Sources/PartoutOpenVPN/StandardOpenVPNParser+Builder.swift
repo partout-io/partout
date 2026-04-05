@@ -96,7 +96,10 @@ extension StandardOpenVPNParser.Builder {
                     guard let direction = Int(components[2]) else {
                         throw StandardOpenVPNParserError.malformed(option: "tls-auth key direction must be numeric")
                     }
-                    optKeyDirection = OpenVPN.StaticKey.Direction(rawValue: direction)
+                    guard let parsedDirection = OpenVPN.StaticKey.Direction(rawValue: direction) else {
+                        throw StandardOpenVPNParserError.malformed(option: "tls-auth key direction must be 0 or 1")
+                    }
+                    optKeyDirection = parsedDirection
                 }
             }
             optTLSStrategy = .auth
