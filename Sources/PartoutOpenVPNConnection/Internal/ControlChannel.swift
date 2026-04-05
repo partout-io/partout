@@ -111,21 +111,51 @@ extension ControlChannel {
         }
     }
 
-    func enqueueOutboundPackets(withCode code: CrossPacketCode, key: UInt8, payload: Data, maxPacketSize: Int) throws {
+    func enqueueOutboundPackets(withCode code: CrossPacketCode, key: UInt8, payload: Data, maxPayloadBytesPerPacket: Int) throws {
+        try enqueueOutboundPackets(
+            withLeadingCode: code,
+            trailingCode: code,
+            key: key,
+            payload: payload,
+            leadingPayloadByteLimit: maxPayloadBytesPerPacket,
+            trailingPayloadByteLimit: maxPayloadBytesPerPacket
+        )
+    }
+
+    func enqueueOutboundPackets(
+        withLeadingCode leadingCode: CrossPacketCode,
+        trailingCode: CrossPacketCode,
+        key: UInt8,
+        payload: Data,
+        leadingPayloadByteLimit: Int,
+        trailingPayloadByteLimit: Int
+    ) throws {
         guard let sessionId else {
             pp_log(ctx, .openvpn, .fault, "Control: Missing sessionId, do reset(forNewSession: true) first")
             throw OpenVPNSessionError.assertion
         }
+        if payload.count > 0 {
+            guard leadingPayloadByteLimit > 0 else {
+                throw OpenVPNSessionError.controlChannel(message: "Leading control payload budget must be positive")
+            }
+            guard trailingPayloadByteLimit > 0 else {
+                throw OpenVPNSessionError.controlChannel(message: "Trailing control payload budget must be positive")
+            }
+        }
 
         let oldIdOut = currentPacketId.outbound
-        var queuedCount = 0
+        var queuedPayloadByteCount = 0
         var offset = 0
+        var isLeadingPacket = true
 
-        repeat {
-            let subPayloadLength = min(maxPacketSize, payload.count - offset)
+        while true {
+            let packetCode = isLeadingPacket ? leadingCode : trailingCode
+            let payloadByteLimit = isLeadingPacket ? leadingPayloadByteLimit : trailingPayloadByteLimit
+            let remainingPayloadLength = payload.count - offset
+            let subPayloadLength = min(payloadByteLimit, remainingPayloadLength)
             let subPayloadData = payload.subdata(offset: offset, count: subPayloadLength)
             let packet = CrossPacket(
-                code: code,
+                code: packetCode,
                 key: key,
                 sessionId: sessionId,
                 packetId: currentPacketId.outbound,
@@ -136,11 +166,13 @@ extension ControlChannel {
 
             queue.outbound.append(packet)
             currentPacketId.outbound += 1
-            offset += maxPacketSize
-            queuedCount += subPayloadLength
-        } while offset < payload.count
+            offset += subPayloadLength
+            queuedPayloadByteCount += subPayloadLength
+            guard offset < payload.count else { break }
+            isLeadingPacket = false
+        }
 
-        assert(queuedCount == payload.count)
+        assert(queuedPayloadByteCount == payload.count)
 
         // packet count
         let packetCount = currentPacketId.outbound - oldIdOut

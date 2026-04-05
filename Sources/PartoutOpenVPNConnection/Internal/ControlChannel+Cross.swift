@@ -19,4 +19,17 @@ extension ControlChannel {
     ) throws {
         self.init(ctx, prng: prng, serializer: try CryptSerializer(ctx, key: key))
     }
+
+    convenience init(
+        _ ctx: PartoutLoggerContext,
+        prng: PRNGProtocol,
+        cryptV2Key key: OpenVPN.StaticKey,
+        wrappedKey: SecureData
+    ) throws {
+        self.init(
+            ctx,
+            prng: prng,
+            serializer: try CryptV2Serializer(ctx, key: key, wrappedKey: wrappedKey)
+        )
+    }
 }

@@ -85,7 +85,19 @@ extension StandardOpenVPNParser.Builder {
         case .externalFiles:
             throw StandardOpenVPNParserError.unsupportedConfiguration(option: "external file: \"\(line)\"")
         case .tlsCryptV2:
-            throw StandardOpenVPNParserError.unsupportedConfiguration(option: "tls-crypt-v2")
+            if components.count > 1 {
+                let keyRef = components[1]
+                guard keyRef == "inline" || keyRef == "[inline]" else {
+                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: "external file: \"\(line)\"")
+                }
+                if components.count > 2 {
+                    let policy = components[2]
+                    guard policy == "force-cookie" || policy == "allow-noncookie" else {
+                        throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
+                    }
+                }
+            }
+            optTLSStrategy = .cryptV2
 
             // MARK: Continuation
 
@@ -147,6 +159,10 @@ extension StandardOpenVPNParser.Builder {
             case "tls-crypt":
                 optTLSKeyLines = currentBlock.map(Substring.init(_:))
                 optTLSStrategy = .crypt
+
+            case "tls-crypt-v2":
+                optTLSKeyLines = currentBlock.map(Substring.init(_:))
+                optTLSStrategy = .cryptV2
 
             default:
                 break
@@ -558,19 +574,28 @@ extension StandardOpenVPNParser.Builder {
         }
 
         if let keyLines = optTLSKeyLines, let strategy = optTLSStrategy {
-            let optKey: OpenVPN.StaticKey?
             switch strategy {
             case .auth:
-                optKey = OpenVPN.StaticKey(lines: keyLines, direction: optKeyDirection)
+                if let key = OpenVPN.StaticKey(lines: keyLines, direction: optKeyDirection) {
+                    builder.tlsWrap = OpenVPN.TLSWrap(strategy: strategy, key: key)
+                }
 
             case .crypt:
-                optKey = OpenVPN.StaticKey(lines: keyLines, direction: .client)
+                if let key = OpenVPN.StaticKey(lines: keyLines, direction: .client) {
+                    builder.tlsWrap = OpenVPN.TLSWrap(strategy: strategy, key: key)
+                }
+
+            case .cryptV2:
+                if let v2Key = OpenVPN.TLSWrap.clientKeyV2(lines: keyLines) {
+                    builder.tlsWrap = OpenVPN.TLSWrap(
+                        strategy: strategy,
+                        key: v2Key.key,
+                        wrappedKey: v2Key.wrappedKey
+                    )
+                }
 
             @unknown default:
-                optKey = nil
-            }
-            if let key = optKey {
-                builder.tlsWrap = OpenVPN.TLSWrap(strategy: strategy, key: key)
+                break
             }
         }
 

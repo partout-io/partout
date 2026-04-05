@@ -105,11 +105,25 @@ struct OpenVPNParserTests {
     }
 
     @Test
-    func givenTLSCryptV2_whenParse_thenFails() throws {
-        let lines = ["tls-crypt-v2-client"]
-        #expect(throws: Error.self) {
-            try parser.parsed(fromLines: lines)
+    func givenTLSCryptV2_whenParse_thenSucceeds() throws {
+        let wrappedKey = Data([0xaa, 0xbb, 0xcc, 0xdd])
+        let staticKeyData = Data((0..<256).map(UInt8.init))
+        let keyData = staticKeyData + wrappedKey
+        let lines = [
+            "tls-crypt-v2 [inline]",
+            "<tls-crypt-v2>",
+            pem(named: "OpenVPN tls-crypt-v2 client key", data: keyData),
+            "</tls-crypt-v2>"
+        ].flatMap {
+            $0.components(separatedBy: .newlines)
         }
+
+        let cfg = try parser.parsed(fromLines: lines).configuration
+        let tlsWrap = try #require(cfg.tlsWrap)
+        #expect(tlsWrap.strategy == .cryptV2)
+        #expect(tlsWrap.key.direction == .client)
+        #expect(tlsWrap.key.hexString == staticKeyData.toHex())
+        #expect(tlsWrap.wrappedKey?.toData() == wrappedKey)
     }
 
     // MARK: URL
@@ -232,6 +246,20 @@ extension OpenVPNParserTests {
 // MARK: - Helpers
 
 private extension OpenVPNParserTests {
+    func pem(named name: String, data: Data) -> String {
+        let base64 = data.base64EncodedString()
+        let lines = stride(from: 0, to: base64.count, by: 64).map { offset in
+            let start = base64.index(base64.startIndex, offsetBy: offset)
+            let end = base64.index(start, offsetBy: min(64, base64.count - offset))
+            return String(base64[start..<end])
+        }
+        return [
+            "-----BEGIN \(name)-----",
+            lines.joined(separator: "\n"),
+            "-----END \(name)-----"
+        ].joined(separator: "\n")
+    }
+
     func url(withName name: String) -> URL {
         guard let url = Bundle.module.url(forResource: name, withExtension: "ovpn") else {
             fatalError("Cannot find URL in bundle")

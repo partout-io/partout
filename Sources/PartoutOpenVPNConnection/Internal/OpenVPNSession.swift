@@ -525,6 +525,17 @@ private extension OpenVPNSession {
                     cryptKey: tlsWrap.key
                 )
 
+            case .cryptV2:
+                guard let wrappedKey = tlsWrap.wrappedKey else {
+                    throw OpenVPNSessionError.assertion
+                }
+                channel = try ControlChannel(
+                    ctx,
+                    prng: prng,
+                    cryptV2Key: tlsWrap.key,
+                    wrappedKey: wrappedKey
+                )
+
             @unknown default:
                 channel = ControlChannel(ctx, prng: prng)
             }
