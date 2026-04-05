@@ -19,3 +19,8 @@ public protocol ConfigurationDecoder {
 /// Implements both ``ConfigurationEncoder`` and ``ConfigurationDecoder``.
 public protocol ConfigurationCoder: ConfigurationEncoder, ConfigurationDecoder where EncodedConfiguration == DecodedConfiguration {
 }
+
+/// Represents a configuration that can be serialized as a textual profile.
+public protocol SerializableConfiguration {
+    func serialized() throws -> String
+}

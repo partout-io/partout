@@ -41,6 +41,7 @@ extension StandardOpenVPNParser {
         private var optIfconfig4Arguments: [String]?
         private var optIfconfig6Arguments: [String]?
         private var optGateway4Arguments: [String]?
+        private var optGateway6Arguments: [String]?
         private var optRoutes4: [Route4Group]?
         private var optRoutes6: [Route6Group]?
         private var optDNSServers: [String]?
@@ -69,7 +70,6 @@ extension StandardOpenVPNParser {
 // MARK: - Parsing
 
 extension StandardOpenVPNParser.Builder {
-
     @inlinable
     mutating func putOption(_ option: OpenVPN.Option, line: String, components: [String]) throws {
         switch option {
@@ -84,12 +84,28 @@ extension StandardOpenVPNParser.Builder {
             throw StandardOpenVPNParserError.unsupportedConfiguration(option: "proxy: \"\(line)\"")
         case .externalFiles:
             throw StandardOpenVPNParserError.unsupportedConfiguration(option: "external file: \"\(line)\"")
+        case .tlsAuth:
+            if components.count > 1 {
+                try Self.ensureInlineBlock(in: components, line: line)
+                if components.count > 2 {
+                    guard let direction = Int(components[2]) else {
+                        throw StandardOpenVPNParserError.malformed(option: "tls-auth key direction must be numeric")
+                    }
+                    guard let parsedDirection = OpenVPN.StaticKey.Direction(rawValue: direction) else {
+                        throw StandardOpenVPNParserError.malformed(option: "tls-auth key direction must be 0 or 1")
+                    }
+                    optKeyDirection = parsedDirection
+                }
+            }
+            optTLSStrategy = .auth
+        case .tlsCrypt:
+            if components.count > 1 {
+                try Self.ensureInlineBlock(in: components, line: line)
+            }
+            optTLSStrategy = .crypt
         case .tlsCryptV2:
             if components.count > 1 {
-                let keyRef = components[1]
-                guard keyRef == "inline" || keyRef == "[inline]" else {
-                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: "external file: \"\(line)\"")
-                }
+                try Self.ensureInlineBlock(in: components, line: line)
                 if components.count > 2 {
                     let policy = components[2]
                     guard policy == "force-cookie" || policy == "allow-noncookie" else {
@@ -149,7 +165,7 @@ extension StandardOpenVPNParser.Builder {
                 optClientCertificate = OpenVPN.CryptoContainer(pem: currentBlock.joined(separator: "\n"))
 
             case "key":
-                normalizeEncryptedPEMBlock(block: &currentBlock)
+                Self.normalizeEncryptedPEMBlock(block: &currentBlock)
                 optClientKey = OpenVPN.CryptoContainer(pem: currentBlock.joined(separator: "\n"))
 
             case "tls-auth":
@@ -287,9 +303,7 @@ extension StandardOpenVPNParser.Builder {
             optDefaultPort = UInt16(str)
 
         case .remote:
-            guard components.count > 1 else {
-                break
-            }
+            guard components.count > 1 else { break }
             let hostname = components[1]
             var port: UInt16?
             var proto: IPSocketType?
@@ -346,22 +360,19 @@ extension StandardOpenVPNParser.Builder {
             optTopology = components[1]
 
         case .ifconfig:
-            guard components.count > 1 else {
-                break
-            }
+            guard components.count > 1 else { break }
             var args = components
             args.removeFirst()
             optIfconfig4Arguments = args
 
         case .ifconfig6:
-            guard components.count > 1 else {
-                break
-            }
+            guard components.count > 1 else { break }
             var args = components
             args.removeFirst()
             optIfconfig6Arguments = args
 
         case .route:
+            guard components.count > 1 else { break }
             var args = components
             args.removeFirst()
             let routeEntryArguments = args
@@ -378,6 +389,7 @@ extension StandardOpenVPNParser.Builder {
             optRoutes4?.append((address, mask, gateway))
 
         case .route6:
+            guard components.count > 1 else { break }
             var args = components
             args.removeFirst()
             let routeEntryArguments = args
@@ -401,9 +413,16 @@ extension StandardOpenVPNParser.Builder {
             optRoutes6?.append((destination, prefix, gateway))
 
         case .gateway:
+            guard components.count > 1 else { break }
             var args = components
             args.removeFirst()
             optGateway4Arguments = args
+
+        case .gateway6:
+            guard components.count > 1 else { break }
+            var args = components
+            args.removeFirst()
+            optGateway6Arguments = args
 
         case .dns:
             guard components.count == 3 else {
@@ -485,10 +504,7 @@ extension StandardOpenVPNParser.Builder {
             // MARK: Extra
 
         case .xorInfo:
-            guard components.count > 1 else {
-                break
-            }
-
+            guard components.count > 1 else { break }
             switch components[1] {
             case "xormask":
                 if components.count > 2, let mask = SecureData(components[2]) {
@@ -573,6 +589,19 @@ extension StandardOpenVPNParser.Builder {
             builder.clientKey = optClientKey
         }
 
+        if let strategy = optTLSStrategy, optTLSKeyLines == nil {
+            switch strategy {
+            case .auth:
+                throw StandardOpenVPNParserError.malformed(option: "tls-auth requires inline key block")
+            case .crypt:
+                throw StandardOpenVPNParserError.malformed(option: "tls-crypt requires inline key block")
+            case .cryptV2:
+                throw StandardOpenVPNParserError.malformed(option: "tls-crypt-v2 requires inline key block")
+            @unknown default:
+                break
+            }
+        }
+
         if let keyLines = optTLSKeyLines, let strategy = optTLSStrategy {
             switch strategy {
             case .auth:
@@ -586,12 +615,8 @@ extension StandardOpenVPNParser.Builder {
                 }
 
             case .cryptV2:
-                if let v2Key = OpenVPN.TLSWrap.clientKeyV2(lines: keyLines) {
-                    builder.tlsWrap = OpenVPN.TLSWrap(
-                        strategy: strategy,
-                        key: v2Key.key,
-                        wrappedKey: v2Key.wrappedKey
-                    )
+                if let tlsWrap = OpenVPN.TLSWrap(withCryptV2KeyLines: keyLines) {
+                    builder.tlsWrap = tlsWrap
                 }
 
             @unknown default:
@@ -693,7 +718,8 @@ extension StandardOpenVPNParser.Builder {
             let gateway = tuple.gateway.map(Address.init(rawValue:)) ?? nil
             return Route(subnet, gateway)
         }
-        builder.routeGateway4 = defaultGateway4.map(Address.init(rawValue:)) ?? nil
+        let routeGateway4 = defaultGateway4 ?? optGateway4Arguments?.first
+        builder.routeGateway4 = routeGateway4.map(Address.init(rawValue:)) ?? nil
 
         let defaultGateway6: String?
         if let ifconfig6Arguments = optIfconfig6Arguments {
@@ -728,7 +754,8 @@ extension StandardOpenVPNParser.Builder {
             let gateway = tuple.gateway.map(Address.init(rawValue:)) ?? nil
             return Route(subnet, gateway)
         }
-        builder.routeGateway6 = defaultGateway6.map(Address.init(rawValue:)) ?? nil
+        let routeGateway6 = defaultGateway6 ?? optGateway6Arguments?.first
+        builder.routeGateway6 = routeGateway6.map(Address.init(rawValue:)) ?? nil
 
         builder.dnsServers = optDNSServers
         builder.dnsDomain = optDomain
@@ -828,15 +855,23 @@ private extension IPSocketType {
     }
 }
 
-private func normalizeEncryptedPEMBlock(block: inout [String]) {
-//    if block.count >= 1 && block[0].contains("ENCRYPTED") {
-//        return true
-//    }
-
-    // XXX: restore blank line after encryption header (easier than tweaking trimmedLines)
-    if block.count >= 3 && block[1].contains("Proc-Type") {
-        block.insert("", at: 3)
-//        return true
+private extension StandardOpenVPNParser.Builder {
+    static func ensureInlineBlock(in components: [String], line: String) throws {
+        let keyRef = components[1]
+        guard keyRef == "inline" || keyRef == "[inline]" else {
+            throw StandardOpenVPNParserError.unsupportedConfiguration(option: "external file: \"\(line)\"")
+        }
     }
-//    return false
+
+    static func normalizeEncryptedPEMBlock(block: inout [String]) {
+//        if block.count >= 1 && block[0].contains("ENCRYPTED") {
+//            return true
+//        }
+        // XXX: Restore blank line after encryption header (easier than tweaking trimmedLines)
+        if block.count >= 3 && block[1].contains("Proc-Type") {
+            block.insert("", at: 3)
+//            return true
+        }
+//        return false
+    }
 }

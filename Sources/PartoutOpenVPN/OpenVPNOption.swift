@@ -20,11 +20,15 @@ extension OpenVPN {
 
         case connectionProxy = "^\\w+-proxy"
 
-        case externalFiles = "^(auth-user-pass|ca|cert|key|tls-auth|tls-crypt) "
+        case externalFiles = "^(auth-user-pass|ca|cert|key) "
 
         case fragment = "^fragment"
 
-        case tlsCryptV2 = "^tls-crypt-v2( +[^\\s]+( +(force-cookie|allow-noncookie))?)?"
+        case tlsAuth = "^tls-auth( +.+)?"
+
+        case tlsCrypt = "^tls-crypt(?!-v2)( +.+)?"
+
+        case tlsCryptV2 = "^tls-crypt-v2( +.+)?"
 
         // MARK: General
 
@@ -68,7 +72,7 @@ extension OpenVPN {
 
         case eku = "^remote-cert-tls +server"
 
-        case remoteRandom = "^remote-random"
+        case remoteRandom = "^remote-random$"
 
         case remoteRandomHostname = "^remote-random-hostname"
 
@@ -93,6 +97,8 @@ extension OpenVPN {
         case route6 = "^route-ipv6 +[\\da-fA-F:]+/\\d+( +[\\da-fA-F:]+){0,2}"
 
         case gateway = "^route-gateway +[\\d\\.]+"
+
+        case gateway6 = "^route-ipv6-gateway +[\\da-fA-F:]+"
 
         case dns = "^dhcp-option +DNS6? +[\\d\\.a-fA-F:]+"
 

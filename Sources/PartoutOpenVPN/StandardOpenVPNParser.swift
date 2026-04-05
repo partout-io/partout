@@ -157,11 +157,15 @@ private extension StandardOpenVPNParser {
     }
 }
 
-// MARK: - ConfigurationDecoder
+// MARK: - ConfigurationCoder
 
-extension StandardOpenVPNParser: ConfigurationDecoder {
+extension StandardOpenVPNParser: ConfigurationCoder {
     public func configuration(from string: String) throws -> OpenVPN.Configuration {
         try parsed(fromContents: string).configuration
+    }
+
+    public func string(from configuration: OpenVPN.Configuration) throws -> String {
+        try configuration.asOvpnConfig()
     }
 }
 

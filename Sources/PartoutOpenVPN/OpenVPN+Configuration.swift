@@ -264,6 +264,12 @@ extension OpenVPN {
     }
 }
 
+extension OpenVPN.Configuration: SerializableConfiguration {
+    public func serialized() throws -> String {
+        try asOvpnConfig()
+    }
+}
+
 // MARK: - Builder
 
 extension OpenVPN.Configuration {

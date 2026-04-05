@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 /// A connection module providing an OpenVPN connection.
-public struct OpenVPNModule: Module, BuildableType, Hashable, Codable {
+public struct OpenVPNModule: SerializableModule, BuildableType, Hashable, Codable {
     public static let moduleType = ModuleType("OpenVPN")
 
     public let id: UniqueID
@@ -21,6 +21,10 @@ public struct OpenVPNModule: Module, BuildableType, Hashable, Codable {
         return configuration?.staticChallenge ?? requiresInteractiveCredentials ?? false
     }
 
+    public var preferredExtension: String {
+        "ovpn"
+    }
+
     fileprivate init(id: UniqueID, configuration: OpenVPN.Configuration?, credentials: OpenVPN.Credentials?, requiresInteractiveCredentials: Bool?) {
         self.id = id
         self.configuration = configuration
@@ -35,6 +39,13 @@ public struct OpenVPNModule: Module, BuildableType, Hashable, Codable {
             credentials: credentials,
             isInteractive: requiresInteractiveCredentials ?? false
         )
+    }
+
+    public func serialized() throws -> String {
+        guard let configuration else {
+            throw PartoutError(.incompleteModule, self)
+        }
+        return try configuration.serialized()
     }
 }
 
