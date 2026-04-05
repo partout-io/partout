@@ -2,6 +2,16 @@ components:
   schemas:
     Address:
       type: string
+    CustomModule:
+      additionalProperties: false
+      properties:
+        innerType:
+          "$ref": "#/components/schemas/ModuleType"
+        json: {}
+      required:
+        - innerType
+        - json
+      type: object
     DNSModule:
       additionalProperties: false
       properties:
@@ -527,6 +537,7 @@ components:
     TaggedModule:
       discriminator:
         mapping:
+          Custom: "#/components/schemas/TaggedModule.Custom"
           DNS: "#/components/schemas/TaggedModule.DNS"
           HTTPProxy: "#/components/schemas/TaggedModule.HTTPProxy"
           IP: "#/components/schemas/TaggedModule.IP"
@@ -539,6 +550,20 @@ components:
           type: string
       required:
         - type
+      type: object
+    TaggedModule.Custom:
+      additionalProperties: false
+      allOf:
+        - "$ref": "#/components/schemas/TaggedModule"
+      properties:
+        type:
+          const: Custom
+          type: string
+        value:
+          "$ref": "#/components/schemas/CustomModule"
+      required:
+        - type
+        - value
       type: object
     TaggedModule.DNS:
       additionalProperties: false

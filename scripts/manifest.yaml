@@ -9,6 +9,7 @@ paths:
   - PartoutWireGuard
 entities:
   - Address
+  - CustomModule
   - DNSModule
   - DNSModule.ProtocolType
   - DNSProtocol
