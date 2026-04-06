@@ -100,7 +100,7 @@ struct OnDemandModuleRulesTests {
             wifiRule.interfaceTypeMatch = .wiFi
             wifiRule.ssidMatch = ["home", "nope"]
             rules.append(wifiRule)
-            rules.append(NEOnDemandRuleIgnore())
+            rules.append(NEOnDemandRuleDisconnect())
             return rules
         }()
         #expect(sut.neRules == computedRules)
