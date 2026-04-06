@@ -69,7 +69,9 @@ MIIE
 
         let module = try builder.build()
         let serialized = try module.serialized()
-        #expect(serialized.contains("tls-auth [inline]"))
+        #expect(!serialized.contains("tls-auth [inline]"))
+        #expect(serialized.contains("key-direction 1"))
+        #expect(serialized.contains("<tls-auth>"))
         #expect(serialized.contains("verify-x509-name vpn.example.com name"))
         #expect(serialized.contains("route-gateway 10.8.0.1"))
         #expect(serialized.contains("route-ipv6-gateway 2001:db8::1"))
