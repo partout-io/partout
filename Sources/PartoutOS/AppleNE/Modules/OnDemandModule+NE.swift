@@ -8,7 +8,7 @@ extension OnDemandModule {
     func neRules(_ ctx: PartoutLoggerContext) -> [NEOnDemandRule] {
         var rules: [NEOnDemandRule] = []
 
-        // apply exceptions (unless .any)
+        // Apply exceptions (unless .any)
         if policy != .any {
             if Self.supportsCellular, withMobileNetwork {
                 if let rule = cellularRule() {
@@ -30,14 +30,13 @@ extension OnDemandModule {
             }
         }
 
-        // IMPORTANT: append fallback rule last
+        // IMPORTANT: Append fallback rule last
         rules.append(globalRule())
 
         pp_log(ctx, .os, .info, "On-demand rules:")
         rules.forEach {
             pp_log(ctx, .os, .info, "\($0)")
         }
-
         return rules
     }
 }
@@ -89,7 +88,7 @@ private extension OnDemandModule {
 
     func wifiRule(SSIDs: [String]) -> NEOnDemandRule {
         let rule = networkRule(matchingInterface: .wiFi)
-        rule.ssidMatch = SSIDs.sorted() // for testing
+        rule.ssidMatch = SSIDs.sorted() // Predictable, for testing
         return rule
     }
 }
