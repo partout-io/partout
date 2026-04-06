@@ -80,12 +80,8 @@ private extension NEIPv4Settings {
         newSettings.includedRoutes = (includedRoutes ?? []) + moreIncluded
         newSettings.excludedRoutes = (excludedRoutes ?? []) + moreExcluded
         if moreExcluded.contains(.default()) {
-            newSettings.includedRoutes?.removeAll {
-                $0 == .default()
-            }
-            newSettings.excludedRoutes?.removeAll {
-                $0 == .default()
-            }
+            newSettings.includedRoutes?.removeAll(where: \.isDefault)
+            newSettings.excludedRoutes?.removeAll(where: \.isDefault)
         }
 
         return newSettings
@@ -107,14 +103,22 @@ private extension NEIPv6Settings {
         newSettings.includedRoutes = (includedRoutes ?? []) + moreIncluded
         newSettings.excludedRoutes = (excludedRoutes ?? []) + moreExcluded
         if moreExcluded.contains(.default()) {
-            newSettings.includedRoutes?.removeAll {
-                $0 == .default()
-            }
-            newSettings.excludedRoutes?.removeAll {
-                $0 == .default()
-            }
+            newSettings.includedRoutes?.removeAll(where: \.isDefault)
+            newSettings.excludedRoutes?.removeAll(where: \.isDefault)
         }
 
         return newSettings
+    }
+}
+
+private extension NEIPv4Route {
+    var isDefault: Bool {
+        destinationAddress == Self.default().destinationAddress
+    }
+}
+
+private extension NEIPv6Route {
+    var isDefault: Bool {
+        destinationAddress == Self.default().destinationAddress
     }
 }
