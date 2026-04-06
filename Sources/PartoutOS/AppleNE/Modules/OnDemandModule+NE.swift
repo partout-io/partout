@@ -48,10 +48,14 @@ private extension OnDemandModule {
         case .any, .excluding:
             rule = NEOnDemandRuleConnect()
         case .including:
-            rule = NEOnDemandRuleIgnore()
+            rule = NEOnDemandRuleDisconnect()
         @unknown default:
             rule = NEOnDemandRuleConnect()
         }
+        // This might be the culprit, WG only matches .wiFi
+        // IIRC, when .any is set with .including policy (i.e. fall
+        // back to a disconnect rule), the profile could not
+        // activate (forcibly disconnected). Maybe only on iOS?
         rule.interfaceTypeMatch = .any
         return rule
     }
