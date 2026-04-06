@@ -17,20 +17,22 @@ extension OpenVPN.Configuration {
         }
 
         func appendStaticKey(_ wrap: OpenVPN.TLSWrap, tag: String) {
+            let blockContents: String
             switch wrap.strategy {
             case .auth:
-                append("tls-auth [inline]")
+//                append("tls-auth [inline]")
                 if let direction = wrap.key.direction {
                     append("key-direction \(direction.rawValue)")
                 }
+                blockContents = wrap.key.asFileContents()
             case .crypt:
-                append("tls-crypt [inline]")
+//                append("tls-crypt [inline]")
+                blockContents = wrap.key.asFileContents()
             case .cryptV2:
-                append("tls-crypt-v2 [inline]")
-                appendBlock(tag: tag, contents: wrap.asCryptV2KeyContents())
-                return
+//                append("tls-crypt-v2 [inline]")
+                blockContents = wrap.asCryptV2KeyContents()
             }
-            appendBlock(tag: tag, contents: wrap.key.asFileContents())
+            appendBlock(tag: tag, contents: blockContents)
         }
 
         func appendRoutingPolicies(_ policies: [OpenVPN.RoutingPolicy]) {
