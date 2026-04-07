@@ -15,6 +15,9 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     nonisolated(unsafe)
     private let sock: pp_socket
 
+    nonisolated(unsafe)
+    private var descriptor: UInt64?
+
     private let endpoint: ExtendedEndpoint?
 
     private let closesOnEmptyRead: Bool
@@ -79,10 +82,12 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
         maxReadLength: Int
     ) {
         self.ctx = ctx
-        let queueLabelContext = pp_socket_fd(sock).description
+        let newDescriptor = pp_socket_fd(sock)
+        let queueLabelContext = newDescriptor.description
         readQueue = DispatchQueue(label: "POSIXBlockingSocket[R:\(queueLabelContext)]")
         writeQueue = DispatchQueue(label: "POSIXBlockingSocket[W:\(queueLabelContext)]")
         self.sock = sock
+        descriptor = newDescriptor
         self.endpoint = endpoint
         self.closesOnEmptyRead = closesOnEmptyRead
         readBuf = [UInt8](repeating: 0, count: maxReadLength)
@@ -95,7 +100,7 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     }
 
     public nonisolated var fileDescriptor: UInt64? {
-        pp_socket_fd(sock)
+        descriptor
     }
 
     public func readPackets() async throws -> [Data] {
@@ -123,8 +128,11 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
                 }
             }
         } catch {
+            guard isActive else {
+                throw PartoutError(.linkNotActive)
+            }
             pp_log(ctx, .core, .fault, "Unable to read packets: \(error)")
-            shutdown()
+            await shutdown()
             throw error
         }
     }
@@ -136,7 +144,10 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 writeQueue.async { [weak self] in
-                    guard let sock = self?.sock else { return }
+                    guard let sock = self?.sock else {
+                        continuation.resume(throwing: PartoutError(.releasedObject))
+                        return
+                    }
                     for toWrite in packets {
                         guard !toWrite.isEmpty else { continue }
                         let writtenCount = toWrite.withUnsafeBytes {
@@ -151,16 +162,31 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
                 }
             }
         } catch {
+            guard isActive else {
+                throw PartoutError(.linkNotActive)
+            }
             pp_log(ctx, .core, .fault, "Unable to write packets: \(error)")
-            shutdown()
+            await shutdown()
             throw error
         }
     }
 
-    public func shutdown() {
+    public func shutdown() async {
         guard isActive else { return }
         isActive = false
+        descriptor = nil
         pp_log(ctx, .core, .info, "Shut down socket")
-        pp_socket_free(sock)
+        pp_socket_shutdown(sock)
+        await Self.waitUntilIdle(readQueue)
+        await Self.waitUntilIdle(writeQueue)
+        pp_socket_close(sock)
+    }
+
+    private static func waitUntilIdle(_ queue: DispatchQueue) async {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                continuation.resume()
+            }
+        }
     }
 }

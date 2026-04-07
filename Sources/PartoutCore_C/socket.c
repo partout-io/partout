@@ -10,6 +10,8 @@
 #define os_socket_fd SOCKET
 #define OS_INVALID_SOCKET INVALID_SOCKET
 #define os_close_socket closesocket
+#define os_shutdown_socket shutdown
+#define OS_SHUTDOWN_BOTH SD_BOTH
 #define SOCKET_PRINT_ERROR(msg) \
     pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed with error %d", msg, WSAGetLastError())
 #else
@@ -21,6 +23,8 @@
 #define os_socket_fd int
 #define OS_INVALID_SOCKET -1
 #define os_close_socket close
+#define os_shutdown_socket shutdown
+#define OS_SHUTDOWN_BOTH SHUT_RDWR
 #define SOCKET_PRINT_ERROR(msg) \
     pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed: %s", msg, strerror(errno))
 #endif
@@ -34,6 +38,7 @@
 #include "portable/socket.h"
 
 int connect_with_timeout(os_socket_fd fd, const struct sockaddr *addr, socklen_t addrlen, bool blocking, int timeout_ms);
+static void pp_socket_close_impl(pp_socket sock);
 
 /* Host a file descriptor with the specific platform type. POSIX systems
  * use int, whereas Windows uses SOCKET.  */
@@ -125,61 +130,136 @@ failure:
     return NULL;
 }
 
-/* Free the socket. */
+/* Close the native file descriptor without freeing the wrapper. */
+void pp_socket_shutdown(pp_socket sock) {
+    if (!sock || sock->fd == OS_INVALID_SOCKET) return;
+    (void)os_shutdown_socket(sock->fd, OS_SHUTDOWN_BOTH);
+}
+
+/* Close the native file descriptor without freeing the wrapper. */
+void pp_socket_close(pp_socket sock) {
+    if (!sock) return;
+    pp_socket_close_impl(sock);
+}
+
+/* Free the socket wrapper. */
 void pp_socket_free(pp_socket sock) {
     if (!sock) return;
-    if (sock->is_owned) os_close_socket(sock->fd);
+    pp_socket_close_impl(sock);
+    pp_free(sock);
 }
 
 /* Read up to dst_len bytes, and return the amount of the actually read
  * bytes. Returns < 0 on failure. */
 int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
+    if (!sock || sock->fd == OS_INVALID_SOCKET) {
 #ifdef _WIN32
-    const int read_len = (int)recv(sock->fd, (void *)dst, dst_len, 0);
+        WSASetLastError(WSAENOTSOCK);
 #else
-    const int read_len = (int)read(sock->fd, (void *)dst, dst_len);
+        errno = EBADF;
 #endif
-    if (read_len < 0) {
-        /* If no messages are available at the socket, the receive call waits
-         * for a message to arrive, unless the socket is nonblocking (see fcntl(2))
-         * in which case the value -1 is returned and the external variable errno
-         * set to EAGAIN. */
-        if (errno == EAGAIN) {
-            return 0;
-        }
-        SOCKET_PRINT_ERROR("recv()");
+        return -1;
     }
-    return read_len;
+#ifdef _WIN32
+    while (true) {
+        const int read_len = (int)recv(sock->fd, (void *)dst, dst_len, 0);
+        if (read_len < 0 && WSAGetLastError() == WSAEINTR) {
+            continue;
+        }
+        if (read_len < 0) {
+            if (WSAGetLastError() == WSAEWOULDBLOCK) {
+                return 0;
+            }
+            SOCKET_PRINT_ERROR("recv()");
+        }
+        return read_len;
+    }
+#else
+    while (true) {
+        const int read_len = (int)read(sock->fd, (void *)dst, dst_len);
+        if (read_len < 0 && errno == EINTR) {
+            continue;
+        }
+        if (read_len < 0) {
+            /* If no messages are available at the socket, the receive call waits
+             * for a message to arrive, unless the socket is nonblocking (see fcntl(2))
+             * in which case the value -1 is returned and the external variable errno
+             * set to EAGAIN. */
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return 0;
+            }
+            SOCKET_PRINT_ERROR("recv()");
+        }
+        return read_len;
+    }
+#endif
 }
 
 /* Write src_len bytes, and repeat until fully written. Returns the amount
  * of written bytes, expected to always be src_len. Returns < 0 on failure. */
 int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
-    size_t remaining = src_len;
-    while (remaining > 0) {
+    if (!sock || sock->fd == OS_INVALID_SOCKET) {
 #ifdef _WIN32
-        const int written_len = (int)send(sock->fd, (void *)src, src_len, 0);
+        WSASetLastError(WSAENOTSOCK);
 #else
-        const int written_len = (int)write(sock->fd, (void *)src, src_len);
+        errno = EBADF;
+#endif
+        return -1;
+    }
+
+    size_t offset = 0;
+    while (offset < src_len) {
+        const uint8_t *current_src = src + offset;
+        const size_t remaining = src_len - offset;
+
+#ifdef _WIN32
+        const int written_len = (int)send(sock->fd, (const char *)current_src, (int)remaining, 0);
+#else
+        const int written_len = (int)write(sock->fd, current_src, remaining);
 #endif
         if (written_len < 0) {
-            if (errno == EAGAIN) {
-                return 0;
+#ifdef _WIN32
+            const int err = WSAGetLastError();
+            if (err == WSAEINTR || err == WSAEWOULDBLOCK) {
+                continue;
             }
+#else
+            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+                continue;
+            }
+#endif
             SOCKET_PRINT_ERROR("send()");
             return written_len;
         }
-        remaining -= written_len;
+        if (written_len == 0) {
+#ifdef _WIN32
+            WSASetLastError(WSAECONNRESET);
+#else
+            errno = EPIPE;
+#endif
+            SOCKET_PRINT_ERROR("send()");
+            return -1;
+        }
+        offset += (size_t)written_len;
     }
-    // Expect to write all data
-    pp_assert(remaining == 0);
-    return (int)src_len;
+    return (int)offset;
 }
 
 /* Return the native file descriptor. */
 uint64_t pp_socket_fd(const pp_socket sock) {
     pp_assert(sock && sock->fd != OS_INVALID_SOCKET);
     return sock->fd;
+}
+
+static void pp_socket_close_impl(pp_socket sock) {
+    if (!sock || sock->fd == OS_INVALID_SOCKET) {
+        return;
+    }
+    if (sock->is_owned) {
+        os_close_socket(sock->fd);
+    }
+    sock->fd = OS_INVALID_SOCKET;
+    sock->is_owned = false;
 }
 
 int connect_with_timeout(os_socket_fd fd, const struct sockaddr *addr, socklen_t addrlen,
