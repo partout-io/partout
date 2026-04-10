@@ -64,8 +64,12 @@ struct ProfileNetworkSettingsTests {
         #expect(dnsSettings.matchDomains == [""])
     }
 
-    @Test
-    func givenProfileWithoutDefaultGateway_whenGetNetworkSettings_thenAddsBogusMatchDomains() throws {
+    @Test(arguments: [
+        nil as DNSModule.DomainPolicy?,
+        .match,
+        .search
+    ])
+    func givenProfileWithoutDefaultGateway_whenGetNetworkSettings_thenAddsBogusMatchDomains(policy: DNSModule.DomainPolicy?) throws {
         let connectionModule = BogusConnectionModule()
         let ipModule = IPModule.Builder(
             ipv4: IPSettings(subnet: Subnet(rawValue: "1.2.3.4/32")!),
@@ -96,13 +100,24 @@ struct ProfileNetworkSettingsTests {
         //
 
         dnsModuleBuilder.domains = ["domain.com"]
-        dnsModuleBuilder.domainPolicy = .search
+        dnsModuleBuilder.domainPolicy = policy
         sut = try Profile.Builder(
             modules: [connectionModule, ipModule, try dnsModuleBuilder.build()],
             activatingModules: true
         ).build().networkSettings(with: nil)
 
-        #expect(sut.dnsSettings?.matchDomains == ["", "domain.com"])
+        let dns = try #require(sut.dnsSettings)
+        switch policy {
+        case .match:
+            #expect(dns.matchDomains == ["domain.com"])
+            #expect(dns.matchDomainsNoSearch == true)
+        case .search:
+            #expect(dns.matchDomains == ["", "domain.com"])
+            #expect(dns.matchDomainsNoSearch == false)
+        default:
+            #expect(dns.matchDomains == ["domain.com"])
+            #expect(dns.matchDomainsNoSearch == false)
+        }
     }
 
     // MARK: With remote info
