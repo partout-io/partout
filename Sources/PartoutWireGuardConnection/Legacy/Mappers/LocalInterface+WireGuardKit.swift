@@ -13,7 +13,7 @@ extension WireGuard.LocalInterface {
 
         var dnsBuilder = DNSModule.Builder()
         dnsBuilder.servers = wg.dns.map(\.stringRepresentation)
-        dnsBuilder.searchDomains = wg.dnsSearch
+        dnsBuilder.domains = wg.dnsSearch
         let dns = try dnsBuilder.build()
 
         let mtu = wg.mtu

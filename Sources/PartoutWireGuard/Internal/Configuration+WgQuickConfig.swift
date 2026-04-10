@@ -176,7 +176,7 @@ extension WireGuard.Configuration {
                 }
             }
             interface.dns.servers = dnsServers.map(\.rawValue)
-            interface.dns.searchDomains = dnsSearch
+            interface.dns.domains = dnsSearch
         }
         if let mtuString = attributes["mtu"] {
             guard let mtu = UInt16(mtuString) else {
