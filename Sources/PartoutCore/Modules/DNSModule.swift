@@ -12,7 +12,7 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
         case tls(hostname: String)
     }
 
-    public enum DomainPolicy: Hashable, Codable, Sendable {
+    public enum DomainPolicy: String, Hashable, Codable, Sendable {
         case search
         case match
     }
