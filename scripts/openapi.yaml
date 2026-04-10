@@ -17,6 +17,8 @@ components:
       properties:
         domainName:
           "$ref": "#/components/schemas/Address"
+        domainPolicy:
+          title: DomainPolicy
         id:
           "$ref": "#/components/schemas/UniqueID"
         protocolType:

@@ -55,9 +55,11 @@ extension Profile {
         // 4. configure DNS for domain-based routing
 
         if let dnsSettings = neSettings.dnsSettings {
-
-            // route DNS through VPN first unless no servers provided
-            if !dnsSettings.servers.isEmpty {
+            // Route DNS through VPN first unless:
+            // - No servers provided
+            // - .matchDomains is not configured
+            // This is a fallback as it *SHOULD* be accomplished by DNSModule+NE
+            if !dnsSettings.servers.isEmpty, dnsSettings.matchDomains == nil {
                 neSettings.dnsSettings?.matchDomains = [""]
             }
         }

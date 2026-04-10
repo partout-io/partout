@@ -67,7 +67,7 @@ Endpoint = 1.2.3.4:12345
 
         var dns = DNSModule.Builder()
         dns.servers = ["1.2.3.4"]
-        dns.searchDomains = ["domain.local"]
+        dns.domains = ["domain.local"]
         sut.interface.dns = dns
 
         let builder = WireGuardModule.Builder(configurationBuilder: sut)
@@ -113,7 +113,7 @@ Endpoint = 1.2.3.4:12345
 //
 //        var dns = DNSModule.Builder()
 //        dns.servers = ["1.a.2.$%3"]
-//        dns.searchDomains = ["-invalid.example.com"]
+//        dns.domains = ["-invalid.example.com"]
 //        sut.interface.dns = dns
 //
 //        do {
@@ -214,7 +214,7 @@ private extension WireGuardParserTests {
             builder.interface.addresses = ["1.2.3.4"]
             var dns = DNSModule.Builder()
             dns.servers = ["1.2.3.4"]
-            dns.searchDomains = ["domain.local"]
+            dns.domains = ["domain.local"]
             builder.interface.dns = dns
         }
         if withPeer {

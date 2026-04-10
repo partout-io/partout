@@ -39,6 +39,24 @@ struct DNSModuleTests {
         #expect(sut == module.builder())
     }
 
+    @Test(arguments: [true, false])
+    func givenDomains_whenRebuild_thenIsRestored(isFirstDomainPrimary: Bool) throws {
+        let sut = DNSModule.Builder(
+            protocolType: .cleartext,
+            servers: ["1.2.3.4"],
+            domains: ["primary.example.com", "search.example.com"],
+            isFirstDomainPrimary: isFirstDomainPrimary
+        )
+        let module = try sut.build()
+        let rebuilt = module.builder()
+
+        #expect(module.domainName?.rawValue == (isFirstDomainPrimary ? "primary.example.com" : nil))
+        #expect(module.searchDomains?.map(\.rawValue) == ["primary.example.com", "search.example.com"])
+        #expect(rebuilt.domains == sut.domains)
+        #expect(rebuilt.isFirstDomainPrimary == sut.isFirstDomainPrimary)
+        #expect(rebuilt == sut)
+    }
+
     @Test
     func givenHTTPSWithoutURL_whenBuild_thenFails() {
         let sut = DNSModule.Builder(

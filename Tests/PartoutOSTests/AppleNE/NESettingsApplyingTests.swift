@@ -100,23 +100,25 @@ struct NESettingsApplyingTests {
         #expect(proxySettings.exceptionList == module.bypassDomains.map(\.rawValue))
     }
 
-    @Test
-    func givenDNS_whenApply_thenUpdatesSettings() throws {
+    @Test(arguments: [true, false])
+    func givenDNS_whenApply_thenUpdatesSettings(isFirstDomainPrimary: Bool) throws {
         let module = try DNSModule.Builder(
             protocolType: .cleartext,
             servers: ["1.1.1.1", "2.2.2.2"],
-            domainName: "domain.com",
-            searchDomains: ["one.com", "two.com"]
+            domains: ["domain.com", "one.com", "two.com"],
+            isFirstDomainPrimary: isFirstDomainPrimary
         ).build()
 
         var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
         module.apply(.global, to: &sut)
 
         let dnsSettings = try #require(sut.dnsSettings)
+        let expSearchDomains = module.searchDomains?.map(\.rawValue)
         #expect(dnsSettings.dnsProtocol == .cleartext)
         #expect(dnsSettings.servers == module.servers.map(\.rawValue))
+        #expect(dnsSettings.domainName == (isFirstDomainPrimary ? "domain.com" : nil))
         #expect(dnsSettings.domainName == module.domainName?.rawValue)
-        #expect(dnsSettings.searchDomains == module.searchDomains?.map(\.rawValue))
+        #expect(dnsSettings.searchDomains == expSearchDomains)
     }
 
     @Test

@@ -230,13 +230,23 @@ private extension NetworkSettingsBuilder {
 
         if let domain = dnsDomain {
             pp_log(ctx, .openvpn, .info, "\tDNS: Set domain: \(domain.asSensitiveAddress(ctx))")
-            dnsSettings.domainName = domain
+            dnsSettings.domains = [domain]
+            dnsSettings.isFirstDomainPrimary = true
+        } else {
+            dnsSettings.isFirstDomainPrimary = false
         }
 
         let searchDomains = allDNSSearchDomains
         if !searchDomains.isEmpty {
             pp_log(ctx, .openvpn, .info, "\tDNS: Set search domains: \(searchDomains.map { $0.asSensitiveAddress(ctx) })")
-            dnsSettings.searchDomains = searchDomains
+            // First domain is main domain
+            if var domains = dnsSettings.domains {
+                let otherDomains = searchDomains.filter { !domains.contains($0) }
+                domains.append(contentsOf: otherDomains)
+                dnsSettings.domains = domains
+            } else {
+                dnsSettings.domains = searchDomains
+            }
         }
 
         do {

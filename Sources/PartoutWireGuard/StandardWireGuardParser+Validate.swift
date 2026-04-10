@@ -29,7 +29,7 @@ private extension WireGuard.Configuration.Builder {
         if !interface.addresses.isEmpty {
             lines.append("Address = \(interface.addresses.wgJoined)")
         }
-        let dnsEntries = interface.dns.servers + (interface.dns.searchDomains ?? [])
+        let dnsEntries = interface.dns.servers + (interface.dns.domains ?? [])
         if !dnsEntries.isEmpty {
             lines.append("DNS = \(dnsEntries.wgJoined)")
         }
