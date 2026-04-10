@@ -95,7 +95,7 @@ struct ProfileNetworkSettingsTests {
         #expect(Set(ipV4Settings.includedRoutes ?? []) == Set(expRoutesV4))
         #expect(Set(ipV6Settings.includedRoutes ?? []) == Set(expRoutesV6))
 
-        // Fallback without DNS module
+        // Fallback without domains
         #expect(sut.dnsSettings?.matchDomains == [""])
 
         //
