@@ -12,6 +12,11 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
         case tls(hostname: String)
     }
 
+    public enum DomainPolicy: Hashable, Codable, Sendable {
+        case search
+        case match
+    }
+
     public static let moduleType = ModuleType("DNS")
 
     public let id: UniqueID
@@ -24,6 +29,8 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
 
     public let searchDomains: [Address]?
 
+    public let domainPolicy: DomainPolicy?
+
     public let routesThroughVPN: Bool?
 
     fileprivate init(
@@ -32,6 +39,7 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
         servers: [Address],
         domainName: Address?,
         searchDomains: [Address]?,
+        domainPolicy: DomainPolicy?,
         routesThroughVPN: Bool?
     ) {
         self.id = id
@@ -39,6 +47,7 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
         self.servers = servers
         self.domainName = domainName
         self.searchDomains = searchDomains
+        self.domainPolicy = domainPolicy
         self.routesThroughVPN = routesThroughVPN
     }
 
@@ -50,17 +59,29 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
         switch protocolType {
         case .cleartext:
             break
-
         case .https(let url):
             builder.protocolType = .https
             builder.dohURL = url.absoluteString
-
         case .tls(let hostname):
             builder.protocolType = .tls
             builder.dotHostname = hostname
         }
-        builder.domainName = domainName?.rawValue
-        builder.searchDomains = searchDomains?.map(\.rawValue)
+        if let domainName {
+            builder.isFirstDomainPrimary = true
+            if let searchDomains {
+                if domainName == searchDomains.first {
+                    builder.domains = searchDomains.map(\.rawValue)
+                } else {
+                    builder.domains = [domainName.rawValue] + searchDomains.map(\.rawValue)
+                }
+            } else {
+                builder.domains = [domainName.rawValue]
+            }
+        } else if let searchDomains {
+            builder.isFirstDomainPrimary = false
+            builder.domains = searchDomains.map(\.rawValue)
+        }
+        builder.domainPolicy = domainPolicy
         builder.routesThroughVPN = routesThroughVPN
         return builder
     }
@@ -78,9 +99,11 @@ extension DNSModule {
 
         public var dotHostname: String
 
-        public var domainName: String?
+        public var domains: [String]?
 
-        public var searchDomains: [String]?
+        public var domainPolicy: DomainPolicy?
+
+        public var isFirstDomainPrimary: Bool
 
         public var routesThroughVPN: Bool?
 
@@ -94,8 +117,9 @@ extension DNSModule {
             servers: [String] = [],
             dohURL: String = "",
             dotHostname: String = "",
-            domainName: String? = nil,
-            searchDomains: [String]? = nil,
+            domains: [String]? = nil,
+            domainPolicy: DomainPolicy? = nil,
+            isFirstDomainPrimary: Bool = true,
             routesThroughVPN: Bool? = nil
         ) {
             self.id = id
@@ -103,8 +127,9 @@ extension DNSModule {
             self.servers = servers
             self.dohURL = dohURL
             self.dotHostname = dotHostname
-            self.domainName = domainName
-            self.searchDomains = searchDomains
+            self.domains = domains
+            self.domainPolicy = domainPolicy
+            self.isFirstDomainPrimary = isFirstDomainPrimary
             self.routesThroughVPN = routesThroughVPN
         }
 
@@ -118,25 +143,15 @@ extension DNSModule {
                 }
                 return addr
             }
-            let validDomainName = try domainName.flatMap {
+            let validDomains = try domains?.compactMap {
                 guard !$0.isEmpty else {
                     return nil as Address?
                 }
                 guard let addr = Address(rawValue: $0), !addr.isIPAddress else {
-                    throw PartoutError.invalidFields(["domainName": $0])
+                    throw PartoutError.invalidFields(["domains": $0])
                 }
                 return addr
             }
-            let validSearchDomains = try searchDomains?.compactMap {
-                guard !$0.isEmpty else {
-                    return nil as Address?
-                }
-                guard let addr = Address(rawValue: $0), !addr.isIPAddress else {
-                    throw PartoutError.invalidFields(["searchDomains": $0])
-                }
-                return addr
-            }
-
             let validProtocolType: ProtocolType
             switch protocolType {
             case .cleartext:
@@ -158,8 +173,9 @@ extension DNSModule {
                 id: id,
                 protocolType: validProtocolType,
                 servers: validServers,
-                domainName: validDomainName,
-                searchDomains: validSearchDomains,
+                domainName: isFirstDomainPrimary ? validDomains?.first : nil,
+                searchDomains: validDomains,
+                domainPolicy: domainPolicy,
                 routesThroughVPN: routesThroughVPN
             )
         }
