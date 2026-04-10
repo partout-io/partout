@@ -95,13 +95,14 @@ struct ProfileNetworkSettingsTests {
 
         //
 
-        dnsModuleBuilder.searchDomains = ["domain.com"]
+        dnsModuleBuilder.domains = ["domain.com"]
+        dnsModuleBuilder.domainPolicy = .search
         sut = try Profile.Builder(
             modules: [connectionModule, ipModule, try dnsModuleBuilder.build()],
             activatingModules: true
         ).build().networkSettings(with: nil)
 
-        #expect(sut.dnsSettings?.matchDomains == [""])
+        #expect(sut.dnsSettings?.matchDomains == ["", "domain.com"])
     }
 
     // MARK: With remote info
