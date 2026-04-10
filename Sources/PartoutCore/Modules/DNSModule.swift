@@ -119,7 +119,7 @@ extension DNSModule {
             dotHostname: String = "",
             domains: [String]? = nil,
             domainPolicy: DomainPolicy? = nil,
-            isFirstDomainPrimary: Bool = true,
+            isFirstDomainPrimary: Bool = false,
             routesThroughVPN: Bool? = nil
         ) {
             self.id = id
