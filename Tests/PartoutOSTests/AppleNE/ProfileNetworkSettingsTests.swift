@@ -69,7 +69,7 @@ struct ProfileNetworkSettingsTests {
         .match,
         .search
     ])
-    func givenProfileWithoutDefaultGateway_whenGetNetworkSettings_thenAddsBogusMatchDomains(policy: DNSModule.DomainPolicy?) throws {
+    func givenProfile_whenGetNetworkSettings_thenAppliesProperDNSPolicy(policy: DNSModule.DomainPolicy?) throws {
         let connectionModule = BogusConnectionModule()
         let ipModule = IPModule.Builder(
             ipv4: IPSettings(subnet: Subnet(rawValue: "1.2.3.4/32")!),
@@ -95,6 +95,7 @@ struct ProfileNetworkSettingsTests {
         #expect(Set(ipV4Settings.includedRoutes ?? []) == Set(expRoutesV4))
         #expect(Set(ipV6Settings.includedRoutes ?? []) == Set(expRoutesV6))
 
+        // Fallback without DNS module
         #expect(sut.dnsSettings?.matchDomains == [""])
 
         //
