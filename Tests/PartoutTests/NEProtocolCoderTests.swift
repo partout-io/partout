@@ -59,7 +59,7 @@ private extension NEProtocolCoderTests {
     func newProfile() throws -> Profile {
         var builder = Profile.Builder()
         builder.name = "foobar"
-        builder.modules.append(try DNSModule.Builder().build())
+        builder.modules.append(try DNSModule.Builder(servers: ["2.4.2.4"]).build())
         builder.modules.append(try HTTPProxyModule.Builder(address: "1.1.1.1", port: 1080, pacURLString: "http://proxy.pac").build())
         builder.modules.append(IPModule.Builder(ipv4: .init(subnet: try .init("1.2.3.4", 16))).build())
         builder.modules.append(OnDemandModule.Builder().build())

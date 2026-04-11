@@ -125,7 +125,7 @@ struct ProfileNetworkSettingsTests {
 
     @Test
     func givenProfile_whenGetNetworkSettingsWithInfo_thenAppliesInfo() throws {
-        let bogusModule = try DNSModule.Builder().build()
+        let bogusModule = try DNSModule.Builder(servers: ["1.1.1.1"]).build()
         let profile = try Profile.Builder(
             modules: [bogusModule],
             activeModulesIds: [bogusModule.id]
@@ -134,7 +134,7 @@ struct ProfileNetworkSettingsTests {
         let sut = profile.networkSettings(with: .init(
             originalModuleId: bogusModule.id,
             address: Address(rawValue: "5.6.7.8")!,
-            modules: [try DNSModule.Builder(servers: ["1.1.1.1"]).build()],
+            modules: [bogusModule],
             fileDescriptors: []
         ))
 

@@ -39,7 +39,7 @@ struct ProfileDiffTests {
 
         var diff: Set<Profile.DiffResult>
 
-        let dnsModule = try DNSModule.Builder().build()
+        let dnsModule = try DNSModule.Builder(servers: ["6.6.6.6"]).build()
         sut.modules = [dnsModule]
         let profileWithDNS = try sut.build()
         diff = profileWithDNS.differences(from: original)
