@@ -155,6 +155,9 @@ extension DNSModule {
             let validProtocolType: ProtocolType
             switch protocolType {
             case .cleartext:
+                guard !servers.isEmpty else {
+                    throw PartoutError.invalidFields(["servers": nil])
+                }
                 validProtocolType = .cleartext
             case .https:
                 guard !dohURL.isEmpty,
