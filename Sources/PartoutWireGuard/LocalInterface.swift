@@ -29,7 +29,7 @@ extension WireGuard {
         public func builder() -> Builder {
             var copy = Builder(privateKey: privateKey.rawValue)
             copy.addresses = addresses.map(\.rawValue)
-            copy.dns = dns?.builder() ?? DNSModule.Builder()
+            copy.dns = dns?.builder()
             copy.mtu = mtu
             return copy
         }
@@ -42,19 +42,19 @@ extension WireGuard.LocalInterface {
 
         public var addresses: [String]
 
-        public var dns: DNSModule.Builder
+        public var dns: DNSModule.Builder?
 
         public var mtu: UInt16?
 
         public init(privateKey: String) {
             self.privateKey = privateKey
-            dns = DNSModule.Builder()
+            dns = nil
             addresses = []
         }
 
         public init(keyGenerator: WireGuardKeyGenerator) {
             privateKey = keyGenerator.newPrivateKey()
-            dns = DNSModule.Builder()
+            dns = nil
             addresses = []
         }
 
@@ -71,7 +71,7 @@ extension WireGuard.LocalInterface {
             return WireGuard.LocalInterface(
                 privateKey: validPrivateKey,
                 addresses: validAddresses,
-                dns: try dns.build(),
+                dns: try dns?.build(),
                 mtu: mtu
             )
         }
