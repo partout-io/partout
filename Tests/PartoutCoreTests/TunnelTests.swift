@@ -23,7 +23,7 @@ struct TunnelTests {
     @Test
     func givenTunnel_whenOperate_thenStatusFollows() async throws {
         let sut = newTunnel()
-        let module = try DNSModule.Builder().build()
+        let module = IPModule.Builder().build()
         let profile = try Profile.Builder(modules: [module], activatingModules: true).build()
         let stream = sut.snapshotsStream.removeDuplicates()
 

@@ -22,7 +22,7 @@ struct CodingRegistryTests {
         wgBuilder.peers = [WireGuard.RemoteInterface.Builder(publicKey: "")]
 
         var profileBuilder = Profile.Builder()
-        profileBuilder.modules.append(try DNSModule.Builder().build())
+        profileBuilder.modules.append(try DNSModule.Builder(servers: ["1.1.1.1"]).build())
         profileBuilder.modules.append(IPModule.Builder(ipv4: .init(subnet: try .init("1.2.3.4", 16))).build())
         profileBuilder.modules.append(OnDemandModule.Builder().build())
         profileBuilder.modules.append(try HTTPProxyModule.Builder(address: "1.1.1.1", port: 1080).build())
@@ -43,7 +43,7 @@ struct CodingRegistryTests {
             DNSModule.moduleHandler
         ])
         let sut = registry.withLegacyEncoding(legacy)
-        let module = try DNSModule.Builder().build()
+        let module = try DNSModule.Builder(servers: ["1.1.1.1"]).build()
         let profile = try Profile.Builder(modules: [module]).build()
 
         let encoded = try sut.string(fromProfile: profile)
@@ -57,7 +57,7 @@ struct CodingRegistryTests {
             DNSModule.moduleHandler
         ])
         let sut = registry.withLegacyEncoding(legacy)
-        let module = try DNSModule.Builder().build()
+        let module = try DNSModule.Builder(servers: ["1.1.1.1"]).build()
         let profile = try Profile.Builder(modules: [module]).build()
 
         let encoded = try sut.string(fromProfile: profile)

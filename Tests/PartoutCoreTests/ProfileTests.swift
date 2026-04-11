@@ -20,7 +20,7 @@ struct ProfileTests {
     @Test
     func givenProfile_whenCopy_thenHasNotSameModules() throws {
         var p1 = Profile.Builder()
-        let m1 = DNSModule.Builder()
+        let m1 = DNSModule.Builder(servers: ["1.2.3.4"])
         p1.name = "One"
         p1.modules = [try m1.build()]
 
