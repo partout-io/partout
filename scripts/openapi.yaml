@@ -21,6 +21,8 @@ components:
           title: DomainPolicy
         id:
           "$ref": "#/components/schemas/UniqueID"
+        inheritsVPN:
+          type: boolean
         protocolType:
           "$ref": "#/components/schemas/DNSModule.ProtocolType"
         routesThroughVPN:

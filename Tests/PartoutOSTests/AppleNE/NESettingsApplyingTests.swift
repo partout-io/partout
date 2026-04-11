@@ -121,6 +121,45 @@ struct NESettingsApplyingTests {
         #expect(dnsSettings.searchDomains == expSearchDomains)
     }
 
+    @Test(arguments: [true, false])
+    func givenDNS_whenInheritsVPN_thenInheritsServersAndDomains(inheritsVPN: Bool) throws {
+        let moduleServers = ["1.1.1.1"]
+        let moduleDomainName = "other.org"
+        let moduleSearchDomains = ["other.org", "some.co.uk", "who.net"]
+        let vpnServers = ["8.8.8.8"]
+        let vpnDomainName = "main.com"
+        let vpnSearchDomains = ["domain.com", "one.com", "two.com"]
+
+        let module = try DNSModule.Builder(
+            protocolType: .cleartext,
+            servers: moduleServers,
+            domains: moduleSearchDomains,
+            inheritsVPN: inheritsVPN,
+            isFirstDomainPrimary: true
+        ).build()
+
+        let dns = NEDNSSettings(servers: vpnServers)
+        dns.domainName = vpnDomainName
+        dns.searchDomains = vpnSearchDomains
+
+        var sut = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "")
+        sut.dnsSettings = dns
+        module.apply(.global, to: &sut)
+
+        let dnsSettings = try #require(sut.dnsSettings)
+        #expect(dnsSettings.dnsProtocol == .cleartext)
+        switch inheritsVPN {
+        case true:
+            #expect(dnsSettings.servers == vpnServers)
+            #expect(dnsSettings.domainName == vpnDomainName)
+            #expect(dnsSettings.searchDomains == vpnSearchDomains)
+        case false:
+            #expect(dnsSettings.servers == moduleServers)
+            #expect(dnsSettings.domainName == moduleDomainName)
+            #expect(dnsSettings.searchDomains == moduleSearchDomains)
+        }
+    }
+
     @Test
     func givenDNSOverHTTPS_whenApply_thenUpdatesSettings() throws {
         let module = try DNSModule.Builder(
