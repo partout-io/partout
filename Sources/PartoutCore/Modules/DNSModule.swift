@@ -155,7 +155,7 @@ extension DNSModule {
             let validProtocolType: ProtocolType
             switch protocolType {
             case .cleartext:
-                guard !servers.isEmpty else {
+                guard !validServers.isEmpty else {
                     throw PartoutError.invalidFields(["servers": nil])
                 }
                 validProtocolType = .cleartext
