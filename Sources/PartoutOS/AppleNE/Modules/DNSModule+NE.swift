@@ -7,7 +7,20 @@ import NetworkExtension
 extension DNSModule: NESettingsApplying {
     public func apply(_ ctx: PartoutLoggerContext, to settings: inout NEPacketTunnelNetworkSettings) {
         let dnsSettings: NEDNSSettings
-        let rawServers = servers.map(\.rawValue)
+
+        // Reuse DNS servers/domains from VPN if desired
+        let rawServers: [String]
+        let rawDomainName: String?
+        let rawDomains: [String]?
+        if inheritsVPN == true {
+            rawServers = settings.dnsSettings?.servers ?? []
+            rawDomainName = settings.dnsSettings?.domainName
+            rawDomains = settings.dnsSettings?.searchDomains
+        } else {
+            rawServers = servers.map(\.rawValue)
+            rawDomainName = domainName?.rawValue
+            rawDomains = searchDomains?.map(\.rawValue)
+        }
 
         // Former DNS settings are always overridden, even with empty servers
         switch protocolType {
@@ -32,17 +45,6 @@ extension DNSModule: NESettingsApplying {
             pp_log(ctx, .os, .info, "\t\tDoT hostname: \(hostname.asSensitiveAddress(ctx))")
         @unknown default:
             break
-        }
-
-        // Reuse DNS servers/domains from VPN if desired
-        let rawDomainName: String?
-        let rawDomains: [String]?
-        if inheritsVPN == true {
-            rawDomainName = settings.dnsSettings?.domainName
-            rawDomains = settings.dnsSettings?.searchDomains
-        } else {
-            rawDomainName = domainName?.rawValue
-            rawDomains = searchDomains?.map(\.rawValue)
         }
 
         // Main domain (if set)
