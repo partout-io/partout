@@ -34,16 +34,27 @@ extension DNSModule: NESettingsApplying {
             break
         }
 
+        // Reuse DNS servers/domains from VPN if desired
+        let rawDomainName: String?
+        let rawDomains: [String]?
+        if inheritsVPN == true {
+            rawDomainName = settings.dnsSettings?.domainName
+            rawDomains = settings.dnsSettings?.searchDomains
+        } else {
+            rawDomainName = domainName?.rawValue
+            rawDomains = searchDomains?.map(\.rawValue)
+        }
+
         // Main domain (if set)
-        domainName.map {
-            dnsSettings.domainName = $0.rawValue
+        rawDomainName.map {
+            dnsSettings.domainName = $0
             pp_log(ctx, .os, .info, "\t\tDomain: \($0.asSensitiveAddress(ctx))")
         }
 
         // Apply domains with the given policy
-        let domains = searchDomains ?? []
+        let domains = rawDomains ?? []
         let domainsDescription = domains.map { $0.asSensitiveAddress(ctx) }
-        let searchDomains = domains.map(\.rawValue)
+        let searchDomains = domains
         //
         // Credit for .matchDomains:
         // https://github.com/WireGuard/wireguard-apple/pull/11
