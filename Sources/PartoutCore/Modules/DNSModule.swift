@@ -85,7 +85,7 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
             builder.isFirstDomainPrimary = false
             builder.domains = searchDomains.map(\.rawValue)
         }
-        builder.inheritsVPN = inheritsVPN
+        builder.inheritsVPN = inheritsVPN ?? false
         builder.domainPolicy = domainPolicy
         builder.routesThroughVPN = routesThroughVPN
         return builder
@@ -106,7 +106,7 @@ extension DNSModule {
 
         public var domains: [String]?
 
-        public var inheritsVPN: Bool?
+        public var inheritsVPN: Bool
 
         public var domainPolicy: DomainPolicy?
 
@@ -125,7 +125,7 @@ extension DNSModule {
             dohURL: String = "",
             dotHostname: String = "",
             domains: [String]? = nil,
-            inheritsVPN: Bool? = false,
+            inheritsVPN: Bool = false,
             domainPolicy: DomainPolicy? = nil,
             isFirstDomainPrimary: Bool = false,
             routesThroughVPN: Bool? = nil
