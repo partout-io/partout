@@ -109,12 +109,12 @@ struct ProfileNetworkSettingsTests {
 
         let dns = try #require(sut.dnsSettings)
         switch policy {
+        case .search:
+            #expect(dns.matchDomains == [""])
+            #expect(dns.matchDomainsNoSearch == false)
         case .match:
             #expect(dns.matchDomains == ["domain.com"])
             #expect(dns.matchDomainsNoSearch == true)
-        case .search:
-            #expect(dns.matchDomains == ["", "domain.com"])
-            #expect(dns.matchDomainsNoSearch == false)
         default:
             #expect(dns.matchDomains == ["domain.com"])
             #expect(dns.matchDomainsNoSearch == false)
