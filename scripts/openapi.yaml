@@ -18,7 +18,7 @@ components:
         domainName:
           "$ref": "#/components/schemas/Address"
         domainPolicy:
-          title: DomainPolicy
+          "$ref": "#/components/schemas/DNSModule.DomainPolicy"
         id:
           "$ref": "#/components/schemas/UniqueID"
         protocolType:
@@ -38,6 +38,14 @@ components:
         - protocolType
         - servers
       type: object
+    DNSModule.DomainPolicy:
+      enum:
+        - match
+        - matchAndSearch
+      type: string
+      x-enum-varnames:
+        - match
+        - matchAndSearch
     DNSModule.ProtocolType:
       discriminator:
         mapping:

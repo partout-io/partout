@@ -11,6 +11,7 @@ entities:
   - Address
   - CustomModule
   - DNSModule
+  - DNSModule.DomainPolicy
   - DNSModule.ProtocolType
   - DNSProtocol
   - Endpoint
