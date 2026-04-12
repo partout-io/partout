@@ -227,7 +227,7 @@ private extension NetworkSettingsBuilder {
 
         pp_log(ctx, .openvpn, .info, "\tDNS: Set servers \(dnsServers.map { $0.asSensitiveAddress(ctx) })")
         var dnsSettings = DNSModule.Builder(servers: dnsServers)
-        dnsSettings.domainPolicy = .search
+        dnsSettings.domainPolicy = nil
 
         if let domain = dnsDomain {
             pp_log(ctx, .openvpn, .info, "\tDNS: Set domain: \(domain.asSensitiveAddress(ctx))")
