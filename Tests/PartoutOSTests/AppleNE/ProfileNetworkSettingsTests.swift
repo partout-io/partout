@@ -67,7 +67,7 @@ struct ProfileNetworkSettingsTests {
     @Test(arguments: [
         nil as DNSModule.DomainPolicy?,
         .match,
-        .search
+        .matchAndSearch
     ])
     func givenProfile_whenGetNetworkSettings_thenAppliesProperDNSPolicy(policy: DNSModule.DomainPolicy?) throws {
         let connectionModule = BogusConnectionModule()
@@ -100,7 +100,8 @@ struct ProfileNetworkSettingsTests {
 
         //
 
-        dnsModuleBuilder.domains = ["domain.com"]
+        let domains = ["domain.com"]
+        dnsModuleBuilder.domains = domains
         dnsModuleBuilder.domainPolicy = policy
         sut = try Profile.Builder(
             modules: [connectionModule, ipModule, try dnsModuleBuilder.build()],
@@ -110,13 +111,16 @@ struct ProfileNetworkSettingsTests {
         let dns = try #require(sut.dnsSettings)
         switch policy {
         case .match:
-            #expect(dns.matchDomains == ["domain.com"])
+            #expect(dns.searchDomains == nil)
+            #expect(dns.matchDomains == domains)
             #expect(dns.matchDomainsNoSearch == true)
-        case .search:
-            #expect(dns.matchDomains == ["", "domain.com"])
+        case .matchAndSearch:
+            #expect(dns.searchDomains == domains)
+            #expect(dns.matchDomains == domains)
             #expect(dns.matchDomainsNoSearch == false)
         default:
-            #expect(dns.matchDomains == ["domain.com"])
+            #expect(dns.searchDomains == domains)
+            #expect(dns.matchDomains == [""])
             #expect(dns.matchDomainsNoSearch == false)
         }
     }

@@ -13,8 +13,8 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
     }
 
     public enum DomainPolicy: String, Hashable, Codable, Sendable {
-        case search
         case match
+        case matchAndSearch
     }
 
     public static let moduleType = ModuleType("DNS")
@@ -118,7 +118,7 @@ extension DNSModule {
             dohURL: String = "",
             dotHostname: String = "",
             domains: [String]? = nil,
-            domainPolicy: DomainPolicy? = nil,
+            domainPolicy: DomainPolicy? = .matchAndSearch,
             isFirstDomainPrimary: Bool = false,
             routesThroughVPN: Bool? = nil
         ) {
