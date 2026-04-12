@@ -16,20 +16,20 @@ extension Profile {
         pp_log(ctx, .os, .info, "Build NetworkExtension settings from Profile")
         pp_log(ctx, .os, .info, "\tTunnel remote address: \(tunnelRemoteAddress.asSensitiveAddress(ctx))")
 
-        // 1. gather active modules
+        // 1. Gather active modules
 
         var applicableModules = modules.filter {
             isActiveModule(withId: $0.id)
         }
 
-        // 2. inject remote modules right after the originating module
+        // 2. Inject remote modules right after the originating module
 
         if let info, let remoteModules = info.modules,
            let indexOfRemoteModule = applicableModules.firstIndex(where: { $0.id == info.originalModuleId }) {
             applicableModules.insert(contentsOf: remoteModules, at: indexOfRemoteModule + 1)
         }
 
-        // 3. apply modules to NE settings
+        // 3. Apply modules to NE settings
 
         applicableModules.forEach {
             let moduleDescription = LoggableModule(ctx, $0)
@@ -52,19 +52,7 @@ extension Profile {
         let isGateway = isGatewayIPv4 || isGatewayIPv6
         pp_log(ctx, .os, .info, "\tVPN is default gateway: \(isGateway)")
 
-        // 4. configure DNS for domain-based routing
-
-        if let dnsSettings = neSettings.dnsSettings {
-            // Route DNS through VPN first unless:
-            // - No servers provided
-            // - .matchDomains is not configured
-            // This is a fallback as it *SHOULD* be accomplished by DNSModule+NE
-            if !dnsSettings.servers.isEmpty, dnsSettings.matchDomains == nil {
-                neSettings.dnsSettings?.matchDomains = [""]
-            }
-        }
-
-        // 5. configure DNS for non-connection profiles
+        // 4. Configure DNS for non-connection profiles
 
         if activeConnectionModule == nil {
             // XXX: The tunnel takes several seconds to stop if only DNS settings
@@ -79,7 +67,7 @@ extension Profile {
             pp_log(ctx, .os, .info, "\tRoute DNS-only settings with empty matchDomains")
         }
 
-        // 6. optionally enable DNS fallback if default gateway without DNS settings
+        // 5. Optionally enable DNS fallback if default gateway without DNS settings
 
         if isGateway, neSettings.dnsSettings == nil {
             pp_log(ctx, .os, .info, "\tVPN is default gateway but has no DNS settings")
@@ -91,7 +79,7 @@ extension Profile {
             }
         }
 
-        // 7. optionally route DNS through the VPN
+        // 6. Optionally route DNS through the VPN
 
         applicableModules.forEach {
             guard let dnsModule = $0 as? DNSModule else {

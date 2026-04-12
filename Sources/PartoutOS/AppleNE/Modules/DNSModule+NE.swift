@@ -63,26 +63,26 @@ extension DNSModule: NESettingsApplying {
         //
         if dnsSettings.dnsProtocol == .cleartext {
             switch domainPolicy {
-            case .search:
-                dnsSettings.searchDomains = searchDomains
-                // XXX: This works around a Network Extension bug. We add the
-                // search domains here because .searchDomains is ineffective when
-                // the VPN is not the default gateway
-                dnsSettings.matchDomains = [""] + searchDomains
-                dnsSettings.matchDomainsNoSearch = false
-                pp_log(ctx, .os, .info, "\t\tSearch-only domains: \(domainsDescription)")
             case .match:
                 let matchDomains = !searchDomains.isEmpty ? searchDomains : [""]
                 dnsSettings.searchDomains = nil
                 dnsSettings.matchDomains = matchDomains
                 dnsSettings.matchDomainsNoSearch = true
                 pp_log(ctx, .os, .info, "\t\tMatch-only domains: \(domainsDescription)")
-            default:
+            case .matchAndSearch:
                 let matchDomains = !searchDomains.isEmpty ? searchDomains : [""]
                 dnsSettings.searchDomains = searchDomains
                 dnsSettings.matchDomains = matchDomains
                 dnsSettings.matchDomainsNoSearch = false
                 pp_log(ctx, .os, .info, "\t\tMatch/Search domains: \(domainsDescription)")
+            default:
+                // XXX: .searchDomains is ineffective when the VPN is not the default
+                // gateway. Appending .searchDomains to .matchDomains would be a partial
+                // workaround, but this is essentially a bug in Network Extension.
+                dnsSettings.searchDomains = searchDomains
+                dnsSettings.matchDomains = [""]
+                dnsSettings.matchDomainsNoSearch = false
+                pp_log(ctx, .os, .info, "\t\tSearch-only domains: \(domainsDescription)")
             }
         } else if !domains.isEmpty {
             //
