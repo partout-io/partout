@@ -2,7 +2,9 @@
 // Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
 import Network
+#if !USE_CMAKE
 import PartoutWireGuard
+#endif
 
 struct InterfaceConfiguration: Sendable {
     var privateKey: PrivateKey

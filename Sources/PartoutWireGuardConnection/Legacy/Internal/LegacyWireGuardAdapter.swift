@@ -277,7 +277,7 @@ class LegacyWireGuardAdapter: @unchecked Sendable {
     /// - Returns: The list of resolved endpoints.
     private func resolvePeers(for tunnelConfiguration: TunnelConfiguration) throws -> [WireGuardEndpoint?] {
         let endpoints = tunnelConfiguration.peers.map { $0.endpoint }
-        let resolutionResults = DNSResolver.resolveSync(endpoints: endpoints)
+        let resolutionResults = WireGuard_DNSResolver.resolveSync(endpoints: endpoints)
         let resolutionErrors = resolutionResults.compactMap { result -> DNSResolutionError? in
             if case .failure(let error) = result {
                 return error

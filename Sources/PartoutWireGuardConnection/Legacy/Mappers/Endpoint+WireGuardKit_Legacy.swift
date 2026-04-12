@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !PARTOUT_MONOLITH
+#if !USE_CMAKE
 import PartoutCore
 #endif
 

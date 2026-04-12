@@ -10,7 +10,7 @@
 
 import NetworkExtension
 import os
-#if !PARTOUT_MONOLITH
+#if !USE_CMAKE
 import PartoutCore
 #endif
 
