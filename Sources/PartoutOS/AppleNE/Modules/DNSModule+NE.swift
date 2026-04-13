@@ -7,54 +7,51 @@ import NetworkExtension
 extension DNSModule: NESettingsApplying {
     public func apply(_ ctx: PartoutLoggerContext, to settings: inout NEPacketTunnelNetworkSettings) {
         let dnsSettings: NEDNSSettings
+        let domains: [String]
 
-        // Reuse DNS servers/domains from VPN if desired
-        let rawServers: [String]
-        let rawDomainName: String?
-        let rawDomains: [String]?
-        if inheritsVPN == true {
-            rawServers = settings.dnsSettings?.servers ?? []
-            rawDomainName = settings.dnsSettings?.domainName
-            rawDomains = settings.dnsSettings?.searchDomains
+        // Reuse DNS settings from VPN if desired (and if any)
+        if inheritsVPN == true, let currentDNSSettings = settings.dnsSettings {
+            dnsSettings = currentDNSSettings
+            domains = dnsSettings.searchDomains ?? []
         } else {
-            rawServers = servers.map(\.rawValue)
-            rawDomainName = domainName?.rawValue
-            rawDomains = searchDomains?.map(\.rawValue)
-        }
+            let rawServers = servers.map(\.rawValue)
+            let rawDomainName = domainName?.rawValue
+            let rawDomains = searchDomains?.map(\.rawValue)
+            domains = rawDomains ?? []
 
-        // Former DNS settings are always overridden, even with empty servers
-        switch protocolType {
-        case .cleartext:
-            guard !rawServers.isEmpty else {
-                pp_log(ctx, .os, .error, "\t\tSkip DNS settings, cleartext requires non-empty servers")
-                return
+            // Former DNS settings are always overridden, even with empty servers
+            switch protocolType {
+            case .cleartext:
+                guard !rawServers.isEmpty else {
+                    pp_log(ctx, .os, .error, "\t\tSkip DNS settings, cleartext requires non-empty servers")
+                    return
+                }
+                dnsSettings = NEDNSSettings(servers: rawServers)
+                pp_log(ctx, .os, .info, "\t\tServers: \(servers.map { $0.asSensitiveAddress(ctx) })")
+            case .https(let url):
+                let specificSettings = NEDNSOverHTTPSSettings(servers: rawServers)
+                specificSettings.serverURL = url
+                dnsSettings = specificSettings
+                pp_log(ctx, .os, .info, "\t\tServers: \(servers.map { $0.asSensitiveAddress(ctx) })")
+                pp_log(ctx, .os, .info, "\t\tDoH URL: \(url.absoluteString.asSensitiveAddress(ctx))")
+            case .tls(let hostname):
+                let specificSettings = NEDNSOverTLSSettings(servers: rawServers)
+                specificSettings.serverName = hostname
+                dnsSettings = specificSettings
+                pp_log(ctx, .os, .info, "\t\tServers: \(servers.map { $0.asSensitiveAddress(ctx) })")
+                pp_log(ctx, .os, .info, "\t\tDoT hostname: \(hostname.asSensitiveAddress(ctx))")
+            @unknown default:
+                break
             }
-            dnsSettings = NEDNSSettings(servers: rawServers)
-            pp_log(ctx, .os, .info, "\t\tServers: \(servers.map { $0.asSensitiveAddress(ctx) })")
-        case .https(let url):
-            let specificSettings = NEDNSOverHTTPSSettings(servers: rawServers)
-            specificSettings.serverURL = url
-            dnsSettings = specificSettings
-            pp_log(ctx, .os, .info, "\t\tServers: \(servers.map { $0.asSensitiveAddress(ctx) })")
-            pp_log(ctx, .os, .info, "\t\tDoH URL: \(url.absoluteString.asSensitiveAddress(ctx))")
-        case .tls(let hostname):
-            let specificSettings = NEDNSOverTLSSettings(servers: rawServers)
-            specificSettings.serverName = hostname
-            dnsSettings = specificSettings
-            pp_log(ctx, .os, .info, "\t\tServers: \(servers.map { $0.asSensitiveAddress(ctx) })")
-            pp_log(ctx, .os, .info, "\t\tDoT hostname: \(hostname.asSensitiveAddress(ctx))")
-        @unknown default:
-            break
-        }
 
-        // Main domain (if set)
-        rawDomainName.map {
-            dnsSettings.domainName = $0
-            pp_log(ctx, .os, .info, "\t\tDomain: \($0.asSensitiveAddress(ctx))")
+            // Main domain (if set)
+            rawDomainName.map {
+                dnsSettings.domainName = $0
+                pp_log(ctx, .os, .info, "\t\tDomain: \($0.asSensitiveAddress(ctx))")
+            }
         }
 
         // Apply domains with the given policy
-        let domains = rawDomains ?? []
         let domainsDescription = domains.map { $0.asSensitiveAddress(ctx) }
         let searchDomains = domains
         //
