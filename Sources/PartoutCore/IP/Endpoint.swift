@@ -12,7 +12,7 @@ public struct Endpoint: Hashable, Codable, Sendable {
 
     public init(_ rawAddress: String, _ port: UInt16) throws {
         guard let address = Address(rawValue: rawAddress) else {
-            throw PartoutError.invalidFields(["rawAddress": rawAddress])
+            throw PartoutError(.invalidValue)
         }
         self.init(address, port)
     }

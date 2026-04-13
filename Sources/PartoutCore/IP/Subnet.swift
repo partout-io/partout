@@ -23,19 +23,19 @@ public struct Subnet: Hashable, Codable, Sendable {
 
     public init(_ rawAddress: String, _ prefixLength: Int) throws {
         guard let address = Address(rawValue: rawAddress) else {
-            throw PartoutError.invalidFields(["rawAddress": rawAddress])
+            throw PartoutError(.invalidValue)
         }
         switch address.family {
         case .v4:
             guard prefixLength <= 32 else {
-                throw PartoutError.invalidFields(["rawAddress": rawAddress])
+                throw PartoutError(.invalidValue)
             }
         case .v6:
             guard prefixLength <= 128 else {
-                throw PartoutError.invalidFields(["rawAddress": rawAddress])
+                throw PartoutError(.invalidValue)
             }
         default:
-            throw PartoutError.invalidFields(["rawAddress": rawAddress])
+            throw PartoutError(.invalidValue)
         }
         // Should never fail because the preconditions are checked here
         self.init(address, prefixLength)!

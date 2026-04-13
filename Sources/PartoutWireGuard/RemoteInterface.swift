@@ -66,23 +66,23 @@ extension WireGuard.RemoteInterface {
 
         public func build() throws -> WireGuard.RemoteInterface {
             guard let validPublicKey = WireGuard.Key(rawValue: publicKey) else {
-                throw PartoutError.invalidFields(["publicKey": publicKey])
+                throw PartoutError.invalidField(.WireGuard.publicKey)
             }
             let validPreSharedKey = try preSharedKey.map {
                 guard let key = WireGuard.Key(rawValue: $0) else {
-                    throw PartoutError.invalidFields(["preSharedKey": $0])
+                    throw PartoutError.invalidField(.WireGuard.preSharedKey)
                 }
                 return key
             }
             let validEndpoint = try endpoint.map {
                 guard let ep = Endpoint(rawValue: $0) else {
-                    throw PartoutError.invalidFields(["endpoint": $0])
+                    throw PartoutError.invalidField(.WireGuard.endpoint)
                 }
                 return ep
             }
             let validAllowedIPs = try allowedIPs.map {
                 guard let addr = Subnet(rawValue: $0) else {
-                    throw PartoutError.invalidFields(["allowedIPs": $0])
+                    throw PartoutError.invalidField(.WireGuard.allowedIPs)
                 }
                 return addr
             }
@@ -155,4 +155,12 @@ private extension Subnet {
             fatalError("Cannot build: \(error)")
         }
     }()
+}
+
+extension PartoutError.ModuleField.WireGuard {
+    private static let root = "WireGuard"
+    public static let publicKey = PartoutError.ModuleField("\(root).publicKey")
+    public static let preSharedKey = PartoutError.ModuleField("\(root).preSharedKey")
+    public static let endpoint = PartoutError.ModuleField("\(root).endpoint")
+    public static let allowedIPs = PartoutError.ModuleField("\(root).allowedIPs")
 }

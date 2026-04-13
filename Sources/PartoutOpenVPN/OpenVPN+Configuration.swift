@@ -450,10 +450,10 @@ extension OpenVPN.Configuration {
             let fallbackCipher: OpenVPN.Cipher?
             if isClient {
                 guard ca != nil else {
-                    throw PartoutError.invalidFields(["ca": nil])
+                    throw PartoutError.invalidField(.OpenVPN.ca)
                 }
                 guard !(remotes?.isEmpty ?? true) else {
-                    throw PartoutError.invalidFields(["remotes": nil])
+                    throw PartoutError.invalidField(.OpenVPN.remotes)
                 }
                 fallbackCipher = cipher ?? .aes128cbc
             } else {
@@ -743,4 +743,12 @@ private func toPullMask(from noPullMask: [OpenVPN.PullMask]?) -> [OpenVPN.PullMa
     }
     let pulled = Array(Set(all).subtracting(notPulled))
     return !pulled.isEmpty ? pulled : nil
+}
+
+extension PartoutError.ModuleField {
+    public enum OpenVPN {
+        private static let root = "OpenVPN"
+        public static let ca = PartoutError.ModuleField("\(root).ca")
+        public static let remotes = PartoutError.ModuleField("\(root).remotes")
+    }
 }

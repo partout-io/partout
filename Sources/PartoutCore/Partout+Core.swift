@@ -120,24 +120,33 @@ extension PartoutError.Code {
 // MARK: Validation
 
 extension PartoutError.Code {
-
     /// Invalid field.
-    public static let invalidFields = Self("invalidFields")
+    public static let invalidField = Self("invalidField")
+
+    /// Invalid value.
+    public static let invalidValue = Self("invalidValue")
 
     /// Parsing error.
     public static let parsing = Self("parsing")
 }
 
 extension PartoutError {
-    public static func invalidFields(_ fields: [String: String?]) -> Self {
-        Self(.invalidFields, fields)
+    public struct ModuleField: Equatable, Sendable {
+        public let key: String
+
+        public init(_ key: String) {
+            self.key = key
+        }
+    }
+
+    public static func invalidField(_ key: ModuleField) -> Self {
+        Self(.invalidField, key)
     }
 }
 
 // MARK: Keychain
 
 extension PartoutError.Code {
-
     /// Unable to add keychain item.
     public static let keychainAddItem = Self("keychainAddItem")
 
