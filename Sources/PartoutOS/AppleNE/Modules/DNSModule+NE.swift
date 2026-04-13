@@ -7,17 +7,17 @@ import NetworkExtension
 extension DNSModule: NESettingsApplying {
     public func apply(_ ctx: PartoutLoggerContext, to settings: inout NEPacketTunnelNetworkSettings) {
         let dnsSettings: NEDNSSettings
-        let domains: [String]
+        let rawDomains: [String]
 
         // Reuse DNS settings from VPN if desired (and if any)
         if inheritsVPN == true, let currentDNSSettings = settings.dnsSettings {
             dnsSettings = currentDNSSettings
-            domains = dnsSettings.searchDomains ?? []
+
+            // Reuse search domains for matching
+            rawDomains = dnsSettings.searchDomains ?? []
         } else {
             let rawServers = servers.map(\.rawValue)
-            let rawDomainName = domainName?.rawValue
-            let rawDomains = searchDomains?.map(\.rawValue)
-            domains = rawDomains ?? []
+            rawDomains = searchDomains?.map(\.rawValue) ?? []
 
             // Former DNS settings are always overridden, even with empty servers
             switch protocolType {
@@ -45,15 +45,15 @@ extension DNSModule: NESettingsApplying {
             }
 
             // Main domain (if set)
-            rawDomainName.map {
-                dnsSettings.domainName = $0
+            domainName.map {
+                dnsSettings.domainName = $0.rawValue
                 pp_log(ctx, .os, .info, "\t\tDomain: \($0.asSensitiveAddress(ctx))")
             }
         }
 
         // Apply domains with the given policy
-        let domainsDescription = domains.map { $0.asSensitiveAddress(ctx) }
-        let searchDomains = domains
+        let domainsDescription = rawDomains.map { $0.asSensitiveAddress(ctx) }
+        let searchDomains = rawDomains
         //
         // Credit for .matchDomains:
         // https://github.com/WireGuard/wireguard-apple/pull/11
@@ -81,7 +81,7 @@ extension DNSModule: NESettingsApplying {
                 dnsSettings.matchDomainsNoSearch = false
                 pp_log(ctx, .os, .info, "\t\tSearch-only domains: \(domainsDescription)")
             }
-        } else if !domains.isEmpty {
+        } else if !rawDomains.isEmpty {
             //
             // This is why we guard before committing .matchDomains:
             // https://git.zx2c4.com/wireguard-apple/commit/?id=20bdf46792905de8862ae7641e50e0f9f99ec946
