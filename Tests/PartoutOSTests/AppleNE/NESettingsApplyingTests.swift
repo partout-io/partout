@@ -131,8 +131,9 @@ struct NESettingsApplyingTests {
         let vpnSearchDomains = ["domain.com", "one.com", "two.com"]
 
         let module = try DNSModule.Builder(
-            protocolType: .cleartext,
+            protocolType: .https,
             servers: moduleServers,
+            dohURL: "https://foo.bar/",
             domains: moduleSearchDomains,
             inheritsVPN: inheritsVPN,
             isFirstDomainPrimary: true
@@ -147,16 +148,17 @@ struct NESettingsApplyingTests {
         module.apply(.global, to: &sut)
 
         let dnsSettings = try #require(sut.dnsSettings)
-        #expect(dnsSettings.dnsProtocol == .cleartext)
         switch inheritsVPN {
         case true:
+            #expect(dnsSettings.dnsProtocol == .cleartext)
             #expect(dnsSettings.servers == vpnServers)
             #expect(dnsSettings.domainName == vpnDomainName)
             #expect(dnsSettings.searchDomains == vpnSearchDomains)
         case false:
+            #expect(dnsSettings.dnsProtocol == .HTTPS)
             #expect(dnsSettings.servers == moduleServers)
             #expect(dnsSettings.domainName == moduleDomainName)
-            #expect(dnsSettings.searchDomains == moduleSearchDomains)
+            #expect(dnsSettings.searchDomains == nil)
         }
     }
 
