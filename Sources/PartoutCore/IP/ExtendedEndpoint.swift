@@ -23,7 +23,7 @@ public struct ExtendedEndpoint: Hashable, Codable, Sendable {
 
     public init(_ rawAddress: String, _ proto: EndpointProtocol) throws {
         guard let address = Address(rawValue: rawAddress) else {
-            throw PartoutError.invalidFields(["rawAddress": rawAddress])
+            throw PartoutError(.invalidValue)
         }
         self.init(address, proto)
     }

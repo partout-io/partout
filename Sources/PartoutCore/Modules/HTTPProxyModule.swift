@@ -88,26 +88,26 @@ extension HTTPProxyModule {
             if !address.isEmpty, port > 0 {
                 guard let addressObject = Address(rawValue: address),
                       addressObject.isIPAddress else {
-                    throw PartoutError.invalidFields(["address": address])
+                    throw PartoutError.invalidField(.HTTPProxy.address)
                 }
                 proxy = Endpoint(addressObject, port)
             }
             if !secureAddress.isEmpty, securePort > 0 {
                 guard let secureAddressObject = Address(rawValue: secureAddress),
                       secureAddressObject.isIPAddress else {
-                    throw PartoutError.invalidFields(["secureAddress": secureAddress])
+                    throw PartoutError.invalidField(.HTTPProxy.secureAddress)
                 }
                 secureProxy = Endpoint(secureAddressObject, securePort)
             }
             if !pacURLString.isEmpty {
                 pacURL = URL(string: pacURLString)
                 guard pacURL != nil else {
-                    throw PartoutError.invalidFields(["pacURLString": pacURLString])
+                    throw PartoutError.invalidField(.HTTPProxy.pacURLString)
                 }
             }
             let validBypassDomains = try bypassDomains.map {
                 guard let addr = Address(rawValue: $0), !addr.isIPAddress else {
-                    throw PartoutError.invalidFields(["bypassDomain": $0])
+                    throw PartoutError.invalidField(.HTTPProxy.bypassDomains)
                 }
                 return addr
             }
@@ -119,5 +119,15 @@ extension HTTPProxyModule {
                 bypassDomains: validBypassDomains
             )
         }
+    }
+}
+
+extension PartoutError.ModuleField {
+    public enum HTTPProxy {
+        private static let root = "HTTPProxy"
+        public static let address = PartoutError.ModuleField("\(root).address")
+        public static let secureAddress = PartoutError.ModuleField("\(root).secureAddress")
+        public static let pacURLString = PartoutError.ModuleField("\(root).pacURLString")
+        public static let bypassDomains = PartoutError.ModuleField("\(root).bypassDomains")
     }
 }

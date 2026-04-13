@@ -152,7 +152,7 @@ extension DNSModule {
                         return nil as Address?
                     }
                     guard let addr = Address(rawValue: $0), addr.isIPAddress else {
-                        throw PartoutError.invalidFields(["servers": $0])
+                        throw PartoutError.invalidField(.DNS.nonIPServers)
                     }
                     return addr
                 }
@@ -161,26 +161,26 @@ extension DNSModule {
                         return nil as Address?
                     }
                     guard let addr = Address(rawValue: $0), !addr.isIPAddress else {
-                        throw PartoutError.invalidFields(["domains": $0])
+                        throw PartoutError.invalidField(.DNS.ipDomains)
                     }
                     return addr
                 }
                 switch protocolType {
                 case .cleartext:
                     guard !validServers.isEmpty else {
-                        throw PartoutError.invalidFields(["servers": nil])
+                        throw PartoutError.invalidField(.DNS.emptyServers)
                     }
                     validProtocolType = .cleartext
                 case .https:
                     guard !dohURL.isEmpty,
                           let url = URL(string: dohURL),
                           url.scheme == "https" else {
-                        throw PartoutError.invalidFields(["dohURL": dohURL])
+                        throw PartoutError.invalidField(.DNS.invalidDoHURL)
                     }
                     validProtocolType = .https(url: url)
                 case .tls:
                     guard !dotHostname.isEmpty else {
-                        throw PartoutError.invalidFields(["dotHostname": nil])
+                        throw PartoutError.invalidField(.DNS.emptyDoTHostname)
                     }
                     validProtocolType = .tls(hostname: dotHostname)
                 }
@@ -325,5 +325,16 @@ extension DNSModule.ProtocolType {
         if let hostname {
             try container.encode(hostname, forKey: .hostname)
         }
+    }
+}
+
+extension PartoutError.ModuleField {
+    public enum DNS {
+        private static let root = "DNS"
+        public static let emptyServers = PartoutError.ModuleField("\(root).emptyServers")
+        public static let nonIPServers = PartoutError.ModuleField("\(root).nonIPServers")
+        public static let ipDomains = PartoutError.ModuleField("\(root).ipDomains")
+        public static let invalidDoHURL = PartoutError.ModuleField("\(root).dohURL")
+        public static let emptyDoTHostname = PartoutError.ModuleField("\(root).emptyDoTHostname")
     }
 }

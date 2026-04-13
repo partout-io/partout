@@ -12,7 +12,7 @@ extension StandardWireGuardParser: ModuleBuilderValidator {
             return
         }
         do {
-            let quickConfig = configurationBuilder.toQuickConfig()
+            let quickConfig = try configurationBuilder.toQuickConfig()
             _ = try WireGuard.Configuration(fromWgQuickConfig: quickConfig)
         } catch {
             throw PartoutError(.parsing, error)
@@ -21,7 +21,7 @@ extension StandardWireGuardParser: ModuleBuilderValidator {
 }
 
 private extension WireGuard.Configuration.Builder {
-    func toQuickConfig() -> String {
+    func toQuickConfig() throws -> String {
         var lines: [String] = []
 
         lines.append("[Interface]")
@@ -30,6 +30,16 @@ private extension WireGuard.Configuration.Builder {
             lines.append("Address = \(interface.addresses.wgJoined)")
         }
         if let dns = interface.dns {
+            try dns.servers.forEach {
+                guard let addr = Address(rawValue: $0), addr.isIPAddress else {
+                    throw PartoutError.invalidField(.DNS.nonIPServers)
+                }
+            }
+            try dns.domains?.forEach {
+                guard let addr = Address(rawValue: $0), !addr.isIPAddress else {
+                    throw PartoutError.invalidField(.DNS.ipDomains)
+                }
+            }
             let dnsEntries = dns.servers + (dns.domains ?? [])
             if !dnsEntries.isEmpty {
                 lines.append("DNS = \(dnsEntries.wgJoined)")

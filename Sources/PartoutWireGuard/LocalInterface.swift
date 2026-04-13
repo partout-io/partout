@@ -60,11 +60,11 @@ extension WireGuard.LocalInterface {
 
         public func build() throws -> WireGuard.LocalInterface {
             guard let validPrivateKey = WireGuard.Key(rawValue: privateKey) else {
-                throw PartoutError.invalidFields(["privateKey": privateKey])
+                throw PartoutError.invalidField(.WireGuard.privateKey)
             }
             let validAddresses = try addresses.map {
                 guard let addr = Subnet(rawValue: $0) else {
-                    throw PartoutError.invalidFields(["addresses": $0])
+                    throw PartoutError.invalidField(.WireGuard.addresses)
                 }
                 return addr
             }
@@ -75,5 +75,13 @@ extension WireGuard.LocalInterface {
                 mtu: mtu
             )
         }
+    }
+}
+
+extension PartoutError.ModuleField {
+    public enum WireGuard {
+        private static let root = "WireGuard"
+        public static let privateKey = PartoutError.ModuleField("\(root).privateKey")
+        public static let addresses = PartoutError.ModuleField("\(root).addresses")
     }
 }
