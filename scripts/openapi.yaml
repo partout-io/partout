@@ -43,9 +43,11 @@ components:
     DNSModule.DomainPolicy:
       enum:
         - match
+        - matchAndSearch
       type: string
       x-enum-varnames:
         - match
+        - matchAndSearch
     DNSModule.ProtocolType:
       discriminator:
         mapping:
