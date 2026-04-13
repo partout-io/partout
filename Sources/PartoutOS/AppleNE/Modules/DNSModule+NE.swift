@@ -62,6 +62,12 @@ extension DNSModule: NESettingsApplying {
             switch domainPolicy {
             case .match:
                 let matchDomains = !searchDomains.isEmpty ? searchDomains : [""]
+                dnsSettings.searchDomains = nil
+                dnsSettings.matchDomains = matchDomains
+                dnsSettings.matchDomainsNoSearch = true
+                pp_log(ctx, .os, .info, "\t\tMatch-only domains: \(domainsDescription)")
+            case .matchAndSearch:
+                let matchDomains = !searchDomains.isEmpty ? searchDomains : [""]
                 dnsSettings.searchDomains = searchDomains
                 dnsSettings.matchDomains = matchDomains
                 dnsSettings.matchDomainsNoSearch = false
