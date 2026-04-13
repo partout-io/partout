@@ -22,7 +22,7 @@ struct PartoutErrorTests {
             throw SomeMappableError()
         } catch {
             let sut = PartoutError(error)
-            #expect(sut == PartoutError.invalidField(.DNS.domains))
+            #expect(sut == PartoutError.invalidField(.DNS.ipDomains))
         }
     }
 
@@ -42,7 +42,7 @@ private extension PartoutErrorTests {
 
     struct SomeMappableError: Error, PartoutErrorMappable {
         var asPartoutError: PartoutError {
-            .invalidField(.DNS.domains)
+            .invalidField(.DNS.ipDomains)
         }
     }
 
