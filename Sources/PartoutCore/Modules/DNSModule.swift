@@ -29,6 +29,8 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
 
     public let searchDomains: [Address]?
 
+    public let inheritsVPN: Bool?
+
     public let domainPolicy: DomainPolicy?
 
     public let routesThroughVPN: Bool?
@@ -39,6 +41,7 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
         servers: [Address],
         domainName: Address?,
         searchDomains: [Address]?,
+        inheritsVPN: Bool?,
         domainPolicy: DomainPolicy?,
         routesThroughVPN: Bool?
     ) {
@@ -47,6 +50,7 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
         self.servers = servers
         self.domainName = domainName
         self.searchDomains = searchDomains
+        self.inheritsVPN = inheritsVPN
         self.domainPolicy = domainPolicy
         self.routesThroughVPN = routesThroughVPN
     }
@@ -81,6 +85,7 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
             builder.isFirstDomainPrimary = false
             builder.domains = searchDomains.map(\.rawValue)
         }
+        builder.inheritsVPN = inheritsVPN ?? false
         builder.domainPolicy = domainPolicy
         builder.routesThroughVPN = routesThroughVPN
         return builder
@@ -101,6 +106,8 @@ extension DNSModule {
 
         public var domains: [String]?
 
+        public var inheritsVPN: Bool
+
         public var domainPolicy: DomainPolicy?
 
         public var isFirstDomainPrimary: Bool
@@ -118,6 +125,7 @@ extension DNSModule {
             dohURL: String = "",
             dotHostname: String = "",
             domains: [String]? = nil,
+            inheritsVPN: Bool = false,
             domainPolicy: DomainPolicy? = .matchAndSearch,
             isFirstDomainPrimary: Bool = false,
             routesThroughVPN: Bool? = nil
@@ -128,49 +136,58 @@ extension DNSModule {
             self.dohURL = dohURL
             self.dotHostname = dotHostname
             self.domains = domains
+            self.inheritsVPN = inheritsVPN
             self.domainPolicy = domainPolicy
             self.isFirstDomainPrimary = isFirstDomainPrimary
             self.routesThroughVPN = routesThroughVPN
         }
 
         public func build() throws -> DNSModule {
-            let validServers = try servers.compactMap {
-                guard !$0.isEmpty else {
-                    return nil as Address?
+            let validServers: [Address]
+            let validDomains: [Address]?
+            let validProtocolType: DNSModule.ProtocolType
+            if inheritsVPN != true {
+                validServers = try servers.compactMap {
+                    guard !$0.isEmpty else {
+                        return nil as Address?
+                    }
+                    guard let addr = Address(rawValue: $0), addr.isIPAddress else {
+                        throw PartoutError.invalidFields(["servers": $0])
+                    }
+                    return addr
                 }
-                guard let addr = Address(rawValue: $0), addr.isIPAddress else {
-                    throw PartoutError.invalidFields(["servers": $0])
+                validDomains = try domains?.compactMap {
+                    guard !$0.isEmpty else {
+                        return nil as Address?
+                    }
+                    guard let addr = Address(rawValue: $0), !addr.isIPAddress else {
+                        throw PartoutError.invalidFields(["domains": $0])
+                    }
+                    return addr
                 }
-                return addr
-            }
-            let validDomains = try domains?.compactMap {
-                guard !$0.isEmpty else {
-                    return nil as Address?
+                switch protocolType {
+                case .cleartext:
+                    guard !validServers.isEmpty else {
+                        throw PartoutError.invalidFields(["servers": nil])
+                    }
+                    validProtocolType = .cleartext
+                case .https:
+                    guard !dohURL.isEmpty,
+                          let url = URL(string: dohURL),
+                          url.scheme == "https" else {
+                        throw PartoutError.invalidFields(["dohURL": dohURL])
+                    }
+                    validProtocolType = .https(url: url)
+                case .tls:
+                    guard !dotHostname.isEmpty else {
+                        throw PartoutError.invalidFields(["dotHostname": nil])
+                    }
+                    validProtocolType = .tls(hostname: dotHostname)
                 }
-                guard let addr = Address(rawValue: $0), !addr.isIPAddress else {
-                    throw PartoutError.invalidFields(["domains": $0])
-                }
-                return addr
-            }
-            let validProtocolType: ProtocolType
-            switch protocolType {
-            case .cleartext:
-                guard !validServers.isEmpty else {
-                    throw PartoutError.invalidFields(["servers": nil])
-                }
+            } else {
+                validServers = []
+                validDomains = nil
                 validProtocolType = .cleartext
-            case .https:
-                guard !dohURL.isEmpty,
-                      let url = URL(string: dohURL),
-                      url.scheme == "https" else {
-                    throw PartoutError.invalidFields(["dohURL": dohURL])
-                }
-                validProtocolType = .https(url: url)
-            case .tls:
-                guard !dotHostname.isEmpty else {
-                    throw PartoutError.invalidFields(["dotHostname": nil])
-                }
-                validProtocolType = .tls(hostname: dotHostname)
             }
             return DNSModule(
                 id: id,
@@ -178,6 +195,7 @@ extension DNSModule {
                 servers: validServers,
                 domainName: isFirstDomainPrimary ? validDomains?.first : nil,
                 searchDomains: validDomains,
+                inheritsVPN: inheritsVPN,
                 domainPolicy: domainPolicy,
                 routesThroughVPN: routesThroughVPN
             )

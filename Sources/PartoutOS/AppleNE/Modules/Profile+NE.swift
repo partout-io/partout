@@ -93,8 +93,9 @@ extension Profile {
             } else {
                 pp_log(ctx, .os, .info, "\tRoute DNS outside the VPN")
             }
-            dnsModule.servers.forEach {
-                switch $0 {
+            neSettings.dnsSettings?.servers.forEach {
+                guard let addr = Address(rawValue: $0) else { return }
+                switch addr {
                 case .ip(let addr, let family):
                     switch family {
                     case .v4:
