@@ -65,7 +65,7 @@ extension DNSModule: NESettingsApplying {
                 dnsSettings.searchDomains = searchDomains
                 dnsSettings.matchDomains = matchDomains
                 dnsSettings.matchDomainsNoSearch = false
-                pp_log(ctx, .os, .info, "\t\tMatch domains: \(domainsDescription)")
+                pp_log(ctx, .os, .info, "\t\tMatch/Search domains: \(domainsDescription)")
             default:
                 // XXX: .searchDomains is ineffective when the VPN is not the default
                 // gateway. Appending .searchDomains to .matchDomains would be a partial
