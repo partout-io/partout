@@ -2,7 +2,7 @@
 // Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
 import Network
-#if !PARTOUT_MONOLITH
+#if !USE_CMAKE
 import PartoutCore
 #endif
 

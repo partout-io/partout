@@ -17,7 +17,7 @@ let envDocs = env["PP_BUILD_DOCS"] == "1"
 
 let areas = Area.allCases
 let cryptoMode: CryptoMode? = .openSSL
-let openSSLVersion: Version = "3.6.200" // 3.6.1
+let openSSLVersion: Version = "3.6.300" // 3.6.2
 let wgGoVersion: Version = "0.0.2025063103"
 let cmakeOutput = envCMakeOutput ?? "bin/windows-arm64"
 let useFoundationCompatibility: FoundationCompatibility = .off

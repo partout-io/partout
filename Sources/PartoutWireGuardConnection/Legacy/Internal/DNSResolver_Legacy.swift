@@ -2,13 +2,13 @@
 // Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
 import Network
-#if !PARTOUT_MONOLITH
+#if !USE_CMAKE
 import PartoutCore
 #endif
 
-enum DNSResolver {}
+enum WireGuard_DNSResolver {}
 
-extension DNSResolver {
+extension WireGuard_DNSResolver {
 
     /// Concurrent queue used for DNS resolutions
     private static let resolverQueue = DispatchQueue(label: "DNSResolverQueue", qos: .default, attributes: .concurrent)
@@ -30,7 +30,7 @@ extension DNSResolver {
             if endpoint.hasHostAsIPAddress() {
                 return .success(endpoint)
             } else {
-                return Result { try DNSResolver.resolveSync(endpoint: endpoint) }
+                return Result { try WireGuard_DNSResolver.resolveSync(endpoint: endpoint) }
                     .mapError { error -> DNSResolutionError in
                         // swiftlint:disable:next force_cast
                         return error as! DNSResolutionError

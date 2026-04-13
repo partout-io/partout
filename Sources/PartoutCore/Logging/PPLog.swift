@@ -42,7 +42,7 @@ public func pp_log(
 }
 
 /// Logs to the global context from C code.
-@_cdecl("pp_clog")
+@c(pp_clog)
 public func pp_clog(
     _ cCategory: UnsafePointer<CChar>,
     _ cLevel: Int,

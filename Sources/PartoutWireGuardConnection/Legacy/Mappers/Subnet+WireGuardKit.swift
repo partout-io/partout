@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Network
-#if !PARTOUT_MONOLITH
+#if !USE_CMAKE
 import PartoutCore
 #endif
 
