@@ -142,43 +142,51 @@ extension DNSModule {
         }
 
         public func build() throws -> DNSModule {
-            let validServers = try servers.compactMap {
-                guard !$0.isEmpty else {
-                    return nil as Address?
+            let validServers: [Address]
+            let validDomains: [Address]?
+            let validProtocolType: DNSModule.ProtocolType
+            if inheritsVPN != true {
+                validServers = try servers.compactMap {
+                    guard !$0.isEmpty else {
+                        return nil as Address?
+                    }
+                    guard let addr = Address(rawValue: $0), addr.isIPAddress else {
+                        throw PartoutError.invalidFields(["servers": $0])
+                    }
+                    return addr
                 }
-                guard let addr = Address(rawValue: $0), addr.isIPAddress else {
-                    throw PartoutError.invalidFields(["servers": $0])
+                validDomains = try domains?.compactMap {
+                    guard !$0.isEmpty else {
+                        return nil as Address?
+                    }
+                    guard let addr = Address(rawValue: $0), !addr.isIPAddress else {
+                        throw PartoutError.invalidFields(["domains": $0])
+                    }
+                    return addr
                 }
-                return addr
-            }
-            let validDomains = try domains?.compactMap {
-                guard !$0.isEmpty else {
-                    return nil as Address?
+                switch protocolType {
+                case .cleartext:
+                    guard !validServers.isEmpty else {
+                        throw PartoutError.invalidFields(["servers": nil])
+                    }
+                    validProtocolType = .cleartext
+                case .https:
+                    guard !dohURL.isEmpty,
+                          let url = URL(string: dohURL),
+                          url.scheme == "https" else {
+                        throw PartoutError.invalidFields(["dohURL": dohURL])
+                    }
+                    validProtocolType = .https(url: url)
+                case .tls:
+                    guard !dotHostname.isEmpty else {
+                        throw PartoutError.invalidFields(["dotHostname": nil])
+                    }
+                    validProtocolType = .tls(hostname: dotHostname)
                 }
-                guard let addr = Address(rawValue: $0), !addr.isIPAddress else {
-                    throw PartoutError.invalidFields(["domains": $0])
-                }
-                return addr
-            }
-            let validProtocolType: ProtocolType
-            switch protocolType {
-            case .cleartext:
-                guard !validServers.isEmpty else {
-                    throw PartoutError.invalidFields(["servers": nil])
-                }
+            } else {
+                validServers = []
+                validDomains = nil
                 validProtocolType = .cleartext
-            case .https:
-                guard !dohURL.isEmpty,
-                      let url = URL(string: dohURL),
-                      url.scheme == "https" else {
-                    throw PartoutError.invalidFields(["dohURL": dohURL])
-                }
-                validProtocolType = .https(url: url)
-            case .tls:
-                guard !dotHostname.isEmpty else {
-                    throw PartoutError.invalidFields(["dotHostname": nil])
-                }
-                validProtocolType = .tls(hostname: dotHostname)
             }
             return DNSModule(
                 id: id,
