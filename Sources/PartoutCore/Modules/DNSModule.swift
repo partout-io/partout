@@ -126,7 +126,7 @@ extension DNSModule {
             dotHostname: String = "",
             domains: [String]? = nil,
             inheritsVPN: Bool = false,
-            domainPolicy: DomainPolicy? = .matchAndSearch,
+            domainPolicy: DomainPolicy? = nil,
             isFirstDomainPrimary: Bool = false,
             routesThroughVPN: Bool? = nil
         ) {
