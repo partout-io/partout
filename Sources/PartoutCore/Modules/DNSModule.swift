@@ -334,7 +334,7 @@ extension PartoutError.ModuleField {
         public static let emptyServers = PartoutError.ModuleField("\(root).emptyServers")
         public static let nonIPServers = PartoutError.ModuleField("\(root).nonIPServers")
         public static let ipDomains = PartoutError.ModuleField("\(root).ipDomains")
-        public static let invalidDoHURL = PartoutError.ModuleField("\(root).dohURL")
+        public static let invalidDoHURL = PartoutError.ModuleField("\(root).invalidDoHURL")
         public static let emptyDoTHostname = PartoutError.ModuleField("\(root).emptyDoTHostname")
     }
 }
