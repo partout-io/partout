@@ -13,7 +13,7 @@ public final class NetworkObserver: @unchecked Sendable {
     private let isStatusReady: (ConnectionStatus) -> Bool
 
     /// Publishes when the network state is ready for reconnection.
-    public let onReady: PassthroughStream<Void>
+    public let onReady: CurrentValueStream<Bool>
 
     private var subscriptions: [Task<Void, Never>]
 
@@ -34,7 +34,7 @@ public final class NetworkObserver: @unchecked Sendable {
         state = AtomicState()
         signalSubject = CurrentValueStream(false)
         self.isStatusReady = isStatusReady
-        onReady = PassthroughStream()
+        onReady = CurrentValueStream(false)
         subscriptions = []
 
         observeObjects(reachabilityStream, statusStream)
@@ -56,7 +56,7 @@ private extension NetworkObserver {
         guard isSatisfied else {
             return
         }
-        onReady.send()
+        onReady.send(true)
     }
 }
 

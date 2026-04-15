@@ -4,7 +4,6 @@
 
 /// Publishes path updates.
 public protocol ReachabilityObserver: AnyObject, Sendable {
-
     /// Starts observing network events.
     func startObserving()
 
