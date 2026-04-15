@@ -23,6 +23,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private let reconnectionDelay: Int
 
+    private let onStatus: ((ConnectionStatus) -> Void)?
+
     private var connection: Connection?
 
     private let networkObserver: NetworkObserver?
@@ -62,6 +64,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         messageHandler = params.messageHandler
         stopDelay = params.stopDelay
         reconnectionDelay = params.reconnectionDelay
+        onStatus = params.onStatus
 
         isStarted = false
         isStopped = false
@@ -335,6 +338,7 @@ extension SimpleConnectionDaemon {
             controller.setReasserting(false)
             resumeNetworkObserver(after: reconnectionDelay)
         }
+        onStatus?(connectionStatus)
     }
 
     func onConnectionError(_ error: Error) {
@@ -357,18 +361,22 @@ extension SimpleConnectionDaemon {
 
         let reconnectionDelay: Int
 
+        let onStatus: ((ConnectionStatus) -> Void)?
+
         public init(
             connectionFactory: ConnectionFactory,
             connectionParameters: ConnectionParameters,
             messageHandler: MessageHandler,
             stopDelay: Int? = nil,
-            reconnectionDelay: Int? = nil
+            reconnectionDelay: Int? = nil,
+            onStatus: ((ConnectionStatus) -> Void)? = nil
         ) {
             self.connectionFactory = connectionFactory
             self.connectionParameters = connectionParameters
             self.messageHandler = messageHandler
             self.stopDelay = stopDelay ?? 2000
             self.reconnectionDelay = reconnectionDelay ?? 2000
+            self.onStatus = onStatus
         }
     }
 }

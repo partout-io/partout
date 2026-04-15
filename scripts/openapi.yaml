@@ -2,6 +2,18 @@ components:
   schemas:
     Address:
       type: string
+    ConnectionStatus:
+      enum:
+        - disconnected
+        - connecting
+        - connected
+        - disconnecting
+      type: string
+      x-enum-varnames:
+        - disconnected
+        - connecting
+        - connected
+        - disconnecting
     CustomModule:
       additionalProperties: false
       properties:
