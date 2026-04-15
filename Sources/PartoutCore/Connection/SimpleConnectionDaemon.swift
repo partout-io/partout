@@ -125,15 +125,11 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
                 // Monitor network events
                 observeEvents()
-
-                // Start the first connection right away
-                await evaluateConnection()
             }
             // Otherwise, configure the tunnel immediately
             else {
                 settingsOnlyTunnel = try await controller.setTunnelSettings(with: nil)
             }
-
             pp_log_id(profile.id, .core, .notice, "Daemon started successfully")
         } catch {
             pp_log_id(profile.id, .core, .fault, "Unable to start daemon: \(error)")
@@ -141,6 +137,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             controller.setReasserting(false)
             controller.cancelTunnelConnection(with: error)
         }
+        networkObserver?.setEnabled(true)
     }
 
     public func hold() async {
