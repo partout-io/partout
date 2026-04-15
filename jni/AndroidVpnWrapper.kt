@@ -12,7 +12,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 // WARNING: These methods are called from a JNI background thread
-class PartoutVpnWrapper: AutoCloseable {
+class AndroidVpnWrapper: AutoCloseable {
     private val logTag = "Partout"
     private val service: VpnService
     private val builder: VpnService.Builder

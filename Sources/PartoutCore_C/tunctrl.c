@@ -153,7 +153,7 @@ void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t f
         elem = NULL;
     }
 
-    // Call VpnWrapper.configureSockets()
+    // Call wrapper.configureSockets()
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
         pp_clog(PPLogCategoryCore, PPLogLevelError, "configure_sockets(): GetObjectClass returned NULL");
@@ -189,10 +189,10 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, void *tun_impl) {
 
     // Release the tun_impl allocated in set_tunnel
     vpn_impl *impl = tun_impl;
-    // Do not close impl->fd, PartoutVpnWrapper.close() will take care
+    // Do not close impl->fd, wrapper.close() will take care
     free(impl);
 
-    // Call PartoutVpnWrapper.close()
+    // Call wrapper.close()
     JNIEnv *env;
     (*jvm)->AttachCurrentThread(jvm, &env, NULL);
     jclass cls = (*env)->GetObjectClass(env, jni_ref);
