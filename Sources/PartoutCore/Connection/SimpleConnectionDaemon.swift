@@ -170,7 +170,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         clearEnvironment()
 
         // Cancel pending tasks to avoid leaks
-        statusSubscription?.cancel()
+//        statusSubscription?.cancel()
         networkSubscription?.cancel()
         networkObserverTask?.cancel()
 
@@ -219,6 +219,7 @@ extension SimpleConnectionDaemon {
         assert(networkSubscription == nil)
 
         // Observe the connection status (except the initial .disconnected)
+        statusSubscription?.cancel()
         statusSubscription = Task { [weak self] in
             guard let self else { return }
             do {
