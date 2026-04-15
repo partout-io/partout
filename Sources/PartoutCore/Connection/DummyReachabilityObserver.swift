@@ -4,9 +4,14 @@
 
 /// A ``ReachabilityObserver`` that never emits reachable events (for development).
 public final class DummyReachabilityObserver: ReachabilityObserver {
-    public init() {}
+    private let stream: CurrentValueStream<Bool>
+
+    public init() {
+        stream = CurrentValueStream(false)
+    }
 
     public func startObserving() {
+        stream.send(true)
     }
 
     public var isReachable: Bool {
@@ -15,6 +20,6 @@ public final class DummyReachabilityObserver: ReachabilityObserver {
 
     // BEWARE that true will emit INFINITE events (CPU 100%)
     public var isReachableStream: AsyncStream<Bool> {
-        AsyncStream { nil }
+        stream.subscribe()
     }
 }
