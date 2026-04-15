@@ -50,6 +50,7 @@ public actor NEPTPForwarder {
             connectionFactory: connectionFactory,
             connectionParameters: connectionParameters,
             messageHandler: messageHandler,
+            startsImmediately: true,
             stopDelay: stopDelay,
             reconnectionDelay: reconnectionDelay
         )

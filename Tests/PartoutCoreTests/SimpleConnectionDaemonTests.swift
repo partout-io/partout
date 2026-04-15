@@ -197,6 +197,7 @@ private extension SimpleConnectionDaemonTests {
                 options: options
             ),
             messageHandler: DefaultMessageHandler(.global, environment: environment),
+            startsImmediately: false,
             stopDelay: stopDelay,
             reconnectionDelay: reconnectionDelay
         ))

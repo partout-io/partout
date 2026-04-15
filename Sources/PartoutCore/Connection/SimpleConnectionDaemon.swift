@@ -19,9 +19,13 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private let messageHandler: MessageHandler
 
+    private let startsImmediately: Bool
+
     private let stopDelay: Int
 
     private let reconnectionDelay: Int
+
+    private let onStatus: StatusCallback?
 
     private var connection: Connection?
 
@@ -60,8 +64,10 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         controller = params.connectionParameters.controller
         reachability = params.connectionParameters.reachability
         messageHandler = params.messageHandler
+        startsImmediately = params.startsImmediately
         stopDelay = params.stopDelay
         reconnectionDelay = params.reconnectionDelay
+        onStatus = params.onStatus
 
         isStarted = false
         isStopped = false
@@ -124,19 +130,23 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
                 observeEvents()
 
                 // Start the first connection right away
-                await evaluateConnection()
+                if startsImmediately {
+                    await evaluateConnection()
+                }
             }
             // Otherwise, configure the tunnel immediately
             else {
                 settingsOnlyTunnel = try await controller.setTunnelSettings(with: nil)
             }
-
             pp_log_id(profile.id, .core, .notice, "Daemon started successfully")
         } catch {
             pp_log_id(profile.id, .core, .fault, "Unable to start daemon: \(error)")
             environment.setEnvironmentValue(PartoutError(error).code, forKey: TunnelEnvironmentKeys.lastErrorCode)
             controller.setReasserting(false)
             controller.cancelTunnelConnection(with: error)
+        }
+        if !startsImmediately {
+            networkObserver?.setEnabled(true)
         }
     }
 
@@ -170,7 +180,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         clearEnvironment()
 
         // Cancel pending tasks to avoid leaks
-        statusSubscription?.cancel()
+//        statusSubscription?.cancel()
         networkSubscription?.cancel()
         networkObserverTask?.cancel()
 
@@ -218,11 +228,19 @@ extension SimpleConnectionDaemon {
         assert(statusSubscription == nil)
         assert(networkSubscription == nil)
 
+        // IMPORTANT: Create streams BEFORE Task blocks. If we create
+        // onNetworkReadyStream inside a Task, we might miss early
+        // onReady events because Task objects might be executed after
+        // the events are delivered.
+        let connectionStatusStream = connection.statusStream.dropFirst()
+        let onNetworkReadyStream = networkObserver.onReady.subscribe()
+
         // Observe the connection status (except the initial .disconnected)
+        statusSubscription?.cancel()
         statusSubscription = Task { [weak self] in
             guard let self else { return }
             do {
-                for try await status in connection.statusStream.dropFirst() {
+                for try await status in connectionStatusStream {
                     guard !Task.isCancelled else {
                         pp_log_id(profile.id, .core, .debug, "Cancelled SimpleConnectionDaemon.statusStream")
                         return
@@ -237,7 +255,8 @@ extension SimpleConnectionDaemon {
         // Observe the network for starting the connection
         networkSubscription = Task { [weak self] in
             guard let self else { return }
-            for await _ in networkObserver.onReady.subscribe() {
+            for await isReady in onNetworkReadyStream {
+                guard isReady else { continue }
                 guard !Task.isCancelled else {
                     pp_log_id(profile.id, .core, .debug, "Cancelled NetworkObserver.onReady")
                     return
@@ -335,6 +354,7 @@ extension SimpleConnectionDaemon {
             controller.setReasserting(false)
             resumeNetworkObserver(after: reconnectionDelay)
         }
+        onStatus?(profile.id, connectionStatus)
     }
 
     func onConnectionError(_ error: Error) {
@@ -346,6 +366,8 @@ extension SimpleConnectionDaemon {
 // MARK: - Parameters
 
 extension SimpleConnectionDaemon {
+    public typealias StatusCallback = @Sendable (Profile.ID, ConnectionStatus) -> Void
+
     public final class Parameters: Sendable {
         let connectionFactory: ConnectionFactory
 
@@ -353,22 +375,30 @@ extension SimpleConnectionDaemon {
 
         let messageHandler: MessageHandler
 
+        let startsImmediately: Bool
+
         let stopDelay: Int
 
         let reconnectionDelay: Int
+
+        let onStatus: StatusCallback?
 
         public init(
             connectionFactory: ConnectionFactory,
             connectionParameters: ConnectionParameters,
             messageHandler: MessageHandler,
+            startsImmediately: Bool,
             stopDelay: Int? = nil,
-            reconnectionDelay: Int? = nil
+            reconnectionDelay: Int? = nil,
+            onStatus: StatusCallback? = nil
         ) {
             self.connectionFactory = connectionFactory
             self.connectionParameters = connectionParameters
             self.messageHandler = messageHandler
+            self.startsImmediately = startsImmediately
             self.stopDelay = stopDelay ?? 2000
             self.reconnectionDelay = reconnectionDelay ?? 2000
+            self.onStatus = onStatus
         }
     }
 }
