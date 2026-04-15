@@ -218,12 +218,15 @@ extension SimpleConnectionDaemon {
         assert(statusSubscription == nil)
         assert(networkSubscription == nil)
 
+        let connectionStatusStream = connection.statusStream.dropFirst()
+        let onNetworkReadyStream = networkObserver.onReady.subscribe()
+
         // Observe the connection status (except the initial .disconnected)
         statusSubscription?.cancel()
         statusSubscription = Task { [weak self] in
             guard let self else { return }
             do {
-                for try await status in connection.statusStream.dropFirst() {
+                for try await status in connectionStatusStream {
                     guard !Task.isCancelled else {
                         pp_log_id(profile.id, .core, .debug, "Cancelled SimpleConnectionDaemon.statusStream")
                         return
@@ -238,7 +241,7 @@ extension SimpleConnectionDaemon {
         // Observe the network for starting the connection
         networkSubscription = Task { [weak self] in
             guard let self else { return }
-            for await _ in networkObserver.onReady.subscribe() {
+            for await _ in onNetworkReadyStream {
                 guard !Task.isCancelled else {
                     pp_log_id(profile.id, .core, .debug, "Cancelled NetworkObserver.onReady")
                     return
