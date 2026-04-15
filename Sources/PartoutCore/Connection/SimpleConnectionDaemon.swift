@@ -23,7 +23,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private let reconnectionDelay: Int
 
-    private let onStatus: ((ConnectionStatus) -> Void)?
+    private let onStatus: StatusCallback?
 
     private var connection: Connection?
 
@@ -335,7 +335,7 @@ extension SimpleConnectionDaemon {
             controller.setReasserting(false)
             resumeNetworkObserver(after: reconnectionDelay)
         }
-        onStatus?(connectionStatus)
+        onStatus?(profile.id, connectionStatus)
     }
 
     func onConnectionError(_ error: Error) {
@@ -347,6 +347,8 @@ extension SimpleConnectionDaemon {
 // MARK: - Parameters
 
 extension SimpleConnectionDaemon {
+    public typealias StatusCallback = @Sendable (Profile.ID, ConnectionStatus) -> Void
+
     public final class Parameters: Sendable {
         let connectionFactory: ConnectionFactory
 
@@ -358,7 +360,7 @@ extension SimpleConnectionDaemon {
 
         let reconnectionDelay: Int
 
-        let onStatus: ((ConnectionStatus) -> Void)?
+        let onStatus: StatusCallback?
 
         public init(
             connectionFactory: ConnectionFactory,
@@ -366,7 +368,7 @@ extension SimpleConnectionDaemon {
             messageHandler: MessageHandler,
             stopDelay: Int? = nil,
             reconnectionDelay: Int? = nil,
-            onStatus: ((ConnectionStatus) -> Void)? = nil
+            onStatus: StatusCallback? = nil
         ) {
             self.connectionFactory = connectionFactory
             self.connectionParameters = connectionParameters
