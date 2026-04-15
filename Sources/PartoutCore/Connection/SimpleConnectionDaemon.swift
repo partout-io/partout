@@ -19,6 +19,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private let messageHandler: MessageHandler
 
+    private let startsImmediately: Bool
+
     private let stopDelay: Int
 
     private let reconnectionDelay: Int
@@ -62,6 +64,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         controller = params.connectionParameters.controller
         reachability = params.connectionParameters.reachability
         messageHandler = params.messageHandler
+        startsImmediately = params.startsImmediately
         stopDelay = params.stopDelay
         reconnectionDelay = params.reconnectionDelay
         onStatus = params.onStatus
@@ -125,6 +128,11 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
                 // Monitor network events
                 observeEvents()
+
+                // Start the first connection right away
+                if startsImmediately {
+                    await evaluateConnection()
+                }
             }
             // Otherwise, configure the tunnel immediately
             else {
@@ -137,7 +145,9 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             controller.setReasserting(false)
             controller.cancelTunnelConnection(with: error)
         }
-        networkObserver?.setEnabled(true)
+        if !startsImmediately {
+            networkObserver?.setEnabled(true)
+        }
     }
 
     public func hold() async {
@@ -365,6 +375,8 @@ extension SimpleConnectionDaemon {
 
         let messageHandler: MessageHandler
 
+        let startsImmediately: Bool
+
         let stopDelay: Int
 
         let reconnectionDelay: Int
@@ -375,6 +387,7 @@ extension SimpleConnectionDaemon {
             connectionFactory: ConnectionFactory,
             connectionParameters: ConnectionParameters,
             messageHandler: MessageHandler,
+            startsImmediately: Bool,
             stopDelay: Int? = nil,
             reconnectionDelay: Int? = nil,
             onStatus: StatusCallback? = nil
@@ -382,6 +395,7 @@ extension SimpleConnectionDaemon {
             self.connectionFactory = connectionFactory
             self.connectionParameters = connectionParameters
             self.messageHandler = messageHandler
+            self.startsImmediately = startsImmediately
             self.stopDelay = stopDelay ?? 2000
             self.reconnectionDelay = reconnectionDelay ?? 2000
             self.onStatus = onStatus
