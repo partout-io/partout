@@ -218,6 +218,10 @@ extension SimpleConnectionDaemon {
         assert(statusSubscription == nil)
         assert(networkSubscription == nil)
 
+        // IMPORTANT: Create streams BEFORE Task blocks. If we create
+        // onNetworkReadyStream inside a Task, we might miss early
+        // onReady events because Task objects might be executed after
+        // the events are delivered.
         let connectionStatusStream = connection.statusStream.dropFirst()
         let onNetworkReadyStream = networkObserver.onReady.subscribe()
 
