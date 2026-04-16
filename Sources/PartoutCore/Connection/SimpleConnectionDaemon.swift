@@ -171,6 +171,11 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         // Prevent reconnection
         networkObserver?.setEnabled(false)
 
+        // Cancel subscriptions before stopping connection
+//        statusSubscription?.cancel()
+        networkSubscription?.cancel()
+        networkObserverTask?.cancel()
+
         // If there is a connection, disconnect with a timeout
         if let connection {
             pp_log_id(profile.id, .core, .notice, "Connection profile, disconnect with a timeout of \(stopDelay) milliseconds")
@@ -186,11 +191,6 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
         // Make sure to clear environment on stop, especially last error code
         clearEnvironment()
-
-        // Cancel pending tasks to avoid leaks
-//        statusSubscription?.cancel()
-        networkSubscription?.cancel()
-        networkObserverTask?.cancel()
         networkObserver = nil
         connection = nil
 
