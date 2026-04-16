@@ -47,7 +47,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
             fwd = try NEPTPForwarder(
                 ctx,
                 profile: profile,
-                registry: .shared,
+                connectionFactory: Registry.shared,
                 controller: controller,
                 environment: environment
             )

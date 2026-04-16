@@ -79,7 +79,7 @@ private extension ContentView {
         Section {
             ForEach(profile.modules, id: \.id) { module in
                 HStack {
-                    Button(module.moduleHandler.id.rawValue) {
+                    Button(module.moduleType.rawValue) {
                         onTapModule(module)
                     }
                     if profile.isActiveModule(withId: module.id) {

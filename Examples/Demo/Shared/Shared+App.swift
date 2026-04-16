@@ -12,7 +12,7 @@ extension Demo.Log {
 // MARK: - Implementations
 
 extension Registry {
-    static let shared = Registry()
+    static let shared = Registry(withKnown: true)
 }
 
 extension TunnelObservable {
