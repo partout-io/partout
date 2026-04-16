@@ -272,6 +272,10 @@ extension SimpleConnectionDaemon {
     }
 
     func evaluateConnection() async {
+        guard state == .started else {
+            pp_log_id(profile.id, .core, .info, "Ignore evaluation, daemon not started")
+            return
+        }
         guard let connection, let networkObserver else {
             assertionFailure("Calling evaluateConnection() without a connection?")
             return
@@ -324,7 +328,7 @@ extension SimpleConnectionDaemon {
 
     func resumeNetworkObserver(after delay: Int) {
         guard state == .started else {
-            pp_log_id(profile.id, .core, .info, "Ignore resume network observer, daemon unstarted or stopped")
+            pp_log_id(profile.id, .core, .info, "Ignore resume network observer, daemon not started")
             return
         }
         guard !onHold else {
