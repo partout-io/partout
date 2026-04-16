@@ -4,6 +4,11 @@
 
 /// Basic implementation of ``ConnectionDaemon``.
 public actor SimpleConnectionDaemon: ConnectionDaemon {
+    private enum State {
+        case initial
+        case started
+        case stopped
+    }
 
     // MARK: Initialization
 
@@ -33,9 +38,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     // MARK: State
 
-    private var isStarted: Bool
-
-    private var isStopped: Bool
+    private var state: State
 
     private var isEvaluatingConnection: Bool
 
@@ -69,8 +72,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         reconnectionDelay = params.reconnectionDelay
         onStatus = params.onStatus
 
-        isStarted = false
-        isStopped = false
+        state = .initial
         isEvaluatingConnection = false
         onHold = false
 
@@ -114,10 +116,11 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     }
 
     public func start() async throws {
-        assert(!isStarted, "Daemon already started")
-        assert(!isStopped, "Daemon stopped and cannot restart")
-        guard !isStarted && !isStopped else { return }
-        isStarted = true
+        guard state == .initial else {
+            assertionFailure("Daemon may only start once")
+            return
+        }
+        state = .started
         do {
             pp_log_id(profile.id, .core, .notice, "Start daemon")
             clearEnvironment()
@@ -151,14 +154,17 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     }
 
     public func hold() async {
+        guard !onHold else { return }
         onHold = true
         await stop()
     }
 
     public func stop() async {
-        assert(isStarted || onHold, "Daemon not started or on hold")
-        guard isStarted && !isStopped else { return }
-        isStopped = true
+        guard state != .stopped else {
+            assertionFailure("Daemon is stopped")
+            return
+        }
+        state = .stopped
 
         pp_log_id(profile.id, .core, .notice, "Stop daemon (\(onHold ? "keep" : "clear") environment)")
 
@@ -190,8 +196,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     }
 
     public func destroy() {
-        assert(isStopped, "Daemon not stopped")
-        guard isStopped else { return }
+        assert(state == .stopped, "Daemon not stopped")
         connection = nil
     }
 
@@ -205,9 +210,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
 private extension SimpleConnectionDaemon {
     func clearEnvironment() {
-        guard !onHold else {
-            return
-        }
+        guard !onHold else { return }
         pp_log_id(profile.id, .core, .notice, "Clear connection environment")
         environment.removeEnvironmentValue(forKey: TunnelEnvironmentKeys.connectionStatus)
         environment.removeEnvironmentValue(forKey: TunnelEnvironmentKeys.dataCount)
@@ -323,8 +326,8 @@ extension SimpleConnectionDaemon {
     }
 
     func resumeNetworkObserver(after delay: Int) {
-        guard isStarted && !isStopped else {
-            pp_log_id(profile.id, .core, .info, "Ignore resume network observer, daemon is stopped")
+        guard state == .started else {
+            pp_log_id(profile.id, .core, .info, "Ignore resume network observer, daemon unstarted or stopped")
             return
         }
         guard !onHold else {
