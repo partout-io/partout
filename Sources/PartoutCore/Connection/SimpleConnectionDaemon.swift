@@ -157,7 +157,9 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     public func stop() async {
         assert(isStarted || onHold, "Daemon not started or on hold")
-        guard isStarted else { return }
+        guard isStarted && !isStopped else { return }
+        isStopped = true
+
         pp_log_id(profile.id, .core, .notice, "Stop daemon (\(onHold ? "keep" : "clear") environment)")
 
         // Prevent reconnection
@@ -185,7 +187,6 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         networkObserverTask?.cancel()
 
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
-        isStopped = true
     }
 
     public func destroy() {
