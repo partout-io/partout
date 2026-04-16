@@ -30,11 +30,11 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private let reconnectionDelay: Int
 
-    private let onStatus: StatusCallback?
+    private var onStatus: StatusCallback?
 
     private var connection: Connection?
 
-    private let networkObserver: NetworkObserver?
+    private var networkObserver: NetworkObserver?
 
     // MARK: State
 
@@ -191,6 +191,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 //        statusSubscription?.cancel()
         networkSubscription?.cancel()
         networkObserverTask?.cancel()
+        networkObserver = nil
+        connection = nil
 
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
     }
@@ -339,7 +341,7 @@ extension SimpleConnectionDaemon {
 
             guard !Task.isCancelled else { return }
             pp_log_id(profile.id, .core, .info, "Resume network observer now")
-            networkObserver?.setEnabled(true)
+            await networkObserver?.setEnabled(true)
         }
     }
 
