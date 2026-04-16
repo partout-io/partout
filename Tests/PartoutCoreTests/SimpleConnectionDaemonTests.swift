@@ -140,7 +140,6 @@ struct SimpleConnectionDaemonTests {
         reachability.isReachable = false
         await sut.stop()
         #expect(await stream.nextElement() == .disconnected)
-        await sut.destroy()
     }
 
     @Test

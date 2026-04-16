@@ -4,6 +4,11 @@
 
 /// Basic implementation of ``ConnectionDaemon``.
 public actor SimpleConnectionDaemon: ConnectionDaemon {
+    private enum State {
+        case initial
+        case started
+        case stopped
+    }
 
     // MARK: Initialization
 
@@ -25,17 +30,15 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private let reconnectionDelay: Int
 
-    private let onStatus: StatusCallback?
+    private var onStatus: StatusCallback?
 
     private var connection: Connection?
 
-    private let networkObserver: NetworkObserver?
+    private var networkObserver: NetworkObserver?
 
     // MARK: State
 
-    private var isStarted: Bool
-
-    private var isStopped: Bool
+    private var state: State
 
     private var isEvaluatingConnection: Bool
 
@@ -69,8 +72,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         reconnectionDelay = params.reconnectionDelay
         onStatus = params.onStatus
 
-        isStarted = false
-        isStopped = false
+        state = .initial
         isEvaluatingConnection = false
         onHold = false
 
@@ -114,10 +116,11 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     }
 
     public func start() async throws {
-        assert(!isStarted, "Daemon already started")
-        assert(!isStopped, "Daemon stopped and cannot restart")
-        guard !isStarted && !isStopped else { return }
-        isStarted = true
+        guard state == .initial else {
+            assertionFailure("Daemon may only start once")
+            return
+        }
+        state = .started
         do {
             pp_log_id(profile.id, .core, .notice, "Start daemon")
             clearEnvironment()
@@ -151,13 +154,18 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     }
 
     public func hold() async {
+        guard !onHold else { return }
         onHold = true
         await stop()
     }
 
     public func stop() async {
-        assert(isStarted || onHold, "Daemon not started or on hold")
-        guard isStarted else { return }
+        guard state != .stopped else {
+            assertionFailure("Daemon is stopped")
+            return
+        }
+        state = .stopped
+
         pp_log_id(profile.id, .core, .notice, "Stop daemon (\(onHold ? "keep" : "clear") environment)")
 
         // Prevent reconnection
@@ -183,15 +191,10 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 //        statusSubscription?.cancel()
         networkSubscription?.cancel()
         networkObserverTask?.cancel()
+        networkObserver = nil
+        connection = nil
 
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
-        isStopped = true
-    }
-
-    public func destroy() {
-        assert(isStopped, "Daemon not stopped")
-        guard isStopped else { return }
-        connection = nil
     }
 
     public func sendMessage(_ input: Message.Input) async throws -> Message.Output? {
@@ -204,9 +207,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
 private extension SimpleConnectionDaemon {
     func clearEnvironment() {
-        guard !onHold else {
-            return
-        }
+        guard !onHold else { return }
         pp_log_id(profile.id, .core, .notice, "Clear connection environment")
         environment.removeEnvironmentValue(forKey: TunnelEnvironmentKeys.connectionStatus)
         environment.removeEnvironmentValue(forKey: TunnelEnvironmentKeys.dataCount)
@@ -322,6 +323,10 @@ extension SimpleConnectionDaemon {
     }
 
     func resumeNetworkObserver(after delay: Int) {
+        guard state == .started else {
+            pp_log_id(profile.id, .core, .info, "Ignore resume network observer, daemon unstarted or stopped")
+            return
+        }
         guard !onHold else {
             pp_log_id(profile.id, .core, .info, "Ignore resume network observer, daemon on hold")
             return
@@ -336,7 +341,7 @@ extension SimpleConnectionDaemon {
 
             guard !Task.isCancelled else { return }
             pp_log_id(profile.id, .core, .info, "Resume network observer now")
-            networkObserver?.setEnabled(true)
+            await networkObserver?.setEnabled(true)
         }
     }
 
