@@ -12,7 +12,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 // WARNING: These methods are called from a JNI background thread
-class PartoutVpnWrapper: AutoCloseable {
+class AndroidTunnelController: AutoCloseable {
     private val logTag = "Partout"
     private val service: VpnService
     private val builder: VpnService.Builder
@@ -25,7 +25,7 @@ class PartoutVpnWrapper: AutoCloseable {
     }
 
     fun testWorking() {
-        Log.e(logTag, ">>> PartoutVpnWrapper: Working!")
+        Log.e(logTag, ">>> AndroidTunnelController: Working!")
     }
 
     fun setAddress(address: String, prefix: Int) {
@@ -36,11 +36,11 @@ class PartoutVpnWrapper: AutoCloseable {
         assert(descriptor == null)
 
         // Decode info
-        Log.e(logTag, ">>> PartoutVpnWrapper: infoJSON = $infoJSON")
+        Log.e(logTag, ">>> AndroidTunnelController: infoJSON = $infoJSON")
         val info: TunnelRemoteInfoWrapper = try {
             Json.decodeFromString(infoJSON)
         } catch (e: SerializationException) {
-            Log.e(logTag, ">>> PartoutVpnWrapper: Failed to decode tunnel info JSON", e)
+            Log.e(logTag, ">>> AndroidTunnelController: Failed to decode tunnel info JSON", e)
             return null
         }
         val remoteFds = info.fileDescriptors
@@ -64,7 +64,7 @@ class PartoutVpnWrapper: AutoCloseable {
         }
 
         // Protect remote socket to escape tunnel
-        Log.e(logTag, ">>> PartoutVpnWrapper: Building with remoteFds = " + remoteFds + " (" + remoteFds.size + ")")
+        Log.e(logTag, ">>> AndroidTunnelController: Building with remoteFds = " + remoteFds + " (" + remoteFds.size + ")")
         remoteFds.forEach {
             service.protect(it)
         }
@@ -94,29 +94,29 @@ class PartoutVpnWrapper: AutoCloseable {
         builder.setBlocking(true)
 
         // Get fd to tun device
-        Log.e(logTag, ">>> PartoutVpnWrapper: Establishing...")
+        Log.e(logTag, ">>> AndroidTunnelController: Establishing...")
         descriptor = builder.establish()
         if (descriptor == null) {
-            Log.e(logTag, ">>> PartoutVpnWrapper: Unable to establish")
+            Log.e(logTag, ">>> AndroidTunnelController: Unable to establish")
             return null
         }
 
         // Success
         val fd = descriptor?.fd
-        Log.e(logTag, ">>> PartoutVpnWrapper: Established descriptor: " + fd)
+        Log.e(logTag, ">>> AndroidTunnelController: Established descriptor: " + fd)
 //        descriptor?.detachFd()
         return fd
     }
 
     fun configureSockets(fds: Array<Int>) {
-        Log.e(logTag, ">>> PartoutVpnWrapper: Configuring with fds = " + fds + " (" + fds.size + ")")
+        Log.e(logTag, ">>> AndroidTunnelController: Configuring with fds = " + fds + " (" + fds.size + ")")
         fds.forEach {
             service.protect(it)
         }
     }
 
     override fun close() {
-        Log.e(logTag, ">>> PartoutVpnWrapper: Closing...")
+        Log.e(logTag, ">>> AndroidTunnelController: Closing...")
         descriptor?.close()
         descriptor = null
     }
