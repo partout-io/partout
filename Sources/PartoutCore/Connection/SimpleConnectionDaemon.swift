@@ -322,6 +322,10 @@ extension SimpleConnectionDaemon {
     }
 
     func resumeNetworkObserver(after delay: Int) {
+        guard isStarted && !isStopped else {
+            pp_log_id(profile.id, .core, .info, "Ignore resume network observer, daemon is stopped")
+            return
+        }
         guard !onHold else {
             pp_log_id(profile.id, .core, .info, "Ignore resume network observer, daemon on hold")
             return
