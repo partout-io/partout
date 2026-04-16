@@ -36,6 +36,7 @@ class AndroidTunnelController: AutoCloseable {
         builder.addAddress(address, prefix)
     }
 
+    // FIXME: Pass Profile
     fun build(infoJSON: String): Int? {
         assert(descriptor == null)
 
@@ -79,10 +80,9 @@ class AndroidTunnelController: AutoCloseable {
             service.protect(it)
         }
 
-        // FIXME: register callback to update protected sockets?
-
-        // FIXME: hardcode network settings to try tun fd
-//        builder.setSession()
+        // FIXME: Register callback to update protected sockets?
+        // FIXME: Set session name from profile name
+//        builder.setSession(profile.name)
 
         // IMPORTANT: this is a requirement for VirtualTunnelInterface
         //
