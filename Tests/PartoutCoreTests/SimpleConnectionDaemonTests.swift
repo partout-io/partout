@@ -138,7 +138,7 @@ struct SimpleConnectionDaemonTests {
         #expect(await stream.nextElement() == .connecting)
         #expect(await stream.nextElement() == .connected)
         reachability.isReachable = false
-        await sut.stop()
+        await sut.stop(cleanUp: false)
         #expect(await stream.nextElement() == .disconnected)
     }
 
@@ -165,7 +165,7 @@ struct SimpleConnectionDaemonTests {
         #expect(await stream.nextElement() == .connecting)
         #expect(await stream.nextElement() == .connected)
         reachability.isReachable = false
-        await sut.stop()
+        await sut.stop(cleanUp: false)
         #expect(await stream.nextElement() == .disconnected)
     }
 }
