@@ -160,10 +160,6 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     }
 
     public func stop() async {
-        await stop(cleanUp: true)
-    }
-
-    func stop(cleanUp: Bool) async {
         guard state != .stopped else {
             assertionFailure("Daemon is stopped")
             return
@@ -195,10 +191,6 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
         // Make sure to clear environment on stop, especially last error code
         clearEnvironment()
-        if cleanUp {
-            networkObserver = nil
-            connection = nil
-        }
 
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
     }
