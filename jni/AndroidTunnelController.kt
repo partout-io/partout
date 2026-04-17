@@ -36,6 +36,7 @@ class AndroidTunnelController: AutoCloseable {
         builder.addAddress(address, prefix)
     }
 
+    // FIXME: Pass Profile
     fun build(infoJSON: String): Int? {
         assert(descriptor == null)
 
@@ -48,20 +49,26 @@ class AndroidTunnelController: AutoCloseable {
             return null
         }
         val remoteFds = info.fileDescriptors
+        var appliedAddressSettings = false
+        var appliedDnsSettings = false
 
         info.modules?.forEach {
             when (it) {
                 is TaggedModuleDNS -> {
                     Log.i(logTag, "DNS: ${it.value}")
+                    appliedDnsSettings = it.value.apply(builder) || appliedDnsSettings
                 }
                 is TaggedModuleIP -> {
                     Log.i(logTag, "IP: ${it.value}")
+                    appliedAddressSettings = it.value.apply(builder) || appliedAddressSettings
                 }
                 is TaggedModuleHTTPProxy -> {
                     Log.i(logTag, "HTTP Proxy: ${it.value}")
+                    it.value.apply(builder)
                 }
                 is TaggedModuleOnDemand -> {
                     Log.i(logTag, "OnDemand: ${it.value}")
+                    it.value.apply(builder)
                 }
                 else -> {}
             }
@@ -73,17 +80,9 @@ class AndroidTunnelController: AutoCloseable {
             service.protect(it)
         }
 
-        // FIXME: hardcode network settings to try tun fd
-//        builder.setSession()
-        builder
-            // OpenVPN
-            .addAddress("10.8.0.2", 24)
-            .addRoute("10.8.0.0", 24)
-            // WireGuard
-//            .addAddress("192.168.30.2", 32)
-            // All
-            .addRoute("0.0.0.0", 0)
-            .addDnsServer("1.1.1.1")
+        // FIXME: Register callback to update protected sockets?
+        // FIXME: Set session name from profile name
+//        builder.setSession(profile.name)
 
         // IMPORTANT: this is a requirement for VirtualTunnelInterface
         //
