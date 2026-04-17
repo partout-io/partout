@@ -160,6 +160,10 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     }
 
     public func stop() async {
+        await stop(cleanUp: true)
+    }
+
+    func stop(cleanUp: Bool) async {
         guard state != .stopped else {
             assertionFailure("Daemon is stopped")
             return
@@ -170,6 +174,11 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
         // Prevent reconnection
         networkObserver?.setEnabled(false)
+
+        // Cancel subscriptions before stopping connection
+//        statusSubscription?.cancel()
+        networkSubscription?.cancel()
+        networkObserverTask?.cancel()
 
         // If there is a connection, disconnect with a timeout
         if let connection {
@@ -186,13 +195,10 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
         // Make sure to clear environment on stop, especially last error code
         clearEnvironment()
-
-        // Cancel pending tasks to avoid leaks
-//        statusSubscription?.cancel()
-        networkSubscription?.cancel()
-        networkObserverTask?.cancel()
-        networkObserver = nil
-        connection = nil
+        if cleanUp {
+            networkObserver = nil
+            connection = nil
+        }
 
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
     }
@@ -272,6 +278,10 @@ extension SimpleConnectionDaemon {
     }
 
     func evaluateConnection() async {
+        guard state == .started else {
+            pp_log_id(profile.id, .core, .info, "Ignore evaluation, daemon not started")
+            return
+        }
         guard let connection, let networkObserver else {
             assertionFailure("Calling evaluateConnection() without a connection?")
             return
@@ -324,7 +334,7 @@ extension SimpleConnectionDaemon {
 
     func resumeNetworkObserver(after delay: Int) {
         guard state == .started else {
-            pp_log_id(profile.id, .core, .info, "Ignore resume network observer, daemon unstarted or stopped")
+            pp_log_id(profile.id, .core, .info, "Ignore resume network observer, daemon not started")
             return
         }
         guard !onHold else {
