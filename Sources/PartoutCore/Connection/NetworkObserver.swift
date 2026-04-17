@@ -40,6 +40,10 @@ public final class NetworkObserver: @unchecked Sendable {
         observeObjects(reachabilityStream, statusStream)
     }
 
+    deinit {
+        pp_log(ctx, .core, .info, "Deinit NetworkObserver")
+    }
+
     public func setEnabled(_ isEnabled: Bool) {
         signalSubject.send(isEnabled)
     }
