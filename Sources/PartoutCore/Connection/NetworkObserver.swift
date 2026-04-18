@@ -54,39 +54,42 @@ public final class NetworkObserver: @unchecked Sendable {
             for await signal in signalSubject.subscribe() {
                 guard !Task.isCancelled else {
                     pp_log(ctx, .core, .debug, "Cancelled NetworkObserver.signalSubject")
-                    return
+                    break
                 }
                 guard let newState = await state.setSignal(signal) else {
                     continue
                 }
                 tryReady(newState)
             }
+            pp_log(ctx, .core, .debug, "NetworkObserver.signalSubject terminated")
         }
         let reachabilitySubscription = Task { [weak self] in
             guard let self else { return }
             for await isNetworkAvailable in reachabilityStream {
                 guard !Task.isCancelled else {
                     pp_log(ctx, .core, .debug, "Cancelled NetworkObserver.reachabilityStream")
-                    return
+                    break
                 }
                 guard let newState = await state.setIsNetworkAvailable(isNetworkAvailable) else {
                     continue
                 }
                 tryReady(newState)
             }
+            pp_log(ctx, .core, .debug, "NetworkObserver.reachabilityStream terminated")
         }
         let statusSubscription = Task { [weak self] in
             guard let self else { return }
             for await connectionStatus in statusStream {
                 guard !Task.isCancelled else {
                     pp_log(ctx, .core, .debug, "Cancelled NetworkObserver.statusStream")
-                    return
+                    break
                 }
                 guard let newState = await state.setConnectionStatus(connectionStatus) else {
                     continue
                 }
                 tryReady(newState)
             }
+            pp_log(ctx, .core, .debug, "NetworkObserver.statusStream terminated")
         }
         subscriptions = [signalSubscription, reachabilitySubscription, statusSubscription]
     }
