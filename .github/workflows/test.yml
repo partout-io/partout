@@ -31,3 +31,93 @@ jobs:
       - name: Run tests
         run: |
           swift test
+
+  build_windows:
+    name: Windows x64 build (library)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - uses: compnerd/gha-setup-swift@main
+        with:
+          swift-version: swift-6.3-release
+          swift-build: 6.3-RELEASE
+
+      - name: Configure and build (library only, vendors disabled)
+        shell: pwsh
+        run: |
+          $swiftCommand = Get-Command swift.exe -ErrorAction SilentlyContinue
+          if (-not $swiftCommand) { throw "swift.exe not found on PATH" }
+          $swiftExe = $swiftCommand.Source
+          $toolchainBin = Split-Path $swiftExe -Parent
+          $usrDir = Split-Path $toolchainBin -Parent
+          $toolchainDir = Split-Path $usrDir -Parent
+          $toolchainsDir = Split-Path $toolchainDir -Parent
+          $swiftRoot = Split-Path $toolchainsDir -Parent
+
+          if (-not $env:SDKROOT -or -not (Test-Path $env:SDKROOT)) {
+            $sdkPath = Get-ChildItem (Join-Path $swiftRoot "Platforms\*\Windows.platform\Developer\SDKs\Windows.sdk") -Directory | Select-Object -First 1
+            if (-not $sdkPath) { throw "Windows.sdk not found under Swift install root: $swiftRoot" }
+            $env:SDKROOT = $sdkPath.FullName
+          }
+
+          $targetInfo = swift -print-target-info | ConvertFrom-Json
+          $runtimePaths = @($targetInfo.paths.runtimeLibraryPaths | Where-Object { Test-Path $_ })
+          if ($runtimePaths.Count -eq 0) { throw "Swift runtime paths not found" }
+
+          $env:PATH = "$toolchainBin;$($runtimePaths -join ';');$env:PATH"
+
+          $clangCl = Join-Path $toolchainBin "clang-cl.exe"
+          if (-not (Test-Path $clangCl)) { throw "clang-cl.exe not found: $clangCl" }
+          $ninjaExe = (Get-Command ninja.exe).Source
+          $linkExe = (Get-Command link.exe).Source
+          $libExe = (Get-Command lib.exe).Source
+
+          swift --version
+          cmake --version
+          ninja --version
+          & $clangCl --version
+
+          New-Item -ItemType Directory -Path .cmake -Force | Out-Null
+          Set-Location .cmake
+
+          cmake -G Ninja `
+            -DCMAKE_MAKE_PROGRAM="$ninjaExe" `
+            -DCMAKE_C_COMPILER="$clangCl" `
+            -DCMAKE_CXX_COMPILER="$clangCl" `
+            -DCMAKE_LINKER="$linkExe" `
+            -DCMAKE_AR="$libExe" `
+            -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY `
+            -DPP_BUILD_USE_OPENSSL=OFF `
+            -DPP_BUILD_USE_MBEDTLS=OFF `
+            -DPP_BUILD_USE_WGGO=OFF `
+            -DPP_BUILD_LIBRARY=ON `
+            ..
+
+          if ($LASTEXITCODE -ne 0) { throw "CMake configure failed" }
+
+          cmake --build . --verbose
+
+          if ($LASTEXITCODE -ne 0) { throw "Build failed" }
+
+      - name: Verify artifacts
+        shell: pwsh
+        run: |
+          $libs = @(
+            "bin\windows-amd64\partout\libpartout.lib",
+            "bin\windows-amd64\partout\libpartout_c.lib"
+          )
+
+          foreach ($lib in $libs) {
+            if (-not (Test-Path $lib)) { throw "Missing artifact: $lib" }
+            Write-Host "$lib : $((Get-Item $lib).Length) bytes"
+          }
+
+          dumpbin /headers "bin\windows-amd64\partout\libpartout_c.lib" | Select-String "machine"
