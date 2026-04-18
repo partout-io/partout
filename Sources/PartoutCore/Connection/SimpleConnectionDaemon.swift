@@ -112,7 +112,6 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
         self.connection = connection
         self.networkObserver = networkObserver
-        networkObserver.startObserving()
     }
 
     deinit {
@@ -282,6 +281,7 @@ extension SimpleConnectionDaemon {
         }
 
         // Start monitoring
+        networkObserver.startObserving()
         reachability.startObserving()
     }
 
