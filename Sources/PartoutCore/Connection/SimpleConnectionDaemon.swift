@@ -192,7 +192,14 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
         // Make sure to clear environment on stop, especially last error code
         clearEnvironment()
+
+        // Clean up
+        reachability.stopObserving()
         networkObserver?.stopObserving()
+        networkObserver = nil
+        // NetworkObserver won't deinit until the connected
+        // connection stream finishes
+        connection = nil
 
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
     }
