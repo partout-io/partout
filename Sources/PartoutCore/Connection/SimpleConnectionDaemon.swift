@@ -40,6 +40,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private var state: State
 
+    private let statusSubject: CurrentValueStream<ConnectionStatus>
+
     private var isEvaluatingConnection: Bool
 
     private var onHold: Bool
@@ -73,6 +75,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         onStatus = params.onStatus
 
         state = .initial
+        statusSubject = CurrentValueStream(.disconnected)
         isEvaluatingConnection = false
         onHold = false
 
@@ -202,6 +205,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         connection = nil
 
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
+        reportStatus(.disconnected)
     }
 
     public func sendMessage(_ input: Message.Input) async throws -> Message.Output? {
@@ -225,8 +229,8 @@ private extension SimpleConnectionDaemon {
 // MARK: - Observation
 
 extension SimpleConnectionDaemon {
-    var statusStream: AsyncStream<ConnectionStatus>? {
-        connection?.statusStream.ignoreErrors()
+    nonisolated var statusStream: AsyncStream<ConnectionStatus> {
+        statusSubject.subscribe()
     }
 
     func observeEvents() {
@@ -373,12 +377,17 @@ extension SimpleConnectionDaemon {
             controller.setReasserting(false)
             resumeNetworkObserver(after: reconnectionDelay)
         }
-        onStatus?(profile.id, connectionStatus)
+        reportStatus(connectionStatus)
     }
 
     func onConnectionError(_ error: Error) {
         environment.setEnvironmentValue(PartoutError(error).code, forKey: TunnelEnvironmentKeys.lastErrorCode)
         controller.setReasserting(false)
+    }
+
+    func reportStatus(_ status: ConnectionStatus) {
+        statusSubject.send(status)
+        onStatus?(profile.id, status)
     }
 }
 
