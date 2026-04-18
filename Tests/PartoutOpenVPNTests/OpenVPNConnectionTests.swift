@@ -6,6 +6,13 @@ import PartoutCore
 @testable import PartoutOpenVPNConnection
 import Testing
 
+private typealias OpenVPNConnectionType = OpenVPNConnectionV2
+extension OpenVPNConnectionV2 {
+    var backend: Self {
+        self
+    }
+}
+
 struct OpenVPNConnectionTests {
     private let constants = Constants()
 
@@ -313,14 +320,14 @@ private struct Constants {
         controller: TunnelController = MockTunnelController(),
         factory: NetworkInterfaceFactory = MockNetworkInterfaceFactory(),
         environment: TunnelEnvironment = SharedTunnelEnvironment(profileId: nil)
-    ) async throws -> OpenVPNConnection {
+    ) async throws -> OpenVPNConnectionType {
         let profile = try Profile.Builder().build()
         let impl = OpenVPNModule.Implementation(
             importerBlock: {
                 StandardOpenVPNParser(decrypter: nil)
             },
             connectionBlock: {
-                try OpenVPNConnection(
+                try OpenVPNConnectionType(
                     .global,
                     parameters: $0,
                     module: $1,
@@ -339,7 +346,7 @@ private struct Constants {
             environment: environment,
             options: options
         ))
-        return try #require(conn as? OpenVPNConnection)
+        return try #require(conn as? OpenVPNConnectionType)
     }
 }
 
