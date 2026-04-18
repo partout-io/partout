@@ -28,7 +28,7 @@ protocol OpenVPNSessionDelegate: AnyObject, Sendable {
 }
 
 /// Provides methods to set up and maintain an OpenVPN session.
-protocol OpenVPNSessionProtocol: Sendable {
+protocol OpenVPNSessionProtocol: AnyObject, Sendable {
 
     /// Observe events with a `OpenVPNSessionDelegate`.
     func setDelegate(_ delegate: OpenVPNSessionDelegate) async
