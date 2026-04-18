@@ -48,6 +48,9 @@ if(DEFINED MBEDTLS_DIR)
 else()
     list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/)
 endif()
+if(NOT PP_BUILD_USE_WGGO)
+    list(APPEND EXCLUDED_PATTERNS PartoutWireGuardConnection_C\/)
+endif()
 
 # C sources
 file(GLOB_RECURSE PARTOUT_C_SOURCES *.c *.cc)
