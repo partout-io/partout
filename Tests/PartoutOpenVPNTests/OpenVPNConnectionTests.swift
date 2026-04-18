@@ -404,8 +404,9 @@ private final class MockOpenVPNSession: OpenVPNSessionProtocol, @unchecked Senda
 }
 
 final class MockReachabilityObserver: ReachabilityObserver {
-    func startObserving() {
-    }
+    func startObserving() {}
+
+    func stopObserving() {}
 
     let isReachable = true
 
