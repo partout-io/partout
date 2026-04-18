@@ -74,7 +74,7 @@ public actor OpenVPNConnectionV2 {
     }
 
     deinit {
-        pp_log(ctx, .openvpn, .debug, "Deinit OpenVPNConnection")
+        pp_log(ctx, .openvpn, .debug, "Deinit OpenVPNConnectionV2")
     }
 }
 
@@ -394,10 +394,8 @@ private extension OpenVPNConnectionV2 {
 
     func observeBetterPath(on link: LinkInterface) {
         pathSubscription?.cancel()
-        pathSubscription = Task { [weak self] in
-            guard let self else {
-                return
-            }
+        pathSubscription = Task { [weak self, weak link] in
+            guard let self, let link else { return }
             for await _ in link.hasBetterPath {
                 guard !Task.isCancelled else {
                     pp_log(ctx, .core, .debug, "Cancelled CyclingConnection.pathSubscription")
