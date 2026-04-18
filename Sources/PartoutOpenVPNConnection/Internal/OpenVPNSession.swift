@@ -128,7 +128,7 @@ final class OpenVPNSession {
     }
 
     deinit {
-        pp_log(ctx, .core, .debug, "Deinit OpenVPNSession")
+        pp_log(ctx, .openvpn, .debug, "Deinit OpenVPNSession")
     }
 }
 
