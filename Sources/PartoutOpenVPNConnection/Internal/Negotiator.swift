@@ -30,7 +30,7 @@ final class Negotiator {
 
     let link: LinkInterface
 
-    private var channel: ControlChannel
+    private let channel: ControlChannel
 
     private let prng: PRNGProtocol
 
@@ -122,6 +122,10 @@ final class Negotiator {
         shouldResendWrappedKey = false
     }
 
+    deinit {
+        pp_log(ctx, .openvpn, .debug, "Deinit OpenVPN.Negotiator")
+    }
+
     func forRenegotiation(initiatedBy newRenegotiation: RenegotiationType) -> Negotiator {
         guard let history else {
             pp_log(ctx, .openvpn, .error, "Negotiator has no history (not connected yet?)")
@@ -179,6 +183,8 @@ extension Negotiator {
 
     func cancel() {
         checkNegotiationTask?.cancel()
+        pendingPackets.removeAll()
+        authenticator = nil
     }
 
     func readInboundPacket(withData packet: Data, offset: Int) throws -> CrossPacket {
@@ -269,13 +275,11 @@ private extension Negotiator {
         guard state == .connected else {
             checkNegotiationTask?.cancel()
             checkNegotiationTask = Task { [weak self] in
-                guard let self else {
-                    return
-                }
-                try? await Task.sleep(milliseconds: Int(options.sessionOptions.tickInterval * 1000))
-                guard !Task.isCancelled else {
-                    return
-                }
+                guard let self else { return }
+                try? await Task.sleep(
+                    milliseconds: Int(options.sessionOptions.tickInterval * 1000)
+                )
+                guard !Task.isCancelled else { return }
                 do {
                     try checkNegotiationComplete()
                 } catch {
