@@ -32,10 +32,10 @@ extension OpenVPNSession {
                 pp_log(ctx, .openvpn, .debug, "Exit TUN loop after empty packets")
                 return
             }
-            try await self.receiveTunnel(packets: packets)
+            try await receiveTunnel(packets: packets)
 
             // repeat as long as self and tunnel exist
-            self.loopTunnel()
+            loopTunnel()
         }
     }
 
