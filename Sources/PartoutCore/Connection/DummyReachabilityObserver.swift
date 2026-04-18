@@ -14,6 +14,10 @@ public final class DummyReachabilityObserver: ReachabilityObserver {
         stream.send(true)
     }
 
+    public func stopObserving() {
+        stream.finish()
+    }
+
     public var isReachable: Bool {
         true
     }

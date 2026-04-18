@@ -6,11 +6,15 @@
 public final class NetworkObserver: @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
+    private let reachabilityStream: AsyncStream<Bool>
+
+    private let statusStream: AsyncStream<ConnectionStatus>
+
     private let state: AtomicState
 
     private let signalSubject: CurrentValueStream<Bool>
 
-    private let isStatusReady: (ConnectionStatus) -> Bool
+    private let isStatusReady: @Sendable (ConnectionStatus) -> Bool
 
     /// Publishes when the network state is ready for reconnection.
     public let onReady: CurrentValueStream<Bool>
@@ -28,16 +32,70 @@ public final class NetworkObserver: @unchecked Sendable {
         _ ctx: PartoutLoggerContext,
         reachabilityStream: AsyncStream<Bool>,
         statusStream: AsyncStream<ConnectionStatus>,
-        isStatusReady: @escaping (ConnectionStatus) -> Bool
+        isStatusReady: @escaping @Sendable (ConnectionStatus) -> Bool
     ) {
         self.ctx = ctx
+        self.reachabilityStream = reachabilityStream
+        self.statusStream = statusStream
         state = AtomicState()
         signalSubject = CurrentValueStream(false)
         self.isStatusReady = isStatusReady
         onReady = CurrentValueStream(false)
         subscriptions = []
+    }
 
-        observeObjects(reachabilityStream, statusStream)
+    deinit {
+        pp_log(ctx, .core, .debug, "Deinit NetworkObserver")
+    }
+
+    public func startObserving() {
+        let signalSubscription = Task { [weak self] in
+            guard let self else { return }
+            for await signal in signalSubject.subscribe() {
+                guard !Task.isCancelled else {
+                    pp_log(ctx, .core, .debug, "Cancelled NetworkObserver.signalSubject")
+                    break
+                }
+                guard let newState = await state.setSignal(signal) else {
+                    continue
+                }
+                tryReady(newState)
+            }
+            pp_log(ctx, .core, .debug, "NetworkObserver.signalSubject terminated")
+        }
+        let reachabilitySubscription = Task { [weak self] in
+            guard let self else { return }
+            for await isNetworkAvailable in reachabilityStream {
+                guard !Task.isCancelled else {
+                    pp_log(ctx, .core, .debug, "Cancelled NetworkObserver.reachabilityStream")
+                    break
+                }
+                guard let newState = await state.setIsNetworkAvailable(isNetworkAvailable) else {
+                    continue
+                }
+                tryReady(newState)
+            }
+            pp_log(ctx, .core, .debug, "NetworkObserver.reachabilityStream terminated")
+        }
+        let statusSubscription = Task { [weak self] in
+            guard let self else { return }
+            for await connectionStatus in statusStream {
+                guard !Task.isCancelled else {
+                    pp_log(ctx, .core, .debug, "Cancelled NetworkObserver.statusStream")
+                    break
+                }
+                guard let newState = await state.setConnectionStatus(connectionStatus) else {
+                    continue
+                }
+                tryReady(newState)
+            }
+            pp_log(ctx, .core, .debug, "NetworkObserver.statusStream terminated")
+        }
+        subscriptions = [signalSubscription, reachabilitySubscription, statusSubscription]
+    }
+
+    public func stopObserving() {
+        signalSubject.finish()
     }
 
     public func setEnabled(_ isEnabled: Bool) {
@@ -53,61 +111,8 @@ private extension NetworkObserver {
     func tryReady(_ value: AtomicState.Tuple) {
         let isSatisfied = satisfied(by: value)
         pp_log(ctx, .core, .info, "NetworkObserver.onReady(\(value.debugDescription)) -> \(isSatisfied)")
-        guard isSatisfied else {
-            return
-        }
+        guard isSatisfied else { return }
         onReady.send(true)
-    }
-}
-
-private extension NetworkObserver {
-    func observeObjects(_ reachabilityStream: AsyncStream<Bool>, _ statusStream: AsyncStream<ConnectionStatus>) {
-        let signalSubscription = Task { [weak self] in
-            guard let self else {
-                return
-            }
-            for await signal in signalSubject.subscribe() {
-                guard !Task.isCancelled else {
-                    pp_log(ctx, .core, .debug, "Cancelled NetworkObserver.signalSubject")
-                    return
-                }
-                guard let newState = await state.setSignal(signal) else {
-                    continue
-                }
-                tryReady(newState)
-            }
-        }
-        let reachabilitySubscription = Task { [weak self] in
-            guard let self else {
-                return
-            }
-            for await isNetworkAvailable in reachabilityStream {
-                guard !Task.isCancelled else {
-                    pp_log(ctx, .core, .debug, "Cancelled NetworkObserver.reachabilityStream")
-                    return
-                }
-                guard let newState = await state.setIsNetworkAvailable(isNetworkAvailable) else {
-                    continue
-                }
-                tryReady(newState)
-            }
-        }
-        let statusSubscription = Task { [weak self] in
-            guard let self else {
-                return
-            }
-            for await connectionStatus in statusStream {
-                guard !Task.isCancelled else {
-                    pp_log(ctx, .core, .debug, "Cancelled NetworkObserver.statusStream")
-                    return
-                }
-                guard let newState = await state.setConnectionStatus(connectionStatus) else {
-                    continue
-                }
-                tryReady(newState)
-            }
-        }
-        subscriptions = [signalSubscription, reachabilitySubscription, statusSubscription]
     }
 }
 

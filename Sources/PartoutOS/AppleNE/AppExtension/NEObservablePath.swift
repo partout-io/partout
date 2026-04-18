@@ -36,6 +36,9 @@ public final class NEObservablePath: ReachabilityObserver {
         }
         monitor.start(queue: monitorQueue)
     }
+
+    public func stopObserving() {
+    }
 }
 
 extension NEObservablePath {

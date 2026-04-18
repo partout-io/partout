@@ -28,6 +28,7 @@ struct NetworkObserverTests {
             }
         }
 
+        sut.startObserving()
         reachability.send(true)
         status.send(.connecting)
         try await observerExpectation.fulfillment(timeout: 200)
@@ -61,6 +62,7 @@ struct NetworkObserverTests {
             }
         }
 
+        sut.startObserving()
         reachability.send(true)
         status.send(.connecting)
         status.send(.connected)
@@ -85,6 +87,7 @@ struct NetworkObserverTests {
         )
         let readyStream = sut.onReady.subscribe()
 
+        sut.startObserving()
         sut.setEnabled(true)
         status.send(.disconnected)
         reachability.send(true)          // 1

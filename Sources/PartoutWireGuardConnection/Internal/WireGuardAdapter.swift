@@ -100,7 +100,7 @@ actor WireGuardAdapter {
     }
 
     deinit {
-        pp_log(ctx, .wireguard, .info, "Deinit WireGuardAdapter")
+        pp_log(ctx, .wireguard, .debug, "Deinit WireGuardAdapter")
 
         // Force remove logger to make sure that no further calls to the instance of this class
         // can happen after deallocation.

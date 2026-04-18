@@ -34,7 +34,7 @@ struct SimpleConnectionDaemonTests {
 
         let reachability = MockReachabilityObserver()
         let sut = try await newDaemon(with: profile, reachability: reachability)
-        let stream = try #require(await sut.statusStream)
+        let stream = sut.statusStream
 
         try await sut.start()
         #expect(await stream.nextElement() == .disconnected)
@@ -96,7 +96,7 @@ struct SimpleConnectionDaemonTests {
             reachability: reachability,
             reconnectionDelay: 100
         )
-        let stream = try #require(await sut.statusStream)
+        let stream = sut.statusStream
 
         let expAvailable = Expectation()
         await sut.setTestEvaluateConnection {
@@ -131,14 +131,14 @@ struct SimpleConnectionDaemonTests {
             stopDelay: 100,
             reconnectionDelay: 5000
         )
-        let stream = try #require(await sut.statusStream)
+        let stream = sut.statusStream
 
         try await sut.start()
         #expect(await stream.nextElement() == .disconnected)
         #expect(await stream.nextElement() == .connecting)
         #expect(await stream.nextElement() == .connected)
         reachability.isReachable = false
-        await sut.stop(cleanUp: false)
+        await sut.stop()
         #expect(await stream.nextElement() == .disconnected)
     }
 
@@ -158,14 +158,14 @@ struct SimpleConnectionDaemonTests {
             reachability: reachability,
             stopDelay: 200
         )
-        let stream = try #require(await sut.statusStream)
+        let stream = sut.statusStream
 
         try await sut.start()
         #expect(await stream.nextElement() == .disconnected)
         #expect(await stream.nextElement() == .connecting)
         #expect(await stream.nextElement() == .connected)
         reachability.isReachable = false
-        await sut.stop(cleanUp: false)
+        await sut.stop()
         #expect(await stream.nextElement() == .disconnected)
     }
 }
@@ -214,6 +214,9 @@ private final class MockReachabilityObserver: ReachabilityObserver, @unchecked S
 
     func startObserving() {
         isReachable = true
+    }
+
+    func stopObserving() {
     }
 
     var isReachable: Bool = false {

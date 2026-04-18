@@ -40,6 +40,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private var state: State
 
+    private let statusSubject: CurrentValueStream<ConnectionStatus>
+
     private var isEvaluatingConnection: Bool
 
     private var onHold: Bool
@@ -73,6 +75,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         onStatus = params.onStatus
 
         state = .initial
+        statusSubject = CurrentValueStream(.disconnected)
         isEvaluatingConnection = false
         onHold = false
 
@@ -112,7 +115,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     }
 
     deinit {
-        pp_log_id(profile.id, .core, .info, "Deinit daemon")
+        pp_log_id(profile.id, .core, .debug, "Deinit SimpleConnectionDaemon")
     }
 
     public func start() async throws {
@@ -160,10 +163,6 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     }
 
     public func stop() async {
-        await stop(cleanUp: true)
-    }
-
-    func stop(cleanUp: Bool) async {
         guard state != .stopped else {
             assertionFailure("Daemon is stopped")
             return
@@ -195,12 +194,17 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
         // Make sure to clear environment on stop, especially last error code
         clearEnvironment()
-        if cleanUp {
-            networkObserver = nil
-            connection = nil
-        }
+
+        // Clean up
+        reachability.stopObserving()
+        networkObserver?.stopObserving()
+        networkObserver = nil
+        // NetworkObserver won't deinit until the connected
+        // connection stream finishes
+        connection = nil
 
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
+        reportStatus(.disconnected)
     }
 
     public func sendMessage(_ input: Message.Input) async throws -> Message.Output? {
@@ -224,8 +228,8 @@ private extension SimpleConnectionDaemon {
 // MARK: - Observation
 
 extension SimpleConnectionDaemon {
-    var statusStream: AsyncStream<ConnectionStatus>? {
-        connection?.statusStream.ignoreErrors()
+    nonisolated var statusStream: AsyncStream<ConnectionStatus> {
+        statusSubject.subscribe()
     }
 
     func observeEvents() {
@@ -260,20 +264,24 @@ extension SimpleConnectionDaemon {
         }
 
         // Observe the network for starting the connection
+        networkSubscription?.cancel()
         networkSubscription = Task { [weak self] in
             guard let self else { return }
+            pp_log_id(profile.id, .core, .debug, "Network subscription started")
             for await isReady in onNetworkReadyStream {
                 guard isReady else { continue }
                 guard !Task.isCancelled else {
                     pp_log_id(profile.id, .core, .debug, "Cancelled NetworkObserver.onReady")
-                    return
+                    break
                 }
                 pp_log_id(profile.id, .core, .notice, "Network is ready, start connection")
                 await evaluateConnection()
             }
+            pp_log_id(profile.id, .core, .debug, "Network subscription terminated")
         }
 
         // Start monitoring
+        networkObserver.startObserving()
         reachability.startObserving()
     }
 
@@ -369,12 +377,17 @@ extension SimpleConnectionDaemon {
             controller.setReasserting(false)
             resumeNetworkObserver(after: reconnectionDelay)
         }
-        onStatus?(profile.id, connectionStatus)
+        reportStatus(connectionStatus)
     }
 
     func onConnectionError(_ error: Error) {
         environment.setEnvironmentValue(PartoutError(error).code, forKey: TunnelEnvironmentKeys.lastErrorCode)
         controller.setReasserting(false)
+    }
+
+    func reportStatus(_ status: ConnectionStatus) {
+        statusSubject.send(status)
+        onStatus?(profile.id, status)
     }
 }
 

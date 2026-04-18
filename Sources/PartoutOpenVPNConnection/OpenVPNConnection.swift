@@ -70,7 +70,7 @@ public actor OpenVPNConnection {
     }
 
     deinit {
-        pp_log(ctx, .openvpn, .info, "Deinit OpenVPNConnection")
+        pp_log(ctx, .openvpn, .debug, "Deinit OpenVPNConnection")
     }
 }
 

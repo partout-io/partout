@@ -7,6 +7,9 @@ public protocol ReachabilityObserver: AnyObject, Sendable {
     /// Starts observing network events.
     func startObserving()
 
+    /// Stops observing network events.
+    func stopObserving()
+
     /// True if the network is currently reachable.
     var isReachable: Bool { get }
 
