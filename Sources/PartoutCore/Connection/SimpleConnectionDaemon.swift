@@ -109,6 +109,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
         self.connection = connection
         self.networkObserver = networkObserver
+        networkObserver.startObserving()
     }
 
     deinit {
@@ -191,6 +192,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
         // Make sure to clear environment on stop, especially last error code
         clearEnvironment()
+        networkObserver?.stopObserving()
 
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
     }

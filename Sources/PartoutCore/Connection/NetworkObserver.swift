@@ -6,6 +6,10 @@
 public final class NetworkObserver: @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
+    private let reachabilityStream: AsyncStream<Bool>
+
+    private let statusStream: AsyncStream<ConnectionStatus>
+
     private let state: AtomicState
 
     private let signalSubject: CurrentValueStream<Bool>
@@ -31,39 +35,20 @@ public final class NetworkObserver: @unchecked Sendable {
         isStatusReady: @escaping @Sendable (ConnectionStatus) -> Bool
     ) {
         self.ctx = ctx
+        self.reachabilityStream = reachabilityStream
+        self.statusStream = statusStream
         state = AtomicState()
         signalSubject = CurrentValueStream(false)
         self.isStatusReady = isStatusReady
         onReady = CurrentValueStream(false)
         subscriptions = []
-
-        observeObjects(reachabilityStream, statusStream)
     }
 
     deinit {
         pp_log(ctx, .core, .info, "Deinit NetworkObserver")
     }
 
-    public func setEnabled(_ isEnabled: Bool) {
-        signalSubject.send(isEnabled)
-    }
-}
-
-private extension NetworkObserver {
-    func satisfied(by tuple: AtomicState.Tuple) -> Bool {
-        tuple.signal && tuple.isNetworkAvailable && isStatusReady(tuple.connectionStatus)
-    }
-
-    func tryReady(_ value: AtomicState.Tuple) {
-        let isSatisfied = satisfied(by: value)
-        pp_log(ctx, .core, .info, "NetworkObserver.onReady(\(value.debugDescription)) -> \(isSatisfied)")
-        guard isSatisfied else { return }
-        onReady.send(true)
-    }
-}
-
-private extension NetworkObserver {
-    func observeObjects(_ reachabilityStream: AsyncStream<Bool>, _ statusStream: AsyncStream<ConnectionStatus>) {
+    public func startObserving() {
         let signalSubscription = Task { [weak self] in
             guard let self else { return }
             for await signal in signalSubject.subscribe() {
@@ -104,6 +89,27 @@ private extension NetworkObserver {
             }
         }
         subscriptions = [signalSubscription, reachabilitySubscription, statusSubscription]
+    }
+
+    public func stopObserving() {
+        signalSubject.finish()
+    }
+
+    public func setEnabled(_ isEnabled: Bool) {
+        signalSubject.send(isEnabled)
+    }
+}
+
+private extension NetworkObserver {
+    func satisfied(by tuple: AtomicState.Tuple) -> Bool {
+        tuple.signal && tuple.isNetworkAvailable && isStatusReady(tuple.connectionStatus)
+    }
+
+    func tryReady(_ value: AtomicState.Tuple) {
+        let isSatisfied = satisfied(by: value)
+        pp_log(ctx, .core, .info, "NetworkObserver.onReady(\(value.debugDescription)) -> \(isSatisfied)")
+        guard isSatisfied else { return }
+        onReady.send(true)
     }
 }
 
