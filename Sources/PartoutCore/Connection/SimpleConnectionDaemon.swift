@@ -204,7 +204,6 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         connection = nil
 
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
-        reportStatus(.disconnected)
     }
 
     public func sendMessage(_ input: Message.Input) async throws -> Message.Output? {
