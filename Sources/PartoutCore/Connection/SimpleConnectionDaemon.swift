@@ -113,7 +113,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     }
 
     deinit {
-        pp_log_id(profile.id, .core, .info, "Deinit SimpleConnectionDaemon")
+        pp_log_id(profile.id, .core, .debug, "Deinit SimpleConnectionDaemon")
     }
 
     public func start() async throws {

@@ -45,7 +45,7 @@ public final class NetworkObserver: @unchecked Sendable {
     }
 
     deinit {
-        pp_log(ctx, .core, .info, "Deinit NetworkObserver")
+        pp_log(ctx, .core, .debug, "Deinit NetworkObserver")
     }
 
     public func startObserving() {

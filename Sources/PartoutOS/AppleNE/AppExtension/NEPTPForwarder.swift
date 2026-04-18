@@ -60,7 +60,7 @@ public actor NEPTPForwarder {
     }
 
     deinit {
-        pp_log(ctx, .os, .info, "Deinit PTP")
+        pp_log(ctx, .os, .debug, "Deinit PTP")
     }
 
     public func startTunnel(options: [String: NSObject]?) async throws {

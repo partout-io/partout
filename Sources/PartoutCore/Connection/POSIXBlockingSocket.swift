@@ -90,7 +90,7 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
     }
 
     deinit {
-        pp_log(ctx, .core, .info, "Deinit POSIXBlockingSocket")
+        pp_log(ctx, .core, .debug, "Deinit POSIXBlockingSocket")
         pp_socket_free(sock)
     }
 
