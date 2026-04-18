@@ -78,15 +78,15 @@ fun DNSModule.addServers(
                 Log.i(logTag, "DNS: Route server through VPN: ${route.address}/${route.prefixLength}")
                 builder.addRoute(route.address, route.prefixLength)
             }
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
-                Log.i(logTag, "DNS: Keep server outside VPN: ${route.address}/${route.prefixLength}")
-                route.toIpPrefix()?.let {
-                    builder.excludeRoute(it)
-                } ?: Log.w(logTag, "DNS: Unable to build route exclusion for '$server'")
-            }
-            else -> {
-                Log.i(logTag, "DNS: Cannot exclude DNS server route before API 33: ${route.address}/${route.prefixLength}")
-            }
+//            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+//                Log.i(logTag, "DNS: Keep server outside VPN: ${route.address}/${route.prefixLength}")
+//                route.toIpPrefix()?.let {
+//                    builder.excludeRoute(it)
+//                } ?: Log.w(logTag, "DNS: Unable to build route exclusion for '$server'")
+//            }
+//            else -> {
+//                Log.i(logTag, "DNS: Cannot exclude DNS server route before API 33: ${route.address}/${route.prefixLength}")
+//            }
         }
     }
 }
