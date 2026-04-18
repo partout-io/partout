@@ -87,9 +87,10 @@ extension OpenVPNConnectionV2: Connection {
 
     @discardableResult
     public func start() async throws -> Bool {
-        guard currentSession == nil else { return false }
         do {
-            currentSession = try await sessionFactory()
+            if currentSession == nil {
+                currentSession = try await sessionFactory()
+            }
             await currentSession?.setDelegate(self)
             guard status == .disconnected else {
                 pp_log(ctx, .core, .error, "Ignore start, connection status \(status) != .disconnected")
