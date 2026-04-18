@@ -126,6 +126,10 @@ final class OpenVPNSession {
         withLocalOptions = true
         dataCount = BidirectionalState(withResetValue: 0)
     }
+
+    deinit {
+        pp_log(ctx, .core, .debug, "Deinit OpenVPNSession")
+    }
 }
 
 // MARK: - Public API
