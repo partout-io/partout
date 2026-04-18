@@ -252,17 +252,20 @@ extension SimpleConnectionDaemon {
         }
 
         // Observe the network for starting the connection
+        networkSubscription?.cancel()
         networkSubscription = Task { [weak self] in
             guard let self else { return }
+            pp_log_id(profile.id, .core, .debug, "Network subscription started")
             for await isReady in onNetworkReadyStream {
                 guard isReady else { continue }
                 guard !Task.isCancelled else {
                     pp_log_id(profile.id, .core, .debug, "Cancelled NetworkObserver.onReady")
-                    return
+                    break
                 }
                 pp_log_id(profile.id, .core, .notice, "Network is ready, start connection")
                 await evaluateConnection()
             }
+            pp_log_id(profile.id, .core, .debug, "Network subscription terminated")
         }
 
         // Start monitoring
