@@ -218,6 +218,7 @@ extension NESocket {
 
     nonisolated func shutdown() {
         nwConnection.cancel()
+        betterPathStream.finish()
     }
 }
 
