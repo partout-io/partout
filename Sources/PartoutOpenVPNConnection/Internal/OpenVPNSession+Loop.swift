@@ -8,28 +8,34 @@ internal import _PartoutOpenVPNConnection_C
 extension OpenVPNSession {
     func loopTunnel() {
         runInActor { [weak self] in
-            guard let self else {
+            guard let ctx = self?.ctx else {
                 pp_log(.global, .openvpn, .debug, "Ignore TUN read from outdated OpenVPNSession")
                 return
             }
-            guard let tunnel else {
+            guard let tunnel = self?.tunnel else {
                 pp_log(ctx, .openvpn, .debug, "Ignore read from outdated TUN")
                 return
             }
+            let packets: [Data]
             do {
-                let packets = try await tunnel.readPackets()
-                guard !packets.isEmpty else {
-                    pp_log(ctx, .openvpn, .debug, "Exit TUN loop after empty packets")
-                    return
-                }
-                try await receiveTunnel(packets: packets)
+                packets = try await tunnel.readPackets()
             } catch {
                 pp_log(ctx, .openvpn, .error, "Failed TUN read: \(error)")
-                await shutdown(error)
+                await self?.shutdown(error)
+                return
             }
+            guard let self else {
+                pp_log(.global, .openvpn, .debug, "Ignore TUN packets from outdated OpenVPNSession")
+                return
+            }
+            guard !packets.isEmpty else {
+                pp_log(ctx, .openvpn, .debug, "Exit TUN loop after empty packets")
+                return
+            }
+            try await self.receiveTunnel(packets: packets)
 
             // repeat as long as self and tunnel exist
-            loopTunnel()
+            self.loopTunnel()
         }
     }
 
