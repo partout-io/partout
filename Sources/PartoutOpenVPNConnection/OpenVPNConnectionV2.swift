@@ -91,7 +91,11 @@ extension OpenVPNConnectionV2: Connection {
             if currentSession == nil {
                 currentSession = try await sessionFactory()
             }
-            await currentSession?.setDelegate(self)
+            guard let session = currentSession else {
+                fatalError("No session from factory?")
+                return false
+            }
+            await session.setDelegate(self)
             guard status == .disconnected else {
                 pp_log(ctx, .core, .error, "Ignore start, connection status \(status) != .disconnected")
                 return false
@@ -99,7 +103,7 @@ extension OpenVPNConnectionV2: Connection {
             sendStatus(.connecting)
             do {
                 let newLink = try await setupLink(upgradingCurrent: false)
-                try await currentSession?.setLink(newLink)
+                try await session.setLink(newLink)
                 observeBetterPath(on: newLink)
                 return true
             } catch {
