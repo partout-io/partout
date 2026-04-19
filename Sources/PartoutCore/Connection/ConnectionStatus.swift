@@ -15,19 +15,16 @@ public enum ConnectionStatus: String, Codable {
 }
 
 extension ConnectionStatus {
-    func canChange(to nextStatus: ConnectionStatus) -> Bool {
+    public func canChange(to nextStatus: ConnectionStatus) -> Bool {
         switch self {
         case .connected:
             return [.connecting, .disconnecting, .disconnected]
                 .contains(nextStatus)
-
         case .connecting:
             return [.connected, .disconnecting, .disconnected]
                 .contains(nextStatus)
-
         case .disconnecting:
             return nextStatus == .disconnected
-
         case .disconnected:
             return nextStatus == .connecting
         }

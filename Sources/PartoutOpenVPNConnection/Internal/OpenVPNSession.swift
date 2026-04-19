@@ -126,6 +126,10 @@ final class OpenVPNSession {
         withLocalOptions = true
         dataCount = BidirectionalState(withResetValue: 0)
     }
+
+    deinit {
+        pp_log(ctx, .openvpn, .debug, "Deinit OpenVPNSession")
+    }
 }
 
 // MARK: - Public API
@@ -353,7 +357,9 @@ extension OpenVPNSession {
         }
 
         sessionState = .started
-        Task {
+        let pushReplyOptions = pushReply.options
+        Task { [weak self] in
+            guard let self else { return }
             guard let remoteAddress = link?.remoteAddress,
                   let remoteProtocol = link?.remoteProtocol else {
                 pp_log(ctx, .openvpn, .fault, "Unable to resolve link remote address/protocol")
@@ -364,7 +370,7 @@ extension OpenVPNSession {
                 self,
                 remoteAddress: remoteAddress,
                 remoteProtocol: remoteProtocol,
-                remoteOptions: pushReply.options,
+                remoteOptions: pushReplyOptions,
                 remoteFd: link?.fileDescriptor
             )
         }
@@ -495,8 +501,10 @@ private extension OpenVPNSession {
             }
         }
         lastDataCountDate = Date()
-        Task {
-            await delegate?.session(self, didUpdateDataCount: .init(UInt(dataCount.inbound), UInt(dataCount.outbound)))
+        let currentDataCount = DataCount(UInt(dataCount.inbound), UInt(dataCount.outbound))
+        Task { [weak self] in
+            guard let self else { return }
+            await delegate?.session(self, didUpdateDataCount: currentDataCount)
         }
     }
 }

@@ -334,9 +334,10 @@ extension SimpleConnectionDaemon {
         }
 
         // start() returns false if the connection is still active
-        if !didStart {
+        guard didStart else {
             pp_log_id(profile.id, .core, .error, "Connection still active")
             resumeNetworkObserver(after: reconnectionDelay)
+            return
         }
     }
 

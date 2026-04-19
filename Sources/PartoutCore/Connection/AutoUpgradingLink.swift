@@ -78,6 +78,7 @@ public final class AutoUpgradingLink: LinkInterface {
     public func shutdown() {
         Task {
             await io.shutdown()
+            betterPathStream.finish()
         }
     }
 
