@@ -24,7 +24,7 @@ final class Authenticator {
 
     private(set) var serverRandom2: CrossZD?
 
-    private(set) var serverOptions: OpenVPN.ServerOCC?
+    private(set) var serverOptions: ServerOCC?
 
     private(set) var username: CrossZD?
 
@@ -143,7 +143,7 @@ final class Authenticator {
 
         if let serverOptsString = serverOpts.nullTerminatedString(fromOffset: 0) {
             pp_log(ctx, .openvpn, .info, "TLS.auth: Parsed server options (string): \"\(serverOptsString)\"")
-            let serverOptions = OpenVPN.ServerOCC.parsed(from: serverOptsString)
+            let serverOptions = ServerOCC.parsed(from: serverOptsString)
             pp_log(ctx, .openvpn, .info, "TLS.auth: Server options: \(serverOptions)")
             self.serverOptions = serverOptions
         }

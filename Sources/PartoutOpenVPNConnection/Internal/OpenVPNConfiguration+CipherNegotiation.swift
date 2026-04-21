@@ -28,7 +28,7 @@ extension OpenVPN.Configuration {
     /// cipher or, when only `dataCiphers` is set, to its first entry.
     func negotiatedDataChannelCipher(
         with pushedOptions: OpenVPN.Configuration,
-        serverOptions: OpenVPN.ServerOCC?
+        serverOptions: ServerOCC?
     ) -> OpenVPN.Cipher {
         if let pushedCipher = pushedOptions.cipher {
             return pushedCipher

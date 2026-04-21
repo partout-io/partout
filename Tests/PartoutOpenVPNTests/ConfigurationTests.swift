@@ -66,7 +66,7 @@ struct ConfigurationTests {
 
         let pushed = try OpenVPN.Configuration.Builder().build(isClient: false)
 
-        let server = OpenVPN.ServerOCC(
+        let server = ServerOCC(
             cipher: .aes128gcm,
             digest: nil
         )
@@ -102,7 +102,7 @@ struct ConfigurationTests {
 
     @Test
     func givenOCCServerOptionsString_whenParsing_thenIgnoresNonProfileTokensAndExtractsCipher() throws {
-        let serverOptions = OpenVPN.ServerOCC.parsed(
+        let serverOptions = ServerOCC.parsed(
             from: "V4,dev-type tun,link-mtu 1569,tun-mtu 1500,proto UDPv4,keydir 0,cipher AES-256-CBC,auth SHA256,keysize 256,tls-auth,key-method 2,tls-server"
         )
 
@@ -112,7 +112,7 @@ struct ConfigurationTests {
 
     @Test
     func givenOCCFallbackCipherAlias_whenParsing_thenMapsItToCipher() throws {
-        let serverOptions = OpenVPN.ServerOCC.parsed(
+        let serverOptions = ServerOCC.parsed(
             from: "V4,data-ciphers-fallback AES-128-CBC,auth SHA1"
         )
 

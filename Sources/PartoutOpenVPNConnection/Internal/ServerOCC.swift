@@ -2,19 +2,17 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-extension OpenVPN {
-    /// The subset of server-side OCC/auth-options values that can affect client
-    /// runtime behavior.
-    struct ServerOCC: Hashable, Sendable {
-        /// The server-selected data-channel cipher, when provided explicitly.
-        let cipher: OpenVPN.Cipher?
+/// The subset of server-side OCC/auth-options values that can affect client
+/// runtime behavior.
+struct ServerOCC: Hashable, Sendable {
+    /// The server-selected data-channel cipher, when provided explicitly.
+    let cipher: OpenVPN.Cipher?
 
-        /// The server-selected HMAC digest, when provided explicitly.
-        let digest: OpenVPN.Digest?
-    }
+    /// The server-selected HMAC digest, when provided explicitly.
+    let digest: OpenVPN.Digest?
 }
 
-extension OpenVPN.ServerOCC {
+extension ServerOCC {
     /// Parses the OCC/auth-options string exchanged during TLS auth.
     ///
     /// This string is not a full `.ovpn` representation, so parsing is kept
