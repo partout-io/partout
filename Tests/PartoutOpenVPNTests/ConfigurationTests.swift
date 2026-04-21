@@ -68,8 +68,6 @@ struct ConfigurationTests {
 
         let server = OpenVPN.ServerOCC(
             cipher: .aes128gcm,
-            dataCiphers: nil,
-            dataCiphersFallback: nil,
             digest: nil
         )
 
@@ -110,6 +108,16 @@ struct ConfigurationTests {
 
         #expect(serverOptions.cipher == .aes256cbc)
         #expect(serverOptions.digest == .sha256)
+    }
+
+    @Test
+    func givenOCCFallbackCipherAlias_whenParsing_thenMapsItToCipher() throws {
+        let serverOptions = OpenVPN.ServerOCC.parsed(
+            from: "V4,data-ciphers-fallback AES-128-CBC,auth SHA1"
+        )
+
+        #expect(serverOptions.cipher == .aes128cbc)
+        #expect(serverOptions.digest == .sha1)
     }
 
     @Test

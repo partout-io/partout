@@ -9,36 +9,22 @@ extension OpenVPN {
         /// The server-selected data-channel cipher, when provided explicitly.
         let cipher: OpenVPN.Cipher?
 
-        /// The server-advertised negotiated cipher list, if present.
-        let dataCiphers: [OpenVPN.Cipher]?
-
-        /// The legacy fallback cipher, if advertised separately.
-        let dataCiphersFallback: OpenVPN.Cipher?
-
         /// The server-selected HMAC digest, when provided explicitly.
         let digest: OpenVPN.Digest?
     }
 }
 
 extension OpenVPN.ServerOCC {
-    /// Returns the effective single-cipher value carried by the OCC string.
-    ///
-    /// Standard OpenVPN normally communicates the server-selected cipher as
-    /// `cipher`, but `data-ciphers-fallback` is treated as the legacy
-    /// single-cipher equivalent when present.
-    var effectiveCipher: OpenVPN.Cipher? {
-        cipher ?? dataCiphersFallback
-    }
-
     /// Parses the OCC/auth-options string exchanged during TLS auth.
     ///
     /// This string is not a full `.ovpn` representation, so parsing is kept
     /// intentionally narrow and tolerant: unknown tokens are ignored and only
-    /// the subset relevant to negotiation is extracted.
+    /// the subset relevant to negotiation is extracted. Standard OpenVPN sends
+    /// a single `cipher` value here; `data-ciphers-fallback` is accepted as a
+    /// tolerant alias for peers that expose the same information under that
+    /// name.
     static func parsed(from string: String) -> Self {
         var cipher: OpenVPN.Cipher?
-        var dataCiphers: [OpenVPN.Cipher]?
-        var dataCiphersFallback: OpenVPN.Cipher?
         var digest: OpenVPN.Digest?
 
         for line in string.components(separatedBy: ",") {
@@ -59,18 +45,12 @@ extension OpenVPN.ServerOCC {
             case "cipher":
                 cipher = OpenVPN.Cipher(rawValue: components[1].uppercased())
 
-            case "data-ciphers", "ncp-ciphers":
-                let parsedCiphers = components[1]
-                    .split(separator: ":")
-                    .compactMap {
-                        OpenVPN.Cipher(rawValue: $0.uppercased())
-                    }
-                if !parsedCiphers.isEmpty {
-                    dataCiphers = parsedCiphers
-                }
-
             case "data-ciphers-fallback":
-                dataCiphersFallback = OpenVPN.Cipher(rawValue: components[1].uppercased())
+                // Treat the fallback directive as a tolerant alias, but keep an
+                // explicit OCC `cipher` if the peer sent both.
+                if cipher == nil {
+                    cipher = OpenVPN.Cipher(rawValue: components[1].uppercased())
+                }
 
             case "auth":
                 digest = OpenVPN.Digest(rawValue: components[1].uppercased())
@@ -82,8 +62,6 @@ extension OpenVPN.ServerOCC {
 
         return Self(
             cipher: cipher,
-            dataCiphers: dataCiphers,
-            dataCiphersFallback: dataCiphersFallback,
             digest: digest
         )
     }

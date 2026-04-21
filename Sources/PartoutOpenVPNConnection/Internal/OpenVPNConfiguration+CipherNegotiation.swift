@@ -33,7 +33,7 @@ extension OpenVPN.Configuration {
         if let pushedCipher = pushedOptions.cipher {
             return pushedCipher
         }
-        if let serverCipher = serverOptions?.effectiveCipher,
+        if let serverCipher = serverOptions?.cipher,
            negotiableDataCiphers?.contains(serverCipher) ?? false {
             return serverCipher
         }
