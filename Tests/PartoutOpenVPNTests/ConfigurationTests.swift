@@ -8,7 +8,7 @@ import Testing
 
 struct ConfigurationTests {
     @Test
-    func givenRandomizeHostnames_whenProcessRemotes_thenHostnamesHaveAlphanumericPrefix() throws {
+    func givenRandomizeHostnames_whenProcessingRemotes_thenPrefixesOnlyHostnames() throws {
         var builder = OpenVPN.Configuration.Builder()
         let hostname = "my.host.name"
         let ipv4 = "1.2.3.4"
@@ -31,6 +31,100 @@ struct ConfigurationTests {
                     #expect($0.address.rawValue == ipv4)
                 }
             }
+    }
+
+    @Test
+    func givenDataCiphersAndLegacyCipher_whenComputingNegotiableDataCiphers_thenAppendsLegacyCipher() throws {
+        var builder = OpenVPN.Configuration.Builder()
+        builder.cipher = .aes128cbc
+        builder.dataCiphers = [.aes256gcm, .aes128gcm]
+        let cfg = try builder.build(isClient: false)
+
+        #expect(cfg.negotiableDataCiphers == [.aes256gcm, .aes128gcm, .aes128cbc])
+    }
+
+    @Test
+    func givenExplicitLegacyCipher_whenBuildingLocalOCCOptions_thenIncludesCipherAndKeysize() throws {
+        var builder = OpenVPN.Configuration.Builder()
+        builder.cipher = .aes128cbc
+        builder.dataCiphers = [.aes256gcm, .aes128gcm]
+        let options = try builder.build(isClient: false)
+
+        let occ = options.asLocalOptionsString(withLocalOptions: true)
+
+        #expect(occ.contains("cipher AES-128-CBC"))
+        #expect(occ.contains("keysize 128"))
+    }
+
+    @Test
+    func givenOnlyDataCiphers_whenBuildingLocalOCCOptions_thenOmitsLegacyCipherAndKeysize() throws {
+        var builder = OpenVPN.Configuration.Builder()
+        builder.dataCiphers = [.aes256cbc]
+        let options = try builder.build(isClient: false)
+
+        let occ = options.asLocalOptionsString(withLocalOptions: true)
+
+        #expect(!occ.contains("cipher "))
+        #expect(!occ.contains("keysize "))
+        #expect(occ.contains("auth SHA1"))
+    }
+
+    @Test
+    func givenOCCDataCiphersFallbackAlias_whenParsing_thenMapsItToCipher() throws {
+        let serverOptions = ServerOCC.parsed(
+            from: "V4,data-ciphers-fallback AES-128-CBC,auth SHA1"
+        )
+
+        #expect(serverOptions.cipher == .aes128cbc)
+        #expect(serverOptions.digest == .sha1)
+    }
+
+    @Test
+    func givenOCCOptionsStringWithNonProfileTokens_whenParsing_thenExtractsCipherAndDigest() throws {
+        let serverOptions = ServerOCC.parsed(
+            from: "V4,dev-type tun,link-mtu 1569,tun-mtu 1500,proto UDPv4,keydir 0,cipher AES-256-CBC,auth SHA256,keysize 256,tls-auth,key-method 2,tls-server"
+        )
+
+        #expect(serverOptions.cipher == .aes256cbc)
+        #expect(serverOptions.digest == .sha256)
+    }
+
+    @Test
+    func givenNoServerSelectedCipher_whenNegotiatingDataChannel_thenUsesFallbackCipher() throws {
+        var localBuilder = OpenVPN.Configuration.Builder()
+        localBuilder.cipher = .aes256cbc
+        let local = try localBuilder.build(isClient: false)
+
+        let pushed = try OpenVPN.Configuration.Builder().build(isClient: false)
+
+        #expect(local.negotiatedDataChannelCipher(with: pushed, serverOptions: nil) == .aes256cbc)
+    }
+
+    @Test
+    func givenPushedCipher_whenNegotiatingDataChannel_thenUsesPushedCipher() throws {
+        var localBuilder = OpenVPN.Configuration.Builder()
+        localBuilder.cipher = .aes128cbc
+        localBuilder.dataCiphers = [.aes256gcm, .aes128gcm]
+        let local = try localBuilder.build(isClient: false)
+
+        var pushedBuilder = OpenVPN.Configuration.Builder()
+        pushedBuilder.cipher = .aes128gcm
+        let pushed = try pushedBuilder.build(isClient: false)
+
+        #expect(local.negotiatedDataChannelCipher(with: pushed, serverOptions: nil) == .aes128gcm)
+    }
+
+    @Test
+    func givenServerOCCCipherInNegotiableList_whenNegotiatingDataChannel_thenUsesServerCipher() throws {
+        var localBuilder = OpenVPN.Configuration.Builder()
+        localBuilder.cipher = .aes128cbc
+        localBuilder.dataCiphers = [.aes256gcm, .aes128gcm]
+        let local = try localBuilder.build(isClient: false)
+
+        let pushed = try OpenVPN.Configuration.Builder().build(isClient: false)
+        let server = ServerOCC(cipher: .aes128gcm, digest: nil)
+
+        #expect(local.negotiatedDataChannelCipher(with: pushed, serverOptions: server) == .aes128gcm)
     }
 }
 

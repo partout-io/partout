@@ -563,6 +563,8 @@ extension StandardOpenVPNParser.Builder {
 
         // MARK: General
 
+        // Normalize deprecated `cipher` to the same slot used for the modern
+        // `data-ciphers-fallback`, since serialization prefers the modern form.
         builder.cipher = optDataCiphersFallback ?? optCipher
         builder.dataCiphers = optDataCiphers
         builder.digest = optDigest

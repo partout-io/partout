@@ -13,7 +13,8 @@ struct ConfigurationBuilderTests {
         sut.ca = .init(pem: "")
         sut.remotes = [.init(rawValue: "1.2.3.4:UDP:1000")!]
         let cfg = try sut.build(isClient: true)
-        #expect(cfg.cipher == .aes128cbc)
+        #expect(cfg.cipher == nil)
+        #expect(cfg.fallbackCipher == .aes128cbc)
         #expect(cfg.digest == nil)
         #expect(cfg.compressionFraming == nil)
         #expect(cfg.compressionAlgorithm == nil)
@@ -27,5 +28,19 @@ struct ConfigurationBuilderTests {
         #expect(cfg.digest == nil)
         #expect(cfg.compressionFraming == nil)
         #expect(cfg.compressionAlgorithm == nil)
+    }
+
+    @Test
+    func givenBuilderWithDataCiphersButNoCipher_whenClient_thenFallbackCipherUsesFirstDataCipher() throws {
+        var sut = OpenVPN.Configuration.Builder()
+        sut.ca = .init(pem: "")
+        sut.remotes = [.init(rawValue: "1.2.3.4:UDP:1000")!]
+        sut.dataCiphers = [.aes256cbc]
+
+        let cfg = try sut.build(isClient: true)
+
+        #expect(cfg.cipher == nil)
+        #expect(cfg.dataCiphers == [.aes256cbc])
+        #expect(cfg.fallbackCipher == .aes256cbc)
     }
 }
