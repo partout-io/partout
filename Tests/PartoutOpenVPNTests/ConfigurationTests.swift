@@ -77,6 +77,32 @@ struct ConfigurationTests {
     }
 
     @Test
+    func givenOnlyDataCiphers_whenBuildingLocalOCCOptions_thenOmitsLegacyCipher() throws {
+        var builder = OpenVPN.Configuration.Builder()
+        builder.dataCiphers = [.aes256cbc]
+        let options = try builder.build(isClient: false)
+
+        let occ = options.asLocalOptionsString(withLocalOptions: true)
+
+        #expect(!occ.contains("cipher "))
+        #expect(!occ.contains("keysize "))
+        #expect(occ.contains("auth SHA1"))
+    }
+
+    @Test
+    func givenExplicitCipher_whenBuildingLocalOCCOptions_thenIncludesLegacyCipher() throws {
+        var builder = OpenVPN.Configuration.Builder()
+        builder.cipher = .aes128cbc
+        builder.dataCiphers = [.aes256gcm, .aes128gcm]
+        let options = try builder.build(isClient: false)
+
+        let occ = options.asLocalOptionsString(withLocalOptions: true)
+
+        #expect(occ.contains("cipher AES-128-CBC"))
+        #expect(occ.contains("keysize 128"))
+    }
+
+    @Test
     func givenOCCServerOptionsString_whenParsing_thenIgnoresNonProfileTokensAndExtractsCipher() throws {
         let serverOptions = OpenVPN.ServerOCC.parsed(
             from: "V4,dev-type tun,link-mtu 1569,tun-mtu 1500,proto UDPv4,keydir 0,cipher AES-256-CBC,auth SHA256,keysize 256,tls-auth,key-method 2,tls-server"

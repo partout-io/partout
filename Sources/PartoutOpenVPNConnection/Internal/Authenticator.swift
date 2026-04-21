@@ -207,8 +207,10 @@ extension OpenVPN.Configuration {
         if let direction = tlsWrap?.key.direction?.rawValue {
             opts.append("keydir \(direction)")
         }
-        opts.append("cipher \(fallbackCipher.rawValue)")
-        opts.append("keysize \(fallbackCipher.keySize)")
+        if let cipher {
+            opts.append("cipher \(cipher.rawValue)")
+            opts.append("keysize \(cipher.keySize)")
+        }
         opts.append("auth \(fallbackDigest.rawValue)")
         if let strategy = tlsWrap?.strategy {
             opts.append("tls-\(strategy.rawValue)")
