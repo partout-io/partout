@@ -40,7 +40,7 @@ final class Authenticator {
         random1 = prng.safeCrossData(length: Constants.Keys.randomLength)
         random2 = prng.safeCrossData(length: Constants.Keys.randomLength)
 
-        // XXX: not 100% secure, can't erase input username/password
+        // XXX: Not 100% secure, can't erase input username/password
         if let username = username, let password = password {
             self.username = CZ(username, nullTerminated: true)
             self.password = CZ(password, nullTerminated: true)
@@ -71,37 +71,17 @@ final class Authenticator {
     func putAuth(into tls: TLSProtocol, options: OpenVPN.Configuration) throws {
         let raw = CZ(Constants.ControlChannel.tlsPrefix)
 
-        // local keys
+        // Local keys
         raw.append(preMaster)
         raw.append(random1)
         raw.append(random2)
 
-        // options string
-        let optsString: String
-        if withLocalOptions {
-            var opts = [
-                "V4",
-                "dev-type tun"
-            ]
-            if let direction = options.tlsWrap?.key.direction?.rawValue {
-                opts.append("keydir \(direction)")
-            }
-            opts.append("cipher \(options.fallbackCipher.rawValue)")
-            opts.append("auth \(options.fallbackDigest.rawValue)")
-            opts.append("keysize \(options.fallbackCipher.keySize)")
-            if let strategy = options.tlsWrap?.strategy {
-                opts.append("tls-\(strategy.rawValue)")
-            }
-            opts.append("key-method 2")
-            opts.append("tls-client")
-            optsString = opts.joined(separator: ",")
-        } else {
-            optsString = "V0 UNDEF"
-        }
+        // Local options string
+        let optsString = options.asLocalOptionsString(withLocalOptions: withLocalOptions)
         pp_log(ctx, .openvpn, .info, "TLS.auth: Local options: \(optsString)")
         raw.appendSized(CZ(optsString, nullTerminated: true))
 
-        // credentials
+        // Credentials
         if let username = username, let password = password {
             raw.appendSized(username)
             raw.appendSized(password)
@@ -110,7 +90,7 @@ final class Authenticator {
             raw.append(CZ(UInt16(0)))
         }
 
-        // peer info
+        // Peer info
         var extra: [String: String] = [:]
         if let dataCiphers = options.negotiableDataCiphers {
             extra["IV_CIPHERS"] = dataCiphers.map(\.rawValue).joined(separator: ":")
@@ -205,5 +185,36 @@ final class Authenticator {
             serverRandom1: serverRandom1,
             serverRandom2: serverRandom2
         )
+    }
+}
+
+extension OpenVPN.Configuration {
+    /// Builds the legacy OCC/auth-options string sent during TLS auth.
+    ///
+    /// Keep `cipher` in this string only when the configuration explicitly
+    /// carries a legacy/fallback cipher. Negotiated `data-ciphers` are
+    /// advertised separately via `IV_CIPHERS`.
+    func asLocalOptionsString(
+        withLocalOptions: Bool
+    ) -> String {
+        guard withLocalOptions else {
+            return "V0 UNDEF"
+        }
+        var opts = [
+            "V4",
+            "dev-type tun"
+        ]
+        if let direction = tlsWrap?.key.direction?.rawValue {
+            opts.append("keydir \(direction)")
+        }
+        opts.append("cipher \(fallbackCipher.rawValue)")
+        opts.append("keysize \(fallbackCipher.keySize)")
+        opts.append("auth \(fallbackDigest.rawValue)")
+        if let strategy = tlsWrap?.strategy {
+            opts.append("tls-\(strategy.rawValue)")
+        }
+        opts.append("key-method 2")
+        opts.append("tls-client")
+        return opts.joined(separator: ",")
     }
 }
