@@ -28,12 +28,12 @@ extension OpenVPN.Configuration {
     /// cipher or, when only `dataCiphers` is set, to its first entry.
     func negotiatedDataChannelCipher(
         with pushedOptions: OpenVPN.Configuration,
-        serverOptions: OpenVPN.Configuration?
+        serverOptions: OpenVPN.ServerOCC?
     ) -> OpenVPN.Cipher {
         if let pushedCipher = pushedOptions.cipher {
             return pushedCipher
         }
-        if let serverCipher = serverOptions?.cipher,
+        if let serverCipher = serverOptions?.effectiveCipher,
            negotiableDataCiphers?.contains(serverCipher) ?? false {
             return serverCipher
         }

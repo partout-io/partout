@@ -66,11 +66,24 @@ struct ConfigurationTests {
 
         let pushed = try OpenVPN.Configuration.Builder().build(isClient: false)
 
-        var serverBuilder = OpenVPN.Configuration.Builder()
-        serverBuilder.cipher = .aes128gcm
-        let server = try serverBuilder.build(isClient: false)
+        let server = OpenVPN.ServerOCC(
+            cipher: .aes128gcm,
+            dataCiphers: nil,
+            dataCiphersFallback: nil,
+            digest: nil
+        )
 
         #expect(local.negotiatedDataChannelCipher(with: pushed, serverOptions: server) == .aes128gcm)
+    }
+
+    @Test
+    func givenOCCServerOptionsString_whenParsing_thenIgnoresNonProfileTokensAndExtractsCipher() throws {
+        let serverOptions = OpenVPN.ServerOCC.parsed(
+            from: "V4,dev-type tun,link-mtu 1569,tun-mtu 1500,proto UDPv4,keydir 0,cipher AES-256-CBC,auth SHA256,keysize 256,tls-auth,key-method 2,tls-server"
+        )
+
+        #expect(serverOptions.cipher == .aes256cbc)
+        #expect(serverOptions.digest == .sha256)
     }
 
     @Test

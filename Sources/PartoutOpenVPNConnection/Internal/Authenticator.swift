@@ -12,8 +12,6 @@ fileprivate extension CrossZD {
 final class Authenticator {
     private let ctx: PartoutLoggerContext
 
-    private let parser = StandardOpenVPNParser(decrypter: nil)
-
     private var controlBuffer: CrossZD
 
     private(set) var preMaster: CrossZD
@@ -26,7 +24,7 @@ final class Authenticator {
 
     private(set) var serverRandom2: CrossZD?
 
-    private(set) var serverOptions: OpenVPN.Configuration?
+    private(set) var serverOptions: OpenVPN.ServerOCC?
 
     private(set) var username: CrossZD?
 
@@ -165,16 +163,9 @@ final class Authenticator {
 
         if let serverOptsString = serverOpts.nullTerminatedString(fromOffset: 0) {
             pp_log(ctx, .openvpn, .info, "TLS.auth: Parsed server options (string): \"\(serverOptsString)\"")
-            let lines = serverOptsString.components(separatedBy: ",").map {
-                $0.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            do {
-                let serverOptions = try parser.parsed(fromLines: lines, isClient: false).configuration
-                pp_log(ctx, .openvpn, .info, "TLS.auth: Server options: \(serverOptions)")
-                self.serverOptions = serverOptions
-            } catch {
-                pp_log(ctx, .openvpn, .error, "TLS.auth: Unable to parse server options: \(error)")
-            }
+            let serverOptions = OpenVPN.ServerOCC.parsed(from: serverOptsString)
+            pp_log(ctx, .openvpn, .info, "TLS.auth: Server options: \(serverOptions)")
+            self.serverOptions = serverOptions
         }
 
         self.serverRandom1 = serverRandom1
