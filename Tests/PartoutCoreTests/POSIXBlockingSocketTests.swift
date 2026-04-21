@@ -29,7 +29,7 @@ struct POSIXBlockingSocketTests {
             _ = close(peerFD)
         }
 
-        let sock = pp_socket_create(UInt64(fds[0]), true)
+        let sock = pp_socket_create(UInt64(fds[0]))
         let sut = POSIXBlockingSocket(
             .global,
             sock: sock,

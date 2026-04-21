@@ -57,8 +57,7 @@ public actor POSIXBlockingSocket: SocketIOInterface, @unchecked Sendable {
         )
     }
 
-    // Assumes fd to be an open socket descriptor. The socket is not
-    // closed on deinit (isOwned is false).
+    // Assumes fd to be an open socket descriptor. Acquires ownership.
     init(
         _ ctx: PartoutLoggerContext,
         sock: pp_socket,

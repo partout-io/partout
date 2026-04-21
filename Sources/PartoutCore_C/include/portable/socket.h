@@ -18,8 +18,10 @@ typedef enum {
 /* The opaque socket type. */
 typedef struct _pp_socket *pp_socket;
 
-/* Externally managed. */
-pp_socket _Nonnull pp_socket_create(uint64_t fd, bool is_owned);
+/* Create a socket wrapper from an already open native descriptor. The
+ * wrapper acquires ownership and will close the descriptor on
+ * pp_socket_close() or pp_socket_free(). */
+pp_socket _Nonnull pp_socket_create(uint64_t fd);
 void pp_socket_shutdown(pp_socket _Nonnull sock);
 void pp_socket_close(pp_socket _Nonnull sock);
 void pp_socket_free(pp_socket _Nonnull sock);

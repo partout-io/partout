@@ -44,15 +44,13 @@ static void pp_socket_close_impl(pp_socket sock);
  * use int, whereas Windows uses SOCKET.  */
 struct _pp_socket {
     os_socket_fd fd;
-    bool is_owned;
 };
 
 /* Create a socket from a formerly opened file descriptor. Use uint64_t to
  * cover the whole range of possible platform values. */
-pp_socket pp_socket_create(uint64_t fd, bool is_owned) {
+pp_socket pp_socket_create(uint64_t fd) {
     pp_socket sock = pp_alloc(sizeof(*sock));
     sock->fd = (os_socket_fd)fd;
-    sock->is_owned = is_owned;
     return sock;
 }
 
@@ -123,7 +121,7 @@ pp_socket pp_socket_open(const char *ip_addr,
     }
 
     // Success
-    return pp_socket_create(new_fd, true);
+    return pp_socket_create(new_fd);
 
 failure:
     if (new_fd != OS_INVALID_SOCKET) os_close_socket(new_fd);
@@ -255,11 +253,8 @@ static void pp_socket_close_impl(pp_socket sock) {
     if (!sock || sock->fd == OS_INVALID_SOCKET) {
         return;
     }
-    if (sock->is_owned) {
-        os_close_socket(sock->fd);
-    }
+    os_close_socket(sock->fd);
     sock->fd = OS_INVALID_SOCKET;
-    sock->is_owned = false;
 }
 
 int connect_with_timeout(os_socket_fd fd, const struct sockaddr *addr, socklen_t addrlen,
