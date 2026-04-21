@@ -684,7 +684,10 @@ private extension Negotiator {
 //        pp_log(ctx, .openvpn, .info, "\tremoteSessionId: \(remoteSessionId.toHex())")
 
         let parameters = DataPathWrapper.Parameters(
-            cipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
+            cipher: options.configuration.negotiatedDataChannelCipher(
+                with: history.pushReply.options,
+                serverOptions: authenticator?.serverOptions
+            ),
             digest: options.configuration.fallbackDigest,
             compressionFraming: history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming,
             compressionAlgorithm: history.pushReply.options.compressionAlgorithm ?? options.configuration.fallbackCompressionAlgorithm,

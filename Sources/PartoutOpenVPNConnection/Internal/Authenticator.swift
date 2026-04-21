@@ -12,6 +12,8 @@ fileprivate extension CrossZD {
 final class Authenticator {
     private let ctx: PartoutLoggerContext
 
+    private let parser = StandardOpenVPNParser(decrypter: nil)
+
     private var controlBuffer: CrossZD
 
     private(set) var preMaster: CrossZD
@@ -23,6 +25,8 @@ final class Authenticator {
     private(set) var serverRandom1: CrossZD?
 
     private(set) var serverRandom2: CrossZD?
+
+    private(set) var serverOptions: OpenVPN.Configuration?
 
     private(set) var username: CrossZD?
 
@@ -59,6 +63,7 @@ final class Authenticator {
         random2.zero()
         serverRandom1?.zero()
         serverRandom2?.zero()
+        serverOptions = nil
         username = nil
         password = nil
     }
@@ -109,7 +114,7 @@ final class Authenticator {
 
         // peer info
         var extra: [String: String] = [:]
-        if let dataCiphers = options.dataCiphers {
+        if let dataCiphers = options.negotiableDataCiphers {
             extra["IV_CIPHERS"] = dataCiphers.map(\.rawValue).joined(separator: ":")
         }
         let peerInfo = Constants.ControlChannel.peerInfo(sslVersion: sslVersion, extra: extra)
@@ -159,7 +164,17 @@ final class Authenticator {
         pp_log(ctx, .openvpn, .info, "TLS.auth: Parsed server random [\(serverRandom1.asSensitiveBytes(ctx)), \(serverRandom2.asSensitiveBytes(ctx))]")
 
         if let serverOptsString = serverOpts.nullTerminatedString(fromOffset: 0) {
-            pp_log(ctx, .openvpn, .info, "TLS.auth: Parsed server options: \"\(serverOptsString)\"")
+            pp_log(ctx, .openvpn, .info, "TLS.auth: Parsed server options (string): \"\(serverOptsString)\"")
+            let lines = serverOptsString.components(separatedBy: ",").map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            do {
+                let serverOptions = try parser.parsed(fromLines: lines, isClient: false).configuration
+                pp_log(ctx, .openvpn, .info, "TLS.auth: Server options: \(serverOptions)")
+                self.serverOptions = serverOptions
+            } catch {
+                pp_log(ctx, .openvpn, .error, "TLS.auth: Unable to parse server options: \(error)")
+            }
         }
 
         self.serverRandom1 = serverRandom1

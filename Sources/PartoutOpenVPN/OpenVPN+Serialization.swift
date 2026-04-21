@@ -98,6 +98,8 @@ extension OpenVPN.Configuration {
         if let dataCiphers, !dataCiphers.isEmpty {
             append("data-ciphers \(dataCiphers.map(\.rawValue).joined(separator: ":"))")
             if let cipher {
+                // Prefer the explicit modern fallback directive when a
+                // negotiated cipher list is present.
                 append("data-ciphers-fallback \(cipher.rawValue)")
             }
         } else if let cipher {
