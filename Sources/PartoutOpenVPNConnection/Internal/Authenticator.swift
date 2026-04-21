@@ -194,9 +194,7 @@ extension OpenVPN.Configuration {
     /// Keep `cipher` in this string only when the configuration explicitly
     /// carries a legacy/fallback cipher. Negotiated `data-ciphers` are
     /// advertised separately via `IV_CIPHERS`.
-    func asLocalOptionsString(
-        withLocalOptions: Bool
-    ) -> String {
+    func asLocalOptionsString(withLocalOptions: Bool) -> String {
         guard withLocalOptions else {
             return "V0 UNDEF"
         }
