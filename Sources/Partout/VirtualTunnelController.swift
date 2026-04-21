@@ -103,6 +103,7 @@ public final class VirtualTunnelController: TunnelController {
         }
         // FIXME: #188, revert settings (record)
 //        tun.deviceName
+        await tunnel.shutdown()
 
         // Release tun implementation if necessary
         if let thiz = impl {

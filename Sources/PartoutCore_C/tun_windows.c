@@ -131,8 +131,10 @@ failure:
 
 void pp_tun_free(pp_tun tun) {
     if (!tun) return;
-    WintunEndSession(tun->session);
-    WintunCloseAdapter(tun->adapter);
+    pp_tun_shutdown(tun);
+    if (tun->adapter) {
+        WintunCloseAdapter(tun->adapter);
+    }
     pp_free(tun->name);
     pp_free(tun);
 
@@ -141,6 +143,10 @@ void pp_tun_free(pp_tun tun) {
 }
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
+    if (!tun || !tun->session) {
+        SetLastError(ERROR_INVALID_HANDLE);
+        return -1;
+    }
     DWORD packet_len;
     BYTE *packet = NULL;
     while (!packet) {
@@ -168,6 +174,10 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
 }
 
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
+    if (!tun || !tun->session) {
+        SetLastError(ERROR_INVALID_HANDLE);
+        return -1;
+    }
     // printf(">>> tun_write write %llu bytes\n", src_len);
     BYTE *packet = WintunAllocateSendPacket(tun->session, src_len);
     if (!packet) {
@@ -182,6 +192,12 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     WintunSendPacket(tun->session, packet);
     // printf(">>> tun_write written\n");
     return src_len;
+}
+
+void pp_tun_shutdown(const pp_tun tun) {
+    if (!tun || !tun->session) return;
+    WintunEndSession(tun->session);
+    tun->session = NULL;
 }
 
 int pp_tun_fd(const pp_tun tun) {

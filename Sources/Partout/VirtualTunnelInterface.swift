@@ -7,7 +7,7 @@
 internal import _PartoutCore_C
 
 /// An interface that interacts with a Layer 3 virtual tun device, commonly found in UNIX-like systems.
-final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
+final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
@@ -17,7 +17,8 @@ final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
 
     nonisolated let deviceName: String?
 
-    nonisolated let fileDescriptor: UInt64?
+    nonisolated(unsafe)
+    private var descriptor: UInt64?
 
     private let readQueue: DispatchQueue
 
@@ -25,6 +26,8 @@ final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
 
     // FIXME: #188, how to avoid silent copy? (enforce reference)
     private var readBuf: [UInt8]
+
+    private var isActive: Bool
 
     init(_ ctx: PartoutLoggerContext, uuid: UniqueID, tunImpl: UnsafeMutableRawPointer?, maxReadLength: Int) throws {
         guard let tun = uuid.uuidString.withCString({
@@ -41,12 +44,13 @@ final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
             deviceName = nil
         }
         let fd = pp_tun_fd(tun)
-        fileDescriptor = fd >= 0 ? UInt64(fd) : nil
+        descriptor = fd >= 0 ? UInt64(fd) : nil
         // FIXME: #188, Windows has device name but it's wchar_t *
-        let label = deviceName?.description ?? fileDescriptor?.description ?? "*"
+        let label = deviceName?.description ?? descriptor?.description ?? "*"
         readQueue = DispatchQueue(label: "VirtualTunnelInterface[R:\(label)]")
         writeQueue = DispatchQueue(label: "VirtualTunnelInterface[W:\(label)]")
         readBuf = [UInt8](repeating: 0, count: maxReadLength)
+        isActive = true
     }
 
     deinit {
@@ -54,7 +58,14 @@ final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
         pp_tun_free(tun)
     }
 
+    nonisolated var fileDescriptor: UInt64? {
+        descriptor
+    }
+
     func readPackets() async throws -> [Data] {
+        guard isActive else {
+            throw PartoutError(.linkNotActive)
+        }
         do {
             return try await withCheckedThrowingContinuation { continuation in
                 readQueue.async { [weak self] in
@@ -72,16 +83,26 @@ final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
                 }
             }
         } catch {
+            guard isActive else {
+                throw PartoutError(.linkNotActive)
+            }
             pp_log(ctx, .core, .fault, "Unable to read TUN packets: \(error)")
+            await shutdown()
             throw error
         }
     }
 
     func writePackets(_ packets: [Data]) async throws {
+        guard isActive else {
+            throw PartoutError(.linkNotActive)
+        }
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 writeQueue.async { [weak self] in
-                    guard let self else { return }
+                    guard let self else {
+                        continuation.resume(throwing: PartoutError(.releasedObject))
+                        return
+                    }
                     for toWrite in packets {
                         guard !toWrite.isEmpty else { continue }
                         let writtenCount = toWrite.withUnsafeBytes {
@@ -96,8 +117,30 @@ final class VirtualTunnelInterface: IOInterface, @unchecked Sendable {
                 }
             }
         } catch {
+            guard isActive else {
+                throw PartoutError(.linkNotActive)
+            }
             pp_log(ctx, .core, .fault, "Unable to write TUN packets: \(error)")
+            await shutdown()
             throw error
+        }
+    }
+
+    func shutdown() async {
+        guard isActive else { return }
+        isActive = false
+        descriptor = nil
+        pp_log(ctx, .core, .info, "Shut down TUN")
+        pp_tun_shutdown(tun)
+        await Self.waitUntilIdle(readQueue)
+        await Self.waitUntilIdle(writeQueue)
+    }
+
+    private static func waitUntilIdle(_ queue: DispatchQueue) async {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                continuation.resume()
+            }
         }
     }
 }
