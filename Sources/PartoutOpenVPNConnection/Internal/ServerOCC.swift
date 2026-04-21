@@ -58,9 +58,6 @@ extension ServerOCC {
             }
         }
 
-        return Self(
-            cipher: cipher,
-            digest: digest
-        )
+        return Self(cipher: cipher, digest: digest)
     }
 }
