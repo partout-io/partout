@@ -48,6 +48,7 @@ public final class AutoUpgradingLink: LinkInterface {
         try await io.writePackets(packets)
     }
 
+    @available(*, deprecated)
     public func setReadHandler(_ handler: @escaping @Sendable ([Data]?, (any Error)?) -> Void) {
         Task.detached { [weak self] in
             while true {

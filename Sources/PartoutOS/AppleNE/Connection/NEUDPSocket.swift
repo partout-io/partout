@@ -89,6 +89,7 @@ extension NEUDPSocket {
             .map { _ in }
     }
 
+    @available(*, deprecated)
     nonisolated func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
 
         // WARNING: runs in Network.framework queue

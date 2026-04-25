@@ -4,6 +4,7 @@
 
 /// Represents a specific I/O interface meant to work at the link layer (e.g. TCP/IP).
 public protocol LinkInterface: IOInterface {
+    /// The link description.
     nonisolated var linkDescription: String { get }
 
     /// The literal address of the remote host.
@@ -20,6 +21,7 @@ public protocol LinkInterface: IOInterface {
 
      - Parameter handler: The handler invoked whenever an array of `Data` packets is received, with an optional `Error` in case a network failure occurs.
      */
+    @available(*, deprecated)
     func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void)
 
     /// Returns an upgraded link if available (e.g. when a better path exists).
@@ -30,7 +32,6 @@ public protocol LinkInterface: IOInterface {
 }
 
 extension LinkInterface {
-
     /// The link type (UDP/TCP).
     public var linkType: IPSocketType {
         remoteProtocol.socketType

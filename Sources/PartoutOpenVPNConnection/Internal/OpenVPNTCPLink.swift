@@ -46,6 +46,7 @@ extension OpenVPNTCPLink: LinkInterface {
         link.hasBetterPath
     }
 
+    @available(*, deprecated)
     func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
         link.setReadHandler { [weak self] packets, error in
             guard let self else {

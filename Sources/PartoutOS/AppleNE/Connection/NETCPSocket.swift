@@ -91,6 +91,7 @@ extension NETCPSocket {
             .map { _ in }
     }
 
+    @available(*, deprecated)
     nonisolated func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
         loopReadPackets(handler)
     }
@@ -127,10 +128,15 @@ extension NETCPSocket {
         }
         let joinedPacket = Data(packets.joined())
         try await asyncWritePacket(joinedPacket)
+        // FIXME: #214, TCP is very slow (test this)
+//        for packet in packets {
+//            try await asyncWritePacket(packet)
+//        }
     }
 }
 
 private extension NETCPSocket {
+    @available(*, deprecated)
     nonisolated func loopReadPackets(_ handler: @escaping ([Data]?, Error?) -> Void) {
 
         // WARNING: runs in Network.framework queue
