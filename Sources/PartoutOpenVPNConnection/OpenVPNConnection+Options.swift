@@ -27,6 +27,8 @@ extension OpenVPNConnection {
 
         public var softNegotiationTimeout: TimeInterval = 120.0
 
+        public var withLoopsV2 = false
+
         public init() {
         }
     }

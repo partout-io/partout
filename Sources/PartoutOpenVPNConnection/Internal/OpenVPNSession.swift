@@ -146,7 +146,11 @@ extension OpenVPNSession: OpenVPNSessionProtocol {
         }
         pp_log(ctx, .openvpn, .info, "Start TUN loop")
         self.tunnel = tunnel
-        loopTunnel()
+        if options.withLoopsV2 {
+            loopTunnelV2()
+        } else {
+            loopTunnel()
+        }
     }
 
     func setLink(_ link: LinkInterface) async throws {
