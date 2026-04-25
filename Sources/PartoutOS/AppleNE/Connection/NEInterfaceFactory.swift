@@ -7,10 +7,6 @@
 /// A factory that spawns link and tunnel interfaces from a `NEPacketTunnelProvider`.
 public final class NEInterfaceFactory: NetworkInterfaceFactory {
     public struct Options: Sendable {
-        // Enable to use NWConnection, NW* sockets were removed from NetworkExtension.
-        public var usesNETCP = false
-        public var usesNEUDP = false
-
         public var maxUDPDatagrams = 200
 
         public var minTCPLength = 2
@@ -42,62 +38,41 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
         }
         switch endpoint.proto.socketType.plainType {
         case .udp:
-            if options.usesNEUDP {
-                let impl = NWConnection(to: endpoint.nwEndpoint, using: .udp)
-                let socketOptions = NESocketObserver.Options(
-                    proto: .udp,
-                    minLength: 0,   // unused
-                    maxLength: 0    // unused
-                )
-                return NESocketObserver(ctx, nwConnection: impl, options: socketOptions)
-            } else {
 #if swift(>=6.0)
-                fatalError("Must enable .usesNetworkFramework in Swift 6.0")
+            fatalError("Must enable .usesNetworkFramework in Swift 6.0")
 #else
-                let impl = provider.createUDPSession(
-                    to: endpoint.nwHostEndpoint,
-                    from: nil
+            let impl = provider.createUDPSession(
+                to: endpoint.nwHostEndpoint,
+                from: nil
+            )
+            return NEUDPObserver(
+                ctx,
+                nwSession: impl,
+                options: .init(
+                    maxDatagrams: options.maxUDPDatagrams,
+                    withReadPackets: false
                 )
-                return NEUDPObserver(
-                    ctx,
-                    nwSession: impl,
-                    options: .init(
-                        maxDatagrams: options.maxUDPDatagrams,
-                        withReadPackets: false
-                    )
-                )
+            )
 #endif
-            }
-
         case .tcp:
-            if options.usesNETCP {
-                let impl = NWConnection(to: endpoint.nwEndpoint, using: .tcp)
-                let socketOptions = NESocketObserver.Options(
-                    proto: .tcp,
+#if swift(>=6.0)
+            fatalError("Must enable .usesNetworkFramework in Swift 6.0")
+#else
+            let impl = provider.createTCPConnection(
+                to: endpoint.nwHostEndpoint,
+                enableTLS: false,
+                tlsParameters: nil,
+                delegate: nil
+            )
+            return NETCPObserver(
+                ctx,
+                nwConnection: impl,
+                options: .init(
                     minLength: options.minTCPLength,
                     maxLength: options.maxTCPLength
                 )
-                return NESocketObserver(ctx, nwConnection: impl, options: socketOptions)
-            } else {
-#if swift(>=6.0)
-                fatalError("Must enable .usesNetworkFramework in Swift 6.0")
-#else
-                let impl = provider.createTCPConnection(
-                    to: endpoint.nwHostEndpoint,
-                    enableTLS: false,
-                    tlsParameters: nil,
-                    delegate: nil
-                )
-                return NETCPObserver(
-                    ctx,
-                    nwConnection: impl,
-                    options: .init(
-                        minLength: options.minTCPLength,
-                        maxLength: options.maxTCPLength
-                    )
-                )
+            )
 #endif
-            }
         }
     }
 }
