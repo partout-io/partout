@@ -62,7 +62,8 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
                     ctx,
                     nwSession: impl,
                     options: .init(
-                        maxDatagrams: options.maxUDPDatagrams
+                        maxDatagrams: options.maxUDPDatagrams,
+                        withReadPackets: false
                     )
                 )
 #endif

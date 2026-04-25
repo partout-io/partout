@@ -9,6 +9,7 @@ import NetworkExtension
 public final class NEUDPObserver: LinkObserver {
     public struct Options: Sendable {
         public let maxDatagrams: Int
+        public let withReadPackets: Bool
     }
 
     private let ctx: PartoutLoggerContext
@@ -68,6 +69,10 @@ private actor NEUDPSocket: LinkInterface {
 
     let remoteProtocol: EndpointProtocol
 
+    private let readStream: AsyncThrowingStream<[Data], Error>?
+
+    private let readContinuation: AsyncThrowingStream<[Data], Error>.Continuation?
+
     init(
         nwSession: NWUDPSession,
         options: NEUDPObserver.Options,
@@ -78,6 +83,31 @@ private actor NEUDPSocket: LinkInterface {
         self.options = options
         self.remoteAddress = remoteAddress
         self.remoteProtocol = remoteProtocol
+
+        guard options.withReadPackets else {
+            readStream = nil
+            readContinuation = nil
+            return
+        }
+
+        var newReadContinuation: AsyncThrowingStream<[Data], Error>.Continuation?
+        readStream = AsyncThrowingStream { continuation in
+            newReadContinuation = continuation
+        }
+        guard let newReadContinuation else {
+            fatalError("withReadPackets requires non-nil readContinuation")
+        }
+        readContinuation = newReadContinuation
+
+        // WARNING: runs in Network.framework queue
+        nwSession.setReadHandler({ [newReadContinuation] packets, error in
+            if let error {
+                newReadContinuation.finish(throwing: error)
+                return
+            }
+            guard let packets, !packets.isEmpty else { return }
+            newReadContinuation.yield(packets)
+        }, maxDatagrams: options.maxDatagrams)
     }
 }
 
@@ -91,7 +121,10 @@ extension NEUDPSocket {
 
     @available(*, deprecated)
     nonisolated func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
-
+        guard readStream == nil else {
+            pp_log_g(.os, .info, "Ignoring setReadHandler() because withReadPackets has its own read handler")
+            return
+        }
         // WARNING: runs in Network.framework queue
         nwSession.setReadHandler(handler, maxDatagrams: options.maxDatagrams)
     }
@@ -118,7 +151,10 @@ extension NEUDPSocket {
     }
 
     func readPackets() async throws -> [Data] {
-        fatalError("readPackets() unavailable")
+        guard let readStream else {
+            fatalError("Not initialized with withReadPackets")
+        }
+        return try await readStream.nextElement() ?? []
     }
 
     func writePackets(_ packets: [Data]) async throws {

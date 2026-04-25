@@ -73,7 +73,14 @@ extension OpenVPNUDPLink {
     }
 
     func readPackets() async throws -> [Data] {
-        fatalError("readPackets() unavailable")
+        let packets = try await link.readPackets()
+        guard !packets.isEmpty else {
+            return []
+        }
+        if let proc {
+            return proc.processPackets(packets, direction: .inbound)
+        }
+        return packets
     }
 
     func writePackets(_ packets: [Data]) async throws {
