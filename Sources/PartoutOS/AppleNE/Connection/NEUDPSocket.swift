@@ -122,8 +122,7 @@ extension NEUDPSocket {
     @available(*, deprecated)
     nonisolated func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
         guard readStream == nil else {
-            pp_log_g(.os, .info, "Ignoring setReadHandler() because withReadPackets has its own read handler")
-            return
+            fatalError("setReadHandler() must not be called because withReadPackets has its own read handler")
         }
         // WARNING: runs in Network.framework queue
         nwSession.setReadHandler(handler, maxDatagrams: options.maxDatagrams)
