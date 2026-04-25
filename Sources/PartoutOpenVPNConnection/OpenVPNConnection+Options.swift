@@ -29,6 +29,8 @@ extension OpenVPNConnection {
 
         public var withLoopsV2 = false
 
+        public var flushesDataBeforeControl = false
+
         public init() {
         }
     }

@@ -131,7 +131,13 @@ extension OpenVPNSession {
 
 private extension OpenVPNSession {
     @inline(always)
-    func flushDataPackets(_ dataPacketsByKey: [UInt8: [Data]]) async throws {
+    func flushDataPackets(_ dataPacketsByKey: inout [UInt8: [Data]]) async throws {
+        guard !dataPacketsByKey.isEmpty else { return }
+        defer {
+            if options.flushesDataBeforeControl {
+                dataPacketsByKey.removeAll(keepingCapacity: true)
+            }
+        }
         guard let tunnel else { return }
         for (key, dataPackets) in dataPacketsByKey {
             guard let dataChannel = dataChannel(for: key) else {
@@ -197,6 +203,10 @@ private extension OpenVPNSession {
                 continue
             }
 
+            if options.flushesDataBeforeControl {
+                try await flushDataPackets(&dataPacketsByKey)
+            }
+
             let controlPacket: CrossPacket
             do {
                 let parsedPacket = try negotiator.readInboundPacket(withData: packet, offset: 0)
@@ -236,7 +246,7 @@ private extension OpenVPNSession {
             }
         }
 
-        try await flushDataPackets(dataPacketsByKey)
+        try await flushDataPackets(&dataPacketsByKey)
     }
 
     func receiveTunnel(packets: [Data]) async throws {
