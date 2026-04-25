@@ -26,7 +26,11 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
 
     private let options: Options
 
-    public init(_ ctx: PartoutLoggerContext, provider: NEPacketTunnelProvider?, options: Options) {
+    public init(
+        _ ctx: PartoutLoggerContext,
+        provider: NEPacketTunnelProvider?,
+        options: Options = Options()
+    ) {
         precondition(provider != nil) // weak
         self.ctx = ctx
         self.provider = provider
