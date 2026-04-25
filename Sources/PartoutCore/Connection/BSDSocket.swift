@@ -6,7 +6,7 @@ internal import _PartoutCore_C
 import Dispatch
 
 /// A `LinkInterface` backed by dedicated blocking reader/writer loops.
-public final class BSDSocket: LinkInterface, @unchecked Sendable {
+public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Sendable {
     private struct WriteRequest {
         let packets: [Data]
 
