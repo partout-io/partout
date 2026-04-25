@@ -6,6 +6,7 @@ internal import _PartoutOpenVPNConnection_C
 
 // TODO: #142/notes, LINK and TUN should be able to run detached in full-duplex
 extension OpenVPNSession {
+    @available(*, deprecated, message: "Use loopTunnelV2()")
     func loopTunnel() {
         runInActor { [weak self] in
             guard let ctx = self?.ctx else {
@@ -39,6 +40,7 @@ extension OpenVPNSession {
         }
     }
 
+    @available(*, deprecated, message: "Use loopLinkV2()")
     func loopLink() {
         link?.setReadHandler { [weak self] packets, error in
             self?.runInActor { [weak self] in
@@ -57,6 +59,68 @@ extension OpenVPNSession {
                     try await self.receiveLink(packets: packets)
                 } catch {
                     await self.shutdown(error)
+                }
+            }
+        }
+    }
+}
+
+extension OpenVPNSession {
+    func loopTunnelV2() {
+        Task { [weak self] in
+            while true {
+                guard let ctx = self?.ctx else {
+                    pp_log(.global, .openvpn, .debug, "Ignore TUN read from outdated OpenVPNSession")
+                    return
+                }
+                guard let tunnel = self?.tunnel else {
+                    pp_log(ctx, .openvpn, .debug, "Ignore read from outdated TUN")
+                    return
+                }
+                guard let self else {
+                    pp_log(.global, .openvpn, .debug, "Ignore TUN packets from outdated OpenVPNSession")
+                    return
+                }
+                do {
+                    let packets = try await tunnel.readPackets()
+                    guard !packets.isEmpty else {
+                        pp_log(ctx, .openvpn, .debug, "Skip TUN loop after empty packets")
+                        continue
+                    }
+                    try await receiveTunnel(packets: packets)
+                } catch {
+                    pp_log(ctx, .openvpn, .error, "Failed TUN read: \(error)")
+                    await shutdown(error)
+                }
+            }
+        }
+    }
+
+    func loopLinkV2() {
+        Task { [weak self] in
+            while true {
+                guard let ctx = self?.ctx else {
+                    pp_log(.global, .openvpn, .debug, "Ignore LINK read from outdated OpenVPNSession")
+                    return
+                }
+                guard let link = self?.link else {
+                    pp_log(ctx, .openvpn, .debug, "Ignore read from outdated LINK")
+                    return
+                }
+                guard let self else {
+                    pp_log(.global, .openvpn, .debug, "Ignore LINK packets from outdated OpenVPNSession")
+                    return
+                }
+                do {
+                    let packets = try await link.readPackets()
+                    guard !packets.isEmpty else {
+                        pp_log(ctx, .openvpn, .debug, "Skip LINK loop after empty packets")
+                        continue
+                    }
+                    try await receiveLink(packets: packets)
+                } catch {
+                    pp_log(ctx, .openvpn, .error, "Failed LINK read: \(error)")
+                    await self.shutdown(PartoutError(.linkFailure, error))
                 }
             }
         }

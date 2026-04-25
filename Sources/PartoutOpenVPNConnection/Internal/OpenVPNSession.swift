@@ -408,8 +408,8 @@ extension OpenVPNSession {
     }
 }
 
+@available(*, deprecated)
 extension OpenVPNSession {
-
     @discardableResult
     nonisolated func runInActor(after: TimeInterval? = nil, _ block: @escaping @OpenVPNActor () async throws -> Void) -> Task<Void, Error> {
         Task {
@@ -432,8 +432,10 @@ private extension OpenVPNSession {
         pp_log(ctx, .openvpn, .debug, "Schedule ping check after \(interval.asTimeString)")
 
         pendingPingTask?.cancel()
-        pendingPingTask = runInActor(after: interval) { [weak self] in
+        pendingPingTask = Task { [weak self] in
             do {
+                try await Task.sleep(interval: interval)
+                guard !Task.isCancelled else { return }
                 try await self?.ping()
             } catch {
                 await self?.shutdown(error)
