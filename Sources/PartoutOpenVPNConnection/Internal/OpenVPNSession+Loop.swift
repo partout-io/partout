@@ -130,6 +130,22 @@ extension OpenVPNSession {
 // MARK: - Private
 
 private extension OpenVPNSession {
+    @inline(always)
+    func flushDataPackets(_ dataPacketsByKey: [UInt8: [Data]]) async throws {
+        guard let tunnel else { return }
+        for (key, dataPackets) in dataPacketsByKey {
+            guard let dataChannel = dataChannel(for: key) else {
+                pp_log(ctx, .openvpn, .error, "Accounted a data packet for which the cryptographic key hadn't been found")
+                continue
+            }
+            try await handleDataPackets(
+                dataPackets,
+                to: tunnel,
+                dataChannel: dataChannel
+            )
+        }
+    }
+
     func receiveLink(packets: [Data]) async throws {
         guard !isStopped, let link else {
             return
@@ -137,23 +153,6 @@ private extension OpenVPNSession {
 
         reportLastReceivedDate()
         var dataPacketsByKey: [UInt8: [Data]] = [:]
-
-        func flushDataPackets() async throws {
-            guard let tunnel else {
-                return
-            }
-            for (key, dataPackets) in dataPacketsByKey {
-                guard let dataChannel = dataChannel(for: key) else {
-                    pp_log(ctx, .openvpn, .error, "Accounted a data packet for which the cryptographic key hadn't been found")
-                    continue
-                }
-                try await handleDataPackets(
-                    dataPackets,
-                    to: tunnel,
-                    dataChannel: dataChannel
-                )
-            }
-        }
 
         guard var negotiator = currentNegotiator else {
             pp_log(ctx, .openvpn, .fault, "No negotiator")
@@ -237,7 +236,7 @@ private extension OpenVPNSession {
             }
         }
 
-        try await flushDataPackets()
+        try await flushDataPackets(dataPacketsByKey)
     }
 
     func receiveTunnel(packets: [Data]) async throws {
