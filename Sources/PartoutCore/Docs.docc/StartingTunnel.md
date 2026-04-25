@@ -45,7 +45,6 @@ Given the main app and the daemon:
 
 ### I/O interfaces
 
-- ``AutoUpgradingLink``
 - ``IOInterface``
 - ``LinkInterface``
 - ``LinkObserver``
