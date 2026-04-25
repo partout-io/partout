@@ -45,7 +45,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
         switch endpoint.proto.socketType.plainType {
         case .udp:
 #if swift(>=6.0)
-            fatalError("Must enable .usesNetworkFramework in Swift 6.0")
+            fatalError("Unavailable in Swift 6")
 #else
             let impl = provider.createUDPSession(
                 to: endpoint.nwHostEndpoint,
@@ -62,7 +62,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
 #endif
         case .tcp:
 #if swift(>=6.0)
-            fatalError("Must enable .usesNetworkFramework in Swift 6.0")
+            fatalError("Unavailable in Swift 6")
 #else
             let impl = provider.createTCPConnection(
                 to: endpoint.nwHostEndpoint,
