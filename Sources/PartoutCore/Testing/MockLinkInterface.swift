@@ -60,6 +60,7 @@ public final class MockLinkInterface: LinkInterface {
     public func shutdown() {
     }
 
+    @available(*, deprecated)
     public func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
     }
 

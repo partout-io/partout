@@ -41,6 +41,7 @@ extension OpenVPNUDPLink: LinkInterface {
         link.hasBetterPath
     }
 
+    @available(*, deprecated)
     func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
         link.setReadHandler { [weak self] packets, error in
             guard let self, let packets, !packets.isEmpty else {
@@ -72,7 +73,14 @@ extension OpenVPNUDPLink {
     }
 
     func readPackets() async throws -> [Data] {
-        fatalError("readPackets() unavailable")
+        let packets = try await link.readPackets()
+        guard !packets.isEmpty else {
+            return []
+        }
+        if let proc {
+            return proc.processPackets(packets, direction: .inbound)
+        }
+        return packets
     }
 
     func writePackets(_ packets: [Data]) async throws {
