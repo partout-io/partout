@@ -13,6 +13,8 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
 
         public var maxTCPLength = 512 * 1024
 
+        public var withReadPackets = false
+
         public init() {
         }
     }
@@ -50,7 +52,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
                 nwSession: impl,
                 options: .init(
                     maxDatagrams: options.maxUDPDatagrams,
-                    withReadPackets: false
+                    withReadPackets: options.withReadPackets
                 )
             )
 #endif
