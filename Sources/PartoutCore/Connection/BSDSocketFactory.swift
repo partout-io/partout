@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-public final class POSIXInterfaceFactory: NetworkInterfaceFactory {
+/// A ``NetworkInterfaceFactory`` spawning BSD sockets.
+public final class BSDSocketFactory: NetworkInterfaceFactory {
     private let ctx: PartoutLoggerContext
 
     private let betterPathBlock: BetterPathBlock
@@ -16,6 +17,6 @@ public final class POSIXInterfaceFactory: NetworkInterfaceFactory {
     }
 
     public func linkObserver(to endpoint: ExtendedEndpoint) -> LinkObserver {
-        POSIXSocketObserver(ctx, endpoint: endpoint, betterPathBlock: betterPathBlock)
+        BSDSocketObserver(ctx, endpoint: endpoint, betterPathBlock: betterPathBlock)
     }
 }

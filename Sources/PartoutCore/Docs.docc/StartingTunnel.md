@@ -26,6 +26,7 @@ Given the main app and the daemon:
 ### Setting up a connection
 
 - ``BetterPathBlock``
+- ``BSDSocketFactory``
 - ``Connection``
 - ``ConnectionParameters``
 - ``ConnectionStatus``
@@ -33,7 +34,6 @@ Given the main app and the daemon:
 - ``DataCount``
 - ``EndpointResolver``
 - ``NetworkInterfaceFactory``
-- ``POSIXInterfaceFactory``
 
 ### DNS resolution
 
@@ -49,8 +49,8 @@ Given the main app and the daemon:
 - ``IOInterface``
 - ``LinkInterface``
 - ``LinkObserver``
-- ``POSIXBlockingSocket``
-- ``POSIXSocketObserver``
+- ``BSDSocket``
+- ``BSDSocketObserver``
 - ``SocketIOInterface``
 
 ### Applying network settings

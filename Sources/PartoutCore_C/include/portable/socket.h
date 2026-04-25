@@ -38,6 +38,11 @@ int pp_socket_read(pp_socket _Nonnull sock,
                    uint8_t *_Nonnull dst, size_t dst_len);
 int pp_socket_write(pp_socket _Nonnull sock,
                     const uint8_t *_Nonnull src, size_t src_len);
+bool pp_socket_set_buffers(pp_socket _Nonnull sock,
+                           int recvbuf_len,
+                           int sendbuf_len);
+bool pp_socket_wait_readable(pp_socket _Nonnull sock, int timeout_ms);
+bool pp_socket_wait_writable(pp_socket _Nonnull sock, int timeout_ms);
 
 /* Universal file descriptor. */
 uint64_t pp_socket_fd(pp_socket _Nonnull sock);
