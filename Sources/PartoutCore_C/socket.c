@@ -38,8 +38,11 @@
 #include "portable/common.h"
 #include "portable/socket.h"
 
-int connect_with_timeout(os_socket_fd fd, const struct sockaddr *addr, socklen_t addrlen, bool blocking, int timeout_ms);
-static int pp_socket_ipproto(pp_socket_proto proto);
+static int pp_socket_connect_with_timeout(os_socket_fd fd,
+                                          const struct sockaddr *addr,
+                                          socklen_t addrlen,
+                                          bool blocking,
+                                          int timeout_ms);
 static bool pp_socket_parse_numeric_addr(const char *ip_addr,
                                          uint16_t port,
                                          struct sockaddr_storage *addr,
@@ -72,7 +75,7 @@ pp_socket pp_socket_open(const char *ip_addr,
     struct addrinfo hints, *resolved = NULL;
     char port_str[16] = { 0 };
     os_socket_fd new_fd = OS_INVALID_SOCKET;
-    const int protocol = pp_socket_ipproto(proto);
+    int ipproto = 0;
 
 #ifdef _WIN32
     static int wsa_initialized = 0;
@@ -88,32 +91,34 @@ pp_socket pp_socket_open(const char *ip_addr,
 
     pp_zero(&hints, sizeof(hints));
     hints.ai_family = AF_UNSPEC;   // IPv4 or IPv6
-    hints.ai_protocol = protocol;
-#ifdef AI_NUMERICSERV
-    hints.ai_flags = AI_NUMERICSERV;
-#endif
     switch (proto) {
         case PPSocketProtoTCP:
+            ipproto = IPPROTO_TCP;
             hints.ai_socktype = SOCK_STREAM;
             break;
         case PPSocketProtoUDP:
+            ipproto = IPPROTO_UDP;
             hints.ai_socktype = SOCK_DGRAM;
             break;
     }
+    hints.ai_protocol = ipproto;
+#ifdef AI_NUMERICSERV
+    hints.ai_flags = AI_NUMERICSERV;
+#endif
 
     struct sockaddr_storage numeric_addr;
     socklen_t numeric_addrlen = 0;
     if (pp_socket_parse_numeric_addr(ip_addr, port, &numeric_addr, &numeric_addrlen)) {
-        new_fd = socket(numeric_addr.ss_family, hints.ai_socktype, protocol);
+        new_fd = socket(numeric_addr.ss_family, hints.ai_socktype, ipproto);
         if (new_fd == OS_INVALID_SOCKET) {
             SOCKET_PRINT_ERROR("socket()");
             goto failure;
         }
-        if (connect_with_timeout(new_fd,
-                                 (const struct sockaddr *)&numeric_addr,
-                                 numeric_addrlen,
-                                 blocking,
-                                 timeout_ms) != 0) {
+        if (pp_socket_connect_with_timeout(new_fd,
+                                           (const struct sockaddr *)&numeric_addr,
+                                           numeric_addrlen,
+                                           blocking,
+                                           timeout_ms) != 0) {
             SOCKET_PRINT_ERROR("connect()");
             goto failure;
         }
@@ -133,11 +138,11 @@ pp_socket pp_socket_open(const char *ip_addr,
             SOCKET_PRINT_ERROR("socket()");
             continue;
         }
-        const int ret = connect_with_timeout(new_fd,
-                                             p->ai_addr,
-                                             (int)p->ai_addrlen,
-                                             blocking,
-                                             timeout_ms);
+        const int ret = pp_socket_connect_with_timeout(new_fd,
+                                                       p->ai_addr,
+                                                       (int)p->ai_addrlen,
+                                                       blocking,
+                                                       timeout_ms);
         if (ret != 0) {
             os_close_socket(new_fd);
             SOCKET_PRINT_ERROR("connect()");
@@ -322,16 +327,6 @@ uint64_t pp_socket_fd(const pp_socket sock) {
     return sock->fd;
 }
 
-static int pp_socket_ipproto(pp_socket_proto proto) {
-    switch (proto) {
-        case PPSocketProtoTCP:
-            return IPPROTO_TCP;
-        case PPSocketProtoUDP:
-            return IPPROTO_UDP;
-    }
-    return 0;
-}
-
 static bool pp_socket_parse_numeric_addr(const char *ip_addr,
                                          uint16_t port,
                                          struct sockaddr_storage *addr,
@@ -425,9 +420,11 @@ static bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool 
     }
 }
 
-int connect_with_timeout(os_socket_fd fd, const struct sockaddr *addr, socklen_t addrlen,
-                         bool blocking, int timeout_ms) {
-
+int pp_socket_connect_with_timeout(os_socket_fd fd,
+                                   const struct sockaddr *addr,
+                                   socklen_t addrlen,
+                                   bool blocking,
+                                   int timeout_ms) {
     // Set non-blocking
 #ifdef _WIN32
     u_long mode = 1;

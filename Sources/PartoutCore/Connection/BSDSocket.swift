@@ -354,24 +354,28 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         endpoint: ExtendedEndpoint,
         timeout: Int,
         betterPathBlock: @escaping BetterPathBlock,
-        maxReadLength: Int = 128 * 1024
+        socketBufferLength: Int = 1 * 1024 * 1024,
+        maxReadLength: Int = 128 * 1024,
+        maxReadBatchPackets: Int = 256,
+        maxReadBatchBytes: Int = 256 * 1024
     ) async throws -> BSDSocket {
         let sock = try await openSocket(
             endpoint: endpoint,
             timeout: timeout,
-            socketBufferLength: 1 * 1024 * 1024
+            socketBufferLength: socketBufferLength
         )
         do {
+            let closesOnEmptyRead = endpoint.proto.socketType.plainType == .tcp
             let betterPathStream = try betterPathBlock()
             return BSDSocket(
                 ctx: ctx,
                 endpoint: endpoint,
                 connectTimeout: timeout,
                 sock: sock,
-                closesOnEmptyRead: endpoint.proto.socketType == .tcp,
+                closesOnEmptyRead: closesOnEmptyRead,
                 maxReadLength: maxReadLength,
-                maxReadBatchPackets: 256,
-                maxReadBatchBytes: 256 * 1024,
+                maxReadBatchPackets: maxReadBatchPackets,
+                maxReadBatchBytes: maxReadBatchBytes,
                 betterPathBlock: betterPathBlock,
                 betterPathStream: betterPathStream
             )
@@ -423,13 +427,9 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         didTerminate = false
 
         workerGroup.enter()
-        readQueue.async { [self] in
-            readLoop()
-        }
+        readQueue.async(execute: readLoop)
         workerGroup.enter()
-        writeQueue.async { [self] in
-            writeLoop()
-        }
+        writeQueue.async(execute: writeLoop)
     }
 
     public nonisolated var remoteAddress: String {
@@ -453,9 +453,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
     }
 
     public func writePackets(_ packets: [Data]) async throws {
-        guard !packets.isEmpty else {
-            return
-        }
+        guard !packets.isEmpty else { return }
         try await writeRequests.enqueue(packets)
     }
 
@@ -487,12 +485,13 @@ private extension BSDSocket {
     ) async throws -> pp_socket {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
+                let blocking = endpoint.proto.socketType.plainType == .tcp
                 let newSock = endpoint.address.rawValue.withCString { cAddr in
                     pp_socket_open(
                         cAddr,
                         endpoint.socketProto,
                         endpoint.proto.port,
-                        endpoint.proto.socketType == .tcp,
+                        blocking,
                         Int32(timeout)
                     )
                 }
@@ -510,16 +509,33 @@ private extension BSDSocket {
         }
     }
 
+    @Sendable
     func readLoop() {
         defer {
             workerGroup.leave()
         }
-
-        if endpoint.proto.socketType == .udp {
-            readDatagramLoop()
-            return
+        switch endpoint.proto.socketType.plainType {
+        case .udp:
+            readLoopUDP()
+        case .tcp:
+            readLoopTCP()
         }
+    }
 
+    @Sendable
+    func writeLoop() {
+        defer {
+            workerGroup.leave()
+        }
+        switch endpoint.proto.socketType.plainType {
+        case .udp:
+            writeLoopUDP()
+        case .tcp:
+            writeLoopTCP()
+        }
+    }
+
+    func readLoopTCP() {
         let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: maxReadLength)
         defer {
             buffer.deallocate()
@@ -568,16 +584,8 @@ private extension BSDSocket {
         }
     }
 
-    func writeLoop() {
-        defer {
-            workerGroup.leave()
-        }
-
-        if endpoint.proto.socketType == .udp {
-            writeDatagramLoop()
-            return
-        }
-
+    @Sendable
+    func writeLoopTCP() {
         while let request = writeRequests.next() {
             var failure: Error?
             for packet in request.packets {
@@ -605,7 +613,7 @@ private extension BSDSocket {
         }
     }
 
-    func readDatagramLoop() {
+    func readLoopUDP() {
         let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: maxReadLength)
         defer {
             buffer.deallocate()
@@ -648,7 +656,7 @@ private extension BSDSocket {
         }
     }
 
-    func writeDatagramLoop() {
+    func writeLoopUDP() {
         while let request = writeRequests.next() {
             var failure: Error?
             packetLoop: for packet in request.packets {
@@ -699,7 +707,7 @@ private extension BSDSocket {
             return
         }
 
-        pp_log(ctx, .core, .info, "Terminate POSIX link: \(error)")
+        pp_log(ctx, .core, .info, "Terminate BSD socket: \(error)")
         socketHandle.requestShutdown()
         packetInbox.finish(throwing: error)
         writeRequests.finish(throwing: error)
