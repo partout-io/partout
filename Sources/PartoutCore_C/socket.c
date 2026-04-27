@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #define os_socket_fd int
@@ -37,8 +38,17 @@
 #include "portable/common.h"
 #include "portable/socket.h"
 
-int connect_with_timeout(os_socket_fd fd, const struct sockaddr *addr, socklen_t addrlen, bool blocking, int timeout_ms);
+static int pp_socket_connect_with_timeout(os_socket_fd fd,
+                                          const struct sockaddr *addr,
+                                          socklen_t addrlen,
+                                          bool blocking,
+                                          int timeout_ms);
+static bool pp_socket_parse_numeric_addr(const char *ip_addr,
+                                         uint16_t port,
+                                         struct sockaddr_storage *addr,
+                                         socklen_t *addrlen);
 static void pp_socket_close_impl(pp_socket sock);
+static bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write);
 
 /* Host a file descriptor with the specific platform type. POSIX systems
  * use int, whereas Windows uses SOCKET.  */
@@ -65,6 +75,7 @@ pp_socket pp_socket_open(const char *ip_addr,
     struct addrinfo hints, *resolved = NULL;
     char port_str[16] = { 0 };
     os_socket_fd new_fd = OS_INVALID_SOCKET;
+    int ipproto = 0;
 
 #ifdef _WIN32
     static int wsa_initialized = 0;
@@ -82,11 +93,36 @@ pp_socket pp_socket_open(const char *ip_addr,
     hints.ai_family = AF_UNSPEC;   // IPv4 or IPv6
     switch (proto) {
         case PPSocketProtoTCP:
+            ipproto = IPPROTO_TCP;
             hints.ai_socktype = SOCK_STREAM;
             break;
         case PPSocketProtoUDP:
+            ipproto = IPPROTO_UDP;
             hints.ai_socktype = SOCK_DGRAM;
             break;
+    }
+    hints.ai_protocol = ipproto;
+#ifdef AI_NUMERICSERV
+    hints.ai_flags = AI_NUMERICSERV;
+#endif
+
+    struct sockaddr_storage numeric_addr;
+    socklen_t numeric_addrlen = 0;
+    if (pp_socket_parse_numeric_addr(ip_addr, port, &numeric_addr, &numeric_addrlen)) {
+        new_fd = socket(numeric_addr.ss_family, hints.ai_socktype, ipproto);
+        if (new_fd == OS_INVALID_SOCKET) {
+            SOCKET_PRINT_ERROR("socket()");
+            goto failure;
+        }
+        if (pp_socket_connect_with_timeout(new_fd,
+                                           (const struct sockaddr *)&numeric_addr,
+                                           numeric_addrlen,
+                                           blocking,
+                                           timeout_ms) != 0) {
+            SOCKET_PRINT_ERROR("connect()");
+            goto failure;
+        }
+        return pp_socket_create(new_fd);
     }
 
     snprintf(port_str, sizeof(port_str), "%u", port);
@@ -102,11 +138,11 @@ pp_socket pp_socket_open(const char *ip_addr,
             SOCKET_PRINT_ERROR("socket()");
             continue;
         }
-        const int ret = connect_with_timeout(new_fd,
-                                             p->ai_addr,
-                                             (int)p->ai_addrlen,
-                                             blocking,
-                                             timeout_ms);
+        const int ret = pp_socket_connect_with_timeout(new_fd,
+                                                       p->ai_addr,
+                                                       (int)p->ai_addrlen,
+                                                       blocking,
+                                                       timeout_ms);
         if (ret != 0) {
             os_close_socket(new_fd);
             SOCKET_PRINT_ERROR("connect()");
@@ -218,12 +254,18 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
         if (written_len < 0) {
 #ifdef _WIN32
             const int err = WSAGetLastError();
-            if (err == WSAEINTR || err == WSAEWOULDBLOCK) {
+            if (err == WSAEINTR) {
                 continue;
             }
+            if (err == WSAEWOULDBLOCK) {
+                return offset > 0 ? (int)offset : 0;
+            }
 #else
-            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+            if (errno == EINTR) {
                 continue;
+            }
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return offset > 0 ? (int)offset : 0;
             }
 #endif
             SOCKET_PRINT_ERROR("send()");
@@ -243,10 +285,74 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
     return (int)offset;
 }
 
+bool pp_socket_set_buffers(pp_socket sock, int recvbuf_len, int sendbuf_len) {
+    if (!sock || sock->fd == OS_INVALID_SOCKET) {
+#ifdef _WIN32
+        WSASetLastError(WSAENOTSOCK);
+#else
+        errno = EBADF;
+#endif
+        return false;
+    }
+
+    bool did_set = true;
+    if (recvbuf_len > 0) {
+        if (setsockopt(sock->fd, SOL_SOCKET, SO_RCVBUF, (const void *)&recvbuf_len, sizeof(recvbuf_len)) < 0) {
+            SOCKET_PRINT_ERROR("setsockopt(SO_RCVBUF)");
+            did_set = false;
+        }
+    }
+    if (sendbuf_len > 0) {
+        if (setsockopt(sock->fd, SOL_SOCKET, SO_SNDBUF, (const void *)&sendbuf_len, sizeof(sendbuf_len)) < 0) {
+            SOCKET_PRINT_ERROR("setsockopt(SO_SNDBUF)");
+            did_set = false;
+        }
+    }
+    return did_set;
+}
+
+/* Wait until the socket is readable. Returns false on timeout or failure. */
+bool pp_socket_wait_readable(pp_socket sock, int timeout_ms) {
+    return pp_socket_wait(sock, timeout_ms, true, false);
+}
+
+/* Wait until the socket is writable. Returns false on timeout or failure. */
+bool pp_socket_wait_writable(pp_socket sock, int timeout_ms) {
+    return pp_socket_wait(sock, timeout_ms, false, true);
+}
+
 /* Return the native file descriptor. */
 uint64_t pp_socket_fd(const pp_socket sock) {
     pp_assert(sock && sock->fd != OS_INVALID_SOCKET);
     return sock->fd;
+}
+
+static bool pp_socket_parse_numeric_addr(const char *ip_addr,
+                                         uint16_t port,
+                                         struct sockaddr_storage *addr,
+                                         socklen_t *addrlen) {
+    struct sockaddr_in addr4;
+    pp_zero(&addr4, sizeof(addr4));
+    addr4.sin_family = AF_INET;
+    addr4.sin_port = htons(port);
+    if (inet_pton(AF_INET, ip_addr, &addr4.sin_addr) == 1) {
+        pp_zero(addr, sizeof(*addr));
+        memcpy(addr, &addr4, sizeof(addr4));
+        *addrlen = sizeof(addr4);
+        return true;
+    }
+
+    struct sockaddr_in6 addr6;
+    pp_zero(&addr6, sizeof(addr6));
+    addr6.sin6_family = AF_INET6;
+    addr6.sin6_port = htons(port);
+    if (inet_pton(AF_INET6, ip_addr, &addr6.sin6_addr) == 1) {
+        pp_zero(addr, sizeof(*addr));
+        memcpy(addr, &addr6, sizeof(addr6));
+        *addrlen = sizeof(addr6);
+        return true;
+    }
+    return false;
 }
 
 static void pp_socket_close_impl(pp_socket sock) {
@@ -257,9 +363,68 @@ static void pp_socket_close_impl(pp_socket sock) {
     sock->fd = OS_INVALID_SOCKET;
 }
 
-int connect_with_timeout(os_socket_fd fd, const struct sockaddr *addr, socklen_t addrlen,
-                         bool blocking, int timeout_ms) {
+static bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write) {
+    if (!sock || sock->fd == OS_INVALID_SOCKET) {
+#ifdef _WIN32
+        WSASetLastError(WSAENOTSOCK);
+#else
+        errno = EBADF;
+#endif
+        return false;
+    }
 
+    while (true) {
+        fd_set readfds;
+        fd_set writefds;
+        fd_set *readfds_ptr = NULL;
+        fd_set *writefds_ptr = NULL;
+        if (want_read) {
+            FD_ZERO(&readfds);
+            FD_SET(sock->fd, &readfds);
+            readfds_ptr = &readfds;
+        }
+        if (want_write) {
+            FD_ZERO(&writefds);
+            FD_SET(sock->fd, &writefds);
+            writefds_ptr = &writefds;
+        }
+
+        struct timeval tv;
+        struct timeval *tv_ptr = NULL;
+        if (timeout_ms >= 0) {
+            tv.tv_sec = timeout_ms / 1000;
+            tv.tv_usec = (timeout_ms % 1000) * 1000;
+            tv_ptr = &tv;
+        }
+
+#ifdef _WIN32
+        const int ret = select(0, readfds_ptr, writefds_ptr, NULL, tv_ptr);
+        if (ret == SOCKET_ERROR) {
+            if (WSAGetLastError() == WSAEINTR) {
+                continue;
+            }
+            SOCKET_PRINT_ERROR("select()");
+            return false;
+        }
+#else
+        const int ret = select(sock->fd + 1, readfds_ptr, writefds_ptr, NULL, tv_ptr);
+        if (ret < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            SOCKET_PRINT_ERROR("select()");
+            return false;
+        }
+#endif
+        return ret > 0;
+    }
+}
+
+int pp_socket_connect_with_timeout(os_socket_fd fd,
+                                   const struct sockaddr *addr,
+                                   socklen_t addrlen,
+                                   bool blocking,
+                                   int timeout_ms) {
     // Set non-blocking
 #ifdef _WIN32
     u_long mode = 1;
@@ -268,12 +433,12 @@ int connect_with_timeout(os_socket_fd fd, const struct sockaddr *addr, socklen_t
         return -1;
     }
 #else
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags < 0) {
+    const int original_flags = fcntl(fd, F_GETFL, 0);
+    if (original_flags < 0) {
         SOCKET_PRINT_ERROR("fcntl()");
         return -1;
     }
-    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+    if (fcntl(fd, F_SETFL, original_flags | O_NONBLOCK) < 0) {
         SOCKET_PRINT_ERROR("fcntl()");
         return -1;
     }
@@ -310,15 +475,24 @@ int connect_with_timeout(os_socket_fd fd, const struct sockaddr *addr, socklen_t
     // Wait until timeout
     ret = select(fd + 1, NULL, &wfds, NULL, &tv);
     if (ret == 0) {
+#ifdef _WIN32
+        WSASetLastError(WSAETIMEDOUT);
+#else
+        errno = ETIMEDOUT;
+#endif
         return -2;  // Timeout
     } else if (ret < 0) {
+        SOCKET_PRINT_ERROR("select()");
         return -1;  // Select error
     }
 
     // Check SO_ERROR to see if connect succeeded
     int err = 0;
     socklen_t len = sizeof(err);
-    getsockopt(fd, SOL_SOCKET, SO_ERROR, (char *)&err, &len);
+    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, (char *)&err, &len) < 0) {
+        SOCKET_PRINT_ERROR("getsockopt()");
+        return -1;
+    }
     if (err != 0) {
 #ifdef _WIN32
         WSASetLastError(err);
@@ -338,8 +512,7 @@ done:
             return -1;
         }
 #else
-        flags = fcntl(fd, F_GETFL);
-        if (fcntl(fd, F_SETFL, flags & ~O_NONBLOCK) < 0) {
+        if (fcntl(fd, F_SETFL, original_flags) < 0) {
             SOCKET_PRINT_ERROR("fnctl()");
             return -1;
         }
