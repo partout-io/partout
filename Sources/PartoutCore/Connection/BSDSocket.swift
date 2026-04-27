@@ -240,7 +240,7 @@ private extension BSDSocket {
 
         while true {
             guard pp_socket_wait_readable(socketHandle.sock, -1) else {
-                terminate(with: socketHandle.preferredError)
+                terminate(with: socketHandle.preferredError())
                 return
             }
 
@@ -256,7 +256,7 @@ private extension BSDSocket {
                     if !packets.isEmpty {
                         packetInbox.push(packets)
                     }
-                    terminate(with: socketHandle.preferredError)
+                    terminate(with: socketHandle.preferredError())
                     return
                 }
                 // Non-blocking read
@@ -278,7 +278,7 @@ private extension BSDSocket {
                 var failure: Error?
                 while true {
                     guard pp_socket_wait_writable(socketHandle.sock, -1) else {
-                        failure = socketHandle.preferredError
+                        failure = socketHandle.preferredError()
                         break
                     }
                     let writtenCount = packet.withUnsafeBytes { ptr -> Int in
@@ -292,7 +292,7 @@ private extension BSDSocket {
 
                     // Report failure unless packet was written fully
                     if writtenCount != packet.count {
-                        failure = socketHandle.preferredError
+                        failure = socketHandle.preferredError()
                     }
                     break
                 }
@@ -312,15 +312,13 @@ private extension BSDSocket {
             buffer.deallocate()
         }
 
+        // TCP should imply that this is true
+        assert(closesOnEmptyRead)
+
         while true {
             let readCount = pp_socket_read(socketHandle.sock, buffer, maxReadLength)
             guard readCount > 0 else {
-                let error: Error
-                if socketHandle.isStopping || (readCount == 0 && closesOnEmptyRead) {
-                    error = PartoutError(.linkNotActive)
-                } else {
-                    error = PartoutError(.linkFailure)
-                }
+                let error = socketHandle.preferredError(withReadCount: readCount)
                 terminate(with: error)
                 return
             }
@@ -337,12 +335,7 @@ private extension BSDSocket {
                   pp_socket_wait_readable(socketHandle.sock, 0) {
                 let nextReadCount = pp_socket_read(socketHandle.sock, buffer, maxReadLength)
                 guard nextReadCount > 0 else {
-                    let error: Error
-                    if socketHandle.isStopping || (nextReadCount == 0 && closesOnEmptyRead) {
-                        error = PartoutError(.linkNotActive)
-                    } else {
-                        error = PartoutError(.linkFailure)
-                    }
+                    let error = socketHandle.preferredError(withReadCount: nextReadCount)
                     packetInbox.push(packets)
                     terminate(with: error)
                     return
@@ -369,7 +362,7 @@ private extension BSDSocket {
                     return Int(pp_socket_write(socketHandle.sock, baseAddress, packet.count))
                 }
                 guard writtenCount > 0 else {
-                    failure = socketHandle.preferredError
+                    failure = socketHandle.preferredError()
                     break
                 }
             }
@@ -637,7 +630,12 @@ private extension ExtendedEndpoint {
 }
 
 private extension SocketHandle {
-    var preferredError: PartoutError {
+    func preferredError() -> PartoutError {
         isStopping ? PartoutError(.linkNotActive) : PartoutError(.linkFailure)
+    }
+
+    func preferredError(withReadCount readCount: Int32) -> PartoutError {
+        // In non-blocking TCP, "0 bytes" means "link inactive"
+        isStopping || readCount == 0 ? PartoutError(.linkNotActive) : PartoutError(.linkFailure)
     }
 }
