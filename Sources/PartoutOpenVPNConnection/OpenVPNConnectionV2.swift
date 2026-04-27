@@ -93,7 +93,6 @@ extension OpenVPNConnectionV2: Connection {
             }
             guard let session = currentSession else {
                 fatalError("No session from factory?")
-                return false
             }
             await session.setDelegate(self)
             guard status == .disconnected else {
