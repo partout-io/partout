@@ -2,18 +2,18 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-public final class SemaphoreMutex: @unchecked Sendable {
+package final class SemaphoreMutex: @unchecked Sendable {
     private let semaphore: DispatchSemaphore
 
-    public init() {
+    package init() {
         semaphore = DispatchSemaphore(value: 1)
     }
 
-    public func lock() {
+    package func lock() {
         semaphore.wait()
     }
 
-    public func unlock() {
+    package func unlock() {
         semaphore.signal()
     }
 }

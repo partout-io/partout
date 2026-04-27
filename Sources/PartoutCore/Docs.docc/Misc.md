@@ -48,4 +48,3 @@ Generic entities and helpers.
 - ``DataUnitRepresentable``
 - ``Keychain``
 - ``ScriptingEngine``
-- ``SemaphoreMutex``
