@@ -143,8 +143,10 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     }
 
     func shutdown() async {
-        guard isActive else { return }
-        isActive = false
+        activeLock.lock()
+        defer { activeLock.unlock() }
+        guard _isActive else { return }
+        _isActive = false
         pp_log(ctx, .core, .info, "Shut down TUN")
         pp_tun_shutdown(tun)
         await readQueue.waitUntilIdle()
