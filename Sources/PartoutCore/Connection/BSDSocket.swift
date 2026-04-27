@@ -450,84 +450,6 @@ private extension BSDSocket {
         }
     }
 
-    func readLoopTCP() {
-        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: maxReadLength)
-        defer {
-            buffer.deallocate()
-        }
-
-        while true {
-            let readCount = pp_socket_read(socketHandle.sock, buffer, maxReadLength)
-            guard readCount > 0 else {
-                let error: Error
-                if socketHandle.isStopping || (readCount == 0 && closesOnEmptyRead) {
-                    error = PartoutError(.linkNotActive)
-                } else {
-                    error = PartoutError(.linkFailure)
-                }
-                terminate(with: error)
-                return
-            }
-
-            var packets: [Data] = []
-            packets.reserveCapacity(maxReadBatchPackets)
-            var batchBytes = 0
-
-            packets.append(Data(bytes: buffer, count: Int(readCount)))
-            batchBytes += Int(readCount)
-
-            while packets.count < maxReadBatchPackets,
-                  batchBytes < maxReadBatchBytes,
-                  pp_socket_wait_readable(socketHandle.sock, 0) {
-                let nextReadCount = pp_socket_read(socketHandle.sock, buffer, maxReadLength)
-                guard nextReadCount > 0 else {
-                    let error: Error
-                    if socketHandle.isStopping || (nextReadCount == 0 && closesOnEmptyRead) {
-                        error = PartoutError(.linkNotActive)
-                    } else {
-                        error = PartoutError(.linkFailure)
-                    }
-                    packetInbox.push(packets)
-                    terminate(with: error)
-                    return
-                }
-                packets.append(Data(bytes: buffer, count: Int(nextReadCount)))
-                batchBytes += Int(nextReadCount)
-            }
-
-            packetInbox.push(packets)
-        }
-    }
-
-    @Sendable
-    func writeLoopTCP() {
-        while let request = writeRequests.next() {
-            var failure: Error?
-            for packet in request.packets {
-                guard !packet.isEmpty else {
-                    continue
-                }
-                let writtenCount = packet.withUnsafeBytes { ptr -> Int in
-                    guard let baseAddress = ptr.bindMemory(to: UInt8.self).baseAddress else {
-                        return 0
-                    }
-                    return Int(pp_socket_write(socketHandle.sock, baseAddress, packet.count))
-                }
-                guard writtenCount > 0 else {
-                    failure = socketHandle.isStopping ? PartoutError(.linkNotActive) : PartoutError(.linkFailure)
-                    break
-                }
-            }
-
-            if let failure {
-                request.continuation.resume(throwing: failure)
-                terminate(with: failure)
-                return
-            }
-            request.continuation.resume()
-        }
-    }
-
     func readLoopUDP() {
         let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: maxReadLength)
         defer {
@@ -597,6 +519,83 @@ private extension BSDSocket {
                     }
                     failure = socketHandle.isStopping ? PartoutError(.linkNotActive) : PartoutError(.linkFailure)
                     break packetLoop
+                }
+            }
+
+            if let failure {
+                request.continuation.resume(throwing: failure)
+                terminate(with: failure)
+                return
+            }
+            request.continuation.resume()
+        }
+    }
+
+    func readLoopTCP() {
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: maxReadLength)
+        defer {
+            buffer.deallocate()
+        }
+
+        while true {
+            let readCount = pp_socket_read(socketHandle.sock, buffer, maxReadLength)
+            guard readCount > 0 else {
+                let error: Error
+                if socketHandle.isStopping || (readCount == 0 && closesOnEmptyRead) {
+                    error = PartoutError(.linkNotActive)
+                } else {
+                    error = PartoutError(.linkFailure)
+                }
+                terminate(with: error)
+                return
+            }
+
+            var packets: [Data] = []
+            packets.reserveCapacity(maxReadBatchPackets)
+            var batchBytes = 0
+
+            packets.append(Data(bytes: buffer, count: Int(readCount)))
+            batchBytes += Int(readCount)
+
+            while packets.count < maxReadBatchPackets,
+                  batchBytes < maxReadBatchBytes,
+                  pp_socket_wait_readable(socketHandle.sock, 0) {
+                let nextReadCount = pp_socket_read(socketHandle.sock, buffer, maxReadLength)
+                guard nextReadCount > 0 else {
+                    let error: Error
+                    if socketHandle.isStopping || (nextReadCount == 0 && closesOnEmptyRead) {
+                        error = PartoutError(.linkNotActive)
+                    } else {
+                        error = PartoutError(.linkFailure)
+                    }
+                    packetInbox.push(packets)
+                    terminate(with: error)
+                    return
+                }
+                packets.append(Data(bytes: buffer, count: Int(nextReadCount)))
+                batchBytes += Int(nextReadCount)
+            }
+
+            packetInbox.push(packets)
+        }
+    }
+
+    func writeLoopTCP() {
+        while let request = writeRequests.next() {
+            var failure: Error?
+            for packet in request.packets {
+                guard !packet.isEmpty else {
+                    continue
+                }
+                let writtenCount = packet.withUnsafeBytes { ptr -> Int in
+                    guard let baseAddress = ptr.bindMemory(to: UInt8.self).baseAddress else {
+                        return 0
+                    }
+                    return Int(pp_socket_write(socketHandle.sock, baseAddress, packet.count))
+                }
+                guard writtenCount > 0 else {
+                    failure = socketHandle.isStopping ? PartoutError(.linkNotActive) : PartoutError(.linkFailure)
+                    break
                 }
             }
 
