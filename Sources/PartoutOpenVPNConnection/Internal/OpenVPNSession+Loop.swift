@@ -114,7 +114,7 @@ extension OpenVPNSession {
                 do {
                     let packets = try await link.readPackets()
                     guard !packets.isEmpty else {
-                        pp_log(ctx, .openvpn, .debug, "Skip LINK loop after empty packets")
+//                        pp_log(ctx, .openvpn, .debug, "Skip LINK loop after empty packets")
                         continue
                     }
                     try await receiveLink(packets: packets)
