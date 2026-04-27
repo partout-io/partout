@@ -17,8 +17,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 
     nonisolated let deviceName: String?
 
-    nonisolated(unsafe)
-    private var descriptor: UInt64?
+    private let descriptor: UInt64?
 
     private let readQueue: DispatchQueue
 
@@ -27,7 +26,22 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     // FIXME: #188, how to avoid silent copy? (enforce reference)
     private var readBuf: [UInt8]
 
-    private var isActive: Bool
+    private var isActive: Bool {
+        get {
+            activeLock.lock()
+            defer { activeLock.unlock() }
+            return _isActive
+        }
+        set {
+            activeLock.lock()
+            defer { activeLock.unlock() }
+            _isActive = newValue
+        }
+    }
+
+    private var _isActive: Bool
+
+    private let activeLock: Mutex
 
     init(_ ctx: PartoutLoggerContext, uuid: UniqueID, tunImpl: UnsafeMutableRawPointer?, maxReadLength: Int) throws {
         guard let tun = uuid.uuidString.withCString({
@@ -50,7 +64,9 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         readQueue = DispatchQueue(label: "VirtualTunnelInterface[R:\(label)]")
         writeQueue = DispatchQueue(label: "VirtualTunnelInterface[W:\(label)]")
         readBuf = [UInt8](repeating: 0, count: maxReadLength)
-        isActive = true
+
+        _isActive = true
+        activeLock = Mutex()
     }
 
     deinit {
@@ -59,7 +75,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     }
 
     nonisolated var fileDescriptor: UInt64? {
-        descriptor
+        isActive ? descriptor : nil
     }
 
     func readPackets() async throws -> [Data] {
@@ -129,7 +145,6 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     func shutdown() async {
         guard isActive else { return }
         isActive = false
-        descriptor = nil
         pp_log(ctx, .core, .info, "Shut down TUN")
         pp_tun_shutdown(tun)
         await readQueue.waitUntilIdle()
