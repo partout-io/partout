@@ -7,223 +7,6 @@ import Dispatch
 
 /// A `LinkInterface` backed by dedicated blocking reader/writer loops.
 public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Sendable {
-    private struct WriteRequest {
-        let packets: [Data]
-
-        let continuation: CheckedContinuation<Void, Error>
-    }
-
-    private final class PacketInbox: @unchecked Sendable {
-        private enum ImmediatePop {
-            case packets([Data])
-
-            case failure(Error)
-
-            case wait
-        }
-
-        private let lock: Mutex
-
-        private var bufferedPackets: FIFO<[Data]>
-
-        private var waitingContinuation: CheckedContinuation<[Data], Error>?
-
-        private var terminalError: Error?
-
-        init() {
-            lock = Mutex()
-            bufferedPackets = FIFO()
-        }
-
-        func push(_ packets: [Data]) {
-            guard !packets.isEmpty else {
-                return
-            }
-
-            let continuation: CheckedContinuation<[Data], Error>?
-            lock.lock()
-            if terminalError != nil {
-                lock.unlock()
-                return
-            }
-            continuation = waitingContinuation
-            waitingContinuation = nil
-            if continuation == nil {
-                bufferedPackets.append(packets)
-            }
-            lock.unlock()
-
-            continuation?.resume(returning: packets)
-        }
-
-        func finish(throwing error: Error) {
-            let continuation: CheckedContinuation<[Data], Error>?
-            lock.lock()
-            guard terminalError == nil else {
-                lock.unlock()
-                return
-            }
-            terminalError = error
-            continuation = waitingContinuation
-            waitingContinuation = nil
-            bufferedPackets.removeAll()
-            lock.unlock()
-
-            continuation?.resume(throwing: error)
-        }
-
-        func pop() async throws -> [Data] {
-            switch immediatePop() {
-            case .packets(let packets):
-                return packets
-            case .failure(let error):
-                throw error
-            case .wait:
-                return try await withCheckedThrowingContinuation { continuation in
-                    lock.lock()
-                    if let packets = bufferedPackets.popFirst() {
-                        lock.unlock()
-                        continuation.resume(returning: packets)
-                        return
-                    }
-                    if let terminalError {
-                        lock.unlock()
-                        continuation.resume(throwing: terminalError)
-                        return
-                    }
-                    precondition(waitingContinuation == nil, "Concurrent reads are unsupported")
-                    waitingContinuation = continuation
-                    lock.unlock()
-                }
-            }
-        }
-
-        private func immediatePop() -> ImmediatePop {
-            lock.lock()
-            defer {
-                lock.unlock()
-            }
-            if let packets = bufferedPackets.popFirst() {
-                return .packets(packets)
-            }
-            if let terminalError {
-                return .failure(terminalError)
-            }
-            return .wait
-        }
-    }
-
-    private final class WriteRequests: @unchecked Sendable {
-        private let lock: Mutex
-
-        private let semaphore: DispatchSemaphore
-
-        private var requests: FIFO<WriteRequest>
-
-        private var terminalError: Error?
-
-        init() {
-            lock = Mutex()
-            semaphore = DispatchSemaphore(value: 0)
-            requests = FIFO()
-        }
-
-        func enqueue(_ packets: [Data]) async throws {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                lock.lock()
-                if let terminalError {
-                    lock.unlock()
-                    continuation.resume(throwing: terminalError)
-                    return
-                }
-                requests.append(
-                    WriteRequest(
-                        packets: packets,
-                        continuation: continuation
-                    )
-                )
-                lock.unlock()
-                semaphore.signal()
-            }
-        }
-
-        func next() -> WriteRequest? {
-            while true {
-                semaphore.wait()
-
-                lock.lock()
-                if let request = requests.popFirst() {
-                    lock.unlock()
-                    return request
-                }
-                let shouldStop = terminalError != nil
-                lock.unlock()
-
-                if shouldStop {
-                    return nil
-                }
-            }
-        }
-
-        func finish(throwing error: Error) {
-            let pending: [WriteRequest]
-            lock.lock()
-            guard terminalError == nil else {
-                lock.unlock()
-                return
-            }
-            terminalError = error
-            pending = requests.removeAllElements()
-            lock.unlock()
-
-            for request in pending {
-                request.continuation.resume(throwing: error)
-            }
-            semaphore.signal()
-        }
-    }
-
-    private struct FIFO<Element> {
-        private var storage: [Element?]
-
-        private var head: Int
-
-        init() {
-            storage = []
-            head = 0
-        }
-
-        mutating func append(_ element: Element) {
-            storage.append(element)
-        }
-
-        mutating func popFirst() -> Element? {
-            guard head < storage.count, let element = storage[head] else {
-                return nil
-            }
-            storage[head] = nil
-            head += 1
-            if head >= 64, head * 2 >= storage.count {
-                storage.removeFirst(head)
-                head = 0
-            }
-            return element
-        }
-
-        mutating func removeAll() {
-            storage.removeAll(keepingCapacity: true)
-            head = 0
-        }
-
-        mutating func removeAllElements() -> [Element] {
-            let elements = storage[head...].compactMap {
-                $0
-            }
-            removeAll()
-            return elements
-        }
-    }
-
     private let ctx: PartoutLoggerContext
 
     private let endpoint: ExtendedEndpoint
@@ -630,6 +413,227 @@ private extension BSDSocket {
         cleanupQueue.async { [socketHandle, workerGroup] in
             workerGroup.wait()
             socketHandle.close()
+        }
+    }
+}
+
+// MARK: - Helpers
+
+private extension BSDSocket {
+    struct WriteRequest {
+        let packets: [Data]
+
+        let continuation: CheckedContinuation<Void, Error>
+    }
+
+    final class PacketInbox: @unchecked Sendable {
+        private enum ImmediatePop {
+            case packets([Data])
+
+            case failure(Error)
+
+            case wait
+        }
+
+        private let lock: Mutex
+
+        private var bufferedPackets: FIFO<[Data]>
+
+        private var waitingContinuation: CheckedContinuation<[Data], Error>?
+
+        private var terminalError: Error?
+
+        init() {
+            lock = Mutex()
+            bufferedPackets = FIFO()
+        }
+
+        func push(_ packets: [Data]) {
+            guard !packets.isEmpty else {
+                return
+            }
+
+            let continuation: CheckedContinuation<[Data], Error>?
+            lock.lock()
+            if terminalError != nil {
+                lock.unlock()
+                return
+            }
+            continuation = waitingContinuation
+            waitingContinuation = nil
+            if continuation == nil {
+                bufferedPackets.append(packets)
+            }
+            lock.unlock()
+
+            continuation?.resume(returning: packets)
+        }
+
+        func finish(throwing error: Error) {
+            let continuation: CheckedContinuation<[Data], Error>?
+            lock.lock()
+            guard terminalError == nil else {
+                lock.unlock()
+                return
+            }
+            terminalError = error
+            continuation = waitingContinuation
+            waitingContinuation = nil
+            bufferedPackets.removeAll()
+            lock.unlock()
+
+            continuation?.resume(throwing: error)
+        }
+
+        func pop() async throws -> [Data] {
+            switch immediatePop() {
+            case .packets(let packets):
+                return packets
+            case .failure(let error):
+                throw error
+            case .wait:
+                return try await withCheckedThrowingContinuation { continuation in
+                    lock.lock()
+                    if let packets = bufferedPackets.popFirst() {
+                        lock.unlock()
+                        continuation.resume(returning: packets)
+                        return
+                    }
+                    if let terminalError {
+                        lock.unlock()
+                        continuation.resume(throwing: terminalError)
+                        return
+                    }
+                    precondition(waitingContinuation == nil, "Concurrent reads are unsupported")
+                    waitingContinuation = continuation
+                    lock.unlock()
+                }
+            }
+        }
+
+        private func immediatePop() -> ImmediatePop {
+            lock.lock()
+            defer {
+                lock.unlock()
+            }
+            if let packets = bufferedPackets.popFirst() {
+                return .packets(packets)
+            }
+            if let terminalError {
+                return .failure(terminalError)
+            }
+            return .wait
+        }
+    }
+
+    final class WriteRequests: @unchecked Sendable {
+        private let lock: Mutex
+
+        private let semaphore: DispatchSemaphore
+
+        private var requests: FIFO<WriteRequest>
+
+        private var terminalError: Error?
+
+        init() {
+            lock = Mutex()
+            semaphore = DispatchSemaphore(value: 0)
+            requests = FIFO()
+        }
+
+        func enqueue(_ packets: [Data]) async throws {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                lock.lock()
+                if let terminalError {
+                    lock.unlock()
+                    continuation.resume(throwing: terminalError)
+                    return
+                }
+                requests.append(
+                    WriteRequest(
+                        packets: packets,
+                        continuation: continuation
+                    )
+                )
+                lock.unlock()
+                semaphore.signal()
+            }
+        }
+
+        func next() -> WriteRequest? {
+            while true {
+                semaphore.wait()
+
+                lock.lock()
+                if let request = requests.popFirst() {
+                    lock.unlock()
+                    return request
+                }
+                let shouldStop = terminalError != nil
+                lock.unlock()
+
+                if shouldStop {
+                    return nil
+                }
+            }
+        }
+
+        func finish(throwing error: Error) {
+            let pending: [WriteRequest]
+            lock.lock()
+            guard terminalError == nil else {
+                lock.unlock()
+                return
+            }
+            terminalError = error
+            pending = requests.removeAllElements()
+            lock.unlock()
+
+            for request in pending {
+                request.continuation.resume(throwing: error)
+            }
+            semaphore.signal()
+        }
+    }
+
+    struct FIFO<Element> {
+        private var storage: [Element?]
+
+        private var head: Int
+
+        init() {
+            storage = []
+            head = 0
+        }
+
+        mutating func append(_ element: Element) {
+            storage.append(element)
+        }
+
+        mutating func popFirst() -> Element? {
+            guard head < storage.count, let element = storage[head] else {
+                return nil
+            }
+            storage[head] = nil
+            head += 1
+            if head >= 64, head * 2 >= storage.count {
+                storage.removeFirst(head)
+                head = 0
+            }
+            return element
+        }
+
+        mutating func removeAll() {
+            storage.removeAll(keepingCapacity: true)
+            head = 0
+        }
+
+        mutating func removeAllElements() -> [Element] {
+            let elements = storage[head...].compactMap {
+                $0
+            }
+            removeAll()
+            return elements
         }
     }
 }
