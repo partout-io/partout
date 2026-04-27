@@ -275,10 +275,10 @@ private extension BSDSocket {
         while let request = writeRequests.next() {
             for packet in request.packets {
                 guard !packet.isEmpty else { continue }
-                var failure: Error?
+                var error: Error?
                 while true {
                     guard pp_socket_wait_writable(socketHandle.sock, -1) else {
-                        failure = socketHandle.preferredError()
+                        error = socketHandle.preferredError()
                         break
                     }
                     let writtenCount = packet.withUnsafeBytes { ptr -> Int in
@@ -292,13 +292,13 @@ private extension BSDSocket {
 
                     // Report failure unless packet was written fully
                     if writtenCount != packet.count {
-                        failure = socketHandle.preferredError()
+                        error = socketHandle.preferredError()
                     }
                     break
                 }
-                if let failure {
-                    request.continuation.resume(throwing: failure)
-                    terminate(with: failure)
+                if let error {
+                    request.continuation.resume(throwing: error)
+                    terminate(with: error)
                     return
                 }
             }
