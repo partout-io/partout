@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import _PartoutCore_C
-import Dispatch
 
 /// A `LinkInterface` backed by dedicated blocking reader/writer loops.
 public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Sendable {
