@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Dispatch
 import Network
 
 /// An observer that publishes updates from a `NWPathMonitor`.

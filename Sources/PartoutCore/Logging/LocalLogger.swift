@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Dispatch
-
 /// The local logger.
 public final class LocalLogger: @unchecked Sendable {
 

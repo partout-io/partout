@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Dispatch
-
 /// A ``TunnelEnvironment`` that stores data in memory.
 public final class SharedTunnelEnvironment: TunnelEnvironment, @unchecked Sendable {
     private let profileId: Profile.ID?

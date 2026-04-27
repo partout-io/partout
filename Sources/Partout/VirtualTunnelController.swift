@@ -29,6 +29,10 @@ public final class VirtualTunnelController: TunnelController {
         }
     }
 
+    deinit {
+        pp_log(ctx, .core, .debug, "Deinit VirtualTunnelController")
+    }
+
     public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
         guard let info else {
             throw PartoutError(.notFound)
