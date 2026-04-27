@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-package final class Mutex: @unchecked Sendable {
+package final class SemaphoreMutex: @unchecked Sendable {
     private let semaphore: DispatchSemaphore
 
     package init() {

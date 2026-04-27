@@ -38,7 +38,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
 
     private let writeRequests: WriteRequests
 
-    private let stateLock: Mutex
+    private let stateLock: SemaphoreMutex
 
     private var didTerminate: Bool
 
@@ -116,7 +116,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         workerGroup = DispatchGroup()
         packetInbox = PacketInbox()
         writeRequests = WriteRequests()
-        stateLock = Mutex()
+        stateLock = SemaphoreMutex()
         didTerminate = false
 
         workerGroup.enter()
@@ -413,7 +413,7 @@ private extension BSDSocket {
             case wait
         }
 
-        private let lock: Mutex
+        private let lock: SemaphoreMutex
 
         private var bufferedPackets: FIFO<[Data]>
 
@@ -422,7 +422,7 @@ private extension BSDSocket {
         private var terminalError: Error?
 
         init() {
-            lock = Mutex()
+            lock = SemaphoreMutex()
             bufferedPackets = FIFO()
         }
 
@@ -505,7 +505,7 @@ private extension BSDSocket {
     }
 
     final class WriteRequests: @unchecked Sendable {
-        private let lock: Mutex
+        private let lock: SemaphoreMutex
 
         private let semaphore: DispatchSemaphore
 
@@ -514,7 +514,7 @@ private extension BSDSocket {
         private var terminalError: Error?
 
         init() {
-            lock = Mutex()
+            lock = SemaphoreMutex()
             semaphore = DispatchSemaphore(value: 0)
             requests = FIFO()
         }

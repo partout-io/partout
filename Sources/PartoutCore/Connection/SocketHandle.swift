@@ -8,7 +8,7 @@ final class SocketHandle: @unchecked Sendable {
     nonisolated(unsafe)
     let sock: pp_socket
 
-    private let lock: Mutex
+    private let lock: SemaphoreMutex
 
     private var descriptor: UInt64?
 
@@ -18,7 +18,7 @@ final class SocketHandle: @unchecked Sendable {
 
     init(sock: pp_socket) {
         self.sock = sock
-        lock = Mutex()
+        lock = SemaphoreMutex()
         descriptor = pp_socket_fd(sock)
         isShuttingDown = false
         isClosed = false

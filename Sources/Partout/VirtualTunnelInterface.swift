@@ -41,7 +41,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 
     private var _isActive: Bool
 
-    private let activeLock: Mutex
+    private let activeLock: SemaphoreMutex
 
     init(_ ctx: PartoutLoggerContext, uuid: UniqueID, tunImpl: UnsafeMutableRawPointer?, maxReadLength: Int) throws {
         guard let tun = uuid.uuidString.withCString({
@@ -66,7 +66,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         readBuf = [UInt8](repeating: 0, count: maxReadLength)
 
         _isActive = true
-        activeLock = Mutex()
+        activeLock = SemaphoreMutex()
     }
 
     deinit {
