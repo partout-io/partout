@@ -28,7 +28,9 @@ public actor Tunnel {
         self.environmentFactory = environmentFactory
         snapshotsSubject = CurrentValueStream([:])
         environments = [:]
-        observeObjects()
+        Task {
+            await observeObjects()
+        }
     }
 }
 
