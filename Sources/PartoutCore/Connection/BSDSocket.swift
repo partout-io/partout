@@ -276,7 +276,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
             socketBufferLength: socketBufferLength
         )
         do {
-            let closesOnEmptyRead = endpoint.proto.socketType.plainType == .tcp
+            let closesOnEmptyRead = endpoint.plainSocketType == .tcp
             let betterPathStream = try betterPathBlock()
             return BSDSocket(
                 ctx: ctx,
@@ -400,7 +400,7 @@ private extension BSDSocket {
     ) async throws -> pp_socket {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                let blocking = endpoint.proto.socketType.plainType == .tcp
+                let blocking = endpoint.plainSocketType == .tcp
                 let newSock = endpoint.address.rawValue.withCString { cAddr in
                     pp_socket_open(
                         cAddr,
@@ -429,7 +429,7 @@ private extension BSDSocket {
         defer {
             workerGroup.leave()
         }
-        switch endpoint.proto.socketType.plainType {
+        switch endpoint.plainSocketType {
         case .udp:
             readLoopUDP()
         case .tcp:
@@ -442,7 +442,7 @@ private extension BSDSocket {
         defer {
             workerGroup.leave()
         }
-        switch endpoint.proto.socketType.plainType {
+        switch endpoint.plainSocketType {
         case .udp:
             writeLoopUDP()
         case .tcp:
@@ -632,5 +632,11 @@ private extension BSDSocket {
             workerGroup.wait()
             socketHandle.close()
         }
+    }
+}
+
+private extension ExtendedEndpoint {
+    var plainSocketType: SocketType {
+        proto.socketType.plainType
     }
 }
