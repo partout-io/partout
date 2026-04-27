@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-struct PushReply {
+struct PushReply: Sendable {
     private let original: String
 
     let options: OpenVPN.Configuration
