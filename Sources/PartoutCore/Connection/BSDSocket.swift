@@ -432,6 +432,10 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         writeQueue.async(execute: writeLoop)
     }
 
+    deinit {
+        pp_log(ctx, .core, .debug, "Deinit BSDSocket")
+    }
+
     public nonisolated var remoteAddress: String {
         endpoint.address.rawValue
     }
