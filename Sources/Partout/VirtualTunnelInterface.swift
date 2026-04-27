@@ -132,13 +132,15 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         descriptor = nil
         pp_log(ctx, .core, .info, "Shut down TUN")
         pp_tun_shutdown(tun)
-        await Self.waitUntilIdle(readQueue)
-        await Self.waitUntilIdle(writeQueue)
+        await readQueue.waitUntilIdle()
+        await writeQueue.waitUntilIdle()
     }
+}
 
-    private static func waitUntilIdle(_ queue: DispatchQueue) async {
+private extension DispatchQueue {
+    func waitUntilIdle() async {
         await withCheckedContinuation { continuation in
-            queue.async {
+            `async` {
                 continuation.resume()
             }
         }
