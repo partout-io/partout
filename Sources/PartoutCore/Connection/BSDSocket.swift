@@ -350,11 +350,8 @@ private extension BSDSocket {
 
     func writeLoopTCP() {
         while let request = writeRequests.next() {
-            var failure: Error?
             for packet in request.packets {
-                guard !packet.isEmpty else {
-                    continue
-                }
+                guard !packet.isEmpty else { continue }
                 let writtenCount = packet.withUnsafeBytes { ptr -> Int in
                     guard let baseAddress = ptr.bindMemory(to: UInt8.self).baseAddress else {
                         return 0
@@ -362,15 +359,11 @@ private extension BSDSocket {
                     return Int(pp_socket_write(socketHandle.sock, baseAddress, packet.count))
                 }
                 guard writtenCount > 0 else {
-                    failure = socketHandle.preferredError()
-                    break
+                    let error = socketHandle.preferredError()
+                    request.continuation.resume(throwing: error)
+                    terminate(with: error)
+                    return
                 }
-            }
-
-            if let failure {
-                request.continuation.resume(throwing: failure)
-                terminate(with: failure)
-                return
             }
             request.continuation.resume()
         }
