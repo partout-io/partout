@@ -175,7 +175,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         networkObserver?.setEnabled(false)
 
         // Cancel subscriptions before stopping connection
-//        statusSubscription?.cancel()
+        statusSubscription?.cancel()
         networkSubscription?.cancel()
         networkObserverTask?.cancel()
 
@@ -205,6 +205,9 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
         reportStatus(.disconnected)
+
+        // Make sure to stop reporting onStatus events
+        onStatus = nil
     }
 
     public func sendMessage(_ input: Message.Input) async throws -> Message.Output? {
