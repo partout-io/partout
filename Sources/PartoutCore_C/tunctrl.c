@@ -28,11 +28,11 @@ static const kotlin_sig sig_testWorking = {
 };
 static const kotlin_sig sig_build = {
     "build",
-    "(Ljava/lang/String;)Ljava/lang/Integer;"
+    "(Ljava/lang/String;)I"
 };
 static const kotlin_sig sig_configureSockets = {
     "configureSockets",
-    "([Ljava/lang/Integer;)V"
+    "([I)V"
 };
 static const kotlin_sig sig_close = {
     "close",
@@ -46,7 +46,7 @@ typedef struct {
 
 JNIEnv *jni_attach_thread(bool *did_attach) {
     JNIEnv *env;
-    jint status = (*jvm)->GetEnv(jvm, &env, JNI_VERSION_1_6);
+    jint status = (*jvm)->GetEnv(jvm, (void **)&env, JNI_VERSION_1_6);
     switch (status) {
         case JNI_OK:
             *did_attach = false;
@@ -92,8 +92,6 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
     void *result = NULL;
     jclass cls = NULL;
     jstring infoJson = NULL;
-    jobject fdObj = NULL;
-    jclass integerClass = NULL;
     vpn_impl *impl = NULL;
 
     cls = (*env)->GetObjectClass(env, jni_ref);
@@ -109,24 +107,10 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
         goto cleanup;
     }
 
-    fdObj = (*env)->CallObjectMethod(env, jni_ref, buildMethod, infoJson);
-    if (fdObj == NULL) {
+    const jint fd = (*env)->CallIntMethod(env, jni_ref, buildMethod, infoJson);
+    if (fd < 0) {
         goto cleanup;
     }
-
-    integerClass = (*env)->FindClass(env, "java/lang/Integer");
-    if (integerClass == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelError, "set_tunnel(): java/lang/Integer class not found");
-        goto cleanup;
-    }
-
-    jmethodID intValueMethod = (*env)->GetMethodID(env, integerClass, "intValue", "()I");
-    if (intValueMethod == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelError, "set_tunnel(): Integer.intValue() not found");
-        goto cleanup;
-    }
-
-    const jint fd = (*env)->CallIntMethod(env, fdObj, intValueMethod);
 
     impl = malloc(sizeof(*impl));
     if (impl == NULL) {
@@ -137,12 +121,6 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
     result = impl;
 
 cleanup:
-    if (fdObj != NULL) {
-        (*env)->DeleteLocalRef(env, fdObj);
-    }
-    if (integerClass != NULL) {
-        (*env)->DeleteLocalRef(env, integerClass);
-    }
     if (infoJson != NULL) {
         (*env)->DeleteLocalRef(env, infoJson);
     }
@@ -162,41 +140,16 @@ void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t f
     JNIEnv *env = jni_attach_thread(&did_attach);
     if (!env) return;
 
-    jclass integerCls = NULL;
-    jmethodID integerCtor = NULL;
-    jobjectArray fdsObj = NULL;
-    jobject elem = NULL;
+    jintArray fdsObj = NULL;
     jclass cls = NULL;
     jmethodID cfgMethod = NULL;
 
-    integerCls = (*env)->FindClass(env, "java/lang/Integer");
-    if (integerCls == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelError, "configure_sockets(): java/lang/Integer class not found");
-        goto cleanup;
-    }
-
-    integerCtor = (*env)->GetMethodID(env, integerCls, "<init>", "(I)V");
-    if (integerCtor == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelError, "configure_sockets(): Integer constructor not found");
-        goto cleanup;
-    }
-
-    fdsObj = (*env)->NewObjectArray(env, fds_len, integerCls, NULL);
+    fdsObj = (*env)->NewIntArray(env, (jsize)fds_len);
     if (fdsObj == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelError, "configure_sockets(): failed to allocate Integer[]");
+        pp_clog(PPLogCategoryCore, PPLogLevelError, "configure_sockets(): failed to allocate int[]");
         goto cleanup;
     }
-
-    for (jsize i = 0; i < fds_len; i++) {
-        elem = (*env)->NewObject(env, integerCls, integerCtor, (jint)(fds[i]));
-        if (elem == NULL) {
-            pp_clog_v(PPLogCategoryCore, PPLogLevelError, "configure_sockets(): failed to wrap fd %d", i);
-            goto cleanup;
-        }
-        (*env)->SetObjectArrayElement(env, fdsObj, i, elem);
-        (*env)->DeleteLocalRef(env, elem);
-        elem = NULL;
-    }
+    (*env)->SetIntArrayRegion(env, fdsObj, 0, (jsize)fds_len, (const jint *)fds);
 
     // Call wrapper.configureSockets()
     cls = (*env)->GetObjectClass(env, jni_ref);
@@ -214,14 +167,8 @@ void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t f
     (*env)->CallVoidMethod(env, jni_ref, cfgMethod, fdsObj);
 
 cleanup:
-    if (elem != NULL) {
-        (*env)->DeleteLocalRef(env, elem);
-    }
     if (fdsObj != NULL) {
         (*env)->DeleteLocalRef(env, fdsObj);
-    }
-    if (integerCls != NULL) {
-        (*env)->DeleteLocalRef(env, integerCls);
     }
     if (cls != NULL) {
         (*env)->DeleteLocalRef(env, cls);
