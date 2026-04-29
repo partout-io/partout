@@ -223,6 +223,13 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, void *tun_impl) {
     (*env)->CallVoidMethod(env, jni_ref, closeMethod);
 }
 
+void pp_tun_ctrl_free(void *jni_ref) {
+    assert(jni_ref);
+    JNIEnv *env;
+    (*jvm)->AttachCurrentThread(jvm, &env, NULL);
+    (*env)->DeleteGlobalRef(env, jni_ref);
+}
+
 #else
 
 void pp_tun_ctrl_test_working_wrapper(void *ref) {
@@ -248,6 +255,11 @@ void pp_tun_ctrl_clear_tunnel(void *ref, void *tun_impl) {
     (void)ref;
     (void)tun_impl;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "[dummy] clear_tunnel(%p)", ref);
+}
+
+void pp_tun_ctrl_free(void *ref) {
+    (void)ref;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "[dummy] free(%p)", ref);
 }
 
 #endif
