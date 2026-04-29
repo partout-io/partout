@@ -87,6 +87,7 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "set_tunnel(): NULL tun_impl");
         goto cleanup;
     }
+    tun_impl->fd = -1;
 
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
@@ -106,6 +107,10 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
     }
 
 cleanup:
+    if (tun_impl != NULL && tun_impl->fd < 0) {
+        free(tun_impl);
+        tun_impl = NULL;
+    }
     if (j_info_json != NULL) (*env)->DeleteLocalRef(env, j_info_json);
     if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
     if (did_attach) (*jvm)->DetachCurrentThread(jvm);
