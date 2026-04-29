@@ -16,6 +16,29 @@
 
 extern JavaVM *jvm;
 
+// Kotlin signatures for AndroidTunnelController
+typedef struct {
+    const char *name;
+    const char *signature;
+} kotlin_sig;
+
+static const kotlin_sig sig_testWorking = {
+    "testWorking",
+    "()V"
+};
+static const kotlin_sig sig_build = {
+    "build",
+    "(Ljava/lang/String;)Ljava/lang/Integer;"
+};
+static const kotlin_sig sig_configureSockets = {
+    "configureSockets",
+    "([Ljava/lang/Integer;)V"
+};
+static const kotlin_sig sig_close = {
+    "close",
+    "()V"
+};
+
 // This must match Partout pp_tun tun_android.c
 typedef struct {
     int fd;
@@ -28,7 +51,7 @@ void pp_tun_ctrl_test_working_wrapper(void *jni_ref) {
     (*jvm)->AttachCurrentThread(jvm, &env, NULL);
     jclass cls = (*env)->GetObjectClass(env, jni_ref);
     jmethodID testWorkingMethod = (*env)->GetMethodID(
-        env, cls, "testWorking", "()V"
+        env, cls, sig_testWorking.name, sig_testWorking.signature
     );
     (*env)->CallVoidMethod(env, jni_ref, testWorkingMethod);
 }
@@ -58,7 +81,7 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
     }
 
     infoJson = info_json ? (*env)->NewStringUTF(env, info_json) : NULL;
-    jmethodID buildMethod = (*env)->GetMethodID(env, cls, "build", "(Ljava/lang/String;)Ljava/lang/Integer;");
+    jmethodID buildMethod = (*env)->GetMethodID(env, cls, sig_build.name, sig_build.signature);
     if (buildMethod == NULL) {
         pp_clog(PPLogCategoryCore, PPLogLevelError, "set_tunnel(): build() method not found");
         goto failure;
@@ -160,7 +183,7 @@ void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t f
         goto cleanup;
     }
 
-    cfgMethod = (*env)->GetMethodID(env, cls, "configureSockets", "([Ljava/lang/Integer;)V");
+    cfgMethod = (*env)->GetMethodID(env, cls, sig_configureSockets.name, sig_configureSockets.signature);
     if (cfgMethod == NULL) {
         pp_clog(PPLogCategoryCore, PPLogLevelError, "configure_sockets(): configureSockets method not found");
         goto cleanup;
@@ -196,7 +219,7 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, void *tun_impl) {
     JNIEnv *env;
     (*jvm)->AttachCurrentThread(jvm, &env, NULL);
     jclass cls = (*env)->GetObjectClass(env, jni_ref);
-    jmethodID closeMethod = (*env)->GetMethodID(env, cls, "close", "()V");
+    jmethodID closeMethod = (*env)->GetMethodID(env, cls, sig_close.name, sig_close.signature);
     (*env)->CallVoidMethod(env, jni_ref, closeMethod);
 }
 

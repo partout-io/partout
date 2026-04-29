@@ -32,10 +32,6 @@ class AndroidTunnelController: AutoCloseable {
         Log.e(logTag, ">>> AndroidTunnelController: Working!")
     }
 
-    fun setAddress(address: String, prefix: Int) {
-        builder.addAddress(address, prefix)
-    }
-
     // FIXME: Pass Profile
     fun build(infoJSON: String): Int? {
         assert(descriptor == null)
