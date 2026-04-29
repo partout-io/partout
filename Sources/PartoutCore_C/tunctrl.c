@@ -44,7 +44,7 @@ typedef struct {
 
 void pp_tun_ctrl_test_working(void *jni_ref) {
     assert(jni_ref);
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "test_working(%p)", jni_ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_test_working(%p)", jni_ref);
 
     bool did_attach;
     JNIEnv *env = pp_jni_attach_thread(&did_attach);
@@ -54,12 +54,12 @@ void pp_tun_ctrl_test_working(void *jni_ref) {
     jmethodID method = NULL;
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "test_working(): NULL cls");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_test_working(): NULL cls");
         goto cleanup;
     }
     method = (*env)->GetMethodID(env, cls, sig_testWorking.name, sig_testWorking.signature);
     if (method == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "test_working(): NULL method");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_test_working(): NULL method");
         goto cleanup;
     }
     (*env)->CallVoidMethod(env, jni_ref, method);
@@ -71,7 +71,7 @@ cleanup:
 
 void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
     assert(jni_ref);
-    pp_clog(PPLogCategoryCore, PPLogLevelInfo, "set_tunnel()");
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_set_tunnel(%p)", jni_ref);
 
     bool did_attach;
     JNIEnv *env = pp_jni_attach_thread(&did_attach);
@@ -84,25 +84,25 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
     // This will be the result on success
     vpn_impl *tun_impl = malloc(sizeof(*tun_impl));
     if (tun_impl == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "set_tunnel(): NULL tun_impl");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): NULL tun_impl");
         goto cleanup;
     }
     tun_impl->fd = -1;
 
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "set_tunnel(): NULL cls");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): NULL cls");
         goto cleanup;
     }
     method = (*env)->GetMethodID(env, cls, sig_setTunnelSettings.name, sig_setTunnelSettings.signature);
     if (method == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "set_tunnel(): NULL method");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): NULL method");
         goto cleanup;
     }
     j_info_json = info_json ? (*env)->NewStringUTF(env, info_json) : NULL;
     tun_impl->fd = (*env)->CallIntMethod(env, jni_ref, method, j_info_json);
     if (tun_impl->fd < 0) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "set_tunnel(): Invalid fd");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): Invalid fd");
         goto cleanup;
     }
 
@@ -119,7 +119,7 @@ cleanup:
 
 void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t fds_len) {
     assert(jni_ref);
-    pp_clog(PPLogCategoryCore, PPLogLevelInfo, "configure_sockets()");
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_configure_sockets(%p)", jni_ref);
     if (!fds || fds_len == 0) return;
 
     bool did_attach;
@@ -132,17 +132,17 @@ void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t f
 
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "configure_sockets(): NULL cls");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_configure_sockets(): NULL cls");
         goto cleanup;
     }
     method = (*env)->GetMethodID(env, cls, sig_configureSockets.name, sig_configureSockets.signature);
     if (method == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "configure_sockets(): NULL method");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_configure_sockets(): NULL method");
         goto cleanup;
     }
     j_fds = (*env)->NewIntArray(env, (jsize)fds_len);
     if (j_fds == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "configure_sockets(): NULL j_fds");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_configure_sockets(): NULL j_fds");
         goto cleanup;
     }
     (*env)->SetIntArrayRegion(env, j_fds, 0, (jsize)fds_len, (const jint *)fds);
@@ -156,7 +156,7 @@ cleanup:
 
 void pp_tun_ctrl_clear_tunnel(void *jni_ref, void *tun_impl) {
     assert(jni_ref && tun_impl);
-    pp_clog(PPLogCategoryCore, PPLogLevelInfo, "clear_tunnel()");
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_clear_tunnel(%p)", jni_ref);
 
     // Release the tun_impl allocated in set_tunnel
     // Do not close impl->fd, JNI close() will take care
@@ -171,12 +171,12 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, void *tun_impl) {
 
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "configure_sockets(): NULL cls");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_clear_tunnel(): NULL cls");
         goto cleanup;
     }
     method = (*env)->GetMethodID(env, cls, sig_clearTunnelSettings.name, sig_clearTunnelSettings.signature);
     if (method == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "configure_sockets(): NULL method");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_clear_tunnel(): NULL method");
         goto cleanup;
     }
     (*env)->CallVoidMethod(env, jni_ref, method);
@@ -188,6 +188,7 @@ cleanup:
 
 void pp_tun_ctrl_free(void *jni_ref) {
     assert(jni_ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_free(%p)", jni_ref);
 
     bool did_attach;
     JNIEnv *env = pp_jni_attach_thread(&did_attach);
