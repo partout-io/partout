@@ -80,7 +80,13 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
     jclass cls = NULL;
     jmethodID method = NULL;
     jstring j_info_json = NULL;
-    vpn_impl *tun_impl = NULL;
+
+    // This will be the result on success
+    vpn_impl *tun_impl = malloc(sizeof(*tun_impl));
+    if (tun_impl == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "set_tunnel(): NULL tun_impl");
+        goto cleanup;
+    }
 
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
@@ -93,16 +99,11 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
         goto cleanup;
     }
     j_info_json = info_json ? (*env)->NewStringUTF(env, info_json) : NULL;
-    const jint fd = (*env)->CallIntMethod(env, jni_ref, method, j_info_json);
-    if (fd < 0) {
+    tun_impl->fd = (*env)->CallIntMethod(env, jni_ref, method, j_info_json);
+    if (tun_impl->fd < 0) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "set_tunnel(): Invalid fd");
         goto cleanup;
     }
-    tun_impl = malloc(sizeof(*tun_impl));
-    if (tun_impl == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "set_tunnel(): NULL result");
-        goto cleanup;
-    }
-    tun_impl->fd = fd;
 
 cleanup:
     if (j_info_json != NULL) (*env)->DeleteLocalRef(env, j_info_json);
@@ -112,8 +113,9 @@ cleanup:
 }
 
 void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t fds_len) {
-    assert(jni_ref && fds && fds_len > 0);
+    assert(jni_ref);
     pp_clog(PPLogCategoryCore, PPLogLevelInfo, "configure_sockets()");
+    if (!fds || fds_len == 0) return;
 
     bool did_attach;
     JNIEnv *env = pp_jni_attach_thread(&did_attach);
@@ -151,13 +153,13 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, void *tun_impl) {
     assert(jni_ref && tun_impl);
     pp_clog(PPLogCategoryCore, PPLogLevelInfo, "clear_tunnel()");
 
-    bool did_attach;
-    JNIEnv *env = pp_jni_attach_thread(&did_attach);
-    if (!env) return;
-
     // Release the tun_impl allocated in set_tunnel
     // Do not close impl->fd, JNI close() will take care
     free(tun_impl);
+
+    bool did_attach;
+    JNIEnv *env = pp_jni_attach_thread(&did_attach);
+    if (!env) return;
 
     jclass cls = NULL;
     jmethodID method = NULL;
