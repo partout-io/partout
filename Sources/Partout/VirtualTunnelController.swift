@@ -25,7 +25,7 @@ public final class VirtualTunnelController: TunnelController {
         self.maxReadLength = maxReadLength
 
         if let thiz = impl {
-            pp_tun_ctrl_test_working_wrapper(thiz)
+            pp_tun_ctrl_test_working(thiz)
         }
     }
 
