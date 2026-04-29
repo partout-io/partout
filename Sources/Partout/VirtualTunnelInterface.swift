@@ -43,12 +43,13 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 
     private let activeLock: SemaphoreMutex
 
-    init(_ ctx: PartoutLoggerContext, uuid: UniqueID, tunImpl: UnsafeMutableRawPointer?, maxReadLength: Int) throws {
-        guard let tun = uuid.uuidString.withCString({
-            pp_tun_create($0, tunImpl)
-        }) else {
-            throw PartoutError(.linkNotActive)
-        }
+    // WARNING: tun ownership is transferred
+    init(
+        _ ctx: PartoutLoggerContext,
+        tun: pp_tun,
+        tunImpl: UnsafeMutableRawPointer?,
+        maxReadLength: Int
+    ) {
         self.ctx = ctx
         self.tun = tun
         self.tunImpl = tunImpl

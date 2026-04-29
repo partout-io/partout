@@ -53,17 +53,26 @@ public final class VirtualTunnelController: TunnelController {
             return json
         }()
 
-        // Fetch tun implementation if necessary
+        // Create tun with optional implementation from controller
         let tunImpl: UnsafeMutableRawPointer?
         if let impl {
             tunImpl = infoJSON.withCString {
                 pp_tun_ctrl_set_tunnel(impl, $0)
             }
-            guard tunImpl != nil else {
+            guard let tunImpl else {
                 throw PartoutError(.linkNotActive)
             }
         } else {
             tunImpl = nil
+        }
+        let uuid = info.originalModuleId
+        guard let tun = uuid.uuidString.withCString({
+            pp_tun_create($0, tunImpl)
+        }) else {
+            if let impl {
+                pp_tun_ctrl_clear_tunnel(impl, tunImpl)
+            }
+            throw PartoutError(.linkNotActive)
         }
 
         // FIXME: #188, add better codes for PartoutError
@@ -93,16 +102,7 @@ public final class VirtualTunnelController: TunnelController {
 //            excludedRoutes.append(Route(Subnet(serverAddress), nil))
 //        }
 
-        // Create virtual device with an optional implementation
-        let uuid = info.originalModuleId
-        do {
-            return try VirtualTunnelInterface(ctx, uuid: uuid, tunImpl: tunImpl, maxReadLength: maxReadLength)
-        } catch {
-            if let impl, let tunImpl {
-                pp_tun_ctrl_clear_tunnel(impl, tunImpl)
-            }
-            throw error
-        }
+        return VirtualTunnelInterface(ctx, tun: tun, tunImpl: tunImpl, maxReadLength: maxReadLength)
     }
 
     public func configureSockets(with descriptors: [UInt64]) {
