@@ -186,18 +186,6 @@ cleanup:
     if (did_attach) (*jvm)->DetachCurrentThread(jvm);
 }
 
-void pp_tun_ctrl_free(void *jni_ref) {
-    assert(jni_ref);
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_free(%p)", jni_ref);
-
-    bool did_attach;
-    JNIEnv *env = pp_jni_attach_thread(&did_attach);
-    if (!env) return;
-
-    (*env)->DeleteGlobalRef(env, jni_ref);
-    if (did_attach) (*jvm)->DetachCurrentThread(jvm);
-}
-
 #else
 
 void pp_tun_ctrl_test_working(void *ref) {
@@ -223,11 +211,6 @@ void pp_tun_ctrl_clear_tunnel(void *ref, void *tun_impl) {
     (void)ref;
     (void)tun_impl;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "[dummy] clear_tunnel(%p)", ref);
-}
-
-void pp_tun_ctrl_free(void *ref) {
-    (void)ref;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "[dummy] free(%p)", ref);
 }
 
 #endif
