@@ -98,3 +98,10 @@ FILE *_Nullable pp_fopen(const char *_Nonnull filename, const char *_Nonnull mod
 #define pp_fopen fopen
 #define pp_sscanf sscanf
 #endif
+
+#ifdef __ANDROID__
+#include <jni.h>
+#include <stdbool.h>
+extern _Nullable JavaVM *_Nullable jvm;
+_Nullable JNIEnv *_Nullable pp_jni_attach_thread(bool *_Nonnull did_attach);
+#endif

@@ -32,12 +32,8 @@ class AndroidTunnelController: AutoCloseable {
         Log.e(logTag, ">>> AndroidTunnelController: Working!")
     }
 
-    fun setAddress(address: String, prefix: Int) {
-        builder.addAddress(address, prefix)
-    }
-
     // FIXME: Pass Profile
-    fun build(infoJSON: String): Int? {
+    fun setTunnelSettings(infoJSON: String): Int {
         assert(descriptor == null)
 
         // Decode info
@@ -46,7 +42,7 @@ class AndroidTunnelController: AutoCloseable {
             Json.decodeFromString(infoJSON)
         } catch (e: SerializationException) {
             Log.e(logTag, ">>> AndroidTunnelController: Failed to decode tunnel info JSON", e)
-            return null
+            return -1
         }
         val remoteFds = info.fileDescriptors
         var appliedAddressSettings = false
@@ -101,26 +97,30 @@ class AndroidTunnelController: AutoCloseable {
         descriptor = builder.establish()
         if (descriptor == null) {
             Log.e(logTag, ">>> AndroidTunnelController: Unable to establish")
-            return null
+            return -1
         }
 
         // Success
-        val fd = descriptor?.fd
+        val fd = descriptor?.fd ?: -1
         Log.e(logTag, ">>> AndroidTunnelController: Established descriptor: " + fd)
 //        descriptor?.detachFd()
         return fd
     }
 
-    fun configureSockets(fds: Array<Int>) {
+    fun configureSockets(fds: IntArray) {
         Log.e(logTag, ">>> AndroidTunnelController: Configuring with fds = " + fds + " (" + fds.size + ")")
         fds.forEach {
             service.protect(it)
         }
     }
 
-    override fun close() {
+    fun clearTunnelSettings() {
         Log.e(logTag, ">>> AndroidTunnelController: Closing...")
         descriptor?.close()
         descriptor = null
+    }
+
+    override fun close() {
+        clearTunnelSettings()
     }
 }

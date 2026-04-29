@@ -25,6 +25,28 @@ void pp_clog_v(pp_log_category category,
 
 #ifdef __ANDROID__
 #include <android/log.h>
+
+JNIEnv *pp_jni_attach_thread(bool *did_attach) {
+    JNIEnv *env;
+    jint status = (*jvm)->GetEnv(jvm, (void **)&env, JNI_VERSION_1_6);
+    switch (status) {
+        case JNI_OK:
+            *did_attach = false;
+            return env;
+        case JNI_EDETACHED:
+            status = (*jvm)->AttachCurrentThread(jvm, &env, NULL);
+            if (status != JNI_OK) {
+                pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "AttachCurrentThread failed (%d)", status);
+                return NULL;
+            }
+            *did_attach = true;
+            return env;
+        default:
+            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "GetEnv failed (%d)", status);
+            return NULL;
+    }
+}
+
 void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonnull message) {
     const char *log_tag = tag ? tag : "Partout";
     int android_level = 0;
