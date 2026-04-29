@@ -64,6 +64,7 @@ let package = Package(
             dependencies: {
                 // These are always included
                 var list: [Target.Dependency] = [
+                    "Partout_C",
                     "PartoutCore",
                     "PartoutOS"
                 ]
@@ -85,6 +86,10 @@ let package = Package(
             swiftSettings: areas.compactMap(\.define).map {
                 .define($0)
             } + useFoundationCompatibility.swiftSettings
+        ),
+        .target(
+            name: "Partout_C",
+            dependencies: ["PartoutCore_C"]
         ),
         .testTarget(
             name: "PartoutTests",

@@ -5,19 +5,20 @@
 #if !os(iOS) && !os(tvOS)
 
 internal import _PartoutCore_C
+import Partout_C
 
 /// A controller that operates on a virtual tun interface.
 public final class VirtualTunnelController: TunnelController {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
-    private let impl: UnsafeMutableRawPointer?
+    private let impl: UnsafeMutablePointer<partout_tun_ctrl>?
 
     private let maxReadLength: Int
 
     public init(
         _ ctx: PartoutLoggerContext,
-        impl: UnsafeMutableRawPointer?,
+        impl: UnsafeMutablePointer<partout_tun_ctrl>?,
         maxReadLength: Int = 128 * 1024
     ) throws {
         self.ctx = ctx
@@ -25,7 +26,7 @@ public final class VirtualTunnelController: TunnelController {
         self.maxReadLength = maxReadLength
 
         if let thiz = impl {
-            pp_tun_ctrl_test_working_wrapper(thiz)
+            thiz.pointee.test_working_wrapper(thiz)
         }
     }
 
@@ -49,7 +50,7 @@ public final class VirtualTunnelController: TunnelController {
         // Fetch tun implementation if necessary
         let tunImpl = impl.map { thiz in
             infoJSON.withCString {
-                pp_tun_ctrl_set_tunnel(thiz, $0)
+                thiz.pointee.set_tunnel(thiz, $0)
             }
         } ?? nil
 
@@ -95,7 +96,7 @@ public final class VirtualTunnelController: TunnelController {
     public func configureSockets(with descriptors: [UInt64]) {
         if let thiz = impl {
             descriptors.map(Int32.init).withUnsafeBufferPointer {
-                pp_tun_ctrl_configure_sockets(thiz, $0.baseAddress, $0.count)
+                thiz.pointee.configure_sockets(thiz, $0.baseAddress, $0.count)
             }
         }
     }
@@ -111,7 +112,7 @@ public final class VirtualTunnelController: TunnelController {
 
         // Release tun implementation if necessary
         if let thiz = impl {
-            pp_tun_ctrl_clear_tunnel(thiz, tunnel.tunImpl)
+            thiz.pointee.clear_tunnel(thiz, tunnel.tunImpl)
         }
     }
 

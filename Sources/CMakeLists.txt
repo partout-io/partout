@@ -11,6 +11,9 @@ target_compile_options(partout_c PRIVATE
 )
 
 # Header search paths from all C targets
+set(PARTOUT_C_INCLUDE_PUBLIC_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/Partout_C/include
+)
 set(PARTOUT_C_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/MiniFoundation_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCore_C/include
@@ -59,7 +62,9 @@ endforeach()
 
 # Add computed files
 target_sources(partout_c PRIVATE ${PARTOUT_C_SOURCES})
+target_include_directories(partout_c PUBLIC ${PARTOUT_C_INCLUDE_PUBLIC_DIRS})
 target_include_directories(partout_c PRIVATE ${PARTOUT_C_INCLUDE_DIRS})
+
 if(LINUX OR ANDROID)
     target_compile_options(partout_c PRIVATE -fPIC)
 endif()
@@ -101,6 +106,9 @@ foreach(pattern ${EXCLUDED_PATTERNS})
 endforeach()
 
 # Look for modulemaps in C "include" dirs
+foreach(dir ${PARTOUT_C_INCLUDE_PUBLIC_DIRS})
+    target_include_directories(partout PUBLIC ${dir})
+endforeach()
 foreach(dir ${PARTOUT_C_INCLUDE_DIRS})
     target_include_directories(partout PRIVATE ${dir})
 endforeach()
