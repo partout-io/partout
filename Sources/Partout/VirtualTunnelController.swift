@@ -40,6 +40,10 @@ public final class VirtualTunnelController: TunnelController {
         guard let info else {
             throw PartoutError(.notFound)
         }
+        guard info.requiresVirtualDevice else {
+            return DummyTunnelInterface()
+        }
+
         let infoJSON: String = try {
             let wrapped = TunnelRemoteInfoWrapper(info)
             let data = try JSONEncoder().encode(wrapped)
@@ -50,19 +54,16 @@ public final class VirtualTunnelController: TunnelController {
         }()
 
         // Fetch tun implementation if necessary
-        let tunImpl = impl.map { thiz in
-            infoJSON.withCString {
-                pp_tun_ctrl_set_tunnel(thiz, $0)
+        let tunImpl: UnsafeMutableRawPointer?
+        if let impl {
+            tunImpl = infoJSON.withCString {
+                pp_tun_ctrl_set_tunnel(impl, $0)
             }
-        } ?? nil
-
-        // Create virtual device with an optional implementation
-        let uuid = info.originalModuleId
-        let tun: IOInterface
-        if info.requiresVirtualDevice {
-            tun = try VirtualTunnelInterface(ctx, uuid: uuid, tunImpl: tunImpl, maxReadLength: maxReadLength)
+            guard tunImpl != nil else {
+                throw PartoutError(.linkNotActive)
+            }
         } else {
-            tun = DummyTunnelInterface()
+            tunImpl = nil
         }
 
         // FIXME: #188, add better codes for PartoutError
@@ -92,7 +93,16 @@ public final class VirtualTunnelController: TunnelController {
 //            excludedRoutes.append(Route(Subnet(serverAddress), nil))
 //        }
 
-        return tun
+        // Create virtual device with an optional implementation
+        let uuid = info.originalModuleId
+        do {
+            return try VirtualTunnelInterface(ctx, uuid: uuid, tunImpl: tunImpl, maxReadLength: maxReadLength)
+        } catch {
+            if let impl, let tunImpl {
+                pp_tun_ctrl_clear_tunnel(impl, tunImpl)
+            }
+            throw error
+        }
     }
 
     public func configureSockets(with descriptors: [UInt64]) {
