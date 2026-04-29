@@ -14,8 +14,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-extern JavaVM *jvm;
-
 // Kotlin signatures for AndroidTunnelController
 typedef struct {
     const char *name;
@@ -44,33 +42,12 @@ typedef struct {
     int fd;
 } vpn_impl;
 
-JNIEnv *jni_attach_thread(bool *did_attach) {
-    JNIEnv *env;
-    jint status = (*jvm)->GetEnv(jvm, (void **)&env, JNI_VERSION_1_6);
-    switch (status) {
-        case JNI_OK:
-            *did_attach = false;
-            return env;
-        case JNI_EDETACHED:
-            status = (*jvm)->AttachCurrentThread(jvm, &env, NULL);
-            if (status != JNI_OK) {
-                pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "AttachCurrentThread failed (%d)", status);
-                return NULL;
-            }
-            *did_attach = true;
-            return env;
-        default:
-            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "GetEnv failed (%d)", status);
-            return NULL;
-    }
-}
-
 void pp_tun_ctrl_test_working_wrapper(void *jni_ref) {
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "test_working_wrapper(%p)", jni_ref);
 
     bool did_attach;
-    JNIEnv *env = jni_attach_thread(&did_attach);
+    JNIEnv *env = pp_jni_attach_thread(&did_attach);
     if (!env) return;
 
     jclass cls = (*env)->GetObjectClass(env, jni_ref);
@@ -86,7 +63,7 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
     pp_clog(PPLogCategoryCore, PPLogLevelInfo, "set_tunnel()");
 
     bool did_attach;
-    JNIEnv *env = jni_attach_thread(&did_attach);
+    JNIEnv *env = pp_jni_attach_thread(&did_attach);
     if (!env) return NULL;
 
     void *result = NULL;
@@ -137,7 +114,7 @@ void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t f
     pp_clog(PPLogCategoryCore, PPLogLevelInfo, "configure_sockets()");
 
     bool did_attach;
-    JNIEnv *env = jni_attach_thread(&did_attach);
+    JNIEnv *env = pp_jni_attach_thread(&did_attach);
     if (!env) return;
 
     jintArray fdsObj = NULL;
@@ -181,7 +158,7 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, void *tun_impl) {
     pp_clog(PPLogCategoryCore, PPLogLevelInfo, "clear_tunnel()");
 
     bool did_attach;
-    JNIEnv *env = jni_attach_thread(&did_attach);
+    JNIEnv *env = pp_jni_attach_thread(&did_attach);
     if (!env) return;
 
     // Release the tun_impl allocated in set_tunnel
@@ -200,7 +177,7 @@ void pp_tun_ctrl_free(void *jni_ref) {
     assert(jni_ref);
 
     bool did_attach;
-    JNIEnv *env = jni_attach_thread(&did_attach);
+    JNIEnv *env = pp_jni_attach_thread(&did_attach);
     if (!env) return;
 
     (*env)->DeleteGlobalRef(env, jni_ref);
