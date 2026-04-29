@@ -24,16 +24,16 @@ static const kotlin_sig sig_testWorking = {
     "testWorking",
     "()V"
 };
-static const kotlin_sig sig_build = {
-    "build",
+static const kotlin_sig sig_setTunnelSettings = {
+    "setTunnelSettings",
     "(Ljava/lang/String;)I"
 };
 static const kotlin_sig sig_configureSockets = {
     "configureSockets",
     "([I)V"
 };
-static const kotlin_sig sig_close = {
-    "close",
+static const kotlin_sig sig_clearTunnelSettings = {
+    "clearTunnelSettings",
     "()V"
 };
 
@@ -93,7 +93,7 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "set_tunnel(): NULL cls");
         goto cleanup;
     }
-    method = (*env)->GetMethodID(env, cls, sig_build.name, sig_build.signature);
+    method = (*env)->GetMethodID(env, cls, sig_setTunnelSettings.name, sig_setTunnelSettings.signature);
     if (method == NULL) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "set_tunnel(): NULL method");
         goto cleanup;
@@ -169,7 +169,7 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, void *tun_impl) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "configure_sockets(): NULL cls");
         goto cleanup;
     }
-    method = (*env)->GetMethodID(env, cls, sig_close.name, sig_close.signature);
+    method = (*env)->GetMethodID(env, cls, sig_clearTunnelSettings.name, sig_clearTunnelSettings.signature);
     if (method == NULL) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "configure_sockets(): NULL method");
         goto cleanup;

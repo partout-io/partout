@@ -33,7 +33,7 @@ class AndroidTunnelController: AutoCloseable {
     }
 
     // FIXME: Pass Profile
-    fun build(infoJSON: String): Int {
+    fun setTunnelSettings(infoJSON: String): Int {
         assert(descriptor == null)
 
         // Decode info
@@ -114,9 +114,13 @@ class AndroidTunnelController: AutoCloseable {
         }
     }
 
-    override fun close() {
+    fun clearTunnelSettings() {
         Log.e(logTag, ">>> AndroidTunnelController: Closing...")
         descriptor?.close()
         descriptor = null
+    }
+
+    override fun close() {
+        clearTunnelSettings()
     }
 }
