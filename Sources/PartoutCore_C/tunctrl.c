@@ -96,14 +96,14 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
 
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelError, "set_tunnel(): GetObjectClass returned NULL");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "set_tunnel(): GetObjectClass returned NULL");
         goto cleanup;
     }
 
     infoJson = info_json ? (*env)->NewStringUTF(env, info_json) : NULL;
     jmethodID buildMethod = (*env)->GetMethodID(env, cls, sig_build.name, sig_build.signature);
     if (buildMethod == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelError, "set_tunnel(): build() method not found");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "set_tunnel(): build() method not found");
         goto cleanup;
     }
 
@@ -114,7 +114,7 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
 
     impl = malloc(sizeof(*impl));
     if (impl == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelError, "set_tunnel(): malloc failed");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "set_tunnel(): malloc failed");
         goto cleanup;
     }
     impl->fd = fd;
@@ -146,7 +146,7 @@ void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t f
 
     fdsObj = (*env)->NewIntArray(env, (jsize)fds_len);
     if (fdsObj == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelError, "configure_sockets(): failed to allocate int[]");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "configure_sockets(): failed to allocate int[]");
         goto cleanup;
     }
     (*env)->SetIntArrayRegion(env, fdsObj, 0, (jsize)fds_len, (const jint *)fds);
@@ -154,13 +154,13 @@ void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t f
     // Call wrapper.configureSockets()
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelError, "configure_sockets(): GetObjectClass returned NULL");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "configure_sockets(): GetObjectClass returned NULL");
         goto cleanup;
     }
 
     cfgMethod = (*env)->GetMethodID(env, cls, sig_configureSockets.name, sig_configureSockets.signature);
     if (cfgMethod == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelError, "configure_sockets(): configureSockets method not found");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "configure_sockets(): configureSockets method not found");
         goto cleanup;
     }
 
