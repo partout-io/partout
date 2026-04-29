@@ -66,6 +66,7 @@ JNIEnv *jni_attach_thread(bool *did_attach) {
 }
 
 void pp_tun_ctrl_test_working_wrapper(void *jni_ref) {
+    assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "test_working_wrapper(%p)", jni_ref);
 
     bool did_attach;
@@ -154,6 +155,7 @@ cleanup:
 }
 
 void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t fds_len) {
+    assert(jni_ref && fds && fds_len > 0);
     pp_clog(PPLogCategoryCore, PPLogLevelInfo, "configure_sockets()");
 
     bool did_attach;
