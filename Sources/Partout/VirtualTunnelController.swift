@@ -30,9 +30,6 @@ public final class VirtualTunnelController: TunnelController {
     }
 
     deinit {
-        if let impl {
-            pp_tun_ctrl_free(impl)
-        }
         pp_log(ctx, .core, .debug, "Deinit VirtualTunnelController")
     }
 
