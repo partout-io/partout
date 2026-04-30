@@ -358,7 +358,7 @@ private extension NETunnelStrategy {
                     $0.filter {
                         $0.value.rank > 0
                     }
-                    .compactMapValues(\.asActiveProfile)
+                    .compactMapValues(\.asSnapshot)
                 }
         } else {
             mappedStream = stream
@@ -378,7 +378,7 @@ private extension NETunnelStrategy {
                         $0.value.rank == maxRank
                     }
                     assert(filtered.count <= 1, "Max ranked manager must be at most one")
-                    return filtered.compactMapValues(\.asActiveProfile)
+                    return filtered.compactMapValues(\.asSnapshot)
                 }
         }
 
@@ -520,12 +520,13 @@ extension NETunnelProviderManager: @retroactive @unchecked Sendable {
 }
 
 private extension NETunnelProviderManager {
-    var asActiveProfile: TunnelSnapshot? {
+    var asSnapshot: TunnelSnapshot? {
         guard let profileId else {
             return nil
         }
         return TunnelSnapshot(
             id: profileId,
+            isEnabled: isEnabled,
             status: connection.status.asTunnelStatus,
             onDemand: isEnabled && isOnDemandEnabled
         )
