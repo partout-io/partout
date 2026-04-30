@@ -6,18 +6,21 @@
 public struct TunnelSnapshot: Hashable, Sendable, CustomStringConvertible {
     public let id: Profile.ID
 
+    public let isEnabled: Bool
+
     public let status: TunnelStatus
 
     public let onDemand: Bool
 
-    public init(id: Profile.ID, status: TunnelStatus, onDemand: Bool) {
+    public init(id: Profile.ID, isEnabled: Bool, status: TunnelStatus, onDemand: Bool) {
         self.id = id
+        self.isEnabled = isEnabled
         self.status = status
         self.onDemand = onDemand
     }
 
     public var description: String {
-        "{\(id.uuidString), status=\(status), onDemand=\(onDemand)}"
+        "{\(id.uuidString), isEnabled=\(isEnabled), status=\(status), onDemand=\(onDemand)}"
     }
 }
 
