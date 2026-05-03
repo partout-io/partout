@@ -85,6 +85,32 @@ struct TunnelRemoteInfoGeneratorTests {
     }
 
     @Test
+    func givenPeerWithoutEndpoint_whenGeneratingUAPIConfiguration_thenKeepsPeerSettings() async throws {
+        let pvtkey = "SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs="
+        let pubkey = "BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw="
+
+        var builder = WireGuard.Configuration.Builder(privateKey: pvtkey)
+        var peer = WireGuard.RemoteInterface.Builder(publicKey: pubkey)
+        peer.allowedIPs = ["10.0.0.0/24"]
+        peer.keepAlive = 25
+        builder.peers = [peer]
+
+        let configuration = try builder.build()
+        let sut = TunnelRemoteInfoGenerator(
+            .global,
+            tunnelConfiguration: configuration,
+            dnsTimeout: 1
+        )
+
+        let uapiConfiguration = try await sut.uapiConfiguration(logHandler: { _, _ in })
+
+        #expect(!uapiConfiguration.contains("endpoint="))
+        #expect(uapiConfiguration.contains("persistent_keepalive_interval=25"))
+        #expect(uapiConfiguration.contains("replace_allowed_ips=true"))
+        #expect(uapiConfiguration.contains("allowed_ip=10.0.0.0/24"))
+    }
+
+    @Test
     func givenInterfaceAddresses_whenGeneratingRemoteInfo_thenMasksInterfaceRoutes() throws {
         let pvtkey = "SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs="
         let pubkey = "BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw="
