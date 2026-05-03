@@ -10,6 +10,8 @@ extension WireGuard.Configuration {
     actor ResolvedMap {
         private var map: [Endpoint: Endpoint] = [:]
 
+        private var failures: [Endpoint] = []
+
         func setEndpoints(_ endpoints: [Endpoint], for sourceEndpoint: Endpoint) {
             assert(!endpoints.isEmpty, "Assigning empty resolved endpoints")
             let targetEndpoint: Endpoint? = {
@@ -30,20 +32,28 @@ extension WireGuard.Configuration {
             map[sourceEndpoint] = targetEndpoint
         }
 
+        func setFailure(for endpoint: Endpoint) {
+            failures.append(endpoint)
+        }
+
         func toMap() -> [Endpoint: Endpoint] {
             map
+        }
+
+        func failedEndpoints() -> [Endpoint] {
+            failures
         }
     }
 
     func resolvePeers(
         timeout: Int,
         logHandler: @escaping WireGuardAdapter.LogHandler
-    ) async -> [Endpoint: Endpoint] {
+    ) async throws -> [Endpoint: Endpoint] {
         let endpoints = peers.compactMap(\.endpoint)
         let resolver = SimpleDNSResolver {
             POSIXDNSStrategy(hostname: $0)
         }
-        return await withTaskGroup(returning: [Endpoint: Endpoint].self) { group in
+        return try await withThrowingTaskGroup(of: Void.self, returning: [Endpoint: Endpoint].self) { group in
             let allResolved = ResolvedMap()
             for endpoint in endpoints {
                 group.addTask { @Sendable in
@@ -63,13 +73,22 @@ extension WireGuard.Configuration {
                                 logHandler(.verbose, "DNS64: mapped \(endpoint.address) to \(record.address)")
                             }
                         }
+                        guard !currentResolved.isEmpty else {
+                            await allResolved.setFailure(for: endpoint)
+                            return
+                        }
                         await allResolved.setEndpoints(currentResolved, for: endpoint)
                     } catch {
                         logHandler(.error, "Failed to resolve endpoint \(endpoint.address.asSensitiveAddress(.global)): \(error.localizedDescription)")
+                        await allResolved.setFailure(for: endpoint)
                     }
                 }
             }
-            await group.waitForAll()
+            try await group.waitForAll()
+            let failures = await allResolved.failedEndpoints()
+            guard failures.isEmpty else {
+                throw WireGuardAdapterError.dnsResolution(failures)
+            }
             return await allResolved.toMap()
         }
     }

@@ -171,6 +171,11 @@ private extension _WireGuardConnectionV2 {
         case .cannotLocateTunnelFileDescriptor:
             pp_log(ctx, .wireguard, .error, "Starting tunnel failed: could not determine file descriptor")
             return WireGuardConnectionError.couldNotDetermineFileDescriptor
+        case .dnsResolution(let endpoints):
+            let hostnamesWithDnsResolutionFailure = endpoints.map(\.address.rawValue)
+                .joined(separator: ", ")
+            pp_log(ctx, .wireguard, .error, "DNS resolution failed for the following hostnames: \(hostnamesWithDnsResolutionFailure)")
+            return WireGuardConnectionError.dnsResolutionFailure
         case .setNetworkSettings(let error):
             pp_log(ctx, .wireguard, .error, "Starting tunnel failed with setTunnelNetworkSettings returning \(error.localizedDescription)")
             return WireGuardConnectionError.couldNotSetNetworkSettings

@@ -34,7 +34,13 @@ final class TunnelRemoteInfoGenerator: Sendable {
     func endpointUapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async -> String {
         var wgSettings = ""
 
-        let resolutionMap = await resolvePeers(logHandler: logHandler)
+        let resolutionMap: [Endpoint: Endpoint]
+        do {
+            resolutionMap = try await resolvePeers(logHandler: logHandler)
+        } catch {
+            logHandler(.error, "Unable to resolve peer endpoints: \(error.localizedDescription)")
+            return wgSettings
+        }
         for peer in tunnelConfiguration.peers {
             let publicKey: String
             do {
@@ -77,10 +83,7 @@ final class TunnelRemoteInfoGenerator: Sendable {
             wgSettings.append("replace_peers=true\n")
         }
 
-        let resolutionMap = await resolvePeers(logHandler: logHandler)
-        guard !resolutionMap.isEmpty else {
-            throw PartoutError(.dnsFailure)
-        }
+        let resolutionMap = try await resolvePeers(logHandler: logHandler)
 
         for peer in tunnelConfiguration.peers {
             let publicKey = try peer.publicKey.rawValue.hexStringFromBase64()
@@ -89,21 +92,20 @@ final class TunnelRemoteInfoGenerator: Sendable {
                 let preSharedKey = try preSharedKeyBase64.hexStringFromBase64()
                 wgSettings.append("preshared_key=\(preSharedKey)\n")
             }
-            guard let endpoint = peer.endpoint,
-                  let resolvedEndpoint = resolutionMap[endpoint] else {
-                continue
+            if let endpoint = peer.endpoint,
+               let resolvedEndpoint = resolutionMap[endpoint] {
+                let reresolvedEndpoint: Endpoint
+                do {
+                    reresolvedEndpoint = try resolvedEndpoint.withReresolvedIP()
+                } catch {
+                    pp_log(ctx, .wireguard, .error, "Unable to re-resolve endpoint: \(error)")
+                    reresolvedEndpoint = resolvedEndpoint
+                }
+                if case .hostname = reresolvedEndpoint.address {
+                    assertionFailure("Endpoint is not resolved")
+                }
+                wgSettings.append("endpoint=\(reresolvedEndpoint.wgRepresentation)\n")
             }
-            let reresolvedEndpoint: Endpoint
-            do {
-                reresolvedEndpoint = try resolvedEndpoint.withReresolvedIP()
-            } catch {
-                pp_log(ctx, .wireguard, .error, "Unable to re-resolve endpoint: \(error)")
-                reresolvedEndpoint = resolvedEndpoint
-            }
-            if case .hostname = reresolvedEndpoint.address {
-                assertionFailure("Endpoint is not resolved")
-            }
-            wgSettings.append("endpoint=\(reresolvedEndpoint.wgRepresentation)\n")
             let persistentKeepAlive = peer.keepAlive ?? 0
             wgSettings.append("persistent_keepalive_interval=\(persistentKeepAlive)\n")
             if !peer.allowedIPs.isEmpty {
@@ -175,11 +177,11 @@ final class TunnelRemoteInfoGenerator: Sendable {
 }
 
 private extension TunnelRemoteInfoGenerator {
-    func resolvePeers(logHandler: @escaping WireGuardAdapter.LogHandler) async -> [Endpoint: Endpoint] {
+    func resolvePeers(logHandler: @escaping WireGuardAdapter.LogHandler) async throws -> [Endpoint: Endpoint] {
         if let resolutionMap = await resolvedEndpoints.value {
             return resolutionMap
         }
-        let resolutionMap = await tunnelConfiguration.resolvePeers(
+        let resolutionMap = try await tunnelConfiguration.resolvePeers(
             timeout: dnsTimeout,
             logHandler: logHandler
         )
