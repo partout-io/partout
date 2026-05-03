@@ -13,7 +13,7 @@ extension _OpenVPNConnectionV2 {
         guard let configuration = module.configuration else {
             fatalError("Creating session without OpenVPN configuration?")
         }
-        pp_log(ctx, .openvpn, .notice, "OpenVPN: Using cross-platform connection V2")
+        pp_log(ctx, .openvpn, .notice, "OpenVPN: Using v2 connection")
 
         // Override options with feature flags
         var options = baseOptions

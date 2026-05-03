@@ -64,7 +64,7 @@ public final class _WireGuardConnectionV2: Connection, @unchecked Sendable {
         guard let configuration = module.configuration else {
             throw PartoutError(.incompleteModule)
         }
-        pp_log(ctx, .wireguard, .notice, "WireGuard: Using Partout connection")
+        pp_log(ctx, .wireguard, .notice, "WireGuard: Using v2 connection")
 
         tunnelConfiguration = try configuration.withModules(from: parameters.profile)
 

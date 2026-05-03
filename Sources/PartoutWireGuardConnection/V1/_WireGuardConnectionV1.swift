@@ -55,7 +55,7 @@ public final class _WireGuardConnectionV1: Connection, @unchecked Sendable {
         guard let configuration = module.configuration else {
             throw PartoutError(.incompleteModule)
         }
-        pp_log(ctx, .wireguard, .notice, "WireGuard: Using legacy connection")
+        pp_log(ctx, .wireguard, .notice, "WireGuard: Using v1 connection")
 
         let tweakedConfiguration = try configuration.withModules(from: parameters.profile)
         tunnelConfiguration = try tweakedConfiguration.toWireGuardConfiguration()
