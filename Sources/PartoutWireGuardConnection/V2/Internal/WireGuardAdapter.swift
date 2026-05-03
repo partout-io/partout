@@ -1,17 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
-internal import _PartoutCore_C
 internal import _PartoutWireGuard_C
+import NetworkExtension
 
-protocol WireGuardAdapterDelegate: AnyObject, Sendable {
+protocol WireGuardAdapterDelegate: AnyObject {
     func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool)
 
-    func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: TunnelRemoteInfo) async throws -> IOInterface
-
-    func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64])
-
-    func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapter, tunnel: IOInterface) async
+    func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: NEPacketTunnelNetworkSettings, completionHandler: (@Sendable (Error?) -> Void)?)
 }
 
 /// Enum representing internal state of the `WireGuardAdapter`
@@ -20,293 +16,35 @@ private enum WireGuardAdapterState {
     case stopped
 
     /// The tunnel is up and running
-    case started(_ handle: Int32, _ settingsGenerator: TunnelRemoteInfoGenerator)
+    case started(_ handle: Int32, _ settingsGenerator: PacketTunnelSettingsGenerator)
 
     /// The tunnel is temporarily shutdown due to device going offline
-    case temporaryShutdown(_ settingsGenerator: TunnelRemoteInfoGenerator)
+    case temporaryShutdown(_ settingsGenerator: PacketTunnelSettingsGenerator)
 }
 
-actor WireGuardAdapter {
-    typealias LogHandler = @Sendable (WireGuardLogLevel, String) -> Void
+class WireGuardAdapter: @unchecked Sendable {
+    typealias LogHandler = (WireGuardLogLevel, String) -> Void
 
-    private let ctx: PartoutLoggerContext
+    /// Network routes monitor.
+    private var networkMonitor: NWPathMonitor?
 
     /// Adapter delegate.
     private weak var delegate: WireGuardAdapterDelegate?
 
-    /// The ID of the original ``WireGuardModule``.
-    private let moduleId: UniqueID
-
-    private let dnsTimeout: Int
+    /// Log handler closure.
+    private let logHandler: LogHandler
 
     /// Backend implementation.
     private let backend: WireGuardBackend
 
-    /// Network routes monitor.
-    private unowned let reachability: ReachabilityObserver
-
-    /// Log handler closure.
-    private let logHandler: LogHandler
-
-    /// Network reachability task.
-    private var reachabilityTask: Task<Void, Never>?
-
-    /// Virtual tunnel interface
-    private var tunnel: IOInterface?
+    /// Private queue used to synchronize access to `WireGuardAdapter` members.
+    private let workQueue = DispatchQueue(label: "WireGuardAdapterWorkQueue")
 
     /// Adapter state.
     private var state: WireGuardAdapterState = .stopped
 
-    private var socketDescriptors: [Int32] {
-        guard case .started(let handle, _) = state else { return [] }
-        return backend.socketDescriptors(handle)
-    }
-
     /// Tunnel device file descriptor.
     private var tunnelFileDescriptor: Int32? {
-        didSet {
-            logHandler(.verbose, "Tunnel file descriptor: \(tunnelFileDescriptor.debugDescription)")
-            logHandler(.verbose, "Socket file descriptors: \(socketDescriptors)")
-        }
-    }
-
-    /// Returns a WireGuard version.
-    var backendVersion: String {
-        backend.version() ?? "unknown"
-    }
-
-    // MARK: - Initialization
-
-    /// Designated initializer.
-    init(
-        _ ctx: PartoutLoggerContext,
-        with delegate: WireGuardAdapterDelegate,
-        moduleId: UniqueID,
-        dnsTimeout: Int,
-        reachability: ReachabilityObserver,
-        logHandler: @escaping LogHandler
-    ) async {
-        self.ctx = ctx
-        self.delegate = delegate
-        self.moduleId = moduleId
-        self.dnsTimeout = dnsTimeout
-        backend = WireGuardBackend()
-        self.reachability = reachability
-        reachabilityTask = nil
-        self.logHandler = logHandler
-
-        setupReachabilityTask()
-        setupLogHandler()
-    }
-
-    deinit {
-        pp_log(ctx, .wireguard, .debug, "Deinit WireGuardAdapter")
-
-        // Force remove logger to make sure that no further calls to the instance of this class
-        // can happen after deallocation.
-        backend.setLogger(context: nil, logger_fn: nil)
-
-        // Shutdown the tunnel
-        if case .started(let handle, _) = state {
-            backend.turnOff(handle)
-        }
-    }
-
-    // MARK: - Public methods
-
-    /// Returns a runtime configuration from WireGuard.
-    func getRuntimeConfiguration() async -> String? {
-        guard case .started(let handle, _) = state else {
-            return nil
-        }
-        return await Task.detached { [weak self] in
-            guard let self else { return nil }
-            guard let settings = backend.getConfig(handle) else { return nil }
-            return settings
-        }.value
-    }
-
-    /// Start the tunnel.
-    /// - Parameters:
-    ///   - tunnelConfiguration: tunnel configuration.
-    func start(tunnelConfiguration: WireGuard.Configuration) async throws {
-        pp_log(ctx, .wireguard, .info, "Start adapter")
-        guard case .stopped = state else {
-            throw WireGuardAdapterError.invalidState
-        }
-        do {
-            let settingsGenerator = makeSettingsGenerator(with: tunnelConfiguration)
-            let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
-            try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
-                moduleId: moduleId,
-                // FIXME: ###, These are always empty at this stage
-                descriptors: socketDescriptors
-            ))
-            let handle = try startWireGuardBackend(wgConfig: wgConfig)
-            state = .started(handle, settingsGenerator)
-        } catch let error as WireGuardAdapterError {
-            throw error
-        } catch {
-            pp_log(ctx, .wireguard, .fault, "Unable to start: \(error)")
-            throw error
-        }
-    }
-
-    /// Stop the tunnel.
-    func stop() async throws {
-        pp_log(ctx, .wireguard, .info, "Stop adapter")
-        switch state {
-        case .started(let handle, _):
-            backend.turnOff(handle)
-        case .temporaryShutdown:
-            break
-        case .stopped:
-            throw WireGuardAdapterError.invalidState
-        }
-        state = .stopped
-        reachabilityTask?.cancel()
-        reachabilityTask = nil
-        if let tunnel {
-            await delegate?.adapterShouldClearNetworkSettings(self, tunnel: tunnel)
-            self.tunnel = nil
-        }
-    }
-
-    // MARK: - Private methods
-
-    private func setupReachabilityTask() {
-        reachabilityTask = Task { [weak self] in
-            guard let self else { return }
-            for await isReachable in reachability.isReachableStream {
-                guard !Task.isCancelled else { return }
-                await didUpdateReachable(isReachable: isReachable)
-            }
-        }
-    }
-
-    /// Setup WireGuard log handler.
-    private func setupLogHandler() {
-        let context = Unmanaged.passUnretained(self).toOpaque()
-        backend.setLogger(context: context) { context, logLevel, message in
-            guard let context, let message else { return }
-
-            let unretainedSelf = Unmanaged<WireGuardAdapter>.fromOpaque(context)
-                .takeUnretainedValue()
-
-            let swiftString = String(cString: message).trimmingCharacters(in: .newlines)
-            let tunnelLogLevel = WireGuardLogLevel(rawValue: logLevel) ?? .verbose
-
-            unretainedSelf.logHandler(tunnelLogLevel, swiftString)
-        }
-    }
-
-    /// Set network tunnel configuration.
-    /// This method ensures that the call to `setTunnelNetworkSettings` does not time out, as in
-    /// certain scenarios the completion handler given to it may not be invoked by the system.
-    ///
-    /// - Parameters:
-    ///   - networkSettings: an instance of type `TunnelRemoteInfo`.
-    /// - Throws: an error of type `WireGuardAdapterError`.
-    /// - Returns: `PacketTunnelSettingsGenerator`.
-    private func setNetworkSettings(_ networkSettings: TunnelRemoteInfo) async throws {
-        guard let delegate else { return }
-        tunnel = try await delegate.adapterShouldSetNetworkSettings(self, settings: networkSettings)
-#if !os(Windows)
-        guard let tunFd = tunnel?.fileDescriptor.map(Int32.init) ?? fallbackFileDescriptor else {
-            throw WireGuardAdapterError.cannotLocateTunnelFileDescriptor
-        }
-        tunnelFileDescriptor = tunFd
-#endif
-    }
-
-    /// Start WireGuard backend.
-    /// - Parameter wgConfig: WireGuard configuration
-    /// - Throws: an error of type `WireGuardAdapterError`
-    /// - Returns: tunnel handle
-    private func startWireGuardBackend(wgConfig: String) throws -> Int32 {
-#if os(Windows)
-        guard let interfaceName else {
-            throw WireGuardAdapterError.cannotLocateTunnelFileDescriptor
-        }
-        let handle = backend.turnOn(settings: wgConfig, ifname: interfaceName)
-#else
-        guard let tunnelFileDescriptor else {
-            throw WireGuardAdapterError.cannotLocateTunnelFileDescriptor
-        }
-        let handle = backend.turnOn(settings: wgConfig, tun_fd: tunnelFileDescriptor)
-#endif
-        if handle < 0 {
-            throw WireGuardAdapterError.startWireGuardBackend(handle)
-        }
-#if os(iOS)
-        backend.disableSomeRoamingForBrokenMobileSemantics(handle)
-#endif
-        // FIXME: ###, Socket descriptors require handle, which only exists after backend.turnOn. How do start() and .temporaryShutdown use socketDescriptors? They are empty, always empty on start()
-        let socketFds = {
-            var rawFds = backend.socketDescriptors(handle)
-            if rawFds.isEmpty {
-                rawFds = fallbackFileDescriptor.map { [$0] } ?? []
-            }
-            return rawFds
-        }()
-        pp_log(ctx, .wireguard, .info, "Socket descriptors: \(socketFds)")
-        delegate?.adapterShouldConfigureSockets(self, descriptors: socketFds.map(UInt64.init))
-        return handle
-    }
-
-    /// Resolves the hostnames in the given tunnel configuration and return settings generator.
-    /// - Parameter tunnelConfiguration: an instance of type `WireGuard.Configuration`.
-    /// - Returns: an instance of type `TunnelRemoteInfoGenerator`.
-    private func makeSettingsGenerator(with tunnelConfiguration: WireGuard.Configuration) -> TunnelRemoteInfoGenerator {
-        TunnelRemoteInfoGenerator(
-            ctx,
-            tunnelConfiguration: tunnelConfiguration,
-            dnsTimeout: dnsTimeout
-        )
-    }
-
-    private func didUpdateReachable(isReachable: Bool) async {
-//        logHandler(.verbose, "Network change detected with \(path.status) route and interface order \(path.availableInterfaces)")
-        logHandler(.verbose, "Network change detected, reachable: \(isReachable)")
-
-        switch state {
-        case .started(let handle, let settingsGenerator):
-            if isReachable {
-                let wgConfig = await settingsGenerator.endpointUapiConfiguration(logHandler: logHandler)
-
-                backend.setConfig(handle, settings: wgConfig)
-                backend.disableSomeRoamingForBrokenMobileSemantics(handle)
-                backend.bumpSockets(handle)
-            } else {
-                logHandler(.verbose, "Connectivity offline, pausing backend.")
-
-                state = .temporaryShutdown(settingsGenerator)
-                backend.turnOff(handle)
-            }
-
-        case .temporaryShutdown(let settingsGenerator):
-            guard isReachable else { return }
-            logHandler(.verbose, "Connectivity online, resuming backend.")
-            do {
-                let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
-                try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
-                    moduleId: moduleId,
-                    descriptors: socketDescriptors
-                ))
-                let handle = try startWireGuardBackend(wgConfig: wgConfig)
-                state = .started(handle, settingsGenerator)
-            } catch {
-                logHandler(.error, "Failed to restart backend: \(error.localizedDescription)")
-            }
-
-        case .stopped:
-            // no-op
-            break
-        }
-    }
-
-    private nonisolated var fallbackFileDescriptor: Int32? {
-#if canImport(Darwin)
         var ctlInfo = ctl_info()
         withUnsafeMutablePointer(to: &ctlInfo.ctl_name) {
             $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: $0.pointee)) {
@@ -336,22 +74,20 @@ actor WireGuardAdapter {
             }
         }
         return nil
-#else
-        return nil
-#endif
     }
-}
 
-// MARK: - Low-level
+    /// Returns a WireGuard version.
+    var backendVersion: String {
+        backend.version() ?? "unknown"
+    }
 
-extension WireGuardAdapter {
-    /// Returns the tunnel device interface name, or nil if unsupported or on error.
+    /// Returns the tunnel device interface name, or nil on error.
+    /// - Returns: String.
     var interfaceName: String? {
-#if os(Windows)
-        moduleId.uuidString
-#elseif canImport(Darwin)
-        guard let tunnelFileDescriptor else { return nil }
+        guard let tunnelFileDescriptor = self.tunnelFileDescriptor else { return nil }
+
         var buffer = [UInt8](repeating: 0, count: Int(IFNAMSIZ))
+
         return buffer.withUnsafeMutableBufferPointer { mutableBufferPointer in
             guard let baseAddress = mutableBufferPointer.baseAddress else { return nil }
 
@@ -363,11 +99,317 @@ extension WireGuardAdapter {
                 baseAddress,
                 &ifnameSize)
 
-            guard result == 0 else { return nil }
-            return String(cString: baseAddress)
+            if result == 0 {
+                return String(cString: baseAddress)
+            } else {
+                return nil
+            }
         }
-#else
-        nil
-#endif
+    }
+
+    // MARK: - Initialization
+
+    /// Designated initializer.
+    /// - Parameter delegate: an instance of `WireGuardAdapterDelegate`. Internally stored
+    ///   as a weak reference.
+    /// - Parameter backend: a backend implementation.
+    /// - Parameter logHandler: a log handler closure.
+    init(with delegate: WireGuardAdapterDelegate, backend: WireGuardBackend, logHandler: @escaping LogHandler) {
+        self.delegate = delegate
+        self.backend = backend
+        self.logHandler = logHandler
+
+        setupLogHandler()
+    }
+
+    deinit {
+        // Force remove logger to make sure that no further calls to the instance of this class
+        // can happen after deallocation.
+        backend.setLogger(context: nil, logger_fn: nil)
+
+        // Cancel network monitor
+        networkMonitor?.cancel()
+
+        // Shutdown the tunnel
+        if case .started(let handle, _) = self.state {
+            backend.turnOff(handle)
+        }
+    }
+
+    // MARK: - Public methods
+
+    /// Returns a runtime configuration from WireGuard.
+    /// - Parameter completionHandler: completion handler.
+    func getRuntimeConfiguration(completionHandler: @escaping @Sendable (String?) -> Void) {
+        workQueue.async {
+            guard case .started(let handle, _) = self.state else {
+                completionHandler(nil)
+                return
+            }
+
+            if let settings = self.backend.getConfig(handle) {
+                completionHandler(settings)
+            } else {
+                completionHandler(nil)
+            }
+        }
+    }
+
+    /// Start the tunnel tunnel.
+    /// - Parameters:
+    ///   - tunnelConfiguration: tunnel configuration.
+    ///   - completionHandler: completion handler.
+    func start(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping @Sendable (WireGuardAdapterError?) -> Void) {
+        workQueue.async {
+            guard case .stopped = self.state else {
+                completionHandler(.invalidState)
+                return
+            }
+
+            let networkMonitor = NWPathMonitor()
+            networkMonitor.pathUpdateHandler = { [weak self] path in
+                self?.didReceivePathUpdate(path: path)
+            }
+            networkMonitor.start(queue: self.workQueue)
+
+            do {
+                let settingsGenerator = try self.makeSettingsGenerator(with: tunnelConfiguration)
+                try self.setNetworkSettings(settingsGenerator.generateNetworkSettings())
+
+                let (wgConfig, resolutionResults) = settingsGenerator.uapiConfiguration()
+                self.logEndpointResolutionResults(resolutionResults)
+
+                self.state = .started(
+                    try self.startWireGuardBackend(wgConfig: wgConfig),
+                    settingsGenerator
+                )
+                self.networkMonitor = networkMonitor
+                completionHandler(nil)
+            } catch let error as WireGuardAdapterError {
+                networkMonitor.cancel()
+                completionHandler(error)
+            } catch {
+                fatalError()
+            }
+        }
+    }
+
+    /// Stop the tunnel.
+    /// - Parameter completionHandler: completion handler.
+    func stop(completionHandler: @escaping @Sendable (WireGuardAdapterError?) -> Void) {
+        workQueue.async {
+            switch self.state {
+            case .started(let handle, _):
+                self.backend.turnOff(handle)
+
+            case .temporaryShutdown:
+                break
+
+            case .stopped:
+                completionHandler(.invalidState)
+                return
+            }
+
+            self.networkMonitor?.cancel()
+            self.networkMonitor = nil
+
+            self.state = .stopped
+
+            completionHandler(nil)
+        }
+    }
+
+    // MARK: - Private methods
+
+    /// Setup WireGuard log handler.
+    private func setupLogHandler() {
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        backend.setLogger(context: context) { context, logLevel, message in
+            guard let context = context, let message = message else { return }
+
+            let unretainedSelf = Unmanaged<WireGuardAdapter>.fromOpaque(context)
+                .takeUnretainedValue()
+
+            let swiftString = String(cString: message).trimmingCharacters(in: .newlines)
+            let tunnelLogLevel = WireGuardLogLevel(rawValue: logLevel) ?? .verbose
+
+            unretainedSelf.logHandler(tunnelLogLevel, swiftString)
+        }
+    }
+
+    /// Set network tunnel configuration.
+    /// This method ensures that the call to `setTunnelNetworkSettings` does not time out, as in
+    /// certain scenarios the completion handler given to it may not be invoked by the system.
+    ///
+    /// - Parameters:
+    ///   - networkSettings: an instance of type `NEPacketTunnelNetworkSettings`.
+    /// - Throws: an error of type `WireGuardAdapterError`.
+    /// - Returns: `PacketTunnelSettingsGenerator`.
+    private func setNetworkSettings(_ networkSettings: NEPacketTunnelNetworkSettings) throws {
+        nonisolated(unsafe) var systemError: Error?
+        let condition = NSCondition()
+
+        // Activate the condition
+        condition.lock()
+        defer { condition.unlock() }
+
+        self.delegate?.adapterShouldSetNetworkSettings(self, settings: networkSettings) { error in
+            systemError = error
+            condition.signal()
+        }
+
+        // Packet tunnel's `setTunnelNetworkSettings` times out in certain
+        // scenarios & never calls the given callback.
+        let setTunnelNetworkSettingsTimeout: TimeInterval = 5 // seconds
+
+        if condition.wait(until: Date().addingTimeInterval(setTunnelNetworkSettingsTimeout)) {
+            if let systemError = systemError {
+                throw WireGuardAdapterError.setNetworkSettings(systemError)
+            }
+        } else {
+            self.logHandler(.error, "setTunnelNetworkSettings timed out after 5 seconds; proceeding anyway")
+        }
+    }
+
+    /// Resolve peers of the given tunnel configuration.
+    /// - Parameter tunnelConfiguration: tunnel configuration.
+    /// - Throws: an error of type `WireGuardAdapterError`.
+    /// - Returns: The list of resolved endpoints.
+    private func resolvePeers(for tunnelConfiguration: TunnelConfiguration) throws -> [WireGuardEndpoint?] {
+        let endpoints = tunnelConfiguration.peers.map { $0.endpoint }
+        let resolutionResults = WireGuard_DNSResolver.resolveSync(endpoints: endpoints)
+        let resolutionErrors = resolutionResults.compactMap { result -> DNSResolutionError? in
+            if case .failure(let error) = result {
+                return error
+            } else {
+                return nil
+            }
+        }
+        assert(endpoints.count == resolutionResults.count)
+        guard resolutionErrors.isEmpty else {
+            throw WireGuardAdapterError.dnsResolution(resolutionErrors)
+        }
+
+        let resolvedEndpoints = resolutionResults.map { result -> WireGuardEndpoint? in
+            // swiftlint:disable:next force_try
+            return try! result?.get()
+        }
+
+        return resolvedEndpoints
+    }
+
+    /// Start WireGuard backend.
+    /// - Parameter wgConfig: WireGuard configuration
+    /// - Throws: an error of type `WireGuardAdapterError`
+    /// - Returns: tunnel handle
+    private func startWireGuardBackend(wgConfig: String) throws -> Int32 {
+        guard let tunnelFileDescriptor = self.tunnelFileDescriptor else {
+            throw WireGuardAdapterError.cannotLocateTunnelFileDescriptor
+        }
+
+        let handle = backend.turnOn(settings: wgConfig, tun_fd: tunnelFileDescriptor)
+        if handle < 0 {
+            throw WireGuardAdapterError.startWireGuardBackend(handle)
+        }
+        #if os(iOS)
+        backend.disableSomeRoamingForBrokenMobileSemantics(handle)
+        #endif
+        return handle
+    }
+
+    /// Resolves the hostnames in the given tunnel configuration and return settings generator.
+    /// - Parameter tunnelConfiguration: an instance of type `TunnelConfiguration`.
+    /// - Throws: an error of type `WireGuardAdapterError`.
+    /// - Returns: an instance of type `PacketTunnelSettingsGenerator`.
+    private func makeSettingsGenerator(with tunnelConfiguration: TunnelConfiguration) throws -> PacketTunnelSettingsGenerator {
+        return PacketTunnelSettingsGenerator(
+            tunnelConfiguration: tunnelConfiguration,
+            resolvedEndpoints: try self.resolvePeers(for: tunnelConfiguration)
+        )
+    }
+
+    /// Log DNS resolution results.
+    /// - Parameter resolutionErrors: an array of type `[DNSResolutionError]`.
+    private func logEndpointResolutionResults(_ resolutionResults: [EndpointResolutionResult?]) {
+        for case .some(let result) in resolutionResults {
+            switch result {
+            case .success((let sourceEndpoint, let resolvedEndpoint)):
+                if sourceEndpoint.host == resolvedEndpoint.host {
+                    self.logHandler(.verbose, "DNS64: mapped \(sourceEndpoint.host) to itself.")
+                } else {
+                    self.logHandler(.verbose, "DNS64: mapped \(sourceEndpoint.host) to \(resolvedEndpoint.host)")
+                }
+            case .failure(let resolutionError):
+                self.logHandler(.error, "Failed to resolve endpoint \(resolutionError.address.asSensitiveAddress(.global)): \(resolutionError.errorDescription ?? "(nil)")")
+            }
+        }
+    }
+
+    /// Helper method used by network path monitor.
+    /// - Parameter path: new network path
+    private func didReceivePathUpdate(path: Network.NWPath) {
+        self.logHandler(.verbose, "Network change detected with \(path.status) route and interface order \(path.availableInterfaces)")
+
+        #if os(macOS)
+        if case .started(let handle, _) = self.state {
+            backend.bumpSockets(handle)
+        }
+        #elseif os(iOS) || os(tvOS)
+        switch self.state {
+        case .started(let handle, let settingsGenerator):
+            if path.status.isSatisfiable {
+                let (wgConfig, resolutionResults) = settingsGenerator.endpointUapiConfiguration()
+                self.logEndpointResolutionResults(resolutionResults)
+
+                backend.setConfig(handle, settings: wgConfig)
+                backend.disableSomeRoamingForBrokenMobileSemantics(handle)
+                backend.bumpSockets(handle)
+            } else {
+                self.logHandler(.verbose, "Connectivity offline, pausing backend.")
+
+                self.state = .temporaryShutdown(settingsGenerator)
+                backend.turnOff(handle)
+            }
+
+        case .temporaryShutdown(let settingsGenerator):
+            guard path.status.isSatisfiable else { return }
+
+            self.logHandler(.verbose, "Connectivity online, resuming backend.")
+
+            do {
+                try self.setNetworkSettings(settingsGenerator.generateNetworkSettings())
+
+                let (wgConfig, resolutionResults) = settingsGenerator.uapiConfiguration()
+                self.logEndpointResolutionResults(resolutionResults)
+
+                self.state = .started(
+                    try self.startWireGuardBackend(wgConfig: wgConfig),
+                    settingsGenerator
+                )
+            } catch {
+                self.logHandler(.error, "Failed to restart backend: \(error.localizedDescription)")
+            }
+
+        case .stopped:
+            // no-op
+            break
+        }
+        #else
+        #error("Unsupported")
+        #endif
+    }
+}
+
+private extension Network.NWPath.Status {
+    /// Returns `true` if the path is potentially satisfiable.
+    var isSatisfiable: Bool {
+        switch self {
+        case .requiresConnection, .satisfied:
+            return true
+        case .unsatisfied:
+            return false
+        @unknown default:
+            return true
+        }
     }
 }

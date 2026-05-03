@@ -10,6 +10,9 @@ enum WireGuardAdapterError: Error, Sendable {
     /// Failure to perform an operation in such state.
     case invalidState
 
+    /// Failure to resolve endpoints.
+    case dnsResolution([DNSResolutionError])
+
     /// Failure to set network settings.
     case setNetworkSettings(Error)
 
