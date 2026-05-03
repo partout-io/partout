@@ -1,318 +1,179 @@
-// SPDX-FileCopyrightText: 2026 Davide De Rosa
-//
-// SPDX-License-Identifier: GPL-3.0
-//
-//  This file incorporates work covered by the following copyright and
-//  permission notice:
-//
-//  SPDX-License-Identifier: MIT
-//  Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
+// SPDX-License-Identifier: MIT
+// Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
 internal import _PartoutWireGuard_C
+import Network
+import NetworkExtension
 
-final class TunnelRemoteInfoGenerator: Sendable {
-    private let ctx: PartoutLoggerContext
+/// A type alias for `Result` type that holds a tuple with source and resolved endpoint.
+typealias EndpointResolutionResult = Result<(WireGuardEndpoint, WireGuardEndpoint), DNSResolutionError>
 
-    private let tunnelConfiguration: WireGuard.Configuration
+class PacketTunnelSettingsGenerator {
+    let tunnelConfiguration: TunnelConfiguration
+    let resolvedEndpoints: [WireGuardEndpoint?]
 
-    private let dnsTimeout: Int
-
-    init(_ ctx: PartoutLoggerContext, tunnelConfiguration: WireGuard.Configuration, dnsTimeout: Int) {
-        self.ctx = ctx
+    init(tunnelConfiguration: TunnelConfiguration, resolvedEndpoints: [WireGuardEndpoint?]) {
         self.tunnelConfiguration = tunnelConfiguration
-        self.dnsTimeout = dnsTimeout
+        self.resolvedEndpoints = resolvedEndpoints
     }
 
-    // Only updates peer endpoints
-    func endpointUapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async -> String {
+    func endpointUapiConfiguration() -> (String, [EndpointResolutionResult?]) {
+        var resolutionResults = [EndpointResolutionResult?]()
         var wgSettings = ""
 
-        // address: String -> resolvedEndpoints: [Endpoint]
-        let resolutionMap = await tunnelConfiguration.resolvePeers(
-            timeout: dnsTimeout,
-            logHandler: logHandler
-        )
-        for peer in tunnelConfiguration.peers {
-            let publicKey: String
-            do {
-                publicKey = try peer.publicKey.rawValue.hexStringFromBase64()
-            } catch {
-                pp_log(ctx, .wireguard, .error, "Unable to parse peer public key: \(peer.publicKey.rawValue)")
-                continue
+        assert(tunnelConfiguration.peers.count == resolvedEndpoints.count)
+        for (peer, resolvedEndpoint) in zip(self.tunnelConfiguration.peers, self.resolvedEndpoints) {
+            wgSettings.append("public_key=\(peer.publicKey.hexKey)\n")
+
+            let result = resolvedEndpoint.map(Self.reresolveEndpoint)
+            if case .success((_, let resolvedEndpoint)) = result {
+                if case .name = resolvedEndpoint.host { assert(false, "Endpoint is not resolved") }
+                wgSettings.append("endpoint=\(resolvedEndpoint.stringRepresentation)\n")
             }
-            wgSettings.append("public_key=\(publicKey)\n")
-            guard let endpoint = peer.endpoint,
-                  let resolvedEndpoint = resolutionMap[endpoint] else {
-                continue
-            }
-            let reresolvedEndpoint: Endpoint
-            do {
-                reresolvedEndpoint = try resolvedEndpoint.withReresolvedIP()
-            } catch {
-                pp_log(ctx, .wireguard, .error, "Unable to re-resolve endpoint: \(error)")
-                reresolvedEndpoint = resolvedEndpoint
-            }
-            if case .hostname = reresolvedEndpoint.address {
-                assertionFailure("Endpoint is not resolved")
-            }
-            wgSettings.append("endpoint=\(reresolvedEndpoint.wgRepresentation)\n")
+            resolutionResults.append(result)
         }
-        return wgSettings
+
+        return (wgSettings, resolutionResults)
     }
 
-    // Updates full configuration
-    func uapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async throws -> String {
-        let privateKey = try tunnelConfiguration.interface.privateKey.rawValue.hexStringFromBase64()
-
+    func uapiConfiguration() -> (String, [EndpointResolutionResult?]) {
+        var resolutionResults = [EndpointResolutionResult?]()
         var wgSettings = ""
-        wgSettings.append("private_key=\(privateKey)\n")
-        // TODO: #93, listenPort not implemented
-//        if let listenPort = tunnelConfiguration.interface.listenPort {
-//            wgSettings.append("listen_port=\(listenPort)\n")
-//        }
+        wgSettings.append("private_key=\(tunnelConfiguration.interface.privateKey.hexKey)\n")
+        if let listenPort = tunnelConfiguration.interface.listenPort {
+            wgSettings.append("listen_port=\(listenPort)\n")
+        }
         if !tunnelConfiguration.peers.isEmpty {
             wgSettings.append("replace_peers=true\n")
         }
-
-        // address: String -> resolvedEndpoints: [Endpoint]
-        let resolutionMap = await tunnelConfiguration.resolvePeers(
-            timeout: dnsTimeout,
-            logHandler: logHandler
-        )
-        guard !resolutionMap.isEmpty else {
-            throw PartoutError(.dnsFailure)
-        }
-
-        for peer in tunnelConfiguration.peers {
-            let publicKey = try peer.publicKey.rawValue.hexStringFromBase64()
-            wgSettings.append("public_key=\(publicKey)\n")
-            if let preSharedKeyBase64 = peer.preSharedKey?.rawValue, !preSharedKeyBase64.isEmpty {
-                let preSharedKey = try preSharedKeyBase64.hexStringFromBase64()
+        assert(tunnelConfiguration.peers.count == resolvedEndpoints.count)
+        for (peer, resolvedEndpoint) in zip(self.tunnelConfiguration.peers, self.resolvedEndpoints) {
+            wgSettings.append("public_key=\(peer.publicKey.hexKey)\n")
+            if let preSharedKey = peer.preSharedKey?.hexKey {
                 wgSettings.append("preshared_key=\(preSharedKey)\n")
             }
-            guard let endpoint = peer.endpoint,
-                  let resolvedEndpoint = resolutionMap[endpoint] else {
-                continue
+
+            let result = resolvedEndpoint.map(Self.reresolveEndpoint)
+            if case .success((_, let resolvedEndpoint)) = result {
+                if case .name = resolvedEndpoint.host { assert(false, "Endpoint is not resolved") }
+                wgSettings.append("endpoint=\(resolvedEndpoint.stringRepresentation)\n")
             }
-            let reresolvedEndpoint: Endpoint
-            do {
-                reresolvedEndpoint = try resolvedEndpoint.withReresolvedIP()
-            } catch {
-                pp_log(ctx, .wireguard, .error, "Unable to re-resolve endpoint: \(error)")
-                reresolvedEndpoint = resolvedEndpoint
-            }
-            if case .hostname = reresolvedEndpoint.address {
-                assertionFailure("Endpoint is not resolved")
-            }
-            wgSettings.append("endpoint=\(reresolvedEndpoint.wgRepresentation)\n")
-            let persistentKeepAlive = peer.keepAlive ?? 0
+            resolutionResults.append(result)
+
+            let persistentKeepAlive = peer.persistentKeepAlive ?? 0
             wgSettings.append("persistent_keepalive_interval=\(persistentKeepAlive)\n")
             if !peer.allowedIPs.isEmpty {
                 wgSettings.append("replace_allowed_ips=true\n")
-                peer.allowedIPs.forEach {
-                    guard !$0.rawValue.isEmpty else { return }
-                    wgSettings.append("allowed_ip=\($0.rawValue)\n")
-                }
+                peer.allowedIPs.forEach { wgSettings.append("allowed_ip=\($0.stringRepresentation)\n") }
             }
         }
-        return wgSettings
+        return (wgSettings, resolutionResults)
     }
 
-    func generateRemoteInfo(moduleId: UniqueID, descriptors: [Int32]) -> TunnelRemoteInfo {
+    func generateNetworkSettings() -> NEPacketTunnelNetworkSettings {
         /* iOS requires a tunnel endpoint, whereas in WireGuard it's valid for
          * a tunnel to have no endpoint, or for there to be many endpoints, in
          * which case, displaying a single one in settings doesn't really
          * make sense. So, we fill it in with this placeholder, which is not
          * a valid IP address that will actually route over the Internet.
          */
-        let remoteAddress = Address(rawValue: "127.0.0.1")
-        assert(remoteAddress != nil)
+        let networkSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
+
+        if !tunnelConfiguration.interface.dnsSearch.isEmpty || !tunnelConfiguration.interface.dns.isEmpty {
+            let dnsServerStrings = tunnelConfiguration.interface.dns.map { $0.stringRepresentation }
+            let dnsSettings = NEDNSSettings(servers: dnsServerStrings)
+            dnsSettings.searchDomains = tunnelConfiguration.interface.dnsSearch
+            if !tunnelConfiguration.interface.dns.isEmpty {
+                dnsSettings.matchDomains = [""] // All DNS queries must first go through the tunnel's DNS
+            }
+            networkSettings.dnsSettings = dnsSettings
+        }
+
+        let mtu = tunnelConfiguration.interface.mtu ?? 0
+
+        /* 0 means automatic MTU. In theory, we should just do
+         * `networkSettings.tunnelOverheadBytes = 80` but in
+         * practice there are too many broken networks out there.
+         * Instead set it to 1280. Boohoo. Maybe someday we'll
+         * add a nob, maybe, or iOS will do probing for us.
+         */
+        if mtu == 0 {
+            #if os(iOS) || os(tvOS)
+            networkSettings.mtu = NSNumber(value: 1280)
+            #elseif os(macOS)
+            networkSettings.tunnelOverheadBytes = 80
+            #else
+            #error("Unimplemented")
+            #endif
+        } else {
+            networkSettings.mtu = NSNumber(value: mtu)
+        }
 
         let (ipv4Addresses, ipv6Addresses) = addresses()
         let (ipv4IncludedRoutes, ipv6IncludedRoutes) = includedRoutes()
-        let ipv4 = IPSettings(subnets: ipv4Addresses)
-            .including(routes: ipv4IncludedRoutes)
-        let ipv6 = IPSettings(subnets: ipv6Addresses)
-            .including(routes: ipv6IncludedRoutes)
 
-        let mtu: UInt16 = {
-            // XXX: Be more tolerant when the MTU is unspecified
-            guard let specified = tunnelConfiguration.interface.mtu,
-                  specified > 0 else {
-#if os(iOS) || os(tvOS)
-                // Deliberately "low"
-                return 1280
-#elseif os(macOS)
-                // Slightly less than 1500 - overhead = (1500 - 80) = 1420
-                return 1400
-#else
-                // Default
-                return 0
-#endif
-            }
-            return specified
-        }()
-        let ipModule = IPModule.Builder(ipv4: ipv4, ipv6: ipv6, mtu: Int(mtu)).build()
+        let ipv4Settings = NEIPv4Settings(addresses: ipv4Addresses.map { $0.destinationAddress }, subnetMasks: ipv4Addresses.map { $0.destinationSubnetMask })
+        ipv4Settings.includedRoutes = ipv4IncludedRoutes
+        networkSettings.ipv4Settings = ipv4Settings
 
-        var modules: [Module] = []
-        modules.append(ipModule)
-        if let dns = tunnelConfiguration.interface.dns {
-            modules.append(dns)
-        }
+        let ipv6Settings = NEIPv6Settings(addresses: ipv6Addresses.map { $0.destinationAddress }, networkPrefixLengths: ipv6Addresses.map { $0.destinationNetworkPrefixLength })
+        ipv6Settings.includedRoutes = ipv6IncludedRoutes
+        networkSettings.ipv6Settings = ipv6Settings
 
-#if os(Windows)
-        let requiresVirtualDevice = false
-#else
-        let requiresVirtualDevice = true
-#endif
-        return TunnelRemoteInfo(
-            originalModuleId: moduleId,
-            address: remoteAddress,
-            modules: modules,
-            fileDescriptors: descriptors.map(UInt64.init),
-            requiresVirtualDevice: requiresVirtualDevice
-        )
-    }
-}
-
-private extension TunnelRemoteInfoGenerator {
-    func addresses() -> ([Subnet], [Subnet]) {
-        var ipv4: [Subnet] = []
-        var ipv6: [Subnet] = []
-        for subnet in tunnelConfiguration.interface.addresses {
-            switch subnet.address {
-            case .ip(_, let family):
-                switch family {
-                case .v4: ipv4.append(subnet)
-                case .v6:
-                    /* Big fat ugly hack for broken iOS networking stack: the smallest prefix that will have
-                     * any effect on iOS is a /120, so we clamp everything above to /120. This is potentially
-                     * very bad, if various network parameters were actually relying on that subnet being
-                     * intentionally small. TODO: talk about this with upstream iOS devs.
-                     */
-                    guard let clampedSubnet = Subnet(subnet.address, min(120, subnet.prefixLength)) else {
-                        fatalError("Could not clamp subnet prefix for WireGuard workaround")
-                    }
-                    ipv6.append(clampedSubnet)
-                }
-            default:
-                break
-            }
-        }
-        return (ipv4, ipv6)
+        return networkSettings
     }
 
-    func includedRoutes() -> ([Route], [Route]) {
-        var ipv4IncludedRoutes: [Route] = []
-        var ipv6IncludedRoutes: [Route] = []
-        for subnet in tunnelConfiguration.interface.addresses {
-            switch subnet.address {
-            case .ip(_, let family):
-                let route = Route(subnet.maskedSubnet, subnet.address)
-                switch family {
-                case .v4: ipv4IncludedRoutes.append(route)
-                case .v6: ipv6IncludedRoutes.append(route)
-                }
-            default:
-                break
+    private func addresses() -> ([NEIPv4Route], [NEIPv6Route]) {
+        var ipv4Routes = [NEIPv4Route]()
+        var ipv6Routes = [NEIPv6Route]()
+        for addressRange in tunnelConfiguration.interface.addresses {
+            if addressRange.address is IPv4Address {
+                ipv4Routes.append(NEIPv4Route(destinationAddress: "\(addressRange.address)", subnetMask: "\(addressRange.subnetMask())"))
+            } else if addressRange.address is IPv6Address {
+                /* Big fat ugly hack for broken iOS networking stack: the smallest prefix that will have
+                 * any effect on iOS is a /120, so we clamp everything above to /120. This is potentially
+                 * very bad, if various network parameters were actually relying on that subnet being
+                 * intentionally small. TODO: talk about this with upstream iOS devs.
+                 */
+                ipv6Routes.append(NEIPv6Route(destinationAddress: "\(addressRange.address)", networkPrefixLength: NSNumber(value: min(120, addressRange.networkPrefixLength))))
             }
         }
+        return (ipv4Routes, ipv6Routes)
+    }
+
+    private func includedRoutes() -> ([NEIPv4Route], [NEIPv6Route]) {
+        var ipv4IncludedRoutes = [NEIPv4Route]()
+        var ipv6IncludedRoutes = [NEIPv6Route]()
+
+        for addressRange in tunnelConfiguration.interface.addresses {
+            if addressRange.address is IPv4Address {
+                let route = NEIPv4Route(destinationAddress: "\(addressRange.maskedAddress())", subnetMask: "\(addressRange.subnetMask())")
+                route.gatewayAddress = "\(addressRange.address)"
+                ipv4IncludedRoutes.append(route)
+            } else if addressRange.address is IPv6Address {
+                let route = NEIPv6Route(destinationAddress: "\(addressRange.maskedAddress())", networkPrefixLength: NSNumber(value: addressRange.networkPrefixLength))
+                route.gatewayAddress = "\(addressRange.address)"
+                ipv6IncludedRoutes.append(route)
+            }
+        }
+
         for peer in tunnelConfiguration.peers {
-            for subnet in peer.allowedIPs {
-                switch subnet.address {
-                case .ip(_, let family):
-                    let route = Route(subnet, nil)
-                    switch family {
-                    case .v4: ipv4IncludedRoutes.append(route)
-                    case .v6: ipv6IncludedRoutes.append(route)
-                    }
-                default:
-                    break
+            for addressRange in peer.allowedIPs {
+                if addressRange.address is IPv4Address {
+                    ipv4IncludedRoutes.append(NEIPv4Route(destinationAddress: "\(addressRange.address)", subnetMask: "\(addressRange.subnetMask())"))
+                } else if addressRange.address is IPv6Address {
+                    ipv6IncludedRoutes.append(NEIPv6Route(destinationAddress: "\(addressRange.address)", networkPrefixLength: NSNumber(value: addressRange.networkPrefixLength)))
                 }
             }
         }
         return (ipv4IncludedRoutes, ipv6IncludedRoutes)
     }
-}
 
-private extension Subnet {
-    var maskedSubnet: Subnet {
-        let maskedAddress: Address? = switch address.family {
-        case .v4:
-            address.network(with: ipv4Mask)
-        case .v6:
-            address.network(with: prefixLength)
-        case nil:
-            nil
-        }
-        guard let maskedAddress,
-              let maskedSubnet = Subnet(maskedAddress, prefixLength) else {
-            fatalError("Could not derive masked route subnet from interface address")
-        }
-        return maskedSubnet
-    }
-}
-
-private extension Endpoint {
-    func withReresolvedIP() throws -> Endpoint {
-#if os(iOS) || os(tvOS)
-        let hostname = address.rawValue
-
-        var hints = addrinfo()
-        hints.ai_family = AF_UNSPEC
-        hints.ai_socktype = SOCK_DGRAM
-        hints.ai_protocol = IPPROTO_UDP
-        hints.ai_flags = 0
-
-        var resultPointer: UnsafeMutablePointer<addrinfo>?
-        defer {
-            resultPointer.flatMap {
-                freeaddrinfo($0)
+    private class func reresolveEndpoint(endpoint: WireGuardEndpoint) -> EndpointResolutionResult {
+        return Result { (endpoint, try endpoint.withReresolvedIP()) }
+            .mapError { error -> DNSResolutionError in
+                // swiftlint:disable:next force_cast
+                return error as! DNSResolutionError
             }
-        }
-
-        let errorCode = getaddrinfo(hostname, "\(port)", &hints, &resultPointer)
-        if errorCode != 0 {
-            throw PartoutError(.dnsFailure)
-        }
-
-        var next = resultPointer
-        while let addrInfo = next?.pointee {
-            if let endpoint = Self.endpoint(from: addrInfo, port: port) {
-                return endpoint
-            }
-            next = addrInfo.ai_next
-        }
-        throw PartoutError(.dnsFailure)
-#else
-        return self
-#endif
-    }
-
-    static func endpoint(from addrInfo: addrinfo, port: UInt16) -> Endpoint? {
-        guard let addr = addrInfo.ai_addr else {
-            return nil
-        }
-        var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-#if os(Windows)
-        let hostBufferLength = DWORD(hostBuffer.count)
-#elseif os(Android)
-        let hostBufferLength = Int(hostBuffer.count)
-#else
-        let hostBufferLength = socklen_t(hostBuffer.count)
-#endif
-        let result = getnameinfo(
-            addr,
-            socklen_t(addrInfo.ai_addrlen),
-            &hostBuffer,
-            hostBufferLength,
-            nil,
-            0,
-            NI_NUMERICHOST
-        )
-        guard result == 0 else {
-            return nil
-        }
-        return try? Endpoint(hostBuffer.string, port)
     }
 }
