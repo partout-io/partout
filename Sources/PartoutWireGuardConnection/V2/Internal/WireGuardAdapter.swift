@@ -144,9 +144,17 @@ actor WireGuardAdapter {
             ))
             let handle = try startWireGuardBackend(wgConfig: wgConfig)
             state = .started(handle, settingsGenerator)
-        } catch let error as WireGuardAdapterError {
-            throw error
         } catch {
+            reachabilityTask?.cancel()
+            reachabilityTask = nil
+            if case .started(let handle, _) = state {
+                backend.turnOff(handle)
+            }
+            state = .stopped
+            if let tunnel {
+                await delegate?.adapterShouldClearNetworkSettings(self, tunnel: tunnel)
+                self.tunnel = nil
+            }
             pp_log(ctx, .wireguard, .fault, "Unable to start: \(error)")
             throw error
         }
