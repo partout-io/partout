@@ -26,6 +26,10 @@ final class TunnelRemoteInfoGenerator: Sendable {
         resolvedEndpoints = ResolvedEndpointsCache()
     }
 
+    func resetResolvedEndpoints() async {
+        await resolvedEndpoints.reset()
+    }
+
     // Only updates peer endpoints
     func endpointUapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async -> String {
         var wgSettings = ""
@@ -253,6 +257,10 @@ private actor ResolvedEndpointsCache {
 
     func setValue(_ resolutionMap: [Endpoint: Endpoint]) {
         self.resolutionMap = resolutionMap
+    }
+
+    func reset() {
+        resolutionMap = nil
     }
 }
 

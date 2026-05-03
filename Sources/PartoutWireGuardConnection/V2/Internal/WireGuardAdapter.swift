@@ -288,6 +288,7 @@ actor WireGuardAdapter {
             guard isReachable else { return }
             logHandler(.verbose, "Connectivity online, resuming backend.")
             do {
+                await settingsGenerator.resetResolvedEndpoints()
                 let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
                 try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
                     moduleId: moduleId,

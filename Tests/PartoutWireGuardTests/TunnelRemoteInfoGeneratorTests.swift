@@ -47,7 +47,7 @@ struct TunnelRemoteInfoGeneratorTests {
     }
 
     @Test
-    func givenCachedResolution_whenGeneratingEndpointUpdate_thenDoesNotResolveAgain() async throws {
+    func givenCachedResolution_whenGeneratingEndpointUpdate_thenDoesNotResolveAgainUntilReset() async throws {
         let pvtkey = "SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs="
         let pubkey = "BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw="
 
@@ -76,6 +76,12 @@ struct TunnelRemoteInfoGeneratorTests {
 
         #expect(resolutionCountAfterFullConfiguration > 0)
         #expect(resolutionCountAfterEndpointUpdate == resolutionCountAfterFullConfiguration)
+
+        await sut.resetResolvedEndpoints()
+        _ = try await sut.uapiConfiguration(logHandler: logHandler)
+        let resolutionCountAfterReset = logs.resolutionCount
+
+        #expect(resolutionCountAfterReset > resolutionCountAfterEndpointUpdate)
     }
 
     @Test
