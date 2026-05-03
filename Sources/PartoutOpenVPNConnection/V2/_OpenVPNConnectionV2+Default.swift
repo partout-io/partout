@@ -2,18 +2,23 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-extension OpenVPNConnection {
+extension _OpenVPNConnectionV2 {
     public init(
         _ ctx: PartoutLoggerContext,
         parameters: ConnectionParameters,
         module: OpenVPNModule,
         cachesURL: URL,
-        options: Options = .init()
+        options baseOptions: _OpenVPNConnectionV1.Options = .init()
     ) throws {
         guard let configuration = module.configuration else {
             fatalError("Creating session without OpenVPN configuration?")
         }
-        pp_log(ctx, .openvpn, .notice, "OpenVPN: Using cross-platform connection")
+        pp_log(ctx, .openvpn, .notice, "OpenVPN: Using cross-platform connection V2")
+
+        // Override options with feature flags
+        var options = baseOptions
+        options.withLoopsV2 = true
+        options.withFlushDataBeforeControl = true
 
         // Hardcode portable implementations
         let prng = PlatformPRNG()

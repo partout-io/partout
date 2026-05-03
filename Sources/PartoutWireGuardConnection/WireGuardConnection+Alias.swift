@@ -8,6 +8,8 @@
 //  SPDX-License-Identifier: MIT
 //  Copyright © 2018-2024 WireGuard LLC. All Rights Reserved.
 
+public typealias WireGuardConnection = _WireGuardConnectionV1
+
 enum WireGuardConnectionError: Error {
     case dnsResolutionFailure
 

@@ -13,7 +13,7 @@
 #endif
 
 /// Establishes a WireGuard connection.
-public actor WireGuardConnection: Connection {
+public actor _WireGuardConnectionV2: Connection {
     private let ctx: PartoutLoggerContext
 
     private let statusSubject: CurrentValueStream<ConnectionStatus>
@@ -143,7 +143,7 @@ public actor WireGuardConnection: Connection {
 
 // MARK: - WireGuardAdapterDelegate
 
-extension WireGuardConnection: WireGuardAdapterDelegate {
+extension _WireGuardConnectionV2: WireGuardAdapterDelegate {
     nonisolated func adapterShouldReassert(_ adapter: WireGuardAdapter, reasserting: Bool) {
         if reasserting {
             statusSubject.send(.connecting)
@@ -174,7 +174,7 @@ extension WireGuardConnection: WireGuardAdapterDelegate {
 
 // MARK: - Data count
 
-private extension WireGuardConnection {
+private extension _WireGuardConnectionV2 {
     func onDataCountTimer() async {
         guard let adapter else { return }
         guard statusSubject.value == .connected else { return }
