@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-extension OpenVPNConnection {
+extension _OpenVPNConnectionV1 {
     /// Intervals are expressed in seconds.
     public struct Options: Sendable {
         public var maxPackets: Int = 100
