@@ -106,6 +106,8 @@ actor WireGuardAdapter {
         // can happen after deallocation.
         backend.setLogger(context: nil, logger_fn: nil)
 
+        reachabilityTask?.cancel()
+
         // Shutdown the tunnel
         if case .started(let handle, _) = state {
             backend.turnOff(handle)
@@ -144,9 +146,17 @@ actor WireGuardAdapter {
             ))
             let handle = try startWireGuardBackend(wgConfig: wgConfig)
             state = .started(handle, settingsGenerator)
-        } catch let error as WireGuardAdapterError {
-            throw error
         } catch {
+            reachabilityTask?.cancel()
+            reachabilityTask = nil
+            if case .started(let handle, _) = state {
+                backend.turnOff(handle)
+            }
+            state = .stopped
+            if let tunnel {
+                await delegate?.adapterShouldClearNetworkSettings(self, tunnel: tunnel)
+                self.tunnel = nil
+            }
             pp_log(ctx, .wireguard, .fault, "Unable to start: \(error)")
             throw error
         }
@@ -175,11 +185,11 @@ actor WireGuardAdapter {
     // MARK: - Private methods
 
     private func setupReachabilityTask() {
+        let reachability = reachability
         reachabilityTask = Task { [weak self] in
-            guard let self else { return }
             for await isReachable in reachability.isReachableStream {
                 guard !Task.isCancelled else { return }
-                await didUpdateReachable(isReachable: isReachable)
+                await self?.didUpdateReachable(isReachable: isReachable)
             }
         }
     }
@@ -288,6 +298,7 @@ actor WireGuardAdapter {
             guard isReachable else { return }
             logHandler(.verbose, "Connectivity online, resuming backend.")
             do {
+                await settingsGenerator.resetResolvedEndpoints()
                 let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
                 try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
                     moduleId: moduleId,

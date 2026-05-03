@@ -52,7 +52,7 @@ public actor _WireGuardConnectionV2: Connection {
         guard let configuration = module.configuration else {
             throw PartoutError(.incompleteModule)
         }
-        pp_log(ctx, .wireguard, .notice, "WireGuard: Using cross-platform connection")
+        pp_log(ctx, .wireguard, .notice, "WireGuard: Using v2 connection")
 
         tunnelConfiguration = try configuration.withModules(from: parameters.profile)
         dataCountTimerInterval = TimeInterval(parameters.options.minDataCountInterval) / 1000.0
@@ -103,24 +103,12 @@ public actor _WireGuardConnectionV2: Connection {
             pp_log(ctx, .wireguard, .info, "Tunnel interface is \(interfaceName)")
             return true
         } catch {
-            if let adapterError = error as? WireGuardAdapterError {
-                switch adapterError {
-                case .cannotLocateTunnelFileDescriptor:
-                    pp_log(ctx, .wireguard, .error, "Starting tunnel failed: could not determine file descriptor")
-                    throw WireGuardConnectionError.couldNotDetermineFileDescriptor
-                case .setNetworkSettings(let error):
-                    pp_log(ctx, .wireguard, .error, "Starting tunnel failed with setTunnelNetworkSettings returning \(error.localizedDescription)")
-                    throw WireGuardConnectionError.couldNotSetNetworkSettings
-                case .startWireGuardBackend(let errorCode):
-                    pp_log(ctx, .wireguard, .error, "Starting tunnel failed with wgTurnOn returning \(errorCode)")
-                    throw WireGuardConnectionError.couldNotStartBackend
-                case .invalidState:
-                    // Must never happen
-                    fatalError()
-                }
-            }
+            let startError = mapStartError(error)
+            dataCountTimer?.cancel()
+            dataCountTimer = nil
+            self.adapter = nil
             statusSubject.send(.disconnected)
-            throw error
+            throw startError
         }
     }
 
@@ -169,6 +157,35 @@ extension _WireGuardConnectionV2: WireGuardAdapterDelegate {
 
     func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapter, tunnel: IOInterface) async {
         await controller.clearTunnelSettings(tunnel)
+    }
+}
+
+// MARK: - Start errors
+
+private extension _WireGuardConnectionV2 {
+    func mapStartError(_ error: Error) -> Error {
+        guard let adapterError = error as? WireGuardAdapterError else {
+            return error
+        }
+        switch adapterError {
+        case .cannotLocateTunnelFileDescriptor:
+            pp_log(ctx, .wireguard, .error, "Starting tunnel failed: could not determine file descriptor")
+            return WireGuardConnectionError.couldNotDetermineFileDescriptor
+        case .dnsResolution(let endpoints):
+            let hostnamesWithDnsResolutionFailure = endpoints.map(\.address.rawValue)
+                .joined(separator: ", ")
+            pp_log(ctx, .wireguard, .error, "DNS resolution failed for the following hostnames: \(hostnamesWithDnsResolutionFailure)")
+            return WireGuardConnectionError.dnsResolutionFailure
+        case .setNetworkSettings(let error):
+            pp_log(ctx, .wireguard, .error, "Starting tunnel failed with setTunnelNetworkSettings returning \(error.localizedDescription)")
+            return WireGuardConnectionError.couldNotSetNetworkSettings
+        case .startWireGuardBackend(let errorCode):
+            pp_log(ctx, .wireguard, .error, "Starting tunnel failed with wgTurnOn returning \(errorCode)")
+            return WireGuardConnectionError.couldNotStartBackend
+        case .invalidState:
+            // Must never happen
+            fatalError()
+        }
     }
 }
 
