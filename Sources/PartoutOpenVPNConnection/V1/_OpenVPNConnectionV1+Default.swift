@@ -13,7 +13,7 @@ extension _OpenVPNConnectionV1 {
         guard let configuration = module.configuration else {
             fatalError("Creating session without OpenVPN configuration?")
         }
-        pp_log(ctx, .openvpn, .notice, "OpenVPN: Using cross-platform connection")
+        pp_log(ctx, .openvpn, .notice, "OpenVPN: Using v1 connection")
 
         // Hardcode portable implementations
         let prng = PlatformPRNG()

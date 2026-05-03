@@ -52,7 +52,7 @@ public actor _WireGuardConnectionV2: Connection {
         guard let configuration = module.configuration else {
             throw PartoutError(.incompleteModule)
         }
-        pp_log(ctx, .wireguard, .notice, "WireGuard: Using cross-platform connection")
+        pp_log(ctx, .wireguard, .notice, "WireGuard: Using v2 connection")
 
         tunnelConfiguration = try configuration.withModules(from: parameters.profile)
         dataCountTimerInterval = TimeInterval(parameters.options.minDataCountInterval) / 1000.0
