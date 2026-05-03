@@ -106,6 +106,8 @@ actor WireGuardAdapter {
         // can happen after deallocation.
         backend.setLogger(context: nil, logger_fn: nil)
 
+        reachabilityTask?.cancel()
+
         // Shutdown the tunnel
         if case .started(let handle, _) = state {
             backend.turnOff(handle)
@@ -183,11 +185,11 @@ actor WireGuardAdapter {
     // MARK: - Private methods
 
     private func setupReachabilityTask() {
+        let reachability = reachability
         reachabilityTask = Task { [weak self] in
-            guard let self else { return }
             for await isReachable in reachability.isReachableStream {
                 guard !Task.isCancelled else { return }
-                await didUpdateReachable(isReachable: isReachable)
+                await self?.didUpdateReachable(isReachable: isReachable)
             }
         }
     }
