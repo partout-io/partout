@@ -17,21 +17,20 @@ final class TunnelRemoteInfoGenerator: Sendable {
 
     private let dnsTimeout: Int
 
+    private let resolvedEndpoints: ResolvedEndpointsCache
+
     init(_ ctx: PartoutLoggerContext, tunnelConfiguration: WireGuard.Configuration, dnsTimeout: Int) {
         self.ctx = ctx
         self.tunnelConfiguration = tunnelConfiguration
         self.dnsTimeout = dnsTimeout
+        resolvedEndpoints = ResolvedEndpointsCache()
     }
 
     // Only updates peer endpoints
     func endpointUapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async -> String {
         var wgSettings = ""
 
-        // address: String -> resolvedEndpoints: [Endpoint]
-        let resolutionMap = await tunnelConfiguration.resolvePeers(
-            timeout: dnsTimeout,
-            logHandler: logHandler
-        )
+        let resolutionMap = await resolvePeers(logHandler: logHandler)
         for peer in tunnelConfiguration.peers {
             let publicKey: String
             do {
@@ -74,11 +73,7 @@ final class TunnelRemoteInfoGenerator: Sendable {
             wgSettings.append("replace_peers=true\n")
         }
 
-        // address: String -> resolvedEndpoints: [Endpoint]
-        let resolutionMap = await tunnelConfiguration.resolvePeers(
-            timeout: dnsTimeout,
-            logHandler: logHandler
-        )
+        let resolutionMap = await resolvePeers(logHandler: logHandler)
         guard !resolutionMap.isEmpty else {
             throw PartoutError(.dnsFailure)
         }
@@ -176,6 +171,20 @@ final class TunnelRemoteInfoGenerator: Sendable {
 }
 
 private extension TunnelRemoteInfoGenerator {
+    func resolvePeers(logHandler: @escaping WireGuardAdapter.LogHandler) async -> [Endpoint: Endpoint] {
+        if let resolutionMap = await resolvedEndpoints.value {
+            return resolutionMap
+        }
+        let resolutionMap = await tunnelConfiguration.resolvePeers(
+            timeout: dnsTimeout,
+            logHandler: logHandler
+        )
+        if !resolutionMap.isEmpty {
+            await resolvedEndpoints.setValue(resolutionMap)
+        }
+        return resolutionMap
+    }
+
     func addresses() -> ([Subnet], [Subnet]) {
         var ipv4: [Subnet] = []
         var ipv6: [Subnet] = []
@@ -232,6 +241,18 @@ private extension TunnelRemoteInfoGenerator {
             }
         }
         return (ipv4IncludedRoutes, ipv6IncludedRoutes)
+    }
+}
+
+private actor ResolvedEndpointsCache {
+    private var resolutionMap: [Endpoint: Endpoint]?
+
+    var value: [Endpoint: Endpoint]? {
+        resolutionMap
+    }
+
+    func setValue(_ resolutionMap: [Endpoint: Endpoint]) {
+        self.resolutionMap = resolutionMap
     }
 }
 
