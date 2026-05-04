@@ -377,7 +377,10 @@ private extension NETunnelStrategy {
                     let filtered = $0.filter {
                         $0.value.rank == maxRank
                     }
-                    assert(filtered.count <= 1, "Max ranked manager must be at most one")
+                    // There might be a moment where 2 managers may be enabled at the same
+                    // time, e.g., while switching from one to another one. We should
+                    // tolerate this scenario.
+                    assert(filtered.count <= 2, "Max ranked manager must be at most two")
                     return filtered.compactMapValues(\.asSnapshot)
                 }
         }
