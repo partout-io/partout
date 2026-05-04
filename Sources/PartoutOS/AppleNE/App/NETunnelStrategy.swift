@@ -441,7 +441,7 @@ private extension NETunnelProviderManager {
     var rank: Int {
 #if os(iOS) || os(tvOS)
         // only one profile at a time is enabled on iOS/tvOS
-        if isEnabled {
+        if isEnabled && isOnDemandEnabled {
             return .max
         }
 #endif
