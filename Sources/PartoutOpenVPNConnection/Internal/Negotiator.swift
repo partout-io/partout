@@ -11,7 +11,7 @@ final class Negotiator {
 
         let withLocalOptions: Bool
 
-        let sessionOptions: _OpenVPNConnectionV1.Options
+        let sessionOptions: OpenVPNConnection.Options
 
         let onConnected: (UInt8, DataChannel, PushReply) async -> Void
 

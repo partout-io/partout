@@ -27,7 +27,7 @@ final class OpenVPNSession {
 
     let cachesURL: URL
 
-    let options: _OpenVPNConnectionV1.Options
+    let options: OpenVPNConnection.Options
 
     private let tlsFactory: TLSFactory
 
@@ -100,7 +100,7 @@ final class OpenVPNSession {
         credentials: OpenVPN.Credentials?,
         prng: PRNGProtocol,
         cachesURL: URL,
-        options: _OpenVPNConnectionV1.Options = .init(),
+        options: OpenVPNConnection.Options = .init(),
         tlsFactory: @escaping TLSFactory,
         dpFactory: @escaping DataPathFactory
     ) throws {

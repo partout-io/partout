@@ -91,8 +91,9 @@ if(USE_COMPAT)
     set(EXCLUDED_PATTERNS
         partout-codegen.*
         PartoutCodegen.*
+        PartoutOpenVPNConnection\/V1
         PartoutOS\/Apple.*
-        PartoutWireGuardConnection\/Legacy.*
+        PartoutWireGuardConnection\/V1
     )
 endif()
 

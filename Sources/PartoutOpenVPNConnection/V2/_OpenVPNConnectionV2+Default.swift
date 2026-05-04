@@ -8,7 +8,7 @@ extension _OpenVPNConnectionV2 {
         parameters: ConnectionParameters,
         module: OpenVPNModule,
         cachesURL: URL,
-        options baseOptions: _OpenVPNConnectionV1.Options = .init()
+        options baseOptions: OpenVPNConnection.Options = .init()
     ) throws {
         guard let configuration = module.configuration else {
             fatalError("Creating session without OpenVPN configuration?")
