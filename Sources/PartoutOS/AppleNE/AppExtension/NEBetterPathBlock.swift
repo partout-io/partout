@@ -5,7 +5,7 @@
 @preconcurrency import Network
 
 /// A ``BetterPathBlock`` implementation backed by `NWPathMonitor`.
-public struct NWPathMonitorBetterPathBlock: Sendable {
+public struct NEBetterPathBlock: Sendable {
     private let ctx: PartoutLoggerContext
 
     public init(_ ctx: PartoutLoggerContext) {
@@ -37,7 +37,7 @@ private final class NWPathMonitorBetterPathStream: @unchecked Sendable {
     init(_ ctx: PartoutLoggerContext) {
         self.ctx = ctx
         monitor = NWPathMonitor()
-        monitorQueue = DispatchQueue(label: "NWPathMonitorBetterPathBlock")
+        monitorQueue = DispatchQueue(label: "NEBetterPathBlock")
         stream = PassthroughStream()
         didSignal = false
         didStop = false
