@@ -527,10 +527,12 @@ private extension NETunnelProviderManager {
         guard let profileId else {
             return nil
         }
+        let status = connection.status.asTunnelStatus
+        let isEnabled = isEnabled && (isOnDemandEnabled || status != .inactive)
         return TunnelSnapshot(
             id: profileId,
             isEnabled: isEnabled,
-            status: connection.status.asTunnelStatus,
+            status: status,
             onDemand: isEnabled && isOnDemandEnabled
         )
     }
