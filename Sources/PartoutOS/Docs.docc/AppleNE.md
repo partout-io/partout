@@ -32,11 +32,11 @@ The ``NEPTPForwarder`` wrapper is a simple way to build a basic [NEPacketTunnelP
 
 ### App Extension
 
+- ``NEBetterPathBlock``
 - ``NEObservablePath``
 - ``NEPTPForwarder``
 - ``NESettingsApplying``
 - ``NESettingsModule``
-- ``NEBetterPathBlock``
 
 ### Serialization
 
