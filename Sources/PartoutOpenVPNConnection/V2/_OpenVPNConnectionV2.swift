@@ -405,7 +405,7 @@ private extension _OpenVPNConnectionV2 {
                     pp_log(ctx, .core, .debug, "Cancelled CyclingConnection.pathSubscription")
                     return
                 }
-                // TODO: #143/notes, may improve this with floating
+                // TODO: #143/notes, may improve this with floating (establish the new socket, then shut down the old one and move work to the new one)
                 pp_log(ctx, .openvpn, .notice, "Link has a better path, shut down session to reconnect")
                 await currentSession?.shutdown(PartoutError(.networkChanged))
             }
