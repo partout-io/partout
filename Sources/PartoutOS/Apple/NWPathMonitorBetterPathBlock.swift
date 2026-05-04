@@ -28,7 +28,7 @@ private final class NWPathMonitorBetterPathStream: @unchecked Sendable {
 
     fileprivate let stream: PassthroughStream<Void>
 
-    private var previousPath: NWPathPreference?
+    private var previousPath: NWPathBetterPathPreference?
 
     private var didSignal: Bool
 
@@ -62,7 +62,7 @@ private extension NWPathMonitorBetterPathStream {
             return
         }
 
-        let nextPath = NWPathPreference(path)
+        let nextPath = NWPathBetterPathPreference(path)
         defer {
             previousPath = nextPath
         }
@@ -96,7 +96,7 @@ private extension NWPathMonitorBetterPathStream {
     }
 }
 
-private struct NWPathPreference: Sendable {
+struct NWPathBetterPathPreference: Sendable {
     private let statusScore: Int
 
     private let isUnconstrained: Bool
@@ -104,6 +104,18 @@ private struct NWPathPreference: Sendable {
     private let isInexpensive: Bool
 
     private let interfaceScore: Int
+
+    init(
+        statusScore: Int,
+        isUnconstrained: Bool,
+        isInexpensive: Bool,
+        interfaceScore: Int
+    ) {
+        self.statusScore = statusScore
+        self.isUnconstrained = isUnconstrained
+        self.isInexpensive = isInexpensive
+        self.interfaceScore = interfaceScore
+    }
 
     init(_ path: NWPath) {
         statusScore = path.status.preferenceScore
