@@ -126,16 +126,20 @@ extension NETunnelStrategy: TunnelObservableStrategy {
     public nonisolated var didUpdateActiveProfiles: AsyncStream<[Profile.ID: TunnelSnapshot]> {
         AsyncStream { [weak self] continuation in
             Task { [weak self] in
-                guard let self else {
+                guard let stream = self?.activeProfilesStream.dropFirst() else {
                     continuation.finish()
                     return
                 }
-                for await activeProfiles in self.activeProfilesStream.dropFirst() {
+                for await activeProfiles in stream {
+                    guard let self else {
+                        continuation.finish()
+                        return
+                    }
                     guard !Task.isCancelled else {
-                        pp_log(self.ctx, .os, .debug, "Cancelled NETunnelStrategy.didUpdateActiveProfiles")
+                        pp_log(ctx, .os, .debug, "Cancelled NETunnelStrategy.didUpdateActiveProfiles")
                         break
                     }
-                    pp_log(self.ctx, .os, .debug, "NETunnelStrategy.activeProfiles -> \(activeProfiles.values.description)")
+                    pp_log(ctx, .os, .debug, "NETunnelStrategy.activeProfiles -> \(activeProfiles.values.description)")
                     continuation.yield(activeProfiles)
                 }
                 continuation.finish()
@@ -230,11 +234,15 @@ extension NETunnelStrategy: NETunnelManagerRepository {
     public nonisolated var managersStream: AsyncStream<[Profile.ID: NETunnelProviderManager]> {
         AsyncStream { [weak self] continuation in
             Task { [weak self] in
-                guard let self else {
+                guard let stream = self?.managersSubject.subscribe().dropFirst() else {
                     continuation.finish()
                     return
                 }
-                for await value in self.managersSubject.subscribe().dropFirst() {
+                for await value in stream {
+                    guard let self else {
+                        continuation.finish()
+                        return
+                    }
                     guard !Task.isCancelled else {
                         pp_log(self.ctx, .os, .debug, "Cancelled NETunnelStrategy.managersStream")
                         break

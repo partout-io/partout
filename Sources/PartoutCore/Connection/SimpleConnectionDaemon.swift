@@ -252,35 +252,37 @@ extension SimpleConnectionDaemon {
         // Observe the connection status (except the initial .disconnected)
         statusSubscription?.cancel()
         statusSubscription = Task { [weak self] in
-            guard let self else { return }
+            guard let profileId = self?.profile.id else { return }
             do {
                 for try await status in connectionStatusStream {
                     guard !Task.isCancelled else {
-                        pp_log_id(profile.id, .core, .debug, "Cancelled SimpleConnectionDaemon.statusStream")
+                        pp_log_id(profileId, .core, .debug, "Cancelled SimpleConnectionDaemon.statusStream")
                         return
                     }
-                    await onConnectionStatus(status)
+                    await self?.onConnectionStatus(status)
                 }
             } catch {
-                await onConnectionError(error)
+                await self?.onConnectionError(error)
             }
+            pp_log_id(profileId, .core, .debug, "Status subscription terminated")
         }
 
         // Observe the network for starting the connection
         networkSubscription?.cancel()
         networkSubscription = Task { [weak self] in
-            guard let self else { return }
-            pp_log_id(profile.id, .core, .debug, "Network subscription started")
+            guard let profileId = self?.profile.id else { return }
+            pp_log_id(profileId, .core, .debug, "Network subscription started")
             for await isReady in onNetworkReadyStream {
+                guard let self else { return }
                 guard isReady else { continue }
                 guard !Task.isCancelled else {
-                    pp_log_id(profile.id, .core, .debug, "Cancelled NetworkObserver.onReady")
+                    pp_log_id(profileId, .core, .debug, "Cancelled NetworkObserver.onReady")
                     break
                 }
-                pp_log_id(profile.id, .core, .notice, "Network is ready, start connection")
+                pp_log_id(profileId, .core, .notice, "Network is ready, start connection")
                 await evaluateConnection()
             }
-            pp_log_id(profile.id, .core, .debug, "Network subscription terminated")
+            pp_log_id(profileId, .core, .debug, "Network subscription terminated")
         }
 
         // Start monitoring
