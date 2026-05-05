@@ -5,7 +5,7 @@
 import NetworkExtension
 
 /// An observer based on `NWTCPConnection`.
-@available(*, deprecated, message: "Use NESocketObserver")
+@available(*, deprecated)
 public final class NETCPObserver: LinkObserver {
     public struct Options: Sendable {
         public let minLength: Int
@@ -91,11 +91,6 @@ extension NETCPSocket {
             .map { _ in }
     }
 
-    @available(*, deprecated)
-    nonisolated func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
-        loopReadPackets(handler)
-    }
-
     nonisolated func upgraded() -> LinkInterface {
         Self(
             nwConnection: NWTCPConnection(upgradeFor: nwConnection),
@@ -145,20 +140,6 @@ extension NETCPSocket {
 }
 
 private extension NETCPSocket {
-    @available(*, deprecated)
-    nonisolated func loopReadPackets(_ handler: @escaping ([Data]?, Error?) -> Void) {
-
-        // WARNING: runs in Network.framework queue
-        nwConnection.readMinimumLength(options.minLength, maximumLength: options.maxLength) { [weak self] data, error in
-            handler(data.map { [$0] }, error)
-
-            // repeat until failure
-            if error == nil {
-                self?.loopReadPackets(handler)
-            }
-        }
-    }
-
     func asyncWritePacket(_ packet: Data) async throws {
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in

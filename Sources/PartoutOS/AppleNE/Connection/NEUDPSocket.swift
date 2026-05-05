@@ -5,11 +5,10 @@
 import NetworkExtension
 
 /// An observer based on `NWUDPSession`.
-@available(*, deprecated, message: "Use NESocketObserver")
+@available(*, deprecated)
 public final class NEUDPObserver: LinkObserver {
     public struct Options: Sendable {
         public let maxDatagrams: Int
-        public let withReadPackets: Bool
     }
 
     private let ctx: PartoutLoggerContext
@@ -69,9 +68,9 @@ private actor NEUDPSocket: LinkInterface {
 
     let remoteProtocol: EndpointProtocol
 
-    private let readStream: AsyncThrowingStream<[Data], Error>?
+    private let readStream: AsyncThrowingStream<[Data], Error>
 
-    private let readContinuation: AsyncThrowingStream<[Data], Error>.Continuation?
+    private let readContinuation: AsyncThrowingStream<[Data], Error>.Continuation
 
     init(
         nwSession: NWUDPSession,
@@ -83,12 +82,6 @@ private actor NEUDPSocket: LinkInterface {
         self.options = options
         self.remoteAddress = remoteAddress
         self.remoteProtocol = remoteProtocol
-
-        guard options.withReadPackets else {
-            readStream = nil
-            readContinuation = nil
-            return
-        }
 
         var newReadContinuation: AsyncThrowingStream<[Data], Error>.Continuation?
         readStream = AsyncThrowingStream { continuation in
@@ -119,15 +112,6 @@ extension NEUDPSocket {
             .map { _ in }
     }
 
-    @available(*, deprecated)
-    nonisolated func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
-        guard readStream == nil else {
-            fatalError("setReadHandler() must not be called because withReadPackets has its own read handler")
-        }
-        // WARNING: runs in Network.framework queue
-        nwSession.setReadHandler(handler, maxDatagrams: options.maxDatagrams)
-    }
-
     nonisolated func upgraded() -> LinkInterface {
         Self(
             nwSession: NWUDPSession(upgradeFor: nwSession),
@@ -150,10 +134,7 @@ extension NEUDPSocket {
     }
 
     func readPackets() async throws -> [Data] {
-        guard let readStream else {
-            fatalError("Not initialized with withReadPackets")
-        }
-        return try await readStream.nextElement() ?? []
+        try await readStream.nextElement() ?? []
     }
 
     func writePackets(_ packets: [Data]) async throws {

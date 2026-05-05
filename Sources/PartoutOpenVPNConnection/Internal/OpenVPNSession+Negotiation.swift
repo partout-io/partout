@@ -8,11 +8,7 @@ extension OpenVPNSession {
         pp_log(ctx, .openvpn, .info, "Start negotiation")
         let neg = try newNegotiator(on: link)
         addNegotiator(neg)
-        if options.withLoopsV2 {
-            loopLinkV2()
-        } else {
-            loopLink()
-        }
+        loopLinkV2()
         try neg.start()
         return neg
     }

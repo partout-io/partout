@@ -8,17 +8,12 @@ extension _OpenVPNConnectionV2 {
         parameters: ConnectionParameters,
         module: OpenVPNModule,
         cachesURL: URL,
-        options baseOptions: OpenVPNConnection.Options = .init()
+        options: OpenVPNConnection.Options = .init()
     ) throws {
         guard let configuration = module.configuration else {
             fatalError("Creating session without OpenVPN configuration?")
         }
         pp_log(ctx, .openvpn, .notice, "OpenVPN: Using v2 connection")
-
-        // Override options with feature flags
-        var options = baseOptions
-        options.withLoopsV2 = true
-        options.withFlushDataBeforeControl = true
 
         // Hardcode portable implementations
         let prng = PlatformPRNG()
