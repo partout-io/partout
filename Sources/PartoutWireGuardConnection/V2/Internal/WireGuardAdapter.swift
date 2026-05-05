@@ -185,9 +185,9 @@ actor WireGuardAdapter {
     // MARK: - Private methods
 
     private func setupReachabilityTask() {
-        let reachability = reachability
+        let stream = reachability.isReachableStream
         reachabilityTask = Task { [weak self] in
-            for await isReachable in reachability.isReachableStream {
+            for await isReachable in stream {
                 guard !Task.isCancelled else { return }
                 await self?.didUpdateReachable(isReachable: isReachable)
             }
