@@ -50,7 +50,8 @@ public final class NetworkObserver: @unchecked Sendable {
 
     public func startObserving() {
         let signalSubscription = Task { [weak self] in
-            for await signal in signalSubject.subscribe() {
+            guard let stream = self?.signalSubject.subscribe() else { return }
+            for await signal in stream {
                 guard let self else { return }
                 guard !Task.isCancelled else {
                     pp_log(ctx, .core, .debug, "Cancelled NetworkObserver.signalSubject")
@@ -64,7 +65,8 @@ public final class NetworkObserver: @unchecked Sendable {
             pp_log(ctx, .core, .debug, "NetworkObserver.signalSubject terminated")
         }
         let reachabilitySubscription = Task { [weak self] in
-            for await isNetworkAvailable in reachabilityStream {
+            guard let stream = self?.reachabilityStream else { return }
+            for await isNetworkAvailable in stream {
                 guard let self else { return }
                 guard !Task.isCancelled else {
                     pp_log(ctx, .core, .debug, "Cancelled NetworkObserver.reachabilityStream")
@@ -78,7 +80,8 @@ public final class NetworkObserver: @unchecked Sendable {
             pp_log(ctx, .core, .debug, "NetworkObserver.reachabilityStream terminated")
         }
         let statusSubscription = Task { [weak self] in
-            for await connectionStatus in statusStream {
+            guard let stream = self?.statusStream else { return }
+            for await connectionStatus in stream {
                 guard let self else { return }
                 guard !Task.isCancelled else {
                     pp_log(ctx, .core, .debug, "Cancelled NetworkObserver.statusStream")
