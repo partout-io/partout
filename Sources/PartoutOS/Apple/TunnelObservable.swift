@@ -16,7 +16,6 @@ public final class TunnelObservable {
         self.tunnel = tunnel
         snapshots = [:]
         Task { [weak self] in
-            guard let self else { return }
             do {
                 let stream = tunnel.snapshotsStream
                 try await tunnel.prepare(purge: false)
