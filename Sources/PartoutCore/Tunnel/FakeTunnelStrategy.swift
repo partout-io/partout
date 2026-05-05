@@ -16,6 +16,7 @@ public actor FakeTunnelStrategy: TunnelObservableStrategy, Sendable {
             }
             activeProfileSubject.send(.init(
                 id: previous.id,
+                isEnabled: previous.isEnabled,
                 status: newValue,
                 onDemand: previous.onDemand
             ))
@@ -73,21 +74,14 @@ public actor FakeTunnelStrategy: TunnelObservableStrategy, Sendable {
         if connect, status != .inactive {
             await doDisconnect()
         }
-        if isOnDemand {
-            activeProfileSubject.send(TunnelSnapshot(
-                id: profile.id,
-                status: .inactive,
-                onDemand: true
-            ))
-        } else {
-            activeProfileSubject.send(TunnelSnapshot(
-                id: profile.id,
-                status: .inactive,
-                onDemand: false
-            ))
-            if connect {
-                await doConnect()
-            }
+        activeProfileSubject.send(TunnelSnapshot(
+            id: profile.id,
+            isEnabled: true,
+            status: .inactive,
+            onDemand: isOnDemand
+        ))
+        if !isOnDemand && connect {
+            await doConnect()
         }
     }
 
@@ -102,6 +96,7 @@ public actor FakeTunnelStrategy: TunnelObservableStrategy, Sendable {
         await doDisconnect()
         activeProfileSubject.send(TunnelSnapshot(
             id: profileId,
+            isEnabled: false,
             status: .inactive,
             onDemand: false
         ))

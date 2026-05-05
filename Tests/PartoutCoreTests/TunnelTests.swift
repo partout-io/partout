@@ -25,7 +25,7 @@ struct TunnelTests {
         let sut = newTunnel()
         let module = IPModule.Builder().build()
         let profile = try Profile.Builder(modules: [module], activatingModules: true).build()
-        let stream = sut.snapshotsStream.removeDuplicates()
+        let stream = sut.snapshotsStream
 
         let expected: [TunnelStatus] = [
             .inactive,
@@ -45,6 +45,10 @@ struct TunnelTests {
                     return emitted
                 }
                 guard let status = snapshots.first?.value.status else {
+                    continue
+                }
+                // Skip duplicates
+                guard status != emitted.last else {
                     continue
                 }
                 emitted.append(status)

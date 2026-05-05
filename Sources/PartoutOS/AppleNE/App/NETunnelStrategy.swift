@@ -126,16 +126,20 @@ extension NETunnelStrategy: TunnelObservableStrategy {
     public nonisolated var didUpdateActiveProfiles: AsyncStream<[Profile.ID: TunnelSnapshot]> {
         AsyncStream { [weak self] continuation in
             Task { [weak self] in
-                guard let self else {
+                guard let stream = self?.activeProfilesStream.dropFirst() else {
                     continuation.finish()
                     return
                 }
-                for await activeProfiles in self.activeProfilesStream.dropFirst() {
+                for await activeProfiles in stream {
+                    guard let self else {
+                        continuation.finish()
+                        return
+                    }
                     guard !Task.isCancelled else {
-                        pp_log(self.ctx, .os, .debug, "Cancelled NETunnelStrategy.didUpdateActiveProfiles")
+                        pp_log(ctx, .os, .debug, "Cancelled NETunnelStrategy.didUpdateActiveProfiles")
                         break
                     }
-                    pp_log(self.ctx, .os, .debug, "NETunnelStrategy.activeProfiles -> \(activeProfiles.values.description)")
+                    pp_log(ctx, .os, .debug, "NETunnelStrategy.activeProfiles -> \(activeProfiles.values.description)")
                     continuation.yield(activeProfiles)
                 }
                 continuation.finish()
@@ -230,11 +234,15 @@ extension NETunnelStrategy: NETunnelManagerRepository {
     public nonisolated var managersStream: AsyncStream<[Profile.ID: NETunnelProviderManager]> {
         AsyncStream { [weak self] continuation in
             Task { [weak self] in
-                guard let self else {
+                guard let stream = self?.managersSubject.subscribe().dropFirst() else {
                     continuation.finish()
                     return
                 }
-                for await value in self.managersSubject.subscribe().dropFirst() {
+                for await value in stream {
+                    guard let self else {
+                        continuation.finish()
+                        return
+                    }
                     guard !Task.isCancelled else {
                         pp_log(self.ctx, .os, .debug, "Cancelled NETunnelStrategy.managersStream")
                         break
@@ -358,7 +366,7 @@ private extension NETunnelStrategy {
                     $0.filter {
                         $0.value.rank > 0
                     }
-                    .compactMapValues(\.asActiveProfile)
+                    .compactMapValues(\.asSnapshot)
                 }
         } else {
             mappedStream = stream
@@ -377,8 +385,11 @@ private extension NETunnelStrategy {
                     let filtered = $0.filter {
                         $0.value.rank == maxRank
                     }
-                    assert(filtered.count <= 1, "Max ranked manager must be at most one")
-                    return filtered.compactMapValues(\.asActiveProfile)
+                    // There might be a moment where 2 managers may be enabled at the same
+                    // time, e.g., while switching from one to another one. We should
+                    // tolerate this scenario.
+                    assert(filtered.count <= 2, "Max ranked manager must be at most two")
+                    return filtered.compactMapValues(\.asSnapshot)
                 }
         }
 
@@ -442,7 +453,7 @@ private extension NETunnelProviderManager {
 #if os(iOS) || os(tvOS)
         // only one profile at a time is enabled on iOS/tvOS
         if isEnabled {
-            return .max
+            return isOnDemandEnabled ? .max : .max - 1
         }
 #endif
         if ![.disconnected, .invalid].contains(connection.status) {
@@ -520,13 +531,16 @@ extension NETunnelProviderManager: @retroactive @unchecked Sendable {
 }
 
 private extension NETunnelProviderManager {
-    var asActiveProfile: TunnelSnapshot? {
+    var asSnapshot: TunnelSnapshot? {
         guard let profileId else {
             return nil
         }
+        let status = connection.status.asTunnelStatus
+        let isEnabled = isEnabled && (isOnDemandEnabled || status != .inactive)
         return TunnelSnapshot(
             id: profileId,
-            status: connection.status.asTunnelStatus,
+            isEnabled: isEnabled,
+            status: status,
             onDemand: isEnabled && isOnDemandEnabled
         )
     }

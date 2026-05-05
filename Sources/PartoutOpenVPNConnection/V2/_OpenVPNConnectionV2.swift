@@ -7,11 +7,10 @@
 #endif
 
 /// Swift/C implementation of an OpenVPN connection.
-public actor OpenVPNConnection {
-
-    // MARK: Initialization
-
+public actor _OpenVPNConnectionV2 {
     private let ctx: PartoutLoggerContext
+
+    private let statusSubject: CurrentValueStream<ConnectionStatus>
 
     private let moduleId: UniqueID
 
@@ -19,21 +18,29 @@ public actor OpenVPNConnection {
 
     private let environment: TunnelEnvironment
 
+    private let factory: NetworkInterfaceFactory
+
     private let options: ConnectionParameters.Options
+
+    private let endpoints: [ExtendedEndpoint]
 
     private let configuration: OpenVPN.Configuration
 
     private let sessionFactory: () async throws -> OpenVPNSessionProtocol
 
-    let backend: CyclingConnection
-
     private let dns: DNSResolver
 
     // MARK: State
 
-    private var hooks: CyclingConnection.Hooks?
+    private var currentSession: OpenVPNSessionProtocol?
+
+    private var endpointResolver: EndpointResolver
+
+    private var currentLink: LinkInterface?
 
     private var tunnelInterface: IOInterface?
+
+    private var pathSubscription: Task<Void, Never>?
 
     init(
         _ ctx: PartoutLoggerContext,
@@ -44,9 +51,11 @@ public actor OpenVPNConnection {
         sessionFactory: @escaping () async throws -> OpenVPNSessionProtocol
     ) throws {
         self.ctx = ctx
+        statusSubject = CurrentValueStream(.disconnected)
         moduleId = module.id
         controller = parameters.controller
         environment = parameters.environment
+        factory = parameters.factory
         options = parameters.options
 
         guard let configuration = module.configuration else {
@@ -60,111 +69,91 @@ public actor OpenVPNConnection {
         self.configuration = try configuration.withModules(from: parameters.profile)
         self.sessionFactory = sessionFactory
         self.dns = dns
-
-        backend = CyclingConnection(
-            ctx,
-            factory: parameters.factory,
-            options: options,
-            endpoints: endpoints
-        )
+        self.endpoints = endpoints
+        endpointResolver = EndpointResolver(ctx, endpoints: endpoints)
     }
 
     deinit {
-        pp_log(ctx, .openvpn, .debug, "Deinit OpenVPNConnection")
+        pp_log(ctx, .openvpn, .debug, "Deinit _OpenVPNConnectionV2")
     }
 }
 
 // MARK: - Connection
 
-extension OpenVPNConnection: Connection {
+extension _OpenVPNConnectionV2: Connection {
     public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
-        backend.statusStream
+        statusSubject.subscribeThrowing().removeDuplicates()
     }
 
     @discardableResult
     public func start() async throws -> Bool {
-        var session: OpenVPNSessionProtocol?
         do {
-            session = try await bindIfNeeded()
-            return try await backend.start()
+            if currentSession == nil {
+                currentSession = try await sessionFactory()
+            }
+            guard let session = currentSession else {
+                fatalError("No session from factory?")
+            }
+            await session.setDelegate(self)
+            guard status == .disconnected else {
+                pp_log(ctx, .core, .error, "Ignore start, connection status \(status) != .disconnected")
+                return false
+            }
+            sendStatus(.connecting)
+            do {
+                let newLink = try await setupLink(upgradingCurrent: false)
+                try await session.setLink(newLink)
+                observeBetterPath(on: newLink)
+                return true
+            } catch {
+                sendStatus(.disconnected)
+                throw error
+            }
         } catch let error as PartoutError {
-            await session?.shutdown(error)
+            await currentSession?.shutdown(error)
             if error.code == .exhaustedEndpoints, let reason = error.reason {
                 throw reason
             }
             throw error
         } catch {
-            await session?.shutdown(error)
+            await currentSession?.shutdown(error)
             throw error
         }
     }
 
     public func stop(timeout: Int) async {
-        await backend.stop(timeout: timeout)
-    }
-}
+        guard let currentSession else { return }
+        guard status != .disconnected else {
+            pp_log(ctx, .core, .error, "Ignore stop, connection not started")
+            return
+        }
+        sendStatus(.disconnecting)
 
-private extension OpenVPNConnection {
-    func bindIfNeeded() async throws -> OpenVPNSessionProtocol? {
-        guard hooks == nil else {
-            return nil
+        // Stop the OpenVPN connection on user request
+        await currentSession.shutdown(nil, timeout: TimeInterval(timeout) / 1000.0)
+
+        // XXX: Poll session status until link clean-up
+        // In the future, make OpenVPNSession.shutdown() wait for stop async-ly
+        let delta = 500
+        var remaining = timeout
+        while remaining > 0, await currentSession.hasLink() {
+            pp_log(ctx, .openvpn, .notice, "Link active, wait \(delta) milliseconds more")
+            try? await Task.sleep(milliseconds: delta)
+            remaining = max(0, remaining - delta)
+        }
+        if remaining > 0 {
+            pp_log(ctx, .openvpn, .notice, "Link shut down gracefully")
+        } else {
+            pp_log(ctx, .openvpn, .error, "Link shut down due to timeout")
         }
 
-        let ctx = self.ctx
-        let configuration = self.configuration
-        let session = try await sessionFactory()
-
-        let hooks = CyclingConnection.Hooks(
-            dns: dns,
-            newLinkBlock: { newLink in
-                // Wrap new link into a specific OpenVPN link
-                newLink.openVPNLink(method: configuration.xorMethod)
-            },
-            startBlock: { newLink in
-                try await session.setLink(newLink)
-            },
-            upgradeBlock: {
-                // TODO: #143/notes, may improve this with floating
-                pp_log(ctx, .openvpn, .notice, "Link has a better path, shut down session to reconnect")
-                await session.shutdown(PartoutError(.networkChanged))
-            },
-            stopBlock: { _, timeout in
-                // Stop the OpenVPN connection on user request
-                await session.shutdown(nil, timeout: TimeInterval(timeout) / 1000.0)
-
-                // XXX: Poll session status until link clean-up
-                // In the future, make OpenVPNSession.shutdown() wait for stop async-ly
-                let delta = 500
-                var remaining = timeout
-                while remaining > 0, await session.hasLink() {
-                    pp_log(ctx, .openvpn, .notice, "Link active, wait \(delta) milliseconds more")
-                    try? await Task.sleep(milliseconds: delta)
-                    remaining = max(0, remaining - delta)
-                }
-                if remaining > 0 {
-                    pp_log(ctx, .openvpn, .notice, "Link shut down gracefully")
-                } else {
-                    pp_log(ctx, .openvpn, .error, "Link shut down due to timeout")
-                }
-            },
-            onStatusBlock: { [weak self] status in
-                self?.onStatus(status)
-            },
-            onErrorBlock: { [weak self] error in
-                self?.onError(error)
-            }
-        )
-
-        self.hooks = hooks
-        await backend.setHooks(hooks)
-        await session.setDelegate(self)
-        return session
+        sendStatus(.disconnected)
     }
 }
 
 // MARK: - OpenVPNSessionDelegate
 
-extension OpenVPNConnection: OpenVPNSessionDelegate {
+extension _OpenVPNConnectionV2: OpenVPNSessionDelegate {
     func sessionDidStart(
         _ session: OpenVPNSessionProtocol,
         remoteAddress: String,
@@ -213,7 +202,7 @@ extension OpenVPNConnection: OpenVPNSessionDelegate {
             // .disconnected state, because it must go through .connecting first
 
             // Signal success and show the "VPN" icon
-            if await backend.sendStatus(.connected) {
+            if sendStatus(.connected) {
                 pp_log(ctx, .openvpn, .notice, "Tunnel interface is now UP")
             }
         } catch {
@@ -236,7 +225,7 @@ extension OpenVPNConnection: OpenVPNSessionDelegate {
         }
 
         // If user stopped the tunnel, let it go
-        if await backend.status == .disconnecting {
+        guard status != .disconnecting else {
             pp_log(ctx, .openvpn, .info, "User requested disconnection")
             return
         }
@@ -244,16 +233,16 @@ extension OpenVPNConnection: OpenVPNSessionDelegate {
         // If error is not recoverable, just fail
         if let error, !error.isOpenVPNRecoverable {
             pp_log(ctx, .openvpn, .error, "Disconnection is not recoverable")
-            await backend.sendError(error)
+            sendError(error)
             return
         }
 
         // Go back to the disconnected state (e.g. daemon will reconnect)
-        await backend.sendStatus(.disconnected)
+        sendStatus(.disconnected)
     }
 
     func session(_ session: OpenVPNSessionProtocol, didUpdateDataCount dataCount: DataCount) async {
-        guard await backend.status == .connected else {
+        guard status == .connected else {
             return
         }
         pp_log(ctx, .openvpn, .debug, "Updated data count: \(dataCount.debugDescription)")
@@ -303,16 +292,38 @@ private extension IPModule {
     }
 }
 
-private extension OpenVPNConnection {
+extension _OpenVPNConnectionV2 {
+    var status: ConnectionStatus {
+        statusSubject.value
+    }
+}
+
+private extension _OpenVPNConnectionV2 {
+    @discardableResult
+    func sendStatus(_ connectionStatus: ConnectionStatus) -> Bool {
+        guard status.canChange(to: connectionStatus) else {
+            pp_log(ctx, .core, .error, "Ignore unexpected status change: \(status) -> \(connectionStatus)")
+            return false
+        }
+        pp_log(ctx, .core, .info, "Report link status: \(connectionStatus.debugDescription)")
+        statusSubject.send(connectionStatus)
+        onStatus(connectionStatus)
+        return true
+    }
+
+    func sendError(_ connectionError: Error) {
+        pp_log(ctx, .core, .info, "Report link failure: \(connectionError)")
+        statusSubject.send(completion: .failure(connectionError))
+        onError(connectionError)
+    }
+
     nonisolated func onStatus(_ connectionStatus: ConnectionStatus) {
         switch connectionStatus {
         case .connected:
             break
-
         case .disconnected:
             environment.removeEnvironmentValue(forKey: TunnelEnvironmentKeys.dataCount)
             environment.removeEnvironmentValue(forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
-
         default:
             break
         }
@@ -332,6 +343,73 @@ private extension LinkInterface {
 
         case .tcp:
             return OpenVPNTCPLink(link: self, method: method)
+        }
+    }
+}
+
+// MARK: - Helpers
+
+private extension _OpenVPNConnectionV2 {
+    func setupLink(upgradingCurrent: Bool) async throws -> LinkInterface {
+        do {
+            pp_log(ctx, .core, .notice, "Create new link")
+            var newLink: LinkInterface
+
+            // upgrade current link if possible
+            if upgradingCurrent, let upgradedLink = try await currentLink?.upgraded() {
+                pp_log(ctx, .core, .notice, "Will reconnect to current link")
+                newLink = upgradedLink
+            }
+            // create new link
+            else {
+                pp_log(ctx, .core, .notice, "Cycle to next endpoint")
+                let result = try await endpointResolver.withNextEndpoint(
+                    dns: dns,
+                    timeout: options.dnsTimeout
+                )
+                endpointResolver = result.nextResolver
+
+                let linkObserver = try factory.linkObserver(to: result.endpoint)
+                pp_log(ctx, .core, .notice, "Connect to \(result.endpoint.asSensitiveAddress(ctx))")
+                newLink = try await linkObserver.waitForActivity(timeout: options.linkActivityTimeout)
+
+                pp_log(ctx, .core, .notice, "Link is active")
+                pp_log(ctx, .core, .info, "Link type is \(newLink.linkDescription)")
+                // Wrap new link into a specific OpenVPN link
+                newLink = newLink.openVPNLink(method: configuration.xorMethod)
+            }
+
+            pp_log(ctx, .core, .info, "Processed link type is \(newLink.linkDescription)")
+
+            currentLink = newLink
+            return newLink
+        } catch {
+            pp_log(ctx, .core, .fault, "Unable to create link: \(error)")
+
+            // reset endpoints on exhaustion
+            if (error as? PartoutError)?.code == .exhaustedEndpoints {
+                endpointResolver = EndpointResolver(ctx, endpoints: endpoints)
+            }
+
+            // stop here
+            throw error
+        }
+    }
+
+    func observeBetterPath(on link: LinkInterface) {
+        pathSubscription?.cancel()
+        pathSubscription = Task { [weak self, weak link] in
+            guard let link else { return }
+            for await _ in link.hasBetterPath {
+                guard let self else { return }
+                guard !Task.isCancelled else {
+                    pp_log(ctx, .core, .debug, "Cancelled CyclingConnection.pathSubscription")
+                    return
+                }
+                // TODO: #143/notes, may improve this with floating (establish the new socket FIRST, then shut down the old one, and FINALLY move work to the new one. this should be seamless with UDP)
+                pp_log(ctx, .openvpn, .notice, "Link has a better path, shut down session to reconnect")
+                await currentSession?.shutdown(PartoutError(.networkChanged))
+            }
         }
     }
 }

@@ -16,7 +16,7 @@ import PartoutCore
 
 /// Establishes a WireGuard connection. Legacy Apple-only implementation.
 @available(*, deprecated, message: "Use WireGuardConnection")
-public final class LegacyWireGuardConnection: Connection, @unchecked Sendable {
+public final class _WireGuardConnectionV1: Connection, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
     private let statusSubject: CurrentValueStream<ConnectionStatus>
@@ -55,7 +55,7 @@ public final class LegacyWireGuardConnection: Connection, @unchecked Sendable {
         guard let configuration = module.configuration else {
             throw PartoutError(.incompleteModule)
         }
-        pp_log(ctx, .wireguard, .notice, "WireGuard: Using legacy connection")
+        pp_log(ctx, .wireguard, .notice, "WireGuard: Using v1 connection")
 
         let tweakedConfiguration = try configuration.withModules(from: parameters.profile)
         tunnelConfiguration = try tweakedConfiguration.toWireGuardConfiguration()
@@ -161,13 +161,13 @@ public final class LegacyWireGuardConnection: Connection, @unchecked Sendable {
 
 // MARK: - WireGuardAdapterDelegate
 
-private extension LegacyWireGuardConnection {
+private extension _WireGuardConnectionV1 {
     final class AdapterDelegate: LegacyWireGuardAdapterDelegate {
         private let ctx: PartoutLoggerContext
 
-        private weak var connection: LegacyWireGuardConnection?
+        private weak var connection: _WireGuardConnectionV1?
 
-        init(_ ctx: PartoutLoggerContext, connection: LegacyWireGuardConnection) {
+        init(_ ctx: PartoutLoggerContext, connection: _WireGuardConnectionV1) {
             self.ctx = ctx
             self.connection = connection
         }
@@ -212,7 +212,7 @@ private extension LegacyWireGuardConnection {
 
 // MARK: - Data count
 
-private extension LegacyWireGuardConnection {
+private extension _WireGuardConnectionV1 {
     func onDataCountTimer() {
         guard statusSubject.value == .connected else {
             return

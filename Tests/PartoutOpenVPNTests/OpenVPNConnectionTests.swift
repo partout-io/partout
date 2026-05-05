@@ -6,8 +6,8 @@ import PartoutCore
 @testable import PartoutOpenVPNConnection
 import Testing
 
-private typealias OpenVPNConnectionType = OpenVPNConnectionV2
-extension OpenVPNConnectionV2 {
+private typealias OpenVPNConnectionType = _OpenVPNConnectionV2
+extension _OpenVPNConnectionV2 {
     var backend: Self {
         self
     }

@@ -53,7 +53,7 @@ extension CyclingConnection {
 /// Automates cycling through a list of endpoints until a connection is successfully established. The connection creation implementation is provided by a ``NetworkInterfaceFactory``, while internal behavior is defined with the use of a ``CyclingConnection/Hooks`` object.
 ///
 /// Make sure to only access this entity within the same actor.
-@available(*, deprecated, message: "Merge into OpenVPNConnection")
+@available(*, deprecated, message: "Merge into _OpenVPNConnectionV1")
 public actor CyclingConnection {
 
     // MARK: Initialization
@@ -221,10 +221,8 @@ private extension CyclingConnection {
     func observeBetterPath(on link: LinkInterface) {
         pathSubscription?.cancel()
         pathSubscription = Task { [weak self] in
-            guard let self else {
-                return
-            }
             for await _ in link.hasBetterPath {
+                guard let self else { return }
                 guard !Task.isCancelled else {
                     pp_log(ctx, .core, .debug, "Cancelled CyclingConnection.pathSubscription")
                     return

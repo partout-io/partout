@@ -106,6 +106,8 @@ actor WireGuardAdapter {
         // can happen after deallocation.
         backend.setLogger(context: nil, logger_fn: nil)
 
+        reachabilityTask?.cancel()
+
         // Shutdown the tunnel
         if case .started(let handle, _) = state {
             backend.turnOff(handle)
@@ -139,13 +141,22 @@ actor WireGuardAdapter {
             let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
             try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
                 moduleId: moduleId,
+                // FIXME: ###, These are always empty at this stage
                 descriptors: socketDescriptors
             ))
             let handle = try startWireGuardBackend(wgConfig: wgConfig)
             state = .started(handle, settingsGenerator)
-        } catch let error as WireGuardAdapterError {
-            throw error
         } catch {
+            reachabilityTask?.cancel()
+            reachabilityTask = nil
+            if case .started(let handle, _) = state {
+                backend.turnOff(handle)
+            }
+            state = .stopped
+            if let tunnel {
+                await delegate?.adapterShouldClearNetworkSettings(self, tunnel: tunnel)
+                self.tunnel = nil
+            }
             pp_log(ctx, .wireguard, .fault, "Unable to start: \(error)")
             throw error
         }
@@ -174,11 +185,11 @@ actor WireGuardAdapter {
     // MARK: - Private methods
 
     private func setupReachabilityTask() {
+        let stream = reachability.isReachableStream
         reachabilityTask = Task { [weak self] in
-            guard let self else { return }
-            for await isReachable in reachability.isReachableStream {
+            for await isReachable in stream {
                 guard !Task.isCancelled else { return }
-                await didUpdateReachable(isReachable: isReachable)
+                await self?.didUpdateReachable(isReachable: isReachable)
             }
         }
     }
@@ -240,6 +251,7 @@ actor WireGuardAdapter {
 #if os(iOS)
         backend.disableSomeRoamingForBrokenMobileSemantics(handle)
 #endif
+        // FIXME: ###, Socket descriptors require handle, which only exists after backend.turnOn. How do start() and .temporaryShutdown use socketDescriptors? They are empty, always empty on start()
         let socketFds = {
             var rawFds = backend.socketDescriptors(handle)
             if rawFds.isEmpty {
@@ -286,6 +298,7 @@ actor WireGuardAdapter {
             guard isReachable else { return }
             logHandler(.verbose, "Connectivity online, resuming backend.")
             do {
+                await settingsGenerator.resetResolvedEndpoints()
                 let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
                 try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
                     moduleId: moduleId,

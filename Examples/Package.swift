@@ -11,10 +11,6 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "test-abi",
-            dependencies: ["partout"]
-        ),
-        .executableTarget(
             name: "test-posix-socket",
             dependencies: ["partout"]
         )

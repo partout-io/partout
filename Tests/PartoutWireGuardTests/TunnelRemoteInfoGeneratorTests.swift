@@ -47,6 +47,70 @@ struct TunnelRemoteInfoGeneratorTests {
     }
 
     @Test
+    func givenCachedResolution_whenGeneratingEndpointUpdate_thenDoesNotResolveAgainUntilReset() async throws {
+        let pvtkey = "SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs="
+        let pubkey = "BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw="
+
+        var builder = WireGuard.Configuration.Builder(privateKey: pvtkey)
+        var peer = WireGuard.RemoteInterface.Builder(publicKey: pubkey)
+        peer.endpoint = "127.0.0.1:12345"
+        peer.allowedIPs = ["0.0.0.0/0"]
+        builder.peers = [peer]
+
+        let configuration = try builder.build()
+        let sut = TunnelRemoteInfoGenerator(
+            .global,
+            tunnelConfiguration: configuration,
+            dnsTimeout: 1000
+        )
+        let logs = LogCollector()
+        let logHandler: WireGuardAdapter.LogHandler = { _, message in
+            logs.append(message)
+        }
+
+        _ = try await sut.uapiConfiguration(logHandler: logHandler)
+        let resolutionCountAfterFullConfiguration = logs.resolutionCount
+
+        _ = await sut.endpointUapiConfiguration(logHandler: logHandler)
+        let resolutionCountAfterEndpointUpdate = logs.resolutionCount
+
+        #expect(resolutionCountAfterFullConfiguration > 0)
+        #expect(resolutionCountAfterEndpointUpdate == resolutionCountAfterFullConfiguration)
+
+        await sut.resetResolvedEndpoints()
+        _ = try await sut.uapiConfiguration(logHandler: logHandler)
+        let resolutionCountAfterReset = logs.resolutionCount
+
+        #expect(resolutionCountAfterReset > resolutionCountAfterEndpointUpdate)
+    }
+
+    @Test
+    func givenPeerWithoutEndpoint_whenGeneratingUAPIConfiguration_thenKeepsPeerSettings() async throws {
+        let pvtkey = "SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs="
+        let pubkey = "BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw="
+
+        var builder = WireGuard.Configuration.Builder(privateKey: pvtkey)
+        var peer = WireGuard.RemoteInterface.Builder(publicKey: pubkey)
+        peer.allowedIPs = ["10.0.0.0/24"]
+        peer.keepAlive = 25
+        builder.peers = [peer]
+
+        let configuration = try builder.build()
+        let sut = TunnelRemoteInfoGenerator(
+            .global,
+            tunnelConfiguration: configuration,
+            dnsTimeout: 1
+        )
+
+        let uapiConfiguration = try await sut.uapiConfiguration(logHandler: { _, _ in })
+
+        #expect(!uapiConfiguration.contains("endpoint="))
+        #expect(uapiConfiguration.contains("persistent_keepalive_interval=25"))
+        #expect(uapiConfiguration.contains("replace_allowed_ips=true"))
+        #expect(uapiConfiguration.contains("allowed_ip=10.0.0.0/24"))
+    }
+
+    @Test
     func givenInterfaceAddresses_whenGeneratingRemoteInfo_thenMasksInterfaceRoutes() throws {
         let pvtkey = "SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs="
         let pubkey = "BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw="
@@ -71,5 +135,25 @@ struct TunnelRemoteInfoGeneratorTests {
         #expect(ipModule.ipv4?.includedRoutes.first?.gateway?.rawValue == "10.0.0.2")
         #expect(ipModule.ipv6?.includedRoutes.first?.destination?.rawValue == "fd00::/64")
         #expect(ipModule.ipv6?.includedRoutes.first?.gateway?.rawValue == "fd00::2")
+    }
+}
+
+private final class LogCollector: @unchecked Sendable {
+    private let lock = NSLock()
+
+    private var messages: [String] = []
+
+    func append(_ message: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        messages.append(message)
+    }
+
+    var resolutionCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return messages.filter {
+            $0.hasPrefix("DNS64: mapped ")
+        }.count
     }
 }
