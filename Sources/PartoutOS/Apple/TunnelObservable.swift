@@ -20,6 +20,7 @@ public final class TunnelObservable {
                 let stream = tunnel.snapshotsStream
                 try await tunnel.prepare(purge: false)
                 for await newSnapshots in stream {
+                    guard let self else { return }
                     snapshots = newSnapshots
                 }
             } catch {
