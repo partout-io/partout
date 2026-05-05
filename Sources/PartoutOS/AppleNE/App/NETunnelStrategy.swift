@@ -126,11 +126,11 @@ extension NETunnelStrategy: TunnelObservableStrategy {
     public nonisolated var didUpdateActiveProfiles: AsyncStream<[Profile.ID: TunnelSnapshot]> {
         AsyncStream { [weak self] continuation in
             Task { [weak self] in
-                guard let activeProfilesStream = self?.activeProfilesStream else {
+                guard let stream = self?.activeProfilesStream.dropFirst() else {
                     continuation.finish()
                     return
                 }
-                for await activeProfiles in activeProfilesStream.dropFirst() {
+                for await activeProfiles in stream {
                     guard let self else {
                         continuation.finish()
                         return
