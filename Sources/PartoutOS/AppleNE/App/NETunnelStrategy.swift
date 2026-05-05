@@ -234,11 +234,11 @@ extension NETunnelStrategy: NETunnelManagerRepository {
     public nonisolated var managersStream: AsyncStream<[Profile.ID: NETunnelProviderManager]> {
         AsyncStream { [weak self] continuation in
             Task { [weak self] in
-                guard let managersSubject = self?.managersSubject else {
+                guard let stream = self?.managersSubject.subscribe().dropFirst() else {
                     continuation.finish()
                     return
                 }
-                for await value in managersSubject.subscribe().dropFirst() {
+                for await value in stream {
                     guard let self else {
                         continuation.finish()
                         return
