@@ -255,12 +255,11 @@ extension SimpleConnectionDaemon {
             guard let profileId = self?.profile.id else { return }
             do {
                 for try await status in connectionStatusStream {
-                    guard let self else { return }
                     guard !Task.isCancelled else {
                         pp_log_id(profileId, .core, .debug, "Cancelled SimpleConnectionDaemon.statusStream")
                         return
                     }
-                    await onConnectionStatus(status)
+                    await self?.onConnectionStatus(status)
                 }
             } catch {
                 await self?.onConnectionError(error)
