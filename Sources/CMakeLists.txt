@@ -59,7 +59,7 @@ endforeach()
 
 # Add computed files
 target_sources(partout_c PRIVATE ${PARTOUT_C_SOURCES})
-target_include_directories(partout_c PRIVATE ${PARTOUT_C_INCLUDE_DIRS})
+target_include_directories(partout_c PUBLIC ${PARTOUT_C_INCLUDE_DIRS})
 if(LINUX OR ANDROID)
     target_compile_options(partout_c PRIVATE -fPIC)
 endif()
@@ -100,7 +100,7 @@ endforeach()
 
 # Look for modulemaps in C "include" dirs
 foreach(dir ${PARTOUT_C_INCLUDE_DIRS})
-    target_include_directories(partout PRIVATE ${dir})
+    target_include_directories(partout PUBLIC ${dir})
 endforeach()
 
 # Depend on C target (include before)
