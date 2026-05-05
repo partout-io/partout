@@ -59,7 +59,7 @@ endforeach()
 
 # Add computed files
 target_sources(partout_c PRIVATE ${PARTOUT_C_SOURCES})
-target_include_directories(partout_c PRIVATE ${PARTOUT_C_INCLUDE_DIRS})
+target_include_directories(partout_c PUBLIC ${PARTOUT_C_INCLUDE_DIRS})
 if(LINUX OR ANDROID)
     target_compile_options(partout_c PRIVATE -fPIC)
 endif()
@@ -70,10 +70,7 @@ endif()
 add_library(partout STATIC "")
 
 # Define symbols to skip Swift imports and legacy code
-target_compile_options(partout PRIVATE
-    -DUSE_CMAKE
-    -enable-library-evolution
-)
+target_compile_options(partout PRIVATE -DUSE_CMAKE)
 
 # Use Foundation on Apple, compatible otherwise
 if(NOT APPLE)
@@ -103,7 +100,7 @@ endforeach()
 
 # Look for modulemaps in C "include" dirs
 foreach(dir ${PARTOUT_C_INCLUDE_DIRS})
-    target_include_directories(partout PRIVATE ${dir})
+    target_include_directories(partout PUBLIC ${dir})
 endforeach()
 
 # Depend on C target (include before)
@@ -111,7 +108,6 @@ add_dependencies(partout partout_c)
 target_sources(partout PRIVATE ${PARTOUT_SOURCES})
 target_link_libraries(partout PRIVATE partout_c)
 target_compile_options(partout PRIVATE
-    -emit-module-interface
     -language-mode 5
 )
 
