@@ -50,6 +50,7 @@ public final class NetworkObserver: @unchecked Sendable {
 
     public func startObserving() {
         let signalSubscription = Task { [weak self] in
+            guard let ctx = self?.ctx else { return }
             guard let stream = self?.signalSubject.subscribe() else { return }
             for await signal in stream {
                 guard let self else { return }
@@ -62,9 +63,10 @@ public final class NetworkObserver: @unchecked Sendable {
                 }
                 tryReady(newState)
             }
-            pp_log(self?.ctx ?? .global, .core, .debug, "NetworkObserver.signalSubject terminated")
+            pp_log(ctx, .core, .debug, "NetworkObserver.signalSubject terminated")
         }
         let reachabilitySubscription = Task { [weak self] in
+            guard let ctx = self?.ctx else { return }
             guard let stream = self?.reachabilityStream else { return }
             for await isNetworkAvailable in stream {
                 guard let self else { return }
@@ -77,9 +79,10 @@ public final class NetworkObserver: @unchecked Sendable {
                 }
                 tryReady(newState)
             }
-            pp_log(self?.ctx ?? .global, .core, .debug, "NetworkObserver.reachabilityStream terminated")
+            pp_log(ctx, .core, .debug, "NetworkObserver.reachabilityStream terminated")
         }
         let statusSubscription = Task { [weak self] in
+            guard let ctx = self?.ctx else { return }
             guard let stream = self?.statusStream else { return }
             for await connectionStatus in stream {
                 guard let self else { return }
@@ -92,7 +95,7 @@ public final class NetworkObserver: @unchecked Sendable {
                 }
                 tryReady(newState)
             }
-            pp_log(self?.ctx ?? .global, .core, .debug, "NetworkObserver.statusStream terminated")
+            pp_log(ctx, .core, .debug, "NetworkObserver.statusStream terminated")
         }
         subscriptions = [signalSubscription, reachabilitySubscription, statusSubscription]
     }
