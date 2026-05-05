@@ -28,9 +28,6 @@ public actor Tunnel {
         self.environmentFactory = environmentFactory
         snapshotsSubject = CurrentValueStream([:])
         environments = [:]
-        Task {
-            await observeObjects()
-        }
     }
 }
 
@@ -38,6 +35,7 @@ public actor Tunnel {
 
 extension Tunnel: TunnelStrategy {
     public func prepare(purge: Bool) async throws {
+        observeObjects()
         pp_log(ctx, .core, .info, "Prepare tunnel (purge: \(purge))...")
         try await strategy.prepare(purge: purge)
     }
@@ -146,6 +144,8 @@ extension Tunnel {
 
 private extension Tunnel {
     func observeObjects() {
+        // Subscribe once
+        guard strategySubscription == nil else { return }
         strategySubscription?.cancel()
         strategySubscription = Task { [weak self] in
             guard let stream = self?.strategy.didUpdateActiveProfiles else { return }
