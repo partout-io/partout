@@ -4,7 +4,7 @@ build_dir=.cmake
 bin_dir=bin
 
 #export ANDROID_NDK_ROOT=
-export SWIFT_ANDROID_SDK=~/.swiftpm/swift-sdks/swift-6.2-RELEASE-android-0.1.artifactbundle
+export SWIFT_ANDROID_SDK=~/.swiftpm/swift-sdks/swift-6.3.1-RELEASE_android.artifactbundle
 export ANDROID_NDK_API=28
 export ANDROID_NDK_ARCH=aarch64
 ANDROID_NDK_TARGET=darwin-x86_64
