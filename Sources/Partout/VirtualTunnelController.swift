@@ -56,9 +56,6 @@ public final class VirtualTunnelController: TunnelController {
             tunImpl = infoJSON.withCString {
                 pp_tun_ctrl_set_tunnel(impl, $0)
             }
-            guard let tunImpl else {
-                throw PartoutError(.linkNotActive)
-            }
         } else {
             tunImpl = nil
         }
