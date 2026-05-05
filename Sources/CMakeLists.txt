@@ -108,7 +108,6 @@ add_dependencies(partout partout_c)
 target_sources(partout PRIVATE ${PARTOUT_SOURCES})
 target_link_libraries(partout PRIVATE partout_c)
 target_compile_options(partout PRIVATE
-    -emit-module-interface
     -language-mode 5
 )
 
