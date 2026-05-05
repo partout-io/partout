@@ -146,7 +146,8 @@ private extension Tunnel {
     func observeObjects() {
         strategySubscription?.cancel()
         strategySubscription = Task { [weak self] in
-            for await snapshots in strategy.didUpdateActiveProfiles {
+            guard let stream = self?.strategy.didUpdateActiveProfiles else { return }
+            for await snapshots in stream {
                 guard let self else { return }
                 guard !Task.isCancelled else {
                     pp_log(ctx, .core, .debug, "Cancelled Tunnel.strategy.didUpdateActiveProfiles (observed)")
