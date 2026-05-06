@@ -101,6 +101,13 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
     }
     j_info_json = info_json ? (*env)->NewStringUTF(env, info_json) : NULL;
     tun_impl->fd = (*env)->CallIntMethod(env, jni_ref, method, j_info_json);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): Kotlin exception");
+        tun_impl->fd = -1;
+        goto cleanup;
+    }
     if (tun_impl->fd < 0) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): Invalid fd");
         goto cleanup;

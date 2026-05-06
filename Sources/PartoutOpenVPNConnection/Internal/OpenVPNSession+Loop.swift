@@ -31,6 +31,7 @@ extension OpenVPNSession {
                 } catch {
                     pp_log(ctx, .openvpn, .error, "Failed TUN read: \(error)")
                     await shutdown(error)
+                    return
                 }
             }
         }
@@ -61,6 +62,7 @@ extension OpenVPNSession {
                 } catch {
                     pp_log(ctx, .openvpn, .error, "Failed LINK read: \(error)")
                     await self.shutdown(PartoutError(.linkFailure, error))
+                    return
                 }
             }
         }
