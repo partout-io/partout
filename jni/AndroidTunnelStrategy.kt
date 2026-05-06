@@ -9,6 +9,7 @@ import android.content.Intent
 import android.net.VpnService
 import androidx.core.content.ContextCompat
 import io.partout.abi.TaggedProfile
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.serialization.json.Json
 
 class AndroidTunnelStrategy(
@@ -17,27 +18,39 @@ class AndroidTunnelStrategy(
     private val requestVpnPermission: (Intent) -> Unit
 ) {
     private val appContext = context.applicationContext
-    private var pendingInstall: TaggedProfile? = null
+    private var pendingPermission: CompletableDeferred<Boolean>? = null
 
-    suspend fun connect(profile: TaggedProfile) {
+    suspend fun connect(profile: TaggedProfile): Boolean {
         val permissionIntent = VpnService.prepare(appContext)
         if (permissionIntent != null) {
-            pendingInstall = profile
+            pendingPermission?.complete(false)
+            val permission = CompletableDeferred<Boolean>()
+            pendingPermission = permission
             requestVpnPermission(permissionIntent)
-            return
+            val isGranted = try {
+                permission.await()
+            } finally {
+                if (pendingPermission === permission) {
+                    pendingPermission = null
+                }
+            }
+            if (!isGranted) {
+                return false
+            }
         }
         startVpnService(profile)
+        return true
     }
 
     suspend fun disconnect() {
+        pendingPermission?.complete(false)
+        pendingPermission = null
         stopVpnService()
     }
 
     fun onVpnPermissionResult(granted: Boolean) {
-        val profile = pendingInstall
-        pendingInstall = null
-        if (!granted || profile == null) { return }
-        startVpnService(profile)
+        pendingPermission?.complete(granted)
+        pendingPermission = null
     }
 
     private fun startVpnService(profile: TaggedProfile) {
@@ -56,7 +69,6 @@ class AndroidTunnelStrategy(
 
     companion object {
         const val ACTION_STOP_VPN = "io.partout.jni.action.STOP_VPN"
-        const val EXTRA_PROFILE_ID = "io.partout.jni.extra.PROFILE_ID"
         const val EXTRA_PROFILE_JSON = "io.partout.jni.extra.PROFILE_JSON"
 
         private val json = Json {
