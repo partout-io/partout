@@ -108,7 +108,7 @@ add_dependencies(partout partout_c)
 target_sources(partout PRIVATE ${PARTOUT_SOURCES})
 target_link_libraries(partout PRIVATE partout_c)
 target_compile_options(partout PRIVATE
-    -language-mode 5
+    -language-mode 6
 )
 
 ################################################
