@@ -19,12 +19,10 @@ import kotlinx.serialization.json.Json
 class AndroidTunnelController: AutoCloseable {
     private val logTag = "Partout"
     private val service: VpnService
-    private val builder: VpnService.Builder
     private var descriptor: ParcelFileDescriptor?
 
     constructor(service: VpnService) {
         this.service = service
-        builder = service.Builder()
         descriptor = null
     }
 
@@ -34,7 +32,11 @@ class AndroidTunnelController: AutoCloseable {
 
     // FIXME: Pass Profile
     fun setTunnelSettings(infoJSON: String): Int {
-        assert(descriptor == null)
+        if (descriptor != null) {
+            Log.w(logTag, ">>> AndroidTunnelController: Replacing existing descriptor")
+            clearTunnelSettings()
+        }
+        val builder = service.Builder()
 
         // Decode info
         Log.e(logTag, ">>> AndroidTunnelController: infoJSON = $infoJSON")
@@ -70,6 +72,11 @@ class AndroidTunnelController: AutoCloseable {
             }
         }
 
+        if (!appliedAddressSettings) {
+            Log.e(logTag, ">>> AndroidTunnelController: No valid interface address")
+            return -1
+        }
+
         // Protect remote socket to escape tunnel
         Log.e(logTag, ">>> AndroidTunnelController: Building with remoteFds = " + remoteFds + " (" + remoteFds.size + ")")
         remoteFds.forEach {
@@ -94,7 +101,12 @@ class AndroidTunnelController: AutoCloseable {
 
         // Get fd to tun device
         Log.e(logTag, ">>> AndroidTunnelController: Establishing...")
-        descriptor = builder.establish()
+        descriptor = try {
+            builder.establish()
+        } catch (e: RuntimeException) {
+            Log.e(logTag, ">>> AndroidTunnelController: Unable to establish", e)
+            null
+        }
         if (descriptor == null) {
             Log.e(logTag, ">>> AndroidTunnelController: Unable to establish")
             return -1
