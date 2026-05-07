@@ -1,4 +1,26 @@
 set(CMAKE_C_COMPILER "clang")
 set(CMAKE_CXX_COMPILER "clang")
 set(CMAKE_C_FLAGS "-fPIC")
-set(CMAKE_Swift_FLAGS "-resource-dir $ENV{SWIFT_RESOURCE_DIR} -ldispatch -lstdc++ -lm -lFoundationEssentials -l_FoundationCollections -l_FoundationCShims -lswiftSynchronization")
+
+# Infer from Swift version
+set(SWIFT_RESOURCE_DIR $ENV{HOME}/.local/share/swiftly/toolchains/$ENV{SWIFT_VERSION}/usr/lib/swift_static)
+
+# Inherit clang resource dir (e.g. for stddef.h and stdbool.h)
+execute_process(
+    COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
+    OUTPUT_VARIABLE CLANG_RESOURCE_DIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+
+set(CMAKE_Swift_FLAGS "\
+    -resource-dir ${SWIFT_RESOURCE_DIR} \
+    -Xcc -resource-dir -Xcc ${CLANG_RESOURCE_DIR} \
+    -lFoundationEssentials \
+    -l_FoundationCollections \
+    -l_FoundationCShims \
+    -lswiftSynchronization \
+    -ldispatch \
+    -lstdc++ \
+    -lm"
+)

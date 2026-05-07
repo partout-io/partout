@@ -89,12 +89,13 @@ bin/android-aarch64/libpartout.a    # Android
 
 Additionally, `libpartout_c` must be linked. Partout must be bundled with the shared vendored libraries and the Swift runtime to work.
 
-Building for Android requires access to external SDKs:
+Building for Android requires access to the Android NDK and the Swift Android SDK, where:
 
-- `$ANDROID_NDK_ROOT` to point to your Android NDK installation
-- `$SWIFT_ANDROID_SDK` to point to your Swift for Android SDK installation (e.g. in `~/.swiftpm/swift-sdks`)
+- `$ANDROID_NDK_HOME` points to your Android NDK installation.
+- `$SWIFT_ANDROID_ARCH` defines your host arch for the Swift Android SDK (e.g. `aarch64`).
+- `$SWIFT_ANDROID_VERSION` defines the Swift version of the Swift Android SDK.
 
-The CMake configuration is done with the `android.toolchain.cmake` toolchain. The script runs on macOS, but can be adapted for other platforms with slight tweaks to `scripts/build.sh`.
+Check out `scripts/build.sh` and the `toolchains/android.toolchain.cmake` toolchain file for more details. The build script runs on macOS and Linux.
 
 #### Codegen
 

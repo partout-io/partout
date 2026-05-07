@@ -1,4 +1,5 @@
 set(WGGO_DIR ${PP_BUILD_OUTPUT}/wg-go)
+set(WGGO_ENV_COMMAND)
 
 # Add some flags if -DANDROID (requires NDK tools in the PATH)
 if(ANDROID)
@@ -15,13 +16,15 @@ else()
     set(WGGO_CMD
         make -C ${CMAKE_CURRENT_SOURCE_DIR}/vendors/wg-go
         DESTDIR=${WGGO_DIR}
-        ANDROID=${WGGO_ANDROID})
+        ANDROID=${WGGO_ANDROID}
+        ANDROID_API=${ANDROID_NATIVE_API_LEVEL}
+        ANDROID_ARCH=$ENV{SWIFT_ANDROID_ARCH})
 endif()
 
 ExternalProject_Add(WireGuardGoProject
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/wg-go
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND ${WGGO_CMD}
+    BUILD_COMMAND ${VENDOR_ENV} ${WGGO_CMD}
     INSTALL_COMMAND ""
     BUILD_IN_SOURCE 1
 )
