@@ -18,7 +18,6 @@ HOST_GOOS := android
 HOST_GOARCH := arm64
 export GOOS := $(HOST_GOOS)
 export GOARCH := $(HOST_GOARCH)
-export CC := aarch64-linux-android24-clang
 BUILDEXT := so
 else ifeq ($(HOST_GOOS),linux)
 BUILDEXT := so

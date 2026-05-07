@@ -24,10 +24,10 @@ endif()
 # Configure flags
 set(OPENSSL_CFG_FLAGS no-apps no-docs no-dsa no-engine no-gost no-legacy shared no-ssl no-tests no-zlib)
 
-# Add some flags if -DANDROID (requires NDK tools in the PATH)
+# Add some flags if -DANDROID
 if(ANDROID)
     set(OPENSSL_TARGET "android-arm64")
-    set(OPENSSL_SYMBOLS "-D__ANDROID_API__=${CMAKE_SYSTEM_VERSION}")
+    set(OPENSSL_SYMBOLS "-D__ANDROID_API__=${ANDROID_NATIVE_API_LEVEL}")
 else()
     set(OPENSSL_TARGET "")
     set(OPENSSL_SYMBOLS "")
@@ -42,9 +42,9 @@ set(CFG_ARGS
 )
 ExternalProject_Add(OpenSSLProject
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl
-    CONFIGURE_COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl/Configure ${CFG_ARGS}
-    BUILD_COMMAND ${MAKE_CMD}
-    INSTALL_COMMAND ${MAKE_CMD} install
+    CONFIGURE_COMMAND ${VENDOR_ENV} perl ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl/Configure ${CFG_ARGS}
+    BUILD_COMMAND ${VENDOR_ENV} ${MAKE_CMD}
+    INSTALL_COMMAND ${VENDOR_ENV} ${MAKE_CMD} install
     INSTALL_DIR ${OPENSSL_DIR}
     BUILD_BYPRODUCTS ${OPENSSL_BYPRODUCTS}
 )
