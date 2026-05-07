@@ -1,5 +1,4 @@
 set(WGGO_DIR ${PP_BUILD_OUTPUT}/wg-go)
-set(WGGO_ENV_COMMAND)
 
 # Add some flags if -DANDROID (requires NDK tools in the PATH)
 if(ANDROID)
