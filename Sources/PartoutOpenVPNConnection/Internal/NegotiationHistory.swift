@@ -2,6 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-struct NegotiationHistory {
+struct NegotiationHistory: Sendable {
     let pushReply: PushReply
 }
