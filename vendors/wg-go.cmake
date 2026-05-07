@@ -10,8 +10,8 @@ else()
         DESTDIR=${WGGO_DIR}
     )
     if(ANDROID)
-        set(CLANG "${SWIFT_ANDROID_ARCH}-linux-android${ANDROID_NATIVE_API_LEVEL}-clang")
-        set(WGGO_CMD "${WGGO_CMD} ANDROID=1 CC=${CLANG}")
+        set(CLANG $ENV{SWIFT_ANDROID_ARCH}-linux-android${ANDROID_NATIVE_API_LEVEL}-clang)
+        set(WGGO_CMD ${WGGO_CMD} ANDROID=1 CC=${CLANG})
     endif()
 endif()
 
