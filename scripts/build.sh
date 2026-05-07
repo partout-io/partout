@@ -3,16 +3,6 @@ opt_configuration=Debug
 build_dir=.cmake
 bin_dir=bin
 
-#export ANDROID_NDK_ROOT=
-export SWIFT_ANDROID_SDK=~/.swiftpm/swift-sdks/swift-6.3.1-RELEASE_android.artifactbundle
-export ANDROID_NDK_API=28
-export ANDROID_NDK_ARCH=aarch64
-ANDROID_NDK_TARGET=darwin-x86_64
-
-# These are derived from the above
-export ANDROID_NDK_TOOLCHAIN=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/$ANDROID_NDK_TARGET/bin
-export ANDROID_NDK_SYSROOT=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/$ANDROID_NDK_TARGET/sysroot
-
 positional_args=()
 cmake_opts=()
 while [[ $# -gt 0 ]]; do
@@ -59,8 +49,11 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -android)
-            PATH=$ANDROID_NDK_TOOLCHAIN:$PATH
-            export SWIFT_RESOURCE_DIR=$SWIFT_ANDROID_SDK/swift-android/swift-resources/usr/lib/swift_static-$ANDROID_NDK_ARCH
+            # Requires ANDROID_NDK_HOME and toolchain in PATH
+            export SWIFT_ANDROID_ABI=arm64-v8a
+            export SWIFT_ANDROID_ARCH=aarch64
+            export SWIFT_ANDROID_API_LEVEL=28
+            export SWIFT_ANDROID_VERSION=6.3.1
             cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=toolchains/android.toolchain.cmake")
             shift
             ;;
