@@ -1,5 +1,4 @@
 set(OPENSSL_DIR ${PP_BUILD_OUTPUT}/openssl)
-set(OPENSSL_ENV_COMMAND)
 
 # Output
 if(WIN32)
