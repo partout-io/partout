@@ -70,7 +70,9 @@ endif()
 add_library(partout STATIC "")
 
 # Define symbols to skip Swift imports and legacy code
-target_compile_options(partout PRIVATE -DUSE_CMAKE)
+target_compile_options(partout PRIVATE
+    -DUSE_CMAKE
+)
 
 # Use Foundation on Apple, compatible otherwise
 if(NOT APPLE)
