@@ -78,12 +78,13 @@ while [[ $# -gt 0 ]]; do
 done
 set -- "${positional_args[@]}"
 
-set -e
-if [ ! -d $build_dir ]; then
+# Generate CMake files
+if [[ ! -d $build_dir ]]; then
     mkdir $build_dir
 fi
-
-# Generate CMake files
+if [[ ! -d $bin_dir ]]; then
+    mkdir $bin_dir
+fi
 if [[ $gen_build == 1 ]]; then
     scripts/gen-cmake-files.sh
     pushd $build_dir
