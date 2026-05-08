@@ -32,7 +32,8 @@ case $mode in
             --import-mappings Double=kotlin.Double,String=kotlin.String \
             --additional-properties=serializationLibrary=kotlinx_serialization \
             --additional-properties=packageName=$package_name \
-            --additional-properties=modelPackage=$package_name
+            --additional-properties=modelPackage=$package_name \
+            --schema-mappings OpenVPN.CryptoContainer=kotlin.String \
         ;;
     cpp)
         echo "cpp mode is not implemented yet; exiting."
