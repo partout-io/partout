@@ -2,6 +2,9 @@
 set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(OUTPUT_DIR ${PP_BUILD_OUTPUT}/partout)
 
+# Include file lists
+include("partout.cmake")
+
 # Partout_C ############################################
 
 # Base configuration
@@ -49,9 +52,6 @@ else()
     list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/)
 endif()
 
-# C sources
-include("partout_c.cmake")
-
 # Account for exclusions in source files
 foreach(pattern ${EXCLUDED_PATTERNS})
     list(FILTER PARTOUT_C_SOURCES EXCLUDE REGEX ${pattern})
@@ -78,9 +78,6 @@ target_compile_options(partout PRIVATE
 if(NOT APPLE)
     set(USE_COMPAT ON)
 endif()
-
-# Swift sources
-include("partout.cmake")
 
 # Exclude Foundation if compatibility is on
 if(USE_COMPAT)
