@@ -42,19 +42,9 @@ set(CFG_ARGS
     ${OPENSSL_SYMBOLS}
     ${OPENSSL_CFG_FLAGS}
 )
-ExternalProject_Add(OpenSSLProject
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl
-    CONFIGURE_COMMAND ${VENDOR_ENV} perl ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl/Configure ${CFG_ARGS}
-    BUILD_COMMAND ${VENDOR_ENV} ${MAKE_CMD}
-    INSTALL_COMMAND ${VENDOR_ENV} ${MAKE_CMD} install
-    INSTALL_DIR ${OPENSSL_DIR}
-    BUILD_BYPRODUCTS ${OPENSSL_BYPRODUCTS}
-)
-
+set(OPENSSL_INSTALL_COMMAND ${VENDOR_ENV} ${MAKE_CMD} install)
 if(APPLE)
-    add_custom_command(
-        TARGET OpenSSLProject
-        POST_BUILD
+    list(APPEND OPENSSL_INSTALL_COMMAND
         COMMAND install_name_tool -id "@rpath/libcrypto.3.dylib" "${OPENSSL_DIR}/${OPENSSL_LIBDIR}/libcrypto.3.dylib"
         COMMAND install_name_tool -id "@rpath/libssl.3.dylib" "${OPENSSL_DIR}/${OPENSSL_LIBDIR}/libssl.3.dylib"
         COMMAND install_name_tool -change
@@ -63,6 +53,14 @@ if(APPLE)
             "${OPENSSL_DIR}/${OPENSSL_LIBDIR}/libssl.3.dylib"
     )
 endif()
+ExternalProject_Add(OpenSSLProject
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl
+    CONFIGURE_COMMAND ${VENDOR_ENV} perl ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl/Configure ${CFG_ARGS}
+    BUILD_COMMAND ${VENDOR_ENV} ${MAKE_CMD}
+    INSTALL_COMMAND ${OPENSSL_INSTALL_COMMAND}
+    INSTALL_DIR ${OPENSSL_DIR}
+    BUILD_BYPRODUCTS ${OPENSSL_BYPRODUCTS}
+)
 
 # XXX: Use absolute paths to fix linking clash with system OpenSSL/BoringSSL
 ExternalProject_Get_Property(OpenSSLProject install_dir)
