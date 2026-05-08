@@ -50,7 +50,7 @@ else()
 endif()
 
 # C sources
-file(GLOB_RECURSE PARTOUT_C_SOURCES *.c *.cc)
+include("partout_c.cmake")
 
 # Account for exclusions in source files
 foreach(pattern ${EXCLUDED_PATTERNS})
@@ -80,7 +80,7 @@ if(NOT APPLE)
 endif()
 
 # Swift sources
-file(GLOB_RECURSE PARTOUT_SOURCES *.swift)
+include("partout.cmake")
 
 # Exclude Foundation if compatibility is on
 if(USE_COMPAT)
