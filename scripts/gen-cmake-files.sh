@@ -1,4 +1,5 @@
 #!/bin/bash
+LC_ALL=C
 partout=partout.cmake
 set -e
 cd Sources
