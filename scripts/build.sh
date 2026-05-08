@@ -82,7 +82,7 @@ fi
 
 # Generate CMake files
 if [ $gen_build == 1 ]; then
-    scripts/gen-file-lists.sh
+    scripts/gen-cmake-files.sh
     cd $build_dir
     cmake -G Ninja "${cmake_opts[@]}" ..
 else
