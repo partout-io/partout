@@ -1,2 +1,2 @@
 #!/bin/bash
-exec swiftly run swiftc "$@"
+~/.swiftly/bin/swiftc "$@"
