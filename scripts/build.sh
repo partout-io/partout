@@ -16,6 +16,10 @@ while [[ $# -gt 0 ]]; do
             gen_build=1
             shift
             ;;
+        -gen-models)
+            gen_models=1
+            shift
+            ;;
         -config)
             # Debug|Release
             cmake_opts+=("-DCMAKE_BUILD_TYPE=$2")
@@ -82,10 +86,17 @@ fi
 # Generate CMake files
 if [[ $gen_build == 1 ]]; then
     scripts/gen-cmake-files.sh
-    cd $build_dir
+    pushd $build_dir
     cmake -G Ninja "${cmake_opts[@]}" ..
 else
-    cd $build_dir
+    pushd $build_dir
 fi
-
 cmake --build .
+popd
+
+# Generate foreign models
+if [[ $gen_models == 1 ]]; then
+    scripts/gen-models.sh kotlin cross-models
+    rm -rf cross/android/io/partout/abi
+    mv cross-models/src/main/kotlin/io/partout/abi cross/android/io/partout
+fi
