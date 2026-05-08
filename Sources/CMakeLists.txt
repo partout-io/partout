@@ -85,8 +85,6 @@ if(USE_COMPAT)
         -DMINIF_COMPAT
     )
     set(EXCLUDED_PATTERNS
-        partout-codegen.*
-        PartoutCodegen.*
         PartoutOpenVPNConnection\/V1
         PartoutOS\/Apple.*
         PartoutWireGuardConnection\/V1
