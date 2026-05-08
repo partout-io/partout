@@ -2,6 +2,9 @@
 set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(OUTPUT_DIR ${PP_BUILD_OUTPUT}/partout)
 
+# Include file lists
+include("partout.cmake")
+
 # Partout_C ############################################
 
 # Base configuration
@@ -49,9 +52,6 @@ else()
     list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/)
 endif()
 
-# C sources
-file(GLOB_RECURSE PARTOUT_C_SOURCES *.c *.cc)
-
 # Account for exclusions in source files
 foreach(pattern ${EXCLUDED_PATTERNS})
     list(FILTER PARTOUT_C_SOURCES EXCLUDE REGEX ${pattern})
@@ -78,9 +78,6 @@ target_compile_options(partout PRIVATE
 if(NOT APPLE)
     set(USE_COMPAT ON)
 endif()
-
-# Swift sources
-file(GLOB_RECURSE PARTOUT_SOURCES *.swift)
 
 # Exclude Foundation if compatibility is on
 if(USE_COMPAT)
@@ -109,8 +106,15 @@ endforeach()
 add_dependencies(partout partout_c)
 target_sources(partout PRIVATE ${PARTOUT_SOURCES})
 target_link_libraries(partout PRIVATE partout_c)
+
+# Apple still requires Swift 5 for NE
+if(APPLE)
+    set(SWIFT_MODE 5)
+else()
+    set(SWIFT_MODE 6)
+endif()
 target_compile_options(partout PRIVATE
-    -language-mode 6
+    -language-mode ${SWIFT_MODE}
 )
 
 ################################################

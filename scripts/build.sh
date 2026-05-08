@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 opt_configuration=Debug
 build_dir=.cmake
 bin_dir=bin
@@ -9,6 +10,10 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         -clean)
             rm -rf $build_dir $bin_dir
+            shift
+            ;;
+        -gen)
+            gen_build=1
             shift
             ;;
         -config)
@@ -73,5 +78,14 @@ set -e
 if [ ! -d $build_dir ]; then
     mkdir $build_dir
 fi
-cmake -G Ninja "${cmake_opts[@]}" ..
+
+# Generate CMake files
+if [[ $gen_build == 1 ]]; then
+    scripts/gen-cmake-files.sh
+    cd $build_dir
+    cmake -G Ninja "${cmake_opts[@]}" ..
+else
+    cd $build_dir
+fi
+
 cmake --build .
