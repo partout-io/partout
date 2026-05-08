@@ -3,8 +3,13 @@ set(OPENSSL_LIBDIR "lib")
 
 # Output
 if(WIN32)
-    set(LIBSSL bin/libssl${LIBEXT})
-    set(LIBCRYPTO bin/libcrypto${LIBEXT})
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+        set(OPENSSL_ARCH arm64)
+    else()
+        set(OPENSSL_ARCH x64)
+    endif()
+    set(LIBSSL bin/libssl-3-${OPENSSL_ARCH}${LIBEXT})
+    set(LIBCRYPTO bin/libcrypto-3-${OPENSSL_ARCH}${LIBEXT})
     set(LIBSSL_IMP ${OPENSSL_LIBDIR}/libssl${LIBEXT_IMP})
     set(LIBCRYPTO_IMP ${OPENSSL_LIBDIR}/libcrypto${LIBEXT_IMP})
     set(OPENSSL_BYPRODUCTS
