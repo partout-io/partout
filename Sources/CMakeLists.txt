@@ -126,6 +126,7 @@ set_target_properties(partout PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
     Swift_MODULE_NAME "Partout"
     Swift_MODULE_DIRECTORY "${OUTPUT_DIR}/modules"
+    Swift_COMPILATION_MODE incremental
 )
 set_target_properties(partout_c PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${OUTPUT_DIR}
