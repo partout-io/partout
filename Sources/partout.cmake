@@ -330,6 +330,7 @@ set(PARTOUT_SOURCES
 ./PartoutWireGuardConnection/WireGuardConnection+Alias.swift
 )
 set(PARTOUT_C_SOURCES
+./MiniFoundation_C/rx.cc
 ./MiniFoundation_C/std.c
 ./PartoutCore_C/common.c
 ./PartoutCore_C/lib.c

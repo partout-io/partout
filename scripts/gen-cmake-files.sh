@@ -7,6 +7,6 @@ set(PARTOUT_SOURCES
 $(find . -name "*.swift" | sort)
 )
 set(PARTOUT_C_SOURCES
-$(find . -name "*.c" | sort)
+$(find . \( -name "*.c" -o -name "*.cc" \) | sort)
 )
 EOF
