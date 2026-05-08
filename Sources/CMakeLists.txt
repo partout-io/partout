@@ -109,8 +109,15 @@ endforeach()
 add_dependencies(partout partout_c)
 target_sources(partout PRIVATE ${PARTOUT_SOURCES})
 target_link_libraries(partout PRIVATE partout_c)
+
+# Apple still requires Swift 5 for NE
+if(APPLE)
+    set(SWIFT_MODE 5)
+else()
+    set(SWIFT_MODE 6)
+endif()
 target_compile_options(partout PRIVATE
-    -language-mode 6
+    -language-mode ${SWIFT_MODE}
 )
 
 ################################################
