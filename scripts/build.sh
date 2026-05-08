@@ -80,7 +80,7 @@ if [ ! -d $build_dir ]; then
 fi
 
 # Generate CMake files
-if [ $gen_build == 1 ]; then
+if [[ $gen_build == 1 ]]; then
     scripts/gen-cmake-files.sh
     cd $build_dir
     cmake -G Ninja "${cmake_opts[@]}" ..
