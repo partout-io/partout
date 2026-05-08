@@ -85,8 +85,6 @@ if(USE_COMPAT)
         -DMINIF_COMPAT
     )
     set(EXCLUDED_PATTERNS
-        partout-codegen.*
-        PartoutCodegen.*
         PartoutOpenVPNConnection\/V1
         PartoutOS\/Apple.*
         PartoutWireGuardConnection\/V1
@@ -126,6 +124,7 @@ set_target_properties(partout PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
     Swift_MODULE_NAME "Partout"
     Swift_MODULE_DIRECTORY "${OUTPUT_DIR}/modules"
+    Swift_COMPILATION_MODE incremental
 )
 set_target_properties(partout_c PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${OUTPUT_DIR}

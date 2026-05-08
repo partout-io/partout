@@ -3,9 +3,6 @@ $build_dir = ".cmake"
 $bin_dir = "bin"
 
 try {
-    # Remove all .txt files in the build folder
-    Remove-Item -Path "$build_dir\*.txt" -ErrorAction SilentlyContinue
-
     # Create build folder if it doesn't exist
     if (-not (Test-Path -Path "$build_dir")) {
         New-Item -ItemType Directory -Path "$build_dir" | Out-Null
