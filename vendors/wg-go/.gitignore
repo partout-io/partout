@@ -2,3 +2,4 @@
 build/
 bin/
 .goroot
+wg-go.def
