@@ -3,7 +3,6 @@ set -e
 opt_configuration=Debug
 build_dir=.cmake
 bin_dir=bin
-gen_build=0
 
 positional_args=()
 cmake_opts=()
