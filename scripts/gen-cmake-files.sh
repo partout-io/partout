@@ -4,10 +4,11 @@ partout=partout.cmake
 set -e
 cd Sources
 
-echo 'set(PARTOUT_SOURCES' >${partout}
-find . -name "*.swift" >>${partout}
-echo ')' >>${partout}
-
-echo 'set(PARTOUT_C_SOURCES' >>${partout}
-find . -name "*.c" >>${partout}
-echo ')' >>${partout}
+cat >${partout} <<EOF
+set(PARTOUT_SOURCES
+$(find . -name "*.swift")
+)
+set(PARTOUT_C_SOURCES
+$(find . -name "*.c")
+)
+EOF
