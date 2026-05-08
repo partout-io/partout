@@ -1,2 +1,2 @@
 #!/bin/bash
-~/.swiftly/bin/swiftc "$@"
+~/.local/share/swiftly/bin/swiftc "$@"
