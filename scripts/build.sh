@@ -102,8 +102,9 @@ popd
 
 # Generate foreign models
 if [[ $gen_models == 1 ]]; then
+    openapi=scripts/openapi.yaml
     # Kotlin
-    scripts/gen-models.sh kotlin cross-models
+    scripts/gen-models.sh $openapi kotlin cross-models
     rm -rf cross/android/io/partout/abi
     mv cross-models/src/main/kotlin/io/partout/abi cross/android/io/partout
     # C++ (TODO)

@@ -2,19 +2,19 @@
 set -e
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-infile="$script_dir/openapi.yaml"
 
 usage() {
-    echo "Usage: $0 <lang:kotlin|cpp> <models-dir>"
+    echo "Usage: $0 <openapi> <lang:kotlin|cpp> <models-dir>"
     exit 1
 }
 
-if [ "$#" -ne 2 ]; then
+if [ "$#" -ne 3 ]; then
     usage
 fi
 
-mode=$1
-models_dir=$2
+infile=$1
+mode=$2
+models_dir=$3
 
 # First, update the OpenAPI metadata
 $script_dir/gen-api.sh
