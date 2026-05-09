@@ -8,6 +8,7 @@
 # Start from the official NDK toolchain
 set(ANDROID_ABI $ENV{SWIFT_ANDROID_ABI})
 set(ANDROID_NATIVE_API_LEVEL $ENV{SWIFT_ANDROID_API_LEVEL})
+set(ANDROID_USE_LEGACY_TOOLCHAIN_FILE FALSE)
 include("$ENV{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake")
 
 # Infer from Swift Android SDK version, arch, and API level
