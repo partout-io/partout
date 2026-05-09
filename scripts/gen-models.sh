@@ -22,7 +22,8 @@ $script_dir/gen-api.sh
 case $mode in
     kotlin)
         package_name=io.partout.abi
-        rm -rf $models_dir/src/main/kotlin/io/partout/abi
+        package_dir=${package_name//./\/}
+        rm -rf $models_dir/src/main/kotlin/$package_dir
         openapi-generator generate \
             -i $infile \
             -o $models_dir \
