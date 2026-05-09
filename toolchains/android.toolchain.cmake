@@ -21,6 +21,12 @@ set(CMAKE_C_COMPILER_TARGET ${SWIFT_ANDROID_TRIPLE})
 set(CMAKE_CXX_COMPILER_TARGET ${SWIFT_ANDROID_TRIPLE})
 set(CMAKE_Swift_COMPILER_TARGET ${SWIFT_ANDROID_TRIPLE})
 
+# NDK tools
+set(CMAKE_AR ${ANDROID_TOOLCHAIN_ROOT}/bin/llvm-ar CACHE FILEPATH "Archiver" FORCE)
+set(CMAKE_LINKER ${ANDROID_TOOLCHAIN_ROOT}/bin/llvm-link CACHE FILEPATH "Linker" FORCE)
+set(CMAKE_RANLIB ${ANDROID_TOOLCHAIN_ROOT}/bin/llvm-ranlib CACHE FILEPATH "Ranlib" FORCE)
+set(CMAKE_STRIP ${ANDROID_TOOLCHAIN_ROOT}/bin/llvm-strip CACHE FILEPATH "Strip" FORCE)
+
 # Inherit clang resource dir (e.g. for stddef.h and stdbool.h)
 execute_process(
     COMMAND "${ANDROID_TOOLCHAIN_ROOT}/bin/clang" -print-resource-dir
