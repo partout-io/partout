@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-
 usage() {
     echo "Usage: $0 <openapi> <language:kotlin|cpp> <models_dir> <package_name>"
     exit 1
@@ -18,6 +16,7 @@ models_dir=$3
 package_name=$4
 
 # First, update the OpenAPI metadata
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 $script_dir/gen-api.sh
 
 case $language in

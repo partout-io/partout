@@ -4,6 +4,9 @@ opt_configuration=Debug
 build_dir=.cmake
 bin_dir=bin
 
+root_dir="$(dirname "$0")"/..
+pushd $root_dir
+
 positional_args=()
 cmake_opts=()
 while [[ $# -gt 0 ]]; do
@@ -114,3 +117,5 @@ if [[ $gen_models == 1 ]]; then
     ######
     rm -rf cross-models
 fi
+
+popd root_dir
