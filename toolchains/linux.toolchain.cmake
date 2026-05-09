@@ -16,6 +16,7 @@ execute_process(
 set(CMAKE_Swift_FLAGS "\
     -resource-dir ${SWIFT_RESOURCE_DIR} \
     -Xcc -resource-dir -Xcc ${CLANG_RESOURCE_DIR} \
+    -module-cache-path ${CMAKE_BINARY_DIR}/swift-module-cache \
     -lFoundationEssentials \
     -l_FoundationCollections \
     -l_FoundationCShims \

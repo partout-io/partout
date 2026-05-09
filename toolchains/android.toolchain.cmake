@@ -9,6 +9,7 @@
 set(ANDROID_ABI $ENV{SWIFT_ANDROID_ABI})
 set(ANDROID_NATIVE_API_LEVEL $ENV{SWIFT_ANDROID_API_LEVEL})
 include("$ENV{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/android-post.toolchain.cmake")
 
 # Infer from Swift Android SDK version, arch, and API level
 set(SWIFT_ANDROID_SDK $ENV{HOME}/.swiftpm/swift-sdks/swift-$ENV{SWIFT_ANDROID_VERSION}-RELEASE_android.artifactbundle)
@@ -22,11 +23,14 @@ set(CMAKE_Swift_COMPILER_TARGET ${SWIFT_ANDROID_TRIPLE})
 
 # Inherit clang resource dir (e.g. for stddef.h and stdbool.h)
 execute_process(
-    COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
+    COMMAND "${ANDROID_TOOLCHAIN_ROOT}/bin/clang" -print-resource-dir
     OUTPUT_VARIABLE ANDROID_CLANG_RESOURCE_DIR
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET
 )
+if(NOT ANDROID_CLANG_RESOURCE_DIR)
+    message(FATAL_ERROR "Unable to infer Android clang resource directory")
+endif()
 
 # C/C++
 set(CMAKE_C_FLAGS "-fPIC")
@@ -39,6 +43,7 @@ set(CMAKE_Swift_FLAGS "\
     -Xcc -resource-dir -Xcc ${ANDROID_CLANG_RESOURCE_DIR} \
     -tools-directory ${ANDROID_TOOLCHAIN_ROOT}/bin \
     -sdk ${SWIFT_ANDROID_SDK}/swift-android/ndk-sysroot \
+    -module-cache-path ${CMAKE_BINARY_DIR}/swift-module-cache \
     -lFoundationEssentials \
     -l_FoundationCollections \
     -l_FoundationCShims \
