@@ -9,6 +9,7 @@
 set(ANDROID_ABI $ENV{SWIFT_ANDROID_ABI})
 set(ANDROID_NATIVE_API_LEVEL $ENV{SWIFT_ANDROID_API_LEVEL})
 include("$ENV{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/android-post.toolchain.cmake")
 
 # Infer from Swift Android SDK version, arch, and API level
 set(SWIFT_ANDROID_SDK $ENV{HOME}/.swiftpm/swift-sdks/swift-$ENV{SWIFT_ANDROID_VERSION}-RELEASE_android.artifactbundle)
@@ -51,10 +52,6 @@ set(CMAKE_Swift_FLAGS "\
     -llog \
     -lm"
 )
-
-# XXX: Override NDK behavior about LINK_FLAGS
-set(CMAKE_Swift_CREATE_SHARED_LIBRARY "<CMAKE_Swift_COMPILER> -emit-library <LANGUAGE_COMPILE_FLAGS> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>")
-set(CMAKE_Swift_CREATE_SHARED_MODULE "${CMAKE_Swift_CREATE_SHARED_LIBRARY}")
 
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
