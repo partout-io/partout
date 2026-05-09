@@ -8,7 +8,6 @@
 # Start from the official NDK toolchain
 set(ANDROID_ABI $ENV{SWIFT_ANDROID_ABI})
 set(ANDROID_NATIVE_API_LEVEL $ENV{SWIFT_ANDROID_API_LEVEL})
-set(ANDROID_USE_LEGACY_TOOLCHAIN_FILE FALSE)
 include("$ENV{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake")
 
 # XXX: Work around LINK_FLAGS being injected into swiftc rather than linker
@@ -27,11 +26,6 @@ set(SWIFT_RESOURCE_DIR "${SWIFT_ANDROID_SDK}/swift-android/swift-resources/usr/l
 set(CMAKE_C_COMPILER_TARGET ${SWIFT_ANDROID_TRIPLE})
 set(CMAKE_CXX_COMPILER_TARGET ${SWIFT_ANDROID_TRIPLE})
 set(CMAKE_Swift_COMPILER_TARGET ${SWIFT_ANDROID_TRIPLE})
-
-# NDK tools
-set(CMAKE_AR ${ANDROID_TOOLCHAIN_ROOT}/bin/llvm-ar CACHE FILEPATH "Archiver" FORCE)
-set(CMAKE_RANLIB ${ANDROID_TOOLCHAIN_ROOT}/bin/llvm-ranlib CACHE FILEPATH "Ranlib" FORCE)
-set(CMAKE_STRIP ${ANDROID_TOOLCHAIN_ROOT}/bin/llvm-strip CACHE FILEPATH "Strip" FORCE)
 
 # Inherit clang resource dir (e.g. for stddef.h and stdbool.h)
 execute_process(
