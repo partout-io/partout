@@ -23,11 +23,14 @@ set(CMAKE_Swift_COMPILER_TARGET ${SWIFT_ANDROID_TRIPLE})
 
 # Inherit clang resource dir (e.g. for stddef.h and stdbool.h)
 execute_process(
-    COMMAND "${CMAKE_C_COMPILER}" -print-resource-dir
+    COMMAND "${ANDROID_TOOLCHAIN_ROOT}/bin/clang" -print-resource-dir
     OUTPUT_VARIABLE ANDROID_CLANG_RESOURCE_DIR
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET
 )
+if(NOT ANDROID_CLANG_RESOURCE_DIR)
+    message(FATAL_ERROR "Unable to infer Android clang resource directory")
+endif()
 
 # C/C++
 set(CMAKE_C_FLAGS "-fPIC")
