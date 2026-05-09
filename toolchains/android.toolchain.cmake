@@ -43,6 +43,7 @@ set(CMAKE_Swift_FLAGS "\
     -Xcc -resource-dir -Xcc ${ANDROID_CLANG_RESOURCE_DIR} \
     -tools-directory ${ANDROID_TOOLCHAIN_ROOT}/bin \
     -sdk ${SWIFT_ANDROID_SDK}/swift-android/ndk-sysroot \
+    -module-cache-path ${CMAKE_BINARY_DIR}/swift-module-cache \
     -lFoundationEssentials \
     -l_FoundationCollections \
     -l_FoundationCShims \
