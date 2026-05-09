@@ -10,7 +10,7 @@
 #include <TargetConditionals.h>
 #endif
 
-/* Available on macOS, Linux, and Windows. */
+/* Available on macOS, Linux/Android, and Windows. */
 #if TARGET_OS_OSX || defined(__linux__) || defined(_WIN32)
 
 #include <stdint.h>
