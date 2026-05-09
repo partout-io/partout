@@ -58,7 +58,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -android)
-            # Requires ANDROID_NDK_HOME and toolchain in PATH
+            # Requires ANDROID_NDK_HOME
             export SWIFT_ANDROID_ABI=arm64-v8a
             export SWIFT_ANDROID_ARCH=aarch64
             export SWIFT_ANDROID_API_LEVEL=28
