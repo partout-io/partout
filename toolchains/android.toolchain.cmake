@@ -10,13 +10,6 @@ set(ANDROID_ABI $ENV{SWIFT_ANDROID_ABI})
 set(ANDROID_NATIVE_API_LEVEL $ENV{SWIFT_ANDROID_API_LEVEL})
 include("$ENV{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake")
 
-# XXX: Work around LINK_FLAGS being injected into swiftc rather than linker
-unset(_ANDROID_NDK_INIT_CFLAGS)
-unset(_ANDROID_NDK_INIT_CFLAGS_DEBUG)
-unset(_ANDROID_NDK_INIT_CFLAGS_RELEASE)
-unset(_ANDROID_NDK_INIT_LDFLAGS)
-unset(_ANDROID_NDK_INIT_LDFLAGS_EXE)
-
 # Infer from Swift Android SDK version, arch, and API level
 set(SWIFT_ANDROID_SDK $ENV{HOME}/.swiftpm/swift-sdks/swift-$ENV{SWIFT_ANDROID_VERSION}-RELEASE_android.artifactbundle)
 set(SWIFT_ANDROID_TRIPLE "$ENV{SWIFT_ANDROID_ARCH}-unknown-linux-android${ANDROID_NATIVE_API_LEVEL}")
