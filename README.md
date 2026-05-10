@@ -91,11 +91,11 @@ Additionally, `libpartout_c` must be linked. Partout must be bundled with the sh
 
 Building for Android requires access to the Android NDK and the Swift Android SDK, where the CMake toolchain expects from the environment:
 
-- `$ANDROID_NDK_HOME` points to your Android NDK installation.
-- `$SWIFT_ANDROID_ABI` feeds the ANDROID_ABI parameter (e.g. `arm64-v8a`).
-- `$SWIFT_ANDROID_ARCH` defines your host arch for the Swift Android SDK (e.g. `aarch64`).
-- `$SWIFT_ANDROID_API_LEVEL` sets the API level (e.g. 28).
-- `$SWIFT_ANDROID_VERSION` defines the Swift version of the Swift Android SDK.
+- `ANDROID_NDK_HOME` points to your Android NDK installation.
+- `SWIFT_ANDROID_ABI` feeds the ANDROID_ABI parameter (e.g. `arm64-v8a`).
+- `SWIFT_ANDROID_ARCH` defines your host arch for the Swift Android SDK (e.g. `aarch64`).
+- `SWIFT_ANDROID_API_LEVEL` sets the API level (e.g. 28).
+- `SWIFT_ANDROID_VERSION` defines the Swift version of the Swift Android SDK.
 
 Check out `scripts/build.sh` and the `toolchains/android.toolchain.cmake` toolchain file for more details. The build script runs on macOS and Linux.
 
@@ -104,10 +104,10 @@ Check out `scripts/build.sh` and the `toolchains/android.toolchain.cmake` toolch
 Partout comes with a [code generator][partout-codegen] that translates Swift data entities to a formal OpenAPI specification for non-Swift consumers.
 
 ```
-swift run partout-codegen --manifest scripts/manifest.yaml
+swift run codegen --manifest scripts/manifest.yaml
 ```
 
-`partout-codegen` uses [swift-syntax][credits-swift-syntax] to build an intermediate representation (IR) of the Swift data entities, then proceeds to map it to the OpenAPI format. [openapi-generator][openapi-generator] can eventually be used to generate the Partout data models for other languages.
+`codegen` uses [swift-syntax][credits-swift-syntax] to build an intermediate representation (IR) of the Swift data entities, then proceeds to map it to the OpenAPI format. [openapi-generator][openapi-generator] can eventually be used to generate the Partout data models for other languages.
 
 ## Demo
 
