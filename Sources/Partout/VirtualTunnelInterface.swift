@@ -11,7 +11,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
-    private let tun: pp_tun
+    let tun: pp_tun
 
     nonisolated let deviceName: String?
 
