@@ -1,5 +1,4 @@
 module _PartoutCore_C {
-    header "conditionals.h"
     header "portable/common.h"
     header "portable/endian.h"
     header "portable/network.h"
