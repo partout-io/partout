@@ -282,192 +282,12 @@ uint64_t pp_socket_fd(const pp_socket sock) {
     return sock->fd;
 }
 
-#if PARTOUT_WINDOWS
-static bool pp_socket_platform_init(void) {
-    static int wsa_initialized = 0;
-    if (!wsa_initialized) {
-        WSADATA wsa;
-        if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
-            pp_socket_print_error("WSAStartup()");
-            return false;
-        }
-        wsa_initialized = 1;
-    }
-    return true;
-}
+/* Cross-platform helpers. */
 
-static void pp_socket_print_error(const char *msg) {
-    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed with error %d", msg, WSAGetLastError());
-}
-
-static os_socket_fd pp_socket_invalid_fd(void) {
-    return INVALID_SOCKET;
-}
-
-static bool pp_socket_is_invalid_fd(os_socket_fd fd) {
-    return fd == INVALID_SOCKET;
-}
-
-static void pp_socket_set_not_socket_error(void) {
-    WSASetLastError(WSAENOTSOCK);
-}
-
-static void pp_socket_set_timeout_error(void) {
-    WSASetLastError(WSAETIMEDOUT);
-}
-
-static void pp_socket_set_reset_error(void) {
-    WSASetLastError(WSAECONNRESET);
-}
-
-static void pp_socket_set_error(int err) {
-    WSASetLastError(err);
-}
-
-static bool pp_socket_is_interrupted(void) {
-    return WSAGetLastError() == WSAEINTR;
-}
-
-static bool pp_socket_is_would_block(void) {
-    return WSAGetLastError() == WSAEWOULDBLOCK;
-}
-
-static bool pp_socket_is_connect_pending(void) {
-    const int err = WSAGetLastError();
-    return err == WSAEWOULDBLOCK || err == WSAEINPROGRESS;
-}
-
-static int pp_socket_close_fd(os_socket_fd fd) {
-    return closesocket(fd);
-}
-
-static int pp_socket_shutdown_fd(os_socket_fd fd) {
-    return shutdown(fd, SD_BOTH);
-}
-
-static int pp_socket_recv_fd(os_socket_fd fd, void *dst, size_t dst_len) {
-    return (int)recv(fd, dst, (int)dst_len, 0);
-}
-
-static int pp_socket_send_fd(os_socket_fd fd, const void *src, size_t src_len) {
-    return (int)send(fd, src, (int)src_len, 0);
-}
-
-static int pp_socket_select_nfds(os_socket_fd fd) {
-    (void)fd;
-    return 0;
-}
-
-static int pp_socket_set_nonblocking(os_socket_fd fd, int *original_flags) {
-    (void)original_flags;
-    u_long mode = 1;
-    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
-        pp_socket_print_error("ioctlsocket()");
-        return -1;
-    }
-    return 0;
-}
-
-static int pp_socket_restore_blocking(os_socket_fd fd, int original_flags) {
-    (void)original_flags;
-    u_long mode = 0;
-    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
-        pp_socket_print_error("ioctlsocket()");
-        return -1;
-    }
-    return 0;
-}
-#else
-static bool pp_socket_platform_init(void) {
-    return true;
-}
-
-static void pp_socket_print_error(const char *msg) {
-    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed: %s", msg, strerror(errno));
-}
-
-static os_socket_fd pp_socket_invalid_fd(void) {
-    return -1;
-}
-
-static bool pp_socket_is_invalid_fd(os_socket_fd fd) {
-    return fd == -1;
-}
-
-static void pp_socket_set_not_socket_error(void) {
-    errno = EBADF;
-}
-
-static void pp_socket_set_timeout_error(void) {
-    errno = ETIMEDOUT;
-}
-
-static void pp_socket_set_reset_error(void) {
-    errno = EPIPE;
-}
-
-static void pp_socket_set_error(int err) {
-    errno = err;
-}
-
-static bool pp_socket_is_interrupted(void) {
-    return errno == EINTR;
-}
-
-static bool pp_socket_is_would_block(void) {
-    return errno == EAGAIN || errno == EWOULDBLOCK;
-}
-
-static bool pp_socket_is_connect_pending(void) {
-    return errno == EINPROGRESS;
-}
-
-static int pp_socket_close_fd(os_socket_fd fd) {
-    return close(fd);
-}
-
-static int pp_socket_shutdown_fd(os_socket_fd fd) {
-    return shutdown(fd, SHUT_RDWR);
-}
-
-static int pp_socket_recv_fd(os_socket_fd fd, void *dst, size_t dst_len) {
-    return (int)read(fd, dst, dst_len);
-}
-
-static int pp_socket_send_fd(os_socket_fd fd, const void *src, size_t src_len) {
-    return (int)write(fd, src, src_len);
-}
-
-static int pp_socket_select_nfds(os_socket_fd fd) {
-    return fd + 1;
-}
-
-static int pp_socket_set_nonblocking(os_socket_fd fd, int *original_flags) {
-    *original_flags = fcntl(fd, F_GETFL, 0);
-    if (*original_flags < 0) {
-        pp_socket_print_error("fcntl()");
-        return -1;
-    }
-    if (fcntl(fd, F_SETFL, *original_flags | O_NONBLOCK) < 0) {
-        pp_socket_print_error("fcntl()");
-        return -1;
-    }
-    return 0;
-}
-
-static int pp_socket_restore_blocking(os_socket_fd fd, int original_flags) {
-    if (fcntl(fd, F_SETFL, original_flags) < 0) {
-        pp_socket_print_error("fcntl()");
-        return -1;
-    }
-    return 0;
-}
-#endif
-
-static bool pp_socket_parse_numeric_addr(const char *ip_addr,
-                                         uint16_t port,
-                                         struct sockaddr_storage *addr,
-                                         os_socklen_t *addrlen) {
+bool pp_socket_parse_numeric_addr(const char *ip_addr,
+                                  uint16_t port,
+                                  struct sockaddr_storage *addr,
+                                  os_socklen_t *addrlen) {
     struct sockaddr_in addr4;
     pp_zero(&addr4, sizeof(addr4));
     addr4.sin_family = AF_INET;
@@ -492,7 +312,7 @@ static bool pp_socket_parse_numeric_addr(const char *ip_addr,
     return false;
 }
 
-static void pp_socket_close_impl(pp_socket sock) {
+void pp_socket_close_impl(pp_socket sock) {
     if (!sock || pp_socket_is_invalid_fd(sock->fd)) {
         return;
     }
@@ -500,7 +320,7 @@ static void pp_socket_close_impl(pp_socket sock) {
     sock->fd = pp_socket_invalid_fd();
 }
 
-static bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write) {
+bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write) {
     if (!sock || pp_socket_is_invalid_fd(sock->fd)) {
         pp_socket_set_not_socket_error();
         return false;
@@ -607,3 +427,187 @@ done:
     // Success
     return 0;
 }
+
+/* OS-specific helpers. */
+
+#if PARTOUT_WINDOWS
+bool pp_socket_platform_init(void) {
+    static int wsa_initialized = 0;
+    if (!wsa_initialized) {
+        WSADATA wsa;
+        if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
+            pp_socket_print_error("WSAStartup()");
+            return false;
+        }
+        wsa_initialized = 1;
+    }
+    return true;
+}
+
+void pp_socket_print_error(const char *msg) {
+    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed with error %d", msg, WSAGetLastError());
+}
+
+os_socket_fd pp_socket_invalid_fd(void) {
+    return INVALID_SOCKET;
+}
+
+bool pp_socket_is_invalid_fd(os_socket_fd fd) {
+    return fd == INVALID_SOCKET;
+}
+
+void pp_socket_set_not_socket_error(void) {
+    WSASetLastError(WSAENOTSOCK);
+}
+
+void pp_socket_set_timeout_error(void) {
+    WSASetLastError(WSAETIMEDOUT);
+}
+
+void pp_socket_set_reset_error(void) {
+    WSASetLastError(WSAECONNRESET);
+}
+
+void pp_socket_set_error(int err) {
+    WSASetLastError(err);
+}
+
+bool pp_socket_is_interrupted(void) {
+    return WSAGetLastError() == WSAEINTR;
+}
+
+bool pp_socket_is_would_block(void) {
+    return WSAGetLastError() == WSAEWOULDBLOCK;
+}
+
+bool pp_socket_is_connect_pending(void) {
+    const int err = WSAGetLastError();
+    return err == WSAEWOULDBLOCK || err == WSAEINPROGRESS;
+}
+
+int pp_socket_close_fd(os_socket_fd fd) {
+    return closesocket(fd);
+}
+
+int pp_socket_shutdown_fd(os_socket_fd fd) {
+    return shutdown(fd, SD_BOTH);
+}
+
+int pp_socket_recv_fd(os_socket_fd fd, void *dst, size_t dst_len) {
+    return (int)recv(fd, dst, (int)dst_len, 0);
+}
+
+int pp_socket_send_fd(os_socket_fd fd, const void *src, size_t src_len) {
+    return (int)send(fd, src, (int)src_len, 0);
+}
+
+int pp_socket_select_nfds(os_socket_fd fd) {
+    (void)fd;
+    return 0;
+}
+
+int pp_socket_set_nonblocking(os_socket_fd fd, int *original_flags) {
+    (void)original_flags;
+    u_long mode = 1;
+    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
+        pp_socket_print_error("ioctlsocket()");
+        return -1;
+    }
+    return 0;
+}
+
+int pp_socket_restore_blocking(os_socket_fd fd, int original_flags) {
+    (void)original_flags;
+    u_long mode = 0;
+    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
+        pp_socket_print_error("ioctlsocket()");
+        return -1;
+    }
+    return 0;
+}
+#else
+bool pp_socket_platform_init(void) {
+    return true;
+}
+
+void pp_socket_print_error(const char *msg) {
+    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed: %s", msg, strerror(errno));
+}
+
+os_socket_fd pp_socket_invalid_fd(void) {
+    return -1;
+}
+
+bool pp_socket_is_invalid_fd(os_socket_fd fd) {
+    return fd == -1;
+}
+
+void pp_socket_set_not_socket_error(void) {
+    errno = EBADF;
+}
+
+void pp_socket_set_timeout_error(void) {
+    errno = ETIMEDOUT;
+}
+
+void pp_socket_set_reset_error(void) {
+    errno = EPIPE;
+}
+
+void pp_socket_set_error(int err) {
+    errno = err;
+}
+
+bool pp_socket_is_interrupted(void) {
+    return errno == EINTR;
+}
+
+bool pp_socket_is_would_block(void) {
+    return errno == EAGAIN || errno == EWOULDBLOCK;
+}
+
+bool pp_socket_is_connect_pending(void) {
+    return errno == EINPROGRESS;
+}
+
+int pp_socket_close_fd(os_socket_fd fd) {
+    return close(fd);
+}
+
+int pp_socket_shutdown_fd(os_socket_fd fd) {
+    return shutdown(fd, SHUT_RDWR);
+}
+
+int pp_socket_recv_fd(os_socket_fd fd, void *dst, size_t dst_len) {
+    return (int)read(fd, dst, dst_len);
+}
+
+int pp_socket_send_fd(os_socket_fd fd, const void *src, size_t src_len) {
+    return (int)write(fd, src, src_len);
+}
+
+int pp_socket_select_nfds(os_socket_fd fd) {
+    return fd + 1;
+}
+
+int pp_socket_set_nonblocking(os_socket_fd fd, int *original_flags) {
+    *original_flags = fcntl(fd, F_GETFL, 0);
+    if (*original_flags < 0) {
+        pp_socket_print_error("fcntl()");
+        return -1;
+    }
+    if (fcntl(fd, F_SETFL, *original_flags | O_NONBLOCK) < 0) {
+        pp_socket_print_error("fcntl()");
+        return -1;
+    }
+    return 0;
+}
+
+int pp_socket_restore_blocking(os_socket_fd fd, int original_flags) {
+    if (fcntl(fd, F_SETFL, original_flags) < 0) {
+        pp_socket_print_error("fcntl()");
+        return -1;
+    }
+    return 0;
+}
+#endif
