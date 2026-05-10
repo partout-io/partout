@@ -129,6 +129,7 @@ failure:
     return NULL;
 }
 
+static
 void pp_tun_free(pp_tun tun) {
     if (!tun) return;
     pp_tun_shutdown(tun);

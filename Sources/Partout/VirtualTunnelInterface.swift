@@ -11,7 +11,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
-    let tun: pp_tun
+    private let tun: pp_tun
 
     nonisolated let deviceName: String?
 
@@ -68,7 +68,6 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 
     deinit {
         pp_log(ctx, .core, .debug, "Deinit VirtualTunnelInterface")
-        pp_tun_free(tun)
     }
 
     nonisolated var fileDescriptor: UInt64? {

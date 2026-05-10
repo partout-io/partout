@@ -28,10 +28,10 @@ pp_tun pp_tun_create(const char *_Nonnull uuid) {
     return NULL;
 }
 
+static
 void pp_tun_free(pp_tun tun) {
-    if (!tun) return;
-    pp_tun_shutdown(tun);
-    pp_free(tun);
+    (void)tun;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_android: Free tun with pp_tun_ctrl_clear_tunnel");
 }
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
@@ -215,7 +215,7 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_clear_tunnel(%p)", jni_ref);
 
     // Release the tun_impl allocated in set_tunnel
-    // Do not close impl->fd, JNI close() will take care
+    // Do not close impl->fd, JNI clearTunnelSettings() will take care
     free(tun_impl);
 
     bool did_attach;

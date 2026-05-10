@@ -15,7 +15,7 @@ typedef struct _pp_tun *pp_tun;
 
 /* Platform-specific implementations. */
 //pp_tun _Nullable pp_tun_create(const char *_Nonnull uuid);
-void pp_tun_free(pp_tun _Nonnull tun);
+//void pp_tun_free(pp_tun _Nonnull tun);
 int pp_tun_read(const pp_tun _Nonnull tun, uint8_t *_Nonnull dst, size_t dst_len);
 int pp_tun_write(const pp_tun _Nonnull tun, const uint8_t *_Nonnull src, size_t src_len);
 void pp_tun_shutdown(const pp_tun _Nonnull tun);
