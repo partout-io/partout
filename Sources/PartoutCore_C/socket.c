@@ -4,6 +4,13 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <errno.h>
+#include "portable/socket.h"
+
 #if PARTOUT_WINDOWS
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -29,14 +36,6 @@
 #define SOCKET_PRINT_ERROR(msg) \
     pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed: %s", msg, strerror(errno))
 #endif
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
-#include <errno.h>
-#include "portable/common.h"
-#include "portable/socket.h"
 
 static int pp_socket_connect_with_timeout(os_socket_fd fd,
                                           const struct sockaddr *addr,

@@ -4,6 +4,7 @@
  */
 
 #pragma once
+#include "portable/conditionals.h"
 
 #if !PARTOUT_WINDOWS
 
@@ -14,7 +15,8 @@
 /* Redefine these manually because the <sys/kern_control.h>
  * header is not exposed to iOS */
 #if PARTOUT_APPLE
-#define CTLIOCGINFO 0xc0644e03UL
+static inline
+unsigned int PP_CTLIOCGINFO() { return 0xc0644e03UL; }
 struct ctl_info {
     u_int32_t   ctl_id;
     char        ctl_name[96];

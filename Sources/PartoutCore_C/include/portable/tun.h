@@ -5,6 +5,7 @@
  */
 
 #pragma once
+#include "portable/conditionals.h"
 
 #if PARTOUT_ABI
 #include <stdint.h>
