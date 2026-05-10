@@ -28,9 +28,9 @@ const char *_Nullable pp_tun_name(const pp_tun _Nonnull tun);
 
 /* Tunnel controller. */
 void pp_tun_ctrl_test_working(void *_Nullable ref);
-void *_Nullable pp_tun_ctrl_set_tunnel(void *_Nullable ref, const char *_Nullable info_json);
+pp_tun _Nullable pp_tun_ctrl_set_tunnel(void *_Nullable ref, const char *_Nullable info_json);
 void pp_tun_ctrl_configure_sockets(void *_Nullable ref, const int *_Nullable fds, const size_t fds_len);
-void pp_tun_ctrl_clear_tunnel(void *_Nullable ref, void *_Nullable tun_impl);
+void pp_tun_ctrl_clear_tunnel(void *_Nullable ref, pp_tun _Nonnull tun_impl);
 
 /* Tunnel strategy. */
 //void pp_tun_strg_prepare(void *ref);

@@ -15,7 +15,7 @@ void pp_tun_ctrl_test_working(void *ref) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "[dummy] test_working(%p), ref");
 }
 
-void *pp_tun_ctrl_set_tunnel(void *ref, const char *info_json) {
+pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *info_json) {
     (void)ref;
     (void)info_json;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "[dummy] set_tunnel(%p)", ref);
@@ -29,7 +29,7 @@ void pp_tun_ctrl_configure_sockets(void *ref, const int *fds, const size_t fds_l
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "[dummy] configure_sockets(%p)", ref);
 }
 
-void pp_tun_ctrl_clear_tunnel(void *ref, void *tun_impl) {
+void pp_tun_ctrl_clear_tunnel(void *ref, pp_tun tun_impl) {
     (void)ref;
     (void)tun_impl;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "[dummy] clear_tunnel(%p)", ref);

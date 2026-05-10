@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-/* Expect this struct from ctrl.set_tunnel(). */
+/* Expect this struct from pp_tun_ctrl_set_tunnel(). */
 struct _pp_tun {
     int fd;
 };
@@ -122,7 +122,7 @@ cleanup:
     if (did_attach) (*jvm)->DetachCurrentThread(jvm);
 }
 
-void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
+pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_set_tunnel(%p)", jni_ref);
 
@@ -135,7 +135,7 @@ void *pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
     jstring j_info_json = NULL;
 
     // This will be the result on success
-    vpn_impl *tun_impl = malloc(sizeof(*tun_impl));
+    pp_tun tun_impl = malloc(sizeof(*tun_impl));
     if (tun_impl == NULL) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): NULL tun_impl");
         goto cleanup;
@@ -214,7 +214,7 @@ cleanup:
     if (did_attach) (*jvm)->DetachCurrentThread(jvm);
 }
 
-void pp_tun_ctrl_clear_tunnel(void *jni_ref, void *tun_impl) {
+void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
     assert(jni_ref && tun_impl);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_clear_tunnel(%p)", jni_ref);
 
