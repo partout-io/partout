@@ -21,19 +21,6 @@ struct _pp_tun {
     int fd;
 };
 
-/* Impl is the pp_tun struct as is. */
-static
-pp_tun pp_tun_create(const char *_Nonnull uuid) {
-    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_android: Create tun with pp_tun_ctrl_set_tunnel");
-    return NULL;
-}
-
-static
-void pp_tun_free(pp_tun tun) {
-    (void)tun;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_android: Free tun with pp_tun_ctrl_clear_tunnel");
-}
-
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     if (!tun || tun->fd < 0) return -1;
     return read(tun->fd, dst, dst_len);
