@@ -26,4 +26,18 @@ int pp_tun_fd(const pp_tun _Nonnull tun);
 /* Return the device name or NULL if none. */
 const char *_Nullable pp_tun_name(const pp_tun _Nonnull tun);
 
+/* Tunnel controller. */
+void pp_tun_ctrl_test_working(void *_Nullable ref);
+void *_Nullable pp_tun_ctrl_set_tunnel(void *_Nullable ref, const char *_Nullable info_json);
+void pp_tun_ctrl_configure_sockets(void *_Nullable ref, const int *_Nullable fds, const size_t fds_len);
+void pp_tun_ctrl_clear_tunnel(void *_Nullable ref, void *_Nullable tun_impl);
+
+/* Tunnel strategy. */
+//void pp_tun_strg_prepare(void *ref);
+//void pp_tun_strg_install(void *ref);
+//void pp_tun_strg_uninstall(void *ref);
+//void pp_tun_strg_disconnect(void *ref);
+//void pp_tun_strg_send_msg(void *ref);
+//void pp_tun_strg_on_active(void *ref, callback);
+
 #endif
