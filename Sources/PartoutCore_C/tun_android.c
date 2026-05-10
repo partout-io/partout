@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include "portable/common.h"
+#include "portable/tun.h"
+
 #if PARTOUT_ANDROID
 
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include "portable/common.h"
-#include "portable/tun.h"
 
 /* Expect this struct from ctrl.set_tunnel(). */
 struct _pp_tun {

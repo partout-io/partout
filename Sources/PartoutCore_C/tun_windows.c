@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include "portable/common.h"
+#include "portable/tun.h"
+
 #if PARTOUT_WINDOWS
 
 #include <wintun.h>
 #include <objbase.h>
-#include "portable/common.h"
-#include "portable/tun.h"
 
 // FIXME: #188, convert debug messages to logs
 

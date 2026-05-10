@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include "portable/common.h"
+#include "portable/tun.h"
+
 #if PARTOUT_MACOS
 
 #include <sys/socket.h>
@@ -15,9 +18,7 @@
 #include <net/if_utun.h>
 #include <stdio.h>
 #include <string.h>
-#include "portable/common.h"
 #include "portable/endian.h"
-#include "portable/tun.h"
 
 struct _pp_tun {
     int fd;
