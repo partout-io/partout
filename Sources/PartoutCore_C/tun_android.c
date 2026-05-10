@@ -157,7 +157,7 @@ pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_
     const int dup_fd = dup(tun_impl->fd);
     if (dup_fd < 0) {
         pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): dup(), %s", strerror(errno));
-        return NULL;
+        goto cleanup;
     }
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "pp_tun_ctrl_set_tunnel(): Duplicated tun device %d -> %d", tun_impl->fd, dup_fd);
     tun_impl->fd = dup_fd;
