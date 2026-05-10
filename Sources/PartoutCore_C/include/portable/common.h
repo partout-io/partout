@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Logging counterpart of Swift pp_log
+/* Logging counterpart of Swift pp_log. */
 
 typedef enum {
     PPLogLevelFault,
@@ -37,7 +37,7 @@ void pp_log_simple_append(const char *_Nullable tag,
                           pp_log_level level,
                           const char *_Nonnull message);
 
-// Use inline rather than #define to make available to Swift
+/* Use inline rather than #define to make available to Swift. */
 
 static inline
 void pp_assert(bool condition) {
