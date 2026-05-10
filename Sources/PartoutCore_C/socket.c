@@ -48,13 +48,13 @@ static int pp_socket_set_nonblocking(os_socket_fd fd, int *original_flags);
 static int pp_socket_restore_blocking(os_socket_fd fd, int original_flags);
 static int pp_socket_connect_with_timeout(os_socket_fd fd,
                                           const struct sockaddr *addr,
-                                          socklen_t addrlen,
+                                          os_socklen_t addrlen,
                                           bool blocking,
                                           int timeout_ms);
 static bool pp_socket_parse_numeric_addr(const char *ip_addr,
                                          uint16_t port,
                                          struct sockaddr_storage *addr,
-                                         socklen_t *addrlen);
+                                         os_socklen_t *addrlen);
 static void pp_socket_close_impl(pp_socket sock);
 static bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write);
 
@@ -107,7 +107,7 @@ pp_socket pp_socket_open(const char *ip_addr,
 #endif
 
     struct sockaddr_storage numeric_addr;
-    socklen_t numeric_addrlen = 0;
+    os_socklen_t numeric_addrlen = 0;
     if (pp_socket_parse_numeric_addr(ip_addr, port, &numeric_addr, &numeric_addrlen)) {
         new_fd = socket(numeric_addr.ss_family, hints.ai_socktype, ipproto);
         if (pp_socket_is_invalid_fd(new_fd)) {
@@ -140,7 +140,7 @@ pp_socket pp_socket_open(const char *ip_addr,
         }
         const int ret = pp_socket_connect_with_timeout(new_fd,
                                                        p->ai_addr,
-                                                       (int)p->ai_addrlen,
+                                                       (os_socklen_t)p->ai_addrlen,
                                                        blocking,
                                                        timeout_ms);
         if (ret != 0) {
@@ -467,7 +467,7 @@ static int pp_socket_restore_blocking(os_socket_fd fd, int original_flags) {
 static bool pp_socket_parse_numeric_addr(const char *ip_addr,
                                          uint16_t port,
                                          struct sockaddr_storage *addr,
-                                         socklen_t *addrlen) {
+                                         os_socklen_t *addrlen) {
     struct sockaddr_in addr4;
     pp_zero(&addr4, sizeof(addr4));
     addr4.sin_family = AF_INET;
@@ -544,7 +544,7 @@ static bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool 
 
 int pp_socket_connect_with_timeout(os_socket_fd fd,
                                    const struct sockaddr *addr,
-                                   socklen_t addrlen,
+                                   os_socklen_t addrlen,
                                    bool blocking,
                                    int timeout_ms) {
     // Set non-blocking
