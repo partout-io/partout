@@ -1,3 +1,7 @@
+if(NOT DEFINED ENV{SWIFT_VERSION} OR "$ENV{SWIFT_VERSION}" STREQUAL "")
+    message(FATAL_ERROR "SWIFT_VERSION must be defined")
+endif()
+
 set(CMAKE_C_COMPILER "clang")
 set(CMAKE_CXX_COMPILER "clang")
 set(CMAKE_C_FLAGS "-fPIC")
@@ -12,6 +16,9 @@ execute_process(
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET
 )
+if(NOT CLANG_RESOURCE_DIR)
+    message(FATAL_ERROR "Unable to infer clang resource directory")
+endif()
 
 set(CMAKE_Swift_FLAGS "\
     -resource-dir ${SWIFT_RESOURCE_DIR} \
