@@ -35,6 +35,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
+#include "portable/common.h"
 #include "portable/socket.h"
 
 static int pp_socket_connect_with_timeout(os_socket_fd fd,

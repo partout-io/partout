@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include "portable/common.h"
 #include "portable/tun.h"
 
 /* Expect this struct from ctrl.set_tunnel(). */

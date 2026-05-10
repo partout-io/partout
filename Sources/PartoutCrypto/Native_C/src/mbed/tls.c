@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include "portable/common.h"
 #include "tls/tls.h"
 
 // FIXME: #108, Implement with mbedTLS

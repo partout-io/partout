@@ -7,6 +7,7 @@
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
+#include "portable/common.h"
 #include "crypto/hmac.h"
 #include "crypto/keys.h"
 

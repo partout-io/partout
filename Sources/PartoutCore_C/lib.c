@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include "portable/common.h"
 #include "portable/lib.h"
 
 #if PARTOUT_WINDOWS

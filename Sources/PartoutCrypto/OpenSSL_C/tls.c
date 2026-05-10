@@ -9,6 +9,7 @@
 #include <openssl/x509v3.h>
 #include <openssl/err.h>
 #include <stdio.h>
+#include "portable/common.h"
 #include "tls/tls.h"
 #include "tls/macros.h"
 
