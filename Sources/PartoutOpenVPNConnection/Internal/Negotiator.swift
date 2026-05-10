@@ -652,15 +652,14 @@ private extension Negotiator {
     func completeConnection(pushReply: PushReply) throws {
         pp_log(ctx, .openvpn, .info, "Complete connection of key \(key)")
         let history = NegotiationHistory(pushReply: pushReply)
-#if swift(<6.0)
+#if swift(>=6.0)
+        nonisolated(unsafe) let dataChannel = try newDataChannel(with: history)
+#else
         let dataChannel = try newDataChannel(with: history)
 #endif
         self.history = history
         authenticator?.reset()
         Task {
-#if swift(>=6.0)
-            nonisolated(unsafe) let dataChannel = try newDataChannel(with: history)
-#endif
             await options.onConnected(key, dataChannel, pushReply)
         }
     }
