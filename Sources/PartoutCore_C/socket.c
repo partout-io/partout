@@ -17,9 +17,6 @@
 #include <ws2tcpip.h>
 typedef SOCKET os_socket_fd;
 typedef int os_socklen_t;
-#define OS_INVALID_SOCKET INVALID_SOCKET
-#define OS_SHUTDOWN_BOTH SD_BOTH
-#define OS_SOCKET_ERROR SOCKET_ERROR
 #else
 #include <unistd.h>
 #include <sys/types.h>
@@ -29,12 +26,11 @@ typedef int os_socklen_t;
 #include <netdb.h>
 typedef int os_socket_fd;
 typedef socklen_t os_socklen_t;
-#define OS_INVALID_SOCKET -1
-#define OS_SHUTDOWN_BOTH SHUT_RDWR
-#define OS_SOCKET_ERROR -1
 #endif
 
 static bool pp_socket_platform_init(void);
+static os_socket_fd pp_socket_invalid_fd(void);
+static bool pp_socket_is_invalid_fd(os_socket_fd fd);
 static void pp_socket_print_error(const char *msg);
 static void pp_socket_set_not_socket_error(void);
 static void pp_socket_set_timeout_error(void);
@@ -86,7 +82,7 @@ pp_socket pp_socket_open(const char *ip_addr,
                          int timeout_ms) {
     struct addrinfo hints, *resolved = NULL;
     char port_str[16] = { 0 };
-    os_socket_fd new_fd = OS_INVALID_SOCKET;
+    os_socket_fd new_fd = pp_socket_invalid_fd();
     int ipproto = 0;
 
     if (!pp_socket_platform_init()) {
@@ -114,7 +110,7 @@ pp_socket pp_socket_open(const char *ip_addr,
     socklen_t numeric_addrlen = 0;
     if (pp_socket_parse_numeric_addr(ip_addr, port, &numeric_addr, &numeric_addrlen)) {
         new_fd = socket(numeric_addr.ss_family, hints.ai_socktype, ipproto);
-        if (new_fd == OS_INVALID_SOCKET) {
+        if (pp_socket_is_invalid_fd(new_fd)) {
             pp_socket_print_error("socket()");
             goto failure;
         }
@@ -138,7 +134,7 @@ pp_socket pp_socket_open(const char *ip_addr,
     // Loop through resolved to find first working socket
     for (struct addrinfo *p = resolved; p != NULL; p = p->ai_next) {
         new_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (new_fd == OS_INVALID_SOCKET) {
+        if (pp_socket_is_invalid_fd(new_fd)) {
             pp_socket_print_error("socket()");
             continue;
         }
@@ -156,7 +152,7 @@ pp_socket pp_socket_open(const char *ip_addr,
         break;
     }
     freeaddrinfo(resolved);
-    if (new_fd == OS_INVALID_SOCKET) {
+    if (pp_socket_is_invalid_fd(new_fd)) {
         goto failure;
     }
 
@@ -164,13 +160,13 @@ pp_socket pp_socket_open(const char *ip_addr,
     return pp_socket_create(new_fd);
 
 failure:
-    if (new_fd != OS_INVALID_SOCKET) pp_socket_close_fd(new_fd);
+    if (!pp_socket_is_invalid_fd(new_fd)) pp_socket_close_fd(new_fd);
     return NULL;
 }
 
 /* Close the native file descriptor without freeing the wrapper. */
 void pp_socket_shutdown(pp_socket sock) {
-    if (!sock || sock->fd == OS_INVALID_SOCKET) return;
+    if (!sock || pp_socket_is_invalid_fd(sock->fd)) return;
     (void)pp_socket_shutdown_fd(sock->fd);
 }
 
@@ -190,7 +186,7 @@ void pp_socket_free(pp_socket sock) {
 /* Read up to dst_len bytes, and return the amount of the actually read
  * bytes. Returns < 0 on failure. */
 int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
-    if (!sock || sock->fd == OS_INVALID_SOCKET) {
+    if (!sock || pp_socket_is_invalid_fd(sock->fd)) {
         pp_socket_set_not_socket_error();
         return -1;
     }
@@ -217,7 +213,7 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
 /* Write src_len bytes, and repeat until fully written. Returns the amount
  * of written bytes, expected to always be src_len. Returns < 0 on failure. */
 int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
-    if (!sock || sock->fd == OS_INVALID_SOCKET) {
+    if (!sock || pp_socket_is_invalid_fd(sock->fd)) {
         pp_socket_set_not_socket_error();
         return -1;
     }
@@ -249,7 +245,7 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
 }
 
 bool pp_socket_set_buffers(pp_socket sock, int recvbuf_len, int sendbuf_len) {
-    if (!sock || sock->fd == OS_INVALID_SOCKET) {
+    if (!sock || pp_socket_is_invalid_fd(sock->fd)) {
         pp_socket_set_not_socket_error();
         return false;
     }
@@ -282,7 +278,7 @@ bool pp_socket_wait_writable(pp_socket sock, int timeout_ms) {
 
 /* Return the native file descriptor. */
 uint64_t pp_socket_fd(const pp_socket sock) {
-    pp_assert(sock && sock->fd != OS_INVALID_SOCKET);
+    pp_assert(sock && !pp_socket_is_invalid_fd(sock->fd));
     return sock->fd;
 }
 
@@ -302,6 +298,14 @@ static bool pp_socket_platform_init(void) {
 
 static void pp_socket_print_error(const char *msg) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed with error %d", msg, WSAGetLastError());
+}
+
+static os_socket_fd pp_socket_invalid_fd(void) {
+    return INVALID_SOCKET;
+}
+
+static bool pp_socket_is_invalid_fd(os_socket_fd fd) {
+    return fd == INVALID_SOCKET;
 }
 
 static void pp_socket_set_not_socket_error(void) {
@@ -338,7 +342,7 @@ static int pp_socket_close_fd(os_socket_fd fd) {
 }
 
 static int pp_socket_shutdown_fd(os_socket_fd fd) {
-    return shutdown(fd, OS_SHUTDOWN_BOTH);
+    return shutdown(fd, SD_BOTH);
 }
 
 static int pp_socket_recv_fd(os_socket_fd fd, void *dst, size_t dst_len) {
@@ -357,7 +361,7 @@ static int pp_socket_select_nfds(os_socket_fd fd) {
 static int pp_socket_set_nonblocking(os_socket_fd fd, int *original_flags) {
     (void)original_flags;
     u_long mode = 1;
-    if (ioctlsocket(fd, FIONBIO, &mode) == OS_SOCKET_ERROR) {
+    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
         pp_socket_print_error("ioctlsocket()");
         return -1;
     }
@@ -367,7 +371,7 @@ static int pp_socket_set_nonblocking(os_socket_fd fd, int *original_flags) {
 static int pp_socket_restore_blocking(os_socket_fd fd, int original_flags) {
     (void)original_flags;
     u_long mode = 0;
-    if (ioctlsocket(fd, FIONBIO, &mode) == OS_SOCKET_ERROR) {
+    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
         pp_socket_print_error("ioctlsocket()");
         return -1;
     }
@@ -380,6 +384,14 @@ static bool pp_socket_platform_init(void) {
 
 static void pp_socket_print_error(const char *msg) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed: %s", msg, strerror(errno));
+}
+
+static os_socket_fd pp_socket_invalid_fd(void) {
+    return -1;
+}
+
+static bool pp_socket_is_invalid_fd(os_socket_fd fd) {
+    return fd == -1;
 }
 
 static void pp_socket_set_not_socket_error(void) {
@@ -415,7 +427,7 @@ static int pp_socket_close_fd(os_socket_fd fd) {
 }
 
 static int pp_socket_shutdown_fd(os_socket_fd fd) {
-    return shutdown(fd, OS_SHUTDOWN_BOTH);
+    return shutdown(fd, SHUT_RDWR);
 }
 
 static int pp_socket_recv_fd(os_socket_fd fd, void *dst, size_t dst_len) {
@@ -481,15 +493,15 @@ static bool pp_socket_parse_numeric_addr(const char *ip_addr,
 }
 
 static void pp_socket_close_impl(pp_socket sock) {
-    if (!sock || sock->fd == OS_INVALID_SOCKET) {
+    if (!sock || pp_socket_is_invalid_fd(sock->fd)) {
         return;
     }
     pp_socket_close_fd(sock->fd);
-    sock->fd = OS_INVALID_SOCKET;
+    sock->fd = pp_socket_invalid_fd();
 }
 
 static bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write) {
-    if (!sock || sock->fd == OS_INVALID_SOCKET) {
+    if (!sock || pp_socket_is_invalid_fd(sock->fd)) {
         pp_socket_set_not_socket_error();
         return false;
     }
@@ -519,7 +531,7 @@ static bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool 
         }
 
         const int ret = select(pp_socket_select_nfds(sock->fd), readfds_ptr, writefds_ptr, NULL, tv_ptr);
-        if (ret == OS_SOCKET_ERROR) {
+        if (ret < 0) {
             if (pp_socket_is_interrupted()) {
                 continue;
             }
@@ -567,7 +579,7 @@ int pp_socket_connect_with_timeout(os_socket_fd fd,
     if (ret == 0) {
         pp_socket_set_timeout_error();
         return -2;  // Timeout
-    } else if (ret == OS_SOCKET_ERROR) {
+    } else if (ret < 0) {
         pp_socket_print_error("select()");
         return -1;  // Select error
     }
