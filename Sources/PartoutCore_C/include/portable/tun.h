@@ -14,7 +14,7 @@
 typedef struct _pp_tun *pp_tun;
 
 /* Platform-specific implementations. */
-pp_tun _Nullable pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl);
+//pp_tun _Nullable pp_tun_create(const char *_Nonnull uuid);
 void pp_tun_free(pp_tun _Nonnull tun);
 int pp_tun_read(const pp_tun _Nonnull tun, uint8_t *_Nonnull dst, size_t dst_len);
 int pp_tun_write(const pp_tun _Nonnull tun, const uint8_t *_Nonnull src, size_t src_len);
@@ -28,9 +28,13 @@ const char *_Nullable pp_tun_name(const pp_tun _Nonnull tun);
 
 /* Tunnel controller. */
 void pp_tun_ctrl_test_working(void *_Nullable ref);
-pp_tun _Nullable pp_tun_ctrl_set_tunnel(void *_Nullable ref, const char *_Nullable info_json);
-void pp_tun_ctrl_configure_sockets(void *_Nullable ref, const int *_Nullable fds, const size_t fds_len);
-void pp_tun_ctrl_clear_tunnel(void *_Nullable ref, pp_tun _Nonnull tun_impl);
+pp_tun _Nullable pp_tun_ctrl_set_tunnel(void *_Nullable ref,
+                                        const char *_Nonnull uuid,
+                                        const char *_Nullable info_json);
+void pp_tun_ctrl_configure_sockets(void *_Nullable ref,
+                                   const int *_Nullable fds,
+                                   const size_t fds_len);
+void pp_tun_ctrl_clear_tunnel(void *_Nullable ref, pp_tun _Nullable tun_impl);
 
 /* Tunnel strategy. */
 //void pp_tun_strg_prepare(void *ref);

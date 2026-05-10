@@ -22,22 +22,10 @@ struct _pp_tun {
 };
 
 /* Impl is the pp_tun struct as is. */
-pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable any_impl) {
-    (void)uuid;
-    if (!any_impl) return NULL;
-    pp_tun impl = (pp_tun)any_impl;
-    pp_assert(impl && impl->fd > 0);
-
-    const int dup_fd = dup(impl->fd);
-    if (dup_fd < 0) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "dup(tun): %s", strerror(errno));
-        return NULL;
-    }
-
-    pp_tun tun = pp_alloc(sizeof(*tun));
-    tun->fd = dup_fd;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_android: Duplicated tun device %d -> %d", impl->fd, dup_fd);
-    return tun;
+static
+pp_tun pp_tun_create(const char *_Nonnull uuid) {
+    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_android: Create tun with pp_tun_ctrl_set_tunnel");
+    return NULL;
 }
 
 void pp_tun_free(pp_tun tun) {
@@ -122,7 +110,8 @@ cleanup:
     if (did_attach) (*jvm)->DetachCurrentThread(jvm);
 }
 
-pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
+pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_json) {
+    (void)uuid;
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_set_tunnel(%p)", jni_ref);
 
@@ -165,6 +154,13 @@ pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *info_json) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): Invalid fd");
         goto cleanup;
     }
+    const int dup_fd = dup(tun_impl->fd);
+    if (dup_fd < 0) {
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): dup(), %s", strerror(errno));
+        return NULL;
+    }
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "pp_tun_ctrl_set_tunnel(): Duplicated tun device %d -> %d", tun_impl->fd, dup_fd);
+    tun_impl->fd = dup_fd;
 
 cleanup:
     if (tun_impl != NULL && tun_impl->fd < 0) {

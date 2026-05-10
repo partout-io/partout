@@ -25,9 +25,9 @@ struct _pp_tun {
     const char *dev_name;
 };
 
-pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl) {
+static
+pp_tun pp_tun_create(const char *_Nonnull uuid) {
     (void)uuid;
-    (void)impl;
     struct sockaddr_ctl sc = { 0 };
     struct ctl_info ctl_info = { 0 };
     char ifname[IFNAMSIZ] = { 0 };

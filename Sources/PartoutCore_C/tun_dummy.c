@@ -15,8 +15,9 @@ void pp_tun_ctrl_test_working(void *ref) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "[dummy] test_working(%p), ref");
 }
 
-pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *info_json) {
+pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
     (void)ref;
+    (void)uuid;
     (void)info_json;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "[dummy] set_tunnel(%p)", ref);
     return NULL;

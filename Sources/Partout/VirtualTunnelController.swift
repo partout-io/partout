@@ -24,9 +24,7 @@ public final class VirtualTunnelController: TunnelController {
         self.impl = impl
         self.maxReadLength = maxReadLength
 
-        if let thiz = impl {
-            pp_tun_ctrl_test_working(thiz)
-        }
+        pp_tun_ctrl_test_working(impl)
     }
 
     deinit {
@@ -51,21 +49,11 @@ public final class VirtualTunnelController: TunnelController {
         }()
 
         // Create tun with optional implementation from controller
-        let tunImpl: UnsafeMutableRawPointer?
-        if let impl {
-            tunImpl = infoJSON.withCString {
-                pp_tun_ctrl_set_tunnel(impl, $0)
+        guard let tun = info.originalModuleId.uuidString.withCString({ uuid in
+            infoJSON.withCString { info in
+                pp_tun_ctrl_set_tunnel(impl, uuid, info)
             }
-        } else {
-            tunImpl = nil
-        }
-        let uuid = info.originalModuleId
-        guard let tun = uuid.uuidString.withCString({
-            pp_tun_create($0, tunImpl)
         }) else {
-            if let impl {
-                pp_tun_ctrl_clear_tunnel(impl, tunImpl)
-            }
             throw PartoutError(.linkNotActive)
         }
 
@@ -96,7 +84,7 @@ public final class VirtualTunnelController: TunnelController {
 //            excludedRoutes.append(Route(Subnet(serverAddress), nil))
 //        }
 
-        return VirtualTunnelInterface(ctx, tun: tun, tunImpl: tunImpl, maxReadLength: maxReadLength)
+        return VirtualTunnelInterface(ctx, tun: tun, maxReadLength: maxReadLength)
     }
 
     public func configureSockets(with descriptors: [UInt64]) {
@@ -117,9 +105,7 @@ public final class VirtualTunnelController: TunnelController {
         await tunnel.shutdown()
 
         // Release tun implementation if necessary
-        if let thiz = impl {
-            pp_tun_ctrl_clear_tunnel(thiz, tunnel.tunImpl)
-        }
+        pp_tun_ctrl_clear_tunnel(impl, tunnel.tun)
     }
 
     public func setReasserting(_ reasserting: Bool) {

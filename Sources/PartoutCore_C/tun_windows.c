@@ -61,9 +61,8 @@ GUID guid_from_wstring(const wchar_t *wstr) {
     return guid;
 }
 
-pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl) {
-    (void)impl;
-
+static
+pp_tun pp_tun_create(const char *_Nonnull uuid) {
     WINTUN_ADAPTER_HANDLE adapter = NULL;
     WINTUN_SESSION_HANDLE session = NULL;
     LPCWSTR tun_type = NULL;
