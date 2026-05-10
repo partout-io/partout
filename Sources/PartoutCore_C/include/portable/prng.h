@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#pragma once
+#include "portable/conditionals.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

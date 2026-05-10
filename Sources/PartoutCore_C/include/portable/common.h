@@ -5,6 +5,7 @@
  */
 
 #pragma once
+#include "portable/conditionals.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -12,7 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Logging counterpart of Swift pp_log
+/* Logging counterpart of Swift pp_log. */
 
 typedef enum {
     PPLogLevelFault,
@@ -37,7 +38,7 @@ void pp_log_simple_append(const char *_Nullable tag,
                           pp_log_level level,
                           const char *_Nonnull message);
 
-// Use inline rather than #define to make available to Swift
+/* Use inline rather than #define to make available to Swift. */
 
 static inline
 void pp_assert(bool condition) {
@@ -71,7 +72,7 @@ void pp_zero(void *_Nonnull ptr, size_t count) {
 
 static inline
 char *_Nonnull pp_dup(const char *_Nonnull str) {
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
     char *ptr = _strdup(str);
 #else
     char *ptr = strdup(str);
@@ -83,7 +84,7 @@ char *_Nonnull pp_dup(const char *_Nonnull str) {
     return ptr;
 }
 
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
 static inline
 FILE *_Nullable pp_fopen(const char *_Nonnull filename, const char *_Nonnull mode) {
     FILE *file_ret = NULL;
@@ -99,7 +100,7 @@ FILE *_Nullable pp_fopen(const char *_Nonnull filename, const char *_Nonnull mod
 #define pp_sscanf sscanf
 #endif
 
-#ifdef __ANDROID__
+#if PARTOUT_ANDROID
 #include <jni.h>
 #include <stdbool.h>
 extern _Nullable JavaVM *_Nullable jvm;

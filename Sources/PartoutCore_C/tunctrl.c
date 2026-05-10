@@ -7,7 +7,7 @@
 #include "portable/common.h"
 #include "portable/tunctrl.h"
 
-#ifdef __ANDROID__
+#if PARTOUT_ANDROID
 
 #include <jni.h>
 #include <assert.h>

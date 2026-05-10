@@ -23,7 +23,7 @@ void pp_clog_v(pp_log_category category,
     pp_free(msg);
 }
 
-#ifdef __ANDROID__
+#if PARTOUT_ANDROID
 #include <android/log.h>
 
 JNIEnv *pp_jni_attach_thread(bool *did_attach) {

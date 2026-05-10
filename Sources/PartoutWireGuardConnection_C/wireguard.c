@@ -28,7 +28,7 @@ void pp_wg_set_logger(void *context, pp_wg_logger_fn logger_fn) {
     return wgSetLogger(context, logger_fn);
 }
 
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
 int pp_wg_turn_on(const char *settings, const char *ifname) {
     return wgTurnOn(settings, ifname);
 }
@@ -58,7 +58,7 @@ void pp_wg_tweak_mobile_roaming(int handle) {
     return wgDisableSomeRoamingForBrokenMobileSemantics(handle);
 }
 
-#ifdef __ANDROID__
+#if PARTOUT_ANDROID
 int pp_wg_get_socket_v4(int handle) {
     return wgGetSocketV4(handle);
 }

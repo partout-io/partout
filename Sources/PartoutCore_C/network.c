@@ -7,15 +7,17 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include "portable/network.h"
 
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
 #include <ws2tcpip.h>
 #else
 #include <arpa/inet.h>
+#include <net/if.h>
+#include <netdb.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #endif
-
-#include "portable/network.h"
 
 int pp_addr_string(void *dst, const size_t dst_len,
                            const void *src, const size_t src_len,

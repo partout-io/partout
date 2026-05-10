@@ -6,7 +6,7 @@
 
 // FIXME: #108, Implement on Apple (CommonCrypto), Linux, Android
 
-#ifndef _WIN32
+#if !PARTOUT_WINDOWS
 
 #include "crypto/crypto.h"
 #include "crypto/hmac.h"

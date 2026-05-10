@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#ifdef _WIN32
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <fcntl.h>
+#include <errno.h>
+#include "portable/common.h"
+#include "portable/socket.h"
+
+#if PARTOUT_WINDOWS
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #define os_socket_fd SOCKET
@@ -29,14 +37,6 @@
 #define SOCKET_PRINT_ERROR(msg) \
     pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed: %s", msg, strerror(errno))
 #endif
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>
-#include <errno.h>
-#include "portable/common.h"
-#include "portable/socket.h"
 
 static int pp_socket_connect_with_timeout(os_socket_fd fd,
                                           const struct sockaddr *addr,
@@ -77,7 +77,7 @@ pp_socket pp_socket_open(const char *ip_addr,
     os_socket_fd new_fd = OS_INVALID_SOCKET;
     int ipproto = 0;
 
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
     static int wsa_initialized = 0;
     if (!wsa_initialized) {
         WSADATA wsa;
@@ -187,14 +187,14 @@ void pp_socket_free(pp_socket sock) {
  * bytes. Returns < 0 on failure. */
 int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
     if (!sock || sock->fd == OS_INVALID_SOCKET) {
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
         WSASetLastError(WSAENOTSOCK);
 #else
         errno = EBADF;
 #endif
         return -1;
     }
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
     while (true) {
         const int read_len = (int)recv(sock->fd, (void *)dst, dst_len, 0);
         if (read_len < 0 && WSAGetLastError() == WSAEINTR) {
@@ -233,7 +233,7 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
  * of written bytes, expected to always be src_len. Returns < 0 on failure. */
 int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
     if (!sock || sock->fd == OS_INVALID_SOCKET) {
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
         WSASetLastError(WSAENOTSOCK);
 #else
         errno = EBADF;
@@ -246,13 +246,13 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
         const uint8_t *current_src = src + offset;
         const size_t remaining = src_len - offset;
 
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
         const int written_len = (int)send(sock->fd, (const char *)current_src, (int)remaining, 0);
 #else
         const int written_len = (int)write(sock->fd, current_src, remaining);
 #endif
         if (written_len < 0) {
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
             const int err = WSAGetLastError();
             if (err == WSAEINTR) {
                 continue;
@@ -272,7 +272,7 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
             return written_len;
         }
         if (written_len == 0) {
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
             WSASetLastError(WSAECONNRESET);
 #else
             errno = EPIPE;
@@ -287,7 +287,7 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
 
 bool pp_socket_set_buffers(pp_socket sock, int recvbuf_len, int sendbuf_len) {
     if (!sock || sock->fd == OS_INVALID_SOCKET) {
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
         WSASetLastError(WSAENOTSOCK);
 #else
         errno = EBADF;
@@ -365,7 +365,7 @@ static void pp_socket_close_impl(pp_socket sock) {
 
 static bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write) {
     if (!sock || sock->fd == OS_INVALID_SOCKET) {
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
         WSASetLastError(WSAENOTSOCK);
 #else
         errno = EBADF;
@@ -397,7 +397,7 @@ static bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool 
             tv_ptr = &tv;
         }
 
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
         const int ret = select(0, readfds_ptr, writefds_ptr, NULL, tv_ptr);
         if (ret == SOCKET_ERROR) {
             if (WSAGetLastError() == WSAEINTR) {
@@ -426,7 +426,7 @@ int pp_socket_connect_with_timeout(os_socket_fd fd,
                                    bool blocking,
                                    int timeout_ms) {
     // Set non-blocking
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
     u_long mode = 1;
     if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
         SOCKET_PRINT_ERROR("ioctlsocket()");
@@ -451,7 +451,7 @@ int pp_socket_connect_with_timeout(os_socket_fd fd,
         goto done;
     }
     // Tell real errors from non-blocking pending states
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
     if (WSAGetLastError() != WSAEWOULDBLOCK && WSAGetLastError() != WSAEINPROGRESS) {
         SOCKET_PRINT_ERROR("connect()");
         return -1;
@@ -475,7 +475,7 @@ int pp_socket_connect_with_timeout(os_socket_fd fd,
     // Wait until timeout
     ret = select(fd + 1, NULL, &wfds, NULL, &tv);
     if (ret == 0) {
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
         WSASetLastError(WSAETIMEDOUT);
 #else
         errno = ETIMEDOUT;
@@ -494,7 +494,7 @@ int pp_socket_connect_with_timeout(os_socket_fd fd,
         return -1;
     }
     if (err != 0) {
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
         WSASetLastError(err);
 #else
         errno = err;
@@ -505,7 +505,7 @@ int pp_socket_connect_with_timeout(os_socket_fd fd,
 done:
     // Store/restore blocking mode as needed
     if (blocking) {
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
         mode = 0;
         if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
             SOCKET_PRINT_ERROR("ioctlsocket()");

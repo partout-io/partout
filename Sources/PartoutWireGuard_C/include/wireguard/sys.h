@@ -4,8 +4,9 @@
  */
 
 #pragma once
+#include "portable/conditionals.h"
 
-#ifndef _WIN32
+#if !PARTOUT_WINDOWS
 
 #include <sys/types.h>
 #include "wireguard/key.h"
@@ -13,7 +14,7 @@
 
 /* Redefine these manually because the <sys/kern_control.h>
  * header is not exposed to iOS */
-#ifdef __APPLE__
+#if PARTOUT_APPLE
 #define CTLIOCGINFO 0xc0644e03UL
 struct ctl_info {
     u_int32_t   ctl_id;

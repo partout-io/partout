@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#if defined(__linux__) && !defined(__ANDROID__)
+#include "portable/common.h"
+#include "portable/tun.h"
+
+#if PARTOUT_LINUX
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,8 +17,6 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <sys/unistd.h>
-#include "portable/common.h"
-#include "portable/tun.h"
 
 struct _pp_tun {
     int fd;
