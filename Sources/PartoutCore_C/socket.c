@@ -28,35 +28,35 @@ typedef int os_socket_fd;
 typedef socklen_t os_socklen_t;
 #endif
 
-static bool pp_socket_platform_init(void);
-static os_socket_fd pp_socket_invalid_fd(void);
-static bool pp_socket_is_invalid_fd(os_socket_fd fd);
-static void pp_socket_print_error(const char *msg);
-static void pp_socket_set_not_socket_error(void);
-static void pp_socket_set_timeout_error(void);
-static void pp_socket_set_reset_error(void);
-static void pp_socket_set_error(int err);
-static bool pp_socket_is_interrupted(void);
-static bool pp_socket_is_would_block(void);
-static bool pp_socket_is_connect_pending(void);
-static int pp_socket_close_fd(os_socket_fd fd);
-static int pp_socket_shutdown_fd(os_socket_fd fd);
-static int pp_socket_recv_fd(os_socket_fd fd, void *dst, size_t dst_len);
-static int pp_socket_send_fd(os_socket_fd fd, const void *src, size_t src_len);
-static int pp_socket_select_nfds(os_socket_fd fd);
-static int pp_socket_set_nonblocking(os_socket_fd fd, int *original_flags);
-static int pp_socket_restore_blocking(os_socket_fd fd, int original_flags);
-static int pp_socket_connect_with_timeout(os_socket_fd fd,
-                                          const struct sockaddr *addr,
-                                          os_socklen_t addrlen,
-                                          bool blocking,
-                                          int timeout_ms);
-static bool pp_socket_parse_numeric_addr(const char *ip_addr,
-                                         uint16_t port,
-                                         struct sockaddr_storage *addr,
-                                         os_socklen_t *addrlen);
-static void pp_socket_close_impl(pp_socket sock);
-static bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write);
+static bool local_platform_init(void);
+static os_socket_fd local_invalid_fd(void);
+static bool local_is_invalid_fd(os_socket_fd fd);
+static void local_print_error(const char *msg);
+static void local_set_not_socket_error(void);
+static void local_set_timeout_error(void);
+static void local_set_reset_error(void);
+static void local_set_error(int err);
+static bool local_is_interrupted(void);
+static bool local_is_would_block(void);
+static bool local_is_connect_pending(void);
+static int local_close_fd(os_socket_fd fd);
+static int local_shutdown_fd(os_socket_fd fd);
+static int local_recv_fd(os_socket_fd fd, void *dst, size_t dst_len);
+static int local_send_fd(os_socket_fd fd, const void *src, size_t src_len);
+static int local_select_nfds(os_socket_fd fd);
+static int local_set_nonblocking(os_socket_fd fd, int *original_flags);
+static int local_restore_blocking(os_socket_fd fd, int original_flags);
+static int local_connect_with_timeout(os_socket_fd fd,
+                                      const struct sockaddr *addr,
+                                      os_socklen_t addrlen,
+                                      bool blocking,
+                                      int timeout_ms);
+static bool local_parse_numeric_addr(const char *ip_addr,
+                                     uint16_t port,
+                                     struct sockaddr_storage *addr,
+                                     os_socklen_t *addrlen);
+static void local_close_impl(pp_socket sock);
+static bool local_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write);
 
 /* Host a file descriptor with the specific platform type. POSIX systems
  * use int, whereas Windows uses SOCKET.  */
@@ -82,10 +82,10 @@ pp_socket pp_socket_open(const char *ip_addr,
                          int timeout_ms) {
     struct addrinfo hints, *resolved = NULL;
     char port_str[16] = { 0 };
-    os_socket_fd new_fd = pp_socket_invalid_fd();
+    os_socket_fd new_fd = local_invalid_fd();
     int ipproto = 0;
 
-    if (!pp_socket_platform_init()) {
+    if (!local_platform_init()) {
         goto failure;
     }
 
@@ -108,18 +108,18 @@ pp_socket pp_socket_open(const char *ip_addr,
 
     struct sockaddr_storage numeric_addr;
     os_socklen_t numeric_addrlen = 0;
-    if (pp_socket_parse_numeric_addr(ip_addr, port, &numeric_addr, &numeric_addrlen)) {
+    if (local_parse_numeric_addr(ip_addr, port, &numeric_addr, &numeric_addrlen)) {
         new_fd = socket(numeric_addr.ss_family, hints.ai_socktype, ipproto);
-        if (pp_socket_is_invalid_fd(new_fd)) {
-            pp_socket_print_error("socket()");
+        if (local_is_invalid_fd(new_fd)) {
+            local_print_error("socket()");
             goto failure;
         }
-        if (pp_socket_connect_with_timeout(new_fd,
+        if (local_connect_with_timeout(new_fd,
                                            (const struct sockaddr *)&numeric_addr,
                                            numeric_addrlen,
                                            blocking,
                                            timeout_ms) != 0) {
-            pp_socket_print_error("connect()");
+            local_print_error("connect()");
             goto failure;
         }
         return pp_socket_create(new_fd);
@@ -127,32 +127,32 @@ pp_socket pp_socket_open(const char *ip_addr,
 
     snprintf(port_str, sizeof(port_str), "%u", port);
     if (getaddrinfo(ip_addr, port_str, &hints, &resolved) != 0) {
-        pp_socket_print_error("getaddrinfo()");
+        local_print_error("getaddrinfo()");
         goto failure;
     }
 
     // Loop through resolved to find first working socket
     for (struct addrinfo *p = resolved; p != NULL; p = p->ai_next) {
         new_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (pp_socket_is_invalid_fd(new_fd)) {
-            pp_socket_print_error("socket()");
+        if (local_is_invalid_fd(new_fd)) {
+            local_print_error("socket()");
             continue;
         }
-        const int ret = pp_socket_connect_with_timeout(new_fd,
+        const int ret = local_connect_with_timeout(new_fd,
                                                        p->ai_addr,
                                                        (os_socklen_t)p->ai_addrlen,
                                                        blocking,
                                                        timeout_ms);
         if (ret != 0) {
-            pp_socket_close_fd(new_fd);
-            pp_socket_print_error("connect()");
+            local_close_fd(new_fd);
+            local_print_error("connect()");
             continue;
         }
         // Exit loop on first success
         break;
     }
     freeaddrinfo(resolved);
-    if (pp_socket_is_invalid_fd(new_fd)) {
+    if (local_is_invalid_fd(new_fd)) {
         goto failure;
     }
 
@@ -160,40 +160,40 @@ pp_socket pp_socket_open(const char *ip_addr,
     return pp_socket_create(new_fd);
 
 failure:
-    if (!pp_socket_is_invalid_fd(new_fd)) pp_socket_close_fd(new_fd);
+    if (!local_is_invalid_fd(new_fd)) local_close_fd(new_fd);
     return NULL;
 }
 
 /* Close the native file descriptor without freeing the wrapper. */
 void pp_socket_shutdown(pp_socket sock) {
-    if (!sock || pp_socket_is_invalid_fd(sock->fd)) return;
-    (void)pp_socket_shutdown_fd(sock->fd);
+    if (!sock || local_is_invalid_fd(sock->fd)) return;
+    (void)local_shutdown_fd(sock->fd);
 }
 
 /* Close the native file descriptor without freeing the wrapper. */
 void pp_socket_close(pp_socket sock) {
     if (!sock) return;
-    pp_socket_close_impl(sock);
+    local_close_impl(sock);
 }
 
 /* Free the socket wrapper. */
 void pp_socket_free(pp_socket sock) {
     if (!sock) return;
-    pp_socket_close_impl(sock);
+    local_close_impl(sock);
     pp_free(sock);
 }
 
 /* Read up to dst_len bytes, and return the amount of the actually read
  * bytes. Returns < 0 on failure. */
 int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
-    if (!sock || pp_socket_is_invalid_fd(sock->fd)) {
-        pp_socket_set_not_socket_error();
+    if (!sock || local_is_invalid_fd(sock->fd)) {
+        local_set_not_socket_error();
         return -1;
     }
 
     while (true) {
-        const int read_len = pp_socket_recv_fd(sock->fd, dst, dst_len);
-        if (read_len < 0 && pp_socket_is_interrupted()) {
+        const int read_len = local_recv_fd(sock->fd, dst, dst_len);
+        if (read_len < 0 && local_is_interrupted()) {
             continue;
         }
         if (read_len < 0) {
@@ -201,10 +201,10 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
              * for a message to arrive, unless the socket is nonblocking (see fcntl(2))
              * in which case the value -1 is returned and the external variable errno
              * set to EAGAIN. */
-            if (pp_socket_is_would_block()) {
+            if (local_is_would_block()) {
                 return 0;
             }
-            pp_socket_print_error("recv()");
+            local_print_error("recv()");
         }
         return read_len;
     }
@@ -213,8 +213,8 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
 /* Write src_len bytes, and repeat until fully written. Returns the amount
  * of written bytes, expected to always be src_len. Returns < 0 on failure. */
 int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
-    if (!sock || pp_socket_is_invalid_fd(sock->fd)) {
-        pp_socket_set_not_socket_error();
+    if (!sock || local_is_invalid_fd(sock->fd)) {
+        local_set_not_socket_error();
         return -1;
     }
 
@@ -223,20 +223,20 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
         const uint8_t *current_src = src + offset;
         const size_t remaining = src_len - offset;
 
-        const int written_len = pp_socket_send_fd(sock->fd, current_src, remaining);
+        const int written_len = local_send_fd(sock->fd, current_src, remaining);
         if (written_len < 0) {
-            if (pp_socket_is_interrupted()) {
+            if (local_is_interrupted()) {
                 continue;
             }
-            if (pp_socket_is_would_block()) {
+            if (local_is_would_block()) {
                 return offset > 0 ? (int)offset : 0;
             }
-            pp_socket_print_error("send()");
+            local_print_error("send()");
             return written_len;
         }
         if (written_len == 0) {
-            pp_socket_set_reset_error();
-            pp_socket_print_error("send()");
+            local_set_reset_error();
+            local_print_error("send()");
             return -1;
         }
         offset += (size_t)written_len;
@@ -245,21 +245,21 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
 }
 
 bool pp_socket_set_buffers(pp_socket sock, int recvbuf_len, int sendbuf_len) {
-    if (!sock || pp_socket_is_invalid_fd(sock->fd)) {
-        pp_socket_set_not_socket_error();
+    if (!sock || local_is_invalid_fd(sock->fd)) {
+        local_set_not_socket_error();
         return false;
     }
 
     bool did_set = true;
     if (recvbuf_len > 0) {
         if (setsockopt(sock->fd, SOL_SOCKET, SO_RCVBUF, (const char *)&recvbuf_len, sizeof(recvbuf_len)) < 0) {
-            pp_socket_print_error("setsockopt(SO_RCVBUF)");
+            local_print_error("setsockopt(SO_RCVBUF)");
             did_set = false;
         }
     }
     if (sendbuf_len > 0) {
         if (setsockopt(sock->fd, SOL_SOCKET, SO_SNDBUF, (const char *)&sendbuf_len, sizeof(sendbuf_len)) < 0) {
-            pp_socket_print_error("setsockopt(SO_SNDBUF)");
+            local_print_error("setsockopt(SO_SNDBUF)");
             did_set = false;
         }
     }
@@ -268,26 +268,26 @@ bool pp_socket_set_buffers(pp_socket sock, int recvbuf_len, int sendbuf_len) {
 
 /* Wait until the socket is readable. Returns false on timeout or failure. */
 bool pp_socket_wait_readable(pp_socket sock, int timeout_ms) {
-    return pp_socket_wait(sock, timeout_ms, true, false);
+    return local_wait(sock, timeout_ms, true, false);
 }
 
 /* Wait until the socket is writable. Returns false on timeout or failure. */
 bool pp_socket_wait_writable(pp_socket sock, int timeout_ms) {
-    return pp_socket_wait(sock, timeout_ms, false, true);
+    return local_wait(sock, timeout_ms, false, true);
 }
 
 /* Return the native file descriptor. */
 uint64_t pp_socket_fd(const pp_socket sock) {
-    pp_assert(sock && !pp_socket_is_invalid_fd(sock->fd));
+    pp_assert(sock && !local_is_invalid_fd(sock->fd));
     return sock->fd;
 }
 
 /* Cross-platform helpers. */
 
-bool pp_socket_parse_numeric_addr(const char *ip_addr,
-                                  uint16_t port,
-                                  struct sockaddr_storage *addr,
-                                  os_socklen_t *addrlen) {
+bool local_parse_numeric_addr(const char *ip_addr,
+                              uint16_t port,
+                              struct sockaddr_storage *addr,
+                              os_socklen_t *addrlen) {
     struct sockaddr_in addr4;
     pp_zero(&addr4, sizeof(addr4));
     addr4.sin_family = AF_INET;
@@ -312,17 +312,17 @@ bool pp_socket_parse_numeric_addr(const char *ip_addr,
     return false;
 }
 
-void pp_socket_close_impl(pp_socket sock) {
-    if (!sock || pp_socket_is_invalid_fd(sock->fd)) {
+void local_close_impl(pp_socket sock) {
+    if (!sock || local_is_invalid_fd(sock->fd)) {
         return;
     }
-    pp_socket_close_fd(sock->fd);
-    sock->fd = pp_socket_invalid_fd();
+    local_close_fd(sock->fd);
+    sock->fd = local_invalid_fd();
 }
 
-bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write) {
-    if (!sock || pp_socket_is_invalid_fd(sock->fd)) {
-        pp_socket_set_not_socket_error();
+bool local_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write) {
+    if (!sock || local_is_invalid_fd(sock->fd)) {
+        local_set_not_socket_error();
         return false;
     }
 
@@ -350,26 +350,26 @@ bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_wr
             tv_ptr = &tv;
         }
 
-        const int ret = select(pp_socket_select_nfds(sock->fd), readfds_ptr, writefds_ptr, NULL, tv_ptr);
+        const int ret = select(local_select_nfds(sock->fd), readfds_ptr, writefds_ptr, NULL, tv_ptr);
         if (ret < 0) {
-            if (pp_socket_is_interrupted()) {
+            if (local_is_interrupted()) {
                 continue;
             }
-            pp_socket_print_error("select()");
+            local_print_error("select()");
             return false;
         }
         return ret > 0;
     }
 }
 
-int pp_socket_connect_with_timeout(os_socket_fd fd,
-                                   const struct sockaddr *addr,
-                                   os_socklen_t addrlen,
-                                   bool blocking,
-                                   int timeout_ms) {
+int local_connect_with_timeout(os_socket_fd fd,
+                               const struct sockaddr *addr,
+                               os_socklen_t addrlen,
+                               bool blocking,
+                               int timeout_ms) {
     // Set non-blocking
     int original_flags = 0;
-    if (pp_socket_set_nonblocking(fd, &original_flags) < 0) {
+    if (local_set_nonblocking(fd, &original_flags) < 0) {
         return -1;
     }
 
@@ -380,8 +380,8 @@ int pp_socket_connect_with_timeout(os_socket_fd fd,
         goto done;
     }
     // Tell real errors from non-blocking pending states
-    if (!pp_socket_is_connect_pending()) {
-        pp_socket_print_error("connect()");
+    if (!local_is_connect_pending()) {
+        local_print_error("connect()");
         return -1;
     }
 
@@ -395,12 +395,12 @@ int pp_socket_connect_with_timeout(os_socket_fd fd,
     tv.tv_usec = (timeout_ms % 1000) * 1000;
 
     // Wait until timeout
-    ret = select(pp_socket_select_nfds(fd), NULL, &wfds, NULL, &tv);
+    ret = select(local_select_nfds(fd), NULL, &wfds, NULL, &tv);
     if (ret == 0) {
-        pp_socket_set_timeout_error();
+        local_set_timeout_error();
         return -2;  // Timeout
     } else if (ret < 0) {
-        pp_socket_print_error("select()");
+        local_print_error("select()");
         return -1;  // Select error
     }
 
@@ -408,18 +408,18 @@ int pp_socket_connect_with_timeout(os_socket_fd fd,
     int err = 0;
     os_socklen_t len = sizeof(err);
     if (getsockopt(fd, SOL_SOCKET, SO_ERROR, (char *)&err, &len) < 0) {
-        pp_socket_print_error("getsockopt()");
+        local_print_error("getsockopt()");
         return -1;
     }
     if (err != 0) {
-        pp_socket_set_error(err);
+        local_set_error(err);
         return -1;
     }
 
 done:
     // Store/restore blocking mode as needed
     if (blocking) {
-        if (pp_socket_restore_blocking(fd, original_flags) < 0) {
+        if (local_restore_blocking(fd, original_flags) < 0) {
             return -1;
         }
     }
@@ -431,12 +431,12 @@ done:
 /* OS-specific helpers. */
 
 #if PARTOUT_WINDOWS
-bool pp_socket_platform_init(void) {
+bool local_platform_init(void) {
     static int wsa_initialized = 0;
     if (!wsa_initialized) {
         WSADATA wsa;
         if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
-            pp_socket_print_error("WSAStartup()");
+            local_print_error("WSAStartup()");
             return false;
         }
         wsa_initialized = 1;
@@ -444,168 +444,168 @@ bool pp_socket_platform_init(void) {
     return true;
 }
 
-void pp_socket_print_error(const char *msg) {
+void local_print_error(const char *msg) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed with error %d", msg, WSAGetLastError());
 }
 
-os_socket_fd pp_socket_invalid_fd(void) {
+os_socket_fd local_invalid_fd(void) {
     return INVALID_SOCKET;
 }
 
-bool pp_socket_is_invalid_fd(os_socket_fd fd) {
+bool local_is_invalid_fd(os_socket_fd fd) {
     return fd == INVALID_SOCKET;
 }
 
-void pp_socket_set_not_socket_error(void) {
+void local_set_not_socket_error(void) {
     WSASetLastError(WSAENOTSOCK);
 }
 
-void pp_socket_set_timeout_error(void) {
+void local_set_timeout_error(void) {
     WSASetLastError(WSAETIMEDOUT);
 }
 
-void pp_socket_set_reset_error(void) {
+void local_set_reset_error(void) {
     WSASetLastError(WSAECONNRESET);
 }
 
-void pp_socket_set_error(int err) {
+void local_set_error(int err) {
     WSASetLastError(err);
 }
 
-bool pp_socket_is_interrupted(void) {
+bool local_is_interrupted(void) {
     return WSAGetLastError() == WSAEINTR;
 }
 
-bool pp_socket_is_would_block(void) {
+bool local_is_would_block(void) {
     return WSAGetLastError() == WSAEWOULDBLOCK;
 }
 
-bool pp_socket_is_connect_pending(void) {
+bool local_is_connect_pending(void) {
     const int err = WSAGetLastError();
     return err == WSAEWOULDBLOCK || err == WSAEINPROGRESS;
 }
 
-int pp_socket_close_fd(os_socket_fd fd) {
+int local_close_fd(os_socket_fd fd) {
     return closesocket(fd);
 }
 
-int pp_socket_shutdown_fd(os_socket_fd fd) {
+int local_shutdown_fd(os_socket_fd fd) {
     return shutdown(fd, SD_BOTH);
 }
 
-int pp_socket_recv_fd(os_socket_fd fd, void *dst, size_t dst_len) {
+int local_recv_fd(os_socket_fd fd, void *dst, size_t dst_len) {
     return (int)recv(fd, dst, (int)dst_len, 0);
 }
 
-int pp_socket_send_fd(os_socket_fd fd, const void *src, size_t src_len) {
+int local_send_fd(os_socket_fd fd, const void *src, size_t src_len) {
     return (int)send(fd, src, (int)src_len, 0);
 }
 
-int pp_socket_select_nfds(os_socket_fd fd) {
+int local_select_nfds(os_socket_fd fd) {
     (void)fd;
     return 0;
 }
 
-int pp_socket_set_nonblocking(os_socket_fd fd, int *original_flags) {
+int local_set_nonblocking(os_socket_fd fd, int *original_flags) {
     (void)original_flags;
     u_long mode = 1;
     if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
-        pp_socket_print_error("ioctlsocket()");
+        local_print_error("ioctlsocket()");
         return -1;
     }
     return 0;
 }
 
-int pp_socket_restore_blocking(os_socket_fd fd, int original_flags) {
+int local_restore_blocking(os_socket_fd fd, int original_flags) {
     (void)original_flags;
     u_long mode = 0;
     if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
-        pp_socket_print_error("ioctlsocket()");
+        local_print_error("ioctlsocket()");
         return -1;
     }
     return 0;
 }
 #else
-bool pp_socket_platform_init(void) {
+bool local_platform_init(void) {
     return true;
 }
 
-void pp_socket_print_error(const char *msg) {
+void local_print_error(const char *msg) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed: %s", msg, strerror(errno));
 }
 
-os_socket_fd pp_socket_invalid_fd(void) {
+os_socket_fd local_invalid_fd(void) {
     return -1;
 }
 
-bool pp_socket_is_invalid_fd(os_socket_fd fd) {
+bool local_is_invalid_fd(os_socket_fd fd) {
     return fd == -1;
 }
 
-void pp_socket_set_not_socket_error(void) {
+void local_set_not_socket_error(void) {
     errno = EBADF;
 }
 
-void pp_socket_set_timeout_error(void) {
+void local_set_timeout_error(void) {
     errno = ETIMEDOUT;
 }
 
-void pp_socket_set_reset_error(void) {
+void local_set_reset_error(void) {
     errno = EPIPE;
 }
 
-void pp_socket_set_error(int err) {
+void local_set_error(int err) {
     errno = err;
 }
 
-bool pp_socket_is_interrupted(void) {
+bool local_is_interrupted(void) {
     return errno == EINTR;
 }
 
-bool pp_socket_is_would_block(void) {
+bool local_is_would_block(void) {
     return errno == EAGAIN || errno == EWOULDBLOCK;
 }
 
-bool pp_socket_is_connect_pending(void) {
+bool local_is_connect_pending(void) {
     return errno == EINPROGRESS;
 }
 
-int pp_socket_close_fd(os_socket_fd fd) {
+int local_close_fd(os_socket_fd fd) {
     return close(fd);
 }
 
-int pp_socket_shutdown_fd(os_socket_fd fd) {
+int local_shutdown_fd(os_socket_fd fd) {
     return shutdown(fd, SHUT_RDWR);
 }
 
-int pp_socket_recv_fd(os_socket_fd fd, void *dst, size_t dst_len) {
+int local_recv_fd(os_socket_fd fd, void *dst, size_t dst_len) {
     return (int)read(fd, dst, dst_len);
 }
 
-int pp_socket_send_fd(os_socket_fd fd, const void *src, size_t src_len) {
+int local_send_fd(os_socket_fd fd, const void *src, size_t src_len) {
     return (int)write(fd, src, src_len);
 }
 
-int pp_socket_select_nfds(os_socket_fd fd) {
+int local_select_nfds(os_socket_fd fd) {
     return fd + 1;
 }
 
-int pp_socket_set_nonblocking(os_socket_fd fd, int *original_flags) {
+int local_set_nonblocking(os_socket_fd fd, int *original_flags) {
     *original_flags = fcntl(fd, F_GETFL, 0);
     if (*original_flags < 0) {
-        pp_socket_print_error("fcntl()");
+        local_print_error("fcntl()");
         return -1;
     }
     if (fcntl(fd, F_SETFL, *original_flags | O_NONBLOCK) < 0) {
-        pp_socket_print_error("fcntl()");
+        local_print_error("fcntl()");
         return -1;
     }
     return 0;
 }
 
-int pp_socket_restore_blocking(os_socket_fd fd, int original_flags) {
+int local_restore_blocking(os_socket_fd fd, int original_flags) {
     if (fcntl(fd, F_SETFL, original_flags) < 0) {
-        pp_socket_print_error("fcntl()");
+        local_print_error("fcntl()");
         return -1;
     }
     return 0;
