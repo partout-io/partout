@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "portable/common.h"
 #include "portable/prng.h"
 #include "wireguard/x25519.h"
 

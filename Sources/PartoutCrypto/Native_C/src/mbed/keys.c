@@ -5,7 +5,6 @@
  */
 
 #include <mbedtls/pem.h>
-#include "portable/common.h"
 #include "crypto/keys.h"
 
 char *pp_key_decrypted_from_path(const char *path, const char *passphrase) {

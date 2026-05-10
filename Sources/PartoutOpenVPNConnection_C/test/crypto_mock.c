@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include "portable/common.h"
 #include "openvpn/dp_macros.h"
 #include "openvpn/test/crypto_mock.h"
 

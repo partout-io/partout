@@ -5,7 +5,6 @@
  */
 
 #include <string.h>
-#include "portable/common.h"
 #include "openvpn/control.h"
 
 openvpn_ctrl *_Nonnull openvpn_ctrl_create(openvpn_packet_code code, uint8_t key, uint32_t packet_id,

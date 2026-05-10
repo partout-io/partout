@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include "portable/common.h"
 #include "tls/tls.h"
 
 pp_tls_options *_Nonnull pp_tls_options_create(int sec_level,

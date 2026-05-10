@@ -6,7 +6,6 @@
 
 #include <openssl/evp.h>
 #include <string.h>
-#include "portable/common.h"
 #include "crypto/crypto_ctr.h"
 #include "crypto/macros.h"
 

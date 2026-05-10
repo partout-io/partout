@@ -8,7 +8,6 @@
 
 #include <wintun.h>
 #include <objbase.h>
-#include "portable/common.h"
 #include "portable/tun.h"
 
 // FIXME: #188, convert debug messages to logs

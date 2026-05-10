@@ -7,7 +7,6 @@
 #include <windows.h>
 #include <bcrypt.h>
 #include <string.h>
-#include "portable/common.h"
 #include "crypto/crypto_ctr.h"
 #include "crypto/windows/macros.h"
 

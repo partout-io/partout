@@ -6,7 +6,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "portable/common.h"
 #include "portable/zd.h"
 
 // TODO: #155, make zd inline

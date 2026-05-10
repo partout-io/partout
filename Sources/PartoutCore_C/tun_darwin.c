@@ -15,7 +15,6 @@
 #include <net/if_utun.h>
 #include <stdio.h>
 #include <string.h>
-#include "portable/common.h"
 #include "portable/endian.h"
 #include "portable/tun.h"
 
