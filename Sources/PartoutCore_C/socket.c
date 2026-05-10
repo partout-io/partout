@@ -9,6 +9,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
+#include "portable/common.h"
 #include "portable/socket.h"
 
 #if PARTOUT_WINDOWS
