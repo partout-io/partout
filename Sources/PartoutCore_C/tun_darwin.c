@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#endif
-
-#if TARGET_OS_OSX
+#if PARTOUT_MACOS
 
 #include <sys/socket.h>
 #include <sys/sys_domain.h>

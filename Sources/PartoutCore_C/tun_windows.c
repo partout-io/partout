@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
 
 #include <wintun.h>
 #include <objbase.h>

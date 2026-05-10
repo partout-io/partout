@@ -71,7 +71,7 @@ void pp_zero(void *_Nonnull ptr, size_t count) {
 
 static inline
 char *_Nonnull pp_dup(const char *_Nonnull str) {
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
     char *ptr = _strdup(str);
 #else
     char *ptr = strdup(str);
@@ -83,7 +83,7 @@ char *_Nonnull pp_dup(const char *_Nonnull str) {
     return ptr;
 }
 
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
 static inline
 FILE *_Nullable pp_fopen(const char *_Nonnull filename, const char *_Nonnull mode) {
     FILE *file_ret = NULL;
@@ -99,7 +99,7 @@ FILE *_Nullable pp_fopen(const char *_Nonnull filename, const char *_Nonnull mod
 #define pp_sscanf sscanf
 #endif
 
-#ifdef __ANDROID__
+#if PARTOUT_ANDROID
 #include <jni.h>
 #include <stdbool.h>
 extern _Nullable JavaVM *_Nullable jvm;

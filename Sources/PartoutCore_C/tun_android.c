@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#ifdef __ANDROID__
+#if PARTOUT_ANDROID
 
 #include <errno.h>
 #include <stdlib.h>
