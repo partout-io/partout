@@ -47,6 +47,12 @@ include("${CMAKE_CURRENT_LIST_DIR}/android-post.toolchain.cmake")
 set(SWIFT_ANDROID_SDK $ENV{HOME}/.swiftpm/swift-sdks/swift-$ENV{SWIFT_ANDROID_VERSION}-RELEASE_android.artifactbundle)
 set(SWIFT_ANDROID_TRIPLE "$ENV{SWIFT_ANDROID_ARCH}-unknown-linux-android${ANDROID_NATIVE_API_LEVEL}")
 set(SWIFT_RESOURCE_DIR "${SWIFT_ANDROID_SDK}/swift-android/swift-resources/usr/lib/swift_static-$ENV{SWIFT_ANDROID_ARCH}")
+if(NOT IS_DIRECTORY "${SWIFT_ANDROID_SDK}")
+    message(FATAL_ERROR "SWIFT_ANDROID_SDK must point to an existing directory: ${SWIFT_ANDROID_SDK}")
+endif()
+if(NOT IS_DIRECTORY "${SWIFT_RESOURCE_DIR}")
+    message(FATAL_ERROR "SWIFT_RESOURCE_DIR must point to an existing directory: ${SWIFT_RESOURCE_DIR}")
+endif()
 
 # Compiler flags
 set(CMAKE_C_COMPILER_TARGET ${SWIFT_ANDROID_TRIPLE})
@@ -62,6 +68,9 @@ execute_process(
 )
 if(NOT ANDROID_CLANG_RESOURCE_DIR)
     message(FATAL_ERROR "Unable to infer Android clang resource directory")
+endif()
+if(NOT IS_DIRECTORY "${ANDROID_CLANG_RESOURCE_DIR}")
+    message(FATAL_ERROR "ANDROID_CLANG_RESOURCE_DIR must point to an existing directory: ${ANDROID_CLANG_RESOURCE_DIR}")
 endif()
 
 # C/C++

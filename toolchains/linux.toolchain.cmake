@@ -8,6 +8,9 @@ set(CMAKE_C_FLAGS "-fPIC")
 
 # Infer from Swift version
 set(SWIFT_RESOURCE_DIR $ENV{HOME}/.local/share/swiftly/toolchains/$ENV{SWIFT_VERSION}/usr/lib/swift_static)
+if(NOT IS_DIRECTORY "${SWIFT_RESOURCE_DIR}")
+    message(FATAL_ERROR "SWIFT_RESOURCE_DIR must point to an existing directory: ${SWIFT_RESOURCE_DIR}")
+endif()
 
 # Inherit clang resource dir (e.g. for stddef.h and stdbool.h)
 execute_process(
@@ -18,6 +21,9 @@ execute_process(
 )
 if(NOT CLANG_RESOURCE_DIR)
     message(FATAL_ERROR "Unable to infer clang resource directory")
+endif()
+if(NOT IS_DIRECTORY "${CLANG_RESOURCE_DIR}")
+    message(FATAL_ERROR "CLANG_RESOURCE_DIR must point to an existing directory: ${CLANG_RESOURCE_DIR}")
 endif()
 
 set(CMAKE_Swift_FLAGS "\
