@@ -9,10 +9,13 @@
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #define PARTOUT_APPLE       1
-#define PARTOUT_MACOS       TARGET_OS_OSX
+#if TARGET_OS_OSX
+#define PARTOUT_MACOS       1
+#else
+#define PARTOUT_MACOS       0
+#endif
 #else
 #define PARTOUT_APPLE       0
-#define PARTOUT_MACOS       0
 #endif
 
 #if defined(__ANDROID__)
