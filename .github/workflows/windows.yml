@@ -85,7 +85,8 @@ jobs:
             -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY `
             -DPP_BUILD_USE_OPENSSL=OFF `
             -DPP_BUILD_USE_MBEDTLS=OFF `
-            -DPP_BUILD_USE_WGGO=OFF `
+            -DPP_BUILD_USE_OPENVPN=OFF `
+            -DPP_BUILD_USE_WIREGUARD=OFF `
             -DPP_BUILD_LIBRARY=ON `
             ..
 
