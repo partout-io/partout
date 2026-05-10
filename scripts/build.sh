@@ -29,7 +29,8 @@ while [[ $# -gt 0 ]]; do
         -a)
             cmake_opts+=("-DPP_BUILD_LIBRARY=ON")
             cmake_opts+=("-DPP_BUILD_USE_OPENSSL=ON")
-            cmake_opts+=("-DPP_BUILD_USE_WGGO=ON")
+            cmake_opts+=("-DPP_BUILD_USE_OPENVPN=ON")
+            cmake_opts+=("-DPP_BUILD_USE_WIREGUARD=ON")
             shift
             ;;
         -crypto)
@@ -49,8 +50,12 @@ while [[ $# -gt 0 ]]; do
             shift
             shift
             ;;
+        -openvpn)
+            cmake_opts+=("-DPP_BUILD_USE_OPENVPN=ON")
+            shift
+            ;;
         -wireguard)
-            cmake_opts+=("-DPP_BUILD_USE_WGGO=ON")
+            cmake_opts+=("-DPP_BUILD_USE_WIREGUARD=ON")
             shift
             ;;
         -l)
