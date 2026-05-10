@@ -16,7 +16,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 // WARNING: These methods are called from a JNI background thread
-class AndroidTunnelController: AutoCloseable {
+class AndroidTunnelController {
     private val logTag = "Partout"
     private val service: VpnService
     private var descriptor: ParcelFileDescriptor?
@@ -32,10 +32,7 @@ class AndroidTunnelController: AutoCloseable {
 
     // FIXME: Pass Profile
     fun setTunnelSettings(infoJSON: String): Int {
-        if (descriptor != null) {
-            Log.w(logTag, ">>> AndroidTunnelController: Replacing existing descriptor")
-            clearTunnelSettings()
-        }
+        assert(descriptor == null)
         val builder = service.Builder()
 
         // Decode info
@@ -124,9 +121,5 @@ class AndroidTunnelController: AutoCloseable {
         fds.forEach {
             service.protect(it)
         }
-    }
-
-    override fun close() {
-        clearTunnelSettings()
     }
 }
