@@ -77,7 +77,8 @@ class AndroidTunnelController {
         // Protect remote socket to escape tunnel
         Log.e(logTag, ">>> AndroidTunnelController: Building with remoteFds = " + remoteFds + " (" + remoteFds.size + ")")
         remoteFds.forEach {
-            service.protect(it)
+            val protected = service.protect(it)
+            Log.e(logTag, ">>> AndroidTunnelController: protect($it) = $protected")
         }
 
         // FIXME: Register callback to update protected sockets?
@@ -119,7 +120,8 @@ class AndroidTunnelController {
     fun configureSockets(fds: IntArray) {
         Log.e(logTag, ">>> AndroidTunnelController: Configuring with fds = " + fds + " (" + fds.size + ")")
         fds.forEach {
-            service.protect(it)
+            val protected = service.protect(it)
+            Log.e(logTag, ">>> AndroidTunnelController: protect($it) = $protected")
         }
     }
 }
