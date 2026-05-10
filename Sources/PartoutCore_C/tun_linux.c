@@ -23,9 +23,9 @@ struct _pp_tun {
     const char *dev_name;
 };
 
-pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl) {
+static
+pp_tun pp_tun_create(const char *_Nonnull uuid) {
     (void)uuid;
-    (void)impl;
     const char *dev_path = "/dev/net/tun";
     int fd = -1;
     struct ifreq ifr = { 0 };
@@ -58,6 +58,7 @@ failure:
     return NULL;
 }
 
+static
 void pp_tun_free(pp_tun tun) {
     if (!tun) return;
     pp_tun_shutdown(tun);

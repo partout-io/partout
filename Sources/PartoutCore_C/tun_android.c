@@ -9,39 +9,17 @@
 
 #if PARTOUT_ANDROID
 
+#include <jni.h>
+#include <assert.h>
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-/* Expect this struct from ctrl.set_tunnel(). */
+/* Expect this struct from pp_tun_ctrl_set_tunnel(). */
 struct _pp_tun {
     int fd;
 };
-
-/* Impl is the pp_tun struct as is. */
-pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable any_impl) {
-    (void)uuid;
-    if (!any_impl) return NULL;
-    pp_tun impl = (pp_tun)any_impl;
-    pp_assert(impl && impl->fd > 0);
-
-    const int dup_fd = dup(impl->fd);
-    if (dup_fd < 0) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "dup(tun): %s", strerror(errno));
-        return NULL;
-    }
-
-    pp_tun tun = pp_alloc(sizeof(*tun));
-    tun->fd = dup_fd;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_android: Duplicated tun device %d -> %d", impl->fd, dup_fd);
-    return tun;
-}
-
-void pp_tun_free(pp_tun tun) {
-    if (!tun) return;
-    pp_tun_shutdown(tun);
-    pp_free(tun);
-}
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     if (!tun || tun->fd < 0) return -1;
@@ -67,6 +45,151 @@ int pp_tun_fd(const pp_tun tun) {
 const char *pp_tun_name(const pp_tun tun) {
     (void)tun;
     return NULL;
+}
+
+/* Kotlin signatures for AndroidTunnelController. */
+typedef struct {
+    const char *name;
+    const char *signature;
+} kotlin_sig;
+
+static const kotlin_sig sig_testWorking = {
+    "testWorking",
+    "()V"
+};
+static const kotlin_sig sig_setTunnelSettings = {
+    "setTunnelSettings",
+    "(Ljava/lang/String;)I"
+};
+static const kotlin_sig sig_configureSockets = {
+    "configureSockets",
+    "([I)V"
+};
+void pp_tun_ctrl_test_working(void *jni_ref) {
+    assert(jni_ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_test_working(%p)", jni_ref);
+
+    bool did_attach;
+    JNIEnv *env = pp_jni_attach_thread(&did_attach);
+    if (!env) return;
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    cls = (*env)->GetObjectClass(env, jni_ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_test_working(): NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_testWorking.name, sig_testWorking.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_test_working(): NULL method");
+        goto cleanup;
+    }
+    (*env)->CallVoidMethod(env, jni_ref, method);
+
+cleanup:
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
+    if (did_attach) (*jvm)->DetachCurrentThread(jvm);
+}
+
+pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_json) {
+    (void)uuid;
+    assert(jni_ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_set_tunnel(%p)", jni_ref);
+
+    bool did_attach;
+    JNIEnv *env = pp_jni_attach_thread(&did_attach);
+    if (!env) return NULL;
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    jstring j_info_json = NULL;
+
+    // This will be the result on success
+    pp_tun tun_impl = malloc(sizeof(*tun_impl));
+    if (tun_impl == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): NULL tun_impl");
+        goto cleanup;
+    }
+    tun_impl->fd = -1;
+
+    cls = (*env)->GetObjectClass(env, jni_ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_setTunnelSettings.name, sig_setTunnelSettings.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): NULL method");
+        goto cleanup;
+    }
+    j_info_json = info_json ? (*env)->NewStringUTF(env, info_json) : NULL;
+    tun_impl->fd = (*env)->CallIntMethod(env, jni_ref, method, j_info_json);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): Kotlin exception");
+        tun_impl->fd = -1;
+        goto cleanup;
+    }
+    if (tun_impl->fd < 0) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): Invalid fd");
+        goto cleanup;
+    }
+cleanup:
+    if (tun_impl != NULL && tun_impl->fd < 0) {
+        free(tun_impl);
+        tun_impl = NULL;
+    }
+    if (j_info_json != NULL) (*env)->DeleteLocalRef(env, j_info_json);
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
+    if (did_attach) (*jvm)->DetachCurrentThread(jvm);
+    return tun_impl;
+}
+
+void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t fds_len) {
+    assert(jni_ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_configure_sockets(%p)", jni_ref);
+    if (!fds || fds_len == 0) return;
+
+    bool did_attach;
+    JNIEnv *env = pp_jni_attach_thread(&did_attach);
+    if (!env) return;
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    jintArray j_fds = NULL;
+
+    cls = (*env)->GetObjectClass(env, jni_ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_configure_sockets(): NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_configureSockets.name, sig_configureSockets.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_configure_sockets(): NULL method");
+        goto cleanup;
+    }
+    j_fds = (*env)->NewIntArray(env, (jsize)fds_len);
+    if (j_fds == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_configure_sockets(): NULL j_fds");
+        goto cleanup;
+    }
+    (*env)->SetIntArrayRegion(env, j_fds, 0, (jsize)fds_len, (const jint *)fds);
+    (*env)->CallVoidMethod(env, jni_ref, method, j_fds);
+
+cleanup:
+    if (j_fds != NULL) (*env)->DeleteLocalRef(env, j_fds);
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
+    if (did_attach) (*jvm)->DetachCurrentThread(jvm);
+}
+
+void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
+    (void)jni_ref;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_clear_tunnel(%p)", jni_ref);
+    if (!tun_impl) return;
+    pp_tun_shutdown(tun_impl);
+    free(tun_impl);
 }
 
 #endif

@@ -11,9 +11,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
-    private let tun: pp_tun
-
-    let tunImpl: UnsafeMutableRawPointer?
+    let tun: pp_tun
 
     nonisolated let deviceName: String?
 
@@ -47,12 +45,10 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     init(
         _ ctx: PartoutLoggerContext,
         tun: pp_tun,
-        tunImpl: UnsafeMutableRawPointer?,
         maxReadLength: Int
     ) {
         self.ctx = ctx
         self.tun = tun
-        self.tunImpl = tunImpl
         if let tunName = pp_tun_name(tun) {
             deviceName = String(cString: tunName)
         } else {
@@ -72,7 +68,6 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 
     deinit {
         pp_log(ctx, .core, .debug, "Deinit VirtualTunnelInterface")
-        pp_tun_free(tun)
     }
 
     nonisolated var fileDescriptor: UInt64? {
