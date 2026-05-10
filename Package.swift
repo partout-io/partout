@@ -133,6 +133,10 @@ package.targets.append(contentsOf: [
                     "-I\(cmakeOutput)/wintun"
                 ]))
             }
+            list.append(.unsafeFlags([
+                "-include",
+                "conditionals.h"
+            ]))
             return list
         }()
     ),
