@@ -15,13 +15,11 @@
 #if PARTOUT_WINDOWS
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#define os_socket_fd SOCKET
+typedef SOCKET os_socket_fd;
+typedef int os_socklen_t;
 #define OS_INVALID_SOCKET INVALID_SOCKET
-#define os_close_socket closesocket
-#define os_shutdown_socket shutdown
 #define OS_SHUTDOWN_BOTH SD_BOTH
-#define SOCKET_PRINT_ERROR(msg) \
-    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed with error %d", msg, WSAGetLastError())
+#define OS_SOCKET_ERROR SOCKET_ERROR
 #else
 #include <unistd.h>
 #include <sys/types.h>
@@ -29,15 +27,29 @@
 #include <sys/select.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#define os_socket_fd int
+typedef int os_socket_fd;
+typedef socklen_t os_socklen_t;
 #define OS_INVALID_SOCKET -1
-#define os_close_socket close
-#define os_shutdown_socket shutdown
 #define OS_SHUTDOWN_BOTH SHUT_RDWR
-#define SOCKET_PRINT_ERROR(msg) \
-    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed: %s", msg, strerror(errno))
+#define OS_SOCKET_ERROR -1
 #endif
 
+static bool pp_socket_platform_init(void);
+static void pp_socket_print_error(const char *msg);
+static void pp_socket_set_not_socket_error(void);
+static void pp_socket_set_timeout_error(void);
+static void pp_socket_set_reset_error(void);
+static void pp_socket_set_error(int err);
+static bool pp_socket_is_interrupted(void);
+static bool pp_socket_is_would_block(void);
+static bool pp_socket_is_connect_pending(void);
+static int pp_socket_close_fd(os_socket_fd fd);
+static int pp_socket_shutdown_fd(os_socket_fd fd);
+static int pp_socket_recv_fd(os_socket_fd fd, void *dst, size_t dst_len);
+static int pp_socket_send_fd(os_socket_fd fd, const void *src, size_t src_len);
+static int pp_socket_select_nfds(os_socket_fd fd);
+static int pp_socket_set_nonblocking(os_socket_fd fd, int *original_flags);
+static int pp_socket_restore_blocking(os_socket_fd fd, int original_flags);
 static int pp_socket_connect_with_timeout(os_socket_fd fd,
                                           const struct sockaddr *addr,
                                           socklen_t addrlen,
@@ -77,17 +89,9 @@ pp_socket pp_socket_open(const char *ip_addr,
     os_socket_fd new_fd = OS_INVALID_SOCKET;
     int ipproto = 0;
 
-#if PARTOUT_WINDOWS
-    static int wsa_initialized = 0;
-    if (!wsa_initialized) {
-        WSADATA wsa;
-        if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
-            SOCKET_PRINT_ERROR("WSAStartup()");
-            goto failure;
-        }
-        wsa_initialized = 1;
+    if (!pp_socket_platform_init()) {
+        goto failure;
     }
-#endif
 
     pp_zero(&hints, sizeof(hints));
     hints.ai_family = AF_UNSPEC;   // IPv4 or IPv6
@@ -111,7 +115,7 @@ pp_socket pp_socket_open(const char *ip_addr,
     if (pp_socket_parse_numeric_addr(ip_addr, port, &numeric_addr, &numeric_addrlen)) {
         new_fd = socket(numeric_addr.ss_family, hints.ai_socktype, ipproto);
         if (new_fd == OS_INVALID_SOCKET) {
-            SOCKET_PRINT_ERROR("socket()");
+            pp_socket_print_error("socket()");
             goto failure;
         }
         if (pp_socket_connect_with_timeout(new_fd,
@@ -119,7 +123,7 @@ pp_socket pp_socket_open(const char *ip_addr,
                                            numeric_addrlen,
                                            blocking,
                                            timeout_ms) != 0) {
-            SOCKET_PRINT_ERROR("connect()");
+            pp_socket_print_error("connect()");
             goto failure;
         }
         return pp_socket_create(new_fd);
@@ -127,7 +131,7 @@ pp_socket pp_socket_open(const char *ip_addr,
 
     snprintf(port_str, sizeof(port_str), "%u", port);
     if (getaddrinfo(ip_addr, port_str, &hints, &resolved) != 0) {
-        SOCKET_PRINT_ERROR("getaddrinfo()");
+        pp_socket_print_error("getaddrinfo()");
         goto failure;
     }
 
@@ -135,7 +139,7 @@ pp_socket pp_socket_open(const char *ip_addr,
     for (struct addrinfo *p = resolved; p != NULL; p = p->ai_next) {
         new_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
         if (new_fd == OS_INVALID_SOCKET) {
-            SOCKET_PRINT_ERROR("socket()");
+            pp_socket_print_error("socket()");
             continue;
         }
         const int ret = pp_socket_connect_with_timeout(new_fd,
@@ -144,8 +148,8 @@ pp_socket pp_socket_open(const char *ip_addr,
                                                        blocking,
                                                        timeout_ms);
         if (ret != 0) {
-            os_close_socket(new_fd);
-            SOCKET_PRINT_ERROR("connect()");
+            pp_socket_close_fd(new_fd);
+            pp_socket_print_error("connect()");
             continue;
         }
         // Exit loop on first success
@@ -160,14 +164,14 @@ pp_socket pp_socket_open(const char *ip_addr,
     return pp_socket_create(new_fd);
 
 failure:
-    if (new_fd != OS_INVALID_SOCKET) os_close_socket(new_fd);
+    if (new_fd != OS_INVALID_SOCKET) pp_socket_close_fd(new_fd);
     return NULL;
 }
 
 /* Close the native file descriptor without freeing the wrapper. */
 void pp_socket_shutdown(pp_socket sock) {
     if (!sock || sock->fd == OS_INVALID_SOCKET) return;
-    (void)os_shutdown_socket(sock->fd, OS_SHUTDOWN_BOTH);
+    (void)pp_socket_shutdown_fd(sock->fd);
 }
 
 /* Close the native file descriptor without freeing the wrapper. */
@@ -187,31 +191,13 @@ void pp_socket_free(pp_socket sock) {
  * bytes. Returns < 0 on failure. */
 int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
     if (!sock || sock->fd == OS_INVALID_SOCKET) {
-#if PARTOUT_WINDOWS
-        WSASetLastError(WSAENOTSOCK);
-#else
-        errno = EBADF;
-#endif
+        pp_socket_set_not_socket_error();
         return -1;
     }
-#if PARTOUT_WINDOWS
+
     while (true) {
-        const int read_len = (int)recv(sock->fd, (void *)dst, dst_len, 0);
-        if (read_len < 0 && WSAGetLastError() == WSAEINTR) {
-            continue;
-        }
-        if (read_len < 0) {
-            if (WSAGetLastError() == WSAEWOULDBLOCK) {
-                return 0;
-            }
-            SOCKET_PRINT_ERROR("recv()");
-        }
-        return read_len;
-    }
-#else
-    while (true) {
-        const int read_len = (int)read(sock->fd, (void *)dst, dst_len);
-        if (read_len < 0 && errno == EINTR) {
+        const int read_len = pp_socket_recv_fd(sock->fd, dst, dst_len);
+        if (read_len < 0 && pp_socket_is_interrupted()) {
             continue;
         }
         if (read_len < 0) {
@@ -219,25 +205,20 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
              * for a message to arrive, unless the socket is nonblocking (see fcntl(2))
              * in which case the value -1 is returned and the external variable errno
              * set to EAGAIN. */
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            if (pp_socket_is_would_block()) {
                 return 0;
             }
-            SOCKET_PRINT_ERROR("recv()");
+            pp_socket_print_error("recv()");
         }
         return read_len;
     }
-#endif
 }
 
 /* Write src_len bytes, and repeat until fully written. Returns the amount
  * of written bytes, expected to always be src_len. Returns < 0 on failure. */
 int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
     if (!sock || sock->fd == OS_INVALID_SOCKET) {
-#if PARTOUT_WINDOWS
-        WSASetLastError(WSAENOTSOCK);
-#else
-        errno = EBADF;
-#endif
+        pp_socket_set_not_socket_error();
         return -1;
     }
 
@@ -246,38 +227,20 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
         const uint8_t *current_src = src + offset;
         const size_t remaining = src_len - offset;
 
-#if PARTOUT_WINDOWS
-        const int written_len = (int)send(sock->fd, (const char *)current_src, (int)remaining, 0);
-#else
-        const int written_len = (int)write(sock->fd, current_src, remaining);
-#endif
+        const int written_len = pp_socket_send_fd(sock->fd, current_src, remaining);
         if (written_len < 0) {
-#if PARTOUT_WINDOWS
-            const int err = WSAGetLastError();
-            if (err == WSAEINTR) {
+            if (pp_socket_is_interrupted()) {
                 continue;
             }
-            if (err == WSAEWOULDBLOCK) {
+            if (pp_socket_is_would_block()) {
                 return offset > 0 ? (int)offset : 0;
             }
-#else
-            if (errno == EINTR) {
-                continue;
-            }
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                return offset > 0 ? (int)offset : 0;
-            }
-#endif
-            SOCKET_PRINT_ERROR("send()");
+            pp_socket_print_error("send()");
             return written_len;
         }
         if (written_len == 0) {
-#if PARTOUT_WINDOWS
-            WSASetLastError(WSAECONNRESET);
-#else
-            errno = EPIPE;
-#endif
-            SOCKET_PRINT_ERROR("send()");
+            pp_socket_set_reset_error();
+            pp_socket_print_error("send()");
             return -1;
         }
         offset += (size_t)written_len;
@@ -287,24 +250,20 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
 
 bool pp_socket_set_buffers(pp_socket sock, int recvbuf_len, int sendbuf_len) {
     if (!sock || sock->fd == OS_INVALID_SOCKET) {
-#if PARTOUT_WINDOWS
-        WSASetLastError(WSAENOTSOCK);
-#else
-        errno = EBADF;
-#endif
+        pp_socket_set_not_socket_error();
         return false;
     }
 
     bool did_set = true;
     if (recvbuf_len > 0) {
-        if (setsockopt(sock->fd, SOL_SOCKET, SO_RCVBUF, (const void *)&recvbuf_len, sizeof(recvbuf_len)) < 0) {
-            SOCKET_PRINT_ERROR("setsockopt(SO_RCVBUF)");
+        if (setsockopt(sock->fd, SOL_SOCKET, SO_RCVBUF, (const char *)&recvbuf_len, sizeof(recvbuf_len)) < 0) {
+            pp_socket_print_error("setsockopt(SO_RCVBUF)");
             did_set = false;
         }
     }
     if (sendbuf_len > 0) {
-        if (setsockopt(sock->fd, SOL_SOCKET, SO_SNDBUF, (const void *)&sendbuf_len, sizeof(sendbuf_len)) < 0) {
-            SOCKET_PRINT_ERROR("setsockopt(SO_SNDBUF)");
+        if (setsockopt(sock->fd, SOL_SOCKET, SO_SNDBUF, (const char *)&sendbuf_len, sizeof(sendbuf_len)) < 0) {
+            pp_socket_print_error("setsockopt(SO_SNDBUF)");
             did_set = false;
         }
     }
@@ -326,6 +285,172 @@ uint64_t pp_socket_fd(const pp_socket sock) {
     pp_assert(sock && sock->fd != OS_INVALID_SOCKET);
     return sock->fd;
 }
+
+#if PARTOUT_WINDOWS
+static bool pp_socket_platform_init(void) {
+    static int wsa_initialized = 0;
+    if (!wsa_initialized) {
+        WSADATA wsa;
+        if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
+            pp_socket_print_error("WSAStartup()");
+            return false;
+        }
+        wsa_initialized = 1;
+    }
+    return true;
+}
+
+static void pp_socket_print_error(const char *msg) {
+    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed with error %d", msg, WSAGetLastError());
+}
+
+static void pp_socket_set_not_socket_error(void) {
+    WSASetLastError(WSAENOTSOCK);
+}
+
+static void pp_socket_set_timeout_error(void) {
+    WSASetLastError(WSAETIMEDOUT);
+}
+
+static void pp_socket_set_reset_error(void) {
+    WSASetLastError(WSAECONNRESET);
+}
+
+static void pp_socket_set_error(int err) {
+    WSASetLastError(err);
+}
+
+static bool pp_socket_is_interrupted(void) {
+    return WSAGetLastError() == WSAEINTR;
+}
+
+static bool pp_socket_is_would_block(void) {
+    return WSAGetLastError() == WSAEWOULDBLOCK;
+}
+
+static bool pp_socket_is_connect_pending(void) {
+    const int err = WSAGetLastError();
+    return err == WSAEWOULDBLOCK || err == WSAEINPROGRESS;
+}
+
+static int pp_socket_close_fd(os_socket_fd fd) {
+    return closesocket(fd);
+}
+
+static int pp_socket_shutdown_fd(os_socket_fd fd) {
+    return shutdown(fd, OS_SHUTDOWN_BOTH);
+}
+
+static int pp_socket_recv_fd(os_socket_fd fd, void *dst, size_t dst_len) {
+    return (int)recv(fd, dst, (int)dst_len, 0);
+}
+
+static int pp_socket_send_fd(os_socket_fd fd, const void *src, size_t src_len) {
+    return (int)send(fd, src, (int)src_len, 0);
+}
+
+static int pp_socket_select_nfds(os_socket_fd fd) {
+    (void)fd;
+    return 0;
+}
+
+static int pp_socket_set_nonblocking(os_socket_fd fd, int *original_flags) {
+    (void)original_flags;
+    u_long mode = 1;
+    if (ioctlsocket(fd, FIONBIO, &mode) == OS_SOCKET_ERROR) {
+        pp_socket_print_error("ioctlsocket()");
+        return -1;
+    }
+    return 0;
+}
+
+static int pp_socket_restore_blocking(os_socket_fd fd, int original_flags) {
+    (void)original_flags;
+    u_long mode = 0;
+    if (ioctlsocket(fd, FIONBIO, &mode) == OS_SOCKET_ERROR) {
+        pp_socket_print_error("ioctlsocket()");
+        return -1;
+    }
+    return 0;
+}
+#else
+static bool pp_socket_platform_init(void) {
+    return true;
+}
+
+static void pp_socket_print_error(const char *msg) {
+    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed: %s", msg, strerror(errno));
+}
+
+static void pp_socket_set_not_socket_error(void) {
+    errno = EBADF;
+}
+
+static void pp_socket_set_timeout_error(void) {
+    errno = ETIMEDOUT;
+}
+
+static void pp_socket_set_reset_error(void) {
+    errno = EPIPE;
+}
+
+static void pp_socket_set_error(int err) {
+    errno = err;
+}
+
+static bool pp_socket_is_interrupted(void) {
+    return errno == EINTR;
+}
+
+static bool pp_socket_is_would_block(void) {
+    return errno == EAGAIN || errno == EWOULDBLOCK;
+}
+
+static bool pp_socket_is_connect_pending(void) {
+    return errno == EINPROGRESS;
+}
+
+static int pp_socket_close_fd(os_socket_fd fd) {
+    return close(fd);
+}
+
+static int pp_socket_shutdown_fd(os_socket_fd fd) {
+    return shutdown(fd, OS_SHUTDOWN_BOTH);
+}
+
+static int pp_socket_recv_fd(os_socket_fd fd, void *dst, size_t dst_len) {
+    return (int)read(fd, dst, dst_len);
+}
+
+static int pp_socket_send_fd(os_socket_fd fd, const void *src, size_t src_len) {
+    return (int)write(fd, src, src_len);
+}
+
+static int pp_socket_select_nfds(os_socket_fd fd) {
+    return fd + 1;
+}
+
+static int pp_socket_set_nonblocking(os_socket_fd fd, int *original_flags) {
+    *original_flags = fcntl(fd, F_GETFL, 0);
+    if (*original_flags < 0) {
+        pp_socket_print_error("fcntl()");
+        return -1;
+    }
+    if (fcntl(fd, F_SETFL, *original_flags | O_NONBLOCK) < 0) {
+        pp_socket_print_error("fcntl()");
+        return -1;
+    }
+    return 0;
+}
+
+static int pp_socket_restore_blocking(os_socket_fd fd, int original_flags) {
+    if (fcntl(fd, F_SETFL, original_flags) < 0) {
+        pp_socket_print_error("fcntl()");
+        return -1;
+    }
+    return 0;
+}
+#endif
 
 static bool pp_socket_parse_numeric_addr(const char *ip_addr,
                                          uint16_t port,
@@ -359,17 +484,13 @@ static void pp_socket_close_impl(pp_socket sock) {
     if (!sock || sock->fd == OS_INVALID_SOCKET) {
         return;
     }
-    os_close_socket(sock->fd);
+    pp_socket_close_fd(sock->fd);
     sock->fd = OS_INVALID_SOCKET;
 }
 
 static bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write) {
     if (!sock || sock->fd == OS_INVALID_SOCKET) {
-#if PARTOUT_WINDOWS
-        WSASetLastError(WSAENOTSOCK);
-#else
-        errno = EBADF;
-#endif
+        pp_socket_set_not_socket_error();
         return false;
     }
 
@@ -397,25 +518,14 @@ static bool pp_socket_wait(pp_socket sock, int timeout_ms, bool want_read, bool 
             tv_ptr = &tv;
         }
 
-#if PARTOUT_WINDOWS
-        const int ret = select(0, readfds_ptr, writefds_ptr, NULL, tv_ptr);
-        if (ret == SOCKET_ERROR) {
-            if (WSAGetLastError() == WSAEINTR) {
+        const int ret = select(pp_socket_select_nfds(sock->fd), readfds_ptr, writefds_ptr, NULL, tv_ptr);
+        if (ret == OS_SOCKET_ERROR) {
+            if (pp_socket_is_interrupted()) {
                 continue;
             }
-            SOCKET_PRINT_ERROR("select()");
+            pp_socket_print_error("select()");
             return false;
         }
-#else
-        const int ret = select(sock->fd + 1, readfds_ptr, writefds_ptr, NULL, tv_ptr);
-        if (ret < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-            SOCKET_PRINT_ERROR("select()");
-            return false;
-        }
-#endif
         return ret > 0;
     }
 }
@@ -426,23 +536,10 @@ int pp_socket_connect_with_timeout(os_socket_fd fd,
                                    bool blocking,
                                    int timeout_ms) {
     // Set non-blocking
-#if PARTOUT_WINDOWS
-    u_long mode = 1;
-    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
-        SOCKET_PRINT_ERROR("ioctlsocket()");
+    int original_flags = 0;
+    if (pp_socket_set_nonblocking(fd, &original_flags) < 0) {
         return -1;
     }
-#else
-    const int original_flags = fcntl(fd, F_GETFL, 0);
-    if (original_flags < 0) {
-        SOCKET_PRINT_ERROR("fcntl()");
-        return -1;
-    }
-    if (fcntl(fd, F_SETFL, original_flags | O_NONBLOCK) < 0) {
-        SOCKET_PRINT_ERROR("fcntl()");
-        return -1;
-    }
-#endif
 
     // At this point, this call will not block
     int ret = connect(fd, addr, addrlen);
@@ -451,17 +548,10 @@ int pp_socket_connect_with_timeout(os_socket_fd fd,
         goto done;
     }
     // Tell real errors from non-blocking pending states
-#if PARTOUT_WINDOWS
-    if (WSAGetLastError() != WSAEWOULDBLOCK && WSAGetLastError() != WSAEINPROGRESS) {
-        SOCKET_PRINT_ERROR("connect()");
+    if (!pp_socket_is_connect_pending()) {
+        pp_socket_print_error("connect()");
         return -1;
     }
-#else
-    if (errno != EINPROGRESS) {
-        SOCKET_PRINT_ERROR("connect()");
-        return -1;
-    }
-#endif
 
     // Wait for socket to be writable
     fd_set wfds;
@@ -473,50 +563,33 @@ int pp_socket_connect_with_timeout(os_socket_fd fd,
     tv.tv_usec = (timeout_ms % 1000) * 1000;
 
     // Wait until timeout
-    ret = select(fd + 1, NULL, &wfds, NULL, &tv);
+    ret = select(pp_socket_select_nfds(fd), NULL, &wfds, NULL, &tv);
     if (ret == 0) {
-#if PARTOUT_WINDOWS
-        WSASetLastError(WSAETIMEDOUT);
-#else
-        errno = ETIMEDOUT;
-#endif
+        pp_socket_set_timeout_error();
         return -2;  // Timeout
-    } else if (ret < 0) {
-        SOCKET_PRINT_ERROR("select()");
+    } else if (ret == OS_SOCKET_ERROR) {
+        pp_socket_print_error("select()");
         return -1;  // Select error
     }
 
     // Check SO_ERROR to see if connect succeeded
     int err = 0;
-    socklen_t len = sizeof(err);
+    os_socklen_t len = sizeof(err);
     if (getsockopt(fd, SOL_SOCKET, SO_ERROR, (char *)&err, &len) < 0) {
-        SOCKET_PRINT_ERROR("getsockopt()");
+        pp_socket_print_error("getsockopt()");
         return -1;
     }
     if (err != 0) {
-#if PARTOUT_WINDOWS
-        WSASetLastError(err);
-#else
-        errno = err;
-#endif
+        pp_socket_set_error(err);
         return -1;
     }
 
 done:
     // Store/restore blocking mode as needed
     if (blocking) {
-#if PARTOUT_WINDOWS
-        mode = 0;
-        if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
-            SOCKET_PRINT_ERROR("ioctlsocket()");
+        if (pp_socket_restore_blocking(fd, original_flags) < 0) {
             return -1;
         }
-#else
-        if (fcntl(fd, F_SETFL, original_flags) < 0) {
-            SOCKET_PRINT_ERROR("fnctl()");
-            return -1;
-        }
-#endif
     }
 
     // Success
