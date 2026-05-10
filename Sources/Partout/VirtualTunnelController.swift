@@ -88,10 +88,8 @@ public final class VirtualTunnelController: TunnelController {
     }
 
     public func configureSockets(with descriptors: [UInt64]) {
-        if let thiz = impl {
-            descriptors.map(Int32.init).withUnsafeBufferPointer {
-                pp_tun_ctrl_configure_sockets(thiz, $0.baseAddress, $0.count)
-            }
+        descriptors.map(Int32.init).withUnsafeBufferPointer {
+            pp_tun_ctrl_configure_sockets(impl, $0.baseAddress, $0.count)
         }
     }
 
