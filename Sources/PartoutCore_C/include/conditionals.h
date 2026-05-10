@@ -35,7 +35,7 @@
 #define PARTOUT_WINDOWS     0
 #endif
 
-#if defined(PARTOUT_MACOS) || defined(PARTOUT_LINUX) || defined(PARTOUT_WINDOWS)
+#if PARTOUT_MACOS || PARTOUT_LINUX || PARTOUT_WINDOWS
 #define PARTOUT_ABI         1
 #else
 #define PARTOUT_ABI         0
