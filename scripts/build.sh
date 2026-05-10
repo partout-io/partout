@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 opt_configuration=Debug
 build_dir=.cmake
 bin_dir=bin
@@ -11,6 +12,14 @@ while [[ $# -gt 0 ]]; do
             rm -rf $build_dir $bin_dir
             shift
             ;;
+        -gen)
+            gen_build=1
+            shift
+            ;;
+        -gen-models)
+            gen_models=1
+            shift
+            ;;
         -config)
             # Debug|Release
             cmake_opts+=("-DCMAKE_BUILD_TYPE=$2")
@@ -20,7 +29,8 @@ while [[ $# -gt 0 ]]; do
         -a)
             cmake_opts+=("-DPP_BUILD_LIBRARY=ON")
             cmake_opts+=("-DPP_BUILD_USE_OPENSSL=ON")
-            cmake_opts+=("-DPP_BUILD_USE_WGGO=ON")
+            cmake_opts+=("-DPP_BUILD_USE_OPENVPN=ON")
+            cmake_opts+=("-DPP_BUILD_USE_WIREGUARD=ON")
             shift
             ;;
         -crypto)
@@ -40,8 +50,12 @@ while [[ $# -gt 0 ]]; do
             shift
             shift
             ;;
+        -openvpn)
+            cmake_opts+=("-DPP_BUILD_USE_OPENVPN=ON")
+            shift
+            ;;
         -wireguard)
-            cmake_opts+=("-DPP_BUILD_USE_WGGO=ON")
+            cmake_opts+=("-DPP_BUILD_USE_WIREGUARD=ON")
             shift
             ;;
         -l)
@@ -49,7 +63,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -android)
-            # Requires ANDROID_NDK_HOME and toolchain in PATH
+            # Requires ANDROID_NDK_HOME
             export SWIFT_ANDROID_ABI=arm64-v8a
             export SWIFT_ANDROID_ARCH=aarch64
             export SWIFT_ANDROID_API_LEVEL=28
@@ -69,11 +83,30 @@ while [[ $# -gt 0 ]]; do
 done
 set -- "${positional_args[@]}"
 
-set -e
-if [ ! -d $build_dir ]; then
+# Generate CMake files
+if [[ ! -d $build_dir ]]; then
     mkdir $build_dir
 fi
-cd $build_dir
-rm -f *.txt
-cmake -G Ninja "${cmake_opts[@]}" ..
+if [[ ! -d $bin_dir ]]; then
+    mkdir $bin_dir
+fi
+if [[ $gen_build == 1 ]]; then
+    scripts/gen-cmake-files.sh
+    pushd $build_dir
+    cmake -G Ninja "${cmake_opts[@]}" ..
+else
+    pushd $build_dir
+fi
 cmake --build .
+popd
+
+# Generate foreign models
+if [[ $gen_models == 1 ]]; then
+    # Kotlin
+    scripts/gen-models.sh kotlin cross-models
+    rm -rf cross/android/io/partout/abi
+    mv cross-models/src/main/kotlin/io/partout/abi cross/android/io/partout
+    # C++ (TODO)
+    ######
+    rm -rf cross-models
+fi

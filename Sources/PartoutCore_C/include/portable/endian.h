@@ -5,10 +5,11 @@
  */
 
 #pragma once
+#include "portable/conditionals.h"
 
 #include <stdint.h>
 
-#ifdef __APPLE__
+#if PARTOUT_APPLE
 
 #include <CoreFoundation/CoreFoundation.h>
 
@@ -34,7 +35,7 @@ uint32_t pp_endian_htonl(uint32_t num) {
 
 #else
 
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
 #include <WinSock2.h>
 #else
 #include <arpa/inet.h>

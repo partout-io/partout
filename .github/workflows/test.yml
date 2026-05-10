@@ -3,6 +3,11 @@ name: Unit Tests
 on:
   pull_request:
     types: [ opened, synchronize ]
+    paths-ignore:
+      - "README.md"
+      - "**/*.md"
+      - "scripts/*.sh"
+      - "scripts/*.ps1"
 
 concurrency:
   group: ${{ github.ref }}

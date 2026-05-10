@@ -5,14 +5,9 @@
  */
 
 #pragma once
+#include "portable/conditionals.h"
 
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#endif
-
-/* Available on macOS, Linux, and Windows. */
-#if TARGET_OS_OSX || defined(__linux__) || defined(_WIN32)
-
+#if PARTOUT_ABI
 #include <stdint.h>
 
 /* Opaque tun device. */
