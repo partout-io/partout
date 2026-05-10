@@ -52,9 +52,6 @@ else()
     set(HAS_CRYPTO OFF)
     list(APPEND EXCLUDED_PATTERNS PartoutCrypto)
 endif()
-if(NOT PP_BUILD_USE_WGGO)
-    list(APPEND EXCLUDED_PATTERNS PartoutWireGuardConnection_C\/)
-endif()
 
 # Filter by VPN support
 if(PP_BUILD_USE_OPENVPN)
