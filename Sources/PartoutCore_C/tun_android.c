@@ -65,11 +65,6 @@ static const kotlin_sig sig_configureSockets = {
     "configureSockets",
     "([I)V"
 };
-static const kotlin_sig sig_clearTunnelSettings = {
-    "clearTunnelSettings",
-    "()V"
-};
-
 void pp_tun_ctrl_test_working(void *jni_ref) {
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_test_working(%p)", jni_ref);
@@ -141,14 +136,6 @@ pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): Invalid fd");
         goto cleanup;
     }
-    const int dup_fd = dup(tun_impl->fd);
-    if (dup_fd < 0) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_set_tunnel(): dup(), %s", strerror(errno));
-        goto cleanup;
-    }
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "pp_tun_ctrl_set_tunnel(): Duplicated tun device %d -> %d", tun_impl->fd, dup_fd);
-    tun_impl->fd = dup_fd;
-
 cleanup:
     if (tun_impl != NULL && tun_impl->fd < 0) {
         free(tun_impl);
@@ -198,35 +185,11 @@ cleanup:
 }
 
 void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
-    assert(jni_ref && tun_impl);
+    (void)jni_ref;
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "pp_tun_ctrl_clear_tunnel(%p)", jni_ref);
-
-    // Release the tun_impl allocated in set_tunnel
-    // Do not close impl->fd, JNI clearTunnelSettings() will take care
+    if (!tun_impl) return;
+    pp_tun_shutdown(tun_impl);
     free(tun_impl);
-
-    bool did_attach;
-    JNIEnv *env = pp_jni_attach_thread(&did_attach);
-    if (!env) return;
-
-    jclass cls = NULL;
-    jmethodID method = NULL;
-
-    cls = (*env)->GetObjectClass(env, jni_ref);
-    if (cls == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_clear_tunnel(): NULL cls");
-        goto cleanup;
-    }
-    method = (*env)->GetMethodID(env, cls, sig_clearTunnelSettings.name, sig_clearTunnelSettings.signature);
-    if (method == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_tun_ctrl_clear_tunnel(): NULL method");
-        goto cleanup;
-    }
-    (*env)->CallVoidMethod(env, jni_ref, method);
-
-cleanup:
-    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
-    if (did_attach) (*jvm)->DetachCurrentThread(jvm);
 }
 
 #endif

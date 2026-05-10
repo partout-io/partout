@@ -113,9 +113,9 @@ class AndroidTunnelController: AutoCloseable {
         }
 
         // Success
-        val fd = descriptor?.fd ?: -1
+        val fd = descriptor?.detachFd() ?: -1
+        descriptor = null
         Log.e(logTag, ">>> AndroidTunnelController: Established descriptor: " + fd)
-//        descriptor?.detachFd()
         return fd
     }
 
@@ -124,12 +124,6 @@ class AndroidTunnelController: AutoCloseable {
         fds.forEach {
             service.protect(it)
         }
-    }
-
-    fun clearTunnelSettings() {
-        Log.e(logTag, ">>> AndroidTunnelController: Closing...")
-        descriptor?.close()
-        descriptor = null
     }
 
     override fun close() {
