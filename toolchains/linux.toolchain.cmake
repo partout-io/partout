@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Davide De Rosa
+#
+# SPDX-License-Identifier: MIT
+
 if(NOT DEFINED ENV{SWIFT_VERSION} OR "$ENV{SWIFT_VERSION}" STREQUAL "")
     message(FATAL_ERROR "SWIFT_VERSION must be defined")
 endif()

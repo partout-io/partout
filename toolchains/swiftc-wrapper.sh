@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Davide De Rosa
+#
+# SPDX-License-Identifier: MIT
+
 #!/bin/bash
 if [[ $(uname -s) == "Darwin" ]]; then
     if ! command -v swiftly >/dev/null 2>&1; then

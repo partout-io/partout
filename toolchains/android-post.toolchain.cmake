@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Davide De Rosa
+#
+# SPDX-License-Identifier: MIT
+
 # The legacy NDK toolchain writes its default linker flags directly into
 # CMAKE_*_LINKER_FLAGS, which CMake's Swift rules pass through LINK_FLAGS
 # without Swift's linker-wrapper syntax.

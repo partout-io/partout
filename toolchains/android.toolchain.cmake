@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Davide De Rosa
+#
+# SPDX-License-Identifier: MIT
+
 # From environment
 # ANDROID_NDK_HOME
 # SWIFT_ANDROID_ABI

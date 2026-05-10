@@ -127,7 +127,7 @@ Open `Demo.xcodeproj` and run the `PartoutDemo` target.
 
 Copyright (c) 2026 Davide De Rosa. All rights reserved.
 
-The library is licensed under the [GPLv3][license]. The `MiniFoundation` targets are MIT-licensed.
+The library is licensed under the [GPLv3][license]. The `MiniFoundation` targets and the [CMake toolchains][github-toolchains] are MIT-licensed.
 
 ### Contributing
 
@@ -183,6 +183,7 @@ Website: [partout.io][about-website]
 [openapi-generator]: https://openapi-generator.tech/
 
 [github-releases]: https://github.com/partout-io/partout/releases
+[github-toolchains]: https://github.com/partout-io/partout/tree/master/toolchains
 [credits-genericjson]: https://github.com/iwill/generic-json-swift
 [credits-mbedtls]: https://github.com/Mbed-TLS/mbedtls
 [credits-openssl]: https://github.com/openssl/openssl
