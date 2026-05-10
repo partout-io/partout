@@ -11,6 +11,7 @@ include("partout.cmake")
 add_library(partout_c STATIC "")
 target_compile_options(partout_c PRIVATE
     -DUSE_CMAKE
+    -include${CMAKE_CURRENT_SOURCE_DIR}/PartoutCore_C/include/conditionals.h
 )
 
 # Header search paths from all C targets

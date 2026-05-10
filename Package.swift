@@ -127,12 +127,17 @@ package.targets.append(contentsOf: [
     .target(
         name: "PartoutCore_C",
         cSettings: globalCSettings + {
+            var list: [CSetting] = []
             if OS.current == .windows {
-                return [
-                    .unsafeFlags(["-I\(cmakeOutput)/wintun"])
-                ]
+                list.append(.unsafeFlags([
+                    "-I\(cmakeOutput)/wintun"
+                ]))
             }
-            return []
+            list.append(.unsafeFlags([
+                "-include",
+                "conditionals.h"
+            ]))
+            return list
         }()
     ),
     .target(

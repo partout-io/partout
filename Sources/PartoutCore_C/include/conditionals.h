@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#pragma once
+
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #define PARTOUT_APPLE       1
