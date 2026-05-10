@@ -7,7 +7,7 @@ public enum PartoutConstants {
     public static let identifier = "io.partout"
 
     /// The library version.
-    public static let version = "0.122.0"
+    public static let version = "0.125.2"
 
     /// The computed version identifier.
     public static let versionIdentifier: String = "\(identifier) \(version)"

@@ -1,11 +1,17 @@
 set(OPENSSL_DIR ${PP_BUILD_OUTPUT}/openssl)
+set(OPENSSL_LIBDIR "lib")
 
 # Output
 if(WIN32)
-    set(LIBSSL bin/libssl${LIBEXT})
-    set(LIBCRYPTO bin/libcrypto${LIBEXT})
-    set(LIBSSL_IMP lib/libssl${LIBEXT_IMP})
-    set(LIBCRYPTO_IMP lib/libcrypto${LIBEXT_IMP})
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+        set(OPENSSL_ARCH arm64)
+    else()
+        set(OPENSSL_ARCH x64)
+    endif()
+    set(LIBSSL bin/libssl-3-${OPENSSL_ARCH}${LIBEXT})
+    set(LIBCRYPTO bin/libcrypto-3-${OPENSSL_ARCH}${LIBEXT})
+    set(LIBSSL_IMP ${OPENSSL_LIBDIR}/libssl${LIBEXT_IMP})
+    set(LIBCRYPTO_IMP ${OPENSSL_LIBDIR}/libcrypto${LIBEXT_IMP})
     set(OPENSSL_BYPRODUCTS
         <INSTALL_DIR>/${LIBSSL}
         <INSTALL_DIR>/${LIBSSL_IMP}
@@ -13,8 +19,8 @@ if(WIN32)
         <INSTALL_DIR>/${LIBCRYPTO_IMP}
     )
 else()
-    set(LIBSSL lib/libssl${LIBEXT})
-    set(LIBCRYPTO lib/libcrypto${LIBEXT})
+    set(LIBSSL ${OPENSSL_LIBDIR}/libssl${LIBEXT})
+    set(LIBCRYPTO ${OPENSSL_LIBDIR}/libcrypto${LIBEXT})
     set(OPENSSL_BYPRODUCTS
         <INSTALL_DIR>/${LIBSSL}
         <INSTALL_DIR>/${LIBCRYPTO}
@@ -24,10 +30,10 @@ endif()
 # Configure flags
 set(OPENSSL_CFG_FLAGS no-apps no-docs no-dsa no-engine no-gost no-legacy shared no-ssl no-tests no-zlib)
 
-# Add some flags if -DANDROID (requires NDK tools in the PATH)
+# Add some flags if -DANDROID
 if(ANDROID)
     set(OPENSSL_TARGET "android-arm64")
-    set(OPENSSL_SYMBOLS "-D__ANDROID_API__=${CMAKE_SYSTEM_VERSION}")
+    set(OPENSSL_SYMBOLS "-D__ANDROID_API__=${ANDROID_NATIVE_API_LEVEL}")
 else()
     set(OPENSSL_TARGET "")
     set(OPENSSL_SYMBOLS "")
@@ -37,30 +43,29 @@ set(CFG_ARGS
     ${OPENSSL_TARGET}
     --prefix=${OPENSSL_DIR}
     --openssldir=${OPENSSL_DIR}
+    --libdir=${OPENSSL_LIBDIR}
     ${OPENSSL_SYMBOLS}
     ${OPENSSL_CFG_FLAGS}
 )
+set(OPENSSL_INSTALL_COMMAND ${VENDOR_ENV} ${MAKE_CMD} install)
+if(APPLE)
+    list(APPEND OPENSSL_INSTALL_COMMAND
+        COMMAND install_name_tool -id "@rpath/libcrypto.3.dylib" "${OPENSSL_DIR}/${OPENSSL_LIBDIR}/libcrypto.3.dylib"
+        COMMAND install_name_tool -id "@rpath/libssl.3.dylib" "${OPENSSL_DIR}/${OPENSSL_LIBDIR}/libssl.3.dylib"
+        COMMAND install_name_tool -change
+            "${OPENSSL_DIR}/${OPENSSL_LIBDIR}/libcrypto.3.dylib"
+            "@rpath/libcrypto.3.dylib"
+            "${OPENSSL_DIR}/${OPENSSL_LIBDIR}/libssl.3.dylib"
+    )
+endif()
 ExternalProject_Add(OpenSSLProject
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl
-    CONFIGURE_COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl/Configure ${CFG_ARGS}
-    BUILD_COMMAND ${MAKE_CMD}
-    INSTALL_COMMAND ${MAKE_CMD} install
+    CONFIGURE_COMMAND ${VENDOR_ENV} perl ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl/Configure ${CFG_ARGS}
+    BUILD_COMMAND ${VENDOR_ENV} ${MAKE_CMD}
+    INSTALL_COMMAND ${OPENSSL_INSTALL_COMMAND}
     INSTALL_DIR ${OPENSSL_DIR}
     BUILD_BYPRODUCTS ${OPENSSL_BYPRODUCTS}
 )
-
-if(APPLE)
-    add_custom_command(
-        TARGET OpenSSLProject
-        POST_BUILD
-        COMMAND install_name_tool -id "@rpath/libcrypto.3.dylib" "${OPENSSL_DIR}/lib/libcrypto.3.dylib"
-        COMMAND install_name_tool -id "@rpath/libssl.3.dylib" "${OPENSSL_DIR}/lib/libssl.3.dylib"
-        COMMAND install_name_tool -change
-            "${OPENSSL_DIR}/lib/libcrypto.3.dylib"
-            "@rpath/libcrypto.3.dylib"
-            "${OPENSSL_DIR}/lib/libssl.3.dylib"
-    )
-endif()
 
 # XXX: Use absolute paths to fix linking clash with system OpenSSL/BoringSSL
 ExternalProject_Get_Property(OpenSSLProject install_dir)

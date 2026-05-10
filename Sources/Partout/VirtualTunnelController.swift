@@ -25,14 +25,22 @@ public final class VirtualTunnelController: TunnelController {
         self.maxReadLength = maxReadLength
 
         if let thiz = impl {
-            pp_tun_ctrl_test_working_wrapper(thiz)
+            pp_tun_ctrl_test_working(thiz)
         }
+    }
+
+    deinit {
+        pp_log(ctx, .core, .debug, "Deinit VirtualTunnelController")
     }
 
     public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
         guard let info else {
             throw PartoutError(.notFound)
         }
+        guard info.requiresVirtualDevice else {
+            return DummyTunnelInterface()
+        }
+
         let infoJSON: String = try {
             let wrapped = TunnelRemoteInfoWrapper(info)
             let data = try JSONEncoder().encode(wrapped)
@@ -42,20 +50,23 @@ public final class VirtualTunnelController: TunnelController {
             return json
         }()
 
-        // Fetch tun implementation if necessary
-        let tunImpl = impl.map { thiz in
-            infoJSON.withCString {
-                pp_tun_ctrl_set_tunnel(thiz, $0)
+        // Create tun with optional implementation from controller
+        let tunImpl: UnsafeMutableRawPointer?
+        if let impl {
+            tunImpl = infoJSON.withCString {
+                pp_tun_ctrl_set_tunnel(impl, $0)
             }
-        } ?? nil
-
-        // Create virtual device with an optional implementation
-        let uuid = info.originalModuleId
-        let tun: IOInterface
-        if info.requiresVirtualDevice {
-            tun = try VirtualTunnelInterface(ctx, uuid: uuid, tunImpl: tunImpl, maxReadLength: maxReadLength)
         } else {
-            tun = DummyTunnelInterface()
+            tunImpl = nil
+        }
+        let uuid = info.originalModuleId
+        guard let tun = uuid.uuidString.withCString({
+            pp_tun_create($0, tunImpl)
+        }) else {
+            if let impl {
+                pp_tun_ctrl_clear_tunnel(impl, tunImpl)
+            }
+            throw PartoutError(.linkNotActive)
         }
 
         // FIXME: #188, add better codes for PartoutError
@@ -85,7 +96,7 @@ public final class VirtualTunnelController: TunnelController {
 //            excludedRoutes.append(Route(Subnet(serverAddress), nil))
 //        }
 
-        return tun
+        return VirtualTunnelInterface(ctx, tun: tun, tunImpl: tunImpl, maxReadLength: maxReadLength)
     }
 
     public func configureSockets(with descriptors: [UInt64]) {
@@ -103,6 +114,7 @@ public final class VirtualTunnelController: TunnelController {
         }
         // FIXME: #188, revert settings (record)
 //        tun.deviceName
+        await tunnel.shutdown()
 
         // Release tun implementation if necessary
         if let thiz = impl {

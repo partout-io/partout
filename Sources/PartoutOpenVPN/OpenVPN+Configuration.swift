@@ -246,8 +246,13 @@ extension OpenVPN {
 
         // MARK: Shortcuts
 
+        /// Returns the effective cipher to use when negotiation does not yield one.
+        ///
+        /// `cipher` takes precedence because the parser also uses it to store
+        /// `data-ciphers-fallback`, allowing deprecated `cipher` input to be
+        /// normalized to the modern fallback form on serialization.
         public var fallbackCipher: Cipher {
-            return cipher ?? Fallback.cipher
+            return cipher ?? dataCiphers?.first ?? Fallback.cipher
         }
 
         public var fallbackDigest: Digest {
@@ -279,7 +284,11 @@ extension OpenVPN.Configuration {
 
         // MARK: General
 
-        /// The cipher algorithm for data encryption.
+        /// The legacy cipher algorithm for data encryption.
+        ///
+        /// When `dataCiphers` is set, this same field also stores the effective
+        /// `data-ciphers-fallback` value so deprecated `cipher` input can be
+        /// normalized on output.
         public var cipher: OpenVPN.Cipher?
 
         /// The set of supported cipher algorithms for data encryption (2.5.).
@@ -447,7 +456,6 @@ extension OpenVPN.Configuration {
          - Throws: If `isClient` is `true` and some required options are missing.
          */
         public func build(isClient: Bool) throws -> OpenVPN.Configuration {
-            let fallbackCipher: OpenVPN.Cipher?
             if isClient {
                 guard ca != nil else {
                     throw PartoutError.invalidField(.OpenVPN.ca)
@@ -455,12 +463,9 @@ extension OpenVPN.Configuration {
                 guard !(remotes?.isEmpty ?? true) else {
                     throw PartoutError.invalidField(.OpenVPN.remotes)
                 }
-                fallbackCipher = cipher ?? .aes128cbc
-            } else {
-                fallbackCipher = cipher
             }
             return OpenVPN.Configuration(
-                cipher: fallbackCipher,
+                cipher: cipher,
                 dataCiphers: dataCiphers,
                 digest: digest,
                 compressionFraming: compressionFraming,

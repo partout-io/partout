@@ -3,13 +3,16 @@
 // SPDX-License-Identifier: GPL-3.0
 
 extension OpenVPNSession {
-
     @discardableResult
     func startNegotiation(on link: LinkInterface) throws -> Negotiator {
         pp_log(ctx, .openvpn, .info, "Start negotiation")
         let neg = try newNegotiator(on: link)
         addNegotiator(neg)
-        loopLink()
+        if options.withLoopsV2 {
+            loopLinkV2()
+        } else {
+            loopLink()
+        }
         try neg.start()
         return neg
     }

@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#endif
+#include "portable/common.h"
+#include "portable/tun.h"
 
-#if TARGET_OS_OSX
+#if PARTOUT_MACOS
 
 #include <sys/socket.h>
 #include <sys/sys_domain.h>
@@ -19,9 +18,7 @@
 #include <net/if_utun.h>
 #include <stdio.h>
 #include <string.h>
-#include "portable/common.h"
 #include "portable/endian.h"
-#include "portable/tun.h"
 
 struct _pp_tun {
     int fd;
@@ -79,7 +76,7 @@ failure:
 
 void pp_tun_free(pp_tun tun) {
     if (!tun) return;
-    close(tun->fd);
+    pp_tun_shutdown(tun);
     pp_free((void *)tun->dev_name);
     pp_free(tun);
 }
@@ -99,6 +96,7 @@ uint32_t pp_tun_proto_for(uint8_t byte) {
 }
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
+    if (!tun || tun->fd < 0) return -1;
     uint32_t pi = 0; // 4-byte utun protocol header
 
     struct iovec iov[2];
@@ -117,6 +115,7 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
 }
 
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
+    if (!tun || tun->fd < 0) return -1;
     const uint32_t pi = pp_endian_htonl(pp_tun_proto_for(*src));
     const size_t pi_len = sizeof(pi);
 
@@ -132,7 +131,14 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     return written_len;
 }
 
+void pp_tun_shutdown(const pp_tun tun) {
+    if (!tun || tun->fd < 0) return;
+    close(tun->fd);
+    tun->fd = -1;
+}
+
 int pp_tun_fd(const pp_tun tun) {
+    if (!tun) return -1;
     return tun->fd;
 }
 

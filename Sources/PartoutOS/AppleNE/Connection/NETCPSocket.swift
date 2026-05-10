@@ -91,6 +91,7 @@ extension NETCPSocket {
             .map { _ in }
     }
 
+    @available(*, deprecated)
     nonisolated func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
         loopReadPackets(handler)
     }
@@ -118,7 +119,20 @@ extension NETCPSocket {
     }
 
     func readPackets() async throws -> [Data] {
-        fatalError("readPackets() unavailable")
+        // WARNING: runs in Network.framework queue
+        try await withCheckedThrowingContinuation { continuation in
+            nwConnection.readMinimumLength(options.minLength, maximumLength: options.maxLength) { data, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let data, !data.isEmpty else {
+                    continuation.resume(throwing: PartoutError(.linkNotActive))
+                    return
+                }
+                continuation.resume(returning: [data])
+            }
+        }
     }
 
     func writePackets(_ packets: [Data]) async throws {
@@ -131,6 +145,7 @@ extension NETCPSocket {
 }
 
 private extension NETCPSocket {
+    @available(*, deprecated)
     nonisolated func loopReadPackets(_ handler: @escaping ([Data]?, Error?) -> Void) {
 
         // WARNING: runs in Network.framework queue

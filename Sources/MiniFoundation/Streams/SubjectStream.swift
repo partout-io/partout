@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-import Dispatch
-
 /// Replacement for completion values.
 public enum SubjectStreamCompletion {
     case finished

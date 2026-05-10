@@ -27,7 +27,7 @@ final class OpenVPNSession {
 
     let cachesURL: URL
 
-    let options: OpenVPNConnection.Options
+    let options: OpenVPNConnectionOptions
 
     private let tlsFactory: TLSFactory
 
@@ -100,7 +100,7 @@ final class OpenVPNSession {
         credentials: OpenVPN.Credentials?,
         prng: PRNGProtocol,
         cachesURL: URL,
-        options: OpenVPNConnection.Options = .init(),
+        options: OpenVPNConnectionOptions = .init(),
         tlsFactory: @escaping TLSFactory,
         dpFactory: @escaping DataPathFactory
     ) throws {
@@ -146,7 +146,11 @@ extension OpenVPNSession: OpenVPNSessionProtocol {
         }
         pp_log(ctx, .openvpn, .info, "Start TUN loop")
         self.tunnel = tunnel
-        loopTunnel()
+        if options.withLoopsV2 {
+            loopTunnelV2()
+        } else {
+            loopTunnel()
+        }
     }
 
     func setLink(_ link: LinkInterface) async throws {
@@ -408,8 +412,8 @@ extension OpenVPNSession {
     }
 }
 
+@available(*, deprecated)
 extension OpenVPNSession {
-
     @discardableResult
     nonisolated func runInActor(after: TimeInterval? = nil, _ block: @escaping @OpenVPNActor () async throws -> Void) -> Task<Void, Error> {
         Task {
@@ -432,8 +436,10 @@ private extension OpenVPNSession {
         pp_log(ctx, .openvpn, .debug, "Schedule ping check after \(interval.asTimeString)")
 
         pendingPingTask?.cancel()
-        pendingPingTask = runInActor(after: interval) { [weak self] in
+        pendingPingTask = Task { [weak self] in
             do {
+                try await Task.sleep(interval: interval)
+                guard !Task.isCancelled else { return }
                 try await self?.ping()
             } catch {
                 await self?.shutdown(error)

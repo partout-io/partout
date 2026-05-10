@@ -1,17 +1,8 @@
 #!/bin/bash
+set -e
 opt_configuration=Debug
 build_dir=.cmake
 bin_dir=bin
-
-#export ANDROID_NDK_ROOT=
-export SWIFT_ANDROID_SDK=~/.swiftpm/swift-sdks/swift-6.2-RELEASE-android-0.1.artifactbundle
-export ANDROID_NDK_API=28
-export ANDROID_NDK_ARCH=aarch64
-ANDROID_NDK_TARGET=darwin-x86_64
-
-# These are derived from the above
-export ANDROID_NDK_TOOLCHAIN=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/$ANDROID_NDK_TARGET/bin
-export ANDROID_NDK_SYSROOT=$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/$ANDROID_NDK_TARGET/sysroot
 
 positional_args=()
 cmake_opts=()
@@ -19,6 +10,14 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         -clean)
             rm -rf $build_dir $bin_dir
+            shift
+            ;;
+        -gen)
+            gen_build=1
+            shift
+            ;;
+        -gen-models)
+            gen_models=1
             shift
             ;;
         -config)
@@ -30,7 +29,8 @@ while [[ $# -gt 0 ]]; do
         -a)
             cmake_opts+=("-DPP_BUILD_LIBRARY=ON")
             cmake_opts+=("-DPP_BUILD_USE_OPENSSL=ON")
-            cmake_opts+=("-DPP_BUILD_USE_WGGO=ON")
+            cmake_opts+=("-DPP_BUILD_USE_OPENVPN=ON")
+            cmake_opts+=("-DPP_BUILD_USE_WIREGUARD=ON")
             shift
             ;;
         -crypto)
@@ -50,8 +50,12 @@ while [[ $# -gt 0 ]]; do
             shift
             shift
             ;;
+        -openvpn)
+            cmake_opts+=("-DPP_BUILD_USE_OPENVPN=ON")
+            shift
+            ;;
         -wireguard)
-            cmake_opts+=("-DPP_BUILD_USE_WGGO=ON")
+            cmake_opts+=("-DPP_BUILD_USE_WIREGUARD=ON")
             shift
             ;;
         -l)
@@ -59,8 +63,11 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -android)
-            PATH=$ANDROID_NDK_TOOLCHAIN:$PATH
-            export SWIFT_RESOURCE_DIR=$SWIFT_ANDROID_SDK/swift-android/swift-resources/usr/lib/swift_static-$ANDROID_NDK_ARCH
+            # Requires ANDROID_NDK_HOME
+            export SWIFT_ANDROID_ABI=arm64-v8a
+            export SWIFT_ANDROID_ARCH=aarch64
+            export SWIFT_ANDROID_API_LEVEL=28
+            export SWIFT_ANDROID_VERSION=6.3.1
             cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=toolchains/android.toolchain.cmake")
             shift
             ;;
@@ -76,11 +83,30 @@ while [[ $# -gt 0 ]]; do
 done
 set -- "${positional_args[@]}"
 
-set -e
-if [ ! -d $build_dir ]; then
+# Generate CMake files
+if [[ ! -d $build_dir ]]; then
     mkdir $build_dir
 fi
-cd $build_dir
-rm -f *.txt
-cmake -G Ninja "${cmake_opts[@]}" ..
+if [[ ! -d $bin_dir ]]; then
+    mkdir $bin_dir
+fi
+if [[ $gen_build == 1 ]]; then
+    scripts/gen-cmake-files.sh
+    pushd $build_dir
+    cmake -G Ninja "${cmake_opts[@]}" ..
+else
+    pushd $build_dir
+fi
 cmake --build .
+popd
+
+# Generate foreign models
+if [[ $gen_models == 1 ]]; then
+    # Kotlin
+    scripts/gen-models.sh kotlin cross-models
+    rm -rf cross/android/io/partout/abi
+    mv cross-models/src/main/kotlin/io/partout/abi cross/android/io/partout
+    # C++ (TODO)
+    ######
+    rm -rf cross-models
+fi

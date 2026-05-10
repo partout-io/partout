@@ -8,4 +8,5 @@ Package.resolved
 .build
 .cmake
 bin
+cross-models
 openapitools.json

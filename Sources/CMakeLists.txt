@@ -2,6 +2,9 @@
 set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(OUTPUT_DIR ${PP_BUILD_OUTPUT}/partout)
 
+# Include file lists
+include("partout.cmake")
+
 # Partout_C ############################################
 
 # Base configuration
@@ -26,13 +29,13 @@ endif()
 set(EXCLUDED_PATTERNS "")
 
 # Filter by crypto vendor
-if(DEFINED OPENSSL_DIR)
+set(HAS_CRYPTO ON)
+if(PP_BUILD_USE_OPENSSL)
     list(APPEND PARTOUT_C_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCrypto/OpenSSL_C/include)
-else()
-    list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/OpenSSL_C\/)
-endif()
-if(DEFINED MBEDTLS_DIR)
+    list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/)
+elseif(PP_BUILD_USE_MBEDTLS)
     list(APPEND PARTOUT_C_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCrypto/Native_C/include)
+    list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/OpenSSL_C\/)
     if(NOT APPLE)
         list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/src/apple)
     endif()
@@ -46,14 +49,24 @@ if(DEFINED MBEDTLS_DIR)
         list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/src/android)
     endif()
 else()
-    list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/)
+    set(HAS_CRYPTO OFF)
+    list(APPEND EXCLUDED_PATTERNS PartoutCrypto)
 endif()
 if(NOT PP_BUILD_USE_WGGO)
     list(APPEND EXCLUDED_PATTERNS PartoutWireGuardConnection_C\/)
 endif()
 
-# C sources
-file(GLOB_RECURSE PARTOUT_C_SOURCES *.c *.cc)
+# Filter by VPN support
+if(PP_BUILD_USE_OPENVPN)
+    if(NOT HAS_CRYPTO)
+        message(FATAL_ERROR "OpenVPN requires a crypto vendor")
+    endif()
+else()
+    list(APPEND EXCLUDED_PATTERNS PartoutOpenVPNConnection_C\/)
+endif()
+if(NOT PP_BUILD_USE_WIREGUARD)
+    list(APPEND EXCLUDED_PATTERNS PartoutWireGuardConnection_C\/)
+endif()
 
 # Account for exclusions in source files
 foreach(pattern ${EXCLUDED_PATTERNS})
@@ -62,7 +75,7 @@ endforeach()
 
 # Add computed files
 target_sources(partout_c PRIVATE ${PARTOUT_C_SOURCES})
-target_include_directories(partout_c PRIVATE ${PARTOUT_C_INCLUDE_DIRS})
+target_include_directories(partout_c PUBLIC ${PARTOUT_C_INCLUDE_DIRS})
 if(LINUX OR ANDROID)
     target_compile_options(partout_c PRIVATE -fPIC)
 endif()
@@ -75,7 +88,6 @@ add_library(partout STATIC "")
 # Define symbols to skip Swift imports and legacy code
 target_compile_options(partout PRIVATE
     -DUSE_CMAKE
-    -enable-library-evolution
 )
 
 # Use Foundation on Apple, compatible otherwise
@@ -83,19 +95,15 @@ if(NOT APPLE)
     set(USE_COMPAT ON)
 endif()
 
-# Swift sources
-file(GLOB_RECURSE PARTOUT_SOURCES *.swift)
-
 # Exclude Foundation if compatibility is on
 if(USE_COMPAT)
     target_compile_options(partout PRIVATE
         -DMINIF_COMPAT
     )
     set(EXCLUDED_PATTERNS
-        partout-codegen.*
-        PartoutCodegen.*
+        PartoutOpenVPNConnection\/V1
         PartoutOS\/Apple.*
-        PartoutWireGuardConnection\/Legacy.*
+        PartoutWireGuardConnection\/V1
     )
 endif()
 
@@ -105,16 +113,22 @@ endforeach()
 
 # Look for modulemaps in C "include" dirs
 foreach(dir ${PARTOUT_C_INCLUDE_DIRS})
-    target_include_directories(partout PRIVATE ${dir})
+    target_include_directories(partout PUBLIC ${dir})
 endforeach()
 
 # Depend on C target (include before)
 add_dependencies(partout partout_c)
 target_sources(partout PRIVATE ${PARTOUT_SOURCES})
 target_link_libraries(partout PRIVATE partout_c)
+
+# Apple still requires Swift 5 for NE
+if(APPLE)
+    set(SWIFT_MODE 5)
+else()
+    set(SWIFT_MODE 6)
+endif()
 target_compile_options(partout PRIVATE
-    -emit-module-interface
-    -language-mode 5
+    -language-mode ${SWIFT_MODE}
 )
 
 ################################################
@@ -126,6 +140,7 @@ set_target_properties(partout PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
     Swift_MODULE_NAME "Partout"
     Swift_MODULE_DIRECTORY "${OUTPUT_DIR}/modules"
+    Swift_COMPILATION_MODE incremental
 )
 set_target_properties(partout_c PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${OUTPUT_DIR}

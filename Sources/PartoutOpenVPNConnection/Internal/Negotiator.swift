@@ -11,7 +11,7 @@ final class Negotiator {
 
         let withLocalOptions: Bool
 
-        let sessionOptions: OpenVPNConnection.Options
+        let sessionOptions: OpenVPNConnectionOptions
 
         let onConnected: (UInt8, DataChannel, PushReply) async -> Void
 
@@ -652,10 +652,15 @@ private extension Negotiator {
     func completeConnection(pushReply: PushReply) throws {
         pp_log(ctx, .openvpn, .info, "Complete connection of key \(key)")
         let history = NegotiationHistory(pushReply: pushReply)
+#if swift(<6.0)
         let dataChannel = try newDataChannel(with: history)
+#endif
         self.history = history
         authenticator?.reset()
         Task {
+#if swift(>=6.0)
+            nonisolated(unsafe) let dataChannel = try newDataChannel(with: history)
+#endif
             await options.onConnected(key, dataChannel, pushReply)
         }
     }
@@ -684,7 +689,10 @@ private extension Negotiator {
 //        pp_log(ctx, .openvpn, .info, "\tremoteSessionId: \(remoteSessionId.toHex())")
 
         let parameters = DataPathWrapper.Parameters(
-            cipher: history.pushReply.options.cipher ?? options.configuration.fallbackCipher,
+            cipher: options.configuration.negotiatedDataChannelCipher(
+                with: history.pushReply.options,
+                serverOptions: authenticator?.serverOptions
+            ),
             digest: options.configuration.fallbackDigest,
             compressionFraming: history.pushReply.options.compressionFraming ?? options.configuration.fallbackCompressionFraming,
             compressionAlgorithm: history.pushReply.options.compressionAlgorithm ?? options.configuration.fallbackCompressionAlgorithm,

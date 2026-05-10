@@ -21,7 +21,7 @@ func tryTCPConnection() async throws {
 
     pp_log(.global, .core, .fault, ">>> CONNECTING")
     let endpoint = try ExtendedEndpoint("vps", .init(.tcp, 80))
-    let observer = POSIXSocketObserver(
+    let observer = BSDSocketObserver(
         .global,
         endpoint: endpoint,
         betterPathBlock: {
@@ -36,18 +36,18 @@ func tryTCPConnection() async throws {
     try await sut.writePackets([reqData])
     pp_log(.global, .core, .fault, ">>> WRITTEN")
 
-    sut.setReadHandler { packets, error in
-        if let error {
-            pp_log(.global, .core, .info, ">>> (error) \(error)")
-            return
-        }
-        packets?.forEach {
+    do {
+        let packets = try await sut.readPackets()
+        packets.forEach {
             guard let string = String(data: $0, encoding: .utf8) else {
                 pp_log(.global, .core, .info, ">>> (hex) \($0.toHex())")
                 return
             }
             pp_log(.global, .core, .info, ">>> (utf) \(string)")
         }
+    } catch {
+        pp_log(.global, .core, .info, ">>> (error) \(error)")
+        return
     }
 
     try await Task.sleep(interval: 10)

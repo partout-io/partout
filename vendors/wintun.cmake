@@ -4,5 +4,14 @@ FetchContent_Declare(wintun
     URL ${WINTUN_URL}
 )
 FetchContent_MakeAvailable(wintun)
-file(COPY ${wintun_SOURCE_DIR}/include/wintun.h DESTINATION ${WINTUN_DIR})
-file(COPY ${wintun_SOURCE_DIR}/bin/${ARCH_NAME}/wintun.dll DESTINATION ${WINTUN_DIR})
+file(MAKE_DIRECTORY ${WINTUN_DIR})
+file(COPY_FILE
+    ${wintun_SOURCE_DIR}/include/wintun.h
+    ${WINTUN_DIR}/wintun.h
+    ONLY_IF_DIFFERENT
+)
+file(COPY_FILE
+    ${wintun_SOURCE_DIR}/bin/${ARCH_NAME}/wintun.dll
+    ${WINTUN_DIR}/wintun.dll
+    ONLY_IF_DIFFERENT
+)

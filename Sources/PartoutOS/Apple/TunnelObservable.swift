@@ -15,13 +15,12 @@ public final class TunnelObservable {
     public init(tunnel: Tunnel) {
         self.tunnel = tunnel
         snapshots = [:]
-        Task { [weak self] in
-            guard let self else { return }
+        Task { [weak self, weak tunnel] in
             do {
-                let stream = tunnel.snapshotsStream
-                try await tunnel.prepare(purge: false)
+                guard let stream = tunnel?.snapshotsStream else { return }
+                try await tunnel?.prepare(purge: false)
                 for await newSnapshots in stream {
-                    snapshots = newSnapshots
+                    self?.snapshots = newSnapshots
                 }
             } catch {
                 pp_log_g(.core, .fault, "Unable to prepare tunnel: \(error)")

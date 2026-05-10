@@ -89,22 +89,25 @@ bin/android-aarch64/libpartout.a    # Android
 
 Additionally, `libpartout_c` must be linked. Partout must be bundled with the shared vendored libraries and the Swift runtime to work.
 
-Building for Android requires access to external SDKs:
+Building for Android requires access to the Android NDK and the Swift Android SDK, where the CMake toolchain expects from the environment:
 
-- `$ANDROID_NDK_ROOT` to point to your Android NDK installation
-- `$SWIFT_ANDROID_SDK` to point to your Swift for Android SDK installation (e.g. in `~/.swiftpm/swift-sdks`)
+- `ANDROID_NDK_HOME` points to your Android NDK installation.
+- `SWIFT_ANDROID_ABI` feeds the ANDROID_ABI parameter (e.g. `arm64-v8a`).
+- `SWIFT_ANDROID_ARCH` defines your host arch for the Swift Android SDK (e.g. `aarch64`).
+- `SWIFT_ANDROID_API_LEVEL` sets the API level (e.g. 28).
+- `SWIFT_ANDROID_VERSION` defines the Swift version of the Swift Android SDK.
 
-The CMake configuration is done with the `android.toolchain.cmake` toolchain. The script runs on macOS, but can be adapted for other platforms with slight tweaks to `scripts/build.sh`.
+Check out `scripts/build.sh` and the `toolchains/android.toolchain.cmake` toolchain file for more details. The build script runs on macOS and Linux.
 
 #### Codegen
 
 Partout comes with a [code generator][partout-codegen] that translates Swift data entities to a formal OpenAPI specification for non-Swift consumers.
 
 ```
-swift run partout-codegen --manifest scripts/manifest.yaml
+swift run codegen --manifest scripts/manifest.yaml
 ```
 
-`partout-codegen` uses [swift-syntax][credits-swift-syntax] to build an intermediate representation (IR) of the Swift data entities, then proceeds to map it to the OpenAPI format. [openapi-generator][openapi-generator] can eventually be used to generate the Partout data models for other languages.
+`codegen` uses [swift-syntax][credits-swift-syntax] to build an intermediate representation (IR) of the Swift data entities, then proceeds to map it to the OpenAPI format. [openapi-generator][openapi-generator] can eventually be used to generate the Partout data models for other languages.
 
 ## Demo
 
@@ -124,7 +127,7 @@ Open `Demo.xcodeproj` and run the `PartoutDemo` target.
 
 Copyright (c) 2026 Davide De Rosa. All rights reserved.
 
-The library is licensed under the [GPLv3][license]. The `MiniFoundation` targets are MIT-licensed.
+The library is licensed under the [GPLv3][license]. The `MiniFoundation` targets and the [CMake toolchains][github-toolchains] are MIT-licensed.
 
 ### Contributing
 
@@ -180,6 +183,7 @@ Website: [partout.io][about-website]
 [openapi-generator]: https://openapi-generator.tech/
 
 [github-releases]: https://github.com/partout-io/partout/releases
+[github-toolchains]: https://github.com/partout-io/partout/tree/master/toolchains
 [credits-genericjson]: https://github.com/iwill/generic-json-swift
 [credits-mbedtls]: https://github.com/Mbed-TLS/mbedtls
 [credits-openssl]: https://github.com/openssl/openssl
