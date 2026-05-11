@@ -17,7 +17,7 @@
 #include <unistd.h>
 
 /* Expect this struct from pp_tun_ctrl_set_tunnel(). */
-struct _pp_tun {
+struct __pp_tun_struct {
     int fd;
 };
 

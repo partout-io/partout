@@ -18,7 +18,7 @@ static const char *const TLSBoxServerEKU = "TLS Web Server Authentication";
 
 static int PPTLSExDataIdx = -1;
 
-struct _pp_tls {
+struct __pp_tls_struct {
     const pp_tls_options *_Nonnull opt;
     SSL_CTX *_Nonnull ssl_ctx;
     size_t buf_len;

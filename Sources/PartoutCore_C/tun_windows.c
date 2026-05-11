@@ -14,7 +14,7 @@
 
 // FIXME: #188, convert debug messages to logs
 
-struct _pp_tun {
+struct __pp_tun_struct {
     LPWSTR name;
     WINTUN_ADAPTER_HANDLE adapter;
     WINTUN_SESSION_HANDLE session;

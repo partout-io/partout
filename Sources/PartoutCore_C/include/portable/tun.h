@@ -11,7 +11,7 @@
 #include <stdint.h>
 
 /* Opaque tun device. */
-typedef struct _pp_tun *pp_tun;
+typedef struct __pp_tun_struct *pp_tun;
 
 /* Platform-specific implementations. */
 int pp_tun_read(const pp_tun _Nonnull tun, uint8_t *_Nonnull dst, size_t dst_len);

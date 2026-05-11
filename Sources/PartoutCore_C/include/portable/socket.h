@@ -17,7 +17,7 @@ typedef enum {
 } pp_socket_proto;
 
 /* The opaque socket type. */
-typedef struct _pp_socket *pp_socket;
+typedef struct __pp_socket_struct *pp_socket;
 
 /* Create a socket wrapper from an already open native descriptor. The
  * wrapper acquires ownership and will close the descriptor on

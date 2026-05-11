@@ -18,7 +18,7 @@
 #include <sys/ioctl.h>
 #include <sys/unistd.h>
 
-struct _pp_tun {
+struct __pp_tun_struct {
     int fd;
     const char *dev_name;
 };
