@@ -47,21 +47,24 @@ const char *pp_tun_name(const pp_tun tun) {
     return NULL;
 }
 
-/* Kotlin signatures for AndroidTunnelController. */
+/* JNI */
+
 typedef struct {
     const char *name;
     const char *signature;
 } kotlin_sig;
 
-static const kotlin_sig sig_testWorking = {
+/* Tunnel controller (AndroidTunnelController) */
+
+static const kotlin_sig sig_ctrl_testWorking = {
     "testWorking",
     "()V"
 };
-static const kotlin_sig sig_setTunnelSettings = {
+static const kotlin_sig sig_ctrl_setTunnelSettings = {
     "setTunnelSettings",
     "(Ljava/lang/String;)I"
 };
-static const kotlin_sig sig_configureSockets = {
+static const kotlin_sig sig_ctrl_configureSockets = {
     "configureSockets",
     "([I)V"
 };
@@ -80,7 +83,7 @@ void pp_tun_ctrl_test_working(void *jni_ref) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_test_working(), NULL cls");
         goto cleanup;
     }
-    method = (*env)->GetMethodID(env, cls, sig_testWorking.name, sig_testWorking.signature);
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_testWorking.name, sig_ctrl_testWorking.signature);
     if (method == NULL) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_test_working(), NULL method");
         goto cleanup;
@@ -118,7 +121,7 @@ pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_set_tunnel(), NULL cls");
         goto cleanup;
     }
-    method = (*env)->GetMethodID(env, cls, sig_setTunnelSettings.name, sig_setTunnelSettings.signature);
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_setTunnelSettings.name, sig_ctrl_setTunnelSettings.signature);
     if (method == NULL) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_set_tunnel(), NULL method");
         goto cleanup;
@@ -165,7 +168,7 @@ void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t f
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_configure_sockets(), NULL cls");
         goto cleanup;
     }
-    method = (*env)->GetMethodID(env, cls, sig_configureSockets.name, sig_configureSockets.signature);
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_configureSockets.name, sig_ctrl_configureSockets.signature);
     if (method == NULL) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_configure_sockets(), NULL method");
         goto cleanup;
