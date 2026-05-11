@@ -7,11 +7,11 @@
 #pragma once
 #include "portable/conditionals.h"
 
-#if PARTOUT_ABI
-#include <stdint.h>
-
 /* Opaque tun device. */
 typedef struct __pp_tun_struct *pp_tun;
+
+#if PARTOUT_ABI
+#include <stdint.h>
 
 /* Platform-specific implementations. */
 int pp_tun_read(const pp_tun _Nonnull tun, uint8_t *_Nonnull dst, size_t dst_len);
