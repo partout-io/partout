@@ -35,7 +35,7 @@ pp_tun pp_tun_create(const char *_Nonnull uuid) {
      * consistent across distros for coming from the kernel. */
     fd = open(dev_path, O_RDWR);
     if (fd < 0) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "open(tun)");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_linux: create(), open(tun)");
         goto failure;
     }
 
@@ -43,7 +43,7 @@ pp_tun pp_tun_create(const char *_Nonnull uuid) {
      * the first available device number */
     ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
     if (ioctl(fd, TUNSETIFF, (void *)&ifr) < 0) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "ioctl(TUNSETIFF)");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_linux: create(), ioctl(TUNSETIFF)");
         goto failure;
     }
 

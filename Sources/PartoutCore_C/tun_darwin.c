@@ -36,13 +36,13 @@ pp_tun pp_tun_create(const char *_Nonnull uuid) {
 
     fd = socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL);
     if (fd < 0) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "socket(PF_SYSTEM)");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: socket(PF_SYSTEM)");
         goto failure;
     }
 
     strncpy(ctl_info.ctl_name, UTUN_CONTROL_NAME, sizeof(ctl_info.ctl_name));
     if (ioctl(fd, CTLIOCGINFO, &ctl_info) == -1) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "ioctl(CTLIOCGINFO)");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: ioctl(CTLIOCGINFO)");
         goto failure;
     }
 
@@ -52,14 +52,14 @@ pp_tun pp_tun_create(const char *_Nonnull uuid) {
     sc.ss_sysaddr = AF_SYS_CONTROL;
     sc.sc_unit = 0;  // First free utunX
     if (connect(fd, (struct sockaddr *)&sc, sizeof(sc)) == -1) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "connect(AF_SYSTEM, AF_SYS_CONTROL)");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: connect(AF_SYSTEM, AF_SYS_CONTROL)");
         goto failure;
     }
 
     // Get actual name
     if (getsockopt(fd, SYSPROTO_CONTROL, UTUN_OPT_IFNAME,
                    ifname, &ifname_len) == -1) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "getsockopt(UTUN_OPT_IFNAME)");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: getsockopt(UTUN_OPT_IFNAME)");
         goto failure;
     }
 
@@ -109,7 +109,7 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     const int read_len = (int)readv(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
     if (read_len < 0) return -1;
     if (read_len < (int)sizeof(pi)) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "Missing 4-byte utun packet header");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: Missing 4-byte utun packet header");
         return -1;
     }
     return read_len - (int)sizeof(pi);

@@ -72,7 +72,7 @@ pp_tun pp_tun_create(const char *_Nonnull uuid) {
     if (!wintun) {
         wintun = LoadLibraryExA("wintun.dll", NULL, LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
         if (!wintun) {
-            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "LoadLibraryExA(): %lu", GetLastError());
+            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: create(), LoadLibraryExA(): %lu", GetLastError());
             goto failure;
         }
         // Required DLL functions
@@ -92,13 +92,13 @@ pp_tun pp_tun_create(const char *_Nonnull uuid) {
     tun_type = L"Partout";
     dev_name = wstring_from_string(uuid);
     if (!dev_name) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "wstring_from_string()");
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: create(), wstring_from_string()");
         goto failure;
     }
     GUID dev_guid = guid_from_wstring(dev_name);
     adapter = WintunCreateAdapter(dev_name, tun_type, &dev_guid);
     if (!adapter) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "WintunCreateAdapter(): %lu", GetLastError());
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: create(), WintunCreateAdapter(): %lu", GetLastError());
         goto failure;
     }
 
@@ -109,7 +109,7 @@ pp_tun pp_tun_create(const char *_Nonnull uuid) {
     // Create a session with a 4MB ring buffer
     session = WintunStartSession(adapter, WINTUN_MAX_RING_CAPACITY);
     if (!session) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "WintunStartSession(): %lu", GetLastError());
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: create(), WintunStartSession(): %lu", GetLastError());
         goto failure;
     }
     // printf("tun_windows: adapter is %p, session is %p\n", adapter, session);
@@ -157,7 +157,7 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
         if (packet) break;
         const DWORD err = GetLastError();
         if (err != ERROR_NO_MORE_ITEMS) {
-            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "Packet read failed: %lu", err);
+            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: read(), %lu", err);
             return -1;
         }
         WaitForSingleObject(WintunGetReadWaitEvent(tun->session), INFINITE);
@@ -185,7 +185,7 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
         const DWORD err = GetLastError();
         // Silently drop packets if the ring is full
         if (err == ERROR_BUFFER_OVERFLOW) return 0;
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "Packet write failed: %lu", err);
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: write(), %lu", err);
         return -1;
     }
     // printf(">>> tun_write allocated\n");
