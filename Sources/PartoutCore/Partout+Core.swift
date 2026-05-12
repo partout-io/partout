@@ -93,7 +93,7 @@ extension PartoutError.Code {
     /// No more endpoints available to try.
     public static let exhaustedEndpoints = Self("exhaustedEndpoints")
 
-    /// Link could not be activated.
+    /// Link device is not active.
     public static let linkNotActive = Self("linkNotActive")
 
     /// Link I/O failure.
@@ -104,6 +104,12 @@ extension PartoutError.Code {
 
     /// Network is unreachable.
     public static let networkUnreachable = Self("networkUnreachable")
+
+    /// TUN device is not active.
+    public static let tunNotActive = Self("tunNotActive")
+
+    /// TUN device is not available for I/O.
+    public static let tunNotAvailable = Self("tunNotAvailable")
 }
 
 // MARK: Serialization

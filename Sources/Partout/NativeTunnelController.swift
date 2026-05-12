@@ -54,7 +54,7 @@ public final class NativeTunnelController: TunnelController {
                 pp_tun_ctrl_set_tunnel(ref, uuid, info)
             }
         }) else {
-            throw PartoutError(.linkNotActive)
+            throw PartoutError(.tunNotAvailable)
         }
 
         // FIXME: #188, add better codes for PartoutError
