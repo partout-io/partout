@@ -7,11 +7,13 @@
 #pragma once
 #include "portable/conditionals.h"
 
+#if PARTOUT_HAS_TUN
+
+#include <stdint.h>
+#include "portable/common.h"
+
 /* Opaque tun device. */
 typedef struct __pp_tun_struct *pp_tun;
-
-#if PARTOUT_ABI
-#include <stdint.h>
 
 /* Platform-specific implementations. */
 int pp_tun_read(const pp_tun _Nonnull tun, uint8_t *_Nonnull dst, size_t dst_len);
@@ -32,13 +34,26 @@ pp_tun _Nullable pp_tun_ctrl_set_tunnel(void *_Nullable ref,
 void pp_tun_ctrl_configure_sockets(void *_Nullable ref,
                                    const int *_Nullable fds,
                                    const size_t fds_len);
-void pp_tun_ctrl_clear_tunnel(void *_Nullable ref, pp_tun _Nullable tun_impl);
+void pp_tun_ctrl_clear_tunnel(void *_Nullable ref,
+                              pp_tun _Nullable tun_impl);
 
 /* Tunnel strategy. */
+void pp_tun_strg_install(void *_Nullable ref,
+                         const char *_Nonnull profile_json,
+                         bool connect,
+                         const char *_Nullable options_json,
+                         void *_Nullable ctx,
+                         _Nullable pp_completion completion);
+void pp_tun_strg_uninstall(void *_Nullable ref,
+                           const char *_Nonnull profile_id,
+                           void *_Nullable ctx,
+                           _Nullable pp_completion completion);
+void pp_tun_strg_disconnect(void *_Nullable ref,
+                            const char *_Nonnull profile_id,
+                            void *_Nullable ctx,
+                            _Nullable pp_completion completion);
+
 //void pp_tun_strg_prepare(void *ref);
-//void pp_tun_strg_install(void *ref);
-//void pp_tun_strg_uninstall(void *ref);
-//void pp_tun_strg_disconnect(void *ref);
 //void pp_tun_strg_send_msg(void *ref);
 //void pp_tun_strg_on_active(void *ref, callback);
 

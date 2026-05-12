@@ -31,7 +31,7 @@ class AndroidTunnelController {
     }
 
     // FIXME: Pass Profile
-    fun setTunnelSettings(infoJSON: String): Int {
+    fun setTunnel(infoJSON: String): Int {
         assert(descriptor == null)
         val builder = service.Builder()
 
