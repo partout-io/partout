@@ -7,28 +7,28 @@
 internal import _PartoutCore_C
 
 /// A controller that operates on a virtual tun interface.
-public final class VirtualTunnelController: TunnelController {
+public final class NativeTunnelController: TunnelController {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
-    private let impl: UnsafeMutableRawPointer?
+    private let ref: UnsafeMutableRawPointer?
 
     private let maxReadLength: Int
 
     public init(
         _ ctx: PartoutLoggerContext,
-        impl: UnsafeMutableRawPointer?,
+        ref: UnsafeMutableRawPointer?,
         maxReadLength: Int = 128 * 1024
     ) throws {
         self.ctx = ctx
-        self.impl = impl
+        self.ref = ref
         self.maxReadLength = maxReadLength
 
-        pp_tun_ctrl_test_working(impl)
+        pp_tun_ctrl_test_working(ref)
     }
 
     deinit {
-        pp_log(ctx, .core, .debug, "Deinit VirtualTunnelController")
+        pp_log(ctx, .core, .debug, "Deinit NativeTunnelController")
     }
 
     public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
@@ -51,10 +51,10 @@ public final class VirtualTunnelController: TunnelController {
         // Create tun with optional implementation from controller
         guard let tun = info.originalModuleId.uuidString.withCString({ uuid in
             infoJSON.withCString { info in
-                pp_tun_ctrl_set_tunnel(impl, uuid, info)
+                pp_tun_ctrl_set_tunnel(ref, uuid, info)
             }
         }) else {
-            throw PartoutError(.linkNotActive)
+            throw PartoutError(.tunNotAvailable)
         }
 
         // FIXME: #188, add better codes for PartoutError
@@ -89,7 +89,7 @@ public final class VirtualTunnelController: TunnelController {
 
     public func configureSockets(with descriptors: [UInt64]) {
         descriptors.map(Int32.init).withUnsafeBufferPointer {
-            pp_tun_ctrl_configure_sockets(impl, $0.baseAddress, $0.count)
+            pp_tun_ctrl_configure_sockets(ref, $0.baseAddress, $0.count)
         }
     }
 
@@ -103,7 +103,7 @@ public final class VirtualTunnelController: TunnelController {
         await tunnel.shutdown()
 
         // Release tun implementation if necessary
-        pp_tun_ctrl_clear_tunnel(impl, tunnel.tun)
+        pp_tun_ctrl_clear_tunnel(ref, tunnel.tun)
     }
 
     public func setReasserting(_ reasserting: Bool) {

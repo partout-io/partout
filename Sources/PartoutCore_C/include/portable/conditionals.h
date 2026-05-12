@@ -36,7 +36,7 @@
 #endif
 
 #if PARTOUT_MACOS || PARTOUT_LINUX || PARTOUT_WINDOWS || PARTOUT_ANDROID
-#define PARTOUT_ABI         1
+#define PARTOUT_HAS_TUN     1
 #else
-#define PARTOUT_ABI         0
+#define PARTOUT_HAS_TUN     0
 #endif

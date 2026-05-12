@@ -76,7 +76,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 
     func readPackets() async throws -> [Data] {
         guard isActive else {
-            throw PartoutError(.linkNotActive)
+            throw PartoutError(.tunNotActive)
         }
         do {
             return try await withCheckedThrowingContinuation { continuation in
@@ -96,7 +96,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
             }
         } catch {
             guard isActive else {
-                throw PartoutError(.linkNotActive)
+                throw PartoutError(.tunNotActive)
             }
             pp_log(ctx, .core, .fault, "Unable to read TUN packets: \(error)")
             await shutdown()
@@ -106,7 +106,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 
     func writePackets(_ packets: [Data]) async throws {
         guard isActive else {
-            throw PartoutError(.linkNotActive)
+            throw PartoutError(.tunNotActive)
         }
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -130,7 +130,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
             }
         } catch {
             guard isActive else {
-                throw PartoutError(.linkNotActive)
+                throw PartoutError(.tunNotActive)
             }
             pp_log(ctx, .core, .fault, "Unable to write TUN packets: \(error)")
             await shutdown()

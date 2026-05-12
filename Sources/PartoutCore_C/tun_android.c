@@ -8,15 +8,14 @@
 #include "portable/tun.h"
 
 #if PARTOUT_ANDROID
-
 #include <jni.h>
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-/* Expect this struct from pp_tun_ctrl_set_tunnel(). */
 struct __pp_tun_struct {
     int fd;
 };
@@ -54,27 +53,49 @@ typedef struct {
     const char *signature;
 } kotlin_sig;
 
+#define JNI_ATTACH_OR_RETURN(env_name, return_value) \
+    bool env_name##_did_attach; \
+    JNIEnv *env_name = pp_jni_attach_thread(&env_name##_did_attach); \
+    if (!(env_name)) return return_value
+
+#define JNI_ATTACH_OR_RETURN_VOID(env_name) \
+    bool env_name##_did_attach; \
+    JNIEnv *env_name = pp_jni_attach_thread(&env_name##_did_attach); \
+    if (!(env_name)) return
+
+#define JNI_ATTACH_OR_COMPLETE(env_name, completion, ctx) \
+    bool env_name##_did_attach; \
+    JNIEnv *env_name = pp_jni_attach_thread(&env_name##_did_attach); \
+    if (!(env_name)) { \
+        if (completion) completion(ctx, -1); \
+        return; \
+    }
+
+#define JNI_DETACH(env_name) \
+    do { \
+        if (env_name##_did_attach) (*jvm)->DetachCurrentThread(jvm); \
+    } while (0)
+
 /* Tunnel controller (AndroidTunnelController) */
 
 static const kotlin_sig sig_ctrl_testWorking = {
     "testWorking",
     "()V"
 };
-static const kotlin_sig sig_ctrl_setTunnelSettings = {
-    "setTunnelSettings",
+static const kotlin_sig sig_ctrl_setTunnel = {
+    "setTunnel",
     "(Ljava/lang/String;)I"
 };
 static const kotlin_sig sig_ctrl_configureSockets = {
     "configureSockets",
     "([I)V"
 };
+
 void pp_tun_ctrl_test_working(void *jni_ref) {
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_test_working(%p)", jni_ref);
 
-    bool did_attach;
-    JNIEnv *env = pp_jni_attach_thread(&did_attach);
-    if (!env) return;
+    JNI_ATTACH_OR_RETURN_VOID(env);
 
     jclass cls = NULL;
     jmethodID method = NULL;
@@ -92,7 +113,7 @@ void pp_tun_ctrl_test_working(void *jni_ref) {
 
 cleanup:
     if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
-    if (did_attach) (*jvm)->DetachCurrentThread(jvm);
+    JNI_DETACH(env);
 }
 
 pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_json) {
@@ -100,9 +121,7 @@ pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_set_tunnel(%p)", jni_ref);
 
-    bool did_attach;
-    JNIEnv *env = pp_jni_attach_thread(&did_attach);
-    if (!env) return NULL;
+    JNI_ATTACH_OR_RETURN(env, NULL);
 
     jclass cls = NULL;
     jmethodID method = NULL;
@@ -121,7 +140,7 @@ pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_set_tunnel(), NULL cls");
         goto cleanup;
     }
-    method = (*env)->GetMethodID(env, cls, sig_ctrl_setTunnelSettings.name, sig_ctrl_setTunnelSettings.signature);
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_setTunnel.name, sig_ctrl_setTunnel.signature);
     if (method == NULL) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_set_tunnel(), NULL method");
         goto cleanup;
@@ -146,7 +165,7 @@ cleanup:
     }
     if (j_info_json != NULL) (*env)->DeleteLocalRef(env, j_info_json);
     if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
-    if (did_attach) (*jvm)->DetachCurrentThread(jvm);
+    JNI_DETACH(env);
     return tun_impl;
 }
 
@@ -155,9 +174,7 @@ void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t f
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_configure_sockets(%p)", jni_ref);
     if (!fds || fds_len == 0) return;
 
-    bool did_attach;
-    JNIEnv *env = pp_jni_attach_thread(&did_attach);
-    if (!env) return;
+    JNI_ATTACH_OR_RETURN_VOID(env);
 
     jclass cls = NULL;
     jmethodID method = NULL;
@@ -184,7 +201,7 @@ void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t f
 cleanup:
     if (j_fds != NULL) (*env)->DeleteLocalRef(env, j_fds);
     if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
-    if (did_attach) (*jvm)->DetachCurrentThread(jvm);
+    JNI_DETACH(env);
 }
 
 void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
@@ -193,6 +210,147 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
     if (!tun_impl) return;
     pp_tun_shutdown(tun_impl);
     free(tun_impl);
+}
+
+/* Tunnel strategy (AndroidTunnel) */
+
+static const kotlin_sig sig_strg_connect = {
+    "connect",
+    "(Ljava/lang/String;JJ)V"
+};
+static const kotlin_sig sig_strg_disconnect = {
+    "disconnect",
+    "(JJ)V"
+};
+
+void pp_tun_strg_install(void *jni_ref,
+                         const char *profile_json,
+                         bool connect,
+                         const char *options_json,
+                         void *ctx,
+                         pp_completion completion) {
+    (void)options_json;
+    assert(jni_ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: strg_install(%p, %d)", jni_ref, connect);
+
+    /* Install-only is nop on Android. */
+    if (!connect) {
+        if (completion) completion(ctx, 0);
+        return;
+    }
+
+    JNI_ATTACH_OR_COMPLETE(env, completion, ctx);
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    jstring j_profile_json = NULL;
+
+    cls = (*env)->GetObjectClass(env, jni_ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: strg_install(), NULL cls");
+        if (completion) completion(ctx, -1);
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_strg_connect.name, sig_strg_connect.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: strg_install(), NULL method");
+        if (completion) completion(ctx, -1);
+        goto cleanup;
+    }
+    j_profile_json = (*env)->NewStringUTF(env, profile_json);
+    if (j_profile_json == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: strg_install(), NULL j_profile_json");
+        if (completion) completion(ctx, -1);
+        goto cleanup;
+    }
+    (*env)->CallVoidMethod(
+        env,
+        jni_ref,
+        method,
+        j_profile_json,
+        (jlong)(intptr_t)ctx,
+        (jlong)(intptr_t)completion
+    );
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: strg_install(), Kotlin exception");
+        if (completion) completion(ctx, -1);
+        goto cleanup;
+    }
+
+cleanup:
+    if (j_profile_json != NULL) (*env)->DeleteLocalRef(env, j_profile_json);
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
+    JNI_DETACH(env);
+}
+
+void pp_tun_strg_uninstall(void *jni_ref,
+                           const char *profile_id,
+                           void *ctx,
+                           pp_completion completion) {
+    (void)jni_ref;
+    (void)profile_id;
+    /* Uninstall is nop on Android. */
+    if (completion) completion(ctx, 0);
+}
+
+void pp_tun_strg_disconnect(void *jni_ref,
+                            const char *profile_id,
+                            void *ctx,
+                            pp_completion completion) {
+    (void)profile_id;
+    assert(jni_ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: strg_disconnect(%p)", jni_ref);
+
+    JNI_ATTACH_OR_COMPLETE(env, completion, ctx);
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+
+    cls = (*env)->GetObjectClass(env, jni_ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: strg_disconnect(), NULL cls");
+        if (completion) completion(ctx, -1);
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_strg_disconnect.name, sig_strg_disconnect.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: strg_disconnect(), NULL method");
+        if (completion) completion(ctx, -1);
+        goto cleanup;
+    }
+    (*env)->CallVoidMethod(
+        env,
+        jni_ref,
+        method,
+        (jlong)(intptr_t)ctx,
+        (jlong)(intptr_t)completion
+    );
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: strg_disconnect(), Kotlin exception");
+        if (completion) completion(ctx, -1);
+        goto cleanup;
+    }
+
+cleanup:
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
+    JNI_DETACH(env);
+}
+
+JNIEXPORT void JNICALL
+Java_io_partout_jni_AndroidTunnel_callback(JNIEnv *env,
+                                           jobject thiz,
+                                           jlong completion_ctx,
+                                           jlong completion,
+                                           jint error_code) {
+    (void)env;
+    (void)thiz;
+    void *ctx = (void *)(intptr_t)completion_ctx;
+    pp_completion cb = (pp_completion)(intptr_t)completion;
+    if (cb) cb(ctx, (int)error_code);
 }
 
 #endif
