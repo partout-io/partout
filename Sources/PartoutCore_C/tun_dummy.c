@@ -47,7 +47,7 @@ void pp_tun_strg_install(void *ref,
     (void)options_json;
     (void)ctx;
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: strg_install(%p, %d)", ref, connect);
-    if (completion) completion(0, NULL);
+    if (completion) completion(NULL, 0);
 }
 
 void pp_tun_strg_uninstall(void *ref,
@@ -58,7 +58,7 @@ void pp_tun_strg_uninstall(void *ref,
     (void)profile_id;
     (void)ctx;
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: strg_uninstall(%p)", ref);
-    if (completion) completion(0, NULL);
+    if (completion) completion(NULL, 0);
 }
 
 void pp_tun_strg_disconnect(void *ref,
@@ -69,6 +69,6 @@ void pp_tun_strg_disconnect(void *ref,
     (void)profile_id;
     (void)ctx;
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: strg_disconnect(%p)", ref);
-    if (completion) completion(0, NULL);
+    if (completion) completion(NULL, 0);
 }
 #endif
