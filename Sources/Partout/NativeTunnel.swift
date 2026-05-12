@@ -30,7 +30,13 @@ public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
     }
 
     public func uninstall(profileId: Profile.ID) async throws {
-//        fatalError()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let box = NativeCompletion(continuation: continuation)
+            let ctx = Unmanaged.passRetained(box).toOpaque()
+            profileId.uuidString.withCString {
+                pp_tun_strg_uninstall(ref, $0, ctx, NativeCompletion.callback)
+            }
+        }
     }
 
     public func disconnect(from profileId: Profile.ID) async throws {
