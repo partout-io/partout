@@ -21,7 +21,7 @@ public final class UserDefaultsEnvironment: TunnelEnvironment, @unchecked Sendab
     public func setEnvironmentValue<T>(_ value: T, forKey key: TunnelEnvironmentKey<T>) where T: Encodable {
         let fullKey = key.keyString.rawKey(prefix: prefix)
         do {
-            let data = try JSONEncoder.new().encode(value)
+            let data = try JSONEncoder.shared().encode(value)
             defaults.set(data, forKey: fullKey)
             pp_log_id(profileId, .core, .debug, "UserDefaultsEnvironment.set(\(fullKey)) -> \(value)")
         } catch {
@@ -35,7 +35,7 @@ public final class UserDefaultsEnvironment: TunnelEnvironment, @unchecked Sendab
             guard let data = defaults.data(forKey: fullKey) else {
                 return nil
             }
-            return try JSONDecoder.new().decode(T.self, from: data)
+            return try JSONDecoder.shared().decode(T.self, from: data)
         } catch {
             pp_log_id(profileId, .core, .error, "Unable to get environment key: \(fullKey) -> \(error)")
             return nil

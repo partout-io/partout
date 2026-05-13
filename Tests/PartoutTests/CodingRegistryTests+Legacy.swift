@@ -87,9 +87,9 @@ private extension CodingRegistryLegacyTests {
             modules: modules,
             activeModulesIds: profile.activeModulesIds,
             behavior: profile.behavior,
-            userInfo: try profile.userInfo.map { try JSONEncoder.new().encode($0) }
+            userInfo: try profile.userInfo.map { try JSONEncoder.shared().encode($0) }
         )
-        let data = try JSONEncoder.new().encode(payload)
+        let data = try JSONEncoder.shared().encode(payload)
         let encoded = data.base64EncodedString()
         return LegacyProfileFixture(profile: profile, encoded: encoded)
     }

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 extension JSONEncoder {
-    public static func new() -> JSONEncoder {
+    public static func shared() -> JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .millisecondsSince1970
         return encoder
@@ -16,7 +16,7 @@ extension JSONEncoder {
 }
 
 extension JSONDecoder {
-    public static func new() -> JSONDecoder {
+    public static func shared() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .millisecondsSince1970
         return decoder

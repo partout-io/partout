@@ -61,8 +61,8 @@ extension JSON {
     /// Create a JSON value from an `Encodable`. This will give you access to the “raw”
     /// encoded JSON value the `Encodable` is serialized into.
     public init<T: Encodable>(encodable: T) throws {
-        let encoded = try JSONEncoder.new().encode(encodable)
-        self = try JSONDecoder.new().decode(JSON.self, from: encoded)
+        let encoded = try JSONEncoder.shared().encode(encodable)
+        self = try JSONDecoder.shared().decode(JSON.self, from: encoded)
     }
 }
 

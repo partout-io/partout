@@ -16,19 +16,19 @@ struct MessageHandlerTests {
         ])
         let output = Message.Output.debugLog(log: log)
         let strategy = FakeTunnelStrategy { _ in
-            (try? JSONEncoder.new().encode(output)) ?? Data()
+            (try? JSONEncoder.shared().encode(output)) ?? Data()
         }
         let sut = Tunnel(.global, strategy: strategy) { _ in
             SharedTunnelEnvironment(profileId: nil)
         }
 
         let inputMessage = Message.Input.debugLog(sinceLast: 60.0, maxLevel: .debug)
-        let input = try JSONEncoder.new().encode(inputMessage)
+        let input = try JSONEncoder.shared().encode(inputMessage)
         let expOutputMessage = try #require(try await sut.sendMessage(
             input,
             to: UniqueID() // unused
         ))
-        let expOutput = try JSONDecoder.new().decode(Message.Output.self, from: expOutputMessage)
+        let expOutput = try JSONDecoder.shared().decode(Message.Output.self, from: expOutputMessage)
         #expect(expOutput == output)
     }
 }
