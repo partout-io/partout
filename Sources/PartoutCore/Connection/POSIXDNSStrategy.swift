@@ -53,7 +53,13 @@ private extension POSIXDNSStrategy {
         hints.ai_family = AF_UNSPEC // IPv4/IPv6
         var infoPointer: UnsafeMutablePointer<addrinfo>?
         let result = getaddrinfo(addr, nil, &hints, &infoPointer)
-        if result != 0 {
+        guard result == 0 else {
+            switch result {
+            case EAI_BADFLAGS:
+                pp_log_g(.core, .fault, "getaddrinfo() failed with bad flags")
+            default:
+                pp_log_g(.core, .fault, "getaddrinfo() failed with result \(result)")
+            }
             throw PartoutError(.dnsFailure)
         }
 
