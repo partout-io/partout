@@ -10,6 +10,39 @@
 // FIXME: ###, Implement macOS, Linux, and Windows (placeholder now)
 
 #if !PARTOUT_HAS_TUN
+int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
+    (void)tun;
+    (void)dst;
+    (void)dst_len;
+    pp_clog(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: read()");
+    return -1;
+}
+
+int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
+    (void)tun;
+    (void)src;
+    (void)src_len;
+    pp_clog(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: write()");
+    return -1;
+}
+
+void pp_tun_shutdown(const pp_tun tun) {
+    (void)tun;
+    pp_clog(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: shutdown()");
+}
+
+int pp_tun_fd(const pp_tun tun) {
+    (void)tun;
+    pp_clog(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: fd()");
+    return -1;
+}
+
+const char *pp_tun_name(const pp_tun tun) {
+    (void)tun;
+    pp_clog(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: name()");
+    return NULL;
+}
+
 void pp_tun_ctrl_test_working(void *ref) {
     (void)ref;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_dummy: ctrl_test_working(%p), ref");
