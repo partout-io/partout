@@ -16,14 +16,6 @@ public protocol LinkInterface: IOInterface {
     /// Publishes when a better path is available.
     nonisolated var hasBetterPath: AsyncStream<Void> { get }
 
-    /**
-     Sets the handler for incoming packets. This only needs to be set once.
-
-     - Parameter handler: The handler invoked whenever an array of `Data` packets is received, with an optional `Error` in case a network failure occurs.
-     */
-    @available(*, deprecated)
-    func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void)
-
     /// Returns an upgraded link if available (e.g. when a better path exists).
     nonisolated func upgraded() async throws -> LinkInterface
 
