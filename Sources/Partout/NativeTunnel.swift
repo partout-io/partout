@@ -4,27 +4,54 @@
 
 internal import _PartoutCore_C
 
-// FIXME: #1656, Forward pp_tun_strg
 public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
+    private let ctx: PartoutLoggerContext
+
     nonisolated(unsafe)
     private let ref: UnsafeMutableRawPointer?
 
-    public init(ref: UnsafeMutableRawPointer?) {
+    public init(
+        _ ctx: PartoutLoggerContext,
+        ref: UnsafeMutableRawPointer?
+    ) {
+        self.ctx = ctx
         self.ref = ref
     }
 
     public func prepare(purge: Bool) async throws {
+        // FIXME: #188, Implement in pp_tun_strg
 //        fatalError()
     }
 
     public func install(_ profile: Profile, connect: Bool, options: (any Sendable)?, title: @escaping (Profile) -> String) async throws {
-        let profileJSON = try Self.encode(profile)
+        let encoder = JSONEncoder.shared()
+        let profileJSON = try encoder.encodeJSON(profile.asTaggedProfile)
+        let optionsJSON: String? = (options as? Encodable)
+            .map {
+                do {
+                    return try encoder.encodeJSON($0)
+                } catch {
+                    pp_log(ctx, .core, .error, "Unable to encode install options: \(error)")
+                    return nil
+                }
+            } ?? nil
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let box = NativeCompletion(continuation: continuation)
             let ctx = Unmanaged.passRetained(box).toOpaque()
-            // FIXME: #1656, Ignore options
-            profileJSON.withCString {
-                pp_tun_strg_install(ref, $0, connect, nil, ctx, NativeCompletion.callback)
+            profileJSON.withCString { profile in
+                if let optionsJSON {
+                    optionsJSON.withCString { options in
+                        pp_tun_strg_install(
+                            ref, profile, connect, options,
+                            ctx, NativeCompletion.callback
+                        )
+                    }
+                } else {
+                    pp_tun_strg_install(
+                        ref, profile, connect, nil,
+                        ctx, NativeCompletion.callback
+                    )
+                }
             }
         }
     }
@@ -50,37 +77,32 @@ public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
     }
 
     public func sendMessage(_ message: Data, to profileId: Profile.ID) async throws -> Data? {
+        // FIXME: #188, Implement in pp_tun_strg
 //        fatalError()
         nil
     }
 
     public var snapshots: [Profile.ID: TunnelSnapshot] {
+        // FIXME: #188, Implement in pp_tun_strg
 //        fatalError()
         [:]
     }
 
     public var snapshotsStream: AsyncStream<[Profile.ID: TunnelSnapshot]> {
+        // FIXME: #188, Implement in pp_tun_strg
 //        fatalError()
         AsyncStream { nil }
     }
 
     public func allEnvironments() async -> [Profile.ID: TunnelEnvironmentReader] {
+        // FIXME: #188, Implement in pp_tun_strg
 //        fatalError()
         [:]
     }
 
     public func environment(for profileId: Profile.ID) async -> TunnelEnvironmentReader? {
+        // FIXME: #188, Implement in pp_tun_strg
 //        fatalError()
         nil
-    }
-}
-
-private extension NativeTunnel {
-    static func encode(_ profile: Profile) throws -> String {
-        let data = try JSONEncoder.shared().encode(profile.asTaggedProfile)
-        guard let json = String(data: data, encoding: .utf8) else {
-            throw PartoutError(.encoding)
-        }
-        return json
     }
 }

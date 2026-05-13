@@ -13,6 +13,14 @@ extension JSONEncoder {
         self.init()
         self.userInfo = userInfo
     }
+
+    public func encodeJSON<T>(_ value: T) throws -> String where T: Encodable {
+        let data = try encode(value)
+        guard let json = String(data: data, encoding: .utf8) else {
+            throw MiniFoundationError.encoding
+        }
+        return json
+    }
 }
 
 extension JSONDecoder {

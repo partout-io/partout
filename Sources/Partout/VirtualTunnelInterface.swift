@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !os(iOS) && !os(tvOS)
-
 internal import _PartoutCore_C
 
 /// An interface that interacts with a Layer 3 virtual tun device, commonly found in UNIX-like systems.
@@ -161,5 +159,3 @@ private extension DispatchQueue {
         }
     }
 }
-
-#endif
