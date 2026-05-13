@@ -19,7 +19,7 @@ public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
     }
 
     public func prepare(purge: Bool) async throws {
-        // FIXME: #1656, Implement in pp_tun_strg
+        // FIXME: #188, Implement in pp_tun_strg
 //        fatalError()
     }
 
@@ -77,31 +77,31 @@ public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
     }
 
     public func sendMessage(_ message: Data, to profileId: Profile.ID) async throws -> Data? {
-        // FIXME: #1656, Implement in pp_tun_strg
+        // FIXME: #188, Implement in pp_tun_strg
 //        fatalError()
         nil
     }
 
     public var snapshots: [Profile.ID: TunnelSnapshot] {
-        // FIXME: #1656, Implement in pp_tun_strg
+        // FIXME: #188, Implement in pp_tun_strg
 //        fatalError()
         [:]
     }
 
     public var snapshotsStream: AsyncStream<[Profile.ID: TunnelSnapshot]> {
-        // FIXME: #1656, Implement in pp_tun_strg
+        // FIXME: #188, Implement in pp_tun_strg
 //        fatalError()
         AsyncStream { nil }
     }
 
     public func allEnvironments() async -> [Profile.ID: TunnelEnvironmentReader] {
-        // FIXME: #1656, Implement in pp_tun_strg
+        // FIXME: #188, Implement in pp_tun_strg
 //        fatalError()
         [:]
     }
 
     public func environment(for profileId: Profile.ID) async -> TunnelEnvironmentReader? {
-        // FIXME: #1656, Implement in pp_tun_strg
+        // FIXME: #188, Implement in pp_tun_strg
 //        fatalError()
         nil
     }

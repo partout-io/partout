@@ -7,7 +7,7 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
-// FIXME: #1656, Implement Windows controller/strategy
+// FIXME: #188, Implement Windows controller/strategy
 
 #if PARTOUT_WINDOWS
 

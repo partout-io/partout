@@ -7,7 +7,7 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
-// FIXME: #1656, Implement Linux controller/strategy
+// FIXME: #188, Implement Linux controller/strategy
 
 #if PARTOUT_LINUX
 
