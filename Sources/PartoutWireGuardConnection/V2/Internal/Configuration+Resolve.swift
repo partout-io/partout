@@ -111,10 +111,6 @@ extension WireGuard.Configuration {
     }
 
     private static var dnsResolverFlags: Int32 {
-#if canImport(Darwin)
         AI_ALL
-#else
-        0
-#endif
     }
 }
