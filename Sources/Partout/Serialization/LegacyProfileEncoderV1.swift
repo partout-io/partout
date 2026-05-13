@@ -18,7 +18,7 @@ extension LegacyProfileEncoderV1 {
         guard let data = Data(base64Encoded: base64Encoded) else {
             throw PartoutError(.decoding)
         }
-        let decodable = try JSONDecoder().decode(LegacyCodableProfile.self, from: data)
+        let decodable = try JSONDecoder.new().decode(LegacyCodableProfile.self, from: data)
         let handlers = decodable.modules.compactMap { wrapper in
             registry.handler(withId: wrapper.id)
         }
@@ -29,7 +29,7 @@ extension LegacyProfileEncoderV1 {
 
     @available(*, deprecated, message: "#273")
     func decodedModule(from data: Data, with registry: Registry) throws -> Module {
-        let decoder = JSONDecoder()
+        let decoder = JSONDecoder.new()
         let wrapper = try decoder.decode(LegacyModuleWrapper.self, from: data)
         guard let handler = registry.handler(withId: wrapper.id) else {
             throw PartoutError(.decoding)
@@ -53,7 +53,7 @@ private enum Serialization {
     typealias ModuleHandlersMap = [ModuleType: ModuleHandler]
 
     static func decodedProfile(from encoded: LegacyCodableProfile, with handlers: ModuleHandlersMap) throws -> Profile {
-        let decoder = JSONDecoder()
+        let decoder = JSONDecoder.new()
         let userInfoMap = try encoded.userInfo.map {
             try JSONSerialization.jsonObject(with: $0)
         } ?? nil
@@ -103,7 +103,7 @@ struct LegacyModuleWrapper: Codable {
 
     init(_ module: Module & Encodable) throws {
         id = module.moduleType
-        data = try JSONEncoder().encode(module)
+        data = try JSONEncoder.new().encode(module)
     }
 }
 

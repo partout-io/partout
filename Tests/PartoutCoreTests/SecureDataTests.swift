@@ -9,9 +9,9 @@ struct SecureDataTests {
     @Test
     func givenData_whenEncode_thenDecodes() throws {
         let sut = SecureData("123456")
-        let encoder = JSONEncoder()
+        let encoder = JSONEncoder.new()
         let data = try encoder.encode(sut)
-        let expected = try JSONDecoder().decode(SecureData.self, from: data)
+        let expected = try JSONDecoder.new().decode(SecureData.self, from: data)
         #expect(expected == sut)
     }
 }

@@ -7,12 +7,12 @@ import Testing
 
 struct SensitiveEncoderTests {
     private let sut: JSONEncoder = {
-        let encoder = JSONEncoder()
+        let encoder = JSONEncoder.new()
         encoder.userInfo = [.redactingSensitiveData: true]
         return encoder
     }()
 
-    private let decoder = JSONDecoder()
+    private let decoder = JSONDecoder.new()
 
     @Test
     func givenSecureData_whenEncodeSensitive_thenIsRedacted() throws {

@@ -40,7 +40,7 @@ private extension TaggedModuleTests {
     }
 
     func encoder(withLegacyEncoding: Bool) -> JSONEncoder {
-        let encoder = JSONEncoder()
+        let encoder = JSONEncoder.new()
         encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
         encoder.userInfo = [.legacySwiftEncoding: withLegacyEncoding]
         return encoder

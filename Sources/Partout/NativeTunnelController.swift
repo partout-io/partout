@@ -41,7 +41,7 @@ public final class NativeTunnelController: TunnelController {
 
         let infoJSON: String = try {
             let wrapped = TunnelRemoteInfoWrapper(info)
-            let data = try JSONEncoder().encode(wrapped)
+            let data = try JSONEncoder.new().encode(wrapped)
             guard let json = String(data: data, encoding: .utf8) else {
                 throw PartoutError(.notFound)
             }

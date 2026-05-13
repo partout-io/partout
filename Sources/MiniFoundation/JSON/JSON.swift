@@ -73,7 +73,7 @@ extension JSON: CustomDebugStringConvertible {
         case .null:
             return "null"
         default:
-            let encoder = JSONEncoder()
+            let encoder = JSONEncoder.new()
             encoder.outputFormatting = [.prettyPrinted]
             return try! String(data: encoder.encode(self), encoding: .utf8)!
         }
