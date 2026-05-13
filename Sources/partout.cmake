@@ -44,7 +44,6 @@ set(PARTOUT_SOURCES
 ./Partout/Registry+Support.swift
 ./Partout/Registry.swift
 ./Partout/Serialization/CodingRegistry.swift
-./Partout/Serialization/LegacyProfileEncoderV1.swift
 ./Partout/Serialization/LegacyProfileEncoderV2.swift
 ./Partout/Serialization/ProfileEncoderV3.swift
 ./Partout/VirtualTunnelInterface.swift
@@ -56,7 +55,6 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/ConnectionDaemon.swift
 ./PartoutCore/Connection/ConnectionParameters.swift
 ./PartoutCore/Connection/ConnectionStatus.swift
-./PartoutCore/Connection/CyclingConnection.swift
 ./PartoutCore/Connection/DNSResolver.swift
 ./PartoutCore/Connection/DataCount.swift
 ./PartoutCore/Connection/DummyReachabilityObserver.swift
@@ -123,7 +121,6 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Modules/HTTPProxyModule.swift
 ./PartoutCore/Modules/IPModule.swift
 ./PartoutCore/Modules/OnDemandModule.swift
-./PartoutCore/Modules/TransientModule.swift
 ./PartoutCore/PRNG/PRNGProtocol+Suite.swift
 ./PartoutCore/PRNG/PRNGProtocol.swift
 ./PartoutCore/PRNG/PlatformPRNG.swift
@@ -203,7 +200,6 @@ set(PARTOUT_SOURCES
 ./PartoutOS/AppleNE/Modules/IPModule+NE.swift
 ./PartoutOS/AppleNE/Modules/OnDemandModule+NE.swift
 ./PartoutOS/AppleNE/Modules/Profile+NE.swift
-./PartoutOS/AppleNE/Modules/TransientModule+NE.swift
 ./PartoutOS/AppleNE/Serialization/KeychainNEProtocolCoder.swift
 ./PartoutOS/AppleNE/Serialization/NEProtocolCoder.swift
 ./PartoutOS/AppleNE/Serialization/ProviderNEProtocolCoder.swift
@@ -283,8 +279,6 @@ set(PARTOUT_SOURCES
 ./PartoutOpenVPNConnection/OpenVPNConnection+Alias.swift
 ./PartoutOpenVPNConnection/OpenVPNConnectionOptions.swift
 ./PartoutOpenVPNConnection/StandardOpenVPNParser+Default.swift
-./PartoutOpenVPNConnection/V1/_OpenVPNConnectionV1+Default.swift
-./PartoutOpenVPNConnection/V1/_OpenVPNConnectionV1.swift
 ./PartoutOpenVPNConnection/V2/_OpenVPNConnectionV2+Default.swift
 ./PartoutOpenVPNConnection/V2/_OpenVPNConnectionV2.swift
 ./PartoutWireGuard/Internal/Configuration+WgQuickConfig.swift
@@ -305,25 +299,6 @@ set(PARTOUT_SOURCES
 ./PartoutWireGuard/WireGuardModule.swift
 ./PartoutWireGuard/WireGuardParseError.swift
 ./PartoutWireGuardConnection/Internal/WireGuardBackend.swift
-./PartoutWireGuardConnection/V1/Internal/Array+ConcurrentMap.swift
-./PartoutWireGuardConnection/V1/Internal/DNSResolver_Legacy.swift
-./PartoutWireGuardConnection/V1/Internal/DNSServer_Legacy.swift
-./PartoutWireGuardConnection/V1/Internal/IPAddress+AddrInfo.swift
-./PartoutWireGuardConnection/V1/Internal/IPAddressRange.swift
-./PartoutWireGuardConnection/V1/Internal/InterfaceConfiguration.swift
-./PartoutWireGuardConnection/V1/Internal/LegacyWireGuardAdapter.swift
-./PartoutWireGuardConnection/V1/Internal/LegacyWireGuardAdapterError.swift
-./PartoutWireGuardConnection/V1/Internal/PacketTunnelSettingsGenerator.swift
-./PartoutWireGuardConnection/V1/Internal/PeerConfiguration.swift
-./PartoutWireGuardConnection/V1/Internal/TunnelConfiguration+WgQuickConfig.swift
-./PartoutWireGuardConnection/V1/Internal/TunnelConfiguration.swift
-./PartoutWireGuardConnection/V1/Internal/WireGuardEndpoint.swift
-./PartoutWireGuardConnection/V1/Mappers/Configuration+WireGuardKit.swift
-./PartoutWireGuardConnection/V1/Mappers/Endpoint+WireGuardKit_Legacy.swift
-./PartoutWireGuardConnection/V1/Mappers/LocalInterface+WireGuardKit.swift
-./PartoutWireGuardConnection/V1/Mappers/RemoteInterface+WireGuardKit.swift
-./PartoutWireGuardConnection/V1/Mappers/Subnet+WireGuardKit.swift
-./PartoutWireGuardConnection/V1/_WireGuardConnectionV1.swift
 ./PartoutWireGuardConnection/V2/Internal/Configuration+Resolve.swift
 ./PartoutWireGuardConnection/V2/Internal/String+Base64Hex.swift
 ./PartoutWireGuardConnection/V2/Internal/TunnelRemoteInfoGenerator.swift
