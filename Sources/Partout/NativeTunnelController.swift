@@ -37,13 +37,13 @@ public final class NativeTunnelController: TunnelController {
             return DummyTunnelInterface()
         }
 
-        let infoJSON: String = try {
+        let infoJSON = try {
             let wrapped = TunnelRemoteInfoWrapper(info)
-            let data = try JSONEncoder.shared().encode(wrapped)
-            guard let json = String(data: data, encoding: .utf8) else {
-                throw PartoutError(.notFound)
+            do {
+                return try JSONEncoder.shared().encodeJSON(wrapped)
+            } catch {
+                throw PartoutError(error)
             }
-            return json
         }()
 
         // Create tun with optional implementation from controller

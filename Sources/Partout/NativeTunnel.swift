@@ -24,11 +24,12 @@ public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
     }
 
     public func install(_ profile: Profile, connect: Bool, options: (any Sendable)?, title: @escaping (Profile) -> String) async throws {
-        let profileJSON = try Self.encodeJSON(profile.asTaggedProfile)
+        let encoder = JSONEncoder.shared()
+        let profileJSON = try encoder.encodeJSON(profile.asTaggedProfile)
         let optionsJSON: String? = (options as? Encodable)
             .map {
                 do {
-                    return try Self.encodeJSON($0)
+                    return try encoder.encodeJSON($0)
                 } catch {
                     pp_log(ctx, .core, .error, "Unable to encode install options: \(error)")
                     return nil
@@ -103,15 +104,5 @@ public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
         // FIXME: #1656, Implement in pp_tun_strg
 //        fatalError()
         nil
-    }
-}
-
-private extension NativeTunnel {
-    static func encodeJSON<T>(_ value: T) throws -> String where T: Encodable {
-        let data = try JSONEncoder.shared().encode(value)
-        guard let json = String(data: data, encoding: .utf8) else {
-            throw PartoutError(.encoding)
-        }
-        return json
     }
 }
