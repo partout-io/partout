@@ -208,4 +208,5 @@ void pp_tun_strg_disconnect(void *ref,
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_darwin: strg_disconnect(%p)", ref);
     if (completion) completion(NULL, 0);
 }
+
 #endif
