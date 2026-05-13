@@ -7,8 +7,6 @@
 #pragma once
 #include "portable/conditionals.h"
 
-#if PARTOUT_HAS_TUN
-
 #include <stdint.h>
 #include "portable/common.h"
 
@@ -56,5 +54,3 @@ void pp_tun_strg_disconnect(void *_Nullable ref,
 //void pp_tun_strg_prepare(void *ref);
 //void pp_tun_strg_send_msg(void *ref);
 //void pp_tun_strg_on_active(void *ref, callback);
-
-#endif

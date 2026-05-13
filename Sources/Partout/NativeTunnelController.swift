@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !os(iOS) && !os(tvOS)
-
 internal import _PartoutCore_C
 
 /// A controller that operates on a virtual tun interface.
@@ -114,8 +112,6 @@ public final class NativeTunnelController: TunnelController {
         // Do nothing
     }
 }
-
-#endif
 
 final class DummyTunnelInterface: IOInterface {
     var fileDescriptor: UInt64? {

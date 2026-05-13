@@ -9,7 +9,7 @@
 
 // FIXME: ###, Implement macOS, Linux, and Windows (placeholder now)
 
-#if PARTOUT_HAS_TUN && !PARTOUT_ANDROID
+#if !PARTOUT_HAS_TUN
 void pp_tun_ctrl_test_working(void *ref) {
     (void)ref;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_dummy: ctrl_test_working(%p), ref");
