@@ -56,9 +56,9 @@ struct TunnelRemoteInfoGeneratorTests {
         ], for: sourceEndpoint.address.rawValue)
 
         let map = try await configuration.resolvePeers(
+            resolver: dns,
             timeout: 1000,
-            logHandler: { _, _ in },
-            resolver: dns
+            logHandler: { _, _ in }
         )
 
         #expect(map[sourceEndpoint] == sourceEndpoint)
@@ -78,9 +78,9 @@ struct TunnelRemoteInfoGeneratorTests {
         ], for: sourceEndpoint.address.rawValue)
 
         let map = try await configuration.resolvePeers(
+            resolver: dns,
             timeout: 1000,
-            logHandler: { _, _ in },
-            resolver: dns
+            logHandler: { _, _ in }
         )
 
         #expect(map[sourceEndpoint] == ipv4Endpoint)

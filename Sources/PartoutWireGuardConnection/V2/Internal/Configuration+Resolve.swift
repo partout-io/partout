@@ -53,16 +53,16 @@ extension WireGuard.Configuration {
             POSIXDNSStrategy(hostname: $0)
         }
         return try await resolvePeers(
+            resolver: resolver,
             timeout: timeout,
-            logHandler: logHandler,
-            resolver: resolver
+            logHandler: logHandler
         )
     }
 
     func resolvePeers(
+        resolver: DNSResolver,
         timeout: Int,
-        logHandler: @escaping WireGuardAdapter.LogHandler,
-        resolver: DNSResolver
+        logHandler: @escaping WireGuardAdapter.LogHandler
     ) async throws -> [Endpoint: Endpoint] {
         let endpoints = peers.compactMap(\.endpoint)
         return try await withThrowingTaskGroup(of: Void.self, returning: [Endpoint: Endpoint].self) { group in
