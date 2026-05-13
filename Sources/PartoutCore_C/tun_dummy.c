@@ -7,8 +7,6 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
-// FIXME: ###, Implement macOS, Linux, and Windows (placeholder now)
-
 #if !PARTOUT_HAS_TUN
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     (void)tun;

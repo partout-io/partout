@@ -8,6 +8,7 @@
 #include "portable/tun.h"
 
 #if PARTOUT_ANDROID
+
 #include <jni.h>
 #include <assert.h>
 #include <errno.h>
