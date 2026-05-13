@@ -8,10 +8,11 @@ import Testing
 struct MessageHandlerTests {
     @Test
     func givenTunnel_whenSendMessage_thenTranslatesDataToInputOutput() async throws {
+        let timestamp = Date(timeIntervalSince1970: 1_700_000_000.123)
         let log = DebugLog(lines: [
-            .init(timestamp: Date(), level: .notice, message: "one"),
-            .init(timestamp: Date(), level: .notice, message: "two"),
-            .init(timestamp: Date(), level: .notice, message: "three")
+            .init(timestamp: timestamp, level: .notice, message: "one"),
+            .init(timestamp: timestamp, level: .notice, message: "two"),
+            .init(timestamp: timestamp, level: .notice, message: "three")
         ])
         let output = Message.Output.debugLog(log: log)
         let strategy = FakeTunnelStrategy { _ in
