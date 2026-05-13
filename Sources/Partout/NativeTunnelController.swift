@@ -2,35 +2,31 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !os(iOS) && !os(tvOS)
-
 internal import _PartoutCore_C
 
 /// A controller that operates on a virtual tun interface.
-public final class VirtualTunnelController: TunnelController {
+public final class NativeTunnelController: TunnelController {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
-    private let impl: UnsafeMutableRawPointer?
+    private let ref: UnsafeMutableRawPointer?
 
     private let maxReadLength: Int
 
     public init(
         _ ctx: PartoutLoggerContext,
-        impl: UnsafeMutableRawPointer?,
+        ref: UnsafeMutableRawPointer?,
         maxReadLength: Int = 128 * 1024
     ) throws {
         self.ctx = ctx
-        self.impl = impl
+        self.ref = ref
         self.maxReadLength = maxReadLength
 
-        if let thiz = impl {
-            pp_tun_ctrl_test_working(thiz)
-        }
+        pp_tun_ctrl_test_working(ref)
     }
 
     deinit {
-        pp_log(ctx, .core, .debug, "Deinit VirtualTunnelController")
+        pp_log(ctx, .core, .debug, "Deinit NativeTunnelController")
     }
 
     public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
@@ -41,32 +37,22 @@ public final class VirtualTunnelController: TunnelController {
             return DummyTunnelInterface()
         }
 
-        let infoJSON: String = try {
+        let infoJSON = try {
             let wrapped = TunnelRemoteInfoWrapper(info)
-            let data = try JSONEncoder().encode(wrapped)
-            guard let json = String(data: data, encoding: .utf8) else {
-                throw PartoutError(.notFound)
+            do {
+                return try JSONEncoder.shared().encodeJSON(wrapped)
+            } catch {
+                throw PartoutError(error)
             }
-            return json
         }()
 
         // Create tun with optional implementation from controller
-        let tunImpl: UnsafeMutableRawPointer?
-        if let impl {
-            tunImpl = infoJSON.withCString {
-                pp_tun_ctrl_set_tunnel(impl, $0)
+        guard let tun = info.originalModuleId.uuidString.withCString({ uuid in
+            infoJSON.withCString { info in
+                pp_tun_ctrl_set_tunnel(ref, uuid, info)
             }
-        } else {
-            tunImpl = nil
-        }
-        let uuid = info.originalModuleId
-        guard let tun = uuid.uuidString.withCString({
-            pp_tun_create($0, tunImpl)
         }) else {
-            if let impl {
-                pp_tun_ctrl_clear_tunnel(impl, tunImpl)
-            }
-            throw PartoutError(.linkNotActive)
+            throw PartoutError(.tunNotAvailable)
         }
 
         // FIXME: #188, add better codes for PartoutError
@@ -96,14 +82,12 @@ public final class VirtualTunnelController: TunnelController {
 //            excludedRoutes.append(Route(Subnet(serverAddress), nil))
 //        }
 
-        return VirtualTunnelInterface(ctx, tun: tun, tunImpl: tunImpl, maxReadLength: maxReadLength)
+        return VirtualTunnelInterface(ctx, tun: tun, maxReadLength: maxReadLength)
     }
 
     public func configureSockets(with descriptors: [UInt64]) {
-        if let thiz = impl {
-            descriptors.map(Int32.init).withUnsafeBufferPointer {
-                pp_tun_ctrl_configure_sockets(thiz, $0.baseAddress, $0.count)
-            }
+        descriptors.map(Int32.init).withUnsafeBufferPointer {
+            pp_tun_ctrl_configure_sockets(ref, $0.baseAddress, $0.count)
         }
     }
 
@@ -117,9 +101,7 @@ public final class VirtualTunnelController: TunnelController {
         await tunnel.shutdown()
 
         // Release tun implementation if necessary
-        if let thiz = impl {
-            pp_tun_ctrl_clear_tunnel(thiz, tunnel.tunImpl)
-        }
+        pp_tun_ctrl_clear_tunnel(ref, tunnel.tun)
     }
 
     public func setReasserting(_ reasserting: Bool) {
@@ -130,8 +112,6 @@ public final class VirtualTunnelController: TunnelController {
         // Do nothing
     }
 }
-
-#endif
 
 final class DummyTunnelInterface: IOInterface {
     var fileDescriptor: UInt64? {

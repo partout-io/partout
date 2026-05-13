@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 /// Manages a tunnel and observes its status.
-public actor Tunnel {
+public actor Tunnel: TunnelProtocol {
     private let ctx: PartoutLoggerContext
 
     private let strategy: TunnelObservableStrategy
@@ -94,17 +94,12 @@ extension Tunnel {
     ) async throws {
         try await install(profile, connect: connect, options: nil, title: title)
     }
-
-    public func sendMessage(_ message: Message.Input) async throws -> Message.Output? {
-        guard let profileId = snapshots.keys.first else { return nil }
-        return try await sendMessage(message, to: profileId)
-    }
 }
 
 // MARK: - State
 
 extension Tunnel {
-    public private(set) var snapshots: [Profile.ID: TunnelSnapshot] {
+    public private(set) nonisolated var snapshots: [Profile.ID: TunnelSnapshot] {
         get {
             snapshotsSubject.value
         }

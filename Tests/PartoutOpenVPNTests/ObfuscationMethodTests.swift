@@ -31,56 +31,56 @@ struct ObfuscationMethodTests {
     @Test
     func givenTaggedXormaskPayload_whenDecode_thenRestoresValue() throws {
         let data = #"{"type":"xormask","mask":"AQID"}"#.data(using: .utf8)!
-        let decoded = try JSONDecoder().decode(OpenVPN.ObfuscationMethod.self, from: data)
+        let decoded = try JSONDecoder.shared().decode(OpenVPN.ObfuscationMethod.self, from: data)
         #expect(decoded == .xormask(mask: SecureData(Data([1, 2, 3]))))
     }
 
     @Test
     func givenTaggedXorptrposPayload_whenDecode_thenRestoresValue() throws {
         let data = #"{"type":"xorptrpos"}"#.data(using: .utf8)!
-        let decoded = try JSONDecoder().decode(OpenVPN.ObfuscationMethod.self, from: data)
+        let decoded = try JSONDecoder.shared().decode(OpenVPN.ObfuscationMethod.self, from: data)
         #expect(decoded == .xorptrpos)
     }
 
     @Test
     func givenTaggedReversePayload_whenDecode_thenRestoresValue() throws {
         let data = #"{"type":"reverse"}"#.data(using: .utf8)!
-        let decoded = try JSONDecoder().decode(OpenVPN.ObfuscationMethod.self, from: data)
+        let decoded = try JSONDecoder.shared().decode(OpenVPN.ObfuscationMethod.self, from: data)
         #expect(decoded == .reverse)
     }
 
     @Test
     func givenTaggedObfuscatePayload_whenDecode_thenRestoresValue() throws {
         let data = #"{"type":"obfuscate","mask":"AQID"}"#.data(using: .utf8)!
-        let decoded = try JSONDecoder().decode(OpenVPN.ObfuscationMethod.self, from: data)
+        let decoded = try JSONDecoder.shared().decode(OpenVPN.ObfuscationMethod.self, from: data)
         #expect(decoded == .obfuscate(mask: SecureData(Data([1, 2, 3]))))
     }
 
     @Test
     func givenLegacyXormaskPayload_whenDecode_thenRestoresValue() throws {
         let data = #"{"xormask":{"mask":"AQID"}}"#.data(using: .utf8)!
-        let decoded = try JSONDecoder().decode(OpenVPN.ObfuscationMethod.self, from: data)
+        let decoded = try JSONDecoder.shared().decode(OpenVPN.ObfuscationMethod.self, from: data)
         #expect(decoded == .xormask(mask: SecureData(Data([1, 2, 3]))))
     }
 
     @Test
     func givenLegacyXorptrposPayload_whenDecode_thenRestoresValue() throws {
         let data = #"{"xorptrpos":{}}"#.data(using: .utf8)!
-        let decoded = try JSONDecoder().decode(OpenVPN.ObfuscationMethod.self, from: data)
+        let decoded = try JSONDecoder.shared().decode(OpenVPN.ObfuscationMethod.self, from: data)
         #expect(decoded == .xorptrpos)
     }
 
     @Test
     func givenLegacyReversePayload_whenDecode_thenRestoresValue() throws {
         let data = #"{"reverse":{}}"#.data(using: .utf8)!
-        let decoded = try JSONDecoder().decode(OpenVPN.ObfuscationMethod.self, from: data)
+        let decoded = try JSONDecoder.shared().decode(OpenVPN.ObfuscationMethod.self, from: data)
         #expect(decoded == .reverse)
     }
 
     @Test
     func givenLegacyObfuscatePayload_whenDecode_thenRestoresValue() throws {
         let data = #"{"obfuscate":{"mask":"AQID"}}"#.data(using: .utf8)!
-        let decoded = try JSONDecoder().decode(OpenVPN.ObfuscationMethod.self, from: data)
+        let decoded = try JSONDecoder.shared().decode(OpenVPN.ObfuscationMethod.self, from: data)
         #expect(decoded == .obfuscate(mask: SecureData(Data([1, 2, 3]))))
     }
 
@@ -88,7 +88,7 @@ struct ObfuscationMethodTests {
     func givenMalformedTaggedXormaskPayload_whenDecode_thenFailsWithoutLegacyFallback() {
         let data = #"{"type":"xormask"}"#.data(using: .utf8)!
         #expect(throws: Error.self) {
-            try JSONDecoder().decode(OpenVPN.ObfuscationMethod.self, from: data)
+            try JSONDecoder.shared().decode(OpenVPN.ObfuscationMethod.self, from: data)
         }
     }
 
@@ -96,7 +96,7 @@ struct ObfuscationMethodTests {
     func givenMalformedLegacyXormaskPayload_whenDecode_thenFailsWithoutTryingOtherLegacyCases() {
         let data = #"{"xormask":{}}"#.data(using: .utf8)!
         #expect(throws: Error.self) {
-            try JSONDecoder().decode(OpenVPN.ObfuscationMethod.self, from: data)
+            try JSONDecoder.shared().decode(OpenVPN.ObfuscationMethod.self, from: data)
         }
     }
 
@@ -104,7 +104,7 @@ struct ObfuscationMethodTests {
     func givenMalformedTaggedObfuscatePayload_whenDecode_thenFailsWithoutLegacyFallback() {
         let data = #"{"type":"obfuscate"}"#.data(using: .utf8)!
         #expect(throws: Error.self) {
-            try JSONDecoder().decode(OpenVPN.ObfuscationMethod.self, from: data)
+            try JSONDecoder.shared().decode(OpenVPN.ObfuscationMethod.self, from: data)
         }
     }
 
@@ -112,15 +112,15 @@ struct ObfuscationMethodTests {
     func givenMalformedLegacyObfuscatePayload_whenDecode_thenFailsWithoutTryingOtherLegacyCases() {
         let data = #"{"obfuscate":{}}"#.data(using: .utf8)!
         #expect(throws: Error.self) {
-            try JSONDecoder().decode(OpenVPN.ObfuscationMethod.self, from: data)
+            try JSONDecoder.shared().decode(OpenVPN.ObfuscationMethod.self, from: data)
         }
     }
 }
 
 private extension ObfuscationMethodTests {
     func assertRoundTrip(_ value: OpenVPN.ObfuscationMethod) throws {
-        let encoded = try JSONEncoder().encode(value)
-        let decoded = try JSONDecoder().decode(OpenVPN.ObfuscationMethod.self, from: encoded)
+        let encoded = try JSONEncoder.shared().encode(value)
+        let decoded = try JSONDecoder.shared().decode(OpenVPN.ObfuscationMethod.self, from: encoded)
         #expect(decoded == value)
     }
 }

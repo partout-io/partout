@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !os(iOS) && !os(tvOS)
-
 internal import _PartoutCore_C
 
 /// An interface that interacts with a Layer 3 virtual tun device, commonly found in UNIX-like systems.
@@ -11,9 +9,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
-    private let tun: pp_tun
-
-    let tunImpl: UnsafeMutableRawPointer?
+    let tun: pp_tun
 
     nonisolated let deviceName: String?
 
@@ -47,12 +43,10 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     init(
         _ ctx: PartoutLoggerContext,
         tun: pp_tun,
-        tunImpl: UnsafeMutableRawPointer?,
         maxReadLength: Int
     ) {
         self.ctx = ctx
         self.tun = tun
-        self.tunImpl = tunImpl
         if let tunName = pp_tun_name(tun) {
             deviceName = String(cString: tunName)
         } else {
@@ -72,7 +66,6 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 
     deinit {
         pp_log(ctx, .core, .debug, "Deinit VirtualTunnelInterface")
-        pp_tun_free(tun)
     }
 
     nonisolated var fileDescriptor: UInt64? {
@@ -81,7 +74,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 
     func readPackets() async throws -> [Data] {
         guard isActive else {
-            throw PartoutError(.linkNotActive)
+            throw PartoutError(.tunNotActive)
         }
         do {
             return try await withCheckedThrowingContinuation { continuation in
@@ -101,7 +94,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
             }
         } catch {
             guard isActive else {
-                throw PartoutError(.linkNotActive)
+                throw PartoutError(.tunNotActive)
             }
             pp_log(ctx, .core, .fault, "Unable to read TUN packets: \(error)")
             await shutdown()
@@ -111,7 +104,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 
     func writePackets(_ packets: [Data]) async throws {
         guard isActive else {
-            throw PartoutError(.linkNotActive)
+            throw PartoutError(.tunNotActive)
         }
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -135,7 +128,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
             }
         } catch {
             guard isActive else {
-                throw PartoutError(.linkNotActive)
+                throw PartoutError(.tunNotActive)
             }
             pp_log(ctx, .core, .fault, "Unable to write TUN packets: \(error)")
             await shutdown()
@@ -166,5 +159,3 @@ private extension DispatchQueue {
         }
     }
 }
-
-#endif

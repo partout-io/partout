@@ -9,48 +9,48 @@ import android.content.Intent
 import android.net.VpnService
 import androidx.core.content.ContextCompat
 import io.partout.abi.TaggedProfile
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.serialization.json.Json
 
-class AndroidTunnelStrategy(
+class AndroidTunnel(
     context: Context,
     private val vpnServiceClass: Class<out VpnService>,
     private val requestVpnPermission: (Intent) -> Unit
 ) {
     private val appContext = context.applicationContext
-    private var pendingPermission: CompletableDeferred<Boolean>? = null
+    private var pendingPermission: PendingPermission? = null
 
-    suspend fun connect(profile: TaggedProfile): Boolean {
+    fun connect(profileJSON: String, ctx: Long, completion: Long) {
+        val profile = json.decodeFromString<TaggedProfile>(profileJSON)
+        val complete: (Int) -> Unit = { code ->
+            callback(ctx, completion, code)
+        }
         val permissionIntent = VpnService.prepare(appContext)
         if (permissionIntent != null) {
-            pendingPermission?.complete(false)
-            val permission = CompletableDeferred<Boolean>()
-            pendingPermission = permission
+            pendingPermission?.completion?.invoke(-1)
+            pendingPermission = PendingPermission(profile, complete)
             requestVpnPermission(permissionIntent)
-            val isGranted = try {
-                permission.await()
-            } finally {
-                if (pendingPermission === permission) {
-                    pendingPermission = null
-                }
-            }
-            if (!isGranted) {
-                return false
-            }
+            return
         }
         startVpnService(profile)
-        return true
+        complete(0)
     }
 
-    suspend fun disconnect() {
-        pendingPermission?.complete(false)
+    fun disconnect(ctx: Long, completion: Long) {
+        pendingPermission?.completion?.invoke(-1)
         pendingPermission = null
         stopVpnService()
+        callback(ctx, completion, 0)
     }
 
     fun onVpnPermissionResult(granted: Boolean) {
-        pendingPermission?.complete(granted)
+        val permission = pendingPermission ?: return
         pendingPermission = null
+        if (!granted) {
+            permission.completion(-1)
+            return
+        }
+        startVpnService(permission.profile)
+        permission.completion(0)
     }
 
     private fun startVpnService(profile: TaggedProfile) {
@@ -75,4 +75,11 @@ class AndroidTunnelStrategy(
             ignoreUnknownKeys = true
         }
     }
+
+    private external fun callback(ctx: Long, completion: Long, errorCode: Int)
+
+    private data class PendingPermission(
+        val profile: TaggedProfile,
+        val completion: (Int) -> Unit
+    )
 }

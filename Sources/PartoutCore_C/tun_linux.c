@@ -7,6 +7,8 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
+// FIXME: #188, Implement Linux controller/strategy
+
 #if PARTOUT_LINUX
 
 #include <stdio.h>
@@ -18,14 +20,14 @@
 #include <sys/ioctl.h>
 #include <sys/unistd.h>
 
-struct _pp_tun {
+struct __pp_tun_struct {
     int fd;
     const char *dev_name;
 };
 
-pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl) {
+static
+pp_tun pp_tun_create(const char *_Nonnull uuid) {
     (void)uuid;
-    (void)impl;
     const char *dev_path = "/dev/net/tun";
     int fd = -1;
     struct ifreq ifr = { 0 };
@@ -35,7 +37,7 @@ pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl) {
      * consistent across distros for coming from the kernel. */
     fd = open(dev_path, O_RDWR);
     if (fd < 0) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "open(tun)");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_linux: create(), open(tun)");
         goto failure;
     }
 
@@ -43,7 +45,7 @@ pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl) {
      * the first available device number */
     ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
     if (ioctl(fd, TUNSETIFF, (void *)&ifr) < 0) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "ioctl(TUNSETIFF)");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_linux: create(), ioctl(TUNSETIFF)");
         goto failure;
     }
 
@@ -58,6 +60,7 @@ failure:
     return NULL;
 }
 
+static
 void pp_tun_free(pp_tun tun) {
     if (!tun) return;
     pp_tun_shutdown(tun);
@@ -88,6 +91,63 @@ int pp_tun_fd(const pp_tun tun) {
 
 const char *pp_tun_name(const pp_tun tun) {
     return tun->dev_name;
+}
+
+pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
+    (void)ref;
+    (void)uuid;
+    (void)info_json;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_linux: ctrl_set_tunnel(%p)", ref);
+    return NULL;
+}
+
+void pp_tun_ctrl_configure_sockets(void *ref, const int *fds, const size_t fds_len) {
+    (void)ref;
+    (void)fds;
+    (void)fds_len;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_linux: ctrl_configure_sockets(%p)", ref);
+}
+
+void pp_tun_ctrl_clear_tunnel(void *ref, pp_tun tun_impl) {
+    (void)ref;
+    (void)tun_impl;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_linux: ctrl_clear_tunnel(%p)", ref);
+}
+
+void pp_tun_strg_install(void *ref,
+                         const char *profile_json,
+                         bool connect,
+                         const char *options_json,
+                         void *ctx,
+                         pp_completion completion) {
+    (void)ref;
+    (void)profile_json;
+    (void)options_json;
+    (void)ctx;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_linux: strg_install(%p, %d)", ref, connect);
+    if (completion) completion(NULL, 0);
+}
+
+void pp_tun_strg_uninstall(void *ref,
+                           const char *profile_id,
+                           void *ctx,
+                           pp_completion completion) {
+    (void)ref;
+    (void)profile_id;
+    (void)ctx;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_linux: strg_uninstall(%p)", ref);
+    if (completion) completion(NULL, 0);
+}
+
+void pp_tun_strg_disconnect(void *ref,
+                            const char *profile_id,
+                            void *ctx,
+                            pp_completion completion) {
+    (void)ref;
+    (void)profile_id;
+    (void)ctx;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_linux: strg_disconnect(%p)", ref);
+    if (completion) completion(NULL, 0);
 }
 
 #endif

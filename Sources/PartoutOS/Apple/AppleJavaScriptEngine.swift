@@ -33,7 +33,7 @@ public final class AppleJavaScriptEngine: ScriptingEngine, @unchecked Sendable {
             guard let data = value.toString().data(using: .utf8) else {
                 throw PartoutError(.parsing, value)
             }
-            return try JSONDecoder().decode(O.self, from: data)
+            return try JSONDecoder.shared().decode(O.self, from: data)
         }.value
     }
 }

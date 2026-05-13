@@ -106,3 +106,5 @@ FILE *_Nullable pp_fopen(const char *_Nonnull filename, const char *_Nonnull mod
 extern _Nullable JavaVM *_Nullable jvm;
 _Nullable JNIEnv *_Nullable pp_jni_attach_thread(bool *_Nonnull did_attach);
 #endif
+
+typedef void (*pp_completion)(void *_Nullable ctx, const int error_code);

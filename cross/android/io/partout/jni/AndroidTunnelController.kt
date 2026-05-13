@@ -16,7 +16,7 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 // WARNING: These methods are called from a JNI background thread
-class AndroidTunnelController: AutoCloseable {
+class AndroidTunnelController {
     private val logTag = "Partout"
     private val service: VpnService
     private var descriptor: ParcelFileDescriptor?
@@ -31,11 +31,8 @@ class AndroidTunnelController: AutoCloseable {
     }
 
     // FIXME: Pass Profile
-    fun setTunnelSettings(infoJSON: String): Int {
-        if (descriptor != null) {
-            Log.w(logTag, ">>> AndroidTunnelController: Replacing existing descriptor")
-            clearTunnelSettings()
-        }
+    fun setTunnel(infoJSON: String): Int {
+        assert(descriptor == null)
         val builder = service.Builder()
 
         // Decode info
@@ -80,7 +77,8 @@ class AndroidTunnelController: AutoCloseable {
         // Protect remote socket to escape tunnel
         Log.e(logTag, ">>> AndroidTunnelController: Building with remoteFds = " + remoteFds + " (" + remoteFds.size + ")")
         remoteFds.forEach {
-            service.protect(it)
+            val protected = service.protect(it)
+            Log.e(logTag, ">>> AndroidTunnelController: protect($it) = $protected")
         }
 
         // FIXME: Register callback to update protected sockets?
@@ -113,26 +111,17 @@ class AndroidTunnelController: AutoCloseable {
         }
 
         // Success
-        val fd = descriptor?.fd ?: -1
+        val fd = descriptor?.detachFd() ?: -1
+        descriptor = null
         Log.e(logTag, ">>> AndroidTunnelController: Established descriptor: " + fd)
-//        descriptor?.detachFd()
         return fd
     }
 
     fun configureSockets(fds: IntArray) {
         Log.e(logTag, ">>> AndroidTunnelController: Configuring with fds = " + fds + " (" + fds.size + ")")
         fds.forEach {
-            service.protect(it)
+            val protected = service.protect(it)
+            Log.e(logTag, ">>> AndroidTunnelController: protect($it) = $protected")
         }
-    }
-
-    fun clearTunnelSettings() {
-        Log.e(logTag, ">>> AndroidTunnelController: Closing...")
-        descriptor?.close()
-        descriptor = null
-    }
-
-    override fun close() {
-        clearTunnelSettings()
     }
 }

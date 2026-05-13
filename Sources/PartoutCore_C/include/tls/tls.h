@@ -37,7 +37,7 @@ typedef struct {
     void (*_Nonnull on_verify_failure)(void *_Nullable ctx);
 } pp_tls_options;
 
-typedef struct _pp_tls *pp_tls;
+typedef struct __pp_tls_struct *pp_tls;
 
 pp_tls_options *_Nonnull pp_tls_options_create(int sec_level,
                                                size_t buf_len,
