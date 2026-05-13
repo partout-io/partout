@@ -77,7 +77,7 @@ public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
 
 private extension NativeTunnel {
     static func encode(_ profile: Profile) throws -> String {
-        let data = try JSONEncoder().encode(profile.asTaggedProfile)
+        let data = try JSONEncoder.shared().encode(profile.asTaggedProfile)
         guard let json = String(data: data, encoding: .utf8) else {
             throw PartoutError(.encoding)
         }
