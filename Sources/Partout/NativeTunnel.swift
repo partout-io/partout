@@ -5,10 +5,16 @@
 internal import _PartoutCore_C
 
 public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
+    private let ctx: PartoutLoggerContext
+
     nonisolated(unsafe)
     private let ref: UnsafeMutableRawPointer?
 
-    public init(ref: UnsafeMutableRawPointer?) {
+    public init(
+        _ ctx: PartoutLoggerContext,
+        ref: UnsafeMutableRawPointer?
+    ) {
+        self.ctx = ctx
         self.ref = ref
     }
 
@@ -18,13 +24,33 @@ public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
     }
 
     public func install(_ profile: Profile, connect: Bool, options: (any Sendable)?, title: @escaping (Profile) -> String) async throws {
-        let profileJSON = try Self.encode(profile)
+        let profileJSON = try Self.encodeJSON(profile.asTaggedProfile)
+        let optionsJSON: String? = (options as? Encodable)
+            .map {
+                do {
+                    return try Self.encodeJSON($0)
+                } catch {
+                    pp_log(ctx, .core, .error, "Unable to encode install options: \(error)")
+                    return nil
+                }
+            } ?? nil
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             let box = NativeCompletion(continuation: continuation)
             let ctx = Unmanaged.passRetained(box).toOpaque()
-            // FIXME: #1656, Ignore options
-            profileJSON.withCString {
-                pp_tun_strg_install(ref, $0, connect, nil, ctx, NativeCompletion.callback)
+            profileJSON.withCString { profile in
+                if let optionsJSON {
+                    optionsJSON.withCString { options in
+                        pp_tun_strg_install(
+                            ref, profile, connect, options,
+                            ctx, NativeCompletion.callback
+                        )
+                    }
+                } else {
+                    pp_tun_strg_install(
+                        ref, profile, connect, nil,
+                        ctx, NativeCompletion.callback
+                    )
+                }
             }
         }
     }
@@ -81,8 +107,8 @@ public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
 }
 
 private extension NativeTunnel {
-    static func encode(_ profile: Profile) throws -> String {
-        let data = try JSONEncoder.shared().encode(profile.asTaggedProfile)
+    static func encodeJSON<T>(_ value: T) throws -> String where T: Encodable {
+        let data = try JSONEncoder.shared().encode(value)
         guard let json = String(data: data, encoding: .utf8) else {
             throw PartoutError(.encoding)
         }
