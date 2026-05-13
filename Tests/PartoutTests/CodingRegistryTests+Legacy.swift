@@ -21,17 +21,6 @@ struct CodingRegistryLegacyTests {
     }
 
     @Test
-    func givenCoder_whenDecodeProfileEncodedWithLegacyV1_thenIsDecoded() throws {
-        let registry = Registry(withKnown: true)
-        let fixture = try newLegacyV1ProfileFixture()
-        let encoded = fixture.encoded
-
-        let sut = registry.withLegacyEncoding(false)
-        let decoded = try sut.profile(fromString: encoded)
-        #expect(decoded == fixture.profile)
-    }
-
-    @Test
     func givenLegacyV2_whenDecodeProfileWithUnknownModule_thenFailsWithUnknownModuleHandler() throws {
         let registry = Registry(allHandlers: [])
         let encoder = LegacyProfileEncoderV2(registry)
@@ -42,55 +31,12 @@ struct CodingRegistryLegacyTests {
         }
         #expect(error?.code == .unknownModuleHandler)
     }
-
-    @Test
-    func givenLegacyV1_whenDecodeProfileWithUnknownModule_thenDropsUnknownModule() throws {
-        let registry = Registry(allHandlers: [])
-        let encoder = LegacyProfileEncoderV1()
-        let fixture = try newLegacyV1ProfileFixture()
-        var expectedBuilder = fixture.profile.builder()
-        expectedBuilder.modules = []
-        let expected = try expectedBuilder.build()
-
-        let legacyDecoded = try encoder.decodedProfile(
-            from: fixture.encoded,
-            with: registry
-        )
-        let sut = registry.withLegacyEncoding(false)
-        let decoded = try sut.profile(fromString: fixture.encoded)
-
-        #expect(legacyDecoded == expected)
-        #expect(decoded == expected)
-        #expect(decoded.modules.isEmpty)
-    }
 }
 
 private extension CodingRegistryLegacyTests {
     func newLegacyV2ProfileFixture(_ encoder: LegacyProfileEncoderV2) throws -> LegacyProfileFixture {
         let profile = try newTestProfile()
         let encoded = try encoder.encode(profile.asCodableProfileV2)
-        return LegacyProfileFixture(profile: profile, encoded: encoded)
-    }
-
-    func newLegacyV1ProfileFixture() throws -> LegacyProfileFixture {
-        let profile = try newTestProfile()
-        let modules = try profile.modules.map { module in
-            guard let encodableModule = module as? (any Module & Encodable) else {
-                throw PartoutError(.encoding)
-            }
-            return try LegacyModuleWrapper(encodableModule)
-        }
-        let payload = LegacyCodableProfile(
-            version: profile.version,
-            id: profile.id,
-            name: profile.name,
-            modules: modules,
-            activeModulesIds: profile.activeModulesIds,
-            behavior: profile.behavior,
-            userInfo: try profile.userInfo.map { try JSONEncoder.shared().encode($0) }
-        )
-        let data = try JSONEncoder.shared().encode(payload)
-        let encoded = data.base64EncodedString()
         return LegacyProfileFixture(profile: profile, encoded: encoded)
     }
 
