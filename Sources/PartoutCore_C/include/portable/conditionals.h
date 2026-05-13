@@ -35,7 +35,9 @@
 #define PARTOUT_WINDOWS     0
 #endif
 
-#if PARTOUT_MACOS || PARTOUT_LINUX || PARTOUT_WINDOWS || PARTOUT_ANDROID
+// FIXME: ###, Only Android fully supported for now
+//#if PARTOUT_MACOS || PARTOUT_LINUX || PARTOUT_WINDOWS || PARTOUT_ANDROID
+#if PARTOUT_ANDROID
 #define PARTOUT_HAS_TUN     1
 #else
 #define PARTOUT_HAS_TUN     0
