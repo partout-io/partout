@@ -5,6 +5,7 @@
 extension JSONEncoder {
     public static func new() -> JSONEncoder {
         let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .millisecondsSince1970
         return encoder
     }
 
@@ -17,6 +18,7 @@ extension JSONEncoder {
 extension JSONDecoder {
     public static func new() -> JSONDecoder {
         let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .millisecondsSince1970
         return decoder
     }
 
