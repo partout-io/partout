@@ -49,15 +49,32 @@ extension WireGuard.Configuration {
         timeout: Int,
         logHandler: @escaping WireGuardAdapter.LogHandler
     ) async throws -> [Endpoint: Endpoint] {
-        let endpoints = peers.compactMap(\.endpoint)
         let resolver = SimpleDNSResolver {
-            POSIXDNSStrategy(hostname: $0)
+            POSIXDNSStrategy(hostname: $0, flags: Self.dnsResolverFlags)
         }
+        return try await resolvePeers(
+            timeout: timeout,
+            logHandler: logHandler,
+            resolver: resolver
+        )
+    }
+
+    func resolvePeers(
+        timeout: Int,
+        logHandler: @escaping WireGuardAdapter.LogHandler,
+        resolver: DNSResolver
+    ) async throws -> [Endpoint: Endpoint] {
+        let endpoints = peers.compactMap(\.endpoint)
         return try await withThrowingTaskGroup(of: Void.self, returning: [Endpoint: Endpoint].self) { group in
             let allResolved = ResolvedMap()
             for endpoint in endpoints {
                 group.addTask { @Sendable in
                     do {
+                        if endpoint.address.isIPAddress {
+                            logHandler(.verbose, "DNS64: mapped \(endpoint.address) to itself.")
+                            await allResolved.setEndpoints([endpoint], for: endpoint)
+                            return
+                        }
                         let resolvedRecords = try await resolver.resolve(
                             endpoint.address.rawValue,
                             timeout: timeout
@@ -91,5 +108,13 @@ extension WireGuard.Configuration {
             }
             return await allResolved.toMap()
         }
+    }
+
+    private static var dnsResolverFlags: Int32 {
+#if canImport(Darwin)
+        AI_ALL
+#else
+        0
+#endif
     }
 }

@@ -47,6 +47,48 @@ struct TunnelRemoteInfoGeneratorTests {
     }
 
     @Test
+    func givenIPAddressEndpoint_whenResolved_thenBypassesDNS64Cache() async throws {
+        let sourceEndpoint = try Endpoint("77.160.28.16", 51830)
+        let configuration = try makeConfiguration(endpoint: sourceEndpoint.rawValue)
+        let dns = RecordingDNSResolver()
+        await dns.setResolvedRecords([
+            DNSRecord(address: "64:ff9b::4da0:1c10", isIPv6: true)
+        ], for: sourceEndpoint.address.rawValue)
+
+        let map = try await configuration.resolvePeers(
+            timeout: 1000,
+            logHandler: { _, _ in },
+            resolver: dns
+        )
+
+        #expect(map[sourceEndpoint] == sourceEndpoint)
+        let requestedHostnames = await dns.requestedHostnames
+        #expect(requestedHostnames.isEmpty)
+    }
+
+    @Test
+    func givenHostnameEndpointWithDNS64AndIPv4_whenResolved_thenCachesIPv4BaseAddress() async throws {
+        let sourceEndpoint = try Endpoint("foobar.com", 51830)
+        let ipv4Endpoint = try Endpoint("77.160.28.16", sourceEndpoint.port)
+        let configuration = try makeConfiguration(endpoint: sourceEndpoint.rawValue)
+        let dns = RecordingDNSResolver()
+        await dns.setResolvedRecords([
+            DNSRecord(address: "64:ff9b::4da0:1c10", isIPv6: true),
+            DNSRecord(address: ipv4Endpoint.address.rawValue, isIPv6: false)
+        ], for: sourceEndpoint.address.rawValue)
+
+        let map = try await configuration.resolvePeers(
+            timeout: 1000,
+            logHandler: { _, _ in },
+            resolver: dns
+        )
+
+        #expect(map[sourceEndpoint] == ipv4Endpoint)
+        let requestedHostnames = await dns.requestedHostnames
+        #expect(requestedHostnames == [sourceEndpoint.address.rawValue])
+    }
+
+    @Test
     func givenCachedResolution_whenGeneratingEndpointUpdate_thenDoesNotResolveAgainUntilReset() async throws {
         let pvtkey = "SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs="
         let pubkey = "BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw="
@@ -135,6 +177,37 @@ struct TunnelRemoteInfoGeneratorTests {
         #expect(ipModule.ipv4?.includedRoutes.first?.gateway?.rawValue == "10.0.0.2")
         #expect(ipModule.ipv6?.includedRoutes.first?.destination?.rawValue == "fd00::/64")
         #expect(ipModule.ipv6?.includedRoutes.first?.gateway?.rawValue == "fd00::2")
+    }
+}
+
+private func makeConfiguration(endpoint: String) throws -> WireGuard.Configuration {
+    let pvtkey = "SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs="
+    let pubkey = "BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw="
+
+    var builder = WireGuard.Configuration.Builder(privateKey: pvtkey)
+    var peer = WireGuard.RemoteInterface.Builder(publicKey: pubkey)
+    peer.endpoint = endpoint
+    peer.allowedIPs = ["0.0.0.0/0"]
+    builder.peers = [peer]
+    return try builder.build()
+}
+
+private actor RecordingDNSResolver: DNSResolver {
+    private var resolvedRecords: [String: [DNSRecord]] = [:]
+
+    private var hostnames: [String] = []
+
+    func setResolvedRecords(_ records: [DNSRecord], for hostname: String) {
+        resolvedRecords[hostname] = records
+    }
+
+    func resolve(_ hostname: String, timeout: Int) async throws -> [DNSRecord] {
+        hostnames.append(hostname)
+        return resolvedRecords[hostname] ?? []
+    }
+
+    var requestedHostnames: [String] {
+        hostnames
     }
 }
 
