@@ -45,8 +45,11 @@ private extension POSIXDNSStrategy {
     static func resolveAndBlock(hostname: String) throws -> [DNSRecord]? {
         let addr = hostname.cString(using: .utf8)
         var hints = addrinfo()
+#if canImport(Darwin)
         // We set this to ALL so that we get v4 addresses even on DNS64 networks
+        // However, DNS breaks on Android when AI_ALL + AF_UNSPEC is set
         hints.ai_flags = AI_ALL
+#endif
         hints.ai_family = AF_UNSPEC // IPv4/IPv6
         var infoPointer: UnsafeMutablePointer<addrinfo>?
         let result = getaddrinfo(addr, nil, &hints, &infoPointer)
