@@ -52,7 +52,6 @@ Profiles are the foundations of Partout, and profiles are made of modules. A bas
 - ``HTTPProxyModule``
 - ``IPModule``
 - ``OnDemandModule``
-- ``TransientModule``
 
 ### Builder pattern
 
