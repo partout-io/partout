@@ -50,7 +50,7 @@ extension WireGuard.Configuration {
         logHandler: @escaping WireGuardAdapter.LogHandler
     ) async throws -> [Endpoint: Endpoint] {
         let resolver = SimpleDNSResolver {
-            POSIXDNSStrategy(hostname: $0, flags: Self.dnsResolverFlags)
+            POSIXDNSStrategy(hostname: $0)
         }
         return try await resolvePeers(
             timeout: timeout,
@@ -108,9 +108,5 @@ extension WireGuard.Configuration {
             }
             return await allResolved.toMap()
         }
-    }
-
-    private static var dnsResolverFlags: Int32 {
-        AI_ALL
     }
 }

@@ -8,17 +8,10 @@ internal import _PartoutCore_C
 public actor POSIXDNSStrategy: SimpleDNSStrategy {
     private let hostname: String
 
-    private let flags: Int32
-
     private var task: Task<[DNSRecord]?, Error>?
 
     public init(hostname: String) {
-        self.init(hostname: hostname, flags: 0)
-    }
-
-    public init(hostname: String, flags: Int32) {
         self.hostname = hostname
-        self.flags = flags
     }
 
     public func startResolution() async throws {
@@ -30,9 +23,8 @@ public actor POSIXDNSStrategy: SimpleDNSStrategy {
             records = try await task.value
         } else {
             let hostname = self.hostname
-            let flags = self.flags
             let newTask = Task.detached { @Sendable in
-                try Self.resolveAndBlock(hostname: hostname, flags: flags)
+                try Self.resolveAndBlock(hostname: hostname)
             }
             task = newTask
             records = try await newTask.value
@@ -50,10 +42,11 @@ public actor POSIXDNSStrategy: SimpleDNSStrategy {
 }
 
 private extension POSIXDNSStrategy {
-    static func resolveAndBlock(hostname: String, flags: Int32) throws -> [DNSRecord]? {
+    static func resolveAndBlock(hostname: String) throws -> [DNSRecord]? {
         let addr = hostname.cString(using: .utf8)
         var hints = addrinfo()
-        hints.ai_flags = flags
+        // We set this to ALL so that we get v4 addresses even on DNS64 networks
+        hints.ai_flags = AI_ALL
         hints.ai_family = AF_UNSPEC // IPv4/IPv6
         var infoPointer: UnsafeMutablePointer<addrinfo>?
         let result = getaddrinfo(addr, nil, &hints, &infoPointer)
