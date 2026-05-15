@@ -174,10 +174,10 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         // Prevent reconnection
         networkObserver?.setEnabled(false)
 
-        // Cancel subscriptions before stopping connection
-        statusSubscription?.cancel()
+        // Prevent more starts before stopping connection
         networkSubscription?.cancel()
         networkObserverTask?.cancel()
+        let isDrainingStatusSubscription = statusSubject.value != .disconnected
 
         // If there is a connection, disconnect with a timeout
         if let connection {
@@ -186,6 +186,13 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         } else {
             pp_log_id(profile.id, .core, .notice, "Non-connection profile, nothing to disconnect from")
         }
+
+        // Drain terminal status before cancelling the subscription
+        if isDrainingStatusSubscription {
+            await statusSubscription?.value
+        }
+        statusSubscription?.cancel()
+        statusSubscription = nil
 
         // Clear tunnel settings
         if let settingsOnlyTunnel {
@@ -204,7 +211,6 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         connection = nil
 
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
-        reportStatus(.disconnected)
 
         // Make sure to stop reporting onStatus events
         onStatus = nil
@@ -259,7 +265,10 @@ extension SimpleConnectionDaemon {
                         pp_log_id(profileId, .core, .debug, "Cancelled SimpleConnectionDaemon.statusStream")
                         return
                     }
-                    await self?.onConnectionStatus(status)
+                    let shouldStopObserving = await self?.onConnectionStatus(status) ?? true
+                    guard !shouldStopObserving else {
+                        break
+                    }
                 }
             } catch {
                 await self?.onConnectionError(error)
@@ -369,7 +378,7 @@ extension SimpleConnectionDaemon {
         }
     }
 
-    func onConnectionStatus(_ connectionStatus: ConnectionStatus) {
+    func onConnectionStatus(_ connectionStatus: ConnectionStatus) -> Bool {
         environment.setEnvironmentValue(connectionStatus, forKey: TunnelEnvironmentKeys.connectionStatus)
         switch connectionStatus {
         case .connected:
@@ -384,6 +393,7 @@ extension SimpleConnectionDaemon {
             resumeNetworkObserver(after: reconnectionDelay)
         }
         reportStatus(connectionStatus)
+        return state == .stopped && connectionStatus == .disconnected
     }
 
     func onConnectionError(_ error: Error) {
