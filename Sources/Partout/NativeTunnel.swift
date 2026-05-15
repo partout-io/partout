@@ -10,17 +10,23 @@ public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
     nonisolated(unsafe)
     private let ref: UnsafeMutableRawPointer?
 
+    private let snapshotsSubject: CurrentValueStream<[Profile.ID: TunnelSnapshot]>
+
     public init(
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?
     ) {
         self.ctx = ctx
         self.ref = ref
+        snapshotsSubject = CurrentValueStream([:])
     }
 
     public func prepare(purge: Bool) async throws {
-        // FIXME: #188, Implement in pp_tun_strg
-//        fatalError()
+        pp_tun_strg_prepare(
+            ref,
+            Unmanaged.passUnretained(self).toOpaque(),
+            Self.snapshotsCallback
+        )
     }
 
     public func install(_ profile: Profile, connect: Bool, options: (any Sendable)?, title: @escaping (Profile) -> String) async throws {
@@ -83,15 +89,11 @@ public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
     }
 
     public var snapshots: [Profile.ID: TunnelSnapshot] {
-        // FIXME: #188, Implement in pp_tun_strg
-//        fatalError()
-        [:]
+        snapshotsSubject.value
     }
 
     public var snapshotsStream: AsyncStream<[Profile.ID: TunnelSnapshot]> {
-        // FIXME: #188, Implement in pp_tun_strg
-//        fatalError()
-        AsyncStream { nil }
+        snapshotsSubject.subscribe()
     }
 
     public func allEnvironments() async -> [Profile.ID: TunnelEnvironmentReader] {
@@ -104,5 +106,27 @@ public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
         // FIXME: #188, Implement in pp_tun_strg
 //        fatalError()
         nil
+    }
+}
+
+private extension NativeTunnel {
+    static let snapshotsCallback: pp_tun_strg_snapshots_cb = { ctx, cJSON in
+        let tunnel = Unmanaged<NativeTunnel>.fromOpaque(ctx).takeUnretainedValue()
+        tunnel.submitSnapshots(String(cString: cJSON))
+    }
+
+    func submitSnapshots(_ json: String) {
+        pp_log(ctx, .core, .debug, "Submit manual snapshots: \(json)")
+        do {
+            let data = Data(json.utf8)
+            let decoded = try JSONDecoder.shared().decode([String: TunnelSnapshot].self, from: data)
+            let snapshots: [Profile.ID: TunnelSnapshot] = decoded.reduce(into: [:]) {
+                guard let id = Profile.ID(uuidString: $1.key) else { return }
+                $0[id] = $1.value
+            }
+            snapshotsSubject.send(snapshots)
+        } catch {
+            pp_log(ctx, .core, .error, "Unable to decode snapshots: \(error)")
+        }
     }
 }
