@@ -9,15 +9,33 @@ import android.content.Intent
 import android.net.VpnService
 import androidx.core.content.ContextCompat
 import io.partout.abi.TaggedProfile
+import io.partout.abi.TunnelSnapshot
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.serialization.json.Json
 
 class PartoutTunnel(
     context: Context,
     private val vpnServiceClass: Class<out VpnService>,
-    private val requestVpnPermission: (Intent) -> Unit
+    private val channel: PartoutVpnServiceRuntime.Channel,
+    private val requestVpnPermission: (Intent) -> Unit,
+    private val coroutineScope: CoroutineScope
 ) {
     private val appContext = context.applicationContext
     private var pendingPermission: PendingPermission? = null
+    private val scope = CoroutineScope(
+        coroutineScope.coroutineContext + SupervisorJob(coroutineScope.coroutineContext[Job])
+    )
+
+    init {
+        channel
+            .activeSnapshot
+            .onEach(::onSnapshot)
+            .launchIn(scope)
+    }
 
     // JNI
     fun connect(profileJSON: String, ctx: Long, completion: Long) {
@@ -36,6 +54,16 @@ class PartoutTunnel(
 
     // JNI
     private external fun callback(ctx: Long, completion: Long, errorCode: Int)
+
+    fun onSnapshot(snapshot: TunnelSnapshot?) {
+        val snapshots: Map<String, TunnelSnapshot> = if (snapshot == null || !snapshot.isEnabled) {
+            emptyMap()
+        } else {
+            mapOf(Pair(snapshot.id, snapshot))
+        }
+        // FIXME: Send back to NativeTunnel via JNI
+//        abi.submitSnapshots(snapshots)
+    }
 
     fun onVpnPermissionResult(granted: Boolean) {
         val permission = pendingPermission ?: return
