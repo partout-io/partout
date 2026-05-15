@@ -4,7 +4,7 @@
 
 @preconcurrency import Network
 
-/// A ``BetterPathBlock`` implementation backed by `NWPathMonitor`.
+/// A better path block implementation backed by `NWPathMonitor`.
 public struct NEBetterPathBlock: Sendable {
     private let ctx: PartoutLoggerContext
 
