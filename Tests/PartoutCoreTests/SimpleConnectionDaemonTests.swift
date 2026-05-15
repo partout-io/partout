@@ -139,6 +139,7 @@ struct SimpleConnectionDaemonTests {
         #expect(await stream.nextElement() == .connected)
         reachability.isReachable = false
         await sut.stop()
+        #expect(await stream.nextElement() == .disconnecting)
         #expect(await stream.nextElement() == .disconnected)
     }
 
@@ -166,6 +167,7 @@ struct SimpleConnectionDaemonTests {
         #expect(await stream.nextElement() == .connected)
         reachability.isReachable = false
         await sut.stop()
+        #expect(await stream.nextElement() == .disconnecting)
         #expect(await stream.nextElement() == .disconnected)
     }
 }
@@ -293,6 +295,7 @@ private final class MockConnection: Connection {
             sleepTask?.cancel()
             return
         }
+        statusSubject.send(.disconnecting)
         if timeout > 0 {
             sleepTask?.cancel()
             if options.shouldTimeout {
