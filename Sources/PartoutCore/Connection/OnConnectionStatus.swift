@@ -4,7 +4,7 @@
 
 /// Event about the ``ConnectionStatus`` of a profile.
 public struct OnConnectionStatus: Codable, Sendable {
-    public let profileId: String
+    public let profileId: UniqueID
     public let status: ConnectionStatus
 }
 

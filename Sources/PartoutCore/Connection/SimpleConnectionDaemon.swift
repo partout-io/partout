@@ -403,10 +403,7 @@ extension SimpleConnectionDaemon {
 
     func reportStatus(_ status: ConnectionStatus) {
         statusSubject.send(status)
-        onStatus?(OnConnectionStatus(
-            profileId: profile.id.uuidString,
-            status: status
-        ))
+        onStatus?(OnConnectionStatus(profileId: profile.id, status: status))
     }
 }
 
