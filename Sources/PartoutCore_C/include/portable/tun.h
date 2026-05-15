@@ -36,6 +36,13 @@ void pp_tun_ctrl_clear_tunnel(void *_Nullable ref,
                               pp_tun _Nullable tun_impl);
 
 /* Tunnel strategy. */
+typedef void (*pp_tun_strg_snapshots_cb)(
+    void *_Nonnull ctx,
+    const char *_Nonnull snapshots_json
+);
+void pp_tun_strg_prepare(void *_Nullable ref,
+                         void *_Nonnull ctx,
+                         _Nonnull pp_tun_strg_snapshots_cb snapshots_cb);
 void pp_tun_strg_install(void *_Nullable ref,
                          const char *_Nonnull profile_json,
                          bool connect,

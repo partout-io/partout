@@ -53,6 +53,7 @@ class PartoutTunnel(
     }
 
     // JNI
+    private external fun submitSnapshots(snapshots: String)
     private external fun callback(ctx: Long, completion: Long, errorCode: Int)
 
     fun onSnapshot(snapshot: TunnelSnapshot?) {
@@ -61,8 +62,8 @@ class PartoutTunnel(
         } else {
             mapOf(Pair(snapshot.id, snapshot))
         }
-        // FIXME: Send back to NativeTunnel via JNI
-//        abi.submitSnapshots(snapshots)
+        val json = json.encodeToString(snapshots)
+        submitSnapshots(json)
     }
 
     fun onVpnPermissionResult(granted: Boolean) {

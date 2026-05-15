@@ -224,6 +224,18 @@ static const kotlin_sig sig_strg_disconnect = {
     "(JJ)V"
 };
 
+/* This is fine in Android because there is only one Tunnel instance. */
+static void *snapshots_ctx = NULL;
+static pp_tun_strg_snapshots_cb snapshots_cb = NULL;
+
+void pp_tun_strg_prepare(void *ref,
+                         void *ctx,
+                         pp_tun_strg_snapshots_cb cb) {
+    (void)ref;
+    snapshots_ctx = ctx;
+    snapshots_cb = cb;
+}
+
 void pp_tun_strg_install(void *jni_ref,
                          const char *profile_json,
                          bool connect,
@@ -339,6 +351,20 @@ void pp_tun_strg_disconnect(void *jni_ref,
 cleanup:
     if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
     JNI_DETACH(env);
+}
+
+JNIEXPORT void JNICALL
+Java_io_partout_jni_PartoutTunnel_submitSnapshots(JNIEnv *env,
+                                                  jobject thiz,
+                                                  jstring snapshots) {
+    (void)thiz;
+    if (!snapshots) return;
+    if (!snapshots_cb) return;
+
+    const char *c_snapshots = (*env)->GetStringUTFChars(env, snapshots, NULL);
+    if (!c_snapshots) return;
+    snapshots_cb(snapshots_ctx, c_snapshots);
+    (*env)->ReleaseStringUTFChars(env, snapshots, c_snapshots);
 }
 
 JNIEXPORT void JNICALL
