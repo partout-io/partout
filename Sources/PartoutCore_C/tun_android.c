@@ -77,7 +77,7 @@ typedef struct {
         if (env_name##_did_attach) (*jvm)->DetachCurrentThread(jvm); \
     } while (0)
 
-/* Tunnel controller (AndroidTunnelController) */
+/* Tunnel controller (PartoutVpnServiceRuntime) */
 
 static const kotlin_sig sig_ctrl_testWorking = {
     "testWorking",
@@ -342,7 +342,7 @@ cleanup:
 }
 
 JNIEXPORT void JNICALL
-Java_io_partout_jni_AndroidTunnel_callback(JNIEnv *env,
+Java_io_partout_jni_PartoutTunnel_callback(JNIEnv *env,
                                            jobject thiz,
                                            jlong completion_ctx,
                                            jlong completion,
