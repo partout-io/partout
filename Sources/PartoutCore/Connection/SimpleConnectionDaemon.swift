@@ -30,7 +30,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private let reconnectionDelay: Int
 
-    private var onStatus: StatusCallback?
+    private var onStatus: OnConnectionStatusCallback?
 
     private var connection: Connection?
 
@@ -403,15 +403,16 @@ extension SimpleConnectionDaemon {
 
     func reportStatus(_ status: ConnectionStatus) {
         statusSubject.send(status)
-        onStatus?(profile.id, status)
+        onStatus?(OnConnectionStatus(
+            profileId: profile.id.uuidString,
+            status: status
+        ))
     }
 }
 
 // MARK: - Parameters
 
 extension SimpleConnectionDaemon {
-    public typealias StatusCallback = @Sendable (Profile.ID, ConnectionStatus) -> Void
-
     public final class Parameters: Sendable {
         let connectionFactory: ConnectionFactory
 
@@ -425,7 +426,7 @@ extension SimpleConnectionDaemon {
 
         let reconnectionDelay: Int
 
-        let onStatus: StatusCallback?
+        let onStatus: OnConnectionStatusCallback?
 
         public init(
             connectionFactory: ConnectionFactory,
@@ -434,7 +435,7 @@ extension SimpleConnectionDaemon {
             startsImmediately: Bool,
             stopDelay: Int? = nil,
             reconnectionDelay: Int? = nil,
-            onStatus: StatusCallback? = nil
+            onStatus: OnConnectionStatusCallback? = nil
         ) {
             self.connectionFactory = connectionFactory
             self.connectionParameters = connectionParameters

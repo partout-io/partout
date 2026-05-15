@@ -20,6 +20,8 @@ Given the main app and the daemon:
 - ``DummyReachabilityObserver``
 - ``MessageHandler``
 - ``NetworkObserver``
+- ``OnConnectionStatus``
+- ``OnConnectionStatusCallback``
 - ``ReachabilityObserver``
 - ``SimpleConnectionDaemon``
 

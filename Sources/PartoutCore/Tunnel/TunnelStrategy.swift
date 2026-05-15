@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 /// Returns a tunnel-specific snapshot of a ``Profile``.
-public struct TunnelSnapshot: Hashable, Sendable, CustomStringConvertible {
-    public let id: Profile.ID
+public struct TunnelSnapshot: Hashable, Codable, Sendable, CustomStringConvertible {
+    public let id: UniqueID
 
     public let isEnabled: Bool
 

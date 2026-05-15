@@ -5,6 +5,7 @@ paths:
   - PartoutCore/IP
   - PartoutCore/Modules
   - PartoutCore/Profile
+  - PartoutCore/Tunnel
   - PartoutOpenVPN
   - PartoutWireGuard
 entities:
@@ -23,6 +24,7 @@ entities:
   - IPSettings
   - IPSocketType
   - ModuleType
+  - OnConnectionStatus
   - OnDemandModule
   - OnDemandModule.OtherNetwork
   - OnDemandModule.Policy
@@ -49,6 +51,8 @@ entities:
   - TaggedModule
   - TaggedProfile
   - TunnelRemoteInfoWrapper
+  - TunnelSnapshot
+  - TunnelStatus
   - WireGuard.Configuration
   - WireGuard.Key
   - WireGuard.LocalInterface
