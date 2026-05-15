@@ -359,7 +359,10 @@ Java_io_partout_jni_PartoutTunnel_submitSnapshots(JNIEnv *env,
                                                   jstring snapshots) {
     (void)thiz;
     if (!snapshots) return;
-    if (!snapshots_cb) return;
+    if (!snapshots_cb) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: NULL snapshots callback, strg_prepare() not called?");
+        return;
+    }
 
     const char *c_snapshots = (*env)->GetStringUTFChars(env, snapshots, NULL);
     if (!c_snapshots) return;
