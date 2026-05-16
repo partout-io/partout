@@ -446,6 +446,7 @@ extension SimpleConnectionDaemon {
             onDemand: false,
             environment: env
         )
+        controller.reportSnapshots([snapshot])
         onSnapshot?(snapshot)
     }
 }
