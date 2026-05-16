@@ -123,6 +123,17 @@ components:
         - cleartext
         - https
         - tls
+    DataCount:
+      additionalProperties: false
+      properties:
+        received:
+          "$ref": "#/components/schemas/UInt"
+        sent:
+          "$ref": "#/components/schemas/UInt"
+      required:
+        - received
+        - sent
+      type: object
     Endpoint:
       type: string
     EndpointProtocol:
@@ -592,6 +603,8 @@ components:
       required:
         - id
       type: object
+    PartoutError.Code:
+      type: string
     ProfileBehavior:
       additionalProperties: false
       properties:
@@ -789,6 +802,8 @@ components:
     TunnelSnapshot:
       additionalProperties: false
       properties:
+        environment:
+          "$ref": "#/components/schemas/TunnelSnapshot.Environment"
         id:
           "$ref": "#/components/schemas/UniqueID"
         isEnabled:
@@ -803,6 +818,19 @@ components:
         - status
         - onDemand
       type: object
+    TunnelSnapshot.Environment:
+      additionalProperties: false
+      properties:
+        connectionStatus:
+          "$ref": "#/components/schemas/ConnectionStatus"
+        dataCount:
+          "$ref": "#/components/schemas/DataCount"
+        lastErrorCode:
+          "$ref": "#/components/schemas/PartoutError.Code"
+      required:
+        - connectionStatus
+        - dataCount
+      type: object
     TunnelStatus:
       enum:
         - inactive
@@ -815,6 +843,8 @@ components:
         - activating
         - active
         - deactivating
+    UInt:
+      type: integer
     UInt16:
       type: integer
     UInt32:

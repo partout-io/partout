@@ -8,6 +8,10 @@ public actor Tunnel: TunnelProtocol {
 
     private let strategy: TunnelObservableStrategy
 
+    private let updateInterval: TimeInterval
+
+    private var strategySnapshots: [Profile.ID: TunnelSnapshot]
+
     private let snapshotsSubject: CurrentValueStream<[Profile.ID: TunnelSnapshot]>
 
     private let environmentFactory: (Profile.ID) -> TunnelEnvironmentReader
@@ -16,18 +20,22 @@ public actor Tunnel: TunnelProtocol {
 
     private var pendingInstall: Task<Void, Error>?
 
-    private var strategySubscription: Task<Void, Never>?
+    private var subscriptions: [Task<Void, Never>]
 
     public init(
         _ ctx: PartoutLoggerContext,
         strategy: TunnelObservableStrategy,
+        updateInterval: TimeInterval = 1.0,
         environmentFactory: @escaping (Profile.ID) -> TunnelEnvironmentReader
     ) {
         self.ctx = ctx
         self.strategy = strategy
+        self.updateInterval = updateInterval
         self.environmentFactory = environmentFactory
+        strategySnapshots = [:]
         snapshotsSubject = CurrentValueStream([:])
         environments = [:]
+        subscriptions = []
 #if swift(<6.0)
         observeObjects()
 #endif
@@ -146,28 +154,43 @@ private extension Tunnel {
     func observeObjects() {
 #if swift(>=6.0)
         // Subscribe once
-        guard strategySubscription == nil else { return }
+        guard subscriptions.isEmpty else { return }
 #endif
-        strategySubscription?.cancel()
-        strategySubscription = Task { [weak self] in
+        let strategySubscription = Task { [weak self] in
+            guard let ctx = self?.ctx else { return }
             guard let stream = self?.strategy.didUpdateActiveProfiles else { return }
             for await snapshots in stream {
-                guard let self else { return }
-                guard !Task.isCancelled else {
-                    pp_log(ctx, .core, .debug, "Cancelled Tunnel.strategy.didUpdateActiveProfiles (observed)")
-                    return
-                }
-                await handleNewSnapshots(snapshots)
+                guard let self else { break }
+                guard !Task.isCancelled else { break }
+                await handleStrategySnapshots(snapshots)
             }
+            pp_log(ctx, .core, .debug, "Cancelled Tunnel.strategy.didUpdateActiveProfiles (observed)")
         }
+        let timerSubscription = Task { [weak self] in
+            guard let ctx = self?.ctx else { return }
+            while true {
+                guard let self else { break }
+                guard !Task.isCancelled else { break }
+                await refreshSnapshotEnvironments()
+                try? await Task.sleep(interval: updateInterval)
+            }
+            pp_log(ctx, .core, .debug, "Cancelled Tunnel.timerSubscription")
+        }
+        subscriptions = [strategySubscription, timerSubscription]
     }
 
-    func handleNewSnapshots(_ snapshots: [Profile.ID: TunnelSnapshot]) {
-        guard snapshots != self.snapshots else {
-            return
-        }
-        pp_log(ctx, .core, .info, "Snapshots: \(snapshots.values.description)")
-        let activeIds = snapshots.keys
+    func handleStrategySnapshots(_ snapshots: [Profile.ID: TunnelSnapshot]) {
+        strategySnapshots = snapshots
+        publishSnapshots()
+    }
+
+    func refreshSnapshotEnvironments() {
+        publishSnapshots()
+    }
+
+    func publishSnapshots() {
+        pp_log(ctx, .core, .info, "Snapshots: \(strategySnapshots.values.description)")
+        let activeIds = strategySnapshots.keys
         // Create new environments if needed
         for profileId in activeIds {
             if environments[profileId] == nil {
@@ -179,6 +202,11 @@ private extension Tunnel {
             activeIds.contains($0.key)
         }
         // Notify .snapshotsStream observers now
-        self.snapshots = snapshots
+        let enriched = strategySnapshots.mapValues {
+            guard let env = environments[$0.id] else { return $0 }
+            return $0.with(environment: env.snapshot)
+        }
+        guard enriched != snapshots else { return }
+        snapshots = enriched
     }
 }

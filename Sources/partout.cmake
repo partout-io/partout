@@ -165,6 +165,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Tunnel/MessageHandler.swift
 ./PartoutCore/Tunnel/Tunnel.swift
 ./PartoutCore/Tunnel/TunnelProtocol.swift
+./PartoutCore/Tunnel/TunnelSnapshot.swift
 ./PartoutCore/Tunnel/TunnelStatus.swift
 ./PartoutCore/Tunnel/TunnelStrategy.swift
 ./PartoutOS/Apple/AppleJavaScriptEngine.swift
