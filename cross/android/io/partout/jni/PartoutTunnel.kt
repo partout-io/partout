@@ -4,37 +4,41 @@
 
 package io.partout.jni
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.VpnService
 import androidx.core.content.ContextCompat
 import io.partout.abi.TaggedProfile
-import io.partout.abi.TunnelSnapshot
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import java.io.Closeable
 import kotlinx.serialization.json.Json
 
 class PartoutTunnel(
     context: Context,
     private val vpnServiceClass: Class<out VpnService>,
-    private val channel: PartoutVpnServiceRuntime.Channel,
     private val requestVpnPermission: (Intent) -> Unit,
-    private val coroutineScope: CoroutineScope
-) {
+) : Closeable {
     private val appContext = context.applicationContext
     private var pendingPermission: PendingPermission? = null
-    private val scope = CoroutineScope(
-        coroutineScope.coroutineContext + SupervisorJob(coroutineScope.coroutineContext[Job])
-    )
+    private val snapshotsReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != PartoutVpnServiceRuntime.ACTION_SNAPSHOTS) {
+                return
+            }
+            intent.getStringExtra(PartoutVpnServiceRuntime.EXTRA_SNAPSHOTS_JSON)?.let {
+                submitSnapshots(it)
+            }
+        }
+    }
 
     init {
-        channel
-            .activeSnapshot
-            .onEach(::onSnapshot)
-            .launchIn(scope)
+        ContextCompat.registerReceiver(
+            appContext,
+            snapshotsReceiver,
+            IntentFilter(PartoutVpnServiceRuntime.ACTION_SNAPSHOTS),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
     // Swift -> JNI
@@ -55,16 +59,6 @@ class PartoutTunnel(
     // JNI -> Swift
     private external fun submitSnapshots(snapshots: String)
     private external fun callback(ctx: Long, completion: Long, errorCode: Int)
-
-    fun onSnapshot(snapshot: TunnelSnapshot?) {
-        val snapshots: Map<String, TunnelSnapshot> = if (snapshot == null || !snapshot.isEnabled) {
-            emptyMap()
-        } else {
-            mapOf(Pair(snapshot.id, snapshot))
-        }
-        val json = json.encodeToString(snapshots)
-        submitSnapshots(json)
-    }
 
     fun onVpnPermissionResult(granted: Boolean) {
         val permission = pendingPermission ?: return
@@ -111,6 +105,10 @@ class PartoutTunnel(
             }
         }
         ContextCompat.startForegroundService(appContext, stopIntent)
+    }
+
+    override fun close() {
+        appContext.unregisterReceiver(snapshotsReceiver)
     }
 
     companion object {
