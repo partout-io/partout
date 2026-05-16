@@ -4,6 +4,9 @@ opt_configuration=Debug
 build_dir=.cmake
 bin_dir=bin
 
+root_dir="$(dirname "$0")"/..
+pushd $root_dir
+
 positional_args=()
 cmake_opts=()
 while [[ $# -gt 0 ]]; do
@@ -102,11 +105,17 @@ popd
 
 # Generate foreign models
 if [[ $gen_models == 1 ]]; then
+    openapi=scripts/openapi.yaml
+    package=io.partout.abi
+    models=cross
+    tmpmodels=cross-models
     # Kotlin
-    scripts/gen-models.sh kotlin cross-models
-    rm -rf cross/android/io/partout/abi
-    mv cross-models/src/main/kotlin/io/partout/abi cross/android/io/partout
+    scripts/gen-models.sh $openapi kotlin $tmpmodels $package
+    rm -rf $models/android/io/partout/abi
+    mv $tmpmodels/src/main/kotlin/io/partout/abi $models/android/io/partout
     # C++ (TODO)
     ######
     rm -rf cross-models
 fi
+
+popd root_dir
