@@ -4,7 +4,6 @@
 
 package io.partout.jni
 
-import android.net.IpPrefix
 import android.net.VpnService
 import android.os.Build
 import android.util.Log
@@ -14,29 +13,27 @@ import io.partout.abi.Route
 import java.net.Inet6Address
 import java.net.InetAddress
 
-private const val logTag = "Partout"
-
-internal fun IPModule.apply(builder: VpnService.Builder): Boolean {
-    var addedAddress = false
-
-    ipv4?.let {
-        addedAddress = it.apply(builder, isIPv6 = false) || addedAddress
+class IPModuleApplying(
+    private val module: IPModule
+): VpnServiceApplying {
+    override fun apply(logTag: String, builder: VpnService.Builder): Boolean {
+        var addedAddress = false
+        module.ipv4?.let {
+            addedAddress = it.apply(logTag, builder, isIPv6 = false) || addedAddress
+        }
+        module.ipv6?.let {
+            addedAddress = it.apply(logTag, builder, isIPv6 = true) || addedAddress
+        }
+        module.mtu?.takeIf { it > 0 }?.let {
+            Log.i(logTag, "IP: MTU = $it")
+            builder.setMtu(it)
+        }
+        return addedAddress
     }
-    ipv6?.let {
-        addedAddress = it.apply(builder, isIPv6 = true) || addedAddress
-    }
-
-    mtu?.takeIf { it > 0 }?.let {
-        Log.i(logTag, "IP: MTU = $it")
-        builder.setMtu(it)
-    }
-
-    return addedAddress
 }
 
-private fun IPSettings.apply(builder: VpnService.Builder, isIPv6: Boolean): Boolean {
+private fun IPSettings.apply(logTag: String, builder: VpnService.Builder, isIPv6: Boolean): Boolean {
     var addedAddress = false
-
     subnets.forEach { rawSubnet ->
         val subnet = subnetFrom(rawSubnet, isIPv6 = isIPv6, isInterfaceAddress = true)
         if (subnet == null) {
@@ -52,19 +49,16 @@ private fun IPSettings.apply(builder: VpnService.Builder, isIPv6: Boolean): Bool
             Log.w(logTag, "IP: Unable to add address '$rawSubnet'", it)
         }
     }
-
     includedRoutes.forEach { route ->
-        route.apply(builder, isExcluded = false, isIPv6 = isIPv6)
+        route.apply(logTag, builder, isExcluded = false, isIPv6 = isIPv6)
     }
-
     excludedRoutes.forEach { route ->
-        route.apply(builder, isExcluded = true, isIPv6 = isIPv6)
+        route.apply(logTag, builder, isExcluded = true, isIPv6 = isIPv6)
     }
-
     return addedAddress
 }
 
-private fun Route.apply(builder: VpnService.Builder, isExcluded: Boolean, isIPv6: Boolean) {
+private fun Route.apply(logTag: String, builder: VpnService.Builder, isExcluded: Boolean, isIPv6: Boolean) {
     val prefix = destinationPrefix(isIPv6) ?: run {
         Log.w(logTag, "IP: Ignoring invalid ${if (isExcluded) "excluded" else "included"} route '$this'")
         return
@@ -77,9 +71,9 @@ private fun Route.apply(builder: VpnService.Builder, isExcluded: Boolean, isIPv6
     when {
         isExcluded && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
             Log.i(logTag, "IP: Exclude route ${prefix.address.hostAddress}/${prefix.prefixLength}")
-            prefix.toIpPrefix()?.let {
-                builder.excludeRoute(it)
-            } ?: Log.w(logTag, "IP: Unable to build route exclusion for '$this'")
+            builder.tryExcludeRoute(prefix.address, prefix.prefixLength)?.let {
+                Log.w(logTag, "IP: Unable to exclude route '$this'", it)
+            }
         }
         isExcluded -> {
             Log.i(logTag, "IP: Cannot exclude route before API 33: ${prefix.address.hostAddress}/${prefix.prefixLength}")
@@ -100,21 +94,21 @@ private data class IpNumericSubnet(
     val prefixLength: Int
 )
 
-private data class IpPrefixRoute(
+private data class RoutePrefix(
     val address: InetAddress,
     val prefixLength: Int
 )
 
-private fun Route.destinationPrefix(isIPv6: Boolean): IpPrefixRoute? {
+private fun Route.destinationPrefix(isIPv6: Boolean): RoutePrefix? {
     val raw = destination?.trim()
     if (raw.isNullOrEmpty()) {
         val address = parseNumericAddress(if (isIPv6) "::" else "0.0.0.0") ?: return null
-        return IpPrefixRoute(
+        return RoutePrefix(
             address = address,
             prefixLength = 0
         )
     }
-    return subnetFrom(raw, isIPv6 = isIPv6)?.let { IpPrefixRoute(it.address, it.prefixLength) }
+    return subnetFrom(raw, isIPv6 = isIPv6)?.let { RoutePrefix(it.address, it.prefixLength) }
 }
 
 private fun subnetFrom(
@@ -175,10 +169,4 @@ private fun String.isDottedDecimal(): Boolean {
     return octets.size == 4 && octets.all { octet ->
         octet.isNotEmpty() && octet.all(Char::isDigit) && octet.toIntOrNull() in 0..255
     }
-}
-
-private fun IpPrefixRoute.toIpPrefix(): IpPrefix? {
-    return runCatching {
-        IpPrefix(address, prefixLength)
-    }.getOrNull()
 }

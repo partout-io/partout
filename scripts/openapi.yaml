@@ -209,6 +209,17 @@ components:
       type: integer
     ModuleType:
       type: string
+    OnConnectionStatus:
+      additionalProperties: false
+      properties:
+        profileId:
+          "$ref": "#/components/schemas/UniqueID"
+        status:
+          "$ref": "#/components/schemas/ConnectionStatus"
+      required:
+        - profileId
+        - status
+      type: object
     OnDemandModule:
       additionalProperties: false
       properties:
@@ -773,6 +784,35 @@ components:
         - fileDescriptors
         - requiresVirtualDevice
       type: object
+    TunnelSnapshot:
+      additionalProperties: false
+      properties:
+        id:
+          "$ref": "#/components/schemas/UniqueID"
+        isEnabled:
+          type: boolean
+        onDemand:
+          type: boolean
+        status:
+          "$ref": "#/components/schemas/TunnelStatus"
+      required:
+        - id
+        - isEnabled
+        - status
+        - onDemand
+      type: object
+    TunnelStatus:
+      enum:
+        - inactive
+        - activating
+        - active
+        - deactivating
+      type: string
+      x-enum-varnames:
+        - inactive
+        - activating
+        - active
+        - deactivating
     UInt16:
       type: integer
     UInt32:

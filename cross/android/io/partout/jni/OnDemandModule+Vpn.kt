@@ -8,9 +8,16 @@ import android.net.VpnService
 import android.util.Log
 import io.partout.abi.OnDemandModule
 
-private const val logTag = "Partout"
+class OnDemandModuleApplying(
+    private val module: OnDemandModule
+): VpnServiceApplying {
 
-@Suppress("UNUSED_PARAMETER")
-internal fun OnDemandModule.apply(builder: VpnService.Builder) {
-    Log.i(logTag, "OnDemand: Android VpnService.Builder does not expose on-demand rules, skipping")
+    @Suppress("UNUSED_PARAMETER")
+    override fun apply(logTag: String, builder: VpnService.Builder): Boolean {
+        Log.i(
+            logTag,
+            "OnDemand: Android VpnService.Builder does not expose on-demand rules, skipping"
+        )
+        return false
+    }
 }

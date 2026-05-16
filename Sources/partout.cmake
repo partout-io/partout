@@ -65,6 +65,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/LinkObserver.swift
 ./PartoutCore/Connection/NetworkInterfaceFactory.swift
 ./PartoutCore/Connection/NetworkObserver.swift
+./PartoutCore/Connection/OnConnectionStatus.swift
 ./PartoutCore/Connection/POSIXDNSStrategy.swift
 ./PartoutCore/Connection/ReachabilityObserver.swift
 ./PartoutCore/Connection/SharedTunnelEnvironment.swift

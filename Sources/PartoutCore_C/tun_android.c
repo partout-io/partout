@@ -77,7 +77,7 @@ typedef struct {
         if (env_name##_did_attach) (*jvm)->DetachCurrentThread(jvm); \
     } while (0)
 
-/* Tunnel controller (AndroidTunnelController) */
+/* Tunnel controller (PartoutVpnServiceRuntime) */
 
 static const kotlin_sig sig_ctrl_testWorking = {
     "testWorking",
@@ -224,6 +224,18 @@ static const kotlin_sig sig_strg_disconnect = {
     "(JJ)V"
 };
 
+/* This is fine in Android because there is only one Tunnel instance. */
+static void *snapshots_ctx = NULL;
+static pp_tun_strg_snapshots_cb snapshots_cb = NULL;
+
+void pp_tun_strg_prepare(void *ref,
+                         void *ctx,
+                         pp_tun_strg_snapshots_cb cb) {
+    (void)ref;
+    snapshots_ctx = ctx;
+    snapshots_cb = cb;
+}
+
 void pp_tun_strg_install(void *jni_ref,
                          const char *profile_json,
                          bool connect,
@@ -342,7 +354,24 @@ cleanup:
 }
 
 JNIEXPORT void JNICALL
-Java_io_partout_jni_AndroidTunnel_callback(JNIEnv *env,
+Java_io_partout_jni_PartoutTunnel_submitSnapshots(JNIEnv *env,
+                                                  jobject thiz,
+                                                  jstring snapshots) {
+    (void)thiz;
+    if (!snapshots) return;
+    if (!snapshots_cb) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: NULL snapshots callback, strg_prepare() not called?");
+        return;
+    }
+
+    const char *c_snapshots = (*env)->GetStringUTFChars(env, snapshots, NULL);
+    if (!c_snapshots) return;
+    snapshots_cb(snapshots_ctx, c_snapshots);
+    (*env)->ReleaseStringUTFChars(env, snapshots, c_snapshots);
+}
+
+JNIEXPORT void JNICALL
+Java_io_partout_jni_PartoutTunnel_callback(JNIEnv *env,
                                            jobject thiz,
                                            jlong completion_ctx,
                                            jlong completion,
