@@ -5,7 +5,6 @@
 package io.partout.jni
 
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
@@ -33,7 +32,6 @@ import kotlinx.serialization.json.Json
 class PartoutVpnServiceRuntime(
     private val logTag: String,
     private val service: VpnService,
-    private val channel: Channel,
     private val engine: Engine,
     private val stopService: () -> Unit,
 ) {
@@ -42,6 +40,10 @@ class PartoutVpnServiceRuntime(
     private var descriptor: ParcelFileDescriptor? = null
     private var isRunning = false
     private var profileId: String? = null
+    @Volatile
+    private var enabledProfileId: String? = null
+
+    // Service lifecycle
 
     @Suppress("UNUSED_PARAMETER")
     fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -75,6 +77,8 @@ class PartoutVpnServiceRuntime(
         disconnect()
     }
 
+    // Actions
+
     private fun connect(profileJSON: String) = launchCommand {
         stopTunnel()
 
@@ -82,7 +86,7 @@ class PartoutVpnServiceRuntime(
             json.decodeFromString<TaggedProfile>(profileJSON).id
         }.getOrNull()
         isRunning = true
-        channel.setEnabledProfile(profileId)
+        setEnabledProfile(profileId)
 
         Log.i(logTag, "Starting VPN daemon")
 
@@ -91,7 +95,7 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to start VPN daemon (code=${result.code}): ${result.payload}")
             stopService()
             isRunning = false
-            channel.setEnabledProfile(null)
+            setEnabledProfile(null)
             profileId = null
             return@launchCommand
         }
@@ -114,7 +118,7 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to stop VPN daemon (code=${result.code}): ${result.payload}")
         }
         isRunning = false
-        channel.setEnabledProfile(null)
+        setEnabledProfile(null)
         profileId = null
     }
 
@@ -223,59 +227,54 @@ class PartoutVpnServiceRuntime(
     fun onStatus(statusJSON: String) {
         val status = json.decodeFromString<OnConnectionStatus>(statusJSON)
         Log.i(logTag, "VPN status: $status")
-        channel.updateStatus(status)
+        sendSnapshot(TunnelSnapshot(
+            id = status.profileId,
+            isEnabled = enabledProfileId == status.profileId,
+            onDemand = false,
+            status = status.status.toTunnelStatus()
+        ))
     }
 
-    interface Engine {
-        suspend fun start(runtime: PartoutVpnServiceRuntime, profileJSON: String): Result
+    // Broadcasts emitters
 
-        suspend fun stop(): Result
+    private fun setEnabledProfile(profileId: String?) {
+        enabledProfileId = profileId
+        if (profileId == null) {
+            sendSnapshot(null)
+        }
     }
+
+    private fun sendSnapshot(snapshot: TunnelSnapshot?) {
+        val snapshots = if (snapshot == null || !snapshot.isEnabled) {
+            emptyMap()
+        } else {
+            mapOf(snapshot.id to snapshot)
+        }
+        val intent = Intent(ACTION_SNAPSHOTS).apply {
+            setPackage(service.packageName)
+            putExtra(EXTRA_SNAPSHOTS_JSON, json.encodeToString(snapshots))
+        }
+        service.sendBroadcast(intent)
+    }
+
+    private fun ConnectionStatus.toTunnelStatus(): TunnelStatus = when (this) {
+        ConnectionStatus.disconnected -> TunnelStatus.inactive
+        ConnectionStatus.connecting -> TunnelStatus.activating
+        ConnectionStatus.connected -> TunnelStatus.active
+        ConnectionStatus.disconnecting -> TunnelStatus.deactivating
+    }
+
+    // Nested classes
 
     data class Result(
         val code: Int,
         val payload: String?
     )
 
-    class Channel(private val context: Context) {
-        @Volatile
-        private var enabledProfileId: String? = null
+    interface Engine {
+        suspend fun start(runtime: PartoutVpnServiceRuntime, profileJSON: String): Result
 
-        internal fun setEnabledProfile(profileId: String?) {
-            enabledProfileId = profileId
-            if (profileId == null) {
-                sendSnapshot(null)
-            }
-        }
-
-        internal fun updateStatus(event: OnConnectionStatus) {
-            sendSnapshot(TunnelSnapshot(
-                id = event.profileId,
-                isEnabled = enabledProfileId == event.profileId,
-                onDemand = false,
-                status = event.status.toTunnelStatus()
-            ))
-        }
-
-        private fun sendSnapshot(snapshot: TunnelSnapshot?) {
-            val snapshots = if (snapshot == null || !snapshot.isEnabled) {
-                emptyMap()
-            } else {
-                mapOf(snapshot.id to snapshot)
-            }
-            val intent = Intent(ACTION_SNAPSHOTS).apply {
-                setPackage(context.packageName)
-                putExtra(EXTRA_SNAPSHOTS_JSON, json.encodeToString(snapshots))
-            }
-            context.sendBroadcast(intent)
-        }
-
-        private fun ConnectionStatus.toTunnelStatus(): TunnelStatus = when (this) {
-            ConnectionStatus.disconnected -> TunnelStatus.inactive
-            ConnectionStatus.connecting -> TunnelStatus.activating
-            ConnectionStatus.connected -> TunnelStatus.active
-            ConnectionStatus.disconnecting -> TunnelStatus.deactivating
-        }
+        suspend fun stop(): Result
     }
 
     companion object {
