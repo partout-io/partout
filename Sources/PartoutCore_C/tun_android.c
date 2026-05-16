@@ -205,6 +205,13 @@ cleanup:
     JNI_DETACH(env);
 }
 
+void pp_tun_ctrl_report_snapshots(void *_Nullable ref,
+                                  const char *_Nonnull snapshots_json) {
+    (void)ref;
+    (void)snapshots_json;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_android: ctrl_report_snapshots(%p)", ref);
+}
+
 void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
     (void)jni_ref;
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_clear_tunnel(%p)", jni_ref);

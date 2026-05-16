@@ -63,6 +63,18 @@ public final class NativeTunnelController: TunnelController {
         }
     }
 
+    public func reportSnapshots(_ snapshots: [TunnelSnapshot]) {
+        pp_log(ctx, .core, .debug, "Report tunnel snapshots: \(snapshots)")
+        do {
+            let json = try JSONEncoder.shared().encodeJSON(snapshots)
+            json.withCString {
+                pp_tun_ctrl_report_snapshots(ref, $0)
+            }
+        } catch {
+            pp_log(ctx, .core, .error, "Unable to encode snapshots: \(error)")
+        }
+    }
+
     public func clearTunnelSettings(_ io: IOInterface, withKillSwitch: Bool) async {
         guard let tunnel = io as? VirtualTunnelInterface else {
             assertionFailure("Expected type is VirtualTunnelInterface")

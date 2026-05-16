@@ -169,6 +169,12 @@ void pp_tun_ctrl_configure_sockets(void *ref, const int *fds, const size_t fds_l
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_darwin: ctrl_configure_sockets(%p)", ref);
 }
 
+void pp_tun_ctrl_report_snapshots(void *ref, const char *snapshots_json) {
+    (void)ref;
+    (void)snapshots_json;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_darwin: ctrl_report_snapshots(%p)", ref);
+}
+
 void pp_tun_ctrl_clear_tunnel(void *ref, pp_tun tun_impl) {
     (void)ref;
     (void)tun_impl;
