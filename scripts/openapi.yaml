@@ -123,6 +123,17 @@ components:
         - cleartext
         - https
         - tls
+    DataCount:
+      additionalProperties: false
+      properties:
+        received:
+          "$ref": "#/components/schemas/UInt"
+        sent:
+          "$ref": "#/components/schemas/UInt"
+      required:
+        - received
+        - sent
+      type: object
     Endpoint:
       type: string
     EndpointProtocol:
@@ -592,6 +603,8 @@ components:
       required:
         - id
       type: object
+    PartoutError.Code:
+      type: string
     ProfileBehavior:
       additionalProperties: false
       properties:
@@ -811,9 +824,9 @@ components:
         connectionStatus:
           "$ref": "#/components/schemas/ConnectionStatus"
         dataCount:
-          title: DataCount
+          "$ref": "#/components/schemas/DataCount"
         lastErrorCode:
-          title: PartoutError.Code
+          "$ref": "#/components/schemas/PartoutError.Code"
       required:
         - connectionStatus
         - dataCount
