@@ -9,16 +9,12 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
-import io.partout.abi.ConnectionStatus
-import io.partout.abi.OnConnectionStatus
 import io.partout.abi.TaggedModuleDNS
 import io.partout.abi.TaggedModuleHTTPProxy
 import io.partout.abi.TaggedModuleIP
 import io.partout.abi.TaggedModuleOnDemand
-import io.partout.abi.TaggedProfile
 import io.partout.abi.TunnelRemoteInfoWrapper
 import io.partout.abi.TunnelSnapshot
-import io.partout.abi.TunnelStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,9 +35,6 @@ class PartoutVpnServiceRuntime(
     private val commandMutex = Mutex()
     private var descriptor: ParcelFileDescriptor? = null
     private var isRunning = false
-    private var profileId: String? = null
-    @Volatile
-    private var enabledProfileId: String? = null
 
     // Service lifecycle
 
@@ -82,12 +75,7 @@ class PartoutVpnServiceRuntime(
     private fun connect(profileJSON: String) = launchCommand {
         stopTunnel()
 
-        profileId = runCatching {
-            json.decodeFromString<TaggedProfile>(profileJSON).id
-        }.getOrNull()
         isRunning = true
-        setEnabledProfile(profileId)
-
         Log.i(logTag, "Starting VPN daemon")
 
         val result = engine.start(this, profileJSON)
@@ -95,8 +83,7 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to start VPN daemon (code=${result.code}): ${result.payload}")
             stopService()
             isRunning = false
-            setEnabledProfile(null)
-            profileId = null
+            sendSnapshots(emptyMap())
             return@launchCommand
         }
         Log.i(logTag, "Started VPN daemon")
@@ -118,8 +105,7 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to stop VPN daemon (code=${result.code}): ${result.payload}")
         }
         isRunning = false
-        setEnabledProfile(null)
-        profileId = null
+        sendSnapshots(emptyMap())
     }
 
     private fun launchCommand(action: suspend () -> Unit) {
@@ -224,44 +210,20 @@ class PartoutVpnServiceRuntime(
     }
 
     // JNI
-    fun onStatus(statusJSON: String) {
-        val status = json.decodeFromString<OnConnectionStatus>(statusJSON)
-        Log.i(logTag, "VPN status: $status")
-        sendSnapshot(TunnelSnapshot(
-            id = status.profileId,
-            isEnabled = enabledProfileId == status.profileId,
-            onDemand = false,
-            status = status.status.toTunnelStatus()
-        ))
+    fun onSnapshots(snapshotsJSON: String) {
+        val snapshots = json.decodeFromString<List<TunnelSnapshot>>(snapshotsJSON)
+        Log.d(logTag, "Report daemon snapshots: $snapshots")
+        sendSnapshots(snapshots.associateBy { it.id })
     }
 
     // Broadcasts emitters
 
-    private fun setEnabledProfile(profileId: String?) {
-        enabledProfileId = profileId
-        if (profileId == null) {
-            sendSnapshot(null)
-        }
-    }
-
-    private fun sendSnapshot(snapshot: TunnelSnapshot?) {
-        val snapshots = if (snapshot == null || !snapshot.isEnabled) {
-            emptyMap()
-        } else {
-            mapOf(snapshot.id to snapshot)
-        }
+    private fun sendSnapshots(snapshots: Map<String, TunnelSnapshot>) {
         val intent = Intent(ACTION_SNAPSHOTS).apply {
             setPackage(service.packageName)
             putExtra(EXTRA_SNAPSHOTS_JSON, json.encodeToString(snapshots))
         }
         service.sendBroadcast(intent)
-    }
-
-    private fun ConnectionStatus.toTunnelStatus(): TunnelStatus = when (this) {
-        ConnectionStatus.disconnected -> TunnelStatus.inactive
-        ConnectionStatus.connecting -> TunnelStatus.activating
-        ConnectionStatus.connected -> TunnelStatus.active
-        ConnectionStatus.disconnecting -> TunnelStatus.deactivating
     }
 
     // Nested classes

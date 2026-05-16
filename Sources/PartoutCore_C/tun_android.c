@@ -91,6 +91,10 @@ static const kotlin_sig sig_ctrl_configureSockets = {
     "configureSockets",
     "([I)V"
 };
+static const kotlin_sig sig_ctrl_onSnapshots = {
+    "onSnapshots",
+    "(Ljava/lang/String;)V"
+};
 
 void pp_tun_ctrl_test_working(void *jni_ref) {
     assert(jni_ref);
@@ -207,9 +211,42 @@ cleanup:
 
 void pp_tun_ctrl_report_snapshots(void *_Nullable ref,
                                   const char *_Nonnull snapshots_json) {
-    (void)ref;
-    (void)snapshots_json;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_android: ctrl_report_snapshots(%p)", ref);
+    assert(ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_report_snapshots(%p)", ref);
+
+    JNI_ATTACH_OR_RETURN_VOID(env);
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    jstring j_snapshots_json = NULL;
+
+    cls = (*env)->GetObjectClass(env, ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_report_snapshots(), NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_onSnapshots.name, sig_ctrl_onSnapshots.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_report_snapshots(), NULL method");
+        goto cleanup;
+    }
+    j_snapshots_json = (*env)->NewStringUTF(env, snapshots_json);
+    if (j_snapshots_json == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_report_snapshots(), NULL j_snapshots_json");
+        goto cleanup;
+    }
+    (*env)->CallVoidMethod(env, ref, method, j_snapshots_json);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_report_snapshots(), Kotlin exception");
+        goto cleanup;
+    }
+
+cleanup:
+    if (j_snapshots_json != NULL) (*env)->DeleteLocalRef(env, j_snapshots_json);
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
+    JNI_DETACH(env);
 }
 
 void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
