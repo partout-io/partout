@@ -222,17 +222,6 @@ components:
       type: integer
     ModuleType:
       type: string
-    OnConnectionStatus:
-      additionalProperties: false
-      properties:
-        profileId:
-          "$ref": "#/components/schemas/UniqueID"
-        status:
-          "$ref": "#/components/schemas/ConnectionStatus"
-      required:
-        - profileId
-        - status
-      type: object
     OnDemandModule:
       additionalProperties: false
       properties:
