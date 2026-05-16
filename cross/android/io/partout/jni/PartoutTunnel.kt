@@ -37,7 +37,7 @@ class PartoutTunnel(
             .launchIn(scope)
     }
 
-    // JNI
+    // Swift -> JNI
     fun connect(profileJSON: String, ctx: Long, completion: Long) {
         val profile = json.decodeFromString<TaggedProfile>(profileJSON)
         connect(profile) { code ->
@@ -45,14 +45,14 @@ class PartoutTunnel(
         }
     }
 
-    // JNI
+    // Swift -> JNI
     fun disconnect(ctx: Long, completion: Long) {
         disconnect { code ->
             callback(ctx, completion, code)
         }
     }
 
-    // JNI
+    // JNI -> Swift
     private external fun submitSnapshots(snapshots: String)
     private external fun callback(ctx: Long, completion: Long, errorCode: Int)
 
