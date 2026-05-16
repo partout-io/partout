@@ -4,7 +4,6 @@
 
 package io.partout.jni
 
-import android.net.IpPrefix
 import android.net.VpnService
 import android.os.Build
 import android.util.Log
@@ -72,9 +71,9 @@ private fun Route.apply(logTag: String, builder: VpnService.Builder, isExcluded:
     when {
         isExcluded && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
             Log.i(logTag, "IP: Exclude route ${prefix.address.hostAddress}/${prefix.prefixLength}")
-            prefix.toIpPrefix()?.let {
-                builder.excludeRoute(it)
-            } ?: Log.w(logTag, "IP: Unable to build route exclusion for '$this'")
+            builder.tryExcludeRoute(prefix.address, prefix.prefixLength)?.let {
+                Log.w(logTag, "IP: Unable to exclude route '$this'", it)
+            }
         }
         isExcluded -> {
             Log.i(logTag, "IP: Cannot exclude route before API 33: ${prefix.address.hostAddress}/${prefix.prefixLength}")
@@ -95,21 +94,21 @@ private data class IpNumericSubnet(
     val prefixLength: Int
 )
 
-private data class IpPrefixRoute(
+private data class RoutePrefix(
     val address: InetAddress,
     val prefixLength: Int
 )
 
-private fun Route.destinationPrefix(isIPv6: Boolean): IpPrefixRoute? {
+private fun Route.destinationPrefix(isIPv6: Boolean): RoutePrefix? {
     val raw = destination?.trim()
     if (raw.isNullOrEmpty()) {
         val address = parseNumericAddress(if (isIPv6) "::" else "0.0.0.0") ?: return null
-        return IpPrefixRoute(
+        return RoutePrefix(
             address = address,
             prefixLength = 0
         )
     }
-    return subnetFrom(raw, isIPv6 = isIPv6)?.let { IpPrefixRoute(it.address, it.prefixLength) }
+    return subnetFrom(raw, isIPv6 = isIPv6)?.let { RoutePrefix(it.address, it.prefixLength) }
 }
 
 private fun subnetFrom(
@@ -170,10 +169,4 @@ private fun String.isDottedDecimal(): Boolean {
     return octets.size == 4 && octets.all { octet ->
         octet.isNotEmpty() && octet.all(Char::isDigit) && octet.toIntOrNull() in 0..255
     }
-}
-
-private fun IpPrefixRoute.toIpPrefix(): IpPrefix? {
-    return runCatching {
-        IpPrefix(address, prefixLength)
-    }.getOrNull()
 }

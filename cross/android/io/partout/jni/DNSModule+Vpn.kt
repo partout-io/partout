@@ -4,14 +4,11 @@
 
 package io.partout.jni
 
-import android.net.IpPrefix
 import android.net.VpnService
 import android.util.Log
 import io.partout.abi.DNSModule
 import io.partout.abi.DNSModuleProtocolTypehttps
 import io.partout.abi.DNSModuleProtocolTypetls
-import io.partout.abi.Route
-import java.net.InetAddress
 
 class DNSModuleApplying(
     private val module: DNSModule
@@ -88,15 +85,6 @@ fun DNSModule.addServers(
                 Log.i(logTag, "DNS: Route server through VPN: ${route.address}/${route.prefixLength}")
                 builder.addRoute(route.address, route.prefixLength)
             }
-//            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
-//                Log.i(logTag, "DNS: Keep server outside VPN: ${route.address}/${route.prefixLength}")
-//                route.toIpPrefix()?.let {
-//                    builder.excludeRoute(it)
-//                } ?: Log.w(logTag, "DNS: Unable to build route exclusion for '$server'")
-//            }
-//            else -> {
-//                Log.i(logTag, "DNS: Cannot exclude DNS server route before API 33: ${route.address}/${route.prefixLength}")
-//            }
         }
     }
 }
@@ -134,16 +122,4 @@ private fun defaultPrefixLength(address: String): Int? {
 
 private fun isNumericAddress(address: String): Boolean {
     return address.contains(":") || address.matches(Regex("""\d{1,3}(\.\d{1,3}){3}"""))
-}
-
-private fun DnsNumericSubnet.toIpPrefix(): IpPrefix? {
-    return runCatching {
-        IpPrefix(InetAddress.getByName(address), prefixLength)
-    }.getOrNull()
-}
-
-private fun Route.toIpPrefix(): IpPrefix? {
-    val destination = destination ?: return null
-    val subnet = subnetFrom(destination) ?: return null
-    return subnet.toIpPrefix()
 }
