@@ -160,19 +160,21 @@ class PartoutVpnServiceRuntime(
             when (it) {
                 is TaggedModuleDNS -> {
                     Log.i(logTag, "DNS: ${it.value}")
-                    appliedDnsSettings = it.value.apply(builder) || appliedDnsSettings
+                    appliedDnsSettings = DNSModuleApplying(it.value).apply(logTag, builder)
+                            || appliedDnsSettings
                 }
                 is TaggedModuleIP -> {
                     Log.i(logTag, "IP: ${it.value}")
-                    appliedAddressSettings = it.value.apply(builder) || appliedAddressSettings
+                    appliedAddressSettings = IPModuleApplying(it.value).apply(logTag, builder)
+                            || appliedAddressSettings
                 }
                 is TaggedModuleHTTPProxy -> {
                     Log.i(logTag, "HTTP Proxy: ${it.value}")
-                    it.value.apply(builder)
+                    HTTPProxyModuleApplying(it.value).apply(logTag, builder)
                 }
                 is TaggedModuleOnDemand -> {
                     Log.i(logTag, "OnDemand: ${it.value}")
-                    it.value.apply(builder)
+                    OnDemandModuleApplying(it.value).apply(logTag, builder)
                 }
                 else -> {}
             }
