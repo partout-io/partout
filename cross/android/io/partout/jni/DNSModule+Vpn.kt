@@ -4,62 +4,69 @@
 
 package io.partout.jni
 
-import android.net.IpPrefix
 import android.net.VpnService
-import android.os.Build
 import android.util.Log
 import io.partout.abi.DNSModule
 import io.partout.abi.DNSModuleProtocolTypehttps
 import io.partout.abi.DNSModuleProtocolTypetls
-import io.partout.abi.Route
-import java.net.InetAddress
 
-private const val logTag = "Partout"
-
-internal fun DNSModule.apply(builder: VpnService.Builder): Boolean {
-    var applied = when (protocolType) {
-        is DNSModuleProtocolTypehttps, is DNSModuleProtocolTypetls -> true
-        else -> servers.isNotEmpty()
-    }
-
-    when (protocolType) {
-        is DNSModuleProtocolTypehttps -> {
-            Log.i(logTag, "DNS: DoH is not supported by VpnService.Builder, using numeric servers only")
-            addServers(builder, routed = routesThroughVPN == true)
+class DNSModuleApplying(
+    private val module: DNSModule
+): VpnServiceApplying {
+    override fun apply(logTag: String, builder: VpnService.Builder): Boolean {
+        var applied = when (module.protocolType) {
+            is DNSModuleProtocolTypehttps, is DNSModuleProtocolTypetls -> true
+            else -> module.servers.isNotEmpty()
         }
-        is DNSModuleProtocolTypetls -> {
-            Log.i(logTag, "DNS: DoT is not supported by VpnService.Builder, using numeric servers only")
-            addServers(builder, routed = routesThroughVPN == true)
-        }
-        else -> {
-            if (servers.isNotEmpty()) {
-                addServers(builder, routed = routesThroughVPN == true)
-            } else {
-                Log.i(logTag, "DNS: cleartext DNS without servers is ignored")
+
+        when (module.protocolType) {
+            is DNSModuleProtocolTypehttps -> {
+                Log.i(
+                    logTag,
+                    "DNS: DoH is not supported by VpnService.Builder, using numeric servers only"
+                )
+                module.addServers(logTag, builder, routed = module.routesThroughVPN == true)
+            }
+
+            is DNSModuleProtocolTypetls -> {
+                Log.i(
+                    logTag,
+                    "DNS: DoT is not supported by VpnService.Builder, using numeric servers only"
+                )
+                module.addServers(logTag, builder, routed = module.routesThroughVPN == true)
+            }
+
+            else -> {
+                if (module.servers.isNotEmpty()) {
+                    module.addServers(logTag, builder, routed = module.routesThroughVPN == true)
+                } else {
+                    Log.i(logTag, "DNS: cleartext DNS without servers is ignored")
+                }
             }
         }
-    }
 
-    if (!applied) {
-        return false
-    }
-
-    domainName?.takeIf { it.isNotBlank() }?.let {
-        Log.i(logTag, "DNS: Search domain (domainName): $it")
-        builder.addSearchDomain(it)
-    }
-
-    searchDomains.orEmpty().forEach { domain ->
-        if (domain.isNotBlank()) {
-            Log.i(logTag, "DNS: Search domain: $domain")
-            builder.addSearchDomain(domain)
+        if (!applied) {
+            return false
         }
-    }
 
-    return applied
+        module.domainName?.takeIf { it.isNotBlank() }?.let {
+            Log.i(logTag, "DNS: Search domain (domainName): $it")
+            builder.addSearchDomain(it)
+        }
+
+        module.searchDomains.orEmpty().forEach { domain ->
+            if (domain.isNotBlank()) {
+                Log.i(logTag, "DNS: Search domain: $domain")
+                builder.addSearchDomain(domain)
+            }
+        }
+
+        return applied
+    }
 }
 
 fun DNSModule.addServers(
+    logTag: String,
     builder: VpnService.Builder,
     routed: Boolean
 ) {
@@ -78,15 +85,6 @@ fun DNSModule.addServers(
                 Log.i(logTag, "DNS: Route server through VPN: ${route.address}/${route.prefixLength}")
                 builder.addRoute(route.address, route.prefixLength)
             }
-//            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
-//                Log.i(logTag, "DNS: Keep server outside VPN: ${route.address}/${route.prefixLength}")
-//                route.toIpPrefix()?.let {
-//                    builder.excludeRoute(it)
-//                } ?: Log.w(logTag, "DNS: Unable to build route exclusion for '$server'")
-//            }
-//            else -> {
-//                Log.i(logTag, "DNS: Cannot exclude DNS server route before API 33: ${route.address}/${route.prefixLength}")
-//            }
         }
     }
 }
@@ -124,16 +122,4 @@ private fun defaultPrefixLength(address: String): Int? {
 
 private fun isNumericAddress(address: String): Boolean {
     return address.contains(":") || address.matches(Regex("""\d{1,3}(\.\d{1,3}){3}"""))
-}
-
-private fun DnsNumericSubnet.toIpPrefix(): IpPrefix? {
-    return runCatching {
-        IpPrefix(InetAddress.getByName(address), prefixLength)
-    }.getOrNull()
-}
-
-private fun Route.toIpPrefix(): IpPrefix? {
-    val destination = destination ?: return null
-    val subnet = subnetFrom(destination) ?: return null
-    return subnet.toIpPrefix()
 }
