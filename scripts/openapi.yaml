@@ -789,6 +789,8 @@ components:
     TunnelSnapshot:
       additionalProperties: false
       properties:
+        environment:
+          "$ref": "#/components/schemas/TunnelSnapshot.Environment"
         id:
           "$ref": "#/components/schemas/UniqueID"
         isEnabled:
@@ -803,6 +805,19 @@ components:
         - status
         - onDemand
       type: object
+    TunnelSnapshot.Environment:
+      additionalProperties: false
+      properties:
+        connectionStatus:
+          "$ref": "#/components/schemas/ConnectionStatus"
+        dataCount:
+          title: DataCount
+        lastErrorCode:
+          title: PartoutError.Code
+      required:
+        - connectionStatus
+        - dataCount
+      type: object
     TunnelStatus:
       enum:
         - inactive
@@ -815,6 +830,8 @@ components:
         - activating
         - active
         - deactivating
+    UInt:
+      type: integer
     UInt16:
       type: integer
     UInt32:

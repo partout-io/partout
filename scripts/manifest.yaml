@@ -52,6 +52,7 @@ entities:
   - TaggedProfile
   - TunnelRemoteInfoWrapper
   - TunnelSnapshot
+  - TunnelSnapshot.Environment
   - TunnelStatus
   - WireGuard.Configuration
   - WireGuard.Key

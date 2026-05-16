@@ -15,6 +15,7 @@
 
 package io.partout.abi
 
+import io.partout.abi.TunnelSnapshotEnvironment
 import io.partout.abi.TunnelStatus
 
 import kotlinx.serialization.Serializable
@@ -28,6 +29,7 @@ import kotlinx.serialization.Contextual
  * @param isEnabled 
  * @param onDemand 
  * @param status 
+ * @param environment 
  */
 @Serializable
 
@@ -43,7 +45,10 @@ data class TunnelSnapshot (
     val onDemand: kotlin.Boolean,
 
     @Contextual @SerialName(value = "status")
-    val status: TunnelStatus
+    val status: TunnelStatus,
+
+    @SerialName(value = "environment")
+    val environment: TunnelSnapshotEnvironment? = null
 
 ) {
 
