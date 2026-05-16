@@ -45,6 +45,7 @@ class PartoutVpnServiceRuntime(
     private var isRunning = false
     private var profileId: String? = null
 
+    @Suppress("UNUSED_PARAMETER")
     fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP_VPN) {
             disconnect()
