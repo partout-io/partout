@@ -5,6 +5,7 @@
 package io.partout.jni
 
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
@@ -23,9 +24,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -45,6 +43,7 @@ class PartoutVpnServiceRuntime(
     private var isRunning = false
     private var profileId: String? = null
 
+    @Suppress("UNUSED_PARAMETER")
     fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP_VPN) {
             disconnect()
@@ -238,28 +237,37 @@ class PartoutVpnServiceRuntime(
         val payload: String?
     )
 
-    class Channel {
-        private val _activeSnapshot = MutableStateFlow<TunnelSnapshot?>(null)
-
-        val activeSnapshot: StateFlow<TunnelSnapshot?> = _activeSnapshot.asStateFlow()
-
+    class Channel(private val context: Context) {
         @Volatile
         private var enabledProfileId: String? = null
 
         internal fun setEnabledProfile(profileId: String?) {
             enabledProfileId = profileId
             if (profileId == null) {
-                _activeSnapshot.value = null
+                sendSnapshot(null)
             }
         }
 
         internal fun updateStatus(event: OnConnectionStatus) {
-            _activeSnapshot.value = TunnelSnapshot(
+            sendSnapshot(TunnelSnapshot(
                 id = event.profileId,
                 isEnabled = enabledProfileId == event.profileId,
                 onDemand = false,
                 status = event.status.toTunnelStatus()
-            )
+            ))
+        }
+
+        private fun sendSnapshot(snapshot: TunnelSnapshot?) {
+            val snapshots = if (snapshot == null || !snapshot.isEnabled) {
+                emptyMap()
+            } else {
+                mapOf(snapshot.id to snapshot)
+            }
+            val intent = Intent(ACTION_SNAPSHOTS).apply {
+                setPackage(context.packageName)
+                putExtra(EXTRA_SNAPSHOTS_JSON, json.encodeToString(snapshots))
+            }
+            context.sendBroadcast(intent)
         }
 
         private fun ConnectionStatus.toTunnelStatus(): TunnelStatus = when (this) {
@@ -272,8 +280,10 @@ class PartoutVpnServiceRuntime(
 
     companion object {
         const val ACTION_STOP_VPN = "io.partout.jni.action.STOP_VPN"
+        const val ACTION_SNAPSHOTS = "io.partout.jni.action.SNAPSHOTS"
         const val EXTRA_PROFILE_ID = "io.partout.jni.extra.PROFILE_ID"
         const val EXTRA_PROFILE_JSON = "io.partout.jni.extra.PROFILE_JSON"
+        const val EXTRA_SNAPSHOTS_JSON = "io.partout.jni.extra.SNAPSHOTS_JSON"
 
         private val json = Json {
             ignoreUnknownKeys = true
