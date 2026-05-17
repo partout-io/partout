@@ -4,7 +4,7 @@
 
 /// Helps expressing integers in shortened data units (e.g. kB).
 @frozen
-public enum DataUnit: UInt {
+public enum DataUnit: UInt64 {
     case byte = 1
 
     case kilobyte = 1024
@@ -48,7 +48,7 @@ public protocol DataUnitRepresentable {
 
 // MARK: - Extensions
 
-extension UInt: DataUnitRepresentable {
+extension UInt64: DataUnitRepresentable {
     public var descriptionAsDataUnit: String {
         if self == 0 {
             return "0B"
@@ -69,9 +69,9 @@ extension UInt: DataUnitRepresentable {
     }
 }
 
-extension Int: DataUnitRepresentable {
+extension Int64: DataUnitRepresentable {
     public var descriptionAsDataUnit: String {
-        return UInt(self).descriptionAsDataUnit
+        return UInt64(self).descriptionAsDataUnit
     }
 }
 
