@@ -9,6 +9,7 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import com.algoritmico.passepartout.Globals
 import io.partout.models.TaggedModuleDNS
 import io.partout.models.TaggedModuleHTTPProxy
 import io.partout.models.TaggedModuleIP
@@ -220,7 +221,6 @@ class PartoutVpnServiceRuntime(
     // JNI
     fun onSnapshots(snapshotsJSON: String) {
         val snapshots = json.decodeFromString<List<TunnelSnapshot>>(snapshotsJSON)
-        Log.d(logTag, "Report daemon snapshots: $snapshots")
         sendSnapshots(snapshots.associateBy { it.id })
     }
 
@@ -237,18 +237,24 @@ class PartoutVpnServiceRuntime(
     // Broadcasts emitters
 
     private fun sendSnapshots(snapshots: Map<String, TunnelSnapshot>) {
+        val newSnapshots: Map<String, TunnelSnapshot>
         if (!snapshots.isEmpty()) {
-            latestSnapshots = snapshots
+            newSnapshots = snapshots
         } else {
-            latestSnapshots = latestSnapshots.mapValues {
+            newSnapshots = latestSnapshots.mapValues {
                 it.value.disabled()
             }
         }
+        if (newSnapshots == latestSnapshots) {
+            return
+        }
+        Log.d(logTag, "Report daemon snapshots: $newSnapshots")
         val intent = Intent(ACTION_SNAPSHOTS).apply {
             setPackage(service.packageName)
-            putExtra(EXTRA_SNAPSHOTS_JSON, json.encodeToString(latestSnapshots))
+            putExtra(EXTRA_SNAPSHOTS_JSON, json.encodeToString(newSnapshots))
         }
         service.sendBroadcast(intent)
+        latestSnapshots = newSnapshots
     }
 
     // Nested classes
