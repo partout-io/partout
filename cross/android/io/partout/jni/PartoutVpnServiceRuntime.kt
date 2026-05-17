@@ -175,7 +175,7 @@ class PartoutVpnServiceRuntime(
         }
 
         remoteFds.forEach {
-            val protected = service.protect(it)
+            val protected = service.protect(it.toInt())
             Log.d(logTag, "protect($it) = $protected")
         }
 
