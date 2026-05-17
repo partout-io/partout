@@ -31,10 +31,10 @@ import kotlinx.serialization.Contextual
 data class DataCount (
 
     @SerialName(value = "received")
-    val received: kotlin.Int,
+    val received: kotlin.Long,
 
     @SerialName(value = "sent")
-    val sent: kotlin.Int
+    val sent: kotlin.Long
 
 ) {
 

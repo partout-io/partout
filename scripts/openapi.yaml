@@ -217,6 +217,7 @@ components:
     Int32:
       type: integer
     Int64:
+      format: int64
       type: integer
     Int8:
       type: integer
@@ -839,6 +840,7 @@ components:
     UInt32:
       type: integer
     UInt64:
+      format: int64
       type: integer
     UInt8:
       type: integer
