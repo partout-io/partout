@@ -63,7 +63,7 @@ struct SimpleConnectionDaemonTests {
     }
 
     @Test
-    func givenConnectionFailingToStart_whenStartDaemon_thenStarts() async throws {
+    func givenConnectionFailingToStart_whenStartDaemon_thenStartsAndPublishesLastErrorCode() async throws {
         var connectionModule = MockConnectionModule()
         connectionModule.options.startError = PartoutError(.dnsFailure)
         let profile = try Profile.Builder(
@@ -72,9 +72,19 @@ struct SimpleConnectionDaemonTests {
         ).build()
         #expect(profile.activeConnectionModule != nil)
 
-        let sut = try await newDaemon(with: profile)
+        let expLastError = Expectation()
+        let sut = try await newDaemon(
+            with: profile,
+            onSnapshot: { snapshot in
+                guard snapshot.environment?.lastErrorCode == .dnsFailure else { return }
+                Task {
+                    await expLastError.fulfill()
+                }
+            }
+        )
         do {
             try await sut.start()
+            try await expLastError.fulfillment(timeout: 500)
         } catch {
             #expect(Bool(false), error.localizedComment)
         }
@@ -113,6 +123,36 @@ struct SimpleConnectionDaemonTests {
         #expect(await stream.nextElement() == .disconnected)
         #expect(await stream.nextElement() == .connecting)
         #expect(await stream.nextElement() == .connected)
+    }
+
+    @Test
+    func givenStartedConnectionFailingAsynchronously_whenConnectionFails_thenPublishesLastErrorCode() async throws {
+        var connectionModule = MockConnectionModule()
+        connectionModule.options.failure = (50, PartoutError(.authentication))
+        let profile = try Profile.Builder(
+            modules: [connectionModule],
+            activeModulesIds: [connectionModule.id]
+        ).build()
+        #expect(profile.activeConnectionModule != nil)
+
+        let expLastError = Expectation()
+        let sut = try await newDaemon(
+            with: profile,
+            reconnectionDelay: 5000,
+            onSnapshot: { snapshot in
+                guard snapshot.environment?.lastErrorCode == .authentication else { return }
+                Task {
+                    await expLastError.fulfill()
+                }
+            }
+        )
+        let stream = sut.statusStream
+
+        try await sut.start()
+        #expect(await stream.nextElement() == .disconnected)
+        #expect(await stream.nextElement() == .connecting)
+        #expect(await stream.nextElement() == .connected)
+        try await expLastError.fulfillment(timeout: 500)
     }
 
     @Test
@@ -181,7 +221,8 @@ private extension SimpleConnectionDaemonTests {
         environment: TunnelEnvironment? = nil,
         onCancel: @escaping (Error?) -> Void = { _ in },
         stopDelay: Int = 1000,
-        reconnectionDelay: Int = 1000
+        reconnectionDelay: Int = 1000,
+        onSnapshot: OnTunnelSnapshotCallback? = nil
     ) async throws -> SimpleConnectionDaemon {
         let controller = MockTunnelController()
         controller.onCancelTunnelConnection = onCancel
@@ -200,7 +241,8 @@ private extension SimpleConnectionDaemonTests {
             messageHandler: DefaultMessageHandler(.global, environment: environment),
             startsImmediately: false,
             stopDelay: stopDelay,
-            reconnectionDelay: reconnectionDelay
+            reconnectionDelay: reconnectionDelay,
+            onSnapshot: onSnapshot
         ))
     }
 }

@@ -152,7 +152,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             pp_log_id(profile.id, .core, .notice, "Daemon started successfully")
         } catch {
             pp_log_id(profile.id, .core, .fault, "Unable to start daemon: \(error)")
-            environment.setEnvironmentValue(PartoutError(error).code, forKey: TunnelEnvironmentKeys.lastErrorCode)
+            reportLastError(error)
             controller.setReasserting(false)
             controller.cancelTunnelConnection(with: error)
         }
@@ -372,7 +372,7 @@ extension SimpleConnectionDaemon {
             didStart = try await connection.start()
         } catch {
             pp_log_id(profile.id, .core, .error, "Unable to start connection: \(error)")
-            environment.setEnvironmentValue(PartoutError(error).code, forKey: TunnelEnvironmentKeys.lastErrorCode)
+            reportLastError(error)
             return
         }
 
@@ -426,8 +426,13 @@ extension SimpleConnectionDaemon {
     }
 
     func onConnectionError(_ error: Error) {
-        environment.setEnvironmentValue(PartoutError(error).code, forKey: TunnelEnvironmentKeys.lastErrorCode)
+        reportLastError(error)
         controller.setReasserting(false)
+    }
+
+    func reportLastError(_ error: Error) {
+        environment.setEnvironmentValue(error.partoutErrorCode, forKey: TunnelEnvironmentKeys.lastErrorCode)
+        publishSnapshot()
     }
 
     func reportStatus(_ status: ConnectionStatus) {
