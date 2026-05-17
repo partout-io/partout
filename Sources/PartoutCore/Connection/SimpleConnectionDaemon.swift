@@ -436,6 +436,7 @@ extension SimpleConnectionDaemon {
     func onConnectionError(_ error: Error) {
         reportLastError(error)
         controller.setReasserting(false)
+        controller.cancelTunnelConnection(with: error)
     }
 
     func reportLastError(_ error: Error) {

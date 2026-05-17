@@ -36,3 +36,5 @@ void pp_tun_ctrl_report_snapshots(void *_Nullable ref,
                                   const char *_Nonnull snapshots_json);
 void pp_tun_ctrl_clear_tunnel(void *_Nullable ref,
                               pp_tun _Nullable tun_impl);
+void pp_tun_ctrl_cancel_tunnel(void *_Nullable ref,
+                               const char *_Nullable error_message);

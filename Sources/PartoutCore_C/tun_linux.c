@@ -120,4 +120,10 @@ void pp_tun_ctrl_clear_tunnel(void *ref, pp_tun tun_impl) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_linux: ctrl_clear_tunnel(%p)", ref);
 }
 
+void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_message) {
+    (void)ref;
+    (void)error_message;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_linux: ctrl_cancel_tunnel(%p)", ref);
+}
+
 #endif

@@ -95,6 +95,10 @@ static const kotlin_sig sig_ctrl_onSnapshots = {
     "onSnapshots",
     "(Ljava/lang/String;)V"
 };
+static const kotlin_sig sig_ctrl_cancelTunnel = {
+    "cancelTunnel",
+    "(Ljava/lang/String;)V"
+};
 
 void pp_tun_ctrl_test_working(void *jni_ref) {
     assert(jni_ref);
@@ -245,6 +249,41 @@ void pp_tun_ctrl_report_snapshots(void *_Nullable ref,
 
 cleanup:
     if (j_snapshots_json != NULL) (*env)->DeleteLocalRef(env, j_snapshots_json);
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
+    JNI_DETACH(env);
+}
+
+void pp_tun_ctrl_cancel_tunnel(void *jni_ref, const char *error_message) {
+    assert(jni_ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_cancel_tunnel(%p)", jni_ref);
+
+    JNI_ATTACH_OR_RETURN_VOID(env);
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    jstring j_error_message = NULL;
+
+    cls = (*env)->GetObjectClass(env, jni_ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_cancel_tunnel(), NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_cancelTunnel.name, sig_ctrl_cancelTunnel.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_cancel_tunnel(), NULL method");
+        goto cleanup;
+    }
+    j_error_message = error_message ? (*env)->NewStringUTF(env, error_message) : NULL;
+    (*env)->CallVoidMethod(env, jni_ref, method, j_error_message);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_cancel_tunnel(), Kotlin exception");
+        goto cleanup;
+    }
+
+cleanup:
+    if (j_error_message != NULL) (*env)->DeleteLocalRef(env, j_error_message);
     if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
     JNI_DETACH(env);
 }

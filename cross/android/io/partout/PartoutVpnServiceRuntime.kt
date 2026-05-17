@@ -223,6 +223,16 @@ class PartoutVpnServiceRuntime(
         sendSnapshots(snapshots.associateBy { it.id })
     }
 
+    // JNI
+    fun cancelTunnel(errorMessage: String?) {
+        if (errorMessage != null) {
+            Log.e(logTag, "VPN daemon cancelled: $errorMessage")
+        } else {
+            Log.i(logTag, "VPN daemon cancelled")
+        }
+        disconnect()
+    }
+
     // Broadcasts emitters
 
     private fun sendSnapshots(snapshots: Map<String, TunnelSnapshot>) {

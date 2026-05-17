@@ -136,8 +136,15 @@ struct SimpleConnectionDaemonTests {
         #expect(profile.activeConnectionModule != nil)
 
         let expLastError = Expectation()
+        let expCancel = Expectation()
         let sut = try await newDaemon(
             with: profile,
+            onCancel: { error in
+                guard error?.partoutErrorCode == .authentication else { return }
+                Task {
+                    await expCancel.fulfill()
+                }
+            },
             reconnectionDelay: 5000,
             onSnapshot: { snapshot in
                 guard snapshot.environment?.lastErrorCode == .authentication else { return }
@@ -153,6 +160,7 @@ struct SimpleConnectionDaemonTests {
         #expect(await stream.nextElement() == .connecting)
         #expect(await stream.nextElement() == .connected)
         try await expLastError.fulfillment(timeout: 500)
+        try await expCancel.fulfillment(timeout: 500)
     }
 
     @Test
