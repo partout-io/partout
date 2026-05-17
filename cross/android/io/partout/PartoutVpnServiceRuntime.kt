@@ -9,7 +9,6 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
-import com.algoritmico.passepartout.Globals
 import io.partout.models.TaggedModuleDNS
 import io.partout.models.TaggedModuleHTTPProxy
 import io.partout.models.TaggedModuleIP
@@ -89,7 +88,7 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to start VPN daemon (code=${result.code}): ${result.payload}")
             stopService()
             isRunning = false
-            sendSnapshots(emptyMap())
+            sendSnapshots(null)
             return@launchCommand
         }
         Log.i(logTag, "Started VPN daemon")
@@ -111,7 +110,7 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to stop VPN daemon (code=${result.code}): ${result.payload}")
         }
         isRunning = false
-        sendSnapshots(emptyMap())
+        sendSnapshots(null)
     }
 
     private fun launchCommand(action: suspend () -> Unit) {
@@ -236,9 +235,9 @@ class PartoutVpnServiceRuntime(
 
     // Broadcasts emitters
 
-    private fun sendSnapshots(snapshots: Map<String, TunnelSnapshot>) {
+    private fun sendSnapshots(snapshots: Map<String, TunnelSnapshot>?) {
         val newSnapshots: Map<String, TunnelSnapshot>
-        if (!snapshots.isEmpty()) {
+        if (snapshots != null) {
             newSnapshots = snapshots
         } else {
             newSnapshots = latestSnapshots.mapValues {
