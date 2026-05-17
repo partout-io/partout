@@ -39,6 +39,7 @@ class PartoutVpnServiceRuntime(
     private val commandMutex = Mutex()
     private var descriptor: ParcelFileDescriptor? = null
     private var isRunning = false
+    private var latestSnapshots: Map<String, TunnelSnapshot> = emptyMap()
 
     // Service lifecycle
 
@@ -236,9 +237,16 @@ class PartoutVpnServiceRuntime(
     // Broadcasts emitters
 
     private fun sendSnapshots(snapshots: Map<String, TunnelSnapshot>) {
+        if (!snapshots.isEmpty()) {
+            latestSnapshots = snapshots
+        } else {
+            latestSnapshots = latestSnapshots.mapValues {
+                it.value.disabled()
+            }
+        }
         val intent = Intent(ACTION_SNAPSHOTS).apply {
             setPackage(service.packageName)
-            putExtra(EXTRA_SNAPSHOTS_JSON, json.encodeToString(snapshots))
+            putExtra(EXTRA_SNAPSHOTS_JSON, json.encodeToString(latestSnapshots))
         }
         service.sendBroadcast(intent)
     }
@@ -254,6 +262,14 @@ class PartoutVpnServiceRuntime(
         suspend fun start(runtime: PartoutVpnServiceRuntime, profileJSON: String): Result
         suspend fun stop(): Result
     }
+
+    private fun TunnelSnapshot.disabled() = TunnelSnapshot(
+        id,
+        false,
+        false,
+        status,
+        environment
+    )
 
     companion object {
         const val ACTION_STOP_VPN = "io.partout.action.STOP_VPN"
