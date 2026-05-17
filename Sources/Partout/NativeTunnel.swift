@@ -112,7 +112,10 @@ public final class NativeTunnel: TunnelProtocol, @unchecked Sendable {
 private extension NativeTunnel {
     static let snapshotsCallback: pp_tun_strg_snapshots_cb = { ctx, cJSON in
         let tunnel = Unmanaged<NativeTunnel>.fromOpaque(ctx).takeUnretainedValue()
-        tunnel.submitSnapshots(String(cString: cJSON))
+        let json = String(cString: cJSON)
+        Task {
+            await tunnel.submitSnapshots(json)
+        }
     }
 
     func submitSnapshots(_ json: String) {

@@ -15,7 +15,6 @@
 
 package io.partout.abi
 
-import io.partout.abi.ConnectionStatus
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -24,18 +23,18 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param profileId 
- * @param status 
+ * @param received 
+ * @param sent 
  */
 @Serializable
 
-data class OnConnectionStatus (
+data class DataCount (
 
-    @SerialName(value = "profileId")
-    val profileId: kotlin.String,
+    @SerialName(value = "received")
+    val received: kotlin.Long,
 
-    @Contextual @SerialName(value = "status")
-    val status: ConnectionStatus
+    @SerialName(value = "sent")
+    val sent: kotlin.Long
 
 ) {
 

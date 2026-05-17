@@ -1,6 +1,7 @@
 paths:
   - Partout
   - Partout/Modules
+  - PartoutCore
   - PartoutCore/Connection
   - PartoutCore/IP
   - PartoutCore/Modules
@@ -12,6 +13,7 @@ entities:
   - Address
   - ConnectionStatus
   - CustomModule
+  - DataCount
   - DNSModule
   - DNSModule.DomainPolicy
   - DNSModule.ProtocolType
@@ -24,7 +26,6 @@ entities:
   - IPSettings
   - IPSocketType
   - ModuleType
-  - OnConnectionStatus
   - OnDemandModule
   - OnDemandModule.OtherNetwork
   - OnDemandModule.Policy
@@ -44,6 +45,7 @@ entities:
   - OpenVPN.TLSWrap
   - OpenVPN.TLSWrap.Strategy
   - OpenVPNModule
+  - PartoutError.Code
   - ProfileBehavior
   - Route
   - SocketType
@@ -52,6 +54,7 @@ entities:
   - TaggedProfile
   - TunnelRemoteInfoWrapper
   - TunnelSnapshot
+  - TunnelSnapshot.Environment
   - TunnelStatus
   - WireGuard.Configuration
   - WireGuard.Key

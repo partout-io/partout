@@ -61,10 +61,25 @@ void pp_tun_ctrl_configure_sockets(void *ref, const int *fds, const size_t fds_l
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_dummy: ctrl_configure_sockets(%p)", ref);
 }
 
+void pp_tun_ctrl_report_snapshots(void *ref, const char *snapshots_json) {
+    (void)ref;
+    (void)snapshots_json;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_dummy: ctrl_report_snapshots(%p)", ref);
+}
+
 void pp_tun_ctrl_clear_tunnel(void *ref, pp_tun tun_impl) {
     (void)ref;
     (void)tun_impl;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_dummy: ctrl_clear_tunnel(%p)", ref);
+}
+
+void pp_tun_strg_prepare(void *ref,
+                         void *ctx,
+                         pp_tun_strg_snapshots_cb cb) {
+    (void)ref;
+    (void)ctx;
+    (void)cb;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: strg_prepare(%p)", ref);
 }
 
 void pp_tun_strg_install(void *ref,

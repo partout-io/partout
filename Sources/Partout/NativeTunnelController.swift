@@ -54,40 +54,24 @@ public final class NativeTunnelController: TunnelController {
         }) else {
             throw PartoutError(.tunNotAvailable)
         }
-
-        // FIXME: #188, add better codes for PartoutError
-        // FIXME: #188, apply subnets and routes (default first, drop excluded from included)
-
-//        var subnets: [(String, String)] = []
-//        var includedRoutes: [Route] = []
-//        var excludedRoutes: [Route] = []
-//        info.modules?.forEach {
-//            switch $0 {
-//            case let ip as IPModule:
-//                for settings in [ip.ipv4, ip.ipv6] {
-//                    guard let settings else { return }
-//                    if let subnet = settings.subnet {
-//                        subnets.append((subnet.rawValue, subnet.address.rawValue))
-//                    }
-//                    includedRoutes.append(contentsOf: settings.includedRoutes)
-//                    excludedRoutes.append(contentsOf: settings.excludedRoutes)
-//                }
-//            default:
-//                break
-//            }
-//        }
-//
-//        // Add exception for server address to escape the tunnel
-//        if let serverAddress = info.address {
-//            excludedRoutes.append(Route(Subnet(serverAddress), nil))
-//        }
-
         return VirtualTunnelInterface(ctx, tun: tun, maxReadLength: maxReadLength)
     }
 
     public func configureSockets(with descriptors: [UInt64]) {
         descriptors.map(Int32.init).withUnsafeBufferPointer {
             pp_tun_ctrl_configure_sockets(ref, $0.baseAddress, $0.count)
+        }
+    }
+
+    public func reportSnapshots(_ snapshots: [TunnelSnapshot]) {
+        pp_log(ctx, .core, .debug, "Report tunnel snapshots: \(snapshots)")
+        do {
+            let json = try JSONEncoder.shared().encodeJSON(snapshots)
+            json.withCString {
+                pp_tun_ctrl_report_snapshots(ref, $0)
+            }
+        } catch {
+            pp_log(ctx, .core, .error, "Unable to encode snapshots: \(error)")
         }
     }
 

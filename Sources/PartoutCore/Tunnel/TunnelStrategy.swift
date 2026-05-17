@@ -2,28 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-/// Returns a tunnel-specific snapshot of a ``Profile``.
-public struct TunnelSnapshot: Hashable, Codable, Sendable, CustomStringConvertible {
-    public let id: UniqueID
-
-    public let isEnabled: Bool
-
-    public let status: TunnelStatus
-
-    public let onDemand: Bool
-
-    public init(id: Profile.ID, isEnabled: Bool, status: TunnelStatus, onDemand: Bool) {
-        self.id = id
-        self.isEnabled = isEnabled
-        self.status = status
-        self.onDemand = onDemand
-    }
-
-    public var description: String {
-        "{\(id.uuidString), isEnabled=\(isEnabled), status=\(status), onDemand=\(onDemand)}"
-    }
-}
-
 /// Provides the underlying strategy of a ``Tunnel``.
 public protocol TunnelStrategy: Sendable {
 

@@ -65,7 +65,6 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/LinkObserver.swift
 ./PartoutCore/Connection/NetworkInterfaceFactory.swift
 ./PartoutCore/Connection/NetworkObserver.swift
-./PartoutCore/Connection/OnConnectionStatus.swift
 ./PartoutCore/Connection/POSIXDNSStrategy.swift
 ./PartoutCore/Connection/ReachabilityObserver.swift
 ./PartoutCore/Connection/SharedTunnelEnvironment.swift
@@ -162,6 +161,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Tunnel/MessageHandler.swift
 ./PartoutCore/Tunnel/Tunnel.swift
 ./PartoutCore/Tunnel/TunnelProtocol.swift
+./PartoutCore/Tunnel/TunnelSnapshot.swift
 ./PartoutCore/Tunnel/TunnelStatus.swift
 ./PartoutCore/Tunnel/TunnelStrategy.swift
 ./PartoutOS/Apple/AppleJavaScriptEngine.swift
