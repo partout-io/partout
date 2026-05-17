@@ -318,7 +318,7 @@ private extension _OpenVPNConnectionV2 {
 
     func sendError(_ connectionError: Error) {
         pp_log(ctx, .core, .info, "Report link failure: \(connectionError)")
-        statusSubject.send(completion: .failure(connectionError))
+        statusSubject.send(.disconnected)
         onError(connectionError)
     }
 
