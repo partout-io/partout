@@ -73,6 +73,15 @@ void pp_tun_ctrl_clear_tunnel(void *ref, pp_tun tun_impl) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_dummy: ctrl_clear_tunnel(%p)", ref);
 }
 
+void pp_tun_strg_prepare(void *ref,
+                         void *ctx,
+                         pp_tun_strg_snapshots_cb cb) {
+    (void)ref;
+    (void)ctx;
+    (void)cb;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: strg_prepare(%p)", ref);
+}
+
 void pp_tun_strg_install(void *ref,
                          const char *profile_json,
                          bool connect,
