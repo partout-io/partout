@@ -432,17 +432,17 @@ extension SimpleConnectionDaemon {
 
     func reportStatus(_ status: ConnectionStatus) {
         statusSubject.send(status)
-        publishSnapshot()
+        publishSnapshot(with: status)
     }
 
-    func publishSnapshot() {
-        let connectionStatus = statusSubject.value
-        let tunnelStatus = connectionStatus.toTunnelStatus
+    func publishSnapshot(with latestConnectionStatus: ConnectionStatus? = nil) {
+        let connectionStatus = latestConnectionStatus ?? statusSubject.value
+        let status = connectionStatus.toTunnelStatus
         let env = environment.snapshot.with(connectionStatus: connectionStatus)
         let snapshot = TunnelSnapshot(
             id: profile.id,
             isEnabled: true,
-            status: tunnelStatus,
+            status: status, // TunnelStatus == ConnectionStatus
             onDemand: false,
             environment: env
         )
