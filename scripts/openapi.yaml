@@ -127,9 +127,9 @@ components:
       additionalProperties: false
       properties:
         received:
-          "$ref": "#/components/schemas/UInt"
+          "$ref": "#/components/schemas/UInt64"
         sent:
-          "$ref": "#/components/schemas/UInt"
+          "$ref": "#/components/schemas/UInt64"
       required:
         - received
         - sent

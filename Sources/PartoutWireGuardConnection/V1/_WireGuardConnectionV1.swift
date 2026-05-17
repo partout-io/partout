@@ -229,14 +229,14 @@ private extension _WireGuardConnectionV1 {
 
 private extension DataCount {
     static func from(wireGuardString string: String) -> DataCount? {
-        var bytesReceived: UInt?
-        var bytesSent: UInt?
+        var bytesReceived: UInt64?
+        var bytesSent: UInt64?
 
         string.enumerateLines { line, stop in
             if bytesReceived == nil, let value = line.getPrefix("rx_bytes=") {
-                bytesReceived = value
+                bytesReceived = UInt64(value)
             } else if bytesSent == nil, let value = line.getPrefix("tx_bytes=") {
-                bytesSent = value
+                bytesSent = UInt64(value)
             }
             if bytesReceived != nil, bytesSent != nil {
                 stop = true

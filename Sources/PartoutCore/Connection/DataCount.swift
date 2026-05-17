@@ -6,12 +6,12 @@
 public struct DataCount: Hashable, Codable, Sendable {
 
     /// Received bytes count.
-    public let received: UInt
+    public let received: UInt64
 
     /// Sent bytes count.
-    public let sent: UInt
+    public let sent: UInt64
 
-    public init(_ received: UInt = .zero, _ sent: UInt = .zero) {
+    public init(_ received: UInt64 = .zero, _ sent: UInt64 = .zero) {
         self.received = received
         self.sent = sent
     }
@@ -20,7 +20,7 @@ public struct DataCount: Hashable, Codable, Sendable {
         adding(other.received, other.sent)
     }
 
-    public func adding(_ received: UInt, _ sent: UInt) -> Self {
+    public func adding(_ received: UInt64, _ sent: UInt64) -> Self {
         DataCount(self.received + received, self.sent + sent)
     }
 }
