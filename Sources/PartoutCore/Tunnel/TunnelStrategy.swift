@@ -4,7 +4,6 @@
 
 /// Provides the underlying strategy of a ``Tunnel``.
 public protocol TunnelStrategy: Sendable {
-
     /// Prepares the tunnel, e.g. fetches its initial status.
     ///
     /// - Parameters:
@@ -17,13 +16,7 @@ public protocol TunnelStrategy: Sendable {
     ///   - profile: The ``Profile`` with which the tunnel must be configured.
     ///   - connect: Also initiate a connection.
     ///   - options: An optional set of connection options.
-    ///   - title: The function of ``Profile`` to return a title.
-    func install(
-        _ profile: Profile,
-        connect: Bool,
-        options: Sendable?,
-        title: @escaping @Sendable (Profile) -> String
-    ) async throws
+    func install(_ profile: Profile, connect: Bool, options: Sendable?) async throws
 
     /// Uninstalls the tunnel.
     ///
@@ -54,7 +47,7 @@ public protocol TunnelObservableStrategy: TunnelStrategy {
 
 extension TunnelStrategy {
     public func install(_ profile: Profile, connect: Bool = false) async throws {
-        try await install(profile, connect: connect, options: nil, title: \.name)
+        try await install(profile, connect: connect, options: nil)
     }
 }
 

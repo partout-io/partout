@@ -18,6 +18,8 @@ public actor NETunnelStrategy {
 
     private let options: Set<Option>
 
+    private let title: @Sendable (Profile) -> String
+
     private nonisolated let managersSubject: CurrentValueStream<[Profile.ID: NETunnelProviderManager]>
 
     private var allManagers: [Profile.ID: NETunnelProviderManager] {
@@ -34,11 +36,13 @@ public actor NETunnelStrategy {
         bundleIdentifier: String,
         coder: NEProtocolCoder,
 //        options: Set<Option> = []
+        title: @escaping @Sendable (Profile) -> String
     ) {
         self.ctx = ctx
         self.bundleIdentifier = bundleIdentifier
         self.coder = coder
 //        self.options = options
+        self.title = title
         options = []
         managersSubject = CurrentValueStream([:])
         allManagers = [:]
@@ -72,17 +76,12 @@ extension NETunnelStrategy: TunnelObservableStrategy {
         }
     }
 
-    public func install(
-        _ profile: Profile,
-        connect: Bool,
-        options: Sendable?,
-        title: @escaping @Sendable (Profile) -> String
-    ) async throws {
+    public func install(_ profile: Profile, connect: Bool, options: Sendable?) async throws {
         if connect, !self.options.contains(.multiple) {
             await disconnectCurrentManagers()
         }
         let nsOptions = options as? [String: NSObject]
-        try await save(profile, forConnecting: connect, options: nsOptions, title: title)
+        try await save(profile, forConnecting: connect, options: nsOptions)
     }
 
     public func uninstall(profileId: Profile.ID) async throws {
@@ -158,18 +157,10 @@ extension NETunnelStrategy: NETunnelManagerRepository {
         return managers
     }
 
-    public func save<O>(
-        _ profile: Profile,
-        forConnecting: Bool,
-        options: O?,
-        title: @Sendable (Profile) -> String
-    ) async throws {
+    public func save<O>(_ profile: Profile, forConnecting: Bool, options: O?) async throws {
         profile.log(.os, .notice, withPreamble: "Encoded profile:")
 
-        let proto = try coder.protocolConfiguration(
-            from: profile,
-            title: title
-        )
+        let proto = try coder.protocolConfiguration(from: profile, title: title)
 
         // store custom data on the side
         proto.profileId = profile.id

@@ -53,13 +53,8 @@ extension Tunnel: TunnelStrategy {
         try await strategy.prepare(purge: purge)
     }
 
-    public func install(
-        _ profile: Profile,
-        connect: Bool,
-        options: Sendable?,
-        title: @escaping @Sendable (Profile) -> String
-    ) async throws {
-        guard !profile.activeModulesIds.isEmpty else {
+    public func install(_ preProfile: Profile, connect: Bool, options: Sendable?) async throws {
+        guard !preProfile.activeModulesIds.isEmpty else {
             throw PartoutError(.noActiveModules)
         }
         if let pendingInstall, !pendingInstall.isCancelled {
@@ -72,7 +67,7 @@ extension Tunnel: TunnelStrategy {
         }
         pendingInstall = Task {
             pp_log(ctx, .core, .info, "Install profile \(profile.id)...")
-            try await strategy.install(profile, connect: connect, options: options, title: title)
+            try await strategy.install(profile, connect: connect, options: options)
             guard !Task.isCancelled else {
                 pp_log(ctx, .core, .info, "Cancelled installation of profile \(profile.id)")
                 return
@@ -100,12 +95,8 @@ extension Tunnel: TunnelStrategy {
 }
 
 extension Tunnel {
-    public func install(
-        _ profile: Profile,
-        connect: Bool,
-        title: @escaping @Sendable (Profile) -> String
-    ) async throws {
-        try await install(profile, connect: connect, options: nil, title: title)
+    public func install(_ profile: Profile, connect: Bool) async throws {
+        try await install(profile, connect: connect, options: nil)
     }
 }
 
@@ -144,6 +135,11 @@ extension Tunnel {
 
     public var status: TunnelStatus {
         snapshot?.status ?? .inactive
+    }
+
+    public func sendMessage(_ message: Message.Input) async throws -> Message.Output? {
+        guard let profileId = snapshots.keys.first else { return nil }
+        return try await sendMessage(message, to: profileId)
     }
 }
 #endif
