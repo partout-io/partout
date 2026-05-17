@@ -230,11 +230,16 @@ extension _OpenVPNConnectionV2: OpenVPNSessionDelegate {
             return
         }
 
-        // If error is not recoverable, just fail
-        if let error, !error.isOpenVPNRecoverable {
-            pp_log(ctx, .openvpn, .error, "Disconnection is not recoverable")
-            sendError(error)
-            return
+        // Store last error
+        if let error {
+            environment.setEnvironmentValue(error.partoutErrorCode, forKey: TunnelEnvironmentKeys.lastErrorCode)
+
+            // If error is not recoverable, just fail
+            guard error.isOpenVPNRecoverable else {
+                pp_log(ctx, .openvpn, .error, "Disconnection is not recoverable")
+                sendError(error)
+                return
+            }
         }
 
         // Go back to the disconnected state (e.g. daemon will reconnect)
