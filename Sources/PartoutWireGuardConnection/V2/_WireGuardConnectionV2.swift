@@ -107,6 +107,7 @@ public actor _WireGuardConnectionV2: Connection {
             dataCountTimer?.cancel()
             dataCountTimer = nil
             self.adapter = nil
+            reporter.reportLastError(startError)
             statusSubject.send(.disconnected)
             throw startError
         }
@@ -146,6 +147,7 @@ extension _WireGuardConnectionV2: WireGuardAdapterDelegate {
             return tunnel
         } catch {
             pp_log(ctx, .wireguard, .error, "Unable to configure tunnel settings: \(error)")
+            reporter.reportLastError(error)
             statusSubject.send(.disconnected)
             throw error
         }
