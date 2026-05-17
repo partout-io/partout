@@ -175,6 +175,9 @@ class PartoutVpnServiceRuntime(
         }
 
         remoteFds.forEach {
+            require(it in 0..Int.MAX_VALUE.toLong()) {
+                "Invalid Android file descriptor: $it"
+            }
             val protected = service.protect(it.toInt())
             Log.d(logTag, "protect($it) = $protected")
         }
