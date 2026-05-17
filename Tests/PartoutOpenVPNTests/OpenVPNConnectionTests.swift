@@ -338,13 +338,12 @@ private struct Constants {
             }
         )
         let options = ConnectionParameters.Options()
-        let reporter = ConnectionReporter(environment: environment)
         let conn = try module.newConnection(with: impl, parameters: .init(
             profile: profile,
             controller: controller,
             factory: factory,
             reachability: MockReachabilityObserver(),
-            reporter: reporter,
+            environment: environment,
             options: options
         ))
         return try #require(conn as? OpenVPNConnectionType)

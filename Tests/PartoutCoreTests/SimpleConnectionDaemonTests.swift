@@ -258,16 +258,14 @@ private extension SimpleConnectionDaemonTests {
         controller.onCancelTunnelConnection = onCancel
         let options = ConnectionParameters.Options()
         let environment = environment ?? SharedTunnelEnvironment(profileId: profile.id)
-        let reporter = ConnectionReporter(environment: environment)
         return try SimpleConnectionDaemon(params: .init(
             connectionFactory: MockConnectionFactory(),
-            environment: environment,
             connectionParameters: .init(
                 profile: profile,
                 controller: controller,
                 factory: MockNetworkInterfaceFactory(),
                 reachability: reachability,
-                reporter: reporter,
+                environment: environment,
                 options: options
             ),
             messageHandler: DefaultMessageHandler(.global, environment: environment),
