@@ -246,7 +246,7 @@ private extension TunnelTests {
         let tunnel = Tunnel(
             .global,
             strategy: FakeTunnelStrategy(delay: 100),
-            updateInterval: 100,
+            refreshInterval: 100,
             willInstall: processor?.willInstall,
             environmentFactory: { @Sendable _ in
                 env ?? SharedTunnelEnvironment(profileId: nil)

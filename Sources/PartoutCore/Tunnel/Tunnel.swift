@@ -10,7 +10,7 @@ public actor Tunnel {
 
     private let strategy: TunnelObservableStrategy
 
-    private let updateInterval: Int
+    private let refreshInterval: Int?
 
     private let willInstall: WillInstallBlock?
 
@@ -29,13 +29,13 @@ public actor Tunnel {
     public init(
         _ ctx: PartoutLoggerContext,
         strategy: TunnelObservableStrategy,
-        updateInterval: Int = 1000,
+        refreshInterval: Int? = nil,
         willInstall: WillInstallBlock? = nil,
         environmentFactory: @escaping (Profile.ID) -> TunnelEnvironmentReader
     ) {
         self.ctx = ctx
         self.strategy = strategy
-        self.updateInterval = updateInterval
+        self.refreshInterval = refreshInterval
         self.willInstall = willInstall
         self.environmentFactory = environmentFactory
         strategySnapshots = [:]
@@ -166,7 +166,8 @@ private extension Tunnel {
         // Subscribe once
         guard subscriptions.isEmpty else { return }
 #endif
-        let strategySubscription = Task { [weak self] in
+        var subscriptions: [Task<Void, Never>] = []
+        subscriptions.append(Task { [weak self] in
             guard let ctx = self?.ctx else { return }
             guard let stream = self?.strategy.didUpdateActiveProfiles else { return }
             for await snapshots in stream {
@@ -175,18 +176,20 @@ private extension Tunnel {
                 await handleStrategySnapshots(snapshots)
             }
             pp_log(ctx, .core, .debug, "Cancelled Tunnel.strategy.didUpdateActiveProfiles (observed)")
+        })
+        if let refreshInterval {
+            subscriptions.append(Task { [weak self] in
+                guard let ctx = self?.ctx else { return }
+                while true {
+                    guard let self else { break }
+                    guard !Task.isCancelled else { break }
+                    await refreshSnapshotEnvironments()
+                    try? await Task.sleep(milliseconds: refreshInterval)
+                }
+                pp_log(ctx, .core, .debug, "Cancelled Tunnel.timerSubscription")
+            })
         }
-        let timerSubscription = Task { [weak self] in
-            guard let ctx = self?.ctx else { return }
-            while true {
-                guard let self else { break }
-                guard !Task.isCancelled else { break }
-                await refreshSnapshotEnvironments()
-                try? await Task.sleep(milliseconds: updateInterval)
-            }
-            pp_log(ctx, .core, .debug, "Cancelled Tunnel.timerSubscription")
-        }
-        subscriptions = [strategySubscription, timerSubscription]
+        self.subscriptions = subscriptions
     }
 
     func handleStrategySnapshots(_ snapshots: [Profile.ID: TunnelSnapshot]) {
