@@ -177,6 +177,7 @@ private extension Tunnel {
 
     func handleStrategySnapshots(_ snapshots: [Profile.ID: TunnelSnapshot]) {
         strategySnapshots = snapshots
+        pp_log(ctx, .core, .info, "Snapshots: \(strategySnapshots.values.description)")
         publishSnapshots()
     }
 
@@ -185,7 +186,6 @@ private extension Tunnel {
     }
 
     func publishSnapshots() {
-        pp_log(ctx, .core, .info, "Snapshots: \(strategySnapshots.values.description)")
         let activeIds = strategySnapshots.keys
         // Create new environments if needed
         for profileId in activeIds {
