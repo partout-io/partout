@@ -13,7 +13,7 @@ struct TunnelTests {
 
         try await sut.prepare(purge: false)
         do {
-            try await sut.install(profile, connect: true, title: \.name)
+            try await sut.install(profile, connect: true)
             #expect(Bool(false), "Connection should fail")
         } catch {
             //
@@ -57,9 +57,9 @@ struct TunnelTests {
         }
 
         try await sut.prepare(purge: false)
-        try await sut.install(profile, connect: true, title: \.name)
+        try await sut.install(profile, connect: true)
         try await sut.disconnect(from: profile.id)
-        try await sut.install(profile, connect: true, title: \.name)
+        try await sut.install(profile, connect: true)
         try await sut.uninstall(profileId: profile.id)
 
         let emitted = await pending.value

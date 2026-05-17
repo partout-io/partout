@@ -7,7 +7,7 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
-// FIXME: #188, Implement Linux controller/strategy
+// FIXME: #188, Implement Linux tun_ctrl
 
 #if PARTOUT_LINUX
 
@@ -118,51 +118,6 @@ void pp_tun_ctrl_clear_tunnel(void *ref, pp_tun tun_impl) {
     (void)ref;
     (void)tun_impl;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_linux: ctrl_clear_tunnel(%p)", ref);
-}
-
-void pp_tun_strg_prepare(void *ref,
-                         void *ctx,
-                         pp_tun_strg_snapshots_cb cb) {
-    (void)ref;
-    (void)ctx;
-    (void)cb;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_linux: strg_prepare(%p)", ref);
-}
-
-void pp_tun_strg_install(void *ref,
-                         const char *profile_json,
-                         bool connect,
-                         const char *options_json,
-                         void *ctx,
-                         pp_completion completion) {
-    (void)ref;
-    (void)profile_json;
-    (void)options_json;
-    (void)ctx;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_linux: strg_install(%p, %d)", ref, connect);
-    if (completion) completion(NULL, 0);
-}
-
-void pp_tun_strg_uninstall(void *ref,
-                           const char *profile_id,
-                           void *ctx,
-                           pp_completion completion) {
-    (void)ref;
-    (void)profile_id;
-    (void)ctx;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_linux: strg_uninstall(%p)", ref);
-    if (completion) completion(NULL, 0);
-}
-
-void pp_tun_strg_disconnect(void *ref,
-                            const char *profile_id,
-                            void *ctx,
-                            pp_completion completion) {
-    (void)ref;
-    (void)profile_id;
-    (void)ctx;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_linux: strg_disconnect(%p)", ref);
-    if (completion) completion(NULL, 0);
 }
 
 #endif

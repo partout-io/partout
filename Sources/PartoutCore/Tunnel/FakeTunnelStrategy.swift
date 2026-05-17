@@ -61,12 +61,7 @@ public actor FakeTunnelStrategy: TunnelObservableStrategy, Sendable {
     public func prepare(purge: Bool) async throws {
     }
 
-    public func install(
-        _ profile: Profile,
-        connect: Bool,
-        options: Sendable?,
-        title: @escaping @Sendable (Profile) -> String
-    ) async throws {
+    public func install(_ profile: Profile, connect: Bool, options: Sendable?) async throws {
         let isOnDemand = profile.activeModules
             .contains {
                 $0 is OnDemandModule
