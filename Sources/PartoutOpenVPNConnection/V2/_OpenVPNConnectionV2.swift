@@ -16,7 +16,7 @@ public actor _OpenVPNConnectionV2 {
 
     private let controller: TunnelController
 
-    private let environment: TunnelEnvironment
+    private let reporter: ConnectionReporter
 
     private let factory: NetworkInterfaceFactory
 
@@ -54,7 +54,7 @@ public actor _OpenVPNConnectionV2 {
         statusSubject = CurrentValueStream(.disconnected)
         moduleId = module.id
         controller = parameters.controller
-        environment = parameters.environment
+        reporter = parameters.reporter
         factory = parameters.factory
         options = parameters.options
 
@@ -175,7 +175,7 @@ extension _OpenVPNConnectionV2: OpenVPNSessionDelegate {
         pp_log(ctx, .openvpn, .notice, "Remote options:")
         remoteOptions.print(ctx, isLocal: false)
 
-        environment.setEnvironmentValue(remoteOptions, forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
+        reporter.reportEnvironmentValue(remoteOptions, forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
 
         let builder = NetworkSettingsBuilder(
             ctx,
@@ -232,7 +232,7 @@ extension _OpenVPNConnectionV2: OpenVPNSessionDelegate {
 
         // Store last error
         if let error {
-            environment.setEnvironmentValue(error.partoutErrorCode, forKey: TunnelEnvironmentKeys.lastErrorCode)
+            reporter.reportLastError(error)
 
             // If error is not recoverable, just fail
             guard error.isOpenVPNRecoverable else {
@@ -251,7 +251,7 @@ extension _OpenVPNConnectionV2: OpenVPNSessionDelegate {
             return
         }
         pp_log(ctx, .openvpn, .debug, "Updated data count: \(dataCount.debugDescription)")
-        environment.setEnvironmentValue(dataCount, forKey: TunnelEnvironmentKeys.dataCount)
+        reporter.reportDataCount(dataCount)
     }
 }
 
@@ -327,16 +327,16 @@ private extension _OpenVPNConnectionV2 {
         case .connected:
             break
         case .disconnected:
-            environment.removeEnvironmentValue(forKey: TunnelEnvironmentKeys.dataCount)
-            environment.removeEnvironmentValue(forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
+            reporter.clearDataCount()
+            reporter.clearEnvironmentValue(forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
         default:
             break
         }
     }
 
     nonisolated func onError(_ connectionError: Error) {
-        environment.removeEnvironmentValue(forKey: TunnelEnvironmentKeys.dataCount)
-        environment.removeEnvironmentValue(forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
+        reporter.clearDataCount()
+        reporter.clearEnvironmentValue(forKey: TunnelEnvironmentKeys.OpenVPN.serverConfiguration)
     }
 }
 

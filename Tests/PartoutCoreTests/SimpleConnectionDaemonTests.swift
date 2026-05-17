@@ -156,6 +156,36 @@ struct SimpleConnectionDaemonTests {
     }
 
     @Test
+    func givenStartedConnectionReportingRecoverableError_whenConnectionDisconnects_thenPublishesLastErrorCode() async throws {
+        var connectionModule = MockConnectionModule()
+        connectionModule.options.reportedError = (50, PartoutError(.timeout))
+        let profile = try Profile.Builder(
+            modules: [connectionModule],
+            activeModulesIds: [connectionModule.id]
+        ).build()
+        #expect(profile.activeConnectionModule != nil)
+
+        let expLastError = Expectation()
+        let sut = try await newDaemon(
+            with: profile,
+            reconnectionDelay: 5000,
+            onSnapshot: { snapshot in
+                guard snapshot.environment?.lastErrorCode == .timeout else { return }
+                Task {
+                    await expLastError.fulfill()
+                }
+            }
+        )
+        let stream = sut.statusStream
+
+        try await sut.start()
+        #expect(await stream.nextElement() == .disconnected)
+        #expect(await stream.nextElement() == .connecting)
+        #expect(await stream.nextElement() == .connected)
+        try await expLastError.fulfillment(timeout: 500)
+    }
+
+    @Test
     func givenStartedDaemon_whenStop_thenDisconnects() async throws {
         let connectionModule = MockConnectionModule()
         let profile = try Profile.Builder(
@@ -228,14 +258,16 @@ private extension SimpleConnectionDaemonTests {
         controller.onCancelTunnelConnection = onCancel
         let options = ConnectionParameters.Options()
         let environment = environment ?? SharedTunnelEnvironment(profileId: profile.id)
+        let reporter = ConnectionReporter(environment: environment)
         return try SimpleConnectionDaemon(params: .init(
             connectionFactory: MockConnectionFactory(),
+            environment: environment,
             connectionParameters: .init(
                 profile: profile,
                 controller: controller,
                 factory: MockNetworkInterfaceFactory(),
                 reachability: reachability,
-                environment: environment,
+                reporter: reporter,
                 options: options
             ),
             messageHandler: DefaultMessageHandler(.global, environment: environment),
@@ -283,7 +315,7 @@ private struct MockConnectionModule: ConnectionModule {
         if let creationError {
             throw creationError
         }
-        return MockConnection(options: options)
+        return MockConnection(options: options, reporter: parameters.reporter)
     }
 }
 
@@ -293,10 +325,14 @@ private final class MockConnection: Connection {
 
         var failure: (interval: Int, error: Error)?
 
+        var reportedError: (interval: Int, error: Error)?
+
         var shouldTimeout = false
     }
 
     let options: Options
+
+    let reporter: ConnectionReporter
 
     private let statusSubject = CurrentValueStream<ConnectionStatus>(.disconnected)
 
@@ -311,8 +347,9 @@ private final class MockConnection: Connection {
     nonisolated(unsafe)
     private var sleepTask: Task<Void, Never>?
 
-    init(options: Options) {
+    init(options: Options, reporter: ConnectionReporter) {
         self.options = options
+        self.reporter = reporter
     }
 
     func start() async throws -> Bool {
@@ -327,6 +364,13 @@ private final class MockConnection: Connection {
             Task {
                 try? await Task.sleep(milliseconds: failure.interval)
                 statusSubject.send(completion: .failure(failure.error))
+            }
+        }
+        if let reportedError = options.reportedError {
+            Task {
+                try? await Task.sleep(milliseconds: reportedError.interval)
+                reporter.reportLastError(reportedError.error)
+                statusSubject.send(.disconnected)
             }
         }
         return true

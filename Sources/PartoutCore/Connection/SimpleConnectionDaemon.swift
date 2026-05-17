@@ -44,6 +44,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private let statusSubject: CurrentValueStream<ConnectionStatus>
 
+    private let reporter: ConnectionReporter
+
     private var isEvaluatingConnection: Bool
 
     private var onHold: Bool
@@ -81,6 +83,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
         state = .initial
         statusSubject = CurrentValueStream(.disconnected)
+        reporter = params.connectionParameters.reporter
         isEvaluatingConnection = false
         onHold = false
 
@@ -431,7 +434,7 @@ extension SimpleConnectionDaemon {
     }
 
     func reportLastError(_ error: Error) {
-        environment.setEnvironmentValue(error.partoutErrorCode, forKey: TunnelEnvironmentKeys.lastErrorCode)
+        reporter.reportLastError(error)
         publishSnapshot()
     }
 
