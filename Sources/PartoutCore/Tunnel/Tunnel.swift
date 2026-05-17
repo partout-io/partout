@@ -10,7 +10,7 @@ public actor Tunnel {
 
     private let strategy: TunnelObservableStrategy
 
-    private let updateInterval: TimeInterval
+    private let updateInterval: Int
 
     private let willInstall: WillInstallBlock?
 
@@ -29,7 +29,7 @@ public actor Tunnel {
     public init(
         _ ctx: PartoutLoggerContext,
         strategy: TunnelObservableStrategy,
-        updateInterval: TimeInterval = 1.0,
+        updateInterval: Int = 1000,
         willInstall: WillInstallBlock? = nil,
         environmentFactory: @escaping (Profile.ID) -> TunnelEnvironmentReader
     ) {
@@ -182,7 +182,7 @@ private extension Tunnel {
                 guard let self else { break }
                 guard !Task.isCancelled else { break }
                 await refreshSnapshotEnvironments()
-                try? await Task.sleep(interval: updateInterval)
+                try? await Task.sleep(milliseconds: updateInterval)
             }
             pp_log(ctx, .core, .debug, "Cancelled Tunnel.timerSubscription")
         }
