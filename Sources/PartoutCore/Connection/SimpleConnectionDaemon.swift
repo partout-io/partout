@@ -32,6 +32,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private let snapshotInterval: Int
 
+    private let minDataCountDelta: UInt64
+
     private var onSnapshot: OnTunnelSnapshotCallback?
 
     private var connection: Connection?
@@ -60,6 +62,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private var snapshotSubscription: Task<Void, Never>?
 
+    private var lastPublishedSnapshot: TunnelSnapshot?
+
     // MARK: Testing
 
     private var testEvaluateConnection: (() -> Void)?
@@ -79,6 +83,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         stopDelay = params.stopDelay
         reconnectionDelay = params.reconnectionDelay
         snapshotInterval = params.snapshotInterval
+        minDataCountDelta = params.minDataCountDelta
         onSnapshot = params.onSnapshot
 
         state = .initial
@@ -436,15 +441,15 @@ extension SimpleConnectionDaemon {
 
     func reportLastError(_ error: Error) {
         reporter.reportLastError(error)
-        publishSnapshot()
+        publishSnapshot(force: true)
     }
 
     func reportStatus(_ status: ConnectionStatus) {
         statusSubject.send(status)
-        publishSnapshot(with: status)
+        publishSnapshot(with: status, force: true)
     }
 
-    func publishSnapshot(with latestConnectionStatus: ConnectionStatus? = nil) {
+    func publishSnapshot(with latestConnectionStatus: ConnectionStatus? = nil, force: Bool = false) {
         let connectionStatus = latestConnectionStatus ?? statusSubject.value
         let status = connectionStatus.toTunnelStatus
         let env = environment.snapshot.with(connectionStatus: connectionStatus)
@@ -455,8 +460,24 @@ extension SimpleConnectionDaemon {
             onDemand: false,
             environment: env
         )
+        guard shouldPublishSnapshot(snapshot, force: force) else {
+            return
+        }
+        lastPublishedSnapshot = snapshot
         controller.reportSnapshots([snapshot])
         onSnapshot?(snapshot)
+    }
+
+    func shouldPublishSnapshot(_ snapshot: TunnelSnapshot, force: Bool) -> Bool {
+        guard !force, minDataCountDelta > 0, let lastPublishedSnapshot else {
+            return true
+        }
+        guard snapshot.isEquivalentExceptDataCount(to: lastPublishedSnapshot) else {
+            return true
+        }
+        let dataCount = snapshot.environment?.dataCount ?? DataCount()
+        let lastDataCount = lastPublishedSnapshot.environment?.dataCount ?? DataCount()
+        return dataCount.delta(from: lastDataCount) >= minDataCountDelta
     }
 }
 
@@ -468,6 +489,32 @@ private extension ConnectionStatus {
         case .disconnecting: .deactivating
         case .disconnected: .inactive
         }
+    }
+}
+
+private extension TunnelSnapshot {
+    func isEquivalentExceptDataCount(to other: Self) -> Bool {
+        id == other.id &&
+        isEnabled == other.isEnabled &&
+        status == other.status &&
+        onDemand == other.onDemand &&
+        environment?.connectionStatus == other.environment?.connectionStatus &&
+        environment?.lastErrorCode == other.environment?.lastErrorCode
+    }
+}
+
+private extension DataCount {
+    func delta(from other: Self) -> UInt64 {
+        let receivedDelta = received.delta(from: other.received)
+        let sentDelta = sent.delta(from: other.sent)
+        let (sum, overflow) = receivedDelta.addingReportingOverflow(sentDelta)
+        return overflow ? UInt64.max : sum
+    }
+}
+
+private extension UInt64 {
+    func delta(from other: Self) -> Self {
+        self >= other ? self - other : other - self
     }
 }
 
@@ -489,6 +536,8 @@ extension SimpleConnectionDaemon {
 
         let snapshotInterval: Int
 
+        let minDataCountDelta: UInt64
+
         let onSnapshot: OnTunnelSnapshotCallback?
 
         public init(
@@ -499,6 +548,7 @@ extension SimpleConnectionDaemon {
             stopDelay: Int? = nil,
             reconnectionDelay: Int? = nil,
             snapshotInterval: Int? = nil,
+            minDataCountDelta: UInt64? = nil,
             onSnapshot: OnTunnelSnapshotCallback? = nil
         ) {
             self.connectionFactory = connectionFactory
@@ -508,6 +558,7 @@ extension SimpleConnectionDaemon {
             self.stopDelay = stopDelay ?? 2000
             self.reconnectionDelay = reconnectionDelay ?? 2000
             self.snapshotInterval = snapshotInterval ?? 1000
+            self.minDataCountDelta = minDataCountDelta ?? 0
             self.onSnapshot = onSnapshot
         }
     }
