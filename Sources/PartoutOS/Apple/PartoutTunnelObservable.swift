@@ -7,7 +7,7 @@ import Observation
 /// Wraps a tunnel for use in the UI.
 @available(iOS 17, macOS 14, tvOS 17, *)
 @MainActor @Observable
-public final class TunnelObservable {
+public final class PartoutTunnelObservable {
     private let tunnel: Tunnel
 
     public private(set) var snapshots: [Profile.ID: TunnelSnapshot]
@@ -36,12 +36,12 @@ public final class TunnelObservable {
         snapshots.values.first?.status ?? .inactive
     }
 
-    public func install(_ profile: Profile, title: @escaping @Sendable (Profile) -> String) async throws {
-        try await tunnel.install(profile, connect: false, title: title)
+    public func install(_ profile: Profile) async throws {
+        try await tunnel.install(profile, connect: false)
     }
 
-    public func connect(to profile: Profile, title: @escaping @Sendable (Profile) -> String) async throws {
-        try await tunnel.install(profile, connect: true, title: title)
+    public func connect(to profile: Profile) async throws {
+        try await tunnel.install(profile, connect: true)
     }
 
     public func disconnect(from profileId: Profile.ID) async throws {
