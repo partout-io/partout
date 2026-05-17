@@ -26,7 +26,6 @@ entities:
   - IPSettings
   - IPSocketType
   - ModuleType
-  - OnConnectionStatus
   - OnDemandModule
   - OnDemandModule.OtherNetwork
   - OnDemandModule.Policy

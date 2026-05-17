@@ -30,7 +30,9 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private let reconnectionDelay: Int
 
-    private var onStatus: OnConnectionStatusCallback?
+    private let snapshotInterval: Int
+
+    private var onSnapshot: OnTunnelSnapshotCallback?
 
     private var connection: Connection?
 
@@ -54,6 +56,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private var networkObserverTask: Task<Void, Error>?
 
+    private var snapshotSubscription: Task<Void, Never>?
+
     // MARK: Testing
 
     private var testEvaluateConnection: (() -> Void)?
@@ -72,7 +76,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         startsImmediately = params.startsImmediately
         stopDelay = params.stopDelay
         reconnectionDelay = params.reconnectionDelay
-        onStatus = params.onStatus
+        snapshotInterval = params.snapshotInterval
+        onSnapshot = params.onSnapshot
 
         state = .initial
         statusSubject = CurrentValueStream(.disconnected)
@@ -193,6 +198,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         }
         statusSubscription?.cancel()
         statusSubscription = nil
+        snapshotSubscription?.cancel()
+        snapshotSubscription = nil
 
         // Clear tunnel settings
         if let settingsOnlyTunnel {
@@ -213,7 +220,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
 
         // Make sure to stop reporting onStatus events
-        onStatus = nil
+        onSnapshot = nil
     }
 
     public func sendMessage(_ input: Message.Input) async throws -> Message.Output? {
@@ -292,6 +299,28 @@ extension SimpleConnectionDaemon {
                 await evaluateConnection()
             }
             pp_log_id(profileId, .core, .debug, "Network subscription terminated")
+        }
+
+        // Emit periodical onStatus events
+        snapshotSubscription?.cancel()
+        snapshotSubscription = Task { [weak self] in
+            guard let profileId = self?.profile.id else { return }
+            pp_log_id(profileId, .core, .debug, "OnStatus subscription started")
+            while true {
+                guard let self else { return }
+                guard !Task.isCancelled else {
+                    pp_log_id(profileId, .core, .debug, "Cancelled OnStatus timer")
+                    break
+                }
+                await publishSnapshot()
+                do {
+                    try await Task.sleep(for: .milliseconds(snapshotInterval))
+                } catch {
+                    pp_log_id(profileId, .core, .debug, "Interrupted OnStatus timer")
+                    break
+                }
+            }
+            pp_log_id(profileId, .core, .debug, "OnStatus subscription terminated")
         }
 
         // Start monitoring
@@ -403,7 +432,33 @@ extension SimpleConnectionDaemon {
 
     func reportStatus(_ status: ConnectionStatus) {
         statusSubject.send(status)
-        onStatus?(OnConnectionStatus(profileId: profile.id, status: status))
+        publishSnapshot()
+    }
+
+    func publishSnapshot() {
+        let connectionStatus = statusSubject.value
+        let tunnelStatus = connectionStatus.toTunnelStatus
+        let env = environment.snapshot.with(connectionStatus: connectionStatus)
+        let snapshot = TunnelSnapshot(
+            id: profile.id,
+            isEnabled: true,
+            status: tunnelStatus,
+            onDemand: false,
+            environment: env
+        )
+        controller.reportSnapshots([snapshot])
+        onSnapshot?(snapshot)
+    }
+}
+
+private extension ConnectionStatus {
+    var toTunnelStatus: TunnelStatus {
+        switch self {
+        case .connecting: .activating
+        case .connected: .active
+        case .disconnecting: .deactivating
+        case .disconnected: .inactive
+        }
     }
 }
 
@@ -423,7 +478,9 @@ extension SimpleConnectionDaemon {
 
         let reconnectionDelay: Int
 
-        let onStatus: OnConnectionStatusCallback?
+        let snapshotInterval: Int
+
+        let onSnapshot: OnTunnelSnapshotCallback?
 
         public init(
             connectionFactory: ConnectionFactory,
@@ -432,7 +489,8 @@ extension SimpleConnectionDaemon {
             startsImmediately: Bool,
             stopDelay: Int? = nil,
             reconnectionDelay: Int? = nil,
-            onStatus: OnConnectionStatusCallback? = nil
+            snapshotInterval: Int? = nil,
+            onSnapshot: OnTunnelSnapshotCallback? = nil
         ) {
             self.connectionFactory = connectionFactory
             self.connectionParameters = connectionParameters
@@ -440,7 +498,8 @@ extension SimpleConnectionDaemon {
             self.startsImmediately = startsImmediately
             self.stopDelay = stopDelay ?? 2000
             self.reconnectionDelay = reconnectionDelay ?? 2000
-            self.onStatus = onStatus
+            self.snapshotInterval = snapshotInterval ?? 1000
+            self.onSnapshot = onSnapshot
         }
     }
 }

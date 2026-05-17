@@ -8,6 +8,8 @@ public protocol TunnelController: AnyObject, Sendable {
 
     func configureSockets(with descriptors: [UInt64])
 
+    func reportSnapshots(_ snapshots: [TunnelSnapshot])
+
     func clearTunnelSettings(_ tunnel: IOInterface, withKillSwitch: Bool) async
 
     func setReasserting(_ reasserting: Bool)
@@ -16,6 +18,9 @@ public protocol TunnelController: AnyObject, Sendable {
 }
 
 extension TunnelController {
+    public func reportSnapshots(_ snapshots: [TunnelSnapshot]) {
+    }
+
     public func clearTunnelSettings(_ tunnel: IOInterface) async {
         await clearTunnelSettings(tunnel, withKillSwitch: false)
     }

@@ -127,9 +127,9 @@ components:
       additionalProperties: false
       properties:
         received:
-          "$ref": "#/components/schemas/UInt"
+          "$ref": "#/components/schemas/UInt64"
         sent:
-          "$ref": "#/components/schemas/UInt"
+          "$ref": "#/components/schemas/UInt64"
       required:
         - received
         - sent
@@ -217,22 +217,12 @@ components:
     Int32:
       type: integer
     Int64:
+      format: int64
       type: integer
     Int8:
       type: integer
     ModuleType:
       type: string
-    OnConnectionStatus:
-      additionalProperties: false
-      properties:
-        profileId:
-          "$ref": "#/components/schemas/UniqueID"
-        status:
-          "$ref": "#/components/schemas/ConnectionStatus"
-      required:
-        - profileId
-        - status
-      type: object
     OnDemandModule:
       additionalProperties: false
       properties:
@@ -850,6 +840,7 @@ components:
     UInt32:
       type: integer
     UInt64:
+      format: int64
       type: integer
     UInt8:
       type: integer

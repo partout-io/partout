@@ -35,7 +35,7 @@ import kotlinx.serialization.Contextual
 data class TunnelRemoteInfoWrapper (
 
     @SerialName(value = "fileDescriptors")
-    val fileDescriptors: kotlin.collections.List<kotlin.Int>,
+    val fileDescriptors: kotlin.collections.List<kotlin.Long>,
 
     @SerialName(value = "originalModuleId")
     val originalModuleId: kotlin.String,
