@@ -217,22 +217,23 @@ struct TunnelTests {
             }
     }
 
-//    @Test
-//    func givenTunnelInfo_whenEnvironmentConnectionStatusChanges_thenProfileStatusIsRecomputed() async throws {
-//        var env = TunnelSnapshot.Environment().with(connectionStatus: .connecting)
-//        let info = ABI.AppTunnelInfo(
-//            id: UniqueID(),
-//            isEnabled: true,
-//            tunnelStatus: .active,
-//            onDemand: false,
-//            environment: env
-//        )
-//        #expect(info.status == .connecting)
-//
-//        env = env.with(connectionStatus: .connected)
-//        let updated = info.with(environment: env)
-//        #expect(updated.status == .connected)
-//    }
+    @Test
+    func givenTunnelSnapshot_whenEnvironmentConnectionStatusChanges_thenStatusConsidersIt() async throws {
+        var env = TunnelSnapshot.Environment()
+        env = env.with(connectionStatus: .connecting)
+        let snapshot = TunnelSnapshot(
+            id: UniqueID(),
+            isEnabled: true,
+            status: .active,
+            onDemand: false,
+            environment: env
+        )
+        #expect(snapshot.status.considering(env) == .activating)
+
+        env = env.with(connectionStatus: .connected)
+        let updated = snapshot.with(environment: env)
+        #expect(updated.status.considering(env) == .active)
+    }
 }
 
 // MARK: - Helpers
