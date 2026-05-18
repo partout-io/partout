@@ -108,17 +108,17 @@ _Nullable JNIEnv *_Nullable pp_jni_attach_thread(bool *_Nonnull did_attach);
 void *_Nullable pp_jni_new_global_ref(void *_Nullable ref);
 void pp_jni_delete_global_ref(void *_Nullable ref);
 
-#define JNI_ATTACH_OR_RETURN(env_name, return_value) \
+#define PP_JNI_ATTACH_OR_RETURN(env_name, return_value) \
     bool env_name##_did_attach; \
     JNIEnv *env_name = pp_jni_attach_thread(&env_name##_did_attach); \
     if (!(env_name)) return return_value
 
-#define JNI_ATTACH_OR_RETURN_VOID(env_name) \
+#define PP_JNI_ATTACH_OR_RETURN_VOID(env_name) \
     bool env_name##_did_attach; \
     JNIEnv *env_name = pp_jni_attach_thread(&env_name##_did_attach); \
     if (!(env_name)) return
 
-#define JNI_ATTACH_OR_COMPLETE(env_name, completion, ctx) \
+#define PP_JNI_ATTACH_OR_COMPLETE(env_name, completion, ctx) \
     bool env_name##_did_attach; \
     JNIEnv *env_name = pp_jni_attach_thread(&env_name##_did_attach); \
     if (!(env_name)) { \
@@ -126,7 +126,7 @@ void pp_jni_delete_global_ref(void *_Nullable ref);
         return; \
     }
 
-#define JNI_DETACH(env_name) \
+#define PP_JNI_DETACH(env_name) \
     do { \
         if (env_name##_did_attach) (*jvm)->DetachCurrentThread(jvm); \
     } while (0)
