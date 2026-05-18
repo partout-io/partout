@@ -50,9 +50,7 @@ JNIEnv *pp_jni_attach_thread(bool *did_attach) {
 void *pp_jni_new_global_ref(void *ref) {
     if (!ref) return NULL;
 
-    bool did_attach = false;
-    JNIEnv *env = pp_jni_attach_thread(&did_attach);
-    if (!env) return NULL;
+    JNI_ATTACH_OR_RETURN(env, NULL);
 
     jobject global_ref = (*env)->NewGlobalRef(env, (jobject)ref);
     if ((*env)->ExceptionCheck(env)) {
@@ -61,24 +59,18 @@ void *pp_jni_new_global_ref(void *ref) {
         global_ref = NULL;
     }
 
-    if (did_attach) {
-        (*jvm)->DetachCurrentThread(jvm);
-    }
+    JNI_DETACH(env);
     return global_ref;
 }
 
 void pp_jni_delete_global_ref(void *ref) {
     if (!ref) return;
 
-    bool did_attach = false;
-    JNIEnv *env = pp_jni_attach_thread(&did_attach);
-    if (!env) return;
+    JNI_ATTACH_OR_RETURN_VOID(env);
 
     (*env)->DeleteGlobalRef(env, (jobject)ref);
 
-    if (did_attach) {
-        (*jvm)->DetachCurrentThread(jvm);
-    }
+    JNI_DETACH(env);
 }
 
 void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonnull message) {
