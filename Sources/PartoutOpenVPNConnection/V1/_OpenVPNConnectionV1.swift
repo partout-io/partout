@@ -242,14 +242,10 @@ extension _OpenVPNConnectionV1: OpenVPNSessionDelegate {
         }
 
         // If error is not recoverable, just fail
-        if let error {
-            reporter.reportLastError(error)
-
-            guard error.isOpenVPNRecoverable else {
-                pp_log(ctx, .openvpn, .error, "Disconnection is not recoverable")
-                await backend.sendError(error)
-                return
-            }
+        if let error, !error.isOpenVPNRecoverable {
+            pp_log(ctx, .openvpn, .error, "Disconnection is not recoverable")
+            await backend.sendError(error)
+            return
         }
 
         // Go back to the disconnected state (e.g. daemon will reconnect)
