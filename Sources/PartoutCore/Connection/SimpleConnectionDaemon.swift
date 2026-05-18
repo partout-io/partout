@@ -30,7 +30,11 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private let reconnectionDelay: Int
 
-    private var onStatus: StatusCallback?
+    private let snapshotInterval: Int
+
+    private let minDataCountDelta: UInt64
+
+    private var onSnapshot: OnTunnelSnapshotCallback?
 
     private var connection: Connection?
 
@@ -41,6 +45,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     private var state: State
 
     private let statusSubject: CurrentValueStream<ConnectionStatus>
+
+    private let reporter: ConnectionReporter
 
     private var isEvaluatingConnection: Bool
 
@@ -53,6 +59,10 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
     private var networkSubscription: Task<Void, Never>?
 
     private var networkObserverTask: Task<Void, Error>?
+
+    private var snapshotSubscription: Task<Void, Never>?
+
+    private var lastPublishedSnapshot: TunnelSnapshot?
 
     // MARK: Testing
 
@@ -72,10 +82,13 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         startsImmediately = params.startsImmediately
         stopDelay = params.stopDelay
         reconnectionDelay = params.reconnectionDelay
-        onStatus = params.onStatus
+        snapshotInterval = params.snapshotInterval
+        minDataCountDelta = params.minDataCountDelta
+        onSnapshot = params.onSnapshot
 
         state = .initial
         statusSubject = CurrentValueStream(.disconnected)
+        reporter = params.connectionParameters.reporter
         isEvaluatingConnection = false
         onHold = false
 
@@ -147,7 +160,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             pp_log_id(profile.id, .core, .notice, "Daemon started successfully")
         } catch {
             pp_log_id(profile.id, .core, .fault, "Unable to start daemon: \(error)")
-            environment.setEnvironmentValue(PartoutError(error).code, forKey: TunnelEnvironmentKeys.lastErrorCode)
+            reportLastError(error)
             controller.setReasserting(false)
             controller.cancelTunnelConnection(with: error)
         }
@@ -174,10 +187,10 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         // Prevent reconnection
         networkObserver?.setEnabled(false)
 
-        // Cancel subscriptions before stopping connection
-        statusSubscription?.cancel()
+        // Prevent more starts before stopping connection
         networkSubscription?.cancel()
         networkObserverTask?.cancel()
+        let isDrainingStatusSubscription = statusSubject.value != .disconnected
 
         // If there is a connection, disconnect with a timeout
         if let connection {
@@ -186,6 +199,15 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         } else {
             pp_log_id(profile.id, .core, .notice, "Non-connection profile, nothing to disconnect from")
         }
+
+        // Drain terminal status before cancelling the subscription
+        if isDrainingStatusSubscription {
+            await statusSubscription?.value
+        }
+        statusSubscription?.cancel()
+        statusSubscription = nil
+        snapshotSubscription?.cancel()
+        snapshotSubscription = nil
 
         // Clear tunnel settings
         if let settingsOnlyTunnel {
@@ -204,10 +226,9 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         connection = nil
 
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
-        reportStatus(.disconnected)
 
         // Make sure to stop reporting onStatus events
-        onStatus = nil
+        onSnapshot = nil
     }
 
     public func sendMessage(_ input: Message.Input) async throws -> Message.Output? {
@@ -259,7 +280,10 @@ extension SimpleConnectionDaemon {
                         pp_log_id(profileId, .core, .debug, "Cancelled SimpleConnectionDaemon.statusStream")
                         return
                     }
-                    await self?.onConnectionStatus(status)
+                    let shouldStopObserving = await self?.onConnectionStatus(status) ?? true
+                    guard !shouldStopObserving else {
+                        break
+                    }
                 }
             } catch {
                 await self?.onConnectionError(error)
@@ -283,6 +307,28 @@ extension SimpleConnectionDaemon {
                 await evaluateConnection()
             }
             pp_log_id(profileId, .core, .debug, "Network subscription terminated")
+        }
+
+        // Emit periodical onStatus events
+        snapshotSubscription?.cancel()
+        snapshotSubscription = Task { [weak self] in
+            guard let profileId = self?.profile.id else { return }
+            pp_log_id(profileId, .core, .debug, "OnStatus subscription started")
+            while true {
+                guard let self else { return }
+                guard !Task.isCancelled else {
+                    pp_log_id(profileId, .core, .debug, "Cancelled OnStatus timer")
+                    break
+                }
+                await publishSnapshot()
+                do {
+                    try await Task.sleep(for: .milliseconds(snapshotInterval))
+                } catch {
+                    pp_log_id(profileId, .core, .debug, "Interrupted OnStatus timer")
+                    break
+                }
+            }
+            pp_log_id(profileId, .core, .debug, "OnStatus subscription terminated")
         }
 
         // Start monitoring
@@ -334,7 +380,7 @@ extension SimpleConnectionDaemon {
             didStart = try await connection.start()
         } catch {
             pp_log_id(profile.id, .core, .error, "Unable to start connection: \(error)")
-            environment.setEnvironmentValue(PartoutError(error).code, forKey: TunnelEnvironmentKeys.lastErrorCode)
+            reportLastError(error)
             return
         }
 
@@ -369,7 +415,7 @@ extension SimpleConnectionDaemon {
         }
     }
 
-    func onConnectionStatus(_ connectionStatus: ConnectionStatus) {
+    func onConnectionStatus(_ connectionStatus: ConnectionStatus) -> Bool {
         environment.setEnvironmentValue(connectionStatus, forKey: TunnelEnvironmentKeys.connectionStatus)
         switch connectionStatus {
         case .connected:
@@ -384,24 +430,86 @@ extension SimpleConnectionDaemon {
             resumeNetworkObserver(after: reconnectionDelay)
         }
         reportStatus(connectionStatus)
+        return state == .stopped && connectionStatus == .disconnected
     }
 
     func onConnectionError(_ error: Error) {
-        environment.setEnvironmentValue(PartoutError(error).code, forKey: TunnelEnvironmentKeys.lastErrorCode)
+        reportLastError(error)
         controller.setReasserting(false)
+        controller.cancelTunnelConnection(with: error)
+    }
+
+    func reportLastError(_ error: Error) {
+        reporter.reportLastError(error)
+        publishSnapshot(force: true)
     }
 
     func reportStatus(_ status: ConnectionStatus) {
         statusSubject.send(status)
-        onStatus?(profile.id, status)
+        publishSnapshot(with: status, force: true)
+    }
+
+    func publishSnapshot(with latestConnectionStatus: ConnectionStatus? = nil, force: Bool = false) {
+        let connectionStatus = latestConnectionStatus ?? statusSubject.value
+        let status = connectionStatus.toTunnelStatus
+        let env = environment.snapshot.with(connectionStatus: connectionStatus)
+        let snapshot = TunnelSnapshot(
+            id: profile.id,
+            isEnabled: true,
+            status: status, // TunnelStatus == ConnectionStatus
+            onDemand: false,
+            environment: env
+        )
+        guard shouldPublishSnapshot(snapshot, force: force) else {
+            return
+        }
+        lastPublishedSnapshot = snapshot
+        controller.reportSnapshots([snapshot])
+        onSnapshot?(snapshot)
+    }
+
+    func shouldPublishSnapshot(_ snapshot: TunnelSnapshot, force: Bool) -> Bool {
+        guard !force, minDataCountDelta > 0, let lastPublishedSnapshot else {
+            return true
+        }
+        guard snapshot.isEquivalentExceptDataCount(to: lastPublishedSnapshot) else {
+            return true
+        }
+        let dataCount = snapshot.environment?.dataCount ?? DataCount()
+        let lastDataCount = lastPublishedSnapshot.environment?.dataCount ?? DataCount()
+        return dataCount.delta(from: lastDataCount) >= minDataCountDelta
+    }
+}
+
+private extension ConnectionStatus {
+    var toTunnelStatus: TunnelStatus {
+        switch self {
+        case .connecting: .activating
+        case .connected: .active
+        case .disconnecting: .deactivating
+        case .disconnected: .inactive
+        }
+    }
+}
+
+private extension DataCount {
+    func delta(from other: Self) -> UInt64 {
+        let receivedDelta = received.delta(from: other.received)
+        let sentDelta = sent.delta(from: other.sent)
+        let (sum, overflow) = receivedDelta.addingReportingOverflow(sentDelta)
+        return overflow ? .max : sum
+    }
+}
+
+private extension UInt64 {
+    func delta(from other: Self) -> Self {
+        self >= other ? self - other : other - self
     }
 }
 
 // MARK: - Parameters
 
 extension SimpleConnectionDaemon {
-    public typealias StatusCallback = @Sendable (Profile.ID, ConnectionStatus) -> Void
-
     public final class Parameters: Sendable {
         let connectionFactory: ConnectionFactory
 
@@ -415,7 +523,11 @@ extension SimpleConnectionDaemon {
 
         let reconnectionDelay: Int
 
-        let onStatus: StatusCallback?
+        let snapshotInterval: Int
+
+        let minDataCountDelta: UInt64
+
+        let onSnapshot: OnTunnelSnapshotCallback?
 
         public init(
             connectionFactory: ConnectionFactory,
@@ -424,7 +536,9 @@ extension SimpleConnectionDaemon {
             startsImmediately: Bool,
             stopDelay: Int? = nil,
             reconnectionDelay: Int? = nil,
-            onStatus: StatusCallback? = nil
+            snapshotInterval: Int? = nil,
+            minDataCountDelta: UInt64? = nil,
+            onSnapshot: OnTunnelSnapshotCallback? = nil
         ) {
             self.connectionFactory = connectionFactory
             self.connectionParameters = connectionParameters
@@ -432,7 +546,9 @@ extension SimpleConnectionDaemon {
             self.startsImmediately = startsImmediately
             self.stopDelay = stopDelay ?? 2000
             self.reconnectionDelay = reconnectionDelay ?? 2000
-            self.onStatus = onStatus
+            self.snapshotInterval = snapshotInterval ?? 1000
+            self.minDataCountDelta = minDataCountDelta ?? 0
+            self.onSnapshot = onSnapshot
         }
     }
 }

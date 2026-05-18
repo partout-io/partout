@@ -83,6 +83,10 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                         continuation.resume(throwing: PartoutError(.releasedObject))
                         return
                     }
+                    guard self.isActive else {
+                        continuation.resume(throwing: PartoutError(.tunNotActive))
+                        return
+                    }
                     let readCount = pp_tun_read(tun, &readBuf, readBuf.count)
                     guard readCount > 0 else {
                         continuation.resume(throwing: PartoutError(.linkFailure))
@@ -113,8 +117,16 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                         continuation.resume(throwing: PartoutError(.releasedObject))
                         return
                     }
+                    guard self.isActive else {
+                        continuation.resume(throwing: PartoutError(.tunNotActive))
+                        return
+                    }
                     for toWrite in packets {
                         guard !toWrite.isEmpty else { continue }
+                        guard self.isActive else {
+                            continuation.resume(throwing: PartoutError(.tunNotActive))
+                            return
+                        }
                         let writtenCount = toWrite.withUnsafeBytes {
                             pp_tun_write(self.tun, $0.bytePointer, toWrite.count)
                         }
@@ -145,6 +157,9 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         guard shouldShutdown else { return }
         pp_log(ctx, .core, .info, "Shut down TUN")
         pp_tun_shutdown(tun)
+    }
+
+    func waitUntilIdle() async {
         await readQueue.waitUntilIdle()
         await writeQueue.waitUntilIdle()
     }

@@ -24,7 +24,7 @@ public actor _WireGuardConnectionV2: Connection {
 
     private let reachability: ReachabilityObserver
 
-    private let environment: TunnelEnvironment
+    private let reporter: ConnectionReporter
 
     private let dnsTimeout: Int
 
@@ -46,7 +46,7 @@ public actor _WireGuardConnectionV2: Connection {
         moduleId = module.id
         controller = parameters.controller
         reachability = parameters.reachability
-        environment = parameters.environment
+        reporter = parameters.reporter
         dnsTimeout = parameters.options.dnsTimeout
 
         guard let configuration = module.configuration else {
@@ -107,6 +107,7 @@ public actor _WireGuardConnectionV2: Connection {
             dataCountTimer?.cancel()
             dataCountTimer = nil
             self.adapter = nil
+            reporter.reportLastError(startError)
             statusSubject.send(.disconnected)
             throw startError
         }
@@ -146,6 +147,7 @@ extension _WireGuardConnectionV2: WireGuardAdapterDelegate {
             return tunnel
         } catch {
             pp_log(ctx, .wireguard, .error, "Unable to configure tunnel settings: \(error)")
+            reporter.reportLastError(error)
             statusSubject.send(.disconnected)
             throw error
         }
@@ -199,19 +201,19 @@ private extension _WireGuardConnectionV2 {
               let dataCount = DataCount.fromWireGuardString(configurationString) else {
             return
         }
-        environment.setEnvironmentValue(dataCount, forKey: TunnelEnvironmentKeys.dataCount)
+        reporter.reportDataCount(dataCount)
     }
 }
 
 private extension DataCount {
     static func fromWireGuardString(_ string: String) -> DataCount? {
-        var bytesReceived: UInt?
-        var bytesSent: UInt?
+        var bytesReceived: UInt64?
+        var bytesSent: UInt64?
         string.enumerateLines { line, stop in
             if bytesReceived == nil, let value = line.getPrefix("rx_bytes=") {
-                bytesReceived = value
+                bytesReceived = UInt64(value)
             } else if bytesSent == nil, let value = line.getPrefix("tx_bytes=") {
-                bytesSent = value
+                bytesSent = UInt64(value)
             }
             if bytesReceived != nil, bytesSent != nil {
                 stop = true

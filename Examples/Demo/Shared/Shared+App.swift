@@ -15,8 +15,8 @@ extension Registry {
     static let shared = Registry(withKnown: true)
 }
 
-extension TunnelObservable {
-    static let shared: TunnelObservable = {
+extension PartoutTunnelObservable {
+    static let shared: PartoutTunnelObservable = {
 #if targetEnvironment(simulator)
         let strategy = FakeTunnelStrategy()
         let tunnel = Tunnel(.global, strategy: strategy) {
@@ -26,12 +26,15 @@ extension TunnelObservable {
         let strategy = NETunnelStrategy(
             .global,
             bundleIdentifier: Demo.tunnelBundleIdentifier,
-            coder: Demo.neProtocolCoder
+            coder: Demo.neProtocolCoder,
+            title: {
+                "PartoutDemo: \($0.name)"
+            }
         )
         let tunnel = Tunnel(.global, strategy: strategy) {
             NETunnelEnvironment(strategy: strategy, profileId: $0)
         }
 #endif
-        return TunnelObservable(tunnel: tunnel)
+        return PartoutTunnelObservable(tunnel: tunnel)
     }()
 }

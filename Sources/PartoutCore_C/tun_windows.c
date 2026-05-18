@@ -7,7 +7,7 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
-// FIXME: #188, Implement Windows controller/strategy
+// FIXME: #188, Implement Windows tun_ctrl
 
 #if PARTOUT_WINDOWS
 
@@ -228,46 +228,22 @@ void pp_tun_ctrl_configure_sockets(void *ref, const int *fds, const size_t fds_l
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_configure_sockets(%p)", ref);
 }
 
+void pp_tun_ctrl_report_snapshots(void *ref, const char *snapshots_json) {
+    (void)ref;
+    (void)snapshots_json;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_report_snapshots(%p)", ref);
+}
+
 void pp_tun_ctrl_clear_tunnel(void *ref, pp_tun tun_impl) {
     (void)ref;
     (void)tun_impl;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_clear_tunnel(%p)", ref);
 }
 
-void pp_tun_strg_install(void *ref,
-                         const char *profile_json,
-                         bool connect,
-                         const char *options_json,
-                         void *ctx,
-                         pp_completion completion) {
+void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_message) {
     (void)ref;
-    (void)profile_json;
-    (void)options_json;
-    (void)ctx;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_windows: strg_install(%p, %d)", ref, connect);
-    if (completion) completion(NULL, 0);
-}
-
-void pp_tun_strg_uninstall(void *ref,
-                           const char *profile_id,
-                           void *ctx,
-                           pp_completion completion) {
-    (void)ref;
-    (void)profile_id;
-    (void)ctx;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_windows: strg_uninstall(%p)", ref);
-    if (completion) completion(NULL, 0);
-}
-
-void pp_tun_strg_disconnect(void *ref,
-                            const char *profile_id,
-                            void *ctx,
-                            pp_completion completion) {
-    (void)ref;
-    (void)profile_id;
-    (void)ctx;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_windows: strg_disconnect(%p)", ref);
-    if (completion) completion(NULL, 0);
+    (void)error_message;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_cancel_tunnel(%p)", ref);
 }
 
 #endif

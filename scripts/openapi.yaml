@@ -123,6 +123,17 @@ components:
         - cleartext
         - https
         - tls
+    DataCount:
+      additionalProperties: false
+      properties:
+        received:
+          "$ref": "#/components/schemas/UInt64"
+        sent:
+          "$ref": "#/components/schemas/UInt64"
+      required:
+        - received
+        - sent
+      type: object
     Endpoint:
       type: string
     EndpointProtocol:
@@ -174,8 +185,6 @@ components:
           items:
             "$ref": "#/components/schemas/Route"
           type: array
-        legacySingleSubnet:
-          "$ref": "#/components/schemas/Subnet"
         subnets:
           items:
             "$ref": "#/components/schemas/Subnet"
@@ -206,6 +215,7 @@ components:
     Int32:
       type: integer
     Int64:
+      format: int64
       type: integer
     Int8:
       type: integer
@@ -581,6 +591,8 @@ components:
       required:
         - id
       type: object
+    PartoutError.Code:
+      type: string
     ProfileBehavior:
       additionalProperties: false
       properties:
@@ -775,11 +787,58 @@ components:
         - fileDescriptors
         - requiresVirtualDevice
       type: object
+    TunnelSnapshot:
+      additionalProperties: false
+      properties:
+        environment:
+          "$ref": "#/components/schemas/TunnelSnapshot.Environment"
+        id:
+          "$ref": "#/components/schemas/UniqueID"
+        isEnabled:
+          type: boolean
+        onDemand:
+          type: boolean
+        status:
+          "$ref": "#/components/schemas/TunnelStatus"
+      required:
+        - id
+        - isEnabled
+        - status
+        - onDemand
+      type: object
+    TunnelSnapshot.Environment:
+      additionalProperties: false
+      properties:
+        connectionStatus:
+          "$ref": "#/components/schemas/ConnectionStatus"
+        dataCount:
+          "$ref": "#/components/schemas/DataCount"
+        lastErrorCode:
+          "$ref": "#/components/schemas/PartoutError.Code"
+      required:
+        - connectionStatus
+        - dataCount
+      type: object
+    TunnelStatus:
+      enum:
+        - inactive
+        - activating
+        - active
+        - deactivating
+      type: string
+      x-enum-varnames:
+        - inactive
+        - activating
+        - active
+        - deactivating
+    UInt:
+      type: integer
     UInt16:
       type: integer
     UInt32:
       type: integer
     UInt64:
+      format: int64
       type: integer
     UInt8:
       type: integer

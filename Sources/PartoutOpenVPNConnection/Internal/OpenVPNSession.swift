@@ -487,7 +487,7 @@ private extension OpenVPNSession {
             }
         }
         lastDataCountDate = Date()
-        let currentDataCount = DataCount(UInt(dataCount.inbound), UInt(dataCount.outbound))
+        let currentDataCount = DataCount(UInt64(dataCount.inbound), UInt64(dataCount.outbound))
         Task { [weak self] in
             guard let self else { return }
             await delegate?.session(self, didUpdateDataCount: currentDataCount)

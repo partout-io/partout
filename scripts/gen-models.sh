@@ -1,28 +1,28 @@
 #!/bin/bash
 set -e
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-infile="$script_dir/openapi.yaml"
-
 usage() {
-    echo "Usage: $0 <lang:kotlin|cpp> <models-dir>"
+    echo "Usage: $0 <openapi> <language:kotlin|cpp> <models_dir> <package_name>"
     exit 1
 }
 
-if [ "$#" -ne 2 ]; then
+if [ "$#" -ne 4 ]; then
     usage
 fi
 
-mode=$1
-models_dir=$2
+infile=$1
+language=$2
+models_dir=$3
+package_name=$4
 
 # First, update the OpenAPI metadata
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 $script_dir/gen-api.sh
 
-case $mode in
+case $language in
     kotlin)
-        package_name=io.partout.abi
-        rm -rf $models_dir/src/main/kotlin/io/partout/abi
+        package_dir=${package_name//./\/}
+        rm -rf $models_dir/src/main/kotlin/$package_dir
         openapi-generator generate \
             -i $infile \
             -o $models_dir \
@@ -36,11 +36,11 @@ case $mode in
             --schema-mappings OpenVPN.CryptoContainer=kotlin.String \
         ;;
     cpp)
-        echo "cpp mode is not implemented yet; exiting."
+        echo "cpp language is not implemented yet; exiting."
         exit 0
         ;;
     *)
-        echo "unknown mode '$mode'; expected 'kotlin' or 'cpp'"
+        echo "unknown language '$language'; expected 'kotlin' or 'cpp'"
         exit 1
         ;;
 esac
