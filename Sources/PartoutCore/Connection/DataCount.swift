@@ -4,6 +4,7 @@
 
 /// A pair of received/sent bytes count.
 public struct DataCount: Hashable, Codable, Sendable {
+    public static let zero = DataCount()
 
     /// Received bytes count.
     public let received: UInt64

@@ -194,6 +194,49 @@ struct SimpleConnectionDaemonTests {
     }
 
     @Test
+    func givenStartedConnectionReportingSmallDataCountChanges_whenSnapshotTimerFires_thenSkipsSnapshotsBelowMinimumDelta() async throws {
+        var connectionModule = MockConnectionModule()
+        connectionModule.options.reportedDataCounts = [
+            (50, DataCount(40, 0)),
+            (110, DataCount(80, 0)),
+            (170, DataCount(140, 0))
+        ]
+        let profile = try Profile.Builder(
+            modules: [connectionModule],
+            activeModulesIds: [connectionModule.id]
+        ).build()
+        #expect(profile.activeConnectionModule != nil)
+
+        let recorder = SnapshotRecorder()
+        let expDataCount = Expectation()
+        let sut = try await newDaemon(
+            with: profile,
+            reconnectionDelay: 5000,
+            snapshotInterval: 30,
+            minDataCountDelta: 100,
+            onSnapshot: { snapshot in
+                Task {
+                    await recorder.append(snapshot)
+                    guard snapshot.environment?.dataCount == DataCount(140, 0) else { return }
+                    await expDataCount.fulfill()
+                }
+            }
+        )
+        let stream = sut.statusStream
+
+        try await sut.start()
+        #expect(await stream.nextElement() == .disconnected)
+        #expect(await stream.nextElement() == .connecting)
+        #expect(await stream.nextElement() == .connected)
+        try await expDataCount.fulfillment(timeout: 1000)
+
+        let dataCounts = await recorder.dataCounts.filter { $0 != DataCount() }
+        #expect(!dataCounts.contains(DataCount(40, 0)))
+        #expect(!dataCounts.contains(DataCount(80, 0)))
+        #expect(dataCounts.contains(DataCount(140, 0)))
+    }
+
+    @Test
     func givenStartedDaemon_whenStop_thenDisconnects() async throws {
         let connectionModule = MockConnectionModule()
         let profile = try Profile.Builder(
@@ -260,6 +303,8 @@ private extension SimpleConnectionDaemonTests {
         onCancel: @escaping (Error?) -> Void = { _ in },
         stopDelay: Int = 1000,
         reconnectionDelay: Int = 1000,
+        snapshotInterval: Int = 1000,
+        minDataCountDelta: UInt64 = 0,
         onSnapshot: OnTunnelSnapshotCallback? = nil
     ) async throws -> SimpleConnectionDaemon {
         let controller = MockTunnelController()
@@ -280,8 +325,22 @@ private extension SimpleConnectionDaemonTests {
             startsImmediately: false,
             stopDelay: stopDelay,
             reconnectionDelay: reconnectionDelay,
+            snapshotInterval: snapshotInterval,
+            minDataCountDelta: minDataCountDelta,
             onSnapshot: onSnapshot
         ))
+    }
+}
+
+private actor SnapshotRecorder {
+    private var snapshots: [TunnelSnapshot] = []
+
+    func append(_ snapshot: TunnelSnapshot) {
+        snapshots.append(snapshot)
+    }
+
+    var dataCounts: [DataCount] {
+        snapshots.compactMap { $0.environment?.dataCount }
     }
 }
 
@@ -333,6 +392,8 @@ private final class MockConnection: Connection {
 
         var reportedError: (interval: Int, error: Error)?
 
+        var reportedDataCounts: [(interval: Int, dataCount: DataCount)] = []
+
         var shouldTimeout = false
     }
 
@@ -377,6 +438,12 @@ private final class MockConnection: Connection {
                 try? await Task.sleep(milliseconds: reportedError.interval)
                 reporter.reportLastError(reportedError.error)
                 statusSubject.send(.disconnected)
+            }
+        }
+        for reportedDataCount in options.reportedDataCounts {
+            Task {
+                try? await Task.sleep(milliseconds: reportedDataCount.interval)
+                reporter.reportDataCount(reportedDataCount.dataCount)
             }
         }
         return true
