@@ -47,6 +47,32 @@ JNIEnv *pp_jni_attach_thread(bool *did_attach) {
     }
 }
 
+void *pp_jni_new_global_ref(void *ref) {
+    if (!ref) return NULL;
+
+    PP_JNI_ATTACH_OR_RETURN(env, NULL);
+
+    jobject global_ref = (*env)->NewGlobalRef(env, (jobject)ref);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        global_ref = NULL;
+    }
+
+    PP_JNI_DETACH(env);
+    return global_ref;
+}
+
+void pp_jni_delete_global_ref(void *ref) {
+    if (!ref) return;
+
+    PP_JNI_ATTACH_OR_RETURN_VOID(env);
+
+    (*env)->DeleteGlobalRef(env, (jobject)ref);
+
+    PP_JNI_DETACH(env);
+}
+
 void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonnull message) {
     const char *log_tag = tag ? tag : "Partout";
     int android_level = 0;
