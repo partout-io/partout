@@ -4,7 +4,10 @@
 
 /// Manages a tunnel and observes its status.
 public actor Tunnel {
-    public typealias WillInstallBlock = @Sendable (_ profile: Profile) async throws -> Profile
+    public typealias WillInstallBlock = @Sendable (
+        _ preProfile: Profile,
+        _ connect: Bool
+    ) async throws -> Profile?
 
     private let ctx: PartoutLoggerContext
 
@@ -75,7 +78,7 @@ extension Tunnel: TunnelStrategy {
         let profile: Profile
         if let willInstall {
             pp_log(ctx, .core, .info, "Pre-process profile \(preProfile.id) before installing")
-            profile = try await willInstall(preProfile)
+            profile = try await willInstall(preProfile, connect) ?? preProfile
         } else {
             profile = preProfile
         }

@@ -267,7 +267,7 @@ private final class MockTunnelProcessor: @unchecked Sendable {
     var willInstallCount = 0
 
     @Sendable
-    func willInstall(_ profile: Profile) throws -> Profile {
+    func willInstall(_ preProfile: Profile, connect: Bool) throws -> Profile {
         willInstallCount += 1
         return profile
     }
