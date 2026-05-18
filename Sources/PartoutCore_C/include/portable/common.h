@@ -105,6 +105,8 @@ FILE *_Nullable pp_fopen(const char *_Nonnull filename, const char *_Nonnull mod
 #include <stdbool.h>
 extern _Nullable JavaVM *_Nullable jvm;
 _Nullable JNIEnv *_Nullable pp_jni_attach_thread(bool *_Nonnull did_attach);
+void *_Nullable pp_jni_new_global_ref(void *_Nullable ref);
+void pp_jni_delete_global_ref(void *_Nullable ref);
 
 #define JNI_ATTACH_OR_RETURN(env_name, return_value) \
     bool env_name##_did_attach; \
