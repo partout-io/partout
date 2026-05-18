@@ -44,6 +44,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private let statusSubject: CurrentValueStream<ConnectionStatus>
 
+    private let reporter: ConnectionReporter
+
     private var isEvaluatingConnection: Bool
 
     private var onHold: Bool
@@ -81,6 +83,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
         state = .initial
         statusSubject = CurrentValueStream(.disconnected)
+        reporter = params.connectionParameters.reporter
         isEvaluatingConnection = false
         onHold = false
 
@@ -152,7 +155,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             pp_log_id(profile.id, .core, .notice, "Daemon started successfully")
         } catch {
             pp_log_id(profile.id, .core, .fault, "Unable to start daemon: \(error)")
-            environment.setEnvironmentValue(PartoutError(error).code, forKey: TunnelEnvironmentKeys.lastErrorCode)
+            reportLastError(error)
             controller.setReasserting(false)
             controller.cancelTunnelConnection(with: error)
         }
@@ -372,7 +375,7 @@ extension SimpleConnectionDaemon {
             didStart = try await connection.start()
         } catch {
             pp_log_id(profile.id, .core, .error, "Unable to start connection: \(error)")
-            environment.setEnvironmentValue(PartoutError(error).code, forKey: TunnelEnvironmentKeys.lastErrorCode)
+            reportLastError(error)
             return
         }
 
@@ -426,23 +429,29 @@ extension SimpleConnectionDaemon {
     }
 
     func onConnectionError(_ error: Error) {
-        environment.setEnvironmentValue(PartoutError(error).code, forKey: TunnelEnvironmentKeys.lastErrorCode)
+        reportLastError(error)
         controller.setReasserting(false)
+        controller.cancelTunnelConnection(with: error)
+    }
+
+    func reportLastError(_ error: Error) {
+        reporter.reportLastError(error)
+        publishSnapshot()
     }
 
     func reportStatus(_ status: ConnectionStatus) {
         statusSubject.send(status)
-        publishSnapshot()
+        publishSnapshot(with: status)
     }
 
-    func publishSnapshot() {
-        let connectionStatus = statusSubject.value
-        let tunnelStatus = connectionStatus.toTunnelStatus
+    func publishSnapshot(with latestConnectionStatus: ConnectionStatus? = nil) {
+        let connectionStatus = latestConnectionStatus ?? statusSubject.value
+        let status = connectionStatus.toTunnelStatus
         let env = environment.snapshot.with(connectionStatus: connectionStatus)
         let snapshot = TunnelSnapshot(
             id: profile.id,
             isEnabled: true,
-            status: tunnelStatus,
+            status: status, // TunnelStatus == ConnectionStatus
             onDemand: false,
             environment: env
         )

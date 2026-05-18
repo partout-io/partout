@@ -68,6 +68,19 @@ extension PartoutError: Equatable {
     }
 }
 
+extension Error {
+    public var partoutErrorCode: PartoutError.Code {
+        switch self {
+        case let pe as PartoutError:
+            return pe.code
+        case let me as PartoutErrorMappable:
+            return me.asPartoutError.code
+        default:
+            return .unhandled
+        }
+    }
+}
+
 // MARK: - Description
 
 extension PartoutError: CustomDebugStringConvertible {

@@ -85,7 +85,11 @@ public final class NativeTunnelController: TunnelController {
         await tunnel.shutdown()
 
         // Release tun implementation if necessary
-        pp_tun_ctrl_clear_tunnel(ref, tunnel.tun)
+        let controllerRef = ref
+        Task.detached { [tunnel] in
+            await tunnel.waitUntilIdle()
+            pp_tun_ctrl_clear_tunnel(controllerRef, tunnel.tun)
+        }
     }
 
     public func setReasserting(_ reasserting: Bool) {
@@ -93,7 +97,13 @@ public final class NativeTunnelController: TunnelController {
     }
 
     public func cancelTunnelConnection(with error: Error?) {
-        // Do nothing
+        guard let error else {
+            pp_tun_ctrl_cancel_tunnel(ref, nil)
+            return
+        }
+        String(describing: error).withCString {
+            pp_tun_ctrl_cancel_tunnel(ref, $0)
+        }
     }
 }
 

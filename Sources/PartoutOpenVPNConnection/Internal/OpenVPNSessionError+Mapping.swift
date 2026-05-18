@@ -15,7 +15,7 @@ extension OpenVPNSessionError: PartoutErrorMappable {
         case .negotiationTimeout, .pingTimeout, .writeTimeout:
             return .timeout
 
-        case .badCredentials:
+        case .badCredentials, .badCredentialsWithLocalOptions:
             return .authentication
 
         case .serverCompression:
@@ -47,6 +47,11 @@ extension OpenVPNSessionError: PartoutErrorMappable {
 
             default:
                 break
+            }
+
+        case .recoverable(let error):
+            if let error {
+                return error.partoutErrorCode
             }
 
         default:

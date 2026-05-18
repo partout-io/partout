@@ -69,7 +69,19 @@ extension UInt64: DataUnitRepresentable {
     }
 }
 
+extension UInt: DataUnitRepresentable {
+    public var descriptionAsDataUnit: String {
+        return UInt64(self).descriptionAsDataUnit
+    }
+}
+
 extension Int64: DataUnitRepresentable {
+    public var descriptionAsDataUnit: String {
+        return UInt64(self).descriptionAsDataUnit
+    }
+}
+
+extension Int: DataUnitRepresentable {
     public var descriptionAsDataUnit: String {
         return UInt64(self).descriptionAsDataUnit
     }

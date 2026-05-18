@@ -72,6 +72,28 @@ public struct TunnelSnapshot: Hashable, Codable, Sendable, CustomStringConvertib
 /// Callback reporting ``TunnelSnapshot``.
 public typealias OnTunnelSnapshotCallback = @Sendable (TunnelSnapshot) -> Void
 
+extension TunnelStatus {
+    public func considering(_ environment: TunnelSnapshot.Environment?) -> TunnelStatus {
+        // If the tunnel is active and it relies on a
+        // connection, map to the connection status
+        if self == .active,
+           let connectionStatus = environment?.connectionStatus {
+            switch connectionStatus {
+            case .connecting:
+                return .activating
+            case .connected:
+                return .active
+            case .disconnecting:
+                return .deactivating
+            case .disconnected:
+                return .inactive
+            }
+        }
+        // Otherwise, map directly to the tunnel status
+        return self
+    }
+}
+
 extension TunnelEnvironmentReader {
     public var snapshot: TunnelSnapshot.Environment {
         let connectionStatus = environmentValue(forKey: TunnelEnvironmentKeys.connectionStatus)

@@ -3,18 +3,22 @@
 // SPDX-License-Identifier: GPL-3.0
 
 /// Manages a tunnel and observes its status.
-public actor Tunnel: TunnelProtocol {
+public actor Tunnel {
+    public typealias WillInstallBlock = @Sendable (_ profile: Profile) async throws -> Profile
+
     private let ctx: PartoutLoggerContext
 
     private let strategy: TunnelObservableStrategy
 
-    private let updateInterval: TimeInterval
+    private let refreshInterval: Int?
+
+    private let willInstall: WillInstallBlock?
+
+    private let environmentFactory: (Profile.ID) -> TunnelEnvironmentReader
 
     private var strategySnapshots: [Profile.ID: TunnelSnapshot]
 
     private let snapshotsSubject: CurrentValueStream<[Profile.ID: TunnelSnapshot]>
-
-    private let environmentFactory: (Profile.ID) -> TunnelEnvironmentReader
 
     private var environments: [Profile.ID: TunnelEnvironmentReader]
 
@@ -25,12 +29,14 @@ public actor Tunnel: TunnelProtocol {
     public init(
         _ ctx: PartoutLoggerContext,
         strategy: TunnelObservableStrategy,
-        updateInterval: TimeInterval = 1.0,
+        refreshInterval: Int? = nil,
+        willInstall: WillInstallBlock? = nil,
         environmentFactory: @escaping (Profile.ID) -> TunnelEnvironmentReader
     ) {
         self.ctx = ctx
         self.strategy = strategy
-        self.updateInterval = updateInterval
+        self.refreshInterval = refreshInterval
+        self.willInstall = willInstall
         self.environmentFactory = environmentFactory
         strategySnapshots = [:]
         snapshotsSubject = CurrentValueStream([:])
@@ -53,13 +59,8 @@ extension Tunnel: TunnelStrategy {
         try await strategy.prepare(purge: purge)
     }
 
-    public func install(
-        _ profile: Profile,
-        connect: Bool,
-        options: Sendable?,
-        title: @escaping @Sendable (Profile) -> String
-    ) async throws {
-        guard !profile.activeModulesIds.isEmpty else {
+    public func install(_ preProfile: Profile, connect: Bool, options: Sendable?) async throws {
+        guard !preProfile.activeModulesIds.isEmpty else {
             throw PartoutError(.noActiveModules)
         }
         if let pendingInstall, !pendingInstall.isCancelled {
@@ -67,12 +68,20 @@ extension Tunnel: TunnelStrategy {
             try? await pendingInstall.value
         }
         guard !Task.isCancelled else {
-            pp_log(ctx, .core, .info, "Cancelled installation of profile \(profile.id)")
+            pp_log(ctx, .core, .info, "Cancelled installation of profile \(preProfile.id)")
             return
+        }
+        // Optionally pre-process profile
+        let profile: Profile
+        if let willInstall {
+            pp_log(ctx, .core, .info, "Pre-process profile \(preProfile.id) before installing")
+            profile = try await willInstall(preProfile)
+        } else {
+            profile = preProfile
         }
         pendingInstall = Task {
             pp_log(ctx, .core, .info, "Install profile \(profile.id)...")
-            try await strategy.install(profile, connect: connect, options: options, title: title)
+            try await strategy.install(profile, connect: connect, options: options)
             guard !Task.isCancelled else {
                 pp_log(ctx, .core, .info, "Cancelled installation of profile \(profile.id)")
                 return
@@ -100,12 +109,8 @@ extension Tunnel: TunnelStrategy {
 }
 
 extension Tunnel {
-    public func install(
-        _ profile: Profile,
-        connect: Bool,
-        title: @escaping @Sendable (Profile) -> String
-    ) async throws {
-        try await install(profile, connect: connect, options: nil, title: title)
+    public func install(_ profile: Profile, connect: Bool) async throws {
+        try await install(profile, connect: connect, options: nil)
     }
 }
 
@@ -145,6 +150,11 @@ extension Tunnel {
     public var status: TunnelStatus {
         snapshot?.status ?? .inactive
     }
+
+    public func sendMessage(_ message: Message.Input) async throws -> Message.Output? {
+        guard let profileId = snapshots.keys.first else { return nil }
+        return try await sendMessage(message, to: profileId)
+    }
 }
 #endif
 
@@ -156,7 +166,8 @@ private extension Tunnel {
         // Subscribe once
         guard subscriptions.isEmpty else { return }
 #endif
-        let strategySubscription = Task { [weak self] in
+        var subscriptions: [Task<Void, Never>] = []
+        subscriptions.append(Task { [weak self] in
             guard let ctx = self?.ctx else { return }
             guard let stream = self?.strategy.didUpdateActiveProfiles else { return }
             for await snapshots in stream {
@@ -165,22 +176,25 @@ private extension Tunnel {
                 await handleStrategySnapshots(snapshots)
             }
             pp_log(ctx, .core, .debug, "Cancelled Tunnel.strategy.didUpdateActiveProfiles (observed)")
+        })
+        if let refreshInterval {
+            subscriptions.append(Task { [weak self] in
+                guard let ctx = self?.ctx else { return }
+                while true {
+                    guard let self else { break }
+                    guard !Task.isCancelled else { break }
+                    await refreshSnapshotEnvironments()
+                    try? await Task.sleep(milliseconds: refreshInterval)
+                }
+                pp_log(ctx, .core, .debug, "Cancelled Tunnel.timerSubscription")
+            })
         }
-        let timerSubscription = Task { [weak self] in
-            guard let ctx = self?.ctx else { return }
-            while true {
-                guard let self else { break }
-                guard !Task.isCancelled else { break }
-                await refreshSnapshotEnvironments()
-                try? await Task.sleep(interval: updateInterval)
-            }
-            pp_log(ctx, .core, .debug, "Cancelled Tunnel.timerSubscription")
-        }
-        subscriptions = [strategySubscription, timerSubscription]
+        self.subscriptions = subscriptions
     }
 
     func handleStrategySnapshots(_ snapshots: [Profile.ID: TunnelSnapshot]) {
         strategySnapshots = snapshots
+        pp_log(ctx, .core, .info, "Snapshots: \(strategySnapshots.values.description)")
         publishSnapshots()
     }
 
@@ -189,7 +203,6 @@ private extension Tunnel {
     }
 
     func publishSnapshots() {
-        pp_log(ctx, .core, .info, "Snapshots: \(strategySnapshots.values.description)")
         let activeIds = strategySnapshots.keys
         // Create new environments if needed
         for profileId in activeIds {

@@ -63,7 +63,7 @@ struct SimpleConnectionDaemonTests {
     }
 
     @Test
-    func givenConnectionFailingToStart_whenStartDaemon_thenStarts() async throws {
+    func givenConnectionFailingToStart_whenStartDaemon_thenStartsAndPublishesLastErrorCode() async throws {
         var connectionModule = MockConnectionModule()
         connectionModule.options.startError = PartoutError(.dnsFailure)
         let profile = try Profile.Builder(
@@ -72,9 +72,19 @@ struct SimpleConnectionDaemonTests {
         ).build()
         #expect(profile.activeConnectionModule != nil)
 
-        let sut = try await newDaemon(with: profile)
+        let expLastError = Expectation()
+        let sut = try await newDaemon(
+            with: profile,
+            onSnapshot: { snapshot in
+                guard snapshot.environment?.lastErrorCode == .dnsFailure else { return }
+                Task {
+                    await expLastError.fulfill()
+                }
+            }
+        )
         do {
             try await sut.start()
+            try await expLastError.fulfillment(timeout: 500)
         } catch {
             #expect(Bool(false), error.localizedComment)
         }
@@ -113,6 +123,74 @@ struct SimpleConnectionDaemonTests {
         #expect(await stream.nextElement() == .disconnected)
         #expect(await stream.nextElement() == .connecting)
         #expect(await stream.nextElement() == .connected)
+    }
+
+    @Test
+    func givenStartedConnectionFailingAsynchronously_whenConnectionFails_thenPublishesLastErrorCode() async throws {
+        var connectionModule = MockConnectionModule()
+        connectionModule.options.failure = (50, PartoutError(.authentication))
+        let profile = try Profile.Builder(
+            modules: [connectionModule],
+            activeModulesIds: [connectionModule.id]
+        ).build()
+        #expect(profile.activeConnectionModule != nil)
+
+        let expLastError = Expectation()
+        let expCancel = Expectation()
+        let sut = try await newDaemon(
+            with: profile,
+            onCancel: { error in
+                guard error?.partoutErrorCode == .authentication else { return }
+                Task {
+                    await expCancel.fulfill()
+                }
+            },
+            reconnectionDelay: 5000,
+            onSnapshot: { snapshot in
+                guard snapshot.environment?.lastErrorCode == .authentication else { return }
+                Task {
+                    await expLastError.fulfill()
+                }
+            }
+        )
+        let stream = sut.statusStream
+
+        try await sut.start()
+        #expect(await stream.nextElement() == .disconnected)
+        #expect(await stream.nextElement() == .connecting)
+        #expect(await stream.nextElement() == .connected)
+        try await expLastError.fulfillment(timeout: 500)
+        try await expCancel.fulfillment(timeout: 500)
+    }
+
+    @Test
+    func givenStartedConnectionReportingRecoverableError_whenConnectionDisconnects_thenPublishesLastErrorCode() async throws {
+        var connectionModule = MockConnectionModule()
+        connectionModule.options.reportedError = (50, PartoutError(.timeout))
+        let profile = try Profile.Builder(
+            modules: [connectionModule],
+            activeModulesIds: [connectionModule.id]
+        ).build()
+        #expect(profile.activeConnectionModule != nil)
+
+        let expLastError = Expectation()
+        let sut = try await newDaemon(
+            with: profile,
+            reconnectionDelay: 5000,
+            onSnapshot: { snapshot in
+                guard snapshot.environment?.lastErrorCode == .timeout else { return }
+                Task {
+                    await expLastError.fulfill()
+                }
+            }
+        )
+        let stream = sut.statusStream
+
+        try await sut.start()
+        #expect(await stream.nextElement() == .disconnected)
+        #expect(await stream.nextElement() == .connecting)
+        #expect(await stream.nextElement() == .connected)
+        try await expLastError.fulfillment(timeout: 500)
     }
 
     @Test
@@ -181,7 +259,8 @@ private extension SimpleConnectionDaemonTests {
         environment: TunnelEnvironment? = nil,
         onCancel: @escaping (Error?) -> Void = { _ in },
         stopDelay: Int = 1000,
-        reconnectionDelay: Int = 1000
+        reconnectionDelay: Int = 1000,
+        onSnapshot: OnTunnelSnapshotCallback? = nil
     ) async throws -> SimpleConnectionDaemon {
         let controller = MockTunnelController()
         controller.onCancelTunnelConnection = onCancel
@@ -200,7 +279,8 @@ private extension SimpleConnectionDaemonTests {
             messageHandler: DefaultMessageHandler(.global, environment: environment),
             startsImmediately: false,
             stopDelay: stopDelay,
-            reconnectionDelay: reconnectionDelay
+            reconnectionDelay: reconnectionDelay,
+            onSnapshot: onSnapshot
         ))
     }
 }
@@ -241,7 +321,7 @@ private struct MockConnectionModule: ConnectionModule {
         if let creationError {
             throw creationError
         }
-        return MockConnection(options: options)
+        return MockConnection(options: options, reporter: parameters.reporter)
     }
 }
 
@@ -251,10 +331,14 @@ private final class MockConnection: Connection {
 
         var failure: (interval: Int, error: Error)?
 
+        var reportedError: (interval: Int, error: Error)?
+
         var shouldTimeout = false
     }
 
     let options: Options
+
+    let reporter: ConnectionReporter
 
     private let statusSubject = CurrentValueStream<ConnectionStatus>(.disconnected)
 
@@ -269,8 +353,9 @@ private final class MockConnection: Connection {
     nonisolated(unsafe)
     private var sleepTask: Task<Void, Never>?
 
-    init(options: Options) {
+    init(options: Options, reporter: ConnectionReporter) {
         self.options = options
+        self.reporter = reporter
     }
 
     func start() async throws -> Bool {
@@ -285,6 +370,13 @@ private final class MockConnection: Connection {
             Task {
                 try? await Task.sleep(milliseconds: failure.interval)
                 statusSubject.send(completion: .failure(failure.error))
+            }
+        }
+        if let reportedError = options.reportedError {
+            Task {
+                try? await Task.sleep(milliseconds: reportedError.interval)
+                reporter.reportLastError(reportedError.error)
+                statusSubject.send(.disconnected)
             }
         }
         return true

@@ -38,7 +38,6 @@ set(PARTOUT_SOURCES
 ./Partout/Modules/TaggedModule.swift
 ./Partout/Modules/TaggedProfile.swift
 ./Partout/NativeHelpers.swift
-./Partout/NativeTunnel.swift
 ./Partout/NativeTunnelController.swift
 ./Partout/PartoutExports.swift
 ./Partout/Registry+Support.swift
@@ -160,7 +159,6 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Tunnel/FakeTunnelStrategy.swift
 ./PartoutCore/Tunnel/MessageHandler.swift
 ./PartoutCore/Tunnel/Tunnel.swift
-./PartoutCore/Tunnel/TunnelProtocol.swift
 ./PartoutCore/Tunnel/TunnelSnapshot.swift
 ./PartoutCore/Tunnel/TunnelStatus.swift
 ./PartoutCore/Tunnel/TunnelStrategy.swift
@@ -169,7 +167,7 @@ set(PARTOUT_SOURCES
 ./PartoutOS/Apple/AppleRandom.swift
 ./PartoutOS/Apple/BundleConfiguration.swift
 ./PartoutOS/Apple/OSLogDestination.swift
-./PartoutOS/Apple/TunnelObservable.swift
+./PartoutOS/Apple/PartoutTunnelObservable.swift
 ./PartoutOS/Apple/UserDefaultsEnvironment.swift
 ./PartoutOS/AppleNE/App/NETunnelEnvironment.swift
 ./PartoutOS/AppleNE/App/NETunnelManagerRepository.swift
