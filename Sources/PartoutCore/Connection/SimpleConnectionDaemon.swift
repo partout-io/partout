@@ -497,7 +497,7 @@ private extension DataCount {
         let receivedDelta = received.delta(from: other.received)
         let sentDelta = sent.delta(from: other.sent)
         let (sum, overflow) = receivedDelta.addingReportingOverflow(sentDelta)
-        return overflow ? UInt64.max : sum
+        return overflow ? .max : sum
     }
 }
 
