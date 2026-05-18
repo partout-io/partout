@@ -492,17 +492,6 @@ private extension ConnectionStatus {
     }
 }
 
-private extension TunnelSnapshot {
-    func isEquivalentExceptDataCount(to other: Self) -> Bool {
-        id == other.id &&
-        isEnabled == other.isEnabled &&
-        status == other.status &&
-        onDemand == other.onDemand &&
-        environment?.connectionStatus == other.environment?.connectionStatus &&
-        environment?.lastErrorCode == other.environment?.lastErrorCode
-    }
-}
-
 private extension DataCount {
     func delta(from other: Self) -> UInt64 {
         let receivedDelta = received.delta(from: other.received)
