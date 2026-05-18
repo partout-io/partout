@@ -45,6 +45,7 @@ class PartoutVpnServiceRuntime(
 
     @Suppress("UNUSED_PARAMETER")
     fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.i(logTag, "PartoutVpnServiceRuntime.onStartCommand()")
         if (intent?.action == ACTION_STOP_VPN) {
             disconnect()
             return Service.START_NOT_STICKY
@@ -60,6 +61,7 @@ class PartoutVpnServiceRuntime(
     }
 
     fun onDestroy() {
+        Log.i(logTag, "PartoutVpnServiceRuntime.onDestroy()")
         if (isRunning) {
             launchCommand {
                 stopTunnel()
@@ -71,7 +73,7 @@ class PartoutVpnServiceRuntime(
     }
 
     fun onRevoke() {
-        Log.i(logTag, "VPN permission revoked")
+        Log.i(logTag, "PartoutVpnServiceRuntime.onRevoke()")
         disconnect()
     }
 
@@ -129,11 +131,12 @@ class PartoutVpnServiceRuntime(
 
     // JNI
     fun testWorking() {
-        Log.d(logTag, "PartoutVpnServiceRuntime: working")
+        Log.d(logTag, "PartoutVpnServiceRuntime.testWorking()")
     }
 
     // JNI
     fun setTunnel(infoJSON: String): Int {
+        Log.d(logTag, "PartoutVpnServiceRuntime.setTunnel()")
         if (descriptor != null) {
             Log.e(logTag, "Tunnel descriptor already established")
             return -1
@@ -210,7 +213,7 @@ class PartoutVpnServiceRuntime(
 
     // JNI
     fun configureSockets(fds: IntArray) {
-        Log.d(logTag, "Configuring sockets: ${fds.toList()}")
+        Log.d(logTag, "PartoutVpnServiceRuntime.configureSockets(${fds.toList()})")
         fds.forEach {
             val protected = service.protect(it)
             Log.d(logTag, "protect($it) = $protected")
@@ -219,12 +222,14 @@ class PartoutVpnServiceRuntime(
 
     // JNI
     fun onSnapshots(snapshotsJSON: String) {
+        Log.d(logTag, "PartoutVpnServiceRuntime.onSnapshots()")
         val snapshots = json.decodeFromString<List<TunnelSnapshot>>(snapshotsJSON)
         sendSnapshots(snapshots.associateBy { it.id })
     }
 
     // JNI
     fun cancelTunnel(errorMessage: String?) {
+        Log.d(logTag, "PartoutVpnServiceRuntime.cancelTunnel()")
         if (errorMessage != null) {
             Log.e(logTag, "VPN daemon cancelled: $errorMessage")
         } else {
