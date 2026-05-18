@@ -58,14 +58,20 @@ public struct TunnelSnapshot: Hashable, Codable, Sendable, CustomStringConvertib
         self.environment = environment
     }
 
-    public func with(environment: Environment) -> Self {
+    public func with(environment: Environment?) -> Self {
         var copy = self
         copy.environment = environment
         return copy
     }
 
+    public func isEquivalentExceptDataCount(to other: Self) -> Bool {
+        let e1 = environment?.with(dataCount: .zero)
+        let e2 = other.environment?.with(dataCount:.zero)
+        return with(environment: e1) == other.with(environment: e2)
+    }
+
     public var description: String {
-        "{\(id.uuidString), isEnabled=\(isEnabled), status=\(status), onDemand=\(onDemand), environment=\(environment)}"
+        "{\(id.uuidString), isEnabled=\(isEnabled), status=\(status), onDemand=\(onDemand), environment=\(environment.debugDescription)}"
     }
 }
 
