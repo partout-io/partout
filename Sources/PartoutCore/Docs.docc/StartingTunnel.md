@@ -16,10 +16,12 @@ Given the main app and the daemon:
 ### Starting a background service
 
 - ``ConnectionDaemon``
+- ``ConnectionReporter``
 - ``DefaultMessageHandler``
 - ``DummyReachabilityObserver``
 - ``MessageHandler``
 - ``NetworkObserver``
+- ``OnTunnelSnapshotCallback``
 - ``ReachabilityObserver``
 - ``SimpleConnectionDaemon``
 

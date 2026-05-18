@@ -37,6 +37,8 @@ set(PARTOUT_SOURCES
 ./Partout/Modules/ModuleType+Extensions.swift
 ./Partout/Modules/TaggedModule.swift
 ./Partout/Modules/TaggedProfile.swift
+./Partout/NativeHelpers.swift
+./Partout/NativeTunnelController.swift
 ./Partout/PartoutExports.swift
 ./Partout/Registry+Support.swift
 ./Partout/Registry.swift
@@ -44,7 +46,6 @@ set(PARTOUT_SOURCES
 ./Partout/Serialization/LegacyProfileEncoderV1.swift
 ./Partout/Serialization/LegacyProfileEncoderV2.swift
 ./Partout/Serialization/ProfileEncoderV3.swift
-./Partout/VirtualTunnelController.swift
 ./Partout/VirtualTunnelInterface.swift
 ./PartoutCore/Connection/BSDSocket.swift
 ./PartoutCore/Connection/BSDSocketFactory.swift
@@ -161,6 +162,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Tunnel/FakeTunnelStrategy.swift
 ./PartoutCore/Tunnel/MessageHandler.swift
 ./PartoutCore/Tunnel/Tunnel.swift
+./PartoutCore/Tunnel/TunnelSnapshot.swift
 ./PartoutCore/Tunnel/TunnelStatus.swift
 ./PartoutCore/Tunnel/TunnelStrategy.swift
 ./PartoutOS/Apple/AppleJavaScriptEngine.swift
@@ -168,7 +170,7 @@ set(PARTOUT_SOURCES
 ./PartoutOS/Apple/AppleRandom.swift
 ./PartoutOS/Apple/BundleConfiguration.swift
 ./PartoutOS/Apple/OSLogDestination.swift
-./PartoutOS/Apple/TunnelObservable.swift
+./PartoutOS/Apple/PartoutTunnelObservable.swift
 ./PartoutOS/Apple/UserDefaultsEnvironment.swift
 ./PartoutOS/AppleNE/App/NETunnelEnvironment.swift
 ./PartoutOS/AppleNE/App/NETunnelManagerRepository.swift
@@ -340,9 +342,9 @@ set(PARTOUT_C_SOURCES
 ./PartoutCore_C/tls_options.c
 ./PartoutCore_C/tun_android.c
 ./PartoutCore_C/tun_darwin.c
+./PartoutCore_C/tun_dummy.c
 ./PartoutCore_C/tun_linux.c
 ./PartoutCore_C/tun_windows.c
-./PartoutCore_C/tunctrl.c
 ./PartoutCore_C/zd.c
 ./PartoutCrypto/Native_C/src/crypto_stubs.c
 ./PartoutCrypto/Native_C/src/mbed/keys.c

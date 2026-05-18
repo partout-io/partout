@@ -9,39 +9,17 @@
 
 #if PARTOUT_ANDROID
 
+#include <jni.h>
+#include <assert.h>
 #include <errno.h>
+#include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-/* Expect this struct from ctrl.set_tunnel(). */
-struct _pp_tun {
+struct __pp_tun_struct {
     int fd;
 };
-
-/* Impl is the pp_tun struct as is. */
-pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable any_impl) {
-    (void)uuid;
-    if (!any_impl) return NULL;
-    pp_tun impl = (pp_tun)any_impl;
-    pp_assert(impl && impl->fd > 0);
-
-    const int dup_fd = dup(impl->fd);
-    if (dup_fd < 0) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "dup(tun): %s", strerror(errno));
-        return NULL;
-    }
-
-    pp_tun tun = pp_alloc(sizeof(*tun));
-    tun->fd = dup_fd;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_android: Duplicated tun device %d -> %d", impl->fd, dup_fd);
-    return tun;
-}
-
-void pp_tun_free(pp_tun tun) {
-    if (!tun) return;
-    pp_tun_shutdown(tun);
-    pp_free(tun);
-}
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     if (!tun || tun->fd < 0) return -1;
@@ -67,6 +45,255 @@ int pp_tun_fd(const pp_tun tun) {
 const char *pp_tun_name(const pp_tun tun) {
     (void)tun;
     return NULL;
+}
+
+/* JNI */
+
+typedef struct {
+    const char *name;
+    const char *signature;
+} kotlin_sig;
+
+#define JNI_ATTACH_OR_RETURN(env_name, return_value) \
+    bool env_name##_did_attach; \
+    JNIEnv *env_name = pp_jni_attach_thread(&env_name##_did_attach); \
+    if (!(env_name)) return return_value
+
+#define JNI_ATTACH_OR_RETURN_VOID(env_name) \
+    bool env_name##_did_attach; \
+    JNIEnv *env_name = pp_jni_attach_thread(&env_name##_did_attach); \
+    if (!(env_name)) return
+
+#define JNI_ATTACH_OR_COMPLETE(env_name, completion, ctx) \
+    bool env_name##_did_attach; \
+    JNIEnv *env_name = pp_jni_attach_thread(&env_name##_did_attach); \
+    if (!(env_name)) { \
+        if (completion) completion(ctx, -1); \
+        return; \
+    }
+
+#define JNI_DETACH(env_name) \
+    do { \
+        if (env_name##_did_attach) (*jvm)->DetachCurrentThread(jvm); \
+    } while (0)
+
+/* Tunnel controller (PartoutVpnServiceRuntime) */
+
+static const kotlin_sig sig_ctrl_testWorking = {
+    "testWorking",
+    "()V"
+};
+static const kotlin_sig sig_ctrl_setTunnel = {
+    "setTunnel",
+    "(Ljava/lang/String;)I"
+};
+static const kotlin_sig sig_ctrl_configureSockets = {
+    "configureSockets",
+    "([I)V"
+};
+static const kotlin_sig sig_ctrl_onSnapshots = {
+    "onSnapshots",
+    "(Ljava/lang/String;)V"
+};
+static const kotlin_sig sig_ctrl_cancelTunnel = {
+    "cancelTunnel",
+    "(Ljava/lang/String;)V"
+};
+
+void pp_tun_ctrl_test_working(void *jni_ref) {
+    assert(jni_ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_test_working(%p)", jni_ref);
+
+    JNI_ATTACH_OR_RETURN_VOID(env);
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    cls = (*env)->GetObjectClass(env, jni_ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_test_working(), NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_testWorking.name, sig_ctrl_testWorking.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_test_working(), NULL method");
+        goto cleanup;
+    }
+    (*env)->CallVoidMethod(env, jni_ref, method);
+
+cleanup:
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
+    JNI_DETACH(env);
+}
+
+pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_json) {
+    (void)uuid;
+    assert(jni_ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_set_tunnel(%p)", jni_ref);
+
+    JNI_ATTACH_OR_RETURN(env, NULL);
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    jstring j_info_json = NULL;
+
+    // This will be the result on success
+    pp_tun tun_impl = malloc(sizeof(*tun_impl));
+    if (tun_impl == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_set_tunnel(), NULL tun_impl");
+        goto cleanup;
+    }
+    tun_impl->fd = -1;
+
+    cls = (*env)->GetObjectClass(env, jni_ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_set_tunnel(), NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_setTunnel.name, sig_ctrl_setTunnel.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_set_tunnel(), NULL method");
+        goto cleanup;
+    }
+    j_info_json = info_json ? (*env)->NewStringUTF(env, info_json) : NULL;
+    tun_impl->fd = (*env)->CallIntMethod(env, jni_ref, method, j_info_json);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_set_tunnel(), Kotlin exception");
+        tun_impl->fd = -1;
+        goto cleanup;
+    }
+    if (tun_impl->fd < 0) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_set_tunnel(), Invalid fd");
+        goto cleanup;
+    }
+cleanup:
+    if (tun_impl != NULL && tun_impl->fd < 0) {
+        free(tun_impl);
+        tun_impl = NULL;
+    }
+    if (j_info_json != NULL) (*env)->DeleteLocalRef(env, j_info_json);
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
+    JNI_DETACH(env);
+    return tun_impl;
+}
+
+void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t fds_len) {
+    assert(jni_ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_configure_sockets(%p)", jni_ref);
+    if (!fds || fds_len == 0) return;
+
+    JNI_ATTACH_OR_RETURN_VOID(env);
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    jintArray j_fds = NULL;
+
+    cls = (*env)->GetObjectClass(env, jni_ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_configure_sockets(), NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_configureSockets.name, sig_ctrl_configureSockets.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_configure_sockets(), NULL method");
+        goto cleanup;
+    }
+    j_fds = (*env)->NewIntArray(env, (jsize)fds_len);
+    if (j_fds == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_configure_sockets(), NULL j_fds");
+        goto cleanup;
+    }
+    (*env)->SetIntArrayRegion(env, j_fds, 0, (jsize)fds_len, (const jint *)fds);
+    (*env)->CallVoidMethod(env, jni_ref, method, j_fds);
+
+cleanup:
+    if (j_fds != NULL) (*env)->DeleteLocalRef(env, j_fds);
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
+    JNI_DETACH(env);
+}
+
+void pp_tun_ctrl_report_snapshots(void *_Nullable ref,
+                                  const char *_Nonnull snapshots_json) {
+    assert(ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_report_snapshots(%p)", ref);
+
+    JNI_ATTACH_OR_RETURN_VOID(env);
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    jstring j_snapshots_json = NULL;
+
+    cls = (*env)->GetObjectClass(env, ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_report_snapshots(), NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_onSnapshots.name, sig_ctrl_onSnapshots.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_report_snapshots(), NULL method");
+        goto cleanup;
+    }
+    j_snapshots_json = (*env)->NewStringUTF(env, snapshots_json);
+    if (j_snapshots_json == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_report_snapshots(), NULL j_snapshots_json");
+        goto cleanup;
+    }
+    (*env)->CallVoidMethod(env, ref, method, j_snapshots_json);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_report_snapshots(), Kotlin exception");
+        goto cleanup;
+    }
+
+cleanup:
+    if (j_snapshots_json != NULL) (*env)->DeleteLocalRef(env, j_snapshots_json);
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
+    JNI_DETACH(env);
+}
+
+void pp_tun_ctrl_cancel_tunnel(void *jni_ref, const char *error_message) {
+    assert(jni_ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_cancel_tunnel(%p)", jni_ref);
+
+    JNI_ATTACH_OR_RETURN_VOID(env);
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    jstring j_error_message = NULL;
+
+    cls = (*env)->GetObjectClass(env, jni_ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_cancel_tunnel(), NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_cancelTunnel.name, sig_ctrl_cancelTunnel.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_cancel_tunnel(), NULL method");
+        goto cleanup;
+    }
+    j_error_message = error_message ? (*env)->NewStringUTF(env, error_message) : NULL;
+    (*env)->CallVoidMethod(env, jni_ref, method, j_error_message);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_cancel_tunnel(), Kotlin exception");
+        goto cleanup;
+    }
+
+cleanup:
+    if (j_error_message != NULL) (*env)->DeleteLocalRef(env, j_error_message);
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
+    JNI_DETACH(env);
+}
+
+void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
+    (void)jni_ref;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_clear_tunnel(%p)", jni_ref);
+    if (!tun_impl) return;
+    pp_tun_shutdown(tun_impl);
+    free(tun_impl);
 }
 
 #endif

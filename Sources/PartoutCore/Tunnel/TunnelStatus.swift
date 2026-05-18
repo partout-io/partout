@@ -4,7 +4,7 @@
 
 /// The status of a ``Tunnel``.
 @frozen
-public enum TunnelStatus: String {
+public enum TunnelStatus: String, Codable {
     case inactive
 
     case activating

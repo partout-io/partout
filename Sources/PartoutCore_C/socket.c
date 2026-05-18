@@ -60,7 +60,7 @@ static bool local_wait(pp_socket sock, int timeout_ms, bool want_read, bool want
 
 /* Host a file descriptor with the specific platform type. POSIX systems
  * use int, whereas Windows uses SOCKET.  */
-struct _pp_socket {
+struct __pp_socket_struct {
     os_socket_fd fd;
 };
 

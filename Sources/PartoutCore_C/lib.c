@@ -11,12 +11,12 @@
 
 #if PARTOUT_WINDOWS
 #include <windows.h>
-struct _pp_lib {
+struct __pp_lib_struct {
     HMODULE handle;
 };
 #else
 #include <dlfcn.h>
-struct _pp_lib {
+struct __pp_lib_struct {
     void *handle;
 };
 #endif

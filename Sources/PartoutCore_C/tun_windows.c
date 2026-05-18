@@ -7,6 +7,8 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
+// FIXME: #188, Implement Windows tun_ctrl
+
 #if PARTOUT_WINDOWS
 
 #include <wintun.h>
@@ -14,7 +16,7 @@
 
 // FIXME: #188, convert debug messages to logs
 
-struct _pp_tun {
+struct __pp_tun_struct {
     LPWSTR name;
     WINTUN_ADAPTER_HANDLE adapter;
     WINTUN_SESSION_HANDLE session;
@@ -61,9 +63,8 @@ GUID guid_from_wstring(const wchar_t *wstr) {
     return guid;
 }
 
-pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl) {
-    (void)impl;
-
+static
+pp_tun pp_tun_create(const char *_Nonnull uuid) {
     WINTUN_ADAPTER_HANDLE adapter = NULL;
     WINTUN_SESSION_HANDLE session = NULL;
     LPCWSTR tun_type = NULL;
@@ -73,7 +74,7 @@ pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl) {
     if (!wintun) {
         wintun = LoadLibraryExA("wintun.dll", NULL, LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
         if (!wintun) {
-            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "LoadLibraryExA(): %lu", GetLastError());
+            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: create(), LoadLibraryExA(): %lu", GetLastError());
             goto failure;
         }
         // Required DLL functions
@@ -93,13 +94,13 @@ pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl) {
     tun_type = L"Partout";
     dev_name = wstring_from_string(uuid);
     if (!dev_name) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "wstring_from_string()");
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: create(), wstring_from_string()");
         goto failure;
     }
     GUID dev_guid = guid_from_wstring(dev_name);
     adapter = WintunCreateAdapter(dev_name, tun_type, &dev_guid);
     if (!adapter) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "WintunCreateAdapter(): %lu", GetLastError());
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: create(), WintunCreateAdapter(): %lu", GetLastError());
         goto failure;
     }
 
@@ -110,7 +111,7 @@ pp_tun pp_tun_create(const char *_Nonnull uuid, const void *_Nullable impl) {
     // Create a session with a 4MB ring buffer
     session = WintunStartSession(adapter, WINTUN_MAX_RING_CAPACITY);
     if (!session) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "WintunStartSession(): %lu", GetLastError());
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: create(), WintunStartSession(): %lu", GetLastError());
         goto failure;
     }
     // printf("tun_windows: adapter is %p, session is %p\n", adapter, session);
@@ -130,6 +131,7 @@ failure:
     return NULL;
 }
 
+static
 void pp_tun_free(pp_tun tun) {
     if (!tun) return;
     pp_tun_shutdown(tun);
@@ -157,7 +159,7 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
         if (packet) break;
         const DWORD err = GetLastError();
         if (err != ERROR_NO_MORE_ITEMS) {
-            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "Packet read failed: %lu", err);
+            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: read(), %lu", err);
             return -1;
         }
         WaitForSingleObject(WintunGetReadWaitEvent(tun->session), INFINITE);
@@ -185,7 +187,7 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
         const DWORD err = GetLastError();
         // Silently drop packets if the ring is full
         if (err == ERROR_BUFFER_OVERFLOW) return 0;
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "Packet write failed: %lu", err);
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: write(), %lu", err);
         return -1;
     }
     // printf(">>> tun_write allocated\n");
@@ -209,6 +211,39 @@ int pp_tun_fd(const pp_tun tun) {
 const char *pp_tun_name(const pp_tun tun) {
     (void)tun;
     return NULL;
+}
+
+pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
+    (void)ref;
+    (void)uuid;
+    (void)info_json;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_set_tunnel(%p)", ref);
+    return NULL;
+}
+
+void pp_tun_ctrl_configure_sockets(void *ref, const int *fds, const size_t fds_len) {
+    (void)ref;
+    (void)fds;
+    (void)fds_len;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_configure_sockets(%p)", ref);
+}
+
+void pp_tun_ctrl_report_snapshots(void *ref, const char *snapshots_json) {
+    (void)ref;
+    (void)snapshots_json;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_report_snapshots(%p)", ref);
+}
+
+void pp_tun_ctrl_clear_tunnel(void *ref, pp_tun tun_impl) {
+    (void)ref;
+    (void)tun_impl;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_clear_tunnel(%p)", ref);
+}
+
+void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_message) {
+    (void)ref;
+    (void)error_message;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_cancel_tunnel(%p)", ref);
 }
 
 #endif

@@ -28,7 +28,7 @@ extension PartoutLogger {
 extension Encodable {
     public func asJSON(_ ctx: PartoutLoggerContext, withSensitiveData: Bool, sortingKeys: Bool = false) -> String? {
         do {
-            let encoder = JSONEncoder()
+            let encoder = JSONEncoder.shared()
             if !withSensitiveData {
                 encoder.userInfo = [.redactingSensitiveData: true]
             }

@@ -2,31 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-/// Returns a tunnel-specific snapshot of a ``Profile``.
-public struct TunnelSnapshot: Hashable, Sendable, CustomStringConvertible {
-    public let id: Profile.ID
-
-    public let isEnabled: Bool
-
-    public let status: TunnelStatus
-
-    public let onDemand: Bool
-
-    public init(id: Profile.ID, isEnabled: Bool, status: TunnelStatus, onDemand: Bool) {
-        self.id = id
-        self.isEnabled = isEnabled
-        self.status = status
-        self.onDemand = onDemand
-    }
-
-    public var description: String {
-        "{\(id.uuidString), isEnabled=\(isEnabled), status=\(status), onDemand=\(onDemand)}"
-    }
-}
-
 /// Provides the underlying strategy of a ``Tunnel``.
 public protocol TunnelStrategy: Sendable {
-
     /// Prepares the tunnel, e.g. fetches its initial status.
     ///
     /// - Parameters:
@@ -39,13 +16,7 @@ public protocol TunnelStrategy: Sendable {
     ///   - profile: The ``Profile`` with which the tunnel must be configured.
     ///   - connect: Also initiate a connection.
     ///   - options: An optional set of connection options.
-    ///   - title: The function of ``Profile`` to return a title.
-    func install(
-        _ profile: Profile,
-        connect: Bool,
-        options: Sendable?,
-        title: @escaping @Sendable (Profile) -> String
-    ) async throws
+    func install(_ profile: Profile, connect: Bool, options: Sendable?) async throws
 
     /// Uninstalls the tunnel.
     ///
@@ -76,16 +47,16 @@ public protocol TunnelObservableStrategy: TunnelStrategy {
 
 extension TunnelStrategy {
     public func install(_ profile: Profile, connect: Bool = false) async throws {
-        try await install(profile, connect: connect, options: nil, title: \.name)
+        try await install(profile, connect: connect, options: nil)
     }
 }
 
 extension TunnelStrategy {
     public func sendMessage(_ input: Message.Input, to profileId: Profile.ID) async throws -> Message.Output? {
-        let encoded = try JSONEncoder().encode(input)
+        let encoded = try JSONEncoder.shared().encode(input)
         guard let output = try await sendMessage(encoded, to: profileId) else {
             return nil
         }
-        return try JSONDecoder().decode(Message.Output.self, from: output)
+        return try JSONDecoder.shared().decode(Message.Output.self, from: output)
     }
 }

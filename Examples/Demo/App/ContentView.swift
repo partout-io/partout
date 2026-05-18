@@ -26,7 +26,7 @@ struct ContentView: View {
     private var profile: Profile = .demo
 
     @State
-    private var vpn: TunnelObservable = .shared
+    private var vpn: PartoutTunnelObservable = .shared
 
     @State
     private var dataCount: DataCount?
@@ -218,9 +218,7 @@ private extension ContentView {
             do {
                 switch buttonAction {
                 case .connect:
-                    try await vpn.connect(to: profile) {
-                        "PartoutDemo: \($0.name)"
-                    }
+                    try await vpn.connect(to: profile)
 
                 case .disconnect:
                     try await vpn.disconnect(from: profile.id)
