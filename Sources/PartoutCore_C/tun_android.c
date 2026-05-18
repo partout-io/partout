@@ -54,29 +54,6 @@ typedef struct {
     const char *signature;
 } kotlin_sig;
 
-#define JNI_ATTACH_OR_RETURN(env_name, return_value) \
-    bool env_name##_did_attach; \
-    JNIEnv *env_name = pp_jni_attach_thread(&env_name##_did_attach); \
-    if (!(env_name)) return return_value
-
-#define JNI_ATTACH_OR_RETURN_VOID(env_name) \
-    bool env_name##_did_attach; \
-    JNIEnv *env_name = pp_jni_attach_thread(&env_name##_did_attach); \
-    if (!(env_name)) return
-
-#define JNI_ATTACH_OR_COMPLETE(env_name, completion, ctx) \
-    bool env_name##_did_attach; \
-    JNIEnv *env_name = pp_jni_attach_thread(&env_name##_did_attach); \
-    if (!(env_name)) { \
-        if (completion) completion(ctx, -1); \
-        return; \
-    }
-
-#define JNI_DETACH(env_name) \
-    do { \
-        if (env_name##_did_attach) (*jvm)->DetachCurrentThread(jvm); \
-    } while (0)
-
 /* Tunnel controller (PartoutVpnServiceRuntime) */
 
 static const kotlin_sig sig_ctrl_testWorking = {
