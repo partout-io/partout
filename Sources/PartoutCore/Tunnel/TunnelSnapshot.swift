@@ -65,8 +65,8 @@ public struct TunnelSnapshot: Hashable, Codable, Sendable, CustomStringConvertib
     }
 
     public func isEquivalentExceptDataCount(to other: Self) -> Bool {
-        var e1 = environment?.with(dataCount: .zero)
-        var e2 = other.environment?.with(dataCount:.zero)
+        let e1 = environment?.with(dataCount: .zero)
+        let e2 = other.environment?.with(dataCount:.zero)
         return with(environment: e1) == other.with(environment: e2)
     }
 
