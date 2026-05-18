@@ -97,7 +97,13 @@ public final class NativeTunnelController: TunnelController {
     }
 
     public func cancelTunnelConnection(with error: Error?) {
-        // Do nothing
+        guard let error else {
+            pp_tun_ctrl_cancel_tunnel(ref, nil)
+            return
+        }
+        String(describing: error).withCString {
+            pp_tun_ctrl_cancel_tunnel(ref, $0)
+        }
     }
 }
 

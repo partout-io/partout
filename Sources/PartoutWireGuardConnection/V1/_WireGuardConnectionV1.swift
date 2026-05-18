@@ -25,7 +25,7 @@ public final class _WireGuardConnectionV1: Connection, @unchecked Sendable {
 
     private let controller: TunnelController
 
-    private let environment: TunnelEnvironment
+    private let reporter: ConnectionReporter
 
     private let tunnelConfiguration: TunnelConfiguration
 
@@ -50,7 +50,7 @@ public final class _WireGuardConnectionV1: Connection, @unchecked Sendable {
         statusSubject = CurrentValueStream(.disconnected)
         moduleId = module.id
         controller = parameters.controller
-        environment = parameters.environment
+        reporter = parameters.reporter
 
         guard let configuration = module.configuration else {
             throw PartoutError(.incompleteModule)
@@ -222,7 +222,7 @@ private extension _WireGuardConnectionV1 {
                   let dataCount = DataCount.from(wireGuardString: configurationString) else {
                 return
             }
-            self?.environment.setEnvironmentValue(dataCount, forKey: TunnelEnvironmentKeys.dataCount)
+            self?.reporter.reportDataCount(dataCount)
         }
     }
 }

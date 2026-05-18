@@ -35,7 +35,6 @@ public actor NEPTPForwarder {
         }
         let factory = NEInterfaceFactory(ctx, provider: provider, options: factoryOptions)
         let reachability = NEObservablePath(ctx)
-
         let connectionParameters = ConnectionParameters(
             profile: profile,
             controller: controller,
