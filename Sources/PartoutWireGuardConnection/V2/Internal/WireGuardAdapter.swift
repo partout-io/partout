@@ -141,7 +141,7 @@ actor WireGuardAdapter {
             let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
             try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
                 moduleId: moduleId,
-                // FIXME: ###, These are always empty at this stage
+                // FIXME: #407, These are always empty at this stage
                 descriptors: socketDescriptors
             ))
             let handle = try startWireGuardBackend(wgConfig: wgConfig)
@@ -251,7 +251,7 @@ actor WireGuardAdapter {
 #if os(iOS)
         backend.disableSomeRoamingForBrokenMobileSemantics(handle)
 #endif
-        // FIXME: ###, Socket descriptors require handle, which only exists after backend.turnOn. How do start() and .temporaryShutdown use socketDescriptors? They are empty, always empty on start()
+        // FIXME: #407, Socket descriptors require handle, which only exists after backend.turnOn. How do start() and .temporaryShutdown use socketDescriptors? They are empty, always empty on start()
         let socketFds = {
             var rawFds = backend.socketDescriptors(handle)
             if rawFds.isEmpty {
