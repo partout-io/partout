@@ -26,6 +26,7 @@ public actor NEPTPForwarder {
         environment: TunnelEnvironment,
         factoryOptions: NEInterfaceFactory.Options = .init(),
         connectionOptions: ConnectionParameters.Options = .init(),
+        cancelsUnrecoverable: Bool,
         stopDelay: Int? = nil,
         reconnectionDelay: Int? = nil,
         minDataCountDelta: UInt64? = nil
@@ -51,6 +52,7 @@ public actor NEPTPForwarder {
             connectionParameters: connectionParameters,
             messageHandler: messageHandler,
             startsImmediately: true,
+            cancelsUnrecoverable: cancelsUnrecoverable,
             stopDelay: stopDelay,
             reconnectionDelay: reconnectionDelay,
             minDataCountDelta: minDataCountDelta

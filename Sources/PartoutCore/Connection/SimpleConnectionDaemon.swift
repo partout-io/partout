@@ -26,6 +26,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
     private let startsImmediately: Bool
 
+    private let cancelsUnrecoverable: Bool
+
     private let stopDelay: Int
 
     private let reconnectionDelay: Int
@@ -80,6 +82,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         reachability = params.connectionParameters.reachability
         messageHandler = params.messageHandler
         startsImmediately = params.startsImmediately
+        cancelsUnrecoverable = params.cancelsUnrecoverable
         stopDelay = params.stopDelay
         reconnectionDelay = params.reconnectionDelay
         snapshotInterval = params.snapshotInterval
@@ -162,7 +165,9 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
             pp_log_id(profile.id, .core, .fault, "Unable to start daemon: \(error)")
             reportLastError(error)
             controller.setReasserting(false)
-            controller.cancelTunnelConnection(with: error)
+            if cancelsUnrecoverable {
+                controller.cancelTunnelConnection(with: error)
+            }
         }
         if !startsImmediately {
             networkObserver?.setEnabled(true)
@@ -436,7 +441,9 @@ extension SimpleConnectionDaemon {
     func onConnectionError(_ error: Error) {
         reportLastError(error)
         controller.setReasserting(false)
-        controller.cancelTunnelConnection(with: error)
+        if cancelsUnrecoverable {
+            controller.cancelTunnelConnection(with: error)
+        }
     }
 
     func reportLastError(_ error: Error) {
@@ -519,6 +526,8 @@ extension SimpleConnectionDaemon {
 
         let startsImmediately: Bool
 
+        let cancelsUnrecoverable: Bool
+
         let stopDelay: Int
 
         let reconnectionDelay: Int
@@ -534,6 +543,7 @@ extension SimpleConnectionDaemon {
             connectionParameters: ConnectionParameters,
             messageHandler: MessageHandler,
             startsImmediately: Bool,
+            cancelsUnrecoverable: Bool,
             stopDelay: Int? = nil,
             reconnectionDelay: Int? = nil,
             snapshotInterval: Int? = nil,
@@ -544,6 +554,7 @@ extension SimpleConnectionDaemon {
             self.connectionParameters = connectionParameters
             self.messageHandler = messageHandler
             self.startsImmediately = startsImmediately
+            self.cancelsUnrecoverable = cancelsUnrecoverable
             self.stopDelay = stopDelay ?? 2000
             self.reconnectionDelay = reconnectionDelay ?? 2000
             self.snapshotInterval = snapshotInterval ?? 1000
