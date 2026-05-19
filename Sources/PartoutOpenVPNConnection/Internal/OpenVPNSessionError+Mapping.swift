@@ -18,6 +18,9 @@ extension OpenVPNSessionError: PartoutErrorMappable {
         case .badCredentials:
             return .authentication
 
+        case .badCredentialsWithLocalOptions:
+            return .OpenVPN.recoverableAuthentication
+
         case .serverCompression:
             return .OpenVPN.compressionMismatch
 
