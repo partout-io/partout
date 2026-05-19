@@ -35,10 +35,15 @@ class PartoutTunnel(
                 if (intent?.action != PartoutVpnServiceRuntime.ACTION_SNAPSHOTS) {
                     return
                 }
-                intent.getStringExtra(PartoutVpnServiceRuntime.EXTRA_SNAPSHOTS_JSON)?.let {
-                    val snapshots = json.decodeFromString<Map<String, TunnelSnapshot>>(it)
+                val extra = intent.getStringExtra(PartoutVpnServiceRuntime.EXTRA_SNAPSHOT_JSON)
+                if (extra != null) {
+                    val snapshot = json.decodeFromString<TunnelSnapshot>(extra)
                     _state.update {
-                        it.copy(snapshots)
+                        it.copy(mapOf(Pair(snapshot.id, snapshot)))
+                    }
+                } else {
+                    _state.update {
+                        it.copy(emptyMap())
                     }
                 }
             }

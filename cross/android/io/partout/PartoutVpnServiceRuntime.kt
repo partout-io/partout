@@ -39,7 +39,7 @@ class PartoutVpnServiceRuntime(
     private val commandMutex = Mutex()
     private var descriptor: ParcelFileDescriptor? = null
     private var isRunning = false
-    private var latestSnapshots: Map<String, TunnelSnapshot> = emptyMap()
+    private var latestSnapshot: TunnelSnapshot? = null
 
     // Service lifecycle
 
@@ -90,7 +90,7 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to start VPN daemon (code=${result.code}): ${result.payload}")
             stopService()
             isRunning = false
-            sendSnapshots(null)
+            sendSnapshot(null)
             return@launchCommand
         }
         Log.i(logTag, "Started VPN daemon")
@@ -112,7 +112,7 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to stop VPN daemon (code=${result.code}): ${result.payload}")
         }
         isRunning = false
-        sendSnapshots(null)
+        sendSnapshot(null)
     }
 
     private fun launchCommand(action: suspend () -> Unit) {
@@ -221,10 +221,10 @@ class PartoutVpnServiceRuntime(
     }
 
     // JNI
-    fun onSnapshots(snapshotsJSON: String) {
-        Log.d(logTag, "PartoutVpnServiceRuntime.onSnapshots()")
-        val snapshots = json.decodeFromString<List<TunnelSnapshot>>(snapshotsJSON)
-        sendSnapshots(snapshots.associateBy { it.id })
+    fun onSnapshot(snapshotJSON: String) {
+        Log.d(logTag, "PartoutVpnServiceRuntime.onSnapshot()")
+        val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
+        sendSnapshot(snapshot)
     }
 
     // JNI
@@ -240,25 +240,25 @@ class PartoutVpnServiceRuntime(
 
     // Broadcasts emitters
 
-    private fun sendSnapshots(snapshots: Map<String, TunnelSnapshot>?) {
-        val newSnapshots: Map<String, TunnelSnapshot>
-        if (snapshots != null) {
-            newSnapshots = snapshots
+    private fun sendSnapshot(snapshot: TunnelSnapshot?) {
+        val newSnapshot: TunnelSnapshot?
+        if (snapshot != null) {
+            newSnapshot = snapshot
         } else {
-            newSnapshots = latestSnapshots.mapValues {
-                it.value.disabled()
-            }
+            newSnapshot = latestSnapshot?.disabled()
         }
-        if (newSnapshots == latestSnapshots) {
+        if (newSnapshot == latestSnapshot) {
             return
         }
-        Log.d(logTag, "Report daemon snapshots: $newSnapshots")
+        Log.d(logTag, "Report daemon snapshot: $newSnapshot")
         val intent = Intent(ACTION_SNAPSHOTS).apply {
             setPackage(service.packageName)
-            putExtra(EXTRA_SNAPSHOTS_JSON, json.encodeToString(newSnapshots))
+            newSnapshot.let {
+                putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(it))
+            }
         }
         service.sendBroadcast(intent)
-        latestSnapshots = newSnapshots
+        latestSnapshot = newSnapshot
     }
 
     // Nested classes
@@ -286,7 +286,7 @@ class PartoutVpnServiceRuntime(
         const val ACTION_SNAPSHOTS = "io.partout.action.SNAPSHOTS"
         const val EXTRA_PROFILE_ID = "io.partout.extra.PROFILE_ID"
         const val EXTRA_PROFILE_JSON = "io.partout.extra.PROFILE_JSON"
-        const val EXTRA_SNAPSHOTS_JSON = "io.partout.extra.SNAPSHOTS_JSON"
+        const val EXTRA_SNAPSHOT_JSON = "io.partout.extra.SNAPSHOT_JSON"
 
         private val json = Json {
             ignoreUnknownKeys = true
