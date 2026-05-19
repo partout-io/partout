@@ -7,6 +7,8 @@ package io.partout
 import android.app.Service
 import android.content.Intent
 import android.net.VpnService
+import android.os.Binder
+import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import io.partout.models.TaggedModuleDNS
@@ -37,6 +39,7 @@ class PartoutVpnServiceRuntime(
 ) {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandMutex = Mutex()
+    private val binder = Binder()
     private var descriptor: ParcelFileDescriptor? = null
     private var isRunning = false
     private var latestSnapshot: TunnelSnapshot? = null
@@ -77,6 +80,10 @@ class PartoutVpnServiceRuntime(
         disconnect()
     }
 
+    @Suppress("UNUSED_PARAMETER")
+    fun onBind(intent: Intent?): IBinder? {
+        return binder
+    }
     // Actions
 
     private fun connect(profileJSON: String) = launchCommand {
@@ -90,7 +97,6 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to start VPN daemon (code=${result.code}): ${result.payload}")
             stopService()
             isRunning = false
-            sendSnapshot(null)
             return@launchCommand
         }
         Log.i(logTag, "Started VPN daemon")
@@ -112,7 +118,7 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to stop VPN daemon (code=${result.code}): ${result.payload}")
         }
         isRunning = false
-        sendSnapshot(null)
+        sendFinalSnapshot()
     }
 
     private fun launchCommand(action: suspend () -> Unit) {
@@ -240,25 +246,20 @@ class PartoutVpnServiceRuntime(
 
     // Broadcasts emitters
 
-    private fun sendSnapshot(snapshot: TunnelSnapshot?) {
-        val newSnapshot: TunnelSnapshot?
-        if (snapshot != null) {
-            newSnapshot = snapshot
-        } else {
-            newSnapshot = latestSnapshot?.disabled()
-        }
-        if (newSnapshot == latestSnapshot) {
-            return
-        }
-        Log.d(logTag, "Report daemon snapshot: $newSnapshot")
+    private fun sendSnapshot(snapshot: TunnelSnapshot) {
+        Log.d(logTag, "Report daemon snapshot: $snapshot")
         val intent = Intent(ACTION_SNAPSHOT).apply {
             setPackage(service.packageName)
-            newSnapshot?.let {
-                putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(it))
-            }
+            putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
         }
         service.sendBroadcast(intent)
-        latestSnapshot = newSnapshot
+        latestSnapshot = snapshot
+    }
+
+    private fun sendFinalSnapshot() {
+        latestSnapshot?.let {
+            sendSnapshot(it.disabled())
+        }
     }
 
     // Nested classes

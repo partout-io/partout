@@ -5,10 +5,14 @@
 package io.partout
 
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.ServiceConnection
 import android.net.VpnService
+import android.os.IBinder
+import android.util.Log
 import androidx.core.content.ContextCompat
 import io.partout.models.TaggedProfile
 import io.partout.models.TunnelSnapshot
@@ -19,35 +23,79 @@ import kotlinx.serialization.json.Json
 import java.io.Closeable
 
 class PartoutTunnel(
+    private val logTag: String,
     context: Context,
     private val vpnServiceClass: Class<out VpnService>,
     private val requestVpnPermission: (Intent) -> Unit,
 ) : Closeable {
     private val appContext = context.applicationContext
     private var pendingPermission: PendingPermission? = null
+
+    // Emitted updates
     private val _state = MutableStateFlow(State())
     val state = _state.asStateFlow()
+
+    // Service updates through binding and broadcasts
+    private val deathRecipient: IBinder.DeathRecipient
+    private val connection: ServiceConnection
     private val snapshotsReceiver: BroadcastReceiver
+    private var isBound: Boolean
+    private var binder: IBinder? = null
+
+    // Initialization
 
     init {
+        deathRecipient = IBinder.DeathRecipient {
+            binder = null
+            onServiceDead()
+        }
+        connection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName, service: IBinder) {
+                binder = service
+                service.linkToDeath(deathRecipient, 0)
+
+                // Important: immediately ask the service for its current snapshot.
+                // Do not wait for the next broadcast.
+//                requestCurrentVpnStatus(service)
+            }
+
+            override fun onServiceDisconnected(name: ComponentName) {
+                binder = null
+                onServiceDead()
+            }
+
+            override fun onBindingDied(name: ComponentName) {
+                binder = null
+                onServiceDead()
+            }
+
+            override fun onNullBinding(name: ComponentName) {
+                binder = null
+                onServiceDead()
+            }
+        }
         snapshotsReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action != PartoutVpnServiceRuntime.ACTION_SNAPSHOT) {
                     return
                 }
                 val extra = intent.getStringExtra(PartoutVpnServiceRuntime.EXTRA_SNAPSHOT_JSON)
-                if (extra != null) {
-                    val snapshot = json.decodeFromString<TunnelSnapshot>(extra)
-                    _state.update {
-                        it.copy(mapOf(snapshot.id to snapshot))
-                    }
-                } else {
-                    _state.update {
-                        it.copy(emptyMap())
-                    }
+                if (extra == null) {
+                    Log.e(logTag, "Missing snapshot from broadcast intent")
+                    return
+                }
+                val snapshot = json.decodeFromString<TunnelSnapshot>(extra)
+                _state.update {
+                    it.copy(mapOf(snapshot.id to snapshot))
                 }
             }
         }
+
+        // Bind service immediately
+        val intent = Intent(context, vpnServiceClass)
+        isBound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+
+        // Register for snapshots
         ContextCompat.registerReceiver(
             appContext,
             snapshotsReceiver,
@@ -55,6 +103,18 @@ class PartoutTunnel(
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
     }
+
+    override fun close() {
+        appContext.unregisterReceiver(snapshotsReceiver)
+        binder?.unlinkToDeath(deathRecipient, 0)
+        binder = null
+        if (isBound) {
+            appContext.unbindService(connection)
+            isBound = false
+        }
+    }
+
+    // Actions
 
     fun onVpnPermissionResult(granted: Boolean) {
         val permission = pendingPermission ?: return
@@ -86,6 +146,8 @@ class PartoutTunnel(
         completion(ERROR_NONE)
     }
 
+    // Internals
+
     private fun startVpnService(profile: TaggedProfile) {
         val startIntent = Intent(appContext, vpnServiceClass).apply {
             putExtra(PartoutVpnServiceRuntime.EXTRA_PROFILE_JSON, json.encodeToString(profile))
@@ -103,8 +165,10 @@ class PartoutTunnel(
         ContextCompat.startForegroundService(appContext, stopIntent)
     }
 
-    override fun close() {
-        appContext.unregisterReceiver(snapshotsReceiver)
+    private fun onServiceDead() {
+        _state.update {
+            it.copy(emptyMap())
+        }
     }
 
     companion object {
