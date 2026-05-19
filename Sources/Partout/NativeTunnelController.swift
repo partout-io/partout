@@ -75,12 +75,12 @@ public final class NativeTunnelController: TunnelController {
         }
     }
 
-    public func reportSnapshots(_ snapshots: [TunnelSnapshot]) {
-        pp_log(ctx, .core, .debug, "Report tunnel snapshots: \(snapshots)")
+    public func reportSnapshot(_ snapshot: TunnelSnapshot) {
+        pp_log(ctx, .core, .debug, "Report tunnel snapshot: \(snapshot)")
         do {
-            let json = try JSONEncoder.shared().encodeJSON(snapshots)
+            let json = try JSONEncoder.shared().encodeJSON(snapshot)
             json.withCString {
-                pp_tun_ctrl_report_snapshots(ref, $0)
+                pp_tun_ctrl_report_snapshot(ref, $0)
             }
         } catch {
             pp_log(ctx, .core, .error, "Unable to encode snapshots: \(error)")
