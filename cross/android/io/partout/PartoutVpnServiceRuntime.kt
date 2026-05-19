@@ -251,9 +251,9 @@ class PartoutVpnServiceRuntime(
             return
         }
         Log.d(logTag, "Report daemon snapshot: $newSnapshot")
-        val intent = Intent(ACTION_SNAPSHOTS).apply {
+        val intent = Intent(ACTION_SNAPSHOT).apply {
             setPackage(service.packageName)
-            newSnapshot.let {
+            newSnapshot?.let {
                 putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(it))
             }
         }
@@ -283,7 +283,7 @@ class PartoutVpnServiceRuntime(
 
     companion object {
         const val ACTION_STOP_VPN = "io.partout.action.STOP_VPN"
-        const val ACTION_SNAPSHOTS = "io.partout.action.SNAPSHOTS"
+        const val ACTION_SNAPSHOT = "io.partout.action.SNAPSHOT"
         const val EXTRA_PROFILE_ID = "io.partout.extra.PROFILE_ID"
         const val EXTRA_PROFILE_JSON = "io.partout.extra.PROFILE_JSON"
         const val EXTRA_SNAPSHOT_JSON = "io.partout.extra.SNAPSHOT_JSON"

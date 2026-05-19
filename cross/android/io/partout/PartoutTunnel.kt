@@ -32,14 +32,14 @@ class PartoutTunnel(
     init {
         snapshotsReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
-                if (intent?.action != PartoutVpnServiceRuntime.ACTION_SNAPSHOTS) {
+                if (intent?.action != PartoutVpnServiceRuntime.ACTION_SNAPSHOT) {
                     return
                 }
                 val extra = intent.getStringExtra(PartoutVpnServiceRuntime.EXTRA_SNAPSHOT_JSON)
                 if (extra != null) {
                     val snapshot = json.decodeFromString<TunnelSnapshot>(extra)
                     _state.update {
-                        it.copy(mapOf(Pair(snapshot.id, snapshot)))
+                        it.copy(mapOf(snapshot.id to snapshot))
                     }
                 } else {
                     _state.update {
@@ -51,7 +51,7 @@ class PartoutTunnel(
         ContextCompat.registerReceiver(
             appContext,
             snapshotsReceiver,
-            IntentFilter(PartoutVpnServiceRuntime.ACTION_SNAPSHOTS),
+            IntentFilter(PartoutVpnServiceRuntime.ACTION_SNAPSHOT),
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
     }
