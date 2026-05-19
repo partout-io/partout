@@ -39,6 +39,8 @@ extension PartoutError.Code {
 
         public static let unsupportedAlgorithm = PartoutError.Code("OpenVPN.unsupportedAlgorithm")
 
+        public static let unsupportedCompression = PartoutError.Code("OpenVPN.unsupportedCompression")
+
         public static let unsupportedOption = PartoutError.Code("OpenVPN.unsupportedOption")
     }
 }

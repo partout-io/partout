@@ -227,7 +227,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
 
         pp_log_id(profile.id, .core, .notice, "Daemon stopped successfully")
 
-        // Make sure to stop reporting onStatus events
+        // Make sure to stop reporting events
         onSnapshot = nil
     }
 
@@ -464,7 +464,7 @@ extension SimpleConnectionDaemon {
             return
         }
         lastPublishedSnapshot = snapshot
-        controller.reportSnapshots([snapshot])
+        controller.reportSnapshot(snapshot)
         onSnapshot?(snapshot)
     }
 

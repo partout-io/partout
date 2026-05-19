@@ -218,7 +218,7 @@ extension StandardOpenVPNParser.Builder {
                 optCompressionAlgorithm = (arg == "no") ? .disabled : .LZO
             } else {
                 guard components.count > 1, components[1] == "no" else {
-                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
+                    throw StandardOpenVPNParserError.unsupportedCompression(option: line)
                 }
                 optCompressionAlgorithm = .disabled
             }
@@ -230,7 +230,7 @@ extension StandardOpenVPNParser.Builder {
                 switch arg {
                 case "lzo":
                     guard supportsLZO else {
-                        throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
+                        throw StandardOpenVPNParserError.unsupportedCompression(option: line)
                     }
                     optCompressionAlgorithm = .LZO
 
@@ -242,7 +242,7 @@ extension StandardOpenVPNParser.Builder {
                     optCompressionAlgorithm = .disabled
 
                 default:
-                    throw StandardOpenVPNParserError.unsupportedConfiguration(option: line)
+                    throw StandardOpenVPNParserError.unsupportedCompression(option: line)
                 }
             } else {
                 optCompressionAlgorithm = .disabled

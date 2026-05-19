@@ -19,14 +19,26 @@ public final class NativeTunnelController: TunnelController {
         maxReadLength: Int = 128 * 1024
     ) throws {
         self.ctx = ctx
+#if os(Android)
+        pp_log(ctx, .core, .debug, "NativeTunnelController: Retain JNI ref to PartoutVpnServiceRuntime")
+        guard let retainedRef = pp_jni_new_global_ref(ref) else {
+            throw PartoutError(.releasedObject)
+        }
+        self.ref = retainedRef
+#else
         self.ref = ref
+#endif
         self.maxReadLength = maxReadLength
 
-        pp_tun_ctrl_test_working(ref)
+        pp_tun_ctrl_test_working(self.ref)
     }
 
     deinit {
         pp_log(ctx, .core, .debug, "Deinit NativeTunnelController")
+#if os(Android)
+        pp_log(ctx, .core, .debug, "NativeTunnelController: Release JNI ref to PartoutVpnServiceRuntime")
+        pp_jni_delete_global_ref(ref)
+#endif
     }
 
     public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
@@ -63,12 +75,12 @@ public final class NativeTunnelController: TunnelController {
         }
     }
 
-    public func reportSnapshots(_ snapshots: [TunnelSnapshot]) {
-        pp_log(ctx, .core, .debug, "Report tunnel snapshots: \(snapshots)")
+    public func reportSnapshot(_ snapshot: TunnelSnapshot) {
+        pp_log(ctx, .core, .debug, "Report tunnel snapshot: \(snapshot)")
         do {
-            let json = try JSONEncoder.shared().encodeJSON(snapshots)
+            let json = try JSONEncoder.shared().encodeJSON(snapshot)
             json.withCString {
-                pp_tun_ctrl_report_snapshots(ref, $0)
+                pp_tun_ctrl_report_snapshot(ref, $0)
             }
         } catch {
             pp_log(ctx, .core, .error, "Unable to encode snapshots: \(error)")

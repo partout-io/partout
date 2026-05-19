@@ -32,8 +32,8 @@ pp_tun _Nullable pp_tun_ctrl_set_tunnel(void *_Nullable ref,
 void pp_tun_ctrl_configure_sockets(void *_Nullable ref,
                                    const int *_Nullable fds,
                                    const size_t fds_len);
-void pp_tun_ctrl_report_snapshots(void *_Nullable ref,
-                                  const char *_Nonnull snapshots_json);
+void pp_tun_ctrl_report_snapshot(void *_Nullable ref,
+                                 const char *_Nonnull snapshot_json);
 void pp_tun_ctrl_clear_tunnel(void *_Nullable ref,
                               pp_tun _Nullable tun_impl);
 void pp_tun_ctrl_cancel_tunnel(void *_Nullable ref,
