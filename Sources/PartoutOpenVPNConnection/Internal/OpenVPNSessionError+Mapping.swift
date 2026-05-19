@@ -15,7 +15,7 @@ extension OpenVPNSessionError: PartoutErrorMappable {
         case .negotiationTimeout, .pingTimeout, .writeTimeout:
             return .timeout
 
-        case .badCredentials, .badCredentialsWithLocalOptions:
+        case .badCredentials:
             return .authentication
 
         case .serverCompression:
