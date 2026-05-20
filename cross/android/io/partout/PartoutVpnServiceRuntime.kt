@@ -8,7 +8,12 @@ import android.app.Service
 import android.content.Intent
 import android.net.VpnService
 import android.os.Binder
+import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.os.Message
+import android.os.Messenger
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import io.partout.models.TaggedModuleDNS
@@ -17,6 +22,7 @@ import io.partout.models.TaggedModuleIP
 import io.partout.models.TaggedModuleOnDemand
 import io.partout.models.TunnelRemoteInfoWrapper
 import io.partout.models.TunnelSnapshot
+import io.partout.models.TunnelStatus
 import io.partout.vpn.DNSModuleApplying
 import io.partout.vpn.HTTPProxyModuleApplying
 import io.partout.vpn.IPModuleApplying
@@ -39,7 +45,6 @@ class PartoutVpnServiceRuntime(
 ) {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandMutex = Mutex()
-    private val binder = Binder()
     private var descriptor: ParcelFileDescriptor? = null
     private var isRunning = false
     private var latestSnapshot: TunnelSnapshot? = null
@@ -80,10 +85,6 @@ class PartoutVpnServiceRuntime(
         disconnect()
     }
 
-    @Suppress("UNUSED_PARAMETER")
-    fun onBind(intent: Intent?): IBinder? {
-        return binder
-    }
     // Actions
 
     private fun connect(profileJSON: String) = launchCommand {
@@ -131,6 +132,37 @@ class PartoutVpnServiceRuntime(
 
     private fun close() {
         serviceScope.cancel()
+    }
+
+    // Messaging
+
+    @Suppress("UNUSED_PARAMETER")
+    fun onBind(intent: Intent?): IBinder? {
+        return messenger.binder
+    }
+
+    private val messenger = Messenger(
+        object : Handler(Looper.getMainLooper()) {
+            override fun handleMessage(msg: Message) {
+                when (msg.what) {
+                    MSG_GET_STATUS -> {
+                        msg.replyTo?.let { replyStatus(it) }
+                    }
+                    else -> super.handleMessage(msg)
+                }
+            }
+        }
+    )
+
+    private fun replyStatus(client: Messenger) {
+        val status = latestSnapshot?.status ?: TunnelStatus.inactive
+        val bundle = Bundle().apply {
+            putString(MSG_KEY_STATUS, status.value)
+        }
+        val msg = Message.obtain(null, MSG_GET_STATUS).apply {
+            data = bundle
+        }
+        client.send(msg)
     }
 
     // WARNING: These methods are called from a JNI background thread
@@ -288,6 +320,9 @@ class PartoutVpnServiceRuntime(
         const val EXTRA_PROFILE_ID = "io.partout.extra.PROFILE_ID"
         const val EXTRA_PROFILE_JSON = "io.partout.extra.PROFILE_JSON"
         const val EXTRA_SNAPSHOT_JSON = "io.partout.extra.SNAPSHOT_JSON"
+
+        const val MSG_GET_STATUS = 1
+        const val MSG_KEY_STATUS = "status"
 
         private val json = Json {
             ignoreUnknownKeys = true
