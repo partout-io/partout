@@ -86,7 +86,12 @@ class PartoutVpnServiceRuntime(
             return engine.readLastProfile()
         }
         Log.i(logTag, "Profile from VPN start intent, persisting it")
-        engine.writeLastProfile(json)
+        try {
+            engine.writeLastProfile(json)
+        } catch (e: Exception) {
+            e.throwIfCancellation()
+            Log.w(logTag, "Unable to persist profile JSON, continuing with intent profile", e)
+        }
         return json
     }
 
@@ -95,7 +100,7 @@ class PartoutVpnServiceRuntime(
             loadOrPersistProfile(intent)
         } catch (e: Exception) {
             e.throwIfCancellation()
-            Log.e(logTag, "Unable to load or persist profile JSON", e)
+            Log.e(logTag, "Unable to load profile JSON", e)
             stopService()
             return@launchCommand
         }
