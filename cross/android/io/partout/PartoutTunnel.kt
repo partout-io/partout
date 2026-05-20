@@ -54,9 +54,14 @@ class PartoutTunnel(
             override fun handleMessage(msg: Message) {
                 when (msg.what) {
                     PartoutVpnServiceRuntime.MSG_GET_STATUS  -> {
-                        msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_SNAPSHOT)?.let {
-                            onSnapshotJSON(it)
+                        val snapshotJSON = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_SNAPSHOT)
+                        if (snapshotJSON == null) {
+                            _state.update {
+                                it.copy(emptyMap())
+                            }
+                            return
                         }
+                        onSnapshotJSON(snapshotJSON)
                     }
                     else -> super.handleMessage(msg)
                 }
