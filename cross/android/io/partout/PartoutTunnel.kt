@@ -11,7 +11,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.net.VpnService
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.os.Message
+import android.os.Messenger
 import android.util.Log
 import androidx.core.content.ContextCompat
 import io.partout.models.TaggedProfile
@@ -36,41 +40,54 @@ class PartoutTunnel(
     val state = _state.asStateFlow()
 
     // Service updates through binding and broadcasts
+    private val clientMessenger: Messenger
     private val deathRecipient: IBinder.DeathRecipient
     private val connection: ServiceConnection
     private val snapshotsReceiver: BroadcastReceiver
     private var isBound: Boolean
-    private var binder: IBinder? = null
+    private var serviceMessenger: Messenger? = null
 
     // Initialization
 
     init {
+        clientMessenger = Messenger(object : Handler(Looper.getMainLooper()) {
+            override fun handleMessage(msg: Message) {
+                when (msg.what) {
+                    PartoutVpnServiceRuntime.MSG_GET_STATUS  -> {
+                        val status = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_STATUS)
+                        if (status != null) {
+                            Log.e(logTag, ">>> Message received: ${status}")
+                        }
+                    }
+                    else -> super.handleMessage(msg)
+                }
+            }
+        })
         deathRecipient = IBinder.DeathRecipient {
-            binder = null
+            serviceMessenger = null
             onServiceDead()
         }
         connection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName, service: IBinder) {
-                binder = service
+                serviceMessenger = Messenger(service)
                 service.linkToDeath(deathRecipient, 0)
 
                 // Important: immediately ask the service for its current snapshot.
-                // Do not wait for the next broadcast.
-//                requestCurrentVpnStatus(service)
+                requestStatus()
             }
 
             override fun onServiceDisconnected(name: ComponentName) {
-                binder = null
+                serviceMessenger = null
                 onServiceDead()
             }
 
             override fun onBindingDied(name: ComponentName) {
-                binder = null
+                serviceMessenger = null
                 onServiceDead()
             }
 
             override fun onNullBinding(name: ComponentName) {
-                binder = null
+                serviceMessenger = null
                 onServiceDead()
             }
         }
@@ -106,8 +123,8 @@ class PartoutTunnel(
 
     override fun close() {
         appContext.unregisterReceiver(snapshotsReceiver)
-        binder?.unlinkToDeath(deathRecipient, 0)
-        binder = null
+        serviceMessenger?.binder?.unlinkToDeath(deathRecipient, 0)
+        serviceMessenger = null
         if (isBound) {
             appContext.unbindService(connection)
             isBound = false
@@ -144,6 +161,15 @@ class PartoutTunnel(
         pendingPermission = null
         stopVpnService(profileId)
         completion(ERROR_NONE)
+    }
+
+    // Messaging
+
+    fun requestStatus() {
+        val msg = Message.obtain(null, PartoutVpnServiceRuntime.MSG_GET_STATUS).apply {
+            replyTo = clientMessenger
+        }
+        serviceMessenger?.send(msg)
     }
 
     // Internals
