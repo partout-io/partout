@@ -33,24 +33,19 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
-import java.io.File
 
 class PartoutVpnServiceRuntime(
     private val logTag: String,
     private val service: VpnService,
-    private val engine: Engine,
-    private val stopService: () -> Unit,
+    private val engine: Engine
 ) {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandMutex = Mutex()
     private var descriptor: ParcelFileDescriptor? = null
     private var isRunning = false
     private var latestSnapshot: TunnelSnapshot? = null
-
-    private val lastProfilePath = File(service.noBackupFilesDir, "tunnel_profile.json")
 
     // Service lifecycle
 
@@ -88,13 +83,14 @@ class PartoutVpnServiceRuntime(
         val json = intent?.getStringExtra(EXTRA_PROFILE_JSON)
         if (json.isNullOrBlank()) {
             Log.i(logTag, "No profile from VPN start intent, loading last persisted")
-            return withContext(Dispatchers.IO) {
-                lastProfilePath.readText()
-            }
+            return engine.readLastProfile()
         }
         Log.i(logTag, "Profile from VPN start intent, persisting it")
-        withContext(Dispatchers.IO) {
-            lastProfilePath.writeText(json)
+        try {
+            engine.writeLastProfile(json)
+        } catch (e: Exception) {
+            e.throwIfCancellation()
+            Log.w(logTag, "Unable to persist profile JSON, continuing with intent profile", e)
         }
         return json
     }
@@ -104,7 +100,7 @@ class PartoutVpnServiceRuntime(
             loadOrPersistProfile(intent)
         } catch (e: Exception) {
             e.throwIfCancellation()
-            Log.e(logTag, "Unable to load or persist profile JSON", e)
+            Log.e(logTag, "Unable to load profile JSON", e)
             stopService()
             return@launchCommand
         }
@@ -326,7 +322,7 @@ class PartoutVpnServiceRuntime(
         }
     }
 
-    // Nested classes
+    // Helpers
 
     data class Result(
         val code: Int,
@@ -336,6 +332,12 @@ class PartoutVpnServiceRuntime(
     interface Engine {
         suspend fun start(runtime: PartoutVpnServiceRuntime, profileJSON: String): Result
         suspend fun stop(): Result
+        suspend fun readLastProfile(): String
+        suspend fun writeLastProfile(json: String)
+    }
+
+    private fun stopService() {
+        service.stopSelf()
     }
 
     private fun TunnelSnapshot.disabled() = TunnelSnapshot(
