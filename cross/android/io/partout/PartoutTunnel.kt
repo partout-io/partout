@@ -54,9 +54,14 @@ class PartoutTunnel(
             override fun handleMessage(msg: Message) {
                 when (msg.what) {
                     PartoutVpnServiceRuntime.MSG_GET_STATUS  -> {
-                        val status = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_STATUS)
-                        if (status != null) {
-                            Log.e(logTag, ">>> Message received: ${status}")
+                        val snapshotJSON = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_SNAPSHOT)
+                        if (snapshotJSON == null) { return }
+                        runCatching {
+                            return@runCatching json.decodeFromString<TunnelSnapshot>(snapshotJSON)
+                        }.onSuccess {
+                            Log.e(logTag, ">>> Snapshot received: ${it}")
+                        }.onFailure {
+                            Log.e(logTag, ">>> Unable to decode snapshot: ${0}")
                         }
                     }
                     else -> super.handleMessage(msg)
@@ -72,8 +77,8 @@ class PartoutTunnel(
                 serviceMessenger = Messenger(service)
                 service.linkToDeath(deathRecipient, 0)
 
-                // Important: immediately ask the service for its current snapshot.
-                requestStatus()
+                // Ask the service for its current snapshot
+                requestSnapshot()
             }
 
             override fun onServiceDisconnected(name: ComponentName) {
@@ -165,7 +170,7 @@ class PartoutTunnel(
 
     // Messaging
 
-    fun requestStatus() {
+    fun requestSnapshot() {
         val msg = Message.obtain(null, PartoutVpnServiceRuntime.MSG_GET_STATUS).apply {
             replyTo = clientMessenger
         }

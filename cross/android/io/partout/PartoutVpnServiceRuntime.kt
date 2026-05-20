@@ -146,7 +146,7 @@ class PartoutVpnServiceRuntime(
             override fun handleMessage(msg: Message) {
                 when (msg.what) {
                     MSG_GET_STATUS -> {
-                        msg.replyTo?.let { replyStatus(it) }
+                        msg.replyTo?.let { replySnapshot(it) }
                     }
                     else -> super.handleMessage(msg)
                 }
@@ -154,10 +154,14 @@ class PartoutVpnServiceRuntime(
         }
     )
 
-    private fun replyStatus(client: Messenger) {
-        val status = latestSnapshot?.status ?: TunnelStatus.inactive
+    private fun replySnapshot(client: Messenger) {
+        val snapshotJSON = latestSnapshot?.let {
+            json.encodeToString(it)
+        }
         val bundle = Bundle().apply {
-            putString(MSG_KEY_STATUS, status.value)
+            snapshotJSON?.let {
+                putString(MSG_KEY_SNAPSHOT, it)
+            }
         }
         val msg = Message.obtain(null, MSG_GET_STATUS).apply {
             data = bundle
@@ -322,7 +326,7 @@ class PartoutVpnServiceRuntime(
         const val EXTRA_SNAPSHOT_JSON = "io.partout.extra.SNAPSHOT_JSON"
 
         const val MSG_GET_STATUS = 1
-        const val MSG_KEY_STATUS = "status"
+        const val MSG_KEY_SNAPSHOT = "snapshot"
 
         private val json = Json {
             ignoreUnknownKeys = true
