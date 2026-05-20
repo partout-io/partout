@@ -54,14 +54,8 @@ class PartoutTunnel(
             override fun handleMessage(msg: Message) {
                 when (msg.what) {
                     PartoutVpnServiceRuntime.MSG_GET_STATUS  -> {
-                        val snapshotJSON = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_SNAPSHOT)
-                        if (snapshotJSON == null) { return }
-                        runCatching {
-                            return@runCatching json.decodeFromString<TunnelSnapshot>(snapshotJSON)
-                        }.onSuccess {
-                            Log.e(logTag, ">>> Snapshot received: ${it}")
-                        }.onFailure {
-                            Log.e(logTag, ">>> Unable to decode snapshot: ${0}")
+                        msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_SNAPSHOT)?.let {
+                            onSnapshotJSON(it)
                         }
                     }
                     else -> super.handleMessage(msg)
@@ -101,14 +95,8 @@ class PartoutTunnel(
                 if (intent?.action != PartoutVpnServiceRuntime.ACTION_SNAPSHOT) {
                     return
                 }
-                val extra = intent.getStringExtra(PartoutVpnServiceRuntime.EXTRA_SNAPSHOT_JSON)
-                if (extra == null) {
-                    Log.e(logTag, "Missing snapshot from broadcast intent")
-                    return
-                }
-                val snapshot = json.decodeFromString<TunnelSnapshot>(extra)
-                _state.update {
-                    it.copy(mapOf(snapshot.id to snapshot))
+                intent.getStringExtra(PartoutVpnServiceRuntime.EXTRA_SNAPSHOT_JSON)?.let {
+                    onSnapshotJSON(it)
                 }
             }
         }
@@ -177,6 +165,12 @@ class PartoutTunnel(
         serviceMessenger?.send(msg)
     }
 
+    private fun onServiceDead() {
+        _state.update {
+            it.copy(emptyMap())
+        }
+    }
+
     // Internals
 
     private fun startVpnService(profile: TaggedProfile) {
@@ -196,9 +190,16 @@ class PartoutTunnel(
         ContextCompat.startForegroundService(appContext, stopIntent)
     }
 
-    private fun onServiceDead() {
-        _state.update {
-            it.copy(emptyMap())
+    private fun onSnapshotJSON(snapshotJSON: String) {
+        runCatching {
+            json.decodeFromString<TunnelSnapshot>(snapshotJSON)
+        }.onSuccess { snapshot ->
+            Log.e(logTag, ">>> Snapshot received: ${snapshot}")
+            _state.update {
+                it.copy(mapOf(snapshot.id to snapshot))
+            }
+        }.onFailure {
+            Log.e(logTag, ">>> Unable to decode snapshot: ${0}")
         }
     }
 

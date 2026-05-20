@@ -7,7 +7,6 @@ package io.partout
 import android.app.Service
 import android.content.Intent
 import android.net.VpnService
-import android.os.Binder
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
@@ -22,7 +21,6 @@ import io.partout.models.TaggedModuleIP
 import io.partout.models.TaggedModuleOnDemand
 import io.partout.models.TunnelRemoteInfoWrapper
 import io.partout.models.TunnelSnapshot
-import io.partout.models.TunnelStatus
 import io.partout.vpn.DNSModuleApplying
 import io.partout.vpn.HTTPProxyModuleApplying
 import io.partout.vpn.IPModuleApplying
