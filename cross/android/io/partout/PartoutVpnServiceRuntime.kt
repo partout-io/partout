@@ -33,10 +33,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
-import java.io.File
 
 class PartoutVpnServiceRuntime(
     private val logTag: String,
@@ -48,8 +46,6 @@ class PartoutVpnServiceRuntime(
     private var descriptor: ParcelFileDescriptor? = null
     private var isRunning = false
     private var latestSnapshot: TunnelSnapshot? = null
-
-    private val lastProfilePath = File(service.noBackupFilesDir, "tunnel_profile.json")
 
     // Service lifecycle
 
@@ -87,14 +83,10 @@ class PartoutVpnServiceRuntime(
         val json = intent?.getStringExtra(EXTRA_PROFILE_JSON)
         if (json.isNullOrBlank()) {
             Log.i(logTag, "No profile from VPN start intent, loading last persisted")
-            return withContext(Dispatchers.IO) {
-                lastProfilePath.readText()
-            }
+            return engine.readLastProfile()
         }
         Log.i(logTag, "Profile from VPN start intent, persisting it")
-        withContext(Dispatchers.IO) {
-            lastProfilePath.writeText(json)
-        }
+        engine.writeLastProfile(json)
         return json
     }
 
@@ -335,6 +327,8 @@ class PartoutVpnServiceRuntime(
     interface Engine {
         suspend fun start(runtime: PartoutVpnServiceRuntime, profileJSON: String): Result
         suspend fun stop(): Result
+        suspend fun readLastProfile(): String
+        suspend fun writeLastProfile(json: String)
     }
 
     private fun stopService() {
