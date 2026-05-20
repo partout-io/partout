@@ -5,10 +5,18 @@
 package io.partout
 
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.ServiceConnection
 import android.net.VpnService
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.os.Message
+import android.os.Messenger
+import android.util.Log
 import androidx.core.content.ContextCompat
 import io.partout.models.TaggedProfile
 import io.partout.models.TunnelSnapshot
@@ -19,35 +27,85 @@ import kotlinx.serialization.json.Json
 import java.io.Closeable
 
 class PartoutTunnel(
+    private val logTag: String,
     context: Context,
     private val vpnServiceClass: Class<out VpnService>,
     private val requestVpnPermission: (Intent) -> Unit,
 ) : Closeable {
     private val appContext = context.applicationContext
     private var pendingPermission: PendingPermission? = null
+
+    // Emitted updates
     private val _state = MutableStateFlow(State())
     val state = _state.asStateFlow()
+
+    // Service updates through binding and broadcasts
+    private val clientMessenger: Messenger
+    private val deathRecipient: IBinder.DeathRecipient
+    private val connection: ServiceConnection
     private val snapshotsReceiver: BroadcastReceiver
+    private var isBound: Boolean
+    private var serviceMessenger: Messenger? = null
+
+    // Initialization
 
     init {
+        clientMessenger = Messenger(object : Handler(Looper.getMainLooper()) {
+            override fun handleMessage(msg: Message) {
+                when (msg.what) {
+                    PartoutVpnServiceRuntime.MSG_GET_STATUS  -> {
+                        msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_SNAPSHOT)?.let {
+                            onSnapshotJSON(it)
+                        }
+                    }
+                    else -> super.handleMessage(msg)
+                }
+            }
+        })
+        deathRecipient = IBinder.DeathRecipient {
+            serviceMessenger = null
+            onServiceDead()
+        }
+        connection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName, service: IBinder) {
+                serviceMessenger = Messenger(service)
+                service.linkToDeath(deathRecipient, 0)
+
+                // Ask the service for its current snapshot
+                requestSnapshot()
+            }
+
+            override fun onServiceDisconnected(name: ComponentName) {
+                serviceMessenger = null
+                onServiceDead()
+            }
+
+            override fun onBindingDied(name: ComponentName) {
+                serviceMessenger = null
+                onServiceDead()
+            }
+
+            override fun onNullBinding(name: ComponentName) {
+                serviceMessenger = null
+                onServiceDead()
+            }
+        }
         snapshotsReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action != PartoutVpnServiceRuntime.ACTION_SNAPSHOT) {
                     return
                 }
-                val extra = intent.getStringExtra(PartoutVpnServiceRuntime.EXTRA_SNAPSHOT_JSON)
-                if (extra != null) {
-                    val snapshot = json.decodeFromString<TunnelSnapshot>(extra)
-                    _state.update {
-                        it.copy(mapOf(snapshot.id to snapshot))
-                    }
-                } else {
-                    _state.update {
-                        it.copy(emptyMap())
-                    }
+                intent.getStringExtra(PartoutVpnServiceRuntime.EXTRA_SNAPSHOT_JSON)?.let {
+                    onSnapshotJSON(it)
                 }
             }
         }
+
+        // Bind service immediately
+        val intent = Intent(context, vpnServiceClass)
+        isBound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+
+        // Register for snapshots
         ContextCompat.registerReceiver(
             appContext,
             snapshotsReceiver,
@@ -55,6 +113,18 @@ class PartoutTunnel(
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
     }
+
+    override fun close() {
+        appContext.unregisterReceiver(snapshotsReceiver)
+        serviceMessenger?.binder?.unlinkToDeath(deathRecipient, 0)
+        serviceMessenger = null
+        if (isBound) {
+            appContext.unbindService(connection)
+            isBound = false
+        }
+    }
+
+    // Actions
 
     fun onVpnPermissionResult(granted: Boolean) {
         val permission = pendingPermission ?: return
@@ -86,6 +156,23 @@ class PartoutTunnel(
         completion(ERROR_NONE)
     }
 
+    // Messaging
+
+    fun requestSnapshot() {
+        val msg = Message.obtain(null, PartoutVpnServiceRuntime.MSG_GET_STATUS).apply {
+            replyTo = clientMessenger
+        }
+        serviceMessenger?.send(msg)
+    }
+
+    private fun onServiceDead() {
+        _state.update {
+            it.copy(emptyMap())
+        }
+    }
+
+    // Internals
+
     private fun startVpnService(profile: TaggedProfile) {
         val startIntent = Intent(appContext, vpnServiceClass).apply {
             putExtra(PartoutVpnServiceRuntime.EXTRA_PROFILE_JSON, json.encodeToString(profile))
@@ -103,8 +190,17 @@ class PartoutTunnel(
         ContextCompat.startForegroundService(appContext, stopIntent)
     }
 
-    override fun close() {
-        appContext.unregisterReceiver(snapshotsReceiver)
+    private fun onSnapshotJSON(snapshotJSON: String) {
+        runCatching {
+            json.decodeFromString<TunnelSnapshot>(snapshotJSON)
+        }.onSuccess { snapshot ->
+            Log.e(logTag, ">>> Snapshot received: ${snapshot}")
+            _state.update {
+                it.copy(mapOf(snapshot.id to snapshot))
+            }
+        }.onFailure {
+            Log.e(logTag, ">>> Unable to decode snapshot: ${0}")
+        }
     }
 
     companion object {

@@ -7,6 +7,12 @@ package io.partout
 import android.app.Service
 import android.content.Intent
 import android.net.VpnService
+import android.os.Bundle
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.os.Message
+import android.os.Messenger
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import io.partout.models.TaggedModuleDNS
@@ -90,7 +96,6 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to start VPN daemon (code=${result.code}): ${result.payload}")
             stopService()
             isRunning = false
-            sendSnapshot(null)
             return@launchCommand
         }
         Log.i(logTag, "Started VPN daemon")
@@ -112,7 +117,7 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to stop VPN daemon (code=${result.code}): ${result.payload}")
         }
         isRunning = false
-        sendSnapshot(null)
+        sendFinalSnapshot()
     }
 
     private fun launchCommand(action: suspend () -> Unit) {
@@ -125,6 +130,41 @@ class PartoutVpnServiceRuntime(
 
     private fun close() {
         serviceScope.cancel()
+    }
+
+    // Messaging
+
+    @Suppress("UNUSED_PARAMETER")
+    fun onBind(intent: Intent?): IBinder? {
+        return messenger.binder
+    }
+
+    private val messenger = Messenger(
+        object : Handler(Looper.getMainLooper()) {
+            override fun handleMessage(msg: Message) {
+                when (msg.what) {
+                    MSG_GET_STATUS -> {
+                        msg.replyTo?.let { replySnapshot(it) }
+                    }
+                    else -> super.handleMessage(msg)
+                }
+            }
+        }
+    )
+
+    private fun replySnapshot(client: Messenger) {
+        val snapshotJSON = latestSnapshot?.let {
+            json.encodeToString(it)
+        }
+        val bundle = Bundle().apply {
+            snapshotJSON?.let {
+                putString(MSG_KEY_SNAPSHOT, it)
+            }
+        }
+        val msg = Message.obtain(null, MSG_GET_STATUS).apply {
+            data = bundle
+        }
+        client.send(msg)
     }
 
     // WARNING: These methods are called from a JNI background thread
@@ -240,25 +280,20 @@ class PartoutVpnServiceRuntime(
 
     // Broadcasts emitters
 
-    private fun sendSnapshot(snapshot: TunnelSnapshot?) {
-        val newSnapshot: TunnelSnapshot?
-        if (snapshot != null) {
-            newSnapshot = snapshot
-        } else {
-            newSnapshot = latestSnapshot?.disabled()
-        }
-        if (newSnapshot == latestSnapshot) {
-            return
-        }
-        Log.d(logTag, "Report daemon snapshot: $newSnapshot")
+    private fun sendSnapshot(snapshot: TunnelSnapshot) {
+        Log.d(logTag, "Report daemon snapshot: $snapshot")
         val intent = Intent(ACTION_SNAPSHOT).apply {
             setPackage(service.packageName)
-            newSnapshot?.let {
-                putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(it))
-            }
+            putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
         }
         service.sendBroadcast(intent)
-        latestSnapshot = newSnapshot
+        latestSnapshot = snapshot
+    }
+
+    private fun sendFinalSnapshot() {
+        latestSnapshot?.let {
+            sendSnapshot(it.disabled())
+        }
     }
 
     // Nested classes
@@ -287,6 +322,9 @@ class PartoutVpnServiceRuntime(
         const val EXTRA_PROFILE_ID = "io.partout.extra.PROFILE_ID"
         const val EXTRA_PROFILE_JSON = "io.partout.extra.PROFILE_JSON"
         const val EXTRA_SNAPSHOT_JSON = "io.partout.extra.SNAPSHOT_JSON"
+
+        const val MSG_GET_STATUS = 1
+        const val MSG_KEY_SNAPSHOT = "snapshot"
 
         private val json = Json {
             ignoreUnknownKeys = true
