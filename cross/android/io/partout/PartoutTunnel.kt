@@ -182,7 +182,7 @@ class PartoutTunnel(
         val startIntent = Intent(appContext, vpnServiceClass).apply {
             putExtra(PartoutVpnServiceRuntime.EXTRA_PROFILE_JSON, json.encodeToString(profile))
         }
-        ContextCompat.startForegroundService(appContext, startIntent)
+        appContext.startService(startIntent)
     }
 
     private fun stopVpnService(profileId: String?) {
@@ -192,7 +192,7 @@ class PartoutTunnel(
                 putExtra(PartoutVpnServiceRuntime.EXTRA_PROFILE_ID, profileId)
             }
         }
-        ContextCompat.startForegroundService(appContext, stopIntent)
+        appContext.startService(stopIntent)
     }
 
     private fun onSnapshotJSON(snapshotJSON: String) {
