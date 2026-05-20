@@ -25,6 +25,7 @@ import io.partout.vpn.DNSModuleApplying
 import io.partout.vpn.HTTPProxyModuleApplying
 import io.partout.vpn.IPModuleApplying
 import io.partout.vpn.OnDemandModuleApplying
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,8 +33,10 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import java.io.File
 
 class PartoutVpnServiceRuntime(
     private val logTag: String,
@@ -47,6 +50,8 @@ class PartoutVpnServiceRuntime(
     private var isRunning = false
     private var latestSnapshot: TunnelSnapshot? = null
 
+    private val lastProfilePath = File(service.noBackupFilesDir, "tunnel_profile.json")
+
     // Service lifecycle
 
     @Suppress("UNUSED_PARAMETER")
@@ -56,13 +61,7 @@ class PartoutVpnServiceRuntime(
             disconnect()
             return Service.START_NOT_STICKY
         }
-        val profileJSON = intent?.getStringExtra(EXTRA_PROFILE_JSON)
-        if (profileJSON.isNullOrBlank()) {
-            Log.e(logTag, "Missing profile in VPN start intent")
-            stopService()
-            return Service.START_NOT_STICKY
-        }
-        connect(profileJSON)
+        connect(intent)
         return Service.START_STICKY
     }
 
@@ -85,7 +84,32 @@ class PartoutVpnServiceRuntime(
 
     // Actions
 
-    private fun connect(profileJSON: String) = launchCommand {
+    private suspend fun loadOrPersistProfile(intent: Intent?): String {
+        val json = intent?.getStringExtra(EXTRA_PROFILE_JSON)
+        if (json.isNullOrBlank()) {
+            Log.i(logTag, "No profile from VPN start intent, loading last persisted")
+            return withContext(Dispatchers.IO) {
+                lastProfilePath.readText()
+            }
+        }
+        Log.i(logTag, "Profile from VPN start intent, persisting it")
+        withContext(Dispatchers.IO) {
+            lastProfilePath.writeText(json)
+        }
+        return json
+    }
+
+    private fun connect(intent: Intent?) = launchCommand {
+        val profileJSON = try {
+            loadOrPersistProfile(intent)
+        } catch (e: Exception) {
+            e.throwIfCancellation()
+            Log.e(logTag, "Unable to load or persist profile JSON", e)
+            stopService()
+            return@launchCommand
+        }
+
+        // Stop current tunnel if running
         stopTunnel()
 
         isRunning = true
@@ -123,7 +147,13 @@ class PartoutVpnServiceRuntime(
     private fun launchCommand(action: suspend () -> Unit) {
         serviceScope.launch {
             commandMutex.withLock {
-                action()
+                try {
+                    action()
+                } catch (e: Exception) {
+                    e.throwIfCancellation()
+                    Log.e(logTag, "Unhandled VPN command failure", e)
+                    stopService()
+                }
             }
         }
     }
@@ -315,6 +345,12 @@ class PartoutVpnServiceRuntime(
         status,
         environment
     )
+
+    private fun Exception.throwIfCancellation() {
+        if (this is CancellationException) {
+            throw this
+        }
+    }
 
     companion object {
         const val ACTION_STOP_VPN = "io.partout.action.STOP_VPN"
