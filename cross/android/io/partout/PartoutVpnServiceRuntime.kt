@@ -41,8 +41,7 @@ import java.io.File
 class PartoutVpnServiceRuntime(
     private val logTag: String,
     private val service: VpnService,
-    private val engine: Engine,
-    private val stopService: () -> Unit,
+    private val engine: Engine
 ) {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandMutex = Mutex()
@@ -326,7 +325,7 @@ class PartoutVpnServiceRuntime(
         }
     }
 
-    // Nested classes
+    // Helpers
 
     data class Result(
         val code: Int,
@@ -336,6 +335,10 @@ class PartoutVpnServiceRuntime(
     interface Engine {
         suspend fun start(runtime: PartoutVpnServiceRuntime, profileJSON: String): Result
         suspend fun stop(): Result
+    }
+
+    private fun stopService() {
+        service.stopSelf()
     }
 
     private fun TunnelSnapshot.disabled() = TunnelSnapshot(
