@@ -28,8 +28,9 @@ import java.io.Closeable
 
 class PartoutTunnel(
     private val logTag: String,
-    context: Context,
+    private val context: Context,
     private val vpnServiceClass: Class<out VpnService>,
+    private val isForeground: Boolean,
     private val requestVpnPermission: (Intent) -> Unit,
 ) : Closeable {
     private val appContext = context.applicationContext
@@ -182,7 +183,11 @@ class PartoutTunnel(
         val startIntent = Intent(appContext, vpnServiceClass).apply {
             putExtra(PartoutVpnServiceRuntime.EXTRA_PROFILE_JSON, json.encodeToString(profile))
         }
-        ContextCompat.startForegroundService(appContext, startIntent)
+        if (isForeground) {
+            ContextCompat.startForegroundService(context, startIntent)
+        } else {
+            appContext.startService(startIntent)
+        }
     }
 
     private fun stopVpnService(profileId: String?) {
@@ -192,7 +197,11 @@ class PartoutTunnel(
                 putExtra(PartoutVpnServiceRuntime.EXTRA_PROFILE_ID, profileId)
             }
         }
-        ContextCompat.startForegroundService(appContext, stopIntent)
+        if (isForeground) {
+            ContextCompat.startForegroundService(context, stopIntent)
+        } else {
+            appContext.startService(stopIntent)
+        }
     }
 
     private fun onSnapshotJSON(snapshotJSON: String) {
