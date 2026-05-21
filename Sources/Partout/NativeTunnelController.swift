@@ -20,7 +20,7 @@ public final class NativeTunnelController: TunnelController {
     ) throws {
         self.ctx = ctx
 #if os(Android)
-        pp_log(ctx, .core, .debug, "NativeTunnelController: Retain JNI ref to PartoutVpnServiceRuntime")
+        pp_log(ctx, .core, .debug, "NativeTunnelController: Retain JNI ref")
         guard let retainedRef = pp_jni_new_global_ref(ref) else {
             throw PartoutError(.releasedObject)
         }
@@ -36,7 +36,7 @@ public final class NativeTunnelController: TunnelController {
     deinit {
         pp_log(ctx, .core, .debug, "Deinit NativeTunnelController")
 #if os(Android)
-        pp_log(ctx, .core, .debug, "NativeTunnelController: Release JNI ref to PartoutVpnServiceRuntime")
+        pp_log(ctx, .core, .debug, "NativeTunnelController: Release JNI ref")
         pp_jni_delete_global_ref(ref)
 #endif
     }
@@ -113,6 +113,7 @@ public final class NativeTunnelController: TunnelController {
             pp_tun_ctrl_cancel_tunnel(ref, nil)
             return
         }
+        // FIXME: ###, Use PartoutError.Code
         String(describing: error).withCString {
             pp_tun_ctrl_cancel_tunnel(ref, $0)
         }

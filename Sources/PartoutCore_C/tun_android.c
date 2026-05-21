@@ -183,6 +183,12 @@ void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t f
     }
     (*env)->SetIntArrayRegion(env, j_fds, 0, (jsize)fds_len, (const jint *)fds);
     (*env)->CallVoidMethod(env, jni_ref, method, j_fds);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_configure_sockets(), Kotlin exception");
+        goto cleanup;
+    }
 
 cleanup:
     if (j_fds != NULL) (*env)->DeleteLocalRef(env, j_fds);
