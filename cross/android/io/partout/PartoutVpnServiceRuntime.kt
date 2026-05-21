@@ -32,8 +32,10 @@ class PartoutVpnServiceRuntime(
 ) {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandQueue = Channel<suspend () -> Unit>(Channel.UNLIMITED)
+    private val snapshotLock = Any()
     @Volatile
     private var latestSnapshot: TunnelSnapshot? = null
+    private var acceptsSnapshots = true
     private var isRunning = false
 
     init {
@@ -90,6 +92,9 @@ class PartoutVpnServiceRuntime(
         // Stop current tunnel if running
         stopTunnel()
 
+        synchronized(snapshotLock) {
+            acceptsSnapshots = true
+        }
         isRunning = true
         Log.i(logTag, "Starting VPN daemon")
 
@@ -103,7 +108,8 @@ class PartoutVpnServiceRuntime(
         Log.i(logTag, "Started VPN daemon")
     }
 
-    fun sendSnapshot(snapshot: TunnelSnapshot) {
+    fun sendSnapshot(snapshot: TunnelSnapshot) = synchronized(snapshotLock) {
+        if (!acceptsSnapshots) { return }
         emitSnapshot(snapshot)
     }
 
@@ -130,11 +136,12 @@ class PartoutVpnServiceRuntime(
         return json
     }
 
-    private fun sendFinalSnapshot() {
+    private fun sendFinalSnapshot() = synchronized(snapshotLock) {
         Log.d(logTag, "Emit final daemon snapshot")
         latestSnapshot?.let {
             emitSnapshot(it.disabled())
         }
+        acceptsSnapshots = false
     }
 
     private suspend fun stopTunnel() {
