@@ -21,6 +21,7 @@ interface TunnelController {
     fun testWorking()
     fun setTunnel(infoJSON: String): Int
     fun configureSockets(fds: IntArray)
+    fun environmentValue(key: String): String?
     fun onSnapshot(snapshotJSON: String)
     fun cancelTunnel(errorMessage: String?)
 }
@@ -132,6 +133,13 @@ class JNITunnelController(
             Log.d(logTag, "protect($it) = $protected")
         }
     }
+
+    override fun environmentValue(name: String): String? = synchronized(lock) {
+        Log.d(logTag, "environmentValue($name)")
+        return jniEnvironmentValue(name)
+    }
+
+    private external fun jniEnvironmentValue(key: String): String?
 
     override fun onSnapshot(snapshotJSON: String) = synchronized(lock) {
         if (isClosed) { return }

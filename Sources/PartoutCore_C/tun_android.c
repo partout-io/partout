@@ -279,4 +279,27 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
     free(tun_impl);
 }
 
+static pp_tun_ctrl_delegate ctrl_delegate;
+
+void pp_tun_ctrl_set_delegate(void *jni_ref, const pp_tun_ctrl_delegate *delegate) {
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_set_delegate(%p)", jni_ref);
+    if (!delegate) {
+        ctrl_delegate.ctx = NULL;
+        return;
+    }
+    ctrl_delegate = *delegate;
+}
+
+JNIEXPORT jstring JNICALL
+Java_io_partout_vpn_JNITunnelController_jniEnvironmentValue(JNIEnv *env, jobject thiz, jstring key) {
+    if (!ctrl_delegate.ctx) return NULL;
+    const char *c_key = (*env)->GetStringUTFChars(env, key, NULL);
+    char *c_value = ctrl_delegate.environment_value(ctrl_delegate.ctx, c_key);
+    (*env)->ReleaseStringUTFChars(env, key, c_key);
+    if (!c_value) return NULL;
+    jstring value = (*env)->NewStringUTF(env, c_value);
+    free(c_value);
+    return value;
+}
+
 #endif

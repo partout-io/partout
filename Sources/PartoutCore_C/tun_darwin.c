@@ -187,4 +187,10 @@ void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_message) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_darwin: ctrl_cancel_tunnel(%p)", ref);
 }
 
+void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
+    (void)ref;
+    (void)delegate;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_darwin: ctrl_set_delegate(%p, %p)", ref, delegate);
+}
+
 #endif

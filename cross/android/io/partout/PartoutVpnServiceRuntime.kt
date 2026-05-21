@@ -16,6 +16,7 @@ import android.os.Messenger
 import android.util.Log
 import io.partout.models.TaggedProfile
 import io.partout.models.TunnelSnapshot
+import io.partout.vpn.JNITunnelController
 import io.partout.vpn.TunnelControllerDelegate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -29,6 +30,7 @@ import kotlinx.serialization.json.Json
 
 class PartoutVpnServiceRuntime(
     private val logTag: String,
+    private val jniLogTag: String,
     val service: VpnService,
     private val engine: Engine
 ): TunnelControllerDelegate {
@@ -36,6 +38,9 @@ class PartoutVpnServiceRuntime(
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandQueue = Channel<suspend () -> Unit>(Channel.UNLIMITED)
     private var isRunning = false
+
+    // C/JNI controller
+    private val controller = JNITunnelController(jniLogTag, service, this)
 
     // Deliver snapshots with mutex
     private val snapshotEmitter = SnapshotEmitter(logTag, service)
@@ -108,7 +113,7 @@ class PartoutVpnServiceRuntime(
         isRunning = true
         Log.i(logTag, "Starting VPN daemon")
         try {
-            engine.start(this, profileJSON)
+            engine.start(controller, profileJSON)
             Log.i(logTag, "Started VPN daemon")
         } catch (e: Exception) {
             e.throwIfCancellation()
@@ -295,8 +300,8 @@ class PartoutVpnServiceRuntime(
         }
     }
 
-    private suspend fun replyEnvironmentValue(client: Messenger, reqId: Int, name: String) {
-        val value = engine.getEnvironmentValue(name)
+    private fun replyEnvironmentValue(client: Messenger, reqId: Int, name: String) {
+        val value = controller.environmentValue(name)
         Log.i(logTag, "Reply with environment: $name = $value")
         val msg = Message.obtain(null, MSG_GET_ENVIRONMENT).apply {
             arg1 = reqId
@@ -315,11 +320,10 @@ class PartoutVpnServiceRuntime(
 
     //region Engine
     interface Engine {
-        suspend fun start(runtime: PartoutVpnServiceRuntime, profileJSON: String)
+        suspend fun start(controller: JNITunnelController, profileJSON: String)
         suspend fun stop()
         suspend fun readLastProfile(): String
         suspend fun writeLastProfile(json: String)
-        suspend fun getEnvironmentValue(name: String): String?
     }
     //endregion
 
