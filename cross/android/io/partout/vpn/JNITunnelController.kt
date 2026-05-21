@@ -126,7 +126,7 @@ class JNITunnelController(
     }
 
     override fun onSnapshot(snapshotJSON: String) {
-        Log.d(logTag, "onSnapshot()")
+        Log.d(logTag, "onSnapshot(${snapshotJSON})")
         val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
         sendSnapshot(snapshot)
     }

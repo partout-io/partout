@@ -126,6 +126,7 @@ class PartoutVpnServiceRuntime(
     }
 
     private suspend fun sendFinalSnapshot() {
+        Log.d(logTag, "Report final daemon snapshot")
         val latest = commandMutex.withLock {
             latestSnapshot
         }
@@ -153,6 +154,7 @@ class PartoutVpnServiceRuntime(
     }
 
     private fun close() {
+        Log.d(logTag, "Cancelling VPN runtime")
         serviceScope.cancel()
     }
     //endregion
