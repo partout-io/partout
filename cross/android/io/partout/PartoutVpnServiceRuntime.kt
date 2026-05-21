@@ -13,18 +13,8 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.Message
 import android.os.Messenger
-import android.os.ParcelFileDescriptor
 import android.util.Log
-import io.partout.models.TaggedModuleDNS
-import io.partout.models.TaggedModuleHTTPProxy
-import io.partout.models.TaggedModuleIP
-import io.partout.models.TaggedModuleOnDemand
-import io.partout.models.TunnelRemoteInfoWrapper
 import io.partout.models.TunnelSnapshot
-import io.partout.vpn.DNSModuleApplying
-import io.partout.vpn.HTTPProxyModuleApplying
-import io.partout.vpn.IPModuleApplying
-import io.partout.vpn.OnDemandModuleApplying
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,26 +23,15 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
-
-// Must match signatures in tun_android.c
-interface PartoutVpnServiceRuntimeJNI {
-    fun testWorking()
-    fun setTunnel(infoJSON: String): Int
-    fun configureSockets(fds: IntArray)
-    fun onSnapshot(snapshotJSON: String)
-    fun cancelTunnel(errorMessage: String?)
-}
 
 class PartoutVpnServiceRuntime(
     private val logTag: String,
     private val service: VpnService,
     private val engine: Engine
-): PartoutVpnServiceRuntimeJNI {
+) {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandMutex = Mutex()
-    private var descriptor: ParcelFileDescriptor? = null
     private var latestSnapshot: TunnelSnapshot? = null
     private var isRunning = false
 
@@ -116,112 +95,6 @@ class PartoutVpnServiceRuntime(
     private fun deferDisconnect() = launchCommand {
         stopTunnel()
         stopService()
-    }
-    //endregion
-
-    //region Actions (C/JNI)
-    override fun testWorking() {
-        Log.d(logTag, "PartoutVpnServiceRuntime.testWorking()")
-    }
-
-    override fun setTunnel(infoJSON: String): Int {
-        Log.d(logTag, "PartoutVpnServiceRuntime.setTunnel()")
-        if (descriptor != null) {
-            Log.e(logTag, "Tunnel descriptor already established")
-            return -1
-        }
-
-        val builder = service.Builder()
-        val info: TunnelRemoteInfoWrapper = try {
-            json.decodeFromString(infoJSON)
-        } catch (e: SerializationException) {
-            Log.e(logTag, "Unable to decode tunnel info JSON", e)
-            return -1
-        }
-        val remoteFds = info.fileDescriptors
-        var appliedAddressSettings = false
-        var appliedDnsSettings = false
-
-        info.modules?.forEach {
-            when (it) {
-                is TaggedModuleDNS -> {
-                    Log.i(logTag, "DNS: ${it.value}")
-                    appliedDnsSettings = DNSModuleApplying(it.value).apply(logTag, builder)
-                            || appliedDnsSettings
-                }
-                is TaggedModuleIP -> {
-                    Log.i(logTag, "IP: ${it.value}")
-                    appliedAddressSettings = IPModuleApplying(it.value).apply(logTag, builder)
-                            || appliedAddressSettings
-                }
-                is TaggedModuleHTTPProxy -> {
-                    Log.i(logTag, "HTTP Proxy: ${it.value}")
-                    HTTPProxyModuleApplying(it.value).apply(logTag, builder)
-                }
-                is TaggedModuleOnDemand -> {
-                    Log.i(logTag, "OnDemand: ${it.value}")
-                    OnDemandModuleApplying(it.value).apply(logTag, builder)
-                }
-                else -> {}
-            }
-        }
-
-        if (!appliedAddressSettings) {
-            Log.e(logTag, "No valid interface address")
-            return -1
-        }
-
-        remoteFds.forEach {
-            require(it in 0..Int.MAX_VALUE.toLong()) {
-                "Invalid Android file descriptor: $it"
-            }
-            val protected = service.protect(it.toInt())
-            Log.d(logTag, "protect($it) = $protected")
-        }
-
-        // IMPORTANT: this is a requirement for VirtualTunnelInterface.
-        // By default, establish() returns a non-blocking descriptor.
-        builder.setBlocking(true)
-
-        descriptor = try {
-            builder.establish()
-        } catch (e: RuntimeException) {
-            Log.e(logTag, "Unable to establish tunnel", e)
-            null
-        }
-        if (descriptor == null) {
-            Log.e(logTag, "Unable to establish tunnel")
-            return -1
-        }
-
-        val fd = descriptor?.detachFd() ?: -1
-        descriptor = null
-        Log.i(logTag, "Established tunnel descriptor: $fd")
-        return fd
-    }
-
-    override fun configureSockets(fds: IntArray) {
-        Log.d(logTag, "PartoutVpnServiceRuntime.configureSockets(${fds.toList()})")
-        fds.forEach {
-            val protected = service.protect(it)
-            Log.d(logTag, "protect($it) = $protected")
-        }
-    }
-
-    override fun onSnapshot(snapshotJSON: String) {
-        Log.d(logTag, "PartoutVpnServiceRuntime.onSnapshot()")
-        val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
-        sendSnapshot(snapshot)
-    }
-
-    override fun cancelTunnel(errorMessage: String?) {
-        Log.d(logTag, "PartoutVpnServiceRuntime.cancelTunnel()")
-        if (errorMessage != null) {
-            Log.e(logTag, "VPN daemon cancelled: $errorMessage")
-        } else {
-            Log.i(logTag, "VPN daemon cancelled")
-        }
-        deferDisconnect()
     }
     //endregion
 
