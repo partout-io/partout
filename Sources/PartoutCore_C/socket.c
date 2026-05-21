@@ -147,6 +147,7 @@ pp_socket pp_socket_open(const char *ip_addr,
                                                        timeout_ms);
         if (ret != 0) {
             local_close_fd(new_fd);
+            new_fd = local_invalid_fd();
             local_print_error("connect()");
             continue;
         }
