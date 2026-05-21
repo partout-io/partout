@@ -125,12 +125,9 @@ class PartoutVpnServiceRuntime(
         return json
     }
 
-    private suspend fun sendFinalSnapshot() {
+    private fun sendFinalSnapshot() {
         Log.d(logTag, "Report final daemon snapshot")
-        val latest = commandMutex.withLock {
-            latestSnapshot
-        }
-        latest?.let {
+        latestSnapshot?.let {
             sendSnapshot(it.disabled())
         }
     }
