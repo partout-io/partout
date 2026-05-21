@@ -34,11 +34,11 @@ class JNITunnelController(
     private var descriptor: ParcelFileDescriptor? = null
 
     override fun testWorking() {
-        Log.d(logTag, "JNITunnelController.testWorking()")
+        Log.d(logTag, "testWorking()")
     }
 
     override fun setTunnel(infoJSON: String): Int {
-        Log.d(logTag, "JNITunnelController.setTunnel()")
+        Log.d(logTag, "setTunnel()")
         if (descriptor != null) {
             Log.e(logTag, "Tunnel descriptor already established")
             return -1
@@ -118,7 +118,7 @@ class JNITunnelController(
     }
 
     override fun configureSockets(fds: IntArray) {
-        Log.d(logTag, "JNITunnelController.configureSockets(${fds.toList()})")
+        Log.d(logTag, "configureSockets(${fds.toList()})")
         fds.forEach {
             val protected = service.protect(it)
             Log.d(logTag, "protect($it) = $protected")
@@ -126,13 +126,13 @@ class JNITunnelController(
     }
 
     override fun onSnapshot(snapshotJSON: String) {
-        Log.d(logTag, "JNITunnelController.onSnapshot()")
+        Log.d(logTag, "onSnapshot()")
         val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
         sendSnapshot(snapshot)
     }
 
     override fun cancelTunnel(errorMessage: String?) {
-        Log.d(logTag, "JNITunnelController.cancelTunnel()")
+        Log.d(logTag, "cancelTunnel()")
         if (errorMessage != null) {
             Log.e(logTag, "VPN daemon cancelled: $errorMessage")
         } else {
