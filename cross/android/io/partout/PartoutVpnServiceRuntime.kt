@@ -40,10 +40,10 @@ class PartoutVpnServiceRuntime(
     fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(logTag, "PartoutVpnServiceRuntime.onStartCommand()")
         if (intent?.action == ACTION_STOP_VPN) {
-            deferDisconnect()
+            disconnect()
             return Service.START_NOT_STICKY
         }
-        deferConnect(intent)
+        connect(intent)
         return Service.START_STICKY
     }
 
@@ -61,12 +61,12 @@ class PartoutVpnServiceRuntime(
 
     fun onRevoke() {
         Log.i(logTag, "PartoutVpnServiceRuntime.onRevoke()")
-        deferDisconnect()
+        disconnect()
     }
     //endregion
 
     //region Actions (Service)
-    private fun deferConnect(intent: Intent?) = launchCommand {
+    private fun connect(intent: Intent?) = launchCommand {
         val profileJSON = try {
             loadOrPersistProfile(intent)
         } catch (e: Exception) {
@@ -92,7 +92,17 @@ class PartoutVpnServiceRuntime(
         Log.i(logTag, "Started VPN daemon")
     }
 
-    private fun deferDisconnect() = launchCommand {
+    fun sendSnapshot(snapshot: TunnelSnapshot) = launchCommand {
+        Log.d(logTag, "Report daemon snapshot: $snapshot")
+        val intent = Intent(ACTION_SNAPSHOT).apply {
+            setPackage(service.packageName)
+            putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
+        }
+        service.sendBroadcast(intent)
+        latestSnapshot = snapshot
+    }
+
+    fun disconnect() = launchCommand {
         stopTunnel()
         stopService()
     }
@@ -115,18 +125,11 @@ class PartoutVpnServiceRuntime(
         return json
     }
 
-    private fun sendSnapshot(snapshot: TunnelSnapshot) {
-        Log.d(logTag, "Report daemon snapshot: $snapshot")
-        val intent = Intent(ACTION_SNAPSHOT).apply {
-            setPackage(service.packageName)
-            putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
+    private suspend fun sendFinalSnapshot() {
+        val latest = commandMutex.withLock {
+            latestSnapshot
         }
-        service.sendBroadcast(intent)
-        latestSnapshot = snapshot
-    }
-
-    private fun sendFinalSnapshot() {
-        latestSnapshot?.let {
+        latest?.let {
             sendSnapshot(it.disabled())
         }
     }
