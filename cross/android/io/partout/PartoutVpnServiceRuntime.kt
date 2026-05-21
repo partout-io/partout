@@ -36,11 +36,20 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
+// Must match signatures in tun_android.c
+interface PartoutVpnServiceRuntimeJNI {
+    fun testWorking()
+    fun setTunnel(infoJSON: String): Int
+    fun configureSockets(fds: IntArray)
+    fun onSnapshot(snapshotJSON: String)
+    fun cancelTunnel(errorMessage: String?)
+}
+
 class PartoutVpnServiceRuntime(
     private val logTag: String,
     private val service: VpnService,
     private val engine: Engine
-) {
+): PartoutVpnServiceRuntimeJNI {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandMutex = Mutex()
     private var descriptor: ParcelFileDescriptor? = null
@@ -204,12 +213,12 @@ class PartoutVpnServiceRuntime(
     }
     //endregion
 
-    //region C/JNI (keep signatures!)
-    fun testWorking() {
+    //region C/JNI
+    override fun testWorking() {
         Log.d(logTag, "PartoutVpnServiceRuntime.testWorking()")
     }
 
-    fun setTunnel(infoJSON: String): Int {
+    override fun setTunnel(infoJSON: String): Int {
         Log.d(logTag, "PartoutVpnServiceRuntime.setTunnel()")
         if (descriptor != null) {
             Log.e(logTag, "Tunnel descriptor already established")
@@ -285,7 +294,7 @@ class PartoutVpnServiceRuntime(
         return fd
     }
 
-    fun configureSockets(fds: IntArray) {
+    override fun configureSockets(fds: IntArray) {
         Log.d(logTag, "PartoutVpnServiceRuntime.configureSockets(${fds.toList()})")
         fds.forEach {
             val protected = service.protect(it)
@@ -293,13 +302,13 @@ class PartoutVpnServiceRuntime(
         }
     }
 
-    fun onSnapshot(snapshotJSON: String) {
+    override fun onSnapshot(snapshotJSON: String) {
         Log.d(logTag, "PartoutVpnServiceRuntime.onSnapshot()")
         val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
         sendSnapshot(snapshot)
     }
 
-    fun cancelTunnel(errorMessage: String?) {
+    override fun cancelTunnel(errorMessage: String?) {
         Log.d(logTag, "PartoutVpnServiceRuntime.cancelTunnel()")
         if (errorMessage != null) {
             Log.e(logTag, "VPN daemon cancelled: $errorMessage")
