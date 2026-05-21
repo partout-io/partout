@@ -14,6 +14,7 @@ import android.os.Looper
 import android.os.Message
 import android.os.Messenger
 import android.util.Log
+import io.partout.models.TaggedProfile
 import io.partout.models.TunnelSnapshot
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -36,6 +37,7 @@ class PartoutVpnServiceRuntime(
     @Volatile
     private var latestSnapshot: TunnelSnapshot? = null
     private var acceptsSnapshots = false
+    private var activeSnapshotProfileId: String? = null
     private var isRunning = false
 
     init {
@@ -88,6 +90,14 @@ class PartoutVpnServiceRuntime(
             stopService()
             return@launchCommand
         }
+        val profileId = try {
+            decodeProfileId(profileJSON)
+        } catch (e: Exception) {
+            e.throwIfCancellation()
+            Log.e(logTag, "Unable to decode profile JSON", e)
+            stopService()
+            return@launchCommand
+        }
 
         // Stop current tunnel if running
         stopTunnel()
@@ -95,6 +105,8 @@ class PartoutVpnServiceRuntime(
         // Observe snapshots during start attempt
         synchronized(snapshotLock) {
             acceptsSnapshots = true
+            activeSnapshotProfileId = profileId
+            latestSnapshot = null
         }
 
         isRunning = true
@@ -108,6 +120,7 @@ class PartoutVpnServiceRuntime(
             stopService()
             synchronized(snapshotLock) {
                 acceptsSnapshots = false
+                activeSnapshotProfileId = null
             }
             isRunning = false
             return@launchCommand
@@ -116,6 +129,10 @@ class PartoutVpnServiceRuntime(
 
     fun sendSnapshot(snapshot: TunnelSnapshot) = synchronized(snapshotLock) {
         if (!acceptsSnapshots) { return }
+        if (snapshot.id != activeSnapshotProfileId) {
+            Log.d(logTag, "Drop stale daemon snapshot: $snapshot")
+            return
+        }
         emitSnapshot(snapshot)
     }
 
@@ -142,12 +159,17 @@ class PartoutVpnServiceRuntime(
         return json
     }
 
+    private fun decodeProfileId(profileJSON: String): String {
+        return json.decodeFromString<TaggedProfile>(profileJSON).id
+    }
+
     private fun sendFinalSnapshot() = synchronized(snapshotLock) {
         Log.d(logTag, "Emit final daemon snapshot")
         latestSnapshot?.let {
             emitSnapshot(it.disabled())
         }
         acceptsSnapshots = false
+        activeSnapshotProfileId = null
     }
 
     private suspend fun stopTunnel() {
