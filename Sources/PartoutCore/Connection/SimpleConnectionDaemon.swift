@@ -236,7 +236,7 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         onSnapshot = nil
     }
 
-    public func environmentData(forKey key: String) async -> Data? {
+    public func environmentData(forKey key: String) -> Data? {
         environment.environmentData(forKey: key)
     }
 
