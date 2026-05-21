@@ -35,7 +35,7 @@ class PartoutVpnServiceRuntime(
     private val snapshotLock = Any()
     @Volatile
     private var latestSnapshot: TunnelSnapshot? = null
-    private var acceptsSnapshots = true
+    private var acceptsSnapshots = false
     private var isRunning = false
 
     init {
@@ -98,10 +98,24 @@ class PartoutVpnServiceRuntime(
         isRunning = true
         Log.i(logTag, "Starting VPN daemon")
 
-        val result = engine.start(this, profileJSON)
+        val result = try {
+            engine.start(this, profileJSON)
+        } catch (e: Exception) {
+            e.throwIfCancellation()
+            Log.e(logTag, "Unable to start VPN daemon", e)
+            stopService()
+            synchronized(snapshotLock) {
+                acceptsSnapshots = false
+            }
+            isRunning = false
+            return@launchCommand
+        }
         if (result.code != 0) {
             Log.e(logTag, "Unable to start VPN daemon (code=${result.code}): ${result.payload}")
             stopService()
+            synchronized(snapshotLock) {
+                acceptsSnapshots = false
+            }
             isRunning = false
             return@launchCommand
         }
@@ -109,8 +123,9 @@ class PartoutVpnServiceRuntime(
     }
 
     fun sendSnapshot(snapshot: TunnelSnapshot) = synchronized(snapshotLock) {
-        if (!acceptsSnapshots) { return }
-        emitSnapshot(snapshot)
+        if (acceptsSnapshots) {
+            emitSnapshot(snapshot)
+        }
     }
 
     fun disconnect() = launchCommand {
