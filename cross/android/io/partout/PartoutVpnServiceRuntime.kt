@@ -27,7 +27,7 @@ import kotlinx.serialization.json.Json
 
 class PartoutVpnServiceRuntime(
     private val logTag: String,
-    private val service: VpnService,
+    val service: VpnService,
     private val engine: Engine
 ) {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
