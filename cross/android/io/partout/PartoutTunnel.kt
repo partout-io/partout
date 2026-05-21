@@ -30,6 +30,7 @@ import kotlinx.serialization.json.Json
 import java.io.Closeable
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class PartoutTunnel(
@@ -80,7 +81,7 @@ class PartoutTunnel(
 
                         // Invoke continuation
                         val reqId = msg.arg1
-                        pendingRequests.remove(reqId)?.resume(valueJSON, null)
+                        pendingRequests.remove(reqId)?.resume(valueJSON)
                     }
                     else -> super.handleMessage(msg)
                 }
