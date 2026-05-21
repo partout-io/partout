@@ -139,6 +139,7 @@ class PartoutTunnel(
     }
 
     override fun close() {
+        failPendingRequests()
         appContext.unregisterReceiver(snapshotsReceiver)
         serviceMessenger?.binder?.unlinkToDeath(deathRecipient, 0)
         serviceMessenger = null
@@ -216,14 +217,20 @@ class PartoutTunnel(
         }
 
     private fun onServiceDead() {
-        val reqs = pendingRequests.values
-        pendingRequests.clear()
-        reqs.forEach {
-            it.resumeWithException(RemoteException())
-        }
+        failPendingRequests()
         _state.update {
             it.copy(emptyMap())
         }
+    }
+
+    private fun failPendingRequests() {
+        pendingRequests.entries
+            .map { it.key to it.value }
+            .forEach { (reqId, continuation) ->
+                if (pendingRequests.remove(reqId, continuation)) {
+                    continuation.resumeWithException(RemoteException())
+                }
+            }
     }
 
     // Internals
