@@ -32,7 +32,7 @@ class PartoutTunnel(
     private val context: Context,
     private val vpnServiceClass: Class<out VpnService>,
     private val isForeground: Boolean,
-    private val requestVpnPermission: (Intent) -> Unit,
+    private val requestVpnPermission: (Intent) -> Unit
 ) : Closeable {
     private val appContext = context.applicationContext
     private var pendingPermission: PendingPermission? = null
