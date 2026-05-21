@@ -81,9 +81,7 @@ class PartoutTunnel(
 
                         // Invoke continuation
                         val reqId = msg.arg1
-                        val request = pendingRequests[reqId]
-                        request?.resume(valueJSON, null)
-                        pendingRequests.remove(reqId)
+                        pendingRequests.remove(reqId)?.resume(valueJSON, null)
                     }
                     else -> super.handleMessage(msg)
                 }
@@ -207,6 +205,7 @@ class PartoutTunnel(
             }
             val messenger = serviceMessenger
             if (messenger == null) {
+                pendingRequests.remove(reqId)
                 continuation.resumeWithException(RemoteException())
                 return@suspendCancellableCoroutine
             }
@@ -219,10 +218,11 @@ class PartoutTunnel(
         }
 
     private fun onServiceDead() {
-        pendingRequests.values.forEach {
+        val reqs = pendingRequests.values
+        pendingRequests.clear()
+        reqs.forEach {
             it.resumeWithException(RemoteException())
         }
-        pendingRequests.clear()
         _state.update {
             it.copy(emptyMap())
         }
