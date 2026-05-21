@@ -92,14 +92,16 @@ class PartoutVpnServiceRuntime(
         // Stop current tunnel if running
         stopTunnel()
 
+        // Observe snapshots during start attempt
         synchronized(snapshotLock) {
             acceptsSnapshots = true
         }
+
         isRunning = true
         Log.i(logTag, "Starting VPN daemon")
-
-        val result = try {
+        try {
             engine.start(this, profileJSON)
+            Log.i(logTag, "Started VPN daemon")
         } catch (e: Exception) {
             e.throwIfCancellation()
             Log.e(logTag, "Unable to start VPN daemon", e)
@@ -110,22 +112,11 @@ class PartoutVpnServiceRuntime(
             isRunning = false
             return@launchCommand
         }
-        if (result.code != 0) {
-            Log.e(logTag, "Unable to start VPN daemon (code=${result.code}): ${result.payload}")
-            stopService()
-            synchronized(snapshotLock) {
-                acceptsSnapshots = false
-            }
-            isRunning = false
-            return@launchCommand
-        }
-        Log.i(logTag, "Started VPN daemon")
     }
 
     fun sendSnapshot(snapshot: TunnelSnapshot) = synchronized(snapshotLock) {
-        if (acceptsSnapshots) {
-            emitSnapshot(snapshot)
-        }
+        if (!acceptsSnapshots) { return }
+        emitSnapshot(snapshot)
     }
 
     fun disconnect() = launchCommand {
@@ -163,11 +154,10 @@ class PartoutVpnServiceRuntime(
         if (!isRunning) { return }
 
         Log.i(logTag, "Stopping VPN daemon")
-        val result = engine.stop()
-        if (result.code == 0) {
-            Log.i(logTag, "Stopped VPN daemon")
-        } else {
-            Log.e(logTag, "Unable to stop VPN daemon (code=${result.code}): ${result.payload}")
+        try {
+            engine.stop()
+        } catch (e: Exception) {
+            Log.e(logTag, "Unable to stop VPN daemon", e)
         }
         isRunning = false
         sendFinalSnapshot()
@@ -182,6 +172,26 @@ class PartoutVpnServiceRuntime(
         commandQueue.close()
         serviceScope.cancel()
     }
+    //endregion
+
+    //region Snapshots
+    private fun emitSnapshot(snapshot: TunnelSnapshot) {
+        Log.d(logTag, "Emit daemon snapshot: $snapshot")
+        val intent = Intent(ACTION_SNAPSHOT).apply {
+            setPackage(service.packageName)
+            putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
+        }
+        latestSnapshot = snapshot
+        service.sendBroadcast(intent)
+    }
+
+    private fun TunnelSnapshot.disabled() = TunnelSnapshot(
+        id,
+        false,
+        false,
+        status,
+        environment
+    )
     //endregion
 
     //region Messaging
@@ -227,35 +237,10 @@ class PartoutVpnServiceRuntime(
     }
     //endregion
 
-    //region Snapshots
-    private fun emitSnapshot(snapshot: TunnelSnapshot) {
-        Log.d(logTag, "Emit daemon snapshot: $snapshot")
-        val intent = Intent(ACTION_SNAPSHOT).apply {
-            setPackage(service.packageName)
-            putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
-        }
-        latestSnapshot = snapshot
-        service.sendBroadcast(intent)
-    }
-
-    private fun TunnelSnapshot.disabled() = TunnelSnapshot(
-        id,
-        false,
-        false,
-        status,
-        environment
-    )
-    //endregion
-
     //region Engine
-    data class Result(
-        val code: Int,
-        val payload: String?
-    )
-
     interface Engine {
-        suspend fun start(runtime: PartoutVpnServiceRuntime, profileJSON: String): Result
-        suspend fun stop(): Result
+        suspend fun start(runtime: PartoutVpnServiceRuntime, profileJSON: String)
+        suspend fun stop()
         suspend fun readLastProfile(): String
         suspend fun writeLastProfile(json: String)
     }
