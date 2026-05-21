@@ -53,10 +53,10 @@ class PartoutVpnServiceRuntime(
     fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(logTag, "PartoutVpnServiceRuntime.onStartCommand()")
         if (intent?.action == ACTION_STOP_VPN) {
-            disconnect()
+            deferDisconnect()
             return Service.START_NOT_STICKY
         }
-        connect(intent)
+        deferConnect(intent)
         return Service.START_STICKY
     }
 
@@ -74,7 +74,7 @@ class PartoutVpnServiceRuntime(
 
     fun onRevoke() {
         Log.i(logTag, "PartoutVpnServiceRuntime.onRevoke()")
-        disconnect()
+        deferDisconnect()
     }
 
     // Actions
@@ -95,7 +95,7 @@ class PartoutVpnServiceRuntime(
         return json
     }
 
-    private fun connect(intent: Intent?) = launchCommand {
+    private fun deferConnect(intent: Intent?) = launchCommand {
         val profileJSON = try {
             loadOrPersistProfile(intent)
         } catch (e: Exception) {
@@ -121,7 +121,7 @@ class PartoutVpnServiceRuntime(
         Log.i(logTag, "Started VPN daemon")
     }
 
-    private fun disconnect() = launchCommand {
+    private fun deferDisconnect() = launchCommand {
         stopTunnel()
         stopService()
     }
@@ -301,7 +301,7 @@ class PartoutVpnServiceRuntime(
         } else {
             Log.i(logTag, "VPN daemon cancelled")
         }
-        disconnect()
+        deferDisconnect()
     }
 
     // Broadcasts emitters
