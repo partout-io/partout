@@ -31,14 +31,16 @@ class PartoutVpnServiceRuntime(
     val service: VpnService,
     private val engine: Engine
 ) {
+    // Execute actions in serial queue
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandQueue = Channel<suspend () -> Unit>(Channel.UNLIMITED)
+    private var isRunning = false
+
+    // Deliver snapshots with mutex
     private val snapshotLock = Any()
-    @Volatile
-    private var latestSnapshot: TunnelSnapshot? = null
     private var acceptsSnapshots = false
     private var activeSnapshotProfileId: String? = null
-    private var isRunning = false
+    @Volatile private var latestSnapshot: TunnelSnapshot? = null
 
     init {
         serviceScope.launch {
