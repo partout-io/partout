@@ -246,6 +246,15 @@ private extension BSDSocket {
             while packets.count < maxReadBatchPackets, batchBytes < maxReadBatchBytes {
                 let readCount = pp_socket_read(socketHandle.sock, buffer, maxReadLength)
 
+                // Would-block is expected while draining, but not as the first read after readiness.
+                guard readCount != PP_SOCKET_WOULD_BLOCK else {
+                    if packets.isEmpty {
+                        terminate(with: socketHandle.preferredError())
+                        return
+                    }
+                    break
+                }
+
                 // Failure if < 0
                 guard readCount >= 0 else {
                     if !packets.isEmpty {
@@ -255,7 +264,15 @@ private extension BSDSocket {
                     return
                 }
                 // Non-blocking read
-                guard readCount != 0 else { break }
+                guard readCount != 0 else {
+                    if socketHandle.isStopping {
+                        if !packets.isEmpty {
+                            packetInbox.push(packets)
+                        }
+                        return
+                    }
+                    break
+                }
 
                 packets.append(Data(bytes: buffer, count: Int(readCount)))
                 batchBytes += Int(readCount)
@@ -283,7 +300,18 @@ private extension BSDSocket {
                         return Int(pp_socket_write(socketHandle.sock, baseAddress, packet.count))
                     }
                     // Non-blocking write
-                    guard writtenCount != 0 else { continue }
+                    guard writtenCount != PP_SOCKET_WOULD_BLOCK else {
+                        if socketHandle.isStopping {
+                            let error = socketHandle.preferredError()
+                            request.continuation.resume(throwing: error)
+                            return
+                        }
+                        error = socketHandle.preferredError()
+                        break
+                    }
+                    guard writtenCount != 0 else {
+                        continue
+                    }
 
                     // Report failure unless packet was written fully
                     if writtenCount != packet.count {
