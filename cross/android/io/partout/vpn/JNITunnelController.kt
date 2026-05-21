@@ -31,13 +31,16 @@ class JNITunnelController(
     private val sendSnapshot: (TunnelSnapshot) -> Unit,
     private val disconnect: () -> Unit
 ): TunnelController {
+    private val lock = Any()
     private var descriptor: ParcelFileDescriptor? = null
+    private var isClosed = false
 
     override fun testWorking() {
         Log.d(logTag, "testWorking()")
     }
 
-    override fun setTunnel(infoJSON: String): Int {
+    override fun setTunnel(infoJSON: String): Int = synchronized(lock) {
+        if (isClosed) { return -1 }
         Log.d(logTag, "setTunnel()")
         if (descriptor != null) {
             Log.e(logTag, "Tunnel descriptor already established")
@@ -117,7 +120,8 @@ class JNITunnelController(
         return fd
     }
 
-    override fun configureSockets(fds: IntArray) {
+    override fun configureSockets(fds: IntArray) = synchronized(lock) {
+        if (isClosed) { return }
         Log.d(logTag, "configureSockets(${fds.toList()})")
         fds.forEach {
             val protected = service.protect(it)
@@ -125,13 +129,16 @@ class JNITunnelController(
         }
     }
 
-    override fun onSnapshot(snapshotJSON: String) {
+    override fun onSnapshot(snapshotJSON: String) = synchronized(lock) {
+        if (isClosed) { return }
         Log.d(logTag, "onSnapshot(${snapshotJSON})")
         val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
         sendSnapshot(snapshot)
     }
 
-    override fun cancelTunnel(errorMessage: String?) {
+    override fun cancelTunnel(errorMessage: String?) = synchronized(lock) {
+        if (isClosed) { return }
+        isClosed = true
         Log.d(logTag, "cancelTunnel()")
         if (errorMessage != null) {
             Log.e(logTag, "VPN daemon cancelled: $errorMessage")
