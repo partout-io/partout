@@ -32,6 +32,7 @@ class PartoutVpnServiceRuntime(
 ) {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandQueue = Channel<suspend () -> Unit>(Channel.UNLIMITED)
+    @Volatile
     private var latestSnapshot: TunnelSnapshot? = null
     private var isRunning = false
 
@@ -102,7 +103,7 @@ class PartoutVpnServiceRuntime(
         Log.i(logTag, "Started VPN daemon")
     }
 
-    fun sendSnapshot(snapshot: TunnelSnapshot) = launchCommand {
+    fun sendSnapshot(snapshot: TunnelSnapshot) {
         emitSnapshot(snapshot)
     }
 
@@ -204,6 +205,26 @@ class PartoutVpnServiceRuntime(
     }
     //endregion
 
+    //region Snapshots
+    private fun emitSnapshot(snapshot: TunnelSnapshot) {
+        Log.d(logTag, "Emit daemon snapshot: $snapshot")
+        val intent = Intent(ACTION_SNAPSHOT).apply {
+            setPackage(service.packageName)
+            putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
+        }
+        latestSnapshot = snapshot
+        service.sendBroadcast(intent)
+    }
+
+    private fun TunnelSnapshot.disabled() = TunnelSnapshot(
+        id,
+        false,
+        false,
+        status,
+        environment
+    )
+    //endregion
+
     //region Engine
     data class Result(
         val code: Int,
@@ -224,24 +245,6 @@ class PartoutVpnServiceRuntime(
             Log.w(logTag, "Unable to enqueue VPN command", it)
         }
     }
-
-    private fun emitSnapshot(snapshot: TunnelSnapshot) {
-        Log.d(logTag, "Emit daemon snapshot: $snapshot")
-        val intent = Intent(ACTION_SNAPSHOT).apply {
-            setPackage(service.packageName)
-            putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
-        }
-        latestSnapshot = snapshot
-        service.sendBroadcast(intent)
-    }
-
-    private fun TunnelSnapshot.disabled() = TunnelSnapshot(
-        id,
-        false,
-        false,
-        status,
-        environment
-    )
 
     private fun Exception.throwIfCancellation() {
         if (this is CancellationException) {
