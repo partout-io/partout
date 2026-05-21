@@ -7,42 +7,53 @@ package io.partout
 import android.app.Service
 import android.content.Intent
 import android.net.VpnService
-import android.os.ParcelFileDescriptor
+import android.os.Bundle
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.os.Message
+import android.os.Messenger
 import android.util.Log
-import io.partout.models.TaggedModuleDNS
-import io.partout.models.TaggedModuleHTTPProxy
-import io.partout.models.TaggedModuleIP
-import io.partout.models.TaggedModuleOnDemand
-import io.partout.models.TunnelRemoteInfoWrapper
+import io.partout.models.TaggedProfile
 import io.partout.models.TunnelSnapshot
-import io.partout.vpn.DNSModuleApplying
-import io.partout.vpn.HTTPProxyModuleApplying
-import io.partout.vpn.IPModuleApplying
-import io.partout.vpn.OnDemandModuleApplying
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.onFailure
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 class PartoutVpnServiceRuntime(
     private val logTag: String,
-    private val service: VpnService,
-    private val engine: Engine,
-    private val stopService: () -> Unit,
+    val service: VpnService,
+    private val engine: Engine
 ) {
+    // Execute actions in serial queue
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val commandMutex = Mutex()
-    private var descriptor: ParcelFileDescriptor? = null
+    private val commandQueue = Channel<suspend () -> Unit>(Channel.UNLIMITED)
     private var isRunning = false
-    private var latestSnapshot: TunnelSnapshot? = null
 
-    // Service lifecycle
+    // Deliver snapshots with mutex
+    private val snapshotEmitter = SnapshotEmitter(logTag, service)
 
+    init {
+        serviceScope.launch {
+            for (action in commandQueue) {
+                try {
+                    action()
+                } catch (e: Exception) {
+                    e.throwIfCancellation()
+                    Log.e(logTag, "Unhandled VPN command failure", e)
+                    stopService()
+                }
+            }
+        }
+    }
+
+    //region Lifecycle
     @Suppress("UNUSED_PARAMETER")
     fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(logTag, "PartoutVpnServiceRuntime.onStartCommand()")
@@ -50,24 +61,14 @@ class PartoutVpnServiceRuntime(
             disconnect()
             return Service.START_NOT_STICKY
         }
-        val profileJSON = intent?.getStringExtra(EXTRA_PROFILE_JSON)
-        if (profileJSON.isNullOrBlank()) {
-            Log.e(logTag, "Missing profile in VPN start intent")
-            stopService()
-            return Service.START_NOT_STICKY
-        }
-        connect(profileJSON)
+        connect(intent)
         return Service.START_STICKY
     }
 
     fun onDestroy() {
         Log.i(logTag, "PartoutVpnServiceRuntime.onDestroy()")
-        if (isRunning) {
-            launchCommand {
-                stopTunnel()
-                close()
-            }
-        } else {
+        launchCommand {
+            stopTunnel()
             close()
         }
     }
@@ -76,211 +77,237 @@ class PartoutVpnServiceRuntime(
         Log.i(logTag, "PartoutVpnServiceRuntime.onRevoke()")
         disconnect()
     }
+    //endregion
 
-    // Actions
+    //region Actions (Service)
+    private fun connect(intent: Intent?) = launchCommand {
+        val profileJSON = try {
+            loadOrPersistProfile(intent)
+        } catch (e: Exception) {
+            e.throwIfCancellation()
+            Log.e(logTag, "Unable to load profile JSON", e)
+            stopService()
+            return@launchCommand
+        }
+        val profileId = try {
+            decodeProfileId(profileJSON)
+        } catch (e: Exception) {
+            e.throwIfCancellation()
+            Log.e(logTag, "Unable to decode profile JSON", e)
+            stopService()
+            return@launchCommand
+        }
 
-    private fun connect(profileJSON: String) = launchCommand {
+        // Stop current tunnel if running
         stopTunnel()
+
+        // Observe snapshots during start attempt
+        snapshotEmitter.accept(profileId)
 
         isRunning = true
         Log.i(logTag, "Starting VPN daemon")
-
-        val result = engine.start(this, profileJSON)
-        if (result.code != 0) {
-            Log.e(logTag, "Unable to start VPN daemon (code=${result.code}): ${result.payload}")
+        try {
+            engine.start(this, profileJSON)
+            Log.i(logTag, "Started VPN daemon")
+        } catch (e: Exception) {
+            e.throwIfCancellation()
+            Log.e(logTag, "Unable to start VPN daemon", e)
             stopService()
+            snapshotEmitter.shutdown()
             isRunning = false
-            sendSnapshot(null)
             return@launchCommand
         }
-        Log.i(logTag, "Started VPN daemon")
     }
 
-    private fun disconnect() = launchCommand {
+    fun sendSnapshot(snapshot: TunnelSnapshot) {
+        snapshotEmitter.emit(snapshot)
+    }
+
+    fun disconnect() = launchCommand {
         stopTunnel()
         stopService()
+    }
+    //endregion
+
+    //region Action helpers
+    private suspend fun loadOrPersistProfile(intent: Intent?): String {
+        val json = intent?.getStringExtra(EXTRA_PROFILE_JSON)
+        if (json.isNullOrBlank()) {
+            Log.i(logTag, "No profile from VPN start intent, loading last persisted")
+            return engine.readLastProfile()
+        }
+        Log.i(logTag, "Profile from VPN start intent, persisting it")
+        try {
+            engine.writeLastProfile(json)
+        } catch (e: Exception) {
+            e.throwIfCancellation()
+            Log.w(logTag, "Unable to persist profile JSON, continuing with intent profile", e)
+        }
+        return json
+    }
+
+    private fun decodeProfileId(profileJSON: String): String {
+        return json.decodeFromString<TaggedProfile>(profileJSON).id
     }
 
     private suspend fun stopTunnel() {
         if (!isRunning) { return }
 
         Log.i(logTag, "Stopping VPN daemon")
-        val result = engine.stop()
-        if (result.code == 0) {
-            Log.i(logTag, "Stopped VPN daemon")
-        } else {
-            Log.e(logTag, "Unable to stop VPN daemon (code=${result.code}): ${result.payload}")
+        try {
+            engine.stop()
+        } catch (e: Exception) {
+            Log.e(logTag, "Unable to stop VPN daemon", e)
         }
         isRunning = false
-        sendSnapshot(null)
+        snapshotEmitter.emitFinal()
     }
 
-    private fun launchCommand(action: suspend () -> Unit) {
-        serviceScope.launch {
-            commandMutex.withLock {
-                action()
-            }
-        }
+    private fun stopService() {
+        service.stopSelf()
     }
 
     private fun close() {
+        Log.d(logTag, "Cancelling VPN runtime")
+        commandQueue.close()
         serviceScope.cancel()
     }
+    //endregion
 
-    // WARNING: These methods are called from a JNI background thread
+    //region Snapshots
+    private class SnapshotEmitter(
+        private val logTag: String,
+        private val service: Service
+    ) {
+        private val lock = Any()
+        private var isAccepting = false
+        private var activeProfileId: String? = null
+        @Volatile private var latestSnapshot: TunnelSnapshot? = null
 
-    // JNI
-    fun testWorking() {
-        Log.d(logTag, "PartoutVpnServiceRuntime.testWorking()")
-    }
-
-    // JNI
-    fun setTunnel(infoJSON: String): Int {
-        Log.d(logTag, "PartoutVpnServiceRuntime.setTunnel()")
-        if (descriptor != null) {
-            Log.e(logTag, "Tunnel descriptor already established")
-            return -1
-        }
-
-        val builder = service.Builder()
-        val info: TunnelRemoteInfoWrapper = try {
-            json.decodeFromString(infoJSON)
-        } catch (e: SerializationException) {
-            Log.e(logTag, "Unable to decode tunnel info JSON", e)
-            return -1
-        }
-        val remoteFds = info.fileDescriptors
-        var appliedAddressSettings = false
-        var appliedDnsSettings = false
-
-        info.modules?.forEach {
-            when (it) {
-                is TaggedModuleDNS -> {
-                    Log.i(logTag, "DNS: ${it.value}")
-                    appliedDnsSettings = DNSModuleApplying(it.value).apply(logTag, builder)
-                            || appliedDnsSettings
-                }
-                is TaggedModuleIP -> {
-                    Log.i(logTag, "IP: ${it.value}")
-                    appliedAddressSettings = IPModuleApplying(it.value).apply(logTag, builder)
-                            || appliedAddressSettings
-                }
-                is TaggedModuleHTTPProxy -> {
-                    Log.i(logTag, "HTTP Proxy: ${it.value}")
-                    HTTPProxyModuleApplying(it.value).apply(logTag, builder)
-                }
-                is TaggedModuleOnDemand -> {
-                    Log.i(logTag, "OnDemand: ${it.value}")
-                    OnDemandModuleApplying(it.value).apply(logTag, builder)
-                }
-                else -> {}
+        fun accept(profileId: String) {
+            synchronized(lock) {
+                isAccepting = true
+                activeProfileId = profileId
+                latestSnapshot = null
             }
         }
 
-        if (!appliedAddressSettings) {
-            Log.e(logTag, "No valid interface address")
-            return -1
-        }
-
-        remoteFds.forEach {
-            require(it in 0..Int.MAX_VALUE.toLong()) {
-                "Invalid Android file descriptor: $it"
-            }
-            val protected = service.protect(it.toInt())
-            Log.d(logTag, "protect($it) = $protected")
-        }
-
-        // IMPORTANT: this is a requirement for VirtualTunnelInterface.
-        // By default, establish() returns a non-blocking descriptor.
-        builder.setBlocking(true)
-
-        descriptor = try {
-            builder.establish()
-        } catch (e: RuntimeException) {
-            Log.e(logTag, "Unable to establish tunnel", e)
-            null
-        }
-        if (descriptor == null) {
-            Log.e(logTag, "Unable to establish tunnel")
-            return -1
-        }
-
-        val fd = descriptor?.detachFd() ?: -1
-        descriptor = null
-        Log.i(logTag, "Established tunnel descriptor: $fd")
-        return fd
-    }
-
-    // JNI
-    fun configureSockets(fds: IntArray) {
-        Log.d(logTag, "PartoutVpnServiceRuntime.configureSockets(${fds.toList()})")
-        fds.forEach {
-            val protected = service.protect(it)
-            Log.d(logTag, "protect($it) = $protected")
-        }
-    }
-
-    // JNI
-    fun onSnapshot(snapshotJSON: String) {
-        Log.d(logTag, "PartoutVpnServiceRuntime.onSnapshot()")
-        val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
-        sendSnapshot(snapshot)
-    }
-
-    // JNI
-    fun cancelTunnel(errorMessage: String?) {
-        Log.d(logTag, "PartoutVpnServiceRuntime.cancelTunnel()")
-        if (errorMessage != null) {
-            Log.e(logTag, "VPN daemon cancelled: $errorMessage")
-        } else {
-            Log.i(logTag, "VPN daemon cancelled")
-        }
-        disconnect()
-    }
-
-    // Broadcasts emitters
-
-    private fun sendSnapshot(snapshot: TunnelSnapshot?) {
-        val newSnapshot: TunnelSnapshot?
-        if (snapshot != null) {
-            newSnapshot = snapshot
-        } else {
-            newSnapshot = latestSnapshot?.disabled()
-        }
-        if (newSnapshot == latestSnapshot) {
-            return
-        }
-        Log.d(logTag, "Report daemon snapshot: $newSnapshot")
-        val intent = Intent(ACTION_SNAPSHOT).apply {
-            setPackage(service.packageName)
-            newSnapshot?.let {
-                putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(it))
+        fun shutdown() {
+            synchronized(lock) {
+                isAccepting = false
+                activeProfileId = null
             }
         }
-        service.sendBroadcast(intent)
-        latestSnapshot = newSnapshot
+
+        fun emit(snapshot: TunnelSnapshot) = synchronized(lock) {
+            if (!isAccepting) { return }
+            if (snapshot.id != activeProfileId) {
+                Log.d(logTag, "Drop stale daemon snapshot: $snapshot")
+                return
+            }
+            broadcast(snapshot)
+        }
+
+        fun emitFinal() = synchronized(lock) {
+            Log.d(logTag, "Emit final daemon snapshot")
+            latestSnapshot?.let {
+                emit(it.disabled())
+            }
+            isAccepting = false
+            activeProfileId = null
+        }
+
+        fun latest(): TunnelSnapshot? = synchronized(lock) {
+            latestSnapshot
+        }
+
+        private fun broadcast(snapshot: TunnelSnapshot) {
+            Log.d(logTag, "Emit daemon snapshot: $snapshot")
+            val intent = Intent(ACTION_SNAPSHOT).apply {
+                setPackage(service.packageName)
+                putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
+            }
+            latestSnapshot = snapshot
+            service.sendBroadcast(intent)
+        }
+
+        private fun TunnelSnapshot.disabled() = TunnelSnapshot(
+            id,
+            false,
+            false,
+            status,
+            environment
+        )
+    }
+    //endregion
+
+    //region Messaging
+    @Suppress("UNUSED_PARAMETER")
+    fun onBind(intent: Intent?): IBinder? {
+        return messenger.binder
     }
 
-    // Nested classes
-
-    data class Result(
-        val code: Int,
-        val payload: String?
+    private val messenger = Messenger(
+        object : Handler(Looper.getMainLooper()) {
+            override fun handleMessage(msg: Message) {
+                when (msg.what) {
+                    MSG_GET_STATUS -> {
+                        msg.replyTo?.let { client ->
+                            launchCommand {
+                                replySnapshot(client)
+                            }
+                        }
+                    }
+                    else -> super.handleMessage(msg)
+                }
+            }
+        }
     )
 
+    private fun replySnapshot(client: Messenger) {
+        val snapshotJSON = snapshotEmitter.latest()?.let {
+            json.encodeToString(it)
+        }
+        val bundle = Bundle().apply {
+            snapshotJSON?.let {
+                putString(MSG_KEY_SNAPSHOT, it)
+            }
+        }
+        val msg = Message.obtain(null, MSG_GET_STATUS).apply {
+            data = bundle
+        }
+        try {
+            client.send(msg)
+        } catch (e: Exception) {
+            Log.w(logTag, "Unable to reply with VPN snapshot", e)
+        }
+    }
+    //endregion
+
+    //region Engine
     interface Engine {
-        suspend fun start(runtime: PartoutVpnServiceRuntime, profileJSON: String): Result
-        suspend fun stop(): Result
+        suspend fun start(runtime: PartoutVpnServiceRuntime, profileJSON: String)
+        suspend fun stop()
+        suspend fun readLastProfile(): String
+        suspend fun writeLastProfile(json: String)
+    }
+    //endregion
+
+    //region Generic helpers
+    private fun launchCommand(action: suspend () -> Unit) {
+        commandQueue.trySend(action).onFailure {
+            Log.w(logTag, "Unable to enqueue VPN command", it)
+        }
     }
 
-    private fun TunnelSnapshot.disabled() = TunnelSnapshot(
-        id,
-        false,
-        false,
-        status,
-        environment
-    )
+    private fun Exception.throwIfCancellation() {
+        if (this is CancellationException) {
+            throw this
+        }
+    }
+    //endregion
 
+    //region Constants
     companion object {
         const val ACTION_STOP_VPN = "io.partout.action.STOP_VPN"
         const val ACTION_SNAPSHOT = "io.partout.action.SNAPSHOT"
@@ -288,8 +315,12 @@ class PartoutVpnServiceRuntime(
         const val EXTRA_PROFILE_JSON = "io.partout.extra.PROFILE_JSON"
         const val EXTRA_SNAPSHOT_JSON = "io.partout.extra.SNAPSHOT_JSON"
 
+        const val MSG_GET_STATUS = 1
+        const val MSG_KEY_SNAPSHOT = "snapshot"
+
         private val json = Json {
             ignoreUnknownKeys = true
         }
     }
+    //endregion
 }

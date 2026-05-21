@@ -8,6 +8,7 @@ on:
       - "**/*.md"
       - "scripts/*.sh"
       - "scripts/*.ps1"
+      - "**/*.kt" # For now
 
 concurrency:
   group: ${{ github.ref }}

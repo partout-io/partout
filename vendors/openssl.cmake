@@ -33,10 +33,8 @@ set(OPENSSL_CFG_FLAGS no-apps no-docs no-dsa no-engine no-gost no-legacy shared 
 # Add some flags if -DANDROID
 if(ANDROID)
     set(OPENSSL_TARGET "android-arm64")
-    set(OPENSSL_SYMBOLS "-D__ANDROID_API__=${ANDROID_NATIVE_API_LEVEL}")
 else()
     set(OPENSSL_TARGET "")
-    set(OPENSSL_SYMBOLS "")
 endif()
 
 set(CFG_ARGS
