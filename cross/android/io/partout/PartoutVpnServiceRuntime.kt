@@ -20,9 +20,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.onFailure
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 
 class PartoutVpnServiceRuntime(
@@ -31,9 +31,23 @@ class PartoutVpnServiceRuntime(
     private val engine: Engine
 ) {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val commandMutex = Mutex()
+    private val commandQueue = Channel<suspend () -> Unit>(Channel.UNLIMITED)
     private var latestSnapshot: TunnelSnapshot? = null
     private var isRunning = false
+
+    init {
+        serviceScope.launch {
+            for (action in commandQueue) {
+                try {
+                    action()
+                } catch (e: Exception) {
+                    e.throwIfCancellation()
+                    Log.e(logTag, "Unhandled VPN command failure", e)
+                    stopService()
+                }
+            }
+        }
+    }
 
     //region Lifecycle
     @Suppress("UNUSED_PARAMETER")
@@ -49,10 +63,6 @@ class PartoutVpnServiceRuntime(
 
     fun onDestroy() {
         Log.i(logTag, "PartoutVpnServiceRuntime.onDestroy()")
-        if (!isRunning) {
-            close()
-            return
-        }
         launchCommand {
             stopTunnel()
             close()
@@ -93,13 +103,7 @@ class PartoutVpnServiceRuntime(
     }
 
     fun sendSnapshot(snapshot: TunnelSnapshot) = launchCommand {
-        Log.d(logTag, "Report daemon snapshot: $snapshot")
-        val intent = Intent(ACTION_SNAPSHOT).apply {
-            setPackage(service.packageName)
-            putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
-        }
-        latestSnapshot = snapshot
-        service.sendBroadcast(intent)
+        emitSnapshot(snapshot)
     }
 
     fun disconnect() = launchCommand {
@@ -126,9 +130,9 @@ class PartoutVpnServiceRuntime(
     }
 
     private fun sendFinalSnapshot() {
-        Log.d(logTag, "Report final daemon snapshot")
+        Log.d(logTag, "Emit final daemon snapshot")
         latestSnapshot?.let {
-            sendSnapshot(it.disabled())
+            emitSnapshot(it.disabled())
         }
     }
 
@@ -152,6 +156,7 @@ class PartoutVpnServiceRuntime(
 
     private fun close() {
         Log.d(logTag, "Cancelling VPN runtime")
+        commandQueue.close()
         serviceScope.cancel()
     }
     //endregion
@@ -167,7 +172,11 @@ class PartoutVpnServiceRuntime(
             override fun handleMessage(msg: Message) {
                 when (msg.what) {
                     MSG_GET_STATUS -> {
-                        msg.replyTo?.let { replySnapshot(it) }
+                        msg.replyTo?.let { client ->
+                            launchCommand {
+                                replySnapshot(client)
+                            }
+                        }
                     }
                     else -> super.handleMessage(msg)
                 }
@@ -187,7 +196,11 @@ class PartoutVpnServiceRuntime(
         val msg = Message.obtain(null, MSG_GET_STATUS).apply {
             data = bundle
         }
-        client.send(msg)
+        try {
+            client.send(msg)
+        } catch (e: Exception) {
+            Log.w(logTag, "Unable to reply with VPN snapshot", e)
+        }
     }
     //endregion
 
@@ -207,17 +220,19 @@ class PartoutVpnServiceRuntime(
 
     //region Generic helpers
     private fun launchCommand(action: suspend () -> Unit) {
-        serviceScope.launch {
-            commandMutex.withLock {
-                try {
-                    action()
-                } catch (e: Exception) {
-                    e.throwIfCancellation()
-                    Log.e(logTag, "Unhandled VPN command failure", e)
-                    stopService()
-                }
-            }
+        commandQueue.trySend(action).onFailure {
+            Log.w(logTag, "Unable to enqueue VPN command", it)
         }
+    }
+
+    private fun emitSnapshot(snapshot: TunnelSnapshot) {
+        Log.d(logTag, "Emit daemon snapshot: $snapshot")
+        val intent = Intent(ACTION_SNAPSHOT).apply {
+            setPackage(service.packageName)
+            putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
+        }
+        latestSnapshot = snapshot
+        service.sendBroadcast(intent)
     }
 
     private fun TunnelSnapshot.disabled() = TunnelSnapshot(
