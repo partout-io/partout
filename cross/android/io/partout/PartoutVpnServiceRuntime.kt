@@ -62,12 +62,12 @@ class PartoutVpnServiceRuntime(
 
     fun onDestroy() {
         Log.i(logTag, "PartoutVpnServiceRuntime.onDestroy()")
-        if (isRunning) {
-            launchCommand {
-                stopTunnel()
-                close()
-            }
-        } else {
+        if (!isRunning) {
+            close()
+            return
+        }
+        launchCommand {
+            stopTunnel()
             close()
         }
     }
