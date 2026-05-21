@@ -58,8 +58,7 @@ class PartoutTunnel(
     private val nextRequestId = AtomicInteger(1)
     private val pendingRequests = ConcurrentHashMap<Int, kotlinx.coroutines.CancellableContinuation<String?>>()
 
-    // Initialization
-
+    //region Initialization
     init {
         clientMessenger = Messenger(object : Handler(Looper.getMainLooper()) {
             override fun handleMessage(msg: Message) {
@@ -148,9 +147,9 @@ class PartoutTunnel(
             isBound = false
         }
     }
+    //endregion
 
-    // Actions
-
+    //region Actions
     fun onVpnPermissionResult(granted: Boolean) {
         val permission = pendingPermission ?: return
         pendingPermission = null
@@ -180,9 +179,9 @@ class PartoutTunnel(
         stopVpnService(profileId)
         completion(ERROR_NONE)
     }
+    //endregion
 
-    // Messaging
-
+    //region Messaging
     fun requestSnapshot() {
         val msg = Message.obtain(null, PartoutVpnServiceRuntime.MSG_GET_STATUS).apply {
             replyTo = clientMessenger
@@ -232,9 +231,9 @@ class PartoutTunnel(
                 }
             }
     }
+    //endregion
 
-    // Internals
-
+    //region Internals
     private fun startVpnService(profile: TaggedProfile) {
         val startIntent = Intent(appContext, vpnServiceClass).apply {
             putExtra(PartoutVpnServiceRuntime.EXTRA_PROFILE_JSON, json.encodeToString(profile))
@@ -272,6 +271,7 @@ class PartoutTunnel(
             Log.e(logTag, ">>> Unable to decode snapshot: ${0}")
         }
     }
+    //endregion
 
     companion object {
         const val ERROR_NONE = 0
