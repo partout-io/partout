@@ -16,6 +16,7 @@ import android.os.Messenger
 import android.util.Log
 import io.partout.models.TaggedProfile
 import io.partout.models.TunnelSnapshot
+import io.partout.vpn.TunnelControllerDelegate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +31,7 @@ class PartoutVpnServiceRuntime(
     private val logTag: String,
     val service: VpnService,
     private val engine: Engine
-) {
+): TunnelControllerDelegate {
     // Execute actions in serial queue
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandQueue = Channel<suspend () -> Unit>(Channel.UNLIMITED)
@@ -119,11 +120,11 @@ class PartoutVpnServiceRuntime(
         }
     }
 
-    fun sendSnapshot(snapshot: TunnelSnapshot) {
+    override fun sendSnapshot(snapshot: TunnelSnapshot) {
         snapshotEmitter.emit(snapshot)
     }
 
-    fun disconnect() = launchCommand {
+    override fun disconnect() = launchCommand {
         stopTunnel()
         stopService()
     }

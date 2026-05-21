@@ -25,11 +25,15 @@ interface TunnelController {
     fun cancelTunnel(errorMessage: String?)
 }
 
+interface TunnelControllerDelegate {
+    fun sendSnapshot(snapshot: TunnelSnapshot)
+    fun disconnect()
+}
+
 class JNITunnelController(
     private val logTag: String,
     private val service: VpnService,
-    private val sendSnapshot: (TunnelSnapshot) -> Unit,
-    private val disconnect: () -> Unit
+    private val delegate: TunnelControllerDelegate
 ): TunnelController {
     private val lock = Any()
     private var descriptor: ParcelFileDescriptor? = null
@@ -133,7 +137,8 @@ class JNITunnelController(
         if (isClosed) { return }
         Log.d(logTag, "onSnapshot(${snapshotJSON})")
         val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
-        sendSnapshot(snapshot)
+        delegate?.sendSnapshot(snapshot)
+        return@synchronized
     }
 
     override fun cancelTunnel(errorMessage: String?) = synchronized(lock) {
@@ -145,7 +150,8 @@ class JNITunnelController(
         } else {
             Log.i(logTag, "VPN daemon cancelled")
         }
-        disconnect()
+        delegate?.disconnect()
+        return@synchronized
     }
 
     companion object {
