@@ -139,10 +139,11 @@ class PartoutTunnel(
     }
 
     override fun close() {
+        val oldServiceMessenger = serviceMessenger
+        serviceMessenger = null
         failPendingRequests()
         appContext.unregisterReceiver(snapshotsReceiver)
-        serviceMessenger?.binder?.unlinkToDeath(deathRecipient, 0)
-        serviceMessenger = null
+        oldServiceMessenger?.binder?.unlinkToDeath(deathRecipient, 0)
         if (isBound) {
             appContext.unbindService(connection)
             isBound = false
