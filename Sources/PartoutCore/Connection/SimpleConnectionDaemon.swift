@@ -236,6 +236,10 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         onSnapshot = nil
     }
 
+    public func environmentData(forKey key: String) async -> Data? {
+        environment.environmentData(forKey: key)
+    }
+
     public func sendMessage(_ input: Message.Input) async throws -> Message.Output? {
         pp_log_id(profile.id, .core, .debug, "Handle message input: \(String(describing: input))")
         let output = try await messageHandler.handleMessage(input)
