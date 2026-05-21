@@ -205,15 +205,13 @@ class PartoutTunnel(
             }
             val messenger = serviceMessenger
             if (messenger == null) {
-                pendingRequests.remove(reqId)
-                continuation.resumeWithException(RemoteException())
+                pendingRequests.remove(reqId)?.resumeWithException(RemoteException())
                 return@suspendCancellableCoroutine
             }
             try {
                 messenger.send(msg)
             } catch (e: Exception) {
-                pendingRequests.remove(reqId)
-                continuation.resumeWithException(e)
+                pendingRequests.remove(reqId)?.resumeWithException(e)
             }
         }
 
