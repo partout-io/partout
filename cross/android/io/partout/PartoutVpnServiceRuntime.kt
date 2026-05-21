@@ -317,7 +317,7 @@ class PartoutVpnServiceRuntime(
         suspend fun stop()
         suspend fun readLastProfile(): String
         suspend fun writeLastProfile(json: String)
-        suspend fun getEnvironmentValue(name: String): String
+        suspend fun getEnvironmentValue(name: String): String?
     }
     //endregion
 
