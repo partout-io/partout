@@ -98,8 +98,8 @@ class PartoutVpnServiceRuntime(
             setPackage(service.packageName)
             putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
         }
-        service.sendBroadcast(intent)
         latestSnapshot = snapshot
+        service.sendBroadcast(intent)
     }
 
     fun disconnect() = launchCommand {
