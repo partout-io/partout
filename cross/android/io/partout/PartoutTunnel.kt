@@ -24,8 +24,12 @@ import io.partout.models.TunnelSnapshot
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.Json
 import java.io.Closeable
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.resumeWithException
 
 class PartoutTunnel(
     private val logTag: String,
@@ -49,6 +53,10 @@ class PartoutTunnel(
     private var isBound: Boolean
     private var serviceMessenger: Messenger? = null
 
+    // Async messaging
+    private val nextRequestId = AtomicInteger(1)
+    private val pendingRequests = ConcurrentHashMap<Int, kotlinx.coroutines.CancellableContinuation<String?>>()
+
     // Initialization
 
     init {
@@ -69,7 +77,12 @@ class PartoutTunnel(
                         val key = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_ENV_NAME)
                         val valueJSON = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_JSON)
                         if (key == null || valueJSON == null) { return }
-                        Log.i(logTag, "Got environment: $key = $valueJSON")
+
+                        // Invoke continuation
+                        val reqId = msg.arg1
+                        val request = pendingRequests[reqId]
+                        request?.resume(valueJSON, null)
+                        pendingRequests.remove(reqId)
                     }
                     else -> super.handleMessage(msg)
                 }
@@ -178,15 +191,27 @@ class PartoutTunnel(
         serviceMessenger?.send(msg)
     }
 
-    fun requestEnvironmentValue(name: String) {
-        val msg = Message.obtain(null, PartoutVpnServiceRuntime.MSG_GET_ENVIRONMENT).apply {
-            replyTo = clientMessenger
-            data = Bundle().apply {
-                putString(PartoutVpnServiceRuntime.MSG_KEY_ENV_NAME, name)
+    suspend fun requestEnvironmentValue(name: String): String? =
+        suspendCancellableCoroutine { continuation ->
+            val reqId = nextRequestId.andIncrement
+            pendingRequests[reqId] = continuation
+            continuation.invokeOnCancellation {
+                pendingRequests.remove(reqId)
+            }
+            val msg = Message.obtain(null, PartoutVpnServiceRuntime.MSG_GET_ENVIRONMENT).apply {
+                replyTo = clientMessenger
+                arg1 = reqId
+                data = Bundle().apply {
+                    putString(PartoutVpnServiceRuntime.MSG_KEY_ENV_NAME, name)
+                }
+            }
+            try {
+                serviceMessenger?.send(msg)
+            } catch (e: Exception) {
+                pendingRequests.remove(reqId)
+                continuation.resumeWithException(e)
             }
         }
-        serviceMessenger?.send(msg)
-    }
 
     private fun onServiceDead() {
         _state.update {
