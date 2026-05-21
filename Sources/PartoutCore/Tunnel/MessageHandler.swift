@@ -8,12 +8,16 @@ public enum Message {
         case debugLog(sinceLast: TimeInterval, maxLevel: DebugLog.Level)
 
         case environment(excludingKeys: Set<String>? = nil)
+
+        case environmentValue(key: String)
     }
 
     public enum Output: Hashable, Codable, Sendable {
         case debugLog(log: DebugLog)
 
         case environment(StaticTunnelEnvironment)
+
+        case environmentValue(key: String, value: String?)
     }
 }
 

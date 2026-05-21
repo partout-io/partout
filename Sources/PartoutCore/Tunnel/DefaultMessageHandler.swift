@@ -22,6 +22,9 @@ public struct DefaultMessageHandler: MessageHandler {
             let values = environment.snapshot(excludingKeys: keys)
             let env = StaticTunnelEnvironment(profileId: ctx.profileId, values: values)
             return .environment(env)
+        case .environmentValue(let key):
+            let json = environment.environmentValue(forKey: TunnelEnvironmentKey<String>(key))
+            return .environmentValue(key: key, value: json)
         }
     }
 }
