@@ -294,7 +294,7 @@ class PartoutVpnServiceRuntime(
         }
     }
 
-    private fun replyEnvironmentValue(client: Messenger, name: String) {
+    private suspend fun replyEnvironmentValue(client: Messenger, name: String) {
         val value = engine.getEnvironmentValue(name)
         Log.i(logTag, "Reply with environment: $name = $value")
         val msg = Message.obtain(null, MSG_GET_ENVIRONMENT).apply {
@@ -317,7 +317,7 @@ class PartoutVpnServiceRuntime(
         suspend fun stop()
         suspend fun readLastProfile(): String
         suspend fun writeLastProfile(json: String)
-        fun getEnvironmentValue(name: String): String
+        suspend fun getEnvironmentValue(name: String): String
     }
     //endregion
 
