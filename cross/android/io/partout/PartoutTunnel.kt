@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.net.VpnService
+import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -63,6 +64,12 @@ class PartoutTunnel(
                             return
                         }
                         onSnapshotJSON(snapshotJSON)
+                    }
+                    PartoutVpnServiceRuntime.MSG_GET_ENVIRONMENT -> {
+                        val key = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_ENV_NAME)
+                        val valueJSON = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_JSON)
+                        if (key == null || valueJSON == null) { return }
+                        Log.i(logTag, "Got environment: $key = $valueJSON")
                     }
                     else -> super.handleMessage(msg)
                 }
@@ -167,6 +174,16 @@ class PartoutTunnel(
     fun requestSnapshot() {
         val msg = Message.obtain(null, PartoutVpnServiceRuntime.MSG_GET_STATUS).apply {
             replyTo = clientMessenger
+        }
+        serviceMessenger?.send(msg)
+    }
+
+    fun requestEnvironmentValue(name: String) {
+        val msg = Message.obtain(null, PartoutVpnServiceRuntime.MSG_GET_ENVIRONMENT).apply {
+            replyTo = clientMessenger
+            data = Bundle().apply {
+                putString(PartoutVpnServiceRuntime.MSG_KEY_ENV_NAME, name)
+            }
         }
         serviceMessenger?.send(msg)
     }

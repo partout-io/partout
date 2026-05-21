@@ -153,7 +153,6 @@ class PartoutVpnServiceRuntime(
 
     private suspend fun stopTunnel() {
         if (!isRunning) { return }
-
         Log.i(logTag, "Stopping VPN daemon")
         try {
             engine.stop()
@@ -259,6 +258,18 @@ class PartoutVpnServiceRuntime(
                             }
                         }
                     }
+                    MSG_GET_ENVIRONMENT -> {
+                        val name = msg.data?.getString(MSG_KEY_ENV_NAME)
+                        if (name == null) {
+                            assert(false)
+                            return
+                        }
+                        msg.replyTo?.let { client ->
+                            launchCommand {
+                                replyEnvironmentValue(client, name)
+                            }
+                        }
+                    }
                     else -> super.handleMessage(msg)
                 }
             }
@@ -282,6 +293,22 @@ class PartoutVpnServiceRuntime(
             Log.w(logTag, "Unable to reply with VPN snapshot", e)
         }
     }
+
+    private fun replyEnvironmentValue(client: Messenger, name: String) {
+        val value = engine.getEnvironmentValue(name)
+        Log.i(logTag, "Reply with environment: $name = $value")
+        val msg = Message.obtain(null, MSG_GET_ENVIRONMENT).apply {
+            data = Bundle().apply {
+                putString(MSG_KEY_ENV_NAME, name)
+                putString(MSG_KEY_JSON, value)
+            }
+        }
+        try {
+            client.send(msg)
+        } catch (e: Exception) {
+            Log.w(logTag, "Unable to reply with environment value", e)
+        }
+    }
     //endregion
 
     //region Engine
@@ -290,6 +317,7 @@ class PartoutVpnServiceRuntime(
         suspend fun stop()
         suspend fun readLastProfile(): String
         suspend fun writeLastProfile(json: String)
+        fun getEnvironmentValue(name: String): String
     }
     //endregion
 
@@ -316,7 +344,9 @@ class PartoutVpnServiceRuntime(
         const val EXTRA_SNAPSHOT_JSON = "io.partout.extra.SNAPSHOT_JSON"
 
         const val MSG_GET_STATUS = 1
+        const val MSG_GET_ENVIRONMENT = 2
         const val MSG_KEY_JSON = "json"
+        const val MSG_KEY_ENV_NAME = "envName"
 
         private val json = Json {
             ignoreUnknownKeys = true
