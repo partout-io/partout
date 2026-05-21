@@ -17,6 +17,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.Message
 import android.os.Messenger
+import android.os.RemoteException
 import android.util.Log
 import androidx.core.content.ContextCompat
 import io.partout.models.TaggedProfile
@@ -76,7 +77,7 @@ class PartoutTunnel(
                     PartoutVpnServiceRuntime.MSG_GET_ENVIRONMENT -> {
                         val key = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_ENV_NAME)
                         val valueJSON = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_JSON)
-                        if (key == null || valueJSON == null) { return }
+                        if (key == null) { return }
 
                         // Invoke continuation
                         val reqId = msg.arg1
@@ -96,7 +97,6 @@ class PartoutTunnel(
             override fun onServiceConnected(name: ComponentName, service: IBinder) {
                 serviceMessenger = Messenger(service)
                 service.linkToDeath(deathRecipient, 0)
-
                 // Ask the service for its current snapshot
                 requestSnapshot()
             }
@@ -193,7 +193,7 @@ class PartoutTunnel(
 
     suspend fun requestEnvironmentValue(name: String): String? =
         suspendCancellableCoroutine { continuation ->
-            val reqId = nextRequestId.andIncrement
+            val reqId = nextRequestId.getAndIncrement()
             pendingRequests[reqId] = continuation
             continuation.invokeOnCancellation {
                 pendingRequests.remove(reqId)
@@ -205,8 +205,13 @@ class PartoutTunnel(
                     putString(PartoutVpnServiceRuntime.MSG_KEY_ENV_NAME, name)
                 }
             }
+            val messenger = serviceMessenger
+            if (messenger == null) {
+                continuation.resumeWithException(RemoteException())
+                return@suspendCancellableCoroutine
+            }
             try {
-                serviceMessenger?.send(msg)
+                messenger.send(msg)
             } catch (e: Exception) {
                 pendingRequests.remove(reqId)
                 continuation.resumeWithException(e)
@@ -214,6 +219,10 @@ class PartoutTunnel(
         }
 
     private fun onServiceDead() {
+        pendingRequests.values.forEach {
+            it.resumeWithException(RemoteException())
+        }
+        pendingRequests.clear()
         _state.update {
             it.copy(emptyMap())
         }

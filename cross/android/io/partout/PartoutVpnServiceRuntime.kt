@@ -259,6 +259,7 @@ class PartoutVpnServiceRuntime(
                         }
                     }
                     MSG_GET_ENVIRONMENT -> {
+                        val reqId = msg.arg1
                         val name = msg.data?.getString(MSG_KEY_ENV_NAME)
                         if (name == null) {
                             assert(false)
@@ -266,7 +267,7 @@ class PartoutVpnServiceRuntime(
                         }
                         msg.replyTo?.let { client ->
                             launchCommand {
-                                replyEnvironmentValue(client, name)
+                                replyEnvironmentValue(client, reqId, name)
                             }
                         }
                     }
@@ -294,10 +295,11 @@ class PartoutVpnServiceRuntime(
         }
     }
 
-    private suspend fun replyEnvironmentValue(client: Messenger, name: String) {
+    private suspend fun replyEnvironmentValue(client: Messenger, reqId: Int, name: String) {
         val value = engine.getEnvironmentValue(name)
         Log.i(logTag, "Reply with environment: $name = $value")
         val msg = Message.obtain(null, MSG_GET_ENVIRONMENT).apply {
+            arg1 = reqId
             data = Bundle().apply {
                 putString(MSG_KEY_ENV_NAME, name)
                 putString(MSG_KEY_JSON, value)
