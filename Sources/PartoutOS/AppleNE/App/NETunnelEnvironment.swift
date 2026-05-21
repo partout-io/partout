@@ -24,6 +24,12 @@ public final class NETunnelEnvironment: TunnelEnvironmentReader, @unchecked Send
         observeObjects()
     }
 
+    public func environmentData(forKey key: String) -> Data? {
+        queue.sync {
+            latestEnvironment?.environmentData(forKey: key)
+        }
+    }
+
     public func environmentValue<T>(forKey key: TunnelEnvironmentKey<T>) -> T? where T: Decodable {
         queue.sync {
             latestEnvironment?.environmentValue(forKey: key)

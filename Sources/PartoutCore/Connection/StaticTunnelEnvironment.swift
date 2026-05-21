@@ -13,6 +13,10 @@ public struct StaticTunnelEnvironment: TunnelEnvironmentReader, Hashable, Codabl
         self.values = values
     }
 
+    public func environmentData(forKey key: String) -> Data? {
+        values[key]
+    }
+
     public func environmentValue<T>(forKey key: TunnelEnvironmentKey<T>) -> T? where T: Decodable {
         do {
             return try values.decode(T.self, forKey: key.keyString)

@@ -9,6 +9,8 @@ public typealias TunnelEnvironment = AnyObject & TunnelEnvironmentReader & Tunne
 public protocol TunnelEnvironmentReader: Sendable {
     var onUpdate: AsyncStream<Void> { get }
 
+    func environmentData(forKey key: String) -> Data?
+
     func environmentValue<T>(forKey key: TunnelEnvironmentKey<T>) -> T? where T: Decodable
 
     func snapshot(excludingKeys excluded: Set<String>?) -> [String: Data]

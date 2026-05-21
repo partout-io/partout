@@ -18,6 +18,10 @@ public final class UserDefaultsEnvironment: TunnelEnvironment, @unchecked Sendab
         } ?? ""
     }
 
+    public func environmentData(forKey key: String) -> Data? {
+        defaults.data(forKey: key)
+    }
+
     public func setEnvironmentValue<T>(_ value: T, forKey key: TunnelEnvironmentKey<T>) where T: Encodable {
         let fullKey = key.keyString.rawKey(prefix: prefix)
         do {
