@@ -19,6 +19,8 @@ typedef enum {
 /* The opaque socket type. */
 typedef struct __pp_socket_struct *pp_socket;
 
+extern const int PP_SOCKET_WOULD_BLOCK;
+
 /* Create a socket wrapper from an already open native descriptor. The
  * wrapper acquires ownership and will close the descriptor on
  * pp_socket_close() or pp_socket_free(). */
@@ -34,7 +36,7 @@ pp_socket _Nullable pp_socket_open(const char *_Nonnull ip_addr,
                                    bool blocking,
                                    int timeout_ms);
 
-/* I/O. */
+/* I/O. Returns PP_SOCKET_WOULD_BLOCK when a non-blocking operation would block. */
 int pp_socket_read(pp_socket _Nonnull sock,
                    uint8_t *_Nonnull dst, size_t dst_len);
 int pp_socket_write(pp_socket _Nonnull sock,
