@@ -119,101 +119,7 @@ class PartoutVpnServiceRuntime(
     }
     //endregion
 
-    //region Actions (JNI)
-    //endregion
-
-    //region Action helpers
-    private suspend fun loadOrPersistProfile(intent: Intent?): String {
-        val json = intent?.getStringExtra(EXTRA_PROFILE_JSON)
-        if (json.isNullOrBlank()) {
-            Log.i(logTag, "No profile from VPN start intent, loading last persisted")
-            return engine.readLastProfile()
-        }
-        Log.i(logTag, "Profile from VPN start intent, persisting it")
-        try {
-            engine.writeLastProfile(json)
-        } catch (e: Exception) {
-            e.throwIfCancellation()
-            Log.w(logTag, "Unable to persist profile JSON, continuing with intent profile", e)
-        }
-        return json
-    }
-
-    private fun sendSnapshot(snapshot: TunnelSnapshot) {
-        Log.d(logTag, "Report daemon snapshot: $snapshot")
-        val intent = Intent(ACTION_SNAPSHOT).apply {
-            setPackage(service.packageName)
-            putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
-        }
-        service.sendBroadcast(intent)
-        latestSnapshot = snapshot
-    }
-
-    private fun sendFinalSnapshot() {
-        latestSnapshot?.let {
-            sendSnapshot(it.disabled())
-        }
-    }
-
-    private suspend fun stopTunnel() {
-        if (!isRunning) { return }
-
-        Log.i(logTag, "Stopping VPN daemon")
-        val result = engine.stop()
-        if (result.code == 0) {
-            Log.i(logTag, "Stopped VPN daemon")
-        } else {
-            Log.e(logTag, "Unable to stop VPN daemon (code=${result.code}): ${result.payload}")
-        }
-        isRunning = false
-        sendFinalSnapshot()
-    }
-
-    private fun stopService() {
-        service.stopSelf()
-    }
-
-    private fun close() {
-        serviceScope.cancel()
-    }
-    //endregion
-
-    //region Messaging
-    @Suppress("UNUSED_PARAMETER")
-    fun onBind(intent: Intent?): IBinder? {
-        return messenger.binder
-    }
-
-    private val messenger = Messenger(
-        object : Handler(Looper.getMainLooper()) {
-            override fun handleMessage(msg: Message) {
-                when (msg.what) {
-                    MSG_GET_STATUS -> {
-                        msg.replyTo?.let { replySnapshot(it) }
-                    }
-                    else -> super.handleMessage(msg)
-                }
-            }
-        }
-    )
-
-    private fun replySnapshot(client: Messenger) {
-        val snapshotJSON = latestSnapshot?.let {
-            json.encodeToString(it)
-        }
-        val bundle = Bundle().apply {
-            snapshotJSON?.let {
-                putString(MSG_KEY_SNAPSHOT, it)
-            }
-        }
-        val msg = Message.obtain(null, MSG_GET_STATUS).apply {
-            data = bundle
-        }
-        client.send(msg)
-    }
-    //endregion
-
-    //region C/JNI
+    //region Actions (C/JNI)
     override fun testWorking() {
         Log.d(logTag, "PartoutVpnServiceRuntime.testWorking()")
     }
@@ -316,6 +222,97 @@ class PartoutVpnServiceRuntime(
             Log.i(logTag, "VPN daemon cancelled")
         }
         deferDisconnect()
+    }
+    //endregion
+
+    //region Action helpers
+    private suspend fun loadOrPersistProfile(intent: Intent?): String {
+        val json = intent?.getStringExtra(EXTRA_PROFILE_JSON)
+        if (json.isNullOrBlank()) {
+            Log.i(logTag, "No profile from VPN start intent, loading last persisted")
+            return engine.readLastProfile()
+        }
+        Log.i(logTag, "Profile from VPN start intent, persisting it")
+        try {
+            engine.writeLastProfile(json)
+        } catch (e: Exception) {
+            e.throwIfCancellation()
+            Log.w(logTag, "Unable to persist profile JSON, continuing with intent profile", e)
+        }
+        return json
+    }
+
+    private fun sendSnapshot(snapshot: TunnelSnapshot) {
+        Log.d(logTag, "Report daemon snapshot: $snapshot")
+        val intent = Intent(ACTION_SNAPSHOT).apply {
+            setPackage(service.packageName)
+            putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
+        }
+        service.sendBroadcast(intent)
+        latestSnapshot = snapshot
+    }
+
+    private fun sendFinalSnapshot() {
+        latestSnapshot?.let {
+            sendSnapshot(it.disabled())
+        }
+    }
+
+    private suspend fun stopTunnel() {
+        if (!isRunning) { return }
+
+        Log.i(logTag, "Stopping VPN daemon")
+        val result = engine.stop()
+        if (result.code == 0) {
+            Log.i(logTag, "Stopped VPN daemon")
+        } else {
+            Log.e(logTag, "Unable to stop VPN daemon (code=${result.code}): ${result.payload}")
+        }
+        isRunning = false
+        sendFinalSnapshot()
+    }
+
+    private fun stopService() {
+        service.stopSelf()
+    }
+
+    private fun close() {
+        serviceScope.cancel()
+    }
+    //endregion
+
+    //region Messaging
+    @Suppress("UNUSED_PARAMETER")
+    fun onBind(intent: Intent?): IBinder? {
+        return messenger.binder
+    }
+
+    private val messenger = Messenger(
+        object : Handler(Looper.getMainLooper()) {
+            override fun handleMessage(msg: Message) {
+                when (msg.what) {
+                    MSG_GET_STATUS -> {
+                        msg.replyTo?.let { replySnapshot(it) }
+                    }
+                    else -> super.handleMessage(msg)
+                }
+            }
+        }
+    )
+
+    private fun replySnapshot(client: Messenger) {
+        val snapshotJSON = latestSnapshot?.let {
+            json.encodeToString(it)
+        }
+        val bundle = Bundle().apply {
+            snapshotJSON?.let {
+                putString(MSG_KEY_SNAPSHOT, it)
+            }
+        }
+        val msg = Message.obtain(null, MSG_GET_STATUS).apply {
+            data = bundle
+        }
+        client.send(msg)
     }
     //endregion
 
