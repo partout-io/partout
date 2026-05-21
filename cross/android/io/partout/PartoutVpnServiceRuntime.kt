@@ -269,13 +269,12 @@ class PartoutVpnServiceRuntime(
         val snapshotJSON = snapshotEmitter.latest()?.let {
             json.encodeToString(it)
         }
-        val bundle = Bundle().apply {
-            snapshotJSON?.let {
-                putString(MSG_KEY_SNAPSHOT, it)
-            }
-        }
         val msg = Message.obtain(null, MSG_GET_STATUS).apply {
-            data = bundle
+            data = Bundle().apply {
+                snapshotJSON?.let {
+                    putString(MSG_KEY_JSON, it)
+                }
+            }
         }
         try {
             client.send(msg)
@@ -317,7 +316,7 @@ class PartoutVpnServiceRuntime(
         const val EXTRA_SNAPSHOT_JSON = "io.partout.extra.SNAPSHOT_JSON"
 
         const val MSG_GET_STATUS = 1
-        const val MSG_KEY_SNAPSHOT = "snapshot"
+        const val MSG_KEY_JSON = "json"
 
         private val json = Json {
             ignoreUnknownKeys = true
