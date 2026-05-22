@@ -297,7 +297,7 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
 }
 
 JNIEXPORT jstring JNICALL
-Java_io_partout_vpn_JNITunnelController_nativeEnvironmentValue(JNIEnv *env, jobject thiz, jlong delegate, jstring key) {
+Java_io_partout_vpn_JNITunnelController_getNativeEnvironmentValue(JNIEnv *env, jobject thiz, jlong delegate, jstring key) {
     (void)thiz;
     pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
     if (!ctrl_delegate || !ctrl_delegate->ctx) return NULL;
