@@ -47,14 +47,12 @@ const char *pp_tun_name(const pp_tun tun) {
     return NULL;
 }
 
-/* JNI */
+/* JNITunnelcontroller */
 
 typedef struct {
     const char *name;
     const char *signature;
 } kotlin_sig;
-
-/* Tunnel controller (PartoutVpnServiceRuntime) */
 
 static const kotlin_sig sig_ctrl_setDelegate = {
     "setDelegate",
