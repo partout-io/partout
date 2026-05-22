@@ -18,12 +18,15 @@ import kotlinx.serialization.json.Json
 
 // Must match signatures in tun_android.c
 interface TunnelController {
+    // JNI -> Jotlin
     fun setDelegate(delegate: Long): Long
     fun setTunnel(infoJSON: String): Int
     fun configureSockets(fds: IntArray)
-    fun getEnvironmentValue(key: String): String?
     fun onSnapshot(snapshotJSON: String)
     fun cancelTunnel(errorMessage: String?)
+
+    // Kotlin -> JNI
+    fun getEnvironmentValue(key: String): String?
 }
 
 interface TunnelControllerDelegate {
@@ -138,13 +141,6 @@ class JNITunnelController(
         }
     }
 
-    override fun getEnvironmentValue(key: String): String? = synchronized(lock) {
-        Log.d(logTag, "environmentValue($key)")
-        return getNativeEnvironmentValue(nativeDelegate, key)
-    }
-
-    private external fun getNativeEnvironmentValue(delegate: Long, key: String): String?
-
     override fun onSnapshot(snapshotJSON: String) = synchronized(lock) {
         if (isClosed) { return }
         Log.d(logTag, "onSnapshot(${snapshotJSON})")
@@ -165,6 +161,13 @@ class JNITunnelController(
         delegate?.disconnect()
         return@synchronized
     }
+
+    override fun getEnvironmentValue(key: String): String? = synchronized(lock) {
+        Log.d(logTag, "environmentValue($key)")
+        return getNativeEnvironmentValue(nativeDelegate, key)
+    }
+
+    private external fun getNativeEnvironmentValue(delegate: Long, key: String): String?
 
     companion object {
         private val json = Json {
