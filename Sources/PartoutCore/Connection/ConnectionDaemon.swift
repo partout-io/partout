@@ -12,7 +12,5 @@ public protocol ConnectionDaemon: AnyObject, Sendable {
 
     func hold() async
 
-    func environmentData(forKey key: String) async -> Data?
-
     func sendMessage(_ message: Message.Input) async throws -> Message.Output?
 }
