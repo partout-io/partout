@@ -40,7 +40,7 @@ class PartoutVpnServiceRuntime(
     private var isRunning = false
 
     // C/JNI controller
-    private val controller = JNITunnelController(jniLogTag, service, this)
+    private var controller: JNITunnelController? = null
 
     // Deliver snapshots with mutex
     private val snapshotEmitter = SnapshotEmitter(logTag, service)
@@ -113,7 +113,9 @@ class PartoutVpnServiceRuntime(
         isRunning = true
         Log.i(logTag, "Starting VPN daemon")
         try {
-            engine.start(controller, profileJSON)
+            val newController = JNITunnelController(jniLogTag, service, this)
+            engine.start(newController, profileJSON)
+            controller = newController
             Log.i(logTag, "Started VPN daemon")
         } catch (e: Exception) {
             e.throwIfCancellation()
@@ -161,6 +163,7 @@ class PartoutVpnServiceRuntime(
         Log.i(logTag, "Stopping VPN daemon")
         try {
             engine.stop()
+            controller = null
         } catch (e: Exception) {
             Log.e(logTag, "Unable to stop VPN daemon", e)
         }
@@ -301,7 +304,9 @@ class PartoutVpnServiceRuntime(
     }
 
     private fun replyEnvironmentValue(client: Messenger, reqId: Int, name: String) {
-        val value = controller.environmentValue(name)
+        val currentController = controller
+        if (currentController == null) { return }
+        val value = currentController.environmentValue(name)
         Log.i(logTag, "Reply with environment: $name = $value")
         val msg = Message.obtain(null, MSG_GET_ENVIRONMENT).apply {
             arg1 = reqId
