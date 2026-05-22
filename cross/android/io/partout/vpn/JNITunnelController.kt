@@ -18,25 +18,37 @@ import kotlinx.serialization.json.Json
 
 // Must match signatures in tun_android.c
 interface TunnelController {
-    fun testWorking()
+    // JNI -> Jotlin
+    fun setDelegate(delegate: Long): Long
     fun setTunnel(infoJSON: String): Int
     fun configureSockets(fds: IntArray)
     fun onSnapshot(snapshotJSON: String)
     fun cancelTunnel(errorMessage: String?)
+
+    // Kotlin -> JNI
+    fun getEnvironmentValue(key: String): String?
+}
+
+interface TunnelControllerDelegate {
+    fun sendSnapshot(snapshot: TunnelSnapshot)
+    fun disconnect()
 }
 
 class JNITunnelController(
     private val logTag: String,
     private val service: VpnService,
-    private val sendSnapshot: (TunnelSnapshot) -> Unit,
-    private val disconnect: () -> Unit
+    private val delegate: TunnelControllerDelegate
 ): TunnelController {
     private val lock = Any()
     private var descriptor: ParcelFileDescriptor? = null
+    private var nativeDelegate: Long = 0
     private var isClosed = false
 
-    override fun testWorking() {
-        Log.d(logTag, "testWorking()")
+    override fun setDelegate(delegate: Long): Long = synchronized(lock) {
+        Log.d(logTag, "setDelegate($delegate)")
+        val oldDelegate = nativeDelegate
+        nativeDelegate = delegate
+        return oldDelegate
     }
 
     override fun setTunnel(infoJSON: String): Int = synchronized(lock) {
@@ -133,7 +145,8 @@ class JNITunnelController(
         if (isClosed) { return }
         Log.d(logTag, "onSnapshot(${snapshotJSON})")
         val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
-        sendSnapshot(snapshot)
+        delegate?.sendSnapshot(snapshot)
+        return@synchronized
     }
 
     override fun cancelTunnel(errorMessage: String?) = synchronized(lock) {
@@ -145,8 +158,16 @@ class JNITunnelController(
         } else {
             Log.i(logTag, "VPN daemon cancelled")
         }
-        disconnect()
+        delegate?.disconnect()
+        return@synchronized
     }
+
+    override fun getEnvironmentValue(key: String): String? = synchronized(lock) {
+        Log.d(logTag, "environmentValue($key)")
+        return getNativeEnvironmentValue(nativeDelegate, key)
+    }
+
+    private external fun getNativeEnvironmentValue(delegate: Long, key: String): String?
 
     companion object {
         private val json = Json {

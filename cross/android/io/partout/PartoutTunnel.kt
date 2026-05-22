@@ -11,11 +11,13 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.net.VpnService
+import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.Message
 import android.os.Messenger
+import android.os.RemoteException
 import android.util.Log
 import androidx.core.content.ContextCompat
 import io.partout.models.TaggedProfile
@@ -23,15 +25,20 @@ import io.partout.models.TunnelSnapshot
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.json.Json
 import java.io.Closeable
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 class PartoutTunnel(
     private val logTag: String,
     private val context: Context,
     private val vpnServiceClass: Class<out VpnService>,
     private val isForeground: Boolean,
-    private val requestVpnPermission: (Intent) -> Unit,
+    private val requestVpnPermission: (Intent) -> Unit
 ) : Closeable {
     private val appContext = context.applicationContext
     private var pendingPermission: PendingPermission? = null
@@ -48,14 +55,17 @@ class PartoutTunnel(
     private var isBound: Boolean
     private var serviceMessenger: Messenger? = null
 
-    // Initialization
+    // Async messaging
+    private val nextRequestId = AtomicInteger(1)
+    private val pendingRequests = ConcurrentHashMap<Int, kotlinx.coroutines.CancellableContinuation<String?>>()
 
+    //region Initialization
     init {
         clientMessenger = Messenger(object : Handler(Looper.getMainLooper()) {
             override fun handleMessage(msg: Message) {
                 when (msg.what) {
-                    PartoutVpnServiceRuntime.MSG_GET_STATUS  -> {
-                        val snapshotJSON = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_SNAPSHOT)
+                    PartoutVpnServiceRuntime.MSG_GET_STATUS -> {
+                        val snapshotJSON = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_JSON)
                         if (snapshotJSON == null) {
                             _state.update {
                                 it.copy(emptyMap())
@@ -63,6 +73,15 @@ class PartoutTunnel(
                             return
                         }
                         onSnapshotJSON(snapshotJSON)
+                    }
+                    PartoutVpnServiceRuntime.MSG_GET_ENVIRONMENT -> {
+                        val key = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_ENV_NAME)
+                        val valueJSON = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_JSON)
+                        if (key == null) { return }
+
+                        // Invoke continuation
+                        val reqId = msg.arg1
+                        pendingRequests.remove(reqId)?.resume(valueJSON)
                     }
                     else -> super.handleMessage(msg)
                 }
@@ -76,7 +95,6 @@ class PartoutTunnel(
             override fun onServiceConnected(name: ComponentName, service: IBinder) {
                 serviceMessenger = Messenger(service)
                 service.linkToDeath(deathRecipient, 0)
-
                 // Ask the service for its current snapshot
                 requestSnapshot()
             }
@@ -121,17 +139,19 @@ class PartoutTunnel(
     }
 
     override fun close() {
-        appContext.unregisterReceiver(snapshotsReceiver)
-        serviceMessenger?.binder?.unlinkToDeath(deathRecipient, 0)
+        val oldServiceMessenger = serviceMessenger
         serviceMessenger = null
+        failPendingRequests()
+        appContext.unregisterReceiver(snapshotsReceiver)
+        oldServiceMessenger?.binder?.unlinkToDeath(deathRecipient, 0)
         if (isBound) {
             appContext.unbindService(connection)
             isBound = false
         }
     }
+    //endregion
 
-    // Actions
-
+    //region Actions
     fun onVpnPermissionResult(granted: Boolean) {
         val permission = pendingPermission ?: return
         pendingPermission = null
@@ -161,9 +181,9 @@ class PartoutTunnel(
         stopVpnService(profileId)
         completion(ERROR_NONE)
     }
+    //endregion
 
-    // Messaging
-
+    //region Messaging
     fun requestSnapshot() {
         val msg = Message.obtain(null, PartoutVpnServiceRuntime.MSG_GET_STATUS).apply {
             replyTo = clientMessenger
@@ -171,14 +191,51 @@ class PartoutTunnel(
         serviceMessenger?.send(msg)
     }
 
+    suspend fun requestEnvironmentValue(name: String): String? =
+        suspendCancellableCoroutine { continuation ->
+            val reqId = nextRequestId.getAndIncrement()
+            pendingRequests[reqId] = continuation
+            continuation.invokeOnCancellation {
+                pendingRequests.remove(reqId)
+            }
+            val msg = Message.obtain(null, PartoutVpnServiceRuntime.MSG_GET_ENVIRONMENT).apply {
+                replyTo = clientMessenger
+                arg1 = reqId
+                data = Bundle().apply {
+                    putString(PartoutVpnServiceRuntime.MSG_KEY_ENV_NAME, name)
+                }
+            }
+            val messenger = serviceMessenger
+            if (messenger == null) {
+                pendingRequests.remove(reqId)?.resumeWithException(RemoteException())
+                return@suspendCancellableCoroutine
+            }
+            try {
+                messenger.send(msg)
+            } catch (e: Exception) {
+                pendingRequests.remove(reqId)?.resumeWithException(e)
+            }
+        }
+
     private fun onServiceDead() {
+        failPendingRequests()
         _state.update {
             it.copy(emptyMap())
         }
     }
 
-    // Internals
+    private fun failPendingRequests() {
+        pendingRequests.entries
+            .map { it.key to it.value }
+            .forEach { (reqId, continuation) ->
+                if (pendingRequests.remove(reqId, continuation)) {
+                    continuation.resumeWithException(RemoteException())
+                }
+            }
+    }
+    //endregion
 
+    //region Internals
     private fun startVpnService(profile: TaggedProfile) {
         val startIntent = Intent(appContext, vpnServiceClass).apply {
             putExtra(PartoutVpnServiceRuntime.EXTRA_PROFILE_JSON, json.encodeToString(profile))
@@ -216,6 +273,7 @@ class PartoutTunnel(
             Log.e(logTag, ">>> Unable to decode snapshot: ${0}")
         }
     }
+    //endregion
 
     companion object {
         const val ERROR_NONE = 0
