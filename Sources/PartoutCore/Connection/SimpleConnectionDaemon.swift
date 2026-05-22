@@ -318,22 +318,22 @@ extension SimpleConnectionDaemon {
         snapshotSubscription?.cancel()
         snapshotSubscription = Task { [weak self] in
             guard let profileId = self?.profile.id else { return }
-            pp_log_id(profileId, .core, .debug, "OnStatus subscription started")
+            pp_log_id(profileId, .core, .debug, "Snapshot subscription started")
             while true {
                 guard let self else { return }
                 guard !Task.isCancelled else {
-                    pp_log_id(profileId, .core, .debug, "Cancelled OnStatus timer")
+                    pp_log_id(profileId, .core, .debug, "Cancelled snapshot timer")
                     break
                 }
                 await publishSnapshot()
                 do {
                     try await Task.sleep(for: .milliseconds(snapshotInterval))
                 } catch {
-                    pp_log_id(profileId, .core, .debug, "Interrupted OnStatus timer")
+                    pp_log_id(profileId, .core, .debug, "Interrupted snapshot timer")
                     break
                 }
             }
-            pp_log_id(profileId, .core, .debug, "OnStatus subscription terminated")
+            pp_log_id(profileId, .core, .debug, "Snapshot subscription terminated")
         }
 
         // Start monitoring
