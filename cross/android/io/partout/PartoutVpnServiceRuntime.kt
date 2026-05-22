@@ -304,9 +304,7 @@ class PartoutVpnServiceRuntime(
     }
 
     private fun replyEnvironmentValue(client: Messenger, reqId: Int, name: String) {
-        val currentController = controller
-        if (currentController == null) { return }
-        val value = currentController.getEnvironmentValue(name)
+        val value = controller?.getEnvironmentValue(name)
         Log.i(logTag, "Reply with environment: $name = $value")
         val msg = Message.obtain(null, MSG_GET_ENVIRONMENT).apply {
             arg1 = reqId
