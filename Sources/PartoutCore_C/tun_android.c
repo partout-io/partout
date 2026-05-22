@@ -56,9 +56,9 @@ typedef struct {
 
 /* Tunnel controller (PartoutVpnServiceRuntime) */
 
-static const kotlin_sig sig_ctrl_testWorking = {
-    "testWorking",
-    "()V"
+static const kotlin_sig sig_ctrl_setDelegate = {
+    "setDelegate",
+    "(J)J"
 };
 static const kotlin_sig sig_ctrl_setTunnel = {
     "setTunnel",
@@ -77,27 +77,44 @@ static const kotlin_sig sig_ctrl_cancelTunnel = {
     "(Ljava/lang/String;)V"
 };
 
-void pp_tun_ctrl_test_working(void *jni_ref) {
+void pp_tun_ctrl_set_delegate(void *jni_ref, const pp_tun_ctrl_delegate *delegate) {
     assert(jni_ref);
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_test_working(%p)", jni_ref);
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_set_delegate(%p, %p)", jni_ref, delegate);
 
     PP_JNI_ATTACH_OR_RETURN_VOID(env);
 
+    pp_tun_ctrl_delegate *new_delegate = NULL;
+    jlong old_delegate = 0;
+    if (delegate) {
+        new_delegate = pp_alloc(sizeof(*new_delegate));
+        *new_delegate = *delegate;
+    }
+
     jclass cls = NULL;
     jmethodID method = NULL;
+
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_test_working(), NULL cls");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_set_delegate(), NULL cls");
         goto cleanup;
     }
-    method = (*env)->GetMethodID(env, cls, sig_ctrl_testWorking.name, sig_ctrl_testWorking.signature);
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_setDelegate.name, sig_ctrl_setDelegate.signature);
     if (method == NULL) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_test_working(), NULL method");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_set_delegate(), NULL method");
         goto cleanup;
     }
-    (*env)->CallVoidMethod(env, jni_ref, method);
+    old_delegate = (*env)->CallLongMethod(env, jni_ref, method, (jlong)(intptr_t)new_delegate);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_set_delegate(), Kotlin exception");
+        goto cleanup;
+    }
+    pp_free((void *)(intptr_t)old_delegate);
+    new_delegate = NULL;
 
 cleanup:
+    pp_free(new_delegate);
     if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
     PP_JNI_DETACH(env);
 }
@@ -279,22 +296,13 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
     free(tun_impl);
 }
 
-static pp_tun_ctrl_delegate ctrl_delegate;
-
-void pp_tun_ctrl_set_delegate(void *jni_ref, const pp_tun_ctrl_delegate *delegate) {
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_set_delegate(%p)", jni_ref);
-    if (!delegate) {
-        ctrl_delegate.ctx = NULL;
-        return;
-    }
-    ctrl_delegate = *delegate;
-}
-
 JNIEXPORT jstring JNICALL
-Java_io_partout_vpn_JNITunnelController_jniEnvironmentValue(JNIEnv *env, jobject thiz, jstring key) {
-    if (!ctrl_delegate.ctx) return NULL;
+Java_io_partout_vpn_JNITunnelController_nativeEnvironmentValue(JNIEnv *env, jobject thiz, jlong delegate, jstring key) {
+    (void)thiz;
+    pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
+    if (!ctrl_delegate || !ctrl_delegate->ctx) return NULL;
     const char *c_key = (*env)->GetStringUTFChars(env, key, NULL);
-    char *c_value = ctrl_delegate.environment_value(ctrl_delegate.ctx, c_key);
+    char *c_value = ctrl_delegate->environment_value(ctrl_delegate->ctx, c_key);
     (*env)->ReleaseStringUTFChars(env, key, c_key);
     if (!c_value) return NULL;
     jstring value = (*env)->NewStringUTF(env, c_value);

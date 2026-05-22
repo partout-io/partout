@@ -213,6 +213,12 @@ const char *pp_tun_name(const pp_tun tun) {
     return NULL;
 }
 
+void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
+    (void)ref;
+    (void)delegate;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_windows: ctrl_set_delegate(%p, %p)", ref, delegate);
+}
+
 pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
     (void)ref;
     (void)uuid;
@@ -246,9 +252,4 @@ void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_message) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_cancel_tunnel(%p)", ref);
 }
 
-void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
-    (void)ref;
-    (void)delegate;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_windows: ctrl_set_delegate(%p, %p)", ref, delegate);
-}
 #endif

@@ -34,8 +34,6 @@ public final class NativeTunnelController: TunnelController {
         self.environment = environment
         self.maxReadLength = maxReadLength
 
-        pp_tun_ctrl_test_working(self.ref)
-
         var delegate = pp_tun_ctrl_delegate(
             ctx: Unmanaged.passUnretained(self).toOpaque(),
             environment_value: { ctx, key in

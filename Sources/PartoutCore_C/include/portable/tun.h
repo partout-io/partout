@@ -25,7 +25,12 @@ int pp_tun_fd(const pp_tun _Nonnull tun);
 const char *_Nullable pp_tun_name(const pp_tun _Nonnull tun);
 
 /* Tunnel controller. */
-void pp_tun_ctrl_test_working(void *_Nullable ref);
+typedef struct {
+    void *_Nullable ctx;
+    char *_Nullable (*_Nonnull environment_value)(void *_Nonnull ctx, const char *_Nonnull key);
+} pp_tun_ctrl_delegate;
+void pp_tun_ctrl_set_delegate(void *_Nullable ref,
+                              const pp_tun_ctrl_delegate *_Nullable delegate);
 pp_tun _Nullable pp_tun_ctrl_set_tunnel(void *_Nullable ref,
                                         const char *_Nonnull uuid,
                                         const char *_Nullable info_json);
@@ -38,10 +43,3 @@ void pp_tun_ctrl_clear_tunnel(void *_Nullable ref,
                               pp_tun _Nullable tun_impl);
 void pp_tun_ctrl_cancel_tunnel(void *_Nullable ref,
                                const char *_Nullable error_message);
-
-typedef struct {
-    void *_Nullable ctx;
-    char *_Nullable (*_Nonnull environment_value)(void *_Nonnull ctx, const char *_Nonnull key);
-} pp_tun_ctrl_delegate;
-void pp_tun_ctrl_set_delegate(void *_Nullable ref,
-                              const pp_tun_ctrl_delegate *_Nullable delegate);
