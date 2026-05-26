@@ -114,7 +114,7 @@ class PartoutVpnServiceRuntime(
         Log.i(logTag, "Starting VPN daemon")
         try {
             val newController = JNITunnelController(jniLogTag, service, this)
-            engine.start(newController, profileJSON)
+            engine.start(intent, newController, profileJSON)
             controller = newController
             Log.i(logTag, "Started VPN daemon")
         } catch (e: Exception) {
@@ -323,7 +323,7 @@ class PartoutVpnServiceRuntime(
 
     //region Engine
     interface Engine {
-        suspend fun start(controller: JNITunnelController, profileJSON: String)
+        suspend fun start(intent: Intent?, controller: JNITunnelController, profileJSON: String)
         suspend fun stop()
         suspend fun readLastProfile(): String
         suspend fun writeLastProfile(json: String)

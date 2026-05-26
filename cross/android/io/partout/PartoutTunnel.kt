@@ -159,19 +159,19 @@ class PartoutTunnel(
             permission.completion(ERROR_PERMISSION_DENIED)
             return
         }
-        startVpnService(permission.profile)
+        startVpnService(permission.profile, permission.onIntent)
         permission.completion(ERROR_NONE)
     }
 
-    fun connect(profile: TaggedProfile, completion: (Int) -> Unit) {
+    fun connect(profile: TaggedProfile, onIntent: (Intent) -> Unit = { _ -> }, completion: (Int) -> Unit) {
         val permissionIntent = VpnService.prepare(appContext)
         if (permissionIntent != null) {
             pendingPermission?.completion?.invoke(ERROR_PERMISSION_DENIED)
-            pendingPermission = PendingPermission(profile, completion)
+            pendingPermission = PendingPermission(profile, onIntent, completion)
             requestVpnPermission(permissionIntent)
             return
         }
-        startVpnService(profile)
+        startVpnService(profile, onIntent)
         completion(ERROR_NONE)
     }
 
@@ -236,9 +236,10 @@ class PartoutTunnel(
     //endregion
 
     //region Internals
-    private fun startVpnService(profile: TaggedProfile) {
+    private fun startVpnService(profile: TaggedProfile, onIntent: (Intent) -> Unit) {
         val startIntent = Intent(appContext, vpnServiceClass).apply {
             putExtra(PartoutVpnServiceRuntime.EXTRA_PROFILE_JSON, json.encodeToString(profile))
+            onIntent(this)
         }
         if (isForeground) {
             ContextCompat.startForegroundService(context, startIntent)
@@ -290,6 +291,7 @@ class PartoutTunnel(
 
     private data class PendingPermission(
         val profile: TaggedProfile,
+        val onIntent: (Intent) -> Unit,
         val completion: (Int) -> Unit
     )
 }
