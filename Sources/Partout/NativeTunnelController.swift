@@ -11,11 +11,14 @@ public final class NativeTunnelController: TunnelController {
     nonisolated(unsafe)
     private let ref: UnsafeMutableRawPointer?
 
+    private let environment: TunnelEnvironmentReader
+
     private let maxReadLength: Int
 
     public init(
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
+        environment: TunnelEnvironmentReader,
         maxReadLength: Int = 128 * 1024
     ) throws {
         self.ctx = ctx
@@ -28,12 +31,25 @@ public final class NativeTunnelController: TunnelController {
 #else
         self.ref = ref
 #endif
+        self.environment = environment
         self.maxReadLength = maxReadLength
 
-        pp_tun_ctrl_test_working(self.ref)
+        var delegate = pp_tun_ctrl_delegate(
+            ctx: Unmanaged.passUnretained(self).toOpaque(),
+            environment_value: { ctx, key in
+                let swift = Unmanaged<NativeTunnelController>.fromOpaque(ctx).takeUnretainedValue()
+                guard let data = swift.environmentData(forKey: String(cString: key)),
+                      let json = String(data: data, encoding: .utf8) else {
+                    return nil
+                }
+                return pp_dup(json)
+            }
+        )
+        pp_tun_ctrl_set_delegate(self.ref, &delegate)
     }
 
     deinit {
+        pp_tun_ctrl_set_delegate(ref, nil)
         pp_log(ctx, .core, .debug, "Deinit NativeTunnelController")
 #if os(Android)
         pp_log(ctx, .core, .debug, "NativeTunnelController: Release JNI ref")
@@ -87,6 +103,11 @@ public final class NativeTunnelController: TunnelController {
         }
     }
 
+    public func environmentData(forKey key: String) -> Data? {
+        pp_log(ctx, .core, .debug, "Get tunnel environment: \(key)")
+        return environment.environmentData(forKey: key)
+    }
+
     public func clearTunnelSettings(_ io: IOInterface, withKillSwitch: Bool) async {
         guard let tunnel = io as? VirtualTunnelInterface else {
             assertionFailure("Expected type is VirtualTunnelInterface")
@@ -113,25 +134,14 @@ public final class NativeTunnelController: TunnelController {
             pp_tun_ctrl_cancel_tunnel(ref, nil)
             return
         }
-        // FIXME: ###, Use PartoutError.Code
+        // FIXME: #419, Use PartoutError.Code
         String(describing: error).withCString {
             pp_tun_ctrl_cancel_tunnel(ref, $0)
         }
     }
 }
 
-final class DummyTunnelInterface: IOInterface {
-    var fileDescriptor: UInt64? {
-        nil
-    }
-
-    func readPackets() async throws -> [Data] {
-        []
-    }
-
-    func writePackets(_ packets: [Data]) async throws {
-    }
-}
+// MARK: - Helpers
 
 struct TunnelRemoteInfoWrapper: Encodable, Sendable {
     let originalModuleId: UniqueID
@@ -150,5 +160,18 @@ struct TunnelRemoteInfoWrapper: Encodable, Sendable {
         fileDescriptors = info.fileDescriptors
         requiresVirtualDevice = info.requiresVirtualDevice
         modules = info.modules?.compactMap(\.taggedModule)
+    }
+}
+
+final class DummyTunnelInterface: IOInterface {
+    var fileDescriptor: UInt64? {
+        nil
+    }
+
+    func readPackets() async throws -> [Data] {
+        []
+    }
+
+    func writePackets(_ packets: [Data]) async throws {
     }
 }

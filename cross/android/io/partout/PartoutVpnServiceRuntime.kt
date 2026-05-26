@@ -16,6 +16,8 @@ import android.os.Messenger
 import android.util.Log
 import io.partout.models.TaggedProfile
 import io.partout.models.TunnelSnapshot
+import io.partout.vpn.JNITunnelController
+import io.partout.vpn.TunnelControllerDelegate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,13 +30,17 @@ import kotlinx.serialization.json.Json
 
 class PartoutVpnServiceRuntime(
     private val logTag: String,
+    private val jniLogTag: String,
     val service: VpnService,
     private val engine: Engine
-) {
+): TunnelControllerDelegate {
     // Execute actions in serial queue
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandQueue = Channel<suspend () -> Unit>(Channel.UNLIMITED)
     private var isRunning = false
+
+    // C/JNI controller
+    private var controller: JNITunnelController? = null
 
     // Deliver snapshots with mutex
     private val snapshotEmitter = SnapshotEmitter(logTag, service)
@@ -107,7 +113,9 @@ class PartoutVpnServiceRuntime(
         isRunning = true
         Log.i(logTag, "Starting VPN daemon")
         try {
-            engine.start(this, profileJSON)
+            val newController = JNITunnelController(jniLogTag, service, this)
+            engine.start(intent, newController, profileJSON)
+            controller = newController
             Log.i(logTag, "Started VPN daemon")
         } catch (e: Exception) {
             e.throwIfCancellation()
@@ -119,11 +127,11 @@ class PartoutVpnServiceRuntime(
         }
     }
 
-    fun sendSnapshot(snapshot: TunnelSnapshot) {
+    override fun sendSnapshot(snapshot: TunnelSnapshot) {
         snapshotEmitter.emit(snapshot)
     }
 
-    fun disconnect() = launchCommand {
+    override fun disconnect() = launchCommand {
         stopTunnel()
         stopService()
     }
@@ -152,10 +160,10 @@ class PartoutVpnServiceRuntime(
 
     private suspend fun stopTunnel() {
         if (!isRunning) { return }
-
         Log.i(logTag, "Stopping VPN daemon")
         try {
             engine.stop()
+            controller = null
         } catch (e: Exception) {
             Log.e(logTag, "Unable to stop VPN daemon", e)
         }
@@ -258,6 +266,19 @@ class PartoutVpnServiceRuntime(
                             }
                         }
                     }
+                    MSG_GET_ENVIRONMENT -> {
+                        val reqId = msg.arg1
+                        val name = msg.data?.getString(MSG_KEY_ENV_NAME)
+                        if (name == null) {
+                            assert(false)
+                            return
+                        }
+                        msg.replyTo?.let { client ->
+                            launchCommand {
+                                replyEnvironmentValue(client, reqId, name)
+                            }
+                        }
+                    }
                     else -> super.handleMessage(msg)
                 }
             }
@@ -268,13 +289,12 @@ class PartoutVpnServiceRuntime(
         val snapshotJSON = snapshotEmitter.latest()?.let {
             json.encodeToString(it)
         }
-        val bundle = Bundle().apply {
-            snapshotJSON?.let {
-                putString(MSG_KEY_SNAPSHOT, it)
-            }
-        }
         val msg = Message.obtain(null, MSG_GET_STATUS).apply {
-            data = bundle
+            data = Bundle().apply {
+                snapshotJSON?.let {
+                    putString(MSG_KEY_JSON, it)
+                }
+            }
         }
         try {
             client.send(msg)
@@ -282,11 +302,28 @@ class PartoutVpnServiceRuntime(
             Log.w(logTag, "Unable to reply with VPN snapshot", e)
         }
     }
+
+    private fun replyEnvironmentValue(client: Messenger, reqId: Int, name: String) {
+        val value = controller?.getEnvironmentValue(name)
+        Log.i(logTag, "Reply with environment: $name = $value")
+        val msg = Message.obtain(null, MSG_GET_ENVIRONMENT).apply {
+            arg1 = reqId
+            data = Bundle().apply {
+                putString(MSG_KEY_ENV_NAME, name)
+                putString(MSG_KEY_JSON, value)
+            }
+        }
+        try {
+            client.send(msg)
+        } catch (e: Exception) {
+            Log.w(logTag, "Unable to reply with environment value", e)
+        }
+    }
     //endregion
 
     //region Engine
     interface Engine {
-        suspend fun start(runtime: PartoutVpnServiceRuntime, profileJSON: String)
+        suspend fun start(intent: Intent?, controller: JNITunnelController, profileJSON: String)
         suspend fun stop()
         suspend fun readLastProfile(): String
         suspend fun writeLastProfile(json: String)
@@ -316,7 +353,9 @@ class PartoutVpnServiceRuntime(
         const val EXTRA_SNAPSHOT_JSON = "io.partout.extra.SNAPSHOT_JSON"
 
         const val MSG_GET_STATUS = 1
-        const val MSG_KEY_SNAPSHOT = "snapshot"
+        const val MSG_GET_ENVIRONMENT = 2
+        const val MSG_KEY_JSON = "json"
+        const val MSG_KEY_ENV_NAME = "envName"
 
         private val json = Json {
             ignoreUnknownKeys = true

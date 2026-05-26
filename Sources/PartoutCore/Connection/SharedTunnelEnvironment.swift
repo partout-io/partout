@@ -16,6 +16,12 @@ public final class SharedTunnelEnvironment: TunnelEnvironment, @unchecked Sendab
         self.values = values
     }
 
+    public func environmentData(forKey key: String) -> Data? {
+        queue.sync {
+            values[key]
+        }
+    }
+
     public func setEnvironmentValue<T>(_ value: T, forKey key: TunnelEnvironmentKey<T>) where T: Encodable {
         queue.sync {
             do {
