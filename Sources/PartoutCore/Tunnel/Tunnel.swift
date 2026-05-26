@@ -59,8 +59,8 @@ extension Tunnel: TunnelStrategy {
         try await strategy.prepare(purge: purge)
     }
 
-    public func install(_ preProfile: Profile, connect: Bool, options: Sendable?) async throws {
-        guard !preProfile.activeModulesIds.isEmpty else {
+    public func install(_ profile: Profile, connect: Bool, options: Sendable?) async throws {
+        guard !profile.activeModulesIds.isEmpty else {
             throw PartoutError(.noActiveModules)
         }
         if let pendingInstall, !pendingInstall.isCancelled {
@@ -68,22 +68,22 @@ extension Tunnel: TunnelStrategy {
             try? await pendingInstall.value
         }
         guard !Task.isCancelled else {
-            pp_log(ctx, .core, .info, "Cancelled installation of profile \(preProfile.id)")
+            pp_log(ctx, .core, .info, "Cancelled installation of profile \(profile.id)")
             return
         }
         // Optionally pre-process profile
-        let profile: Profile
+        let postProfile: Profile
         if let willInstall {
-            pp_log(ctx, .core, .info, "Pre-process profile \(preProfile.id) before installing")
-            profile = try await willInstall(preProfile)
+            pp_log(ctx, .core, .info, "Pre-process profile \(profile.id) before installing")
+            postProfile = try await willInstall(profile)
         } else {
-            profile = preProfile
+            postProfile = profile
         }
         pendingInstall = Task {
-            pp_log(ctx, .core, .info, "Install profile \(profile.id)...")
-            try await strategy.install(profile, connect: connect, options: options)
+            pp_log(ctx, .core, .info, "Install profile \(postProfile.id)...")
+            try await strategy.install(postProfile, connect: connect, options: options)
             guard !Task.isCancelled else {
-                pp_log(ctx, .core, .info, "Cancelled installation of profile \(profile.id)")
+                pp_log(ctx, .core, .info, "Cancelled installation of profile \(postProfile.id)")
                 return
             }
         }
