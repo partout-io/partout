@@ -23,7 +23,7 @@ interface TunnelController {
     fun setTunnel(infoJSON: String): Int
     fun configureSockets(fds: IntArray)
     fun onSnapshot(snapshotJSON: String)
-    fun cancelTunnel(errorMessage: String?)
+    fun cancelTunnel(errorCode: String?)
 
     // Kotlin -> JNI
     fun getEnvironmentValue(key: String): String?
@@ -143,12 +143,12 @@ class JNITunnelController(
         return@synchronized
     }
 
-    override fun cancelTunnel(errorMessage: String?) = synchronized(lock) {
+    override fun cancelTunnel(errorCode: String?) = synchronized(lock) {
         if (isClosed) { return }
         isClosed = true
         Log.d(logTag, "cancelTunnel()")
-        if (errorMessage != null) {
-            Log.e(logTag, "VPN daemon cancelled: $errorMessage")
+        if (errorCode != null) {
+            Log.e(logTag, "VPN daemon cancelled: $errorCode")
         } else {
             Log.i(logTag, "VPN daemon cancelled")
         }
