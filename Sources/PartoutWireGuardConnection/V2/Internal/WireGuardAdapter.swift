@@ -57,16 +57,10 @@ actor WireGuardAdapter {
     /// Adapter state.
     private var state: WireGuardAdapterState = .stopped
 
-    private var socketDescriptors: [Int32] {
-        guard case .started(let handle, _) = state else { return [] }
-        return backend.socketDescriptors(handle)
-    }
-
     /// Tunnel device file descriptor.
     private var tunnelFileDescriptor: Int32? {
         didSet {
             logHandler(.verbose, "Tunnel file descriptor: \(tunnelFileDescriptor.debugDescription)")
-            logHandler(.verbose, "Socket file descriptors: \(socketDescriptors)")
         }
     }
 
