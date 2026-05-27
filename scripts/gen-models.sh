@@ -2,11 +2,11 @@
 set -e
 
 usage() {
-    echo "Usage: $0 <openapi> <language:kotlin|cpp> <models_dir> <package_name>"
+    echo "Usage: $0 <openapi> <language:kotlin|cpp> <models_dir> <package_name> [extra_imports]"
     exit 1
 }
 
-if [ "$#" -ne 4 ]; then
+if [ "$#" -lt 4 ]; then
     usage
 fi
 
@@ -14,10 +14,27 @@ infile=$1
 language=$2
 models_dir=$3
 package_name=$4
+extra_imports=$5
 
 # First, update the OpenAPI metadata
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 $script_dir/gen-api.sh
+
+extra_imports_opts=()
+if [[ -n "$extra_imports" ]]; then
+    IFS=',' read -ra extra_import_names <<< "$extra_imports"
+    for name in "${extra_import_names[@]}"; do
+        name="${name#"${name%%[![:space:]]*}"}"
+        name="${name%"${name##*[![:space:]]}"}"
+
+        if [[ -n "$name" ]]; then
+            extra_imports_opts+=(
+                --import-mappings "$name=io.partout.models.$name"
+                --schema-mappings "$name=$name"
+            )
+        fi
+    done
+fi
 
 case $language in
     kotlin)
@@ -34,6 +51,7 @@ case $language in
             --additional-properties=packageName=$package_name \
             --additional-properties=modelPackage=$package_name \
             --schema-mappings OpenVPN.CryptoContainer=kotlin.String \
+            "${extra_imports_opts[@]}"
         ;;
     cpp)
         echo "cpp language is not implemented yet; exiting."
