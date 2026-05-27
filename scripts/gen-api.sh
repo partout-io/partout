@@ -1,5 +1,6 @@
 #!/bin/bash
+cwd=`dirname $0`
 swift run codegen \
-    --manifest scripts/manifest.yaml \
+    --manifest $cwd/manifest.yaml \
     --aliases SecureData:string,UniqueID:string \
-    >scripts/openapi.yaml
+    >$cwd/openapi.yaml
