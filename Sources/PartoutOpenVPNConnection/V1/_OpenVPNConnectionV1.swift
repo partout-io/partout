@@ -199,10 +199,10 @@ extension _OpenVPNConnectionV1: OpenVPNSessionDelegate {
                 with: TunnelRemoteInfo(
                     originalModuleId: moduleId,
                     address: addressObject,
-                    modules: builder.modules(),
-                    fileDescriptors: remoteFd.map { [$0] } ?? []
+                    modules: builder.modules()
                 )
             )
+            controller.configureSockets(with: remoteFd.map { [$0] } ?? [])
             await session.setTunnel(tunnelInterface)
             self.tunnelInterface = tunnelInterface
 

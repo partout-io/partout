@@ -119,7 +119,7 @@ final class TunnelRemoteInfoGenerator: Sendable {
         return wgSettings
     }
 
-    func generateRemoteInfo(moduleId: UniqueID, descriptors: [Int32]) -> TunnelRemoteInfo {
+    func generateRemoteInfo(moduleId: UniqueID) -> TunnelRemoteInfo {
         /* iOS requires a tunnel endpoint, whereas in WireGuard it's valid for
          * a tunnel to have no endpoint, or for there to be many endpoints, in
          * which case, displaying a single one in settings doesn't really
@@ -170,7 +170,6 @@ final class TunnelRemoteInfoGenerator: Sendable {
             originalModuleId: moduleId,
             address: remoteAddress,
             modules: modules,
-            fileDescriptors: descriptors.map(UInt64.init),
             requiresVirtualDevice: requiresVirtualDevice
         )
     }

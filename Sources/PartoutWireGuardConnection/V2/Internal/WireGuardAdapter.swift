@@ -140,9 +140,7 @@ actor WireGuardAdapter {
             let settingsGenerator = makeSettingsGenerator(with: tunnelConfiguration)
             let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
             try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
-                moduleId: moduleId,
-                // FIXME: #407, These are always empty at this stage
-                descriptors: socketDescriptors
+                moduleId: moduleId
             ))
             let handle = try startWireGuardBackend(wgConfig: wgConfig)
             state = .started(handle, settingsGenerator)
@@ -301,8 +299,7 @@ actor WireGuardAdapter {
                 await settingsGenerator.resetResolvedEndpoints()
                 let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
                 try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
-                    moduleId: moduleId,
-                    descriptors: socketDescriptors
+                    moduleId: moduleId
                 ))
                 let handle = try startWireGuardBackend(wgConfig: wgConfig)
                 state = .started(handle, settingsGenerator)
