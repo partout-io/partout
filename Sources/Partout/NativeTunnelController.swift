@@ -134,8 +134,7 @@ public final class NativeTunnelController: TunnelController {
             pp_tun_ctrl_cancel_tunnel(ref, nil)
             return
         }
-        // FIXME: #419, Use PartoutError.Code
-        String(describing: error).withCString {
+        error.partoutErrorCode.rawValue.withCString {
             pp_tun_ctrl_cancel_tunnel(ref, $0)
         }
     }
