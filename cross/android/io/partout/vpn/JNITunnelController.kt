@@ -66,7 +66,6 @@ class JNITunnelController(
             Log.e(logTag, "Unable to decode tunnel info JSON", e)
             return -1
         }
-        val remoteFds = info.fileDescriptors
         var appliedAddressSettings = false
         var appliedDnsSettings = false
 
@@ -103,14 +102,6 @@ class JNITunnelController(
             return -1
         }
 
-        remoteFds.forEach {
-            require(it in 0..Int.MAX_VALUE.toLong()) {
-                "Invalid Android file descriptor: $it"
-            }
-            val protected = service.protect(it.toInt())
-            Log.d(logTag, "protect($it) = $protected")
-        }
-
         // IMPORTANT: this is a requirement for VirtualTunnelInterface.
         // By default, establish() returns a non-blocking descriptor.
         builder.setBlocking(true)
@@ -136,7 +127,10 @@ class JNITunnelController(
         if (isClosed) { return }
         Log.d(logTag, "configureSockets(${fds.toList()})")
         fds.forEach {
-            val protected = service.protect(it)
+            require(it in 0..Int.MAX_VALUE.toLong()) {
+                "Invalid Android file descriptor: $it"
+            }
+            val protected = service.protect(it.toInt())
             Log.d(logTag, "protect($it) = $protected")
         }
     }
