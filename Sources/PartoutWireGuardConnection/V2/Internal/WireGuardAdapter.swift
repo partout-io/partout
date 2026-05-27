@@ -243,17 +243,19 @@ actor WireGuardAdapter {
 #if os(iOS)
         backend.disableSomeRoamingForBrokenMobileSemantics(handle)
 #endif
-        // FIXME: #407, Socket descriptors require handle, which only exists after backend.turnOn. How do start() and .temporaryShutdown use socketDescriptors? They are empty, always empty on start()
-        let socketFds = {
-            var rawFds = backend.socketDescriptors(handle)
-            if rawFds.isEmpty {
-                rawFds = fallbackFileDescriptor.map { [$0] } ?? []
-            }
-            return rawFds
-        }()
-        pp_log(ctx, .wireguard, .info, "Socket descriptors: \(socketFds)")
-        delegate?.adapterShouldConfigureSockets(self, descriptors: socketFds.map(UInt64.init))
+        configureSockets(for: handle)
         return handle
+    }
+
+    @discardableResult
+    private func configureSockets(for handle: Int32) -> [UInt64] {
+        let descriptors = backend.socketDescriptors(handle)
+            .filter { $0 >= 0 }
+            .map { UInt64($0) }
+        pp_log(ctx, .wireguard, .info, "Socket descriptors: \(descriptors)")
+        guard !descriptors.isEmpty else { return [] }
+        delegate?.adapterShouldConfigureSockets(self, descriptors: descriptors)
+        return descriptors
     }
 
     /// Resolves the hostnames in the given tunnel configuration and return settings generator.
