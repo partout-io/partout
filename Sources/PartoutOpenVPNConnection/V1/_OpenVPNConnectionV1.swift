@@ -195,6 +195,7 @@ extension _OpenVPNConnectionV1: OpenVPNSessionDelegate {
         )
         builder.print()
         do {
+            controller.configureSockets(with: remoteFd.map { [$0] } ?? [])
             let tunnelInterface = try await controller.setTunnelSettings(
                 with: TunnelRemoteInfo(
                     originalModuleId: moduleId,
@@ -202,7 +203,6 @@ extension _OpenVPNConnectionV1: OpenVPNSessionDelegate {
                     modules: builder.modules()
                 )
             )
-            controller.configureSockets(with: remoteFd.map { [$0] } ?? [])
             await session.setTunnel(tunnelInterface)
             self.tunnelInterface = tunnelInterface
 
