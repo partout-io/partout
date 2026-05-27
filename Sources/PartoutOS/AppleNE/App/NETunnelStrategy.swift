@@ -72,7 +72,9 @@ extension NETunnelStrategy: TunnelObservableStrategy {
     public func prepare(purge: Bool) async throws {
         try await reloadAllManagers()
         if purge {
-            await coder.purge(managers: Array(allManagers.values))
+            var managers = Array(allManagers.values)
+            let profiles = await coder.purge(managers: managers)
+            await restoreProfiles(profiles, into: &managers)
         }
     }
 
@@ -152,12 +154,14 @@ extension NETunnelStrategy: TunnelObservableStrategy {
 extension NETunnelStrategy: NETunnelManagerRepository {
     public func fetch() async throws -> [NETunnelProviderManager] {
         try await reloadAllManagers()
-        let managers = Array(allManagers.values)
-        await coder.purge(managers: managers)
+        var managers = Array(allManagers.values)
+        let profiles = await coder.purge(managers: managers)
+        await restoreProfiles(profiles, into: &managers)
         return managers
     }
 
-    public func save<O>(_ profile: Profile, forConnecting: Bool, options: O?) async throws {
+    @discardableResult
+    public func save<O>(_ profile: Profile, forConnecting: Bool, options: O?) async throws -> NETunnelProviderManager {
         profile.log(.os, .notice, withPreamble: "Encoded profile:")
 
         let proto = try coder.protocolConfiguration(from: profile, title: title)
@@ -204,6 +208,7 @@ extension NETunnelStrategy: NETunnelManagerRepository {
             let options = options as? [String: NSObject]
             try manager.connection.startVPNTunnel(options: options)
         }
+        return manager
     }
 
     public func remove(profileId: Profile.ID) async throws {
@@ -241,6 +246,20 @@ extension NETunnelStrategy: NETunnelManagerRepository {
                     continuation.yield(value)
                 }
                 continuation.finish()
+            }
+        }
+    }
+}
+
+private extension NETunnelStrategy {
+    func restoreProfiles(_ profiles: [Profile], into managers: inout [NETunnelProviderManager]) async {
+        for p in profiles {
+            do {
+                pp_log(ctx, .os, .notice, "Restore stale profile: \(p.id)")
+                let restored = try await save(p, forConnecting: false, options: nil as Void?)
+                managers.append(restored)
+            } catch {
+                pp_log(ctx, .os, .error, "Unable to restore stale profile: \(error)")
             }
         }
     }
