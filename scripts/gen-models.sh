@@ -20,24 +20,24 @@ extra_imports=$5
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 $script_dir/gen-api.sh
 
-extra_imports_opts=()
-if [[ -n "$extra_imports" ]]; then
-    IFS=',' read -ra extra_import_names <<< "$extra_imports"
-    for name in "${extra_import_names[@]}"; do
-        name="${name#"${name%%[![:space:]]*}"}"
-        name="${name%"${name##*[![:space:]]}"}"
-
-        if [[ -n "$name" ]]; then
-            extra_imports_opts+=(
-                --import-mappings "$name=io.partout.models.$name"
-                --schema-mappings "$name=$name"
-            )
-        fi
-    done
-fi
-
 case $language in
     kotlin)
+        kotlin_extra_imports_opts=()
+        if [[ -n "$extra_imports" ]]; then
+            IFS=',' read -ra extra_import_names <<< "$extra_imports"
+            for name in "${extra_import_names[@]}"; do
+                name="${name#"${name%%[![:space:]]*}"}"
+                name="${name%"${name##*[![:space:]]}"}"
+
+                if [[ -n "$name" ]]; then
+                    kotlin_extra_imports_opts+=(
+                        --import-mappings "$name=io.partout.models.$name"
+                        --schema-mappings "$name=$name"
+                    )
+                fi
+            done
+        fi
+
         package_dir=${package_name//./\/}
         rm -rf $models_dir/src/main/kotlin/$package_dir
         openapi-generator generate \
@@ -51,7 +51,7 @@ case $language in
             --additional-properties=packageName=$package_name \
             --additional-properties=modelPackage=$package_name \
             --schema-mappings OpenVPN.CryptoContainer=kotlin.String \
-            "${extra_imports_opts[@]}"
+            "${kotlin_extra_imports_opts[@]}"
         ;;
     cpp)
         echo "cpp language is not implemented yet; exiting."
