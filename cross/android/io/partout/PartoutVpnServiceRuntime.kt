@@ -113,7 +113,7 @@ class PartoutVpnServiceRuntime(
         isRunning = true
         Log.i(logTag, "Starting VPN daemon")
         try {
-            val newController = JNITunnelController(jniLogTag, service, this)
+            val newController = JNITunnelController(jniLogTag, service, this, serviceScope)
             engine.start(intent, newController, profileJSON)
             controller = newController
             Log.i(logTag, "Started VPN daemon")
@@ -163,9 +163,11 @@ class PartoutVpnServiceRuntime(
         Log.i(logTag, "Stopping VPN daemon")
         try {
             engine.stop()
-            controller = null
         } catch (e: Exception) {
             Log.e(logTag, "Unable to stop VPN daemon", e)
+        } finally {
+            controller?.close()
+            controller = null
         }
         isRunning = false
         snapshotEmitter.emitFinal()

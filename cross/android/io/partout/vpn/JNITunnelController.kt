@@ -13,11 +13,18 @@ import io.partout.models.TaggedModuleIP
 import io.partout.models.TaggedModuleOnDemand
 import io.partout.models.TunnelRemoteInfoWrapper
 import io.partout.models.TunnelSnapshot
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 // Must match signatures in tun_android.c
 interface TunnelController {
+    // Runtime
+    fun close()
+
     // JNI -> Jotlin
     fun setDelegate(delegate: Long): Long
     fun setTunnel(infoJSON: String): Int
@@ -37,12 +44,16 @@ interface TunnelControllerDelegate {
 class JNITunnelController(
     private val logTag: String,
     private val service: VpnService,
-    private val delegate: TunnelControllerDelegate
-): TunnelController {
+    private val delegate: TunnelControllerDelegate,
+    private val scope: CoroutineScope
+) : TunnelController {
     private val lock = Any()
     private var descriptor: ParcelFileDescriptor? = null
     private var nativeDelegate: Long = 0
     private var isClosed = false
+
+    override fun close() {
+    }
 
     override fun setDelegate(delegate: Long): Long = synchronized(lock) {
         Log.d(logTag, "setDelegate($delegate)")
