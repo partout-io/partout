@@ -294,8 +294,32 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
     free(tun_impl);
 }
 
+JNIEXPORT void JNICALL
+Java_io_partout_vpn_JNITunnelController_onNativeReachabilityUpdate(JNIEnv *env,
+                                                                   jobject thiz,
+                                                                   jlong delegate,
+                                                                   jboolean is_reachable) {
+    (void)thiz;
+    pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
+    if (!ctrl_delegate || !ctrl_delegate->ctx) return;
+    ctrl_delegate->on_reachable(ctrl_delegate->ctx, is_reachable);
+}
+
+JNIEXPORT void JNICALL
+Java_io_partout_vpn_JNITunnelController_onNativeBetterPathUpdate(JNIEnv *env,
+                                                                 jobject thiz,
+                                                                 jlong delegate) {
+    (void)thiz;
+    pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
+    if (!ctrl_delegate || !ctrl_delegate->ctx) return;
+    ctrl_delegate->on_better_path(ctrl_delegate->ctx);
+}
+
 JNIEXPORT jstring JNICALL
-Java_io_partout_vpn_JNITunnelController_getNativeEnvironmentValue(JNIEnv *env, jobject thiz, jlong delegate, jstring key) {
+Java_io_partout_vpn_JNITunnelController_getNativeEnvironmentValue(JNIEnv *env,
+                                                                  jobject thiz,
+                                                                  jlong delegate,
+                                                                  jstring key) {
     (void)thiz;
     pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
     if (!ctrl_delegate || !ctrl_delegate->ctx) return NULL;

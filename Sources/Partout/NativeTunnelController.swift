@@ -15,6 +15,10 @@ public final class NativeTunnelController: TunnelController {
 
     private let maxReadLength: Int
 
+    private let onReachableStream: CurrentValueStream<Bool>
+
+    private let betterPathProxy: BetterPathProxy
+
     public init(
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
@@ -33,12 +37,22 @@ public final class NativeTunnelController: TunnelController {
 #endif
         self.environment = environment
         self.maxReadLength = maxReadLength
+        onReachableStream = CurrentValueStream(false)
+        betterPathProxy = BetterPathProxy()
 
         var delegate = pp_tun_ctrl_delegate(
-            ctx: Unmanaged.passUnretained(self).toOpaque(),
+            ctx: .fromSelf(self),
+            on_reachable: { ctx, isReachable in
+                let this = ctx.toSelf
+                this.onReachable(isReachable)
+            },
+            on_better_path: { ctx in
+                let this = ctx.toSelf
+                this.onBetterPath()
+            },
             environment_value: { ctx, key in
-                let swift = Unmanaged<NativeTunnelController>.fromOpaque(ctx).takeUnretainedValue()
-                guard let data = swift.environmentData(forKey: String(cString: key)),
+                let this = ctx.toSelf
+                guard let data = this.environmentData(forKey: String(cString: key)),
                       let json = String(data: data, encoding: .utf8) else {
                     return nil
                 }
@@ -140,7 +154,72 @@ public final class NativeTunnelController: TunnelController {
     }
 }
 
+// MARK: - Streams
+
+extension NativeTunnelController: ReachabilityObserver {
+    public func startObserving() {
+    }
+
+    public func stopObserving() {
+    }
+
+    public var isReachable: Bool {
+        onReachableStream.value
+    }
+
+    public var isReachableStream: AsyncStream<Bool> {
+        onReachableStream.subscribe()
+    }
+
+    public var betterPathFactory: BetterPathStreamFactory {
+        betterPathProxy
+    }
+}
+
+private extension NativeTunnelController {
+    func onReachable(_ isReachable: Bool) {
+        onReachableStream.send(isReachable)
+    }
+
+    func onBetterPath() {
+        betterPathProxy.onBetterPath()
+    }
+}
+
+private final class BetterPathProxy: BetterPathStreamFactory, @unchecked Sendable {
+    private let lock = SemaphoreMutex()
+    private var stream: PassthroughStream<Void>?
+
+    nonisolated func newStream() -> PassthroughStream<Void> {
+        let new = PassthroughStream<Void>()
+        let oldStream = lock.with {
+            let old = stream
+            stream = new
+            return old
+        }
+        oldStream?.finish()
+        return new
+    }
+
+    func onBetterPath() {
+        let current = lock.with {
+            stream
+        }
+        current?.send()
+    }
+}
+
 // MARK: - Helpers
+
+private extension UnsafeMutableRawPointer {
+    static func fromSelf(_ controller: NativeTunnelController) -> Self {
+        Unmanaged.passUnretained(controller).toOpaque()
+    }
+
+    var toSelf: NativeTunnelController {
+        Unmanaged.fromOpaque(self).takeUnretainedValue()
+    }
+}
 
 struct TunnelRemoteInfoWrapper: Encodable, Sendable {
     let originalModuleId: UniqueID

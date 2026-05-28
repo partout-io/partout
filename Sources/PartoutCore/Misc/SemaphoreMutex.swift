@@ -16,4 +16,11 @@ public final class SemaphoreMutex: @unchecked Sendable {
     public func unlock() {
         semaphore.signal()
     }
+
+    public func with<T>(block: () -> T) -> T {
+        lock()
+        let result = block()
+        unlock()
+        return result
+    }
 }

@@ -13,11 +13,15 @@ import io.partout.models.TaggedModuleIP
 import io.partout.models.TaggedModuleOnDemand
 import io.partout.models.TunnelRemoteInfoWrapper
 import io.partout.models.TunnelSnapshot
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 // Must match signatures in tun_android.c
 interface TunnelController {
+    // Runtime
+    fun stopObserving()
+
     // JNI -> Jotlin
     fun setDelegate(delegate: Long): Long
     fun setTunnel(infoJSON: String): Int
@@ -26,6 +30,8 @@ interface TunnelController {
     fun cancelTunnel(errorCode: String?)
 
     // Kotlin -> JNI
+    fun onReachabilityUpdate(isReachable: Boolean)
+    fun onBetterPathUpdate()
     fun getEnvironmentValue(key: String): String?
 }
 
@@ -37,12 +43,19 @@ interface TunnelControllerDelegate {
 class JNITunnelController(
     private val logTag: String,
     private val service: VpnService,
+    scope: CoroutineScope,
     private val delegate: TunnelControllerDelegate
-): TunnelController {
+) : TunnelController {
+    // All accesses must be synchronized against the lock
     private val lock = Any()
-    private var descriptor: ParcelFileDescriptor? = null
+
+    // JNI interactions with Native (Swift)
     private var nativeDelegate: Long = 0
-    private var isClosed = false
+    private var isNativeCancelled = false
+    private var tunDescriptor: ParcelFileDescriptor? = null
+
+    override fun stopObserving() {
+    }
 
     override fun setDelegate(delegate: Long): Long = synchronized(lock) {
         Log.d(logTag, "setDelegate($delegate)")
@@ -52,9 +65,9 @@ class JNITunnelController(
     }
 
     override fun setTunnel(infoJSON: String): Int = synchronized(lock) {
-        if (isClosed) { return -1 }
+        if (isNativeCancelled) { return -1 }
         Log.d(logTag, "setTunnel()")
-        if (descriptor != null) {
+        if (tunDescriptor != null) {
             Log.e(logTag, "Tunnel descriptor already established")
             return -1
         }
@@ -106,61 +119,73 @@ class JNITunnelController(
         // By default, establish() returns a non-blocking descriptor.
         builder.setBlocking(true)
 
-        descriptor = try {
+        tunDescriptor = try {
             builder.establish()
         } catch (e: RuntimeException) {
             Log.e(logTag, "Unable to establish tunnel", e)
             null
         }
-        if (descriptor == null) {
+        if (tunDescriptor == null) {
             Log.e(logTag, "Unable to establish tunnel")
             return -1
         }
 
-        val fd = descriptor?.detachFd() ?: -1
-        descriptor = null
+        val fd = tunDescriptor?.detachFd() ?: -1
+        tunDescriptor = null
         Log.i(logTag, "Established tunnel descriptor: $fd")
         return fd
     }
 
     override fun configureSockets(fds: IntArray) = synchronized(lock) {
-        if (isClosed) { return }
+        if (isNativeCancelled) { return }
         Log.d(logTag, "configureSockets(${fds.toList()})")
         fds.forEach {
             require(it in 0..Int.MAX_VALUE.toLong()) {
                 "Invalid Android file descriptor: $it"
             }
-            val protected = service.protect(it.toInt())
+            val protected = service.protect(it)
             Log.d(logTag, "protect($it) = $protected")
         }
     }
 
     override fun onSnapshot(snapshotJSON: String) = synchronized(lock) {
-        if (isClosed) { return }
+        if (isNativeCancelled) { return }
         Log.d(logTag, "onSnapshot(${snapshotJSON})")
         val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
-        delegate?.sendSnapshot(snapshot)
+        delegate.sendSnapshot(snapshot)
         return@synchronized
     }
 
     override fun cancelTunnel(errorCode: String?) = synchronized(lock) {
-        if (isClosed) { return }
-        isClosed = true
+        if (isNativeCancelled) { return }
+        isNativeCancelled = true
         Log.d(logTag, "cancelTunnel()")
         if (errorCode != null) {
             Log.e(logTag, "VPN daemon cancelled: $errorCode")
         } else {
             Log.i(logTag, "VPN daemon cancelled")
         }
-        delegate?.disconnect()
+        delegate.disconnect()
         return@synchronized
     }
 
+    override fun onReachabilityUpdate(isReachable: Boolean) = synchronized(lock) {
+        Log.e(logTag, ">>> Network: onReachabilityUpdate($isReachable)")
+        onNativeReachabilityUpdate(nativeDelegate, isReachable)
+    }
+
+    override fun onBetterPathUpdate() = synchronized(lock) {
+        Log.e(logTag, ">>> Network: onBetterPathUpdate()")
+        onNativeBetterPathUpdate(nativeDelegate)
+    }
+
     override fun getEnvironmentValue(key: String): String? = synchronized(lock) {
-        Log.d(logTag, "environmentValue($key)")
+        Log.d(logTag, "getEnvironmentValue($key)")
         return getNativeEnvironmentValue(nativeDelegate, key)
     }
 
+    private external fun onNativeReachabilityUpdate(delegate: Long, isReachable: Boolean)
+    private external fun onNativeBetterPathUpdate(delegate: Long)
     private external fun getNativeEnvironmentValue(delegate: Long, key: String): String?
 
     companion object {
