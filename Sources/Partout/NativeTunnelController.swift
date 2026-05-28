@@ -5,7 +5,7 @@
 internal import _PartoutCore_C
 
 /// A controller that operates on a virtual tun interface.
-public final class NativeTunnelController: TunnelController {
+public final class NativeTunnelController: TunnelController, ReachabilityObserver {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
@@ -14,6 +14,10 @@ public final class NativeTunnelController: TunnelController {
     private let environment: TunnelEnvironmentReader
 
     private let maxReadLength: Int
+
+    private let onReachableStream: CurrentValueStream<Bool>
+
+    public let onBetterPathStream: PassthroughStream<Void>
 
     public init(
         _ ctx: PartoutLoggerContext,
@@ -33,9 +37,19 @@ public final class NativeTunnelController: TunnelController {
 #endif
         self.environment = environment
         self.maxReadLength = maxReadLength
+        onReachableStream = CurrentValueStream(false)
+        onBetterPathStream = PassthroughStream()
 
         var delegate = pp_tun_ctrl_delegate(
             ctx: Unmanaged.passUnretained(self).toOpaque(),
+            on_reachable: { ctx, isReachable in
+                let swift = Unmanaged<NativeTunnelController>.fromOpaque(ctx).takeUnretainedValue()
+                swift.onReachable(isReachable)
+            },
+            on_better_path: { ctx in
+                let swift = Unmanaged<NativeTunnelController>.fromOpaque(ctx).takeUnretainedValue()
+                swift.onBetterPath()
+            },
             environment_value: { ctx, key in
                 let swift = Unmanaged<NativeTunnelController>.fromOpaque(ctx).takeUnretainedValue()
                 guard let data = swift.environmentData(forKey: String(cString: key)),
@@ -137,6 +151,34 @@ public final class NativeTunnelController: TunnelController {
         error.partoutErrorCode.rawValue.withCString {
             pp_tun_ctrl_cancel_tunnel(ref, $0)
         }
+    }
+}
+
+// MARK: - Streams
+
+extension NativeTunnelController {
+    public func startObserving() {
+    }
+
+    public func stopObserving() {
+    }
+
+    public var isReachable: Bool {
+        onReachableStream.value
+    }
+
+    public var isReachableStream: AsyncStream<Bool> {
+        onReachableStream.subscribe()
+    }
+}
+
+private extension NativeTunnelController {
+    func onReachable(_ isReachable: Bool) {
+        onReachableStream.send(isReachable)
+    }
+
+    func onBetterPath() {
+        onBetterPathStream.send()
     }
 }
 
