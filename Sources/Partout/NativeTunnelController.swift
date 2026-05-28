@@ -5,7 +5,7 @@
 internal import _PartoutCore_C
 
 /// A controller that operates on a virtual tun interface.
-public final class NativeTunnelController: TunnelController, ReachabilityObserver {
+public final class NativeTunnelController: TunnelController {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
@@ -17,7 +17,9 @@ public final class NativeTunnelController: TunnelController, ReachabilityObserve
 
     private let onReachableStream: CurrentValueStream<Bool>
 
-    public let onBetterPathStream: PassthroughStream<Void>
+    private let betterPathLock: SemaphoreMutex
+
+    private var onBetterPathStream: PassthroughStream<Void>?
 
     public init(
         _ ctx: PartoutLoggerContext,
@@ -38,7 +40,7 @@ public final class NativeTunnelController: TunnelController, ReachabilityObserve
         self.environment = environment
         self.maxReadLength = maxReadLength
         onReachableStream = CurrentValueStream(false)
-        onBetterPathStream = PassthroughStream()
+        betterPathLock = SemaphoreMutex()
 
         var delegate = pp_tun_ctrl_delegate(
             ctx: Unmanaged.passUnretained(self).toOpaque(),
@@ -156,7 +158,7 @@ public final class NativeTunnelController: TunnelController, ReachabilityObserve
 
 // MARK: - Streams
 
-extension NativeTunnelController {
+extension NativeTunnelController: ReachabilityObserver {
     public func startObserving() {
     }
 
@@ -172,13 +174,29 @@ extension NativeTunnelController {
     }
 }
 
+extension NativeTunnelController: BetterPathStreamFactory {
+    public nonisolated func newStream() -> PassthroughStream<Void> {
+        let stream = PassthroughStream<Void>()
+        let oldStream = betterPathLock.with {
+            let old = onBetterPathStream
+            onBetterPathStream = stream
+            return old
+        }
+        oldStream?.finish()
+        return stream
+    }
+}
+
 private extension NativeTunnelController {
     func onReachable(_ isReachable: Bool) {
         onReachableStream.send(isReachable)
     }
 
     func onBetterPath() {
-        onBetterPathStream.send()
+        let stream = betterPathLock.with {
+            onBetterPathStream
+        }
+        stream?.send()
     }
 }
 
