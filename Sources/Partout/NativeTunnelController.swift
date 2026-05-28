@@ -41,7 +41,7 @@ public final class NativeTunnelController: TunnelController {
         betterPathProxy = BetterPathProxy()
 
         var delegate = pp_tun_ctrl_delegate(
-            ctx: Unmanaged.passUnretained(self).toOpaque(),
+            ctx: .fromSelf(self),
             on_reachable: { ctx, isReachable in
                 let this = ctx.toSelf
                 this.onReachable(isReachable)
@@ -212,6 +212,10 @@ private final class BetterPathProxy: BetterPathStreamFactory, @unchecked Sendabl
 // MARK: - Helpers
 
 private extension UnsafeMutableRawPointer {
+    static func fromSelf(_ controller: NativeTunnelController) -> Self {
+        Unmanaged.passUnretained(controller).toOpaque()
+    }
+
     var toSelf: NativeTunnelController {
         Unmanaged.fromOpaque(self).takeUnretainedValue()
     }
