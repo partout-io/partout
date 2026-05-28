@@ -21,6 +21,7 @@ import kotlinx.serialization.json.Json
 // Must match signatures in tun_android.c
 interface TunnelController {
     // Runtime
+    fun startObserving()
     fun stopObserving()
 
     // JNI -> Jotlin
@@ -44,7 +45,7 @@ interface TunnelControllerDelegate {
 class JNITunnelController(
     private val logTag: String,
     private val service: VpnService,
-    scope: CoroutineScope,
+    private val scope: CoroutineScope,
     private val delegate: TunnelControllerDelegate
 ) : TunnelController {
     // All accesses must be synchronized against the lock
@@ -54,6 +55,9 @@ class JNITunnelController(
     private var nativeDelegate: Long = 0
     private var isNativeCancelled = false
     private var tunDescriptor: ParcelFileDescriptor? = null
+
+    override fun startObserving() {
+    }
 
     override fun stopObserving() {
     }
