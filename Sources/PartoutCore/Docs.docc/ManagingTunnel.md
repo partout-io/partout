@@ -13,7 +13,6 @@ Control the daemon started in <doc:StartingTunnel> and be informed about its cur
 - ``Tunnel``
 - ``TunnelStrategy``
 - ``TunnelObservableStrategy``
-- ``TunnelProtocol``
 - ``TunnelStatus``
 - ``TunnelSnapshot``
 - ``FakeTunnelStrategy``

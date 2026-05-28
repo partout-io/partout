@@ -770,10 +770,6 @@ components:
       properties:
         address:
           "$ref": "#/components/schemas/Address"
-        fileDescriptors:
-          items:
-            "$ref": "#/components/schemas/UInt64"
-          type: array
         modules:
           items:
             "$ref": "#/components/schemas/TaggedModule"
@@ -784,7 +780,6 @@ components:
           type: boolean
       required:
         - originalModuleId
-        - fileDescriptors
         - requiresVirtualDevice
       type: object
     TunnelSnapshot:

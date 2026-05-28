@@ -23,7 +23,7 @@ interface TunnelController {
     fun setTunnel(infoJSON: String): Int
     fun configureSockets(fds: IntArray)
     fun onSnapshot(snapshotJSON: String)
-    fun cancelTunnel(errorMessage: String?)
+    fun cancelTunnel(errorCode: String?)
 
     // Kotlin -> JNI
     fun getEnvironmentValue(key: String): String?
@@ -66,7 +66,6 @@ class JNITunnelController(
             Log.e(logTag, "Unable to decode tunnel info JSON", e)
             return -1
         }
-        val remoteFds = info.fileDescriptors
         var appliedAddressSettings = false
         var appliedDnsSettings = false
 
@@ -103,14 +102,6 @@ class JNITunnelController(
             return -1
         }
 
-        remoteFds.forEach {
-            require(it in 0..Int.MAX_VALUE.toLong()) {
-                "Invalid Android file descriptor: $it"
-            }
-            val protected = service.protect(it.toInt())
-            Log.d(logTag, "protect($it) = $protected")
-        }
-
         // IMPORTANT: this is a requirement for VirtualTunnelInterface.
         // By default, establish() returns a non-blocking descriptor.
         builder.setBlocking(true)
@@ -136,7 +127,10 @@ class JNITunnelController(
         if (isClosed) { return }
         Log.d(logTag, "configureSockets(${fds.toList()})")
         fds.forEach {
-            val protected = service.protect(it)
+            require(it in 0..Int.MAX_VALUE.toLong()) {
+                "Invalid Android file descriptor: $it"
+            }
+            val protected = service.protect(it.toInt())
             Log.d(logTag, "protect($it) = $protected")
         }
     }
@@ -149,12 +143,12 @@ class JNITunnelController(
         return@synchronized
     }
 
-    override fun cancelTunnel(errorMessage: String?) = synchronized(lock) {
+    override fun cancelTunnel(errorCode: String?) = synchronized(lock) {
         if (isClosed) { return }
         isClosed = true
         Log.d(logTag, "cancelTunnel()")
-        if (errorMessage != null) {
-            Log.e(logTag, "VPN daemon cancelled: $errorMessage")
+        if (errorCode != null) {
+            Log.e(logTag, "VPN daemon cancelled: $errorCode")
         } else {
             Log.i(logTag, "VPN daemon cancelled")
         }

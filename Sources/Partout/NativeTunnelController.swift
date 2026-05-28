@@ -134,8 +134,7 @@ public final class NativeTunnelController: TunnelController {
             pp_tun_ctrl_cancel_tunnel(ref, nil)
             return
         }
-        // FIXME: #419, Use PartoutError.Code
-        String(describing: error).withCString {
+        error.partoutErrorCode.rawValue.withCString {
             pp_tun_ctrl_cancel_tunnel(ref, $0)
         }
     }
@@ -148,8 +147,6 @@ struct TunnelRemoteInfoWrapper: Encodable, Sendable {
 
     let address: Address?
 
-    let fileDescriptors: [UInt64]
-
     let requiresVirtualDevice: Bool
 
     let modules: [TaggedModule]?
@@ -157,7 +154,6 @@ struct TunnelRemoteInfoWrapper: Encodable, Sendable {
     init(_ info: TunnelRemoteInfo) {
         originalModuleId = info.originalModuleId
         address = info.address
-        fileDescriptors = info.fileDescriptors
         requiresVirtualDevice = info.requiresVirtualDevice
         modules = info.modules?.compactMap(\.taggedModule)
     }

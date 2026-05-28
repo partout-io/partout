@@ -13,12 +13,14 @@ struct SubjectTests {
         let sut = PassthroughSubject<Int, Error>()
         let expected = [5, 7, 67]
         var i = 0
-        var isDone = false
+        let exp = Expectation()
         var subscriptions: Set<AnyCancellable> = []
 
         sut
             .sink { _ in
-                isDone = true
+                Task {
+                    await exp.fulfill()
+                }
             } receiveValue: { num in
                 print("Number: \(num)")
                 guard i < expected.count else {
@@ -35,7 +37,7 @@ struct SubjectTests {
             try await Task.sleep(for: .milliseconds(100))
         }
         sut.send(completion: .finished)
-        while !isDone {} // spinlock
+        try await exp.fulfillment(timeout: 500)
     }
 
     @Test
@@ -44,12 +46,14 @@ struct SubjectTests {
         let sequence = [5, 7, 67]
         let expected = [100] + sequence
         var i = 0
-        var isDone = false
+        let exp = Expectation()
         var subscriptions: Set<AnyCancellable> = []
 
         sut
             .sink { _ in
-                isDone = true
+                Task {
+                    await exp.fulfill()
+                }
             } receiveValue: { num in
                 print("Number: \(num)")
                 guard i < expected.count else {
@@ -66,7 +70,7 @@ struct SubjectTests {
             try await Task.sleep(for: .milliseconds(100))
         }
         sut.send(completion: .finished)
-        while !isDone {} // spinlock
+        try await exp.fulfillment(timeout: 500)
     }
 
     @Test

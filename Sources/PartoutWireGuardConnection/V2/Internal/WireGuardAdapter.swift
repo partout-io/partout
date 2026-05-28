@@ -57,16 +57,10 @@ actor WireGuardAdapter {
     /// Adapter state.
     private var state: WireGuardAdapterState = .stopped
 
-    private var socketDescriptors: [Int32] {
-        guard case .started(let handle, _) = state else { return [] }
-        return backend.socketDescriptors(handle)
-    }
-
     /// Tunnel device file descriptor.
     private var tunnelFileDescriptor: Int32? {
         didSet {
             logHandler(.verbose, "Tunnel file descriptor: \(tunnelFileDescriptor.debugDescription)")
-            logHandler(.verbose, "Socket file descriptors: \(socketDescriptors)")
         }
     }
 
@@ -140,9 +134,7 @@ actor WireGuardAdapter {
             let settingsGenerator = makeSettingsGenerator(with: tunnelConfiguration)
             let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
             try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
-                moduleId: moduleId,
-                // FIXME: #407, These are always empty at this stage
-                descriptors: socketDescriptors
+                moduleId: moduleId
             ))
             let handle = try startWireGuardBackend(wgConfig: wgConfig)
             state = .started(handle, settingsGenerator)
@@ -251,17 +243,19 @@ actor WireGuardAdapter {
 #if os(iOS)
         backend.disableSomeRoamingForBrokenMobileSemantics(handle)
 #endif
-        // FIXME: #407, Socket descriptors require handle, which only exists after backend.turnOn. How do start() and .temporaryShutdown use socketDescriptors? They are empty, always empty on start()
-        let socketFds = {
-            var rawFds = backend.socketDescriptors(handle)
-            if rawFds.isEmpty {
-                rawFds = fallbackFileDescriptor.map { [$0] } ?? []
-            }
-            return rawFds
-        }()
-        pp_log(ctx, .wireguard, .info, "Socket descriptors: \(socketFds)")
-        delegate?.adapterShouldConfigureSockets(self, descriptors: socketFds.map(UInt64.init))
+        configureSockets(for: handle)
         return handle
+    }
+
+    @discardableResult
+    private func configureSockets(for handle: Int32) -> [UInt64] {
+        let descriptors = backend.socketDescriptors(handle)
+            .filter { $0 >= 0 }
+            .map { UInt64($0) }
+        pp_log(ctx, .wireguard, .info, "Socket descriptors: \(descriptors)")
+        guard !descriptors.isEmpty else { return [] }
+        delegate?.adapterShouldConfigureSockets(self, descriptors: descriptors)
+        return descriptors
     }
 
     /// Resolves the hostnames in the given tunnel configuration and return settings generator.
@@ -279,6 +273,11 @@ actor WireGuardAdapter {
 //        logHandler(.verbose, "Network change detected with \(path.status) route and interface order \(path.availableInterfaces)")
         logHandler(.verbose, "Network change detected, reachable: \(isReachable)")
 
+#if os(macOS)
+        if case .started(let handle, _) = self.state {
+            backend.bumpSockets(handle)
+        }
+#else
         switch state {
         case .started(let handle, let settingsGenerator):
             if isReachable {
@@ -301,8 +300,7 @@ actor WireGuardAdapter {
                 await settingsGenerator.resetResolvedEndpoints()
                 let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
                 try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
-                    moduleId: moduleId,
-                    descriptors: socketDescriptors
+                    moduleId: moduleId
                 ))
                 let handle = try startWireGuardBackend(wgConfig: wgConfig)
                 state = .started(handle, settingsGenerator)
@@ -314,6 +312,7 @@ actor WireGuardAdapter {
             // no-op
             break
         }
+#endif
     }
 
     private nonisolated var fallbackFileDescriptor: Int32? {

@@ -170,7 +170,7 @@ struct TunnelRemoteInfoGeneratorTests {
             tunnelConfiguration: configuration,
             dnsTimeout: 1
         )
-        let info = sut.generateRemoteInfo(moduleId: UniqueID(), descriptors: [])
+        let info = sut.generateRemoteInfo(moduleId: UniqueID())
         let ipModule = try #require(info.modules?.compactMap { $0 as? IPModule }.first)
 
         #expect(ipModule.ipv4?.includedRoutes.first?.destination?.rawValue == "10.0.0.0/24")

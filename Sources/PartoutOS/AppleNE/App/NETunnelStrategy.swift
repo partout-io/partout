@@ -28,7 +28,7 @@ public actor NETunnelStrategy {
         }
     }
 
-    private var pendingSaveTask: Task<Void, Error>?
+    private var pendingSaveTask: PendingSaveTask?
 
     // TODO: #218/passepartout, support .multiple option after implementing in PTP
     public init(
@@ -303,20 +303,41 @@ private extension NETunnelStrategy {
         _ managerBlock: @escaping @autoclosure () -> NETunnelProviderManager,
         block: @escaping @Sendable (NETunnelProviderManager) -> Void
     ) async throws -> NETunnelProviderManager {
-        if let pendingSaveTask {
-            try await pendingSaveTask.value
+        while let pendingSaveTask {
+            do {
+                try await pendingSaveTask.task.value
+                clearPendingSaveTask(pendingSaveTask)
+            } catch {
+                clearPendingSaveTask(pendingSaveTask)
+                throw error
+            }
         }
+
         let manager = managerBlock()
-        pendingSaveTask = Task { @Sendable in
+        let pendingSaveTask = PendingSaveTask(task: Task { @Sendable in
             try await manager.loadFromPreferences()
             try Task.checkCancellation()
             block(manager)
             try Task.checkCancellation()
             try await manager.saveToPreferences()
+        })
+        self.pendingSaveTask = pendingSaveTask
+
+        do {
+            try await pendingSaveTask.task.value
+            clearPendingSaveTask(pendingSaveTask)
+        } catch {
+            clearPendingSaveTask(pendingSaveTask)
+            throw error
         }
-        try await pendingSaveTask?.value
-        pendingSaveTask = nil
         return manager
+    }
+
+    func clearPendingSaveTask(_ pendingSaveTask: PendingSaveTask) {
+        guard self.pendingSaveTask?.id == pendingSaveTask.id else {
+            return
+        }
+        self.pendingSaveTask = nil
     }
 
     func disconnectCurrentManagers() async {
@@ -341,6 +362,12 @@ private extension NETunnelStrategy {
             }
         }
     }
+}
+
+private struct PendingSaveTask: Sendable {
+    let id = UniqueID()
+
+    let task: Task<Void, Error>
 }
 
 // MARK: - Active managers
