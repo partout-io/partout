@@ -96,7 +96,8 @@ private extension POSIXDNSStrategy {
             )
             if result == 0 {
                 let address = hostBuffer.string
-                records.append(DNSRecord(address: address, isIPv6: addrLength == 128))
+                let isIPv6 = info.ai_family == AF_INET6
+                records.append(DNSRecord(address: address, isIPv6: isIPv6))
             }
         }
         return records
