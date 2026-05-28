@@ -17,7 +17,7 @@ public final class NativeTunnelController: TunnelController {
 
     private let onReachableStream: CurrentValueStream<Bool>
 
-    private let pipeBetterPathFactory: PipeBetterPathFactory
+    private let betterPathProxy: BetterPathProxy
 
     public init(
         _ ctx: PartoutLoggerContext,
@@ -38,7 +38,7 @@ public final class NativeTunnelController: TunnelController {
         self.environment = environment
         self.maxReadLength = maxReadLength
         onReachableStream = CurrentValueStream(false)
-        pipeBetterPathFactory = PipeBetterPathFactory()
+        betterPathProxy = BetterPathProxy()
 
         var delegate = pp_tun_ctrl_delegate(
             ctx: Unmanaged.passUnretained(self).toOpaque(),
@@ -172,7 +172,7 @@ extension NativeTunnelController: ReachabilityObserver {
     }
 
     public var betterPathFactory: BetterPathStreamFactory {
-        pipeBetterPathFactory
+        betterPathProxy
     }
 }
 
@@ -182,11 +182,11 @@ private extension NativeTunnelController {
     }
 
     func onBetterPath() {
-        pipeBetterPathFactory.onBetterPath()
+        betterPathProxy.onBetterPath()
     }
 }
 
-private final class PipeBetterPathFactory: BetterPathStreamFactory, @unchecked Sendable {
+private final class BetterPathProxy: BetterPathStreamFactory, @unchecked Sendable {
     private let lock = SemaphoreMutex()
     private var stream: PassthroughStream<Void>?
 
