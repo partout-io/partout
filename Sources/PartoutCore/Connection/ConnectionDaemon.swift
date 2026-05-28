@@ -12,17 +12,5 @@ public protocol ConnectionDaemon: AnyObject, Sendable {
 
     func hold() async
 
-    func sleep() async
-
-    func wake() async
-
     func sendMessage(_ message: Message.Input) async throws -> Message.Output?
-}
-
-public extension ConnectionDaemon {
-    func sleep() async {
-    }
-
-    func wake() async {
-    }
 }

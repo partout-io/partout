@@ -20,18 +20,4 @@ public protocol Connection: AnyObject, Sendable {
     /// - Postcondition: Status must be `.disconnected`.
     /// - Parameter timeout: The graceful period. Passing 0 will stop the connection by force.
     func stop(timeout: Int) async
-
-    /// Notifies the connection that the device is about to sleep.
-    func sleep() async
-
-    /// Notifies the connection that the device woke up.
-    func wake() async
-}
-
-public extension Connection {
-    func sleep() async {
-    }
-
-    func wake() async {
-    }
 }

@@ -174,12 +174,6 @@ actor WireGuardAdapter {
         }
     }
 
-    /// Force the same socket refresh that path monitoring performs.
-    func wake() async {
-        logHandler(.verbose, "Wake event detected, refreshing backend reachability.")
-        await didUpdateReachable(isReachable: reachability.isReachable)
-    }
-
     // MARK: - Private methods
 
     private func setupReachabilityTask() {

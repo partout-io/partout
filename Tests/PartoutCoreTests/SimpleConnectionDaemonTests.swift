@@ -289,34 +289,6 @@ struct SimpleConnectionDaemonTests {
         #expect(await stream.nextElement() == .disconnecting)
         #expect(await stream.nextElement() == .disconnected)
     }
-
-    @Test
-    func givenStartedConnection_whenWake_thenNotifiesConnection() async throws {
-        let expWake = Expectation()
-        var connectionModule = MockConnectionModule()
-        connectionModule.options.onWake = {
-            Task {
-                await expWake.fulfill()
-            }
-        }
-        let profile = try Profile.Builder(
-            modules: [connectionModule],
-            activeModulesIds: [connectionModule.id]
-        ).build()
-        #expect(profile.activeConnectionModule != nil)
-
-        let sut = try newDaemon(with: profile)
-        let stream = sut.statusStream
-
-        try await withStartedDaemon(sut) {
-            #expect(await stream.nextElement() == .disconnected)
-            #expect(await stream.nextElement() == .connecting)
-            #expect(await stream.nextElement() == .connected)
-
-            await sut.wake()
-            try await expWake.fulfillment(timeout: 500)
-        }
-    }
 }
 
 // MARK: - Helpers
@@ -436,8 +408,6 @@ private final class MockConnection: Connection {
         var reportedDataCounts: [(interval: Int, dataCount: DataCount)] = []
 
         var shouldTimeout = false
-
-        var onWake: (@Sendable () -> Void)?
     }
 
     let options: Options
@@ -508,9 +478,5 @@ private final class MockConnection: Connection {
             }
         }
         statusSubject.send(.disconnected)
-    }
-
-    func wake() async {
-        options.onWake?()
     }
 }
