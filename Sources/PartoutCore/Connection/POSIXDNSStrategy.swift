@@ -71,13 +71,11 @@ private extension POSIXDNSStrategy {
 
         var records: [DNSRecord] = []
         var currentPointer = infoPointer
-        while let info = currentPointer?.pointee {
-            guard !Task.isCancelled else {
-                return nil
-            }
-            guard let addr = info.ai_addr else {
-                continue
-            }
+        while let pointer = currentPointer {
+            var info = pointer.pointee
+            currentPointer = info.ai_next
+            guard !Task.isCancelled else { return nil }
+            guard let addr = info.ai_addr else { continue }
             let addrLength = socklen_t(info.ai_addrlen)
             var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
 #if os(Windows)
@@ -100,7 +98,6 @@ private extension POSIXDNSStrategy {
                 let address = hostBuffer.string
                 records.append(DNSRecord(address: address, isIPv6: addrLength == 128))
             }
-            currentPointer = info.ai_next
         }
         return records
     }
