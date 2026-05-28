@@ -50,6 +50,8 @@ private extension POSIXDNSStrategy {
         hints.ai_flags = AI_ALL
 #endif
         hints.ai_family = AF_UNSPEC // IPv4/IPv6
+        // XXX: Choosing either would dedup results
+//        hints.ai_socktype = SOCK_STREAM SOCK_DGRAM
         var infoPointer: UnsafeMutablePointer<addrinfo>?
         let result = hostname.withCString {
             getaddrinfo($0, nil, &hints, &infoPointer)
