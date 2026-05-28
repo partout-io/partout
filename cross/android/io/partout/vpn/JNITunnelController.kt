@@ -143,7 +143,7 @@ class JNITunnelController(
             require(it in 0..Int.MAX_VALUE.toLong()) {
                 "Invalid Android file descriptor: $it"
             }
-            val protected = service.protect(it.toInt())
+            val protected = service.protect(it)
             Log.d(logTag, "protect($it) = $protected")
         }
     }
@@ -152,7 +152,7 @@ class JNITunnelController(
         if (isNativeCancelled) { return }
         Log.d(logTag, "onSnapshot(${snapshotJSON})")
         val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
-        delegate?.sendSnapshot(snapshot)
+        delegate.sendSnapshot(snapshot)
         return@synchronized
     }
 
@@ -165,7 +165,7 @@ class JNITunnelController(
         } else {
             Log.i(logTag, "VPN daemon cancelled")
         }
-        delegate?.disconnect()
+        delegate.disconnect()
         return@synchronized
     }
 
