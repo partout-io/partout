@@ -29,6 +29,8 @@ private enum WireGuardAdapterState {
 actor WireGuardAdapter {
     typealias LogHandler = @Sendable (WireGuardLogLevel, String) -> Void
 
+    private static let temporaryShutdownRetryDelay = 2000
+
     private let ctx: PartoutLoggerContext
 
     /// Adapter delegate.
@@ -52,6 +54,12 @@ actor WireGuardAdapter {
 
     /// Network reachability task.
     private var reachabilityTask: Task<Void, Never>?
+
+    /// Backend restart retry task after transient failures while resuming from temporary shutdown.
+    private var temporaryShutdownRetryTask: Task<Void, Never>?
+
+    /// True while trying to restart the backend after a temporary shutdown.
+    private var isRestartingBackend = false
 
     /// Virtual tunnel interface
     private var tunnel: IOInterface?
@@ -105,6 +113,7 @@ actor WireGuardAdapter {
         backend.setLogger(context: nil, logger_fn: nil)
 
         reachabilityTask?.cancel()
+        temporaryShutdownRetryTask?.cancel()
 
         // Shutdown the tunnel
         if case .started(let handle, _) = state {
@@ -145,6 +154,7 @@ actor WireGuardAdapter {
         } catch {
             reachabilityTask?.cancel()
             reachabilityTask = nil
+            cancelTemporaryShutdownRetry()
             if case .started(let handle, _) = state {
                 backend.turnOff(handle)
             }
@@ -172,6 +182,7 @@ actor WireGuardAdapter {
         state = .stopped
         reachabilityTask?.cancel()
         reachabilityTask = nil
+        cancelTemporaryShutdownRetry()
         if let tunnel {
             await delegate?.adapterShouldClearNetworkSettings(self, tunnel: tunnel)
             self.tunnel = nil
@@ -285,6 +296,7 @@ actor WireGuardAdapter {
 #else
         switch state {
         case .started(let handle, let settingsGenerator):
+            cancelTemporaryShutdownRetry()
             if isReachable {
                 let wgConfig = await settingsGenerator.endpointUapiConfiguration(logHandler: logHandler)
 
@@ -299,25 +311,89 @@ actor WireGuardAdapter {
             }
 
         case .temporaryShutdown(let settingsGenerator):
-            guard isReachable else { return }
-            logHandler(.verbose, "Connectivity online, resuming backend.")
-            do {
-                await settingsGenerator.resetResolvedEndpoints()
-                let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
-                try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
-                    moduleId: moduleId
-                ))
-                let handle = try startWireGuardBackend(wgConfig: wgConfig)
-                state = .started(handle, settingsGenerator)
-            } catch {
-                logHandler(.error, "Failed to restart backend: \(error.localizedDescription)")
+            guard isReachable else {
+                cancelTemporaryShutdownRetry()
+                return
             }
+            await restartBackend(settingsGenerator)
 
         case .stopped:
             // no-op
             break
         }
 #endif
+    }
+
+    private func restartBackend(_ settingsGenerator: TunnelRemoteInfoGenerator) async {
+        guard !isRestartingBackend else {
+            return
+        }
+        isRestartingBackend = true
+        defer {
+            isRestartingBackend = false
+        }
+        cancelTemporaryShutdownRetry()
+        logHandler(.verbose, "Connectivity online, resuming backend.")
+        do {
+            await settingsGenerator.resetResolvedEndpoints()
+            let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
+            guard isTemporarilyShutdown(with: settingsGenerator) else {
+                return
+            }
+            try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
+                moduleId: moduleId
+            ))
+            guard isTemporarilyShutdown(with: settingsGenerator) else {
+                if let tunnel {
+                    await delegate?.adapterShouldClearNetworkSettings(self, tunnel: tunnel)
+                    self.tunnel = nil
+                }
+                return
+            }
+            let handle = try startWireGuardBackend(wgConfig: wgConfig)
+            state = .started(handle, settingsGenerator)
+        } catch {
+            logHandler(.error, "Failed to restart backend: \(error.localizedDescription)")
+            scheduleTemporaryShutdownRetry(for: settingsGenerator)
+        }
+    }
+
+    private func scheduleTemporaryShutdownRetry(for settingsGenerator: TunnelRemoteInfoGenerator) {
+        guard isTemporarilyShutdown(with: settingsGenerator), reachability.isReachable else {
+            return
+        }
+        guard temporaryShutdownRetryTask == nil else {
+            return
+        }
+        logHandler(.verbose, "Retry backend restart in \(Self.temporaryShutdownRetryDelay) milliseconds")
+        temporaryShutdownRetryTask = Task { [weak self] in
+            do {
+                try await Task.sleep(milliseconds: Self.temporaryShutdownRetryDelay)
+            } catch {
+                return
+            }
+            await self?.retryTemporaryShutdown(settingsGenerator)
+        }
+    }
+
+    private func retryTemporaryShutdown(_ settingsGenerator: TunnelRemoteInfoGenerator) async {
+        temporaryShutdownRetryTask = nil
+        guard reachability.isReachable, isTemporarilyShutdown(with: settingsGenerator) else {
+            return
+        }
+        await restartBackend(settingsGenerator)
+    }
+
+    private func cancelTemporaryShutdownRetry() {
+        temporaryShutdownRetryTask?.cancel()
+        temporaryShutdownRetryTask = nil
+    }
+
+    private func isTemporarilyShutdown(with settingsGenerator: TunnelRemoteInfoGenerator) -> Bool {
+        guard case .temporaryShutdown(let currentSettingsGenerator) = state else {
+            return false
+        }
+        return currentSettingsGenerator === settingsGenerator
     }
 
     private nonisolated var fallbackFileDescriptor: Int32? {
