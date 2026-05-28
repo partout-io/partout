@@ -43,8 +43,8 @@ interface TunnelControllerDelegate {
 class JNITunnelController(
     private val logTag: String,
     private val service: VpnService,
-    private val delegate: TunnelControllerDelegate,
-    scope: CoroutineScope
+    scope: CoroutineScope,
+    private val delegate: TunnelControllerDelegate
 ) : TunnelController {
     // All accesses must be synchronized against the lock
     private val lock = Any()

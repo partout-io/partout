@@ -113,7 +113,7 @@ class PartoutVpnServiceRuntime(
         isRunning = true
         Log.i(logTag, "Starting VPN daemon")
         try {
-            val newController = JNITunnelController(jniLogTag, service, this, serviceScope)
+            val newController = JNITunnelController(jniLogTag, service, serviceScope, this)
             engine.start(intent, newController, profileJSON)
             controller = newController
             Log.i(logTag, "Started VPN daemon")
