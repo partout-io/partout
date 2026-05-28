@@ -180,6 +180,16 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         await stop()
     }
 
+    public func sleep() async {
+        pp_log_id(profile.id, .core, .debug, "Device is about to sleep")
+        await connection?.sleep()
+    }
+
+    public func wake() async {
+        pp_log_id(profile.id, .core, .debug, "Device did wake up")
+        await connection?.wake()
+    }
+
     public func stop() async {
         guard state != .stopped else {
             assertionFailure("Daemon is stopped")

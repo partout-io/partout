@@ -128,6 +128,12 @@ public actor _WireGuardConnectionV2: Connection {
         dataCountTimer = nil
         self.adapter = nil
     }
+
+    public func wake() async {
+        guard let adapter else { return }
+        pp_log(ctx, .wireguard, .debug, "Wake tunnel")
+        await adapter.wake()
+    }
 }
 
 // MARK: - WireGuardAdapterDelegate
