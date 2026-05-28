@@ -43,16 +43,16 @@ public final class NativeTunnelController: TunnelController {
         var delegate = pp_tun_ctrl_delegate(
             ctx: Unmanaged.passUnretained(self).toOpaque(),
             on_reachable: { ctx, isReachable in
-                let swift = Unmanaged<NativeTunnelController>.fromOpaque(ctx).takeUnretainedValue()
-                swift.onReachable(isReachable)
+                let this = ctx.toSelf
+                this.onReachable(isReachable)
             },
             on_better_path: { ctx in
-                let swift = Unmanaged<NativeTunnelController>.fromOpaque(ctx).takeUnretainedValue()
-                swift.onBetterPath()
+                let this = ctx.toSelf
+                this.onBetterPath()
             },
             environment_value: { ctx, key in
-                let swift = Unmanaged<NativeTunnelController>.fromOpaque(ctx).takeUnretainedValue()
-                guard let data = swift.environmentData(forKey: String(cString: key)),
+                let this = ctx.toSelf
+                guard let data = this.environmentData(forKey: String(cString: key)),
                       let json = String(data: data, encoding: .utf8) else {
                     return nil
                 }
@@ -210,6 +210,12 @@ private final class BetterPathProxy: BetterPathStreamFactory, @unchecked Sendabl
 }
 
 // MARK: - Helpers
+
+private extension UnsafeMutableRawPointer {
+    var toSelf: NativeTunnelController {
+        Unmanaged.fromOpaque(self).takeUnretainedValue()
+    }
+}
 
 struct TunnelRemoteInfoWrapper: Encodable, Sendable {
     let originalModuleId: UniqueID
