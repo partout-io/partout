@@ -273,6 +273,11 @@ actor WireGuardAdapter {
 //        logHandler(.verbose, "Network change detected with \(path.status) route and interface order \(path.availableInterfaces)")
         logHandler(.verbose, "Network change detected, reachable: \(isReachable)")
 
+#if os(macOS)
+        if case .started(let handle, _) = self.state {
+            backend.bumpSockets(handle)
+        }
+#else
         switch state {
         case .started(let handle, let settingsGenerator):
             if isReachable {
@@ -307,6 +312,7 @@ actor WireGuardAdapter {
             // no-op
             break
         }
+#endif
     }
 
     private nonisolated var fallbackFileDescriptor: Int32? {
