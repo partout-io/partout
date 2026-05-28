@@ -17,9 +17,7 @@ public final class NativeTunnelController: TunnelController {
 
     private let onReachableStream: CurrentValueStream<Bool>
 
-    private let betterPathLock: SemaphoreMutex
-
-    private var onBetterPathStream: PassthroughStream<Void>?
+    private let pipeBetterPathFactory: PipeBetterPathFactory
 
     public init(
         _ ctx: PartoutLoggerContext,
@@ -40,7 +38,7 @@ public final class NativeTunnelController: TunnelController {
         self.environment = environment
         self.maxReadLength = maxReadLength
         onReachableStream = CurrentValueStream(false)
-        betterPathLock = SemaphoreMutex()
+        pipeBetterPathFactory = PipeBetterPathFactory()
 
         var delegate = pp_tun_ctrl_delegate(
             ctx: Unmanaged.passUnretained(self).toOpaque(),
@@ -172,18 +170,9 @@ extension NativeTunnelController: ReachabilityObserver {
     public var isReachableStream: AsyncStream<Bool> {
         onReachableStream.subscribe()
     }
-}
 
-extension NativeTunnelController: BetterPathStreamFactory {
-    public nonisolated func newStream() -> PassthroughStream<Void> {
-        let stream = PassthroughStream<Void>()
-        let oldStream = betterPathLock.with {
-            let old = onBetterPathStream
-            onBetterPathStream = stream
-            return old
-        }
-        oldStream?.finish()
-        return stream
+    public var betterPathFactory: BetterPathStreamFactory {
+        pipeBetterPathFactory
     }
 }
 
@@ -193,10 +182,30 @@ private extension NativeTunnelController {
     }
 
     func onBetterPath() {
-        let stream = betterPathLock.with {
-            onBetterPathStream
+        pipeBetterPathFactory.onBetterPath()
+    }
+}
+
+private final class PipeBetterPathFactory: BetterPathStreamFactory, @unchecked Sendable {
+    private let lock = SemaphoreMutex()
+    private var stream: PassthroughStream<Void>?
+
+    nonisolated func newStream() -> PassthroughStream<Void> {
+        let new = PassthroughStream<Void>()
+        let oldStream = lock.with {
+            let old = stream
+            stream = new
+            return old
         }
-        stream?.send()
+        oldStream?.finish()
+        return new
+    }
+
+    func onBetterPath() {
+        let current = lock.with {
+            stream
+        }
+        current?.send()
     }
 }
 
