@@ -50,7 +50,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/BSDSocket.swift
 ./PartoutCore/Connection/BSDSocketFactory.swift
 ./PartoutCore/Connection/BSDSocketObserver.swift
-./PartoutCore/Connection/BetterPathBlock.swift
+./PartoutCore/Connection/BetterPathStreamFactory.swift
 ./PartoutCore/Connection/Connection.swift
 ./PartoutCore/Connection/ConnectionDaemon.swift
 ./PartoutCore/Connection/ConnectionParameters.swift
@@ -175,7 +175,7 @@ set(PARTOUT_SOURCES
 ./PartoutOS/AppleNE/App/NETunnelEnvironment.swift
 ./PartoutOS/AppleNE/App/NETunnelManagerRepository.swift
 ./PartoutOS/AppleNE/App/NETunnelStrategy.swift
-./PartoutOS/AppleNE/AppExtension/NEBetterPathBlock.swift
+./PartoutOS/AppleNE/AppExtension/NEBetterPathStreamFactory.swift
 ./PartoutOS/AppleNE/AppExtension/NEObservablePath.swift
 ./PartoutOS/AppleNE/AppExtension/NEPTPForwarder.swift
 ./PartoutOS/AppleNE/AppExtension/NESettingsApplying.swift

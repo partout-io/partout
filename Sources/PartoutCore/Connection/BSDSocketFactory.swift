@@ -6,17 +6,17 @@
 public final class BSDSocketFactory: NetworkInterfaceFactory {
     private let ctx: PartoutLoggerContext
 
-    private let betterPathBlock: BetterPathBlock
+    private let betterPathFactory: BetterPathStreamFactory
 
     public init(
         _ ctx: PartoutLoggerContext,
-        betterPathBlock: @escaping BetterPathBlock
+        betterPathFactory: BetterPathStreamFactory
     ) {
         self.ctx = ctx
-        self.betterPathBlock = betterPathBlock
+        self.betterPathFactory = betterPathFactory
     }
 
     public func linkObserver(to endpoint: ExtendedEndpoint) -> LinkObserver {
-        BSDSocketObserver(ctx, endpoint: endpoint, betterPathBlock: betterPathBlock)
+        BSDSocketObserver(ctx, endpoint: endpoint, betterPathFactory: betterPathFactory)
     }
 }

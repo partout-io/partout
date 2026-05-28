@@ -4,18 +4,16 @@
 
 @preconcurrency import Network
 
-/// A better path block implementation backed by `NWPathMonitor`.
-public struct NEBetterPathBlock: Sendable {
+/// A better path implementation backed by `NWPathMonitor`.
+public struct NEBetterPathStreamFactory: BetterPathStreamFactory {
     private let ctx: PartoutLoggerContext
 
     public init(_ ctx: PartoutLoggerContext) {
         self.ctx = ctx
     }
 
-    public var block: BetterPathBlock {
-        { [ctx] in
-            NWPathMonitorBetterPathStream(ctx).stream
-        }
+    public func newStream() -> PassthroughStream<Void> {
+        NWPathMonitorBetterPathStream(ctx).stream
     }
 }
 
@@ -37,7 +35,7 @@ private final class NWPathMonitorBetterPathStream: @unchecked Sendable {
     init(_ ctx: PartoutLoggerContext) {
         self.ctx = ctx
         monitor = NWPathMonitor()
-        monitorQueue = DispatchQueue(label: "NEBetterPathBlock")
+        monitorQueue = DispatchQueue(label: "NEBetterPathStreamFactory")
         stream = PassthroughStream()
         didSignal = false
         didStop = false
