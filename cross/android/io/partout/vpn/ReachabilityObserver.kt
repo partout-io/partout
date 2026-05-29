@@ -10,10 +10,8 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.launch
 
 interface ReachabilityObserverProtocol {
     fun flow(): Flow<Network?>
@@ -26,7 +24,6 @@ class ReachabilityObserver(
         appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 ) : ReachabilityObserverProtocol {
     override fun flow(): Flow<Network?> = callbackFlow {
-        val producerScope = this
         val lock = Any()
         val reachableNetworks = linkedSetOf<Network>()
         var lastNetwork: Network? = null
@@ -46,31 +43,6 @@ class ReachabilityObserver(
             didEmit = true
             lastNetwork = network
             return Evaluation(network)
-        }
-
-        fun currentReachableNetworks(): List<Network> {
-            return connectivityManager.allNetworks.filter { network ->
-                connectivityManager.getNetworkCapabilities(network).isUsableUnderlying()
-            }
-        }
-
-        fun replaceCurrentNetworks() {
-            val evaluation = synchronized(lock) {
-                reachableNetworks.clear()
-                reachableNetworks.addAll(currentReachableNetworks())
-                evaluateLocked()
-            }
-            evaluation?.let {
-                trySend(it.network)
-            }
-        }
-
-        fun refreshCurrentNetworks() {
-            replaceCurrentNetworks()
-            producerScope.launch {
-                delay(CONNECTIVITY_REFRESH_DELAY_MS)
-                replaceCurrentNetworks()
-            }
         }
 
         fun update(network: Network, capabilities: NetworkCapabilities?) {
@@ -110,7 +82,6 @@ class ReachabilityObserver(
             .build()
 
         connectivityManager.registerNetworkCallback(request, callback)
-        refreshCurrentNetworks()
 
         awaitClose {
             runCatching {
@@ -128,9 +99,5 @@ class ReachabilityObserver(
                 hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN) &&
                 hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED) &&
                 hasCapability(NetworkCapabilities.NET_CAPABILITY_TRUSTED)
-    }
-
-    private companion object {
-        const val CONNECTIVITY_REFRESH_DELAY_MS = 500L
     }
 }
