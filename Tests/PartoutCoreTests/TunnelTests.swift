@@ -41,9 +41,6 @@ struct TunnelTests {
         let pending = Task {
             var emitted: [TunnelStatus] = []
             for await snapshots in stream {
-                if emitted.count == expected.count {
-                    return emitted
-                }
                 guard let status = snapshots.first?.value.status else {
                     continue
                 }
@@ -52,8 +49,14 @@ struct TunnelTests {
                     continue
                 }
                 emitted.append(status)
+                if emitted.count == expected.count {
+                    return emitted
+                }
             }
             return emitted
+        }
+        defer {
+            pending.cancel()
         }
 
         try await sut.prepare(purge: false)
@@ -78,14 +81,16 @@ struct TunnelTests {
 
         let exp = Expectation()
         let stream = sut.snapshotsStream
-        var didCall = false
-        Task {
+        let pending = Task {
             for await _ in stream {
-                if !didCall, sut.snapshots[profile.id]?.environment?.lastErrorCode != nil {
-                    didCall = true
+                if sut.snapshots[profile.id]?.environment?.lastErrorCode != nil {
                     await exp.fulfill()
+                    return
                 }
             }
+        }
+        defer {
+            pending.cancel()
         }
 
         try await sut.disconnect(from: profile.id)
@@ -114,16 +119,23 @@ struct TunnelTests {
         #expect(active.first?.key == profile.id)
 
         let expDataCount = DataCount(500, 700)
-        env.setEnvironmentValue(expDataCount, forKey: TunnelEnvironmentKeys.dataCount)
-
-        for await next in stream {
-            let dataCount = next[profile.id]?.environment?.dataCount
-            guard dataCount == expDataCount else {
-                continue
+        let exp = Expectation()
+        let pending = Task {
+            for await next in stream {
+                let dataCount = next[profile.id]?.environment?.dataCount
+                guard dataCount == expDataCount else {
+                    continue
+                }
+                await exp.fulfill()
+                return
             }
-            // Success
-            return
         }
+        defer {
+            pending.cancel()
+        }
+
+        env.setEnvironmentValue(expDataCount, forKey: TunnelEnvironmentKeys.dataCount)
+        try await exp.fulfillment(timeout: 500)
     }
 
     @Test
