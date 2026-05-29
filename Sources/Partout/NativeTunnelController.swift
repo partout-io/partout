@@ -5,7 +5,7 @@
 internal import _PartoutCore_C
 
 /// A controller that operates on a virtual tun interface.
-public final class NativeTunnelController: TunnelController {
+public final class NativeTunnelController: TunnelController, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
@@ -22,6 +22,8 @@ public final class NativeTunnelController: TunnelController {
     private var reachability: pp_tun_ctrl_reachability?
 
     private let betterPathProxy: BetterPathProxy
+
+    private let dns: DNSResolver
 
     public init(
         _ ctx: PartoutLoggerContext,
@@ -44,6 +46,9 @@ public final class NativeTunnelController: TunnelController {
         onReachableStream = CurrentValueStream(true)
         reachabilityLock = SemaphoreMutex()
         betterPathProxy = BetterPathProxy()
+        dns = SimpleDNSResolver {
+            POSIXDNSStrategy(hostname: $0)
+        }
 
         var delegate = pp_tun_ctrl_delegate(
             ctx: .fromSelf(self),
@@ -156,6 +161,14 @@ public final class NativeTunnelController: TunnelController {
         error.partoutErrorCode.rawValue.withCString {
             pp_tun_ctrl_cancel_tunnel(ref, $0)
         }
+    }
+}
+
+// MARK: - DNS
+
+extension NativeTunnelController: DNSResolver {
+    public func resolve(_ hostname: String, timeout: Int) async throws -> [DNSRecord] {
+        try await dns.resolve(hostname, timeout: timeout)
     }
 }
 

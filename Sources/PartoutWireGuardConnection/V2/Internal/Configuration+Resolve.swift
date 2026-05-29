@@ -46,10 +46,11 @@ extension WireGuard.Configuration {
     }
 
     func resolvePeers(
+        dns: DNSResolver?,
         timeout: Int,
         logHandler: @escaping WireGuardAdapter.LogHandler
     ) async throws -> [Endpoint: Endpoint] {
-        let resolver = SimpleDNSResolver {
+        let resolver = dns ?? SimpleDNSResolver {
             POSIXDNSStrategy(hostname: $0)
         }
         return try await resolvePeers(
