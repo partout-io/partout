@@ -4,15 +4,11 @@
 
 package io.partout.vpn
 
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import androidx.core.content.ContextCompat
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -67,16 +63,6 @@ class ReachabilityObserver(
             }
         }
 
-        fun replaceWithUnreachable() {
-            val evaluation = synchronized(lock) {
-                reachableNetworks.clear()
-                evaluateLocked()
-            }
-            evaluation?.let {
-                trySend(it.network)
-            }
-        }
-
         fun refreshCurrentNetworks() {
             replaceCurrentNetworks()
             producerScope.launch {
@@ -116,46 +102,17 @@ class ReachabilityObserver(
             }
         }
 
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context?, intent: Intent?) {
-                when (intent?.action) {
-                    Intent.ACTION_AIRPLANE_MODE_CHANGED -> {
-                        if (intent.getBooleanExtra("state", false)) {
-                            replaceWithUnreachable()
-                        } else {
-                            refreshCurrentNetworks()
-                        }
-                    }
-                }
-            }
-        }
-
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
             .build()
 
         connectivityManager.registerNetworkCallback(request, callback)
-
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
-        }
-
-        ContextCompat.registerReceiver(
-            appContext,
-            receiver,
-            filter,
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-
         refreshCurrentNetworks()
 
         awaitClose {
             runCatching {
                 connectivityManager.unregisterNetworkCallback(callback)
-            }
-            runCatching {
-                appContext.unregisterReceiver(receiver)
             }
         }
     }
