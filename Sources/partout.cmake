@@ -67,6 +67,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/NetworkInterfaceFactory.swift
 ./PartoutCore/Connection/NetworkObserver.swift
 ./PartoutCore/Connection/POSIXDNSStrategy.swift
+./PartoutCore/Connection/ReachabilityInfo.swift
 ./PartoutCore/Connection/ReachabilityObserver.swift
 ./PartoutCore/Connection/SharedTunnelEnvironment.swift
 ./PartoutCore/Connection/SimpleConnectionDaemon.swift

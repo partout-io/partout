@@ -16,14 +16,14 @@ public actor POSIXDNSStrategy: SimpleDNSStrategy {
     public func startResolution() async throws {
     }
 
-    public func waitForResolution(networkHandle: UInt64?) async throws -> [DNSRecord] {
+    public func waitForResolution(reachability: ReachabilityInfo?) async throws -> [DNSRecord] {
         let records: [DNSRecord]?
         if let task {
             records = try await task.value
         } else {
             let hostname = self.hostname
             let newTask = Task.detached { @Sendable in
-                try Self.resolveAndBlock(hostname: hostname, networkHandle: networkHandle)
+                try Self.resolveAndBlock(hostname: hostname, reachability: reachability)
             }
             task = newTask
             records = try await newTask.value
@@ -41,9 +41,9 @@ public actor POSIXDNSStrategy: SimpleDNSStrategy {
 }
 
 private extension POSIXDNSStrategy {
-    static func resolveAndBlock(hostname: String, networkHandle: UInt64?) throws -> [DNSRecord]? {
+    static func resolveAndBlock(hostname: String, reachability: ReachabilityInfo?) throws -> [DNSRecord]? {
 #if os(Android)
-        guard let networkHandle else {
+        guard let networkHandle = reachability?.networkHandle else {
             throw PartoutError(.networkUnreachable)
         }
         pp_log_g(.core, .info, "resolveAndBlock() with Android network handle: \(networkHandle)")

@@ -103,6 +103,7 @@ struct TunnelRemoteInfoGeneratorTests {
         let sut = TunnelRemoteInfoGenerator(
             .global,
             tunnelConfiguration: configuration,
+            dns: nil,
             dnsTimeout: 1000
         )
         let logs = LogCollector()
@@ -141,6 +142,7 @@ struct TunnelRemoteInfoGeneratorTests {
         let sut = TunnelRemoteInfoGenerator(
             .global,
             tunnelConfiguration: configuration,
+            dns: nil,
             dnsTimeout: 1
         )
 
@@ -168,6 +170,7 @@ struct TunnelRemoteInfoGeneratorTests {
         let sut = TunnelRemoteInfoGenerator(
             .global,
             tunnelConfiguration: configuration,
+            dns: nil,
             dnsTimeout: 1
         )
         let info = sut.generateRemoteInfo(moduleId: UniqueID())

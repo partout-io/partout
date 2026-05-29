@@ -51,9 +51,9 @@ public final class NativeTunnelController: TunnelController, Sendable {
             strategy: {
                 POSIXDNSStrategy(hostname: $0)
             },
-            networkHandle: { [weak reachabilityHolder] in
+            reachability: { [weak reachabilityHolder] in
 #if os(Android)
-                reachabilityHolder?.get()?.network_handle
+                reachabilityHolder?.get()
 #else
                 nil
 #endif
@@ -225,9 +225,19 @@ private final class ReachabilityHolder: @unchecked Sendable {
     private let lock = SemaphoreMutex()
     private var reachability: pp_tun_ctrl_reachability?
 
-    nonisolated func get() -> pp_tun_ctrl_reachability? {
+    nonisolated func get() -> ReachabilityInfo? {
         lock.with {
-            reachability
+            guard let reachability else { return nil }
+#if os(Android)
+            return ReachabilityInfo(
+                isReachable: reachability.reachable,
+                networkHandle: reachability.network_handle
+            )
+#else
+            return ReachabilityInfo(
+                isReachable: reachability.reachable
+            )
+#endif
         }
     }
 

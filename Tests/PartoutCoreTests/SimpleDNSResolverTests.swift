@@ -74,7 +74,7 @@ private actor MockStrategy: SimpleDNSStrategy {
         }
     }
 
-    func waitForResolution() async throws -> [DNSRecord] {
+    func waitForResolution(reachability: ReachabilityInfo?) async throws -> [DNSRecord] {
         print("waitForResolution")
         let result = try await resolutionTask?.value
         print("endResolution")
@@ -91,7 +91,7 @@ private actor CancellationIgnoringStrategy: SimpleDNSStrategy {
     func startResolution() {
     }
 
-    func waitForResolution() async throws -> [DNSRecord] {
+    func waitForResolution(reachability: ReachabilityInfo?) async throws -> [DNSRecord] {
         try await Task.sleep(milliseconds: 10_000)
         return []
     }

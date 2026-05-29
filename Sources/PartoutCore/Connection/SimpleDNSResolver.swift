@@ -6,30 +6,30 @@
 public protocol SimpleDNSStrategy: Sendable {
     func startResolution() async throws
 
-    func waitForResolution(networkHandle: UInt64?) async throws -> [DNSRecord]
+    func waitForResolution(reachability: ReachabilityInfo?) async throws -> [DNSRecord]
 
     func cancelResolution() async
 }
 
 /// ``DNSResolver`` with support for timeout cancellation.
 public actor SimpleDNSResolver: DNSResolver {
-    public typealias NetworkHandleBlock = () -> UInt64?
+    public typealias ReachabilityBlock = () -> ReachabilityInfo?
 
     private let strategy: (String) -> SimpleDNSStrategy
-    private let networkHandle: NetworkHandleBlock
+    private let reachability: ReachabilityBlock
 
     private var pendingResolutions: [String: Task<[DNSRecord], Error>]
 
     public init(strategy: @escaping (String) -> SimpleDNSStrategy) {
-        self.init(strategy: strategy, networkHandle: { nil })
+        self.init(strategy: strategy, reachability: { nil })
     }
 
     public init(
         strategy: @escaping (String) -> SimpleDNSStrategy,
-        networkHandle: @escaping NetworkHandleBlock
+        reachability: @escaping ReachabilityBlock
     ) {
         self.strategy = strategy
-        self.networkHandle = networkHandle
+        self.reachability = reachability
         pendingResolutions = [:]
     }
 
@@ -42,7 +42,7 @@ public actor SimpleDNSResolver: DNSResolver {
             try await newStrategy.startResolution()
             return try await Self.waitForResolution(
                 newStrategy,
-                networkHandle: networkHandle(),
+                reachability: reachability(),
                 timeout: timeout
             )
         }
@@ -57,7 +57,7 @@ public actor SimpleDNSResolver: DNSResolver {
 private extension SimpleDNSResolver {
     nonisolated static func waitForResolution(
         _ strategy: SimpleDNSStrategy,
-        networkHandle: UInt64?,
+        reachability: ReachabilityInfo?,
         timeout: Int
     ) async throws -> [DNSRecord] {
         try await withCheckedThrowingContinuation { continuation in
@@ -67,7 +67,9 @@ private extension SimpleDNSResolver {
             // child before returning the timeout.
             let waitTask = Task {
                 do {
-                    let records = try await strategy.waitForResolution(networkHandle: networkHandle)
+                    let records = try await strategy.waitForResolution(
+                        reachability: reachability
+                    )
                     await state.resume(with: .success(records))
                 } catch {
                     await state.resume(with: .failure(error))
