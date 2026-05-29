@@ -4,11 +4,7 @@
 
 package io.partout.vpn
 
-import android.content.Context
-import android.net.ConnectivityManager
 import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
@@ -67,20 +63,15 @@ class JNITunnelController(
     private val reachabilityObserver = ReachabilityObserver(service)
     private var reachabilityJob: Job? = null
     private var reachableNetwork: Network? = null
-    private val networkTracker = UnderlyingNetworkTracker(service) { handle ->
-        onReachabilityUpdate(handle)
-    }
 
     override fun startObserving() {
         reachabilityJob = reachabilityObserver
             .flow()
             .onEach { onReachabilityUpdate(it) }
             .launchIn(scope)
-        networkTracker.start()
     }
 
     override fun stopObserving() {
-        networkTracker.stop()
         reachabilityJob?.cancel()
         reachabilityJob = null
     }
