@@ -4,6 +4,7 @@
 
 package io.partout.vpn
 
+import android.net.Network
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
@@ -30,7 +31,7 @@ interface TunnelController {
     fun cancelTunnel(errorCode: String?)
 
     // Kotlin -> JNI
-    fun onReachabilityUpdate(isReachable: Boolean)
+    fun onReachabilityUpdate(network: Network?)
     fun onBetterPathUpdate()
     fun getEnvironmentValue(key: String): String?
 }
@@ -169,9 +170,10 @@ class JNITunnelController(
         return@synchronized
     }
 
-    override fun onReachabilityUpdate(isReachable: Boolean) = synchronized(lock) {
-        Log.e(logTag, ">>> Network: onReachabilityUpdate($isReachable)")
-        onNativeReachabilityUpdate(nativeDelegate, isReachable)
+    override fun onReachabilityUpdate(network: Network?) = synchronized(lock) {
+        val networkHandle = network?.networkHandle
+        Log.e(logTag, ">>> Network: onReachabilityUpdate($networkHandle)")
+        onNativeReachabilityUpdate(nativeDelegate, networkHandle ?: -1)
     }
 
     override fun onBetterPathUpdate() = synchronized(lock) {
@@ -184,7 +186,7 @@ class JNITunnelController(
         return getNativeEnvironmentValue(nativeDelegate, key)
     }
 
-    private external fun onNativeReachabilityUpdate(delegate: Long, isReachable: Boolean)
+    private external fun onNativeReachabilityUpdate(delegate: Long, networkHandle: Long)
     private external fun onNativeBetterPathUpdate(delegate: Long)
     private external fun getNativeEnvironmentValue(delegate: Long, key: String): String?
 
