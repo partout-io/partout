@@ -22,8 +22,9 @@ public actor POSIXDNSStrategy: SimpleDNSStrategy {
             records = try await task.value
         } else {
             let hostname = self.hostname
+            let reachabilityCopy = reachability
             let newTask = Task.detached { @Sendable in
-                try Self.resolveAndBlock(hostname: hostname, reachability: reachability)
+                try Self.resolveAndBlock(hostname: hostname, reachability: reachabilityCopy)
             }
             task = newTask
             records = try await newTask.value
