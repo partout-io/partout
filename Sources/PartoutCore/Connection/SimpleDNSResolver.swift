@@ -27,21 +27,82 @@ public actor SimpleDNSResolver: DNSResolver {
             return try await pendingResolutionTask.value
         }
         let newStrategy = strategy(hostname)
-        let timeoutTask = Task {
-            try await Task.sleep(milliseconds: timeout)
-            guard !Task.isCancelled else { return }
-            await newStrategy.cancelResolution()
-        }
         let resolutionTask = Task {
             try await newStrategy.startResolution()
-            let result = try await newStrategy.waitForResolution()
-            timeoutTask.cancel()
-            return result
+            return try await Self.waitForResolution(newStrategy, timeout: timeout)
         }
         pendingResolutions[hostname] = resolutionTask
         defer {
             pendingResolutions.removeValue(forKey: hostname)
         }
         return try await resolutionTask.value
+    }
+}
+
+private extension SimpleDNSResolver {
+    nonisolated static func waitForResolution(_ strategy: SimpleDNSStrategy, timeout: Int) async throws -> [DNSRecord] {
+        try await withCheckedThrowingContinuation { continuation in
+            let state = DNSResolutionState(continuation: continuation)
+            // Keep this unstructured. Blocking DNS resolution may ignore
+            // cancellation, and a task group would still wait for that
+            // child before returning the timeout.
+            let waitTask = Task {
+                do {
+                    let records = try await strategy.waitForResolution()
+                    await state.resume(with: .success(records))
+                } catch {
+                    await state.resume(with: .failure(error))
+                }
+            }
+            let timeoutTask = Task {
+                do {
+                    try await Task.sleep(milliseconds: timeout)
+                } catch {
+                    return
+                }
+                await strategy.cancelResolution()
+                await state.resume(with: .failure(PartoutError(.timeout)))
+            }
+            Task {
+                await state.setTasks(waitTask: waitTask, timeoutTask: timeoutTask)
+            }
+        }
+    }
+}
+
+private actor DNSResolutionState {
+    private var continuation: CheckedContinuation<[DNSRecord], Error>?
+
+    private var waitTask: Task<Void, Never>?
+
+    private var timeoutTask: Task<Void, Never>?
+
+    init(continuation: CheckedContinuation<[DNSRecord], Error>) {
+        self.continuation = continuation
+    }
+
+    func setTasks(waitTask: Task<Void, Never>, timeoutTask: Task<Void, Never>) {
+        guard continuation != nil else {
+            waitTask.cancel()
+            timeoutTask.cancel()
+            return
+        }
+        self.waitTask = waitTask
+        self.timeoutTask = timeoutTask
+    }
+
+    func resume(with result: Result<[DNSRecord], Error>) {
+        guard let continuation else { return }
+        self.continuation = nil
+        waitTask?.cancel()
+        timeoutTask?.cancel()
+        waitTask = nil
+        timeoutTask = nil
+        switch result {
+        case .success(let records):
+            continuation.resume(returning: records)
+        case .failure(let error):
+            continuation.resume(throwing: error)
+        }
     }
 }

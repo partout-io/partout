@@ -31,6 +31,21 @@ struct SimpleDNSResolverTests {
             #expect(Bool(false), "Unexpected error: \(error)")
         }
     }
+
+    @Test
+    func givenResolverIgnoringCancellation_whenTimeout_thenStillReturns() async throws {
+        let sut = SimpleDNSResolver { _ in
+            CancellationIgnoringStrategy()
+        }
+        do {
+            _ = try await sut.resolve("foobar.com", timeout: 100)
+            #expect(Bool(false), ".resolve must fail")
+        } catch let error as PartoutError {
+            #expect(error.code == .timeout)
+        } catch {
+            #expect(Bool(false), "Unexpected error: \(error)")
+        }
+    }
 }
 
 // MARK: -
@@ -69,5 +84,18 @@ private actor MockStrategy: SimpleDNSStrategy {
     func cancelResolution() {
         print("cancelResolution")
         resolutionTask?.cancel()
+    }
+}
+
+private actor CancellationIgnoringStrategy: SimpleDNSStrategy {
+    func startResolution() {
+    }
+
+    func waitForResolution() async throws -> [DNSRecord] {
+        try await Task.sleep(milliseconds: 10_000)
+        return []
+    }
+
+    func cancelResolution() {
     }
 }

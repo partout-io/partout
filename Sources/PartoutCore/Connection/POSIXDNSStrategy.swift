@@ -43,7 +43,6 @@ public actor POSIXDNSStrategy: SimpleDNSStrategy {
 
 private extension POSIXDNSStrategy {
     static func resolveAndBlock(hostname: String) throws -> [DNSRecord]? {
-        let addr = hostname.cString(using: .utf8)
         var hints = addrinfo()
 #if canImport(Darwin)
         // We set this to ALL so that we get v4 addresses even on DNS64 networks
@@ -51,8 +50,12 @@ private extension POSIXDNSStrategy {
         hints.ai_flags = AI_ALL
 #endif
         hints.ai_family = AF_UNSPEC // IPv4/IPv6
+        // XXX: Choosing either would dedup results
+//        hints.ai_socktype = SOCK_STREAM SOCK_DGRAM
         var infoPointer: UnsafeMutablePointer<addrinfo>?
-        let result = getaddrinfo(addr, nil, &hints, &infoPointer)
+        let result = hostname.withCString {
+            getaddrinfo($0, nil, &hints, &infoPointer)
+        }
         guard result == 0 else {
             switch result {
             case EAI_BADFLAGS:
@@ -71,13 +74,11 @@ private extension POSIXDNSStrategy {
 
         var records: [DNSRecord] = []
         var currentPointer = infoPointer
-        while let info = currentPointer?.pointee {
-            guard !Task.isCancelled else {
-                return nil
-            }
-            guard let addr = info.ai_addr else {
-                continue
-            }
+        while let pointer = currentPointer {
+            let info = pointer.pointee
+            currentPointer = info.ai_next
+            guard !Task.isCancelled else { return nil }
+            guard let addr = info.ai_addr else { continue }
             let addrLength = socklen_t(info.ai_addrlen)
             var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
 #if os(Windows)
@@ -98,9 +99,9 @@ private extension POSIXDNSStrategy {
             )
             if result == 0 {
                 let address = hostBuffer.string
-                records.append(DNSRecord(address: address, isIPv6: addrLength == 128))
+                let isIPv6 = info.ai_family == AF_INET6
+                records.append(DNSRecord(address: address, isIPv6: isIPv6))
             }
-            currentPointer = info.ai_next
         }
         return records
     }
