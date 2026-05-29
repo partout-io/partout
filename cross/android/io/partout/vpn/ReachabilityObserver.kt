@@ -126,10 +126,6 @@ class ReachabilityObserver(
                             refreshCurrentNetworks()
                         }
                     }
-
-                    ConnectivityManager.CONNECTIVITY_ACTION -> {
-                        refreshCurrentNetworks()
-                    }
                 }
             }
         }
@@ -143,7 +139,6 @@ class ReachabilityObserver(
 
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
-            addAction(ConnectivityManager.CONNECTIVITY_ACTION)
         }
 
         ContextCompat.registerReceiver(
