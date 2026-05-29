@@ -6,19 +6,30 @@
 public protocol SimpleDNSStrategy: Sendable {
     func startResolution() async throws
 
-    func waitForResolution() async throws -> [DNSRecord]
+    func waitForResolution(networkHandle: UInt64?) async throws -> [DNSRecord]
 
     func cancelResolution() async
 }
 
 /// ``DNSResolver`` with support for timeout cancellation.
 public actor SimpleDNSResolver: DNSResolver {
+    public typealias NetworkHandleBlock = () -> UInt64?
+
     private let strategy: (String) -> SimpleDNSStrategy
+    private let networkHandle: NetworkHandleBlock
 
     private var pendingResolutions: [String: Task<[DNSRecord], Error>]
 
     public init(strategy: @escaping (String) -> SimpleDNSStrategy) {
+        self.init(strategy: strategy, networkHandle: { nil })
+    }
+
+    public init(
+        strategy: @escaping (String) -> SimpleDNSStrategy,
+        networkHandle: @escaping NetworkHandleBlock
+    ) {
         self.strategy = strategy
+        self.networkHandle = networkHandle
         pendingResolutions = [:]
     }
 
@@ -29,7 +40,11 @@ public actor SimpleDNSResolver: DNSResolver {
         let newStrategy = strategy(hostname)
         let resolutionTask = Task {
             try await newStrategy.startResolution()
-            return try await Self.waitForResolution(newStrategy, timeout: timeout)
+            return try await Self.waitForResolution(
+                newStrategy,
+                networkHandle: networkHandle(),
+                timeout: timeout
+            )
         }
         pendingResolutions[hostname] = resolutionTask
         defer {
@@ -40,7 +55,11 @@ public actor SimpleDNSResolver: DNSResolver {
 }
 
 private extension SimpleDNSResolver {
-    nonisolated static func waitForResolution(_ strategy: SimpleDNSStrategy, timeout: Int) async throws -> [DNSRecord] {
+    nonisolated static func waitForResolution(
+        _ strategy: SimpleDNSStrategy,
+        networkHandle: UInt64?,
+        timeout: Int
+    ) async throws -> [DNSRecord] {
         try await withCheckedThrowingContinuation { continuation in
             let state = DNSResolutionState(continuation: continuation)
             // Keep this unstructured. Blocking DNS resolution may ignore
@@ -48,7 +67,7 @@ private extension SimpleDNSResolver {
             // child before returning the timeout.
             let waitTask = Task {
                 do {
-                    let records = try await strategy.waitForResolution()
+                    let records = try await strategy.waitForResolution(networkHandle: networkHandle)
                     await state.resume(with: .success(records))
                 } catch {
                     await state.resume(with: .failure(error))

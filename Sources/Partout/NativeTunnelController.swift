@@ -5,7 +5,7 @@
 internal import _PartoutCore_C
 
 /// A controller that operates on a virtual tun interface.
-public final class NativeTunnelController: TunnelController, @unchecked Sendable {
+public final class NativeTunnelController: TunnelController, Sendable {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
@@ -17,9 +17,7 @@ public final class NativeTunnelController: TunnelController, @unchecked Sendable
 
     private let onReachableStream: CurrentValueStream<Bool>
 
-    private let reachabilityLock: SemaphoreMutex
-
-    private var reachability: pp_tun_ctrl_reachability?
+    private let reachabilityHolder: ReachabilityHolder
 
     private let betterPathProxy: BetterPathProxy
 
@@ -44,11 +42,23 @@ public final class NativeTunnelController: TunnelController, @unchecked Sendable
         self.environment = environment
         self.maxReadLength = maxReadLength
         onReachableStream = CurrentValueStream(true)
-        reachabilityLock = SemaphoreMutex()
+        let reachabilityHolder = ReachabilityHolder()
+        self.reachabilityHolder = reachabilityHolder
         betterPathProxy = BetterPathProxy()
-        dns = SimpleDNSResolver {
-            POSIXDNSStrategy(hostname: $0)
-        }
+
+        // Native resolver requires network handle on Android
+        dns = SimpleDNSResolver(
+            strategy: {
+                POSIXDNSStrategy(hostname: $0)
+            },
+            networkHandle: { [weak reachabilityHolder] in
+#if os(Android)
+                reachabilityHolder?.get()?.network_handle
+#else
+                nil
+#endif
+            }
+        )
 
         var delegate = pp_tun_ctrl_delegate(
             ctx: .fromSelf(self),
@@ -202,14 +212,29 @@ private extension NativeTunnelController {
 #else
         pp_log(ctx, .core, .info, "Network reachability changed: reachable=\(isReachable)")
 #endif
-        reachabilityLock.with {
-            self.reachability = reachability.pointee
-        }
+        reachabilityHolder.set(reachability)
         onReachableStream.send(isReachable)
     }
 
     func onBetterPath() {
         betterPathProxy.onBetterPath()
+    }
+}
+
+private final class ReachabilityHolder: @unchecked Sendable {
+    private let lock = SemaphoreMutex()
+    private var reachability: pp_tun_ctrl_reachability?
+
+    nonisolated func get() -> pp_tun_ctrl_reachability? {
+        lock.with {
+            reachability
+        }
+    }
+
+    nonisolated func set(_ new: UnsafePointer<pp_tun_ctrl_reachability>) {
+        lock.with {
+            reachability = new.pointee
+        }
     }
 }
 

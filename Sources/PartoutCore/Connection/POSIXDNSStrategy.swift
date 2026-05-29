@@ -7,7 +7,6 @@ internal import _PartoutCore_C
 /// Implementation of ``SimpleDNSStrategy`` with the POSIX C library.
 public actor POSIXDNSStrategy: SimpleDNSStrategy {
     private let hostname: String
-
     private var task: Task<[DNSRecord]?, Error>?
 
     public init(hostname: String) {
@@ -17,14 +16,14 @@ public actor POSIXDNSStrategy: SimpleDNSStrategy {
     public func startResolution() async throws {
     }
 
-    public func waitForResolution() async throws -> [DNSRecord] {
+    public func waitForResolution(networkHandle: UInt64?) async throws -> [DNSRecord] {
         let records: [DNSRecord]?
         if let task {
             records = try await task.value
         } else {
             let hostname = self.hostname
             let newTask = Task.detached { @Sendable in
-                try Self.resolveAndBlock(hostname: hostname)
+                try Self.resolveAndBlock(hostname: hostname, networkHandle: networkHandle)
             }
             task = newTask
             records = try await newTask.value
@@ -42,7 +41,13 @@ public actor POSIXDNSStrategy: SimpleDNSStrategy {
 }
 
 private extension POSIXDNSStrategy {
-    static func resolveAndBlock(hostname: String) throws -> [DNSRecord]? {
+    static func resolveAndBlock(hostname: String, networkHandle: UInt64?) throws -> [DNSRecord]? {
+#if os(Android)
+        guard let networkHandle else {
+            throw PartoutError(.networkUnreachable)
+        }
+        pp_log_g(.core, .info, "resolveAndBlock() with Android network handle: \(networkHandle)")
+#endif
         var hints = addrinfo()
 #if canImport(Darwin)
         // We set this to ALL so that we get v4 addresses even on DNS64 networks
@@ -54,7 +59,11 @@ private extension POSIXDNSStrategy {
 //        hints.ai_socktype = SOCK_STREAM SOCK_DGRAM
         var infoPointer: UnsafeMutablePointer<addrinfo>?
         let result = hostname.withCString {
+#if os(Android)
+            android_getaddrinfofornetwork(networkHandle, $0, nil, &hints, &infoPointer)
+#else
             getaddrinfo($0, nil, &hints, &infoPointer)
+#endif
         }
         guard result == 0 else {
             switch result {

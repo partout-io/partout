@@ -13,6 +13,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if PARTOUT_ANDROID
+#include <android/multinetwork.h>
+#endif
+
 /* Logging counterpart of Swift pp_log. */
 
 typedef enum {
