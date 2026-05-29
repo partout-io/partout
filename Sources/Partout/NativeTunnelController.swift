@@ -42,23 +42,13 @@ public final class NativeTunnelController: TunnelController, Sendable {
         self.environment = environment
         self.maxReadLength = maxReadLength
         onReachableStream = CurrentValueStream(true)
-        let reachabilityHolder = ReachabilityHolder()
-        self.reachabilityHolder = reachabilityHolder
+        reachabilityHolder = ReachabilityHolder()
         betterPathProxy = BetterPathProxy()
 
         // Native resolver requires network handle on Android
-        dns = SimpleDNSResolver(
-            strategy: {
-                POSIXDNSStrategy(hostname: $0)
-            },
-            reachability: { [weak reachabilityHolder] in
-#if os(Android)
-                reachabilityHolder?.get()
-#else
-                nil
-#endif
-            }
-        )
+        dns = SimpleDNSResolver {
+            POSIXDNSStrategy(hostname: $0)
+        }
 
         var delegate = pp_tun_ctrl_delegate(
             ctx: .fromSelf(self),
@@ -177,8 +167,14 @@ public final class NativeTunnelController: TunnelController, Sendable {
 // MARK: - DNS
 
 extension NativeTunnelController: DNSResolver {
-    public func resolve(_ hostname: String, timeout: Int) async throws -> [DNSRecord] {
-        try await dns.resolve(hostname, timeout: timeout)
+    public func resolve(_ hostname: String, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
+        let localReachability: ReachabilityInfo?
+#if os(Android)
+        localReachability = reachabilityHolder?.get()
+#else
+        localReachability = reachability
+#endif
+        return try await dns.resolve(hostname, reachability: localReachability, timeout: timeout)
     }
 }
 

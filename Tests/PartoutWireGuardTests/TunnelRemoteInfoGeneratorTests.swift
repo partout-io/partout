@@ -204,7 +204,7 @@ private actor RecordingDNSResolver: DNSResolver {
         resolvedRecords[hostname] = records
     }
 
-    func resolve(_ hostname: String, timeout: Int) async throws -> [DNSRecord] {
+    func resolve(_ hostname: String, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
         hostnames.append(hostname)
         return resolvedRecords[hostname] ?? []
     }
