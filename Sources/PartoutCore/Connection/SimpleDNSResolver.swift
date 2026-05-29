@@ -43,8 +43,9 @@ private extension SimpleDNSResolver {
     nonisolated static func waitForResolution(_ strategy: SimpleDNSStrategy, timeout: Int) async throws -> [DNSRecord] {
         try await withCheckedThrowingContinuation { continuation in
             let state = DNSResolutionState(continuation: continuation)
-            // Keep this unstructured: POSIX getaddrinfo() may ignore cancellation, and a task group
-            // would still wait for that child before returning the timeout.
+            // Keep this unstructured. Blocking DNS resolution may ignore
+            // cancellation, and a task group would still wait for that
+            // child before returning the timeout.
             let waitTask = Task {
                 do {
                     let records = try await strategy.waitForResolution()
