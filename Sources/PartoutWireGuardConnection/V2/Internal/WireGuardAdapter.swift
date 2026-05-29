@@ -281,8 +281,8 @@ actor WireGuardAdapter {
 #if os(macOS)
         if case .started(let handle, _) = self.state {
             Task {
-                self.backend.bumpSockets(handle)
-                self.configureSockets(for: handle)
+                backend.bumpSockets(handle)
+                configureSockets(for: handle)
             }
         }
 #else
