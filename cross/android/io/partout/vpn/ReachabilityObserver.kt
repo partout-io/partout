@@ -30,6 +30,7 @@ class ReachabilityObserver(
         val lock = Any()
         val reachableNetworks = linkedSetOf<Network>()
         var lastNetwork: Network? = null
+        var didEmit = false
 
         class Evaluation(val network: Network?)
 
@@ -39,9 +40,10 @@ class ReachabilityObserver(
 
         fun evaluateLocked(): Evaluation? {
             val network = currentNetwork()
-            if (network == lastNetwork) {
+            if (didEmit && network == lastNetwork) {
                 return null
             }
+            didEmit = true
             lastNetwork = network
             return Evaluation(network)
         }
