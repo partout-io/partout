@@ -52,7 +52,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
         var delegate = pp_tun_ctrl_delegate(
             ctx: .fromSelf(self),
-            on_reachable: { ctx, reachability in
+            on_reachability: { ctx, reachability in
                 let this = ctx.toSelf
                 this.onReachability(reachability)
             },
