@@ -185,9 +185,9 @@ private extension NativeTunnelController {
     func onReachability(_ reachability: UnsafePointer<pp_tun_ctrl_reachability>) {
         let isReachable = reachability.pointee.reachable
 #if os(Android)
-        pp_log(ctx, .core, .fault, ">>> Network reachable: \(isReachable), network_handle=\(reachability.pointee.network_handle)")
+        pp_log(ctx, .core, .info, "Network reachability changed: reachable=\(isReachable), network_handle=\(reachability.pointee.network_handle)")
 #else
-        pp_log(ctx, .core, .fault, ">>> Network reachable: \(isReachable)")
+        pp_log(ctx, .core, .info, "Network reachability changed: reachable=\(isReachable)")
 #endif
         reachabilityLock.with {
             self.reachability = reachability.pointee
