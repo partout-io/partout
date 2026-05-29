@@ -41,7 +41,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
 #endif
         self.environment = environment
         self.maxReadLength = maxReadLength
-        onReachableStream = CurrentValueStream(true)
+        onReachableStream = CurrentValueStream(false)
         reachabilityHolder = ReachabilityHolder()
         betterPathProxy = BetterPathProxy()
 
