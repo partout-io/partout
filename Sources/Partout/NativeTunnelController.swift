@@ -168,13 +168,17 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
 extension NativeTunnelController: DNSResolver {
     public func resolve(_ hostname: String, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
-        let localReachability: ReachabilityInfo?
+        let fallbackReachability: ReachabilityInfo?
 #if os(Android)
-        localReachability = reachabilityHolder?.get()
+        fallbackReachability = reachabilityHolder?.get()
 #else
-        localReachability = reachability
+        fallbackReachability = reachability
 #endif
-        return try await dns.resolve(hostname, reachability: localReachability, timeout: timeout)
+        return try await dns.resolve(
+            hostname,
+            reachability: reachability ?? fallbackReachability,
+            timeout: timeout
+        )
     }
 }
 
