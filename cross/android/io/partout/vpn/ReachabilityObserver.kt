@@ -29,7 +29,6 @@ class ReachabilityObserver(
     private val connectivityManager: ConnectivityManager =
         appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 ) : ReachabilityObserverProtocol {
-    @Suppress("DEPRECATION")
     override fun flow(): Flow<Network?> = callbackFlow {
         val producerScope = this
         val lock = Any()
@@ -53,7 +52,7 @@ class ReachabilityObserver(
 
         fun currentReachableNetworks(): List<Network> {
             return connectivityManager.allNetworks.filter { network ->
-                connectivityManager.getNetworkCapabilities(network).isReachablePath
+                connectivityManager.getNetworkCapabilities(network).isUsableUnderlying()
             }
         }
 
@@ -88,7 +87,7 @@ class ReachabilityObserver(
 
         fun update(network: Network, capabilities: NetworkCapabilities?) {
             val evaluation = synchronized(lock) {
-                if (capabilities.isReachablePath) {
+                if (capabilities.isUsableUnderlying()) {
                     reachableNetworks.add(network)
                 } else {
                     reachableNetworks.remove(network)
@@ -127,6 +126,7 @@ class ReachabilityObserver(
                             refreshCurrentNetworks()
                         }
                     }
+
                     ConnectivityManager.CONNECTIVITY_ACTION -> {
                         refreshCurrentNetworks()
                     }
@@ -134,10 +134,9 @@ class ReachabilityObserver(
             }
         }
 
-        // Keep the callback unfiltered so paths that stop matching INTERNET/NOT_VPN
-        // can still trigger null.
         val request = NetworkRequest.Builder()
-            .clearCapabilities()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
             .build()
 
         connectivityManager.registerNetworkCallback(request, callback)
@@ -166,13 +165,7 @@ class ReachabilityObserver(
         }
     }
 
-    private companion object {
-        const val CONNECTIVITY_REFRESH_DELAY_MS = 500L
-    }
-}
-
-private val NetworkCapabilities?.isReachablePath: Boolean
-    get() {
+    private fun NetworkCapabilities?.isUsableUnderlying(): Boolean {
         if (this == null) {
             return false
         }
@@ -182,3 +175,8 @@ private val NetworkCapabilities?.isReachablePath: Boolean
                 hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED) &&
                 hasCapability(NetworkCapabilities.NET_CAPABILITY_TRUSTED)
     }
+
+    private companion object {
+        const val CONNECTIVITY_REFRESH_DELAY_MS = 500L
+    }
+}
