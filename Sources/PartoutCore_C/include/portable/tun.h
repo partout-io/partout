@@ -26,8 +26,15 @@ const char *_Nullable pp_tun_name(const pp_tun _Nonnull tun);
 
 /* Tunnel controller. */
 typedef struct {
+    bool reachable;
+#if PARTOUT_ANDROID
+    uint64_t network_handle;
+#endif
+} pp_tun_ctrl_reachability;
+typedef struct {
     void *_Nullable ctx;
-    void (*_Nonnull on_reachable)(void *_Nonnull ctx, bool is_reachable);
+    void (*_Nonnull on_reachable)(void *_Nonnull ctx,
+                                  const pp_tun_ctrl_reachability *_Nonnull reachability);
     void (*_Nonnull on_better_path)(void *_Nonnull ctx);
     char *_Nullable (*_Nonnull environment_value)(void *_Nonnull ctx, const char *_Nonnull key);
 } pp_tun_ctrl_delegate;

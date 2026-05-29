@@ -298,11 +298,15 @@ JNIEXPORT void JNICALL
 Java_io_partout_vpn_JNITunnelController_onNativeReachabilityUpdate(JNIEnv *env,
                                                                    jobject thiz,
                                                                    jlong delegate,
-                                                                   jboolean is_reachable) {
+                                                                   jlong net_handle) {
     (void)thiz;
     pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
     if (!ctrl_delegate || !ctrl_delegate->ctx) return;
-    ctrl_delegate->on_reachable(ctrl_delegate->ctx, is_reachable);
+    const pp_tun_ctrl_reachability reachability = {
+        .reachable = net_handle != -1,
+        .network_handle = net_handle
+    };
+    ctrl_delegate->on_reachable(ctrl_delegate->ctx, &reachability);
 }
 
 JNIEXPORT void JNICALL

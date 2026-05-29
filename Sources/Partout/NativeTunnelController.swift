@@ -17,6 +17,10 @@ public final class NativeTunnelController: TunnelController {
 
     private let onReachableStream: CurrentValueStream<Bool>
 
+    private let reachabilityLock: SemaphoreMutex
+
+    private var reachability: pp_tun_ctrl_reachability?
+
     private let betterPathProxy: BetterPathProxy
 
     public init(
@@ -37,14 +41,15 @@ public final class NativeTunnelController: TunnelController {
 #endif
         self.environment = environment
         self.maxReadLength = maxReadLength
-        onReachableStream = CurrentValueStream(false)
+        onReachableStream = CurrentValueStream(true)
+        reachabilityLock = SemaphoreMutex()
         betterPathProxy = BetterPathProxy()
 
         var delegate = pp_tun_ctrl_delegate(
             ctx: .fromSelf(self),
-            on_reachable: { ctx, isReachable in
+            on_reachable: { ctx, reachability in
                 let this = ctx.toSelf
-                this.onReachable(isReachable)
+                this.onReachability(reachability)
             },
             on_better_path: { ctx in
                 let this = ctx.toSelf
@@ -177,7 +182,16 @@ extension NativeTunnelController: ReachabilityObserver {
 }
 
 private extension NativeTunnelController {
-    func onReachable(_ isReachable: Bool) {
+    func onReachability(_ reachability: UnsafePointer<pp_tun_ctrl_reachability>) {
+        let isReachable = reachability.pointee.reachable
+#if os(Android)
+        pp_log(ctx, .core, .info, "Network reachability changed: reachable=\(isReachable), network_handle=\(reachability.pointee.network_handle)")
+#else
+        pp_log(ctx, .core, .info, "Network reachability changed: reachable=\(isReachable)")
+#endif
+        reachabilityLock.with {
+            self.reachability = reachability.pointee
+        }
         onReachableStream.send(isReachable)
     }
 

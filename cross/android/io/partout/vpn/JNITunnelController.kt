@@ -4,6 +4,7 @@
 
 package io.partout.vpn
 
+import android.net.Network
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
@@ -13,13 +14,13 @@ import io.partout.models.TaggedModuleIP
 import io.partout.models.TaggedModuleOnDemand
 import io.partout.models.TunnelRemoteInfoWrapper
 import io.partout.models.TunnelSnapshot
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 // Must match signatures in tun_android.c
 interface TunnelController {
     // Runtime
+    fun startObserving()
     fun stopObserving()
 
     // JNI -> Jotlin
@@ -30,7 +31,7 @@ interface TunnelController {
     fun cancelTunnel(errorCode: String?)
 
     // Kotlin -> JNI
-    fun onReachabilityUpdate(isReachable: Boolean)
+    fun onReachabilityUpdate(network: Network?)
     fun onBetterPathUpdate()
     fun getEnvironmentValue(key: String): String?
 }
@@ -43,7 +44,6 @@ interface TunnelControllerDelegate {
 class JNITunnelController(
     private val logTag: String,
     private val service: VpnService,
-    scope: CoroutineScope,
     private val delegate: TunnelControllerDelegate
 ) : TunnelController {
     // All accesses must be synchronized against the lock
@@ -53,6 +53,9 @@ class JNITunnelController(
     private var nativeDelegate: Long = 0
     private var isNativeCancelled = false
     private var tunDescriptor: ParcelFileDescriptor? = null
+
+    override fun startObserving() {
+    }
 
     override fun stopObserving() {
     }
@@ -169,9 +172,10 @@ class JNITunnelController(
         return@synchronized
     }
 
-    override fun onReachabilityUpdate(isReachable: Boolean) = synchronized(lock) {
-        Log.e(logTag, ">>> Network: onReachabilityUpdate($isReachable)")
-        onNativeReachabilityUpdate(nativeDelegate, isReachable)
+    override fun onReachabilityUpdate(network: Network?) = synchronized(lock) {
+        val networkHandle = network?.networkHandle
+        Log.e(logTag, ">>> Network: onReachabilityUpdate($networkHandle)")
+        onNativeReachabilityUpdate(nativeDelegate, networkHandle ?: -1)
     }
 
     override fun onBetterPathUpdate() = synchronized(lock) {
@@ -184,7 +188,7 @@ class JNITunnelController(
         return getNativeEnvironmentValue(nativeDelegate, key)
     }
 
-    private external fun onNativeReachabilityUpdate(delegate: Long, isReachable: Boolean)
+    private external fun onNativeReachabilityUpdate(delegate: Long, networkHandle: Long)
     private external fun onNativeBetterPathUpdate(delegate: Long)
     private external fun getNativeEnvironmentValue(delegate: Long, key: String): String?
 
