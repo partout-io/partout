@@ -14,6 +14,12 @@ final class MyDest: LoggerDestination {
     }
 }
 
+final class DummyFactory: BetterPathStreamFactory {
+    func newStream() -> PassthroughStream<Void> {
+        PassthroughStream()
+    }
+}
+
 func tryTCPConnection() async throws {
     var log = PartoutLogger.Builder()
     log.setDestination(MyDest(), for: [.core])
@@ -24,9 +30,7 @@ func tryTCPConnection() async throws {
     let observer = BSDSocketObserver(
         .global,
         endpoint: endpoint,
-        betterPathBlock: {
-            PassthroughStream()
-        }
+        betterPathFactory: DummyFactory()
     )
     let sut = try await observer.waitForActivity(timeout: 5000)
 

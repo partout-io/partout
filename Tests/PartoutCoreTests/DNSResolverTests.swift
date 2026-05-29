@@ -7,21 +7,21 @@ import Testing
 
 struct DNSResolverTests {
     @Test
-    func givenResolver_whenResolve_thenReturnsResolvedAddress() throws {
+    func givenResolver_whenResolve_thenReturnsResolvedAddress() async throws {
         let expRecords = [DNSRecord(address: "1.2.3.4", isIPv6: false)]
 
         let sut = MockDNSResolver()
         sut.resolvedRecords = ["www.google.com": expRecords]
-        let records = try sut.resolve("www.google.com", timeout: 1000)
+        let records = try await sut.resolve("www.google.com", timeout: 1000)
         #expect(records == expRecords)
     }
 
     @Test
-    func givenBrokenResolver_whenResolve_thenFails() throws {
+    func givenBrokenResolver_whenResolve_thenFails() async throws {
         let sut = MockDNSResolver()
         sut.error = PartoutError(.dnsFailure)
         do {
-            _ = try sut.resolve("www.google.com", timeout: 1000)
+            _ = try await sut.resolve("www.google.com", timeout: 1000)
         } catch let error as PartoutError {
             #expect(error.code == .dnsFailure)
         } catch {
@@ -30,11 +30,11 @@ struct DNSResolverTests {
     }
 
     @Test
-    func givenSlowResolver_whenResolve_thenFailsWithTimeout() throws {
+    func givenSlowResolver_whenResolve_thenFailsWithTimeout() async throws {
         let sut = MockDNSResolver()
         sut.error = PartoutError(.timeout)
         do {
-            _ = try sut.resolve("www.google.com", timeout: 1000)
+            _ = try await sut.resolve("www.google.com", timeout: 1000)
         } catch let error as PartoutError {
             #expect(error.code == .timeout)
         } catch {

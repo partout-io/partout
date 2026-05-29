@@ -27,7 +27,7 @@ Given the main app and the daemon:
 
 ### Setting up a connection
 
-- ``BetterPathBlock``
+- ``BetterPathStreamFactory``
 - ``BSDSocketFactory``
 - ``Connection``
 - ``ConnectionParameters``
@@ -42,6 +42,7 @@ Given the main app and the daemon:
 - ``DNSRecord``
 - ``DNSResolver``
 - ``POSIXDNSStrategy``
+- ``ReachabilityInfo``
 - ``SimpleDNSResolver``
 - ``SimpleDNSStrategy``
 

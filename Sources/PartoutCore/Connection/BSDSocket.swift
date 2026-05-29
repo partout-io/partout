@@ -20,7 +20,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
 
     private let maxReadBatchBytes: Int
 
-    private let betterPathBlock: BetterPathBlock
+    private let betterPathFactory: BetterPathStreamFactory
 
     private let betterPathStream: PassthroughStream<Void>
 
@@ -46,7 +46,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         _ ctx: PartoutLoggerContext,
         endpoint: ExtendedEndpoint,
         timeout: Int,
-        betterPathBlock: @escaping BetterPathBlock,
+        betterPathFactory: BetterPathStreamFactory,
         socketBufferLength: Int = 1 * 1024 * 1024,
         maxReadLength: Int = 128 * 1024,
         maxReadBatchPackets: Int = 256,
@@ -57,25 +57,20 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
             timeout: timeout,
             socketBufferLength: socketBufferLength
         )
-        do {
-            let closesOnEmptyRead = endpoint.plainSocketType == .tcp
-            let betterPathStream = try betterPathBlock()
-            return BSDSocket(
-                ctx: ctx,
-                endpoint: endpoint,
-                connectTimeout: timeout,
-                sock: sock,
-                closesOnEmptyRead: closesOnEmptyRead,
-                maxReadLength: maxReadLength,
-                maxReadBatchPackets: maxReadBatchPackets,
-                maxReadBatchBytes: maxReadBatchBytes,
-                betterPathBlock: betterPathBlock,
-                betterPathStream: betterPathStream
-            )
-        } catch {
-            pp_socket_free(sock)
-            throw error
-        }
+        let closesOnEmptyRead = endpoint.plainSocketType == .tcp
+        let betterPathStream = betterPathFactory.newStream()
+        return BSDSocket(
+            ctx: ctx,
+            endpoint: endpoint,
+            connectTimeout: timeout,
+            sock: sock,
+            closesOnEmptyRead: closesOnEmptyRead,
+            maxReadLength: maxReadLength,
+            maxReadBatchPackets: maxReadBatchPackets,
+            maxReadBatchBytes: maxReadBatchBytes,
+            betterPathFactory: betterPathFactory,
+            betterPathStream: betterPathStream
+        )
     }
 
     private init(
@@ -87,7 +82,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         maxReadLength: Int,
         maxReadBatchPackets: Int,
         maxReadBatchBytes: Int,
-        betterPathBlock: @escaping BetterPathBlock,
+        betterPathFactory: BetterPathStreamFactory,
         betterPathStream: PassthroughStream<Void>
     ) {
         self.ctx = ctx
@@ -97,7 +92,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         self.maxReadLength = maxReadLength
         self.maxReadBatchPackets = max(1, maxReadBatchPackets)
         self.maxReadBatchBytes = max(maxReadLength, maxReadBatchBytes)
-        self.betterPathBlock = betterPathBlock
+        self.betterPathFactory = betterPathFactory
         self.betterPathStream = betterPathStream
         socketHandle = SocketHandle(sock: sock)
         let queueLabelContext = socketHandle.fileDescriptor?.description ?? "unknown"
@@ -159,7 +154,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
             ctx,
             endpoint: endpoint,
             timeout: connectTimeout,
-            betterPathBlock: betterPathBlock,
+            betterPathFactory: betterPathFactory,
             maxReadLength: maxReadLength
         )
     }

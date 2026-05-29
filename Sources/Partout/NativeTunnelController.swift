@@ -5,7 +5,7 @@
 internal import _PartoutCore_C
 
 /// A controller that operates on a virtual tun interface.
-public final class NativeTunnelController: TunnelController {
+public final class NativeTunnelController: TunnelController, Sendable {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
@@ -14,6 +14,14 @@ public final class NativeTunnelController: TunnelController {
     private let environment: TunnelEnvironmentReader
 
     private let maxReadLength: Int
+
+    private let onReachableStream: CurrentValueStream<Bool>
+
+    private let reachabilityHolder: ReachabilityHolder
+
+    private let betterPathProxy: BetterPathProxy
+
+    private let dns: DNSResolver
 
     public init(
         _ ctx: PartoutLoggerContext,
@@ -33,12 +41,28 @@ public final class NativeTunnelController: TunnelController {
 #endif
         self.environment = environment
         self.maxReadLength = maxReadLength
+        onReachableStream = CurrentValueStream(false)
+        reachabilityHolder = ReachabilityHolder()
+        betterPathProxy = BetterPathProxy()
+
+        // Native resolver requires network handle on Android
+        dns = SimpleDNSResolver {
+            POSIXDNSStrategy(hostname: $0)
+        }
 
         var delegate = pp_tun_ctrl_delegate(
-            ctx: Unmanaged.passUnretained(self).toOpaque(),
+            ctx: .fromSelf(self),
+            on_reachability: { ctx, reachability in
+                let this = ctx.toSelf
+                this.onReachability(reachability)
+            },
+            on_better_path: { ctx in
+                let this = ctx.toSelf
+                this.onBetterPath()
+            },
             environment_value: { ctx, key in
-                let swift = Unmanaged<NativeTunnelController>.fromOpaque(ctx).takeUnretainedValue()
-                guard let data = swift.environmentData(forKey: String(cString: key)),
+                let this = ctx.toSelf
+                guard let data = this.environmentData(forKey: String(cString: key)),
                       let json = String(data: data, encoding: .utf8) else {
                     return nil
                 }
@@ -140,7 +164,124 @@ public final class NativeTunnelController: TunnelController {
     }
 }
 
+// MARK: - DNS
+
+extension NativeTunnelController: DNSResolver {
+    public func resolve(_ hostname: String, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
+        let fallbackReachability: ReachabilityInfo?
+#if os(Android)
+        fallbackReachability = reachabilityHolder.get()
+#else
+        fallbackReachability = reachability
+#endif
+        return try await dns.resolve(
+            hostname,
+            reachability: reachability ?? fallbackReachability,
+            timeout: timeout
+        )
+    }
+}
+
+// MARK: - Streams
+
+extension NativeTunnelController: ReachabilityObserver {
+    public func startObserving() {
+    }
+
+    public func stopObserving() {
+    }
+
+    public var isReachable: Bool {
+        onReachableStream.value
+    }
+
+    public var isReachableStream: AsyncStream<Bool> {
+        onReachableStream.subscribe()
+    }
+
+    public var betterPathFactory: BetterPathStreamFactory {
+        betterPathProxy
+    }
+}
+
+private extension NativeTunnelController {
+    func onReachability(_ reachability: UnsafePointer<pp_tun_ctrl_reachability>) {
+        let isReachable = reachability.pointee.reachable
+#if os(Android)
+        pp_log(ctx, .core, .info, "Network reachability changed: reachable=\(isReachable), network_handle=\(reachability.pointee.network_handle)")
+#else
+        pp_log(ctx, .core, .info, "Network reachability changed: reachable=\(isReachable)")
+#endif
+        reachabilityHolder.set(reachability)
+        onReachableStream.send(isReachable)
+    }
+
+    func onBetterPath() {
+        betterPathProxy.onBetterPath()
+    }
+}
+
+private final class ReachabilityHolder: @unchecked Sendable {
+    private let lock = SemaphoreMutex()
+    private var reachability: pp_tun_ctrl_reachability?
+
+    nonisolated func get() -> ReachabilityInfo? {
+        lock.with {
+            guard let reachability else { return nil }
+#if os(Android)
+            return ReachabilityInfo(
+                isReachable: reachability.reachable,
+                networkHandle: reachability.network_handle
+            )
+#else
+            return ReachabilityInfo(
+                isReachable: reachability.reachable
+            )
+#endif
+        }
+    }
+
+    nonisolated func set(_ new: UnsafePointer<pp_tun_ctrl_reachability>) {
+        lock.with {
+            reachability = new.pointee
+        }
+    }
+}
+
+private final class BetterPathProxy: BetterPathStreamFactory, @unchecked Sendable {
+    private let lock = SemaphoreMutex()
+    private var stream: PassthroughStream<Void>?
+
+    nonisolated func newStream() -> PassthroughStream<Void> {
+        let new = PassthroughStream<Void>()
+        let oldStream = lock.with {
+            let old = stream
+            stream = new
+            return old
+        }
+        oldStream?.finish()
+        return new
+    }
+
+    func onBetterPath() {
+        let current = lock.with {
+            stream
+        }
+        current?.send()
+    }
+}
+
 // MARK: - Helpers
+
+private extension UnsafeMutableRawPointer {
+    static func fromSelf(_ controller: NativeTunnelController) -> Self {
+        Unmanaged.passUnretained(controller).toOpaque()
+    }
+
+    var toSelf: NativeTunnelController {
+        Unmanaged.fromOpaque(self).takeUnretainedValue()
+    }
+}
 
 struct TunnelRemoteInfoWrapper: Encodable, Sendable {
     let originalModuleId: UniqueID

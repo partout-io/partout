@@ -24,7 +24,18 @@ public protocol DNSResolver: AnyObject, Sendable {
      Resolves a hostname asynchronously.
 
      - Parameter hostname: The hostname to resolve.
+     - Parameter reachability: The optional ``ReachabilityInfo``.
      - Parameter timeout: The timeout in milliseconds.
      */
-    func resolve(_ hostname: String, timeout: Int) async throws -> [DNSRecord]
+    func resolve(
+        _ hostname: String,
+        reachability: ReachabilityInfo?,
+        timeout: Int
+    ) async throws -> [DNSRecord]
+}
+
+extension DNSResolver {
+    public func resolve(_ hostname: String, timeout: Int) async throws -> [DNSRecord] {
+        try await resolve(hostname, reachability: nil, timeout: timeout)
+    }
 }

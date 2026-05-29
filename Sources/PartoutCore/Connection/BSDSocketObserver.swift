@@ -10,19 +10,19 @@ public final class BSDSocketObserver: LinkObserver, @unchecked Sendable {
 
     private let endpoint: ExtendedEndpoint
 
-    private let betterPathBlock: BetterPathBlock
+    private let betterPathFactory: BetterPathStreamFactory
 
     private let maxReadLength: Int
 
     public init(
         _ ctx: PartoutLoggerContext,
         endpoint: ExtendedEndpoint,
-        betterPathBlock: @escaping BetterPathBlock,
+        betterPathFactory: BetterPathStreamFactory,
         maxReadLength: Int = 128 * 1024
     ) {
         self.ctx = ctx
         self.endpoint = endpoint
-        self.betterPathBlock = betterPathBlock
+        self.betterPathFactory = betterPathFactory
         self.maxReadLength = maxReadLength
     }
 
@@ -31,12 +31,7 @@ public final class BSDSocketObserver: LinkObserver, @unchecked Sendable {
             ctx,
             endpoint: endpoint,
             timeout: timeout,
-            betterPathBlock: { [weak self] in
-                guard let self else {
-                    throw PartoutError(.releasedObject)
-                }
-                return try betterPathBlock()
-            },
+            betterPathFactory: betterPathFactory,
             maxReadLength: maxReadLength
         )
     }
