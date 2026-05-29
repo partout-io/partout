@@ -37,7 +37,7 @@ public final class NativeTunnelController: TunnelController {
 #endif
         self.environment = environment
         self.maxReadLength = maxReadLength
-        onReachableStream = CurrentValueStream(false)
+        onReachableStream = CurrentValueStream(true)
         betterPathProxy = BetterPathProxy()
 
         var delegate = pp_tun_ctrl_delegate(
