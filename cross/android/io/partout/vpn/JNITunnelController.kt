@@ -215,8 +215,8 @@ class JNITunnelController(
     private external fun getNativeEnvironmentValue(delegate: Long, key: String): String?
 
     companion object {
-        private val INVALID_TUN_FD = -1
-        private val INVALID_NETWORK_HANDLE = -1L
+        private const val INVALID_TUN_FD = -1
+        private const val INVALID_NETWORK_HANDLE = -1L
 
         private val json = Json {
             ignoreUnknownKeys = true
