@@ -170,7 +170,7 @@ extension NativeTunnelController: DNSResolver {
     public func resolve(_ hostname: String, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
         let fallbackReachability: ReachabilityInfo?
 #if os(Android)
-        fallbackReachability = reachabilityHolder?.get()
+        fallbackReachability = reachabilityHolder.get()
 #else
         fallbackReachability = reachability
 #endif
