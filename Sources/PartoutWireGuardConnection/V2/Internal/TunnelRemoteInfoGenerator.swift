@@ -15,13 +15,21 @@ final class TunnelRemoteInfoGenerator: Sendable {
 
     private let tunnelConfiguration: WireGuard.Configuration
 
+    private let dns: DNSResolver?
+
     private let dnsTimeout: Int
 
     private let resolvedEndpoints: ResolvedEndpointsCache
 
-    init(_ ctx: PartoutLoggerContext, tunnelConfiguration: WireGuard.Configuration, dnsTimeout: Int) {
+    init(
+        _ ctx: PartoutLoggerContext,
+        tunnelConfiguration: WireGuard.Configuration,
+        dns: DNSResolver?,
+        dnsTimeout: Int
+    ) {
         self.ctx = ctx
         self.tunnelConfiguration = tunnelConfiguration
+        self.dns = dns
         self.dnsTimeout = dnsTimeout
         resolvedEndpoints = ResolvedEndpointsCache()
     }
@@ -36,7 +44,7 @@ final class TunnelRemoteInfoGenerator: Sendable {
 
         let resolutionMap: [Endpoint: Endpoint]
         do {
-            resolutionMap = try await resolvePeers(logHandler: logHandler)
+            resolutionMap = try await resolvePeers(dns: dns, logHandler: logHandler)
         } catch {
             logHandler(.error, "Unable to resolve peer endpoints: \(error.localizedDescription)")
             return wgSettings
@@ -83,7 +91,7 @@ final class TunnelRemoteInfoGenerator: Sendable {
             wgSettings.append("replace_peers=true\n")
         }
 
-        let resolutionMap = try await resolvePeers(logHandler: logHandler)
+        let resolutionMap = try await resolvePeers(dns: dns, logHandler: logHandler)
 
         for peer in tunnelConfiguration.peers {
             let publicKey = try peer.publicKey.rawValue.hexStringFromBase64()
@@ -176,11 +184,12 @@ final class TunnelRemoteInfoGenerator: Sendable {
 }
 
 private extension TunnelRemoteInfoGenerator {
-    func resolvePeers(logHandler: @escaping WireGuardAdapter.LogHandler) async throws -> [Endpoint: Endpoint] {
+    func resolvePeers(dns: DNSResolver?, logHandler: @escaping WireGuardAdapter.LogHandler) async throws -> [Endpoint: Endpoint] {
         if let resolutionMap = await resolvedEndpoints.value {
             return resolutionMap
         }
         let resolutionMap = try await tunnelConfiguration.resolvePeers(
+            dns: dns,
             timeout: dnsTimeout,
             logHandler: logHandler
         )

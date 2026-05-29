@@ -72,6 +72,7 @@ public actor _WireGuardConnectionV2: Connection {
             ctx,
             with: self,
             moduleId: moduleId,
+            dns: controller as? DNSResolver,
             dnsTimeout: dnsTimeout,
             reachability: reachability,
             logHandler: { [weak self] logLevel, message in

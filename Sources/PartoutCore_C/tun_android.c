@@ -306,7 +306,7 @@ Java_io_partout_vpn_JNITunnelController_onNativeReachabilityUpdate(JNIEnv *env,
         .reachable = net_handle != -1,
         .network_handle = net_handle
     };
-    ctrl_delegate->on_reachable(ctrl_delegate->ctx, &reachability);
+    ctrl_delegate->on_reachability(ctrl_delegate->ctx, &reachability);
 }
 
 JNIEXPORT void JNICALL

@@ -5,7 +5,7 @@
 internal import _PartoutCore_C
 
 /// A controller that operates on a virtual tun interface.
-public final class NativeTunnelController: TunnelController {
+public final class NativeTunnelController: TunnelController, Sendable {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
@@ -17,11 +17,11 @@ public final class NativeTunnelController: TunnelController {
 
     private let onReachableStream: CurrentValueStream<Bool>
 
-    private let reachabilityLock: SemaphoreMutex
-
-    private var reachability: pp_tun_ctrl_reachability?
+    private let reachabilityHolder: ReachabilityHolder
 
     private let betterPathProxy: BetterPathProxy
+
+    private let dns: DNSResolver
 
     public init(
         _ ctx: PartoutLoggerContext,
@@ -41,13 +41,18 @@ public final class NativeTunnelController: TunnelController {
 #endif
         self.environment = environment
         self.maxReadLength = maxReadLength
-        onReachableStream = CurrentValueStream(true)
-        reachabilityLock = SemaphoreMutex()
+        onReachableStream = CurrentValueStream(false)
+        reachabilityHolder = ReachabilityHolder()
         betterPathProxy = BetterPathProxy()
+
+        // Native resolver requires network handle on Android
+        dns = SimpleDNSResolver {
+            POSIXDNSStrategy(hostname: $0)
+        }
 
         var delegate = pp_tun_ctrl_delegate(
             ctx: .fromSelf(self),
-            on_reachable: { ctx, reachability in
+            on_reachability: { ctx, reachability in
                 let this = ctx.toSelf
                 this.onReachability(reachability)
             },
@@ -159,6 +164,24 @@ public final class NativeTunnelController: TunnelController {
     }
 }
 
+// MARK: - DNS
+
+extension NativeTunnelController: DNSResolver {
+    public func resolve(_ hostname: String, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
+        let fallbackReachability: ReachabilityInfo?
+#if os(Android)
+        fallbackReachability = reachabilityHolder.get()
+#else
+        fallbackReachability = reachability
+#endif
+        return try await dns.resolve(
+            hostname,
+            reachability: reachability ?? fallbackReachability,
+            timeout: timeout
+        )
+    }
+}
+
 // MARK: - Streams
 
 extension NativeTunnelController: ReachabilityObserver {
@@ -189,14 +212,39 @@ private extension NativeTunnelController {
 #else
         pp_log(ctx, .core, .info, "Network reachability changed: reachable=\(isReachable)")
 #endif
-        reachabilityLock.with {
-            self.reachability = reachability.pointee
-        }
+        reachabilityHolder.set(reachability)
         onReachableStream.send(isReachable)
     }
 
     func onBetterPath() {
         betterPathProxy.onBetterPath()
+    }
+}
+
+private final class ReachabilityHolder: @unchecked Sendable {
+    private let lock = SemaphoreMutex()
+    private var reachability: pp_tun_ctrl_reachability?
+
+    nonisolated func get() -> ReachabilityInfo? {
+        lock.with {
+            guard let reachability else { return nil }
+#if os(Android)
+            return ReachabilityInfo(
+                isReachable: reachability.reachable,
+                networkHandle: reachability.network_handle
+            )
+#else
+            return ReachabilityInfo(
+                isReachable: reachability.reachable
+            )
+#endif
+        }
+    }
+
+    nonisolated func set(_ new: UnsafePointer<pp_tun_ctrl_reachability>) {
+        lock.with {
+            reachability = new.pointee
+        }
     }
 }
 

@@ -33,8 +33,8 @@ typedef struct {
 } pp_tun_ctrl_reachability;
 typedef struct {
     void *_Nullable ctx;
-    void (*_Nonnull on_reachable)(void *_Nonnull ctx,
-                                  const pp_tun_ctrl_reachability *_Nonnull reachability);
+    void (*_Nonnull on_reachability)(void *_Nonnull ctx,
+                                     const pp_tun_ctrl_reachability *_Nonnull reachability);
     void (*_Nonnull on_better_path)(void *_Nonnull ctx);
     char *_Nullable (*_Nonnull environment_value)(void *_Nonnull ctx, const char *_Nonnull key);
 } pp_tun_ctrl_delegate;

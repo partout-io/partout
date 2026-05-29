@@ -6,7 +6,7 @@
 public protocol SimpleDNSStrategy: Sendable {
     func startResolution() async throws
 
-    func waitForResolution() async throws -> [DNSRecord]
+    func waitForResolution(reachability: ReachabilityInfo?) async throws -> [DNSRecord]
 
     func cancelResolution() async
 }
@@ -22,14 +22,18 @@ public actor SimpleDNSResolver: DNSResolver {
         pendingResolutions = [:]
     }
 
-    public func resolve(_ hostname: String, timeout: Int) async throws -> [DNSRecord] {
+    public func resolve(_ hostname: String, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
         if let pendingResolutionTask = pendingResolutions[hostname] {
             return try await pendingResolutionTask.value
         }
         let newStrategy = strategy(hostname)
         let resolutionTask = Task {
             try await newStrategy.startResolution()
-            return try await Self.waitForResolution(newStrategy, timeout: timeout)
+            return try await Self.waitForResolution(
+                newStrategy,
+                reachability: reachability,
+                timeout: timeout
+            )
         }
         pendingResolutions[hostname] = resolutionTask
         defer {
@@ -40,7 +44,11 @@ public actor SimpleDNSResolver: DNSResolver {
 }
 
 private extension SimpleDNSResolver {
-    nonisolated static func waitForResolution(_ strategy: SimpleDNSStrategy, timeout: Int) async throws -> [DNSRecord] {
+    nonisolated static func waitForResolution(
+        _ strategy: SimpleDNSStrategy,
+        reachability: ReachabilityInfo?,
+        timeout: Int
+    ) async throws -> [DNSRecord] {
         try await withCheckedThrowingContinuation { continuation in
             let state = DNSResolutionState(continuation: continuation)
             // Keep this unstructured. Blocking DNS resolution may ignore
@@ -48,7 +56,9 @@ private extension SimpleDNSResolver {
             // child before returning the timeout.
             let waitTask = Task {
                 do {
-                    let records = try await strategy.waitForResolution()
+                    let records = try await strategy.waitForResolution(
+                        reachability: reachability
+                    )
                     await state.resume(with: .success(records))
                 } catch {
                     await state.resume(with: .failure(error))

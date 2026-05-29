@@ -42,6 +42,7 @@ Given the main app and the daemon:
 - ``DNSRecord``
 - ``DNSResolver``
 - ``POSIXDNSStrategy``
+- ``ReachabilityInfo``
 - ``SimpleDNSResolver``
 - ``SimpleDNSStrategy``
 
