@@ -75,7 +75,7 @@ private extension POSIXDNSStrategy {
         var records: [DNSRecord] = []
         var currentPointer = infoPointer
         while let pointer = currentPointer {
-            var info = pointer.pointee
+            let info = pointer.pointee
             currentPointer = info.ai_next
             guard !Task.isCancelled else { return nil }
             guard let addr = info.ai_addr else { continue }
