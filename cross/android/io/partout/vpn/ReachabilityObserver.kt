@@ -83,6 +83,14 @@ class ReachabilityObserver(
 
         connectivityManager.registerNetworkCallback(request, callback)
 
+        // Emit initial event
+        val initialEvaluation = synchronized(lock) {
+            evaluateLocked()
+        }
+        initialEvaluation?.let {
+            trySend(it.network)
+        }
+
         awaitClose {
             runCatching {
                 connectivityManager.unregisterNetworkCallback(callback)
