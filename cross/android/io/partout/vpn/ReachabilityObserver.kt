@@ -178,5 +178,7 @@ private val NetworkCapabilities?.isReachablePath: Boolean
         }
         return hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
                 hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) &&
-                hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN) &&
+                hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED) &&
+                hasCapability(NetworkCapabilities.NET_CAPABILITY_TRUSTED)
     }
