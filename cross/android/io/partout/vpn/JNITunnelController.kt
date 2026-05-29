@@ -14,7 +14,6 @@ import io.partout.models.TaggedModuleIP
 import io.partout.models.TaggedModuleOnDemand
 import io.partout.models.TunnelRemoteInfoWrapper
 import io.partout.models.TunnelSnapshot
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
@@ -45,7 +44,6 @@ interface TunnelControllerDelegate {
 class JNITunnelController(
     private val logTag: String,
     private val service: VpnService,
-    private val scope: CoroutineScope,
     private val delegate: TunnelControllerDelegate
 ) : TunnelController {
     // All accesses must be synchronized against the lock
