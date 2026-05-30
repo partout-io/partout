@@ -8,7 +8,7 @@ internal import _PartoutCore_C
 final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     private enum IOError: Error {
         case readWouldBlock
-        case writeWouldBlock(lastPacketIndex: Int)
+        case writeWouldBlock(failedPacketIndex: Int)
     }
 
     private let ctx: PartoutLoggerContext
@@ -129,8 +129,8 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
             do {
                 try await writePacketsImmediately(packets, from: from)
                 return
-            } catch IOError.writeWouldBlock(let lastPacketIndex) {
-                from = lastPacketIndex
+            } catch IOError.writeWouldBlock(let failedPacketIndex) {
+                from = failedPacketIndex
                 guard attempt + 1 < maxAttempts else {
                     return // Drop after bounded retry
                 }
@@ -140,7 +140,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         }
     }
 
-    private func writePacketsImmediately(_ packets: [Data], from: Int) async throws -> Int {
+    private func writePacketsImmediately(_ packets: [Data], from: Int) async throws {
         guard isActive else {
             throw PartoutError(.tunNotActive)
         }
@@ -155,10 +155,11 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                         continuation.resume(throwing: PartoutError(.tunNotActive))
                         return
                     }
-                    var i = 0
+                    var next = 0
                     for toWrite in packets {
-                        guard i >= from else { continue }
-                        i += 1
+                        let current = next
+                        next += 1
+                        guard current >= from else { continue }
                         guard !toWrite.isEmpty else { continue }
                         guard self.isActive else {
                             continuation.resume(throwing: PartoutError(.tunNotActive))
@@ -170,7 +171,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                         guard writtenCount == toWrite.count else {
                             guard errno != EAGAIN else {
                                 continuation.resume(
-                                    throwing: IOError.writeWouldBlock(lastPacketIndex: i)
+                                    throwing: IOError.writeWouldBlock(failedPacketIndex: current)
                                 )
                                 return
                             }
@@ -189,8 +190,6 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
             await shutdown()
             throw error
         }
-        // All packets were written
-        return packets.count
     }
 
     private func backoffAfterWouldBlock() async throws {
