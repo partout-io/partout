@@ -200,7 +200,8 @@ extension _OpenVPNConnectionV1: OpenVPNSessionDelegate {
                 with: TunnelRemoteInfo(
                     originalModuleId: moduleId,
                     address: addressObject,
-                    modules: builder.modules()
+                    modules: builder.modules(),
+                    requiresVirtualDevice: true
                 )
             )
             await session.setTunnel(tunnelInterface)
