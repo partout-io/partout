@@ -50,7 +50,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         _ ctx: PartoutLoggerContext,
         tun: pp_tun,
         maxReadLength: Int,
-        nonBlockingBackoff: Int = 100
+        nonBlockingBackoff: Int = 20
     ) {
         self.ctx = ctx
         self.tun = tun
