@@ -117,6 +117,7 @@ cleanup:
     PP_JNI_DETACH(env);
 }
 
+// Balance with pp_tun_ctrl_clear_tunnel
 pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_json) {
     (void)uuid;
     assert(jni_ref);
@@ -251,6 +252,15 @@ cleanup:
     PP_JNI_DETACH(env);
 }
 
+// Balance with pp_tun_ctrl_set_tunnel
+void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
+    (void)jni_ref;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_clear_tunnel(%p)", jni_ref);
+    if (!tun_impl) return;
+    pp_tun_shutdown(tun_impl);
+    free(tun_impl);
+}
+
 void pp_tun_ctrl_cancel_tunnel(void *jni_ref, const char *error_message) {
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_cancel_tunnel(%p)", jni_ref);
@@ -284,14 +294,6 @@ cleanup:
     if (j_error_message != NULL) (*env)->DeleteLocalRef(env, j_error_message);
     if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
     PP_JNI_DETACH(env);
-}
-
-void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
-    (void)jni_ref;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_clear_tunnel(%p)", jni_ref);
-    if (!tun_impl) return;
-    pp_tun_shutdown(tun_impl);
-    free(tun_impl);
 }
 
 JNIEXPORT void JNICALL
