@@ -122,6 +122,22 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     }
 
     func writePackets(_ packets: [Data]) async throws {
+        let maxAttempts = 2
+        for attempt in 0..<maxAttempts {
+            do {
+                try await writePacketsImmediately(packets)
+                return
+            } catch IOError.wouldBlock {
+                guard attempt + 1 < maxAttempts else {
+                    return // Drop after bounded retry
+                }
+                await backoffAfterWouldBlock()
+                try Task.checkCancellation()
+            }
+        }
+    }
+
+    private func writePacketsImmediately(_ packets: [Data]) async throws {
         guard isActive else {
             throw PartoutError(.tunNotActive)
         }
@@ -157,8 +173,6 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                     continuation.resume()
                 }
             }
-        } catch IOError.wouldBlock {
-            await backoffAfterWouldBlock()
         } catch {
             guard isActive else {
                 throw PartoutError(.tunNotActive)
@@ -167,6 +181,15 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
             await shutdown()
             throw error
         }
+    }
+
+    private func backoffAfterWouldBlock() async {
+        guard !Task.isCancelled else { return }
+        guard nonBlockingBackoff > 0 else {
+            await Task.yield()
+            return
+        }
+        try? await Task.sleep(milliseconds: nonBlockingBackoff)
     }
 
     func shutdown() async {
@@ -183,17 +206,6 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     func waitUntilIdle() async {
         await readQueue.waitUntilIdle()
         await writeQueue.waitUntilIdle()
-    }
-}
-
-private extension VirtualTunnelInterface {
-    func backoffAfterWouldBlock() async {
-        guard !Task.isCancelled else { return }
-        guard nonBlockingBackoff > 0 else {
-            await Task.yield()
-            return
-        }
-        try? await Task.sleep(milliseconds: nonBlockingBackoff)
     }
 }
 
