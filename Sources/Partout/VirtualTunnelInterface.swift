@@ -97,7 +97,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                         return
                     }
                     let readCount = pp_tun_read(tun, &readBuf, readBuf.count)
-                    if readCount < 0, errno == EAGAIN {
+                    if readCount < 0, errno == EAGAIN || errno == EWOULDBLOCK {
                         continuation.resume(throwing: IOError.readWouldBlock)
                         return
                     }
@@ -167,7 +167,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                         let writtenCount = toWrite.withUnsafeBytes {
                             pp_tun_write(self.tun, $0.bytePointer, toWrite.count)
                         }
-                        if writtenCount < 0, errno == EAGAIN {
+                        if writtenCount < 0, errno == EAGAIN || errno == EWOULDBLOCK {
                             continuation.resume(
                                 throwing: IOError.writeWouldBlock(failedPacketIndex: current)
                             )
