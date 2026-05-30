@@ -147,6 +147,7 @@ class JNITunnelController(
                 "Invalid Android file descriptor: $it"
             }
             val protected = service.protect(it)
+            // FIXME: Throw exception on protect() failure?
             Log.d(logTag, "protect($it) = $protected")
         }
     }
