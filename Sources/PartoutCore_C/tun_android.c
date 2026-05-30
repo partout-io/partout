@@ -70,6 +70,10 @@ static const kotlin_sig sig_ctrl_onSnapshot = {
     "onSnapshot",
     "(Ljava/lang/String;)V"
 };
+static const kotlin_sig sig_ctrl_clearTunnel = {
+    "clearTunnel",
+    "()V"
+};
 static const kotlin_sig sig_ctrl_cancelTunnel = {
     "cancelTunnel",
     "(Ljava/lang/String;)V"
@@ -259,6 +263,33 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
     if (!tun_impl) return;
     pp_tun_shutdown(tun_impl);
     free(tun_impl);
+
+    PP_JNI_ATTACH_OR_RETURN_VOID(env);
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    jintArray j_fds = NULL;
+
+    cls = (*env)->GetObjectClass(env, jni_ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_clear_tunnel(), NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_clearTunnel.name, sig_ctrl_clearTunnel.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_clear_tunnel(), NULL method");
+        goto cleanup;
+    }
+    (*env)->CallVoidMethod(env, jni_ref, method);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_clear_tunnel(), Kotlin exception");
+        goto cleanup;
+    }
+
+cleanup:
+    PP_JNI_DETACH(env);
 }
 
 void pp_tun_ctrl_cancel_tunnel(void *jni_ref, const char *error_code) {

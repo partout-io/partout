@@ -171,6 +171,7 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to stop VPN daemon", e)
         } finally {
             controller?.stopObserving()
+            controller?.cancelTunnel(null)
             controller = null
         }
         isRunning = false
