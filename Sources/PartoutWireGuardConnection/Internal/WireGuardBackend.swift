@@ -55,12 +55,12 @@ final class WireGuardBackend: @unchecked Sendable {
     }
 
     func bumpSockets(_ handle: Int32) {
-        pp_wg_bump_sockets(handle)
+        pp_wg_bump_sockets(handle, false)
     }
 
     func bumpSocketsAsync(_ handle: Int32) async {
         await withCheckedContinuation { continuation in
-            pp_wg_bump_sockets(handle)
+            pp_wg_bump_sockets(handle, true)
             continuation.resume()
         }
     }
