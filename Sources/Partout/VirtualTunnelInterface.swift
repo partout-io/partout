@@ -189,6 +189,8 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
             await shutdown()
             throw error
         }
+        // All packets were written
+        return packets.count
     }
 
     private func backoffAfterWouldBlock() async throws {
