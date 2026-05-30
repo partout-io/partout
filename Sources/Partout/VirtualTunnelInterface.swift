@@ -135,7 +135,6 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                     return // Drop after bounded retry
                 }
                 try await backoffAfterWouldBlock()
-                try Task.checkCancellation()
             }
         }
     }
