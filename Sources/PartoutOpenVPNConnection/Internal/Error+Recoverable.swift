@@ -17,7 +17,7 @@ extension Error {
 
 private let ppRecoverableCodes: [PartoutError.Code] = [
     .timeout,
-    .linkFailure,
+    .ioFailure,
     .networkChanged,
     .OpenVPN.connectionFailure,
     .OpenVPN.recoverableAuthentication,

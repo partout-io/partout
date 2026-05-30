@@ -367,7 +367,7 @@ private extension Negotiator {
                 try await link.writePackets(rawList)
             } catch {
                 pp_log(ctx, .openvpn, .error, "Failed LINK write during control flush: \(error)")
-                await options.onError(key, PartoutError(.linkFailure, error))
+                await options.onError(key, PartoutError(.ioFailure, error))
             }
         }
     }
@@ -505,7 +505,7 @@ private extension Negotiator {
             pp_log(ctx, .openvpn, .info, "Ack successfully written to LINK for packetId \(controlPacket.packetId)")
         } catch {
             pp_log(ctx, .openvpn, .error, "Failed LINK write during send ack for packetId \(controlPacket.packetId): \(error)")
-            await options.onError(key, PartoutError(.linkFailure, error))
+            await options.onError(key, PartoutError(.ioFailure, error))
         }
     }
 

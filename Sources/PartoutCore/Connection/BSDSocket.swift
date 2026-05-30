@@ -647,11 +647,11 @@ private extension ExtendedEndpoint {
 
 private extension SocketHandle {
     func preferredError() -> PartoutError {
-        isStopping ? PartoutError(.linkNotActive) : PartoutError(.linkFailure)
+        isStopping ? PartoutError(.linkNotActive) : PartoutError(.ioFailure)
     }
 
     func preferredError(withReadCount readCount: Int32) -> PartoutError {
         // In non-blocking TCP, "0 bytes" means "link inactive"
-        isStopping || readCount == 0 ? PartoutError(.linkNotActive) : PartoutError(.linkFailure)
+        isStopping || readCount == 0 ? PartoutError(.linkNotActive) : PartoutError(.ioFailure)
     }
 }

@@ -6,6 +6,11 @@ internal import _PartoutCore_C
 
 /// An interface that interacts with a Layer 3 virtual tun device, commonly found in UNIX-like systems.
 final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
+    private enum IOError: Error {
+        case readWouldBlock
+        case writeWouldBlock(failedPacketIndex: Int)
+    }
+
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
@@ -18,6 +23,8 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     private let readQueue: DispatchQueue
 
     private let writeQueue: DispatchQueue
+
+    private let nonBlockingBackoff: Int
 
     // FIXME: #188, how to avoid silent copy? (enforce reference)
     private var readBuf: [UInt8]
@@ -43,7 +50,8 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     init(
         _ ctx: PartoutLoggerContext,
         tun: pp_tun,
-        maxReadLength: Int
+        maxReadLength: Int,
+        nonBlockingBackoff: Int = 20
     ) {
         self.ctx = ctx
         self.tun = tun
@@ -58,6 +66,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         let label = deviceName?.description ?? descriptor?.description ?? "*"
         readQueue = DispatchQueue(label: "VirtualTunnelInterface[R:\(label)]")
         writeQueue = DispatchQueue(label: "VirtualTunnelInterface[W:\(label)]")
+        self.nonBlockingBackoff = nonBlockingBackoff
         readBuf = [UInt8](repeating: 0, count: maxReadLength)
 
         _isActive = true
@@ -88,14 +97,21 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                         return
                     }
                     let readCount = pp_tun_read(tun, &readBuf, readBuf.count)
+                    guard !ioWouldBlock(readCount) else {
+                        continuation.resume(throwing: IOError.readWouldBlock)
+                        return
+                    }
                     guard readCount > 0 else {
-                        continuation.resume(throwing: PartoutError(.linkFailure))
+                        continuation.resume(throwing: PartoutError(.ioFailure))
                         return
                     }
                     let newPacket = Data(readBuf[0..<Int(readCount)])
                     continuation.resume(returning: [newPacket])
                 }
             }
+        } catch IOError.readWouldBlock {
+            try await backoffAfterWouldBlock()
+            return []
         } catch {
             guard isActive else {
                 throw PartoutError(.tunNotActive)
@@ -107,6 +123,23 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     }
 
     func writePackets(_ packets: [Data]) async throws {
+        var from = 0
+        let maxAttempts = 2
+        for attempt in 0..<maxAttempts {
+            do {
+                try await writePacketsImmediately(packets, from: from)
+                return
+            } catch IOError.writeWouldBlock(let failedPacketIndex) {
+                from = failedPacketIndex
+                guard attempt + 1 < maxAttempts else {
+                    return // Drop after bounded retry
+                }
+                try await backoffAfterWouldBlock()
+            }
+        }
+    }
+
+    private func writePacketsImmediately(_ packets: [Data], from: Int) async throws {
         guard isActive else {
             throw PartoutError(.tunNotActive)
         }
@@ -121,7 +154,11 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                         continuation.resume(throwing: PartoutError(.tunNotActive))
                         return
                     }
+                    var next = 0
                     for toWrite in packets {
+                        let current = next
+                        next += 1
+                        guard current >= from else { continue }
                         guard !toWrite.isEmpty else { continue }
                         guard self.isActive else {
                             continuation.resume(throwing: PartoutError(.tunNotActive))
@@ -130,14 +167,22 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                         let writtenCount = toWrite.withUnsafeBytes {
                             pp_tun_write(self.tun, $0.bytePointer, toWrite.count)
                         }
-                        guard writtenCount > 0 else {
-                            continuation.resume(throwing: PartoutError(.linkFailure))
+                        guard !ioWouldBlock(writtenCount) else {
+                            continuation.resume(
+                                throwing: IOError.writeWouldBlock(failedPacketIndex: current)
+                            )
+                            return
+                        }
+                        guard writtenCount == toWrite.count else {
+                            continuation.resume(throwing: PartoutError(.ioFailure))
                             return
                         }
                     }
                     continuation.resume()
                 }
             }
+        } catch let error as IOError {
+            throw error
         } catch {
             guard isActive else {
                 throw PartoutError(.tunNotActive)
@@ -146,6 +191,16 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
             await shutdown()
             throw error
         }
+    }
+
+    private func backoffAfterWouldBlock() async throws {
+        try Task.checkCancellation()
+        guard nonBlockingBackoff > 0 else {
+            await Task.yield()
+            try Task.checkCancellation()
+            return
+        }
+        try await Task.sleep(milliseconds: nonBlockingBackoff)
     }
 
     func shutdown() async {
@@ -163,6 +218,10 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         await readQueue.waitUntilIdle()
         await writeQueue.waitUntilIdle()
     }
+}
+
+private func ioWouldBlock(_ count: Int32) -> Bool {
+    count < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)
 }
 
 private extension DispatchQueue {
