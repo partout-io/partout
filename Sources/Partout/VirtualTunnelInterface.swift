@@ -93,7 +93,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                             continuation.resume(returning: [])
                             return
                         }
-                        continuation.resume(throwing: PartoutError(.linkFailure))
+                        continuation.resume(throwing: PartoutError(.ioFailure))
                         return
                     }
                     let newPacket = Data(readBuf[0..<Int(readCount)])
@@ -139,7 +139,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                                 continuation.resume()
                                 return
                             }
-                            continuation.resume(throwing: PartoutError(.linkFailure))
+                            continuation.resume(throwing: PartoutError(.ioFailure))
                             return
                         }
                     }

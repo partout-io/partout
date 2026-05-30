@@ -50,7 +50,7 @@ extension OpenVPNSession {
                 }
                 if let error {
                     pp_log(self.ctx, .openvpn, .error, "Failed LINK read: \(error)")
-                    await self.shutdown(PartoutError(.linkFailure, error))
+                    await self.shutdown(PartoutError(.ioFailure, error))
                     return
                 }
                 guard let packets, !packets.isEmpty else {
@@ -123,7 +123,7 @@ extension OpenVPNSession {
                     try await receiveLink(packets: packets)
                 } catch {
                     pp_log(ctx, .openvpn, .error, "Failed LINK read: \(error)")
-                    await self.shutdown(PartoutError(.linkFailure, error))
+                    await self.shutdown(PartoutError(.ioFailure, error))
                     return
                 }
             }
