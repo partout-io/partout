@@ -6,6 +6,10 @@ internal import _PartoutCore_C
 
 /// An interface that interacts with a Layer 3 virtual tun device, commonly found in UNIX-like systems.
 final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
+    private enum IOError: Error {
+        case nonBlocking
+    }
+
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
@@ -18,6 +22,8 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     private let readQueue: DispatchQueue
 
     private let writeQueue: DispatchQueue
+
+    private let yieldNonBlocking: Int
 
     // FIXME: #188, how to avoid silent copy? (enforce reference)
     private var readBuf: [UInt8]
@@ -43,7 +49,8 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     init(
         _ ctx: PartoutLoggerContext,
         tun: pp_tun,
-        maxReadLength: Int
+        maxReadLength: Int,
+        yieldNonBlocking: Int = 100
     ) {
         self.ctx = ctx
         self.tun = tun
@@ -58,6 +65,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         let label = deviceName?.description ?? descriptor?.description ?? "*"
         readQueue = DispatchQueue(label: "VirtualTunnelInterface[R:\(label)]")
         writeQueue = DispatchQueue(label: "VirtualTunnelInterface[W:\(label)]")
+        self.yieldNonBlocking = yieldNonBlocking
         readBuf = [UInt8](repeating: 0, count: maxReadLength)
 
         _isActive = true
@@ -90,7 +98,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                     let readCount = pp_tun_read(tun, &readBuf, readBuf.count)
                     guard readCount > 0 else {
                         guard errno != EAGAIN else {
-                            continuation.resume(returning: [])
+                            continuation.resume(throwing: IOError.nonBlocking)
                             return
                         }
                         continuation.resume(throwing: PartoutError(.ioFailure))
@@ -100,6 +108,9 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                     continuation.resume(returning: [newPacket])
                 }
             }
+        } catch IOError.nonBlocking {
+            await yield()
+            return []
         } catch {
             guard isActive else {
                 throw PartoutError(.tunNotActive)
@@ -136,7 +147,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                         }
                         guard writtenCount > 0 else {
                             guard errno != EAGAIN else {
-                                continuation.resume()
+                                continuation.resume(throwing: IOError.nonBlocking)
                                 return
                             }
                             continuation.resume(throwing: PartoutError(.ioFailure))
@@ -146,6 +157,8 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                     continuation.resume()
                 }
             }
+        } catch IOError.nonBlocking {
+            await yield()
         } catch {
             guard isActive else {
                 throw PartoutError(.tunNotActive)
@@ -170,6 +183,13 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     func waitUntilIdle() async {
         await readQueue.waitUntilIdle()
         await writeQueue.waitUntilIdle()
+    }
+}
+
+private extension VirtualTunnelInterface {
+    func yield() async {
+        guard yieldNonBlocking > 0 else { return }
+        try? await Task.sleep(milliseconds: yieldNonBlocking)
     }
 }
 
