@@ -89,6 +89,10 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                     }
                     let readCount = pp_tun_read(tun, &readBuf, readBuf.count)
                     guard readCount > 0 else {
+                        guard errno != EAGAIN else {
+                            continuation.resume(returning: [])
+                            return
+                        }
                         continuation.resume(throwing: PartoutError(.linkFailure))
                         return
                     }
@@ -131,6 +135,10 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                             pp_tun_write(self.tun, $0.bytePointer, toWrite.count)
                         }
                         guard writtenCount > 0 else {
+                            guard errno != EAGAIN else {
+                                continuation.resume()
+                                return
+                            }
                             continuation.resume(throwing: PartoutError(.linkFailure))
                             return
                         }
