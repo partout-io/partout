@@ -8,15 +8,24 @@ public final class BSDSocketFactory: NetworkInterfaceFactory {
 
     private let betterPathFactory: BetterPathStreamFactory
 
+    private let configurator: SocketConfigurator?
+
     public init(
         _ ctx: PartoutLoggerContext,
-        betterPathFactory: BetterPathStreamFactory
+        betterPathFactory: BetterPathStreamFactory,
+        configurator: SocketConfigurator? = nil
     ) {
         self.ctx = ctx
         self.betterPathFactory = betterPathFactory
+        self.configurator = configurator
     }
 
     public func linkObserver(to endpoint: ExtendedEndpoint) -> LinkObserver {
-        BSDSocketObserver(ctx, endpoint: endpoint, betterPathFactory: betterPathFactory)
+        BSDSocketObserver(
+            ctx,
+            endpoint: endpoint,
+            betterPathFactory: betterPathFactory,
+            configurator: configurator
+        )
     }
 }

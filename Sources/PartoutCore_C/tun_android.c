@@ -175,12 +175,22 @@ cleanup:
     return tun_impl;
 }
 
-void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t fds_len) {
+void pp_tun_ctrl_configure_sockets(void *jni_ref, const pp_tun_ctrl_reachability *info,
+                                   const int *fds, const size_t fds_len) {
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_configure_sockets(%p)", jni_ref);
     if (!fds || fds_len == 0) return;
 
     PP_JNI_ATTACH_OR_RETURN_VOID(env);
+
+    if (info && info->network_handle > 0) {
+        for (int i = 0; i < fds_len; ++i) {
+            if (android_setsocknetwork(info->network_handle, fds[i]) != 0) {
+                pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_configure_sockets(), android_setsocknetwork(%d)", i);
+                goto cleanup;
+            }
+        }
+    }
 
     jclass cls = NULL;
     jmethodID method = NULL;

@@ -81,7 +81,10 @@ pp_socket pp_socket_open(const char *ip_addr,
                          pp_socket_proto proto,
                          uint16_t port,
                          bool blocking,
-                         int timeout_ms) {
+                         int timeout_ms,
+                         const pp_tun_ctrl_reachability *info,
+                         void (*configure)(void *ctx, uint64_t fd),
+                         void *configure_ctx) {
     int socktype = 0;
     struct addrinfo hints, *resolved = NULL;
     char port_str[16] = { 0 };
@@ -108,6 +111,9 @@ pp_socket pp_socket_open(const char *ip_addr,
         if (local_is_invalid_fd(new_fd)) {
             local_print_error("socket()");
             goto failure;
+        }
+        if (configure) {
+            configure(configure_ctx, new_fd);
         }
         if (local_connect_with_timeout(new_fd,
                                            (const struct sockaddr *)&numeric_addr,
@@ -137,7 +143,15 @@ pp_socket pp_socket_open(const char *ip_addr,
 #endif
 
     snprintf(port_str, sizeof(port_str), "%u", port);
+#if PARTOUT_ANDROID
+    if (info || info->network_handle <= 0) {
+        local_print_error("android_getaddrinfofornetwork(): missing network handle");
+        goto failure;
+    }
+    if (android_getaddrinfofornetwork(info->network_handle, ip_addr, port_str, &hints, &resolved) != 0) {
+#else
     if (getaddrinfo(ip_addr, port_str, &hints, &resolved) != 0) {
+#endif
         local_print_error("getaddrinfo()");
         goto failure;
     }
@@ -148,6 +162,9 @@ pp_socket pp_socket_open(const char *ip_addr,
         if (local_is_invalid_fd(new_fd)) {
             local_print_error("socket()");
             continue;
+        }
+        if (configure) {
+            configure(configure_ctx, new_fd);
         }
         const int ret = local_connect_with_timeout(new_fd,
                                                        p->ai_addr,

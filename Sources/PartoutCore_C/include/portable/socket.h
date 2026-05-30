@@ -10,6 +10,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/* Network reachability. */
+typedef struct {
+    bool reachable;
+#if PARTOUT_ANDROID
+    uint64_t network_handle;
+#endif
+} pp_tun_ctrl_reachability;
+
 /* The available protocols. */
 typedef enum {
     PPSocketProtoTCP,
@@ -34,7 +42,10 @@ pp_socket _Nullable pp_socket_open(const char *_Nonnull ip_addr,
                                    pp_socket_proto proto,
                                    uint16_t port,
                                    bool blocking,
-                                   int timeout_ms);
+                                   int timeout_ms,
+                                   const pp_tun_ctrl_reachability *_Nullable info,
+                                   void (*_Nullable configure)(void *_Nullable ctx, uint64_t fd),
+                                   void *_Nullable configure_ctx);
 
 /* I/O. Returns PP_SOCKET_WOULD_BLOCK when a non-blocking operation would block. */
 int pp_socket_read(pp_socket _Nonnull sock,

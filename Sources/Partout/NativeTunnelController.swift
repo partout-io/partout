@@ -110,9 +110,17 @@ public final class NativeTunnelController: TunnelController, Sendable {
     }
 
     public func configureSockets(with descriptors: [UInt64]) {
-        descriptors.map(Int32.init).withUnsafeBufferPointer {
-            pp_tun_ctrl_configure_sockets(ref, $0.baseAddress, $0.count)
-        }
+        descriptors
+            .map(Int32.init)
+            .withUnsafeBufferPointer { fds in
+                if let info = reachabilityInfo?.toCReachability {
+                    withUnsafePointer(to: info) { infoPtr in
+                        pp_tun_ctrl_configure_sockets(ref, infoPtr, fds.baseAddress, fds.count)
+                    }
+                } else {
+                    pp_tun_ctrl_configure_sockets(ref, nil, fds.baseAddress, fds.count)
+                }
+            }
     }
 
     public func reportSnapshot(_ snapshot: TunnelSnapshot) {
@@ -167,16 +175,14 @@ public final class NativeTunnelController: TunnelController, Sendable {
 // MARK: - DNS
 
 extension NativeTunnelController: DNSResolver {
+    public var reachabilityInfo: ReachabilityInfo? {
+        reachabilityHolder.get()
+    }
+
     public func resolve(_ hostname: String, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
-        let fallbackReachability: ReachabilityInfo?
-#if os(Android)
-        fallbackReachability = reachabilityHolder.get()
-#else
-        fallbackReachability = reachability
-#endif
-        return try await dns.resolve(
+        try await dns.resolve(
             hostname,
-            reachability: reachability ?? fallbackReachability,
+            reachability: reachability ?? reachabilityInfo,
             timeout: timeout
         )
     }
@@ -271,6 +277,21 @@ private final class BetterPathProxy: BetterPathStreamFactory, @unchecked Sendabl
     }
 }
 
+// MARK: - SocketConfigurator
+
+extension NativeTunnelController {
+    public func socketConfigurator() -> SocketConfigurator {
+        SocketConfigurator(
+            reachability: { [weak self] in
+                self?.reachabilityInfo
+            },
+            configureSocket: { [weak self] fd in
+                self?.configureSockets(with: [fd])
+            }
+        )
+    }
+}
+
 // MARK: - Helpers
 
 private extension UnsafeMutableRawPointer {
@@ -280,6 +301,21 @@ private extension UnsafeMutableRawPointer {
 
     var toSelf: NativeTunnelController {
         Unmanaged.fromOpaque(self).takeUnretainedValue()
+    }
+}
+
+private extension ReachabilityInfo {
+    var toCReachability: pp_tun_ctrl_reachability {
+#if os(Android)
+        pp_tun_ctrl_reachability(
+            reachable: isReachable,
+            network_handle: networkHandle ?? 0
+        )
+#else
+        pp_tun_ctrl_reachability(
+            reachable: isReachable
+        )
+#endif
     }
 }
 
