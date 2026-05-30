@@ -144,6 +144,26 @@ func wgBumpSockets(tunnelHandle int32) {
 	if !ok {
 		return
 	}
+	go func() {
+		for i := 0; i < 10; i++ {
+			err := dev.BindUpdate()
+			if err == nil {
+				dev.SendKeepalivesToPeersWithCurrentKeypair()
+				return
+			}
+			dev.Errorf("Unable to update bind, try %d: %v", i+1, err)
+			time.Sleep(time.Second / 2)
+		}
+		dev.Errorf("Gave up trying to update bind; tunnel is likely dysfunctional")
+	}()
+}
+
+//export wgBumpSocketsSync
+func wgBumpSocketsSync(tunnelHandle int32) {
+	dev, ok := tunnelHandles[tunnelHandle]
+	if !ok {
+		return
+	}
 	for i := 0; i < 10; i++ {
 		err := dev.BindUpdate()
 		if err == nil {

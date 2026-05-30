@@ -54,7 +54,11 @@ final class WireGuardBackend: @unchecked Sendable {
         String(unsafeCString: pp_wg_get_config(handle))
     }
 
-    func bumpSockets(_ handle: Int32) async {
+    func bumpSockets(_ handle: Int32) {
+        pp_wg_bump_sockets(handle)
+    }
+
+    func bumpSocketsAsync(_ handle: Int32) async {
         await withCheckedContinuation { continuation in
             pp_wg_bump_sockets(handle)
             continuation.resume()
