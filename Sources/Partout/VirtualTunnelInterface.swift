@@ -188,6 +188,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 
 private extension VirtualTunnelInterface {
     func backoffAfterWouldBlock() async {
+        guard !Task.isCancelled else { return }
         guard nonBlockingBackoff > 0 else { return }
         try? await Task.sleep(milliseconds: nonBlockingBackoff)
     }
