@@ -109,7 +109,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                 }
             }
         } catch IOError.wouldBlock {
-            await backoffAfterWouldBlock()
+            try await backoffAfterWouldBlock()
             return []
         } catch {
             guard isActive else {
@@ -131,7 +131,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                 guard attempt + 1 < maxAttempts else {
                     return // Drop after bounded retry
                 }
-                await backoffAfterWouldBlock()
+                try await backoffAfterWouldBlock()
                 try Task.checkCancellation()
             }
         }
@@ -183,13 +183,14 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         }
     }
 
-    private func backoffAfterWouldBlock() async {
-        guard !Task.isCancelled else { return }
+    private func backoffAfterWouldBlock() async throws {
+        try Task.checkCancellation()
         guard nonBlockingBackoff > 0 else {
             await Task.yield()
+            try Task.checkCancellation()
             return
         }
-        try? await Task.sleep(milliseconds: nonBlockingBackoff)
+        try await Task.sleep(milliseconds: nonBlockingBackoff)
     }
 
     func shutdown() async {
