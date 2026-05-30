@@ -132,6 +132,7 @@ class PartoutVpnServiceRuntime(
 
     override fun sendSnapshot(snapshot: TunnelSnapshot) {
         snapshotEmitter.emit(snapshot)
+        engine.onSnapshot(snapshot)
     }
 
     override fun disconnect() = launchCommand {
@@ -332,6 +333,7 @@ class PartoutVpnServiceRuntime(
         suspend fun stop()
         suspend fun readLastProfile(): String
         suspend fun writeLastProfile(json: String)
+        fun onSnapshot(snapshot: TunnelSnapshot)
     }
     //endregion
 
