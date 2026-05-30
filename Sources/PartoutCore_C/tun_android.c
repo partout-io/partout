@@ -258,7 +258,6 @@ cleanup:
 
 // Balance with pp_tun_ctrl_set_tunnel
 void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
-    (void)jni_ref;
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_clear_tunnel(%p)", jni_ref);
     if (!tun_impl) return;
     pp_tun_shutdown(tun_impl);
@@ -268,7 +267,6 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
 
     jclass cls = NULL;
     jmethodID method = NULL;
-    jintArray j_fds = NULL;
 
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
