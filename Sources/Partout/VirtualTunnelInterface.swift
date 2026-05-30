@@ -46,7 +46,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 
     private let activeLock: SemaphoreMutex
 
-    // WARNING: tun ownership is transferred
+    // WARNING: tun is NOT owned
     init(
         _ ctx: PartoutLoggerContext,
         tun: pp_tun,

@@ -70,6 +70,10 @@ static const kotlin_sig sig_ctrl_onSnapshot = {
     "onSnapshot",
     "(Ljava/lang/String;)V"
 };
+static const kotlin_sig sig_ctrl_clearTunnel = {
+    "clearTunnel",
+    "()V"
+};
 static const kotlin_sig sig_ctrl_cancelTunnel = {
     "cancelTunnel",
     "(Ljava/lang/String;)V"
@@ -117,6 +121,7 @@ cleanup:
     PP_JNI_DETACH(env);
 }
 
+// Balance with pp_tun_ctrl_clear_tunnel
 pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_json) {
     (void)uuid;
     assert(jni_ref);
@@ -251,7 +256,41 @@ cleanup:
     PP_JNI_DETACH(env);
 }
 
-void pp_tun_ctrl_cancel_tunnel(void *jni_ref, const char *error_message) {
+// Balance with pp_tun_ctrl_set_tunnel
+void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_clear_tunnel(%p)", jni_ref);
+    if (!tun_impl) return;
+    pp_tun_shutdown(tun_impl);
+    free(tun_impl);
+
+    PP_JNI_ATTACH_OR_RETURN_VOID(env);
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+
+    cls = (*env)->GetObjectClass(env, jni_ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_clear_tunnel(), NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_clearTunnel.name, sig_ctrl_clearTunnel.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_clear_tunnel(), NULL method");
+        goto cleanup;
+    }
+    (*env)->CallVoidMethod(env, jni_ref, method);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_clear_tunnel(), Kotlin exception");
+        goto cleanup;
+    }
+
+cleanup:
+    PP_JNI_DETACH(env);
+}
+
+void pp_tun_ctrl_cancel_tunnel(void *jni_ref, const char *error_code) {
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_cancel_tunnel(%p)", jni_ref);
 
@@ -259,7 +298,7 @@ void pp_tun_ctrl_cancel_tunnel(void *jni_ref, const char *error_message) {
 
     jclass cls = NULL;
     jmethodID method = NULL;
-    jstring j_error_message = NULL;
+    jstring j_error_code = NULL;
 
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
@@ -271,8 +310,8 @@ void pp_tun_ctrl_cancel_tunnel(void *jni_ref, const char *error_message) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_cancel_tunnel(), NULL method");
         goto cleanup;
     }
-    j_error_message = error_message ? (*env)->NewStringUTF(env, error_message) : NULL;
-    (*env)->CallVoidMethod(env, jni_ref, method, j_error_message);
+    j_error_code = error_code ? (*env)->NewStringUTF(env, error_code) : NULL;
+    (*env)->CallVoidMethod(env, jni_ref, method, j_error_code);
     if ((*env)->ExceptionCheck(env)) {
         (*env)->ExceptionDescribe(env);
         (*env)->ExceptionClear(env);
@@ -281,17 +320,9 @@ void pp_tun_ctrl_cancel_tunnel(void *jni_ref, const char *error_message) {
     }
 
 cleanup:
-    if (j_error_message != NULL) (*env)->DeleteLocalRef(env, j_error_message);
+    if (j_error_code != NULL) (*env)->DeleteLocalRef(env, j_error_code);
     if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
     PP_JNI_DETACH(env);
-}
-
-void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
-    (void)jni_ref;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_clear_tunnel(%p)", jni_ref);
-    if (!tun_impl) return;
-    pp_tun_shutdown(tun_impl);
-    free(tun_impl);
 }
 
 JNIEXPORT void JNICALL

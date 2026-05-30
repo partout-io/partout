@@ -32,6 +32,7 @@ interface TunnelController {
     fun setTunnel(infoJSON: String): Int
     fun configureSockets(fds: IntArray)
     fun onSnapshot(snapshotJSON: String)
+    fun clearTunnel()
     fun cancelTunnel(errorCode: String?)
 
     // Kotlin -> JNI
@@ -179,9 +180,15 @@ class JNITunnelController(
         return@synchronized
     }
 
+    override fun clearTunnel() = synchronized(lock) {
+        if (isNativeCancelled) { return }
+        return@synchronized
+    }
+
     override fun cancelTunnel(errorCode: String?) = synchronized(lock) {
         if (isNativeCancelled) { return }
         isNativeCancelled = true
+        tunDescriptor = null // Do not close, fd is detached
         Log.d(logTag, "cancelTunnel()")
         if (errorCode != null) {
             Log.e(logTag, "VPN daemon cancelled: $errorCode")
