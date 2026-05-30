@@ -182,6 +182,8 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                     continuation.resume()
                 }
             }
+        } catch let error as IOError {
+            throw error
         } catch {
             guard isActive else {
                 throw PartoutError(.tunNotActive)
