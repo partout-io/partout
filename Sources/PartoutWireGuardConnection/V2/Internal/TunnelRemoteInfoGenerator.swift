@@ -169,16 +169,11 @@ final class TunnelRemoteInfoGenerator: Sendable {
             modules.append(dns)
         }
 
-#if os(Windows)
-        let requiresVirtualDevice = false
-#else
-        let requiresVirtualDevice = true
-#endif
         return TunnelRemoteInfo(
             originalModuleId: moduleId,
             address: remoteAddress,
             modules: modules,
-            requiresVirtualDevice: requiresVirtualDevice
+            requiresVirtualDevice: false
         )
     }
 }
