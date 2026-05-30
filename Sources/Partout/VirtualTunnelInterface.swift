@@ -221,7 +221,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 }
 
 private func ioWouldBlock(_ count: Int32) -> Bool {
-    count < 0 && errno == EAGAIN || errno == EWOULDBLOCK
+    count < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)
 }
 
 private extension DispatchQueue {
