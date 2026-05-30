@@ -106,7 +106,10 @@ public final class _WireGuardConnectionV1: Connection, @unchecked Sendable {
                             continuation.resume(throwing: WireGuardConnectionError.couldNotDetermineFileDescriptor)
 
                         case .dnsResolution(let dnsErrors):
-                            let hostnamesWithDnsResolutionFailure = dnsErrors.map(\.address)
+                            let hostnamesWithDnsResolutionFailure = dnsErrors
+                                .map {
+                                    $0.address.asSensitiveAddress(self.ctx)
+                                }
                                 .joined(separator: ", ")
                             pp_log(ctx, .wireguard, .error, "DNS resolution failed for the following hostnames: \(hostnamesWithDnsResolutionFailure)")
                             continuation.resume(throwing: WireGuardConnectionError.dnsResolutionFailure)
