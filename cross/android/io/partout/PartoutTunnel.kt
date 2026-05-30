@@ -266,7 +266,7 @@ class PartoutTunnel(
         runCatching {
             json.decodeFromString<TunnelSnapshot>(snapshotJSON)
         }.onSuccess { snapshot ->
-            Log.e(logTag, ">>> Snapshot received: ${snapshot}")
+            Log.d(logTag, ">>> Snapshot received: ${snapshot}")
             _state.update {
                 it.copy(mapOf(snapshot.id to snapshot))
             }

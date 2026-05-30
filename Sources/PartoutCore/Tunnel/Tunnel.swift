@@ -46,6 +46,13 @@ public actor Tunnel {
         observeObjects()
 #endif
     }
+
+    deinit {
+        pendingInstall?.cancel()
+        subscriptions.forEach {
+            $0.cancel()
+        }
+    }
 }
 
 // MARK: - TunnelStrategy
@@ -171,9 +178,8 @@ private extension Tunnel {
             guard let ctx = self?.ctx else { return }
             guard let stream = self?.strategy.didUpdateActiveProfiles else { return }
             for await snapshots in stream {
-                guard let self else { break }
                 guard !Task.isCancelled else { break }
-                await handleStrategySnapshots(snapshots)
+                await self?.handleStrategySnapshots(snapshots)
             }
             pp_log(ctx, .core, .debug, "Cancelled Tunnel.strategy.didUpdateActiveProfiles (observed)")
         })
@@ -181,9 +187,8 @@ private extension Tunnel {
             subscriptions.append(Task { [weak self] in
                 guard let ctx = self?.ctx else { return }
                 while true {
-                    guard let self else { break }
                     guard !Task.isCancelled else { break }
-                    await refreshSnapshotEnvironments()
+                    await self?.refreshSnapshotEnvironments()
                     try? await Task.sleep(milliseconds: refreshInterval)
                 }
                 pp_log(ctx, .core, .debug, "Cancelled Tunnel.timerSubscription")
