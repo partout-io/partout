@@ -161,7 +161,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                         let writtenCount = toWrite.withUnsafeBytes {
                             pp_tun_write(self.tun, $0.bytePointer, toWrite.count)
                         }
-                        guard writtenCount > 0 else {
+                        guard writtenCount == toWrite.count else {
                             guard errno != EAGAIN else {
                                 continuation.resume(throwing: IOError.wouldBlock)
                                 return
