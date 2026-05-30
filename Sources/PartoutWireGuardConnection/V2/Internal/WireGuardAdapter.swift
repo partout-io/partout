@@ -280,7 +280,7 @@ actor WireGuardAdapter {
 
 #if os(macOS)
         if case .started(let handle, _) = self.state {
-            await backend.bumpSocketsAsync(handle)
+            await backend.bumpSocketsAndWait(handle)
             configureSockets(for: handle)
         }
 #else
@@ -291,7 +291,7 @@ actor WireGuardAdapter {
 
                 backend.setConfig(handle, settings: wgConfig)
                 backend.disableSomeRoamingForBrokenMobileSemantics(handle)
-                await backend.bumpSocketsAsync(handle)
+                await backend.bumpSocketsAndWait(handle)
                 configureSockets(for: handle)
             } else {
                 logHandler(.verbose, "Connectivity offline, pausing backend.")
