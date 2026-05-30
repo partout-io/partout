@@ -14,6 +14,10 @@ import io.partout.models.TaggedModuleIP
 import io.partout.models.TaggedModuleOnDemand
 import io.partout.models.TunnelRemoteInfoWrapper
 import io.partout.models.TunnelSnapshot
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
@@ -44,6 +48,7 @@ interface TunnelControllerDelegate {
 class JNITunnelController(
     private val logTag: String,
     private val service: VpnService,
+    private val scope: CoroutineScope,
     private val delegate: TunnelControllerDelegate
 ) : TunnelController {
     // All accesses must be synchronized against the lock
@@ -54,25 +59,42 @@ class JNITunnelController(
     private var isNativeCancelled = false
     private var tunDescriptor: ParcelFileDescriptor? = null
 
+    // Network observers
+    private val reachabilityObserver = ReachabilityObserver(service)
+    private var reachabilityJob: Job? = null
+    private var reachableNetwork: Network? = null
+
     override fun startObserving() {
+        reachabilityJob = reachabilityObserver
+            .flow()
+            .onEach { onReachabilityUpdate(it) }
+            .launchIn(scope)
     }
 
     override fun stopObserving() {
+        reachabilityJob?.cancel()
+        reachabilityJob = null
     }
 
     override fun setDelegate(delegate: Long): Long = synchronized(lock) {
         Log.d(logTag, "setDelegate($delegate)")
         val oldDelegate = nativeDelegate
         nativeDelegate = delegate
+        if (delegate != 0L) {
+            onNativeReachabilityUpdate(
+                delegate,
+                reachableNetwork?.networkHandle ?: INVALID_NETWORK_HANDLE
+            )
+        }
         return oldDelegate
     }
 
     override fun setTunnel(infoJSON: String): Int = synchronized(lock) {
-        if (isNativeCancelled) { return -1 }
+        if (isNativeCancelled) { return INVALID_TUN_FD }
         Log.d(logTag, "setTunnel()")
         if (tunDescriptor != null) {
             Log.e(logTag, "Tunnel descriptor already established")
-            return -1
+            return INVALID_TUN_FD
         }
 
         val builder = service.Builder()
@@ -80,7 +102,7 @@ class JNITunnelController(
             json.decodeFromString(infoJSON)
         } catch (e: SerializationException) {
             Log.e(logTag, "Unable to decode tunnel info JSON", e)
-            return -1
+            return INVALID_TUN_FD
         }
         var appliedAddressSettings = false
         var appliedDnsSettings = false
@@ -115,7 +137,7 @@ class JNITunnelController(
 
         if (!appliedAddressSettings) {
             Log.e(logTag, "No valid interface address")
-            return -1
+            return INVALID_TUN_FD
         }
 
         // IMPORTANT: this is a requirement for VirtualTunnelInterface.
@@ -130,10 +152,10 @@ class JNITunnelController(
         }
         if (tunDescriptor == null) {
             Log.e(logTag, "Unable to establish tunnel")
-            return -1
+            return INVALID_TUN_FD
         }
 
-        val fd = tunDescriptor?.detachFd() ?: -1
+        val fd = tunDescriptor?.detachFd() ?: INVALID_TUN_FD
         tunDescriptor = null
         Log.i(logTag, "Established tunnel descriptor: $fd")
         return fd
@@ -147,6 +169,7 @@ class JNITunnelController(
                 "Invalid Android file descriptor: $it"
             }
             val protected = service.protect(it)
+            // FIXME: Throw exception on protect() failure?
             Log.d(logTag, "protect($it) = $protected")
         }
     }
@@ -175,7 +198,7 @@ class JNITunnelController(
     override fun onReachabilityUpdate(network: Network?) = synchronized(lock) {
         val networkHandle = network?.networkHandle
         Log.e(logTag, ">>> Network: onReachabilityUpdate($networkHandle)")
-        onNativeReachabilityUpdate(nativeDelegate, networkHandle ?: -1)
+        onNativeReachabilityUpdate(nativeDelegate, networkHandle ?: INVALID_NETWORK_HANDLE)
     }
 
     override fun onBetterPathUpdate() = synchronized(lock) {
@@ -193,6 +216,9 @@ class JNITunnelController(
     private external fun getNativeEnvironmentValue(delegate: Long, key: String): String?
 
     companion object {
+        private const val INVALID_TUN_FD = -1
+        private const val INVALID_NETWORK_HANDLE = -1L
+
         private val json = Json {
             ignoreUnknownKeys = true
         }
