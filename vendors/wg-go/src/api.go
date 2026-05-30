@@ -158,8 +158,8 @@ func wgBumpSockets(tunnelHandle int32) {
 	}()
 }
 
-//export wgBumpSocketsSync
-func wgBumpSocketsSync(tunnelHandle int32) {
+//export wgBumpSocketsAndWait
+func wgBumpSocketsAndWait(tunnelHandle int32) {
 	dev, ok := tunnelHandles[tunnelHandle]
 	if !ok {
 		return
