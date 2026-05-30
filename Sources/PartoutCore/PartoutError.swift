@@ -85,10 +85,13 @@ extension Error {
 
 extension PartoutError: CustomDebugStringConvertible {
     public var debugDescription: String {
-        let desc = [code.rawValue, userInfo.map(String.init(describing:)), reason?.localizedDescription]
-            .compactMap { $0 }
-            .joined(separator: ", ")
-
-        return "[PartoutError.\(desc)]"
+        var desc: [String] = ["PartoutError.\(code.rawValue)"]
+        if let userInfo {
+            desc.append("userInfo=\(String(describing: userInfo))")
+        }
+        if let reason {
+            desc.append("reason=\(reason) (\(reason.localizedDescription))")
+        }
+        return "{\(desc.joined(separator: ", "))}"
     }
 }
