@@ -48,7 +48,7 @@ extension OpenVPNSession {
             throw cError
         } catch {
             pp_log(ctx, .openvpn, .error, "Data: Failed LINK write during send data: \(error)")
-            await shutdown(PartoutError(.linkFailure, error))
+            await shutdown(PartoutError(.ioFailure, error))
         }
     }
 }

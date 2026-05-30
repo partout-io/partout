@@ -140,10 +140,7 @@ class JNITunnelController(
             return INVALID_TUN_FD
         }
 
-        // IMPORTANT: this is a requirement for VirtualTunnelInterface.
-        // By default, establish() returns a non-blocking descriptor.
-        builder.setBlocking(true)
-
+        // IMPORTANT: By default, establish() returns a non-blocking descriptor.
         tunDescriptor = try {
             builder.establish()
         } catch (e: RuntimeException) {
