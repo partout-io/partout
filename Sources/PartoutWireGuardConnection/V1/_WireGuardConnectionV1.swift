@@ -194,8 +194,7 @@ private extension _WireGuardConnectionV1 {
                     _ = try await connection.controller.setTunnelSettings(with: TunnelRemoteInfo(
                         originalModuleId: connection.moduleId,
                         address: addressObject,
-                        modules: [module],
-                        requiresVirtualDevice: false
+                        modules: [module]
                     ))
                     completionHandler?(nil)
                     pp_log(connection.ctx, .wireguard, .info, "Tunnel interface is now UP")
