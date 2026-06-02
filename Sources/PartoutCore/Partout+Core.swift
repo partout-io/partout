@@ -105,6 +105,9 @@ extension PartoutError.Code {
     /// Network is unreachable.
     public static let networkUnreachable = Self("networkUnreachable")
 
+    /// Native sockets could not be configured.
+    public static let socketConfiguration = Self("socketConfiguration")
+
     /// TUN device is not active.
     public static let tunNotActive = Self("tunNotActive")
 

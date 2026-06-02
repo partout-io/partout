@@ -109,9 +109,20 @@ public final class NativeTunnelController: TunnelController, Sendable {
         return VirtualTunnelInterface(ctx, tun: tun, maxReadLength: maxReadLength)
     }
 
-    public func configureSockets(with descriptors: [UInt64]) {
-        descriptors.map(Int32.init).withUnsafeBufferPointer {
-            pp_tun_ctrl_configure_sockets(ref, $0.baseAddress, $0.count)
+    public func configureSockets(with descriptors: [UInt64]) throws {
+        let result = descriptors
+            .map(Int32.init)
+            .withUnsafeBufferPointer { fds in
+                if let info = reachabilityInfo?.toCReachability {
+                    withUnsafePointer(to: info) { infoPtr in
+                        pp_tun_ctrl_configure_sockets(ref, infoPtr, fds.baseAddress, fds.count)
+                    }
+                } else {
+                    pp_tun_ctrl_configure_sockets(ref, nil, fds.baseAddress, fds.count)
+                }
+            }
+        guard result else {
+            throw PartoutError(.socketConfiguration)
         }
     }
 
@@ -167,16 +178,14 @@ public final class NativeTunnelController: TunnelController, Sendable {
 // MARK: - DNS
 
 extension NativeTunnelController: DNSResolver {
+    public var reachabilityInfo: ReachabilityInfo? {
+        reachabilityHolder.get()
+    }
+
     public func resolve(_ hostname: String, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
-        let fallbackReachability: ReachabilityInfo?
-#if os(Android)
-        fallbackReachability = reachabilityHolder.get()
-#else
-        fallbackReachability = reachability
-#endif
-        return try await dns.resolve(
+        try await dns.resolve(
             hostname,
-            reachability: reachability ?? fallbackReachability,
+            reachability: reachability ?? reachabilityInfo,
             timeout: timeout
         )
     }
@@ -205,7 +214,7 @@ extension NativeTunnelController: ReachabilityObserver {
 }
 
 private extension NativeTunnelController {
-    func onReachability(_ reachability: UnsafePointer<pp_tun_ctrl_reachability>) {
+    func onReachability(_ reachability: UnsafePointer<pp_reachability>) {
         let isReachable = reachability.pointee.reachable
 #if os(Android)
         pp_log(ctx, .core, .info, "Network reachability changed: reachable=\(isReachable), network_handle=\(reachability.pointee.network_handle)")
@@ -223,7 +232,7 @@ private extension NativeTunnelController {
 
 private final class ReachabilityHolder: @unchecked Sendable {
     private let lock = SemaphoreMutex()
-    private var reachability: pp_tun_ctrl_reachability?
+    private var reachability: pp_reachability?
 
     nonisolated func get() -> ReachabilityInfo? {
         lock.with {
@@ -241,7 +250,7 @@ private final class ReachabilityHolder: @unchecked Sendable {
         }
     }
 
-    nonisolated func set(_ new: UnsafePointer<pp_tun_ctrl_reachability>) {
+    nonisolated func set(_ new: UnsafePointer<pp_reachability>) {
         lock.with {
             reachability = new.pointee
         }
@@ -271,6 +280,27 @@ private final class BetterPathProxy: BetterPathStreamFactory, @unchecked Sendabl
     }
 }
 
+// MARK: - SocketConfigurator
+
+extension NativeTunnelController {
+    public func socketConfigurator() -> SocketConfigurator {
+        SocketConfigurator(
+            reachability: { [weak self] in
+                self?.reachabilityInfo
+            },
+            configureSocket: { [weak self] fd in
+                do {
+                    try self?.configureSockets(with: [fd])
+                    return true
+                } catch {
+                    pp_log(self?.ctx ?? .global, .core, .fault, "Unable to configure sockets: \(error)")
+                    return false
+                }
+            }
+        )
+    }
+}
+
 // MARK: - Helpers
 
 private extension UnsafeMutableRawPointer {
@@ -280,6 +310,21 @@ private extension UnsafeMutableRawPointer {
 
     var toSelf: NativeTunnelController {
         Unmanaged.fromOpaque(self).takeUnretainedValue()
+    }
+}
+
+private extension ReachabilityInfo {
+    var toCReachability: pp_reachability {
+#if os(Android)
+        pp_reachability(
+            reachable: isReachable,
+            network_handle: networkHandle ?? 0
+        )
+#else
+        pp_reachability(
+            reachable: isReachable
+        )
+#endif
     }
 }
 

@@ -72,6 +72,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/SharedTunnelEnvironment.swift
 ./PartoutCore/Connection/SimpleConnectionDaemon.swift
 ./PartoutCore/Connection/SimpleDNSResolver.swift
+./PartoutCore/Connection/SocketConfigurator.swift
 ./PartoutCore/Connection/SocketHandle.swift
 ./PartoutCore/Connection/SocketIOInterface.swift
 ./PartoutCore/Connection/StaticTunnelEnvironment.swift

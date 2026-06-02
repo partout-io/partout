@@ -24,6 +24,8 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
 
     private let betterPathStream: PassthroughStream<Void>
 
+    private let configurator: SocketConfigurator?
+
     private let socketHandle: SocketHandle
 
     private let readQueue: DispatchQueue
@@ -47,6 +49,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         endpoint: ExtendedEndpoint,
         timeout: Int,
         betterPathFactory: BetterPathStreamFactory,
+        configurator: SocketConfigurator?,
         socketBufferLength: Int = 1 * 1024 * 1024,
         maxReadLength: Int = 128 * 1024,
         maxReadBatchPackets: Int = 256,
@@ -55,7 +58,8 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         let sock = try await openSocket(
             endpoint: endpoint,
             timeout: timeout,
-            socketBufferLength: socketBufferLength
+            socketBufferLength: socketBufferLength,
+            configurator: configurator
         )
         let closesOnEmptyRead = endpoint.plainSocketType == .tcp
         let betterPathStream = betterPathFactory.newStream()
@@ -69,7 +73,8 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
             maxReadBatchPackets: maxReadBatchPackets,
             maxReadBatchBytes: maxReadBatchBytes,
             betterPathFactory: betterPathFactory,
-            betterPathStream: betterPathStream
+            betterPathStream: betterPathStream,
+            configurator: configurator
         )
     }
 
@@ -83,7 +88,8 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         maxReadBatchPackets: Int,
         maxReadBatchBytes: Int,
         betterPathFactory: BetterPathStreamFactory,
-        betterPathStream: PassthroughStream<Void>
+        betterPathStream: PassthroughStream<Void>,
+        configurator: SocketConfigurator?
     ) {
         self.ctx = ctx
         self.endpoint = endpoint
@@ -94,6 +100,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         self.maxReadBatchBytes = max(maxReadLength, maxReadBatchBytes)
         self.betterPathFactory = betterPathFactory
         self.betterPathStream = betterPathStream
+        self.configurator = configurator
         socketHandle = SocketHandle(sock: sock)
         let queueLabelContext = socketHandle.fileDescriptor?.description ?? "unknown"
         readQueue = DispatchQueue(
@@ -160,6 +167,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
             endpoint: endpoint,
             timeout: connectTimeout,
             betterPathFactory: betterPathFactory,
+            configurator: configurator,
             maxReadLength: maxReadLength
         )
     }
@@ -173,18 +181,38 @@ private extension BSDSocket {
     static func openSocket(
         endpoint: ExtendedEndpoint,
         timeout: Int,
-        socketBufferLength: Int
+        socketBufferLength: Int,
+        configurator: SocketConfigurator?
     ) async throws -> pp_socket {
         try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 let blocking = endpoint.plainSocketType == .tcp
+
+                let reachability = configurator?.reachability()
+                var cReachability = pp_reachability()
+                cReachability.reachable = reachability?.isReachable ?? false
+#if os(Android)
+                cReachability.network_handle = reachability?.networkHandle ?? 0
+#endif
+                let cConfigurator = configurator.map {
+                    Unmanaged.passUnretained($0).toOpaque()
+                }
                 let newSock = endpoint.address.rawValue.withCString { cAddr in
                     pp_socket_open(
                         cAddr,
                         endpoint.socketProto,
                         endpoint.proto.port,
                         blocking,
-                        Int32(timeout)
+                        Int32(timeout),
+                        &cReachability,
+                        { ctx, fd in
+                            guard let ctx else { return true }
+                            let cfg = Unmanaged<SocketConfigurator>
+                                .fromOpaque(ctx)
+                                .takeUnretainedValue()
+                            return cfg.configureSocket(fd)
+                        },
+                        cConfigurator
                     )
                 }
                 guard let newSock else {

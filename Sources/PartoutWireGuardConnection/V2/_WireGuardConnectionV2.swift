@@ -154,8 +154,8 @@ extension _WireGuardConnectionV2: WireGuardAdapterDelegate {
         }
     }
 
-    nonisolated func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64]) {
-        controller.configureSockets(with: descriptors)
+    nonisolated func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64]) throws {
+        try controller.configureSockets(with: descriptors)
     }
 
     func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapter, tunnel: IOInterface) async {
