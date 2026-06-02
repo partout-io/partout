@@ -112,11 +112,9 @@ pp_socket pp_socket_open(const char *ip_addr,
             local_print_error("socket()");
             goto failure;
         }
-        if (configure) {
-            if (!configure(configure_ctx, new_fd)) {
-                local_print_error("configure()");
-                goto failure;
-            }
+        if (configure && !configure(configure_ctx, new_fd)) {
+            local_print_error("configure()");
+            goto failure;
         }
         if (local_connect_with_timeout(new_fd,
                                            (const struct sockaddr *)&numeric_addr,
@@ -166,7 +164,7 @@ pp_socket pp_socket_open(const char *ip_addr,
             local_print_error("socket()");
             continue;
         }
-        if (!configure(configure_ctx, new_fd)) {
+        if (configure && !configure(configure_ctx, new_fd)) {
             local_print_error("configure()");
             goto failure;
         }
