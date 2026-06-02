@@ -188,7 +188,7 @@ bool pp_tun_ctrl_configure_sockets(void *jni_ref, const pp_reachability *info,
     if (info && info->network_handle > 0) {
         for (int i = 0; i < fds_len; ++i) {
             if (android_setsocknetwork(info->network_handle, fds[i]) != 0) {
-                pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_configure_sockets(), android_setsocknetwork(%d)", i);
+                pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_configure_sockets(), android_setsocknetwork(%d)", fds[i]);
                 goto cleanup;
             }
         }
