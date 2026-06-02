@@ -175,7 +175,7 @@ cleanup:
     return tun_impl;
 }
 
-void pp_tun_ctrl_configure_sockets(void *jni_ref, const pp_tun_ctrl_reachability *info,
+void pp_tun_ctrl_configure_sockets(void *jni_ref, const pp_reachability *info,
                                    const int *fds, const size_t fds_len) {
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_configure_sockets(%p)", jni_ref);
@@ -343,7 +343,7 @@ Java_io_partout_vpn_JNITunnelController_onNativeReachabilityUpdate(JNIEnv *env,
     (void)thiz;
     pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
     if (!ctrl_delegate || !ctrl_delegate->ctx) return;
-    const pp_tun_ctrl_reachability reachability = {
+    const pp_reachability reachability = {
         .reachable = net_handle != -1,
         .network_handle = net_handle
     };

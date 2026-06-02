@@ -82,7 +82,7 @@ pp_socket pp_socket_open(const char *ip_addr,
                          uint16_t port,
                          bool blocking,
                          int timeout_ms,
-                         const pp_tun_ctrl_reachability *info,
+                         const pp_reachability *info,
                          void (*configure)(void *ctx, uint64_t fd),
                          void *configure_ctx) {
     int socktype = 0;

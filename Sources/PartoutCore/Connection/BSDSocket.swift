@@ -189,7 +189,7 @@ private extension BSDSocket {
                 let blocking = endpoint.plainSocketType == .tcp
 
                 let reachability = configurator?.reachability()
-                var cReachability = pp_tun_ctrl_reachability()
+                var cReachability = pp_reachability()
                 cReachability.reachable = reachability?.isReachable ?? false
 #if os(Android)
                 cReachability.network_handle = reachability?.networkHandle ?? 0

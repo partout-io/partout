@@ -16,7 +16,7 @@ typedef struct {
 #if PARTOUT_ANDROID
     uint64_t network_handle;
 #endif
-} pp_tun_ctrl_reachability;
+} pp_reachability;
 
 /* The available protocols. */
 typedef enum {
@@ -43,7 +43,7 @@ pp_socket _Nullable pp_socket_open(const char *_Nonnull ip_addr,
                                    uint16_t port,
                                    bool blocking,
                                    int timeout_ms,
-                                   const pp_tun_ctrl_reachability *_Nullable info,
+                                   const pp_reachability *_Nullable info,
                                    void (*_Nullable configure)(void *_Nullable ctx, uint64_t fd),
                                    void *_Nullable configure_ctx);
 

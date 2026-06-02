@@ -211,7 +211,7 @@ extension NativeTunnelController: ReachabilityObserver {
 }
 
 private extension NativeTunnelController {
-    func onReachability(_ reachability: UnsafePointer<pp_tun_ctrl_reachability>) {
+    func onReachability(_ reachability: UnsafePointer<pp_reachability>) {
         let isReachable = reachability.pointee.reachable
 #if os(Android)
         pp_log(ctx, .core, .info, "Network reachability changed: reachable=\(isReachable), network_handle=\(reachability.pointee.network_handle)")
@@ -229,7 +229,7 @@ private extension NativeTunnelController {
 
 private final class ReachabilityHolder: @unchecked Sendable {
     private let lock = SemaphoreMutex()
-    private var reachability: pp_tun_ctrl_reachability?
+    private var reachability: pp_reachability?
 
     nonisolated func get() -> ReachabilityInfo? {
         lock.with {
@@ -247,7 +247,7 @@ private final class ReachabilityHolder: @unchecked Sendable {
         }
     }
 
-    nonisolated func set(_ new: UnsafePointer<pp_tun_ctrl_reachability>) {
+    nonisolated func set(_ new: UnsafePointer<pp_reachability>) {
         lock.with {
             reachability = new.pointee
         }
@@ -305,14 +305,14 @@ private extension UnsafeMutableRawPointer {
 }
 
 private extension ReachabilityInfo {
-    var toCReachability: pp_tun_ctrl_reachability {
+    var toCReachability: pp_reachability {
 #if os(Android)
-        pp_tun_ctrl_reachability(
+        pp_reachability(
             reachable: isReachable,
             network_handle: networkHandle ?? 0
         )
 #else
-        pp_tun_ctrl_reachability(
+        pp_reachability(
             reachable: isReachable
         )
 #endif

@@ -29,7 +29,7 @@ const char *_Nullable pp_tun_name(const pp_tun _Nonnull tun);
 typedef struct {
     void *_Nullable ctx;
     void (*_Nonnull on_reachability)(void *_Nonnull ctx,
-                                     const pp_tun_ctrl_reachability *_Nonnull reachability);
+                                     const pp_reachability *_Nonnull reachability);
     void (*_Nonnull on_better_path)(void *_Nonnull ctx);
     char *_Nullable (*_Nonnull environment_value)(void *_Nonnull ctx, const char *_Nonnull key);
 } pp_tun_ctrl_delegate;
@@ -39,7 +39,7 @@ pp_tun _Nullable pp_tun_ctrl_set_tunnel(void *_Nullable ref,
                                         const char *_Nonnull uuid,
                                         const char *_Nullable info_json);
 void pp_tun_ctrl_configure_sockets(void *_Nullable ref,
-                                   const pp_tun_ctrl_reachability *_Nullable info,
+                                   const pp_reachability *_Nullable info,
                                    const int *_Nullable fds,
                                    const size_t fds_len);
 void pp_tun_ctrl_report_snapshot(void *_Nullable ref,
