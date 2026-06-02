@@ -144,7 +144,7 @@ pp_socket pp_socket_open(const char *ip_addr,
 
     snprintf(port_str, sizeof(port_str), "%u", port);
 #if PARTOUT_ANDROID
-    if (info || info->network_handle <= 0) {
+    if (!info || info->network_handle <= 0) {
         local_print_error("android_getaddrinfofornetwork(): missing network handle");
         goto failure;
     }
