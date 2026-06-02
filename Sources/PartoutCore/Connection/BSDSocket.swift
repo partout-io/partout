@@ -206,11 +206,11 @@ private extension BSDSocket {
                         Int32(timeout),
                         &cReachability,
                         { ctx, fd in
-                            guard let ctx else { return }
+                            guard let ctx else { return true }
                             let cfg = Unmanaged<SocketConfigurator>
                                 .fromOpaque(ctx)
                                 .takeUnretainedValue()
-                            cfg.configureSocket(fd)
+                            return cfg.configureSocket(fd)
                         },
                         cConfigurator
                     )

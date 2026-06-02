@@ -83,7 +83,7 @@ pp_socket pp_socket_open(const char *ip_addr,
                          bool blocking,
                          int timeout_ms,
                          const pp_reachability *info,
-                         void (*configure)(void *ctx, uint64_t fd),
+                         bool (*configure)(void *ctx, uint64_t fd),
                          void *configure_ctx) {
     int socktype = 0;
     struct addrinfo hints, *resolved = NULL;
@@ -113,7 +113,10 @@ pp_socket pp_socket_open(const char *ip_addr,
             goto failure;
         }
         if (configure) {
-            configure(configure_ctx, new_fd);
+            if (!configure(configure_ctx, new_fd)) {
+                local_print_error("configure()");
+                goto failure;
+            }
         }
         if (local_connect_with_timeout(new_fd,
                                            (const struct sockaddr *)&numeric_addr,
@@ -163,8 +166,9 @@ pp_socket pp_socket_open(const char *ip_addr,
             local_print_error("socket()");
             continue;
         }
-        if (configure) {
-            configure(configure_ctx, new_fd);
+        if (!configure(configure_ctx, new_fd)) {
+            local_print_error("configure()");
+            goto failure;
         }
         const int ret = local_connect_with_timeout(new_fd,
                                                        p->ai_addr,

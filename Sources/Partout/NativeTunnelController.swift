@@ -109,8 +109,8 @@ public final class NativeTunnelController: TunnelController, Sendable {
         return VirtualTunnelInterface(ctx, tun: tun, maxReadLength: maxReadLength)
     }
 
-    public func configureSockets(with descriptors: [UInt64]) {
-        descriptors
+    public func configureSockets(with descriptors: [UInt64]) throws {
+        let result = descriptors
             .map(Int32.init)
             .withUnsafeBufferPointer { fds in
                 if let info = reachabilityInfo?.toCReachability {
@@ -121,6 +121,9 @@ public final class NativeTunnelController: TunnelController, Sendable {
                     pp_tun_ctrl_configure_sockets(ref, nil, fds.baseAddress, fds.count)
                 }
             }
+        guard result else {
+            throw PartoutError(.socketConfiguration)
+        }
     }
 
     public func reportSnapshot(_ snapshot: TunnelSnapshot) {
@@ -286,7 +289,13 @@ extension NativeTunnelController {
                 self?.reachabilityInfo
             },
             configureSocket: { [weak self] fd in
-                self?.configureSockets(with: [fd])
+                do {
+                    try self?.configureSockets(with: [fd])
+                    return true
+                } catch {
+                    pp_log(self?.ctx ?? .global, .core, .fault, "Unable to configure sockets: \(error)")
+                    return false
+                }
             }
         )
     }

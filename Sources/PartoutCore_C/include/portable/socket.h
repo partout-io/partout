@@ -44,7 +44,7 @@ pp_socket _Nullable pp_socket_open(const char *_Nonnull ip_addr,
                                    bool blocking,
                                    int timeout_ms,
                                    const pp_reachability *_Nullable info,
-                                   void (*_Nullable configure)(void *_Nullable ctx, uint64_t fd),
+                                   bool (*_Nullable configure)(void *_Nullable ctx, uint64_t fd),
                                    void *_Nullable configure_ctx);
 
 /* I/O. Returns PP_SOCKET_WOULD_BLOCK when a non-blocking operation would block. */

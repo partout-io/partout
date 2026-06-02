@@ -175,13 +175,15 @@ cleanup:
     return tun_impl;
 }
 
-void pp_tun_ctrl_configure_sockets(void *jni_ref, const pp_reachability *info,
+bool pp_tun_ctrl_configure_sockets(void *jni_ref, const pp_reachability *info,
                                    const int *fds, const size_t fds_len) {
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_configure_sockets(%p)", jni_ref);
-    if (!fds || fds_len == 0) return;
+    if (!fds || fds_len == 0) return false;
 
-    PP_JNI_ATTACH_OR_RETURN_VOID(env);
+    PP_JNI_ATTACH_OR_RETURN(env, false);
+
+    bool success = false;
 
     if (info && info->network_handle > 0) {
         for (int i = 0; i < fds_len; ++i) {
@@ -220,10 +222,14 @@ void pp_tun_ctrl_configure_sockets(void *jni_ref, const pp_reachability *info,
         goto cleanup;
     }
 
+    success = true;
+
 cleanup:
     if (j_fds != NULL) (*env)->DeleteLocalRef(env, j_fds);
     if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
     PP_JNI_DETACH(env);
+
+    return success;
 }
 
 void pp_tun_ctrl_report_snapshot(void *_Nullable ref,

@@ -7,6 +7,7 @@
 #pragma once
 #include "portable/conditionals.h"
 
+#include <stdbool.h>
 #include <stdint.h>
 #include "portable/common.h"
 #include "portable/socket.h"
@@ -38,7 +39,7 @@ void pp_tun_ctrl_set_delegate(void *_Nullable ref,
 pp_tun _Nullable pp_tun_ctrl_set_tunnel(void *_Nullable ref,
                                         const char *_Nonnull uuid,
                                         const char *_Nullable info_json);
-void pp_tun_ctrl_configure_sockets(void *_Nullable ref,
+bool pp_tun_ctrl_configure_sockets(void *_Nullable ref,
                                    const pp_reachability *_Nullable info,
                                    const int *_Nullable fds,
                                    const size_t fds_len);
