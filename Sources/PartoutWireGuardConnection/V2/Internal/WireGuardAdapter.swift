@@ -9,7 +9,7 @@ protocol WireGuardAdapterDelegate: AnyObject, Sendable {
 
     func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: TunnelRemoteInfo) async throws -> IOInterface
 
-    func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64])
+    func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64]) throws
 
     func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapter, tunnel: IOInterface) async
 }
@@ -185,7 +185,11 @@ actor WireGuardAdapter {
         reachabilityTask = Task { [weak self] in
             for await isReachable in stream {
                 guard !Task.isCancelled else { return }
-                await self?.didUpdateReachable(isReachable: isReachable)
+                do {
+                    try await self?.didUpdateReachable(isReachable: isReachable)
+                } catch {
+                    self?.logHandler(.error, "Unable to update reachability: \(error)")
+                }
             }
         }
     }
@@ -247,18 +251,18 @@ actor WireGuardAdapter {
 #if os(iOS)
         backend.disableSomeRoamingForBrokenMobileSemantics(handle)
 #endif
-        configureSockets(for: handle)
+        try configureSockets(for: handle)
         return handle
     }
 
     @discardableResult
-    private func configureSockets(for handle: Int32) -> [UInt64] {
+    private func configureSockets(for handle: Int32) throws -> [UInt64] {
         let descriptors = backend.socketDescriptors(handle)
             .filter { $0 >= 0 }
             .map { UInt64($0) }
         pp_log(ctx, .wireguard, .info, "Socket descriptors: \(descriptors)")
         guard !descriptors.isEmpty else { return [] }
-        delegate?.adapterShouldConfigureSockets(self, descriptors: descriptors)
+        try delegate?.adapterShouldConfigureSockets(self, descriptors: descriptors)
         return descriptors
     }
 
@@ -274,14 +278,14 @@ actor WireGuardAdapter {
         )
     }
 
-    private func didUpdateReachable(isReachable: Bool) async {
+    private func didUpdateReachable(isReachable: Bool) async throws {
 //        logHandler(.verbose, "Network change detected with \(path.status) route and interface order \(path.availableInterfaces)")
         logHandler(.verbose, "Network change detected, reachable: \(isReachable)")
 
 #if os(macOS)
         if case .started(let handle, _) = self.state {
             await backend.bumpSocketsAndWait(handle)
-            configureSockets(for: handle)
+            try configureSockets(for: handle)
         }
 #else
         switch state {
@@ -292,7 +296,7 @@ actor WireGuardAdapter {
                 backend.setConfig(handle, settings: wgConfig)
                 backend.disableSomeRoamingForBrokenMobileSemantics(handle)
                 await backend.bumpSocketsAndWait(handle)
-                configureSockets(for: handle)
+                try configureSockets(for: handle)
             } else {
                 logHandler(.verbose, "Connectivity offline, pausing backend.")
 
