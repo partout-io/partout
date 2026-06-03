@@ -18,7 +18,7 @@ extension _OpenVPNConnectionV2 {
         // Hardcode portable implementations
         let prng = PlatformPRNG()
         let dns = parameters.controller as? DNSResolver ?? SimpleDNSResolver {
-            POSIXDNSStrategy(hostname: $0)
+            POSIXDNSStrategy(hostname: $0, flags: $1)
         }
         let sessionFactory = {
             try await OpenVPNSession(

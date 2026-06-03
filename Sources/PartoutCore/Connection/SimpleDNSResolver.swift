@@ -13,20 +13,36 @@ public protocol SimpleDNSStrategy: Sendable {
 
 /// ``DNSResolver`` with support for timeout cancellation.
 public actor SimpleDNSResolver: DNSResolver {
-    private let strategy: (String) -> SimpleDNSStrategy
+    private struct PendingKey: Hashable, Sendable {
+        let hostname: String
+        let flags: Set<DNSResolverFlag>
 
-    private var pendingResolutions: [String: Task<[DNSRecord], Error>]
+        init(_ hostname: String, _ flags: Set<DNSResolverFlag>) {
+            self.hostname = hostname
+            self.flags = flags
+        }
+    }
 
-    public init(strategy: @escaping (String) -> SimpleDNSStrategy) {
+    private let strategy: (String, Set<DNSResolverFlag>) -> SimpleDNSStrategy
+
+    private var pendingResolutions: [PendingKey: Task<[DNSRecord], Error>]
+
+    public init(strategy: @escaping (String, Set<DNSResolverFlag>) -> SimpleDNSStrategy) {
         self.strategy = strategy
         pendingResolutions = [:]
     }
 
-    public func resolve(_ hostname: String, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
-        if let pendingResolutionTask = pendingResolutions[hostname] {
+    public func resolve(
+        _ hostname: String,
+        flags: Set<DNSResolverFlag>,
+        reachability: ReachabilityInfo?,
+        timeout: Int
+    ) async throws -> [DNSRecord] {
+        let key = PendingKey(hostname, flags)
+        if let pendingResolutionTask = pendingResolutions[key] {
             return try await pendingResolutionTask.value
         }
-        let newStrategy = strategy(hostname)
+        let newStrategy = strategy(hostname, flags)
         let resolutionTask = Task {
             try await newStrategy.startResolution()
             return try await Self.waitForResolution(
@@ -35,9 +51,9 @@ public actor SimpleDNSResolver: DNSResolver {
                 timeout: timeout
             )
         }
-        pendingResolutions[hostname] = resolutionTask
+        pendingResolutions[key] = resolutionTask
         defer {
-            pendingResolutions.removeValue(forKey: hostname)
+            pendingResolutions.removeValue(forKey: key)
         }
         return try await resolutionTask.value
     }

@@ -38,13 +38,19 @@ final class TunnelRemoteInfoGenerator: Sendable {
         await resolvedEndpoints.reset()
     }
 
+    func cacheResolvedPeerEndpoints(logHandler: @escaping WireGuardAdapter.LogHandler) async throws {
+        // We set .allAddresses so that we get v4 addresses even on DNS64 networks
+        _ = try await resolvePeers(dns: dns, flags: [.allAddresses], logHandler: logHandler)
+    }
+
     // Only updates peer endpoints
     func endpointUapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async -> String {
         var wgSettings = ""
 
         let resolutionMap: [Endpoint: Endpoint]
         do {
-            resolutionMap = try await resolvePeers(dns: dns, logHandler: logHandler)
+            // We omit flags so that we actually resolve this using DNS64
+            resolutionMap = try await resolvePeers(dns: dns, flags: [], logHandler: logHandler)
         } catch {
             logHandler(.error, "Unable to resolve peer endpoints: \(error.localizedDescription)")
             return wgSettings
@@ -91,7 +97,8 @@ final class TunnelRemoteInfoGenerator: Sendable {
             wgSettings.append("replace_peers=true\n")
         }
 
-        let resolutionMap = try await resolvePeers(dns: dns, logHandler: logHandler)
+        // We omit flags so that we actually resolve this using DNS64
+        let resolutionMap = try await resolvePeers(dns: dns, flags: [], logHandler: logHandler)
 
         for peer in tunnelConfiguration.peers {
             let publicKey = try peer.publicKey.rawValue.hexStringFromBase64()
@@ -184,12 +191,17 @@ final class TunnelRemoteInfoGenerator: Sendable {
 }
 
 private extension TunnelRemoteInfoGenerator {
-    func resolvePeers(dns: DNSResolver?, logHandler: @escaping WireGuardAdapter.LogHandler) async throws -> [Endpoint: Endpoint] {
+    func resolvePeers(
+        dns: DNSResolver?,
+        flags: Set<DNSResolverFlag>,
+        logHandler: @escaping WireGuardAdapter.LogHandler
+    ) async throws -> [Endpoint: Endpoint] {
         if let resolutionMap = await resolvedEndpoints.value {
             return resolutionMap
         }
         let resolutionMap = try await tunnelConfiguration.resolvePeers(
             dns: dns,
+            flags: flags,
             timeout: dnsTimeout,
             logHandler: logHandler
         )

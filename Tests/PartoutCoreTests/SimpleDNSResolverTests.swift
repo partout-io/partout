@@ -9,7 +9,7 @@ struct SimpleDNSResolverTests {
     @Test
     func givenResolver_whenResolveBeforeTimeout_thenReturnsResolvedRecords() async throws {
         let records = [DNSRecord(address: "1.2.3.4", isIPv6: false)]
-        let sut = SimpleDNSResolver { _ in
+        let sut = SimpleDNSResolver { _, _ in
             MockStrategy(records: records, delay: 100)
         }
         let result = try await sut.resolve("foobar.com", timeout: 500)
@@ -19,7 +19,7 @@ struct SimpleDNSResolverTests {
     @Test
     func givenResolver_whenResolveAfterTimeout_thenFailsWithTimeout() async throws {
         let records = [DNSRecord(address: "1.2.3.4", isIPv6: false)]
-        let sut = SimpleDNSResolver { _ in
+        let sut = SimpleDNSResolver { _, _ in
             MockStrategy(records: records, delay: 500)
         }
         do {
@@ -34,7 +34,7 @@ struct SimpleDNSResolverTests {
 
     @Test
     func givenResolverIgnoringCancellation_whenTimeout_thenStillReturns() async throws {
-        let sut = SimpleDNSResolver { _ in
+        let sut = SimpleDNSResolver { _, _ in
             CancellationIgnoringStrategy()
         }
         do {
