@@ -86,7 +86,6 @@ private extension ExtendedEndpoint {
     }
 
 #if swift(<6.0)
-    @available(*, deprecated, message: "NetworkExtension UDP/TCP sockets were removed in Swift 6")
     var nwHostEndpoint: NWHostEndpoint {
         NWHostEndpoint(hostname: address.rawValue, port: proto.port.description)
     }

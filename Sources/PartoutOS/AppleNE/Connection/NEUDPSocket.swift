@@ -5,7 +5,6 @@
 import NetworkExtension
 
 /// An observer based on `NWUDPSession`.
-@available(*, deprecated)
 public final class NEUDPObserver: LinkObserver {
     public struct Options: Sendable {
         public let maxDatagrams: Int

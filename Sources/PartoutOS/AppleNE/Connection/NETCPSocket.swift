@@ -5,7 +5,6 @@
 import NetworkExtension
 
 /// An observer based on `NWTCPConnection`.
-@available(*, deprecated)
 public final class NETCPObserver: LinkObserver {
     public struct Options: Sendable {
         public let minLength: Int
