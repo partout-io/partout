@@ -114,8 +114,48 @@ struct TunnelRemoteInfoGeneratorTests {
         let requestedHostnamesAfterUAPI = await dns.requestedHostnames
 
         #expect(requestedHostnamesAfterResolve == [sourceEndpoint.address.rawValue])
+        #expect(await dns.requestedFlags == [[.allAddresses]])
         #expect(requestedHostnamesAfterUAPI == requestedHostnamesAfterResolve)
         #expect(uapiConfiguration.contains("endpoint=\(ipv4Endpoint.wgRepresentation)"))
+    }
+
+    @Test
+    func givenUncachedEndpoint_whenGeneratingUAPIConfigurations_thenResolveWithoutAllAddresses() async throws {
+        let sourceEndpoint = try Endpoint("foobar.com", 51830)
+        let ipv4Endpoint = try Endpoint("77.160.28.16", sourceEndpoint.port)
+        let configuration = try makeConfiguration(endpoint: sourceEndpoint.rawValue)
+        let fullConfigurationDNS = RecordingDNSResolver()
+        await fullConfigurationDNS.setResolvedRecords([
+            DNSRecord(address: ipv4Endpoint.address.rawValue, isIPv6: false)
+        ], for: sourceEndpoint.address.rawValue)
+        let endpointUpdateDNS = RecordingDNSResolver()
+        await endpointUpdateDNS.setResolvedRecords([
+            DNSRecord(address: ipv4Endpoint.address.rawValue, isIPv6: false)
+        ], for: sourceEndpoint.address.rawValue)
+
+        let fullConfigurationGenerator = TunnelRemoteInfoGenerator(
+            .global,
+            tunnelConfiguration: configuration,
+            dns: fullConfigurationDNS,
+            dnsTimeout: 1000
+        )
+        let endpointUpdateGenerator = TunnelRemoteInfoGenerator(
+            .global,
+            tunnelConfiguration: configuration,
+            dns: endpointUpdateDNS,
+            dnsTimeout: 1000
+        )
+
+        let uapiConfiguration = try await fullConfigurationGenerator.uapiConfiguration(logHandler: { _, _ in })
+        let endpointUapiConfiguration = await endpointUpdateGenerator.endpointUapiConfiguration(logHandler: { _, _ in })
+
+        #expect(await fullConfigurationDNS.requestedHostnames == [sourceEndpoint.address.rawValue])
+        #expect(await fullConfigurationDNS.requestedFlags == [[]])
+        #expect(uapiConfiguration.contains("endpoint=\(ipv4Endpoint.wgRepresentation)"))
+
+        #expect(await endpointUpdateDNS.requestedHostnames == [sourceEndpoint.address.rawValue])
+        #expect(await endpointUpdateDNS.requestedFlags == [[]])
+        #expect(endpointUapiConfiguration.contains("endpoint=\(ipv4Endpoint.wgRepresentation)"))
     }
 
     @Test
@@ -230,17 +270,24 @@ private actor RecordingDNSResolver: DNSResolver {
 
     private var hostnames: [String] = []
 
+    private var flags: [Set<DNSResolverFlag>] = []
+
     func setResolvedRecords(_ records: [DNSRecord], for hostname: String) {
         resolvedRecords[hostname] = records
     }
 
     func resolve(_ hostname: String, flags: Set<DNSResolverFlag>, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
         hostnames.append(hostname)
+        self.flags.append(flags)
         return resolvedRecords[hostname] ?? []
     }
 
     var requestedHostnames: [String] {
         hostnames
+    }
+
+    var requestedFlags: [Set<DNSResolverFlag>] {
+        flags
     }
 }
 
