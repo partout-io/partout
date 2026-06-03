@@ -150,14 +150,13 @@ public final class NativeTunnelController: TunnelController, Sendable {
         }
         // FIXME: #188, revert settings (record)
 //        tun.deviceName
+
+        // Make sure to issue the tunnel shutdown and wait for it to
+        // finish to prevent races on VirtualTunnelInterface.deinit
         await tunnel.shutdown()
 
-        // Release tun implementation if necessary
-        let controllerRef = ref
-        Task.detached { [tunnel] in
-            await tunnel.waitUntilIdle()
-            pp_tun_ctrl_clear_tunnel(controllerRef, tunnel.tun)
-        }
+        // Wrap up clear in native layer
+        pp_tun_ctrl_clear_tunnel(ref, withKillSwitch)
     }
 
     public func setReasserting(_ reasserting: Bool) {

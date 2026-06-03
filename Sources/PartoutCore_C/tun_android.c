@@ -21,6 +21,12 @@ struct __pp_tun_struct {
     int fd;
 };
 
+void pp_tun_free(pp_tun tun) {
+    if (!tun) return;
+    pp_tun_shutdown(tun);
+    free(tun);
+}
+
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     if (!tun || tun->fd < 0) return -1;
     return read(tun->fd, dst, dst_len);
@@ -72,7 +78,7 @@ static const kotlin_sig sig_ctrl_onSnapshot = {
 };
 static const kotlin_sig sig_ctrl_clearTunnel = {
     "clearTunnel",
-    "()V"
+    "(Z)V"
 };
 static const kotlin_sig sig_ctrl_cancelTunnel = {
     "cancelTunnel",
@@ -273,11 +279,8 @@ cleanup:
 }
 
 // Balance with pp_tun_ctrl_set_tunnel
-void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
+void pp_tun_ctrl_clear_tunnel(void *jni_ref, bool kill_switch) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_clear_tunnel(%p)", jni_ref);
-    if (!tun_impl) return;
-    pp_tun_shutdown(tun_impl);
-    free(tun_impl);
 
     PP_JNI_ATTACH_OR_RETURN_VOID(env);
 
@@ -294,7 +297,7 @@ void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_clear_tunnel(), NULL method");
         goto cleanup;
     }
-    (*env)->CallVoidMethod(env, jni_ref, method);
+    (*env)->CallVoidMethod(env, jni_ref, method, kill_switch);
     if ((*env)->ExceptionCheck(env)) {
         (*env)->ExceptionDescribe(env);
         (*env)->ExceptionClear(env);

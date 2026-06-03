@@ -46,7 +46,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 
     private let activeLock: SemaphoreMutex
 
-    // WARNING: tun is NOT owned
+    // WARNING: tun ownership is transferred
     init(
         _ ctx: PartoutLoggerContext,
         tun: pp_tun,
@@ -75,6 +75,9 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
 
     deinit {
         pp_log(ctx, .core, .debug, "Deinit VirtualTunnelInterface")
+
+        // WARNING: Must wait for shutdown() before deinit
+        pp_tun_free(tun)
     }
 
     nonisolated var fileDescriptor: UInt64? {
@@ -212,9 +215,8 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         guard shouldShutdown else { return }
         pp_log(ctx, .core, .info, "Shut down TUN")
         pp_tun_shutdown(tun)
-    }
 
-    func waitUntilIdle() async {
+        // Wait for shutdown
         await readQueue.waitUntilIdle()
         await writeQueue.waitUntilIdle()
     }
