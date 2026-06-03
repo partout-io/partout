@@ -38,10 +38,9 @@ final class TunnelRemoteInfoGenerator: Sendable {
         await resolvedEndpoints.reset()
     }
 
-    @discardableResult
-    func resolvePeerEndpoints(logHandler: @escaping WireGuardAdapter.LogHandler) async throws -> [Endpoint: Endpoint] {
+    func cacheResolvedPeerEndpoints(logHandler: @escaping WireGuardAdapter.LogHandler) async throws {
         // We set this to ALL so that we get v4 addresses even on DNS64 networks
-        try await resolvePeers(dns: dns, flags: [.allAddresses], logHandler: logHandler)
+        _ = try await resolvePeers(dns: dns, flags: [.allAddresses], logHandler: logHandler)
     }
 
     // Only updates peer endpoints
