@@ -150,6 +150,9 @@ public final class NativeTunnelController: TunnelController, Sendable {
         }
         // FIXME: #188, revert settings (record)
 //        tun.deviceName
+
+        // Make sure to issue the tunnel shutdown and wait for it to
+        // finish to prevent races on VirtualTunnelInterface.deinit
         await tunnel.shutdown()
 
         // Wrap up clear in native layer
