@@ -6,7 +6,6 @@ set(PARTOUT_SOURCES
 ./MiniFoundation/Core/UniqueID.swift
 ./MiniFoundation/Foundation/FileManager+Foundation.swift
 ./MiniFoundation/Foundation/NSObject+Stream.swift
-./MiniFoundation/Foundation/Publisher+Stream.swift
 ./MiniFoundation/Foundation/RegularExpression+Foundation.swift
 ./MiniFoundation/Foundation/String+Foundation.swift
 ./MiniFoundation/FoundationCompat/CharacterSet.swift
