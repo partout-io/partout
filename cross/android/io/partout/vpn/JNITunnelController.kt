@@ -44,7 +44,7 @@ interface TunnelController {
 
 interface TunnelControllerDelegate {
     fun sendSnapshot(snapshot: TunnelSnapshot)
-    fun disconnect()
+    fun disconnect(controller: JNITunnelController)
 }
 
 class JNITunnelController(
@@ -259,7 +259,7 @@ class JNITunnelController(
         }
 
         // Signal disconnection to delegate (runtime)
-        delegate.disconnect()
+        delegate.disconnect(this)
         return@synchronized
     }
 
