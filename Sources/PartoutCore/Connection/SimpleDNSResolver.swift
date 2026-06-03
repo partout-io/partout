@@ -13,20 +13,25 @@ public protocol SimpleDNSStrategy: Sendable {
 
 /// ``DNSResolver`` with support for timeout cancellation.
 public actor SimpleDNSResolver: DNSResolver {
-    private let strategy: (String) -> SimpleDNSStrategy
+    private let strategy: (String, Set<DNSResolverFlag>) -> SimpleDNSStrategy
 
     private var pendingResolutions: [String: Task<[DNSRecord], Error>]
 
-    public init(strategy: @escaping (String) -> SimpleDNSStrategy) {
+    public init(strategy: @escaping (String, Set<DNSResolverFlag>) -> SimpleDNSStrategy) {
         self.strategy = strategy
         pendingResolutions = [:]
     }
 
-    public func resolve(_ hostname: String, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
+    public func resolve(
+        _ hostname: String,
+        flags: Set<DNSResolverFlag>,
+        reachability: ReachabilityInfo?,
+        timeout: Int
+    ) async throws -> [DNSRecord] {
         if let pendingResolutionTask = pendingResolutions[hostname] {
             return try await pendingResolutionTask.value
         }
-        let newStrategy = strategy(hostname)
+        let newStrategy = strategy(hostname, flags)
         let resolutionTask = Task {
             try await newStrategy.startResolution()
             return try await Self.waitForResolution(

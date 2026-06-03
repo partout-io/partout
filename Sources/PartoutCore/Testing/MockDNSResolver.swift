@@ -10,7 +10,7 @@ public final class MockDNSResolver: DNSResolver, @unchecked Sendable {
     public init() {
     }
 
-    public func resolve(_ hostname: String, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
+    public func resolve(_ hostname: String, flags: Set<DNSResolverFlag>, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
         if let error {
             throw error
         }

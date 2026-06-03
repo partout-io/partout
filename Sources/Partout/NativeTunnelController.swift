@@ -47,7 +47,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
         // Native resolver requires network handle on Android
         dns = SimpleDNSResolver {
-            POSIXDNSStrategy(hostname: $0)
+            POSIXDNSStrategy(hostname: $0, flags: $1)
         }
 
         var delegate = pp_tun_ctrl_delegate(
@@ -181,9 +181,15 @@ extension NativeTunnelController: DNSResolver {
         reachabilityHolder.get()
     }
 
-    public func resolve(_ hostname: String, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
+    public func resolve(
+        _ hostname: String,
+        flags: Set<DNSResolverFlag>,
+        reachability: ReachabilityInfo?,
+        timeout: Int
+    ) async throws -> [DNSRecord] {
         try await dns.resolve(
             hostname,
+            flags: flags,
             reachability: reachability ?? reachabilityInfo,
             timeout: timeout
         )

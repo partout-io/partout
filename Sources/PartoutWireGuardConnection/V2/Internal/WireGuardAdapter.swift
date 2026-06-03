@@ -145,7 +145,6 @@ actor WireGuardAdapter {
         }
         do {
             let settingsGenerator = makeSettingsGenerator(with: tunnelConfiguration)
-            // Keep first DNS before tunnel settings, but DNS64 re-resolution after.
             try await settingsGenerator.resolvePeerEndpoints(logHandler: logHandler)
             try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
                 moduleId: moduleId
@@ -344,7 +343,6 @@ actor WireGuardAdapter {
         logHandler(.verbose, "Connectivity online, resuming backend.")
         do {
             await settingsGenerator.resetResolvedEndpoints()
-            // Keep first DNS before tunnel settings, but DNS64 re-resolution after.
             try await settingsGenerator.resolvePeerEndpoints(logHandler: logHandler)
             guard isTemporarilyShutdown(with: settingsGenerator) else {
                 return

@@ -4,7 +4,6 @@
 
 /// Result of ``DNSResolver/resolve(_:timeout:)``.
 public struct DNSRecord: Hashable, Codable, Sendable {
-
     /// Address string.
     public let address: String
 
@@ -17,9 +16,13 @@ public struct DNSRecord: Hashable, Codable, Sendable {
     }
 }
 
+/// Flags for ``DNSResolver``.
+public enum DNSResolverFlag: Sendable {
+    case allAddresses
+}
+
 /// Performs DNS resolution.
 public protocol DNSResolver: AnyObject, Sendable {
-
     /**
      Resolves a hostname asynchronously.
 
@@ -29,13 +32,14 @@ public protocol DNSResolver: AnyObject, Sendable {
      */
     func resolve(
         _ hostname: String,
+        flags: Set<DNSResolverFlag>,
         reachability: ReachabilityInfo?,
         timeout: Int
     ) async throws -> [DNSRecord]
 }
 
 extension DNSResolver {
-    public func resolve(_ hostname: String, timeout: Int) async throws -> [DNSRecord] {
-        try await resolve(hostname, reachability: nil, timeout: timeout)
+    public func resolve(_ hostname: String, flags: Set<DNSResolverFlag>, timeout: Int) async throws -> [DNSRecord] {
+        try await resolve(hostname, flags: flags, reachability: nil, timeout: timeout)
     }
 }
