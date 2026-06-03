@@ -16,8 +16,10 @@ import io.partout.models.TunnelRemoteInfoWrapper
 import io.partout.models.TunnelSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
@@ -61,6 +63,7 @@ class JNITunnelController(
     // Network observers
     private val reachabilityObserver = ReachabilityObserver(service)
     private var reachabilityJob: Job? = null
+    private var betterPathJob: Job? = null
     private var networkInfo = NetworkInfo.empty
     private var lastEmittedNetwork: Network? = null
     private var lastEmittedNetworkPreference: NetworkPathPreference? = null
@@ -86,6 +89,7 @@ class JNITunnelController(
     override fun stopObserving() {
         reachabilityJob?.cancel()
         reachabilityJob = null
+        cancelBetterPathUpdate()
     }
 
     override fun setDelegate(delegate: Long): Long = synchronized(lock) {
@@ -98,6 +102,7 @@ class JNITunnelController(
             rememberEmittedNetwork(selection)
         } else {
             clearEmittedNetwork()
+            cancelBetterPathUpdate()
         }
         return oldDelegate
     }
@@ -237,6 +242,7 @@ class JNITunnelController(
 
         // Prevent further calls
         isNativeCancelled = true
+        cancelBetterPathUpdate()
 
         // Close former tunnel
         runCatching {
@@ -262,7 +268,9 @@ class JNITunnelController(
         val selection = info.reachabilitySelection()
         emitReachabilityUpdate(selection)
         if (selection.isBetterThanLastEmitted()) {
-            emitBetterPathUpdate(selection)
+            scheduleBetterPathUpdate(selection)
+        } else {
+            cancelBetterPathUpdate()
         }
         rememberEmittedNetwork(selection)
     }
@@ -279,6 +287,7 @@ class JNITunnelController(
     companion object {
         private const val INVALID_TUN_FD = -1
         private const val INVALID_NETWORK_HANDLE = -1L
+        private const val BETTER_PATH_DELAY_MS = 300L
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -313,6 +322,27 @@ class JNITunnelController(
     private fun emitBetterPathUpdate(selection: ReachabilitySelection) {
         Log.e(logTag, ">>> Network: onBetterPathUpdate(${selection.networkHandle})")
         onNativeBetterPathUpdate(nativeDelegate)
+    }
+
+    private fun scheduleBetterPathUpdate(selection: ReachabilitySelection) {
+        betterPathJob?.cancel()
+        betterPathJob = scope.launch {
+            delay(BETTER_PATH_DELAY_MS)
+            synchronized(lock) {
+                if (!isNativeCancelled &&
+                    nativeDelegate != 0L &&
+                    selection == networkInfo.reachabilitySelection()
+                ) {
+                    emitBetterPathUpdate(selection)
+                }
+                betterPathJob = null
+            }
+        }
+    }
+
+    private fun cancelBetterPathUpdate() {
+        betterPathJob?.cancel()
+        betterPathJob = null
     }
 
     private fun rememberEmittedNetwork(selection: ReachabilitySelection) {
