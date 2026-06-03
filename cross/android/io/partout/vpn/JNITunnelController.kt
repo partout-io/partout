@@ -16,8 +16,10 @@ import io.partout.models.TunnelRemoteInfoWrapper
 import io.partout.models.TunnelSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
@@ -36,8 +38,7 @@ interface TunnelController {
     fun cancelTunnel(errorCode: String?)
 
     // Kotlin -> JNI
-    fun onReachabilityUpdate(network: Network?)
-    fun onBetterPathUpdate()
+    fun onReachabilityUpdate(info: NetworkInfo)
     fun getEnvironmentValue(key: String): String?
 }
 
@@ -62,7 +63,18 @@ class JNITunnelController(
     // Network observers
     private val reachabilityObserver = ReachabilityObserver(service)
     private var reachabilityJob: Job? = null
-    private var reachableNetwork: Network? = null
+    private var betterPathJob: Job? = null
+    private var networkInfo = NetworkInfo.empty
+    private var lastEmittedNetwork: Network? = null
+    private var lastEmittedNetworkPreference: NetworkPathPreference? = null
+
+    private data class ReachabilitySelection(
+        val network: Network?,
+        val preference: NetworkPathPreference?
+    ) {
+        val networkHandle: Long?
+            get() = network?.networkHandle
+    }
 
     // Retain tun across reconnections
     private var tunDescriptor: ParcelFileDescriptor? = null
@@ -77,6 +89,7 @@ class JNITunnelController(
     override fun stopObserving() {
         reachabilityJob?.cancel()
         reachabilityJob = null
+        cancelBetterPathUpdate()
     }
 
     override fun setDelegate(delegate: Long): Long = synchronized(lock) {
@@ -84,10 +97,12 @@ class JNITunnelController(
         val oldDelegate = nativeDelegate
         nativeDelegate = delegate
         if (delegate != 0L) {
-            onNativeReachabilityUpdate(
-                delegate,
-                reachableNetwork?.networkHandle ?: INVALID_NETWORK_HANDLE
-            )
+            val selection = networkInfo.reachabilitySelection()
+            emitReachabilityUpdate(selection)
+            rememberEmittedNetwork(selection)
+        } else {
+            clearEmittedNetwork()
+            cancelBetterPathUpdate()
         }
         return oldDelegate
     }
@@ -227,6 +242,7 @@ class JNITunnelController(
 
         // Prevent further calls
         isNativeCancelled = true
+        cancelBetterPathUpdate()
 
         // Close former tunnel
         runCatching {
@@ -247,15 +263,16 @@ class JNITunnelController(
         return@synchronized
     }
 
-    override fun onReachabilityUpdate(network: Network?) = synchronized(lock) {
-        val networkHandle = network?.networkHandle
-        Log.e(logTag, ">>> Network: onReachabilityUpdate($networkHandle)")
-        onNativeReachabilityUpdate(nativeDelegate, networkHandle ?: INVALID_NETWORK_HANDLE)
-    }
-
-    override fun onBetterPathUpdate() = synchronized(lock) {
-        Log.e(logTag, ">>> Network: onBetterPathUpdate()")
-        onNativeBetterPathUpdate(nativeDelegate)
+    override fun onReachabilityUpdate(info: NetworkInfo) = synchronized(lock) {
+        networkInfo = info
+        val selection = info.reachabilitySelection()
+        emitReachabilityUpdate(selection)
+        if (selection.isBetterThanLastEmitted()) {
+            scheduleBetterPathUpdate(selection)
+        } else {
+            cancelBetterPathUpdate()
+        }
+        rememberEmittedNetwork(selection)
     }
 
     override fun getEnvironmentValue(key: String): String? = synchronized(lock) {
@@ -270,9 +287,74 @@ class JNITunnelController(
     companion object {
         private const val INVALID_TUN_FD = -1
         private const val INVALID_NETWORK_HANDLE = -1L
+        private const val BETTER_PATH_DELAY_MS = 300L
 
         private val json = Json {
             ignoreUnknownKeys = true
         }
+    }
+
+    private fun NetworkInfo.reachabilitySelection(): ReachabilitySelection {
+        val currentNetwork = bestNetworks().firstOrNull()
+        return ReachabilitySelection(
+            network = currentNetwork,
+            preference = preferenceFor(currentNetwork)
+        )
+    }
+
+    private fun ReachabilitySelection.isBetterThanLastEmitted(): Boolean {
+        val currentPreference = preference ?: return false
+        val previousPreference = lastEmittedNetworkPreference ?: return false
+        if (lastEmittedNetwork == null) {
+            return false
+        }
+        return currentPreference > previousPreference
+    }
+
+    private fun emitReachabilityUpdate(selection: ReachabilitySelection) {
+        Log.e(logTag, ">>> Network: onReachabilityUpdate(${selection.networkHandle})")
+        onNativeReachabilityUpdate(
+            nativeDelegate,
+            selection.networkHandle ?: INVALID_NETWORK_HANDLE
+        )
+    }
+
+    private fun emitBetterPathUpdate(selection: ReachabilitySelection) {
+        Log.e(logTag, ">>> Network: onBetterPathUpdate(${selection.networkHandle})")
+        onNativeBetterPathUpdate(nativeDelegate)
+    }
+
+    private fun scheduleBetterPathUpdate(selection: ReachabilitySelection) {
+        betterPathJob?.cancel()
+        betterPathJob = scope.launch {
+            delay(BETTER_PATH_DELAY_MS)
+            synchronized(lock) {
+                if (!isNativeCancelled &&
+                    nativeDelegate != 0L &&
+                    selection == networkInfo.reachabilitySelection()
+                ) {
+                    emitBetterPathUpdate(selection)
+                }
+                betterPathJob = null
+            }
+        }
+    }
+
+    private fun cancelBetterPathUpdate() {
+        betterPathJob?.cancel()
+        betterPathJob = null
+    }
+
+    private fun rememberEmittedNetwork(selection: ReachabilitySelection) {
+        if (nativeDelegate == 0L) {
+            return
+        }
+        lastEmittedNetwork = selection.network
+        lastEmittedNetworkPreference = selection.preference
+    }
+
+    private fun clearEmittedNetwork() {
+        lastEmittedNetwork = null
+        lastEmittedNetworkPreference = null
     }
 }
