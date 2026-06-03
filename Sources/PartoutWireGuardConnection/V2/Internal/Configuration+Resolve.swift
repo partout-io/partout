@@ -47,14 +47,16 @@ extension WireGuard.Configuration {
 
     func resolvePeers(
         dns: DNSResolver?,
+        flags: Set<DNSResolverFlag>,
         timeout: Int,
         logHandler: @escaping WireGuardAdapter.LogHandler
     ) async throws -> [Endpoint: Endpoint] {
         let resolver = dns ?? SimpleDNSResolver {
-            POSIXDNSStrategy(hostname: $0)
+            POSIXDNSStrategy(hostname: $0, flags: $1)
         }
         return try await resolvePeers(
             resolver: resolver,
+            flags: flags,
             timeout: timeout,
             logHandler: logHandler
         )
@@ -62,6 +64,7 @@ extension WireGuard.Configuration {
 
     func resolvePeers(
         resolver: DNSResolver,
+        flags: Set<DNSResolverFlag>,
         timeout: Int,
         logHandler: @escaping WireGuardAdapter.LogHandler
     ) async throws -> [Endpoint: Endpoint] {
@@ -78,6 +81,7 @@ extension WireGuard.Configuration {
                         }
                         let resolvedRecords = try await resolver.resolve(
                             endpoint.address.rawValue,
+                            flags: flags,
                             timeout: timeout
                         )
                         var currentResolved: [Endpoint] = []

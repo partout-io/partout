@@ -7,10 +7,12 @@ internal import _PartoutCore_C
 /// Implementation of ``SimpleDNSStrategy`` with the POSIX C library.
 public actor POSIXDNSStrategy: SimpleDNSStrategy {
     private let hostname: String
+    private let flags: Set<DNSResolverFlag>
     private var task: Task<[DNSRecord]?, Error>?
 
-    public init(hostname: String) {
+    public init(hostname: String, flags: Set<DNSResolverFlag>) {
         self.hostname = hostname
+        self.flags = flags
     }
 
     public func startResolution() async throws {
@@ -22,9 +24,14 @@ public actor POSIXDNSStrategy: SimpleDNSStrategy {
             records = try await task.value
         } else {
             let hostname = self.hostname
+            let flags = self.flags
             let reachabilityCopy = reachability
             let newTask = Task.detached { @Sendable in
-                try Self.resolveAndBlock(hostname: hostname, reachability: reachabilityCopy)
+                try Self.resolveAndBlock(
+                    hostname: hostname,
+                    flags: flags,
+                    reachability: reachabilityCopy
+                )
             }
             task = newTask
             records = try await newTask.value
@@ -42,7 +49,7 @@ public actor POSIXDNSStrategy: SimpleDNSStrategy {
 }
 
 private extension POSIXDNSStrategy {
-    static func resolveAndBlock(hostname: String, reachability: ReachabilityInfo?) throws -> [DNSRecord]? {
+    static func resolveAndBlock(hostname: String, flags: Set<DNSResolverFlag>, reachability: ReachabilityInfo?) throws -> [DNSRecord]? {
 #if os(Android)
         guard let networkHandle = reachability?.networkHandle else {
             throw PartoutError(.networkUnreachable)
@@ -51,9 +58,8 @@ private extension POSIXDNSStrategy {
 #endif
         var hints = addrinfo()
 #if canImport(Darwin)
-        // We set this to ALL so that we get v4 addresses even on DNS64 networks
-        // However, DNS breaks on Android when AI_ALL + AF_UNSPEC is set
-        hints.ai_flags = AI_ALL
+        // Beware that DNS breaks on Android when AI_ALL + AF_UNSPEC is set
+        hints.ai_flags = flags.contains(.allAddresses) ? AI_ALL : 0
 #endif
         hints.ai_family = AF_UNSPEC // IPv4/IPv6
         // XXX: Choosing either would dedup results

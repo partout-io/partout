@@ -145,10 +145,11 @@ actor WireGuardAdapter {
         }
         do {
             let settingsGenerator = makeSettingsGenerator(with: tunnelConfiguration)
-            let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
+            try await settingsGenerator.cacheResolvedPeerEndpoints(logHandler: logHandler)
             try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
                 moduleId: moduleId
             ))
+            let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
             let handle = try startWireGuardBackend(wgConfig: wgConfig)
             state = .started(handle, settingsGenerator)
         } catch {
@@ -342,13 +343,21 @@ actor WireGuardAdapter {
         logHandler(.verbose, "Connectivity online, resuming backend.")
         do {
             await settingsGenerator.resetResolvedEndpoints()
-            let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
+            try await settingsGenerator.cacheResolvedPeerEndpoints(logHandler: logHandler)
             guard isTemporarilyShutdown(with: settingsGenerator) else {
                 return
             }
             try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
                 moduleId: moduleId
             ))
+            guard isTemporarilyShutdown(with: settingsGenerator) else {
+                if let tunnel {
+                    await delegate?.adapterShouldClearNetworkSettings(self, tunnel: tunnel)
+                    self.tunnel = nil
+                }
+                return
+            }
+            let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
             guard isTemporarilyShutdown(with: settingsGenerator) else {
                 if let tunnel {
                     await delegate?.adapterShouldClearNetworkSettings(self, tunnel: tunnel)
