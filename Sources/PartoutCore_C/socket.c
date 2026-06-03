@@ -81,7 +81,11 @@ pp_socket pp_socket_open(const char *ip_addr,
                          pp_socket_proto proto,
                          uint16_t port,
                          bool blocking,
-                         int timeout_ms) {
+                         int timeout_ms,
+                         const pp_reachability *info,
+                         bool (*configure)(void *ctx, uint64_t fd),
+                         void *configure_ctx) {
+    int socktype = 0;
     struct addrinfo hints, *resolved = NULL;
     char port_str[16] = { 0 };
     os_socket_fd new_fd = local_invalid_fd();
@@ -91,29 +95,25 @@ pp_socket pp_socket_open(const char *ip_addr,
         goto failure;
     }
 
-    pp_zero(&hints, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;   // IPv4 or IPv6
     switch (proto) {
         case PPSocketProtoTCP:
-            ipproto = IPPROTO_TCP;
-            hints.ai_socktype = SOCK_STREAM;
+            socktype = SOCK_STREAM;
             break;
         case PPSocketProtoUDP:
-            ipproto = IPPROTO_UDP;
-            hints.ai_socktype = SOCK_DGRAM;
+            socktype = SOCK_DGRAM;
             break;
     }
-    hints.ai_protocol = ipproto;
-#ifdef AI_NUMERICSERV
-    hints.ai_flags = AI_NUMERICSERV;
-#endif
 
     struct sockaddr_storage numeric_addr;
     os_socklen_t numeric_addrlen = 0;
     if (local_parse_numeric_addr(ip_addr, port, &numeric_addr, &numeric_addrlen)) {
-        new_fd = socket(numeric_addr.ss_family, hints.ai_socktype, ipproto);
+        new_fd = socket(numeric_addr.ss_family, socktype, ipproto);
         if (local_is_invalid_fd(new_fd)) {
             local_print_error("socket()");
+            goto failure;
+        }
+        if (configure && !configure(configure_ctx, new_fd)) {
+            local_print_error("configure()");
             goto failure;
         }
         if (local_connect_with_timeout(new_fd,
@@ -127,8 +127,32 @@ pp_socket pp_socket_open(const char *ip_addr,
         return pp_socket_create(new_fd);
     }
 
+    pp_zero(&hints, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;   // IPv4 or IPv6
+    hints.ai_socktype = socktype;
+    switch (proto) {
+        case PPSocketProtoTCP:
+            ipproto = IPPROTO_TCP;
+            break;
+        case PPSocketProtoUDP:
+            ipproto = IPPROTO_UDP;
+            break;
+    }
+    hints.ai_protocol = ipproto;
+#ifdef AI_NUMERICSERV
+    hints.ai_flags = AI_NUMERICSERV;
+#endif
+
     snprintf(port_str, sizeof(port_str), "%u", port);
+#if PARTOUT_ANDROID
+    if (!info || info->network_handle <= 0) {
+        local_print_error("android_getaddrinfofornetwork(): missing network handle");
+        goto failure;
+    }
+    if (android_getaddrinfofornetwork(info->network_handle, ip_addr, port_str, &hints, &resolved) != 0) {
+#else
     if (getaddrinfo(ip_addr, port_str, &hints, &resolved) != 0) {
+#endif
         local_print_error("getaddrinfo()");
         goto failure;
     }
@@ -139,6 +163,10 @@ pp_socket pp_socket_open(const char *ip_addr,
         if (local_is_invalid_fd(new_fd)) {
             local_print_error("socket()");
             continue;
+        }
+        if (configure && !configure(configure_ctx, new_fd)) {
+            local_print_error("configure()");
+            goto failure;
         }
         const int ret = local_connect_with_timeout(new_fd,
                                                        p->ai_addr,

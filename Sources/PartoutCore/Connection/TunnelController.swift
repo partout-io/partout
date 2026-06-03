@@ -6,7 +6,7 @@
 public protocol TunnelController: AnyObject, Sendable {
     func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface
 
-    func configureSockets(with descriptors: [UInt64])
+    func configureSockets(with descriptors: [UInt64]) throws
 
     func reportSnapshot(_ snapshot: TunnelSnapshot)
 

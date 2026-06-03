@@ -36,6 +36,7 @@ Given the main app and the daemon:
 - ``DataCount``
 - ``EndpointResolver``
 - ``NetworkInterfaceFactory``
+- ``SocketConfigurator``
 
 ### DNS resolution
 

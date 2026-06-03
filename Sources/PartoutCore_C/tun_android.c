@@ -16,10 +16,17 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/socket.h>
 
 struct __pp_tun_struct {
     int fd;
 };
+
+void pp_tun_free(pp_tun tun) {
+    if (!tun) return;
+    pp_tun_shutdown(tun);
+    free(tun);
+}
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     if (!tun || tun->fd < 0) return -1;
@@ -33,8 +40,7 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
 
 void pp_tun_shutdown(const pp_tun tun) {
     if (!tun || tun->fd < 0) return;
-    close(tun->fd);
-    tun->fd = -1;
+    shutdown(tun->fd, SHUT_RDWR);
 }
 
 int pp_tun_fd(const pp_tun tun) {
@@ -69,6 +75,10 @@ static const kotlin_sig sig_ctrl_configureSockets = {
 static const kotlin_sig sig_ctrl_onSnapshot = {
     "onSnapshot",
     "(Ljava/lang/String;)V"
+};
+static const kotlin_sig sig_ctrl_clearTunnel = {
+    "clearTunnel",
+    "(Z)V"
 };
 static const kotlin_sig sig_ctrl_cancelTunnel = {
     "cancelTunnel",
@@ -117,6 +127,7 @@ cleanup:
     PP_JNI_DETACH(env);
 }
 
+// Balance with pp_tun_ctrl_clear_tunnel
 pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_json) {
     (void)uuid;
     assert(jni_ref);
@@ -170,12 +181,24 @@ cleanup:
     return tun_impl;
 }
 
-void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t fds_len) {
+bool pp_tun_ctrl_configure_sockets(void *jni_ref, const pp_reachability *info,
+                                   const int *fds, const size_t fds_len) {
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_configure_sockets(%p)", jni_ref);
-    if (!fds || fds_len == 0) return;
+    if (!fds || fds_len == 0) return false;
 
-    PP_JNI_ATTACH_OR_RETURN_VOID(env);
+    PP_JNI_ATTACH_OR_RETURN(env, false);
+
+    bool success = false;
+
+    if (info && info->network_handle > 0) {
+        for (int i = 0; i < fds_len; ++i) {
+            if (android_setsocknetwork(info->network_handle, fds[i]) != 0) {
+                pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_configure_sockets(), android_setsocknetwork(%d)", fds[i]);
+                goto cleanup;
+            }
+        }
+    }
 
     jclass cls = NULL;
     jmethodID method = NULL;
@@ -205,10 +228,14 @@ void pp_tun_ctrl_configure_sockets(void *jni_ref, const int *fds, const size_t f
         goto cleanup;
     }
 
+    success = true;
+
 cleanup:
     if (j_fds != NULL) (*env)->DeleteLocalRef(env, j_fds);
     if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
     PP_JNI_DETACH(env);
+
+    return success;
 }
 
 void pp_tun_ctrl_report_snapshot(void *_Nullable ref,
@@ -251,7 +278,38 @@ cleanup:
     PP_JNI_DETACH(env);
 }
 
-void pp_tun_ctrl_cancel_tunnel(void *jni_ref, const char *error_message) {
+// Balance with pp_tun_ctrl_set_tunnel
+void pp_tun_ctrl_clear_tunnel(void *jni_ref, bool kill_switch) {
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_clear_tunnel(%p)", jni_ref);
+
+    PP_JNI_ATTACH_OR_RETURN_VOID(env);
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+
+    cls = (*env)->GetObjectClass(env, jni_ref);
+    if (cls == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_clear_tunnel(), NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_clearTunnel.name, sig_ctrl_clearTunnel.signature);
+    if (method == NULL) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_clear_tunnel(), NULL method");
+        goto cleanup;
+    }
+    (*env)->CallVoidMethod(env, jni_ref, method, kill_switch);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_clear_tunnel(), Kotlin exception");
+        goto cleanup;
+    }
+
+cleanup:
+    PP_JNI_DETACH(env);
+}
+
+void pp_tun_ctrl_cancel_tunnel(void *jni_ref, const char *error_code) {
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_cancel_tunnel(%p)", jni_ref);
 
@@ -259,7 +317,7 @@ void pp_tun_ctrl_cancel_tunnel(void *jni_ref, const char *error_message) {
 
     jclass cls = NULL;
     jmethodID method = NULL;
-    jstring j_error_message = NULL;
+    jstring j_error_code = NULL;
 
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
@@ -271,8 +329,8 @@ void pp_tun_ctrl_cancel_tunnel(void *jni_ref, const char *error_message) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_cancel_tunnel(), NULL method");
         goto cleanup;
     }
-    j_error_message = error_message ? (*env)->NewStringUTF(env, error_message) : NULL;
-    (*env)->CallVoidMethod(env, jni_ref, method, j_error_message);
+    j_error_code = error_code ? (*env)->NewStringUTF(env, error_code) : NULL;
+    (*env)->CallVoidMethod(env, jni_ref, method, j_error_code);
     if ((*env)->ExceptionCheck(env)) {
         (*env)->ExceptionDescribe(env);
         (*env)->ExceptionClear(env);
@@ -281,17 +339,9 @@ void pp_tun_ctrl_cancel_tunnel(void *jni_ref, const char *error_message) {
     }
 
 cleanup:
-    if (j_error_message != NULL) (*env)->DeleteLocalRef(env, j_error_message);
+    if (j_error_code != NULL) (*env)->DeleteLocalRef(env, j_error_code);
     if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
     PP_JNI_DETACH(env);
-}
-
-void pp_tun_ctrl_clear_tunnel(void *jni_ref, pp_tun tun_impl) {
-    (void)jni_ref;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_clear_tunnel(%p)", jni_ref);
-    if (!tun_impl) return;
-    pp_tun_shutdown(tun_impl);
-    free(tun_impl);
 }
 
 JNIEXPORT void JNICALL
@@ -302,7 +352,7 @@ Java_io_partout_vpn_JNITunnelController_onNativeReachabilityUpdate(JNIEnv *env,
     (void)thiz;
     pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
     if (!ctrl_delegate || !ctrl_delegate->ctx) return;
-    const pp_tun_ctrl_reachability reachability = {
+    const pp_reachability reachability = {
         .reachable = net_handle != -1,
         .network_handle = net_handle
     };

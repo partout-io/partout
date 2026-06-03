@@ -93,17 +93,20 @@ extension PartoutError.Code {
     /// No more endpoints available to try.
     public static let exhaustedEndpoints = Self("exhaustedEndpoints")
 
+    /// I/O failure.
+    public static let ioFailure = Self("ioFailure")
+
     /// Link device is not active.
     public static let linkNotActive = Self("linkNotActive")
-
-    /// Link I/O failure.
-    public static let linkFailure = Self("linkFailure")
 
     /// Network changed.
     public static let networkChanged = Self("networkChanged")
 
     /// Network is unreachable.
     public static let networkUnreachable = Self("networkUnreachable")
+
+    /// Native sockets could not be configured.
+    public static let socketConfiguration = Self("socketConfiguration")
 
     /// TUN device is not active.
     public static let tunNotActive = Self("tunNotActive")

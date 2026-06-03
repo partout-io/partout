@@ -17,7 +17,7 @@ public struct TunnelRemoteInfo: Sendable {
     /// True if the controller should create a virtual I/O device.
     public let requiresVirtualDevice: Bool
 
-    public init(originalModuleId: UniqueID, address: Address?, modules: [Module]?, requiresVirtualDevice: Bool = true) {
+    public init(originalModuleId: UniqueID, address: Address?, modules: [Module]?, requiresVirtualDevice: Bool) {
         self.originalModuleId = originalModuleId
         self.address = address
         self.modules = modules

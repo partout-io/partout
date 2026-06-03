@@ -132,6 +132,7 @@ class PartoutVpnServiceRuntime(
 
     override fun sendSnapshot(snapshot: TunnelSnapshot) {
         snapshotEmitter.emit(snapshot)
+        engine.onSnapshot(snapshot)
     }
 
     override fun disconnect() = launchCommand {
@@ -170,6 +171,7 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to stop VPN daemon", e)
         } finally {
             controller?.stopObserving()
+            controller?.cancelTunnel(null)
             controller = null
         }
         isRunning = false
@@ -332,6 +334,7 @@ class PartoutVpnServiceRuntime(
         suspend fun stop()
         suspend fun readLastProfile(): String
         suspend fun writeLastProfile(json: String)
+        fun onSnapshot(snapshot: TunnelSnapshot)
     }
     //endregion
 

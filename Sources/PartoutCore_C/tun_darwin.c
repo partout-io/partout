@@ -76,7 +76,6 @@ failure:
     return NULL;
 }
 
-static
 void pp_tun_free(pp_tun tun) {
     if (!tun) return;
     pp_tun_shutdown(tun);
@@ -163,11 +162,14 @@ pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json
     return NULL;
 }
 
-void pp_tun_ctrl_configure_sockets(void *ref, const int *fds, const size_t fds_len) {
+bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
+                                   const int *fds, const size_t fds_len) {
     (void)ref;
+    (void)info;
     (void)fds;
     (void)fds_len;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_darwin: ctrl_configure_sockets(%p)", ref);
+    return true;
 }
 
 void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
@@ -176,9 +178,9 @@ void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_darwin: ctrl_report_snapshot(%p)", ref);
 }
 
-void pp_tun_ctrl_clear_tunnel(void *ref, pp_tun tun_impl) {
+void pp_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
     (void)ref;
-    (void)tun_impl;
+    (void)kill_switch;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_darwin: ctrl_clear_tunnel(%p)", ref);
 }
 

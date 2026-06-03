@@ -68,7 +68,8 @@ extension WireGuard.RemoteInterface {
             guard let validPublicKey = WireGuard.Key(rawValue: publicKey) else {
                 throw PartoutError.invalidField(.WireGuard.publicKey)
             }
-            let validPreSharedKey = try preSharedKey.map {
+            let validPreSharedKey: WireGuard.Key? = try preSharedKey.flatMap {
+                guard !$0.isEmpty else { return nil }
                 guard let key = WireGuard.Key(rawValue: $0) else {
                     throw PartoutError.invalidField(.WireGuard.preSharedKey)
                 }

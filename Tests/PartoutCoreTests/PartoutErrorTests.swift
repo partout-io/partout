@@ -27,9 +27,9 @@ struct PartoutErrorTests {
     }
 
     @Test(arguments: [
-        (PartoutError(.authentication), "[PartoutError.authentication]"),
-        (PartoutError(.authentication, "userInfo"), "[PartoutError.authentication, userInfo]"),
-        (PartoutError(.authentication, "userInfo", SomeDescriptiveError()), "[PartoutError.authentication, userInfo, errorDescription]")
+        (PartoutError(.authentication), "{PartoutError.authentication}"),
+        (PartoutError(.authentication, "userInfo"), "{PartoutError.authentication, userInfo=userInfo}"),
+        (PartoutError(.authentication, "userInfo", SomeDescriptiveError()), "{PartoutError.authentication, userInfo=userInfo, reason=SomeDescriptiveError() (errorDescription)}")
     ])
     func givenError_whenDescribe_thenReturnsDescription(error: PartoutError, expectedDescription: String) {
         #expect(error.debugDescription == expectedDescription)
