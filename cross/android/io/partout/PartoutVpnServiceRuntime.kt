@@ -38,6 +38,7 @@ class PartoutVpnServiceRuntime(
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandQueue = Channel<suspend () -> Unit>(Channel.UNLIMITED)
     private var isRunning = false
+    @Volatile private var isStoppingTunnel = false
 
     // C/JNI controller
     private var controller: JNITunnelController? = null
@@ -135,9 +136,12 @@ class PartoutVpnServiceRuntime(
         engine.onSnapshot(snapshot)
     }
 
-    override fun disconnect() = launchCommand {
-        stopTunnel()
-        stopService()
+    override fun disconnect() {
+        if (isStoppingTunnel) { return }
+        launchCommand {
+            stopTunnel()
+            stopService()
+        }
     }
     //endregion
 
@@ -171,7 +175,12 @@ class PartoutVpnServiceRuntime(
             Log.e(logTag, "Unable to stop VPN daemon", e)
         } finally {
             controller?.stopObserving()
-            controller?.cancelTunnel(null)
+            isStoppingTunnel = true
+            try {
+                controller?.cancelTunnel(null)
+            } finally {
+                isStoppingTunnel = false
+            }
             controller = null
         }
         isRunning = false
