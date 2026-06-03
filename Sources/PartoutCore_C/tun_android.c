@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/socket.h>
 
 struct __pp_tun_struct {
     int fd;
@@ -39,8 +40,7 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
 
 void pp_tun_shutdown(const pp_tun tun) {
     if (!tun || tun->fd < 0) return;
-    close(tun->fd);
-    tun->fd = -1;
+    shutdown(tun->fd, SHUT_RDWR);
 }
 
 int pp_tun_fd(const pp_tun tun) {

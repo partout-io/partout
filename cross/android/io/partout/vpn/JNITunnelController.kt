@@ -58,12 +58,14 @@ class JNITunnelController(
     // JNI interactions with Native (Swift)
     private var nativeDelegate: Long = 0
     private var isNativeCancelled = false
-    private var tunDescriptor: ParcelFileDescriptor? = null
 
     // Network observers
     private val reachabilityObserver = ReachabilityObserver(service)
     private var reachabilityJob: Job? = null
     private var reachableNetwork: Network? = null
+
+    // Retain tun across reconnections
+    private var tunDescriptor: ParcelFileDescriptor? = null
 
     override fun startObserving() {
         reachabilityJob = reachabilityObserver
@@ -93,11 +95,8 @@ class JNITunnelController(
     override fun setTunnel(infoJSON: String): Int = synchronized(lock) {
         if (isNativeCancelled) { return INVALID_TUN_FD }
         Log.d(logTag, "setTunnel()")
-        if (tunDescriptor != null) {
-            Log.e(logTag, "Tunnel descriptor already established")
-            return INVALID_TUN_FD
-        }
 
+        // Decode info modules
         val builder = service.Builder()
         val info: TunnelRemoteInfoWrapper = try {
             json.decodeFromString(infoJSON)
@@ -105,9 +104,10 @@ class JNITunnelController(
             Log.e(logTag, "Unable to decode tunnel info JSON", e)
             return INVALID_TUN_FD
         }
+
+        // Apply modules to VPN builder
         var appliedAddressSettings = false
         var appliedDnsSettings = false
-
         info.modules?.forEach {
             when (it) {
                 is TaggedModuleDNS -> {
@@ -135,26 +135,35 @@ class JNITunnelController(
                 else -> {}
             }
         }
-
         if (!appliedAddressSettings) {
             Log.e(logTag, "No valid interface address")
             return INVALID_TUN_FD
         }
 
         // IMPORTANT: By default, establish() returns a non-blocking descriptor.
-        tunDescriptor = try {
+        val newDescriptor = try {
             builder.establish()
         } catch (e: RuntimeException) {
             Log.e(logTag, "Unable to establish tunnel", e)
             null
         }
-        if (tunDescriptor == null) {
+        if (newDescriptor == null) {
             Log.e(logTag, "Unable to establish tunnel")
             return INVALID_TUN_FD
         }
 
-        val fd = tunDescriptor?.detachFd() ?: INVALID_TUN_FD
-        tunDescriptor = null
+        // Close old tun kept as handover kill switch
+        if (tunDescriptor != null) {
+            Log.d(logTag, "Clear old tun")
+            runCatching {
+                tunDescriptor?.close()
+            }
+            tunDescriptor = null
+        }
+
+        // Track tun then propagate fd to native layer
+        tunDescriptor = newDescriptor
+        val fd = newDescriptor.fd
         Log.i(logTag, "Established tunnel descriptor: $fd")
         return fd
     }
@@ -187,14 +196,26 @@ class JNITunnelController(
 
     override fun cancelTunnel(errorCode: String?) = synchronized(lock) {
         if (isNativeCancelled) { return }
-        isNativeCancelled = true
-        tunDescriptor = null // Do not close, fd is detached
         Log.d(logTag, "cancelTunnel()")
+
+        // Prevent further calls
+        isNativeCancelled = true
+
+        // Close former tunnel
+        runCatching {
+            tunDescriptor?.close()
+            tunDescriptor = null
+        }.onFailure {
+            Log.e(logTag, "Unable to close former tun descriptor", it)
+        }
+
         if (errorCode != null) {
             Log.e(logTag, "VPN daemon cancelled: $errorCode")
         } else {
             Log.i(logTag, "VPN daemon cancelled")
         }
+
+        // Signal disconnection to delegate (runtime)
         delegate.disconnect()
         return@synchronized
     }
