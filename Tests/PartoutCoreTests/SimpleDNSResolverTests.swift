@@ -34,7 +34,7 @@ struct SimpleDNSResolverTests {
 
     @Test
     func givenResolverIgnoringCancellation_whenTimeout_thenStillReturns() async throws {
-        let sut = SimpleDNSResolver { _ in
+        let sut = SimpleDNSResolver { _, _ in
             CancellationIgnoringStrategy()
         }
         do {

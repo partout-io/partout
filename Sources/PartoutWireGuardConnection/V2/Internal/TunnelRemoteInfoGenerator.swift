@@ -50,7 +50,7 @@ final class TunnelRemoteInfoGenerator: Sendable {
         let resolutionMap: [Endpoint: Endpoint]
         do {
             // We set this to zero so that we actually resolve this using DNS64
-            resolutionMap = try await resolvePeers(dns: dns, logHandler: logHandler)
+            resolutionMap = try await resolvePeers(dns: dns, flags: [], logHandler: logHandler)
         } catch {
             logHandler(.error, "Unable to resolve peer endpoints: \(error.localizedDescription)")
             return wgSettings
@@ -98,7 +98,7 @@ final class TunnelRemoteInfoGenerator: Sendable {
         }
 
         // We set this to zero so that we actually resolve this using DNS64
-        let resolutionMap = try await resolvePeers(dns: dns, logHandler: logHandler)
+        let resolutionMap = try await resolvePeers(dns: dns, flags: [], logHandler: logHandler)
 
         for peer in tunnelConfiguration.peers {
             let publicKey = try peer.publicKey.rawValue.hexStringFromBase64()
