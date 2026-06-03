@@ -191,6 +191,29 @@ class JNITunnelController(
 
     override fun clearTunnel(killSwitch: Boolean) = synchronized(lock) {
         if (isNativeCancelled) { return }
+
+        // Optionally replace with catch-all fake tun
+        if (killSwitch) {
+            val builder = service.Builder()
+            // FIXME: Externalize these constants
+            builder.addAddress("192.0.2.1", 32)
+            builder.addAddress("fd00::1", 128)
+            builder.addRoute("0.0.0.0", 0)
+            builder.addRoute("::", 0)
+            runCatching {
+                val oldDescriptor = tunDescriptor
+                val newDescriptor = builder.establish()
+                if (newDescriptor == null) {
+                    Log.e(logTag, "Unable to set up kill switch")
+                    return@synchronized
+                }
+                oldDescriptor?.close()
+                tunDescriptor = newDescriptor
+            }.onFailure {
+                Log.e(logTag, "Unable to set up kill switch", it)
+            }
+        }
+
         return@synchronized
     }
 
