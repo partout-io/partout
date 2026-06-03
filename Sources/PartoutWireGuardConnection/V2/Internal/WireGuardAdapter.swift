@@ -145,10 +145,12 @@ actor WireGuardAdapter {
         }
         do {
             let settingsGenerator = makeSettingsGenerator(with: tunnelConfiguration)
-            let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
+            // Keep first DNS before tunnel settings, but DNS64 re-resolution after.
+            try await settingsGenerator.resolvePeerEndpoints(logHandler: logHandler)
             try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
                 moduleId: moduleId
             ))
+            let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
             let handle = try startWireGuardBackend(wgConfig: wgConfig)
             state = .started(handle, settingsGenerator)
         } catch {
@@ -342,13 +344,22 @@ actor WireGuardAdapter {
         logHandler(.verbose, "Connectivity online, resuming backend.")
         do {
             await settingsGenerator.resetResolvedEndpoints()
-            let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
+            // Keep first DNS before tunnel settings, but DNS64 re-resolution after.
+            try await settingsGenerator.resolvePeerEndpoints(logHandler: logHandler)
             guard isTemporarilyShutdown(with: settingsGenerator) else {
                 return
             }
             try await setNetworkSettings(settingsGenerator.generateRemoteInfo(
                 moduleId: moduleId
             ))
+            guard isTemporarilyShutdown(with: settingsGenerator) else {
+                if let tunnel {
+                    await delegate?.adapterShouldClearNetworkSettings(self, tunnel: tunnel)
+                    self.tunnel = nil
+                }
+                return
+            }
+            let wgConfig = try await settingsGenerator.uapiConfiguration(logHandler: logHandler)
             guard isTemporarilyShutdown(with: settingsGenerator) else {
                 if let tunnel {
                     await delegate?.adapterShouldClearNetworkSettings(self, tunnel: tunnel)

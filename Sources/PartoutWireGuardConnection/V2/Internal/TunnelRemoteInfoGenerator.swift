@@ -38,6 +38,11 @@ final class TunnelRemoteInfoGenerator: Sendable {
         await resolvedEndpoints.reset()
     }
 
+    @discardableResult
+    func resolvePeerEndpoints(logHandler: @escaping WireGuardAdapter.LogHandler) async throws -> [Endpoint: Endpoint] {
+        try await resolvePeers(dns: dns, logHandler: logHandler)
+    }
+
     // Only updates peer endpoints
     func endpointUapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async -> String {
         var wgSettings = ""

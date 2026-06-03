@@ -89,6 +89,34 @@ struct TunnelRemoteInfoGeneratorTests {
     }
 
     @Test
+    func givenPreResolvedEndpoint_whenGeneratingUAPIConfiguration_thenUsesCachedDNS() async throws {
+        let sourceEndpoint = try Endpoint("foobar.com", 51830)
+        let ipv4Endpoint = try Endpoint("77.160.28.16", sourceEndpoint.port)
+        let configuration = try makeConfiguration(endpoint: sourceEndpoint.rawValue)
+        let dns = RecordingDNSResolver()
+        await dns.setResolvedRecords([
+            DNSRecord(address: ipv4Endpoint.address.rawValue, isIPv6: false)
+        ], for: sourceEndpoint.address.rawValue)
+
+        let sut = TunnelRemoteInfoGenerator(
+            .global,
+            tunnelConfiguration: configuration,
+            dns: dns,
+            dnsTimeout: 1000
+        )
+
+        _ = try await sut.resolvePeerEndpoints(logHandler: { _, _ in })
+        let requestedHostnamesAfterResolve = await dns.requestedHostnames
+
+        let uapiConfiguration = try await sut.uapiConfiguration(logHandler: { _, _ in })
+        let requestedHostnamesAfterUAPI = await dns.requestedHostnames
+
+        #expect(requestedHostnamesAfterResolve == [sourceEndpoint.address.rawValue])
+        #expect(requestedHostnamesAfterUAPI == requestedHostnamesAfterResolve)
+        #expect(uapiConfiguration.contains("endpoint=\(ipv4Endpoint.wgRepresentation)"))
+    }
+
+    @Test
     func givenCachedResolution_whenGeneratingEndpointUpdate_thenDoesNotResolveAgainUntilReset() async throws {
         let pvtkey = "SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs="
         let pubkey = "BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw="
