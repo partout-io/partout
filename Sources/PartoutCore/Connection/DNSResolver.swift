@@ -39,7 +39,7 @@ public protocol DNSResolver: AnyObject, Sendable {
 }
 
 extension DNSResolver {
-    public func resolve(_ hostname: String, flags: Set<DNSResolverFlag>, timeout: Int) async throws -> [DNSRecord] {
+    public func resolve(_ hostname: String, flags: Set<DNSResolverFlag> = [], timeout: Int) async throws -> [DNSRecord] {
         try await resolve(hostname, flags: flags, reachability: nil, timeout: timeout)
     }
 }

@@ -57,6 +57,7 @@ struct TunnelRemoteInfoGeneratorTests {
 
         let map = try await configuration.resolvePeers(
             resolver: dns,
+            flags: [],
             timeout: 1000,
             logHandler: { _, _ in }
         )
@@ -79,6 +80,7 @@ struct TunnelRemoteInfoGeneratorTests {
 
         let map = try await configuration.resolvePeers(
             resolver: dns,
+            flags: [],
             timeout: 1000,
             logHandler: { _, _ in }
         )
@@ -105,7 +107,7 @@ struct TunnelRemoteInfoGeneratorTests {
             dnsTimeout: 1000
         )
 
-        _ = try await sut.resolvePeerEndpoints(logHandler: { _, _ in })
+        _ = try await sut.cacheResolvedPeerEndpoints(logHandler: { _, _ in })
         let requestedHostnamesAfterResolve = await dns.requestedHostnames
 
         let uapiConfiguration = try await sut.uapiConfiguration(logHandler: { _, _ in })
@@ -232,7 +234,7 @@ private actor RecordingDNSResolver: DNSResolver {
         resolvedRecords[hostname] = records
     }
 
-    func resolve(_ hostname: String, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
+    func resolve(_ hostname: String, flags: Set<DNSResolverFlag>, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
         hostnames.append(hostname)
         return resolvedRecords[hostname] ?? []
     }

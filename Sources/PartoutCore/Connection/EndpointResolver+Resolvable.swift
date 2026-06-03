@@ -43,7 +43,6 @@ extension EndpointResolver {
         func resolved(with dns: DNSResolver, timeout: Int) async throws -> Self {
             let records = try await dns.resolve(
                 originalEndpoint.address.rawValue,
-                flags: [],
                 timeout: timeout
             )
             pp_log(ctx, .core, .notice, "DNS resolved addresses: \(records.map { $0.address.asSensitiveAddress(ctx) })")
