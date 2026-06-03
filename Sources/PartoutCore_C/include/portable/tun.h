@@ -19,6 +19,7 @@ typedef struct __pp_tun_struct *pp_tun;
 int pp_tun_read(const pp_tun _Nonnull tun, uint8_t *_Nonnull dst, size_t dst_len);
 int pp_tun_write(const pp_tun _Nonnull tun, const uint8_t *_Nonnull src, size_t src_len);
 void pp_tun_shutdown(const pp_tun _Nonnull tun);
+void pp_tun_free(pp_tun _Nonnull tun);
 
 /* Return the file descriptor or -1 if none. */
 int pp_tun_fd(const pp_tun _Nonnull tun);
@@ -45,7 +46,6 @@ bool pp_tun_ctrl_configure_sockets(void *_Nullable ref,
                                    const size_t fds_len);
 void pp_tun_ctrl_report_snapshot(void *_Nullable ref,
                                  const char *_Nonnull snapshot_json);
-void pp_tun_ctrl_clear_tunnel(void *_Nullable ref,
-                              pp_tun _Nullable tun_impl);
+void pp_tun_ctrl_clear_tunnel(void *_Nullable ref, bool kill_switch);
 void pp_tun_ctrl_cancel_tunnel(void *_Nullable ref,
                                const char *_Nullable error_message);

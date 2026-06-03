@@ -152,12 +152,8 @@ public final class NativeTunnelController: TunnelController, Sendable {
 //        tun.deviceName
         await tunnel.shutdown()
 
-        // Release tun implementation if necessary
-        let controllerRef = ref
-        Task.detached { [tunnel] in
-            await tunnel.waitUntilIdle()
-            pp_tun_ctrl_clear_tunnel(controllerRef, tunnel.tun)
-        }
+        // Wrap up clear in native layer
+        pp_tun_ctrl_clear_tunnel(ref, withKillSwitch)
     }
 
     public func setReasserting(_ reasserting: Bool) {

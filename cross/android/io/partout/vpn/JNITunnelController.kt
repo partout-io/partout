@@ -32,7 +32,7 @@ interface TunnelController {
     fun setTunnel(infoJSON: String): Int
     fun configureSockets(fds: IntArray)
     fun onSnapshot(snapshotJSON: String)
-    fun clearTunnel()
+    fun clearTunnel(killSwitch: Boolean)
     fun cancelTunnel(errorCode: String?)
 
     // Kotlin -> JNI
@@ -180,7 +180,7 @@ class JNITunnelController(
         return@synchronized
     }
 
-    override fun clearTunnel() = synchronized(lock) {
+    override fun clearTunnel(killSwitch: Boolean) = synchronized(lock) {
         if (isNativeCancelled) { return }
         return@synchronized
     }
