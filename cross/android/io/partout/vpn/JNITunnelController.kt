@@ -4,6 +4,7 @@
 
 package io.partout.vpn
 
+import android.net.Network
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
@@ -61,6 +62,16 @@ class JNITunnelController(
     private val reachabilityObserver = ReachabilityObserver(service)
     private var reachabilityJob: Job? = null
     private var networkInfo = NetworkInfo.empty
+    private var lastEmittedNetwork: Network? = null
+    private var lastEmittedNetworkPreference: NetworkPathPreference? = null
+
+    private data class ReachabilitySelection(
+        val network: Network?,
+        val preference: NetworkPathPreference?
+    ) {
+        val networkHandle: Long?
+            get() = network?.networkHandle
+    }
 
     // Retain tun across reconnections
     private var tunDescriptor: ParcelFileDescriptor? = null
@@ -82,10 +93,11 @@ class JNITunnelController(
         val oldDelegate = nativeDelegate
         nativeDelegate = delegate
         if (delegate != 0L) {
-            onNativeReachabilityUpdate(
-                delegate,
-                networkInfo.bestNetworks().firstOrNull()?.networkHandle ?: INVALID_NETWORK_HANDLE
-            )
+            val selection = networkInfo.reachabilitySelection()
+            emitReachabilityUpdate(selection)
+            rememberEmittedNetwork(selection)
+        } else {
+            clearEmittedNetwork()
         }
         return oldDelegate
     }
@@ -247,9 +259,12 @@ class JNITunnelController(
 
     override fun onReachabilityUpdate(info: NetworkInfo) = synchronized(lock) {
         networkInfo = info
-        val networkHandle = info.bestNetworks().firstOrNull()?.networkHandle
-        Log.e(logTag, ">>> Network: onReachabilityUpdate($networkHandle)")
-        onNativeReachabilityUpdate(nativeDelegate, networkHandle ?: INVALID_NETWORK_HANDLE)
+        val selection = info.reachabilitySelection()
+        emitReachabilityUpdate(selection)
+        if (selection.isBetterThanLastEmitted()) {
+            emitBetterPathUpdate(selection)
+        }
+        rememberEmittedNetwork(selection)
     }
 
     override fun getEnvironmentValue(key: String): String? = synchronized(lock) {
@@ -258,6 +273,7 @@ class JNITunnelController(
     }
 
     private external fun onNativeReachabilityUpdate(delegate: Long, networkHandle: Long)
+    private external fun onNativeBetterPathUpdate(delegate: Long)
     private external fun getNativeEnvironmentValue(delegate: Long, key: String): String?
 
     companion object {
@@ -267,5 +283,48 @@ class JNITunnelController(
         private val json = Json {
             ignoreUnknownKeys = true
         }
+    }
+
+    private fun NetworkInfo.reachabilitySelection(): ReachabilitySelection {
+        val currentNetwork = bestNetworks().firstOrNull()
+        return ReachabilitySelection(
+            network = currentNetwork,
+            preference = preferenceFor(currentNetwork)
+        )
+    }
+
+    private fun ReachabilitySelection.isBetterThanLastEmitted(): Boolean {
+        val currentPreference = preference ?: return false
+        val previousPreference = lastEmittedNetworkPreference ?: return false
+        if (lastEmittedNetwork == null) {
+            return false
+        }
+        return currentPreference > previousPreference
+    }
+
+    private fun emitReachabilityUpdate(selection: ReachabilitySelection) {
+        Log.e(logTag, ">>> Network: onReachabilityUpdate(${selection.networkHandle})")
+        onNativeReachabilityUpdate(
+            nativeDelegate,
+            selection.networkHandle ?: INVALID_NETWORK_HANDLE
+        )
+    }
+
+    private fun emitBetterPathUpdate(selection: ReachabilitySelection) {
+        Log.e(logTag, ">>> Network: onBetterPathUpdate(${selection.networkHandle})")
+        onNativeBetterPathUpdate(nativeDelegate)
+    }
+
+    private fun rememberEmittedNetwork(selection: ReachabilitySelection) {
+        if (nativeDelegate == 0L) {
+            return
+        }
+        lastEmittedNetwork = selection.network
+        lastEmittedNetworkPreference = selection.preference
+    }
+
+    private fun clearEmittedNetwork() {
+        lastEmittedNetwork = null
+        lastEmittedNetworkPreference = null
     }
 }

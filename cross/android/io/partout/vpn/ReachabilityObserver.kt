@@ -19,10 +19,18 @@ interface ReachabilityObserverProtocol {
 
 class NetworkInfo private constructor(
     val currentNetworks: Set<Network>,
+    private val preferences: Map<Network, NetworkPathPreference>,
     private val sortedNetworks: List<Network>
 ) {
     fun bestNetworks(): List<Network> {
         return sortedNetworks
+    }
+
+    internal fun preferenceFor(network: Network?): NetworkPathPreference? {
+        if (network == null) {
+            return null
+        }
+        return preferences[network]
     }
 
     override fun equals(other: Any?): Boolean {
@@ -32,11 +40,14 @@ class NetworkInfo private constructor(
         if (other !is NetworkInfo) {
             return false
         }
-        return currentNetworks == other.currentNetworks && sortedNetworks == other.sortedNetworks
+        return currentNetworks == other.currentNetworks &&
+                preferences == other.preferences &&
+                sortedNetworks == other.sortedNetworks
     }
 
     override fun hashCode(): Int {
         var result = currentNetworks.hashCode()
+        result = 31 * result + preferences.hashCode()
         result = 31 * result + sortedNetworks.hashCode()
         return result
     }
@@ -46,7 +57,7 @@ class NetworkInfo private constructor(
     }
 
     companion object {
-        internal val empty = NetworkInfo(emptySet(), emptyList())
+        internal val empty = NetworkInfo(emptySet(), emptyMap(), emptyList())
 
         internal fun from(
             currentNetworks: Set<Network>,
@@ -57,7 +68,7 @@ class NetworkInfo private constructor(
                 val rhsPreference = preferences[rhs] ?: NetworkPathPreference.unavailable
                 rhsPreference.compareTo(lhsPreference)
             }
-            return NetworkInfo(currentNetworks, sortedNetworks)
+            return NetworkInfo(currentNetworks, preferences, sortedNetworks)
         }
     }
 }
