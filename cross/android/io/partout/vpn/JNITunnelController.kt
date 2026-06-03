@@ -207,8 +207,12 @@ class JNITunnelController(
                     Log.e(logTag, "Unable to set up kill switch")
                     return@synchronized
                 }
-                oldDescriptor?.close()
                 tunDescriptor = newDescriptor
+                runCatching {
+                    oldDescriptor?.close()
+                }.onFailure {
+                    Log.e(logTag, "Unable to close former tun descriptor", it)
+                }
             }.onFailure {
                 Log.e(logTag, "Unable to set up kill switch", it)
             }
