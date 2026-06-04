@@ -7,10 +7,6 @@ public struct IPSettings: Hashable, Codable, Sendable {
     /// The subnets.
     public private(set) var subnets: [Subnet]
 
-    /// The subnet.
-    @available(*, deprecated, message: "For temporary decoding backward-compatibility")
-    private var legacySingleSubnet: Subnet?
-
     /// The included routes.
     public private(set) var includedRoutes: [Route]
 
@@ -98,22 +94,13 @@ extension IPSettings {
 extension IPSettings {
     enum CodingKeys: String, CodingKey {
         case subnets
-
-        case legacySingleSubnet = "subnet"
-
         case includedRoutes
-
         case excludedRoutes
     }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        do {
-            subnets = try container.decodeIfPresent([Subnet].self, forKey: .subnets) ?? []
-        } catch {
-            let singleSubnet = try container.decodeIfPresent(Subnet.self, forKey: .legacySingleSubnet)
-            subnets = singleSubnet.map { [$0] } ?? []
-        }
+        subnets = try container.decodeIfPresent([Subnet].self, forKey: .subnets) ?? []
         includedRoutes = try container.decodeIfPresent([Route].self, forKey: .includedRoutes) ?? []
         excludedRoutes = try container.decodeIfPresent([Route].self, forKey: .excludedRoutes) ?? []
     }
