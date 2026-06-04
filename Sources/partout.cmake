@@ -6,7 +6,6 @@ set(PARTOUT_SOURCES
 ./MiniFoundation/Core/UniqueID.swift
 ./MiniFoundation/Foundation/FileManager+Foundation.swift
 ./MiniFoundation/Foundation/NSObject+Stream.swift
-./MiniFoundation/Foundation/Publisher+Stream.swift
 ./MiniFoundation/Foundation/RegularExpression+Foundation.swift
 ./MiniFoundation/Foundation/String+Foundation.swift
 ./MiniFoundation/FoundationCompat/CharacterSet.swift
@@ -43,7 +42,6 @@ set(PARTOUT_SOURCES
 ./Partout/Registry+Support.swift
 ./Partout/Registry.swift
 ./Partout/Serialization/CodingRegistry.swift
-./Partout/Serialization/LegacyProfileEncoderV1.swift
 ./Partout/Serialization/LegacyProfileEncoderV2.swift
 ./Partout/Serialization/ProfileEncoderV3.swift
 ./Partout/VirtualTunnelInterface.swift
@@ -55,7 +53,6 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/ConnectionDaemon.swift
 ./PartoutCore/Connection/ConnectionParameters.swift
 ./PartoutCore/Connection/ConnectionStatus.swift
-./PartoutCore/Connection/CyclingConnection.swift
 ./PartoutCore/Connection/DNSResolver.swift
 ./PartoutCore/Connection/DataCount.swift
 ./PartoutCore/Connection/DummyReachabilityObserver.swift
@@ -284,8 +281,6 @@ set(PARTOUT_SOURCES
 ./PartoutOpenVPNConnection/OpenVPNConnection+Alias.swift
 ./PartoutOpenVPNConnection/OpenVPNConnectionOptions.swift
 ./PartoutOpenVPNConnection/StandardOpenVPNParser+Default.swift
-./PartoutOpenVPNConnection/V1/_OpenVPNConnectionV1+Default.swift
-./PartoutOpenVPNConnection/V1/_OpenVPNConnectionV1.swift
 ./PartoutOpenVPNConnection/V2/_OpenVPNConnectionV2+Default.swift
 ./PartoutOpenVPNConnection/V2/_OpenVPNConnectionV2.swift
 ./PartoutWireGuard/Internal/Configuration+WgQuickConfig.swift

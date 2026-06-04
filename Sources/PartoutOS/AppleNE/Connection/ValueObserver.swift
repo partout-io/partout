@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 /// Observes KVO updates asynchronously.
-@available(*, deprecated, message: "Required by the deprecated NEUDPObserver and NETCPObserver. Use NESocketObserver instead")
+// FIXME: #16, ValueObserver crashes, races in continuations
 actor ValueObserver<O> where O: NSObject {
     private weak var subject: O?
 

@@ -34,15 +34,10 @@ extension CodingRegistry: ProfileCoder {
     }
 
     public func profile(fromString string: String) throws -> Profile {
-        var decoders: [DecoderPair] = [
+        let decoders: [DecoderPair] = [
             DecoderPair(version: 3, decoder: rawProfileV3),
             DecoderPair(version: 2, decoder: rawProfileLegacyV2)
         ]
-#if !MINIF_COMPAT
-        decoders.append(
-            DecoderPair(version: 1, decoder: rawProfileLegacyV1)
-        )
-#endif
         var lastError: Error?
         for pair in decoders {
             do {
@@ -86,16 +81,6 @@ extension CodingRegistry {
         return try Profile(codableProfileV2: codableProfile)
     }
 }
-
-#if !MINIF_COMPAT
-// Like legacy V2, but Base64-encoded (decoding only)
-extension CodingRegistry {
-    func rawProfileLegacyV1(fromString string: String) throws -> Profile {
-        try LegacyProfileEncoderV1()
-            .decodedProfile(from: string, with: registry)
-    }
-}
-#endif
 
 private extension CodingRegistry {
     struct DecoderPair {

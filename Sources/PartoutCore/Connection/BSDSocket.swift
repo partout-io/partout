@@ -156,11 +156,6 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         try await writeRequests.enqueue(packets)
     }
 
-    @available(*, deprecated)
-    public func setReadHandler(_ handler: @escaping ([Data]?, (any Error)?) -> Void) {
-        fatalError("Deprecated")
-    }
-
     public func upgraded() async throws -> LinkInterface {
         try await Self.connect(
             ctx,

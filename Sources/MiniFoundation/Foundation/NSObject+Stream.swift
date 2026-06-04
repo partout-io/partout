@@ -3,9 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 #if canImport(Combine)
-import Combine
-
-@available(*, deprecated, message: "Not cross-platform")
 public func stream<O, V>(
     for keyPath: KeyPath<O, V>,
     of object: O,

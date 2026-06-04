@@ -185,8 +185,6 @@ components:
           items:
             "$ref": "#/components/schemas/Route"
           type: array
-        legacySingleSubnet:
-          "$ref": "#/components/schemas/Subnet"
         subnets:
           items:
             "$ref": "#/components/schemas/Subnet"

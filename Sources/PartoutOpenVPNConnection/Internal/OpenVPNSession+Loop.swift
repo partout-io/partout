@@ -6,68 +6,6 @@ internal import _PartoutOpenVPNConnection_C
 
 // TODO: #142/notes, LINK and TUN should be able to run detached in full-duplex
 extension OpenVPNSession {
-    @available(*, deprecated, message: "Use loopTunnelV2()")
-    func loopTunnel() {
-        runInActor { [weak self] in
-            guard let ctx = self?.ctx else {
-                pp_log(.global, .openvpn, .debug, "Ignore TUN read from outdated OpenVPNSession")
-                return
-            }
-            guard let tunnel = self?.tunnel else {
-                pp_log(ctx, .openvpn, .debug, "Ignore read from outdated TUN")
-                return
-            }
-            let packets: [Data]
-            do {
-                packets = try await tunnel.readPackets()
-            } catch {
-                pp_log(ctx, .openvpn, .error, "Failed TUN read: \(error)")
-                await self?.shutdown(error)
-                return
-            }
-            guard let self else {
-                pp_log(.global, .openvpn, .debug, "Ignore TUN packets from outdated OpenVPNSession")
-                return
-            }
-            guard !packets.isEmpty else {
-                pp_log(ctx, .openvpn, .debug, "Exit TUN loop after empty packets")
-                return
-            }
-            try await receiveTunnel(packets: packets)
-
-            // repeat as long as self and tunnel exist
-            loopTunnel()
-        }
-    }
-
-    @available(*, deprecated, message: "Use loopLinkV2()")
-    func loopLink() {
-        link?.setReadHandler { [weak self] packets, error in
-            self?.runInActor { [weak self] in
-                guard let self else {
-                    pp_log(.global, .openvpn, .debug, "Ignore LINK read from outdated OpenVPNSession")
-                    return
-                }
-                if let error {
-                    pp_log(self.ctx, .openvpn, .error, "Failed LINK read: \(error)")
-                    await self.shutdown(PartoutError(.ioFailure, error))
-                    return
-                }
-                guard let packets, !packets.isEmpty else {
-                    return
-                }
-                do {
-                    try await self.receiveLink(packets: packets)
-                } catch {
-                    await self.shutdown(error)
-                    return
-                }
-            }
-        }
-    }
-}
-
-extension OpenVPNSession {
     func loopTunnelV2() {
         Task { [weak self] in
             while true {
@@ -202,10 +140,8 @@ private extension OpenVPNSession {
                 continue
             }
 
-            if options.withFlushDataBeforeControl {
-                try await processDataPackets(dataPacketsByKey)
-                dataPacketsByKey.removeAll(keepingCapacity: true)
-            }
+            try await processDataPackets(dataPacketsByKey)
+            dataPacketsByKey.removeAll(keepingCapacity: true)
 
             let controlPacket: CrossPacket
             do {
@@ -221,17 +157,14 @@ private extension OpenVPNSession {
             }
             switch code {
             case .hardResetServerV2:
-
                 // HARD_RESET coming while connected
                 guard !negotiator.isConnected else {
                     throw OpenVPNSessionError.recoverable(OpenVPNSessionError.staleSession)
                 }
-
             case .softResetV1:
                 if !negotiator.isRenegotiating {
                     negotiator = try startRenegotiation(after: negotiator, on: link, isServerInitiated: true)
                 }
-
             default:
                 break
             }

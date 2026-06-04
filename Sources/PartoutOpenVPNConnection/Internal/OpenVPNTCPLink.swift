@@ -46,30 +46,6 @@ extension OpenVPNTCPLink: LinkInterface {
         link.hasBetterPath
     }
 
-    @available(*, deprecated)
-    func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
-        link.setReadHandler { [weak self] packets, error in
-            guard let self else {
-                return
-            }
-            guard error == nil, let packets else {
-                handler(nil, error)
-                return
-            }
-
-            // FIXME: #214, TCP is very slow
-            buffer.reserveCapacity(buffer.count + packets.flatCount)
-            for p in packets {
-                buffer.append(p)
-            }
-            var until = 0
-            let processedPackets = proc.packets(fromStream: buffer, until: &until)
-            buffer = buffer.subdata(in: until..<buffer.count)
-
-            handler(processedPackets, error)
-        }
-    }
-
     func upgraded() async throws -> LinkInterface {
         OpenVPNTCPLink(link: try await link.upgraded(), proc: proc)
     }
