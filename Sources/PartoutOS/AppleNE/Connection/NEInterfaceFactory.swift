@@ -13,8 +13,6 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
 
         public var maxTCPLength = 512 * 1024
 
-        public var withReadPackets = false
-
         public init() {
         }
     }
@@ -55,8 +53,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
                 ctx,
                 nwSession: impl,
                 options: .init(
-                    maxDatagrams: options.maxUDPDatagrams,
-                    withReadPackets: options.withReadPackets
+                    maxDatagrams: options.maxUDPDatagrams
                 )
             )
 #endif
@@ -89,7 +86,6 @@ private extension ExtendedEndpoint {
     }
 
 #if swift(<6.0)
-    @available(*, deprecated, message: "NetworkExtension UDP/TCP sockets were removed in Swift 6")
     var nwHostEndpoint: NWHostEndpoint {
         NWHostEndpoint(hostname: address.rawValue, port: proto.port.description)
     }
