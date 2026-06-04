@@ -146,11 +146,7 @@ extension OpenVPNSession: OpenVPNSessionProtocol {
         }
         pp_log(ctx, .openvpn, .info, "Start TUN loop")
         self.tunnel = tunnel
-        if options.withLoopsV2 {
-            loopTunnelV2()
-        } else {
-            loopTunnel()
-        }
+        loopTunnelV2()
     }
 
     func setLink(_ link: LinkInterface) async throws {
@@ -408,22 +404,6 @@ extension OpenVPNSession {
             guard -lastReceivedDate.timeIntervalSinceNow <= keepAliveTimeout else {
                 throw OpenVPNSessionError.pingTimeout
             }
-        }
-    }
-}
-
-@available(*, deprecated)
-extension OpenVPNSession {
-    @discardableResult
-    nonisolated func runInActor(after: TimeInterval? = nil, _ block: @escaping @OpenVPNActor () async throws -> Void) -> Task<Void, Error> {
-        Task {
-            if let after {
-                try await Task.sleep(interval: after)
-            }
-            guard !Task.isCancelled else {
-                return
-            }
-            try await block()
         }
     }
 }

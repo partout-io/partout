@@ -22,10 +22,8 @@ The client is known to work with OpenVPN® 2.3+ servers.
     - Client certificate
 - [x] TLS wrapping
     - Authentication (`--tls-auth`)
-    - Encryption (`--tls-crypt`)
+    - Encryption (`--tls-crypt` and `--tls-crypt-v2`)
 - [x] Compression framing
-    - Via `--comp-lzo` (deprecated in 2.4)
-    - Via `--compress`
 - [x] Key renegotiation
 - [x] Replay protection (hardcoded window)
 

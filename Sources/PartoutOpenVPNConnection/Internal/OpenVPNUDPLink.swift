@@ -41,21 +41,6 @@ extension OpenVPNUDPLink: LinkInterface {
         link.hasBetterPath
     }
 
-    @available(*, deprecated)
-    func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void) {
-        link.setReadHandler { [weak self] packets, error in
-            guard let self, let packets, !packets.isEmpty else {
-                return
-            }
-            if let proc {
-                let processedPackets = proc.processPackets(packets, direction: .inbound)
-                handler(processedPackets, error)
-                return
-            }
-            handler(packets, error)
-        }
-    }
-
     func upgraded() async throws -> LinkInterface {
         OpenVPNUDPLink(link: try await link.upgraded(), proc: proc)
     }
