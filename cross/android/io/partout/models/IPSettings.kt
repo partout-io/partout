@@ -27,7 +27,6 @@ import kotlinx.serialization.Contextual
  * @param excludedRoutes 
  * @param includedRoutes 
  * @param subnets 
- * @param legacySingleSubnet 
  */
 @Serializable
 
@@ -40,10 +39,7 @@ data class IPSettings (
     val includedRoutes: kotlin.collections.List<Route>,
 
     @SerialName(value = "subnets")
-    val subnets: kotlin.collections.List<kotlin.String>,
-
-    @SerialName(value = "legacySingleSubnet")
-    val legacySingleSubnet: kotlin.String? = null
+    val subnets: kotlin.collections.List<kotlin.String>
 
 ) {
 
