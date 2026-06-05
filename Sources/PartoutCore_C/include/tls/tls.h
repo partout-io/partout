@@ -49,8 +49,8 @@ pp_tls_options *pp_tls_options_create(int sec_level,
                                       const char *_Nullable cert_pem,
                                       const char *_Nullable key_pem,
                                       const char *_Nullable hostname,
-                                      void *_Nullable ctx,
-                                      void (*on_verify_failure)(void *_Nullable ctx));
+                                      void (*on_verify_failure)(void *_Nullable ctx),
+                                      void *_Nullable ctx);
 
 void pp_tls_options_free(pp_tls_options *opt);
 

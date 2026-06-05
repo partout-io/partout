@@ -15,8 +15,8 @@ pp_tls_options *pp_tls_options_create(int sec_level,
                                       const char *_Nullable cert_pem,
                                       const char *_Nullable key_pem,
                                       const char *_Nullable hostname,
-                                      void *ctx,
-                                      void (*on_verify_failure)(void *ctx)) {
+                                      void (*on_verify_failure)(void *ctx),
+                                      void *ctx) {
     pp_assert(ca_path && on_verify_failure);
 
     pp_tls_options *opt = pp_alloc(sizeof(pp_tls_options));
