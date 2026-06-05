@@ -125,7 +125,7 @@ void pp_mux_stop(pp_mux mux) {
 //    eventf
 }
 
-#elif PARTOUT_LINUX
+#elif PARTOUT_LINUX || PARTOUT_ANDROID
 #include <sys/epoll.h>
 #include <unistd.h>
 
