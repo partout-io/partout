@@ -35,6 +35,7 @@ Given the main app and the daemon:
 - ``CyclingConnection``
 - ``DataCount``
 - ``EndpointResolver``
+- ``FdLooper``
 - ``NetworkInterfaceFactory``
 - ``SocketConfigurator``
 
