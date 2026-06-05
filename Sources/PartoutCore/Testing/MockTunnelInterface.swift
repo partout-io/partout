@@ -6,10 +6,6 @@ public final class MockTunnelInterface: IOInterface {
     public init() {
     }
 
-    public var fileDescriptor: UInt64? {
-        nil
-    }
-
     public func readPackets() async throws -> [Data] {
         []
     }

@@ -58,6 +58,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/DummyReachabilityObserver.swift
 ./PartoutCore/Connection/EndpointResolver+Resolvable.swift
 ./PartoutCore/Connection/EndpointResolver.swift
+./PartoutCore/Connection/FdLooper.swift
 ./PartoutCore/Connection/IOInterface.swift
 ./PartoutCore/Connection/LinkInterface.swift
 ./PartoutCore/Connection/LinkObserver.swift

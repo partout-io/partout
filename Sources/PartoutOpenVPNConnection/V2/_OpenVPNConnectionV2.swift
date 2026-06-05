@@ -345,7 +345,6 @@ private extension LinkInterface {
         switch linkType.plainType {
         case .udp:
             return OpenVPNUDPLink(link: self, method: method)
-
         case .tcp:
             return OpenVPNTCPLink(link: self, method: method)
         }

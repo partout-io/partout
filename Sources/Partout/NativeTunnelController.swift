@@ -351,10 +351,6 @@ struct TunnelRemoteInfoWrapper: Encodable, Sendable {
 }
 
 final class DummyTunnelInterface: IOInterface {
-    var fileDescriptor: UInt64? {
-        nil
-    }
-
     func readPackets() async throws -> [Data] {
         []
     }

@@ -102,6 +102,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         self.betterPathStream = betterPathStream
         self.configurator = configurator
         socketHandle = SocketHandle(sock: sock)
+        assert(socketHandle.fileDescriptor != nil, "SocketHandle without descriptor?")
         let queueLabelContext = socketHandle.fileDescriptor?.description ?? "unknown"
         readQueue = DispatchQueue(
             label: "BSDSocket[R:\(queueLabelContext)]",

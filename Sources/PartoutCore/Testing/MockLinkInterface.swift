@@ -49,10 +49,6 @@ public final class MockLinkInterface: LinkInterface {
         }
     }
 
-    public var fileDescriptor: UInt64? {
-        nil
-    }
-
     public func upgraded() -> LinkInterface {
         self
     }
