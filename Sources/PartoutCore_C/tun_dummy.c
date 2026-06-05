@@ -10,9 +10,9 @@
 const int PP_TUN_WOULD_BLOCK = -2;
 
 #if !PARTOUT_HAS_TUN
-void pp_tun_free(pp_tun tun) {
+void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     (void)tun;
-    pp_clog(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: free()");
+    pp_clog(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: free_and_close()");
 }
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
