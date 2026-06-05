@@ -112,11 +112,6 @@ bool pp_mux_wake(pp_mux mux) {
     return kevent(mux->handle, &ev, 1, NULL, 0, NULL) == 0;
 }
 
-void pp_mux_stop(pp_mux mux) {
-    if (!mux) return;
-//    eventf
-}
-
 #elif PARTOUT_LINUX || PARTOUT_ANDROID
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
@@ -257,9 +252,5 @@ bool pp_mux_wake(pp_mux mux) {
     if (!mux) return false;
     if (eventfd_write(mux->wake_fd, 1) == 0) return true;
     return errno == EAGAIN;
-}
-
-void pp_mux_stop(pp_mux mux) {
-    if (!mux) return;
 }
 #endif

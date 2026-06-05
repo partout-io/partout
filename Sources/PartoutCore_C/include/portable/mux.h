@@ -23,6 +23,5 @@ void pp_mux_set_on_readable(pp_mux mux, void (*callback)(void *ctx, int fd), voi
 void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, int fd), void *ctx);
 int pp_mux_wait(pp_mux mux);
 bool pp_mux_wake(pp_mux mux);
-void pp_mux_stop(pp_mux mux);
 
 #pragma clang assume_nonnull end
