@@ -253,8 +253,7 @@ cleanup:
     return success;
 }
 
-void pp_tun_ctrl_report_snapshot(void *_Nullable ref,
-                                 const char *_Nonnull snapshot_json) {
+void pp_tun_ctrl_report_snapshot(void *_Nullable ref, const char *snapshot_json) {
     assert(ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_report_snapshot(%p)", ref);
 
