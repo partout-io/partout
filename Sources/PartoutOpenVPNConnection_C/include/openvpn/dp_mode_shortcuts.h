@@ -11,8 +11,10 @@
 #include "openvpn/dp_mode_ad.h"
 #include "openvpn/dp_mode_hmac.h"
 
+#pragma clang assume_nonnull begin
+
 static inline
-openvpn_dp_mode *_Nullable openvpn_dp_mode_ad_create_aead(const char *_Nonnull cipher,
+openvpn_dp_mode *_Nullable openvpn_dp_mode_ad_create_aead(const char *cipher,
                                                           size_t tag_len, size_t id_len,
                                                           const pp_crypto_keys *_Nullable keys,
                                                           openvpn_compression_framing comp_f) {
@@ -25,7 +27,7 @@ openvpn_dp_mode *_Nullable openvpn_dp_mode_ad_create_aead(const char *_Nonnull c
 
 static inline
 openvpn_dp_mode *_Nullable openvpn_dp_mode_hmac_create_cbc(const char *_Nullable cipher,
-                                                           const char *_Nonnull digest,
+                                                           const char *digest,
                                                            const pp_crypto_keys *_Nullable keys,
                                                            openvpn_compression_framing comp_f) {
     pp_crypto_ctx crypto = pp_crypto_cbc_create(cipher, digest, keys);
@@ -34,3 +36,5 @@ openvpn_dp_mode *_Nullable openvpn_dp_mode_hmac_create_cbc(const char *_Nullable
     }
     return openvpn_dp_mode_hmac_create(crypto, pp_crypto_cbc_free, comp_f);
 }
+
+#pragma clang assume_nonnull end

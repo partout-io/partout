@@ -8,9 +8,13 @@
 
 #include "crypto/crypto.h"
 
+#pragma clang assume_nonnull begin
+
 typedef struct {
     pp_crypto crypto;
 } openvpn_crypto_mock;
 
-pp_crypto_ctx _Nonnull openvpn_crypto_mock_create();
-void openvpn_crypto_mock_free(pp_crypto_ctx _Nonnull ctx);
+pp_crypto_ctx openvpn_crypto_mock_create();
+void openvpn_crypto_mock_free(pp_crypto_ctx ctx);
+
+#pragma clang assume_nonnull end

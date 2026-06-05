@@ -11,6 +11,8 @@
 #include "portable/common.h"
 #include "portable/endian.h"
 
+#pragma clang assume_nonnull begin
+
 // MARK: - Packets
 
 #define OpenVPNPacketOpcodeLength          ((size_t)1)
@@ -49,7 +51,7 @@ typedef enum {
 #define OPENVPN_PEER_ID_MASKED(pid)        (pid & 0xffffff)
 
 static inline
-bool openvpn_packet_is_ping(const uint8_t *_Nonnull bytes, size_t len) {
+bool openvpn_packet_is_ping(const uint8_t *bytes, size_t len) {
     static const uint8_t ping[] = {
         0x2a, 0x18, 0x7b, 0xf3, 0x64, 0x1e, 0xb4, 0xcb,
         0x07, 0xed, 0x2d, 0x0a, 0x98, 0x1f, 0xc7, 0x48
@@ -59,9 +61,8 @@ bool openvpn_packet_is_ping(const uint8_t *_Nonnull bytes, size_t len) {
 
 static inline
 void openvpn_packet_header_get(openvpn_packet_code *_Nullable dst_code,
-                       uint8_t *_Nullable dst_key,
-                       const uint8_t *_Nonnull src) {
-
+                               uint8_t *_Nullable dst_key,
+                               const uint8_t *src) {
     if (dst_code) {
         *dst_code = (openvpn_packet_code)(*src >> 3);
     }
@@ -71,11 +72,10 @@ void openvpn_packet_header_get(openvpn_packet_code *_Nullable dst_code,
 }
 
 static inline
-size_t openvpn_packet_header_set(uint8_t *_Nonnull dst,
-                         openvpn_packet_code src_code,
-                         uint8_t src_key,
-                         const uint8_t *_Nullable src_session_id) {
-
+size_t openvpn_packet_header_set(uint8_t *dst,
+                                 openvpn_packet_code src_code,
+                                 uint8_t src_key,
+                                 const uint8_t *_Nullable src_session_id) {
     *(uint8_t *)dst = (src_code << 3) | (src_key & 0b111);
     int offset = OpenVPNPacketOpcodeLength;
     if (src_session_id) {
@@ -86,25 +86,23 @@ size_t openvpn_packet_header_set(uint8_t *_Nonnull dst,
 }
 
 static inline
-size_t openvpn_packet_header_v2_set(uint8_t *_Nonnull dst,
-                            uint8_t src_key,
-                            uint32_t src_peer_id) {
-
+size_t openvpn_packet_header_v2_set(uint8_t *dst,
+                                    uint8_t src_key,
+                                    uint32_t src_peer_id) {
     *(uint32_t *)dst = ((OpenVPNPacketCodeDataV2 << 3) | (src_key & 0b111)) | pp_endian_htonl(OPENVPN_PEER_ID_MASKED(src_peer_id));
     return OpenVPNPacketOpcodeLength + OpenVPNPacketPeerIdLength;
 }
 
 static inline
-uint32_t openvpn_packet_header_v2_get_peer_id(const uint8_t *_Nonnull src) {
+uint32_t openvpn_packet_header_v2_get_peer_id(const uint8_t *src) {
     return pp_endian_ntohl(*(const uint32_t *)src & 0xffffff00);
 }
 
 #pragma mark - Utils
 
 static inline
-void openvpn_data_swap(uint8_t *_Nonnull ptr, size_t len1, size_t len2)
-{
-    // two buffers due to overlapping
+void openvpn_data_swap(uint8_t *ptr, size_t len1, size_t len2) {
+    // Two buffers due to overlapping
     uint8_t buf1[len1];
     uint8_t buf2[len2];
     memcpy(buf1, ptr, len1);
@@ -114,10 +112,12 @@ void openvpn_data_swap(uint8_t *_Nonnull ptr, size_t len1, size_t len2)
 }
 
 static inline
-void openvpn_data_swap_copy(uint8_t *_Nonnull dst, const uint8_t *_Nonnull src, size_t src_len, size_t len1, size_t len2) {
+void openvpn_data_swap_copy(uint8_t *dst, const uint8_t *src, size_t src_len, size_t len1, size_t len2) {
     pp_assert(src_len >= len1 + len2);//, @"src is smaller than expected");
     memcpy(dst, src + len1, len2);
     memcpy(dst + len2, src, len1);
     const size_t preamble_len = len1 + len2;
     memcpy(dst + preamble_len, src + preamble_len, src_len - preamble_len);
 }
+
+#pragma clang assume_nonnull end

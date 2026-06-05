@@ -9,14 +9,18 @@
 #include "openvpn/dp_mode_shortcuts.h"
 #include "openvpn/test/crypto_mock.h"
 
+#pragma clang assume_nonnull begin
+
 static inline
-openvpn_dp_mode *_Nonnull openvpn_dp_mode_ad_create_mock(openvpn_compression_framing comp_f) {
+openvpn_dp_mode *openvpn_dp_mode_ad_create_mock(openvpn_compression_framing comp_f) {
     pp_crypto_ctx mock = openvpn_crypto_mock_create();
     return openvpn_dp_mode_ad_create(mock, openvpn_crypto_mock_free, comp_f);
 }
 
 static inline
-openvpn_dp_mode *_Nonnull openvpn_dp_mode_hmac_create_mock(openvpn_compression_framing comp_f) {
+openvpn_dp_mode *openvpn_dp_mode_hmac_create_mock(openvpn_compression_framing comp_f) {
     pp_crypto_ctx mock = openvpn_crypto_mock_create();
     return openvpn_dp_mode_hmac_create(mock, openvpn_crypto_mock_free, comp_f);
 }
+
+#pragma clang assume_nonnull end
