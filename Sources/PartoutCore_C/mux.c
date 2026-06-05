@@ -127,49 +127,147 @@ void pp_mux_stop(pp_mux mux) {
 
 #elif PARTOUT_LINUX || PARTOUT_ANDROID
 #include <sys/epoll.h>
+#include <sys/eventfd.h>
 #include <unistd.h>
+
+#ifndef EPOLLRDHUP
+#define EPOLLRDHUP 0
+#endif
 
 struct __pp_mux {
     int handle;
+    int wake_fd;
     struct epoll_event *events;
     int events_len;
+    void (*on_readable)(void *ctx, int fd);
+    void (*on_writable)(void *ctx, int fd);
+    void *read_ctx;
+    void *write_ctx;
 };
 
 pp_mux pp_mux_create(int num) {
     int handle = epoll_create(1); /* Size is ignored */
     if (handle < 0) return NULL;
+    int wake_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+    if (wake_fd < 0) {
+        close(handle);
+        return NULL;
+    }
+
     pp_mux mux = pp_alloc(sizeof(*mux));
     mux->handle = handle;
+    mux->wake_fd = wake_fd;
     mux->events = pp_alloc((1 + num) * sizeof(struct epoll_event));
     mux->events_len = 1 + num;
+
+    struct epoll_event ev;
+    pp_zero(&ev, sizeof(ev));
+    ev.events = EPOLLIN;
+    ev.data.fd = mux->wake_fd;
+    if (epoll_ctl(mux->handle, EPOLL_CTL_ADD, mux->wake_fd, &ev) != 0) {
+        pp_mux_free(mux);
+        return NULL;
+    }
+
     return mux;
 }
 
 void pp_mux_free(pp_mux mux) {
     if (!mux) return;
     close(mux->handle);
+    close(mux->wake_fd);
     pp_free(mux->events);
     pp_free(mux);
 }
 
-bool pp_mux_add(pp_mux mux, int pos, int fd) {
+bool pp_mux_add(pp_mux mux, int fd) {
     if (!mux) return false;
-    struct epoll_event *event = &mux->events[pos];
-    event->events = EPOLLIN;
-    event->data.fd = fd;
-    return epoll_ctl(mux->handle, EPOLL_CTL_ADD, fd, event) == 0;
+    struct epoll_event ev;
+    pp_zero(&ev, sizeof(ev));
+    ev.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLRDHUP;
+    ev.data.fd = fd;
+    const int ret = epoll_ctl(mux->handle, EPOLL_CTL_ADD, fd, &ev);
+    if (ret < 0) {
+        if (errno == EEXIST) return true;
+        return false;
+    }
+    return true;
 }
 
-bool pp_mux_set_write(pp_mux mux, int pos, int fd, bool enable) {
+bool pp_mux_set_write(pp_mux mux, int fd, bool enable) {
     if (!mux) return false;
-    struct epoll_event *event = &mux->events[pos];
-    event->events = enable ? (EPOLLIN | EPOLLOUT) : EPOLLIN;
-    event->data.fd = fd;
-    return epoll_ctl(mux->handle, EPOLL_CTL_MOD, fd, event) == 0;
+    struct epoll_event ev;
+    pp_zero(&ev, sizeof(ev));
+    ev.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLRDHUP;
+    if (enable) {
+        ev.events |= EPOLLOUT;
+    }
+    ev.data.fd = fd;
+    const int ret = epoll_ctl(mux->handle, EPOLL_CTL_MOD, fd, &ev);
+    if (ret < 0) {
+        if (enable && errno == ENOENT) {
+            return epoll_ctl(mux->handle, EPOLL_CTL_ADD, fd, &ev) == 0;
+        }
+        /* Ignore failed deletion. */
+        if (!enable && errno == ENOENT) return true;
+        return false;
+    }
+    return true;
+}
+
+void pp_mux_set_on_readable(pp_mux mux, void (*callback)(void *ctx, int fd), void *ctx) {
+    if (!mux) return;
+    mux->on_readable = callback;
+    mux->read_ctx = ctx;
+}
+
+void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, int fd), void *ctx) {
+    if (!mux) return;
+    mux->on_writable = callback;
+    mux->write_ctx = ctx;
 }
 
 int pp_mux_wait(pp_mux mux) {
     if (!mux) return -1;
-    return epoll_wait(mux->handle, mux->events, mux->events_len, -1);
+    const int num = epoll_wait(mux->handle, mux->events, mux->events_len, -1);
+    for (int i = 0; i < num; ++i) {
+        const struct epoll_event *ev = mux->events + i;
+        const int fd = ev->data.fd;
+        if (fd == mux->wake_fd) {
+            eventfd_t value;
+            while (true) {
+                if (eventfd_read(mux->wake_fd, &value) == 0) {
+                    continue;
+                }
+                if (errno == EINTR) {
+                    continue;
+                }
+                break;
+            }
+            continue;
+        }
+        if (ev->events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP)) {
+            epoll_ctl(mux->handle, EPOLL_CTL_DEL, fd, NULL);
+            // FIXME: ###, Report EOF
+            continue;
+        }
+        if ((ev->events & EPOLLIN) && mux->on_readable) {
+            mux->on_readable(mux->read_ctx, fd);
+        }
+        if ((ev->events & EPOLLOUT) && mux->on_writable) {
+            mux->on_writable(mux->write_ctx, fd);
+        }
+    }
+    return num;
+}
+
+bool pp_mux_wake(pp_mux mux) {
+    if (!mux) return false;
+    if (eventfd_write(mux->wake_fd, 1) == 0) return true;
+    return errno == EAGAIN;
+}
+
+void pp_mux_stop(pp_mux mux) {
+    if (!mux) return;
 }
 #endif
