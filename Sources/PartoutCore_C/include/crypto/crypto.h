@@ -60,20 +60,20 @@ typedef struct {
 } pp_crypto_flags;
 
 typedef void (*pp_crypto_configure_fn)(void *ctx,
-                                       const pp_zd *cipher_key,
-                                       const pp_zd *hmac_key);
+                                       const pp_zd *_Nullable cipher_key,
+                                       const pp_zd *_Nullable hmac_key);
 
 typedef size_t (*pp_crypto_encrypt_fn)(void *ctx,
                                        uint8_t *out, size_t out_buf_len,
                                        const uint8_t *in, size_t in_len,
                                        const pp_crypto_flags *_Nullable flags,
-                                       pp_crypto_error_code *error);
+                                       pp_crypto_error_code *_Nullable error);
 
 typedef size_t (*pp_crypto_decrypt_fn)(void *ctx,
                                        uint8_t *out, size_t out_buf_len,
                                        const uint8_t *in, size_t in_len,
                                        const pp_crypto_flags *_Nullable flags,
-                                       pp_crypto_error_code *error);
+                                       pp_crypto_error_code *_Nullable error);
 
 typedef bool (*pp_crypto_verify_fn)(void *ctx,
                                  const uint8_t *in, size_t in_len,
@@ -128,8 +128,8 @@ size_t pp_crypto_encryption_capacity(pp_crypto_ctx ctx, size_t len) {
 
 static inline
 void pp_crypto_configure_encrypt(pp_crypto_ctx ctx,
-                                 const pp_zd *cipher_key,
-                                 const pp_zd *hmac_key) {
+                                 const pp_zd *_Nullable cipher_key,
+                                 const pp_zd *_Nullable hmac_key) {
     ctx->base.encrypter.configure(&ctx->base, cipher_key, hmac_key);
 }
 
@@ -143,8 +143,8 @@ size_t pp_crypto_encrypt(pp_crypto_ctx ctx,
 
 static inline
 void pp_crypto_configure_decrypt(pp_crypto_ctx ctx,
-                                 const pp_zd *cipher_key,
-                                 const pp_zd *hmac_key) {
+                                 const pp_zd *_Nullable cipher_key,
+                                 const pp_zd *_Nullable hmac_key) {
     ctx->base.decrypter.configure(&ctx->base, cipher_key, hmac_key);
 }
 
@@ -152,7 +152,7 @@ static inline
 size_t pp_crypto_decrypt(pp_crypto_ctx ctx,
                          uint8_t *out, size_t out_buf_len,
                          const uint8_t *in, size_t in_len,
-                         const pp_crypto_flags *flags, pp_crypto_error_code *error) {
+                         const pp_crypto_flags *_Nullable flags, pp_crypto_error_code *error) {
     return ctx->base.decrypter.decrypt(&ctx->base, out, out_buf_len, in, in_len, flags, error);
 }
 
