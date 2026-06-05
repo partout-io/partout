@@ -56,16 +56,16 @@ public final class FdLooper: @unchecked Sendable {
             throw PartoutError(.fdUnavailable)
         }
         guard let newMux = pp_mux_create(Int32(Self.numberOfDescriptors)) else {
-            throw PartoutError(.ioFailure)
+            throw PartoutError(.muxFailure)
         }
         guard pp_mux_add(newMux, linkFd) else {
             pp_mux_free(newMux)
-            throw PartoutError(.ioFailure)
+            throw PartoutError(.muxFailure, linkFd)
         }
         if let tunFd {
             guard pp_mux_add(newMux, tunFd) else {
                 pp_mux_free(newMux)
-                throw PartoutError(.ioFailure)
+                throw PartoutError(.muxFailure, tunFd)
             }
         }
 
@@ -233,7 +233,7 @@ private extension FdLooper {
                     break
                 }
                 guard pp_mux_add(mux, fd) else {
-                    results.append(.attachTun(continuation, .failure(PartoutError(.ioFailure))))
+                    results.append(.attachTun(continuation, .failure(PartoutError(.muxFailure, fd))))
                     break
                 }
                 pp_log(ctx, .core, .info, "Attach tun (fd=\(fd))")
