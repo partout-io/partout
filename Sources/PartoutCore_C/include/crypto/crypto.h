@@ -15,10 +15,9 @@
 /// - Returns: The number of bytes to store a crypto buffer safely.
 static inline
 size_t pp_crypto_encryption_base_capacity(size_t size, size_t overhead) {
-
-#define PP_CRYPTO_MAX_BLOCK_SIZE 16  // AES only, block is 128-bit
-
-    // encryption, byte-alignment, overhead (e.g. IV, digest)
+    // AES only, block is 128-bit
+    static const int PP_CRYPTO_MAX_BLOCK_SIZE = 16;
+    // Encryption, byte-alignment, overhead (e.g. IV, digest)
     return 2 * size + PP_CRYPTO_MAX_BLOCK_SIZE + overhead;
 }
 
