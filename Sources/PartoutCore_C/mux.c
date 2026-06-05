@@ -91,14 +91,6 @@ int pp_mux_wait(pp_mux mux) {
         const struct kevent *ev = mux->events + i;
         const int fd = (int)ev->ident;
         if (ev->filter == EVFILT_READ) {
-            if (ev->flags & EV_EOF) {
-                struct kevent changes[2];
-                EV_SET(&changes[0], fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
-                EV_SET(&changes[1], fd, EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
-                kevent(mux->handle, changes, 2, NULL, 0, NULL);
-                // FIXME: ###, Report EOF
-                continue;
-            }
             if (mux->on_readable) {
                 mux->on_readable(mux->read_ctx, fd);
             }
@@ -246,15 +238,15 @@ int pp_mux_wait(pp_mux mux) {
             }
             continue;
         }
-        if (ev->events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP)) {
-            epoll_ctl(mux->handle, EPOLL_CTL_DEL, fd, NULL);
-            // FIXME: ###, Report EOF
-            continue;
-        }
-        if ((ev->events & EPOLLIN) && mux->on_readable) {
+        const bool failed = ev->events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP);
+        const bool readable = (ev->events & EPOLLIN) || failed;
+        const bool writable = ev->events & EPOLLOUT;
+        bool did_notify_readable = false;
+        if (readable && mux->on_readable) {
             mux->on_readable(mux->read_ctx, fd);
+            did_notify_readable = true;
         }
-        if ((ev->events & EPOLLOUT) && mux->on_writable) {
+        if ((writable || (!did_notify_readable && failed)) && mux->on_writable) {
             mux->on_writable(mux->write_ctx, fd);
         }
     }
