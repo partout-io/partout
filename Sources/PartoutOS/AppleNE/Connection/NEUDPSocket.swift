@@ -128,10 +128,6 @@ extension NEUDPSocket {
 // MARK: IOInterface
 
 extension NEUDPSocket {
-    nonisolated var fileDescriptor: UInt64? {
-        nil
-    }
-
     func readPackets() async throws -> [Data] {
         try await readStream.nextElement() ?? []
     }

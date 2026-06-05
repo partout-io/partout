@@ -108,10 +108,6 @@ extension NETCPSocket {
 // MARK: IOInterface
 
 extension NETCPSocket {
-    nonisolated var fileDescriptor: UInt64? {
-        nil
-    }
-
     func readPackets() async throws -> [Data] {
         // WARNING: runs in Network.framework queue
         try await withCheckedThrowingContinuation { continuation in
