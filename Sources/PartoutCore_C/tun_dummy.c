@@ -10,6 +10,18 @@
 const int PP_TUN_WOULD_BLOCK = -2;
 
 #if !PARTOUT_HAS_TUN
+pp_tun pp_tun_create(int fd) {
+    (void)fd;
+    pp_clog(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: create()");
+    return NULL;
+}
+
+pp_tun pp_tun_open(const char *uuid) {
+    (void)uuid;
+    pp_clog(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: open()");
+    return NULL;
+}
+
 void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     (void)tun;
     pp_clog(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: free_and_close()");

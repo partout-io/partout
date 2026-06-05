@@ -63,7 +63,6 @@ GUID guid_from_wstring(const wchar_t *wstr) {
     return guid;
 }
 
-static
 pp_tun pp_tun_open(const char *uuid) {
     if (!uuid) return NULL;
     WINTUN_ADAPTER_HANDLE adapter = NULL;

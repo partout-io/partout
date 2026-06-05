@@ -33,7 +33,6 @@ pp_tun pp_tun_create(int fd) {
     return tun;
 }
 
-static
 pp_tun pp_tun_open(const char *uuid) {
     (void)uuid;
     struct sockaddr_ctl sc = { 0 };

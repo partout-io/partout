@@ -31,7 +31,6 @@ pp_tun pp_tun_create(int fd) {
     return tun;
 }
 
-static
 pp_tun pp_tun_open(const char *uuid) {
     (void)uuid;
     const char *dev_path = "/dev/net/tun";
