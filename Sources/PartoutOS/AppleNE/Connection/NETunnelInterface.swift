@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+internal import _PartoutCore_C
 import NetworkExtension
 
 /// A tunnel interface based on `NEPacketTunnelFlow`.
@@ -19,6 +20,28 @@ public final class NETunnelInterface: IOInterface {
     // MARK: TunnelInterface
 
     public var fileDescriptor: UInt64? {
+        Self.existingFileDescriptor.map(UInt64.init)
+    }
+
+    public func readPackets() async throws -> [Data] {
+        guard let impl else {
+            pp_log(ctx, .os, .error, "NEPacketTunnelFlow released prematurely")
+            throw PartoutError(.unhandled)
+        }
+        let pair = await impl.readPackets()
+        return pair.0
+    }
+
+    public func writePackets(_ packets: [Data]) {
+        let protocols = packets.map(IPHeader.protocolNumber(inPacket:))
+        impl?.writePackets(packets, withProtocols: protocols as [NSNumber])
+    }
+}
+
+extension NETunnelInterface {
+    private static let CTLIOCGINFO: UInt = 0xc0644e03
+
+    public static var existingFileDescriptor: Int32? {
         var ctlInfo = ctl_info()
         withUnsafeMutablePointer(to: &ctlInfo.ctl_name) {
             $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: $0.pointee)) {
@@ -37,7 +60,7 @@ public final class NETunnelInterface: IOInterface {
                 continue
             }
             if ctlInfo.ctl_id == 0 {
-                let ret = ioctl(fd, CTLIOCGINFO, &ctlInfo)
+                let ret = ioctl(fd, Self.CTLIOCGINFO, &ctlInfo)
                 guard ret == 0 else {
                     continue
                 }
@@ -45,24 +68,8 @@ public final class NETunnelInterface: IOInterface {
             guard addr.sc_id == ctlInfo.ctl_id else {
                 continue
             }
-            return UInt64(fd)
+            return fd
         }
         return nil
     }
-
-    public func readPackets() async throws -> [Data] {
-        guard let impl else {
-            pp_log(ctx, .os, .error, "NEPacketTunnelFlow released prematurely")
-            throw PartoutError(.unhandled)
-        }
-        let pair = await impl.readPackets()
-        return pair.0
-    }
-
-    public func writePackets(_ packets: [Data]) {
-        let protocols = packets.map(IPHeader.protocolNumber(inPacket:))
-        impl?.writePackets(packets, withProtocols: protocols as [NSNumber])
-    }
 }
-
-private let CTLIOCGINFO: UInt = 0xc0644e03
