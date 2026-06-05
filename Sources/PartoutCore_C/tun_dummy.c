@@ -7,8 +7,6 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
-const int PP_TUN_WOULD_BLOCK = -2;
-
 #if !PARTOUT_HAS_TUN
 void pp_tun_free(pp_tun tun) {
     (void)tun;

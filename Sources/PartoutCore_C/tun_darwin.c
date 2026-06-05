@@ -27,14 +27,8 @@ struct __pp_tun_struct {
     const char *dev_name;
 };
 
-pp_tun pp_tun_create(int fd) {
-    pp_tun tun = pp_alloc(sizeof(*tun));
-    tun->fd = fd;
-    return tun;
-}
-
 static
-pp_tun pp_tun_request(const char *uuid) {
+pp_tun pp_tun_create(const char *uuid) {
     (void)uuid;
     struct sockaddr_ctl sc = { 0 };
     struct ctl_info ctl_info = { 0 };
@@ -82,11 +76,9 @@ failure:
     return NULL;
 }
 
-void pp_tun_free_and_close(pp_tun tun, bool and_close) {
+void pp_tun_free(pp_tun tun) {
     if (!tun) return;
-    if (and_close) {
-        pp_tun_shutdown(tun);
-    }
+    pp_tun_shutdown(tun);
     if (tun->dev_name) {
         pp_free((void *)tun->dev_name);
     }
@@ -119,9 +111,6 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
 
     const int read_len = (int)readv(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
     if (read_len < 0) {
-        if (pp_tun_would_block()) {
-            return PP_TUN_WOULD_BLOCK;
-        }
         return -1;
     }
     if (read_len < (int)sizeof(pi)) {
@@ -144,9 +133,6 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
 
     const int written_len = (int)writev(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
     if (written_len < 0) {
-        if (pp_tun_would_block()) {
-            return PP_TUN_WOULD_BLOCK;
-        }
         return -1;
     }
     if (written_len != (int)(pi_len + src_len)) return -2;
