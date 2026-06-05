@@ -7,10 +7,31 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
+const int PP_TUN_WOULD_BLOCK = -2;
+
 #if !PARTOUT_HAS_TUN
-void pp_tun_free(pp_tun tun) {
+struct __pp_tun_struct {
+    int fd;
+};
+
+pp_tun pp_tun_create(int fd) {
+    pp_clog(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: create()");
+    pp_tun tun = pp_alloc(sizeof(*tun));
+    tun->fd = fd;
+    return tun;
+}
+
+pp_tun pp_tun_open(const char *uuid) {
+    (void)uuid;
+    pp_clog(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: open()");
+    return NULL;
+}
+
+void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     (void)tun;
-    pp_clog(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: free()");
+    (void)and_close;
+    pp_clog(PPLogCategoryCore, PPLogLevelDebug, "tun_dummy: free_and_close()");
+    pp_free(tun);
 }
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {

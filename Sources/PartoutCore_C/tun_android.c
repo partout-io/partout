@@ -21,20 +21,36 @@ struct __pp_tun_struct {
     int fd;
 };
 
-void pp_tun_free(pp_tun tun) {
+pp_tun pp_tun_create(int fd) {
+    pp_tun tun = pp_alloc(sizeof(*tun));
+    tun->fd = fd;
+    return tun;
+}
+
+void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     if (!tun) return;
-    pp_tun_shutdown(tun);
+    if (and_close) {
+        pp_tun_shutdown(tun);
+    }
     pp_free(tun);
 }
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     if (!tun || tun->fd < 0) return -1;
-    return read(tun->fd, dst, dst_len);
+    const int ret = read(tun->fd, dst, dst_len);
+    if (ret < 0 && pp_tun_would_block()) {
+        return PP_TUN_WOULD_BLOCK;
+    }
+    return ret;
 }
 
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     if (!tun || tun->fd < 0) return -1;
-    return write(tun->fd, src, src_len);
+    const int ret = write(tun->fd, src, src_len);
+    if (ret < 0 && pp_tun_would_block()) {
+        return PP_TUN_WOULD_BLOCK;
+    }
+    return ret;
 }
 
 void pp_tun_shutdown(const pp_tun tun) {

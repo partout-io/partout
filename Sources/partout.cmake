@@ -333,6 +333,7 @@ set(PARTOUT_C_SOURCES
 ./MiniFoundation_C/std.c
 ./PartoutCore_C/common.c
 ./PartoutCore_C/lib.c
+./PartoutCore_C/mux.c
 ./PartoutCore_C/network.c
 ./PartoutCore_C/prng.c
 ./PartoutCore_C/socket.c

@@ -30,7 +30,8 @@ func tryTCPConnection() async throws {
     let observer = BSDSocketObserver(
         .global,
         endpoint: endpoint,
-        betterPathFactory: DummyFactory()
+        betterPathFactory: DummyFactory(),
+        configurator: nil
     )
     let sut = try await observer.waitForActivity(timeout: 5000)
 

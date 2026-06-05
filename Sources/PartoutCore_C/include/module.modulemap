@@ -1,6 +1,7 @@
 module _PartoutCore_C {
     header "portable/common.h"
     header "portable/endian.h"
+    header "portable/mux.h"
     header "portable/network.h"
     header "portable/prng.h"
     header "portable/socket.h"
