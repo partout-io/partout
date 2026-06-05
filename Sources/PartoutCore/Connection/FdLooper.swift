@@ -258,12 +258,6 @@ private extension FdLooper {
     }
 
     func process(mux: pp_mux, fdSet: FdSet) throws {
-        // Reset write wake-ups
-        pp_mux_set_write(mux, linkFd, false)
-        if let tunFd {
-            pp_mux_set_write(mux, tunFd, false)
-        }
-
         // Write link
         if fdSet.writable.contains(linkFd) {
             var watchWrites = false
@@ -285,9 +279,8 @@ private extension FdLooper {
                 }
             }
             // Stop watching if no blocks
-            if watchWrites {
-                pp_mux_set_write(mux, linkFd, true)
-            } else {
+            pp_mux_set_write(mux, linkFd, watchWrites)
+            if !watchWrites {
                 fdSet.writable.remove(linkFd)
             }
         }
@@ -313,9 +306,8 @@ private extension FdLooper {
                 }
             }
             // Stop watching if no blocks
-            if watchWrites {
-                pp_mux_set_write(mux, tunFd, true)
-            } else {
+            pp_mux_set_write(mux, tunFd, watchWrites)
+            if !watchWrites {
                 fdSet.writable.remove(tunFd)
             }
         }
