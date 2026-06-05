@@ -47,26 +47,25 @@ public final class FdLooper: @unchecked Sendable {
         maxReadSize: Int = 256 * 1024,
         maxReadCount: Int = 128
     ) throws {
-        // FIXME: ###, Throw specific errors
         let linkFd = linkInterface.fileDescriptor.map(Int32.init)
         let tunFd = tunInterface?.fileDescriptor.map(Int32.init)
         guard let linkFd else {
-            throw PartoutError(.unhandled)
+            throw PartoutError(.fdUnavailable)
         }
         guard tunInterface == nil || tunFd != nil else {
-            throw PartoutError(.unhandled)
+            throw PartoutError(.fdUnavailable)
         }
         guard let newMux = pp_mux_create(Int32(Self.numberOfDescriptors)) else {
-            throw PartoutError(.unhandled)
+            throw PartoutError(.ioFailure)
         }
         guard pp_mux_add(newMux, linkFd) else {
             pp_mux_free(newMux)
-            throw PartoutError(.unhandled)
+            throw PartoutError(.ioFailure)
         }
         if let tunFd {
             guard pp_mux_add(newMux, tunFd) else {
                 pp_mux_free(newMux)
-                throw PartoutError(.unhandled)
+                throw PartoutError(.ioFailure)
             }
         }
 
@@ -230,12 +229,11 @@ private extension FdLooper {
                 }
                 // Can only attach once
                 guard tunFd == nil else {
-                    results.append(.attachTun(continuation, .failure(PartoutError(.ioFailure))))
+                    results.append(.attachTun(continuation, .failure(PartoutError(.operationCancelled))))
                     break
                 }
-                // FIXME: ###, Throw specific errors
                 guard pp_mux_add(mux, fd) else {
-                    results.append(.attachTun(continuation, .failure(PartoutError(.unhandled))))
+                    results.append(.attachTun(continuation, .failure(PartoutError(.ioFailure))))
                     break
                 }
                 pp_log(ctx, .core, .info, "Attach tun (fd=\(fd))")
@@ -269,7 +267,6 @@ private extension FdLooper {
         // Write link
         if fdSet.writable.contains(linkFd) {
             var watchWrites = false
-            // FIXME: ###, Write new link packets
             while let packet = linkQueue.outbound.first {
                 let count = pp_socket_write(link, packet, packet.count)
                 guard count != PP_SOCKET_WOULD_BLOCK else {
@@ -298,7 +295,6 @@ private extension FdLooper {
         // Write tun
         if let tunFd, let tun, fdSet.writable.contains(tunFd) {
             var watchWrites = false
-            // FIXME: ###, Write new tun packets
             while let packet = tunQueue.outbound.first {
                 let count = pp_tun_write(tun, packet, packet.count)
                 guard count != PP_TUN_WOULD_BLOCK else {
@@ -339,11 +335,6 @@ private extension FdLooper {
                 if count > 0 {
                     let packet = [UInt8](tunBuf[0..<Int(count)])
                     tunQueue.inbound.append(packet)
-                    // FIXME: ###, Forward read tun packet
-//                    tun_read_queue.append(packet)
-//                    if tun_read_queue.isFull {
-//                        throw exception or yield
-//                    }
                 }
                 // Keep going
                 readCount += 1
@@ -366,11 +357,6 @@ private extension FdLooper {
                 if count > 0 {
                     let packet = [UInt8](linkBuf[0..<Int(count)])
                     linkQueue.inbound.append(packet)
-                    // FIXME: ###, Forward read link packet
-//                    link_read_queue.append(packet)
-//                    if link_read_queue.isFull {
-//                        throw exception or yield
-//                    }
                 }
                 // Keep going
                 readCount += 1
