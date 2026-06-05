@@ -35,8 +35,8 @@ public final class FdLooper: @unchecked Sendable {
     // Consumer:
     // - Writes to linkQueue/tunQueue .outbound
     // - Reads from linkQueue/tunQueue .inbound
-    private var linkQueue: BidirectionalState<[[UInt8]]>
-    private var tunQueue: BidirectionalState<[[UInt8]]>
+    private var linkQueue: BidirectionalState<[Data]>
+    private var tunQueue: BidirectionalState<[Data]>
 
     public init(
         _ ctx: PartoutLoggerContext,
@@ -262,7 +262,10 @@ private extension FdLooper {
         if fdSet.writable.contains(linkFd) {
             var watchWrites = false
             while let packet = linkQueue.outbound.first {
-                let count = pp_socket_write(link, packet, packet.count)
+                let packetCount = packet.count
+                let count = packet.withUnsafeBytes {
+                    pp_socket_write(link, $0, packetCount)
+                }
                 guard count != PP_SOCKET_WOULD_BLOCK else {
                     watchWrites = true
                     break
@@ -273,7 +276,7 @@ private extension FdLooper {
                 // Dequeue, but reinsert remainder on partial write
                 linkQueue.outbound.removeFirst()
                 if count < packet.count {
-                    let partialPacket = [UInt8](packet[Int(count)...])
+                    let partialPacket = Data(packet[Int(count)...])
                     linkQueue.outbound.insert(partialPacket, at: 0)
                     watchWrites = true
                 }
@@ -289,7 +292,10 @@ private extension FdLooper {
         if let tunFd, let tun, fdSet.writable.contains(tunFd) {
             var watchWrites = false
             while let packet = tunQueue.outbound.first {
-                let count = pp_tun_write(tun, packet, packet.count)
+                let packetCount = packet.count
+                let count = packet.withUnsafeBytes {
+                    pp_tun_write(tun, $0, packetCount)
+                }
                 guard count != PP_TUN_WOULD_BLOCK else {
                     watchWrites = true
                     break
@@ -300,7 +306,7 @@ private extension FdLooper {
                 // Dequeue, but reinsert remainder on partial write
                 tunQueue.outbound.removeFirst()
                 if count < packet.count {
-                    let partialPacket = [UInt8](packet[Int(count)...])
+                    let partialPacket = Data(packet[Int(count)...])
                     tunQueue.outbound.insert(partialPacket, at: 0)
                     watchWrites = true
                 }
@@ -325,7 +331,7 @@ private extension FdLooper {
                     throw PartoutError(.ioFailure)
                 }
                 if count > 0 {
-                    let packet = [UInt8](tunBuf[0..<Int(count)])
+                    let packet = Data(tunBuf[0..<Int(count)])
                     tunQueue.inbound.append(packet)
                 }
                 // Keep going
@@ -347,7 +353,7 @@ private extension FdLooper {
                     throw PartoutError(.ioFailure)
                 }
                 if count > 0 {
-                    let packet = [UInt8](linkBuf[0..<Int(count)])
+                    let packet = Data(linkBuf[0..<Int(count)])
                     linkQueue.inbound.append(packet)
                 }
                 // Keep going
