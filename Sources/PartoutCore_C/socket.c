@@ -85,6 +85,7 @@ pp_socket pp_socket_open(const char *ip_addr,
                          const pp_reachability *info,
                          bool (*configure)(void *ctx, uint64_t fd),
                          void *configure_ctx) {
+    (void)info;
     int socktype = 0;
     struct addrinfo hints, *resolved = NULL;
     char port_str[16] = { 0 };
@@ -208,9 +209,11 @@ void pp_socket_close(pp_socket sock) {
 }
 
 /* Free the socket wrapper. */
-void pp_socket_free(pp_socket sock) {
+void pp_socket_free_and_close(pp_socket sock, bool and_close) {
     if (!sock) return;
-    local_close_impl(sock);
+    if (and_close) {
+        local_close_impl(sock);
+    }
     pp_free(sock);
 }
 

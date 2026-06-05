@@ -28,7 +28,7 @@ struct __pp_tun_struct {
 };
 
 static
-pp_tun pp_tun_create(const char *_Nonnull uuid) {
+pp_tun pp_tun_create(const char *uuid) {
     (void)uuid;
     struct sockaddr_ctl sc = { 0 };
     struct ctl_info ctl_info = { 0 };
@@ -79,7 +79,9 @@ failure:
 void pp_tun_free(pp_tun tun) {
     if (!tun) return;
     pp_tun_shutdown(tun);
-    pp_free((void *)tun->dev_name);
+    if (tun->dev_name) {
+        pp_free((void *)tun->dev_name);
+    }
     pp_free(tun);
 }
 
@@ -108,7 +110,9 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     iov[1].iov_len  = dst_len;
 
     const int read_len = (int)readv(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
-    if (read_len < 0) return -1;
+    if (read_len < 0) {
+        return -1;
+    }
     if (read_len < (int)sizeof(pi)) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: Missing 4-byte utun packet header");
         return -1;
@@ -128,7 +132,9 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     iov[1].iov_len  = src_len;
 
     const int written_len = (int)writev(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
-    if (written_len < 0) return -1;
+    if (written_len < 0) {
+        return -1;
+    }
     if (written_len != (int)(pi_len + src_len)) return -2;
     return written_len;
 }

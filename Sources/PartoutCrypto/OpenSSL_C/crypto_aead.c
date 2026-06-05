@@ -13,7 +13,7 @@
 typedef struct {
     pp_crypto crypto;
 
-    // cipher
+    // Cipher
     const EVP_CIPHER *_Nonnull cipher;
     EVP_CIPHER_CTX *_Nonnull ctx_enc;
     EVP_CIPHER_CTX *_Nonnull ctx_dec;

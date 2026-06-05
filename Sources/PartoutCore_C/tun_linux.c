@@ -26,7 +26,7 @@ struct __pp_tun_struct {
 };
 
 static
-pp_tun pp_tun_create(const char *_Nonnull uuid) {
+pp_tun pp_tun_create(const char *uuid) {
     (void)uuid;
     const char *dev_path = "/dev/net/tun";
     int fd = -1;
@@ -63,7 +63,9 @@ failure:
 void pp_tun_free(pp_tun tun) {
     if (!tun) return;
     pp_tun_shutdown(tun);
-    pp_free((void *)tun->dev_name);
+    if (tun->dev_name) {
+        pp_free((void *)tun->dev_name);
+    }
     pp_free(tun);
 }
 

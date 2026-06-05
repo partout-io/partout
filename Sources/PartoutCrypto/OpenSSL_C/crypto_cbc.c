@@ -16,7 +16,7 @@
 typedef struct {
     pp_crypto crypto;
 
-    // cipher
+    // Cipher
     const EVP_CIPHER *_Nullable cipher;
     EVP_CIPHER_CTX *_Nullable ctx_enc;
     EVP_CIPHER_CTX *_Nullable ctx_dec;
@@ -187,7 +187,7 @@ bool local_verify(void *vctx, const uint8_t *in, size_t in_len, pp_crypto_error_
 // MARK: -
 
 pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name, const char *digest_name,
-                             const pp_crypto_keys *keys) {
+                                   const pp_crypto_keys *keys) {
     pp_assert(digest_name);
 
     pp_crypto_cbc *ctx = pp_alloc(sizeof(pp_crypto_cbc));

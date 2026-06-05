@@ -11,8 +11,10 @@
 #include "openvpn/mss_fix.h"
 #include "openvpn/packet.h"
 
+#pragma clang assume_nonnull begin
+
 static
-void openvpn_dp_framing_assemble_disabled(openvpn_dp_framing_assemble_ctx *_Nonnull ctx) {
+void openvpn_dp_framing_assemble_disabled(openvpn_dp_framing_assemble_ctx *ctx) {
     memcpy(ctx->dst, ctx->src, ctx->src_len);
     if (ctx->mss_val) {
         openvpn_mss_fix(ctx->dst, ctx->src_len, ctx->mss_val);
@@ -21,7 +23,7 @@ void openvpn_dp_framing_assemble_disabled(openvpn_dp_framing_assemble_ctx *_Nonn
 }
 
 static
-bool openvpn_dp_framing_parse_disabled(openvpn_dp_framing_parse_ctx *_Nonnull ctx) {
+bool openvpn_dp_framing_parse_disabled(openvpn_dp_framing_parse_ctx *ctx) {
     *ctx->dst_payload_offset = 0;
     *ctx->dst_header = 0x00;
     *ctx->dst_header_len = 0;
@@ -31,7 +33,7 @@ bool openvpn_dp_framing_parse_disabled(openvpn_dp_framing_parse_ctx *_Nonnull ct
 // MARK: -
 
 static
-bool openvpn_dp_framing_parse_v1(openvpn_dp_framing_parse_ctx *_Nonnull ctx) {
+bool openvpn_dp_framing_parse_v1(openvpn_dp_framing_parse_ctx *ctx) {
     *ctx->dst_header = ctx->dst_payload[0];
     *ctx->dst_payload_offset = 0;
     *ctx->dst_header_len = 0;
@@ -59,7 +61,7 @@ bool openvpn_dp_framing_parse_v1(openvpn_dp_framing_parse_ctx *_Nonnull ctx) {
 }
 
 static
-bool openvpn_dp_framing_parse_v2(openvpn_dp_framing_parse_ctx *_Nonnull ctx) {
+bool openvpn_dp_framing_parse_v2(openvpn_dp_framing_parse_ctx *ctx) {
     *ctx->dst_header = ctx->dst_payload[0];
     *ctx->dst_payload_offset = 0;
     *ctx->dst_header_len = 0;
@@ -84,7 +86,7 @@ bool openvpn_dp_framing_parse_v2(openvpn_dp_framing_parse_ctx *_Nonnull ctx) {
 }
 
 static
-void openvpn_dp_framing_assemble_lzo(openvpn_dp_framing_assemble_ctx *_Nonnull ctx) {
+void openvpn_dp_framing_assemble_lzo(openvpn_dp_framing_assemble_ctx *ctx) {
     ctx->dst[0] = OpenVPNDataPacketNoCompress;
     *ctx->dst_len_offset = 1;
     memcpy(ctx->dst + 1, ctx->src, ctx->src_len);
@@ -94,12 +96,12 @@ void openvpn_dp_framing_assemble_lzo(openvpn_dp_framing_assemble_ctx *_Nonnull c
 }
 
 static
-bool openvpn_dp_framing_parse_lzo(openvpn_dp_framing_parse_ctx *_Nonnull ctx) {
+bool openvpn_dp_framing_parse_lzo(openvpn_dp_framing_parse_ctx *ctx) {
     return openvpn_dp_framing_parse_v1(ctx);
 }
 
 static
-void openvpn_dp_framing_assemble_compress(openvpn_dp_framing_assemble_ctx *_Nonnull ctx) {
+void openvpn_dp_framing_assemble_compress(openvpn_dp_framing_assemble_ctx *ctx) {
     *ctx->dst_len_offset = 1;
     memcpy(ctx->dst, ctx->src, ctx->src_len);
     if (ctx->mss_val) {
@@ -111,12 +113,12 @@ void openvpn_dp_framing_assemble_compress(openvpn_dp_framing_assemble_ctx *_Nonn
 }
 
 static
-bool openvpn_dp_framing_parse_compress(openvpn_dp_framing_parse_ctx *_Nonnull ctx) {
+bool openvpn_dp_framing_parse_compress(openvpn_dp_framing_parse_ctx *ctx) {
     return openvpn_dp_framing_parse_v1(ctx);
 }
 
 static
-void openvpn_dp_framing_assemble_compress_v2(openvpn_dp_framing_assemble_ctx *_Nonnull ctx) {
+void openvpn_dp_framing_assemble_compress_v2(openvpn_dp_framing_assemble_ctx *ctx) {
     // assume no compression (v2 algorithms unsupported)
 
     // prepend headers only in case of byte ambiguity
@@ -135,6 +137,8 @@ void openvpn_dp_framing_assemble_compress_v2(openvpn_dp_framing_assemble_ctx *_N
 }
 
 static
-bool openvpn_dp_framing_parse_compress_v2(openvpn_dp_framing_parse_ctx *_Nonnull ctx) {
+bool openvpn_dp_framing_parse_compress_v2(openvpn_dp_framing_parse_ctx *ctx) {
     return openvpn_dp_framing_parse_v2(ctx);
 }
+
+#pragma clang assume_nonnull end

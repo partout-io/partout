@@ -17,6 +17,8 @@
 #include <android/multinetwork.h>
 #endif
 
+#pragma clang assume_nonnull begin
+
 /* Logging counterpart of Swift pp_log. */
 
 typedef enum {
@@ -27,20 +29,20 @@ typedef enum {
     PPLogLevelDebug
 } pp_log_level;
 
-typedef const char *_Nonnull pp_log_category;
+typedef const char *pp_log_category;
 extern pp_log_category PPLogCategoryCore;
 
 extern void pp_clog(pp_log_category category,
                     pp_log_level level,
-                    const char *_Nonnull message);
+                    const char *message);
 
 void pp_clog_v(pp_log_category category,
                pp_log_level level,
-               const char *_Nonnull fmt, ...);
+               const char *fmt, ...);
 
 void pp_log_simple_append(const char *_Nullable tag,
                           pp_log_level level,
-                          const char *_Nonnull message);
+                          const char *message);
 
 /* Use inline rather than #define to make available to Swift. */
 
@@ -50,7 +52,7 @@ void pp_assert(bool condition) {
 }
 
 static inline
-void *_Nonnull pp_alloc(size_t size) {
+void *pp_alloc(size_t size) {
     void *memory = calloc(1, size);
     if (!memory) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_alloc: malloc() call failed");
@@ -66,7 +68,7 @@ void pp_free(void *_Nullable ptr) {
 }
 
 static inline
-void pp_zero(void *_Nonnull ptr, size_t count) {
+void pp_zero(void *ptr, size_t count) {
 #ifdef bzero
     bzero(ptr, count);
 #else
@@ -75,7 +77,7 @@ void pp_zero(void *_Nonnull ptr, size_t count) {
 }
 
 static inline
-char *_Nonnull pp_dup(const char *_Nonnull str) {
+char *pp_dup(const char *str) {
 #if PARTOUT_WINDOWS
     char *ptr = _strdup(str);
 #else
@@ -90,7 +92,7 @@ char *_Nonnull pp_dup(const char *_Nonnull str) {
 
 #if PARTOUT_WINDOWS
 static inline
-FILE *_Nullable pp_fopen(const char *_Nonnull filename, const char *_Nonnull mode) {
+FILE *_Nullable pp_fopen(const char *filename, const char *mode) {
     FILE *file_ret = NULL;
     errno_t file_err = fopen_s(&file_ret, filename, mode);
     if (file_err == 0) {
@@ -108,7 +110,7 @@ FILE *_Nullable pp_fopen(const char *_Nonnull filename, const char *_Nonnull mod
 #include <jni.h>
 #include <stdbool.h>
 extern _Nullable JavaVM *_Nullable jvm;
-_Nullable JNIEnv *_Nullable pp_jni_attach_thread(bool *_Nonnull did_attach);
+_Nullable JNIEnv *_Nullable pp_jni_attach_thread(bool *did_attach);
 void *_Nullable pp_jni_new_global_ref(void *_Nullable ref);
 void pp_jni_delete_global_ref(void *_Nullable ref);
 
@@ -137,3 +139,5 @@ void pp_jni_delete_global_ref(void *_Nullable ref);
 #endif
 
 typedef void (*pp_completion)(void *_Nullable ctx, const int error_code);
+
+#pragma clang assume_nonnull end

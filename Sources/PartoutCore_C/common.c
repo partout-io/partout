@@ -11,7 +11,7 @@ pp_log_category PPLogCategoryCore = "core";
 
 void pp_clog_v(pp_log_category category,
                pp_log_level level,
-               const char *_Nonnull fmt, ...) {
+               const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     // Add 1 to include the null terminator
@@ -73,7 +73,7 @@ void pp_jni_delete_global_ref(void *ref) {
     PP_JNI_DETACH(env);
 }
 
-void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonnull message) {
+void pp_log_simple_append(const char *tag, pp_log_level level, const char *message) {
     const char *log_tag = tag ? tag : "Partout";
     int android_level = 0;
     switch (level) {
@@ -96,7 +96,7 @@ void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonn
     __android_log_print(android_level, log_tag, "%s", message);
 }
 #else
-void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonnull message) {
+void pp_log_simple_append(const char *tag, pp_log_level level, const char *message) {
     FILE *out = NULL;
     switch (level) {
     case PPLogLevelError:

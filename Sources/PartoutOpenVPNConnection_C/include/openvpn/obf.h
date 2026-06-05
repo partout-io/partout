@@ -8,16 +8,17 @@
 
 #include <stdint.h>
 
+#pragma clang assume_nonnull begin
+
 // WARNING: assume dst to be able to hold src_len
 
 // TODO: #154, make more efficient by XOR-ing 4-8 bytes per loop
 
 static inline
-void openvpn_obf_xor_mask(uint8_t *_Nonnull dst,
-                  size_t dst_len,
-                  const uint8_t *_Nonnull mask,
-                  size_t mask_len) {
-
+void openvpn_obf_xor_mask(uint8_t *dst,
+                          size_t dst_len,
+                          const uint8_t *mask,
+                          size_t mask_len) {
     pp_assert(mask && mask_len > 0);
     if (mask_len == 0) {
         return;
@@ -28,8 +29,7 @@ void openvpn_obf_xor_mask(uint8_t *_Nonnull dst,
 }
 
 static inline
-void openvpn_obf_xor_ptrpos(uint8_t *_Nonnull dst, size_t dst_len) {
-
+void openvpn_obf_xor_ptrpos(uint8_t *dst, size_t dst_len) {
     for (size_t i = 0; i < dst_len; ++i) {
         dst[i] ^= ((i + 1) & 0xff);
     }
@@ -37,8 +37,7 @@ void openvpn_obf_xor_ptrpos(uint8_t *_Nonnull dst, size_t dst_len) {
 
 // first byte as-is, [1..n-1] reversed
 static inline
-void openvpn_obf_reverse(uint8_t *_Nonnull dst, size_t dst_len) {
-
+void openvpn_obf_reverse(uint8_t *dst, size_t dst_len) {
     if (dst_len <= 2) {
         return;
     }
@@ -55,12 +54,11 @@ void openvpn_obf_reverse(uint8_t *_Nonnull dst, size_t dst_len) {
 }
 
 static inline
-void openvpn_obf_xor_obfuscate(uint8_t *_Nonnull dst,
-                       size_t dst_len,
-                       const uint8_t *_Nonnull mask,
-                       size_t mask_len,
-                       bool outbound)
-{
+void openvpn_obf_xor_obfuscate(uint8_t *dst,
+                               size_t dst_len,
+                               const uint8_t *mask,
+                               size_t mask_len,
+                               bool outbound) {
     if (outbound) {
         openvpn_obf_xor_ptrpos(dst, dst_len);
         openvpn_obf_reverse(dst, dst_len);
@@ -73,3 +71,5 @@ void openvpn_obf_xor_obfuscate(uint8_t *_Nonnull dst,
         openvpn_obf_xor_ptrpos(dst, dst_len);
     }
 }
+
+#pragma clang assume_nonnull end
