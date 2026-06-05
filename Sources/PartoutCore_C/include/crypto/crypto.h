@@ -76,8 +76,8 @@ typedef size_t (*pp_crypto_decrypt_fn)(void *ctx,
                                        pp_crypto_error_code *_Nullable error);
 
 typedef bool (*pp_crypto_verify_fn)(void *ctx,
-                                 const uint8_t *in, size_t in_len,
-                                 pp_crypto_error_code *error);
+                                    const uint8_t *in, size_t in_len,
+                                    pp_crypto_error_code *_Nullable error);
 
 typedef struct {
     pp_crypto_configure_fn configure;
@@ -137,7 +137,8 @@ static inline
 size_t pp_crypto_encrypt(pp_crypto_ctx ctx,
                          uint8_t *out, size_t out_buf_len,
                          const uint8_t *in, size_t in_len,
-                         const pp_crypto_flags *_Nullable flags, pp_crypto_error_code *error) {
+                         const pp_crypto_flags *_Nullable flags,
+                         pp_crypto_error_code *_Nullable error) {
     return ctx->base.encrypter.encrypt(&ctx->base, out, out_buf_len, in, in_len, flags, error);
 }
 
@@ -152,14 +153,15 @@ static inline
 size_t pp_crypto_decrypt(pp_crypto_ctx ctx,
                          uint8_t *out, size_t out_buf_len,
                          const uint8_t *in, size_t in_len,
-                         const pp_crypto_flags *_Nullable flags, pp_crypto_error_code *error) {
+                         const pp_crypto_flags *_Nullable flags,
+                         pp_crypto_error_code *_Nullable error) {
     return ctx->base.decrypter.decrypt(&ctx->base, out, out_buf_len, in, in_len, flags, error);
 }
 
 static inline
 bool pp_crypto_verify(pp_crypto_ctx ctx,
                       const uint8_t *in, size_t in_len,
-                      pp_crypto_error_code *error) {
+                      pp_crypto_error_code *_Nullable error) {
     pp_assert(ctx->base.decrypter.verify);
     return ctx->base.decrypter.verify(&ctx->base, in, in_len, error);
 }
