@@ -7,13 +7,13 @@
 #include "portable/mux.h"
 #include <errno.h>
 
-#define PP_MUX_WAKE_ID 1
-
 #if PARTOUT_APPLE
 #include <sys/types.h>
 #include <sys/event.h>
 #include <sys/time.h>
 #include <unistd.h>
+
+#define PP_MUX_WAKE_ID 1
 
 struct __pp_mux {
     int handle;
