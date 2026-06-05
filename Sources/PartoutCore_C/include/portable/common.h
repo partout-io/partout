@@ -13,10 +13,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if PARTOUT_ANDROID
-#include <android/multinetwork.h>
-#endif
-
 #pragma clang assume_nonnull begin
 
 /* Logging counterpart of Swift pp_log. */
@@ -43,6 +39,8 @@ void pp_clog_v(pp_log_category category,
 void pp_log_simple_append(const char *_Nullable tag,
                           pp_log_level level,
                           const char *message);
+
+typedef void (*pp_completion)(void *_Nullable ctx, const int error_code);
 
 /* Use inline rather than #define to make available to Swift. */
 
@@ -106,9 +104,16 @@ FILE *_Nullable pp_fopen(const char *filename, const char *mode) {
 #define pp_sscanf sscanf
 #endif
 
+#pragma clang assume_nonnull end
+
+/* Android only. */
+
 #if PARTOUT_ANDROID
+#include <android/multinetwork.h>
 #include <jni.h>
-#include <stdbool.h>
+
+#pragma clang assume_nonnull begin
+
 extern _Nullable JavaVM *_Nullable jvm;
 _Nullable JNIEnv *_Nullable pp_jni_attach_thread(bool *did_attach);
 void *_Nullable pp_jni_new_global_ref(void *_Nullable ref);
@@ -136,8 +141,7 @@ void pp_jni_delete_global_ref(void *_Nullable ref);
     do { \
         if (env_name##_did_attach) (*jvm)->DetachCurrentThread(jvm); \
     } while (0)
-#endif
-
-typedef void (*pp_completion)(void *_Nullable ctx, const int error_code);
 
 #pragma clang assume_nonnull end
+
+#endif
