@@ -64,7 +64,7 @@ GUID guid_from_wstring(const wchar_t *wstr) {
 }
 
 static
-pp_tun pp_tun_create(const char *uuid) {
+pp_tun pp_tun_request(const char *uuid) {
     if (!uuid) return NULL;
     WINTUN_ADAPTER_HANDLE adapter = NULL;
     WINTUN_SESSION_HANDLE session = NULL;
@@ -132,11 +132,13 @@ failure:
     return NULL;
 }
 
-void pp_tun_free(pp_tun tun) {
+void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     if (!tun) return;
-    pp_tun_shutdown(tun);
-    if (tun->adapter) {
-        WintunCloseAdapter(tun->adapter);
+    if (and_close) {
+        pp_tun_shutdown(tun);
+        if (tun->adapter) {
+            WintunCloseAdapter(tun->adapter);
+        }
     }
     pp_free(tun->name);
     pp_free(tun);
