@@ -6,11 +6,7 @@
 internal import _PartoutCore_C
 
 public struct FdLooperDelegate: Sendable {
-    public enum Side: Sendable {
-        case link
-        case tun
-    }
-    public typealias OnRead = @Sendable (_ packets: [Data], _ side: Side) -> Void
+    public typealias OnRead = @Sendable (_ packets: [Data], _ side: FdLooper.Side) -> Void
     public typealias OnFinish = @Sendable (_ error: Error?) -> Void
 
     public let onRead: OnRead
@@ -27,6 +23,11 @@ public struct FdLooperDelegate: Sendable {
 
 /// Loops through a set of file descriptors.
 public final class FdLooper: @unchecked Sendable {
+    public enum Side: Sendable {
+        case link
+        case tun
+    }
+
     private enum State: Sendable {
         case idle
         case started
