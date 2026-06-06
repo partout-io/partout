@@ -440,10 +440,14 @@ private extension FdLooper {
 
     func finish(throwing error: Error? = nil) {
         lock.lock()
-        defer { lock.unlock() }
-        guard terminalError == nil else { return }
+        guard terminalError == nil else {
+            lock.unlock()
+            return
+        }
         terminalError = error
         state = .stopped
+        lock.unlock()
+
         delegate.onFinish(error)
     }
 }
