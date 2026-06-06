@@ -332,7 +332,7 @@ private extension FdLooper {
         // Write link
         if fdSet.writable.contains(link.fd) {
             var watchWrites = false
-            while let pending = lock.with(block: { link.dequeueWrite() }) {
+            while let pending = link.dequeueWrite(lock: lock) {
                 do {
                     let didComplete = try link.performWrite(pending, lock: lock)
                     watchWrites = !didComplete
@@ -353,7 +353,7 @@ private extension FdLooper {
         // Write tun
         if let tun, fdSet.writable.contains(tun.fd) {
             var watchWrites = false
-            while let pending = lock.with(block: { tun.dequeueWrite() }) {
+            while let pending = tun.dequeueWrite(lock: lock) {
                 do {
                     let didComplete = try tun.performWrite(pending, lock: lock)
                     watchWrites = !didComplete
@@ -529,8 +529,10 @@ private extension FdLooper {
             return didComplete
         }
 
-        func dequeueWrite() -> PendingWrite? {
-            writeQueue.first
+        func dequeueWrite(lock: SemaphoreMutex) -> PendingWrite? {
+            lock.with {
+                writeQueue.first
+            }
         }
 
         func enqueueWrite(_ pendingWrite: PendingWrite) {
