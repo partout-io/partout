@@ -226,7 +226,7 @@ public final class FdLooper: @unchecked Sendable {
         switch side {
         case .link:
             packets.forEach {
-                link.enqueueWrite(PendingWrite($0))
+                link.unsafeEnqueueWrite(PendingWrite($0))
             }
             commands.append(.enableWrite(.link))
         case .tun:
@@ -235,7 +235,7 @@ public final class FdLooper: @unchecked Sendable {
                 return
             }
             packets.forEach {
-                tun.enqueueWrite(PendingWrite($0))
+                tun.unsafeEnqueueWrite(PendingWrite($0))
             }
             commands.append(.enableWrite(.tun))
         }
@@ -535,7 +535,7 @@ private extension FdLooper {
             }
         }
 
-        func enqueueWrite(_ pendingWrite: PendingWrite) {
+        func unsafeEnqueueWrite(_ pendingWrite: PendingWrite) {
             writeQueue.append(pendingWrite)
         }
     }
