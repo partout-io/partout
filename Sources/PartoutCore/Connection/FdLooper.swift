@@ -43,6 +43,7 @@ public final class FdLooper: @unchecked Sendable {
 
     fileprivate enum Command {
         case attachTun(tunInterface: IOInterface, CheckedContinuation<Void, Error>)
+        case setRead(Side, isEnabled: Bool)
         case stop
     }
 
@@ -251,17 +252,8 @@ public final class FdLooper: @unchecked Sendable {
 
     public func resumeReading(from side: Side) {
         lock.lock()
-        defer { lock.unlock() }
-        switch side {
-        case .link:
-            pp_mux_set_read(mux, linkFd, true)
-        case .tun:
-            guard let tunFd else {
-                pp_log(ctx, .core, .error, "Ignoring tun resume, not attached")
-                return
-            }
-            pp_mux_set_read(mux, tunFd, true)
-        }
+        commands.append(.setRead(side, isEnabled: true))
+        lock.unlock()
     }
 
     public func write(_ packets: [Data], to side: Side) {
@@ -325,6 +317,17 @@ private extension FdLooper {
                 tunFd = fd
                 tun = pp_tun_create(fd)
                 results.append(.attachTun(continuation, .success(())))
+            case .setRead(let side, let isEnabled):
+                switch side {
+                case .link:
+                    pp_mux_set_read(mux, linkFd, isEnabled)
+                case .tun:
+                    guard let tunFd else {
+                        pp_log(ctx, .core, .error, "Ignoring tun setRead(), not attached")
+                        return true
+                    }
+                    pp_mux_set_read(mux, tunFd, isEnabled)
+                }
             case .stop:
                 pp_log(ctx, .core, .info, "Stop looper")
                 shouldStop = true
