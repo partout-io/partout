@@ -268,7 +268,7 @@ public final class FdLooper: @unchecked Sendable {
             }
             commands.append(.enableWrite(.link))
         case .tun:
-            guard let tunFd else {
+            guard tunFd != nil else {
                 pp_log(ctx, .core, .error, "Ignoring tun packets, not attached")
                 return
             }
