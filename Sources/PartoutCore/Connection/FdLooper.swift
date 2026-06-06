@@ -165,9 +165,10 @@ public final class FdLooper: @unchecked Sendable {
         // Event loop
         state = .started
         loopQueue.async { [weak self] in
+            var lastError: Error?
             defer {
                 pp_log(self?.ctx ?? .global, .core, .info, "Finish looper")
-                self?.finish()
+                self?.finish(throwing: lastError)
             }
 
             // Hold mux weakly
@@ -213,7 +214,7 @@ public final class FdLooper: @unchecked Sendable {
                     try process(mux: mux, fdSet: fdSet)
                 } catch {
                     pp_log(ctx, .core, .error, "Unable to process: \(error)")
-                    finish(throwing: error)
+                    lastError = error
                     break
                 }
             }
