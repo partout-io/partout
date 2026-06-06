@@ -74,6 +74,7 @@ public final class FdLooper: @unchecked Sendable {
     private let lock: SemaphoreMutex
     private var commands: [Command]
     private var state: State
+    private var stopContinuation: CheckedContinuation<Void, Error>?
     private var terminalError: Error?
     private var linkBuf: [UInt8]
     private var tunBuf: [UInt8]
@@ -220,13 +221,16 @@ public final class FdLooper: @unchecked Sendable {
         }
     }
 
-    public func stop() {
+    public func stop() async throws {
         lock.lock()
         defer { lock.unlock() }
         guard state == .started else { return }
         state = .stopping
-        commands.append(.stop)
-        pp_mux_wake(mux)
+        try await withCheckedThrowingContinuation { continuation in
+            stopContinuation = continuation
+            commands.append(.stop)
+            pp_mux_wake(mux)
+        }
     }
 
     public func attachTun(_ tunInterface: IOInterface) async throws {
@@ -455,6 +459,12 @@ private extension FdLooper {
         terminalError = error
         lock.unlock()
 
+        if let error {
+            stopContinuation?.resume(throwing: error)
+        } else {
+            stopContinuation?.resume()
+        }
+        stopContinuation = nil
         delegate.onFinish(error)
     }
 }
