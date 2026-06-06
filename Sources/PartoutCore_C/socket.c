@@ -29,6 +29,7 @@ typedef socklen_t os_socklen_t;
 #endif
 
 const int PP_SOCKET_WOULD_BLOCK = -2;
+const int PP_SOCKET_NO_BUF      = -10;
 
 static bool local_platform_init(void);
 static os_socket_fd local_invalid_fd(void);
@@ -40,6 +41,7 @@ static void local_set_reset_error(void);
 static void local_set_error(int err);
 static bool local_is_interrupted(void);
 static bool local_is_would_block(void);
+static bool local_is_nobufs(void);
 static bool local_is_connect_pending(void);
 static int local_close_fd(os_socket_fd fd);
 static int local_shutdown_fd(os_socket_fd fd);
@@ -264,6 +266,9 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
             }
             if (local_is_would_block()) {
                 return offset > 0 ? (int)offset : PP_SOCKET_WOULD_BLOCK;
+            }
+            if (local_is_nobufs()) {
+                return offset > 0 ? (int)offset : PP_SOCKET_NO_BUF;
             }
             local_print_error("send()");
             return written_len;
@@ -514,6 +519,10 @@ bool local_is_would_block(void) {
     return WSAGetLastError() == WSAEWOULDBLOCK;
 }
 
+bool local_is_nobufs(void) {
+    return WSAGetLastError() == WSAENOBUFS;
+}
+
 bool local_is_connect_pending(void) {
     const int err = WSAGetLastError();
     return err == WSAEWOULDBLOCK || err == WSAEINPROGRESS;
@@ -598,6 +607,10 @@ bool local_is_interrupted(void) {
 
 bool local_is_would_block(void) {
     return errno == EAGAIN || errno == EWOULDBLOCK;
+}
+
+bool local_is_nobufs(void) {
+    return errno == ENOBUFS;
 }
 
 bool local_is_connect_pending(void) {
