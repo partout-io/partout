@@ -23,6 +23,21 @@ public protocol LinkInterface: IOInterface {
     nonisolated func shutdown()
 }
 
+/// Metadata associated with a ``LinkInterface``.
+public struct LinkMetadata: Sendable {
+    public let isReliable: Bool
+    public let remoteAddress: String
+    public let remoteProtocol: EndpointProtocol
+    public let fileDescriptor: UInt64?
+
+    public init(isReliable: Bool, remoteAddress: String, remoteProtocol: EndpointProtocol, fileDescriptor: UInt64?) {
+        self.isReliable = isReliable
+        self.remoteAddress = remoteAddress
+        self.remoteProtocol = remoteProtocol
+        self.fileDescriptor = fileDescriptor
+    }
+}
+
 extension LinkInterface {
     /// The link type (UDP/TCP).
     public var linkType: IPSocketType {
@@ -32,6 +47,15 @@ extension LinkInterface {
     /// When `true`, packets delivery is guaranteed.
     public var isReliable: Bool {
         linkType.plainType == .tcp
+    }
+
+    public var metadata: LinkMetadata {
+        LinkMetadata(
+            isReliable: isReliable,
+            remoteAddress: remoteAddress,
+            remoteProtocol: remoteProtocol,
+            fileDescriptor: fileDescriptor
+        )
     }
 }
 

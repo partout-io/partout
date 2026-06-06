@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@OpenVPNActor
 final class NegotiatorV3 {
     struct Options {
         let configuration: OpenVPN.Configuration
@@ -13,9 +12,9 @@ final class NegotiatorV3 {
 
         let sessionOptions: OpenVPNConnectionOptions
 
-        let onConnected: (UInt8, DataChannel, PushReply) async -> Void
+        let onConnected: (UInt8, DataChannel, PushReply) -> Void
 
-        let onError: (UInt8, Error) async -> Void
+        let onError: (UInt8, Error) -> Void
     }
 
     private let ctx: PartoutLoggerContext
@@ -28,9 +27,11 @@ final class NegotiatorV3 {
 
     private let renegotiation: RenegotiationType?
 
-    let link: LinkInterface
+    let looper: FdLooper
 
-    private let channel: ControlChannel
+    private let linkMetadata: LinkMetadata
+
+    private let channel: ControlChannelV3
 
     private let prng: PRNGProtocol
 
@@ -70,8 +71,9 @@ final class NegotiatorV3 {
 
     convenience init(
         _ ctx: PartoutLoggerContext,
-        link: LinkInterface,
-        channel: ControlChannel,
+        looper: FdLooper,
+        linkMetadata: LinkMetadata,
+        channel: ControlChannelV3,
         prng: PRNGProtocol,
         tls: TLSProtocol,
         dpFactory: @escaping DataPathFactory,
@@ -82,7 +84,8 @@ final class NegotiatorV3 {
             key: 0,
             history: nil,
             renegotiation: nil,
-            link: link,
+            looper: looper,
+            linkMetadata: linkMetadata,
             channel: channel,
             prng: prng,
             tls: tls,
@@ -96,8 +99,9 @@ final class NegotiatorV3 {
         key: UInt8,
         history: NegotiationHistory?,
         renegotiation: RenegotiationType?,
-        link: LinkInterface,
-        channel: ControlChannel, // TODO: #29, abstract this for testing
+        looper: FdLooper,
+        linkMetadata: LinkMetadata,
+        channel: ControlChannelV3, // TODO: #29, abstract this for testing
         prng: PRNGProtocol,
         tls: TLSProtocol,
         dpFactory: @escaping DataPathFactory,
@@ -107,7 +111,8 @@ final class NegotiatorV3 {
         self.key = key
         self.history = history
         self.renegotiation = renegotiation
-        self.link = link
+        self.looper = looper
+        self.linkMetadata = linkMetadata
         self.channel = channel
         self.prng = prng
         self.tls = tls
@@ -137,7 +142,8 @@ final class NegotiatorV3 {
             key: newKey,
             history: history,
             renegotiation: newRenegotiation,
-            link: link,
+            looper: looper,
+            linkMetadata: linkMetadata,
             channel: channel,
             prng: prng,
             tls: tls,
@@ -218,10 +224,8 @@ extension NegotiatorV3 {
         //
     }
 
-    func sendAck(for controlPacket: CrossPacket, to link: LinkInterface) {
-        Task {
-            try await privateSendAck(for: controlPacket, to: link)
-        }
+    func sendAck(for controlPacket: CrossPacket, to looper: FdLooper) throws {
+        try privateSendAck(for: controlPacket, to: looper)
     }
 
     func shouldRenegotiate() -> Bool {
@@ -268,7 +272,7 @@ private extension NegotiatorV3 {
         if !isRenegotiating {
             try pushRequest()
         }
-        if !link.isReliable {
+        if !linkMetadata.isReliable {
             try flushControlQueue()
         }
 
@@ -283,7 +287,7 @@ private extension NegotiatorV3 {
                 do {
                     try checkNegotiationComplete()
                 } catch {
-                    await options.onError(key, error)
+                    options.onError(key, error)
                 }
             }
             return
@@ -362,14 +366,7 @@ private extension NegotiatorV3 {
         for raw in rawList {
             pp_log(ctx, .openvpn, .info, "Send control packet \(raw.asSensitiveBytes(ctx))")
         }
-        Task {
-            do {
-                try await link.writePackets(rawList)
-            } catch {
-                pp_log(ctx, .openvpn, .error, "Failed LINK write during control flush: \(error)")
-                await options.onError(key, PartoutError(.ioFailure, error))
-            }
-        }
+        looper.write(rawList, to: .link)
     }
 
     func requestsWrappedKeyResend(from payload: Data?) -> Bool {
@@ -493,7 +490,7 @@ private extension NegotiatorV3 {
         }
     }
 
-    func privateSendAck(for controlPacket: CrossPacket, to link: LinkInterface) async throws {
+    func privateSendAck(for controlPacket: CrossPacket, to looper: FdLooper) throws {
         do {
             pp_log(ctx, .openvpn, .info, "Send ack for received packetId \(controlPacket.packetId)")
             let raw = try channel.writeAcks(
@@ -501,11 +498,11 @@ private extension NegotiatorV3 {
                 ackPacketIds: [controlPacket.packetId],
                 ackRemoteSessionId: controlPacket.sessionId
             )
-            try await link.writePackets([raw])
+            looper.write([raw], to: .link)
             pp_log(ctx, .openvpn, .info, "Ack successfully written to LINK for packetId \(controlPacket.packetId)")
         } catch {
             pp_log(ctx, .openvpn, .error, "Failed LINK write during send ack for packetId \(controlPacket.packetId): \(error)")
-            await options.onError(key, PartoutError(.ioFailure, error))
+            options.onError(key, PartoutError(.ioFailure, error))
         }
     }
 
@@ -567,9 +564,7 @@ private extension NegotiatorV3 {
             do {
                 try handleControlMessage(message)
             } catch {
-                Task {
-                    await options.onError(key, error)
-                }
+                options.onError(key, error)
                 throw error
             }
         }
@@ -655,9 +650,7 @@ private extension NegotiatorV3 {
         nonisolated(unsafe) let dataChannel = try newDataChannel(with: history)
         self.history = history
         authenticator?.reset()
-        Task {
-            await options.onConnected(key, dataChannel, pushReply)
-        }
+        options.onConnected(key, dataChannel, pushReply)
     }
 
     func newDataChannel(with history: NegotiationHistory) throws -> DataChannel {

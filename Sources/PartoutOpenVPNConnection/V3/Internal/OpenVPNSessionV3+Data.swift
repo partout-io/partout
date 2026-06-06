@@ -5,9 +5,9 @@
 extension OpenVPNSessionV3 {
     func handleDataPackets(
         _ packets: [Data],
-        to tunnel: IOInterface,
+        to looper: FdLooper,
         dataChannel: DataChannel
-    ) async throws {
+    ) throws {
         do {
             guard let decryptedPackets = try dataChannel.decrypt(packets: packets) else {
                 pp_log(ctx, .openvpn, .error, "Unable to decrypt packets, is SessionKey properly configured (dataPath, peerId)?")
@@ -17,7 +17,7 @@ extension OpenVPNSessionV3 {
                 return
             }
             reportInboundDataCount(decryptedPackets.flatCount)
-            try await tunnel.writePackets(decryptedPackets)
+            looper.write(decryptedPackets, to: .tun)
         } catch let cError as CCryptoError {
             throw cError
         } catch let cError as CDataPathError {
@@ -29,9 +29,9 @@ extension OpenVPNSessionV3 {
 
     func sendDataPackets(
         _ packets: [Data],
-        to link: LinkInterface,
+        to looper: FdLooper,
         dataChannel: DataChannel
-    ) async throws {
+    ) throws {
         do {
             guard let encryptedPackets = try dataChannel.encrypt(packets: packets) else {
                 pp_log(ctx, .openvpn, .error, "Unable to encrypt packets, is SessionKey properly configured (dataPath, peerId)?")
@@ -41,14 +41,16 @@ extension OpenVPNSessionV3 {
                 return
             }
             reportOutboundDataCount(encryptedPackets.flatCount)
-            try await link.writePackets(encryptedPackets)
+            looper.write(encryptedPackets, to: .link)
         } catch let cError as CCryptoError {
             throw cError
         } catch let cError as CDataPathError {
             throw cError
         } catch {
             pp_log(ctx, .openvpn, .error, "Data: Failed LINK write during send data: \(error)")
-            await shutdown(PartoutError(.ioFailure, error))
+            Task {
+                await shutdown(PartoutError(.ioFailure, error))
+            }
         }
     }
 }

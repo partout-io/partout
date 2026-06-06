@@ -4,93 +4,9 @@
 
 internal import _PartoutOpenVPNConnection_C
 
-// TODO: #142/notes, LINK and TUN should be able to run detached in full-duplex
 extension OpenVPNSessionV3 {
-    func loopTunnelV2() {
-        Task { [weak self] in
-            while true {
-                guard let ctx = self?.ctx else {
-                    pp_log(.global, .openvpn, .debug, "Ignore TUN read from outdated OpenVPNSession")
-                    return
-                }
-                guard let tunnel = self?.tunnel else {
-                    pp_log(ctx, .openvpn, .debug, "Ignore read from outdated TUN")
-                    return
-                }
-                guard let self else {
-                    pp_log(.global, .openvpn, .debug, "Ignore TUN packets from outdated OpenVPNSession")
-                    return
-                }
-                do {
-                    let packets = try await tunnel.readPackets()
-                    guard !packets.isEmpty else {
-//                        pp_log(ctx, .openvpn, .debug, "Skip TUN loop after empty packets")
-                        continue
-                    }
-                    try await receiveTunnel(packets: packets)
-                } catch {
-                    pp_log(ctx, .openvpn, .error, "Failed TUN read: \(error)")
-                    await shutdown(error)
-                    return
-                }
-            }
-        }
-    }
-
-    func loopLinkV2() {
-        Task { [weak self] in
-            while true {
-                guard let ctx = self?.ctx else {
-                    pp_log(.global, .openvpn, .debug, "Ignore LINK read from outdated OpenVPNSession")
-                    return
-                }
-                guard let link = self?.link else {
-                    pp_log(ctx, .openvpn, .debug, "Ignore read from outdated LINK")
-                    return
-                }
-                guard let self else {
-                    pp_log(.global, .openvpn, .debug, "Ignore LINK packets from outdated OpenVPNSession")
-                    return
-                }
-                do {
-                    let packets = try await link.readPackets()
-                    guard !packets.isEmpty else {
-//                        pp_log(ctx, .openvpn, .debug, "Skip LINK loop after empty packets")
-                        continue
-                    }
-                    try await receiveLink(packets: packets)
-                } catch {
-                    pp_log(ctx, .openvpn, .error, "Failed LINK read: \(error)")
-                    await self.shutdown(PartoutError(.ioFailure, error))
-                    return
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Private
-
-private extension OpenVPNSessionV3 {
-    @inline(always)
-    func processDataPackets(_ dataPacketsByKey: [UInt8: [Data]]) async throws {
-        guard !dataPacketsByKey.isEmpty else { return }
-        guard let tunnel else { return }
-        for (key, dataPackets) in dataPacketsByKey {
-            guard let dataChannel = dataChannel(for: key) else {
-                pp_log(ctx, .openvpn, .error, "Accounted a data packet for which the cryptographic key hadn't been found")
-                continue
-            }
-            try await handleDataPackets(
-                dataPackets,
-                to: tunnel,
-                dataChannel: dataChannel
-            )
-        }
-    }
-
-    func receiveLink(packets: [Data]) async throws {
-        guard !isStopped, let link else {
+    func receiveLink(_ packets: [Data]) throws {
+        guard !isStopped, let looper else {
             return
         }
 
@@ -102,7 +18,7 @@ private extension OpenVPNSessionV3 {
             throw OpenVPNSessionError.assertion
         }
         if negotiator.shouldRenegotiate() {
-            negotiator = try startRenegotiation(after: negotiator, on: link, isServerInitiated: false)
+            negotiator = try startRenegotiation(after: negotiator, on: looper, isServerInitiated: false)
         }
 
         for packet in packets {
@@ -140,7 +56,7 @@ private extension OpenVPNSessionV3 {
                 continue
             }
 
-            try await processDataPackets(dataPacketsByKey)
+            try processDataPackets(dataPacketsByKey)
             dataPacketsByKey.removeAll(keepingCapacity: true)
 
             let controlPacket: CrossPacket
@@ -163,13 +79,13 @@ private extension OpenVPNSessionV3 {
                 }
             case .softResetV1:
                 if !negotiator.isRenegotiating {
-                    negotiator = try startRenegotiation(after: negotiator, on: link, isServerInitiated: true)
+                    negotiator = try startRenegotiation(after: negotiator, on: looper, isServerInitiated: true)
                 }
             default:
                 break
             }
 
-            negotiator.sendAck(for: controlPacket, to: link)
+            try negotiator.sendAck(for: controlPacket, to: looper)
 
             let pendingInboundQueue = negotiator.enqueueInboundPacket(packet: controlPacket)
             pp_log(ctx, .openvpn, .debug, "Pending inbound queue: \(pendingInboundQueue.map(\.packetId))")
@@ -179,10 +95,10 @@ private extension OpenVPNSessionV3 {
             }
         }
 
-        try await processDataPackets(dataPacketsByKey)
+        try processDataPackets(dataPacketsByKey)
     }
 
-    func receiveTunnel(packets: [Data]) async throws {
+    func receiveTunnel(_ packets: [Data]) throws {
         guard !isStopped else {
             return
         }
@@ -196,10 +112,29 @@ private extension OpenVPNSessionV3 {
 
         try checkPingTimeout()
 
-        try await sendDataPackets(
+        try sendDataPackets(
             packets,
-            to: negotiator.link,
+            to: negotiator.looper,
             dataChannel: currentDataChannel
         )
+    }
+}
+
+private extension OpenVPNSessionV3 {
+    @inline(always)
+    func processDataPackets(_ dataPacketsByKey: [UInt8: [Data]]) throws {
+        guard !dataPacketsByKey.isEmpty else { return }
+        guard let looper else { return }
+        for (key, dataPackets) in dataPacketsByKey {
+            guard let dataChannel = dataChannel(for: key) else {
+                pp_log(ctx, .openvpn, .error, "Accounted a data packet for which the cryptographic key hadn't been found")
+                continue
+            }
+            try handleDataPackets(
+                dataPackets,
+                to: looper,
+                dataChannel: dataChannel
+            )
+        }
     }
 }

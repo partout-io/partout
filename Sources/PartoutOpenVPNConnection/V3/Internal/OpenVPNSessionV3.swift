@@ -2,82 +2,26 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-/// Default implementation of `OpenVPNSessionProtocolV3`.
-@OpenVPNActor
-final class OpenVPNSessionV3 {
-    enum SessionState {
-        case stopped
-
-        case starting
-
-        case started
-
-        case stopping
-    }
-
-    // MARK: Init
-
+/// Default implementation of `OpenVPNSessionProtocol`.
+final class OpenVPNSessionV3: @unchecked Sendable {
     let ctx: PartoutLoggerContext
-
     private let configuration: OpenVPN.Configuration
-
     private let credentials: OpenVPN.Credentials?
-
     private let prng: PRNGProtocol
-
     let cachesURL: URL
-
     let options: OpenVPNConnectionOptions
-
     private let tlsFactory: TLSFactory
-
     private let dpFactory: DataPathFactory
-
-    // MARK: Persistent state
-
-    private let controlChannel: ControlChannel
-
+    private let queue: DispatchQueue
+    private let queueKey: DispatchSpecificKey<Void>
+    // FIXME: ###, Workaround for self in init closures
+    var looper: FdLooper!
     private weak var delegate: OpenVPNSessionDelegateV3?
 
-    // MARK: State
+    // MARK: Mutable state
 
+    private let controlChannel: ControlChannelV3
     private var sessionState: SessionState
-
-    private(set) var tunnel: IOInterface?
-
-    private(set) var link: LinkInterface?
-
-    private var negotiators: [UInt8: NegotiatorV3]
-
-    private var dataChannels: [UInt8: DataChannel]
-
-    private var oldKeys: [UInt8]
-
-    private var currentNegotiatorKey: UInt8? {
-        didSet {
-            pp_log(ctx, .openvpn, .info, "Negotiator: Current key is \(currentNegotiatorKey?.description ?? "nil")")
-        }
-    }
-
-    private var currentDataChannelKey: UInt8? {
-        didSet {
-            pp_log(ctx, .openvpn, .info, "Data: Current key is \(currentDataChannelKey?.description ?? "nil")")
-        }
-    }
-
-    private var withLocalOptions: Bool
-
-    private var pushReply: PushReply?
-
-    private var pendingPingTask: Task<Void, Error>?
-
-    private var lastReceivedDate: Date?
-
-    private var lastDataCountDate: Date?
-
-    private var dataCount: BidirectionalState<Int>
-
-    // MARK: Init
 
     /**
      Creates a VPN session.
@@ -113,97 +57,242 @@ final class OpenVPNSessionV3 {
         self.tlsFactory = tlsFactory
         self.dpFactory = dpFactory
 
+        queue = DispatchQueue(label: "OpenVPNSession[\(ctx.profileId?.description ?? "*")]")
+        queueKey = DispatchSpecificKey()
+        queue.setSpecific(key: queueKey, value: ())
         controlChannel = try Self.newControlChannel(
             ctx,
             with: prng,
             configuration: configuration
         )
-        negotiators = [:]
-        dataChannels = [:]
-        oldKeys = []
+        sessionState = .stopped(IdleContext(withLocalOptions: true))
 
-        sessionState = .stopped
-        withLocalOptions = true
-        dataCount = BidirectionalState(withResetValue: 0)
+        looper = try FdLooper(ctx, queue: queue, delegate: FdLooperDelegate(
+            onRead: { [weak self] packets, side in
+                switch side {
+                case .link:
+                    try self?.receiveLink(packets)
+                case .tun:
+                    try self?.receiveTunnel(packets)
+                }
+                return .keep
+            },
+            onFinish: { [weak self] error in
+                pp_log(self?.ctx ?? .global, .openvpn, .error, "Session looper finished with error: \(error?.localizedDescription ?? "none")")
+                self?.looperDidFinish(error)
+            }
+        ))
+        looper.start()
     }
 
     deinit {
-        pp_log(ctx, .openvpn, .debug, "Deinit OpenVPNSessionV3")
+        pp_log(ctx, .openvpn, .debug, "Deinit OpenVPNSession")
+    }
+}
+
+private extension OpenVPNSessionV3 {
+    func preconditionOnQueue() {
+        precondition(
+            DispatchQueue.getSpecific(key: queueKey) != nil,
+            "OpenVPNSessionV3 state accessed outside its queue"
+        )
+    }
+
+    var activePhase: ActivePhase? {
+        preconditionOnQueue()
+        guard case .active(let phase, _) = sessionState else {
+            return nil
+        }
+        return phase
+    }
+
+    var idleContext: IdleContext? {
+        preconditionOnQueue()
+        guard case .stopped(let context) = sessionState else {
+            return nil
+        }
+        return context
+    }
+
+    var activeContext: ActiveContext? {
+        preconditionOnQueue()
+        guard case .active(_, let context) = sessionState else {
+            return nil
+        }
+        return context
+    }
+
+    @discardableResult
+    func withActiveContext<R>(
+        _ body: (inout ActivePhase, inout ActiveContext) throws -> R
+    ) rethrows -> R? {
+        preconditionOnQueue()
+        guard case .active(var phase, var context) = sessionState else {
+            return nil
+        }
+        let result = try body(&phase, &context)
+        sessionState = .active(phase, context)
+        return result
+    }
+
+    @discardableResult
+    func withActiveContext<R>(
+        _ body: (inout ActiveContext) throws -> R
+    ) rethrows -> R? {
+        try withActiveContext { _, context in
+            try body(&context)
+        }
     }
 }
 
 // MARK: - Public API
 
 extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
-    func setDelegate(_ delegate: OpenVPNSessionDelegateV3) async {
-        self.delegate = delegate
+    func setDelegate(_ delegate: OpenVPNSessionDelegateV3) {
+        looper.schedule { [weak self] in
+            self?.delegate = delegate
+        }
     }
 
-    func setTunnel(_ tunnel: IOInterface) {
-        guard self.tunnel == nil else {
+    func setLink(_ link: LinkInterface) async throws {
+        guard !looper.isLinkAttached else {
+            pp_log(ctx, .openvpn, .error, "Link interface already set")
+            return
+        }
+        try await looper.attachLink(link)
+        try looper.schedule { [weak self] in
+            try self?.setLinkOnQueue(link)
+        }
+    }
+
+    func setTunnel(_ tunnel: IOInterface) async throws {
+        guard looper.isLinkAttached else {
+            pp_log(ctx, .openvpn, .error, "Set link interface first")
+            return
+        }
+        guard !looper.isTunAttached else {
             pp_log(ctx, .openvpn, .error, "Tunnel interface already set")
             return
         }
         pp_log(ctx, .openvpn, .info, "Start TUN loop")
-        self.tunnel = tunnel
-        loopTunnelV2()
+        try await looper.attachTun(tunnel)
     }
 
-    func setLink(_ link: LinkInterface) async throws {
-        guard self.link == nil else {
-            pp_log(ctx, .openvpn, .error, "Link interface already set")
-            return
-        }
-        pp_log(ctx, .openvpn, .info, "Start VPN session")
-        self.link = link
-        sessionState = .starting
-        try startNegotiation(on: link)
-    }
-
-    func hasLink() async -> Bool {
-        link != nil
+    func hasLink() -> Bool {
+        looper.isLinkAttached
     }
 
     func shutdown(_ error: Error?, timeout: TimeInterval?) async {
-        guard sessionState != .stopping, sessionState != .stopped else {
-            pp_log(ctx, .openvpn, .debug, "Ignore stop request, stopped or already stopping")
-            return
+        do {
+            let shouldDetach = try await looper.perform { [weak self] in
+                self?.prepareShutdownOnQueue(error, timeout: timeout) ?? false
+            }
+            guard shouldDetach else {
+                return
+            }
+            await looper.detachTun()
+            await looper.detachLink()
+            try await looper.perform { [weak self] in
+                self?.finishShutdownOnQueue(error)
+            }
+        } catch {
+            pp_log(ctx, .openvpn, .error, "Unable to shut down session on looper queue: \(error)")
         }
+    }
+}
 
+private extension OpenVPNSessionV3 {
+    func setLinkOnQueue(_ link: LinkInterface) throws {
+        preconditionOnQueue()
+        guard let idleContext else {
+            pp_log(ctx, .openvpn, .error, "Session is not stopped")
+            throw PartoutError(.operationCancelled)
+        }
+        pp_log(ctx, .openvpn, .info, "Start VPN session")
+        sessionState = .active(.starting, ActiveContext(
+            ctx: ctx,
+            withLocalOptions: idleContext.withLocalOptions,
+            linkMetadata: link.metadata
+        ))
+        do {
+            try startNegotiation(on: looper, linkMetadata: link.metadata)
+        } catch {
+            withActiveContext { context in
+                context.reset()
+            }
+            sessionState = .stopped(idleContext)
+            throw error
+        }
+    }
+
+    func prepareShutdownOnQueue(_ error: Error?, timeout: TimeInterval?) -> Bool {
+        preconditionOnQueue()
+        guard activePhase != .stopping, activePhase != nil else {
+            pp_log(ctx, .openvpn, .debug, "Ignore stop request, stopped or already stopping")
+            return false
+        }
+        // Report .stopping phase
         if let error {
             pp_log(ctx, .openvpn, .error, "Shut down with failure: \(error)")
         } else {
             pp_log(ctx, .openvpn, .info, "Shut down on request")
         }
-        sessionState = .stopping
+        withActiveContext { phase, _ in
+            phase = .stopping
+        }
 
-        // shut down after sending exit notification if link is unreliable (normally UDP)
-        if error == nil || (error as? PartoutError)?.code == .networkChanged {
+        // Shut down after sending exit notification if link is unreliable (normally UDP)
+        if error == nil || error?.partoutErrorCode == .networkChanged {
             do {
-                try await sendExitPacket(timeout: timeout)
+                try sendExitPacketOnQueue()
             } catch {
                 pp_log(ctx, .openvpn, .error, "Unable to send exit packet: \(error)")
             }
         }
+        return true
+    }
 
-        await cleanup()
-        sessionState = .stopped
-
-        // retry authentication without local otpions
-        if case .badCredentialsWithLocalOptions = error as? OpenVPNSessionError {
-            withLocalOptions = false
+    func finishShutdownOnQueue(_ error: Error?) {
+        preconditionOnQueue()
+        guard activePhase != nil else {
+            return
+        }
+        withActiveContext { context in
+            context.reset()
         }
 
-        await delegate?.sessionDidStop(
+        // Migrate context to go back to .stopped state
+        let nextWithLocalOptions: Bool
+        switch sessionState {
+        case .stopped(let context):
+            nextWithLocalOptions = context.withLocalOptions
+        case .active(_, let context):
+            if case .badCredentialsWithLocalOptions = error as? OpenVPNSessionError {
+                nextWithLocalOptions = false
+            } else {
+                nextWithLocalOptions = context.withLocalOptions
+            }
+        }
+        sessionState = .stopped(IdleContext(withLocalOptions: nextWithLocalOptions))
+
+        delegate?.sessionDidStop(
             self,
             withError: error.map(OpenVPNSessionError.init) ?? error
         )
     }
+
+    func looperDidFinish(_ error: Error?) {
+        preconditionOnQueue()
+        finishShutdownOnQueue(error)
+    }
 }
 
 private extension OpenVPNSessionV3 {
-    func sendExitPacket(timeout: TimeInterval?) async throws {
-        guard let link, !link.isReliable, let currentDataChannel else {
+    func sendExitPacketOnQueue() throws {
+        preconditionOnQueue()
+        guard let activeContext,
+              !activeContext.linkMetadata.isReliable,
+              let currentDataChannel = activeContext.currentDataChannel else {
             return
         }
         guard let packets = try currentDataChannel.encrypt(packets: [OCCPacket.exit.serialized()]) else {
@@ -213,48 +302,8 @@ private extension OpenVPNSessionV3 {
         }
 
         pp_log(ctx, .openvpn, .info, "Send OCCPacket exit")
-
-        let timeoutMillis = Int((timeout ?? options.writeTimeout) * 1000.0)
-        let timeoutTask = Task {
-            try await Task.sleep(milliseconds: timeoutMillis)
-        }
-        let writeTask = Task {
-            try await link.writePackets(packets)
-            timeoutTask.cancel()
-            do {
-                try Task.checkCancellation()
-            } catch {
-                pp_log(ctx, .openvpn, .error, "Cancelled OCCPacket: \(error)")
-            }
-        }
-        do {
-            try await timeoutTask.value
-        } catch {
-            pp_log(ctx, .openvpn, .info, "Cancelled OCCPacket write timeout (completed earlier): \(error)")
-        }
-        writeTask.cancel()
-
+        looper.write(packets, to: .link)
         pp_log(ctx, .openvpn, .info, "Sent OCCPacket correctly")
-    }
-
-    func cleanup() async {
-        link?.shutdown()
-        for neg in negotiators.values {
-            neg.cancel()
-        }
-        negotiators.removeAll()
-        dataChannels.removeAll()
-        oldKeys.removeAll()
-        pendingPingTask?.cancel()
-        dataCount.reset()
-
-        link = nil
-        tunnel = nil
-        currentNegotiatorKey = nil
-        currentDataChannelKey = nil
-        pushReply = nil
-        pendingPingTask = nil
-        lastDataCountDate = nil
     }
 }
 
@@ -262,28 +311,25 @@ private extension OpenVPNSessionV3 {
 
 extension OpenVPNSessionV3 {
     var isStopped: Bool {
-        sessionState == .stopped
+        activePhase == nil
     }
 
     var currentNegotiator: NegotiatorV3? {
-        guard let key = currentNegotiatorKey else {
-            return nil
-        }
-        return negotiators[key]
+        activeContext?.currentNegotiator
     }
 
     var currentDataChannel: DataChannel? {
-        guard let key = currentDataChannelKey else {
-            return nil
-        }
-        return dataChannels[key]
+        activeContext?.currentDataChannel
     }
 
-    func newNegotiator(on link: LinkInterface) throws -> NegotiatorV3 {
+    func newNegotiator(on looper: FdLooper, linkMetadata: LinkMetadata) throws -> NegotiatorV3 {
+        guard let activeContext else {
+            throw OpenVPNSessionError.assertion
+        }
         let negOptions = NegotiatorV3.Options(
             configuration: configuration,
             credentials: credentials,
-            withLocalOptions: withLocalOptions,
+            withLocalOptions: activeContext.withLocalOptions,
             sessionOptions: options,
             onConnected: { [weak self] key, dataChannel, pushReply in
                 self?.didNegotiate(
@@ -293,7 +339,9 @@ extension OpenVPNSessionV3 {
                 )
             },
             onError: { [weak self] _, error in
-                await self?.shutdown(error)
+                Task {
+                    await self?.shutdown(error)
+                }
             }
         )
         let tlsParameters = TLSWrapper.Parameters(
@@ -308,7 +356,8 @@ extension OpenVPNSessionV3 {
         let tls = try tlsFactory(tlsParameters)
         return NegotiatorV3(
             ctx,
-            link: link,
+            looper: looper,
+            linkMetadata: linkMetadata,
             channel: controlChannel,
             prng: prng,
             tls: tls,
@@ -318,10 +367,12 @@ extension OpenVPNSessionV3 {
     }
 
     func addNegotiator(_ negotiator: NegotiatorV3) {
-        pp_log(ctx, .openvpn, .info, "Replace negotiator with key \(negotiator.key)")
-        negotiators[negotiator.key] = negotiator
-        pp_log(ctx, .openvpn, .info, "Negotiators: \(negotiators.keys)")
-        currentNegotiatorKey = negotiator.key
+        withActiveContext { context in
+            pp_log(ctx, .openvpn, .info, "Replace negotiator with key \(negotiator.key)")
+            context.negotiators[negotiator.key] = negotiator
+            pp_log(ctx, .openvpn, .info, "Negotiators: \(context.negotiators.keys)")
+            context.currentNegotiatorKey = negotiator.key
+        }
     }
 
     func didNegotiate(
@@ -329,78 +380,80 @@ extension OpenVPNSessionV3 {
         dataChannel: DataChannel,
         pushReply: PushReply
     ) {
-        pp_log(ctx, .openvpn, .info, "Negotiation succeeded, set key \(key) as current")
+        let didStart = withActiveContext { phase, context -> (LinkMetadata, OpenVPN.Configuration)? in
+            pp_log(ctx, .openvpn, .info, "Negotiation succeeded, set key \(key) as current")
 
-        self.pushReply = pushReply
+            context.pushReply = pushReply
 
-        // replace current channel with new
-        pp_log(ctx, .openvpn, .info, "Replace key \(dataChannel.key) with new data channel")
-        dataChannels[dataChannel.key] = dataChannel
-        if let currentDataChannel {
-            oldKeys.append(currentDataChannel.key)
-        }
-        currentDataChannelKey = key
+            // Replace current channel with new
+            pp_log(ctx, .openvpn, .info, "Replace key \(dataChannel.key) with new data channel")
+            context.dataChannels[dataChannel.key] = dataChannel
+            if let currentDataChannel = context.currentDataChannel {
+                context.oldKeys.append(currentDataChannel.key)
+            }
+            context.currentDataChannelKey = key
 
-        // clean up old keys
-        while oldKeys.count > 1 {
-            let keyToRemove = oldKeys.removeFirst()
-            pp_log(ctx, .openvpn, .info, "Remove key \(keyToRemove) from negotiators and data channels")
-            negotiators.removeValue(forKey: keyToRemove)
-            dataChannels.removeValue(forKey: keyToRemove)
-        }
-        pp_log(ctx, .openvpn, .info, "Negotiators: \(negotiators.keys)")
-        pp_log(ctx, .openvpn, .info, "Data channels: \(dataChannels.keys)")
+            // Clean up old keys
+            while context.oldKeys.count > 1 {
+                let keyToRemove = context.oldKeys.removeFirst()
+                pp_log(ctx, .openvpn, .info, "Remove key \(keyToRemove) from negotiators and data channels")
+                context.negotiators.removeValue(forKey: keyToRemove)
+                context.dataChannels.removeValue(forKey: keyToRemove)
+            }
+            pp_log(ctx, .openvpn, .info, "Negotiators: \(context.negotiators.keys)")
+            pp_log(ctx, .openvpn, .info, "Data channels: \(context.dataChannels.keys)")
 
-        // renegotiation stops here
-        guard sessionState != .started else {
+            // Renegotiation stops here
+            guard phase != .started else {
+                return nil
+            }
+
+            phase = .started
+            scheduleNextPing(in: &context)
+            return (context.linkMetadata, pushReply.options)
+        } ?? nil
+        guard let (linkMetadata, pushReplyOptions) = didStart else {
             return
         }
-
-        sessionState = .started
-        let pushReplyOptions = pushReply.options
-        Task { [weak self] in
-            guard let self else { return }
-            guard let remoteAddress = link?.remoteAddress,
-                  let remoteProtocol = link?.remoteProtocol else {
-                pp_log(ctx, .openvpn, .fault, "Unable to resolve link remote address/protocol")
-                await shutdown(OpenVPNSessionError.assertion)
-                return
-            }
-            await delegate?.sessionDidStart(
-                self,
-                remoteAddress: remoteAddress,
-                remoteProtocol: remoteProtocol,
-                remoteOptions: pushReplyOptions,
-                remoteFd: link?.fileDescriptor
-            )
-        }
-        scheduleNextPing()
+        delegate?.sessionDidStart(
+            self,
+            remoteAddress: linkMetadata.remoteAddress,
+            remoteProtocol: linkMetadata.remoteProtocol,
+            remoteOptions: pushReplyOptions,
+            remoteFd: linkMetadata.fileDescriptor
+        )
     }
 
     func hasDataChannel(for key: UInt8) -> Bool {
-        dataChannels[key] != nil
+        activeContext?.dataChannels[key] != nil
     }
 
     func dataChannel(for key: UInt8) -> DataChannel? {
-        dataChannels[key]
+        activeContext?.dataChannels[key]
     }
 
     func reportLastReceivedDate() {
-        lastReceivedDate = Date()
+        withActiveContext { context in
+            context.lastReceivedDate = Date()
+        }
     }
 
     func reportInboundDataCount(_ count: Int) {
-        dataCount.inbound += count
-        delegateCurrentDataCount()
+        withActiveContext { context in
+            context.dataCount.inbound += count
+            delegateCurrentDataCount(in: &context)
+        }
     }
 
     func reportOutboundDataCount(_ count: Int) {
-        dataCount.outbound += count
-        delegateCurrentDataCount()
+        withActiveContext { context in
+            context.dataCount.outbound += count
+            delegateCurrentDataCount(in: &context)
+        }
     }
 
     func checkPingTimeout() throws {
-        if let lastReceivedDate {
+        if let lastReceivedDate = activeContext?.lastReceivedDate {
             guard -lastReceivedDate.timeIntervalSinceNow <= keepAliveTimeout else {
                 throw OpenVPNSessionError.pingTimeout
             }
@@ -412,27 +465,36 @@ extension OpenVPNSessionV3 {
 
 private extension OpenVPNSessionV3 {
     func scheduleNextPing() {
-        let interval = keepAliveInterval ?? options.pingTimeoutCheckInterval
+        withActiveContext { context in
+            scheduleNextPing(in: &context)
+        }
+    }
+
+    func scheduleNextPing(in context: inout ActiveContext) {
+        let interval = keepAliveInterval(in: context) ?? options.pingTimeoutCheckInterval
         pp_log(ctx, .openvpn, .debug, "Schedule ping check after \(interval.asTimeString)")
 
-        pendingPingTask?.cancel()
-        pendingPingTask = Task { [weak self] in
+        context.pendingPingTask?.cancel()
+        context.pendingPingTask = Task { [weak self] in
             do {
                 try await Task.sleep(interval: interval)
                 guard !Task.isCancelled else { return }
-                try await self?.ping()
+                guard let self else { return }
+                try await looper.perform {
+                    try self.ping()
+                }
             } catch {
                 await self?.shutdown(error)
             }
         }
     }
 
-    func ping() async throws {
+    func ping() throws {
         guard !isStopped else {
             pp_log(ctx, .openvpn, .debug, "Ping cancelled, session stopped")
             return
         }
-        guard let link else {
+        guard looper.isLinkAttached else {
             pp_log(ctx, .openvpn, .debug, "Ping cancelled, no link")
             return
         }
@@ -444,23 +506,27 @@ private extension OpenVPNSessionV3 {
         pp_log(ctx, .openvpn, .debug, "Run ping check")
         try checkPingTimeout()
 
-        // is keep-alive enabled?
+        // Is keep-alive enabled?
         if keepAliveInterval != nil {
             pp_log(ctx, .openvpn, .debug, "Send ping")
-            try await sendDataPackets(
+            try sendDataPackets(
                 [Constants.DataChannel.pingString],
-                to: link,
+                to: looper,
                 dataChannel: currentDataChannel
             )
         }
 
-        // schedule even just to check for ping timeout
+        // Schedule even just to check for ping timeout
         scheduleNextPing()
     }
 
     var keepAliveInterval: TimeInterval? {
+        keepAliveInterval(in: activeContext)
+    }
+
+    func keepAliveInterval(in context: ActiveContext?) -> TimeInterval? {
         let interval: TimeInterval?
-        if let negInterval = pushReply?.options.keepAliveInterval, negInterval > 0.0 {
+        if let negInterval = context?.pushReply?.options.keepAliveInterval, negInterval > 0.0 {
             interval = negInterval
         } else if let cfgInterval = configuration.keepAliveInterval, cfgInterval > 0.0 {
             interval = cfgInterval
@@ -471,7 +537,7 @@ private extension OpenVPNSessionV3 {
     }
 
     var keepAliveTimeout: TimeInterval {
-        if let negTimeout = pushReply?.options.keepAliveTimeout, negTimeout > 0.0 {
+        if let negTimeout = activeContext?.pushReply?.options.keepAliveTimeout, negTimeout > 0.0 {
             return negTimeout
         } else if let cfgTimeout = configuration.keepAliveTimeout, cfgTimeout > 0.0 {
             return cfgTimeout
@@ -480,18 +546,15 @@ private extension OpenVPNSessionV3 {
         }
     }
 
-    func delegateCurrentDataCount() {
-        if let lastDataCountDate {
+    func delegateCurrentDataCount(in context: inout ActiveContext) {
+        if let lastDataCountDate = context.lastDataCountDate {
             guard -lastDataCountDate.timeIntervalSinceNow >= options.minDataCountInterval else {
                 return
             }
         }
-        lastDataCountDate = Date()
-        let currentDataCount = DataCount(UInt64(dataCount.inbound), UInt64(dataCount.outbound))
-        Task { [weak self] in
-            guard let self else { return }
-            await delegate?.session(self, didUpdateDataCount: currentDataCount)
-        }
+        context.lastDataCountDate = Date()
+        let currentDataCount = DataCount(UInt64(context.dataCount.inbound), UInt64(context.dataCount.outbound))
+        delegate?.session(self, didUpdateDataCount: currentDataCount)
     }
 }
 
@@ -500,12 +563,12 @@ private extension OpenVPNSessionV3 {
         _ ctx: PartoutLoggerContext,
         with prng: PRNGProtocol,
         configuration: OpenVPN.Configuration
-    ) throws -> ControlChannel {
-        let channel: ControlChannel
+    ) throws -> ControlChannelV3 {
+        let channel: ControlChannelV3
         if let tlsWrap = configuration.tlsWrap {
             switch tlsWrap.strategy {
             case .auth:
-                channel = try ControlChannel(
+                channel = try ControlChannelV3(
                     ctx,
                     prng: prng,
                     authKey: tlsWrap.key,
@@ -513,7 +576,7 @@ private extension OpenVPNSessionV3 {
                 )
 
             case .crypt:
-                channel = try ControlChannel(
+                channel = try ControlChannelV3(
                     ctx,
                     prng: prng,
                     cryptKey: tlsWrap.key
@@ -523,7 +586,7 @@ private extension OpenVPNSessionV3 {
                 guard let wrappedKey = tlsWrap.wrappedKey else {
                     throw OpenVPNSessionError.assertion
                 }
-                channel = try ControlChannel(
+                channel = try ControlChannelV3(
                     ctx,
                     prng: prng,
                     cryptV2Key: tlsWrap.key,
@@ -531,10 +594,10 @@ private extension OpenVPNSessionV3 {
                 )
 
             @unknown default:
-                channel = ControlChannel(ctx, prng: prng)
+                channel = ControlChannelV3(ctx, prng: prng)
             }
         } else {
-            channel = ControlChannel(ctx, prng: prng)
+            channel = ControlChannelV3(ctx, prng: prng)
         }
         return channel
     }
