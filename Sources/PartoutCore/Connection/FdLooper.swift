@@ -167,12 +167,6 @@ public final class FdLooper: @unchecked Sendable {
         loopQueue.async { [weak self] in
             var lastError: Error?
             defer {
-                let logCtx = self?.ctx ?? .global
-                if let lastError {
-                    pp_log(logCtx, .core, .error, "Finish looper with error: \(lastError)")
-                } else {
-                    pp_log(logCtx, .core, .info, "Finish looper")
-                }
                 self?.finish(throwing: lastError)
             }
 
@@ -449,6 +443,12 @@ private extension FdLooper {
     }
 
     func finish(throwing error: Error? = nil) {
+        if let error {
+            pp_log(ctx, .core, .error, "Finish looper with error: \(error)")
+        } else {
+            pp_log(ctx, .core, .info, "Finish looper")
+        }
+
         lock.lock()
         precondition(state != .stopped)
         state = .stopped
