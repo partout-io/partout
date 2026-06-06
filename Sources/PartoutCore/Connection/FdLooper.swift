@@ -43,7 +43,8 @@ public final class FdLooper: @unchecked Sendable {
 
     fileprivate enum Command {
         case attachTun(tunInterface: IOInterface, CheckedContinuation<Void, Error>)
-        case setRead(Side, isEnabled: Bool)
+        case enableRead(Side)
+        case enableWrite(Side)
         case stop
     }
 
@@ -252,7 +253,8 @@ public final class FdLooper: @unchecked Sendable {
 
     public func resumeReading(from side: Side) {
         lock.lock()
-        commands.append(.setRead(side, isEnabled: true))
+        commands.append(.enableRead(side))
+        pp_mux_wake(mux)
         lock.unlock()
     }
 
@@ -264,7 +266,7 @@ public final class FdLooper: @unchecked Sendable {
             packets.forEach {
                 linkQueue.append(PendingWrite($0))
             }
-            pp_mux_set_write(mux, linkFd, true)
+            commands.append(.enableWrite(.link))
         case .tun:
             guard let tunFd else {
                 pp_log(ctx, .core, .error, "Ignoring tun packets, not attached")
@@ -273,7 +275,7 @@ public final class FdLooper: @unchecked Sendable {
             packets.forEach {
                 tunQueue.append(PendingWrite($0))
             }
-            pp_mux_set_write(mux, tunFd, true)
+            commands.append(.enableWrite(.tun))
         }
     }
 }
@@ -317,16 +319,27 @@ private extension FdLooper {
                 tunFd = fd
                 tun = pp_tun_create(fd)
                 results.append(.attachTun(continuation, .success(())))
-            case .setRead(let side, let isEnabled):
+            case .enableRead(let side):
                 switch side {
                 case .link:
-                    pp_mux_set_read(mux, linkFd, isEnabled)
+                    pp_mux_set_read(mux, linkFd, true)
                 case .tun:
-                    guard let tunFd else {
-                        pp_log(ctx, .core, .error, "Ignoring tun setRead(), not attached")
-                        return true
+                    if let tunFd {
+                        pp_mux_set_read(mux, tunFd, true)
+                    } else {
+                        pp_log(ctx, .core, .error, "Ignoring tun enableRead(), not attached")
                     }
-                    pp_mux_set_read(mux, tunFd, isEnabled)
+                }
+            case .enableWrite(let side):
+                switch side {
+                case .link:
+                    pp_mux_set_write(mux, linkFd, true)
+                case .tun:
+                    if let tunFd {
+                        pp_mux_set_write(mux, tunFd, true)
+                    } else {
+                        pp_log(ctx, .core, .error, "Ignoring tun enableWrite(), not attached")
+                    }
                 }
             case .stop:
                 pp_log(ctx, .core, .info, "Stop looper")
