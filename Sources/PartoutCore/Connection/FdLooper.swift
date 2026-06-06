@@ -249,6 +249,21 @@ public final class FdLooper: @unchecked Sendable {
         }
     }
 
+    public func resumeReading(from side: Side) {
+        lock.lock()
+        defer { lock.unlock() }
+        switch side {
+        case .link:
+            pp_mux_set_read(mux, linkFd, true)
+        case .tun:
+            guard let tunFd else {
+                pp_log(ctx, .core, .error, "Ignoring tun resume, not attached")
+                return
+            }
+            pp_mux_set_read(mux, tunFd, true)
+        }
+    }
+
     public func write(_ packets: [Data], to side: Side) {
         lock.lock()
         defer { lock.unlock() }
