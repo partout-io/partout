@@ -90,8 +90,8 @@ public final class FdLooper: @unchecked Sendable {
     // Consumer:
     // - Writes to linkQueue/tunQueue .outbound
     // - Reads from linkQueue/tunQueue .inbound
-    private var linkQueue: [PendingWrite]
-    private var tunQueue: [PendingWrite]
+    private var linkQueue: RingQueue<PendingWrite>
+    private var tunQueue: RingQueue<PendingWrite>
 
     public init(
         _ ctx: PartoutLoggerContext,
@@ -148,8 +148,8 @@ public final class FdLooper: @unchecked Sendable {
         tun = tunFd.map(pp_tun_create)
         linkBuf = Array(repeating: 0, count: linkBufSize)
         tunBuf = Array(repeating: 0, count: tunBufSize)
-        linkQueue = []
-        tunQueue = []
+        linkQueue = RingQueue()
+        tunQueue = RingQueue()
     }
 
     deinit {
@@ -378,13 +378,13 @@ private extension FdLooper {
                 guard count >= 0 else {
                     throw PartoutError(.ioFailure)
                 }
-                // Dequeue, but reinsert remainder on partial write
                 lock.lock()
-                linkQueue.removeFirst()
                 if count < pending.count {
                     let partialPacket = PendingWrite(pending, newOffset: Int(count))
-                    linkQueue.insert(partialPacket, at: 0)
+                    linkQueue.replaceFirst(with: partialPacket)
                     watchWrites = true
+                } else {
+                    linkQueue.removeFirst()
                 }
                 lock.unlock()
             }
@@ -414,13 +414,13 @@ private extension FdLooper {
                 guard count >= 0 else {
                     throw PartoutError(.ioFailure)
                 }
-                // Dequeue, but reinsert remainder on partial write
                 lock.lock()
-                tunQueue.removeFirst()
                 if count < pending.count {
                     let partialPacket = PendingWrite(pending, newOffset: Int(count))
-                    tunQueue.insert(partialPacket, at: 0)
+                    tunQueue.replaceFirst(with: partialPacket)
                     watchWrites = true
+                } else {
+                    tunQueue.removeFirst()
                 }
                 lock.unlock()
             }
