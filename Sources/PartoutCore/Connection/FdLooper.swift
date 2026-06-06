@@ -142,7 +142,10 @@ public final class FdLooper: @unchecked Sendable {
     deinit {
         lock.lock()
         defer { lock.unlock() }
-        precondition(state == .started, "Call await stop() before releasing InterfaceLooper")
+        precondition(
+            [.idle, .stopped].contains(state),
+            "Called start() without stop() before releasing FdLooper"
+        )
 
         pp_log(ctx, .core, .debug, "Deinit InterfaceLooper")
         pp_socket_release(link)
