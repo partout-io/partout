@@ -5,9 +5,29 @@
 #if !os(Windows)
 internal import _PartoutCore_C
 
+public struct FdLooperDelegate: Sendable {
+    public enum Side: Sendable {
+        case link
+        case tun
+    }
+    public typealias OnRead = @Sendable (_ packets: [Data], _ side: Side) -> Void
+    public typealias OnFinish = @Sendable (_ error: Error?) -> Void
+
+    public let onRead: OnRead
+    public let onFinish: OnFinish
+
+    public init(
+        onRead: @escaping OnRead,
+        onFinish: @escaping OnFinish
+    ) {
+        self.onRead = onRead
+        self.onFinish = onFinish
+    }
+}
+
 /// Loops through a set of file descriptors.
 public final class FdLooper: @unchecked Sendable {
-    private enum State {
+    private enum State: Sendable {
         case idle
         case started
         case stopping
@@ -29,6 +49,7 @@ public final class FdLooper: @unchecked Sendable {
     private var tunFd: Int32?
     private let link: pp_socket
     private var tun: pp_tun?
+    private let delegate: FdLooperDelegate
     private let maxReadSize: Int
     private let maxReadCount: Int
 
@@ -43,13 +64,14 @@ public final class FdLooper: @unchecked Sendable {
     // Consumer:
     // - Writes to linkQueue/tunQueue .outbound
     // - Reads from linkQueue/tunQueue .inbound
-    private var linkQueue: BidirectionalState<[Data]>
-    private var tunQueue: BidirectionalState<[Data]>
+    private var linkQueue: [Data]
+    private var tunQueue: [Data]
 
     public init(
         _ ctx: PartoutLoggerContext,
         link linkInterface: IOInterface,
         tun tunInterface: IOInterface?,
+        delegate: FdLooperDelegate,
         linkBufSize: Int = 64 * 1024,
         tunBufSize: Int = 16 * 1024,
         maxReadSize: Int = 256 * 1024,
@@ -88,6 +110,7 @@ public final class FdLooper: @unchecked Sendable {
         originalTun = tunInterface
         self.linkFd = linkFd
         self.tunFd = tunFd
+        self.delegate = delegate
         self.maxReadSize = max(maxReadSize, linkBufSize, tunBufSize)
         self.maxReadCount = maxReadCount
 
@@ -99,8 +122,8 @@ public final class FdLooper: @unchecked Sendable {
         tun = tunFd.map(pp_tun_create)
         linkBuf = Array(repeating: 0, count: linkBufSize)
         tunBuf = Array(repeating: 0, count: tunBufSize)
-        linkQueue = BidirectionalState(withResetValue: [])
-        tunQueue = BidirectionalState(withResetValue: [])
+        linkQueue = []
+        tunQueue = []
     }
 
     deinit {
@@ -259,7 +282,7 @@ private extension FdLooper {
         // Write link
         if fdSet.writable.contains(linkFd) {
             var watchWrites = false
-            while let packet = linkQueue.outbound.first {
+            while let packet = linkQueue.first {
                 let packetCount = packet.count
                 let count = packet.withUnsafeBytes {
                     pp_socket_write(link, $0.bytePointer, packetCount)
@@ -272,10 +295,10 @@ private extension FdLooper {
                     throw PartoutError(.ioFailure)
                 }
                 // Dequeue, but reinsert remainder on partial write
-                linkQueue.outbound.removeFirst()
+                linkQueue.removeFirst()
                 if count < packet.count {
                     let partialPacket = Data(packet[Int(count)...])
-                    linkQueue.outbound.insert(partialPacket, at: 0)
+                    linkQueue.insert(partialPacket, at: 0)
                     watchWrites = true
                 }
             }
@@ -289,7 +312,7 @@ private extension FdLooper {
         // Write tun
         if let tunFd, let tun, fdSet.writable.contains(tunFd) {
             var watchWrites = false
-            while let packet = tunQueue.outbound.first {
+            while let packet = tunQueue.first {
                 let packetCount = packet.count
                 let count = packet.withUnsafeBytes {
                     pp_tun_write(tun, $0.bytePointer, packetCount)
@@ -302,10 +325,10 @@ private extension FdLooper {
                     throw PartoutError(.ioFailure)
                 }
                 // Dequeue, but reinsert remainder on partial write
-                tunQueue.outbound.removeFirst()
+                tunQueue.removeFirst()
                 if count < packet.count {
                     let partialPacket = Data(packet[Int(count)...])
-                    tunQueue.outbound.insert(partialPacket, at: 0)
+                    tunQueue.insert(partialPacket, at: 0)
                     watchWrites = true
                 }
             }
@@ -318,6 +341,7 @@ private extension FdLooper {
 
         // Read tun
         if let tunFd, let tun, fdSet.readable.contains(tunFd) {
+            var inbox: [Data] = []
             var readCount = 0
             var readSize: Int32 = 0
             while readCount < maxReadCount, readSize < maxReadSize {
@@ -330,16 +354,18 @@ private extension FdLooper {
                 }
                 if count > 0 {
                     let packet = Data(tunBuf[0..<Int(count)])
-                    tunQueue.inbound.append(packet)
+                    inbox.append(packet)
                 }
                 // Keep going
                 readCount += 1
                 readSize += count
             }
+            delegate.onRead(inbox, .tun)
         }
 
         // Read link
         if fdSet.readable.contains(linkFd) {
+            var inbox: [Data] = []
             var readCount = 0
             var readSize: Int32 = 0
             while readCount < maxReadCount, readSize < maxReadSize {
@@ -352,12 +378,13 @@ private extension FdLooper {
                 }
                 if count > 0 {
                     let packet = Data(linkBuf[0..<Int(count)])
-                    linkQueue.inbound.append(packet)
+                    inbox.append(packet)
                 }
                 // Keep going
                 readCount += 1
                 readSize += count
             }
+            delegate.onRead(inbox, .link)
         }
     }
 
