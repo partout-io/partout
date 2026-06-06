@@ -40,6 +40,18 @@ public final class FdLooper: @unchecked Sendable {
         case stop
     }
 
+    private struct PendingWrite {
+        let data: Data
+        let offset: Int
+        init(_ data: Data, offset: Int = 0) {
+            self.data = data
+            self.offset = offset
+        }
+        var count: Int {
+            data.count - offset
+        }
+    }
+
     private static let numberOfDescriptors = 2
 
     private let ctx: PartoutLoggerContext
@@ -65,8 +77,8 @@ public final class FdLooper: @unchecked Sendable {
     // Consumer:
     // - Writes to linkQueue/tunQueue .outbound
     // - Reads from linkQueue/tunQueue .inbound
-    private var linkQueue: [Data]
-    private var tunQueue: [Data]
+    private var linkQueue: [PendingWrite]
+    private var tunQueue: [PendingWrite]
 
     public init(
         _ ctx: PartoutLoggerContext,
@@ -229,7 +241,7 @@ public final class FdLooper: @unchecked Sendable {
         switch side {
         case .link:
             packets.forEach {
-                linkQueue.append($0)
+                linkQueue.append(PendingWrite($0))
             }
             pp_mux_set_write(mux, linkFd, true)
         case .tun:
@@ -238,7 +250,7 @@ public final class FdLooper: @unchecked Sendable {
                 return
             }
             packets.forEach {
-                tunQueue.append($0)
+                tunQueue.append(PendingWrite($0))
             }
             pp_mux_set_write(mux, tunFd, true)
         }
@@ -304,9 +316,9 @@ private extension FdLooper {
         // Write link
         if fdSet.writable.contains(linkFd) {
             var watchWrites = false
-            while let packet = lock.with(block: { linkQueue.first }) {
-                let packetCount = packet.count
-                let count = packet.withUnsafeBytes {
+            while let pending = lock.with(block: { linkQueue.first }) {
+                let packetCount = pending.data.count
+                let count = pending.data.withUnsafeBytes {
                     pp_socket_write(link, $0.bytePointer, packetCount)
                 }
                 guard count != PP_SOCKET_WOULD_BLOCK else {
@@ -319,8 +331,8 @@ private extension FdLooper {
                 // Dequeue, but reinsert remainder on partial write
                 lock.lock()
                 linkQueue.removeFirst()
-                if count < packet.count {
-                    let partialPacket = Data(packet[Int(count)...])
+                if count < pending.count {
+                    let partialPacket = PendingWrite(pending.data, offset: Int(count))
                     linkQueue.insert(partialPacket, at: 0)
                     watchWrites = true
                 }
@@ -336,9 +348,9 @@ private extension FdLooper {
         // Write tun
         if let tunFd, let tun, fdSet.writable.contains(tunFd) {
             var watchWrites = false
-            while let packet = lock.with(block: { tunQueue.first }) {
-                let packetCount = packet.count
-                let count = packet.withUnsafeBytes {
+            while let pending = lock.with(block: { tunQueue.first }) {
+                let packetCount = pending.data.count
+                let count = pending.data.withUnsafeBytes {
                     pp_tun_write(tun, $0.bytePointer, packetCount)
                 }
                 guard count != PP_TUN_WOULD_BLOCK else {
@@ -351,8 +363,8 @@ private extension FdLooper {
                 // Dequeue, but reinsert remainder on partial write
                 lock.lock()
                 tunQueue.removeFirst()
-                if count < packet.count {
-                    let partialPacket = Data(packet[Int(count)...])
+                if count < pending.count {
+                    let partialPacket = PendingWrite(pending.data, offset: Int(count))
                     tunQueue.insert(partialPacket, at: 0)
                     watchWrites = true
                 }
