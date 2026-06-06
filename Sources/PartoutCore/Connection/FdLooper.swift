@@ -228,11 +228,7 @@ public final class FdLooper: @unchecked Sendable {
     public func attachTun(_ tunInterface: IOInterface) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             lock.with {
-                // Ignore command if not started or stopping
-                guard [.idle, .stopping].contains(state) else {
-                    continuation.resume(throwing: CancellationError())
-                    return
-                }
+                precondition(state == .started, "Attach tun after start()")
                 commands.append(.attachTun(tunInterface: tunInterface, continuation))
                 pp_mux_wake(mux)
             }
