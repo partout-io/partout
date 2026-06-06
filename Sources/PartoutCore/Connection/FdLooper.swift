@@ -253,9 +253,9 @@ public final class FdLooper: @unchecked Sendable {
 
     public func resumeReading(from side: Side) {
         lock.lock()
+        defer { lock.unlock() }
         commands.append(.enableRead(side))
         pp_mux_wake(mux)
-        lock.unlock()
     }
 
     public func write(_ packets: [Data], to side: Side) {
@@ -277,6 +277,7 @@ public final class FdLooper: @unchecked Sendable {
             }
             commands.append(.enableWrite(.tun))
         }
+        pp_mux_wake(mux)
     }
 }
 
