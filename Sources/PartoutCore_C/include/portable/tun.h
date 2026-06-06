@@ -36,12 +36,16 @@ struct sockaddr_ctl {
 typedef struct __pp_tun_struct *pp_tun;
 
 extern const int PP_TUN_WOULD_BLOCK;
+extern const int PP_TUN_NO_BUF;
 
 #if !PARTOUT_WINDOWS
 /* With manual file descriptor. */
 pp_tun pp_tun_create(int fd);
 static inline bool pp_tun_would_block() {
     return (errno == EAGAIN || errno == EWOULDBLOCK);
+}
+static inline bool pp_tun_nobufs() {
+    return errno == ENOBUFS;
 }
 #endif
 

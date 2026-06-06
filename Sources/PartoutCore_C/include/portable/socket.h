@@ -31,6 +31,7 @@ typedef enum {
 typedef struct __pp_socket_struct *pp_socket;
 
 extern const int PP_SOCKET_WOULD_BLOCK;
+extern const int PP_SOCKET_NO_BUF;
 
 /* Create a socket wrapper from an already open native descriptor. The
  * wrapper acquires ownership and will close the descriptor on

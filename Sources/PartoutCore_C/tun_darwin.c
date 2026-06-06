@@ -146,10 +146,13 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
         if (pp_tun_would_block()) {
             return PP_TUN_WOULD_BLOCK;
         }
+        if (pp_tun_nobufs()) {
+            return PP_TUN_NO_BUF;
+        }
         return -1;
     }
     if (written_len != (int)(pi_len + src_len)) return -3;
-    return written_len;
+    return (int)src_len;
 }
 
 void pp_tun_shutdown(const pp_tun tun) {
