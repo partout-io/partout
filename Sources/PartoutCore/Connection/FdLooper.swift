@@ -223,10 +223,7 @@ public final class FdLooper: @unchecked Sendable {
 
     public func stop() async throws {
         lock.lock()
-        guard state == .started else {
-            lock.unlock()
-            return
-        }
+        precondition(state == .started, "Cannot stop() twice")
         state = .stopping
         try await withCheckedThrowingContinuation { continuation in
             stopContinuation = continuation
