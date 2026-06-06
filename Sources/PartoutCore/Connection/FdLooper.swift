@@ -103,15 +103,10 @@ public final class FdLooper: @unchecked Sendable {
     }
 
     deinit {
-        lock.lock()
-        defer { lock.unlock() }
-        precondition(
-            [.idle, .stopped].contains(state),
-            "Called start() without stop() before releasing FdLooper"
-        )
-
         pp_log(ctx, .core, .debug, "Deinit InterfaceLooper")
-        pp_mux_free(mux)
+        link?.detach()
+        tun?.detach()
+        stopWithoutWaiting()
     }
 
     public func start() {
@@ -119,17 +114,19 @@ public final class FdLooper: @unchecked Sendable {
         defer { lock.unlock() }
         precondition(state == .idle, "Looper already started")
 
+        // Hold mux for cleanup
+        nonisolated(unsafe) let mux = self.mux
+
         // Event loop
         state = .started
         loopQueue.async { [weak self] in
             var lastError: Error?
             defer {
                 self?.finish(throwing: lastError)
+                self?.link?.detach()
+                self?.tun?.detach()
+                pp_mux_free(mux)
             }
-
-            // Hold mux weakly
-            guard let weakMux = self?.mux else { return }
-            nonisolated(unsafe) let mux = weakMux
 
             // Bind I/O callbacks to fd set. Fd set is never mutated
             // concurrently, no locks are needed.
@@ -160,7 +157,6 @@ public final class FdLooper: @unchecked Sendable {
 
                 // Unwrap AFTER blocking call
                 guard let self else { break }
-                guard !Task.isCancelled else { break }
 
                 // Handle commands on wake signal (true = continue)
                 guard handleCommands() else { break }
@@ -170,10 +166,12 @@ public final class FdLooper: @unchecked Sendable {
                     try process(mux: mux, fdSet: fdSet)
                 } catch IOError.linkFailed {
                     lock.with {
+                        self.link?.detach()
                         self.link = nil
                     }
                 } catch IOError.tunFailed {
                     lock.with {
+                        self.tun?.detach()
                         self.tun = nil
                     }
                 } catch {
@@ -196,6 +194,21 @@ public final class FdLooper: @unchecked Sendable {
             pp_mux_wake(mux)
             lock.unlock()
         }
+    }
+
+    private func stopWithoutWaiting() {
+        lock.lock()
+        switch state {
+        case .idle:
+            pp_mux_free(mux)
+        case .started:
+            state = .stopping
+            commands.append(.stop)
+            pp_mux_wake(mux)
+        default:
+            break
+        }
+        lock.unlock()
     }
 
     public func attachLink(_ linkInterface: IOInterface) async throws {
@@ -370,9 +383,11 @@ private extension FdLooper {
 
                 results.append(.attach(continuation, .success(())))
             case .detachLink(let continuation):
+                link?.detach()
                 link = nil
                 results.append(.detach(continuation))
             case .detachTun(let continuation):
+                tun?.detach()
                 tun = nil
                 results.append(.detach(continuation))
             case .enableRead(let side):
@@ -578,7 +593,7 @@ private extension FdLooper {
         let originalInterface: IOInterface
         private let read: (inout [UInt8]) throws -> Data?
         private let write: (PendingWrite) throws -> Int
-        private let cleanup: () -> Void
+        private var cleanup: (() -> Void)?
         private var readBuf: [UInt8]
         private var writeQueue: RingQueue<Data>
         private var writeOffset: Int
@@ -599,10 +614,6 @@ private extension FdLooper {
             readBuf = Array(repeating: 0, count: readBufSize)
             writeQueue = RingQueue()
             writeOffset = 0
-        }
-
-        deinit {
-            cleanup()
         }
 
         func dequeueRead() throws -> Data? {
@@ -633,6 +644,11 @@ private extension FdLooper {
 
         func unsafeEnqueueWrite(_ packet: Data) {
             writeQueue.append(packet)
+        }
+
+        func detach() {
+            cleanup?()
+            cleanup = nil
         }
     }
 }
