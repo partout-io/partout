@@ -156,6 +156,7 @@ public final class FdLooper: @unchecked Sendable {
         precondition(state == .idle, "Looper already started")
 
         // Event loop
+        state = .started
         loopQueue.async { [weak self] in
             defer {
                 pp_log(self?.ctx ?? .global, .core, .info, "Finish looper")
