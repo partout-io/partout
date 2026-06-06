@@ -9,7 +9,7 @@ internal import _PartoutCore_C
 
 /// Delegates ``FdLooper`` events.
 public struct FdLooperDelegate: Sendable {
-    public typealias OnRead = @Sendable (_ packets: [Data], _ side: FdLooper.Side) -> FdLooper.ReadAction
+    public typealias OnRead = @Sendable (_ packets: [Data], _ side: FdLooper.Side) throws -> FdLooper.ReadAction
     public typealias OnFinish = @Sendable (_ error: Error?) -> Void
 
     public let onRead: OnRead
@@ -390,7 +390,7 @@ private extension FdLooper {
                 }
             }
             if !inbox.isEmpty {
-                let action = delegate.onRead(inbox, .tun)
+                let action = try delegate.onRead(inbox, .tun)
                 if action == .pause {
                     pp_mux_set_read(mux, tun.fd, false)
                 }
@@ -416,7 +416,7 @@ private extension FdLooper {
                 }
             }
             if !inbox.isEmpty {
-                let action = delegate.onRead(inbox, .link)
+                let action = try delegate.onRead(inbox, .link)
                 if action == .pause {
                     pp_mux_set_read(mux, link.fd, false)
                 }
