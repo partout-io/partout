@@ -264,7 +264,7 @@ private extension FdLooper {
             while let packet = linkQueue.outbound.first {
                 let packetCount = packet.count
                 let count = packet.withUnsafeBytes {
-                    pp_socket_write(link, $0, packetCount)
+                    pp_socket_write(link, $0.bytePointer, packetCount)
                 }
                 guard count != PP_SOCKET_WOULD_BLOCK else {
                     watchWrites = true
@@ -294,7 +294,7 @@ private extension FdLooper {
             while let packet = tunQueue.outbound.first {
                 let packetCount = packet.count
                 let count = packet.withUnsafeBytes {
-                    pp_tun_write(tun, $0, packetCount)
+                    pp_tun_write(tun, $0.bytePointer, packetCount)
                 }
                 guard count != PP_TUN_WOULD_BLOCK else {
                     watchWrites = true
