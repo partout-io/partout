@@ -193,6 +193,7 @@ public final class FdLooper: @unchecked Sendable {
 
     public func stop() async throws {
         lock.lock()
+        guard state != .idle else { return }
         precondition(state == .started, "Cannot stop() twice")
         state = .stopping
         try await withCheckedThrowingContinuation { continuation in
