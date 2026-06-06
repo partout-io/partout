@@ -5,8 +5,9 @@
 #if !os(Windows)
 internal import _PartoutCore_C
 
+/// Delegates ``FdLooper`` events.
 public struct FdLooperDelegate: Sendable {
-    public typealias OnRead = @Sendable (_ packets: [Data], _ side: FdLooper.Side) -> Void
+    public typealias OnRead = @Sendable (_ packets: [Data], _ side: FdLooper.Side) -> FdLooper.ReadAction
     public typealias OnFinish = @Sendable (_ error: Error?) -> Void
 
     public let onRead: OnRead
@@ -26,6 +27,11 @@ public final class FdLooper: @unchecked Sendable {
     public enum Side: Sendable {
         case link
         case tun
+    }
+
+    public enum ReadAction: Sendable {
+        case keep
+        case pause
     }
 
     private enum State: Sendable {
@@ -415,7 +421,10 @@ private extension FdLooper {
                 readSize += count
             }
             if !inbox.isEmpty {
-                delegate.onRead(inbox, .tun)
+                let action = delegate.onRead(inbox, .tun)
+                if action == .pause {
+                    pp_mux_set_read(mux, tunFd, false)
+                }
             }
         }
 
@@ -441,7 +450,10 @@ private extension FdLooper {
                 readSize += count
             }
             if !inbox.isEmpty {
-                delegate.onRead(inbox, .link)
+                let action = delegate.onRead(inbox, .link)
+                if action == .pause {
+                    pp_mux_set_read(mux, linkFd, false)
+                }
             }
         }
     }
