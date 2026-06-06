@@ -222,6 +222,27 @@ public final class FdLooper: @unchecked Sendable {
             }
         }
     }
+
+    public func write(_ packets: [Data], to side: Side) {
+        lock.lock()
+        defer { lock.unlock() }
+        switch side {
+        case .link:
+            packets.forEach {
+                linkQueue.append($0)
+            }
+            pp_mux_set_write(mux, linkFd, true)
+        case .tun:
+            guard let tunFd else {
+                pp_log(ctx, .core, .error, "Ignoring tun packets, not attached")
+                return
+            }
+            packets.forEach {
+                tunQueue.append($0)
+            }
+            pp_mux_set_write(mux, tunFd, true)
+        }
+    }
 }
 
 private extension FdLooper {
@@ -283,7 +304,7 @@ private extension FdLooper {
         // Write link
         if fdSet.writable.contains(linkFd) {
             var watchWrites = false
-            while let packet = linkQueue.first {
+            while let packet = lock.with(block: { linkQueue.first }) {
                 let packetCount = packet.count
                 let count = packet.withUnsafeBytes {
                     pp_socket_write(link, $0.bytePointer, packetCount)
@@ -296,12 +317,14 @@ private extension FdLooper {
                     throw PartoutError(.ioFailure)
                 }
                 // Dequeue, but reinsert remainder on partial write
+                lock.lock()
                 linkQueue.removeFirst()
                 if count < packet.count {
                     let partialPacket = Data(packet[Int(count)...])
                     linkQueue.insert(partialPacket, at: 0)
                     watchWrites = true
                 }
+                lock.unlock()
             }
             // Stop watching if no blocks
             pp_mux_set_write(mux, linkFd, watchWrites)
@@ -313,7 +336,7 @@ private extension FdLooper {
         // Write tun
         if let tunFd, let tun, fdSet.writable.contains(tunFd) {
             var watchWrites = false
-            while let packet = tunQueue.first {
+            while let packet = lock.with(block: { tunQueue.first }) {
                 let packetCount = packet.count
                 let count = packet.withUnsafeBytes {
                     pp_tun_write(tun, $0.bytePointer, packetCount)
@@ -326,12 +349,14 @@ private extension FdLooper {
                     throw PartoutError(.ioFailure)
                 }
                 // Dequeue, but reinsert remainder on partial write
+                lock.lock()
                 tunQueue.removeFirst()
                 if count < packet.count {
                     let partialPacket = Data(packet[Int(count)...])
                     tunQueue.insert(partialPacket, at: 0)
                     watchWrites = true
                 }
+                lock.unlock()
             }
             // Stop watching if no blocks
             pp_mux_set_write(mux, tunFd, watchWrites)
