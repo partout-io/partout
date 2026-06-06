@@ -285,6 +285,16 @@ set(PARTOUT_SOURCES
 ./PartoutOpenVPNConnection/StandardOpenVPNParser+Default.swift
 ./PartoutOpenVPNConnection/V2/_OpenVPNConnectionV2+Default.swift
 ./PartoutOpenVPNConnection/V2/_OpenVPNConnectionV2.swift
+./PartoutOpenVPNConnection/V3/Internal/ControlChannelV3+Cross.swift
+./PartoutOpenVPNConnection/V3/Internal/ControlChannelV3.swift
+./PartoutOpenVPNConnection/V3/Internal/NegotiatorV3.swift
+./PartoutOpenVPNConnection/V3/Internal/OpenVPNSessionProtocolV3.swift
+./PartoutOpenVPNConnection/V3/Internal/OpenVPNSessionV3+Data.swift
+./PartoutOpenVPNConnection/V3/Internal/OpenVPNSessionV3+Loop.swift
+./PartoutOpenVPNConnection/V3/Internal/OpenVPNSessionV3+Negotiation.swift
+./PartoutOpenVPNConnection/V3/Internal/OpenVPNSessionV3.swift
+./PartoutOpenVPNConnection/V3/_OpenVPNConnectionV3+Default.swift
+./PartoutOpenVPNConnection/V3/_OpenVPNConnectionV3.swift
 ./PartoutWireGuard/Internal/Configuration+WgQuickConfig.swift
 ./PartoutWireGuard/Internal/Endpoint+WireGuardKit.swift
 ./PartoutWireGuard/Internal/PrivateKey.swift
