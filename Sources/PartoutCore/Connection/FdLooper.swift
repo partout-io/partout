@@ -399,7 +399,9 @@ private extension FdLooper {
                 readCount += 1
                 readSize += count
             }
-            delegate.onRead(inbox, .tun)
+            if !inbox.isEmpty {
+                delegate.onRead(inbox, .tun)
+            }
         }
 
         // Read link
@@ -423,7 +425,9 @@ private extension FdLooper {
                 readCount += 1
                 readSize += count
             }
-            delegate.onRead(inbox, .link)
+            if !inbox.isEmpty {
+                delegate.onRead(inbox, .link)
+            }
         }
     }
 
