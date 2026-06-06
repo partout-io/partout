@@ -149,7 +149,7 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
         return -1;
     }
     if (written_len != (int)(pi_len + src_len)) return -3;
-    return written_len;
+    return (int)src_len;
 }
 
 void pp_tun_shutdown(const pp_tun tun) {
