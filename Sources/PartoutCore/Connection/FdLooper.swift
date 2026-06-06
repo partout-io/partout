@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+// FIXME: ###, Beware of the Int32/UInt64 mismatch (UNIX fd is Int32, Windows SOCKET is UInt64)
+
 #if !os(Windows)
 internal import _PartoutCore_C
 
@@ -48,33 +50,16 @@ public final class FdLooper: @unchecked Sendable {
         case stop
     }
 
-    private struct PendingWrite {
-        let data: Data
-        let offset: Int
-        init(_ data: Data, offset: Int = 0) {
-            self.data = data
-            self.offset = offset
-        }
-        init(_ pending: PendingWrite, newOffset: Int) {
-            data = pending.data
-            offset = pending.offset + newOffset
-        }
-        var count: Int {
-            data.count - offset
-        }
-    }
-
     private static let numberOfDescriptors = 2
 
     private let ctx: PartoutLoggerContext
-    private let originalLink: IOInterface
-    private var originalTun: IOInterface?
     private let mux: pp_mux
-    private let linkFd: Int32
-    private var tunFd: Int32?
-    private let link: pp_socket
-    private var tun: pp_tun?
+    private var link: SideIO
+    private var tun: SideIO?
+    private let linkHandle: pp_socket
+    private var tunHandle: pp_tun?
     private let delegate: FdLooperDelegate
+    private let tunBufSize: Int
     private let maxReadSize: Int
     private let maxReadCount: Int
 
@@ -84,19 +69,10 @@ public final class FdLooper: @unchecked Sendable {
     private var state: State
     private var stopContinuation: CheckedContinuation<Void, Error>?
     private var terminalError: Error?
-    private var linkBuf: [UInt8]
-    private var tunBuf: [UInt8]
-
-    // Consumer:
-    // - Writes to linkQueue/tunQueue .outbound
-    // - Reads from linkQueue/tunQueue .inbound
-    private var linkQueue: RingQueue<PendingWrite>
-    private var tunQueue: RingQueue<PendingWrite>
 
     public init(
         _ ctx: PartoutLoggerContext,
         link linkInterface: IOInterface,
-        tun tunInterface: IOInterface?,
         delegate: FdLooperDelegate,
         linkBufSize: Int = 64 * 1024,
         tunBufSize: Int = 16 * 1024,
@@ -104,13 +80,8 @@ public final class FdLooper: @unchecked Sendable {
         maxReadCount: Int = 128
     ) throws {
         let linkFd = linkInterface.fileDescriptor.map(Int32.init)
-        let tunFd = tunInterface?.fileDescriptor.map(Int32.init)
         guard let linkFd else {
             pp_log(ctx, .core, .fault, "Missing link descriptor")
-            throw PartoutError(.fdUnavailable)
-        }
-        guard tunInterface == nil || tunFd != nil else {
-            pp_log(ctx, .core, .fault, "Missing tun descriptor")
             throw PartoutError(.fdUnavailable)
         }
         guard let newMux = pp_mux_create(Int32(Self.numberOfDescriptors)) else {
@@ -122,21 +93,11 @@ public final class FdLooper: @unchecked Sendable {
             pp_mux_free(newMux)
             throw PartoutError(.muxFailure, linkFd)
         }
-        if let tunFd {
-            guard pp_mux_add(newMux, tunFd) else {
-                pp_log(ctx, .core, .fault, "Unable to add tunFd")
-                pp_mux_free(newMux)
-                throw PartoutError(.muxFailure, tunFd)
-            }
-        }
 
         self.ctx = ctx
         mux = newMux
-        originalLink = linkInterface
-        originalTun = tunInterface
-        self.linkFd = linkFd
-        self.tunFd = tunFd
         self.delegate = delegate
+        self.tunBufSize = tunBufSize
         self.maxReadSize = max(maxReadSize, linkBufSize, tunBufSize)
         self.maxReadCount = maxReadCount
 
@@ -144,12 +105,13 @@ public final class FdLooper: @unchecked Sendable {
         lock = SemaphoreMutex()
         commands = []
         state = .idle
-        link = pp_socket_create(UInt64(linkFd))
-        tun = tunFd.map(pp_tun_create)
-        linkBuf = Array(repeating: 0, count: linkBufSize)
-        tunBuf = Array(repeating: 0, count: tunBufSize)
-        linkQueue = RingQueue()
-        tunQueue = RingQueue()
+        linkHandle = pp_socket_create(UInt64(linkFd))
+        link = SideIO(
+            linkFd: linkFd,
+            handle: linkHandle,
+            originalInterface: linkInterface,
+            readBufSize: linkBufSize
+        )
     }
 
     deinit {
@@ -161,8 +123,8 @@ public final class FdLooper: @unchecked Sendable {
         )
 
         pp_log(ctx, .core, .debug, "Deinit InterfaceLooper")
-        pp_socket_release(link)
-        tun.map(pp_tun_release)
+        tun?.cleanup()
+        link.cleanup()
         pp_mux_free(mux)
     }
 
@@ -264,16 +226,16 @@ public final class FdLooper: @unchecked Sendable {
         switch side {
         case .link:
             packets.forEach {
-                linkQueue.append(PendingWrite($0))
+                link.enqueueWrite(PendingWrite($0))
             }
             commands.append(.enableWrite(.link))
         case .tun:
-            guard tunFd != nil else {
+            guard let tun else {
                 pp_log(ctx, .core, .error, "Ignoring tun packets, not attached")
                 return
             }
             packets.forEach {
-                tunQueue.append(PendingWrite($0))
+                tun.enqueueWrite(PendingWrite($0))
             }
             commands.append(.enableWrite(.tun))
         }
@@ -306,7 +268,7 @@ private extension FdLooper {
                     break
                 }
                 // Can only attach once
-                guard tunFd == nil else {
+                guard tun == nil else {
                     results.append(.attachTun(continuation, .failure(PartoutError(.operationCancelled))))
                     break
                 }
@@ -316,17 +278,25 @@ private extension FdLooper {
                     break
                 }
                 pp_log(ctx, .core, .info, "Attach tun (fd=\(fd))")
-                originalTun = tunInterface
-                tunFd = fd
-                tun = pp_tun_create(fd)
+
+                // Create new side
+                let tunHandle = pp_tun_create(fd)
+                self.tunHandle = tunHandle
+                tun = SideIO(
+                    tunFd: fd,
+                    handle: tunHandle,
+                    originalInterface: tunInterface,
+                    readBufSize: tunBufSize
+                )
+
                 results.append(.attachTun(continuation, .success(())))
             case .enableRead(let side):
                 switch side {
                 case .link:
-                    pp_mux_set_read(mux, linkFd, true)
+                    pp_mux_set_read(mux, link.fd, true)
                 case .tun:
-                    if let tunFd {
-                        pp_mux_set_read(mux, tunFd, true)
+                    if let tun {
+                        pp_mux_set_read(mux, tun.fd, true)
                     } else {
                         pp_log(ctx, .core, .error, "Ignoring tun enableRead(), not attached")
                     }
@@ -334,10 +304,10 @@ private extension FdLooper {
             case .enableWrite(let side):
                 switch side {
                 case .link:
-                    pp_mux_set_write(mux, linkFd, true)
+                    pp_mux_set_write(mux, link.fd, true)
                 case .tun:
-                    if let tunFd {
-                        pp_mux_set_write(mux, tunFd, true)
+                    if let tun {
+                        pp_mux_set_write(mux, tun.fd, true)
                     } else {
                         pp_log(ctx, .core, .error, "Ignoring tun enableWrite(), not attached")
                     }
@@ -360,131 +330,95 @@ private extension FdLooper {
 
     func process(mux: pp_mux, fdSet: FdSet) throws {
         // Write link
-        if fdSet.writable.contains(linkFd) {
+        if fdSet.writable.contains(link.fd) {
             var watchWrites = false
-            while let pending = lock.with(block: { linkQueue.first }) {
-                let packetCount = pending.data.count
-                let count = pending.data.withUnsafeBytes {
-                    pp_socket_write(
-                        link,
-                        $0.bytePointer + pending.offset,
-                        packetCount - pending.offset
-                    )
-                }
-                guard count != PP_SOCKET_WOULD_BLOCK else {
+            while let pending = lock.with(block: { link.dequeuePendingWrite() }) {
+                do {
+                    let didComplete = try link.performWrite(pending, lock: lock)
+                    watchWrites = !didComplete
+                } catch IOError.wouldBlock {
                     watchWrites = true
                     break
-                }
-                guard count >= 0 else {
+                } catch {
                     throw PartoutError(.ioFailure)
                 }
-                lock.lock()
-                if count < pending.count {
-                    let partialPacket = PendingWrite(pending, newOffset: Int(count))
-                    linkQueue.replaceFirst(with: partialPacket)
-                    watchWrites = true
-                } else {
-                    linkQueue.removeFirst()
-                }
-                lock.unlock()
             }
             // Stop watching if no blocks
-            pp_mux_set_write(mux, linkFd, watchWrites)
+            pp_mux_set_write(mux, link.fd, watchWrites)
             if !watchWrites {
-                fdSet.writable.remove(linkFd)
+                fdSet.writable.remove(link.fd)
             }
         }
 
         // Write tun
-        if let tunFd, let tun, fdSet.writable.contains(tunFd) {
+        if let tun, fdSet.writable.contains(tun.fd) {
             var watchWrites = false
-            while let pending = lock.with(block: { tunQueue.first }) {
-                let packetCount = pending.data.count
-                let count = pending.data.withUnsafeBytes {
-                    pp_tun_write(
-                        tun,
-                        $0.bytePointer + pending.offset,
-                        packetCount - pending.offset
-                    )
-                }
-                guard count != PP_TUN_WOULD_BLOCK else {
+            while let pending = lock.with(block: { tun.dequeuePendingWrite() }) {
+                do {
+                    let didComplete = try tun.performWrite(pending, lock: lock)
+                    watchWrites = !didComplete
+                } catch IOError.wouldBlock {
                     watchWrites = true
                     break
-                }
-                guard count >= 0 else {
+                } catch {
                     throw PartoutError(.ioFailure)
                 }
-                lock.lock()
-                if count < pending.count {
-                    let partialPacket = PendingWrite(pending, newOffset: Int(count))
-                    tunQueue.replaceFirst(with: partialPacket)
-                    watchWrites = true
-                } else {
-                    tunQueue.removeFirst()
-                }
-                lock.unlock()
             }
             // Stop watching if no blocks
-            pp_mux_set_write(mux, tunFd, watchWrites)
+            pp_mux_set_write(mux, tun.fd, watchWrites)
             if !watchWrites {
-                fdSet.writable.remove(tunFd)
+                fdSet.writable.remove(tun.fd)
             }
         }
 
         // Read tun
-        if let tunFd, let tun, fdSet.readable.contains(tunFd) {
+        if let tun, fdSet.readable.contains(tun.fd) {
             var inbox: [Data] = []
             var readCount = 0
-            var readSize: Int32 = 0
+            var readSize = 0
             while readCount < maxReadCount, readSize < maxReadSize {
-                let count = pp_tun_read(tun, &tunBuf, tunBuf.count)
-                guard count != PP_TUN_WOULD_BLOCK else {
+                do {
+                    if let packet = try tun.dequeueRead() {
+                        inbox.append(packet)
+                        readSize += packet.count
+                    }
+                    readCount += 1
+                } catch IOError.wouldBlock {
                     break
-                }
-                guard count >= 0 else {
+                } catch {
                     throw PartoutError(.ioFailure)
                 }
-                if count > 0 {
-                    let packet = Data(tunBuf[0..<Int(count)])
-                    inbox.append(packet)
-                }
-                // Keep going
-                readCount += 1
-                readSize += count
             }
             if !inbox.isEmpty {
                 let action = delegate.onRead(inbox, .tun)
                 if action == .pause {
-                    pp_mux_set_read(mux, tunFd, false)
+                    pp_mux_set_read(mux, tun.fd, false)
                 }
             }
         }
 
         // Read link
-        if fdSet.readable.contains(linkFd) {
+        if fdSet.readable.contains(link.fd) {
             var inbox: [Data] = []
             var readCount = 0
-            var readSize: Int32 = 0
+            var readSize = 0
             while readCount < maxReadCount, readSize < maxReadSize {
-                let count = pp_socket_read(link, &linkBuf, linkBuf.count)
-                guard count != PP_SOCKET_WOULD_BLOCK else {
+                do {
+                    if let packet = try link.dequeueRead() {
+                        inbox.append(packet)
+                        readSize += packet.count
+                    }
+                    readCount += 1
+                } catch IOError.wouldBlock {
                     break
-                }
-                guard count >= 0 else {
+                } catch {
                     throw PartoutError(.ioFailure)
                 }
-                if count > 0 {
-                    let packet = Data(linkBuf[0..<Int(count)])
-                    inbox.append(packet)
-                }
-                // Keep going
-                readCount += 1
-                readSize += count
             }
             if !inbox.isEmpty {
                 let action = delegate.onRead(inbox, .link)
                 if action == .pause {
-                    pp_mux_set_read(mux, linkFd, false)
+                    pp_mux_set_read(mux, link.fd, false)
                 }
             }
         }
@@ -524,6 +458,180 @@ private final class FdSet {
 
     func resetReadable() {
         readable.removeAll(keepingCapacity: true)
+    }
+}
+
+// MARK: - SideIO
+
+private extension FdLooper {
+    enum IOError: Error {
+        case wouldBlock
+        case failed
+    }
+
+    struct PendingWrite {
+        let data: Data
+        let offset: Int
+        init(_ data: Data, offset: Int = 0) {
+            self.data = data
+            self.offset = offset
+        }
+        init(_ pending: PendingWrite, newOffset: Int) {
+            data = pending.data
+            offset = pending.offset + newOffset
+        }
+        var count: Int {
+            data.count - offset
+        }
+    }
+
+    final class SideIO {
+        let fd: Int32
+        let originalInterface: IOInterface
+        private let read: (inout [UInt8]) throws -> Data?
+        private let write: (PendingWrite) throws -> Int
+        let cleanup: () -> Void
+        private var readBuf: [UInt8]
+        private var writeQueue: RingQueue<PendingWrite>
+
+        init(
+            fd: Int32,
+            originalInterface: IOInterface,
+            readBufSize: Int,
+            read: @escaping @Sendable (inout [UInt8]) throws -> Data?,
+            write: @escaping @Sendable (PendingWrite) throws -> Int,
+            cleanup: @escaping @Sendable () -> Void
+        ) {
+            self.fd = fd
+            self.originalInterface = originalInterface
+            self.read = read
+            self.write = write
+            self.cleanup = cleanup
+            readBuf = Array(repeating: 0, count: readBufSize)
+            writeQueue = RingQueue()
+        }
+
+        func dequeueRead() throws -> Data? {
+            try read(&readBuf)
+        }
+
+        func performWrite(_ pending: PendingWrite, lock: SemaphoreMutex) throws -> Bool {
+            let count = try write(pending)
+            let didComplete = count == pending.count
+            lock.lock()
+            if didComplete {
+                writeQueue.removeFirst()
+            } else {
+                let partialPacket = PendingWrite(pending, newOffset: Int(count))
+                writeQueue.replaceFirst(with: partialPacket)
+            }
+            lock.unlock()
+            return didComplete
+        }
+
+        func dequeuePendingWrite() -> PendingWrite? {
+            writeQueue.first
+        }
+
+        func enqueueWrite(_ pendingWrite: PendingWrite) {
+            writeQueue.append(pendingWrite)
+        }
+    }
+}
+
+// MARK: - Link/Tun initializers
+
+private extension FdLooper.SideIO {
+    convenience init(
+        linkFd: Int32,
+        handle: pp_socket,
+        originalInterface: IOInterface,
+        readBufSize: Int
+    ) {
+        nonisolated(unsafe) let linkHandle = handle
+        self.init(
+            fd: linkFd,
+            originalInterface: originalInterface,
+            readBufSize: readBufSize,
+            read: { buf in
+                let count = pp_socket_read(linkHandle, &buf, buf.count)
+                guard count != PP_SOCKET_WOULD_BLOCK else {
+                    throw FdLooper.IOError.wouldBlock
+                }
+                guard count >= 0 else {
+                    throw FdLooper.IOError.failed
+                }
+                guard count > 0 else {
+                    return nil
+                }
+                return Data(buf[0..<Int(count)])
+            },
+            write: { pending in
+                let count = pending.data.withUnsafeBytes {
+                    pp_socket_write(
+                        linkHandle,
+                        $0.bytePointer + pending.offset,
+                        pending.count
+                    )
+                }
+                guard count != PP_SOCKET_WOULD_BLOCK else {
+                    throw FdLooper.IOError.wouldBlock
+                }
+                guard count >= 0 else {
+                    throw FdLooper.IOError.failed
+                }
+                return Int(count)
+            },
+            cleanup: {
+                pp_socket_release(linkHandle)
+            }
+        )
+    }
+
+    convenience init(
+        tunFd: Int32,
+        handle: pp_tun,
+        originalInterface: IOInterface,
+        readBufSize: Int
+    ) {
+        nonisolated(unsafe) let tunHandle = handle
+        self.init(
+            fd: tunFd,
+            originalInterface: originalInterface,
+            readBufSize: readBufSize,
+            read: { buf in
+                let count = pp_tun_read(tunHandle, &buf, buf.count)
+                guard count != PP_TUN_WOULD_BLOCK else {
+                    throw FdLooper.IOError.wouldBlock
+                }
+                guard count >= 0 else {
+                    throw FdLooper.IOError.failed
+                }
+                guard count > 0 else {
+                    return nil
+                }
+                return Data(buf[0..<Int(count)])
+            },
+            write: { pending in
+                let count = pending.data.withUnsafeBytes {
+                    pp_tun_write(
+                        tunHandle,
+                        $0.bytePointer + pending.offset,
+                        pending.count
+                    )
+                }
+                guard count != PP_TUN_WOULD_BLOCK else {
+                    throw FdLooper.IOError.wouldBlock
+                }
+                guard count >= 0 else {
+                    throw FdLooper.IOError.failed
+                }
+                return Int(count)
+            },
+            cleanup: {
+                pp_tun_release(tunHandle)
+            }
+        )
     }
 }
 
