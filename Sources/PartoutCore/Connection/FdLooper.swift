@@ -223,13 +223,16 @@ public final class FdLooper: @unchecked Sendable {
 
     public func stop() async throws {
         lock.lock()
-        defer { lock.unlock() }
-        guard state == .started else { return }
+        guard state == .started else {
+            lock.unlock()
+            return
+        }
         state = .stopping
         try await withCheckedThrowingContinuation { continuation in
             stopContinuation = continuation
             commands.append(.stop)
             pp_mux_wake(mux)
+            lock.unlock()
         }
     }
 
