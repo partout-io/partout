@@ -7,6 +7,13 @@ internal import _PartoutCore_C
 
 /// Loops through a set of file descriptors.
 public final class FdLooper: @unchecked Sendable {
+    private enum State {
+        case idle
+        case started
+        case stopping
+        case stopped
+    }
+
     fileprivate enum Command {
         case attachTun(tunInterface: IOInterface, CheckedContinuation<Void, Error>)
         case stop
@@ -25,10 +32,11 @@ public final class FdLooper: @unchecked Sendable {
     private let maxReadSize: Int
     private let maxReadCount: Int
 
+    private let loopQueue: DispatchQueue
     private let lock: SemaphoreMutex
-    private var loopTask: Task<Void, Never>?
     private var commands: [Command]
-    private var isStopping: Bool
+    private var state: State
+    private var terminalError: Error?
     private var linkBuf: [UInt8]
     private var tunBuf: [UInt8]
 
@@ -83,9 +91,10 @@ public final class FdLooper: @unchecked Sendable {
         self.maxReadSize = max(maxReadSize, linkBufSize, tunBufSize)
         self.maxReadCount = maxReadCount
 
+        loopQueue = DispatchQueue(label: "FdLooper")
         lock = SemaphoreMutex()
         commands = []
-        isStopping = false
+        state = .idle
         link = pp_socket_create(UInt64(linkFd))
         tun = tunFd.map(pp_tun_create)
         linkBuf = Array(repeating: 0, count: linkBufSize)
@@ -97,7 +106,7 @@ public final class FdLooper: @unchecked Sendable {
     deinit {
         lock.lock()
         defer { lock.unlock() }
-        precondition(loopTask == nil, "Call await stop() before releasing InterfaceLooper")
+        precondition(state == .started, "Call await stop() before releasing InterfaceLooper")
 
         pp_log(ctx, .core, .debug, "Deinit InterfaceLooper")
         pp_socket_release(link)
@@ -109,7 +118,7 @@ public final class FdLooper: @unchecked Sendable {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             lock.with {
                 // Ignore command if not started or stopping
-                guard loopTask != nil, !isStopping else {
+                guard [.idle, .stopping].contains(state) else {
                     continuation.resume(throwing: CancellationError())
                     return
                 }
@@ -122,17 +131,21 @@ public final class FdLooper: @unchecked Sendable {
     public func start() throws {
         lock.lock()
         defer { lock.unlock() }
-        precondition(loopTask == nil, "Looper already started")
+        precondition(state == .idle, "Looper already started")
 
         // Event loop
-        loopTask = Task { [weak self] in
+        loopQueue.async { [weak self] in
             defer {
                 pp_log(self?.ctx ?? .global, .core, .info, "Finish looper")
+                self?.finish()
             }
+
+            // Hold mux weakly
             guard let weakMux = self?.mux else { return }
             nonisolated(unsafe) let mux = weakMux
 
-            // Bind I/O callbacks to fd set
+            // Bind I/O callbacks to fd set. Fd set is never mutated
+            // concurrently, no locks are needed.
             let fdSet = FdSet(capacity: Self.numberOfDescriptors)
             let fdSetCtx = Unmanaged.passRetained(fdSet).toOpaque()
             pp_mux_set_on_readable(mux, { ctx, fd in
@@ -144,31 +157,19 @@ public final class FdLooper: @unchecked Sendable {
                 fdSet.writable.insert(fd)
             }, fdSetCtx)
 
-            // Fd sets are mutated here and in the waitQueue, but
-            // never concurrently, so no locks are needed
-            let waitQueue = DispatchQueue(label: "InterfaceLooper.Waiter")
-            pp_log(self?.ctx ?? .global, .core, .info, "Start looper")
-
-            // Remember to clean up on task end
+            // Remember to clean up on finish
             defer {
                 Unmanaged<FdSet>.fromOpaque(fdSetCtx).release()
             }
 
             // Start loop
+            pp_log(self?.ctx ?? .global, .core, .info, "Start looper")
             while true {
                 // Reset readable fds before the wait
                 fdSet.resetReadable()
 
                 // Perform the blocking call
-                let result = await withCheckedContinuation { continuation in
-                    waitQueue.async {
-                        let num = pp_mux_wait(mux)
-                        continuation.resume(returning: num)
-                    }
-                }
-                guard result >= 0 else {
-                    break
-                }
+                guard pp_mux_wait(mux) >= 0 else { break }
 
                 // Unwrap AFTER blocking call
                 guard let self else { break }
@@ -182,29 +183,20 @@ public final class FdLooper: @unchecked Sendable {
                     try process(mux: mux, fdSet: fdSet)
                 } catch {
                     pp_log(ctx, .core, .error, "Unable to process: \(error)")
+                    finish(throwing: error)
+                    break
                 }
             }
         }
     }
 
-    public func stop() async {
-        let task: Task<Void, Never>?
-
-        // Submit .stop command
+    public func stop() {
         lock.lock()
-        task = loopTask
-        if task != nil, !isStopping {
-            isStopping = true
-            commands.append(.stop)
-            pp_mux_wake(mux)
-        }
-        lock.unlock()
-
-        // Wait for task to exit
-        await task?.value
-        lock.with {
-            loopTask = nil
-        }
+        defer { lock.unlock() }
+        guard state == .started else { return }
+        state = .stopping
+        commands.append(.stop)
+        pp_mux_wake(mux)
     }
 }
 
@@ -228,7 +220,7 @@ private extension FdLooper {
                     break
                 }
                 // Cancel attach if stopping
-                guard !isStopping else {
+                guard state != .stopping else {
                     results.append(.attachTun(continuation, .failure(CancellationError())))
                     break
                 }
@@ -367,6 +359,14 @@ private extension FdLooper {
                 readSize += count
             }
         }
+    }
+
+    func finish(throwing error: Error? = nil) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard terminalError == nil else { return }
+        terminalError = error
+        state = .stopped
     }
 }
 
