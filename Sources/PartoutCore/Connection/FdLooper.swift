@@ -433,6 +433,7 @@ private extension FdLooper {
         guard terminalError == nil else { return }
         terminalError = error
         state = .stopped
+        delegate.onFinish(error)
     }
 }
 
