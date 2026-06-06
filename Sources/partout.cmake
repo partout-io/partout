@@ -111,6 +111,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Misc/BidirectionalState.swift
 ./PartoutCore/Misc/DataUnit.swift
 ./PartoutCore/Misc/Keychain.swift
+./PartoutCore/Misc/RingQueue.swift
 ./PartoutCore/Misc/ScriptingEngine.swift
 ./PartoutCore/Misc/SemaphoreMutex.swift
 ./PartoutCore/Misc/Swift+Extensions.swift
