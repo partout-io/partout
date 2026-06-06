@@ -382,12 +382,9 @@ private extension FdLooper {
                 pp_log(ctx, .core, .info, "Attach link (fd=\(fd))")
 
                 // Create new side
-                let linkHandle = pp_socket_create(fd)
-                self.linkHandle = linkHandle
                 link = SideIO(
                     mux: mux,
                     linkFd: linkFd,
-                    handle: linkHandle,
                     originalInterface: linkInterface,
                     readBufSize: linkBufSize
                 )
@@ -416,12 +413,9 @@ private extension FdLooper {
                 pp_log(ctx, .core, .info, "Attach tun (fd=\(fd))")
 
                 // Create new side
-                let tunHandle = pp_tun_create(tunFd)
-                self.tunHandle = tunHandle
                 tun = SideIO(
                     mux: mux,
                     tunFd: tunFd,
-                    handle: tunHandle,
                     originalInterface: tunInterface,
                     readBufSize: tunBufSize
                 )
@@ -618,14 +612,16 @@ private extension FdLooper {
         readRetries.insert(io.side)
         lock.unlock()
 
+        let side = io.side
+        let command: Command = .enableRead(side, io.id)
         retryQueue.asyncAfter(deadline: .now() + Self.noBufRetryDelay) { [weak self] in
             guard let self else { return }
             self.lock.with {
-                self.readRetries.remove(io.side)
+                self.readRetries.remove(side)
                 guard self.state == .started else {
                     return
                 }
-                self.commands.append(.enableRead(io.side, io.id))
+                self.commands.append(command)
                 pp_mux_wake(self.mux)
             }
         }
@@ -640,14 +636,16 @@ private extension FdLooper {
         writeRetries.insert(io.side)
         lock.unlock()
 
+        let side = io.side
+        let command: Command = .enableWrite(side, io.id)
         retryQueue.asyncAfter(deadline: .now() + Self.noBufRetryDelay) { [weak self] in
             guard let self else { return }
             self.lock.with {
-                self.writeRetries.remove(io.side)
+                self.writeRetries.remove(side)
                 guard self.state == .started else {
                     return
                 }
-                self.commands.append(.enableWrite(io.side, io.id))
+                self.commands.append(command)
                 pp_mux_wake(self.mux)
             }
         }
@@ -796,11 +794,10 @@ private extension FdLooper.SideIO {
     convenience init(
         mux: pp_mux,
         linkFd: Int32,
-        handle: pp_socket,
         originalInterface: IOInterface,
         readBufSize: Int
     ) {
-        nonisolated(unsafe) let linkHandle = handle
+        let linkHandle = pp_socket_create(UInt64(linkFd))
         self.init(
             side: .link,
             fd: linkFd,
@@ -848,11 +845,10 @@ private extension FdLooper.SideIO {
     convenience init(
         mux: pp_mux,
         tunFd: Int32,
-        handle: pp_tun,
         originalInterface: IOInterface,
         readBufSize: Int
     ) {
-        nonisolated(unsafe) let tunHandle = handle
+        let tunHandle = pp_tun_create(tunFd)
         self.init(
             side: .tun,
             fd: tunFd,
