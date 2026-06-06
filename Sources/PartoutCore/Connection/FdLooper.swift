@@ -618,14 +618,16 @@ private extension FdLooper {
         readRetries.insert(io.side)
         lock.unlock()
 
+        let side = io.side
+        let command: Command = .enableRead(side, io.id)
         retryQueue.asyncAfter(deadline: .now() + Self.noBufRetryDelay) { [weak self] in
             guard let self else { return }
             self.lock.with {
-                self.readRetries.remove(io.side)
+                self.readRetries.remove(side)
                 guard self.state == .started else {
                     return
                 }
-                self.commands.append(.enableRead(io.side, io.id))
+                self.commands.append(command)
                 pp_mux_wake(self.mux)
             }
         }
@@ -640,14 +642,16 @@ private extension FdLooper {
         writeRetries.insert(io.side)
         lock.unlock()
 
+        let side = io.side
+        let command: Command = .enableWrite(side, io.id)
         retryQueue.asyncAfter(deadline: .now() + Self.noBufRetryDelay) { [weak self] in
             guard let self else { return }
             self.lock.with {
-                self.writeRetries.remove(io.side)
+                self.writeRetries.remove(side)
                 guard self.state == .started else {
                     return
                 }
-                self.commands.append(.enableWrite(io.side, io.id))
+                self.commands.append(command)
                 pp_mux_wake(self.mux)
             }
         }
