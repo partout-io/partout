@@ -226,7 +226,7 @@ public final class FdLooper: @unchecked Sendable {
         switch side {
         case .link:
             packets.forEach {
-                link.unsafeEnqueueWrite(PendingWrite($0))
+                link.unsafeEnqueueWrite($0)
             }
             commands.append(.enableWrite(.link))
         case .tun:
@@ -235,7 +235,7 @@ public final class FdLooper: @unchecked Sendable {
                 return
             }
             packets.forEach {
-                tun.unsafeEnqueueWrite(PendingWrite($0))
+                tun.unsafeEnqueueWrite($0)
             }
             commands.append(.enableWrite(.tun))
         }
@@ -476,10 +476,6 @@ private extension FdLooper {
             self.data = data
             self.offset = offset
         }
-        init(_ pending: PendingWrite, newOffset: Int) {
-            data = pending.data
-            offset = pending.offset + newOffset
-        }
         var count: Int {
             data.count - offset
         }
@@ -492,7 +488,8 @@ private extension FdLooper {
         private let write: (PendingWrite) throws -> Int
         let cleanup: () -> Void
         private var readBuf: [UInt8]
-        private var writeQueue: RingQueue<PendingWrite>
+        private var writeQueue: RingQueue<Data>
+        private var writeOffset: Int
 
         init(
             fd: Int32,
@@ -509,6 +506,7 @@ private extension FdLooper {
             self.cleanup = cleanup
             readBuf = Array(repeating: 0, count: readBufSize)
             writeQueue = RingQueue()
+            writeOffset = 0
         }
 
         func dequeueRead() throws -> Data? {
@@ -521,9 +519,9 @@ private extension FdLooper {
             lock.lock()
             if didComplete {
                 writeQueue.removeFirst()
+                writeOffset = 0
             } else {
-                let partialPacket = PendingWrite(pending, newOffset: Int(count))
-                writeQueue.replaceFirst(with: partialPacket)
+                writeOffset += count
             }
             lock.unlock()
             return didComplete
@@ -531,12 +529,14 @@ private extension FdLooper {
 
         func dequeueWrite(lock: SemaphoreMutex) -> PendingWrite? {
             lock.with {
-                writeQueue.first
+                writeQueue.first.map {
+                    PendingWrite($0, offset: writeOffset)
+                }
             }
         }
 
-        func unsafeEnqueueWrite(_ pendingWrite: PendingWrite) {
-            writeQueue.append(pendingWrite)
+        func unsafeEnqueueWrite(_ packet: Data) {
+            writeQueue.append(packet)
         }
     }
 }
