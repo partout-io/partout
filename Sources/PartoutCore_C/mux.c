@@ -59,6 +59,19 @@ bool pp_mux_add(pp_mux mux, int fd) {
     return kevent(mux->handle, &ev, 1, NULL, 0, NULL) == 0;
 }
 
+bool pp_mux_set_read(pp_mux mux, int fd, bool enable) {
+    if (!mux) return false;
+    struct kevent ev;
+    EV_SET(&ev, fd, EVFILT_READ, enable ? EV_ADD : EV_DELETE, 0, 0, 0);
+    const int ret = kevent(mux->handle, &ev, 1, NULL, 0, NULL);
+    if (ret < 0) {
+        /* Ignore failed deletion. */
+        if (!enable && errno == ENOENT) return true;
+        return false;
+    }
+    return true;
+}
+
 bool pp_mux_set_write(pp_mux mux, int fd, bool enable) {
     if (!mux) return false;
     struct kevent ev;

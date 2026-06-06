@@ -18,6 +18,7 @@ pp_mux _Nullable pp_mux_create(int num);
 void pp_mux_free(pp_mux mux);
 
 bool pp_mux_add(pp_mux mux, int fd);
+bool pp_mux_set_read(pp_mux mux, int fd, bool enable);
 bool pp_mux_set_write(pp_mux mux, int fd, bool enable);
 void pp_mux_set_on_readable(pp_mux mux, void (*callback)(void *ctx, int fd), void *ctx);
 void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, int fd), void *ctx);
