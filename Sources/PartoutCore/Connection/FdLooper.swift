@@ -47,6 +47,10 @@ public final class FdLooper: @unchecked Sendable {
             self.data = data
             self.offset = offset
         }
+        init(_ pending: PendingWrite, newOffset: Int) {
+            data = pending.data
+            offset = pending.offset + newOffset
+        }
         var count: Int {
             data.count - offset
         }
@@ -336,7 +340,7 @@ private extension FdLooper {
                 lock.lock()
                 linkQueue.removeFirst()
                 if count < pending.count {
-                    let partialPacket = PendingWrite(pending.data, offset: Int(count))
+                    let partialPacket = PendingWrite(pending, newOffset: Int(count))
                     linkQueue.insert(partialPacket, at: 0)
                     watchWrites = true
                 }
@@ -372,7 +376,7 @@ private extension FdLooper {
                 lock.lock()
                 tunQueue.removeFirst()
                 if count < pending.count {
-                    let partialPacket = PendingWrite(pending.data, offset: Int(count))
+                    let partialPacket = PendingWrite(pending, newOffset: Int(count))
                     tunQueue.insert(partialPacket, at: 0)
                     watchWrites = true
                 }
