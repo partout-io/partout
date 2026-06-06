@@ -319,7 +319,7 @@ private extension FdLooper {
             while let pending = lock.with(block: { linkQueue.first }) {
                 let packetCount = pending.data.count
                 let count = pending.data.withUnsafeBytes {
-                    pp_socket_write(link, $0.bytePointer, packetCount)
+                    pp_socket_write(link, $0.bytePointer + pending.offset, packetCount)
                 }
                 guard count != PP_SOCKET_WOULD_BLOCK else {
                     watchWrites = true
@@ -351,7 +351,7 @@ private extension FdLooper {
             while let pending = lock.with(block: { tunQueue.first }) {
                 let packetCount = pending.data.count
                 let count = pending.data.withUnsafeBytes {
-                    pp_tun_write(tun, $0.bytePointer, packetCount)
+                    pp_tun_write(tun, $0.bytePointer + pending.offset, packetCount)
                 }
                 guard count != PP_TUN_WOULD_BLOCK else {
                     watchWrites = true
