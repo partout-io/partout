@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+/// A binary atomic state for mutual exclusion.
 public final class SemaphoreMutex: @unchecked Sendable {
     private let semaphore: DispatchSemaphore
 
