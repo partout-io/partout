@@ -50,20 +50,25 @@ public final class FdLooper: @unchecked Sendable {
         let linkFd = linkInterface.fileDescriptor.map(Int32.init)
         let tunFd = tunInterface?.fileDescriptor.map(Int32.init)
         guard let linkFd else {
+            pp_log(ctx, .core, .fault, "Missing link descriptor")
             throw PartoutError(.fdUnavailable)
         }
         guard tunInterface == nil || tunFd != nil else {
+            pp_log(ctx, .core, .fault, "Missing tun descriptor")
             throw PartoutError(.fdUnavailable)
         }
         guard let newMux = pp_mux_create(Int32(Self.numberOfDescriptors)) else {
+            pp_log(ctx, .core, .fault, "Unable to create mux")
             throw PartoutError(.muxFailure)
         }
         guard pp_mux_add(newMux, linkFd) else {
+            pp_log(ctx, .core, .fault, "Unable to add linkFd")
             pp_mux_free(newMux)
             throw PartoutError(.muxFailure, linkFd)
         }
         if let tunFd {
             guard pp_mux_add(newMux, tunFd) else {
+                pp_log(ctx, .core, .fault, "Unable to add tunFd")
                 pp_mux_free(newMux)
                 throw PartoutError(.muxFailure, tunFd)
             }
@@ -233,6 +238,7 @@ private extension FdLooper {
                     break
                 }
                 guard pp_mux_add(mux, fd) else {
+                    pp_log(ctx, .core, .fault, "Unable to attach tun")
                     results.append(.attachTun(continuation, .failure(PartoutError(.muxFailure, fd))))
                     break
                 }
