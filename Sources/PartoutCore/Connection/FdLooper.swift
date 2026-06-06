@@ -498,9 +498,9 @@ private extension FdLooper {
             fd: Int32,
             originalInterface: IOInterface,
             readBufSize: Int,
-            read: @escaping @Sendable (inout [UInt8]) throws -> Data?,
-            write: @escaping @Sendable (PendingWrite) throws -> Int,
-            cleanup: @escaping @Sendable () -> Void
+            read: @escaping (inout [UInt8]) throws -> Data?,
+            write: @escaping (PendingWrite) throws -> Int,
+            cleanup: @escaping () -> Void
         ) {
             self.fd = fd
             self.originalInterface = originalInterface
