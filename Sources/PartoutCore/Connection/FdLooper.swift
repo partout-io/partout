@@ -656,7 +656,7 @@ private extension FdLooper {
                 results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
                 break
             }
-            let linkFd = Int32(fd)
+            let linkFd = dup(Int32(fd))
             guard pp_mux_add(mux, linkFd) else {
                 pp_log(ctx, .core, .fault, "Unable to attach link")
                 results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
@@ -687,7 +687,7 @@ private extension FdLooper {
                 results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
                 break
             }
-            let tunFd = Int32(fd)
+            let tunFd = dup(Int32(fd))
             guard pp_mux_add(mux, tunFd) else {
                 pp_log(ctx, .core, .fault, "Unable to attach tun")
                 results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
@@ -981,7 +981,7 @@ private extension FdLooper.SideIO {
             },
             cleanup: {
                 pp_mux_delete(mux, linkFd)
-                pp_socket_release(linkHandle)
+                pp_socket_free(linkHandle)
             }
         )
     }
@@ -1032,7 +1032,7 @@ private extension FdLooper.SideIO {
             },
             cleanup: {
                 pp_mux_delete(mux, tunFd)
-                pp_tun_release(tunHandle)
+                pp_tun_free(tunHandle)
             }
         )
     }
