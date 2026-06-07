@@ -109,23 +109,33 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
         }
         let proc = PacketProcessor(method: configuration.xorMethod)
         let rw = LinkProcessor(proc: proc, isTCP: link.isReliable)
-        try await looper.attach(.init(
-            side: .link,
-            original: link,
-            transformWrite: rw.beforeWrite,
-            onRead: { [weak self] packets in
-                let processed = try rw.beforeRead(packets)
-                try self?.receiveLink(processed)
-                return .keep
-            },
-            onFailure: { [weak self] error in
-                Task {
-                    await self?.shutdown(error)
+
+        var didAttach = false
+        do {
+            try await looper.attach(.init(
+                side: .link,
+                original: link,
+                transformWrite: rw.beforeWrite,
+                onRead: { [weak self] packets in
+                    let processed = try rw.beforeRead(packets)
+                    try self?.receiveLink(processed)
+                    return .keep
+                },
+                onFailure: { [weak self] error in
+                    Task {
+                        await self?.shutdown(error)
+                    }
                 }
+            ))
+            didAttach = true
+            try await looper.perform { [weak self] in
+                try self?.setLinkOnQueue(link)
             }
-        ))
-        try looper.schedule { [weak self] in
-            try self?.setLinkOnQueue(link)
+        } catch {
+            if didAttach {
+                await looper.detach(.link)
+            }
+            throw error
         }
     }
 
