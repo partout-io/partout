@@ -659,7 +659,7 @@ private extension FdLooper {
             let linkFd = dup(Int32(fd))
             guard linkFd >= 0 else {
                 pp_log(ctx, .core, .fault, "Unable to dup link fd")
-                results.append(.attach(continuation, .failure(PartoutError(.ioFailure, fd))))
+                results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable, fd))))
                 break
             }
             guard pp_mux_add(mux, linkFd) else {
@@ -695,7 +695,7 @@ private extension FdLooper {
             let tunFd = dup(Int32(fd))
             guard tunFd >= 0 else {
                 pp_log(ctx, .core, .fault, "Unable to dup tun fd")
-                results.append(.attach(continuation, .failure(PartoutError(.ioFailure, fd))))
+                results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable, fd))))
                 break
             }
             guard pp_mux_add(mux, tunFd) else {
