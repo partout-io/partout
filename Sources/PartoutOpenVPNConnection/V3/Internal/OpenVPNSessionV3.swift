@@ -14,7 +14,7 @@ final class OpenVPNSessionV3: @unchecked Sendable {
     private let dpFactory: DataPathFactory
     private let queue: DispatchQueue
     private let queueKey: DispatchSpecificKey<Void>
-    // FIXME: ###, Workaround for self in init closures
+    // XXX: Workaround for self in init closures
     var looper: FdLooper!
     private weak var delegate: OpenVPNSessionDelegateV3?
 
