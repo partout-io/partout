@@ -286,7 +286,7 @@ private extension NegotiatorV3 {
                 do {
                     try checkNegotiationComplete()
                 } catch {
-                    self.options.onError(self.key, error)
+                    options.onError(key, error)
                 }
             }
             return
