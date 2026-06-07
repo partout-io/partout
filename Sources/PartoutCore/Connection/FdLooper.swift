@@ -237,15 +237,23 @@ public final class FdLooper: @unchecked Sendable {
         }
     }
 
-    public func schedule(_ body: @escaping @Sendable () throws -> Void) rethrows {
-        if isOnQueue {
-            try body()
-            return
+    public func schedule(
+        after delay: DispatchTimeInterval? = nil,
+        _ body: @escaping @Sendable () throws -> Void
+    ) rethrows {
+        var deadline: DispatchTime = .now()
+        if let delay {
+            deadline = deadline + delay
         }
-        lock.with {
-            precondition(state == .started, "Schedule after start()")
-            commands.append(.custom(body))
-            pp_mux_wake(mux)
+        retryQueue.asyncAfter(deadline: deadline) { [weak self] in
+            guard let self else { return }
+            self.lock.with {
+                guard self.state == .started else {
+                    return
+                }
+                self.commands.append(.custom(body))
+                pp_mux_wake(self.mux)
+            }
         }
     }
 
