@@ -171,7 +171,7 @@ public final class FdLooper: @unchecked Sendable {
                     // Unwrap user-defined errors
                     detachImmediately(side, withReason: reason)
                 } catch let reason as IOError {
-                    // Rethrow anything else as is
+                    // Rethrow any other IOError as is
                     detachImmediately(reason.side, withReason: reason)
                 } catch {
                     pp_log(ctx, .core, .fault, "Unable to process: \(error)")
@@ -472,6 +472,8 @@ private extension FdLooper {
                     readCount += 1
                 } catch IOError.wouldBlock {
                     break
+                } catch let error as IOError {
+                    throw error
                 } catch {
                     throw PartoutError(.ioFailure)
                 }
@@ -498,6 +500,8 @@ private extension FdLooper {
                     readCount += 1
                 } catch IOError.wouldBlock {
                     break
+                } catch let error as IOError {
+                    throw error
                 } catch {
                     throw PartoutError(.ioFailure)
                 }
@@ -769,6 +773,7 @@ private extension FdLooper {
     enum IOError: Error, CustomDebugStringConvertible {
         case wouldBlock(Side)
         case noBufSpace(Side)
+        case eof(Side)
         case libc(Side, Int32)
         case user(Side, Error? = nil)
 
@@ -776,6 +781,7 @@ private extension FdLooper {
             switch self {
             case .wouldBlock(let side): side
             case .noBufSpace(let side): side
+            case .eof(let side): side
             case .libc(let side, _): side
             case .user(let side, _): side
             }
@@ -785,6 +791,7 @@ private extension FdLooper {
             switch self {
             case .wouldBlock(let side): "\(side): would block"
             case .noBufSpace(let side): "\(side): no buffer space"
+            case .eof(let side): "\(side): EOF"
             case .libc(let side, let code): "\(side): libc errno=\(code)"
             case .user(let side, let reason): "\(side): user error, \(reason.debugDescription)"
             }
@@ -903,6 +910,8 @@ private extension FdLooper.SideIO {
         arguments: FdLooper.AttachArguments
     ) {
         let linkHandle = pp_socket_create(UInt64(linkFd))
+        // FIXME: ###, Will pass pp_socket later to tell UDP/TCP
+        let closesOnEmptyRead = (arguments.original as? LinkInterface)?.isReliable == true
         self.init(
             side: .link,
             fd: linkFd,
@@ -917,6 +926,9 @@ private extension FdLooper.SideIO {
                     throw FdLooper.IOError.libc(.link, errno)
                 }
                 guard count > 0 else {
+                    if closesOnEmptyRead {
+                        throw FdLooper.IOError.eof(.link)
+                    }
                     return nil
                 }
                 return Data(buf[0..<Int(count)])
