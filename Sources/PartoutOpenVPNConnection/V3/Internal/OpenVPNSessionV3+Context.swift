@@ -19,6 +19,7 @@ extension OpenVPNSessionV3 {
     }
 
     struct ActiveContext {
+        private let dataLink: DataLink
         var withLocalOptions: Bool
         var linkMetadata: LinkMetadata
         var negotiators: [UInt8: NegotiatorV3] = [:]
@@ -29,11 +30,7 @@ extension OpenVPNSessionV3 {
                 pp_log(ctx, .openvpn, .info, "Negotiator: Current key is \(currentNegotiatorKey?.description ?? "nil")")
             }
         }
-        var currentDataChannelKey: UInt8? {
-            didSet {
-                pp_log(ctx, .openvpn, .info, "Data: Current key is \(currentDataChannelKey?.description ?? "nil")")
-            }
-        }
+        private var currentDataChannelKey: UInt8?
         var pushReply: PushReply?
         var pendingPingTask: Task<Void, Error>?
         var lastReceivedDate: Date?
@@ -42,8 +39,14 @@ extension OpenVPNSessionV3 {
 
         private let ctx: PartoutLoggerContext
 
-        init(ctx: PartoutLoggerContext, withLocalOptions: Bool, linkMetadata: LinkMetadata) {
+        init(
+            ctx: PartoutLoggerContext,
+            dataLink: DataLink,
+            withLocalOptions: Bool,
+            linkMetadata: LinkMetadata
+        ) {
             self.ctx = ctx
+            self.dataLink = dataLink
             self.withLocalOptions = withLocalOptions
             self.linkMetadata = linkMetadata
         }
@@ -54,10 +57,19 @@ extension OpenVPNSessionV3 {
             }
         }
 
-        var currentDataChannel: DataChannel? {
-            currentDataChannelKey.flatMap {
-                dataChannels[$0]
+        var currentDataPair: DataLinkPair? {
+            currentDataChannelKey.map {
+                DataLinkPair(link: dataLink, key: $0)
             }
+        }
+
+        mutating func setDataChannel(_ channel: DataChannel, forKey key: UInt8) {
+            dataChannels[channel.key] = channel
+            if let currentDataChannelKey {
+                oldKeys.append(currentDataChannelKey)
+            }
+            currentDataChannelKey = key
+            pp_log(ctx, .openvpn, .info, "Data: Current key is \(key.description)")
         }
 
         mutating func reset() {
@@ -74,6 +86,19 @@ extension OpenVPNSessionV3 {
             pushReply = nil
             pendingPingTask = nil
             lastDataCountDate = nil
+        }
+    }
+
+    struct DataLinkPair {
+        fileprivate let link: DataLink
+        fileprivate let key: UInt8
+
+        func send(_ packets: [Data], on key: UInt8? = nil) throws {
+            try link.send(packets, on: key ?? self.key)
+        }
+
+        func receive(_ packets: [Data], on key: UInt8) throws {
+            try link.receive(packets, on: key)
         }
     }
 }

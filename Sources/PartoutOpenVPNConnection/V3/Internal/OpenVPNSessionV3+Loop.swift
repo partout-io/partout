@@ -99,24 +99,9 @@ extension OpenVPNSessionV3 {
     }
 
     func receiveTunnel(_ packets: [Data]) throws {
-        guard !isStopped else {
-            return
-        }
-        guard let negotiator = currentNegotiator else {
-            pp_log(ctx, .openvpn, .fault, "No negotiator")
-            throw OpenVPNSessionError.assertion
-        }
-        guard negotiator.isConnected, let currentDataChannel else {
-            return
-        }
-
+        guard let currentDataPair else { return }
         try checkPingTimeout()
-
-        try sendDataPackets(
-            packets,
-            to: negotiator.looper,
-            dataChannel: currentDataChannel
-        )
+        try currentDataPair.send(packets)
     }
 }
 
@@ -124,17 +109,9 @@ private extension OpenVPNSessionV3 {
     @inline(always)
     func processDataPackets(_ dataPacketsByKey: [UInt8: [Data]]) throws {
         guard !dataPacketsByKey.isEmpty else { return }
-        guard let looper else { return }
+        guard let currentDataPair else { return }
         for (key, dataPackets) in dataPacketsByKey {
-            guard let dataChannel = dataChannel(for: key) else {
-                pp_log(ctx, .openvpn, .error, "Accounted a data packet for which the cryptographic key hadn't been found")
-                continue
-            }
-            try handleDataPackets(
-                dataPackets,
-                to: looper,
-                dataChannel: dataChannel
-            )
+            try currentDataPair.receive(dataPackets, on: key)
         }
     }
 }

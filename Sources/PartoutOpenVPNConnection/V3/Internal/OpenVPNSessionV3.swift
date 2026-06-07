@@ -170,8 +170,22 @@ private extension OpenVPNSessionV3 {
             throw PartoutError(.operationCancelled)
         }
         pp_log(ctx, .openvpn, .info, "Start VPN session")
+        let dataLink = DataLink(
+            ctx: ctx,
+            looper: looper,
+            dataChannel: { [weak self] in
+                self?.activeContext?.dataChannels[$0]
+            },
+            reportInboundDataCount: { [weak self] in
+                self?.reportInboundDataCount($0)
+            },
+            reportOutboundDataCount: { [weak self] in
+                self?.reportOutboundDataCount($0)
+            }
+        )
         sessionState = .active(.starting, ActiveContext(
             ctx: ctx,
+            dataLink: dataLink,
             withLocalOptions: idleContext.withLocalOptions,
             linkMetadata: link.metadata
         ))
@@ -251,20 +265,14 @@ private extension OpenVPNSessionV3 {
 private extension OpenVPNSessionV3 {
     func sendExitPacketOnQueue() throws {
         preconditionOnQueue()
-        guard let activeContext,
-              !activeContext.linkMetadata.isReliable,
-              let currentDataChannel = activeContext.currentDataChannel else {
-            return
+        try withActiveContext { context in
+            guard !context.linkMetadata.isReliable, let dataPair = context.currentDataPair else {
+                return
+            }
+            pp_log(ctx, .openvpn, .info, "Send OCCPacket exit")
+            try dataPair.send([OCCPacket.exit.serialized()])
+            pp_log(ctx, .openvpn, .info, "Sent OCCPacket correctly")
         }
-        guard let packets = try currentDataChannel.encrypt(packets: [OCCPacket.exit.serialized()]) else {
-            pp_log(ctx, .openvpn, .error, "Encrypted to empty OCCPacket packets")
-            assertionFailure("Empty OCCPacket packets?")
-            return
-        }
-
-        pp_log(ctx, .openvpn, .info, "Send OCCPacket exit")
-        try looper.write(packets, to: .link)
-        pp_log(ctx, .openvpn, .info, "Sent OCCPacket correctly")
     }
 }
 
@@ -279,8 +287,8 @@ extension OpenVPNSessionV3 {
         activeContext?.currentNegotiator
     }
 
-    var currentDataChannel: DataChannel? {
-        activeContext?.currentDataChannel
+    var currentDataPair: DataLinkPair? {
+        activeContext?.currentDataPair
     }
 
     func newNegotiator(on looper: FdLooper, linkMetadata: LinkMetadata) throws -> NegotiatorV3 {
@@ -348,11 +356,7 @@ extension OpenVPNSessionV3 {
 
             // Replace current channel with new
             pp_log(ctx, .openvpn, .info, "Replace key \(dataChannel.key) with new data channel")
-            context.dataChannels[dataChannel.key] = dataChannel
-            if let currentDataChannel = context.currentDataChannel {
-                context.oldKeys.append(currentDataChannel.key)
-            }
-            context.currentDataChannelKey = key
+            context.setDataChannel(dataChannel, forKey: key)
 
             // Clean up old keys
             while context.oldKeys.count > 1 {
@@ -455,26 +459,17 @@ private extension OpenVPNSessionV3 {
             pp_log(ctx, .openvpn, .debug, "Ping cancelled, session stopped")
             return
         }
-        guard looper.isLinkAttached else {
-            pp_log(ctx, .openvpn, .debug, "Ping cancelled, no link")
+        guard let currentDataPair else {
+            pp_log(ctx, .openvpn, .debug, "Ping cancelled, no data link")
             return
         }
-        guard let currentDataChannel else {
-            pp_log(ctx, .openvpn, .debug, "Ping cancelled, no data channel")
-            return
-        }
-
         pp_log(ctx, .openvpn, .debug, "Run ping check")
         try checkPingTimeout()
 
         // Is keep-alive enabled?
         if keepAliveInterval != nil {
             pp_log(ctx, .openvpn, .debug, "Send ping")
-            try sendDataPackets(
-                [Constants.DataChannel.pingString],
-                to: looper,
-                dataChannel: currentDataChannel
-            )
+            try currentDataPair.send([Constants.DataChannel.pingString])
         }
 
         // Schedule even just to check for ping timeout
