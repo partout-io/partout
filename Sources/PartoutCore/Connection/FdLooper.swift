@@ -241,11 +241,19 @@ public final class FdLooper: @unchecked Sendable {
         after delay: DispatchTimeInterval? = nil,
         _ body: @escaping @Sendable () throws -> Void
     ) rethrows {
-        var deadline: DispatchTime = .now()
-        if let delay {
-            deadline = deadline + delay
+        guard let delay else {
+            if isOnQueue {
+                try body()
+            } else {
+                lock.with {
+                    precondition(state == .started, "Schedule after start()")
+                    commands.append(.custom(body))
+                    pp_mux_wake(mux)
+                }
+            }
+            return
         }
-        scheduleQueue.asyncAfter(deadline: deadline) { [weak self] in
+        scheduleQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self else { return }
             self.lock.with {
                 guard self.state == .started else {
