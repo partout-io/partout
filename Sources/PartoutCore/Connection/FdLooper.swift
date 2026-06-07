@@ -314,7 +314,9 @@ public final class FdLooper: @unchecked Sendable {
                 pp_log(ctx, .core, .error, "Ignoring link packets, not attached")
                 return
             }
+            lock.unlock()
             let processedPackets = try link.transformWrite?(packets) ?? packets
+            lock.lock()
             processedPackets.forEach {
                 link.unsafeEnqueueWrite($0)
             }
@@ -324,7 +326,9 @@ public final class FdLooper: @unchecked Sendable {
                 pp_log(ctx, .core, .error, "Ignoring tun packets, not attached")
                 return
             }
+            lock.unlock()
             let processedPackets = try tun.transformWrite?(packets) ?? packets
+            lock.lock()
             processedPackets.forEach {
                 tun.unsafeEnqueueWrite($0)
             }
