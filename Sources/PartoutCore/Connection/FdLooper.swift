@@ -7,27 +7,6 @@
 #if !os(Windows)
 internal import _PartoutCore_C
 
-/// Delegates ``FdLooper`` events.
-public struct FdLooperDelegate: Sendable {
-    public typealias OnRead = @Sendable (_ packets: [Data], _ side: FdLooper.Side) throws -> FdLooper.ReadAction
-    public typealias OnWrite = @Sendable (_ packet: Data, _ side: FdLooper.Side) throws -> Data
-    public typealias OnFinish = @Sendable (_ error: Error?) -> Void
-
-    public let onRead: OnRead
-    public let onWrite: OnWrite?
-    public let onFinish: OnFinish
-
-    public init(
-        onRead: @escaping OnRead,
-        onWrite: OnWrite?,
-        onFinish: @escaping OnFinish
-    ) {
-        self.onRead = onRead
-        self.onWrite = onWrite
-        self.onFinish = onFinish
-    }
-}
-
 /// Loops through a set of file descriptors.
 public final class FdLooper: @unchecked Sendable {
     public enum Side: Hashable, Sendable {
@@ -40,58 +19,66 @@ public final class FdLooper: @unchecked Sendable {
         case pause
     }
 
-    private enum State: Sendable {
-        case idle
-        case started
-        case stopping
-        case stopped
-    }
+    public typealias BeforeRead = @Sendable (_ packets: [Data]) throws -> [Data]
+    public typealias OnRead = @Sendable (_ packets: [Data]) throws -> FdLooper.ReadAction
+    public typealias TransformWrite = @Sendable (_ packets: [Data]) throws -> [Data]
+    public typealias OnFinish = @Sendable (_ error: Error?) -> Void
 
-    fileprivate enum Command {
-        case attachLink(IOInterface, CheckedContinuation<Void, Error>)
-        case attachTun(IOInterface, CheckedContinuation<Void, Error>)
-        case detachLink(CheckedContinuation<Void, Never>)
-        case detachTun(CheckedContinuation<Void, Never>)
-        case enableRead(Side, UUID?)
-        case enableWrite(Side, UUID?)
-        case custom(@Sendable () throws -> Void)
-        case stop
+    public struct AttachArguments: Sendable {
+        public let side: Side
+        public let original: IOInterface
+        public let beforeRead: BeforeRead?
+        public let onRead: OnRead?
+        public let transformWrite: TransformWrite?
+
+        public init(
+            side: Side,
+            original: IOInterface,
+            beforeRead: BeforeRead?,
+            onRead: OnRead?,
+            transformWrite: TransformWrite?
+        ) {
+            self.side = side
+            self.original = original
+            self.beforeRead = beforeRead
+            self.onRead = onRead
+            self.transformWrite = transformWrite
+        }
     }
 
     private static let numberOfDescriptors = 2
+    private static let noBufRetryDelay: DispatchTimeInterval = .milliseconds(10)
 
     private let ctx: PartoutLoggerContext
     private let mux: pp_mux
-    private var link: SideIO?
-    private var tun: SideIO?
-    private var linkHandle: pp_socket?
-    private var tunHandle: pp_tun?
-    private let delegate: FdLooperDelegate
     private let linkBufSize: Int
     private let tunBufSize: Int
     private let maxReadSize: Int
     private let maxReadCount: Int
-    private static let noBufRetryDelay: DispatchTimeInterval = .milliseconds(10)
+    private let onFinish: OnFinish
 
     private let loopQueue: DispatchQueue
     private let loopQueueKey: DispatchSpecificKey<Void>
-    private let retryQueue: DispatchQueue
+    private let scheduleQueue: DispatchQueue
     private let lock: SemaphoreMutex
+
+    private var state: State
     private var commands: [Command]
     private var readRetries: Set<Side>
     private var writeRetries: Set<Side>
-    private var state: State
+    private var link: SideIO?
+    private var tun: SideIO?
     private var stopContinuation: CheckedContinuation<Void, Error>?
     private var terminalError: Error?
 
     public init(
         _ ctx: PartoutLoggerContext,
         queue: DispatchQueue,
-        delegate: FdLooperDelegate,
         linkBufSize: Int = 64 * 1024,
         tunBufSize: Int = 16 * 1024,
         maxReadSize: Int = 256 * 1024,
-        maxReadCount: Int = 128
+        maxReadCount: Int = 128,
+        onFinish: @escaping OnFinish
     ) throws {
         guard let newMux = pp_mux_create(Int32(Self.numberOfDescriptors)) else {
             pp_log(ctx, .core, .fault, "Unable to create mux")
@@ -100,21 +87,22 @@ public final class FdLooper: @unchecked Sendable {
 
         self.ctx = ctx
         mux = newMux
-        self.delegate = delegate
         self.linkBufSize = linkBufSize
         self.tunBufSize = tunBufSize
         self.maxReadSize = max(maxReadSize, linkBufSize, tunBufSize)
         self.maxReadCount = maxReadCount
+        self.onFinish = onFinish
 
         loopQueue = queue
         loopQueueKey = DispatchSpecificKey()
         loopQueue.setSpecific(key: loopQueueKey, value: ())
-        retryQueue = DispatchQueue(label: "\(queue.label).retry")
+        scheduleQueue = DispatchQueue(label: "\(queue.label).schedule")
         lock = SemaphoreMutex()
+
+        state = .idle
         commands = []
         readRetries = []
         writeRetries = []
-        state = .idle
     }
 
     deinit {
@@ -249,53 +237,49 @@ public final class FdLooper: @unchecked Sendable {
         }
     }
 
-    public func schedule(_ body: @escaping @Sendable () throws -> Void) rethrows {
-        if isOnQueue {
-            try body()
+    public func schedule(
+        after delay: DispatchTimeInterval? = nil,
+        _ body: @escaping @Sendable () throws -> Void
+    ) rethrows {
+        guard let delay else {
+            if isOnQueue {
+                try body()
+            } else {
+                lock.with {
+                    precondition(state == .started, "Schedule after start()")
+                    commands.append(.custom(body))
+                    pp_mux_wake(mux)
+                }
+            }
             return
         }
-        lock.with {
-            precondition(state == .started, "Schedule after start()")
-            commands.append(.custom(body))
-            pp_mux_wake(mux)
+        scheduleQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self else { return }
+            self.lock.with {
+                guard self.state == .started else {
+                    return
+                }
+                self.commands.append(.custom(body))
+                pp_mux_wake(self.mux)
+            }
         }
     }
 
-    public func attachLink(_ linkInterface: IOInterface) async throws {
+    public func attach(_ arguments: AttachArguments) async throws {
         try await withCheckedThrowingContinuation { continuation in
             lock.with {
-                precondition(state == .started, "Attach link after start()")
-                commands.append(.attachLink(linkInterface, continuation))
+                precondition(state == .started, "Attach after start()")
+                commands.append(.attach(arguments, continuation))
                 pp_mux_wake(mux)
             }
         }
     }
 
-    public func attachTun(_ tunInterface: IOInterface) async throws {
-        try await withCheckedThrowingContinuation { continuation in
-            lock.with {
-                precondition(state == .started, "Attach tun after start()")
-                commands.append(.attachTun(tunInterface, continuation))
-                pp_mux_wake(mux)
-            }
-        }
-    }
-
-    public func detachLink() async {
+    public func detach(_ side: Side) async {
         await withCheckedContinuation { continuation in
             lock.with {
-                precondition(state == .started, "Detach link after start()")
-                commands.append(.detachLink(continuation))
-                pp_mux_wake(mux)
-            }
-        }
-    }
-
-    public func detachTun() async {
-        await withCheckedContinuation { continuation in
-            lock.with {
-                precondition(state == .started, "Detach link after start()")
-                commands.append(.detachTun(continuation))
+                precondition(state == .started, "Detach after start()")
+                commands.append(.detach(side, continuation))
                 pp_mux_wake(mux)
             }
         }
@@ -329,9 +313,17 @@ public final class FdLooper: @unchecked Sendable {
                 pp_log(ctx, .core, .error, "Ignoring link packets, not attached")
                 return
             }
-            try packets.forEach {
-                let packet = try delegate.onWrite?($0, side) ?? $0
-                link.unsafeEnqueueWrite(packet)
+            lock.unlock()
+
+            let processedPackets = try link.transformWrite?(packets) ?? packets
+
+            lock.lock()
+            guard link === self.link else {
+                pp_log(ctx, .core, .error, "Ignoring detached link during processing")
+                return
+            }
+            processedPackets.forEach {
+                link.unsafeEnqueueWrite($0)
             }
             commands.append(.enableWrite(.link, nil))
         case .tun:
@@ -339,7 +331,16 @@ public final class FdLooper: @unchecked Sendable {
                 pp_log(ctx, .core, .error, "Ignoring tun packets, not attached")
                 return
             }
-            packets.forEach {
+            lock.unlock()
+
+            let processedPackets = try tun.transformWrite?(packets) ?? packets
+
+            lock.lock()
+            guard tun === self.tun else {
+                pp_log(ctx, .core, .error, "Ignoring detached tun during processing")
+                return
+            }
+            processedPackets.forEach {
                 tun.unsafeEnqueueWrite($0)
             }
             commands.append(.enableWrite(.tun, nil))
@@ -349,6 +350,22 @@ public final class FdLooper: @unchecked Sendable {
 }
 
 private extension FdLooper {
+    enum State: Sendable {
+        case idle
+        case started
+        case stopping
+        case stopped
+    }
+
+    enum Command {
+        case attach(AttachArguments, CheckedContinuation<Void, Error>)
+        case detach(Side, CheckedContinuation<Void, Never>)
+        case enableRead(Side, UUID?)
+        case enableWrite(Side, UUID?)
+        case custom(@Sendable () throws -> Void)
+        case stop
+    }
+
     enum CommandResult {
         case attach(CheckedContinuation<Void, Error>, Result<Void, Error>)
         case detach(CheckedContinuation<Void, Never>)
@@ -358,131 +375,18 @@ private extension FdLooper {
         lock.lock()
         let pendingCommands = commands
         commands.removeAll(keepingCapacity: true)
-
-        var shouldStop = false
         var results: [CommandResult] = []
+        var shouldStop = false
         for cmd in pendingCommands {
             switch cmd {
-            case .attachLink(let linkInterface, let continuation):
-                guard let fd = linkInterface.fileDescriptor else {
-                    results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable))))
-                    break
-                }
-                // Cancel attach if stopping
-                guard state != .stopping else {
-                    results.append(.attach(continuation, .failure(CancellationError())))
-                    break
-                }
-                // Can only attach once
-                guard link == nil else {
-                    results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
-                    break
-                }
-                let linkFd = Int32(fd)
-                guard pp_mux_add(mux, linkFd) else {
-                    pp_log(ctx, .core, .fault, "Unable to attach link")
-                    results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
-                    break
-                }
-                pp_log(ctx, .core, .info, "Attach link (fd=\(fd))")
-
-                // Create new side
-                let linkHandle = pp_socket_create(fd)
-                self.linkHandle = linkHandle
-                link = SideIO(
-                    mux: mux,
-                    linkFd: linkFd,
-                    handle: linkHandle,
-                    originalInterface: linkInterface,
-                    readBufSize: linkBufSize
-                )
-                results.append(.attach(continuation, .success(())))
-            case .attachTun(let tunInterface, let continuation):
-                guard let fd = tunInterface.fileDescriptor else {
-                    results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable))))
-                    break
-                }
-                // Cancel attach if stopping
-                guard state != .stopping else {
-                    results.append(.attach(continuation, .failure(CancellationError())))
-                    break
-                }
-                // Can only attach once
-                guard tun == nil else {
-                    results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
-                    break
-                }
-                let tunFd = Int32(fd)
-                guard pp_mux_add(mux, tunFd) else {
-                    pp_log(ctx, .core, .fault, "Unable to attach tun")
-                    results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
-                    break
-                }
-                pp_log(ctx, .core, .info, "Attach tun (fd=\(fd))")
-
-                // Create new side
-                let tunHandle = pp_tun_create(tunFd)
-                self.tunHandle = tunHandle
-                tun = SideIO(
-                    mux: mux,
-                    tunFd: tunFd,
-                    handle: tunHandle,
-                    originalInterface: tunInterface,
-                    readBufSize: tunBufSize
-                )
-                results.append(.attach(continuation, .success(())))
-            case .detachLink(let continuation):
-                link?.detach()
-                link = nil
-                readRetries.remove(.link)
-                writeRetries.remove(.link)
-                results.append(.detach(continuation))
-            case .detachTun(let continuation):
-                tun?.detach()
-                tun = nil
-                readRetries.remove(.tun)
-                writeRetries.remove(.tun)
-                results.append(.detach(continuation))
+            case .attach(let arguments, let continuation):
+                handleAttach(arguments, continuation: continuation, results: &results)
+            case .detach(let side, let continuation):
+                handleDetach(side, continuation: continuation, results: &results)
             case .enableRead(let side, let id):
-                if let id {
-                    guard !isOutdated(id, side: side) else {
-                        break
-                    }
-                }
-                switch side {
-                case .link:
-                    if let link {
-                        pp_mux_set_read(mux, link.fd, true)
-                    } else {
-                        pp_log(ctx, .core, .error, "Ignoring link enableRead(), not attached")
-                    }
-                case .tun:
-                    if let tun {
-                        pp_mux_set_read(mux, tun.fd, true)
-                    } else {
-                        pp_log(ctx, .core, .error, "Ignoring tun enableRead(), not attached")
-                    }
-                }
+                handleEnableRead(side, id: id)
             case .enableWrite(let side, let id):
-                if let id {
-                    guard !isOutdated(id, side: side) else {
-                        break
-                    }
-                }
-                switch side {
-                case .link:
-                    if let link {
-                        pp_mux_set_write(mux, link.fd, true)
-                    } else {
-                        pp_log(ctx, .core, .error, "Ignoring link enableWrite(), not attached")
-                    }
-                case .tun:
-                    if let tun {
-                        pp_mux_set_write(mux, tun.fd, true)
-                    } else {
-                        pp_log(ctx, .core, .error, "Ignoring tun enableWrite(), not attached")
-                    }
-                }
+                handleEnableWrite(side, id: id)
             case .custom(let body):
                 lock.unlock()
                 try body()
@@ -577,7 +481,7 @@ private extension FdLooper {
                 }
             }
             if !inbox.isEmpty {
-                let action = try delegate.onRead(inbox, .tun)
+                let action = try tun.processReadPackets(inbox)
                 if action == .pause {
                     pp_mux_set_read(mux, tun.fd, false)
                 }
@@ -603,7 +507,7 @@ private extension FdLooper {
                 }
             }
             if !inbox.isEmpty {
-                let action = try delegate.onRead(inbox, .link)
+                let action = try link.processReadPackets(inbox)
                 if action == .pause {
                     pp_mux_set_read(mux, link.fd, false)
                 }
@@ -625,7 +529,7 @@ private extension FdLooper {
 
         let side = io.side
         let command: Command = .enableRead(side, io.id)
-        retryQueue.asyncAfter(deadline: .now() + Self.noBufRetryDelay) { [weak self] in
+        scheduleQueue.asyncAfter(deadline: .now() + Self.noBufRetryDelay) { [weak self] in
             guard let self else { return }
             self.lock.with {
                 self.readRetries.remove(side)
@@ -649,7 +553,7 @@ private extension FdLooper {
 
         let side = io.side
         let command: Command = .enableWrite(side, io.id)
-        retryQueue.asyncAfter(deadline: .now() + Self.noBufRetryDelay) { [weak self] in
+        scheduleQueue.asyncAfter(deadline: .now() + Self.noBufRetryDelay) { [weak self] in
             guard let self else { return }
             self.lock.with {
                 self.writeRetries.remove(side)
@@ -690,9 +594,151 @@ private extension FdLooper {
             stopContinuation?.resume()
         }
         stopContinuation = nil
-        delegate.onFinish(error)
+        onFinish(error)
     }
 }
+
+// MARK: - Commands (inside lock)
+
+private extension FdLooper {
+    func handleAttach(
+        _ arguments: AttachArguments,
+        continuation: CheckedContinuation<Void, Error>,
+        results: inout [CommandResult]
+    ) {
+        switch arguments.side {
+        case .link:
+            guard let fd = arguments.original.fileDescriptor else {
+                results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable))))
+                break
+            }
+            // Cancel attach if stopping
+            guard state != .stopping else {
+                results.append(.attach(continuation, .failure(CancellationError())))
+                break
+            }
+            // Can only attach once
+            guard link == nil else {
+                results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
+                break
+            }
+            let linkFd = Int32(fd)
+            guard pp_mux_add(mux, linkFd) else {
+                pp_log(ctx, .core, .fault, "Unable to attach link")
+                results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
+                break
+            }
+            pp_log(ctx, .core, .info, "Attach link (fd=\(fd))")
+
+            // Create new side
+            link = SideIO(
+                mux: mux,
+                linkFd: linkFd,
+                readBufSize: linkBufSize,
+                arguments: arguments
+            )
+            results.append(.attach(continuation, .success(())))
+        case .tun:
+            guard let fd = arguments.original.fileDescriptor else {
+                results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable))))
+                break
+            }
+            // Cancel attach if stopping
+            guard state != .stopping else {
+                results.append(.attach(continuation, .failure(CancellationError())))
+                break
+            }
+            // Can only attach once
+            guard tun == nil else {
+                results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
+                break
+            }
+            let tunFd = Int32(fd)
+            guard pp_mux_add(mux, tunFd) else {
+                pp_log(ctx, .core, .fault, "Unable to attach tun")
+                results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
+                break
+            }
+            pp_log(ctx, .core, .info, "Attach tun (fd=\(fd))")
+
+            // Create new side
+            tun = SideIO(
+                mux: mux,
+                tunFd: tunFd,
+                readBufSize: tunBufSize,
+                arguments: arguments
+            )
+            results.append(.attach(continuation, .success(())))
+        }
+    }
+
+    func handleDetach(
+        _ side: Side,
+        continuation: CheckedContinuation<Void, Never>,
+        results: inout [CommandResult]
+    ) {
+        switch side {
+        case .link:
+            link?.detach()
+            link = nil
+            readRetries.remove(.link)
+            writeRetries.remove(.link)
+            results.append(.detach(continuation))
+        case .tun:
+            tun?.detach()
+            tun = nil
+            readRetries.remove(.tun)
+            writeRetries.remove(.tun)
+            results.append(.detach(continuation))
+        }
+    }
+
+    func handleEnableRead(_ side: Side, id: UUID?) {
+        if let id {
+            guard !isOutdated(id, side: side) else {
+                return
+            }
+        }
+        switch side {
+        case .link:
+            if let link {
+                pp_mux_set_read(mux, link.fd, true)
+            } else {
+                pp_log(ctx, .core, .error, "Ignoring link enableRead(), not attached")
+            }
+        case .tun:
+            if let tun {
+                pp_mux_set_read(mux, tun.fd, true)
+            } else {
+                pp_log(ctx, .core, .error, "Ignoring tun enableRead(), not attached")
+            }
+        }
+    }
+
+    func handleEnableWrite(_ side: Side, id: UUID?) {
+        if let id {
+            guard !isOutdated(id, side: side) else {
+                return
+            }
+        }
+        switch side {
+        case .link:
+            if let link {
+                pp_mux_set_write(mux, link.fd, true)
+            } else {
+                pp_log(ctx, .core, .error, "Ignoring link enableWrite(), not attached")
+            }
+        case .tun:
+            if let tun {
+                pp_mux_set_write(mux, tun.fd, true)
+            } else {
+                pp_log(ctx, .core, .error, "Ignoring tun enableWrite(), not attached")
+            }
+        }
+    }
+}
+
+// MARK: - Descriptors
 
 private final class FdSet {
     var readable: Set<Int32>
@@ -734,10 +780,16 @@ private extension FdLooper {
         let id = UUID()
         let side: Side
         let fd: Int32
+
         let originalInterface: IOInterface
+        private let beforeRead: BeforeRead?
+        private let onRead: OnRead?
+        let transformWrite: TransformWrite?
+
         private let read: (inout [UInt8]) throws -> Data?
         private let write: (PendingWrite) throws -> Int
         private var cleanup: (() -> Void)?
+
         private var readBuf: [UInt8]
         private var writeQueue: RingQueue<Data>
         private var writeOffset: Int
@@ -745,15 +797,18 @@ private extension FdLooper {
         init(
             side: Side,
             fd: Int32,
-            originalInterface: IOInterface,
             readBufSize: Int,
+            arguments: FdLooper.AttachArguments,
             read: @escaping (inout [UInt8]) throws -> Data?,
             write: @escaping (PendingWrite) throws -> Int,
-            cleanup: @escaping () -> Void
+            cleanup: @escaping () -> Void,
         ) {
             self.side = side
             self.fd = fd
-            self.originalInterface = originalInterface
+            originalInterface = arguments.original
+            beforeRead = arguments.beforeRead
+            onRead = arguments.onRead
+            transformWrite = arguments.transformWrite
             self.read = read
             self.write = write
             self.cleanup = cleanup
@@ -764,6 +819,11 @@ private extension FdLooper {
 
         func dequeueRead() throws -> Data? {
             try read(&readBuf)
+        }
+
+        func processReadPackets(_ packets: [Data]) throws -> FdLooper.ReadAction {
+            let processed = try beforeRead?(packets) ?? packets
+            return try onRead?(processed) ?? .keep
         }
 
         func performWrite(_ pending: PendingWrite, lock: SemaphoreMutex) throws -> Bool {
@@ -805,16 +865,15 @@ private extension FdLooper.SideIO {
     convenience init(
         mux: pp_mux,
         linkFd: Int32,
-        handle: pp_socket,
-        originalInterface: IOInterface,
-        readBufSize: Int
+        readBufSize: Int,
+        arguments: FdLooper.AttachArguments
     ) {
-        nonisolated(unsafe) let linkHandle = handle
+        let linkHandle = pp_socket_create(UInt64(linkFd))
         self.init(
             side: .link,
             fd: linkFd,
-            originalInterface: originalInterface,
             readBufSize: readBufSize,
+            arguments: arguments,
             read: { buf in
                 let count = pp_socket_read(linkHandle, &buf, buf.count)
                 guard count != PP_SOCKET_WOULD_BLOCK else {
@@ -857,16 +916,15 @@ private extension FdLooper.SideIO {
     convenience init(
         mux: pp_mux,
         tunFd: Int32,
-        handle: pp_tun,
-        originalInterface: IOInterface,
-        readBufSize: Int
+        readBufSize: Int,
+        arguments: FdLooper.AttachArguments
     ) {
-        nonisolated(unsafe) let tunHandle = handle
+        let tunHandle = pp_tun_create(tunFd)
         self.init(
             side: .tun,
             fd: tunFd,
-            originalInterface: originalInterface,
             readBufSize: readBufSize,
+            arguments: arguments,
             read: { buf in
                 let count = pp_tun_read(tunHandle, &buf, buf.count)
                 guard count != PP_TUN_WOULD_BLOCK else {
