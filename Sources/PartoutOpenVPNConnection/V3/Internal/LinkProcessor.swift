@@ -4,13 +4,13 @@
 
 struct LinkProcessor: @unchecked Sendable {
     private let proc: PacketProcessor
-    let beforeRead: ([Data]) throws -> [Data]
-    let beforeWrite: ([Data]) throws -> [Data]
+    let beforeRead: @Sendable ([Data]) throws -> [Data]
+    let beforeWrite: @Sendable ([Data]) throws -> [Data]
 
     init(proc: PacketProcessor, isReliable: Bool) {
         self.proc = proc
         if isReliable {
-            var buffer = Data()
+            nonisolated(unsafe) var buffer = Data()
             beforeRead = {
                 // FIXME: #214, TCP is very slow
                 buffer.reserveCapacity(buffer.count + $0.flatCount)
