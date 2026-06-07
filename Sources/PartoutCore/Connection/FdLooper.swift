@@ -657,6 +657,11 @@ private extension FdLooper {
                 break
             }
             let linkFd = dup(Int32(fd))
+            guard linkFd >= 0 else {
+                pp_log(ctx, .core, .fault, "Unable to dup link fd")
+                results.append(.attach(continuation, .failure(PartoutError(.ioFailure, fd))))
+                break
+            }
             guard pp_mux_add(mux, linkFd) else {
                 pp_log(ctx, .core, .fault, "Unable to attach link")
                 results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
@@ -688,6 +693,11 @@ private extension FdLooper {
                 break
             }
             let tunFd = dup(Int32(fd))
+            guard tunFd >= 0 else {
+                pp_log(ctx, .core, .fault, "Unable to dup tun fd")
+                results.append(.attach(continuation, .failure(PartoutError(.ioFailure, fd))))
+                break
+            }
             guard pp_mux_add(mux, tunFd) else {
                 pp_log(ctx, .core, .fault, "Unable to attach tun")
                 results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
