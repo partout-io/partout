@@ -167,18 +167,18 @@ public final class FdLooper: @unchecked Sendable {
 
                     // Iterate through the fds
                     try process(mux: mux, fdSet: fdSet)
-                } catch IOError.linkFailed {
+                } catch IOError.failed(let side, let reason) {
                     lock.with {
-                        self.link?.detach(error: IOError.linkFailed)
-                        self.link = nil
-                    }
-                } catch IOError.tunFailed {
-                    lock.with {
-                        self.tun?.detach(error: IOError.tunFailed)
-                        self.tun = nil
+                        switch side {
+                        case .link:
+                            self.link?.detach(reason: reason)
+                            self.link = nil
+                        case .tun:
+                            self.tun?.detach(reason: reason)
+                            self.tun = nil
+                        }
                     }
                 } catch {
-                    // FIXME: ###, Custom onRead() errors end up here
                     pp_log(ctx, .core, .error, "Unable to process: \(error)")
                     lastError = error
                     break
@@ -759,10 +759,17 @@ private final class FdSet {
 
 private extension FdLooper {
     enum IOError: Error {
-        case wouldBlock
-        case noBufSpace
-        case linkFailed
-        case tunFailed
+        case wouldBlock(Side)
+        case noBufSpace(Side)
+        case failed(Side, Error? = nil)
+
+        var side: Side {
+            switch self {
+            case .wouldBlock(let side): side
+            case .noBufSpace(let side): side
+            case .failed(let side, _): side
+            }
+        }
     }
 
     struct PendingWrite {
@@ -822,9 +829,13 @@ private extension FdLooper {
             try read(&readBuf)
         }
 
-        // May throw user-defined errors in onRead
         func processReadPackets(_ packets: [Data]) throws -> FdLooper.ReadAction {
-            try onRead?(packets) ?? .keep
+            do {
+                return try onRead?(packets) ?? .keep
+            } catch {
+                // BEWARE: Wrap user-defined errors to prevent premature finish
+                throw IOError.failed(side, error)
+            }
         }
 
         func performWrite(_ pending: PendingWrite, lock: SemaphoreMutex) throws -> Bool {
@@ -853,9 +864,9 @@ private extension FdLooper {
             writeQueue.append(packet)
         }
 
-        func detach(error: Error? = nil) {
-            if let error {
-                onFailure?(error)
+        func detach(reason: Error? = nil) {
+            if let reason {
+                onFailure?(reason)
             }
             cleanup?()
             cleanup = nil
@@ -881,10 +892,10 @@ private extension FdLooper.SideIO {
             read: { buf in
                 let count = pp_socket_read(linkHandle, &buf, buf.count)
                 guard count != PP_SOCKET_WOULD_BLOCK else {
-                    throw FdLooper.IOError.wouldBlock
+                    throw FdLooper.IOError.wouldBlock(.link)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.linkFailed
+                    throw FdLooper.IOError.failed(.link)
                 }
                 guard count > 0 else {
                     return nil
@@ -900,13 +911,13 @@ private extension FdLooper.SideIO {
                     )
                 }
                 guard count != PP_SOCKET_WOULD_BLOCK else {
-                    throw FdLooper.IOError.wouldBlock
+                    throw FdLooper.IOError.wouldBlock(.link)
                 }
                 guard count != PP_SOCKET_NO_BUF else {
-                    throw FdLooper.IOError.noBufSpace
+                    throw FdLooper.IOError.noBufSpace(.link)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.linkFailed
+                    throw FdLooper.IOError.failed(.link)
                 }
                 return Int(count)
             },
@@ -932,10 +943,10 @@ private extension FdLooper.SideIO {
             read: { buf in
                 let count = pp_tun_read(tunHandle, &buf, buf.count)
                 guard count != PP_TUN_WOULD_BLOCK else {
-                    throw FdLooper.IOError.wouldBlock
+                    throw FdLooper.IOError.wouldBlock(.tun)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.tunFailed
+                    throw FdLooper.IOError.failed(.tun)
                 }
                 guard count > 0 else {
                     return nil
@@ -951,13 +962,13 @@ private extension FdLooper.SideIO {
                     )
                 }
                 guard count != PP_TUN_WOULD_BLOCK else {
-                    throw FdLooper.IOError.wouldBlock
+                    throw FdLooper.IOError.wouldBlock(.tun)
                 }
                 guard count != PP_TUN_NO_BUF else {
-                    throw FdLooper.IOError.noBufSpace
+                    throw FdLooper.IOError.noBufSpace(.tun)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.tunFailed
+                    throw FdLooper.IOError.failed(.tun)
                 }
                 return Int(count)
             },
