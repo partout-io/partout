@@ -13,7 +13,7 @@ extension _OpenVPNConnectionV3 {
         guard let configuration = module.configuration else {
             fatalError("Creating session without OpenVPN configuration?")
         }
-        pp_log(ctx, .openvpn, .notice, "OpenVPN: Using v2 connection")
+        pp_log(ctx, .openvpn, .notice, "OpenVPN: Using v3 connection")
 
         // Hardcode portable implementations
         let prng = PlatformPRNG()
@@ -21,7 +21,7 @@ extension _OpenVPNConnectionV3 {
             POSIXDNSStrategy(hostname: $0, flags: $1)
         }
         let sessionFactory = {
-            try await OpenVPNSessionV3(
+            try OpenVPNSessionV3(
                 ctx,
                 configuration: configuration,
                 credentials: module.credentials,

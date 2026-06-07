@@ -4,18 +4,17 @@
 
 extension OpenVPNSessionV3 {
     @discardableResult
-    func startNegotiation(on link: LinkInterface) throws -> NegotiatorV3 {
+    func startNegotiation(on looper: FdLooper, linkMetadata: LinkMetadata) throws -> NegotiatorV3 {
         pp_log(ctx, .openvpn, .info, "Start negotiation")
-        let neg = try newNegotiator(on: link)
+        let neg = try newNegotiator(on: looper, linkMetadata: linkMetadata)
         addNegotiator(neg)
-        loopLinkV2()
         try neg.start()
         return neg
     }
 
     func startRenegotiation(
         after negotiator: NegotiatorV3,
-        on link: LinkInterface,
+        on looper: FdLooper,
         isServerInitiated: Bool
     ) throws -> NegotiatorV3 {
         guard !negotiator.isRenegotiating else {

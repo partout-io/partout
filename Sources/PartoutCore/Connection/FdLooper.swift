@@ -300,7 +300,28 @@ public final class FdLooper: @unchecked Sendable {
         pp_mux_wake(mux)
     }
 
-    public func write(_ packets: [Data], to side: Side) throws {
+    public func write(_ packets: [Data], to side: Side, outOfBand: Bool = false) throws {
+        if outOfBand {
+            precondition(isOnQueue, "OOB writes must run on the looper queue")
+            switch side {
+            case .link:
+                guard let link else {
+                    pp_log(ctx, .core, .error, "Ignoring link packets, not attached")
+                    return
+                }
+                let processedPackets = try link.transformWrite?(packets) ?? packets
+                try processedPackets.forEach(link.writeOutOfBand)
+            case .tun:
+                guard let tun else {
+                    pp_log(ctx, .core, .error, "Ignoring tun packets, not attached")
+                    return
+                }
+                let processedPackets = try tun.transformWrite?(packets) ?? packets
+                try processedPackets.forEach(tun.writeOutOfBand)
+            }
+            return
+        }
+
         lock.lock()
         defer { lock.unlock() }
         switch side {
@@ -888,6 +909,12 @@ private extension FdLooper {
 
         func unsafeEnqueueWrite(_ packet: Data) {
             writeQueue.append(packet)
+        }
+
+        func writeOutOfBand(_ data: Data) throws {
+            guard try write(PendingWrite(data)) == data.count else {
+                throw PartoutError(.ioFailure)
+            }
         }
 
         func detach(reason: Error? = nil) {
