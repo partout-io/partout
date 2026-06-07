@@ -513,14 +513,12 @@ private extension OpenVPNSessionV3 {
                     authKey: tlsWrap.key,
                     digest: configuration.fallbackDigest
                 )
-
             case .crypt:
                 channel = try ControlChannelV3(
                     ctx,
                     prng: prng,
                     cryptKey: tlsWrap.key
                 )
-
             case .cryptV2:
                 guard let wrappedKey = tlsWrap.wrappedKey else {
                     throw OpenVPNSessionError.assertion
@@ -531,7 +529,6 @@ private extension OpenVPNSessionV3 {
                     cryptV2Key: tlsWrap.key,
                     wrappedKey: wrappedKey
                 )
-
             @unknown default:
                 channel = ControlChannelV3(ctx, prng: prng)
             }
