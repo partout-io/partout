@@ -351,131 +351,18 @@ private extension FdLooper {
         lock.lock()
         let pendingCommands = commands
         commands.removeAll(keepingCapacity: true)
-
-        var shouldStop = false
         var results: [CommandResult] = []
+        var shouldStop = false
         for cmd in pendingCommands {
             switch cmd {
             case .attach(let arguments, let continuation):
-                switch arguments.side {
-                case .link:
-                    guard let fd = arguments.original.fileDescriptor else {
-                        results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable))))
-                        break
-                    }
-                    // Cancel attach if stopping
-                    guard state != .stopping else {
-                        results.append(.attach(continuation, .failure(CancellationError())))
-                        break
-                    }
-                    // Can only attach once
-                    guard link == nil else {
-                        results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
-                        break
-                    }
-                    let linkFd = Int32(fd)
-                    guard pp_mux_add(mux, linkFd) else {
-                        pp_log(ctx, .core, .fault, "Unable to attach link")
-                        results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
-                        break
-                    }
-                    pp_log(ctx, .core, .info, "Attach link (fd=\(fd))")
-
-                    // Create new side
-                    link = SideIO(
-                        mux: mux,
-                        linkFd: linkFd,
-                        readBufSize: linkBufSize,
-                        arguments: arguments
-                    )
-                    results.append(.attach(continuation, .success(())))
-                case .tun:
-                    guard let fd = arguments.original.fileDescriptor else {
-                        results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable))))
-                        break
-                    }
-                    // Cancel attach if stopping
-                    guard state != .stopping else {
-                        results.append(.attach(continuation, .failure(CancellationError())))
-                        break
-                    }
-                    // Can only attach once
-                    guard tun == nil else {
-                        results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
-                        break
-                    }
-                    let tunFd = Int32(fd)
-                    guard pp_mux_add(mux, tunFd) else {
-                        pp_log(ctx, .core, .fault, "Unable to attach tun")
-                        results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
-                        break
-                    }
-                    pp_log(ctx, .core, .info, "Attach tun (fd=\(fd))")
-
-                    // Create new side
-                    tun = SideIO(
-                        mux: mux,
-                        tunFd: tunFd,
-                        readBufSize: tunBufSize,
-                        arguments: arguments
-                    )
-                    results.append(.attach(continuation, .success(())))
-                }
+                handleAttach(arguments, continuation: continuation, results: &results)
             case .detach(let side, let continuation):
-                switch side {
-                case .link:
-                    link?.detach()
-                    link = nil
-                    readRetries.remove(.link)
-                    writeRetries.remove(.link)
-                    results.append(.detach(continuation))
-                case .tun:
-                    tun?.detach()
-                    tun = nil
-                    readRetries.remove(.tun)
-                    writeRetries.remove(.tun)
-                    results.append(.detach(continuation))
-                }
+                handleDetach(side, continuation: continuation, results: &results)
             case .enableRead(let side, let id):
-                if let id {
-                    guard !isOutdated(id, side: side) else {
-                        break
-                    }
-                }
-                switch side {
-                case .link:
-                    if let link {
-                        pp_mux_set_read(mux, link.fd, true)
-                    } else {
-                        pp_log(ctx, .core, .error, "Ignoring link enableRead(), not attached")
-                    }
-                case .tun:
-                    if let tun {
-                        pp_mux_set_read(mux, tun.fd, true)
-                    } else {
-                        pp_log(ctx, .core, .error, "Ignoring tun enableRead(), not attached")
-                    }
-                }
+                handleEnableRead(side, id: id)
             case .enableWrite(let side, let id):
-                if let id {
-                    guard !isOutdated(id, side: side) else {
-                        break
-                    }
-                }
-                switch side {
-                case .link:
-                    if let link {
-                        pp_mux_set_write(mux, link.fd, true)
-                    } else {
-                        pp_log(ctx, .core, .error, "Ignoring link enableWrite(), not attached")
-                    }
-                case .tun:
-                    if let tun {
-                        pp_mux_set_write(mux, tun.fd, true)
-                    } else {
-                        pp_log(ctx, .core, .error, "Ignoring tun enableWrite(), not attached")
-                    }
-                }
+                handleEnableWrite(side, id: id)
             case .custom(let body):
                 lock.unlock()
                 try body()
@@ -688,6 +575,148 @@ private extension FdLooper {
         onFinish(error)
     }
 }
+
+// MARK: - Commands (inside lock)
+
+private extension FdLooper {
+    func handleAttach(
+        _ arguments: AttachArguments,
+        continuation: CheckedContinuation<Void, Error>,
+        results: inout [CommandResult]
+    ) {
+        switch arguments.side {
+        case .link:
+            guard let fd = arguments.original.fileDescriptor else {
+                results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable))))
+                break
+            }
+            // Cancel attach if stopping
+            guard state != .stopping else {
+                results.append(.attach(continuation, .failure(CancellationError())))
+                break
+            }
+            // Can only attach once
+            guard link == nil else {
+                results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
+                break
+            }
+            let linkFd = Int32(fd)
+            guard pp_mux_add(mux, linkFd) else {
+                pp_log(ctx, .core, .fault, "Unable to attach link")
+                results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
+                break
+            }
+            pp_log(ctx, .core, .info, "Attach link (fd=\(fd))")
+
+            // Create new side
+            link = SideIO(
+                mux: mux,
+                linkFd: linkFd,
+                readBufSize: linkBufSize,
+                arguments: arguments
+            )
+            results.append(.attach(continuation, .success(())))
+        case .tun:
+            guard let fd = arguments.original.fileDescriptor else {
+                results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable))))
+                break
+            }
+            // Cancel attach if stopping
+            guard state != .stopping else {
+                results.append(.attach(continuation, .failure(CancellationError())))
+                break
+            }
+            // Can only attach once
+            guard tun == nil else {
+                results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
+                break
+            }
+            let tunFd = Int32(fd)
+            guard pp_mux_add(mux, tunFd) else {
+                pp_log(ctx, .core, .fault, "Unable to attach tun")
+                results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
+                break
+            }
+            pp_log(ctx, .core, .info, "Attach tun (fd=\(fd))")
+
+            // Create new side
+            tun = SideIO(
+                mux: mux,
+                tunFd: tunFd,
+                readBufSize: tunBufSize,
+                arguments: arguments
+            )
+            results.append(.attach(continuation, .success(())))
+        }
+    }
+
+    func handleDetach(
+        _ side: Side,
+        continuation: CheckedContinuation<Void, Never>,
+        results: inout [CommandResult]
+    ) {
+        switch side {
+        case .link:
+            link?.detach()
+            link = nil
+            readRetries.remove(.link)
+            writeRetries.remove(.link)
+            results.append(.detach(continuation))
+        case .tun:
+            tun?.detach()
+            tun = nil
+            readRetries.remove(.tun)
+            writeRetries.remove(.tun)
+            results.append(.detach(continuation))
+        }
+    }
+
+    func handleEnableRead(_ side: Side, id: UUID?) {
+        if let id {
+            guard !isOutdated(id, side: side) else {
+                return
+            }
+        }
+        switch side {
+        case .link:
+            if let link {
+                pp_mux_set_read(mux, link.fd, true)
+            } else {
+                pp_log(ctx, .core, .error, "Ignoring link enableRead(), not attached")
+            }
+        case .tun:
+            if let tun {
+                pp_mux_set_read(mux, tun.fd, true)
+            } else {
+                pp_log(ctx, .core, .error, "Ignoring tun enableRead(), not attached")
+            }
+        }
+    }
+
+    func handleEnableWrite(_ side: Side, id: UUID?) {
+        if let id {
+            guard !isOutdated(id, side: side) else {
+                return
+            }
+        }
+        switch side {
+        case .link:
+            if let link {
+                pp_mux_set_write(mux, link.fd, true)
+            } else {
+                pp_log(ctx, .core, .error, "Ignoring link enableWrite(), not attached")
+            }
+        case .tun:
+            if let tun {
+                pp_mux_set_write(mux, tun.fd, true)
+            } else {
+                pp_log(ctx, .core, .error, "Ignoring tun enableWrite(), not attached")
+            }
+        }
+    }
+}
+
+// MARK: - Descriptors
 
 private final class FdSet {
     var readable: Set<Int32>
