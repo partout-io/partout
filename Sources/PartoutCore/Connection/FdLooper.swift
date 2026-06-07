@@ -29,7 +29,6 @@ public final class FdLooper: @unchecked Sendable {
         public let original: IOInterface
         public let beforeRead: BeforeRead?
         public let onRead: OnRead?
-        // BEWARE: NEVER call FdLooper API from this to avoid deadlock
         public let transformWrite: TransformWrite?
 
         public init(
