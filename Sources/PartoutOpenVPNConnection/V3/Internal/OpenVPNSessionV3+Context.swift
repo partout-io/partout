@@ -28,7 +28,7 @@ extension OpenVPNSessionV3 {
         private var dataChannels: [UInt8: DataChannel] = [:]
         private var oldKeys: [UInt8] = []
         private var currentNegotiatorKey: UInt8?
-        private var currentDataChannelKey: UInt8?
+        private(set) var currentDataPair: DataLinkPair?
         var pushReply: PushReply?
         var pendingPingTask: Task<Void, Error>?
         var lastReceivedDate: Date?
@@ -74,12 +74,6 @@ extension OpenVPNSessionV3 {
             }
         }
 
-        var currentDataPair: DataLinkPair? {
-            currentDataChannelKey.map {
-                DataLinkPair(link: dataLink, key: $0)
-            }
-        }
-
         var allDataKeys: [UInt8] {
             Array(dataChannels.keys)
         }
@@ -90,10 +84,10 @@ extension OpenVPNSessionV3 {
 
         mutating func setDataChannel(_ channel: DataChannel, forKey key: UInt8) {
             dataChannels[channel.key] = channel
-            if let currentDataChannelKey {
-                oldKeys.append(currentDataChannelKey)
+            if let currentDataPair {
+                oldKeys.append(currentDataPair.key)
             }
-            currentDataChannelKey = key
+            currentDataPair = DataLinkPair(link: dataLink, key: key)
             pp_log(ctx, .openvpn, .info, "Data: Current key is \(key.description)")
         }
 
@@ -107,7 +101,7 @@ extension OpenVPNSessionV3 {
             pendingPingTask?.cancel()
             dataCount.reset()
             currentNegotiatorKey = nil
-            currentDataChannelKey = nil
+            currentDataPair = nil
             pushReply = nil
             pendingPingTask = nil
             lastDataCountDate = nil
