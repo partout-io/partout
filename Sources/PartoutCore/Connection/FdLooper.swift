@@ -20,29 +20,30 @@ public final class FdLooper: @unchecked Sendable {
     }
 
     public typealias BeforeRead = @Sendable (_ packets: [Data]) throws -> [Data]
-    public typealias BeforeWrite = @Sendable (_ packets: [Data]) throws -> [Data]
     public typealias OnRead = @Sendable (_ packets: [Data]) throws -> FdLooper.ReadAction
+    public typealias TransformWrite = @Sendable (_ packets: [Data]) throws -> [Data]
     public typealias OnFinish = @Sendable (_ error: Error?) -> Void
 
     public struct AttachArguments: Sendable {
         public let side: Side
         public let original: IOInterface
         public let beforeRead: BeforeRead?
-        public let beforeWrite: BeforeWrite?
         public let onRead: OnRead?
+        // BEWARE: NEVER call FdLooper API from this to avoid deadlock
+        public let transformWrite: TransformWrite?
 
         public init(
             side: Side,
             original: IOInterface,
             beforeRead: BeforeRead?,
-            beforeWrite: BeforeWrite?,
-            onRead: OnRead?
+            onRead: OnRead?,
+            transformWrite: TransformWrite?
         ) {
             self.side = side
             self.original = original
             self.beforeRead = beforeRead
-            self.beforeWrite = beforeWrite
             self.onRead = onRead
+            self.transformWrite = transformWrite
         }
     }
 
@@ -313,7 +314,7 @@ public final class FdLooper: @unchecked Sendable {
                 pp_log(ctx, .core, .error, "Ignoring link packets, not attached")
                 return
             }
-            let processedPackets = try link.beforeWrite?(packets) ?? packets
+            let processedPackets = try link.transformWrite?(packets) ?? packets
             processedPackets.forEach {
                 link.unsafeEnqueueWrite($0)
             }
@@ -323,7 +324,7 @@ public final class FdLooper: @unchecked Sendable {
                 pp_log(ctx, .core, .error, "Ignoring tun packets, not attached")
                 return
             }
-            let processedPackets = try tun.beforeWrite?(packets) ?? packets
+            let processedPackets = try tun.transformWrite?(packets) ?? packets
             processedPackets.forEach {
                 tun.unsafeEnqueueWrite($0)
             }
@@ -465,8 +466,7 @@ private extension FdLooper {
                 }
             }
             if !inbox.isEmpty {
-                let processedInbox = try tun.beforeRead?(inbox) ?? inbox
-                let action = try tun.onRead?(processedInbox)
+                let action = try tun.processReadPackets(inbox)
                 if action == .pause {
                     pp_mux_set_read(mux, tun.fd, false)
                 }
@@ -492,8 +492,7 @@ private extension FdLooper {
                 }
             }
             if !inbox.isEmpty {
-                let processedInbox = try link.beforeRead?(inbox) ?? inbox
-                let action = try link.onRead?(processedInbox)
+                let action = try link.processReadPackets(inbox)
                 if action == .pause {
                     pp_mux_set_read(mux, link.fd, false)
                 }
@@ -768,9 +767,9 @@ private extension FdLooper {
         let fd: Int32
 
         let originalInterface: IOInterface
-        let beforeRead: BeforeRead?
-        let beforeWrite: BeforeWrite?
-        let onRead: OnRead?
+        private let beforeRead: BeforeRead?
+        private let onRead: OnRead?
+        let transformWrite: TransformWrite?
 
         private let read: (inout [UInt8]) throws -> Data?
         private let write: (PendingWrite) throws -> Int
@@ -793,8 +792,8 @@ private extension FdLooper {
             self.fd = fd
             originalInterface = arguments.original
             beforeRead = arguments.beforeRead
-            beforeWrite = arguments.beforeWrite
             onRead = arguments.onRead
+            transformWrite = arguments.transformWrite
             self.read = read
             self.write = write
             self.cleanup = cleanup
@@ -805,6 +804,11 @@ private extension FdLooper {
 
         func dequeueRead() throws -> Data? {
             try read(&readBuf)
+        }
+
+        func processReadPackets(_ packets: [Data]) throws -> FdLooper.ReadAction {
+            let processed = try beforeRead?(packets) ?? packets
+            return try onRead?(processed) ?? .keep
         }
 
         func performWrite(_ pending: PendingWrite, lock: SemaphoreMutex) throws -> Bool {
