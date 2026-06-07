@@ -107,8 +107,15 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             original: link,
             beforeRead: rw.beforeRead,
             onRead: { [weak self] packets in
-                try self?.receiveLink(packets)
-                return .keep
+                do {
+                    try self?.receiveLink(packets)
+                    return .keep
+                } catch {
+                    Task {
+                        await self?.shutdown(error)
+                    }
+                    return .pause
+                }
             },
             transformWrite: rw.beforeWrite
         ))
@@ -132,8 +139,15 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             original: tunnel,
             beforeRead: nil,
             onRead: { [weak self] packets in
-                try self?.receiveTunnel(packets)
-                return .keep
+                do {
+                    try self?.receiveTunnel(packets)
+                    return .keep
+                } catch {
+                    Task {
+                        await self?.shutdown(error)
+                    }
+                    return .pause
+                }
             },
             transformWrite: nil
         ))
