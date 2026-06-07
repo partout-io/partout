@@ -116,8 +116,8 @@ extension OpenVPNSessionV3 {
         fileprivate let link: DataLink
         fileprivate let key: UInt8
 
-        func send(_ packets: [Data], on key: UInt8? = nil) throws {
-            try link.send(packets, on: key ?? self.key)
+        func send(_ packets: [Data], on key: UInt8? = nil, outOfBand: Bool = false) throws {
+            try link.send(packets, on: key ?? self.key, outOfBand: outOfBand)
         }
 
         func receive(_ packets: [Data], on key: UInt8) throws {

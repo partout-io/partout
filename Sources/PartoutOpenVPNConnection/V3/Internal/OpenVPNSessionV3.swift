@@ -291,7 +291,7 @@ private extension OpenVPNSessionV3 {
                 return
             }
             pp_log(ctx, .openvpn, .info, "Send OCCPacket exit")
-            try dataPair.send([OCCPacket.exit.serialized()])
+            try dataPair.send([OCCPacket.exit.serialized()], outOfBand: true)
             pp_log(ctx, .openvpn, .info, "Sent OCCPacket correctly")
         }
     }
