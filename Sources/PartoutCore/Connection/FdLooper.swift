@@ -169,15 +169,16 @@ public final class FdLooper: @unchecked Sendable {
                     try process(mux: mux, fdSet: fdSet)
                 } catch IOError.linkFailed {
                     lock.with {
-                        self.link?.detach()
+                        self.link?.detach(error: IOError.linkFailed)
                         self.link = nil
                     }
                 } catch IOError.tunFailed {
                     lock.with {
-                        self.tun?.detach()
+                        self.tun?.detach(error: IOError.tunFailed)
                         self.tun = nil
                     }
                 } catch {
+                    // FIXME: ###, Custom onRead() errors end up here
                     pp_log(ctx, .core, .error, "Unable to process: \(error)")
                     lastError = error
                     break
@@ -852,7 +853,10 @@ private extension FdLooper {
             writeQueue.append(packet)
         }
 
-        func detach() {
+        func detach(error: Error? = nil) {
+            if let error {
+                onFailure?(error)
+            }
             cleanup?()
             cleanup = nil
         }
