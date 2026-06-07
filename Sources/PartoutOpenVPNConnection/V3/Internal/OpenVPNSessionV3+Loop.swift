@@ -6,10 +6,9 @@ internal import _PartoutOpenVPNConnection_C
 
 extension OpenVPNSessionV3 {
     func receiveLink(_ packets: [Data]) throws {
-        guard !isStopped, let looper else {
+        guard !isStopped else {
             return
         }
-
         reportLastReceivedDate()
         var dataPacketsByKey: [UInt8: [Data]] = [:]
 
