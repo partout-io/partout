@@ -260,8 +260,8 @@ private extension _OpenVPNConnectionV3 {
                         requiresVirtualDevice: true
                     )
                 )
-                try await session.setTunnel(tunnelInterface)
                 self.tunnelInterface = tunnelInterface
+                try await session.setTunnel(tunnelInterface)
 
                 // In this suspended interval, sessionDidStop may have been called and
                 // the status may have changed to .disconnected in the meantime
