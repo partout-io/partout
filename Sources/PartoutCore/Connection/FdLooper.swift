@@ -59,7 +59,7 @@ public final class FdLooper: @unchecked Sendable {
 
     private let loopQueue: DispatchQueue
     private let loopQueueKey: DispatchSpecificKey<Void>
-    private let retryQueue: DispatchQueue
+    private let scheduleQueue: DispatchQueue
     private let lock: SemaphoreMutex
 
     private var state: State
@@ -96,7 +96,7 @@ public final class FdLooper: @unchecked Sendable {
         loopQueue = queue
         loopQueueKey = DispatchSpecificKey()
         loopQueue.setSpecific(key: loopQueueKey, value: ())
-        retryQueue = DispatchQueue(label: "\(queue.label).retry")
+        scheduleQueue = DispatchQueue(label: "\(queue.label).schedule")
         lock = SemaphoreMutex()
 
         state = .idle
@@ -245,7 +245,7 @@ public final class FdLooper: @unchecked Sendable {
         if let delay {
             deadline = deadline + delay
         }
-        retryQueue.asyncAfter(deadline: deadline) { [weak self] in
+        scheduleQueue.asyncAfter(deadline: deadline) { [weak self] in
             guard let self else { return }
             self.lock.with {
                 guard self.state == .started else {
@@ -507,7 +507,7 @@ private extension FdLooper {
 
         let side = io.side
         let command: Command = .enableRead(side, io.id)
-        retryQueue.asyncAfter(deadline: .now() + Self.noBufRetryDelay) { [weak self] in
+        scheduleQueue.asyncAfter(deadline: .now() + Self.noBufRetryDelay) { [weak self] in
             guard let self else { return }
             self.lock.with {
                 self.readRetries.remove(side)
@@ -531,7 +531,7 @@ private extension FdLooper {
 
         let side = io.side
         let command: Command = .enableWrite(side, io.id)
-        retryQueue.asyncAfter(deadline: .now() + Self.noBufRetryDelay) { [weak self] in
+        scheduleQueue.asyncAfter(deadline: .now() + Self.noBufRetryDelay) { [weak self] in
             guard let self else { return }
             self.lock.with {
                 self.writeRetries.remove(side)
