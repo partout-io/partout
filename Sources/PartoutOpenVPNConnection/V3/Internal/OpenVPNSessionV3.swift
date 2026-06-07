@@ -67,22 +67,10 @@ final class OpenVPNSessionV3: @unchecked Sendable {
         )
         sessionState = .stopped(IdleContext(withLocalOptions: true))
 
-        looper = try FdLooper(ctx, queue: queue, delegate: FdLooperDelegate(
-            onRead: { [weak self] packets, side in
-                switch side {
-                case .link:
-                    try self?.receiveLink(packets)
-                case .tun:
-                    try self?.receiveTunnel(packets)
-                }
-                return .keep
-            },
-            onWrite: nil,
-            onFinish: { [weak self] error in
-                pp_log(self?.ctx ?? .global, .openvpn, .error, "Session looper finished with error: \(error?.localizedDescription ?? "none")")
-                self?.looperDidFinish(error)
-            }
-        ))
+        looper = try FdLooper(ctx, queue: queue) { [weak self] error in
+            pp_log(self?.ctx ?? .global, .openvpn, .error, "Session looper finished with error: \(error?.localizedDescription ?? "none")")
+            self?.looperDidFinish(error)
+        }
         looper.start()
     }
 
@@ -160,7 +148,41 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             pp_log(ctx, .openvpn, .error, "Link interface already set")
             return
         }
-        try await looper.attachLink(link)
+        let proc = PacketProcessor(method: configuration.xorMethod)
+        var buffer = Data()
+        try await looper.attach(.init(
+            side: .link,
+            original: link,
+            beforeRead: { prePackets in
+                // FIXME: ###
+                if link.metadata.isReliable {
+                    // FIXME: #214, TCP is very slow
+                    buffer.reserveCapacity(buffer.count + prePackets.flatCount)
+                    for p in prePackets {
+                        buffer.append(p)
+                    }
+                    var until = 0
+                    let processedPackets = proc.packets(fromStream: buffer, until: &until)
+                    buffer = buffer.subdata(in: until..<buffer.count)
+                    return processedPackets
+                } else {
+                    return proc.processPackets(prePackets, direction: .inbound)
+                }
+            },
+            beforeWrite: { packets in
+                if link.metadata.isReliable {
+                    let stream = proc.stream(fromPackets: packets)
+                    guard !stream.isEmpty else { return [] }
+                    return [stream]
+                } else {
+                    return proc.processPackets(packets, direction: .outbound)
+                }
+            },
+            onRead: { [weak self] packets in
+                try self?.receiveLink(packets)
+                return .keep
+            }
+        ))
         try looper.schedule { [weak self] in
             try self?.setLinkOnQueue(link)
         }
@@ -176,7 +198,16 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             return
         }
         pp_log(ctx, .openvpn, .info, "Start TUN loop")
-        try await looper.attachTun(tunnel)
+        try await looper.attach(.init(
+            side: .tun,
+            original: tunnel,
+            beforeRead: nil,
+            beforeWrite: nil,
+            onRead: { [weak self] packets in
+                try self?.receiveTunnel(packets)
+                return .keep
+            }
+        ))
     }
 
     func hasLink() -> Bool {
@@ -191,8 +222,8 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             guard shouldDetach else {
                 return
             }
-            await looper.detachTun()
-            await looper.detachLink()
+            await looper.detach(.tun)
+            await looper.detach(.link)
             try await looper.perform { [weak self] in
                 self?.finishShutdownOnQueue(error)
             }
