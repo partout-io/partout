@@ -14,9 +14,16 @@ final class OpenVPNSessionV3: @unchecked Sendable {
     private let dpFactory: DataPathFactory
     private let queue: DispatchQueue
     private let queueKey: DispatchSpecificKey<Void>
-    // XXX: Workaround for self in init closures
-    var looper: FdLooper!
     private weak var delegate: OpenVPNSessionDelegateV3?
+
+    // XXX: Workaround for self in init closures
+    private var unsafeLooper: FdLooper?
+    var looper: FdLooper {
+        guard let unsafeLooper else {
+            fatalError("Uninitialized looper")
+        }
+        return unsafeLooper
+    }
 
     // MARK: Mutable state
 
@@ -74,7 +81,7 @@ final class OpenVPNSessionV3: @unchecked Sendable {
         )
         sessionState = .stopped(IdleContext(withLocalOptions: true))
 
-        looper = try FdLooper(ctx, queue: queue) { [weak self] error in
+        unsafeLooper = try FdLooper(ctx, queue: queue) { [weak self] error in
             pp_log(self?.ctx ?? .global, .openvpn, .error, "Session looper finished with error: \(error?.localizedDescription ?? "none")")
             self?.finishShutdownOnQueue(error)
         }
