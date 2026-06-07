@@ -64,9 +64,9 @@ final class NegotiatorV3: @unchecked Sendable {
 
     private var continuatedPushReplyMessage: String?
 
-    private var shouldResendWrappedKey: Bool
+    private var checkNegotiationTask: Task<Void, Never>?
 
-    private var isCancelled: Bool
+    private var shouldResendWrappedKey: Bool
 
     // MARK: Init
 
@@ -126,7 +126,6 @@ final class NegotiatorV3: @unchecked Sendable {
         expectedPacketId = 0
         pendingPackets = [:]
         shouldResendWrappedKey = false
-        isCancelled = false
     }
 
     deinit {
@@ -190,7 +189,7 @@ extension NegotiatorV3 {
     }
 
     func cancel() {
-        isCancelled = true
+        checkNegotiationTask?.cancel()
         pendingPackets.removeAll()
         authenticator = nil
     }
@@ -279,14 +278,19 @@ private extension NegotiatorV3 {
         }
 
         guard state == .connected else {
-            let delay = Int(options.sessionOptions.tickInterval * 1000)
-            looper.schedule(after: .milliseconds(delay)) { [weak self] in
+            checkNegotiationTask?.cancel()
+            checkNegotiationTask = Task { [weak self] in
                 guard let self else { return }
-                guard !isCancelled else { return }
-                do {
-                    try checkNegotiationComplete()
-                } catch {
-                    options.onError(key, error)
+                try? await Task.sleep(
+                    milliseconds: Int(options.sessionOptions.tickInterval * 1000)
+                )
+                guard !Task.isCancelled else { return }
+                looper.schedule {
+                    do {
+                        try self.checkNegotiationComplete()
+                    } catch {
+                        self.options.onError(self.key, error)
+                    }
                 }
             }
             return
