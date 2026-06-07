@@ -53,7 +53,7 @@ extension OpenVPNSessionV3 {
                 throw cError
             } catch {
                 pp_log(ctx, .openvpn, .error, "Data: Failed LINK write during send data: \(error)")
-                throw PartoutError(.ioFailure, error)
+                throw error
             }
         }
     }

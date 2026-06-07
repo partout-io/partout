@@ -505,7 +505,7 @@ private extension NegotiatorV3 {
             pp_log(ctx, .openvpn, .info, "Ack successfully written to LINK for packetId \(controlPacket.packetId)")
         } catch {
             pp_log(ctx, .openvpn, .error, "Failed LINK write during send ack for packetId \(controlPacket.packetId): \(error)")
-            options.onError(key, PartoutError(.ioFailure, error))
+            options.onError(key, error)
         }
     }
 
