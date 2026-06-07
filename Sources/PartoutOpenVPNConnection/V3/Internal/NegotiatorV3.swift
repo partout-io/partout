@@ -64,9 +64,9 @@ final class NegotiatorV3: @unchecked Sendable {
 
     private var continuatedPushReplyMessage: String?
 
-    private var checkNegotiationTask: Task<Void, Never>?
-
     private var shouldResendWrappedKey: Bool
+
+    private var isCancelled: Bool
 
     // MARK: Init
 
@@ -126,6 +126,7 @@ final class NegotiatorV3: @unchecked Sendable {
         expectedPacketId = 0
         pendingPackets = [:]
         shouldResendWrappedKey = false
+        isCancelled = false
     }
 
     deinit {
@@ -172,7 +173,7 @@ extension NegotiatorV3 {
     func start() throws {
         channel.reset(forNewSession: renegotiation == nil)
 
-        // schedule this repeatedly
+        // Schedule this repeatedly
         try checkNegotiationComplete()
 
         switch renegotiation {
@@ -189,7 +190,7 @@ extension NegotiatorV3 {
     }
 
     func cancel() {
-        checkNegotiationTask?.cancel()
+        isCancelled = true
         pendingPackets.removeAll()
         authenticator = nil
     }
@@ -278,25 +279,20 @@ private extension NegotiatorV3 {
         }
 
         guard state == .connected else {
-            checkNegotiationTask?.cancel()
-            checkNegotiationTask = Task { [weak self] in
+            let delay = Int(options.sessionOptions.tickInterval * 1000)
+            looper.schedule(after: .milliseconds(delay)) { [weak self] in
                 guard let self else { return }
-                try? await Task.sleep(
-                    milliseconds: Int(options.sessionOptions.tickInterval * 1000)
-                )
-                guard !Task.isCancelled else { return }
-                looper.schedule {
-                    do {
-                        try self.checkNegotiationComplete()
-                    } catch {
-                        self.options.onError(self.key, error)
-                    }
+                guard !isCancelled else { return }
+                do {
+                    try checkNegotiationComplete()
+                } catch {
+                    self.options.onError(self.key, error)
                 }
             }
             return
         }
 
-        // let loop die when negotiation is complete
+        // Let loop die when negotiation is complete
     }
 
     func pushRequest() throws {
@@ -576,25 +572,23 @@ private extension NegotiatorV3 {
     func handleControlMessage(_ message: String) throws {
         pp_log(ctx, .openvpn, .info, "Received control message \(message.asSensitiveBytes(ctx))")
 
-        // disconnect on authentication failure
+        // Disconnect on authentication failure
         guard !message.hasPrefix("AUTH_FAILED") else {
-
-            // XXX: retry without client options
+            // XXX: Retry without client options
             if authenticator?.withLocalOptions ?? false {
                 pp_log(ctx, .openvpn, .error, "Authentication failure, retry without local options")
                 throw OpenVPNSessionError.badCredentialsWithLocalOptions
             }
-
             throw OpenVPNSessionError.badCredentials
         }
 
-        // disconnect on remote server restart (--explicit-exit-notify)
+        // Disconnect on remote server restart (--explicit-exit-notify)
         guard !message.hasPrefix("RESTART") else {
             pp_log(ctx, .openvpn, .info, "Disconnect due to server shutdown")
             throw OpenVPNSessionError.serverShutdown
         }
 
-        // handle authentication from now on
+        // Handle authentication from now on
         guard state == .push else {
             return
         }
@@ -630,7 +624,7 @@ private extension NegotiatorV3 {
             }
         } catch StandardOpenVPNParserError.continuationPushReply {
             continuatedPushReplyMessage = completeMessage.replacingOccurrences(of: "push-continuation", with: "")
-            // XXX: strip "PUSH_REPLY" and "push-continuation 2"
+            // XXX: Strip "PUSH_REPLY" and "push-continuation 2"
             return
         }
 
@@ -704,13 +698,9 @@ private extension NegotiatorV3 {
 private extension NegotiatorV3 {
     enum State: Int, Comparable {
         case idle
-
         case tls
-
         case auth
-
         case push
-
         case connected
 
         static func < (lhs: Self, rhs: Self) -> Bool {
