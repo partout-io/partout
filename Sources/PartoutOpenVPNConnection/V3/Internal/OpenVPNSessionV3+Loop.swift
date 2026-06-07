@@ -43,7 +43,7 @@ extension OpenVPNSessionV3 {
 
             if code == .dataV1 || code == .dataV2 {
                 let key = firstByte & 0b111
-                guard hasDataChannel(for: key) else {
+                guard activeContext?.dataChannel(forKey: key) != nil else {
                     pp_log(ctx, .openvpn, .error, "Data: Channel with key \(key) not found")
                     continue
                 }

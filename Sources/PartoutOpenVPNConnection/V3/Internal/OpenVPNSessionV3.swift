@@ -174,7 +174,7 @@ private extension OpenVPNSessionV3 {
             ctx: ctx,
             looper: looper,
             dataChannel: { [weak self] in
-                self?.activeContext?.dataChannels[$0]
+                self?.activeContext?.dataChannel(forKey: $0)
             },
             reportInboundDataCount: { [weak self] in
                 self?.reportInboundDataCount($0)
@@ -337,10 +337,7 @@ extension OpenVPNSessionV3 {
 
     func addNegotiator(_ negotiator: NegotiatorV3) {
         withActiveContext { context in
-            pp_log(ctx, .openvpn, .info, "Replace negotiator with key \(negotiator.key)")
-            context.negotiators[negotiator.key] = negotiator
-            pp_log(ctx, .openvpn, .info, "Negotiators: \(context.negotiators.keys)")
-            context.currentNegotiatorKey = negotiator.key
+            context.addNegotiator(negotiator)
         }
     }
 
@@ -351,22 +348,16 @@ extension OpenVPNSessionV3 {
     ) {
         let didStart = withActiveContext { phase, context -> (LinkMetadata, OpenVPN.Configuration)? in
             pp_log(ctx, .openvpn, .info, "Negotiation succeeded, set key \(key) as current")
-
             context.pushReply = pushReply
 
             // Replace current channel with new
             pp_log(ctx, .openvpn, .info, "Replace key \(dataChannel.key) with new data channel")
             context.setDataChannel(dataChannel, forKey: key)
 
-            // Clean up old keys
-            while context.oldKeys.count > 1 {
-                let keyToRemove = context.oldKeys.removeFirst()
-                pp_log(ctx, .openvpn, .info, "Remove key \(keyToRemove) from negotiators and data channels")
-                context.negotiators.removeValue(forKey: keyToRemove)
-                context.dataChannels.removeValue(forKey: keyToRemove)
-            }
-            pp_log(ctx, .openvpn, .info, "Negotiators: \(context.negotiators.keys)")
-            pp_log(ctx, .openvpn, .info, "Data channels: \(context.dataChannels.keys)")
+            // Clean up old negotiator
+            context.removeOldNegotiators()
+            pp_log(ctx, .openvpn, .info, "Negotiators: \(context.allNegotiatorKeys)")
+            pp_log(ctx, .openvpn, .info, "Data channels: \(context.allDataKeys)")
 
             // Renegotiation stops here
             guard phase != .started else {
@@ -387,14 +378,6 @@ extension OpenVPNSessionV3 {
             remoteOptions: pushReplyOptions,
             remoteFd: linkMetadata.fileDescriptor
         )
-    }
-
-    func hasDataChannel(for key: UInt8) -> Bool {
-        activeContext?.dataChannels[key] != nil
-    }
-
-    func dataChannel(for key: UInt8) -> DataChannel? {
-        activeContext?.dataChannels[key]
     }
 
     func reportLastReceivedDate() {

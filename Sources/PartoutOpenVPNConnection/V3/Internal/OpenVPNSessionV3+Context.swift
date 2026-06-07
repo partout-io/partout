@@ -19,25 +19,21 @@ extension OpenVPNSessionV3 {
     }
 
     struct ActiveContext {
+        private let ctx: PartoutLoggerContext
         private let dataLink: DataLink
         var withLocalOptions: Bool
-        var linkMetadata: LinkMetadata
-        var negotiators: [UInt8: NegotiatorV3] = [:]
-        var dataChannels: [UInt8: DataChannel] = [:]
-        var oldKeys: [UInt8] = []
-        var currentNegotiatorKey: UInt8? {
-            didSet {
-                pp_log(ctx, .openvpn, .info, "Negotiator: Current key is \(currentNegotiatorKey?.description ?? "nil")")
-            }
-        }
+        let linkMetadata: LinkMetadata
+
+        private var negotiators: [UInt8: NegotiatorV3] = [:]
+        private var dataChannels: [UInt8: DataChannel] = [:]
+        private var oldKeys: [UInt8] = []
+        private var currentNegotiatorKey: UInt8?
         private var currentDataChannelKey: UInt8?
         var pushReply: PushReply?
         var pendingPingTask: Task<Void, Error>?
         var lastReceivedDate: Date?
         var lastDataCountDate: Date?
         var dataCount = BidirectionalState<Int>(withResetValue: 0)
-
-        private let ctx: PartoutLoggerContext
 
         init(
             ctx: PartoutLoggerContext,
@@ -57,10 +53,39 @@ extension OpenVPNSessionV3 {
             }
         }
 
+        var allNegotiatorKeys: [UInt8] {
+            Array(negotiators.keys)
+        }
+
+        mutating func addNegotiator(_ negotiator: NegotiatorV3) {
+            pp_log(ctx, .openvpn, .info, "Replace negotiator with key \(negotiator.key)")
+            negotiators[negotiator.key] = negotiator
+            pp_log(ctx, .openvpn, .info, "Negotiators: \(negotiators.keys)")
+            currentNegotiatorKey = negotiator.key
+            pp_log(ctx, .openvpn, .info, "Negotiator: Current key is \(negotiator.key.description)")
+        }
+
+        mutating func removeOldNegotiators() {
+            while oldKeys.count > 1 {
+                let keyToRemove = oldKeys.removeFirst()
+                pp_log(ctx, .openvpn, .info, "Remove key \(keyToRemove) from negotiators and data channels")
+                negotiators.removeValue(forKey: keyToRemove)
+                dataChannels.removeValue(forKey: keyToRemove)
+            }
+        }
+
         var currentDataPair: DataLinkPair? {
             currentDataChannelKey.map {
                 DataLinkPair(link: dataLink, key: $0)
             }
+        }
+
+        var allDataKeys: [UInt8] {
+            Array(dataChannels.keys)
+        }
+
+        func dataChannel(forKey key: UInt8) -> DataChannel? {
+            dataChannels[key]
         }
 
         mutating func setDataChannel(_ channel: DataChannel, forKey key: UInt8) {
