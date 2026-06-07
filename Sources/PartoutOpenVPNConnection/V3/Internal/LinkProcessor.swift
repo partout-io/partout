@@ -7,9 +7,9 @@ struct LinkProcessor: @unchecked Sendable {
     let beforeRead: @Sendable ([Data]) throws -> [Data]
     let beforeWrite: @Sendable ([Data]) throws -> [Data]
 
-    init(proc: PacketProcessor, isReliable: Bool) {
+    init(proc: PacketProcessor, isTCP: Bool) {
         self.proc = proc
-        if isReliable {
+        if isTCP {
             nonisolated(unsafe) var buffer = Data()
             beforeRead = {
                 // FIXME: #214, TCP is very slow

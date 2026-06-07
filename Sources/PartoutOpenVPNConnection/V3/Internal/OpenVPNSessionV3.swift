@@ -149,7 +149,7 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             return
         }
         let proc = PacketProcessor(method: configuration.xorMethod)
-        let rw = LinkProcessor(proc: proc, isReliable: link.isReliable)
+        let rw = LinkProcessor(proc: proc, isTCP: link.isReliable)
         try await looper.attach(.init(
             side: .link,
             original: link,
