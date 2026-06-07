@@ -167,17 +167,9 @@ public final class FdLooper: @unchecked Sendable {
 
                     // Iterate through the fds
                     try process(mux: mux, fdSet: fdSet)
-                } catch IOError.failed(let side, let reason) {
-                    lock.with {
-                        switch side {
-                        case .link:
-                            self.link?.detach(reason: reason)
-                            self.link = nil
-                        case .tun:
-                            self.tun?.detach(reason: reason)
-                            self.tun = nil
-                        }
-                    }
+                } catch let reason as IOError {
+                    // Can be either .user or .libc
+                    detachImmediately(reason.side, withReason: reason)
                 } catch {
                     pp_log(ctx, .core, .error, "Unable to process: \(error)")
                     lastError = error
@@ -576,6 +568,19 @@ private extension FdLooper {
         }
     }
 
+    func detachImmediately(_ side: Side, withReason reason: Error?) {
+        lock.with {
+            switch side {
+            case .link:
+                link?.detach(reason: reason)
+                link = nil
+            case .tun:
+                tun?.detach(reason: reason)
+                tun = nil
+            }
+        }
+    }
+
     func finish(throwing error: Error? = nil) {
         if let error {
             pp_log(ctx, .core, .error, "Finish looper with error: \(error)")
@@ -758,16 +763,27 @@ private final class FdSet {
 // MARK: - SideIO
 
 private extension FdLooper {
-    enum IOError: Error {
+    enum IOError: Error, CustomDebugStringConvertible {
         case wouldBlock(Side)
         case noBufSpace(Side)
-        case failed(Side, Error? = nil)
+        case libc(Side, Int32)
+        case user(Side, Error? = nil)
 
         var side: Side {
             switch self {
             case .wouldBlock(let side): side
             case .noBufSpace(let side): side
-            case .failed(let side, _): side
+            case .libc(let side, _): side
+            case .user(let side, _): side
+            }
+        }
+
+        var debugDescription: String {
+            switch self {
+            case .wouldBlock(let side): "\(side): would block"
+            case .noBufSpace(let side): "\(side): no buffer space"
+            case .libc(let side, let code): "\(side): libc errno=\(code)"
+            case .user(let side, let reason): "\(side): user error, \(reason.debugDescription)"
             }
         }
     }
@@ -834,7 +850,7 @@ private extension FdLooper {
                 return try onRead?(packets) ?? .keep
             } catch {
                 // BEWARE: Wrap user-defined errors to prevent premature finish
-                throw IOError.failed(side, error)
+                throw IOError.user(side, error)
             }
         }
 
@@ -895,7 +911,7 @@ private extension FdLooper.SideIO {
                     throw FdLooper.IOError.wouldBlock(.link)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.failed(.link)
+                    throw FdLooper.IOError.libc(.link, errno)
                 }
                 guard count > 0 else {
                     return nil
@@ -917,7 +933,7 @@ private extension FdLooper.SideIO {
                     throw FdLooper.IOError.noBufSpace(.link)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.failed(.link)
+                    throw FdLooper.IOError.libc(.link, errno)
                 }
                 return Int(count)
             },
@@ -946,7 +962,7 @@ private extension FdLooper.SideIO {
                     throw FdLooper.IOError.wouldBlock(.tun)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.failed(.tun)
+                    throw FdLooper.IOError.libc(.tun, errno)
                 }
                 guard count > 0 else {
                     return nil
@@ -968,7 +984,7 @@ private extension FdLooper.SideIO {
                     throw FdLooper.IOError.noBufSpace(.tun)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.failed(.tun)
+                    throw FdLooper.IOError.libc(.tun, errno)
                 }
                 return Int(count)
             },
