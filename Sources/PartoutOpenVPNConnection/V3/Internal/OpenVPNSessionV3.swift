@@ -149,35 +149,12 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             return
         }
         let proc = PacketProcessor(method: configuration.xorMethod)
-        var buffer = Data()
+        let rw = LinkProcessor(proc: proc, isReliable: link.isReliable)
         try await looper.attach(.init(
             side: .link,
             original: link,
-            beforeRead: { prePackets in
-                // FIXME: ###
-                if link.metadata.isReliable {
-                    // FIXME: #214, TCP is very slow
-                    buffer.reserveCapacity(buffer.count + prePackets.flatCount)
-                    for p in prePackets {
-                        buffer.append(p)
-                    }
-                    var until = 0
-                    let processedPackets = proc.packets(fromStream: buffer, until: &until)
-                    buffer = buffer.subdata(in: until..<buffer.count)
-                    return processedPackets
-                } else {
-                    return proc.processPackets(prePackets, direction: .inbound)
-                }
-            },
-            beforeWrite: { packets in
-                if link.metadata.isReliable {
-                    let stream = proc.stream(fromPackets: packets)
-                    guard !stream.isEmpty else { return [] }
-                    return [stream]
-                } else {
-                    return proc.processPackets(packets, direction: .outbound)
-                }
-            },
+            beforeRead: rw.beforeRead,
+            beforeWrite: rw.beforeWrite,
             onRead: { [weak self] packets in
                 try self?.receiveLink(packets)
                 return .keep

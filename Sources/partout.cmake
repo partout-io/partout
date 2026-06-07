@@ -287,6 +287,7 @@ set(PARTOUT_SOURCES
 ./PartoutOpenVPNConnection/V2/_OpenVPNConnectionV2.swift
 ./PartoutOpenVPNConnection/V3/Internal/ControlChannelV3+Cross.swift
 ./PartoutOpenVPNConnection/V3/Internal/ControlChannelV3.swift
+./PartoutOpenVPNConnection/V3/Internal/LinkProcessor.swift
 ./PartoutOpenVPNConnection/V3/Internal/NegotiatorV3.swift
 ./PartoutOpenVPNConnection/V3/Internal/OpenVPNSessionProtocolV3.swift
 ./PartoutOpenVPNConnection/V3/Internal/OpenVPNSessionV3+Context.swift
