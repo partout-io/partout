@@ -36,7 +36,6 @@ Given the main app and the daemon:
 - ``DataCount``
 - ``EndpointResolver``
 - ``FdLooper``
-- ``FdLooperDelegate``
 - ``NetworkInterfaceFactory``
 - ``SocketConfigurator``
 
