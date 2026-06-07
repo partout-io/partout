@@ -24,16 +24,16 @@ extension OpenVPNSessionV3 {
         var withLocalOptions: Bool
         let linkMetadata: LinkMetadata
 
-        private var negotiators: [UInt8: NegotiatorV3] = [:]
-        private var dataChannels: [UInt8: DataChannel] = [:]
-        private var oldKeys: [UInt8] = []
+        private var negotiators: [UInt8: NegotiatorV3]
+        private var dataChannels: [UInt8: DataChannel]
+        private var oldKeys: [UInt8]
         private var currentNegotiatorKey: UInt8?
         private(set) var currentDataPair: DataLinkPair?
         var pushReply: PushReply?
         var pendingPingTask: Task<Void, Error>?
         var lastReceivedDate: Date?
         var lastDataCountDate: Date?
-        var dataCount = BidirectionalState<Int>(withResetValue: 0)
+        var dataCount: BidirectionalState<Int>
 
         init(
             ctx: PartoutLoggerContext,
@@ -45,6 +45,10 @@ extension OpenVPNSessionV3 {
             self.dataLink = dataLink
             self.withLocalOptions = withLocalOptions
             self.linkMetadata = linkMetadata
+            negotiators = [:]
+            dataChannels = [:]
+            oldKeys = []
+            dataCount = BidirectionalState(withResetValue: 0)
         }
 
         var currentNegotiator: NegotiatorV3? {
