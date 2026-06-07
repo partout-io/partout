@@ -9,15 +9,12 @@
 
 // FIXME: #188, Implement macOS controller/strategy
 
-#if PARTOUT_MACOS
+#if PARTOUT_APPLE
 
 #include <sys/socket.h>
-#include <sys/sys_domain.h>
-#include <sys/kern_control.h>
 #include <sys/ioctl.h>
 #include <sys/uio.h>
 #include <net/if.h>
-#include <net/if_utun.h>
 #include <stdio.h>
 #include <string.h>
 #include "portable/endian.h"
@@ -32,6 +29,11 @@ pp_tun pp_tun_create(int fd) {
     tun->fd = fd;
     return tun;
 }
+
+#if PARTOUT_MACOS
+#include <sys/sys_domain.h>
+#include <sys/kern_control.h>
+#include <net/if_utun.h>
 
 pp_tun pp_tun_open(const char *uuid) {
     (void)uuid;
@@ -80,6 +82,7 @@ failure:
     if (fd != -1) close(fd);
     return NULL;
 }
+#endif
 
 void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     if (!tun) return;
