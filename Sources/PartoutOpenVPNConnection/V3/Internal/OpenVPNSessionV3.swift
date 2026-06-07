@@ -76,7 +76,7 @@ final class OpenVPNSessionV3: @unchecked Sendable {
 
         looper = try FdLooper(ctx, queue: queue) { [weak self] error in
             pp_log(self?.ctx ?? .global, .openvpn, .error, "Session looper finished with error: \(error?.localizedDescription ?? "none")")
-            self?.looperDidFinishOnQueue(error)
+            self?.finishShutdownOnQueue(error)
         }
         looper.start()
     }
@@ -265,11 +265,6 @@ private extension OpenVPNSessionV3 {
             self,
             withError: error.map(OpenVPNSessionError.init) ?? error
         )
-    }
-
-    func looperDidFinishOnQueue(_ error: Error?) {
-        preconditionOnQueue()
-        finishShutdownOnQueue(error)
     }
 
     func sendExitPacketOnQueue() throws {
