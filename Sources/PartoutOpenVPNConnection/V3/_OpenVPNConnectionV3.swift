@@ -405,17 +405,6 @@ private extension _OpenVPNConnectionV3 {
     }
 }
 
-private extension LinkInterface {
-    func openVPNLink(method: OpenVPN.ObfuscationMethod?) -> LinkInterface {
-        switch linkType.plainType {
-        case .udp:
-            return OpenVPNUDPLink(link: self, method: method)
-        case .tcp:
-            return OpenVPNTCPLink(link: self, method: method)
-        }
-    }
-}
-
 // MARK: - Helpers
 
 private extension _OpenVPNConnectionV3 {
@@ -444,11 +433,7 @@ private extension _OpenVPNConnectionV3 {
 
                 pp_log(ctx, .openvpn, .notice, "Link is active")
                 pp_log(ctx, .openvpn, .info, "Link type is \(newLink.linkDescription)")
-                // Wrap new link into a specific OpenVPN link
-                newLink = newLink.openVPNLink(method: configuration.xorMethod)
             }
-
-            pp_log(ctx, .openvpn, .info, "Processed link type is \(newLink.linkDescription)")
 
             currentLink = newLink
             return newLink
