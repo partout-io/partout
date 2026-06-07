@@ -315,8 +315,14 @@ public final class FdLooper: @unchecked Sendable {
                 return
             }
             lock.unlock()
+
             let processedPackets = try link.transformWrite?(packets) ?? packets
+
             lock.lock()
+            guard link === self.link else {
+                pp_log(ctx, .core, .error, "Ignoring detached link during processing")
+                return
+            }
             processedPackets.forEach {
                 link.unsafeEnqueueWrite($0)
             }
@@ -327,8 +333,14 @@ public final class FdLooper: @unchecked Sendable {
                 return
             }
             lock.unlock()
+
             let processedPackets = try tun.transformWrite?(packets) ?? packets
+
             lock.lock()
+            guard tun === self.tun else {
+                pp_log(ctx, .core, .error, "Ignoring detached tun during processing")
+                return
+            }
             processedPackets.forEach {
                 tun.unsafeEnqueueWrite($0)
             }
