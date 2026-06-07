@@ -167,8 +167,11 @@ public final class FdLooper: @unchecked Sendable {
 
                     // Iterate through the fds
                     try process(mux: mux, fdSet: fdSet)
+                } catch IOError.user(let side, let reason) {
+                    // Unwrap user-defined errors
+                    detachImmediately(side, withReason: reason)
                 } catch let reason as IOError {
-                    // Can be either .user or .libc
+                    // Rethrow anything else as is
                     detachImmediately(reason.side, withReason: reason)
                 } catch {
                     pp_log(ctx, .core, .error, "Unable to process: \(error)")
