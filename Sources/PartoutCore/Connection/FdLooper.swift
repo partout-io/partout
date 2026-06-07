@@ -174,7 +174,7 @@ public final class FdLooper: @unchecked Sendable {
                     // Rethrow anything else as is
                     detachImmediately(reason.side, withReason: reason)
                 } catch {
-                    pp_log(ctx, .core, .error, "Unable to process: \(error)")
+                    pp_log(ctx, .core, .fault, "Unable to process: \(error)")
                     lastError = error
                     break
                 }
