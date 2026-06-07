@@ -247,7 +247,7 @@ private extension OpenVPNSessionV3 {
         // Shut down after sending exit notification if link is unreliable (normally UDP)
         if error == nil || error?.partoutErrorCode == .networkChanged {
             do {
-                try sendExitPacketOnQueue()
+                try sendExitPacketOnQueue(timeout: timeout ?? options.writeTimeout)
             } catch {
                 pp_log(ctx, .openvpn, .error, "Unable to send exit packet: \(error)")
             }
@@ -284,14 +284,14 @@ private extension OpenVPNSessionV3 {
         )
     }
 
-    func sendExitPacketOnQueue() throws {
+    func sendExitPacketOnQueue(timeout: TimeInterval) throws {
         preconditionOnQueue()
         try withActiveContext { context in
             guard !context.linkMetadata.isReliable, let dataPair = context.currentDataPair else {
                 return
             }
             pp_log(ctx, .openvpn, .info, "Send OCCPacket exit")
-            try dataPair.send([OCCPacket.exit.serialized()], outOfBand: true)
+            try dataPair.send([OCCPacket.exit.serialized()], timeout: timeout)
             pp_log(ctx, .openvpn, .info, "Sent OCCPacket correctly")
         }
     }

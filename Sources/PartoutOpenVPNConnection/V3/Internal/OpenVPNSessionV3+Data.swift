@@ -33,7 +33,7 @@ extension OpenVPNSessionV3 {
             }
         }
 
-        func send(_ packets: [Data], on key: UInt8, outOfBand: Bool) throws {
+        func send(_ packets: [Data], on key: UInt8, timeout: TimeInterval?) throws {
             do {
                 guard let channel = dataChannel(key) else {
                     return
@@ -46,13 +46,28 @@ extension OpenVPNSessionV3 {
                     return
                 }
                 reportOutboundDataCount(encryptedPackets.flatCount)
-                try looper.write(encryptedPackets, to: .link, outOfBand: outOfBand)
+
+                if let timeout {
+                    let deadline = Date().addingTimeInterval(timeout)
+                    var lastError: Error?
+                    repeat {
+                        do {
+                            try looper.write(encryptedPackets, to: .link, outOfBand: true)
+                            return
+                        } catch let error {
+                            lastError = error
+                        }
+                    } while Date() < deadline
+                    throw lastError ?? OpenVPNSessionError.writeTimeout
+                }
+
+                try looper.write(encryptedPackets, to: .link)
             } catch let cError as CCryptoError {
                 throw cError
             } catch let cError as CDataPathError {
                 throw cError
             } catch {
-                pp_log(ctx, .openvpn, .error, "Data: Failed \(outOfBand ? "synchronous " : "")LINK write during send data: \(error)")
+                pp_log(ctx, .openvpn, .error, "Data: Failed \(timeout != nil ? "synchronous " : "")LINK write during send data: \(error)")
                 throw error
             }
         }
