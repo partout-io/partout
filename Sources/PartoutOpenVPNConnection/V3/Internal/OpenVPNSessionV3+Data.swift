@@ -39,7 +39,7 @@ extension OpenVPNSessionV3 {
                     return
                 }
                 guard let encryptedPackets = try channel.encrypt(packets: packets) else {
-                    pp_log(ctx, .openvpn, .error, "Unable to encrypt packets, is SessionKey properly configured (dataPath, peerId)?")
+                    pp_log(ctx, .openvpn, .error, "Unable to encrypt packets, is DataChannel properly configured?")
                     return
                 }
                 guard !encryptedPackets.isEmpty else {
