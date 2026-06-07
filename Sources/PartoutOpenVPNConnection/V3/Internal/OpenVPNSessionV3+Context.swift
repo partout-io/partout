@@ -77,3 +77,51 @@ extension OpenVPNSessionV3 {
         }
     }
 }
+
+extension OpenVPNSessionV3 {
+    var activePhase: ActivePhase? {
+        preconditionOnQueue()
+        guard case .active(let phase, _) = sessionState else {
+            return nil
+        }
+        return phase
+    }
+
+    var idleContext: IdleContext? {
+        preconditionOnQueue()
+        guard case .stopped(let context) = sessionState else {
+            return nil
+        }
+        return context
+    }
+
+    var activeContext: ActiveContext? {
+        preconditionOnQueue()
+        guard case .active(_, let context) = sessionState else {
+            return nil
+        }
+        return context
+    }
+
+    @discardableResult
+    func withActiveContext<R>(
+        _ body: (inout ActivePhase, inout ActiveContext) throws -> R
+    ) rethrows -> R? {
+        preconditionOnQueue()
+        guard case .active(var phase, var context) = sessionState else {
+            return nil
+        }
+        let result = try body(&phase, &context)
+        sessionState = .active(phase, context)
+        return result
+    }
+
+    @discardableResult
+    func withActiveContext<R>(
+        _ body: (inout ActiveContext) throws -> R
+    ) rethrows -> R? {
+        try withActiveContext { _, context in
+            try body(&context)
+        }
+    }
+}

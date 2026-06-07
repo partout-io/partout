@@ -21,7 +21,14 @@ final class OpenVPNSessionV3: @unchecked Sendable {
     // MARK: Mutable state
 
     private let controlChannel: ControlChannelV3
-    private var sessionState: SessionState
+    var sessionState: SessionState
+
+    func preconditionOnQueue() {
+        precondition(
+            DispatchQueue.getSpecific(key: queueKey) != nil,
+            "OpenVPNSessionV3 state accessed outside its queue"
+        )
+    }
 
     /**
      Creates a VPN session.
@@ -76,61 +83,6 @@ final class OpenVPNSessionV3: @unchecked Sendable {
 
     deinit {
         pp_log(ctx, .openvpn, .debug, "Deinit OpenVPNSession")
-    }
-}
-
-private extension OpenVPNSessionV3 {
-    func preconditionOnQueue() {
-        precondition(
-            DispatchQueue.getSpecific(key: queueKey) != nil,
-            "OpenVPNSessionV3 state accessed outside its queue"
-        )
-    }
-
-    var activePhase: ActivePhase? {
-        preconditionOnQueue()
-        guard case .active(let phase, _) = sessionState else {
-            return nil
-        }
-        return phase
-    }
-
-    var idleContext: IdleContext? {
-        preconditionOnQueue()
-        guard case .stopped(let context) = sessionState else {
-            return nil
-        }
-        return context
-    }
-
-    var activeContext: ActiveContext? {
-        preconditionOnQueue()
-        guard case .active(_, let context) = sessionState else {
-            return nil
-        }
-        return context
-    }
-
-    @discardableResult
-    func withActiveContext<R>(
-        _ body: (inout ActivePhase, inout ActiveContext) throws -> R
-    ) rethrows -> R? {
-        preconditionOnQueue()
-        guard case .active(var phase, var context) = sessionState else {
-            return nil
-        }
-        let result = try body(&phase, &context)
-        sessionState = .active(phase, context)
-        return result
-    }
-
-    @discardableResult
-    func withActiveContext<R>(
-        _ body: (inout ActiveContext) throws -> R
-    ) rethrows -> R? {
-        try withActiveContext { _, context in
-            try body(&context)
-        }
     }
 }
 
