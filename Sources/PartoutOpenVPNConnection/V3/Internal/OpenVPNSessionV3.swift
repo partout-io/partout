@@ -105,19 +105,17 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
         try await looper.attach(.init(
             side: .link,
             original: link,
-            beforeRead: rw.beforeRead,
+            transformWrite: rw.beforeWrite,
             onRead: { [weak self] packets in
-                do {
-                    try self?.receiveLink(packets)
-                    return .keep
-                } catch {
-                    Task {
-                        await self?.shutdown(error)
-                    }
-                    return .pause
-                }
+                let processed = try rw.beforeRead(packets)
+                try self?.receiveLink(processed)
+                return .keep
             },
-            transformWrite: rw.beforeWrite
+            onFailure: { [weak self] error in
+                Task {
+                    await self?.shutdown(error)
+                }
+            }
         ))
         try looper.schedule { [weak self] in
             try self?.setLinkOnQueue(link)
@@ -137,19 +135,16 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
         try await looper.attach(.init(
             side: .tun,
             original: tunnel,
-            beforeRead: nil,
+            transformWrite: nil,
             onRead: { [weak self] packets in
-                do {
-                    try self?.receiveTunnel(packets)
-                    return .keep
-                } catch {
-                    Task {
-                        await self?.shutdown(error)
-                    }
-                    return .pause
-                }
+                try self?.receiveTunnel(packets)
+                return .keep
             },
-            transformWrite: nil
+            onFailure: { [weak self] error in
+                Task {
+                    await self?.shutdown(error)
+                }
+            }
         ))
     }
 

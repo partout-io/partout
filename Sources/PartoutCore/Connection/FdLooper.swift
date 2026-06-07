@@ -19,30 +19,30 @@ public final class FdLooper: @unchecked Sendable {
         case pause
     }
 
-    public typealias BeforeRead = @Sendable (_ packets: [Data]) throws -> [Data]
-    public typealias OnRead = @Sendable (_ packets: [Data]) throws -> FdLooper.ReadAction
     public typealias TransformWrite = @Sendable (_ packets: [Data]) throws -> [Data]
+    public typealias OnRead = @Sendable (_ packets: [Data]) throws -> FdLooper.ReadAction
+    public typealias OnFailure = @Sendable (_ error: Error) -> Void
     public typealias OnFinish = @Sendable (_ error: Error?) -> Void
 
     public struct AttachArguments: Sendable {
         public let side: Side
         public let original: IOInterface
-        public let beforeRead: BeforeRead?
-        public let onRead: OnRead?
         public let transformWrite: TransformWrite?
+        public let onRead: OnRead?
+        public let onFailure: OnFailure?
 
         public init(
             side: Side,
             original: IOInterface,
-            beforeRead: BeforeRead?,
+            transformWrite: TransformWrite?,
             onRead: OnRead?,
-            transformWrite: TransformWrite?
+            onFailure: OnFailure?
         ) {
             self.side = side
             self.original = original
-            self.beforeRead = beforeRead
-            self.onRead = onRead
             self.transformWrite = transformWrite
+            self.onRead = onRead
+            self.onFailure = onFailure
         }
     }
 
@@ -782,9 +782,9 @@ private extension FdLooper {
         let fd: Int32
 
         let originalInterface: IOInterface
-        private let beforeRead: BeforeRead?
-        private let onRead: OnRead?
         let transformWrite: TransformWrite?
+        private let onRead: OnRead?
+        private let onFailure: OnFailure?
 
         private let read: (inout [UInt8]) throws -> Data?
         private let write: (PendingWrite) throws -> Int
@@ -806,9 +806,9 @@ private extension FdLooper {
             self.side = side
             self.fd = fd
             originalInterface = arguments.original
-            beforeRead = arguments.beforeRead
-            onRead = arguments.onRead
             transformWrite = arguments.transformWrite
+            onRead = arguments.onRead
+            onFailure = arguments.onFailure
             self.read = read
             self.write = write
             self.cleanup = cleanup
@@ -821,9 +821,9 @@ private extension FdLooper {
             try read(&readBuf)
         }
 
+        // May throw user-defined errors in onRead
         func processReadPackets(_ packets: [Data]) throws -> FdLooper.ReadAction {
-            let processed = try beforeRead?(packets) ?? packets
-            return try onRead?(processed) ?? .keep
+            try onRead?(packets) ?? .keep
         }
 
         func performWrite(_ pending: PendingWrite, lock: SemaphoreMutex) throws -> Bool {
