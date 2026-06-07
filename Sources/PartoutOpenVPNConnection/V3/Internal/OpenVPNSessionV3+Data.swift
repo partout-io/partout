@@ -17,7 +17,7 @@ extension OpenVPNSessionV3 {
                 return
             }
             reportInboundDataCount(decryptedPackets.flatCount)
-            looper.write(decryptedPackets, to: .tun)
+            try looper.write(decryptedPackets, to: .tun)
         } catch let cError as CCryptoError {
             throw cError
         } catch let cError as CDataPathError {
@@ -41,7 +41,7 @@ extension OpenVPNSessionV3 {
                 return
             }
             reportOutboundDataCount(encryptedPackets.flatCount)
-            looper.write(encryptedPackets, to: .link)
+            try looper.write(encryptedPackets, to: .link)
         } catch let cError as CCryptoError {
             throw cError
         } catch let cError as CDataPathError {

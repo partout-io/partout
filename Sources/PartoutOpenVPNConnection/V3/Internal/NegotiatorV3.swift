@@ -369,7 +369,7 @@ private extension NegotiatorV3 {
         for raw in rawList {
             pp_log(ctx, .openvpn, .info, "Send control packet \(raw.asSensitiveBytes(ctx))")
         }
-        looper.write(rawList, to: .link)
+        try looper.write(rawList, to: .link)
     }
 
     func requestsWrappedKeyResend(from payload: Data?) -> Bool {
@@ -501,7 +501,7 @@ private extension NegotiatorV3 {
                 ackPacketIds: [controlPacket.packetId],
                 ackRemoteSessionId: controlPacket.sessionId
             )
-            looper.write([raw], to: .link)
+            try looper.write([raw], to: .link)
             pp_log(ctx, .openvpn, .info, "Ack successfully written to LINK for packetId \(controlPacket.packetId)")
         } catch {
             pp_log(ctx, .openvpn, .error, "Failed LINK write during send ack for packetId \(controlPacket.packetId): \(error)")

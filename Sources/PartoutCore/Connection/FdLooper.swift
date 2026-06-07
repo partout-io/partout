@@ -10,16 +10,20 @@ internal import _PartoutCore_C
 /// Delegates ``FdLooper`` events.
 public struct FdLooperDelegate: Sendable {
     public typealias OnRead = @Sendable (_ packets: [Data], _ side: FdLooper.Side) throws -> FdLooper.ReadAction
+    public typealias OnWrite = @Sendable (_ packet: Data, _ side: FdLooper.Side) throws -> Data
     public typealias OnFinish = @Sendable (_ error: Error?) -> Void
 
     public let onRead: OnRead
+    public let onWrite: OnWrite?
     public let onFinish: OnFinish
 
     public init(
         onRead: @escaping OnRead,
+        onWrite: OnWrite?,
         onFinish: @escaping OnFinish
     ) {
         self.onRead = onRead
+        self.onWrite = onWrite
         self.onFinish = onFinish
     }
 }
@@ -316,7 +320,7 @@ public final class FdLooper: @unchecked Sendable {
         pp_mux_wake(mux)
     }
 
-    public func write(_ packets: [Data], to side: Side) {
+    public func write(_ packets: [Data], to side: Side) throws {
         lock.lock()
         defer { lock.unlock() }
         switch side {
@@ -325,8 +329,9 @@ public final class FdLooper: @unchecked Sendable {
                 pp_log(ctx, .core, .error, "Ignoring link packets, not attached")
                 return
             }
-            packets.forEach {
-                link.unsafeEnqueueWrite($0)
+            try packets.forEach {
+                let packet = try delegate.onWrite?($0, side) ?? $0
+                link.unsafeEnqueueWrite(packet)
             }
             commands.append(.enableWrite(.link, nil))
         case .tun:

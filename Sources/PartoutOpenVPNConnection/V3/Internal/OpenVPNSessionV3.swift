@@ -77,6 +77,7 @@ final class OpenVPNSessionV3: @unchecked Sendable {
                 }
                 return .keep
             },
+            onWrite: nil,
             onFinish: { [weak self] error in
                 pp_log(self?.ctx ?? .global, .openvpn, .error, "Session looper finished with error: \(error?.localizedDescription ?? "none")")
                 self?.looperDidFinish(error)
@@ -302,7 +303,7 @@ private extension OpenVPNSessionV3 {
         }
 
         pp_log(ctx, .openvpn, .info, "Send OCCPacket exit")
-        looper.write(packets, to: .link)
+        try looper.write(packets, to: .link)
         pp_log(ctx, .openvpn, .info, "Sent OCCPacket correctly")
     }
 }
