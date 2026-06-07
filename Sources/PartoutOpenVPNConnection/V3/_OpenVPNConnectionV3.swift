@@ -456,7 +456,7 @@ private extension _OpenVPNConnectionV3 {
             pp_log(ctx, .openvpn, .fault, "Unable to create link: \(error)")
 
             // reset endpoints on exhaustion
-            if (error as? PartoutError)?.code == .exhaustedEndpoints {
+            if error.partoutErrorCode == .exhaustedEndpoints {
                 endpointResolver = EndpointResolver(ctx, endpoints: endpoints)
             }
 
