@@ -154,11 +154,11 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             side: .link,
             original: link,
             beforeRead: rw.beforeRead,
-            beforeWrite: rw.beforeWrite,
             onRead: { [weak self] packets in
                 try self?.receiveLink(packets)
                 return .keep
-            }
+            },
+            transformWrite: rw.beforeWrite
         ))
         try looper.schedule { [weak self] in
             try self?.setLinkOnQueue(link)
@@ -179,11 +179,11 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             side: .tun,
             original: tunnel,
             beforeRead: nil,
-            beforeWrite: nil,
             onRead: { [weak self] packets in
                 try self?.receiveTunnel(packets)
                 return .keep
-            }
+            },
+            transformWrite: nil
         ))
     }
 
