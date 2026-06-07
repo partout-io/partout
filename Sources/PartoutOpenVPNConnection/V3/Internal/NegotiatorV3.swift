@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-final class NegotiatorV3 {
+// Use looper.schedule() for synchronization
+final class NegotiatorV3: @unchecked Sendable {
     struct Options {
         let configuration: OpenVPN.Configuration
 
@@ -284,10 +285,12 @@ private extension NegotiatorV3 {
                     milliseconds: Int(options.sessionOptions.tickInterval * 1000)
                 )
                 guard !Task.isCancelled else { return }
-                do {
-                    try checkNegotiationComplete()
-                } catch {
-                    options.onError(key, error)
+                looper.schedule {
+                    do {
+                        try self.checkNegotiationComplete()
+                    } catch {
+                        self.options.onError(self.key, error)
+                    }
                 }
             }
             return
