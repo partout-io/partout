@@ -852,7 +852,7 @@ private extension FdLooper {
             do {
                 return try onRead?(packets) ?? .keep
             } catch {
-                // BEWARE: Wrap user-defined errors to prevent premature finish
+                // IMPORTANT: Wrap user-defined errors to prevent premature finish
                 throw IOError.user(side, error)
             }
         }
