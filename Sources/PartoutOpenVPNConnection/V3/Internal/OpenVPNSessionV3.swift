@@ -169,10 +169,10 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
         looper.isLinkAttached
     }
 
-    func shutdown(_ error: Error?) async {
+    func shutdown(_ error: Error?, timeout: TimeInterval?) async {
         do {
             let shouldDetach = try await looper.perform { [weak self] in
-                self?.prepareShutdownOnQueue(error) ?? false
+                self?.prepareShutdownOnQueue(error, timeout: timeout) ?? false
             }
             guard shouldDetach else {
                 return
@@ -228,7 +228,7 @@ private extension OpenVPNSessionV3 {
         }
     }
 
-    func prepareShutdownOnQueue(_ error: Error?) -> Bool {
+    func prepareShutdownOnQueue(_ error: Error?, timeout: TimeInterval?) -> Bool {
         preconditionOnQueue()
         guard activePhase != .stopping, activePhase != nil else {
             pp_log(ctx, .openvpn, .debug, "Ignore stop request, stopped or already stopping")

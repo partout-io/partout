@@ -57,6 +57,13 @@ protocol OpenVPNSessionProtocolV3: AnyObject, Sendable {
 
      - Parameters:
        - error: An optional `Error` being the reason of the shutdown.
+       - timeout: The optional timeout in seconds.
      */
-    func shutdown(_ error: Error?) async
+    func shutdown(_ error: Error?, timeout: TimeInterval?) async
+}
+
+extension OpenVPNSessionProtocolV3 {
+    func shutdown(_ error: Error?) async {
+        await shutdown(error, timeout: nil)
+    }
 }
