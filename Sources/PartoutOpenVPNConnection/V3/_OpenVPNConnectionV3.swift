@@ -136,7 +136,7 @@ extension _OpenVPNConnectionV3: Connection {
         sendStatus(.disconnecting)
 
         // Stop the OpenVPN connection on user request
-        await currentSession.shutdown(nil, timeout: TimeInterval(timeout) / 1000.0)
+        await currentSession.shutdown(nil)
 
         // XXX: Poll session status until link clean-up
         // In the future, make OpenVPNSession.shutdown() wait for stop async-ly
