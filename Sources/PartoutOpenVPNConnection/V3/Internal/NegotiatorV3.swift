@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@OpenVPNActor
-final class NegotiatorV3 {
+// Use looper.schedule() for synchronization
+final class NegotiatorV3: @unchecked Sendable {
     struct Options {
         let configuration: OpenVPN.Configuration
 
@@ -13,9 +13,9 @@ final class NegotiatorV3 {
 
         let sessionOptions: OpenVPNConnectionOptions
 
-        let onConnected: (UInt8, DataChannel, PushReply) async -> Void
+        let onConnected: (UInt8, DataChannel, PushReply) -> Void
 
-        let onError: (UInt8, Error) async -> Void
+        let onError: (UInt8, Error) -> Void
     }
 
     private let ctx: PartoutLoggerContext
@@ -28,9 +28,11 @@ final class NegotiatorV3 {
 
     private let renegotiation: RenegotiationType?
 
-    let link: LinkInterface
+    let looper: FdLooper
 
-    private let channel: ControlChannel
+    private let linkMetadata: LinkMetadata
+
+    private let channel: ControlChannelV3
 
     private let prng: PRNGProtocol
 
@@ -70,8 +72,9 @@ final class NegotiatorV3 {
 
     convenience init(
         _ ctx: PartoutLoggerContext,
-        link: LinkInterface,
-        channel: ControlChannel,
+        looper: FdLooper,
+        linkMetadata: LinkMetadata,
+        channel: ControlChannelV3,
         prng: PRNGProtocol,
         tls: TLSProtocol,
         dpFactory: @escaping DataPathFactory,
@@ -82,7 +85,8 @@ final class NegotiatorV3 {
             key: 0,
             history: nil,
             renegotiation: nil,
-            link: link,
+            looper: looper,
+            linkMetadata: linkMetadata,
             channel: channel,
             prng: prng,
             tls: tls,
@@ -96,8 +100,9 @@ final class NegotiatorV3 {
         key: UInt8,
         history: NegotiationHistory?,
         renegotiation: RenegotiationType?,
-        link: LinkInterface,
-        channel: ControlChannel, // TODO: #29, abstract this for testing
+        looper: FdLooper,
+        linkMetadata: LinkMetadata,
+        channel: ControlChannelV3, // TODO: #29, abstract this for testing
         prng: PRNGProtocol,
         tls: TLSProtocol,
         dpFactory: @escaping DataPathFactory,
@@ -107,7 +112,8 @@ final class NegotiatorV3 {
         self.key = key
         self.history = history
         self.renegotiation = renegotiation
-        self.link = link
+        self.looper = looper
+        self.linkMetadata = linkMetadata
         self.channel = channel
         self.prng = prng
         self.tls = tls
@@ -137,7 +143,8 @@ final class NegotiatorV3 {
             key: newKey,
             history: history,
             renegotiation: newRenegotiation,
-            link: link,
+            looper: looper,
+            linkMetadata: linkMetadata,
             channel: channel,
             prng: prng,
             tls: tls,
@@ -165,7 +172,7 @@ extension NegotiatorV3 {
     func start() throws {
         channel.reset(forNewSession: renegotiation == nil)
 
-        // schedule this repeatedly
+        // Schedule this repeatedly
         try checkNegotiationComplete()
 
         switch renegotiation {
@@ -218,10 +225,8 @@ extension NegotiatorV3 {
         //
     }
 
-    func sendAck(for controlPacket: CrossPacket, to link: LinkInterface) {
-        Task {
-            try await privateSendAck(for: controlPacket, to: link)
-        }
+    func sendAck(for controlPacket: CrossPacket, to looper: FdLooper) throws {
+        try privateSendAck(for: controlPacket, to: looper)
     }
 
     func shouldRenegotiate() -> Bool {
@@ -268,7 +273,7 @@ private extension NegotiatorV3 {
         if !isRenegotiating {
             try pushRequest()
         }
-        if !link.isReliable {
+        if !linkMetadata.isReliable {
             try flushControlQueue()
         }
 
@@ -280,16 +285,18 @@ private extension NegotiatorV3 {
                     milliseconds: Int(options.sessionOptions.tickInterval * 1000)
                 )
                 guard !Task.isCancelled else { return }
-                do {
-                    try checkNegotiationComplete()
-                } catch {
-                    await options.onError(key, error)
+                looper.schedule {
+                    do {
+                        try self.checkNegotiationComplete()
+                    } catch {
+                        self.options.onError(self.key, error)
+                    }
                 }
             }
             return
         }
 
-        // let loop die when negotiation is complete
+        // Let loop die when negotiation is complete
     }
 
     func pushRequest() throws {
@@ -362,14 +369,7 @@ private extension NegotiatorV3 {
         for raw in rawList {
             pp_log(ctx, .openvpn, .info, "Send control packet \(raw.asSensitiveBytes(ctx))")
         }
-        Task {
-            do {
-                try await link.writePackets(rawList)
-            } catch {
-                pp_log(ctx, .openvpn, .error, "Failed LINK write during control flush: \(error)")
-                await options.onError(key, PartoutError(.ioFailure, error))
-            }
-        }
+        try looper.write(rawList, to: .link)
     }
 
     func requestsWrappedKeyResend(from payload: Data?) -> Bool {
@@ -493,7 +493,7 @@ private extension NegotiatorV3 {
         }
     }
 
-    func privateSendAck(for controlPacket: CrossPacket, to link: LinkInterface) async throws {
+    func privateSendAck(for controlPacket: CrossPacket, to looper: FdLooper) throws {
         do {
             pp_log(ctx, .openvpn, .info, "Send ack for received packetId \(controlPacket.packetId)")
             let raw = try channel.writeAcks(
@@ -501,11 +501,11 @@ private extension NegotiatorV3 {
                 ackPacketIds: [controlPacket.packetId],
                 ackRemoteSessionId: controlPacket.sessionId
             )
-            try await link.writePackets([raw])
+            try looper.write([raw], to: .link)
             pp_log(ctx, .openvpn, .info, "Ack successfully written to LINK for packetId \(controlPacket.packetId)")
         } catch {
             pp_log(ctx, .openvpn, .error, "Failed LINK write during send ack for packetId \(controlPacket.packetId): \(error)")
-            await options.onError(key, PartoutError(.ioFailure, error))
+            options.onError(key, error)
         }
     }
 
@@ -567,9 +567,7 @@ private extension NegotiatorV3 {
             do {
                 try handleControlMessage(message)
             } catch {
-                Task {
-                    await options.onError(key, error)
-                }
+                options.onError(key, error)
                 throw error
             }
         }
@@ -578,25 +576,23 @@ private extension NegotiatorV3 {
     func handleControlMessage(_ message: String) throws {
         pp_log(ctx, .openvpn, .info, "Received control message \(message.asSensitiveBytes(ctx))")
 
-        // disconnect on authentication failure
+        // Disconnect on authentication failure
         guard !message.hasPrefix("AUTH_FAILED") else {
-
-            // XXX: retry without client options
+            // XXX: Retry without client options
             if authenticator?.withLocalOptions ?? false {
                 pp_log(ctx, .openvpn, .error, "Authentication failure, retry without local options")
                 throw OpenVPNSessionError.badCredentialsWithLocalOptions
             }
-
             throw OpenVPNSessionError.badCredentials
         }
 
-        // disconnect on remote server restart (--explicit-exit-notify)
+        // Disconnect on remote server restart (--explicit-exit-notify)
         guard !message.hasPrefix("RESTART") else {
             pp_log(ctx, .openvpn, .info, "Disconnect due to server shutdown")
             throw OpenVPNSessionError.serverShutdown
         }
 
-        // handle authentication from now on
+        // Handle authentication from now on
         guard state == .push else {
             return
         }
@@ -632,7 +628,7 @@ private extension NegotiatorV3 {
             }
         } catch StandardOpenVPNParserError.continuationPushReply {
             continuatedPushReplyMessage = completeMessage.replacingOccurrences(of: "push-continuation", with: "")
-            // XXX: strip "PUSH_REPLY" and "push-continuation 2"
+            // XXX: Strip "PUSH_REPLY" and "push-continuation 2"
             return
         }
 
@@ -655,9 +651,7 @@ private extension NegotiatorV3 {
         nonisolated(unsafe) let dataChannel = try newDataChannel(with: history)
         self.history = history
         authenticator?.reset()
-        Task {
-            await options.onConnected(key, dataChannel, pushReply)
-        }
+        options.onConnected(key, dataChannel, pushReply)
     }
 
     func newDataChannel(with history: NegotiationHistory) throws -> DataChannel {
@@ -708,13 +702,9 @@ private extension NegotiatorV3 {
 private extension NegotiatorV3 {
     enum State: Int, Comparable {
         case idle
-
         case tls
-
         case auth
-
         case push
-
         case connected
 
         static func < (lhs: Self, rhs: Self) -> Bool {

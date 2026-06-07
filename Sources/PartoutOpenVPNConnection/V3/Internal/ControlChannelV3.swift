@@ -4,7 +4,6 @@
 
 internal import _PartoutOpenVPNConnection_C
 
-@OpenVPNActor
 final class ControlChannelV3 {
     private let ctx: PartoutLoggerContext
 

@@ -53,6 +53,7 @@ Given the main app and the daemon:
 
 - ``IOInterface``
 - ``LinkInterface``
+- ``LinkMetadata``
 - ``LinkObserver``
 - ``BSDSocket``
 - ``BSDSocketObserver``

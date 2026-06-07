@@ -4,7 +4,6 @@
 
 /// Observes major events notified by a `OpenVPNSessionProtocol`.
 protocol OpenVPNSessionDelegateV3: AnyObject, Sendable {
-
     /// Called after starting a session.
     ///
     /// - Parameter session: The originator.
@@ -12,35 +11,25 @@ protocol OpenVPNSessionDelegateV3: AnyObject, Sendable {
     /// - Parameter remoteProtocol: The endpoint protocol of the VPN server.
     /// - Parameter remoteOptions: The pulled tunnel settings.
     /// - Parameter remoteFd: The file descriptor of the underlying connection.
-    func sessionDidStart(_ session: OpenVPNSessionProtocolV3, remoteAddress: String, remoteProtocol: EndpointProtocol, remoteOptions: OpenVPN.Configuration, remoteFd: UInt64?) async
+    func sessionDidStart(_ session: OpenVPNSessionProtocolV3, remoteAddress: String, remoteProtocol: EndpointProtocol, remoteOptions: OpenVPN.Configuration, remoteFd: UInt64?)
 
     /// Called after stopping a session.
     ///
     /// - Parameter session: The originator.
     /// - Parameter error: An optional `Error` being the reason of the stop.
-    func sessionDidStop(_ session: OpenVPNSessionProtocolV3, withError error: Error?) async
+    func sessionDidStop(_ session: OpenVPNSessionProtocolV3, withError error: Error?)
 
     /// Called when the data count gets a significant update.
     ///
     /// - Parameter session: The originator.
     /// - Parameter dataCount: The data count.
-    func session(_ session: OpenVPNSessionProtocolV3, didUpdateDataCount dataCount: DataCount) async
+    func session(_ session: OpenVPNSessionProtocolV3, didUpdateDataCount dataCount: DataCount)
 }
 
 /// Provides methods to set up and maintain an OpenVPN session.
 protocol OpenVPNSessionProtocolV3: AnyObject, Sendable {
-
     /// Observe events with a `OpenVPNSessionDelegate`.
-    func setDelegate(_ delegate: OpenVPNSessionDelegateV3) async
-
-    /**
-     Establishes the tunnel interface for this session. The interface must be up and running for sending and receiving packets.
-
-     - Precondition: `tunnel` is an active network interface.
-     - Postcondition: The VPN data channel is open.
-     - Parameter tunnel: The `IOInterface` on which to exchange the VPN data traffic.
-     */
-    func setTunnel(_ tunnel: IOInterface) async
+    func setDelegate(_ delegate: OpenVPNSessionDelegateV3)
 
     /**
      Establishes the link interface for this session. The interface must be up and running for sending and receiving packets.
@@ -52,7 +41,16 @@ protocol OpenVPNSessionProtocolV3: AnyObject, Sendable {
     func setLink(_ link: LinkInterface) async throws
 
     /// True if a link was set via ``setLink(_:)`` and is still alive.
-    func hasLink() async -> Bool
+    func hasLink() -> Bool
+
+    /**
+     Establishes the tunnel interface for this session. The interface must be up and running for sending and receiving packets.
+
+     - Precondition: `tunnel` is an active network interface.
+     - Postcondition: The VPN data channel is open.
+     - Parameter tunnel: The `IOInterface` on which to exchange the VPN data traffic.
+     */
+    func setTunnel(_ tunnel: IOInterface) async throws
 
     /**
      Shuts down the session with an optional `Error` reason. Does nothing if the session is already stopped or about to stop.

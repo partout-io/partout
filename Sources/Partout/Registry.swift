@@ -67,7 +67,7 @@ extension Registry: ModuleImporter {
                 return try importer.module(fromContents: contents, object: object)
             } catch {
                 // URL content is not recognized by this importer, skip to next importer
-                if (error as? PartoutError)?.code != .unknownImportedModule {
+                if error.partoutErrorCode != .unknownImportedModule {
                     errors.append(error)
                 }
                 continue
