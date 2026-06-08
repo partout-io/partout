@@ -8,6 +8,9 @@
 #include <errno.h>
 #include "portable/common.h"
 
+const int PPIOErrorWouldBlock   = -11;
+const int PPIOErrorNoBufs       = -12;
+
 pp_log_category PPLogCategoryCore = "core";
 
 void pp_clog_v(pp_log_category category,

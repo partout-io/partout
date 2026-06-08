@@ -108,6 +108,9 @@ FILE *_Nullable pp_fopen(const char *filename, const char *mode) {
 
 /* Syscalls. */
 
+extern const int PPIOErrorWouldBlock;
+extern const int PPIOErrorNoBufs;
+
 #if PARTOUT_WINDOWS
 #include <ws2tcpip.h>
 

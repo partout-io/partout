@@ -35,9 +35,6 @@ struct sockaddr_ctl {
 /* Opaque tun device. */
 typedef struct __pp_tun_struct *pp_tun;
 
-extern const int PPTunErrorWouldBlock;
-extern const int PPTunErrorNoBuf;
-
 #if !PARTOUT_WINDOWS
 /* With manual file descriptor. */
 pp_tun pp_tun_create(int fd);
@@ -45,10 +42,10 @@ pp_tun pp_tun_create(int fd);
 static inline int pp_tun_handle_result(int ret) {
     if (ret < 0) {
         if (PP_IO_WOULD_BLOCK()) {
-            return PPTunErrorWouldBlock;
+            return PPIOErrorWouldBlock;
         }
         if (PP_IO_NOBUFS()) {
-            return PPTunErrorNoBuf;
+            return PPIOErrorNoBufs;
         }
     }
     return ret;
