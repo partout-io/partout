@@ -109,8 +109,8 @@ FILE *_Nullable pp_fopen(const char *filename, const char *mode) {
 /* Syscalls. */
 
 #if PARTOUT_WINDOWS
-
 #include <ws2tcpip.h>
+
 #define PP_IO_RETRY(result, fn) \
     do { \
         do { \
@@ -131,7 +131,6 @@ static inline bool PP_IO_NOBUFS(void) {
 }
 
 #else
-
 #include <errno.h>
 
 #define PP_IO_RETRY(result, fn) \
