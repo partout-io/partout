@@ -168,6 +168,7 @@ struct pp_mux_fd {
     int fd;
     bool read;
     bool write;
+    bool registered;
 };
 
 struct __pp_mux {
@@ -199,6 +200,7 @@ static struct pp_mux_fd *pp_mux_track_fd(pp_mux mux, int fd) {
     tracked->fd = fd;
     tracked->read = false;
     tracked->write = false;
+    tracked->registered = false;
     ++mux->fds_count;
     return tracked;
 }
@@ -212,24 +214,44 @@ static void pp_mux_untrack_fd(pp_mux mux, struct pp_mux_fd *fd) {
 }
 
 static uint32_t pp_mux_events(const struct pp_mux_fd *fd) {
-    uint32_t events = PP_MUX_ERROR_EVENTS;
+    uint32_t events = 0;
+    if (fd->read || fd->write) events |= PP_MUX_ERROR_EVENTS;
     if (fd->read) events |= EPOLLIN;
     if (fd->write) events |= EPOLLOUT;
     return events;
 }
 
-static bool pp_mux_update_fd(pp_mux mux, const struct pp_mux_fd *fd, bool add_if_missing, bool ignore_missing) {
+static bool pp_mux_sync_fd(pp_mux mux, struct pp_mux_fd *fd) {
+    const uint32_t events = pp_mux_events(fd);
+    if (events == 0) {
+        if (!fd->registered) return true;
+        const int ret = epoll_ctl(mux->handle, EPOLL_CTL_DEL, fd->fd, NULL);
+        if (ret != 0 && errno != ENOENT) return false;
+        fd->registered = false;
+        return true;
+    }
+
     struct epoll_event ev;
     pp_zero(&ev, sizeof(ev));
-    ev.events = pp_mux_events(fd);
+    ev.events = events;
     ev.data.fd = fd->fd;
 
-    const int ret = epoll_ctl(mux->handle, EPOLL_CTL_MOD, fd->fd, &ev);
-    if (ret == 0) return true;
-    if (errno == ENOENT) {
-        if (ignore_missing) return true;
-        if (add_if_missing) {
-            return epoll_ctl(mux->handle, EPOLL_CTL_ADD, fd->fd, &ev) == 0;
+    if (fd->registered) {
+        const int ret = epoll_ctl(mux->handle, EPOLL_CTL_MOD, fd->fd, &ev);
+        if (ret == 0) return true;
+        if (errno != ENOENT) return false;
+        fd->registered = false;
+    }
+
+    const int ret = epoll_ctl(mux->handle, EPOLL_CTL_ADD, fd->fd, &ev);
+    if (ret == 0) {
+        fd->registered = true;
+        return true;
+    }
+    if (errno == EEXIST) {
+        fd->registered = true;
+        if (epoll_ctl(mux->handle, EPOLL_CTL_MOD, fd->fd, &ev) == 0) {
+            return true;
         }
     }
     return false;
@@ -282,10 +304,11 @@ bool pp_mux_add(pp_mux mux, int fd) {
     const bool previous_write = tracked->write;
     tracked->read = true;
     tracked->write = false;
-    const bool ok = pp_mux_update_fd(mux, tracked, true, false);
+    const bool ok = pp_mux_sync_fd(mux, tracked);
     if (!ok) {
         tracked->read = previous_read;
         tracked->write = previous_write;
+        pp_mux_sync_fd(mux, tracked);
         mux->fds_count = previous_count;
         return false;
     }
@@ -297,11 +320,12 @@ bool pp_mux_delete(pp_mux mux, int fd) {
     struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
     if (!tracked) return true;
 
-    struct epoll_event ev;
-    pp_zero(&ev, sizeof(ev));
-    const int ret = epoll_ctl(mux->handle, EPOLL_CTL_DEL, fd, &ev);
-    if (ret != 0 && errno != ENOENT) {
-        return false;
+    if (tracked->registered) {
+        const int ret = epoll_ctl(mux->handle, EPOLL_CTL_DEL, fd, NULL);
+        if (ret != 0 && errno != ENOENT) {
+            return false;
+        }
+        tracked->registered = false;
     }
     pp_mux_untrack_fd(mux, tracked);
     return true;
@@ -315,9 +339,10 @@ bool pp_mux_set_read(pp_mux mux, int fd, bool enable) {
 
     const bool previous_read = tracked->read;
     tracked->read = enable;
-    const bool ok = pp_mux_update_fd(mux, tracked, false, !enable);
+    const bool ok = pp_mux_sync_fd(mux, tracked);
     if (!ok) {
         tracked->read = previous_read;
+        pp_mux_sync_fd(mux, tracked);
         return false;
     }
     return true;
@@ -331,9 +356,10 @@ bool pp_mux_set_write(pp_mux mux, int fd, bool enable) {
 
     const bool previous_write = tracked->write;
     tracked->write = enable;
-    const bool ok = pp_mux_update_fd(mux, tracked, false, !enable);
+    const bool ok = pp_mux_sync_fd(mux, tracked);
     if (!ok) {
         tracked->write = previous_write;
+        pp_mux_sync_fd(mux, tracked);
         return false;
     }
     return true;
@@ -384,15 +410,15 @@ int pp_mux_wait(pp_mux mux) {
             }
             continue;
         }
+        const struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
+        if (!tracked) continue;
         const bool failed = ev->events & PP_MUX_ERROR_EVENTS;
-        const bool readable = (ev->events & EPOLLIN) || failed;
-        const bool writable = ev->events & EPOLLOUT;
-        bool did_notify_readable = false;
+        const bool readable = tracked->read && ((ev->events & EPOLLIN) || failed);
+        const bool writable = tracked->write && ((ev->events & EPOLLOUT) || failed);
         if (readable && mux->on_readable) {
             mux->on_readable(mux->read_ctx, fd);
-            did_notify_readable = true;
         }
-        if ((writable || (!did_notify_readable && failed)) && mux->on_writable) {
+        if (writable && mux->on_writable) {
             mux->on_writable(mux->write_ctx, fd);
         }
     }
