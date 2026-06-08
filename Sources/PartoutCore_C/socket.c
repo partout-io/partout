@@ -120,10 +120,10 @@ pp_socket pp_socket_open(const char *ip_addr,
             goto failure;
         }
         if (local_connect_with_timeout(new_fd,
-                                           (const struct sockaddr *)&numeric_addr,
-                                           numeric_addrlen,
-                                           blocking,
-                                           timeout_ms) != 0) {
+                                       (const struct sockaddr *)&numeric_addr,
+                                       numeric_addrlen,
+                                       blocking,
+                                       timeout_ms) != 0) {
             local_print_error("connect()");
             goto failure;
         }
@@ -172,10 +172,10 @@ pp_socket pp_socket_open(const char *ip_addr,
             goto failure;
         }
         const int ret = local_connect_with_timeout(new_fd,
-                                                       p->ai_addr,
-                                                       (os_socklen_t)p->ai_addrlen,
-                                                       blocking,
-                                                       timeout_ms);
+                                                   p->ai_addr,
+                                                   (os_socklen_t)p->ai_addrlen,
+                                                   blocking,
+                                                   timeout_ms);
         if (ret != 0) {
             local_close_fd(new_fd);
             new_fd = local_invalid_fd();
@@ -419,7 +419,7 @@ int local_connect_with_timeout(os_socket_fd fd,
         goto done;
     }
     // Tell real errors from non-blocking pending states
-    if (!local_is_connect_pending()) {
+    if (!local_is_connect_pending() && !local_is_interrupted()) {
         local_print_error("connect()");
         return -1;
     }
