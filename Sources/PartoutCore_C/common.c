@@ -124,7 +124,7 @@ int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {
     (void)original_flags;
     u_long mode = 1;
     if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
-        local_print_error("ioctlsocket(): set");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "ioctlsocket(): set");
         return -1;
     }
     return 0;
@@ -134,7 +134,7 @@ int pp_fd_restore_blocking(pp_fd fd, int original_flags) {
     (void)original_flags;
     u_long mode = 0;
     if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
-        local_print_error("ioctlsocket(): restore");
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "ioctlsocket(): restore");
         return -1;
     }
     return 0;
