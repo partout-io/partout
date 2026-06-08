@@ -134,7 +134,7 @@ failure:
 void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     if (!tun) return;
     if (and_close) {
-        pp_tun_shutdown(tun);
+        pp_tun_close(tun);
         if (tun->adapter) {
             WintunCloseAdapter(tun->adapter);
         }
@@ -198,7 +198,7 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     return src_len;
 }
 
-void pp_tun_shutdown(const pp_tun tun) {
+void pp_tun_close(const pp_tun tun) {
     if (!tun || !tun->session) return;
     WintunEndSession(tun->session);
     tun->session = NULL;
