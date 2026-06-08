@@ -106,7 +106,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         }) else {
             throw PartoutError(.tunNotAvailable)
         }
-        return VirtualTunnelInterface(ctx, tun: tun, maxReadLength: maxReadLength)
+        return TunWrapper(ctx, tun: tun)
     }
 
     public func configureSockets(with descriptors: [FileDescriptor]) throws {
@@ -144,14 +144,10 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     public func clearTunnelSettings(_ io: IOInterface, withKillSwitch: Bool) async {
         // FIXME: #188, revert settings (record)
-        if let tunnel = io as? VirtualTunnelInterface {
+        if let tunnel = io as? TunWrapper {
 //            tun.deviceName
-
-            // Make sure to close the tun device and wait for it to
-            // finish to prevent races on VirtualTunnelInterface.deinit
-            await tunnel.close()
+            tunnel.close()
         }
-
         // Wrap up clear in native layer
         pp_tun_ctrl_clear_tunnel(ref, withKillSwitch)
     }

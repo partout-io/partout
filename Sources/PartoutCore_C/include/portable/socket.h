@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "portable/common.h"
 
 #pragma clang assume_nonnull begin
 
@@ -62,8 +63,6 @@ int pp_socket_write(pp_socket sock,
 bool pp_socket_set_buffers(pp_socket sock,
                            int recvbuf_len,
                            int sendbuf_len);
-bool pp_socket_wait_readable(pp_socket sock, int timeout_ms);
-bool pp_socket_wait_writable(pp_socket sock, int timeout_ms);
 
 /* Universal file descriptor. */
 pp_fd pp_socket_get_fd(pp_socket sock);

@@ -6,7 +6,7 @@ internal import _PartoutCore_C
 
 extension ExtendedEndpoint {
     var socketProto: pp_socket_proto {
-        switch proto.socketType.plainType {
+        switch plainSocketType {
         case .udp:
             return PPSocketProtoUDP
         case .tcp:

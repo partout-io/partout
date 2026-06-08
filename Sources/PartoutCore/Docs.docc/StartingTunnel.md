@@ -28,14 +28,13 @@ Given the main app and the daemon:
 ### Setting up a connection
 
 - ``BetterPathStreamFactory``
-- ``BSDSocketFactory``
 - ``Connection``
 - ``ConnectionParameters``
 - ``ConnectionStatus``
-- ``CyclingConnection``
 - ``DataCount``
 - ``EndpointResolver``
 - ``FdLooper``
+- ``NativeSocketFactory``
 - ``NetworkInterfaceFactory``
 - ``SocketConfigurator``
 
@@ -53,11 +52,7 @@ Given the main app and the daemon:
 
 - ``IOInterface``
 - ``LinkInterface``
-- ``LinkMetadata``
 - ``LinkObserver``
-- ``BSDSocket``
-- ``BSDSocketObserver``
-- ``SocketIOInterface``
 
 ### Applying network settings
 

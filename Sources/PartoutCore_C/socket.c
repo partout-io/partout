@@ -40,8 +40,6 @@ static int local_shutdown_fd(pp_fd fd);
 static int local_recv_fd(pp_fd fd, void *dst, size_t dst_len);
 static int local_send_fd(pp_fd fd, const void *src, size_t src_len);
 static int local_select_nfds(pp_fd fd);
-static int local_set_nonblocking(pp_fd fd, int *original_flags);
-static int local_restore_blocking(pp_fd fd, int original_flags);
 static int local_connect_with_timeout(pp_fd fd,
                                       const struct sockaddr *addr,
                                       os_socklen_t addrlen,
@@ -52,7 +50,6 @@ static bool local_parse_numeric_addr(const char *ip_addr,
                                      struct sockaddr_storage *addr,
                                      os_socklen_t *addrlen);
 static void local_close_impl(pp_socket sock);
-static bool local_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write);
 
 /* Host a file descriptor with the specific platform type. POSIX systems
  * use int, whereas Windows uses SOCKET.  */
@@ -297,16 +294,6 @@ bool pp_socket_set_buffers(pp_socket sock, int recvbuf_len, int sendbuf_len) {
     return did_set;
 }
 
-/* Wait until the socket is readable. Returns false on timeout or failure. */
-bool pp_socket_wait_readable(pp_socket sock, int timeout_ms) {
-    return local_wait(sock, timeout_ms, true, false);
-}
-
-/* Wait until the socket is writable. Returns false on timeout or failure. */
-bool pp_socket_wait_writable(pp_socket sock, int timeout_ms) {
-    return local_wait(sock, timeout_ms, false, true);
-}
-
 /* Return the native file descriptor. */
 pp_fd pp_socket_get_fd(const pp_socket sock) {
     pp_assert(sock && !local_is_invalid_fd(sock->fd));
@@ -351,48 +338,6 @@ void local_close_impl(pp_socket sock) {
     sock->fd = local_invalid_fd();
 }
 
-bool local_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write) {
-    if (!sock || local_is_invalid_fd(sock->fd)) {
-        local_set_not_socket_error();
-        return false;
-    }
-
-    while (true) {
-        fd_set readfds;
-        fd_set writefds;
-        fd_set *readfds_ptr = NULL;
-        fd_set *writefds_ptr = NULL;
-        if (want_read) {
-            FD_ZERO(&readfds);
-            FD_SET(sock->fd, &readfds);
-            readfds_ptr = &readfds;
-        }
-        if (want_write) {
-            FD_ZERO(&writefds);
-            FD_SET(sock->fd, &writefds);
-            writefds_ptr = &writefds;
-        }
-
-        struct timeval tv;
-        struct timeval *tv_ptr = NULL;
-        if (timeout_ms >= 0) {
-            tv.tv_sec = timeout_ms / 1000;
-            tv.tv_usec = (timeout_ms % 1000) * 1000;
-            tv_ptr = &tv;
-        }
-
-        const int ret = select(local_select_nfds(sock->fd), readfds_ptr, writefds_ptr, NULL, tv_ptr);
-        if (ret < 0) {
-            if (PP_IO_INTR()) {
-                continue;
-            }
-            local_print_error("select()");
-            return false;
-        }
-        return ret > 0;
-    }
-}
-
 int local_connect_with_timeout(pp_fd fd,
                                const struct sockaddr *addr,
                                os_socklen_t addrlen,
@@ -400,7 +345,7 @@ int local_connect_with_timeout(pp_fd fd,
                                int timeout_ms) {
     // Set non-blocking
     int original_flags = 0;
-    if (local_set_nonblocking(fd, &original_flags) < 0) {
+    if (pp_fd_set_nonblocking(fd, &original_flags) < 0) {
         return -1;
     }
 
@@ -454,7 +399,7 @@ int local_connect_with_timeout(pp_fd fd,
 done:
     // Store/restore blocking mode as needed
     if (blocking) {
-        if (local_restore_blocking(fd, original_flags) < 0) {
+        if (pp_fd_restore_blocking(fd, original_flags) < 0) {
             return -1;
         }
     }
@@ -532,26 +477,6 @@ int local_select_nfds(pp_fd fd) {
     (void)fd;
     return 0;
 }
-
-int local_set_nonblocking(pp_fd fd, int *original_flags) {
-    (void)original_flags;
-    u_long mode = 1;
-    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
-        local_print_error("ioctlsocket()");
-        return -1;
-    }
-    return 0;
-}
-
-int local_restore_blocking(pp_fd fd, int original_flags) {
-    (void)original_flags;
-    u_long mode = 0;
-    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
-        local_print_error("ioctlsocket()");
-        return -1;
-    }
-    return 0;
-}
 #else
 bool local_platform_init(void) {
     return true;
@@ -607,26 +532,5 @@ int local_send_fd(pp_fd fd, const void *src, size_t src_len) {
 
 int local_select_nfds(pp_fd fd) {
     return fd + 1;
-}
-
-int local_set_nonblocking(pp_fd fd, int *original_flags) {
-    *original_flags = fcntl(fd, F_GETFL, 0);
-    if (*original_flags < 0) {
-        local_print_error("fcntl()");
-        return -1;
-    }
-    if (fcntl(fd, F_SETFL, *original_flags | O_NONBLOCK) < 0) {
-        local_print_error("fcntl()");
-        return -1;
-    }
-    return 0;
-}
-
-int local_restore_blocking(pp_fd fd, int original_flags) {
-    if (fcntl(fd, F_SETFL, original_flags) < 0) {
-        local_print_error("fcntl()");
-        return -1;
-    }
-    return 0;
 }
 #endif

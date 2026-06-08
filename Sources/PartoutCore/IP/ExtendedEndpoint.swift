@@ -48,6 +48,10 @@ public struct ExtendedEndpoint: Hashable, Codable, Sendable {
     public var isHostname: Bool {
         !isIPv4 && !isIPv6
     }
+
+    public var plainSocketType: SocketType {
+        proto.socketType.plainType
+    }
 }
 
 extension ExtendedEndpoint: RawRepresentable {

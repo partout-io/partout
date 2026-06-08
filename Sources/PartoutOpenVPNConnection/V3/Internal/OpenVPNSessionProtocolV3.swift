@@ -7,11 +7,9 @@ protocol OpenVPNSessionDelegateV3: AnyObject, Sendable {
     /// Called after starting a session.
     ///
     /// - Parameter session: The originator.
-    /// - Parameter remoteAddress: The address of the VPN server.
-    /// - Parameter remoteProtocol: The endpoint protocol of the VPN server.
+    /// - Parameter remoteEndpoint: The remote endpoint of the VPN server.
     /// - Parameter remoteOptions: The pulled tunnel settings.
-    /// - Parameter remoteFd: The file descriptor of the underlying connection.
-    func sessionDidStart(_ session: OpenVPNSessionProtocolV3, remoteAddress: String, remoteProtocol: EndpointProtocol, remoteOptions: OpenVPN.Configuration, remoteFd: FileDescriptor?)
+    func sessionDidStart(_ session: OpenVPNSessionProtocolV3, remoteEndpoint: ExtendedEndpoint, remoteOptions: OpenVPN.Configuration)
 
     /// Called after stopping a session.
     ///
@@ -37,8 +35,9 @@ protocol OpenVPNSessionProtocolV3: AnyObject, Sendable {
      - Precondition: `link` is an active network interface.
      - Postcondition: The VPN negotiation is started.
      - Parameter link: The `LinkInterface` on which to establish the VPN session.
+     - Parameter remoteEndpoint: The address and protocol of the remote server.
      */
-    func setLink(_ link: LinkInterface) async throws
+    func setLink(_ link: LinkInterface, to remoteEndpoint: ExtendedEndpoint) async throws
 
     /// True if a link was set via ``setLink(_:)`` and is still alive.
     func hasLink() -> Bool

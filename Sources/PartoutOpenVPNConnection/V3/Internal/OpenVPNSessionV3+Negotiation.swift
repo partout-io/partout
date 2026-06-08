@@ -4,9 +4,9 @@
 
 extension OpenVPNSessionV3 {
     @discardableResult
-    func startNegotiation(on looper: FdLooper, linkMetadata: LinkMetadata) throws -> NegotiatorV3 {
+    func startNegotiation(on looper: FdLooper, remoteEndpoint: ExtendedEndpoint) throws -> NegotiatorV3 {
         pp_log(ctx, .openvpn, .info, "Start negotiation")
-        let neg = try newNegotiator(on: looper, linkMetadata: linkMetadata)
+        let neg = try newNegotiator(on: looper, remoteEndpoint: remoteEndpoint)
         addNegotiator(neg)
         try neg.start()
         return neg

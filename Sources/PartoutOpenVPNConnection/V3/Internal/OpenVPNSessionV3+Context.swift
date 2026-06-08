@@ -22,7 +22,7 @@ extension OpenVPNSessionV3 {
         private let ctx: PartoutLoggerContext
         private let dataLink: DataLink
         var withLocalOptions: Bool
-        let linkMetadata: LinkMetadata
+        let remoteEndpoint: ExtendedEndpoint
 
         private var negotiators: [UInt8: NegotiatorV3]
         private var dataChannels: [UInt8: DataChannel]
@@ -39,12 +39,12 @@ extension OpenVPNSessionV3 {
             ctx: PartoutLoggerContext,
             dataLink: DataLink,
             withLocalOptions: Bool,
-            linkMetadata: LinkMetadata
+            remoteEndpoint: ExtendedEndpoint
         ) {
             self.ctx = ctx
             self.dataLink = dataLink
             self.withLocalOptions = withLocalOptions
-            self.linkMetadata = linkMetadata
+            self.remoteEndpoint = remoteEndpoint
             negotiators = [:]
             dataChannels = [:]
             oldKeys = []

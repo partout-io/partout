@@ -30,7 +30,7 @@ final class NegotiatorV3: @unchecked Sendable {
 
     let looper: FdLooper
 
-    private let linkMetadata: LinkMetadata
+    private let remoteEndpoint: ExtendedEndpoint
 
     private let channel: ControlChannelV3
 
@@ -73,7 +73,7 @@ final class NegotiatorV3: @unchecked Sendable {
     convenience init(
         _ ctx: PartoutLoggerContext,
         looper: FdLooper,
-        linkMetadata: LinkMetadata,
+        remoteEndpoint: ExtendedEndpoint,
         channel: ControlChannelV3,
         prng: PRNGProtocol,
         tls: TLSProtocol,
@@ -86,7 +86,7 @@ final class NegotiatorV3: @unchecked Sendable {
             history: nil,
             renegotiation: nil,
             looper: looper,
-            linkMetadata: linkMetadata,
+            remoteEndpoint: remoteEndpoint,
             channel: channel,
             prng: prng,
             tls: tls,
@@ -101,7 +101,7 @@ final class NegotiatorV3: @unchecked Sendable {
         history: NegotiationHistory?,
         renegotiation: RenegotiationType?,
         looper: FdLooper,
-        linkMetadata: LinkMetadata,
+        remoteEndpoint: ExtendedEndpoint,
         channel: ControlChannelV3, // TODO: #29, abstract this for testing
         prng: PRNGProtocol,
         tls: TLSProtocol,
@@ -113,7 +113,7 @@ final class NegotiatorV3: @unchecked Sendable {
         self.history = history
         self.renegotiation = renegotiation
         self.looper = looper
-        self.linkMetadata = linkMetadata
+        self.remoteEndpoint = remoteEndpoint
         self.channel = channel
         self.prng = prng
         self.tls = tls
@@ -144,7 +144,7 @@ final class NegotiatorV3: @unchecked Sendable {
             history: history,
             renegotiation: newRenegotiation,
             looper: looper,
-            linkMetadata: linkMetadata,
+            remoteEndpoint: remoteEndpoint,
             channel: channel,
             prng: prng,
             tls: tls,
@@ -273,7 +273,7 @@ private extension NegotiatorV3 {
         if !isRenegotiating {
             try pushRequest()
         }
-        if !linkMetadata.isReliable {
+        if remoteEndpoint.plainSocketType == .udp {
             try flushControlQueue()
         }
 
