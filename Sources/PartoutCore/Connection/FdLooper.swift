@@ -217,18 +217,18 @@ public final class FdLooper: @unchecked Sendable {
     }
 
     private func stopWithoutWaiting() {
-        lock.lock()
-        switch state {
-        case .idle:
-            pp_mux_free(mux)
-        case .started:
-            state = .stopping
-            commands.append(.stop)
-            pp_mux_wake(mux)
-        default:
-            break
+        lock.with {
+            switch state {
+            case .idle:
+                pp_mux_free(mux)
+            case .started:
+                state = .stopping
+                commands.append(.stop)
+                pp_mux_wake(mux)
+            default:
+                break
+            }
         }
-        lock.unlock()
     }
 
     public var isOnQueue: Bool {
@@ -944,14 +944,14 @@ private extension FdLooper {
         func performWrite(_ pending: PendingWrite, lock: SemaphoreMutex) throws -> Bool {
             let count = try write(pending)
             let didComplete = count == pending.count
-            lock.lock()
-            if didComplete {
-                writeQueue.removeFirst()
-                writeOffset = 0
-            } else {
-                writeOffset += count
+            lock.with {
+                if didComplete {
+                    writeQueue.removeFirst()
+                    writeOffset = 0
+                } else {
+                    writeOffset += count
+                }
             }
-            lock.unlock()
             return didComplete
         }
 
