@@ -9,15 +9,12 @@
 
 // FIXME: #188, Implement macOS controller/strategy
 
-#if PARTOUT_MACOS
+#if PARTOUT_APPLE
 
 #include <sys/socket.h>
-#include <sys/sys_domain.h>
-#include <sys/kern_control.h>
 #include <sys/ioctl.h>
 #include <sys/uio.h>
 #include <net/if.h>
-#include <net/if_utun.h>
 #include <stdio.h>
 #include <string.h>
 #include "portable/endian.h"
@@ -32,6 +29,11 @@ pp_tun pp_tun_create(int fd) {
     tun->fd = fd;
     return tun;
 }
+
+#if PARTOUT_MACOS
+#include <sys/sys_domain.h>
+#include <sys/kern_control.h>
+#include <net/if_utun.h>
 
 pp_tun pp_tun_open(const char *uuid) {
     (void)uuid;
@@ -48,7 +50,9 @@ pp_tun pp_tun_open(const char *uuid) {
     }
 
     strncpy(ctl_info.ctl_name, UTUN_CONTROL_NAME, sizeof(ctl_info.ctl_name));
-    if (ioctl(fd, CTLIOCGINFO, &ctl_info) == -1) {
+    int ret;
+    PP_IO_RETRY(ret, ioctl(fd, CTLIOCGINFO, &ctl_info));
+    if (ret < 0) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: ioctl(CTLIOCGINFO)");
         goto failure;
     }
@@ -58,7 +62,8 @@ pp_tun pp_tun_open(const char *uuid) {
     sc.sc_family = AF_SYSTEM;
     sc.ss_sysaddr = AF_SYS_CONTROL;
     sc.sc_unit = 0;  // First free utunX
-    if (connect(fd, (struct sockaddr *)&sc, sizeof(sc)) == -1) {
+    PP_IO_RETRY(ret, connect(fd, (struct sockaddr *)&sc, sizeof(sc)));
+    if (ret < 0) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: connect(AF_SYSTEM, AF_SYS_CONTROL)");
         goto failure;
     }
@@ -80,6 +85,7 @@ failure:
     if (fd != -1) close(fd);
     return NULL;
 }
+#endif
 
 void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     if (!tun) return;
@@ -116,12 +122,10 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     iov[1].iov_base = dst;
     iov[1].iov_len  = dst_len;
 
-    const int read_len = (int)readv(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
+    int read_len;
+    PP_IO_RETRY(read_len, (int)readv(tun->fd, iov, sizeof(iov) / sizeof(struct iovec)));
     if (read_len < 0) {
-        if (pp_tun_would_block()) {
-            return PP_TUN_WOULD_BLOCK;
-        }
-        return -1;
+        return pp_tun_handle_result(read_len);
     }
     if (read_len < (int)sizeof(pi)) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: Missing 4-byte utun packet header");
@@ -141,15 +145,10 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     iov[1].iov_base = (void *)src;
     iov[1].iov_len  = src_len;
 
-    const int written_len = (int)writev(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
+    int written_len;
+    PP_IO_RETRY(written_len, (int)writev(tun->fd, iov, sizeof(iov) / sizeof(struct iovec)));
     if (written_len < 0) {
-        if (pp_tun_would_block()) {
-            return PP_TUN_WOULD_BLOCK;
-        }
-        if (pp_tun_nobufs()) {
-            return PP_TUN_NO_BUF;
-        }
-        return -1;
+        return pp_tun_handle_result(written_len);
     }
     if (written_len != (int)(pi_len + src_len)) return -3;
     return (int)src_len;

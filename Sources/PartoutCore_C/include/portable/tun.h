@@ -35,17 +35,20 @@ struct sockaddr_ctl {
 /* Opaque tun device. */
 typedef struct __pp_tun_struct *pp_tun;
 
-extern const int PP_TUN_WOULD_BLOCK;
-extern const int PP_TUN_NO_BUF;
-
 #if !PARTOUT_WINDOWS
 /* With manual file descriptor. */
 pp_tun pp_tun_create(int fd);
-static inline bool pp_tun_would_block() {
-    return (errno == EAGAIN || errno == EWOULDBLOCK);
-}
-static inline bool pp_tun_nobufs() {
-    return errno == ENOBUFS;
+
+static inline int pp_tun_handle_result(int ret) {
+    if (ret < 0) {
+        if (PP_IO_WOULDBLOCK()) {
+            return PPIOErrorWouldBlock;
+        }
+        if (PP_IO_NOBUFS()) {
+            return PPIOErrorNoBufs;
+        }
+    }
+    return ret;
 }
 #endif
 

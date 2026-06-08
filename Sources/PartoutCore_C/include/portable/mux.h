@@ -14,6 +14,8 @@
 
 typedef struct __pp_mux *pp_mux;
 
+extern const int PPMuxErrorNull;
+
 pp_mux _Nullable pp_mux_create(int num);
 void pp_mux_free(pp_mux mux);
 

@@ -21,8 +21,7 @@ public final class SemaphoreMutex: @unchecked Sendable {
     @discardableResult
     public func with<T>(block: () throws -> T) rethrows -> T {
         lock()
-        let result = try block()
-        unlock()
-        return result
+        defer { unlock() }
+        return try block()
     }
 }

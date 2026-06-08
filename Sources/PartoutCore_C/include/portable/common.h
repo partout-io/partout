@@ -106,6 +106,57 @@ FILE *_Nullable pp_fopen(const char *filename, const char *mode) {
 
 #pragma clang assume_nonnull end
 
+/* Syscalls. */
+
+extern const int PPIOErrorWouldBlock;
+extern const int PPIOErrorNoBufs;
+
+#if PARTOUT_WINDOWS
+#include <ws2tcpip.h>
+
+#define PP_IO_RETRY(result, fn) \
+    do { \
+        do { \
+            (result) = (fn); \
+        } while ((result) < 0 && WSAGetLastError() == WSAEINTR); \
+    } while (0)
+
+static inline bool PP_IO_INTR(void) {
+    return WSAGetLastError() == WSAEINTR;
+}
+
+static inline bool PP_IO_WOULDBLOCK(void) {
+    return WSAGetLastError() == WSAEWOULDBLOCK;
+}
+
+static inline bool PP_IO_NOBUFS(void) {
+    return WSAGetLastError() == WSAENOBUFS;
+}
+
+#else
+#include <errno.h>
+
+#define PP_IO_RETRY(result, fn) \
+    do { \
+        do { \
+            (result) = (fn); \
+        } while ((result) < 0 && errno == EINTR); \
+    } while (0)
+
+static inline bool PP_IO_INTR(void) {
+    return errno == EINTR;
+}
+
+static inline bool PP_IO_WOULDBLOCK(void) {
+    return errno == EAGAIN || errno == EWOULDBLOCK;
+}
+
+static inline bool PP_IO_NOBUFS(void) {
+    return errno == ENOBUFS;
+}
+
+#endif
+
 /* Android only. */
 
 #if PARTOUT_ANDROID
