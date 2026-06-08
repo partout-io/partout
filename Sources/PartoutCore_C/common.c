@@ -116,3 +116,46 @@ void pp_log_simple_append(const char *tag, pp_log_level level, const char *messa
     fprintf(out, "%s[%d]: %s\n", tag ? tag : "Partout", level, message);
 }
 #endif
+
+#if PARTOUT_WINDOWS
+int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {
+    (void)original_flags;
+    u_long mode = 1;
+    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
+        local_print_error("ioctlsocket(): set");
+        return -1;
+    }
+    return 0;
+}
+
+int pp_fd_restore_blocking(pp_fd fd, int original_flags) {
+    (void)original_flags;
+    u_long mode = 0;
+    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
+        local_print_error("ioctlsocket(): restore");
+        return -1;
+    }
+    return 0;
+}
+#else
+int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {
+    *original_flags = fcntl(fd, F_GETFL, 0);
+    if (*original_flags < 0) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "fcntl(): set, F_GETFL");
+        return -1;
+    }
+    if (fcntl(fd, F_SETFL, *original_flags | O_NONBLOCK) < 0) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "fcntl(): set, F_SETFL");
+        return -1;
+    }
+    return 0;
+}
+
+int pp_fd_restore_blocking(pp_fd fd, int original_flags) {
+    if (fcntl(fd, F_SETFL, original_flags) < 0) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "fcntl(): restore");
+        return -1;
+    }
+    return 0;
+}
+#endif

@@ -133,7 +133,6 @@ static inline bool PP_IO_WOULDBLOCK(void) {
 static inline bool PP_IO_NOBUFS(void) {
     return WSAGetLastError() == WSAENOBUFS;
 }
-
 #else
 #include <errno.h>
 typedef int pp_fd;
@@ -156,8 +155,10 @@ static inline bool PP_IO_WOULDBLOCK(void) {
 static inline bool PP_IO_NOBUFS(void) {
     return errno == ENOBUFS;
 }
-
 #endif
+
+int pp_fd_set_nonblocking(pp_fd fd, int *original_flags);
+int pp_fd_restore_blocking(pp_fd fd, int original_flags);
 
 /* Android only. */
 

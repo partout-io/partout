@@ -40,8 +40,6 @@ static int local_shutdown_fd(pp_fd fd);
 static int local_recv_fd(pp_fd fd, void *dst, size_t dst_len);
 static int local_send_fd(pp_fd fd, const void *src, size_t src_len);
 static int local_select_nfds(pp_fd fd);
-static int local_set_nonblocking(pp_fd fd, int *original_flags);
-static int local_restore_blocking(pp_fd fd, int original_flags);
 static int local_connect_with_timeout(pp_fd fd,
                                       const struct sockaddr *addr,
                                       os_socklen_t addrlen,
@@ -347,7 +345,7 @@ int local_connect_with_timeout(pp_fd fd,
                                int timeout_ms) {
     // Set non-blocking
     int original_flags = 0;
-    if (local_set_nonblocking(fd, &original_flags) < 0) {
+    if (pp_fd_set_nonblocking(fd, &original_flags) < 0) {
         return -1;
     }
 
@@ -401,7 +399,7 @@ int local_connect_with_timeout(pp_fd fd,
 done:
     // Store/restore blocking mode as needed
     if (blocking) {
-        if (local_restore_blocking(fd, original_flags) < 0) {
+        if (pp_fd_restore_blocking(fd, original_flags) < 0) {
             return -1;
         }
     }
@@ -479,26 +477,6 @@ int local_select_nfds(pp_fd fd) {
     (void)fd;
     return 0;
 }
-
-int local_set_nonblocking(pp_fd fd, int *original_flags) {
-    (void)original_flags;
-    u_long mode = 1;
-    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
-        local_print_error("ioctlsocket()");
-        return -1;
-    }
-    return 0;
-}
-
-int local_restore_blocking(pp_fd fd, int original_flags) {
-    (void)original_flags;
-    u_long mode = 0;
-    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
-        local_print_error("ioctlsocket()");
-        return -1;
-    }
-    return 0;
-}
 #else
 bool local_platform_init(void) {
     return true;
@@ -554,26 +532,5 @@ int local_send_fd(pp_fd fd, const void *src, size_t src_len) {
 
 int local_select_nfds(pp_fd fd) {
     return fd + 1;
-}
-
-int local_set_nonblocking(pp_fd fd, int *original_flags) {
-    *original_flags = fcntl(fd, F_GETFL, 0);
-    if (*original_flags < 0) {
-        local_print_error("fcntl()");
-        return -1;
-    }
-    if (fcntl(fd, F_SETFL, *original_flags | O_NONBLOCK) < 0) {
-        local_print_error("fcntl()");
-        return -1;
-    }
-    return 0;
-}
-
-int local_restore_blocking(pp_fd fd, int original_flags) {
-    if (fcntl(fd, F_SETFL, original_flags) < 0) {
-        local_print_error("fcntl()");
-        return -1;
-    }
-    return 0;
 }
 #endif
