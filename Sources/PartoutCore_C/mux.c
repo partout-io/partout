@@ -367,9 +367,21 @@ int pp_mux_wait(pp_mux mux) {
         if (fd == mux->wake_fd) {
             eventfd_t value;
             while (true) {
-                if (eventfd_read(mux->wake_fd, &value) == 0) continue;
-                if (errno == EINTR) continue;
-                break;
+                /* wake_fd is non-blocking */
+                if (eventfd_read(mux->wake_fd, &value) == 0) {
+                    /* Successful read, keep going */
+                    continue;
+                }
+                if (errno == EINTR) {
+                    /* Interrupted, retry */
+                    continue;
+                }
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                     /* Fully drained */
+                    break;
+                }
+                /* Unexpected error */
+                return -1;
             }
             continue;
         }
