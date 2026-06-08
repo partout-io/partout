@@ -115,7 +115,10 @@ public final class FdLooper: @unchecked Sendable {
     public func start() {
         lock.lock()
         defer { lock.unlock() }
-        precondition(state == .idle, "Looper already started")
+        guard state == .idle else {
+            assertionFailure("Looper already started")
+            return
+        }
 
         // Hold mux for cleanup
         nonisolated(unsafe) let mux = self.mux
@@ -184,8 +187,14 @@ public final class FdLooper: @unchecked Sendable {
 
     public func stop() async throws {
         lock.lock()
-        guard state != .idle else { return }
-        precondition(state == .started, "Cannot stop() twice")
+        guard state != .idle else {
+            // Never started
+            return
+        }
+        guard state == .started else {
+            assertionFailure("Stopping twice?")
+            return
+        }
         state = .stopping
         try await withCheckedThrowingContinuation { continuation in
             stopContinuation = continuation
@@ -220,7 +229,10 @@ public final class FdLooper: @unchecked Sendable {
         }
         return try await withCheckedThrowingContinuation { continuation in
             lock.with {
-                precondition(state == .started, "Perform after start()")
+                guard state == .started else {
+                    pp_log(ctx, .core, .error, "Ignoring perform before start()")
+                    return
+                }
                 commands.append(.custom {
                     do {
                         continuation.resume(returning: try body())
@@ -242,7 +254,10 @@ public final class FdLooper: @unchecked Sendable {
                 try body()
             } else {
                 lock.with {
-                    precondition(state == .started, "Schedule after start()")
+                    guard state == .started else {
+                        pp_log(ctx, .core, .error, "Ignoring schedule before start()")
+                        return
+                    }
                     commands.append(.custom(body))
                     pp_mux_wake(mux)
                 }
@@ -264,7 +279,10 @@ public final class FdLooper: @unchecked Sendable {
     public func attach(_ arguments: AttachArguments) async throws {
         try await withCheckedThrowingContinuation { continuation in
             lock.with {
-                precondition(state == .started, "Attach after start()")
+                guard state == .started else {
+                    pp_log(ctx, .core, .error, "Ignoring attach before start()")
+                    return
+                }
                 commands.append(.attach(arguments, continuation))
                 pp_mux_wake(mux)
             }
@@ -274,7 +292,10 @@ public final class FdLooper: @unchecked Sendable {
     public func detach(_ side: Side) async {
         await withCheckedContinuation { continuation in
             lock.with {
-                precondition(state == .started, "Detach after start()")
+                guard state == .started else {
+                    pp_log(ctx, .core, .error, "Ignoring detach before start()")
+                    return
+                }
                 commands.append(.detach(side, continuation))
                 pp_mux_wake(mux)
             }
@@ -302,7 +323,10 @@ public final class FdLooper: @unchecked Sendable {
 
     public func write(_ packets: [Data], to side: Side, outOfBand: Bool = false) throws {
         if outOfBand {
-            precondition(isOnQueue, "OOB writes must run on the looper queue")
+            guard isOnQueue else {
+                pp_log(ctx, .core, .fault, "OOB writes must run on the looper queue")
+                return
+            }
             switch side {
             case .link:
                 guard let link else {
@@ -617,7 +641,10 @@ private extension FdLooper {
         }
 
         lock.lock()
-        precondition(state != .stopped)
+        guard state != .stopped else {
+            assertionFailure("Finishing twice?")
+            return
+        }
         state = .stopped
         terminalError = error
         lock.unlock()
@@ -748,13 +775,13 @@ private extension FdLooper {
             if let link {
                 pp_mux_set_read(mux, link.fd, true)
             } else {
-                pp_log(ctx, .core, .error, "Ignoring link enableRead(), not attached")
+                pp_log(ctx, .core, .error, "Ignoring enableRead(.link), not attached")
             }
         case .tun:
             if let tun {
                 pp_mux_set_read(mux, tun.fd, true)
             } else {
-                pp_log(ctx, .core, .error, "Ignoring tun enableRead(), not attached")
+                pp_log(ctx, .core, .error, "Ignoring enableRead(.tun), not attached")
             }
         }
     }
@@ -770,13 +797,13 @@ private extension FdLooper {
             if let link {
                 pp_mux_set_write(mux, link.fd, true)
             } else {
-                pp_log(ctx, .core, .error, "Ignoring link enableWrite(), not attached")
+                pp_log(ctx, .core, .error, "Ignoring enableWrite(.link), not attached")
             }
         case .tun:
             if let tun {
                 pp_mux_set_write(mux, tun.fd, true)
             } else {
-                pp_log(ctx, .core, .error, "Ignoring tun enableWrite(), not attached")
+                pp_log(ctx, .core, .error, "Ignoring enableWrite(.tun), not attached")
             }
         }
     }
