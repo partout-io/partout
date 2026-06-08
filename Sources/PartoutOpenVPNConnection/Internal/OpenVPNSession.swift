@@ -370,7 +370,8 @@ extension OpenVPNSession {
                 self,
                 remoteAddress: remoteAddress,
                 remoteProtocol: remoteProtocol,
-                remoteOptions: pushReplyOptions
+                remoteOptions: pushReplyOptions,
+                remoteFd: link?.fileDescriptor
             )
         }
         scheduleNextPing()
