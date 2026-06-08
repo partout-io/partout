@@ -44,10 +44,10 @@ pp_tun pp_tun_create(int fd);
 
 static inline int pp_tun_handle_result(int ret) {
     if (ret < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        if (PP_IO_WOULD_BLOCK()) {
             return PPTunErrorWouldBlock;
         }
-        if (errno == ENOBUFS) {
+        if (PP_IO_NOBUFS()) {
             return PPTunErrorNoBuf;
         }
     }

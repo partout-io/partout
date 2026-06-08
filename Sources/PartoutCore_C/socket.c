@@ -39,9 +39,6 @@ static void local_set_not_socket_error(void);
 static void local_set_timeout_error(void);
 static void local_set_reset_error(void);
 static void local_set_error(int err);
-static bool local_is_interrupted(void);
-static bool local_is_would_block(void);
-static bool local_is_nobufs(void);
 static bool local_is_connect_pending(void);
 static int local_close_fd(os_socket_fd fd);
 static int local_shutdown_fd(os_socket_fd fd);
@@ -229,7 +226,7 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
 
     while (true) {
         const int read_len = local_recv_fd(sock->fd, dst, dst_len);
-        if (read_len < 0 && local_is_interrupted()) {
+        if (read_len < 0 && PP_IO_INTR()) {
             continue;
         }
         if (read_len < 0) {
@@ -237,7 +234,7 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
              * for a message to arrive, unless the socket is nonblocking (see fcntl(2))
              * in which case the value -1 is returned and the external variable errno
              * set to EAGAIN. */
-            if (local_is_would_block()) {
+            if (PP_IO_WOULD_BLOCK()) {
                 return PPSocketErrorWouldBlock;
             }
             local_print_error("recv()");
@@ -261,13 +258,13 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
 
         const int written_len = local_send_fd(sock->fd, current_src, remaining);
         if (written_len < 0) {
-            if (local_is_interrupted()) {
+            if (PP_IO_INTR()) {
                 continue;
             }
-            if (local_is_would_block()) {
+            if (PP_IO_WOULD_BLOCK()) {
                 return offset > 0 ? (int)offset : PPSocketErrorWouldBlock;
             }
-            if (local_is_nobufs()) {
+            if (PP_IO_NOBUFS()) {
                 return offset > 0 ? (int)offset : PPSocketErrorNoBuf;
             }
             local_print_error("send()");
@@ -391,7 +388,7 @@ bool local_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write)
 
         const int ret = select(local_select_nfds(sock->fd), readfds_ptr, writefds_ptr, NULL, tv_ptr);
         if (ret < 0) {
-            if (local_is_interrupted()) {
+            if (PP_IO_INTR()) {
                 continue;
             }
             local_print_error("select()");
@@ -419,7 +416,7 @@ int local_connect_with_timeout(os_socket_fd fd,
         goto done;
     }
     // Tell real errors from non-blocking pending states
-    if (!local_is_connect_pending() && !local_is_interrupted()) {
+    if (!local_is_connect_pending() && !PP_IO_INTR()) {
         local_print_error("connect()");
         return -1;
     }
@@ -511,18 +508,6 @@ void local_set_error(int err) {
     WSASetLastError(err);
 }
 
-bool local_is_interrupted(void) {
-    return WSAGetLastError() == WSAEINTR;
-}
-
-bool local_is_would_block(void) {
-    return WSAGetLastError() == WSAEWOULDBLOCK;
-}
-
-bool local_is_nobufs(void) {
-    return WSAGetLastError() == WSAENOBUFS;
-}
-
 bool local_is_connect_pending(void) {
     const int err = WSAGetLastError();
     return err == WSAEWOULDBLOCK || err == WSAEINPROGRESS;
@@ -599,18 +584,6 @@ void local_set_reset_error(void) {
 
 void local_set_error(int err) {
     errno = err;
-}
-
-bool local_is_interrupted(void) {
-    return errno == EINTR;
-}
-
-bool local_is_would_block(void) {
-    return errno == EAGAIN || errno == EWOULDBLOCK;
-}
-
-bool local_is_nobufs(void) {
-    return errno == ENOBUFS;
 }
 
 bool local_is_connect_pending(void) {

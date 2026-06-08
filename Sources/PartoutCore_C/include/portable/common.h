@@ -109,6 +109,7 @@ FILE *_Nullable pp_fopen(const char *filename, const char *mode) {
 /* Syscalls. */
 
 #if PARTOUT_WINDOWS
+
 #include <ws2tcpip.h>
 #define PP_IO_RETRY(result, fn) \
     do { \
@@ -116,14 +117,42 @@ FILE *_Nullable pp_fopen(const char *filename, const char *mode) {
             (result) = (fn); \
         } while ((result) < 0 && WSAGetLastError() == WSAEINTR); \
     } while (0)
+
+static inline bool PP_IO_INTR(void) {
+    return WSAGetLastError() == WSAEINTR;
+}
+
+static inline bool PP_IO_WOULD_BLOCK(void) {
+    return WSAGetLastError() == WSAEWOULDBLOCK;
+}
+
+static inline bool PP_IO_NOBUFS(void) {
+    return WSAGetLastError() == WSAENOBUFS;
+}
+
 #else
+
 #include <errno.h>
+
 #define PP_IO_RETRY(result, fn) \
     do { \
         do { \
             (result) = (fn); \
         } while ((result) < 0 && errno == EINTR); \
     } while (0)
+
+static inline bool PP_IO_INTR(void) {
+    return errno == EINTR;
+}
+
+static inline bool PP_IO_WOULD_BLOCK(void) {
+    return errno == EAGAIN || errno == EWOULDBLOCK;
+}
+
+static inline bool PP_IO_NOBUFS(void) {
+    return errno == ENOBUFS;
+}
+
 #endif
 
 /* Android only. */
