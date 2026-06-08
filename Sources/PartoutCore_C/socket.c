@@ -52,7 +52,6 @@ static bool local_parse_numeric_addr(const char *ip_addr,
                                      struct sockaddr_storage *addr,
                                      os_socklen_t *addrlen);
 static void local_close_impl(pp_socket sock);
-static bool local_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write);
 
 /* Host a file descriptor with the specific platform type. POSIX systems
  * use int, whereas Windows uses SOCKET.  */
@@ -297,16 +296,6 @@ bool pp_socket_set_buffers(pp_socket sock, int recvbuf_len, int sendbuf_len) {
     return did_set;
 }
 
-/* Wait until the socket is readable. Returns false on timeout or failure. */
-bool pp_socket_wait_readable(pp_socket sock, int timeout_ms) {
-    return local_wait(sock, timeout_ms, true, false);
-}
-
-/* Wait until the socket is writable. Returns false on timeout or failure. */
-bool pp_socket_wait_writable(pp_socket sock, int timeout_ms) {
-    return local_wait(sock, timeout_ms, false, true);
-}
-
 /* Return the native file descriptor. */
 pp_fd pp_socket_get_fd(const pp_socket sock) {
     pp_assert(sock && !local_is_invalid_fd(sock->fd));
@@ -349,48 +338,6 @@ void local_close_impl(pp_socket sock) {
     }
     local_close_fd(sock->fd);
     sock->fd = local_invalid_fd();
-}
-
-bool local_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write) {
-    if (!sock || local_is_invalid_fd(sock->fd)) {
-        local_set_not_socket_error();
-        return false;
-    }
-
-    while (true) {
-        fd_set readfds;
-        fd_set writefds;
-        fd_set *readfds_ptr = NULL;
-        fd_set *writefds_ptr = NULL;
-        if (want_read) {
-            FD_ZERO(&readfds);
-            FD_SET(sock->fd, &readfds);
-            readfds_ptr = &readfds;
-        }
-        if (want_write) {
-            FD_ZERO(&writefds);
-            FD_SET(sock->fd, &writefds);
-            writefds_ptr = &writefds;
-        }
-
-        struct timeval tv;
-        struct timeval *tv_ptr = NULL;
-        if (timeout_ms >= 0) {
-            tv.tv_sec = timeout_ms / 1000;
-            tv.tv_usec = (timeout_ms % 1000) * 1000;
-            tv_ptr = &tv;
-        }
-
-        const int ret = select(local_select_nfds(sock->fd), readfds_ptr, writefds_ptr, NULL, tv_ptr);
-        if (ret < 0) {
-            if (PP_IO_INTR()) {
-                continue;
-            }
-            local_print_error("select()");
-            return false;
-        }
-        return ret > 0;
-    }
 }
 
 int local_connect_with_timeout(pp_fd fd,
