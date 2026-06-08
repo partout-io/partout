@@ -241,6 +241,7 @@ public final class FdLooper: @unchecked Sendable {
             lock.with {
                 guard state == .started else {
                     pp_log(ctx, .core, .error, "Ignoring perform before start()")
+                    continuation.resume(throwing: CancellationError())
                     return
                 }
                 commands.append(.custom {
@@ -291,6 +292,7 @@ public final class FdLooper: @unchecked Sendable {
             lock.with {
                 guard state == .started else {
                     pp_log(ctx, .core, .error, "Ignoring attach before start()")
+                    continuation.resume()
                     assertionFailure("Attach after start()")
                     return
                 }
@@ -305,6 +307,7 @@ public final class FdLooper: @unchecked Sendable {
             lock.with {
                 guard state == .started else {
                     pp_log(ctx, .core, .error, "Ignoring detach before start()")
+                    continuation.resume()
                     assertionFailure("Detach after start()")
                     return
                 }
