@@ -50,7 +50,9 @@ pp_tun pp_tun_open(const char *uuid) {
     }
 
     strncpy(ctl_info.ctl_name, UTUN_CONTROL_NAME, sizeof(ctl_info.ctl_name));
-    if (ioctl(fd, CTLIOCGINFO, &ctl_info) == -1) {
+    int ret;
+    PP_IO_RETRY(ret, ioctl(fd, CTLIOCGINFO, &ctl_info));
+    if (ret < 0) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: ioctl(CTLIOCGINFO)");
         goto failure;
     }
@@ -60,7 +62,6 @@ pp_tun pp_tun_open(const char *uuid) {
     sc.sc_family = AF_SYSTEM;
     sc.ss_sysaddr = AF_SYS_CONTROL;
     sc.sc_unit = 0;  // First free utunX
-    int ret;
     PP_IO_RETRY(ret, connect(fd, (struct sockaddr *)&sc, sizeof(sc)));
     if (ret < 0) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: connect(AF_SYSTEM, AF_SYS_CONTROL)");

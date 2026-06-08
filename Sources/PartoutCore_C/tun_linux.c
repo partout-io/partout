@@ -49,7 +49,9 @@ pp_tun pp_tun_open(const char *uuid) {
     /* Leave ifr.ifr_name empty to let the kernel retrieve
      * the first available device number */
     ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
-    if (ioctl(fd, TUNSETIFF, (void *)&ifr) < 0) {
+    int ret;
+    PP_IO_RETRY(ret, ioctl(fd, TUNSETIFF, (void *)&ifr));
+    if (ret < 0) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_linux: create(), ioctl(TUNSETIFF)");
         goto failure;
     }
