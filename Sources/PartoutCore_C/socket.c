@@ -28,8 +28,8 @@ typedef int os_socket_fd;
 typedef socklen_t os_socklen_t;
 #endif
 
-const int PP_SOCKET_WOULD_BLOCK = -2;
-const int PP_SOCKET_NO_BUF      = -10;
+const int PPSocketErrorWouldBlock   = -2;
+const int PPSocketErrorNoBuf        = -10;
 
 static bool local_platform_init(void);
 static os_socket_fd local_invalid_fd(void);
@@ -238,7 +238,7 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
              * in which case the value -1 is returned and the external variable errno
              * set to EAGAIN. */
             if (local_is_would_block()) {
-                return PP_SOCKET_WOULD_BLOCK;
+                return PPSocketErrorWouldBlock;
             }
             local_print_error("recv()");
         }
@@ -265,10 +265,10 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
                 continue;
             }
             if (local_is_would_block()) {
-                return offset > 0 ? (int)offset : PP_SOCKET_WOULD_BLOCK;
+                return offset > 0 ? (int)offset : PPSocketErrorWouldBlock;
             }
             if (local_is_nobufs()) {
-                return offset > 0 ? (int)offset : PP_SOCKET_NO_BUF;
+                return offset > 0 ? (int)offset : PPSocketErrorNoBuf;
             }
             local_print_error("send()");
             return written_len;

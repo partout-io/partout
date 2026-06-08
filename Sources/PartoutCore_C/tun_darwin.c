@@ -122,7 +122,7 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     const int read_len = (int)readv(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
     if (read_len < 0) {
         if (pp_tun_would_block()) {
-            return PP_TUN_WOULD_BLOCK;
+            return PPTunErrorWouldBlock;
         }
         return -1;
     }
@@ -147,10 +147,10 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     const int written_len = (int)writev(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
     if (written_len < 0) {
         if (pp_tun_would_block()) {
-            return PP_TUN_WOULD_BLOCK;
+            return PPTunErrorWouldBlock;
         }
         if (pp_tun_nobufs()) {
-            return PP_TUN_NO_BUF;
+            return PPTunErrorNoBuf;
         }
         return -1;
     }

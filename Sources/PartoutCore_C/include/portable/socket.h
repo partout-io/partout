@@ -30,8 +30,8 @@ typedef enum {
 /* The opaque socket type. */
 typedef struct __pp_socket_struct *pp_socket;
 
-extern const int PP_SOCKET_WOULD_BLOCK;
-extern const int PP_SOCKET_NO_BUF;
+extern const int PPSocketErrorWouldBlock;
+extern const int PPSocketErrorNoBuf;
 
 /* Create a socket wrapper from an already open native descriptor. The
  * wrapper acquires ownership and will close the descriptor on
@@ -58,7 +58,7 @@ pp_socket _Nullable pp_socket_open(const char *ip_addr,
                                    bool (*_Nullable configure)(void *_Nullable ctx, uint64_t fd),
                                    void *_Nullable configure_ctx);
 
-/* I/O. Returns PP_SOCKET_WOULD_BLOCK when a non-blocking operation would block. */
+/* I/O. Returns PPSocketErrorWouldBlock when a non-blocking operation would block. */
 int pp_socket_read(pp_socket sock,
                    uint8_t *dst, size_t dst_len);
 int pp_socket_write(pp_socket sock,

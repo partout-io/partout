@@ -39,7 +39,7 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     if (!tun || tun->fd < 0) return -1;
     const int ret = read(tun->fd, dst, dst_len);
     if (ret < 0 && pp_tun_would_block()) {
-        return PP_TUN_WOULD_BLOCK;
+        return PPTunErrorWouldBlock;
     }
     return ret;
 }
@@ -49,10 +49,10 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     const int ret = write(tun->fd, src, src_len);
     if (ret < 0) {
         if (pp_tun_would_block()) {
-            return PP_TUN_WOULD_BLOCK;
+            return PPTunErrorWouldBlock;
         }
         if (pp_tun_nobufs()) {
-            return PP_TUN_NO_BUF;
+            return PPTunErrorNoBuf;
         }
     }
     return ret;

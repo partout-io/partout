@@ -7,5 +7,5 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
-const int PP_TUN_WOULD_BLOCK    = -2;
-const int PP_TUN_NO_BUF         = -10;
+const int PPTunErrorWouldBlock  = -2;
+const int PPTunErrorNoBuf       = -10;

@@ -983,7 +983,7 @@ private extension FdLooper.SideIO {
             arguments: arguments,
             read: { buf in
                 let count = pp_socket_read(linkHandle, &buf, buf.count)
-                guard count != PP_SOCKET_WOULD_BLOCK else {
+                guard count != PPSocketErrorWouldBlock else {
                     throw FdLooper.IOError.wouldBlock(.link)
                 }
                 guard count >= 0 else {
@@ -1005,10 +1005,10 @@ private extension FdLooper.SideIO {
                         pending.count
                     )
                 }
-                guard count != PP_SOCKET_WOULD_BLOCK else {
+                guard count != PPSocketErrorWouldBlock else {
                     throw FdLooper.IOError.wouldBlock(.link)
                 }
-                guard count != PP_SOCKET_NO_BUF else {
+                guard count != PPSocketErrorNoBuf else {
                     throw FdLooper.IOError.noBufSpace(.link)
                 }
                 guard count >= 0 else {
@@ -1037,7 +1037,7 @@ private extension FdLooper.SideIO {
             arguments: arguments,
             read: { buf in
                 let count = pp_tun_read(tunHandle, &buf, buf.count)
-                guard count != PP_TUN_WOULD_BLOCK else {
+                guard count != PPTunErrorWouldBlock else {
                     throw FdLooper.IOError.wouldBlock(.tun)
                 }
                 guard count >= 0 else {
@@ -1056,10 +1056,10 @@ private extension FdLooper.SideIO {
                         pending.count
                     )
                 }
-                guard count != PP_TUN_WOULD_BLOCK else {
+                guard count != PPTunErrorWouldBlock else {
                     throw FdLooper.IOError.wouldBlock(.tun)
                 }
-                guard count != PP_TUN_NO_BUF else {
+                guard count != PPTunErrorNoBuf else {
                     throw FdLooper.IOError.noBufSpace(.tun)
                 }
                 guard count >= 0 else {
