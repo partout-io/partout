@@ -115,9 +115,6 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
         let isTCP = remoteEndpoint.plainSocketType == .tcp
         let proc = PacketProcessor(method: configuration.xorMethod)
         let rw = LinkProcessor(proc: proc, isTCP: isTCP)
-        guard let fd = link.fileDescriptor else {
-            fatalError("Link has no file descriptor")
-        }
 
         var didAttach = false
         do {
