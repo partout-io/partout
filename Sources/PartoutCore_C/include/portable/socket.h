@@ -30,19 +30,20 @@ typedef enum {
 /* The opaque socket type. */
 typedef struct __pp_socket_struct *pp_socket;
 
-/* Create a socket wrapper from an already open native descriptor. The
- * wrapper acquires ownership and will close the descriptor on
- * pp_socket_close() or pp_socket_free(). */
-pp_socket pp_socket_create(uint64_t fd);
 void pp_socket_shutdown(pp_socket sock);
 void pp_socket_close(pp_socket sock);
 void pp_socket_free_and_close(pp_socket sock, bool and_close);
 
-static inline void pp_socket_release(pp_socket sock) {
-    pp_socket_free_and_close(sock, false);
-}
 static inline void pp_socket_free(pp_socket sock) {
     pp_socket_free_and_close(sock, true);
+}
+
+/* Create a socket wrapper from an already open native descriptor. The
+ * wrapper acquires ownership and will close the descriptor on
+ * pp_socket_close() or pp_socket_free(). */
+pp_socket pp_socket_retain(uint64_t fd);
+static inline void pp_socket_release(pp_socket sock) {
+    pp_socket_free_and_close(sock, false);
 }
 
 /* Create socket to endpoint. */

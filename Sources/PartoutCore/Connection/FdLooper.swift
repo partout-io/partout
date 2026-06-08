@@ -991,7 +991,7 @@ private extension FdLooper.SideIO {
         readBufSize: Int,
         arguments: FdLooper.AttachArguments
     ) {
-        let linkHandle = pp_socket_create(UInt64(linkFd))
+        let linkHandle = pp_socket_retain(UInt64(linkFd))
         // FIXME: ###, Will pass pp_socket later to tell UDP/TCP
         let closesOnEmptyRead = (arguments.original as? LinkInterface)?.isReliable == true
         self.init(
