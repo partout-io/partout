@@ -7,6 +7,8 @@
 #include "portable/mux.h"
 #include <errno.h>
 
+const int PPMuxErrorNull = -2;
+
 #if PARTOUT_APPLE
 #include <sys/types.h>
 #include <sys/event.h>
@@ -114,7 +116,7 @@ void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, int fd), voi
 }
 
 int pp_mux_wait(pp_mux mux) {
-    if (!mux) return -1;
+    if (!mux) return PPMuxErrorNull;
 
     int num;
     do {
@@ -350,7 +352,7 @@ void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, int fd), voi
 }
 
 int pp_mux_wait(pp_mux mux) {
-    if (!mux) return -1;
+    if (!mux) return PPMuxErrorNull;
 
     int num;
     do {
