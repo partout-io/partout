@@ -148,9 +148,9 @@ public final class NativeTunnelController: TunnelController, Sendable {
         if let tunnel = io as? VirtualTunnelInterface {
 //            tun.deviceName
 
-            // Make sure to issue the tunnel shutdown and wait for it to
+            // Make sure to close the tun device and wait for it to
             // finish to prevent races on VirtualTunnelInterface.deinit
-            await tunnel.shutdown()
+            await tunnel.close()
         }
 
         // Wrap up clear in native layer
