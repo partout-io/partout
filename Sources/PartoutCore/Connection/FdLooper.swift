@@ -854,7 +854,7 @@ private extension FdLooper {
         let code: Int32
 
         var description: String {
-            "wait errno=\(code)"
+            "wait: errno=\(code)"
         }
     }
 
