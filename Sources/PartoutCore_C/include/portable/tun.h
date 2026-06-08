@@ -50,7 +50,11 @@ static inline void pp_tun_free(pp_tun tun) {
 /* With manual file descriptor. */
 pp_tun pp_tun_retain(int fd);
 static inline void pp_tun_release(pp_tun tun) {
+#if PARTOUT_APPLE && !PARTOUT_MACOS
+    pp_tun_free_and_close(tun, true);
+#else
     pp_tun_free_and_close(tun, false);
+#endif
 }
 #endif
 

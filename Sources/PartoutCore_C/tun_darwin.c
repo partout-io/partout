@@ -26,7 +26,11 @@ struct __pp_tun_struct {
 
 pp_tun pp_tun_retain(int fd) {
     pp_tun tun = pp_alloc(sizeof(*tun));
+#if PARTOUT_MACOS
     tun->fd = fd;
+#else
+    tun->fd = dup(fd);
+#endif
     return tun;
 }
 
