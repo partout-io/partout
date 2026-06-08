@@ -1036,7 +1036,7 @@ private extension FdLooper.SideIO {
             },
             cleanup: {
                 pp_mux_delete(mux, linkFd)
-                pp_socket_free(linkHandle)
+                pp_socket_release(linkHandle)
             }
         )
     }
