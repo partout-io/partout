@@ -657,14 +657,15 @@ private extension FdLooper {
             pp_log(ctx, .core, .info, "Finish looper")
         }
 
-        lock.with {
-            guard state != .stopped else {
-                assertionFailure("Finishing twice?")
-                return
-            }
-            state = .stopped
-            terminalError = error
+        lock.lock()
+        guard state != .stopped else {
+            lock.unlock()
+            assertionFailure("Finishing twice?")
+            return
         }
+        state = .stopped
+        terminalError = error
+        lock.unlock()
 
         if let error {
             stopContinuation?.resume(throwing: error)
