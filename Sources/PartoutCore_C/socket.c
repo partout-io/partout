@@ -422,22 +422,26 @@ int local_connect_with_timeout(os_socket_fd fd,
     }
 
     // Wait for socket to be writable
-    fd_set wfds;
-    FD_ZERO(&wfds);
-    FD_SET(fd, &wfds);
+    while (true) {
+        fd_set wfds;
+        FD_ZERO(&wfds);
+        FD_SET(fd, &wfds);
 
-    struct timeval tv;
-    tv.tv_sec = timeout_ms / 1000;
-    tv.tv_usec = (timeout_ms % 1000) * 1000;
+        struct timeval tv;
+        tv.tv_sec = timeout_ms / 1000;
+        tv.tv_usec = (timeout_ms % 1000) * 1000;
 
-    // Wait until timeout
-    ret = select(local_select_nfds(fd), NULL, &wfds, NULL, &tv);
-    if (ret == 0) {
-        local_set_timeout_error();
-        return -2;  // Timeout
-    } else if (ret < 0) {
-        local_print_error("select()");
-        return -1;  // Select error
+        // Wait until timeout
+        ret = select(local_select_nfds(fd), NULL, &wfds, NULL, &tv);
+        if (ret == 0) {
+            local_set_timeout_error();
+            return -2;  // Timeout
+        } else if (ret < 0) {
+            if (PP_IO_INTR()) continue;
+            local_print_error("select()");
+            return -1;  // Select error
+        }
+        break;
     }
 
     // Check SO_ERROR to see if connect succeeded
