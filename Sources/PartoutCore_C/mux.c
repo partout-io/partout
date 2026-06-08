@@ -123,7 +123,7 @@ int pp_mux_wait(pp_mux mux) {
         num = kevent(mux->handle, NULL, 0, mux->events, mux->events_len, NULL);
     } while (num < 0 && errno == EINTR);
     if (num < 0) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait failed: errno=%d\n", errno);
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait failed: errno=%d", errno);
         return num;
     }
 
@@ -359,7 +359,7 @@ int pp_mux_wait(pp_mux mux) {
         num = epoll_wait(mux->handle, mux->events, mux->events_len, -1);
     } while (num < 0 && errno == EINTR);
     if (num < 0) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait failed: errno=%d\n", errno);
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait epoll_wait() failed: errno=%d", errno);
         return num;
     }
 
@@ -369,25 +369,22 @@ int pp_mux_wait(pp_mux mux) {
         if (fd == mux->wake_fd) {
             eventfd_t value;
             while (true) {
-                /* wake_fd is non-blocking */
-                if (eventfd_read(mux->wake_fd, &value) == 0) {
-                    /* Successful read, keep going */
-                    continue;
+                int ret;
+                do {
+                    /* Context: wake_fd is non-blocking */
+                    ret = eventfd_read(mux->wake_fd, &value);
+                } while (ret < 0 && errno == EINTR);
+                if (ret < 0) {
+                    /* Fully drained */
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+                    /* Unexpected error */
+                    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait eventfd failed: errno=%d", errno);
+                    return ret;
                 }
-                if (errno == EINTR) {
-                    /* Interrupted, retry */
-                    continue;
-                }
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                     /* Fully drained */
-                    break;
-                }
-                /* Unexpected error */
-                return -1;
             }
             continue;
         }
-        const bool failed = ev->events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP);
+        const bool failed = ev->events & PP_MUX_ERROR_EVENTS;
         const bool readable = (ev->events & EPOLLIN) || failed;
         const bool writable = ev->events & EPOLLOUT;
         bool did_notify_readable = false;
