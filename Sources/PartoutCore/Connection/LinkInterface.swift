@@ -28,9 +28,9 @@ public struct LinkMetadata: Sendable {
     public let isReliable: Bool
     public let remoteAddress: String
     public let remoteProtocol: EndpointProtocol
-    public let fileDescriptor: UInt64?
+    public let fileDescriptor: FileDescriptor?
 
-    public init(isReliable: Bool, remoteAddress: String, remoteProtocol: EndpointProtocol, fileDescriptor: UInt64?) {
+    public init(isReliable: Bool, remoteAddress: String, remoteProtocol: EndpointProtocol, fileDescriptor: FileDescriptor?) {
         self.isReliable = isReliable
         self.remoteAddress = remoteAddress
         self.remoteProtocol = remoteProtocol

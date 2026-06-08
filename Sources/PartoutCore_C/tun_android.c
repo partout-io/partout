@@ -54,7 +54,7 @@ void pp_tun_close(const pp_tun tun) {
     shutdown(tun->fd, SHUT_RDWR);
 }
 
-int pp_tun_fd(const pp_tun tun) {
+int pp_tun_get_fd(const pp_tun tun) {
     if (!tun) return -1;
     return tun->fd;
 }

@@ -46,6 +46,8 @@ Generic entities and helpers.
 - ``BidirectionalState``
 - ``DataUnit``
 - ``DataUnitRepresentable``
+- ``FileDescriptor->Int32``
+- ``FileDescriptor->UInt64``
 - ``Keychain``
 - ``ScriptingEngine``
 - ``SemaphoreMutex``

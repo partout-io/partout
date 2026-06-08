@@ -21,8 +21,8 @@ struct __pp_mux {
     int handle;
     struct kevent *events;
     int events_len;
-    void (*on_readable)(void *ctx, int fd);
-    void (*on_writable)(void *ctx, int fd);
+    void (*on_readable)(void *ctx, pp_fd fd);
+    void (*on_writable)(void *ctx, pp_fd fd);
     void *read_ctx;
     void *write_ctx;
 };
@@ -55,7 +55,7 @@ void pp_mux_free(pp_mux mux) {
     pp_free(mux);
 }
 
-bool pp_mux_add(pp_mux mux, int fd) {
+bool pp_mux_add(pp_mux mux, pp_fd fd) {
     if (!mux) return false;
     struct kevent ev;
     EV_SET(&ev, fd, EVFILT_READ, EV_ADD, 0, 0, 0);
@@ -64,7 +64,7 @@ bool pp_mux_add(pp_mux mux, int fd) {
     return ret == 0;
 }
 
-bool pp_mux_delete(pp_mux mux, int fd) {
+bool pp_mux_delete(pp_mux mux, pp_fd fd) {
     if (!mux) return false;
     struct kevent ev[2];
     EV_SET(&ev[0], fd, EVFILT_READ, EV_DELETE, 0, 0, 0);
@@ -81,7 +81,7 @@ bool pp_mux_delete(pp_mux mux, int fd) {
     return ok;
 }
 
-bool pp_mux_set_read(pp_mux mux, int fd, bool enable) {
+bool pp_mux_set_read(pp_mux mux, pp_fd fd, bool enable) {
     if (!mux) return false;
     struct kevent ev;
     EV_SET(&ev, fd, EVFILT_READ, enable ? EV_ADD : EV_DELETE, 0, 0, 0);
@@ -95,7 +95,7 @@ bool pp_mux_set_read(pp_mux mux, int fd, bool enable) {
     return true;
 }
 
-bool pp_mux_set_write(pp_mux mux, int fd, bool enable) {
+bool pp_mux_set_write(pp_mux mux, pp_fd fd, bool enable) {
     if (!mux) return false;
     struct kevent ev;
     EV_SET(&ev, fd, EVFILT_WRITE, enable ? EV_ADD : EV_DELETE, 0, 0, 0);
@@ -109,13 +109,13 @@ bool pp_mux_set_write(pp_mux mux, int fd, bool enable) {
     return true;
 }
 
-void pp_mux_set_on_readable(pp_mux mux, void (*callback)(void *ctx, int fd), void *ctx) {
+void pp_mux_set_on_readable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), void *ctx) {
     if (!mux) return;
     mux->on_readable = callback;
     mux->read_ctx = ctx;
 }
 
-void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, int fd), void *ctx) {
+void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), void *ctx) {
     if (!mux) return;
     mux->on_writable = callback;
     mux->write_ctx = ctx;
@@ -186,20 +186,20 @@ struct __pp_mux {
     struct pp_mux_fd *fds;
     int fds_len;
     int fds_count;
-    void (*on_readable)(void *ctx, int fd);
-    void (*on_writable)(void *ctx, int fd);
+    void (*on_readable)(void *ctx, pp_fd fd);
+    void (*on_writable)(void *ctx, pp_fd fd);
     void *read_ctx;
     void *write_ctx;
 };
 
-static struct pp_mux_fd *pp_mux_find_fd(pp_mux mux, int fd) {
+static struct pp_mux_fd *pp_mux_find_fd(pp_mux mux, pp_fd fd) {
     for (int i = 0; i < mux->fds_count; ++i) {
         if (mux->fds[i].fd == fd) return mux->fds + i;
     }
     return NULL;
 }
 
-static struct pp_mux_fd *pp_mux_track_fd(pp_mux mux, int fd) {
+static struct pp_mux_fd *pp_mux_track_fd(pp_mux mux, pp_fd fd) {
     struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
     if (tracked) return tracked;
     if (mux->fds_count >= mux->fds_len) return NULL;
@@ -302,7 +302,7 @@ void pp_mux_free(pp_mux mux) {
     pp_free(mux);
 }
 
-bool pp_mux_add(pp_mux mux, int fd) {
+bool pp_mux_add(pp_mux mux, pp_fd fd) {
     if (!mux) return false;
     const int previous_count = mux->fds_count;
     struct pp_mux_fd *tracked = pp_mux_track_fd(mux, fd);
@@ -322,7 +322,7 @@ bool pp_mux_add(pp_mux mux, int fd) {
     return true;
 }
 
-bool pp_mux_delete(pp_mux mux, int fd) {
+bool pp_mux_delete(pp_mux mux, pp_fd fd) {
     if (!mux) return false;
     struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
     if (!tracked) return true;
@@ -338,7 +338,7 @@ bool pp_mux_delete(pp_mux mux, int fd) {
     return true;
 }
 
-bool pp_mux_set_read(pp_mux mux, int fd, bool enable) {
+bool pp_mux_set_read(pp_mux mux, pp_fd fd, bool enable) {
     if (!mux) return false;
     struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
     if (!tracked && !enable) return true;
@@ -355,7 +355,7 @@ bool pp_mux_set_read(pp_mux mux, int fd, bool enable) {
     return true;
 }
 
-bool pp_mux_set_write(pp_mux mux, int fd, bool enable) {
+bool pp_mux_set_write(pp_mux mux, pp_fd fd, bool enable) {
     if (!mux) return false;
     struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
     if (!tracked && !enable) return true;
@@ -372,13 +372,13 @@ bool pp_mux_set_write(pp_mux mux, int fd, bool enable) {
     return true;
 }
 
-void pp_mux_set_on_readable(pp_mux mux, void (*callback)(void *ctx, int fd), void *ctx) {
+void pp_mux_set_on_readable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), void *ctx) {
     if (!mux) return;
     mux->on_readable = callback;
     mux->read_ctx = ctx;
 }
 
-void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, int fd), void *ctx) {
+void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), void *ctx) {
     if (!mux) return;
     mux->on_writable = callback;
     mux->write_ctx = ctx;

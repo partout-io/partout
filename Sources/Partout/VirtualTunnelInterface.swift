@@ -60,7 +60,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         } else {
             deviceName = nil
         }
-        let fd = pp_tun_fd(tun)
+        let fd = pp_tun_get_fd(tun)
         descriptor = fd >= 0 ? UInt64(fd) : nil
         // FIXME: #188, Windows has device name but it's wchar_t *
         let label = deviceName?.description ?? descriptor?.description ?? "*"

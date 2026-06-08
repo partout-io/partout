@@ -113,6 +113,7 @@ extern const int PPIOErrorNoBufs;
 
 #if PARTOUT_WINDOWS
 #include <ws2tcpip.h>
+typedef SOCKET pp_fd;
 
 #define PP_IO_RETRY(result, fn) \
     do { \
@@ -135,6 +136,7 @@ static inline bool PP_IO_NOBUFS(void) {
 
 #else
 #include <errno.h>
+typedef int pp_fd;
 
 #define PP_IO_RETRY(result, fn) \
     do { \

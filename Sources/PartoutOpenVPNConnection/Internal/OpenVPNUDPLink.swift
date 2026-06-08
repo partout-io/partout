@@ -53,7 +53,7 @@ extension OpenVPNUDPLink: LinkInterface {
 // MARK: - IOInterface
 
 extension OpenVPNUDPLink {
-    var fileDescriptor: UInt64? {
+    var fileDescriptor: FileDescriptor? {
         link.fileDescriptor
     }
 

@@ -144,7 +144,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         betterPathStream.subscribe()
     }
 
-    public nonisolated var fileDescriptor: UInt64? {
+    public nonisolated var fileDescriptor: FileDescriptor? {
         socketHandle.fileDescriptor
     }
 

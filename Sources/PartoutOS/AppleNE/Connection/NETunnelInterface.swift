@@ -19,8 +19,8 @@ public final class NETunnelInterface: IOInterface {
 
     // MARK: TunnelInterface
 
-    public var fileDescriptor: UInt64? {
-        Self.existingFileDescriptor.map(UInt64.init)
+    public var fileDescriptor: FileDescriptor? {
+        Self.existingFileDescriptor
     }
 
     public func readPackets() async throws -> [Data] {

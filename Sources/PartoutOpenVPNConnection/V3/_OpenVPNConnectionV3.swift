@@ -169,7 +169,7 @@ extension _OpenVPNConnectionV3: OpenVPNSessionDelegateV3 {
         remoteAddress: String,
         remoteProtocol: EndpointProtocol,
         remoteOptions: OpenVPN.Configuration,
-        remoteFd: UInt64?
+        remoteFd: FileDescriptor?
     ) {
         delegateSubject.send(.didStart(
             session,
@@ -202,7 +202,7 @@ private extension _OpenVPNConnectionV3 {
             remoteAddress: String,
             remoteProtocol: EndpointProtocol,
             remoteOptions: OpenVPN.Configuration,
-            remoteFd: UInt64?
+            remoteFd: FileDescriptor?
         )
         case didStop(
             _ session: OpenVPNSessionProtocolV3,

@@ -15,7 +15,6 @@
 #if PARTOUT_WINDOWS
 #include <winsock2.h>
 #include <ws2tcpip.h>
-typedef SOCKET os_socket_fd;
 typedef int os_socklen_t;
 #else
 #include <unistd.h>
@@ -24,27 +23,26 @@ typedef int os_socklen_t;
 #include <sys/select.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-typedef int os_socket_fd;
 typedef socklen_t os_socklen_t;
 #endif
 
 static bool local_platform_init(void);
-static os_socket_fd local_invalid_fd(void);
-static bool local_is_invalid_fd(os_socket_fd fd);
+static pp_fd local_invalid_fd(void);
+static bool local_is_invalid_fd(pp_fd fd);
 static void local_print_error(const char *msg);
 static void local_set_not_socket_error(void);
 static void local_set_timeout_error(void);
 static void local_set_reset_error(void);
 static void local_set_error(int err);
 static bool local_is_connect_pending(void);
-static int local_close_fd(os_socket_fd fd);
-static int local_shutdown_fd(os_socket_fd fd);
-static int local_recv_fd(os_socket_fd fd, void *dst, size_t dst_len);
-static int local_send_fd(os_socket_fd fd, const void *src, size_t src_len);
-static int local_select_nfds(os_socket_fd fd);
-static int local_set_nonblocking(os_socket_fd fd, int *original_flags);
-static int local_restore_blocking(os_socket_fd fd, int original_flags);
-static int local_connect_with_timeout(os_socket_fd fd,
+static int local_close_fd(pp_fd fd);
+static int local_shutdown_fd(pp_fd fd);
+static int local_recv_fd(pp_fd fd, void *dst, size_t dst_len);
+static int local_send_fd(pp_fd fd, const void *src, size_t src_len);
+static int local_select_nfds(pp_fd fd);
+static int local_set_nonblocking(pp_fd fd, int *original_flags);
+static int local_restore_blocking(pp_fd fd, int original_flags);
+static int local_connect_with_timeout(pp_fd fd,
                                       const struct sockaddr *addr,
                                       os_socklen_t addrlen,
                                       bool blocking,
@@ -59,14 +57,14 @@ static bool local_wait(pp_socket sock, int timeout_ms, bool want_read, bool want
 /* Host a file descriptor with the specific platform type. POSIX systems
  * use int, whereas Windows uses SOCKET.  */
 struct __pp_socket_struct {
-    os_socket_fd fd;
+    pp_fd fd;
 };
 
 /* Create a socket from a formerly opened file descriptor. Use uint64_t to
  * cover the whole range of possible platform values. */
-pp_socket pp_socket_retain(uint64_t fd) {
+pp_socket pp_socket_retain(pp_fd fd) {
     pp_socket sock = pp_alloc(sizeof(*sock));
-    sock->fd = (os_socket_fd)fd;
+    sock->fd = (pp_fd)fd;
     return sock;
 }
 
@@ -79,13 +77,13 @@ pp_socket pp_socket_open(const char *ip_addr,
                          bool blocking,
                          int timeout_ms,
                          const pp_reachability *info,
-                         bool (*configure)(void *ctx, uint64_t fd),
+                         bool (*configure)(void *ctx, pp_fd fd),
                          void *configure_ctx) {
     (void)info;
     int socktype = 0;
     struct addrinfo hints, *resolved = NULL;
     char port_str[16] = { 0 };
-    os_socket_fd new_fd = local_invalid_fd();
+    pp_fd new_fd = local_invalid_fd();
     int ipproto = 0;
 
     if (!local_platform_init()) {
@@ -310,7 +308,7 @@ bool pp_socket_wait_writable(pp_socket sock, int timeout_ms) {
 }
 
 /* Return the native file descriptor. */
-uint64_t pp_socket_fd(const pp_socket sock) {
+pp_fd pp_socket_get_fd(const pp_socket sock) {
     pp_assert(sock && !local_is_invalid_fd(sock->fd));
     return sock->fd;
 }
@@ -395,7 +393,7 @@ bool local_wait(pp_socket sock, int timeout_ms, bool want_read, bool want_write)
     }
 }
 
-int local_connect_with_timeout(os_socket_fd fd,
+int local_connect_with_timeout(pp_fd fd,
                                const struct sockaddr *addr,
                                os_socklen_t addrlen,
                                bool blocking,
@@ -485,11 +483,11 @@ void local_print_error(const char *msg) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed with error %d", msg, WSAGetLastError());
 }
 
-os_socket_fd local_invalid_fd(void) {
+pp_fd local_invalid_fd(void) {
     return INVALID_SOCKET;
 }
 
-bool local_is_invalid_fd(os_socket_fd fd) {
+bool local_is_invalid_fd(pp_fd fd) {
     return fd == INVALID_SOCKET;
 }
 
@@ -514,28 +512,28 @@ bool local_is_connect_pending(void) {
     return err == WSAEWOULDBLOCK || err == WSAEINPROGRESS;
 }
 
-int local_close_fd(os_socket_fd fd) {
+int local_close_fd(pp_fd fd) {
     return closesocket(fd);
 }
 
-int local_shutdown_fd(os_socket_fd fd) {
+int local_shutdown_fd(pp_fd fd) {
     return shutdown(fd, SD_BOTH);
 }
 
-int local_recv_fd(os_socket_fd fd, void *dst, size_t dst_len) {
+int local_recv_fd(pp_fd fd, void *dst, size_t dst_len) {
     return (int)recv(fd, dst, (int)dst_len, 0);
 }
 
-int local_send_fd(os_socket_fd fd, const void *src, size_t src_len) {
+int local_send_fd(pp_fd fd, const void *src, size_t src_len) {
     return (int)send(fd, src, (int)src_len, 0);
 }
 
-int local_select_nfds(os_socket_fd fd) {
+int local_select_nfds(pp_fd fd) {
     (void)fd;
     return 0;
 }
 
-int local_set_nonblocking(os_socket_fd fd, int *original_flags) {
+int local_set_nonblocking(pp_fd fd, int *original_flags) {
     (void)original_flags;
     u_long mode = 1;
     if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
@@ -545,7 +543,7 @@ int local_set_nonblocking(os_socket_fd fd, int *original_flags) {
     return 0;
 }
 
-int local_restore_blocking(os_socket_fd fd, int original_flags) {
+int local_restore_blocking(pp_fd fd, int original_flags) {
     (void)original_flags;
     u_long mode = 0;
     if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
@@ -563,11 +561,11 @@ void local_print_error(const char *msg) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed: %s", msg, strerror(errno));
 }
 
-os_socket_fd local_invalid_fd(void) {
+pp_fd local_invalid_fd(void) {
     return -1;
 }
 
-bool local_is_invalid_fd(os_socket_fd fd) {
+bool local_is_invalid_fd(pp_fd fd) {
     return fd == -1;
 }
 
@@ -591,27 +589,27 @@ bool local_is_connect_pending(void) {
     return errno == EINPROGRESS;
 }
 
-int local_close_fd(os_socket_fd fd) {
+int local_close_fd(pp_fd fd) {
     return close(fd);
 }
 
-int local_shutdown_fd(os_socket_fd fd) {
+int local_shutdown_fd(pp_fd fd) {
     return shutdown(fd, SHUT_RDWR);
 }
 
-int local_recv_fd(os_socket_fd fd, void *dst, size_t dst_len) {
+int local_recv_fd(pp_fd fd, void *dst, size_t dst_len) {
     return (int)read(fd, dst, dst_len);
 }
 
-int local_send_fd(os_socket_fd fd, const void *src, size_t src_len) {
+int local_send_fd(pp_fd fd, const void *src, size_t src_len) {
     return (int)write(fd, src, src_len);
 }
 
-int local_select_nfds(os_socket_fd fd) {
+int local_select_nfds(pp_fd fd) {
     return fd + 1;
 }
 
-int local_set_nonblocking(os_socket_fd fd, int *original_flags) {
+int local_set_nonblocking(pp_fd fd, int *original_flags) {
     *original_flags = fcntl(fd, F_GETFL, 0);
     if (*original_flags < 0) {
         local_print_error("fcntl()");
@@ -624,7 +622,7 @@ int local_set_nonblocking(os_socket_fd fd, int *original_flags) {
     return 0;
 }
 
-int local_restore_blocking(os_socket_fd fd, int original_flags) {
+int local_restore_blocking(pp_fd fd, int original_flags) {
     if (fcntl(fd, F_SETFL, original_flags) < 0) {
         local_print_error("fcntl()");
         return -1;

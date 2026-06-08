@@ -10,7 +10,7 @@ final class SocketHandle: @unchecked Sendable {
 
     private let lock: SemaphoreMutex
 
-    private var descriptor: UInt64?
+    private var descriptor: FileDescriptor?
 
     private var isShuttingDown: Bool
 
@@ -19,12 +19,12 @@ final class SocketHandle: @unchecked Sendable {
     init(sock: pp_socket) {
         self.sock = sock
         lock = SemaphoreMutex()
-        descriptor = pp_socket_fd(sock)
+        descriptor = pp_socket_get_fd(sock)
         isShuttingDown = false
         isClosed = false
     }
 
-    var fileDescriptor: UInt64? {
+    var fileDescriptor: FileDescriptor? {
         lock.lock()
         defer { lock.unlock() }
         return descriptor
