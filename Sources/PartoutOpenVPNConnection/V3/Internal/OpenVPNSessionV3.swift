@@ -82,7 +82,7 @@ final class OpenVPNSessionV3: @unchecked Sendable {
         sessionState = .stopped(IdleContext(withLocalOptions: true))
 
         unsafeLooper = try FdLooper(ctx, queue: queue) { [weak self] error in
-            pp_log(self?.ctx ?? .global, .openvpn, .error, "Session looper finished with error: \(error)")
+            pp_log(self?.ctx ?? .global, .openvpn, .error, "Session looper finished with error: \(error.debugDescription)")
             self?.finishShutdownOnQueue(error)
         }
         looper.start()
