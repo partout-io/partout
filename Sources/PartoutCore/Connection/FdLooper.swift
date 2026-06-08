@@ -708,6 +708,7 @@ private extension FdLooper {
             }
             guard pp_mux_add(mux, linkFd) else {
                 pp_log(ctx, .core, .fault, "Unable to attach link")
+                close(linkFd)
                 results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
                 break
             }
@@ -744,6 +745,7 @@ private extension FdLooper {
             }
             guard pp_mux_add(mux, tunFd) else {
                 pp_log(ctx, .core, .fault, "Unable to attach tun")
+                close(tunFd)
                 results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
                 break
             }
