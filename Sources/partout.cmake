@@ -354,7 +354,6 @@ set(PARTOUT_C_SOURCES
 ./PartoutCore_C/tls_options.c
 ./PartoutCore_C/tun_android.c
 ./PartoutCore_C/tun_darwin.c
-./PartoutCore_C/tun_dummy.c
 ./PartoutCore_C/tun_linux.c
 ./PartoutCore_C/tun_windows.c
 ./PartoutCore_C/zd.c

@@ -7,6 +7,8 @@
 #include "portable/mux.h"
 #include <errno.h>
 
+const int PPMuxErrorNull = -2;
+
 #if PARTOUT_APPLE
 #include <sys/types.h>
 #include <sys/event.h>
@@ -37,11 +39,12 @@ pp_mux pp_mux_create(int num) {
     /* EV_CLEAR resets the fd after wake delivery. */
     struct kevent ev;
     EV_SET(&ev, PP_MUX_WAKE_ID, EVFILT_USER, EV_ADD | EV_CLEAR, 0, 0, NULL);
-    if (kevent(mux->handle, &ev, 1, NULL, 0, NULL) != 0) {
+    int ret;
+    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
+    if (ret != 0) {
         pp_mux_free(mux);
         return NULL;
     }
-
     return mux;
 }
 
@@ -56,7 +59,9 @@ bool pp_mux_add(pp_mux mux, int fd) {
     if (!mux) return false;
     struct kevent ev;
     EV_SET(&ev, fd, EVFILT_READ, EV_ADD, 0, 0, 0);
-    return kevent(mux->handle, &ev, 1, NULL, 0, NULL) == 0;
+    int ret;
+    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
+    return ret == 0;
 }
 
 bool pp_mux_delete(pp_mux mux, int fd) {
@@ -67,7 +72,8 @@ bool pp_mux_delete(pp_mux mux, int fd) {
 
     bool ok = true;
     for (int i = 0; i < 2; ++i) {
-        const int ret = kevent(mux->handle, &ev[i], 1, NULL, 0, NULL);
+        int ret;
+        PP_IO_RETRY(ret, kevent(mux->handle, &ev[i], 1, NULL, 0, NULL));
         if (ret < 0 && errno != ENOENT) {
             ok = false;
         }
@@ -79,7 +85,8 @@ bool pp_mux_set_read(pp_mux mux, int fd, bool enable) {
     if (!mux) return false;
     struct kevent ev;
     EV_SET(&ev, fd, EVFILT_READ, enable ? EV_ADD : EV_DELETE, 0, 0, 0);
-    const int ret = kevent(mux->handle, &ev, 1, NULL, 0, NULL);
+    int ret;
+    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
     if (ret < 0) {
         /* Ignore failed deletion. */
         if (!enable && errno == ENOENT) return true;
@@ -92,7 +99,8 @@ bool pp_mux_set_write(pp_mux mux, int fd, bool enable) {
     if (!mux) return false;
     struct kevent ev;
     EV_SET(&ev, fd, EVFILT_WRITE, enable ? EV_ADD : EV_DELETE, 0, 0, 0);
-    const int ret = kevent(mux->handle, &ev, 1, NULL, 0, NULL);
+    int ret;
+    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
     if (ret < 0) {
         /* Ignore failed deletion. */
         if (!enable && errno == ENOENT) return true;
@@ -114,8 +122,15 @@ void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, int fd), voi
 }
 
 int pp_mux_wait(pp_mux mux) {
-    if (!mux) return -1;
-    const int num = kevent(mux->handle, NULL, 0, mux->events, mux->events_len, NULL);
+    if (!mux) return PPMuxErrorNull;
+
+    int num;
+    PP_IO_RETRY(num, kevent(mux->handle, NULL, 0, mux->events, mux->events_len, NULL));
+    if (num < 0) {
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait failed: errno=%d", errno);
+        return num;
+    }
+
     for (int i = 0; i < num; ++i) {
         const struct kevent *ev = mux->events + i;
         const int fd = (int)ev->ident;
@@ -138,7 +153,9 @@ bool pp_mux_wake(pp_mux mux) {
     if (!mux) return false;
     struct kevent ev;
     EV_SET(&ev, PP_MUX_WAKE_ID, EVFILT_USER, 0, NOTE_TRIGGER, 0, NULL);
-    return kevent(mux->handle, &ev, 1, NULL, 0, NULL) == 0;
+    int ret;
+    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
+    return ret == 0;
 }
 
 #elif PARTOUT_LINUX || PARTOUT_ANDROID
@@ -157,6 +174,7 @@ struct pp_mux_fd {
     int fd;
     bool read;
     bool write;
+    bool registered;
 };
 
 struct __pp_mux {
@@ -188,6 +206,7 @@ static struct pp_mux_fd *pp_mux_track_fd(pp_mux mux, int fd) {
     tracked->fd = fd;
     tracked->read = false;
     tracked->write = false;
+    tracked->registered = false;
     ++mux->fds_count;
     return tracked;
 }
@@ -201,24 +220,44 @@ static void pp_mux_untrack_fd(pp_mux mux, struct pp_mux_fd *fd) {
 }
 
 static uint32_t pp_mux_events(const struct pp_mux_fd *fd) {
-    uint32_t events = PP_MUX_ERROR_EVENTS;
+    uint32_t events = 0;
+    if (fd->read || fd->write) events |= PP_MUX_ERROR_EVENTS;
     if (fd->read) events |= EPOLLIN;
     if (fd->write) events |= EPOLLOUT;
     return events;
 }
 
-static bool pp_mux_update_fd(pp_mux mux, const struct pp_mux_fd *fd, bool add_if_missing, bool ignore_missing) {
+static bool pp_mux_sync_fd(pp_mux mux, struct pp_mux_fd *fd) {
+    const uint32_t events = pp_mux_events(fd);
+    if (events == 0) {
+        if (!fd->registered) return true;
+        const int ret = epoll_ctl(mux->handle, EPOLL_CTL_DEL, fd->fd, NULL);
+        if (ret != 0 && errno != ENOENT) return false;
+        fd->registered = false;
+        return true;
+    }
+
     struct epoll_event ev;
     pp_zero(&ev, sizeof(ev));
-    ev.events = pp_mux_events(fd);
+    ev.events = events;
     ev.data.fd = fd->fd;
 
-    const int ret = epoll_ctl(mux->handle, EPOLL_CTL_MOD, fd->fd, &ev);
-    if (ret == 0) return true;
-    if (errno == ENOENT) {
-        if (ignore_missing) return true;
-        if (add_if_missing) {
-            return epoll_ctl(mux->handle, EPOLL_CTL_ADD, fd->fd, &ev) == 0;
+    if (fd->registered) {
+        const int ret = epoll_ctl(mux->handle, EPOLL_CTL_MOD, fd->fd, &ev);
+        if (ret == 0) return true;
+        if (errno != ENOENT) return false;
+        fd->registered = false;
+    }
+
+    const int ret = epoll_ctl(mux->handle, EPOLL_CTL_ADD, fd->fd, &ev);
+    if (ret == 0) {
+        fd->registered = true;
+        return true;
+    }
+    if (errno == EEXIST) {
+        fd->registered = true;
+        if (epoll_ctl(mux->handle, EPOLL_CTL_MOD, fd->fd, &ev) == 0) {
+            return true;
         }
     }
     return false;
@@ -271,10 +310,11 @@ bool pp_mux_add(pp_mux mux, int fd) {
     const bool previous_write = tracked->write;
     tracked->read = true;
     tracked->write = false;
-    const bool ok = pp_mux_update_fd(mux, tracked, true, false);
+    const bool ok = pp_mux_sync_fd(mux, tracked);
     if (!ok) {
         tracked->read = previous_read;
         tracked->write = previous_write;
+        pp_mux_sync_fd(mux, tracked);
         mux->fds_count = previous_count;
         return false;
     }
@@ -286,11 +326,12 @@ bool pp_mux_delete(pp_mux mux, int fd) {
     struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
     if (!tracked) return true;
 
-    struct epoll_event ev;
-    pp_zero(&ev, sizeof(ev));
-    const int ret = epoll_ctl(mux->handle, EPOLL_CTL_DEL, fd, &ev);
-    if (ret != 0 && errno != ENOENT) {
-        return false;
+    if (tracked->registered) {
+        const int ret = epoll_ctl(mux->handle, EPOLL_CTL_DEL, fd, NULL);
+        if (ret != 0 && errno != ENOENT) {
+            return false;
+        }
+        tracked->registered = false;
     }
     pp_mux_untrack_fd(mux, tracked);
     return true;
@@ -304,9 +345,10 @@ bool pp_mux_set_read(pp_mux mux, int fd, bool enable) {
 
     const bool previous_read = tracked->read;
     tracked->read = enable;
-    const bool ok = pp_mux_update_fd(mux, tracked, false, !enable);
+    const bool ok = pp_mux_sync_fd(mux, tracked);
     if (!ok) {
         tracked->read = previous_read;
+        pp_mux_sync_fd(mux, tracked);
         return false;
     }
     return true;
@@ -320,9 +362,10 @@ bool pp_mux_set_write(pp_mux mux, int fd, bool enable) {
 
     const bool previous_write = tracked->write;
     tracked->write = enable;
-    const bool ok = pp_mux_update_fd(mux, tracked, false, !enable);
+    const bool ok = pp_mux_sync_fd(mux, tracked);
     if (!ok) {
         tracked->write = previous_write;
+        pp_mux_sync_fd(mux, tracked);
         return false;
     }
     return true;
@@ -341,33 +384,43 @@ void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, int fd), voi
 }
 
 int pp_mux_wait(pp_mux mux) {
-    if (!mux) return -1;
-    const int num = epoll_wait(mux->handle, mux->events, mux->events_len, -1);
+    if (!mux) return PPMuxErrorNull;
+
+    int num;
+    PP_IO_RETRY(num, epoll_wait(mux->handle, mux->events, mux->events_len, -1));
+    if (num < 0) {
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait epoll_wait() failed: errno=%d", errno);
+        return num;
+    }
+
     for (int i = 0; i < num; ++i) {
         const struct epoll_event *ev = mux->events + i;
         const int fd = ev->data.fd;
         if (fd == mux->wake_fd) {
             eventfd_t value;
             while (true) {
-                if (eventfd_read(mux->wake_fd, &value) == 0) {
-                    continue;
+                int ret;
+                /* Context: wake_fd is non-blocking */
+                PP_IO_RETRY(ret, eventfd_read(mux->wake_fd, &value));
+                if (ret < 0) {
+                    /* Fully drained */
+                    if (PP_IO_WOULDBLOCK()) break;
+                    /* Unexpected error */
+                    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait eventfd failed: errno=%d", errno);
+                    return ret;
                 }
-                if (errno == EINTR) {
-                    continue;
-                }
-                break;
             }
             continue;
         }
-        const bool failed = ev->events & (EPOLLERR | EPOLLHUP | EPOLLRDHUP);
-        const bool readable = (ev->events & EPOLLIN) || failed;
-        const bool writable = ev->events & EPOLLOUT;
-        bool did_notify_readable = false;
+        const struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
+        if (!tracked) continue;
+        const bool failed = ev->events & PP_MUX_ERROR_EVENTS;
+        const bool readable = tracked->read && ((ev->events & EPOLLIN) || failed);
+        const bool writable = tracked->write && ((ev->events & EPOLLOUT) || failed);
         if (readable && mux->on_readable) {
             mux->on_readable(mux->read_ctx, fd);
-            did_notify_readable = true;
         }
-        if ((writable || (!did_notify_readable && failed)) && mux->on_writable) {
+        if (writable && mux->on_writable) {
             mux->on_writable(mux->write_ctx, fd);
         }
     }
@@ -376,7 +429,9 @@ int pp_mux_wait(pp_mux mux) {
 
 bool pp_mux_wake(pp_mux mux) {
     if (!mux) return false;
-    if (eventfd_write(mux->wake_fd, 1) == 0) return true;
+    int ret;
+    PP_IO_RETRY(ret, eventfd_write(mux->wake_fd, 1));
+    if (ret == 0) return true;
     return errno == EAGAIN;
 }
 #endif

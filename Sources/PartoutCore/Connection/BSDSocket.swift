@@ -271,7 +271,7 @@ private extension BSDSocket {
                 let readCount = pp_socket_read(socketHandle.sock, buffer, maxReadLength)
 
                 // Would-block is expected while draining, but not as the first read after readiness.
-                guard readCount != PP_SOCKET_WOULD_BLOCK else {
+                guard readCount != PPIOErrorWouldBlock else {
                     if packets.isEmpty {
                         terminate(with: socketHandle.preferredError())
                         return
@@ -324,7 +324,7 @@ private extension BSDSocket {
                         return Int(pp_socket_write(socketHandle.sock, baseAddress, packet.count))
                     }
                     // Non-blocking write
-                    guard writtenCount != PP_SOCKET_WOULD_BLOCK else {
+                    guard writtenCount != PPIOErrorWouldBlock else {
                         if socketHandle.isStopping {
                             let error = socketHandle.preferredError()
                             request.continuation.resume(throwing: error)

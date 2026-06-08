@@ -5,13 +5,18 @@
  */
 
 #include <stdarg.h>
+#include <errno.h>
 #include "portable/common.h"
+
+const int PPIOErrorWouldBlock   = -11;
+const int PPIOErrorNoBufs       = -12;
 
 pp_log_category PPLogCategoryCore = "core";
 
 void pp_clog_v(pp_log_category category,
                pp_log_level level,
                const char *fmt, ...) {
+    const int saved_errno = errno;
     va_list args;
     va_start(args, fmt);
     // Add 1 to include the null terminator
@@ -21,6 +26,7 @@ void pp_clog_v(pp_log_category category,
     va_end(args);
     pp_clog(category, level, msg);
     pp_free(msg);
+    errno = saved_errno;
 }
 
 #if PARTOUT_ANDROID

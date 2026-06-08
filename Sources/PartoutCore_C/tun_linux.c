@@ -40,7 +40,7 @@ pp_tun pp_tun_open(const char *uuid) {
     /* Open the tun device for writing. Requires kernel support
      * but it's quite ubiquitous. Path is also expected to be
      * consistent across distros for coming from the kernel. */
-    fd = open(dev_path, O_RDWR);
+    PP_IO_RETRY(fd, open(dev_path, O_RDWR));
     if (fd < 0) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_linux: create(), open(tun)");
         goto failure;
@@ -49,7 +49,9 @@ pp_tun pp_tun_open(const char *uuid) {
     /* Leave ifr.ifr_name empty to let the kernel retrieve
      * the first available device number */
     ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
-    if (ioctl(fd, TUNSETIFF, (void *)&ifr) < 0) {
+    int ret;
+    PP_IO_RETRY(ret, ioctl(fd, TUNSETIFF, (void *)&ifr));
+    if (ret < 0) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_linux: create(), ioctl(TUNSETIFF)");
         goto failure;
     }
@@ -78,25 +80,16 @@ void pp_tun_free_and_close(pp_tun tun, bool and_close) {
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     if (!tun || tun->fd < 0) return -1;
-    const int ret = read(tun->fd, dst, dst_len);
-    if (ret < 0 && pp_tun_would_block()) {
-        return PP_TUN_WOULD_BLOCK;
-    }
-    return ret;
+    int ret;
+    PP_IO_RETRY(ret, read(tun->fd, dst, dst_len));
+    return pp_tun_handle_result(ret);
 }
 
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     if (!tun || tun->fd < 0) return -1;
-    const int ret = write(tun->fd, src, src_len);
-    if (ret < 0) {
-        if (pp_tun_would_block()) {
-            return PP_TUN_WOULD_BLOCK;
-        }
-        if (pp_tun_nobufs()) {
-            return PP_TUN_NO_BUF;
-        }
-    }
-    return ret;
+    int ret;
+    PP_IO_RETRY(ret, write(tun->fd, src, src_len));
+    return pp_tun_handle_result(ret);
 }
 
 void pp_tun_shutdown(const pp_tun tun) {
