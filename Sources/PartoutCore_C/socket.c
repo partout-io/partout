@@ -413,7 +413,8 @@ int local_connect_with_timeout(os_socket_fd fd,
     }
 
     // At this point, this call will not block
-    int ret = connect(fd, addr, addrlen);
+    int ret;
+    PP_IO_RETRY(ret, connect(fd, addr, addrlen));
     if (ret == 0) {
         // Connected immediately
         goto done;

@@ -60,7 +60,9 @@ pp_tun pp_tun_open(const char *uuid) {
     sc.sc_family = AF_SYSTEM;
     sc.ss_sysaddr = AF_SYS_CONTROL;
     sc.sc_unit = 0;  // First free utunX
-    if (connect(fd, (struct sockaddr *)&sc, sizeof(sc)) == -1) {
+    int ret;
+    PP_IO_RETRY(ret, connect(fd, (struct sockaddr *)&sc, sizeof(sc)));
+    if (ret < 0) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: connect(AF_SYSTEM, AF_SYS_CONTROL)");
         goto failure;
     }

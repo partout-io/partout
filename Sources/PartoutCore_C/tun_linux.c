@@ -40,7 +40,7 @@ pp_tun pp_tun_open(const char *uuid) {
     /* Open the tun device for writing. Requires kernel support
      * but it's quite ubiquitous. Path is also expected to be
      * consistent across distros for coming from the kernel. */
-    fd = open(dev_path, O_RDWR);
+    PP_IO_RETRY(fd, open(dev_path, O_RDWR));
     if (fd < 0) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_linux: create(), open(tun)");
         goto failure;
