@@ -12,7 +12,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 
 #pragma clang assume_nonnull begin
 
@@ -105,15 +104,27 @@ FILE *_Nullable pp_fopen(const char *filename, const char *mode) {
 #define pp_sscanf sscanf
 #endif
 
+#pragma clang assume_nonnull end
+
 /* Syscalls. */
+
+#if PARTOUT_WINDOWS
+#include <ws2tcpip.h>
+#define PP_IO_RETRY(result, fn) \
+    do { \
+        do { \
+            (result) = (fn); \
+        } while ((result) < 0 && WSAGetLastError() == WSAEINTR); \
+    } while (0)
+#else
+#include <errno.h>
 #define PP_IO_RETRY(result, fn) \
     do { \
         do { \
             (result) = (fn); \
         } while ((result) < 0 && errno == EINTR); \
     } while (0)
-
-#pragma clang assume_nonnull end
+#endif
 
 /* Android only. */
 
