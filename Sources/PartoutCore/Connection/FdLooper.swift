@@ -701,7 +701,7 @@ private extension FdLooper {
                 results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
                 break
             }
-            let linkFd = dup(Int32(fd))
+            let linkFd = Int32(fd)
             guard linkFd >= 0 else {
                 pp_log(ctx, .core, .fault, "Unable to dup link fd")
                 results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable, fd))))
@@ -709,7 +709,6 @@ private extension FdLooper {
             }
             guard pp_mux_add(mux, linkFd) else {
                 pp_log(ctx, .core, .fault, "Unable to attach link")
-                close(linkFd)
                 results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
                 break
             }
@@ -738,7 +737,7 @@ private extension FdLooper {
                 results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
                 break
             }
-            let tunFd = dup(Int32(fd))
+            let tunFd = Int32(fd)
             guard tunFd >= 0 else {
                 pp_log(ctx, .core, .fault, "Unable to dup tun fd")
                 results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable, fd))))
@@ -746,7 +745,6 @@ private extension FdLooper {
             }
             guard pp_mux_add(mux, tunFd) else {
                 pp_log(ctx, .core, .fault, "Unable to attach tun")
-                close(tunFd)
                 results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
                 break
             }
@@ -1049,7 +1047,7 @@ private extension FdLooper.SideIO {
         readBufSize: Int,
         arguments: FdLooper.AttachArguments
     ) {
-        let tunHandle = pp_tun_create(tunFd)
+        let tunHandle = pp_tun_retain(tunFd)
         self.init(
             side: .tun,
             fd: tunFd,
@@ -1089,7 +1087,7 @@ private extension FdLooper.SideIO {
             },
             cleanup: {
                 pp_mux_delete(mux, tunFd)
-                pp_tun_free(tunHandle)
+                pp_tun_release(tunHandle)
             }
         )
     }

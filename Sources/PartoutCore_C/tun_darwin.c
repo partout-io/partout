@@ -24,7 +24,7 @@ struct __pp_tun_struct {
     const char *dev_name;
 };
 
-pp_tun pp_tun_create(int fd) {
+pp_tun pp_tun_retain(int fd) {
     pp_tun tun = pp_alloc(sizeof(*tun));
     tun->fd = fd;
     return tun;
