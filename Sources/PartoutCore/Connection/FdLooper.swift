@@ -199,9 +199,11 @@ public final class FdLooper: @unchecked Sendable {
         lock.lock()
         guard state != .idle else {
             // Never started
+            lock.unlock()
             return
         }
         guard state == .started else {
+            lock.unlock()
             assertionFailure("Stopping twice?")
             return
         }
