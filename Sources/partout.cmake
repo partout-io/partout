@@ -44,10 +44,7 @@ set(PARTOUT_SOURCES
 ./Partout/Serialization/CodingRegistry.swift
 ./Partout/Serialization/LegacyProfileEncoderV2.swift
 ./Partout/Serialization/ProfileEncoderV3.swift
-./Partout/VirtualTunnelInterface.swift
-./PartoutCore/Connection/BSDSocket.swift
-./PartoutCore/Connection/BSDSocketFactory.swift
-./PartoutCore/Connection/BSDSocketObserver.swift
+./Partout/TunWrapper.swift
 ./PartoutCore/Connection/BetterPathStreamFactory.swift
 ./PartoutCore/Connection/Connection.swift
 ./PartoutCore/Connection/ConnectionDaemon.swift
@@ -62,6 +59,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/IOInterface.swift
 ./PartoutCore/Connection/LinkInterface.swift
 ./PartoutCore/Connection/LinkObserver.swift
+./PartoutCore/Connection/NativeSocketFactory.swift
 ./PartoutCore/Connection/NetworkInterfaceFactory.swift
 ./PartoutCore/Connection/NetworkObserver.swift
 ./PartoutCore/Connection/POSIXDNSStrategy.swift
@@ -71,8 +69,6 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/SimpleConnectionDaemon.swift
 ./PartoutCore/Connection/SimpleDNSResolver.swift
 ./PartoutCore/Connection/SocketConfigurator.swift
-./PartoutCore/Connection/SocketHandle.swift
-./PartoutCore/Connection/SocketIOInterface.swift
 ./PartoutCore/Connection/StaticTunnelEnvironment.swift
 ./PartoutCore/Connection/TunnelController.swift
 ./PartoutCore/Connection/TunnelEnvironment.swift
