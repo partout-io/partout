@@ -115,7 +115,16 @@ void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, int fd), voi
 
 int pp_mux_wait(pp_mux mux) {
     if (!mux) return -1;
-    const int num = kevent(mux->handle, NULL, 0, mux->events, mux->events_len, NULL);
+
+    int num;
+    do {
+        num = kevent(mux->handle, NULL, 0, mux->events, mux->events_len, NULL);
+    } while (num < 0 && errno == EINTR);
+    if (num < 0) {
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait failed: errno=%d\n", errno);
+        return num;
+    }
+
     for (int i = 0; i < num; ++i) {
         const struct kevent *ev = mux->events + i;
         const int fd = (int)ev->ident;
@@ -342,19 +351,24 @@ void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, int fd), voi
 
 int pp_mux_wait(pp_mux mux) {
     if (!mux) return -1;
-    const int num = epoll_wait(mux->handle, mux->events, mux->events_len, -1);
+
+    int num;
+    do {
+        num = epoll_wait(mux->handle, mux->events, mux->events_len, -1);
+    } while (num < 0 && errno == EINTR);
+    if (num < 0) {
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait failed: errno=%d\n", errno);
+        return num;
+    }
+
     for (int i = 0; i < num; ++i) {
         const struct epoll_event *ev = mux->events + i;
         const int fd = ev->data.fd;
         if (fd == mux->wake_fd) {
             eventfd_t value;
             while (true) {
-                if (eventfd_read(mux->wake_fd, &value) == 0) {
-                    continue;
-                }
-                if (errno == EINTR) {
-                    continue;
-                }
+                if (eventfd_read(mux->wake_fd, &value) == 0) continue;
+                if (errno == EINTR) continue;
                 break;
             }
             continue;
