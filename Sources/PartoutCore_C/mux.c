@@ -127,7 +127,7 @@ int pp_mux_wait(pp_mux mux) {
     int num;
     PP_IO_RETRY(num, kevent(mux->handle, NULL, 0, mux->events, mux->events_len, NULL));
     if (num < 0) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait failed: errno=%d", errno);
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait kevent() failed: errno=%d", errno);
         return num;
     }
 
@@ -406,7 +406,7 @@ int pp_mux_wait(pp_mux mux) {
                     /* Fully drained */
                     if (PP_IO_WOULDBLOCK()) break;
                     /* Unexpected error */
-                    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait eventfd failed: errno=%d", errno);
+                    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait eventfd_read() failed: errno=%d", errno);
                     return ret;
                 }
             }
