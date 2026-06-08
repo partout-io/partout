@@ -93,9 +93,9 @@ extension _OpenVPNConnectionV3: Connection {
     @discardableResult
     public func start() async throws -> Bool {
         do {
-            if currentSession == nil {
-                currentSession = try sessionFactory()
-            }
+            await currentSession?.shutdown(nil)
+            currentSession = nil
+            currentSession = try sessionFactory()
             guard let session = currentSession else {
                 fatalError("No session from factory?")
             }
