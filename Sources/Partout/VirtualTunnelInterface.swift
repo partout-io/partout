@@ -214,7 +214,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         activeLock.unlock()
         guard shouldShutdown else { return }
         pp_log(ctx, .core, .info, "Shut down TUN")
-        pp_tun_shutdown(tun)
+        pp_tun_close(tun)
 
         // Wait for shutdown
         await readQueue.waitUntilIdle()

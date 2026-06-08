@@ -56,7 +56,7 @@ static inline int pp_tun_handle_result(int ret) {
 pp_tun _Nullable pp_tun_open(const char *uuid);
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len);
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len);
-void pp_tun_shutdown(const pp_tun tun);
+void pp_tun_close(const pp_tun tun);
 void pp_tun_free_and_close(pp_tun tun, bool and_close);
 
 static inline void pp_tun_release(pp_tun tun) {
