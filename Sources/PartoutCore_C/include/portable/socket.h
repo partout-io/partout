@@ -38,9 +38,7 @@ static inline void pp_socket_free(pp_socket sock) {
     pp_socket_free_and_close(sock, true);
 }
 
-/* Create a socket wrapper from an already open native descriptor. The
- * wrapper acquires ownership and will close the descriptor on
- * pp_socket_close() or pp_socket_free(). */
+/* Create a socket wrapper from an already open native descriptor. */
 pp_socket pp_socket_retain(uint64_t fd);
 static inline void pp_socket_release(pp_socket sock) {
     pp_socket_free_and_close(sock, false);
