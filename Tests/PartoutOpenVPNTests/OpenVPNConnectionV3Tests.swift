@@ -405,15 +405,13 @@ private final class MockOpenVPNSession: OpenVPNSessionProtocolV3, @unchecked Sen
         self.delegate = delegate
     }
 
-    func setLink(_ link: LinkInterface) async throws {
+    func setLink(_ link: LinkInterface, to remoteEndpoint: ExtendedEndpoint) async throws {
         do {
             try onSetLink()
             delegate?.sessionDidStart(
                 self,
-                remoteAddress: "100.200.100.200",
-                remoteProtocol: .init(.udp, 1234),
-                remoteOptions: options,
-                remoteFd: nil
+                remoteEndpoint: remoteEndpoint,
+                remoteOptions: options
             )
             onConnected()
         } catch {

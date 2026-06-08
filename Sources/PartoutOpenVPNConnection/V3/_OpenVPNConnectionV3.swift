@@ -115,7 +115,8 @@ extension _OpenVPNConnectionV3: Connection {
         do {
             sendStatus(.connecting)
             let newLink = try await setupLink(upgradingCurrent: false)
-            try await session.setLink(newLink)
+            let remoteEndpoint = try newLink.remoteEndpoint()
+            try await session.setLink(newLink, to: remoteEndpoint)
             observeBetterPath(on: newLink)
             return true
         } catch {
@@ -166,17 +167,13 @@ extension _OpenVPNConnectionV3: Connection {
 extension _OpenVPNConnectionV3: OpenVPNSessionDelegateV3 {
     nonisolated func sessionDidStart(
         _ session: OpenVPNSessionProtocolV3,
-        remoteAddress: String,
-        remoteProtocol: EndpointProtocol,
-        remoteOptions: OpenVPN.Configuration,
-        remoteFd: FileDescriptor?
+        remoteEndpoint: ExtendedEndpoint,
+        remoteOptions: OpenVPN.Configuration
     ) {
         delegateSubject.send(.didStart(
             session,
-            remoteAddress: remoteAddress,
-            remoteProtocol: remoteProtocol,
-            remoteOptions: remoteOptions,
-            remoteFd: remoteFd
+            remoteEndpoint: remoteEndpoint,
+            remoteOptions: remoteOptions
         ))
     }
 
@@ -199,10 +196,8 @@ private extension _OpenVPNConnectionV3 {
     enum DelegateEvent: Sendable {
         case didStart(
             _ session: OpenVPNSessionProtocolV3,
-            remoteAddress: String,
-            remoteProtocol: EndpointProtocol,
-            remoteOptions: OpenVPN.Configuration,
-            remoteFd: FileDescriptor?
+            remoteEndpoint: ExtendedEndpoint,
+            remoteOptions: OpenVPN.Configuration
         )
         case didStop(
             _ session: OpenVPNSessionProtocolV3,
@@ -215,7 +210,7 @@ private extension _OpenVPNConnectionV3 {
 
         var session: OpenVPNSessionProtocolV3 {
             switch self {
-            case .didStart(let session, _, _, _, _): session
+            case .didStart(let session, _, _): session
             case .didStop(let session, _): session
             case .didUpdateDataCount(let session, _): session
             }
@@ -240,19 +235,12 @@ private extension _OpenVPNConnectionV3 {
         switch event {
         case .didStart(
             let session,
-            let remoteAddress,
-            let remoteProtocol,
-            let remoteOptions,
-            _ // remoteFd
+            let remoteEndpoint,
+            let remoteOptions
         ):
-            let addressObject = Address(rawValue: remoteAddress)
-            if addressObject == nil {
-                pp_log(ctx, .openvpn, .error, "Unable to parse remote tunnel address")
-            }
-
             pp_log(ctx, .openvpn, .notice, "Session did start")
-            pp_log(ctx, .openvpn, .info, "\tAddress: \(remoteAddress.asSensitiveAddress(ctx))")
-            pp_log(ctx, .openvpn, .info, "\tProtocol: \(remoteProtocol)")
+            pp_log(ctx, .openvpn, .info, "\tEndpoint: \(remoteEndpoint.address.asSensitiveAddress(ctx))")
+            pp_log(ctx, .openvpn, .info, "\tProtocol: \(remoteEndpoint.proto)")
 
             pp_log(ctx, .openvpn, .notice, "Local options:")
             configuration.print(ctx, isLocal: true)
@@ -271,7 +259,7 @@ private extension _OpenVPNConnectionV3 {
                 let tunnelInterface = try await controller.setTunnelSettings(
                     with: TunnelRemoteInfo(
                         originalModuleId: moduleId,
-                        address: addressObject,
+                        address: remoteEndpoint.address,
                         modules: builder.modules(),
                         requiresVirtualDevice: true
                     )

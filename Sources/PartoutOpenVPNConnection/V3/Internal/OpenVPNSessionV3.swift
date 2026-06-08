@@ -102,13 +102,19 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
         }
     }
 
-    func setLink(_ link: LinkInterface) async throws {
+    func setLink(_ link: LinkInterface, to remoteEndpoint: ExtendedEndpoint) async throws {
         guard !looper.isLinkAttached else {
             pp_log(ctx, .openvpn, .error, "Link interface already set")
             return
         }
+        guard let fd = link.fileDescriptor else {
+            fatalError("Link has no file descriptor")
+        }
+
+        pp_log(ctx, .openvpn, .info, "Attach LINK")
+        let isTCP = remoteEndpoint.plainSocketType == .tcp
         let proc = PacketProcessor(method: configuration.xorMethod)
-        let rw = LinkProcessor(proc: proc, isTCP: link.isReliable)
+        let rw = LinkProcessor(proc: proc, isTCP: isTCP)
         guard let fd = link.fileDescriptor else {
             fatalError("Link has no file descriptor")
         }
@@ -118,7 +124,7 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             try await looper.attach(.init(
                 side: .link,
                 fd: fd,
-                closesOnEmptyRead: link.isReliable,
+                closesOnEmptyRead: isTCP,
                 transformWrite: rw.beforeWrite,
                 onRead: { [weak self] packets in
                     let processed = try rw.beforeRead(packets)
@@ -133,7 +139,7 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             ))
             didAttach = true
             try await looper.perform { [weak self] in
-                try self?.setLinkOnQueue(link)
+                try self?.setLinkOnQueue(link, to: remoteEndpoint)
             }
         } catch {
             if didAttach {
@@ -156,7 +162,7 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             fatalError("Tunnel has no file descriptor")
         }
 
-        pp_log(ctx, .openvpn, .info, "Start TUN loop")
+        pp_log(ctx, .openvpn, .info, "Attach TUN")
         try await looper.attach(.init(
             side: .tun,
             fd: fd,
@@ -200,7 +206,7 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
 // MARK: Performed on queue
 
 private extension OpenVPNSessionV3 {
-    func setLinkOnQueue(_ link: LinkInterface) throws {
+    func setLinkOnQueue(_ link: LinkInterface, to remoteEndpoint: ExtendedEndpoint) throws {
         preconditionOnQueue()
         guard let idleContext else {
             pp_log(ctx, .openvpn, .error, "Session is not stopped")
@@ -224,10 +230,10 @@ private extension OpenVPNSessionV3 {
             ctx: ctx,
             dataLink: dataLink,
             withLocalOptions: idleContext.withLocalOptions,
-            linkMetadata: link.metadata
+            remoteEndpoint: remoteEndpoint
         ))
         do {
-            try startNegotiation(on: looper, linkMetadata: link.metadata)
+            try startNegotiation(on: looper, remoteEndpoint: remoteEndpoint)
         } catch {
             withActiveContext { context in
                 context.reset()
@@ -296,7 +302,8 @@ private extension OpenVPNSessionV3 {
     func sendExitPacketOnQueue(timeout: TimeInterval) throws {
         preconditionOnQueue()
         try withActiveContext { context in
-            guard !context.linkMetadata.isReliable, let dataPair = context.currentDataPair else {
+            let proto = context.remoteEndpoint.plainSocketType
+            guard proto == .udp, let dataPair = context.currentDataPair else {
                 return
             }
             pp_log(ctx, .openvpn, .info, "Send OCCPacket exit")
@@ -321,7 +328,7 @@ extension OpenVPNSessionV3 {
         activeContext?.currentDataPair
     }
 
-    func newNegotiator(on looper: FdLooper, linkMetadata: LinkMetadata) throws -> NegotiatorV3 {
+    func newNegotiator(on looper: FdLooper, remoteEndpoint: ExtendedEndpoint) throws -> NegotiatorV3 {
         guard let activeContext else {
             throw OpenVPNSessionError.assertion
         }
@@ -356,7 +363,7 @@ extension OpenVPNSessionV3 {
         return NegotiatorV3(
             ctx,
             looper: looper,
-            linkMetadata: linkMetadata,
+            remoteEndpoint: remoteEndpoint,
             channel: controlChannel,
             prng: prng,
             tls: tls,
@@ -376,7 +383,7 @@ extension OpenVPNSessionV3 {
         dataChannel: DataChannel,
         pushReply: PushReply
     ) {
-        let didStart = withActiveContext { phase, context -> (LinkMetadata, OpenVPN.Configuration)? in
+        let didStart = withActiveContext { phase, context -> (ExtendedEndpoint, OpenVPN.Configuration)? in
             pp_log(ctx, .openvpn, .info, "Negotiation succeeded, set key \(key) as current")
             context.pushReply = pushReply
 
@@ -396,17 +403,15 @@ extension OpenVPNSessionV3 {
 
             phase = .started
             scheduleNextPing(in: &context)
-            return (context.linkMetadata, pushReply.options)
+            return (context.remoteEndpoint, pushReply.options)
         } ?? nil
-        guard let (linkMetadata, pushReplyOptions) = didStart else {
+        guard let (remoteEndpoint, pushReplyOptions) = didStart else {
             return
         }
         delegate?.sessionDidStart(
             self,
-            remoteAddress: linkMetadata.remoteAddress,
-            remoteProtocol: linkMetadata.remoteProtocol,
-            remoteOptions: pushReplyOptions,
-            remoteFd: linkMetadata.fileDescriptor
+            remoteEndpoint: remoteEndpoint,
+            remoteOptions: pushReplyOptions
         )
     }
 
