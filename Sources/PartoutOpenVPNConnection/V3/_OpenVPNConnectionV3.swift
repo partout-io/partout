@@ -227,16 +227,16 @@ private extension _OpenVPNConnectionV3 {
         let stream = delegateSubject.subscribe()
         delegateTask = Task { [weak self] in
             for await event in stream {
-                guard event.session === currentSession else {
-                    pp_log(ctx, .openvpn, .info, "Ignoring delegate event from old session")
-                    continue
-                }
                 await self?.handleDelegate(event)
             }
         }
     }
 
     func handleDelegate(_ event: DelegateEvent) async {
+        guard event.session === currentSession else {
+            pp_log(ctx, .openvpn, .info, "Ignoring delegate event from old session")
+            return
+        }
         switch event {
         case .didStart(
             let session,
