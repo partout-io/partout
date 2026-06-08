@@ -92,14 +92,18 @@ extension _OpenVPNConnectionV3: Connection {
 
     @discardableResult
     public func start() async throws -> Bool {
+        // Subscribe once
+        subscribeToDelegateOnce()
+
+        // Shut down current session and discard further events
+        if let currentSession {
+            await currentSession.shutdown(nil)
+            self.currentSession = nil
+        }
+
+        // Do not catch constructor failures
+        let session = try sessionFactory()
         do {
-            await currentSession?.shutdown(nil)
-            currentSession = nil
-            currentSession = try sessionFactory()
-            guard let session = currentSession else {
-                fatalError("No session from factory?")
-            }
-            subscribeToDelegate()
             session.setDelegate(self)
             guard status == .disconnected else {
                 pp_log(ctx, .openvpn, .error, "Ignore start, connection status \(status) != .disconnected")
@@ -116,13 +120,13 @@ extension _OpenVPNConnectionV3: Connection {
                 throw error
             }
         } catch let error as PartoutError {
-            await currentSession?.shutdown(error)
+            await session.shutdown(error)
             if error.code == .exhaustedEndpoints, let reason = error.reason {
                 throw reason
             }
             throw error
         } catch {
-            await currentSession?.shutdown(error)
+            await session.shutdown(error)
             throw error
         }
     }
@@ -218,7 +222,7 @@ private extension _OpenVPNConnectionV3 {
         }
     }
 
-    func subscribeToDelegate() {
+    func subscribeToDelegateOnce() {
         guard delegateTask == nil else { return }
         let stream = delegateSubject.subscribe()
         delegateTask = Task { [weak self] in
