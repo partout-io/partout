@@ -4,5 +4,5 @@
 
 /// An ``IOInterface`` suitable for representing a socket.
 public protocol SocketIOInterface: IOInterface {
-    func shutdown() async
+    func close() async
 }

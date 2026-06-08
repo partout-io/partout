@@ -99,7 +99,7 @@ extension NETCPSocket {
         )
     }
 
-    nonisolated func shutdown() {
+    nonisolated func close() {
         nwConnection.writeClose()
         nwConnection.cancel()
     }

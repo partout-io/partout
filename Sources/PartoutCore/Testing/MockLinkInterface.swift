@@ -28,9 +28,6 @@ public final class MockLinkObserver: LinkObserver {
         linkBlock(newLink)
         return newLink
     }
-
-    public func shutdown() {
-    }
 }
 
 public final class MockLinkInterface: LinkInterface {
@@ -53,13 +50,13 @@ public final class MockLinkInterface: LinkInterface {
         self
     }
 
-    public func shutdown() {
-    }
-
     public func readPackets() async throws -> [Data] {
         []
     }
 
     public func writePackets(_ packets: [Data]) async throws {
+    }
+
+    public func close() {
     }
 }

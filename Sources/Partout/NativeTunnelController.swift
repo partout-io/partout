@@ -144,16 +144,14 @@ public final class NativeTunnelController: TunnelController, Sendable {
     }
 
     public func clearTunnelSettings(_ io: IOInterface, withKillSwitch: Bool) async {
-        guard let tunnel = io as? VirtualTunnelInterface else {
-            assertionFailure("Expected type is VirtualTunnelInterface")
-            return
-        }
         // FIXME: #188, revert settings (record)
-//        tun.deviceName
+        if let tunnel = io as? VirtualTunnelInterface {
+//            tun.deviceName
 
-        // Make sure to issue the tunnel shutdown and wait for it to
-        // finish to prevent races on VirtualTunnelInterface.deinit
-        await tunnel.shutdown()
+            // Make sure to close the tun device and wait for it to
+            // finish to prevent races on VirtualTunnelInterface.deinit
+            await tunnel.close()
+        }
 
         // Wrap up clear in native layer
         pp_tun_ctrl_clear_tunnel(ref, withKillSwitch)

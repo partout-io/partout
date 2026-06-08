@@ -120,7 +120,7 @@ extension NEUDPSocket {
         )
     }
 
-    nonisolated func shutdown() {
+    nonisolated func close() {
         nwSession.cancel()
     }
 }

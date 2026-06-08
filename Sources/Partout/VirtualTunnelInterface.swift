@@ -76,7 +76,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     deinit {
         pp_log(ctx, .core, .debug, "Deinit VirtualTunnelInterface")
 
-        // WARNING: Must wait for shutdown() before deinit
+        // WARNING: Must wait for close() before deinit
         pp_tun_free(tun)
     }
 
@@ -120,7 +120,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                 throw PartoutError(.tunNotActive)
             }
             pp_log(ctx, .core, .fault, "Unable to read TUN packets: \(error)")
-            await shutdown()
+            await close()
             throw error
         }
     }
@@ -191,7 +191,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
                 throw PartoutError(.tunNotActive)
             }
             pp_log(ctx, .core, .fault, "Unable to write TUN packets: \(error)")
-            await shutdown()
+            await close()
             throw error
         }
     }
@@ -206,17 +206,17 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         try await Task.sleep(milliseconds: nonBlockingBackoff)
     }
 
-    func shutdown() async {
+    func close() async {
         let shouldShutdown: Bool
         activeLock.lock()
         shouldShutdown = _isActive
         _isActive = false
         activeLock.unlock()
         guard shouldShutdown else { return }
-        pp_log(ctx, .core, .info, "Shut down TUN")
+        pp_log(ctx, .core, .info, "Close TUN")
         pp_tun_close(tun)
 
-        // Wait for shutdown
+        // Wait for close
         await readQueue.waitUntilIdle()
         await writeQueue.waitUntilIdle()
     }

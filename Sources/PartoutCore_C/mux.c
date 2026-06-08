@@ -121,13 +121,14 @@ void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, int fd), voi
     mux->write_ctx = ctx;
 }
 
-int pp_mux_wait(pp_mux mux) {
+int pp_mux_wait(pp_mux mux, int *error_code) {
     if (!mux) return PPMuxErrorNull;
 
     int num;
     PP_IO_RETRY(num, kevent(mux->handle, NULL, 0, mux->events, mux->events_len, NULL));
     if (num < 0) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait failed: errno=%d", errno);
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait kevent() failed: errno=%d", errno);
+        if (error_code) *error_code = errno;
         return num;
     }
 
@@ -383,13 +384,14 @@ void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, int fd), voi
     mux->write_ctx = ctx;
 }
 
-int pp_mux_wait(pp_mux mux) {
+int pp_mux_wait(pp_mux mux, int *error_code) {
     if (!mux) return PPMuxErrorNull;
 
     int num;
     PP_IO_RETRY(num, epoll_wait(mux->handle, mux->events, mux->events_len, -1));
     if (num < 0) {
         pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait epoll_wait() failed: errno=%d", errno);
+        if (error_code) *error_code = errno;
         return num;
     }
 
@@ -406,7 +408,7 @@ int pp_mux_wait(pp_mux mux) {
                     /* Fully drained */
                     if (PP_IO_WOULDBLOCK()) break;
                     /* Unexpected error */
-                    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait eventfd failed: errno=%d", errno);
+                    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait eventfd_read() failed: errno=%d", errno);
                     return ret;
                 }
             }
