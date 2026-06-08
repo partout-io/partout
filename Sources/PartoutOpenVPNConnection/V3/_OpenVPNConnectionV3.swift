@@ -208,6 +208,14 @@ private extension _OpenVPNConnectionV3 {
             _ session: OpenVPNSessionProtocolV3,
             dataCount: DataCount
         )
+
+        var session: OpenVPNSessionProtocolV3 {
+            switch self {
+            case .didStart(let session, _, _, _, _): session
+            case .didStop(let session, _): session
+            case .didUpdateDataCount(let session, _): session
+            }
+        }
     }
 
     func subscribeToDelegate() {
@@ -215,6 +223,10 @@ private extension _OpenVPNConnectionV3 {
         let stream = delegateSubject.subscribe()
         delegateTask = Task { [weak self] in
             for await event in stream {
+                guard event.session === currentSession else {
+                    pp_log(ctx, .openvpn, .info, "Ignoring delegate event from old session")
+                    continue
+                }
                 await self?.handleDelegate(event)
             }
         }
