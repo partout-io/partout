@@ -168,7 +168,7 @@ public final class BSDSocket: LinkInterface, SocketIOInterface, @unchecked Senda
         )
     }
 
-    public nonisolated func shutdown() {
+    public nonisolated func close() {
         terminate(with: PartoutError(.linkNotActive))
     }
 }

@@ -76,7 +76,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
     deinit {
         pp_log(ctx, .core, .debug, "Deinit VirtualTunnelInterface")
 
-        // WARNING: Must wait for shutdown() before deinit
+        // WARNING: Must wait for close() before deinit
         pp_tun_free(tun)
     }
 
@@ -216,7 +216,7 @@ final class VirtualTunnelInterface: SocketIOInterface, @unchecked Sendable {
         pp_log(ctx, .core, .info, "Close TUN")
         pp_tun_close(tun)
 
-        // Wait for shutdown
+        // Wait for close
         await readQueue.waitUntilIdle()
         await writeQueue.waitUntilIdle()
     }

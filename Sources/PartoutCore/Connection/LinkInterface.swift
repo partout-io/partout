@@ -20,7 +20,7 @@ public protocol LinkInterface: IOInterface {
     nonisolated func upgraded() async throws -> LinkInterface
 
     /// Shuts down the link.
-    nonisolated func shutdown()
+    nonisolated func close()
 }
 
 /// Metadata associated with a ``LinkInterface``.

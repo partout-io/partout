@@ -50,8 +50,8 @@ extension OpenVPNTCPLink: LinkInterface {
         OpenVPNTCPLink(link: try await link.upgraded(), proc: proc)
     }
 
-    func shutdown() {
-        link.shutdown()
+    func close() {
+        link.close()
     }
 }
 

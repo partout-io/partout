@@ -238,7 +238,7 @@ private extension OpenVPNSession {
     }
 
     func cleanup() async {
-        link?.shutdown()
+        link?.close()
         for neg in negotiators.values {
             neg.cancel()
         }
