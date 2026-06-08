@@ -125,7 +125,7 @@ static inline bool PP_IO_INTR(void) {
     return WSAGetLastError() == WSAEINTR;
 }
 
-static inline bool PP_IO_WOULD_BLOCK(void) {
+static inline bool PP_IO_WOULDBLOCK(void) {
     return WSAGetLastError() == WSAEWOULDBLOCK;
 }
 
@@ -147,7 +147,7 @@ static inline bool PP_IO_INTR(void) {
     return errno == EINTR;
 }
 
-static inline bool PP_IO_WOULD_BLOCK(void) {
+static inline bool PP_IO_WOULDBLOCK(void) {
     return errno == EAGAIN || errno == EWOULDBLOCK;
 }
 

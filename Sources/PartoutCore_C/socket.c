@@ -231,7 +231,7 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
              * for a message to arrive, unless the socket is nonblocking (see fcntl(2))
              * in which case the value -1 is returned and the external variable errno
              * set to EAGAIN. */
-            if (PP_IO_WOULD_BLOCK()) {
+            if (PP_IO_WOULDBLOCK()) {
                 return PPIOErrorWouldBlock;
             }
             local_print_error("recv()");
@@ -258,7 +258,7 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
             if (PP_IO_INTR()) {
                 continue;
             }
-            if (PP_IO_WOULD_BLOCK()) {
+            if (PP_IO_WOULDBLOCK()) {
                 return offset > 0 ? (int)offset : PPIOErrorWouldBlock;
             }
             if (PP_IO_NOBUFS()) {

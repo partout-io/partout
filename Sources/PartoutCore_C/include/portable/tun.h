@@ -41,7 +41,7 @@ pp_tun pp_tun_create(int fd);
 
 static inline int pp_tun_handle_result(int ret) {
     if (ret < 0) {
-        if (PP_IO_WOULD_BLOCK()) {
+        if (PP_IO_WOULDBLOCK()) {
             return PPIOErrorWouldBlock;
         }
         if (PP_IO_NOBUFS()) {
