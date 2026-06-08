@@ -109,12 +109,16 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
         }
         let proc = PacketProcessor(method: configuration.xorMethod)
         let rw = LinkProcessor(proc: proc, isTCP: link.isReliable)
+        guard let fd = link.fileDescriptor else {
+            fatalError("Link has no file descriptor")
+        }
 
         var didAttach = false
         do {
             try await looper.attach(.init(
                 side: .link,
-                original: link,
+                fd: fd,
+                closesOnEmptyRead: link.isReliable,
                 transformWrite: rw.beforeWrite,
                 onRead: { [weak self] packets in
                     let processed = try rw.beforeRead(packets)
@@ -148,10 +152,15 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             pp_log(ctx, .openvpn, .error, "Tunnel interface already set")
             return
         }
+        guard let fd = tunnel.fileDescriptor else {
+            fatalError("Tunnel has no file descriptor")
+        }
+
         pp_log(ctx, .openvpn, .info, "Start TUN loop")
         try await looper.attach(.init(
             side: .tun,
-            original: tunnel,
+            fd: fd,
+            closesOnEmptyRead: false,
             transformWrite: nil,
             onRead: { [weak self] packets in
                 try self?.receiveTunnel(packets)

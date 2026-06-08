@@ -109,9 +109,8 @@ public final class NativeTunnelController: TunnelController, Sendable {
         return VirtualTunnelInterface(ctx, tun: tun, maxReadLength: maxReadLength)
     }
 
-    public func configureSockets(with descriptors: [UInt64]) throws {
+    public func configureSockets(with descriptors: [FileDescriptor]) throws {
         let result = descriptors
-            .map(Int32.init)
             .withUnsafeBufferPointer { fds in
                 if let info = reachabilityInfo?.toCReachability {
                     withUnsafePointer(to: info) { infoPtr in

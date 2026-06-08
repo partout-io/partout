@@ -59,7 +59,7 @@ static inline void pp_tun_release(pp_tun tun) {
 #endif
 
 /* Return the file descriptor or -1 if none. */
-int pp_tun_fd(const pp_tun tun);
+int pp_tun_get_fd(const pp_tun tun);
 
 /* Return the device name or NULL if none. */
 const char *_Nullable pp_tun_name(const pp_tun tun);

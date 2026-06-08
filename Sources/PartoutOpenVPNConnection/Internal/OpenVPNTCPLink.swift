@@ -58,7 +58,7 @@ extension OpenVPNTCPLink: LinkInterface {
 // MARK: - IOInterface
 
 extension OpenVPNTCPLink {
-    var fileDescriptor: UInt64? {
+    var fileDescriptor: FileDescriptor? {
         link.fileDescriptor
     }
 

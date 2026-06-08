@@ -8,7 +8,7 @@ protocol WireGuardAdapterDelegate: AnyObject, Sendable {
 
     func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: TunnelRemoteInfo) async throws -> IOInterface
 
-    func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64]) throws
+    func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [FileDescriptor]) throws
 
     func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapter, tunnel: IOInterface) async
 }
@@ -67,7 +67,7 @@ actor WireGuardAdapter {
     private var state: WireGuardAdapterState = .stopped
 
     /// Tunnel device file descriptor.
-    private var tunnelFileDescriptor: Int32? {
+    private var tunnelFileDescriptor: FileDescriptor? {
         didSet {
             logHandler(.verbose, "Tunnel file descriptor: \(tunnelFileDescriptor.debugDescription)")
         }
@@ -233,7 +233,7 @@ actor WireGuardAdapter {
         guard let delegate else { return }
         tunnel = try await delegate.adapterShouldSetNetworkSettings(self, settings: networkSettings)
 #if !os(Windows)
-        guard let tunFd = tunnel?.fileDescriptor.map(Int32.init) else {
+        guard let tunFd = tunnel?.fileDescriptor else {
             throw WireGuardAdapterError.cannotLocateTunnelFileDescriptor
         }
         tunnelFileDescriptor = tunFd
@@ -267,10 +267,9 @@ actor WireGuardAdapter {
     }
 
     @discardableResult
-    private func configureSockets(for handle: Int32) throws -> [UInt64] {
+    private func configureSockets(for handle: Int32) throws -> [FileDescriptor] {
         let descriptors = backend.socketDescriptors(handle)
             .filter { $0 >= 0 }
-            .map { UInt64($0) }
         pp_log(ctx, .wireguard, .info, "Socket descriptors: \(descriptors)")
         guard !descriptors.isEmpty else { return [] }
         try delegate?.adapterShouldConfigureSockets(self, descriptors: descriptors)

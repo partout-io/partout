@@ -110,6 +110,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Logging/SimpleLogDestination.swift
 ./PartoutCore/Misc/BidirectionalState.swift
 ./PartoutCore/Misc/DataUnit.swift
+./PartoutCore/Misc/FileDescriptor.swift
 ./PartoutCore/Misc/Keychain.swift
 ./PartoutCore/Misc/RingQueue.swift
 ./PartoutCore/Misc/ScriptingEngine.swift

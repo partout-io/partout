@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-// FIXME: ###, Beware of the Int32/UInt64 mismatch (UNIX fd is Int32, Windows SOCKET is UInt64)
-
 #if !os(Windows)
 internal import _PartoutCore_C
 
@@ -26,20 +24,23 @@ public final class FdLooper: @unchecked Sendable {
 
     public struct AttachArguments: Sendable {
         public let side: Side
-        public let original: IOInterface
+        public let fd: FileDescriptor
+        public let closesOnEmptyRead: Bool
         public let transformWrite: TransformWrite?
         public let onRead: OnRead?
         public let onFailure: OnFailure?
 
         public init(
             side: Side,
-            original: IOInterface,
+            fd: FileDescriptor,
+            closesOnEmptyRead: Bool,
             transformWrite: TransformWrite?,
             onRead: OnRead?,
             onFailure: OnFailure?
         ) {
             self.side = side
-            self.original = original
+            self.fd = fd
+            self.closesOnEmptyRead = closesOnEmptyRead
             self.transformWrite = transformWrite
             self.onRead = onRead
             self.onFailure = onFailure
@@ -689,10 +690,6 @@ private extension FdLooper {
     ) {
         switch arguments.side {
         case .link:
-            guard let fd = arguments.original.fileDescriptor else {
-                results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable))))
-                break
-            }
             // Cancel attach if stopping
             guard state != .stopping else {
                 results.append(.attach(continuation, .failure(CancellationError())))
@@ -703,18 +700,13 @@ private extension FdLooper {
                 results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
                 break
             }
-            let linkFd = Int32(fd)
-            guard linkFd >= 0 else {
-                pp_log(ctx, .core, .fault, "Unable to dup link fd")
-                results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable, fd))))
-                break
-            }
+            let linkFd = arguments.fd
             guard pp_mux_add(mux, linkFd) else {
                 pp_log(ctx, .core, .fault, "Unable to attach link")
-                results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
+                results.append(.attach(continuation, .failure(PartoutError(.muxFailure, linkFd))))
                 break
             }
-            pp_log(ctx, .core, .info, "Attach link (fd=\(fd))")
+            pp_log(ctx, .core, .info, "Attach link (fd=\(linkFd))")
 
             // Create new side
             link = SideIO(
@@ -725,10 +717,6 @@ private extension FdLooper {
             )
             results.append(.attach(continuation, .success(())))
         case .tun:
-            guard let fd = arguments.original.fileDescriptor else {
-                results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable))))
-                break
-            }
             // Cancel attach if stopping
             guard state != .stopping else {
                 results.append(.attach(continuation, .failure(CancellationError())))
@@ -739,18 +727,13 @@ private extension FdLooper {
                 results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
                 break
             }
-            let tunFd = Int32(fd)
-            guard tunFd >= 0 else {
-                pp_log(ctx, .core, .fault, "Unable to dup tun fd")
-                results.append(.attach(continuation, .failure(PartoutError(.fdUnavailable, fd))))
-                break
-            }
+            let tunFd = arguments.fd
             guard pp_mux_add(mux, tunFd) else {
                 pp_log(ctx, .core, .fault, "Unable to attach tun")
-                results.append(.attach(continuation, .failure(PartoutError(.muxFailure, fd))))
+                results.append(.attach(continuation, .failure(PartoutError(.muxFailure, tunFd))))
                 break
             }
-            pp_log(ctx, .core, .info, "Attach tun (fd=\(fd))")
+            pp_log(ctx, .core, .info, "Attach tun (fd=\(tunFd))")
 
             // Create new side
             tun = SideIO(
@@ -832,8 +815,8 @@ private extension FdLooper {
 // MARK: - Descriptors
 
 private final class FdSet {
-    var readable: Set<Int32>
-    var writable: Set<Int32>
+    var readable: Set<FileDescriptor>
+    var writable: Set<FileDescriptor>
 
     init(capacity: Int) {
         readable = Set(minimumCapacity: capacity)
@@ -899,9 +882,8 @@ private extension FdLooper {
     final class SideIO: Identifiable {
         let id = UUID()
         let side: Side
-        let fd: Int32
+        let fd: FileDescriptor
 
-        let originalInterface: IOInterface
         let transformWrite: TransformWrite?
         private let onRead: OnRead?
         private let onFailure: OnFailure?
@@ -916,7 +898,7 @@ private extension FdLooper {
 
         init(
             side: Side,
-            fd: Int32,
+            fd: FileDescriptor,
             readBufSize: Int,
             arguments: FdLooper.AttachArguments,
             read: @escaping (inout [UInt8]) throws -> Data?,
@@ -925,7 +907,6 @@ private extension FdLooper {
         ) {
             self.side = side
             self.fd = fd
-            originalInterface = arguments.original
             transformWrite = arguments.transformWrite
             onRead = arguments.onRead
             onFailure = arguments.onFailure
@@ -997,13 +978,12 @@ private extension FdLooper {
 private extension FdLooper.SideIO {
     convenience init(
         mux: pp_mux,
-        linkFd: Int32,
+        linkFd: FileDescriptor,
         readBufSize: Int,
         arguments: FdLooper.AttachArguments
     ) {
-        let linkHandle = pp_socket_retain(UInt64(linkFd))
-        // FIXME: ###, Will pass pp_socket later to tell UDP/TCP
-        let closesOnEmptyRead = (arguments.original as? LinkInterface)?.isReliable == true
+        let linkHandle = pp_socket_retain(linkFd)
+        let closesOnEmptyRead = arguments.closesOnEmptyRead
         self.init(
             side: .link,
             fd: linkFd,
@@ -1053,7 +1033,7 @@ private extension FdLooper.SideIO {
 
     convenience init(
         mux: pp_mux,
-        tunFd: Int32,
+        tunFd: FileDescriptor,
         readBufSize: Int,
         arguments: FdLooper.AttachArguments
     ) {

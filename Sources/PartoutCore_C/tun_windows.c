@@ -204,7 +204,7 @@ void pp_tun_close(const pp_tun tun) {
     tun->session = NULL;
 }
 
-int pp_tun_fd(const pp_tun tun) {
+int pp_tun_get_fd(const pp_tun tun) {
     (void)tun;
     return -1;
 }
