@@ -92,6 +92,11 @@ extension _OpenVPNConnectionV3: Connection {
 
     @discardableResult
     public func start() async throws -> Bool {
+        guard status == .disconnected else {
+            pp_log(ctx, .openvpn, .error, "Ignore start, connection status \(status) != .disconnected")
+            return false
+        }
+
         // Subscribe once
         subscribeToDelegateOnce()
 
@@ -105,10 +110,7 @@ extension _OpenVPNConnectionV3: Connection {
         let session = try sessionFactory()
         do {
             session.setDelegate(self)
-            guard status == .disconnected else {
-                pp_log(ctx, .openvpn, .error, "Ignore start, connection status \(status) != .disconnected")
-                return false
-            }
+            currentSession = session
             sendStatus(.connecting)
             do {
                 let newLink = try await setupLink(upgradingCurrent: false)
