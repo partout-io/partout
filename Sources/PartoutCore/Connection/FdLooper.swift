@@ -160,8 +160,10 @@ public final class FdLooper: @unchecked Sendable {
                 fdSet.resetReadable()
 
                 // Perform the blocking call
-                guard pp_mux_wait(mux) >= 0 else {
-                    pp_log(ctx, .core, .fault, "Looper: pp_mux_wait() failed")
+                var code: Int32 = 0
+                guard pp_mux_wait(mux, &code) >= 0 else {
+                    pp_log(ctx, .core, .fault, "Looper: pp_mux_wait() failed (code=\(code))")
+                    lastError = WaitError(code: code)
                     break
                 }
 
@@ -848,6 +850,14 @@ private final class FdSet {
 // MARK: - SideIO
 
 private extension FdLooper {
+    struct WaitError: Error, CustomDebugStringConvertible {
+        let code: Int32
+
+        var debugDescription: String {
+            "wait errno=\(code)"
+        }
+    }
+
     enum IOError: Error, CustomDebugStringConvertible {
         case wouldBlock(Side)
         case noBufSpace(Side)
