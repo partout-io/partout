@@ -701,8 +701,7 @@ private extension FdLooper {
                 break
             }
             let linkFd = arguments.fd
-            var flags: Int32 = 0
-            guard pp_fd_set_nonblocking(linkFd, &flags) == 0 else {
+            guard pp_fd_set_nonblocking(linkFd, nil) == 0 else {
                 pp_log(ctx, .core, .fault, "Unable to set link non-blocking mode")
                 results.append(.attach(continuation, .failure(PartoutError(.muxFailure, linkFd))))
                 break
@@ -734,8 +733,7 @@ private extension FdLooper {
                 break
             }
             let tunFd = arguments.fd
-            var flags: Int32 = 0
-            guard pp_fd_set_nonblocking(tunFd, &flags) == 0 else {
+            guard pp_fd_set_nonblocking(tunFd, nil) == 0 else {
                 pp_log(ctx, .core, .fault, "Unable to set tun non-blocking mode")
                 results.append(.attach(continuation, .failure(PartoutError(.muxFailure, tunFd))))
                 break

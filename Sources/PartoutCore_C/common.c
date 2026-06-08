@@ -118,6 +118,8 @@ void pp_log_simple_append(const char *tag, pp_log_level level, const char *messa
 #endif
 
 #if PARTOUT_WINDOWS
+#include <winsock2.h>
+
 int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {
     (void)original_flags;
     u_long mode = 1;
@@ -138,13 +140,18 @@ int pp_fd_restore_blocking(pp_fd fd, int original_flags) {
     return 0;
 }
 #else
+#include <fcntl.h>
+
 int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {
-    *original_flags = fcntl(fd, F_GETFL, 0);
-    if (*original_flags < 0) {
+    const int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "fcntl(): set, F_GETFL");
         return -1;
     }
-    if (fcntl(fd, F_SETFL, *original_flags | O_NONBLOCK) < 0) {
+    if (original_flags) {
+        *original_flags = flags;
+    }
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "fcntl(): set, F_SETFL");
         return -1;
     }

@@ -157,8 +157,10 @@ static inline bool PP_IO_NOBUFS(void) {
 }
 #endif
 
-int pp_fd_set_nonblocking(pp_fd fd, int *original_flags);
+#pragma clang assume_nonnull begin
+int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
 int pp_fd_restore_blocking(pp_fd fd, int original_flags);
+#pragma clang assume_nonnull end
 
 /* Android only. */
 
