@@ -848,15 +848,15 @@ private final class FdSet {
 // MARK: - SideIO
 
 private extension FdLooper {
-    struct WaitError: Error, CustomStringConvertible {
+    struct WaitError: Error, CustomDebugStringConvertible {
         let code: Int32
 
-        var description: String {
+        var debugDescription: String {
             "wait: errno=\(code)"
         }
     }
 
-    enum IOError: Error, CustomStringConvertible {
+    enum IOError: Error, CustomDebugStringConvertible {
         case wouldBlock(Side)
         case noBufSpace(Side)
         case eof(Side)
@@ -873,7 +873,7 @@ private extension FdLooper {
             }
         }
 
-        var description: String {
+        var debugDescription: String {
             switch self {
             case .wouldBlock(let side): "\(side): would block"
             case .noBufSpace(let side): "\(side): no buffer space"
