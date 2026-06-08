@@ -35,10 +35,36 @@ struct sockaddr_ctl {
 /* Opaque tun device. */
 typedef struct __pp_tun_struct *pp_tun;
 
+/* Platform-specific implementations. */
+pp_tun _Nullable pp_tun_open(const char *uuid);
+int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len);
+int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len);
+void pp_tun_close(const pp_tun tun);
+void pp_tun_free_and_close(pp_tun tun, bool and_close);
+
+static inline void pp_tun_free(pp_tun tun) {
+    pp_tun_free_and_close(tun, true);
+}
+
 #if !PARTOUT_WINDOWS
 /* With manual file descriptor. */
-pp_tun pp_tun_create(int fd);
+pp_tun pp_tun_retain(int fd);
+static inline void pp_tun_release(pp_tun tun) {
+#if PARTOUT_APPLE && !PARTOUT_MACOS
+    pp_tun_free_and_close(tun, true);
+#else
+    pp_tun_free_and_close(tun, false);
+#endif
+}
+#endif
 
+/* Return the file descriptor or -1 if none. */
+int pp_tun_fd(const pp_tun tun);
+
+/* Return the device name or NULL if none. */
+const char *_Nullable pp_tun_name(const pp_tun tun);
+
+/* Reusable cross-platform. */
 static inline int pp_tun_handle_result(int ret) {
     if (ret < 0) {
         if (PP_IO_WOULDBLOCK()) {
@@ -50,27 +76,6 @@ static inline int pp_tun_handle_result(int ret) {
     }
     return ret;
 }
-#endif
-
-/* Platform-specific implementations. */
-pp_tun _Nullable pp_tun_open(const char *uuid);
-int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len);
-int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len);
-void pp_tun_shutdown(const pp_tun tun);
-void pp_tun_free_and_close(pp_tun tun, bool and_close);
-
-static inline void pp_tun_release(pp_tun tun) {
-    pp_tun_free_and_close(tun, false);
-}
-static inline void pp_tun_free(pp_tun tun) {
-    pp_tun_free_and_close(tun, true);
-}
-
-/* Return the file descriptor or -1 if none. */
-int pp_tun_fd(const pp_tun tun);
-
-/* Return the device name or NULL if none. */
-const char *_Nullable pp_tun_name(const pp_tun tun);
 
 /* Tunnel controller. */
 typedef struct {

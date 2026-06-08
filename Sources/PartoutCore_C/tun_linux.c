@@ -25,7 +25,7 @@ struct __pp_tun_struct {
     const char *dev_name;
 };
 
-pp_tun pp_tun_create(int fd) {
+pp_tun pp_tun_retain(int fd) {
     pp_tun tun = pp_alloc(sizeof(*tun));
     tun->fd = fd;
     return tun;
@@ -70,7 +70,7 @@ failure:
 void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     if (!tun) return;
     if (and_close) {
-        pp_tun_shutdown(tun);
+        pp_tun_close(tun);
     }
     if (tun->dev_name) {
         pp_free((void *)tun->dev_name);
@@ -92,7 +92,7 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     return pp_tun_handle_result(ret);
 }
 
-void pp_tun_shutdown(const pp_tun tun) {
+void pp_tun_close(const pp_tun tun) {
     if (!tun || tun->fd < 0) return;
     close(tun->fd);
     tun->fd = -1;
