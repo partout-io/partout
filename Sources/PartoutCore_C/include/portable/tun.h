@@ -41,11 +41,17 @@ extern const int PPTunErrorNoBuf;
 #if !PARTOUT_WINDOWS
 /* With manual file descriptor. */
 pp_tun pp_tun_create(int fd);
-static inline bool pp_tun_would_block() {
-    return (errno == EAGAIN || errno == EWOULDBLOCK);
-}
-static inline bool pp_tun_nobufs() {
-    return errno == ENOBUFS;
+
+static inline int pp_tun_handle_result(int ret) {
+    if (ret < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return PPTunErrorWouldBlock;
+        }
+        if (errno == ENOBUFS) {
+            return PPTunErrorNoBuf;
+        }
+    }
+    return ret;
 }
 #endif
 

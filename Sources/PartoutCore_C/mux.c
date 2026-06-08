@@ -39,11 +39,12 @@ pp_mux pp_mux_create(int num) {
     /* EV_CLEAR resets the fd after wake delivery. */
     struct kevent ev;
     EV_SET(&ev, PP_MUX_WAKE_ID, EVFILT_USER, EV_ADD | EV_CLEAR, 0, 0, NULL);
-    if (kevent(mux->handle, &ev, 1, NULL, 0, NULL) != 0) {
+    int ret;
+    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
+    if (ret != 0) {
         pp_mux_free(mux);
         return NULL;
     }
-
     return mux;
 }
 
@@ -58,7 +59,9 @@ bool pp_mux_add(pp_mux mux, int fd) {
     if (!mux) return false;
     struct kevent ev;
     EV_SET(&ev, fd, EVFILT_READ, EV_ADD, 0, 0, 0);
-    return kevent(mux->handle, &ev, 1, NULL, 0, NULL) == 0;
+    int ret;
+    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
+    return ret == 0;
 }
 
 bool pp_mux_delete(pp_mux mux, int fd) {
@@ -69,7 +72,8 @@ bool pp_mux_delete(pp_mux mux, int fd) {
 
     bool ok = true;
     for (int i = 0; i < 2; ++i) {
-        const int ret = kevent(mux->handle, &ev[i], 1, NULL, 0, NULL);
+        int ret;
+        PP_IO_RETRY(ret, kevent(mux->handle, &ev[i], 1, NULL, 0, NULL));
         if (ret < 0 && errno != ENOENT) {
             ok = false;
         }
@@ -81,7 +85,8 @@ bool pp_mux_set_read(pp_mux mux, int fd, bool enable) {
     if (!mux) return false;
     struct kevent ev;
     EV_SET(&ev, fd, EVFILT_READ, enable ? EV_ADD : EV_DELETE, 0, 0, 0);
-    const int ret = kevent(mux->handle, &ev, 1, NULL, 0, NULL);
+    int ret;
+    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
     if (ret < 0) {
         /* Ignore failed deletion. */
         if (!enable && errno == ENOENT) return true;
@@ -94,7 +99,8 @@ bool pp_mux_set_write(pp_mux mux, int fd, bool enable) {
     if (!mux) return false;
     struct kevent ev;
     EV_SET(&ev, fd, EVFILT_WRITE, enable ? EV_ADD : EV_DELETE, 0, 0, 0);
-    const int ret = kevent(mux->handle, &ev, 1, NULL, 0, NULL);
+    int ret;
+    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
     if (ret < 0) {
         /* Ignore failed deletion. */
         if (!enable && errno == ENOENT) return true;
@@ -119,9 +125,7 @@ int pp_mux_wait(pp_mux mux) {
     if (!mux) return PPMuxErrorNull;
 
     int num;
-    do {
-        num = kevent(mux->handle, NULL, 0, mux->events, mux->events_len, NULL);
-    } while (num < 0 && errno == EINTR);
+    PP_IO_RETRY(num, kevent(mux->handle, NULL, 0, mux->events, mux->events_len, NULL));
     if (num < 0) {
         pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait failed: errno=%d", errno);
         return num;
@@ -149,7 +153,9 @@ bool pp_mux_wake(pp_mux mux) {
     if (!mux) return false;
     struct kevent ev;
     EV_SET(&ev, PP_MUX_WAKE_ID, EVFILT_USER, 0, NOTE_TRIGGER, 0, NULL);
-    return kevent(mux->handle, &ev, 1, NULL, 0, NULL) == 0;
+    int ret;
+    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
+    return ret == 0;
 }
 
 #elif PARTOUT_LINUX || PARTOUT_ANDROID
@@ -381,9 +387,7 @@ int pp_mux_wait(pp_mux mux) {
     if (!mux) return PPMuxErrorNull;
 
     int num;
-    do {
-        num = epoll_wait(mux->handle, mux->events, mux->events_len, -1);
-    } while (num < 0 && errno == EINTR);
+    PP_IO_RETRY(num, epoll_wait(mux->handle, mux->events, mux->events_len, -1));
     if (num < 0) {
         pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait epoll_wait() failed: errno=%d", errno);
         return num;
@@ -396,10 +400,8 @@ int pp_mux_wait(pp_mux mux) {
             eventfd_t value;
             while (true) {
                 int ret;
-                do {
-                    /* Context: wake_fd is non-blocking */
-                    ret = eventfd_read(mux->wake_fd, &value);
-                } while (ret < 0 && errno == EINTR);
+                /* Context: wake_fd is non-blocking */
+                PP_IO_RETRY(ret, eventfd_read(mux->wake_fd, &value));
                 if (ret < 0) {
                     /* Fully drained */
                     if (errno == EAGAIN || errno == EWOULDBLOCK) break;
@@ -427,7 +429,9 @@ int pp_mux_wait(pp_mux mux) {
 
 bool pp_mux_wake(pp_mux mux) {
     if (!mux) return false;
-    if (eventfd_write(mux->wake_fd, 1) == 0) return true;
+    int ret;
+    PP_IO_RETRY(ret, eventfd_write(mux->wake_fd, 1));
+    if (ret == 0) return true;
     return errno == EAGAIN;
 }
 #endif

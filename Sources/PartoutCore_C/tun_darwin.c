@@ -119,12 +119,10 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     iov[1].iov_base = dst;
     iov[1].iov_len  = dst_len;
 
-    const int read_len = (int)readv(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
+    int read_len;
+    PP_IO_RETRY(read_len, (int)readv(tun->fd, iov, sizeof(iov) / sizeof(struct iovec)));
     if (read_len < 0) {
-        if (pp_tun_would_block()) {
-            return PPTunErrorWouldBlock;
-        }
-        return -1;
+        return pp_tun_handle_result(read_len);
     }
     if (read_len < (int)sizeof(pi)) {
         pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: Missing 4-byte utun packet header");
@@ -144,15 +142,10 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     iov[1].iov_base = (void *)src;
     iov[1].iov_len  = src_len;
 
-    const int written_len = (int)writev(tun->fd, iov, sizeof(iov) / sizeof(struct iovec));
+    int written_len;
+    PP_IO_RETRY(written_len, (int)writev(tun->fd, iov, sizeof(iov) / sizeof(struct iovec)));
     if (written_len < 0) {
-        if (pp_tun_would_block()) {
-            return PPTunErrorWouldBlock;
-        }
-        if (pp_tun_nobufs()) {
-            return PPTunErrorNoBuf;
-        }
-        return -1;
+        return pp_tun_handle_result(written_len);
     }
     if (written_len != (int)(pi_len + src_len)) return -3;
     return (int)src_len;

@@ -104,6 +104,14 @@ FILE *_Nullable pp_fopen(const char *filename, const char *mode) {
 #define pp_sscanf sscanf
 #endif
 
+/* Syscalls. */
+#define PP_IO_RETRY(result, fn) \
+    do { \
+        do { \
+            (result) = (fn); \
+        } while ((result) < 0 && errno == EINTR); \
+    } while (0)
+
 #pragma clang assume_nonnull end
 
 /* Android only. */
