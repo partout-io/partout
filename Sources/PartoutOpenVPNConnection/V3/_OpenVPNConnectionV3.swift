@@ -108,27 +108,25 @@ extension _OpenVPNConnectionV3: Connection {
 
         // Do not catch constructor failures
         let session = try sessionFactory()
+        session.setDelegate(self)
+        currentSession = session
+
+        // Initiate connection
         do {
-            session.setDelegate(self)
-            currentSession = session
             sendStatus(.connecting)
-            do {
-                let newLink = try await setupLink(upgradingCurrent: false)
-                try await session.setLink(newLink)
-                observeBetterPath(on: newLink)
-                return true
-            } catch {
-                sendStatus(.disconnected)
-                throw error
-            }
-        } catch let error as PartoutError {
+            let newLink = try await setupLink(upgradingCurrent: false)
+            try await session.setLink(newLink)
+            observeBetterPath(on: newLink)
+            return true
+        } catch {
+            sendStatus(.disconnected)
             await session.shutdown(error)
-            if error.code == .exhaustedEndpoints, let reason = error.reason {
+            currentSession = nil
+            if let partoutError = error as? PartoutError,
+               partoutError.code == .exhaustedEndpoints,
+               let reason = partoutError.reason {
                 throw reason
             }
-            throw error
-        } catch {
-            await session.shutdown(error)
             throw error
         }
     }
