@@ -153,20 +153,30 @@ public final class FdLooper: @unchecked Sendable {
             }
 
             // Start loop
-            pp_log(self?.ctx ?? .global, .core, .info, "Start looper")
+            let ctx = self?.ctx ?? .global
+            pp_log(ctx, .core, .info, "Start looper")
             while true {
                 // Reset readable fds before the wait
                 fdSet.resetReadable()
 
                 // Perform the blocking call
-                guard pp_mux_wait(mux) >= 0 else { break }
+                guard pp_mux_wait(mux) >= 0 else {
+                    pp_log(ctx, .core, .fault, "Looper: pp_mux_wait() failed")
+                    break
+                }
 
                 // Unwrap AFTER blocking call
-                guard let self else { break }
+                guard let self else {
+                    pp_log(ctx, .core, .info, "Looper: released self")
+                    break
+                }
 
                 do {
                     // Handle commands on wake signal (true = continue)
-                    guard try handleCommands() else { break }
+                    guard try handleCommands() else {
+                        pp_log(.global, .core, .info, "Looper: stop requested")
+                        break
+                    }
 
                     // Iterate through the fds
                     try process(mux: mux, fdSet: fdSet)
