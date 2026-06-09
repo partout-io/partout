@@ -137,15 +137,17 @@ pp_socket pp_socket_open(const char *ip_addr,
 #endif
 
     snprintf(port_str, sizeof(port_str), "%u", port);
+    int ret;
 #if PARTOUT_ANDROID
     if (!info || info->network_handle <= 0) {
         local_print_error("android_getaddrinfofornetwork(): missing network handle");
         goto failure;
     }
-    if (android_getaddrinfofornetwork(info->network_handle, ip_addr, port_str, &hints, &resolved) != 0) {
+    ret = android_getaddrinfofornetwork(info->network_handle, ip_addr, port_str, &hints, &resolved)
 #else
-    if (getaddrinfo(ip_addr, port_str, &hints, &resolved) != 0) {
+    ret = getaddrinfo(ip_addr, port_str, &hints, &resolved);
 #endif
+    if (ret != 0) {
         local_print_error("getaddrinfo()");
         goto failure;
     }
