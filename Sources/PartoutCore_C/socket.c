@@ -34,7 +34,6 @@ static void local_set_not_socket_error(void);
 static void local_set_timeout_error(void);
 static void local_set_reset_error(void);
 static void local_set_error(int err);
-static int local_last_error(void);
 static bool local_is_connect_pending(void);
 static int local_close_fd(pp_socket_fd fd);
 static int local_shutdown_fd(pp_socket_fd fd);
