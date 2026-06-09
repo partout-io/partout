@@ -500,6 +500,15 @@ int local_restore_blocking(pp_socket_fd fd, int original_flags) {
     }
     return 0;
 }
+
+int pp_socket_set_nonblocking(pp_socket_fd fd, int *original_flags) {
+    return local_set_nonblocking(fd, original_flags);
+}
+
+int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags) {
+    return local_restore_blocking(fd, original_flags);
+}
+
 #else
 bool local_platform_init(void) {
     return true;
