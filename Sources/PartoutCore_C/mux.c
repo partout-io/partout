@@ -9,7 +9,9 @@
 
 const int PPMuxErrorNull = -2;
 
-#if PARTOUT_APPLE || PARTOUT_LINUX || PARTOUT_ANDROID
+#if PARTOUT_WINDOWS
+// FIXME: ###
+#else
 #include <fcntl.h>
 #include <poll.h>
 #include <stdint.h>
