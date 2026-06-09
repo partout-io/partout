@@ -101,6 +101,9 @@ target_compile_options(partout PRIVATE
 # Use Foundation on Apple, compatible otherwise
 if(NOT APPLE)
     set(USE_COMPAT ON)
+    list(APPEND EXCLUDED_PATTERNS
+        PartoutOS\/Apple.*
+    )
 endif()
 
 # Exclude Foundation if compatibility is on
@@ -108,12 +111,13 @@ if(USE_COMPAT)
     target_compile_options(partout PRIVATE
         -DMINIF_COMPAT
     )
-    list(APPEND EXCLUDED_PATTERNS
-        PartoutOpenVPNConnection\/V1
-        PartoutOS\/Apple.*
-        PartoutWireGuardConnection\/V1
-    )
 endif()
+
+# Exclude legacy connections
+list(APPEND EXCLUDED_PATTERNS
+    PartoutOpenVPNConnection\/V1
+    PartoutWireGuardConnection\/V1
+)
 
 foreach(pattern ${EXCLUDED_PATTERNS})
     list(FILTER PARTOUT_SOURCES EXCLUDE REGEX ${pattern})
