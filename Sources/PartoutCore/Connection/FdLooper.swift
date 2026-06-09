@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !os(Windows)
 internal import _PartoutCore_C
 
 /// Loops through a set of file descriptors.
@@ -1113,5 +1112,3 @@ private extension FdLooper.SideIO {
         )
     }
 }
-
-#endif
