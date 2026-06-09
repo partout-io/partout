@@ -17,55 +17,56 @@ const int PPMuxErrorNull = -2;
 
 #define PP_MUX_ERROR_EVENTS (POLLERR | POLLHUP | POLLNVAL)
 
-struct pp_mux_fd {
+struct pp_mux_entry {
     pp_fd fd;
     bool read;
     bool write;
 };
 
 struct __pp_mux {
+    struct pp_mux_entry *entries;
+    int entries_len;
     pp_fd wake_pipe[2];
     struct pollfd *pollfds;
-    struct pp_mux_fd *fds;
-    int fds_len;
-    int fds_count;
+    int num_tracked;
     void (*on_readable)(void *ctx, pp_fd fd);
     void (*on_writable)(void *ctx, pp_fd fd);
     void *read_ctx;
     void *write_ctx;
 };
 
-static struct pp_mux_fd *pp_mux_find_fd(pp_mux mux, pp_fd fd) {
-    for (int i = 0; i < mux->fds_count; ++i) {
-        if (mux->fds[i].fd == fd) return mux->fds + i;
+static struct pp_mux_entry *pp_mux_entry_find(pp_mux mux, pp_fd fd) {
+    for (int i = 0; i < mux->num_tracked; ++i) {
+        if (mux->entries[i].fd == fd) return mux->entries + i;
     }
     return NULL;
 }
 
-static struct pp_mux_fd *pp_mux_track_fd(pp_mux mux, pp_fd fd) {
-    struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
+static struct pp_mux_entry *pp_mux_track_fd(pp_mux mux, pp_fd fd) {
+    struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
     if (tracked) return tracked;
-    if (mux->fds_count >= mux->fds_len) return NULL;
-    tracked = mux->fds + mux->fds_count;
+    /* Do not track more than fds_len. */
+    if (mux->num_tracked >= mux->entries_len) return NULL;
+    tracked = mux->entries + mux->num_tracked;
     tracked->fd = fd;
     tracked->read = false;
     tracked->write = false;
-    ++mux->fds_count;
+    ++mux->num_tracked;
     return tracked;
 }
 
-static void pp_mux_untrack_fd(pp_mux mux, struct pp_mux_fd *fd) {
-    const int index = (int)(fd - mux->fds);
-    --mux->fds_count;
-    if (index != mux->fds_count) {
-        mux->fds[index] = mux->fds[mux->fds_count];
+static void pp_mux_untrack_fd(pp_mux mux, struct pp_mux_entry *entry) {
+    const int index = (int)(entry - mux->entries);
+    --mux->num_tracked;
+    if (index != mux->num_tracked) {
+        mux->entries[index] = mux->entries[mux->num_tracked];
     }
 }
 
-static short pp_mux_events(const struct pp_mux_fd *fd) {
+static short pp_mux_events(const struct pp_mux_entry *entry) {
     short events = 0;
-    if (fd->read) events |= POLLIN;
-    if (fd->write) events |= POLLOUT;
+    if (entry->read) events |= POLLIN;
+    if (entry->write) events |= POLLOUT;
     return events;
 }
 
@@ -76,8 +77,8 @@ static int pp_mux_build_pollfds(pp_mux mux) {
     mux->pollfds[count].revents = 0;
     ++count;
 
-    for (int i = 0; i < mux->fds_count; ++i) {
-        const struct pp_mux_fd *tracked = mux->fds + i;
+    for (int i = 0; i < mux->num_tracked; ++i) {
+        const struct pp_mux_entry *tracked = mux->entries + i;
         const short events = pp_mux_events(tracked);
         if (events == 0) continue;
         mux->pollfds[count].fd = tracked->fd;
@@ -110,7 +111,7 @@ static int pp_mux_drain_wake(pp_mux mux) {
 }
 
 pp_mux pp_mux_create(int num) {
-    if (num < 0) return NULL;
+    if (num <= 0) return NULL;
     pp_fd wake_pipe[2];
     if (pipe(wake_pipe) != 0) return NULL;
     if (!pp_mux_set_cloexec(wake_pipe[0]) ||
@@ -123,11 +124,12 @@ pp_mux pp_mux_create(int num) {
     }
 
     pp_mux mux = pp_alloc(sizeof(*mux));
+    mux->entries = pp_alloc(num * sizeof(struct pp_mux_entry));
+    mux->entries_len = num;
     mux->wake_pipe[0] = wake_pipe[0];
     mux->wake_pipe[1] = wake_pipe[1];
+    /* Adds 1 to account for wake_pipe. */
     mux->pollfds = pp_alloc((1 + num) * sizeof(struct pollfd));
-    mux->fds = num > 0 ? pp_alloc(num * sizeof(struct pp_mux_fd)) : NULL;
-    mux->fds_len = num;
 
     return mux;
 }
@@ -137,13 +139,13 @@ void pp_mux_free(pp_mux mux) {
     close(mux->wake_pipe[1]);
     close(mux->wake_pipe[0]);
     pp_free(mux->pollfds);
-    pp_free(mux->fds);
+    pp_free(mux->entries);
     pp_free(mux);
 }
 
 bool pp_mux_add(pp_mux mux, pp_fd fd) {
     if (!mux) return false;
-    struct pp_mux_fd *tracked = pp_mux_track_fd(mux, fd);
+    struct pp_mux_entry *tracked = pp_mux_track_fd(mux, fd);
     if (!tracked) return false;
     tracked->read = true;
     tracked->write = false;
@@ -152,7 +154,7 @@ bool pp_mux_add(pp_mux mux, pp_fd fd) {
 
 bool pp_mux_delete(pp_mux mux, pp_fd fd) {
     if (!mux) return false;
-    struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
+    struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
     if (!tracked) return true;
     pp_mux_untrack_fd(mux, tracked);
     return true;
@@ -160,7 +162,7 @@ bool pp_mux_delete(pp_mux mux, pp_fd fd) {
 
 bool pp_mux_set_read(pp_mux mux, pp_fd fd, bool enable) {
     if (!mux) return false;
-    struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
+    struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
     if (!tracked && !enable) return true;
     if (!tracked) return false;
     tracked->read = enable;
@@ -169,7 +171,7 @@ bool pp_mux_set_read(pp_mux mux, pp_fd fd, bool enable) {
 
 bool pp_mux_set_write(pp_mux mux, pp_fd fd, bool enable) {
     if (!mux) return false;
-    struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
+    struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
     if (!tracked && !enable) return true;
     if (!tracked) return false;
     tracked->write = enable;
@@ -213,7 +215,7 @@ int pp_mux_wait(pp_mux mux, int *error_code) {
             }
             continue;
         }
-        const struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
+        const struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
         if (!tracked) continue;
         const bool failed = revents & PP_MUX_ERROR_EVENTS;
         const bool readable = tracked->read && ((revents & POLLIN) || failed);
