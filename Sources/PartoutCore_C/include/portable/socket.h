@@ -40,7 +40,7 @@ static inline void pp_socket_free(pp_socket sock) {
 }
 
 /* Create a socket wrapper from an already open native descriptor. */
-pp_socket pp_socket_retain(pp_fd fd);
+pp_socket pp_socket_retain(pp_socket_fd fd);
 static inline void pp_socket_release(pp_socket sock) {
     pp_socket_free_and_close(sock, false);
 }
@@ -52,7 +52,7 @@ pp_socket _Nullable pp_socket_open(const char *ip_addr,
                                    bool blocking,
                                    int timeout_ms,
                                    const pp_reachability *_Nullable info,
-                                   bool (*_Nullable configure)(void *_Nullable ctx, pp_fd fd),
+                                   bool (*_Nullable configure)(void *_Nullable ctx, pp_socket_fd fd),
                                    void *_Nullable configure_ctx);
 
 /* I/O. Returns PPIOErrorWouldBlock when a non-blocking operation would block. */
@@ -65,6 +65,10 @@ bool pp_socket_set_buffers(pp_socket sock,
                            int sendbuf_len);
 
 /* Universal file descriptor. */
-pp_fd pp_socket_get_fd(pp_socket sock);
+pp_socket_fd pp_socket_get_fd(pp_socket sock);
+
+/* Tied to sockets on Windows. */
+int pp_socket_set_nonblocking(pp_socket_fd fd, int *_Nullable original_flags);
+int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags);
 
 #pragma clang assume_nonnull end

@@ -109,15 +109,18 @@ public final class NativeTunnelController: TunnelController, Sendable {
         return TunWrapper(ctx, tun: tun)
     }
 
-    public func configureSockets(with descriptors: [FileDescriptor]) throws {
+    public func configureSockets(with descriptors: [SocketDescriptor]) throws {
         let result = descriptors
             .withUnsafeBufferPointer { fds in
+                guard let fdsBase = fds.baseAddress else {
+                    return false
+                }
                 if let info = reachabilityInfo?.toCReachability {
-                    withUnsafePointer(to: info) { infoPtr in
-                        pp_tun_ctrl_configure_sockets(ref, infoPtr, fds.baseAddress, fds.count)
+                    return withUnsafePointer(to: info) { infoPtr in
+                        pp_tun_ctrl_configure_sockets(ref, infoPtr, fdsBase, fds.count)
                     }
                 } else {
-                    pp_tun_ctrl_configure_sockets(ref, nil, fds.baseAddress, fds.count)
+                    return pp_tun_ctrl_configure_sockets(ref, nil, fdsBase, fds.count)
                 }
             }
         guard result else {
