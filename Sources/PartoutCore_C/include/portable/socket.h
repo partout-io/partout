@@ -67,9 +67,8 @@ bool pp_socket_set_buffers(pp_socket sock,
 /* Universal file descriptor. */
 pp_socket_fd pp_socket_get_fd(pp_socket sock);
 
-#if PARTOUT_WINDOWS
+/* Tied to sockets on Windows. */
 int pp_socket_set_nonblocking(pp_socket_fd fd, int *_Nullable original_flags);
 int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags);
-#endif
 
 #pragma clang assume_nonnull end

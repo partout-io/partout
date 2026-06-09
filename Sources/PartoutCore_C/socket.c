@@ -40,8 +40,6 @@ static int local_shutdown_fd(pp_socket_fd fd);
 static int local_recv_fd(pp_socket_fd fd, void *dst, size_t dst_len);
 static int local_send_fd(pp_socket_fd fd, const void *src, size_t src_len);
 static int local_select_nfds(pp_socket_fd fd);
-static int local_set_nonblocking(pp_socket_fd fd, int *original_flags);
-static int local_restore_blocking(pp_socket_fd fd, int original_flags);
 
 static int local_connect_with_timeout(pp_socket_fd fd,
                                       const struct sockaddr *addr,
@@ -348,7 +346,7 @@ int local_connect_with_timeout(pp_socket_fd fd,
                                int timeout_ms) {
     // Set non-blocking
     int original_flags = 0;
-    if (local_set_nonblocking(fd, &original_flags) < 0) {
+    if (pp_socket_set_nonblocking(fd, &original_flags) < 0) {
         return -1;
     }
 
@@ -402,7 +400,7 @@ int local_connect_with_timeout(pp_socket_fd fd,
 done:
     // Store/restore blocking mode as needed
     if (blocking) {
-        if (local_restore_blocking(fd, original_flags) < 0) {
+        if (pp_socket_restore_blocking(fd, original_flags) < 0) {
             return -1;
         }
     }
@@ -481,7 +479,7 @@ int local_select_nfds(pp_socket_fd fd) {
     return 0;
 }
 
-int local_set_nonblocking(pp_socket_fd fd, int *original_flags) {
+int pp_socket_set_nonblocking(pp_socket_fd fd, int *original_flags) {
     (void)original_flags;
     u_long mode = 1;
     if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
@@ -491,7 +489,7 @@ int local_set_nonblocking(pp_socket_fd fd, int *original_flags) {
     return 0;
 }
 
-int local_restore_blocking(pp_socket_fd fd, int original_flags) {
+int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags) {
     (void)original_flags;
     u_long mode = 0;
     if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
@@ -499,14 +497,6 @@ int local_restore_blocking(pp_socket_fd fd, int original_flags) {
         return -1;
     }
     return 0;
-}
-
-int pp_socket_set_nonblocking(pp_socket_fd fd, int *original_flags) {
-    return local_set_nonblocking(fd, original_flags);
-}
-
-int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags) {
-    return local_restore_blocking(fd, original_flags);
 }
 
 #else
@@ -568,11 +558,11 @@ int local_select_nfds(pp_socket_fd fd) {
 
 // pp_socket_fd == pp_fd in POSIX
 
-int local_set_nonblocking(pp_socket_fd fd, int *original_flags) {
+int pp_socket_set_nonblocking(pp_socket_fd fd, int *original_flags) {
     return pp_fd_set_nonblocking(fd, original_flags);
 }
 
-int local_restore_blocking(pp_socket_fd fd, int original_flags) {
+int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags) {
     return pp_fd_restore_blocking(fd, original_flags);
 }
 #endif
