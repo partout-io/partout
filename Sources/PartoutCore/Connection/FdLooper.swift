@@ -1005,7 +1005,7 @@ private extension FdLooper.SideIO {
                     throw FdLooper.IOError.wouldBlock(.link)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.libc(.link, pp_io_last_error())
+                    throw FdLooper.IOError.libc(.link, pp_socket_last_error())
                 }
                 guard count > 0 else {
                     if closesOnEmptyRead {
@@ -1030,7 +1030,7 @@ private extension FdLooper.SideIO {
                     throw FdLooper.IOError.noBufSpace(.link)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.libc(.link, pp_io_last_error())
+                    throw FdLooper.IOError.libc(.link, pp_socket_last_error())
                 }
                 return Int(count)
             },
