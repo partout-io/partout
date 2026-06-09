@@ -149,7 +149,7 @@ pp_socket pp_socket_open(const char *ip_addr,
         local_print_error("android_getaddrinfofornetwork(): missing network handle");
         goto failure;
     }
-    ret = android_getaddrinfofornetwork(info->network_handle, ip_addr, port_str, &hints, &resolved)
+    ret = android_getaddrinfofornetwork(info->network_handle, ip_addr, port_str, &hints, &resolved);
 #else
     ret = getaddrinfo(ip_addr, port_str, &hints, &resolved);
 #endif
