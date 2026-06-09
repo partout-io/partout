@@ -5,11 +5,11 @@
 /// Provides methods to configure sockets on a native platform.
 public final class SocketConfigurator: Sendable {
     public let reachability: @Sendable () -> ReachabilityInfo?
-    public let configureSocket: @Sendable (_ fd: UInt64) -> Bool
+    public let configureSocket: @Sendable (_ fd: FileDescriptor) -> Bool
 
     public init(
         reachability: @Sendable @escaping () -> ReachabilityInfo?,
-        configureSocket: @Sendable @escaping (_: UInt64) -> Bool
+        configureSocket: @Sendable @escaping (_: FileDescriptor) -> Bool
     ) {
         self.reachability = reachability
         self.configureSocket = configureSocket

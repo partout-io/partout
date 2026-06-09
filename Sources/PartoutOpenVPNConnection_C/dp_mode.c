@@ -44,12 +44,11 @@ void openvpn_dp_mode_free(openvpn_dp_mode *mode) {
 
 // MARK: - Encryption
 
-size_t openvpn_dp_mode_assemble(openvpn_dp_mode *_Nonnull mode,
-                        uint32_t packet_id,
-                        pp_zd *_Nonnull dst,
-                        const uint8_t *_Nonnull src,
-                        size_t src_len) {
-
+size_t openvpn_dp_mode_assemble(openvpn_dp_mode *mode,
+                                uint32_t packet_id,
+                                pp_zd *dst,
+                                const uint8_t *src,
+                                size_t src_len) {
     openvpn_dp_mode_assemble_ctx *ctx = &mode->assemble_ctx;
     ctx->mode = mode;
     ctx->packet_id = packet_id;
@@ -59,14 +58,13 @@ size_t openvpn_dp_mode_assemble(openvpn_dp_mode *_Nonnull mode,
     return mode->enc.assemble(mode);
 }
 
-size_t openvpn_dp_mode_encrypt(openvpn_dp_mode *_Nonnull mode,
-                       uint8_t key,
-                       uint32_t packet_id,
-                       pp_zd *_Nonnull dst,
-                       const uint8_t *_Nonnull src,
-                       size_t src_len,
-                       openvpn_dp_error *_Nullable error) {
-
+size_t openvpn_dp_mode_encrypt(openvpn_dp_mode *mode,
+                               uint8_t key,
+                               uint32_t packet_id,
+                               pp_zd *dst,
+                               const uint8_t *src,
+                               size_t src_len,
+                               openvpn_dp_error *_Nullable error) {
     openvpn_dp_mode_encrypt_ctx *ctx = &mode->enc_ctx;
     ctx->key = key;
     ctx->packet_id = packet_id;
@@ -79,13 +77,12 @@ size_t openvpn_dp_mode_encrypt(openvpn_dp_mode *_Nonnull mode,
 
 // MARK: - Decryption
 
-size_t openvpn_dp_mode_decrypt(openvpn_dp_mode *_Nonnull mode,
-                       pp_zd *_Nonnull dst,
-                       uint32_t *_Nonnull dst_packet_id,
-                       const uint8_t *_Nonnull src,
-                       size_t src_len,
-                       openvpn_dp_error *_Nullable error) {
-
+size_t openvpn_dp_mode_decrypt(openvpn_dp_mode *mode,
+                               pp_zd *dst,
+                               uint32_t *dst_packet_id,
+                               const uint8_t *src,
+                               size_t src_len,
+                               openvpn_dp_error *_Nullable error) {
     openvpn_dp_mode_decrypt_ctx *ctx = &mode->dec_ctx;
     ctx->dst = dst;
     ctx->dst_packet_id = dst_packet_id;
@@ -95,13 +92,12 @@ size_t openvpn_dp_mode_decrypt(openvpn_dp_mode *_Nonnull mode,
     return mode->dec.decrypt(mode);
 }
 
-size_t openvpn_dp_mode_parse(openvpn_dp_mode *_Nonnull mode,
-                     pp_zd *_Nonnull dst,
-                     uint8_t *_Nonnull dst_header,
-                     uint8_t *_Nonnull src,
-                     size_t src_len,
-                     openvpn_dp_error *_Nullable error) {
-
+size_t openvpn_dp_mode_parse(openvpn_dp_mode *mode,
+                             pp_zd *dst,
+                             uint8_t *dst_header,
+                             uint8_t *src,
+                             size_t src_len,
+                             openvpn_dp_error *_Nullable error) {
     openvpn_dp_mode_parse_ctx *ctx = &mode->parse_ctx;
     ctx->dst_header = dst_header;
     ctx->dst = dst;

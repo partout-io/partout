@@ -12,7 +12,7 @@ protocol OpenVPNSessionDelegate: AnyObject, Sendable {
     /// - Parameter remoteProtocol: The endpoint protocol of the VPN server.
     /// - Parameter remoteOptions: The pulled tunnel settings.
     /// - Parameter remoteFd: The file descriptor of the underlying connection.
-    func sessionDidStart(_ session: OpenVPNSessionProtocol, remoteAddress: String, remoteProtocol: EndpointProtocol, remoteOptions: OpenVPN.Configuration, remoteFd: UInt64?) async
+    func sessionDidStart(_ session: OpenVPNSessionProtocol, remoteAddress: String, remoteProtocol: EndpointProtocol, remoteOptions: OpenVPN.Configuration, remoteFd: FileDescriptor?) async
 
     /// Called after stopping a session.
     ///

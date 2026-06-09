@@ -76,8 +76,6 @@ private extension POSIXDNSStrategy {
             switch result {
             case EAI_BADFLAGS:
                 pp_log_g(.core, .fault, "getaddrinfo() failed with EAI_BADFLAGS")
-            case EAI_NODATA:
-                pp_log_g(.core, .fault, "getaddrinfo() failed with EAI_NODATA")
             default:
                 pp_log_g(.core, .fault, "getaddrinfo() failed with result \(result)")
             }

@@ -20,7 +20,7 @@ public protocol LinkInterface: IOInterface {
     nonisolated func upgraded() async throws -> LinkInterface
 
     /// Shuts down the link.
-    nonisolated func shutdown()
+    nonisolated func close()
 }
 
 extension LinkInterface {
@@ -32,6 +32,10 @@ extension LinkInterface {
     /// When `true`, packets delivery is guaranteed.
     public var isReliable: Bool {
         linkType.plainType == .tcp
+    }
+
+    public func remoteEndpoint() throws -> ExtendedEndpoint {
+        try ExtendedEndpoint(remoteAddress, remoteProtocol)
     }
 }
 

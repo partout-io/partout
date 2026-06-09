@@ -5,13 +5,18 @@
  */
 
 #include <stdarg.h>
+#include <errno.h>
 #include "portable/common.h"
+
+const int PPIOErrorWouldBlock   = -11;
+const int PPIOErrorNoBufs       = -12;
 
 pp_log_category PPLogCategoryCore = "core";
 
 void pp_clog_v(pp_log_category category,
                pp_log_level level,
-               const char *_Nonnull fmt, ...) {
+               const char *fmt, ...) {
+    const int saved_errno = errno;
     va_list args;
     va_start(args, fmt);
     // Add 1 to include the null terminator
@@ -21,6 +26,7 @@ void pp_clog_v(pp_log_category category,
     va_end(args);
     pp_clog(category, level, msg);
     pp_free(msg);
+    errno = saved_errno;
 }
 
 #if PARTOUT_ANDROID
@@ -73,7 +79,7 @@ void pp_jni_delete_global_ref(void *ref) {
     PP_JNI_DETACH(env);
 }
 
-void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonnull message) {
+void pp_log_simple_append(const char *tag, pp_log_level level, const char *message) {
     const char *log_tag = tag ? tag : "Partout";
     int android_level = 0;
     switch (level) {
@@ -96,7 +102,7 @@ void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonn
     __android_log_print(android_level, log_tag, "%s", message);
 }
 #else
-void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonnull message) {
+void pp_log_simple_append(const char *tag, pp_log_level level, const char *message) {
     FILE *out = NULL;
     switch (level) {
     case PPLogLevelError:
@@ -108,5 +114,55 @@ void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonn
         break;
     }
     fprintf(out, "%s[%d]: %s\n", tag ? tag : "Partout", level, message);
+}
+#endif
+
+#if PARTOUT_WINDOWS
+#include <winsock2.h>
+
+int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {
+    (void)original_flags;
+    u_long mode = 1;
+    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "ioctlsocket(): set");
+        return -1;
+    }
+    return 0;
+}
+
+int pp_fd_restore_blocking(pp_fd fd, int original_flags) {
+    (void)original_flags;
+    u_long mode = 0;
+    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "ioctlsocket(): restore");
+        return -1;
+    }
+    return 0;
+}
+#else
+#include <fcntl.h>
+
+int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {
+    const int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "fcntl(): set, F_GETFL");
+        return -1;
+    }
+    if (original_flags) {
+        *original_flags = flags;
+    }
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "fcntl(): set, F_SETFL");
+        return -1;
+    }
+    return 0;
+}
+
+int pp_fd_restore_blocking(pp_fd fd, int original_flags) {
+    if (fcntl(fd, F_SETFL, original_flags) < 0) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "fcntl(): restore");
+        return -1;
+    }
+    return 0;
 }
 #endif

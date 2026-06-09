@@ -11,9 +11,11 @@
 #include "portable/common.h"
 #include "crypto/crypto.h"
 
+#pragma clang assume_nonnull begin
+
 typedef struct {
     uint32_t highest_pid;
-    uint32_t *_Nonnull bitmap;
+    uint32_t *bitmap;
 } openvpn_replay;
 
 #define OpenVPNReplayHiddenWinSize              128
@@ -25,7 +27,7 @@ typedef struct {
 #define OpenVPNReplayWinSize                    (OpenVPNReplayHiddenWinSize - OpenVPNReplayRedundantBits)
 
 static inline
-openvpn_replay *_Nonnull openvpn_replay_create() {
+openvpn_replay *openvpn_replay_create() {
     openvpn_replay *rp = pp_alloc(sizeof(openvpn_replay));
     rp->highest_pid = 0;
     rp->bitmap =  pp_alloc(OpenVPNReplayBitmapLength * sizeof(uint32_t));
@@ -33,14 +35,14 @@ openvpn_replay *_Nonnull openvpn_replay_create() {
 }
 
 static inline
-void openvpn_replay_free(openvpn_replay *_Nonnull rp) {
+void openvpn_replay_free(openvpn_replay *rp) {
     if (!rp) return;
     pp_free(rp->bitmap);
     pp_free(rp);
 }
 
 static inline
-bool openvpn_replay_is_replayed(openvpn_replay *_Nonnull rp, uint32_t packet_id) {
+bool openvpn_replay_is_replayed(openvpn_replay *rp, uint32_t packet_id) {
     if (packet_id == 0) {
         return true;
     }
@@ -72,3 +74,5 @@ bool openvpn_replay_is_replayed(openvpn_replay *_Nonnull rp, uint32_t packet_id)
     rp->bitmap[p_index] |= bitmask;
     return false;
 }
+
+#pragma clang assume_nonnull end

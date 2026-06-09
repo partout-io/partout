@@ -8,12 +8,11 @@
 #include "portable/common.h"
 #include "openvpn/control.h"
 
-openvpn_ctrl *_Nonnull openvpn_ctrl_create(openvpn_packet_code code, uint8_t key, uint32_t packet_id,
-                                     const uint8_t *_Nonnull session_id,
-                                     const uint8_t *_Nullable payload, size_t payload_len,
-                                     const uint32_t *_Nullable ack_ids, size_t ack_ids_len,
-                                     const uint8_t *_Nullable ack_remote_session_id) {
-
+openvpn_ctrl *openvpn_ctrl_create(openvpn_packet_code code, uint8_t key, uint32_t packet_id,
+                                  const uint8_t *session_id,
+                                  const uint8_t *_Nullable payload, size_t payload_len,
+                                  const uint32_t *_Nullable ack_ids, size_t ack_ids_len,
+                                  const uint8_t *_Nullable ack_remote_session_id) {
     openvpn_ctrl *pkt = pp_alloc(sizeof(openvpn_ctrl));
     pkt->code = code;
     pkt->key = key;
@@ -44,7 +43,7 @@ openvpn_ctrl *_Nonnull openvpn_ctrl_create(openvpn_packet_code code, uint8_t key
     return pkt;
 }
 
-void openvpn_ctrl_free(openvpn_ctrl *_Nonnull pkt) {
+void openvpn_ctrl_free(openvpn_ctrl *pkt) {
     if (!pkt) return;
     if (pkt->session_id) {
         pp_free(pkt->session_id);
@@ -95,7 +94,7 @@ size_t openvpn_ctrl_capacity_alg(const openvpn_ctrl *pkt, const openvpn_ctrl_alg
     return header_len + enc_capacity;
 }
 
-size_t openvpn_ctrl_serialize(uint8_t *_Nonnull dst, const openvpn_ctrl *_Nonnull pkt) {
+size_t openvpn_ctrl_serialize(uint8_t *dst, const openvpn_ctrl *pkt) {
     uint8_t *ptr = dst;
     if (pkt->ack_ids) {
         *ptr = pkt->ack_ids_len;
@@ -126,11 +125,10 @@ size_t openvpn_ctrl_serialize(uint8_t *_Nonnull dst, const openvpn_ctrl *_Nonnul
 // MARK: - Auth
 
 size_t openvpn_ctrl_serialize_auth(uint8_t *dst,
-                               size_t dst_buf_len,
-                               const openvpn_ctrl *pkt,
-                               openvpn_ctrl_alg *alg,
-                               pp_crypto_error_code *error) {
-
+                                   size_t dst_buf_len,
+                                   const openvpn_ctrl *pkt,
+                                   openvpn_ctrl_alg *alg,
+                                   pp_crypto_error_code *error) {
     const size_t digest_len = alg->crypto->base.meta.digest_len;
     uint8_t *ptr = dst + digest_len;
     const uint8_t *subject = ptr;
@@ -143,12 +141,12 @@ size_t openvpn_ctrl_serialize_auth(uint8_t *dst,
 
     const size_t subject_len = ptr - subject;
     const size_t dst_len = pp_crypto_encrypt(alg->crypto,
-                                          dst,
-                                          dst_buf_len,
-                                          subject,
-                                          subject_len,
-                                          NULL,
-                                          error);
+                                             dst,
+                                             dst_buf_len,
+                                             subject,
+                                             subject_len,
+                                             NULL,
+                                             error);
     if (!dst_len) {
         return 0;
     }

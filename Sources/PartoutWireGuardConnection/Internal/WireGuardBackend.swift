@@ -20,7 +20,7 @@ final class WireGuardBackend: @unchecked Sendable {
     }
 
     func setLogger(context: UnsafeMutableRawPointer?, logger_fn: LoggerCallback?) {
-        pp_wg_set_logger(context, logger_fn)
+        pp_wg_set_logger(logger_fn, context)
     }
 
 #if os(Windows)

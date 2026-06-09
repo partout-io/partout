@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
-internal import _PartoutCore_C
 internal import _PartoutWireGuard_C
 
 protocol WireGuardAdapterDelegate: AnyObject, Sendable {
@@ -9,7 +8,7 @@ protocol WireGuardAdapterDelegate: AnyObject, Sendable {
 
     func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: TunnelRemoteInfo) async throws -> IOInterface
 
-    func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64]) throws
+    func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [FileDescriptor]) throws
 
     func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapter, tunnel: IOInterface) async
 }
@@ -68,7 +67,7 @@ actor WireGuardAdapter {
     private var state: WireGuardAdapterState = .stopped
 
     /// Tunnel device file descriptor.
-    private var tunnelFileDescriptor: Int32? {
+    private var tunnelFileDescriptor: FileDescriptor? {
         didSet {
             logHandler(.verbose, "Tunnel file descriptor: \(tunnelFileDescriptor.debugDescription)")
         }
@@ -234,7 +233,7 @@ actor WireGuardAdapter {
         guard let delegate else { return }
         tunnel = try await delegate.adapterShouldSetNetworkSettings(self, settings: networkSettings)
 #if !os(Windows)
-        guard let tunFd = tunnel?.fileDescriptor.map(Int32.init) ?? fallbackFileDescriptor else {
+        guard let tunFd = tunnel?.fileDescriptor else {
             throw WireGuardAdapterError.cannotLocateTunnelFileDescriptor
         }
         tunnelFileDescriptor = tunFd
@@ -268,10 +267,9 @@ actor WireGuardAdapter {
     }
 
     @discardableResult
-    private func configureSockets(for handle: Int32) throws -> [UInt64] {
+    private func configureSockets(for handle: Int32) throws -> [FileDescriptor] {
         let descriptors = backend.socketDescriptors(handle)
             .filter { $0 >= 0 }
-            .map { UInt64($0) }
         pp_log(ctx, .wireguard, .info, "Socket descriptors: \(descriptors)")
         guard !descriptors.isEmpty else { return [] }
         try delegate?.adapterShouldConfigureSockets(self, descriptors: descriptors)
@@ -409,42 +407,6 @@ actor WireGuardAdapter {
             return false
         }
         return currentSettingsGenerator === settingsGenerator
-    }
-
-    private nonisolated var fallbackFileDescriptor: Int32? {
-#if canImport(Darwin)
-        var ctlInfo = ctl_info()
-        withUnsafeMutablePointer(to: &ctlInfo.ctl_name) {
-            $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: $0.pointee)) {
-                _ = strcpy($0, "com.apple.net.utun_control")
-            }
-        }
-        for fd: Int32 in 0...1024 {
-            var addr = sockaddr_ctl()
-            var ret: Int32 = -1
-            var len = socklen_t(MemoryLayout.size(ofValue: addr))
-            withUnsafeMutablePointer(to: &addr) {
-                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                    ret = getpeername(fd, $0, &len)
-                }
-            }
-            if ret != 0 || addr.sc_family != AF_SYSTEM {
-                continue
-            }
-            if ctlInfo.ctl_id == 0 {
-                ret = ioctl(fd, CTLIOCGINFO, &ctlInfo)
-                if ret != 0 {
-                    continue
-                }
-            }
-            if addr.sc_id == ctlInfo.ctl_id {
-                return fd
-            }
-        }
-        return nil
-#else
-        return nil
-#endif
     }
 }
 

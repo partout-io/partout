@@ -14,7 +14,7 @@ int pp_wg_init();
 typedef void (*pp_wg_logger_fn)(void *context, int level, const char *msg);
 
 const char *pp_wg_version();
-void pp_wg_set_logger(void *context, pp_wg_logger_fn logger_fn);
+void pp_wg_set_logger(pp_wg_logger_fn logger_fn, void *context);
 #if PARTOUT_WINDOWS
 int pp_wg_turn_on(const char *settings, const char *ifname);
 #else

@@ -8,4 +8,8 @@
 
 #include <stdint.h>
 
-void openvpn_mss_fix(uint8_t *_Nonnull data, size_t data_len, uint16_t mtu);
+#pragma clang assume_nonnull begin
+
+void openvpn_mss_fix(uint8_t *data, size_t data_len, uint16_t mtu);
+
+#pragma clang assume_nonnull end

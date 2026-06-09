@@ -106,12 +106,11 @@ public final class NativeTunnelController: TunnelController, Sendable {
         }) else {
             throw PartoutError(.tunNotAvailable)
         }
-        return VirtualTunnelInterface(ctx, tun: tun, maxReadLength: maxReadLength)
+        return TunWrapper(ctx, tun: tun)
     }
 
-    public func configureSockets(with descriptors: [UInt64]) throws {
+    public func configureSockets(with descriptors: [FileDescriptor]) throws {
         let result = descriptors
-            .map(Int32.init)
             .withUnsafeBufferPointer { fds in
                 if let info = reachabilityInfo?.toCReachability {
                     withUnsafePointer(to: info) { infoPtr in
@@ -144,17 +143,11 @@ public final class NativeTunnelController: TunnelController, Sendable {
     }
 
     public func clearTunnelSettings(_ io: IOInterface, withKillSwitch: Bool) async {
-        guard let tunnel = io as? VirtualTunnelInterface else {
-            assertionFailure("Expected type is VirtualTunnelInterface")
-            return
-        }
         // FIXME: #188, revert settings (record)
-//        tun.deviceName
-
-        // Make sure to issue the tunnel shutdown and wait for it to
-        // finish to prevent races on VirtualTunnelInterface.deinit
-        await tunnel.shutdown()
-
+        if let tunnel = io as? TunWrapper {
+//            tun.deviceName
+            tunnel.close()
+        }
         // Wrap up clear in native layer
         pp_tun_ctrl_clear_tunnel(ref, withKillSwitch)
     }
@@ -351,10 +344,6 @@ struct TunnelRemoteInfoWrapper: Encodable, Sendable {
 }
 
 final class DummyTunnelInterface: IOInterface {
-    var fileDescriptor: UInt64? {
-        nil
-    }
-
     func readPackets() async throws -> [Data] {
         []
     }
