@@ -71,4 +71,14 @@ pp_socket_fd pp_socket_get_fd(pp_socket sock);
 int pp_socket_set_nonblocking(pp_socket_fd fd, int *_Nullable original_flags);
 int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags);
 
+#if PARTOUT_WINDOWS
+static inline int pp_socket_last_error(void) {
+    return WSAGetLastError();
+}
+#else
+static inline int pp_socket_last_error(void) {
+    return errno;
+}
+#endif
+
 #pragma clang assume_nonnull end
