@@ -15,6 +15,8 @@ extension Profile {
         case addedModules([UniqueID])
         case removedModules([UniqueID])
         case changedModules([UniqueID])
+        case enabledModules([UniqueID])
+        case disabledModules([UniqueID])
     }
 
     public func differences(from previous: Profile) -> Set<DiffResult> {
@@ -37,25 +39,44 @@ extension Profile {
         if previous.activeModulesIds != activeModulesIds {
             diff.append(.changedActiveModules)
         }
-        // removed = only here, not in other
+
+        // Removed = only here, not in other
         let removedModules = previous.modules
             .filter {
                 module(withId: $0.id) == nil
             }
             .map(\.id)
-        // added = not here, only in other
+
+        // Added = not here, only in other
         let addedModules = modules
             .filter {
                 previous.module(withId: $0.id) == nil
             }
             .map(\.id)
-        // changed = in both but modified content
+
+        // Changed = in both but modified content
         let changedModules = modules
             .filter {
                 guard let previousModule = previous.module(withId: $0.id) else { return false }
                 return $0.fingerprint != previousModule.fingerprint
             }
             .map(\.id)
+
+        // Enabled/Disabled
+        let enabledModules = modules
+            .filter {
+                !previous.activeModulesIds.contains($0.id) &&
+                    activeModulesIds.contains($0.id)
+            }
+            .map(\.id)
+        let disabledModules = modules
+            .filter {
+                previous.activeModulesIds.contains($0.id) &&
+                    !activeModulesIds.contains($0.id)
+            }
+            .map(\.id)
+
+        // Pack diff results
         if !addedModules.isEmpty {
             diff.append(.addedModules(addedModules))
         }
@@ -65,6 +86,13 @@ extension Profile {
         if !changedModules.isEmpty {
             diff.append(.changedModules(changedModules))
         }
+        if !enabledModules.isEmpty {
+            diff.append(.enabledModules(enabledModules))
+        }
+        if !disabledModules.isEmpty {
+            diff.append(.disabledModules(disabledModules))
+        }
+
         return Set(diff)
     }
 }
