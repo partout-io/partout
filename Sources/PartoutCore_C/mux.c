@@ -10,7 +10,7 @@
 const int PPMuxErrorNull = -2;
 
 #if PARTOUT_WINDOWS
-// FIXME: ###
+// FIXME: ###, Implement mux.c on Windows
 #else
 #include <fcntl.h>
 #include <poll.h>
