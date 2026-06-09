@@ -24,7 +24,7 @@ const char *pp_wg_version() {
     return wgVersion();
 }
 
-void pp_wg_set_logger(void *context, pp_wg_logger_fn logger_fn) {
+void pp_wg_set_logger(pp_wg_logger_fn logger_fn, void *context) {
     return wgSetLogger(context, logger_fn);
 }
 
@@ -50,8 +50,12 @@ char *pp_wg_get_config(int handle) {
     return wgGetConfig(handle);
 }
 
-void pp_wg_bump_sockets(int handle) {
-    return wgBumpSockets(handle);
+void pp_wg_bump_sockets(int handle, bool sync) {
+    if (sync) {
+        return wgBumpSocketsAndWait(handle);
+    } else {
+        return wgBumpSockets(handle);
+    }
 }
 
 void pp_wg_tweak_mobile_roaming(int handle) {

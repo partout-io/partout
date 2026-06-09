@@ -15,13 +15,21 @@ final class TunnelRemoteInfoGenerator: Sendable {
 
     private let tunnelConfiguration: WireGuard.Configuration
 
+    private let dns: DNSResolver?
+
     private let dnsTimeout: Int
 
     private let resolvedEndpoints: ResolvedEndpointsCache
 
-    init(_ ctx: PartoutLoggerContext, tunnelConfiguration: WireGuard.Configuration, dnsTimeout: Int) {
+    init(
+        _ ctx: PartoutLoggerContext,
+        tunnelConfiguration: WireGuard.Configuration,
+        dns: DNSResolver?,
+        dnsTimeout: Int
+    ) {
         self.ctx = ctx
         self.tunnelConfiguration = tunnelConfiguration
+        self.dns = dns
         self.dnsTimeout = dnsTimeout
         resolvedEndpoints = ResolvedEndpointsCache()
     }
@@ -30,13 +38,19 @@ final class TunnelRemoteInfoGenerator: Sendable {
         await resolvedEndpoints.reset()
     }
 
+    func cacheResolvedPeerEndpoints(logHandler: @escaping WireGuardAdapter.LogHandler) async throws {
+        // We set .allAddresses so that we get v4 addresses even on DNS64 networks
+        _ = try await resolvePeers(dns: dns, flags: [.allAddresses], logHandler: logHandler)
+    }
+
     // Only updates peer endpoints
     func endpointUapiConfiguration(logHandler: @escaping WireGuardAdapter.LogHandler) async -> String {
         var wgSettings = ""
 
         let resolutionMap: [Endpoint: Endpoint]
         do {
-            resolutionMap = try await resolvePeers(logHandler: logHandler)
+            // We omit flags so that we actually resolve this using DNS64
+            resolutionMap = try await resolvePeers(dns: dns, flags: [], logHandler: logHandler)
         } catch {
             logHandler(.error, "Unable to resolve peer endpoints: \(error.localizedDescription)")
             return wgSettings
@@ -83,7 +97,8 @@ final class TunnelRemoteInfoGenerator: Sendable {
             wgSettings.append("replace_peers=true\n")
         }
 
-        let resolutionMap = try await resolvePeers(logHandler: logHandler)
+        // We omit flags so that we actually resolve this using DNS64
+        let resolutionMap = try await resolvePeers(dns: dns, flags: [], logHandler: logHandler)
 
         for peer in tunnelConfiguration.peers {
             let publicKey = try peer.publicKey.rawValue.hexStringFromBase64()
@@ -119,7 +134,7 @@ final class TunnelRemoteInfoGenerator: Sendable {
         return wgSettings
     }
 
-    func generateRemoteInfo(moduleId: UniqueID, descriptors: [Int32]) -> TunnelRemoteInfo {
+    func generateRemoteInfo(moduleId: UniqueID) -> TunnelRemoteInfo {
         /* iOS requires a tunnel endpoint, whereas in WireGuard it's valid for
          * a tunnel to have no endpoint, or for there to be many endpoints, in
          * which case, displaying a single one in settings doesn't really
@@ -170,18 +185,23 @@ final class TunnelRemoteInfoGenerator: Sendable {
             originalModuleId: moduleId,
             address: remoteAddress,
             modules: modules,
-            fileDescriptors: descriptors.map(UInt64.init),
             requiresVirtualDevice: requiresVirtualDevice
         )
     }
 }
 
 private extension TunnelRemoteInfoGenerator {
-    func resolvePeers(logHandler: @escaping WireGuardAdapter.LogHandler) async throws -> [Endpoint: Endpoint] {
+    func resolvePeers(
+        dns: DNSResolver?,
+        flags: Set<DNSResolverFlag>,
+        logHandler: @escaping WireGuardAdapter.LogHandler
+    ) async throws -> [Endpoint: Endpoint] {
         if let resolutionMap = await resolvedEndpoints.value {
             return resolutionMap
         }
         let resolutionMap = try await tunnelConfiguration.resolvePeers(
+            dns: dns,
+            flags: flags,
             timeout: dnsTimeout,
             logHandler: logHandler
         )

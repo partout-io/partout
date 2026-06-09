@@ -20,7 +20,7 @@ pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
 void pp_crypto_aead_free(pp_crypto_ctx vctx) {}
 
 pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name,
-                                   const char *_Nonnull digest_name,
+                                   const char *digest_name,
                                    const pp_crypto_keys *keys) {
     return NULL;
 }
@@ -28,7 +28,7 @@ pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name,
 void pp_crypto_cbc_free(pp_crypto_ctx vctx) {}
 
 pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name,
-                                   const char *_Nonnull digest_name,
+                                   const char *digest_name,
                                    size_t tag_len, size_t payload_len,
                                    const pp_crypto_keys *keys) {
     return NULL;
@@ -36,7 +36,7 @@ pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name,
 
 void pp_crypto_ctr_free(pp_crypto_ctx vctx) {}
 
-bool pp_crypto_init_seed(const uint8_t *_Nonnull src, const size_t len) {
+bool pp_crypto_init_seed(const uint8_t *src, const size_t len) {
     return false;
 }
 
@@ -44,7 +44,7 @@ pp_zd *pp_hmac_create() {
     return NULL;
 }
 
-size_t pp_hmac_do(pp_hmac_ctx *_Nonnull ctx) {
+size_t pp_hmac_do(pp_hmac_ctx *ctx) {
     return 0;
 }
 

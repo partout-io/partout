@@ -11,5 +11,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#pragma clang assume_nonnull begin
+
 uint32_t pp_prng_rand();
-bool pp_prng_do(uint8_t *_Nonnull dst, size_t len);
+bool pp_prng_do(uint8_t *dst, size_t len);
+
+#pragma clang assume_nonnull end

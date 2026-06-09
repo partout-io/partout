@@ -6,9 +6,9 @@
 public protocol TunnelController: AnyObject, Sendable {
     func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface
 
-    func configureSockets(with descriptors: [UInt64])
+    func configureSockets(with descriptors: [FileDescriptor]) throws
 
-    func reportSnapshots(_ snapshots: [TunnelSnapshot])
+    func reportSnapshot(_ snapshot: TunnelSnapshot)
 
     func clearTunnelSettings(_ tunnel: IOInterface, withKillSwitch: Bool) async
 
@@ -18,7 +18,7 @@ public protocol TunnelController: AnyObject, Sendable {
 }
 
 extension TunnelController {
-    public func reportSnapshots(_ snapshots: [TunnelSnapshot]) {
+    public func reportSnapshot(_ snapshot: TunnelSnapshot) {
     }
 
     public func clearTunnelSettings(_ tunnel: IOInterface) async {

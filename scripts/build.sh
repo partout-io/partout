@@ -118,4 +118,4 @@ if [[ $gen_models == 1 ]]; then
     rm -rf cross-models
 fi
 
-popd root_dir
+popd

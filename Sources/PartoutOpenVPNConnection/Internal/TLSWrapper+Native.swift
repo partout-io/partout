@@ -60,14 +60,14 @@ private final class NativeTLSWrapper: TLSProtocol {
             certPEM,
             keyPEM,
             hostname,
-            Unmanaged.passUnretained(didFailVerification).toOpaque(),
             { ctx in
                 guard let ctx else { return }
                 let stream = Unmanaged<PassthroughStream<Void>>
                     .fromOpaque(ctx)
                     .takeUnretainedValue()
                 stream.send()
-            }
+            },
+            Unmanaged.passUnretained(didFailVerification).toOpaque()
         )
         var error = PPTLSErrorNone
         guard let tls = pp_tls_create(options, &error) else {

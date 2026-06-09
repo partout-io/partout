@@ -159,7 +159,7 @@ extension _OpenVPNConnectionV2: OpenVPNSessionDelegate {
         remoteAddress: String,
         remoteProtocol: EndpointProtocol,
         remoteOptions: OpenVPN.Configuration,
-        remoteFd: UInt64?
+        remoteFd: FileDescriptor?
     ) async {
         let addressObject = Address(rawValue: remoteAddress)
         if addressObject == nil {
@@ -189,7 +189,7 @@ extension _OpenVPNConnectionV2: OpenVPNSessionDelegate {
                     originalModuleId: moduleId,
                     address: addressObject,
                     modules: builder.modules(),
-                    fileDescriptors: remoteFd.map { [$0] } ?? []
+                    requiresVirtualDevice: true
                 )
             )
             await session.setTunnel(tunnelInterface)
@@ -345,7 +345,6 @@ private extension LinkInterface {
         switch linkType.plainType {
         case .udp:
             return OpenVPNUDPLink(link: self, method: method)
-
         case .tcp:
             return OpenVPNTCPLink(link: self, method: method)
         }

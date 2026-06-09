@@ -13,7 +13,6 @@ extension LoggerCategory {
 // MARK: Generic
 
 extension PartoutError.Code {
-
     /// Response is cached.
     public static let cached = Self("cached")
 
@@ -39,7 +38,6 @@ extension PartoutError.Code {
 // MARK: Profile
 
 extension PartoutError.Code {
-
     /// Some modules are incompatible (`userInfo` is an array of incompatible ``Module``).
     public static let incompatibleModules = Self("incompatibleModules")
 
@@ -80,7 +78,6 @@ extension PartoutError {
 // MARK: Networking
 
 extension PartoutError.Code {
-
     /// Authentication failure.
     public static let authentication = Self("authentication")
 
@@ -93,17 +90,26 @@ extension PartoutError.Code {
     /// No more endpoints available to try.
     public static let exhaustedEndpoints = Self("exhaustedEndpoints")
 
+    /// File descriptor is not available.
+    public static let fdUnavailable = Self("fdUnavailable")
+
+    /// I/O failure.
+    public static let ioFailure = Self("ioFailure")
+
     /// Link device is not active.
     public static let linkNotActive = Self("linkNotActive")
 
-    /// Link I/O failure.
-    public static let linkFailure = Self("linkFailure")
+    /// Multiplexer failure.
+    public static let muxFailure = Self("muxFailure")
 
     /// Network changed.
     public static let networkChanged = Self("networkChanged")
 
     /// Network is unreachable.
     public static let networkUnreachable = Self("networkUnreachable")
+
+    /// Native sockets could not be configured.
+    public static let socketConfiguration = Self("socketConfiguration")
 
     /// TUN device is not active.
     public static let tunNotActive = Self("tunNotActive")
@@ -115,7 +121,6 @@ extension PartoutError.Code {
 // MARK: Serialization
 
 extension PartoutError.Code {
-
     /// Decoding error.
     public static let decoding = Self("decoding")
 

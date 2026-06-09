@@ -10,7 +10,7 @@
 
 int main() {
     puts("Hello");
-    pp_tun tun = pp_tun_create("00000000-00000000-00000000-00000000", NULL);
+    pp_tun tun = pp_tun_open("00000000-00000000-00000000-00000000");
     Sleep(1000 * 1000); // 1000 seconds
     return 0;
 }

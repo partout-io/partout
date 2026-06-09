@@ -33,11 +33,15 @@ extension PartoutError.Code {
 
         public static let passphraseRequired = PartoutError.Code("OpenVPN.passphraseRequired")
 
+        public static let recoverableAuthentication = PartoutError.Code("OpenVPN.recoverableAuthentication")
+
         public static let serverShutdown = PartoutError.Code("OpenVPN.serverShutdown")
 
         public static let tlsFailure = PartoutError.Code("OpenVPN.tlsFailure")
 
         public static let unsupportedAlgorithm = PartoutError.Code("OpenVPN.unsupportedAlgorithm")
+
+        public static let unsupportedCompression = PartoutError.Code("OpenVPN.unsupportedCompression")
 
         public static let unsupportedOption = PartoutError.Code("OpenVPN.unsupportedOption")
     }

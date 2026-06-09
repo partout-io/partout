@@ -50,15 +50,15 @@ extension OpenVPNTCPLink: LinkInterface {
         OpenVPNTCPLink(link: try await link.upgraded(), proc: proc)
     }
 
-    func shutdown() {
-        link.shutdown()
+    func close() {
+        link.close()
     }
 }
 
 // MARK: - IOInterface
 
 extension OpenVPNTCPLink {
-    var fileDescriptor: UInt64? {
+    var fileDescriptor: FileDescriptor? {
         link.fileDescriptor
     }
 

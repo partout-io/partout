@@ -93,6 +93,7 @@ set(CMAKE_Swift_FLAGS "\
     -l_FoundationCollections \
     -l_FoundationCShims \
     -lswiftSynchronization \
+    -landroid \
     -lc++_shared \
     -llog \
     -lm"

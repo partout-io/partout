@@ -15,12 +15,8 @@ struct SimpleConnectionDaemonTests {
         let profile = try Profile.Builder()
             .build()
 
-        let sut = try await newDaemon(with: profile)
-        do {
-            try await sut.start()
-        } catch {
-            #expect(Bool(false), error.localizedComment)
-        }
+        let sut = try newDaemon(with: profile)
+        try await withStartedDaemon(sut)
     }
 
     @Test
@@ -33,13 +29,14 @@ struct SimpleConnectionDaemonTests {
         #expect(profile.activeConnectionModule != nil)
 
         let reachability = MockReachabilityObserver()
-        let sut = try await newDaemon(with: profile, reachability: reachability)
+        let sut = try newDaemon(with: profile, reachability: reachability)
         let stream = sut.statusStream
 
-        try await sut.start()
-        #expect(await stream.nextElement() == .disconnected)
-        #expect(await stream.nextElement() == .connecting)
-        #expect(await stream.nextElement() == .connected)
+        try await withStartedDaemon(sut) {
+            #expect(await stream.nextElement() == .disconnected)
+            #expect(await stream.nextElement() == .connecting)
+            #expect(await stream.nextElement() == .connected)
+        }
     }
 
     @Test
@@ -54,7 +51,7 @@ struct SimpleConnectionDaemonTests {
 
         let environment = SharedTunnelEnvironment(profileId: profile.id)
         do {
-            _ = try await newDaemon(with: profile, environment: environment)
+            _ = try newDaemon(with: profile, environment: environment)
         } catch let error as PartoutError {
             #expect(error.code == .authentication)
         } catch {
@@ -73,7 +70,7 @@ struct SimpleConnectionDaemonTests {
         #expect(profile.activeConnectionModule != nil)
 
         let expLastError = Expectation()
-        let sut = try await newDaemon(
+        let sut = try newDaemon(
             with: profile,
             onSnapshot: { snapshot in
                 guard snapshot.environment?.lastErrorCode == .dnsFailure else { return }
@@ -82,11 +79,8 @@ struct SimpleConnectionDaemonTests {
                 }
             }
         )
-        do {
-            try await sut.start()
+        try await withStartedDaemon(sut) {
             try await expLastError.fulfillment(timeout: 500)
-        } catch {
-            #expect(Bool(false), error.localizedComment)
         }
     }
 
@@ -101,7 +95,7 @@ struct SimpleConnectionDaemonTests {
 
         let reachability = MockReachabilityObserver()
         reachability.isReachable = false
-        let sut = try await newDaemon(
+        let sut = try newDaemon(
             with: profile,
             reachability: reachability,
             reconnectionDelay: 100
@@ -115,14 +109,15 @@ struct SimpleConnectionDaemonTests {
             }
         }
 
-        try await sut.start()
-        Task {
-            reachability.isReachable = true
+        try await withStartedDaemon(sut) {
+            Task {
+                reachability.isReachable = true
+            }
+            try await expAvailable.fulfillment(timeout: 500)
+            #expect(await stream.nextElement() == .disconnected)
+            #expect(await stream.nextElement() == .connecting)
+            #expect(await stream.nextElement() == .connected)
         }
-        try await expAvailable.fulfillment(timeout: 500)
-        #expect(await stream.nextElement() == .disconnected)
-        #expect(await stream.nextElement() == .connecting)
-        #expect(await stream.nextElement() == .connected)
     }
 
     @Test
@@ -137,7 +132,7 @@ struct SimpleConnectionDaemonTests {
 
         let expLastError = Expectation()
         let expCancel = Expectation()
-        let sut = try await newDaemon(
+        let sut = try newDaemon(
             with: profile,
             onCancel: { error in
                 guard error?.partoutErrorCode == .authentication else { return }
@@ -155,12 +150,13 @@ struct SimpleConnectionDaemonTests {
         )
         let stream = sut.statusStream
 
-        try await sut.start()
-        #expect(await stream.nextElement() == .disconnected)
-        #expect(await stream.nextElement() == .connecting)
-        #expect(await stream.nextElement() == .connected)
-        try await expLastError.fulfillment(timeout: 500)
-        try await expCancel.fulfillment(timeout: 500)
+        try await withStartedDaemon(sut) {
+            #expect(await stream.nextElement() == .disconnected)
+            #expect(await stream.nextElement() == .connecting)
+            #expect(await stream.nextElement() == .connected)
+            try await expLastError.fulfillment(timeout: 500)
+            try await expCancel.fulfillment(timeout: 500)
+        }
     }
 
     @Test
@@ -174,7 +170,7 @@ struct SimpleConnectionDaemonTests {
         #expect(profile.activeConnectionModule != nil)
 
         let expLastError = Expectation()
-        let sut = try await newDaemon(
+        let sut = try newDaemon(
             with: profile,
             reconnectionDelay: 5000,
             onSnapshot: { snapshot in
@@ -186,11 +182,12 @@ struct SimpleConnectionDaemonTests {
         )
         let stream = sut.statusStream
 
-        try await sut.start()
-        #expect(await stream.nextElement() == .disconnected)
-        #expect(await stream.nextElement() == .connecting)
-        #expect(await stream.nextElement() == .connected)
-        try await expLastError.fulfillment(timeout: 500)
+        try await withStartedDaemon(sut) {
+            #expect(await stream.nextElement() == .disconnected)
+            #expect(await stream.nextElement() == .connecting)
+            #expect(await stream.nextElement() == .connected)
+            try await expLastError.fulfillment(timeout: 500)
+        }
     }
 
     @Test
@@ -209,7 +206,7 @@ struct SimpleConnectionDaemonTests {
 
         let recorder = SnapshotRecorder()
         let expDataCount = Expectation()
-        let sut = try await newDaemon(
+        let sut = try newDaemon(
             with: profile,
             reconnectionDelay: 5000,
             snapshotInterval: 30,
@@ -224,16 +221,17 @@ struct SimpleConnectionDaemonTests {
         )
         let stream = sut.statusStream
 
-        try await sut.start()
-        #expect(await stream.nextElement() == .disconnected)
-        #expect(await stream.nextElement() == .connecting)
-        #expect(await stream.nextElement() == .connected)
-        try await expDataCount.fulfillment(timeout: 1000)
+        try await withStartedDaemon(sut) {
+            #expect(await stream.nextElement() == .disconnected)
+            #expect(await stream.nextElement() == .connecting)
+            #expect(await stream.nextElement() == .connected)
+            try await expDataCount.fulfillment(timeout: 1000)
 
-        let dataCounts = await recorder.dataCounts.filter { $0 != DataCount() }
-        #expect(!dataCounts.contains(DataCount(40, 0)))
-        #expect(!dataCounts.contains(DataCount(80, 0)))
-        #expect(dataCounts.contains(DataCount(140, 0)))
+            let dataCounts = await recorder.dataCounts.filter { $0 != DataCount() }
+            #expect(!dataCounts.contains(DataCount(40, 0)))
+            #expect(!dataCounts.contains(DataCount(80, 0)))
+            #expect(dataCounts.contains(DataCount(140, 0)))
+        }
     }
 
     @Test
@@ -246,7 +244,7 @@ struct SimpleConnectionDaemonTests {
         #expect(profile.activeConnectionModule != nil)
 
         let reachability = MockReachabilityObserver()
-        let sut = try await newDaemon(
+        let sut = try newDaemon(
             with: profile,
             reachability: reachability,
             stopDelay: 100,
@@ -275,7 +273,7 @@ struct SimpleConnectionDaemonTests {
         #expect(profile.activeConnectionModule != nil)
 
         let reachability = MockReachabilityObserver()
-        let sut = try await newDaemon(
+        let sut = try newDaemon(
             with: profile,
             reachability: reachability,
             stopDelay: 200
@@ -296,6 +294,20 @@ struct SimpleConnectionDaemonTests {
 // MARK: - Helpers
 
 private extension SimpleConnectionDaemonTests {
+    func withStartedDaemon(
+        _ daemon: SimpleConnectionDaemon,
+        operation: () async throws -> Void = {}
+    ) async throws {
+        try await daemon.start()
+        do {
+            try await operation()
+        } catch {
+            await daemon.stop()
+            throw error
+        }
+        await daemon.stop()
+    }
+
     func newDaemon(
         with profile: Profile,
         reachability: ReachabilityObserver = MockReachabilityObserver(),
@@ -306,7 +318,7 @@ private extension SimpleConnectionDaemonTests {
         snapshotInterval: Int = 1000,
         minDataCountDelta: UInt64 = 0,
         onSnapshot: OnTunnelSnapshotCallback? = nil
-    ) async throws -> SimpleConnectionDaemon {
+    ) throws -> SimpleConnectionDaemon {
         let controller = MockTunnelController()
         controller.onCancelTunnelConnection = onCancel
         let options = ConnectionParameters.Options()
@@ -323,6 +335,7 @@ private extension SimpleConnectionDaemonTests {
             ),
             messageHandler: DefaultMessageHandler(.global, environment: environment),
             startsImmediately: false,
+            cancelsUnrecoverable: true,
             stopDelay: stopDelay,
             reconnectionDelay: reconnectionDelay,
             snapshotInterval: snapshotInterval,

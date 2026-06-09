@@ -24,7 +24,7 @@ extension OpenVPNSession {
                 do {
                     let packets = try await tunnel.readPackets()
                     guard !packets.isEmpty else {
-                        pp_log(ctx, .openvpn, .debug, "Skip TUN loop after empty packets")
+//                        pp_log(ctx, .openvpn, .debug, "Skip TUN loop after empty packets")
                         continue
                     }
                     try await receiveTunnel(packets: packets)
@@ -61,7 +61,7 @@ extension OpenVPNSession {
                     try await receiveLink(packets: packets)
                 } catch {
                     pp_log(ctx, .openvpn, .error, "Failed LINK read: \(error)")
-                    await self.shutdown(PartoutError(.linkFailure, error))
+                    await self.shutdown(PartoutError(.ioFailure, error))
                     return
                 }
             }

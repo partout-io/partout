@@ -5,7 +5,7 @@
 @testable import PartoutOS
 import Testing
 
-struct NEBetterPathBlockTests {
+struct NEBetterPathStreamFactoryTests {
     @Test
     func givenUnsatisfiedPath_whenPathBecomesSatisfied_thenIsBetter() {
         let oldPath = NWPathBetterPathPreference(

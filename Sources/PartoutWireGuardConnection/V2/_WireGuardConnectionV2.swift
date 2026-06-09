@@ -72,6 +72,7 @@ public actor _WireGuardConnectionV2: Connection {
             ctx,
             with: self,
             moduleId: moduleId,
+            dns: controller as? DNSResolver,
             dnsTimeout: dnsTimeout,
             reachability: reachability,
             logHandler: { [weak self] logLevel, message in
@@ -153,8 +154,8 @@ extension _WireGuardConnectionV2: WireGuardAdapterDelegate {
         }
     }
 
-    nonisolated func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [UInt64]) {
-        controller.configureSockets(with: descriptors)
+    nonisolated func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [FileDescriptor]) throws {
+        try controller.configureSockets(with: descriptors)
     }
 
     func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapter, tunnel: IOInterface) async {
@@ -174,7 +175,10 @@ private extension _WireGuardConnectionV2 {
             pp_log(ctx, .wireguard, .error, "Starting tunnel failed: could not determine file descriptor")
             return WireGuardConnectionError.couldNotDetermineFileDescriptor
         case .dnsResolution(let endpoints):
-            let hostnamesWithDnsResolutionFailure = endpoints.map(\.address.rawValue)
+            let hostnamesWithDnsResolutionFailure = endpoints
+                .map {
+                    $0.address.asSensitiveAddress(ctx)
+                }
                 .joined(separator: ", ")
             pp_log(ctx, .wireguard, .error, "DNS resolution failed for the following hostnames: \(hostnamesWithDnsResolutionFailure)")
             return WireGuardConnectionError.dnsResolutionFailure

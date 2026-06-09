@@ -40,7 +40,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
             pp_log(ctx, .os, .info, "NEInterfaceFactory: NEPacketTunnelProvider released")
             throw PartoutError(.releasedObject)
         }
-        switch endpoint.proto.socketType.plainType {
+        switch endpoint.plainSocketType {
         case .udp:
 #if swift(>=6.0)
             fatalError("Unavailable in Swift 6")
@@ -86,7 +86,6 @@ private extension ExtendedEndpoint {
     }
 
 #if swift(<6.0)
-    @available(*, deprecated, message: "NetworkExtension UDP/TCP sockets were removed in Swift 6")
     var nwHostEndpoint: NWHostEndpoint {
         NWHostEndpoint(hostname: address.rawValue, port: proto.port.description)
     }

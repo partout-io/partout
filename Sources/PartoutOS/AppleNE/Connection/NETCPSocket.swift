@@ -5,7 +5,6 @@
 import NetworkExtension
 
 /// An observer based on `NWTCPConnection`.
-@available(*, deprecated)
 public final class NETCPObserver: LinkObserver {
     public struct Options: Sendable {
         public let minLength: Int
@@ -100,7 +99,7 @@ extension NETCPSocket {
         )
     }
 
-    nonisolated func shutdown() {
+    nonisolated func close() {
         nwConnection.writeClose()
         nwConnection.cancel()
     }
@@ -109,10 +108,6 @@ extension NETCPSocket {
 // MARK: IOInterface
 
 extension NETCPSocket {
-    nonisolated var fileDescriptor: UInt64? {
-        nil
-    }
-
     func readPackets() async throws -> [Data] {
         // WARNING: runs in Network.framework queue
         try await withCheckedThrowingContinuation { continuation in

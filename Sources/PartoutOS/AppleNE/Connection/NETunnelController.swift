@@ -61,7 +61,7 @@ public final class NETunnelController: TunnelController {
         return tun
     }
 
-    public func configureSockets(with descriptors: [UInt64]) {
+    public func configureSockets(with descriptors: [FileDescriptor]) {
     }
 
     public func clearTunnelSettings(_ tunnel: IOInterface, withKillSwitch: Bool) async {

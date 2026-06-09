@@ -63,8 +63,8 @@ GUID guid_from_wstring(const wchar_t *wstr) {
     return guid;
 }
 
-static
-pp_tun pp_tun_create(const char *_Nonnull uuid) {
+pp_tun pp_tun_open(const char *uuid) {
+    if (!uuid) return NULL;
     WINTUN_ADAPTER_HANDLE adapter = NULL;
     WINTUN_SESSION_HANDLE session = NULL;
     LPCWSTR tun_type = NULL;
@@ -131,12 +131,13 @@ failure:
     return NULL;
 }
 
-static
-void pp_tun_free(pp_tun tun) {
+void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     if (!tun) return;
-    pp_tun_shutdown(tun);
-    if (tun->adapter) {
-        WintunCloseAdapter(tun->adapter);
+    if (and_close) {
+        pp_tun_close(tun);
+        if (tun->adapter) {
+            WintunCloseAdapter(tun->adapter);
+        }
     }
     pp_free(tun->name);
     pp_free(tun);
@@ -197,13 +198,13 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     return src_len;
 }
 
-void pp_tun_shutdown(const pp_tun tun) {
+void pp_tun_close(const pp_tun tun) {
     if (!tun || !tun->session) return;
     WintunEndSession(tun->session);
     tun->session = NULL;
 }
 
-int pp_tun_fd(const pp_tun tun) {
+int pp_tun_get_fd(const pp_tun tun) {
     (void)tun;
     return -1;
 }
@@ -211,6 +212,12 @@ int pp_tun_fd(const pp_tun tun) {
 const char *pp_tun_name(const pp_tun tun) {
     (void)tun;
     return NULL;
+}
+
+void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
+    (void)ref;
+    (void)delegate;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_windows: ctrl_set_delegate(%p, %p)", ref, delegate);
 }
 
 pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
@@ -221,28 +228,31 @@ pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json
     return NULL;
 }
 
-void pp_tun_ctrl_configure_sockets(void *ref, const int *fds, const size_t fds_len) {
+bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
+                                   const int *fds, const size_t fds_len) {
     (void)ref;
+    (void)info;
     (void)fds;
     (void)fds_len;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_configure_sockets(%p)", ref);
+    return true;
 }
 
-void pp_tun_ctrl_report_snapshots(void *ref, const char *snapshots_json) {
+void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
     (void)ref;
-    (void)snapshots_json;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_report_snapshots(%p)", ref);
+    (void)snapshot_json;
+    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_report_snapshot(%p)", ref);
 }
 
-void pp_tun_ctrl_clear_tunnel(void *ref, pp_tun tun_impl) {
+void pp_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
     (void)ref;
-    (void)tun_impl;
+    (void)kill_switch;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_clear_tunnel(%p)", ref);
 }
 
-void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_message) {
+void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_code) {
     (void)ref;
-    (void)error_message;
+    (void)error_code;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_cancel_tunnel(%p)", ref);
 }
 

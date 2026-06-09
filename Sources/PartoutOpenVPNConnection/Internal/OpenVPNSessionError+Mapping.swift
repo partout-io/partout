@@ -15,8 +15,11 @@ extension OpenVPNSessionError: PartoutErrorMappable {
         case .negotiationTimeout, .pingTimeout, .writeTimeout:
             return .timeout
 
-        case .badCredentials, .badCredentialsWithLocalOptions:
+        case .badCredentials:
             return .authentication
+
+        case .badCredentialsWithLocalOptions:
+            return .OpenVPN.recoverableAuthentication
 
         case .serverCompression:
             return .OpenVPN.compressionMismatch

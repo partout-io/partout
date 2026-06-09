@@ -12,6 +12,8 @@
 #include "portable/endian.h"
 #include "portable/zd.h"
 
+#pragma clang assume_nonnull begin
+
 typedef enum {
     OpenVPNPktProcMethodNone,
     OpenVPNPktProcMethodXORMask,
@@ -21,9 +23,9 @@ typedef enum {
 } openvpn_pkt_proc_method;
 
 typedef struct {
-    uint8_t *_Nonnull dst;
+    uint8_t *dst;
     size_t dst_offset;
-    const uint8_t *_Nonnull src;
+    const uint8_t *src;
     size_t src_offset;
     size_t src_len;
     const uint8_t *_Nullable mask;
@@ -34,24 +36,23 @@ typedef void (*openvpn_pkt_proc_algorithm)(const openvpn_pkt_proc_alg_ctx *_Nonn
 
 typedef struct {
     pp_zd *_Nullable mask;
-    openvpn_pkt_proc_algorithm _Nonnull recv;
-    openvpn_pkt_proc_algorithm _Nonnull send;
+    openvpn_pkt_proc_algorithm recv;
+    openvpn_pkt_proc_algorithm send;
 } openvpn_pkt_proc;
 
-openvpn_pkt_proc *_Nonnull openvpn_pkt_proc_create(openvpn_pkt_proc_method method,
-                                                   const uint8_t *_Nullable mask,
-                                                   size_t mask_len);
+openvpn_pkt_proc *openvpn_pkt_proc_create(openvpn_pkt_proc_method method,
+                                          const uint8_t *_Nullable mask,
+                                          size_t mask_len);
 
-void openvpn_pkt_proc_free(openvpn_pkt_proc *_Nonnull proc);
+void openvpn_pkt_proc_free(openvpn_pkt_proc *proc);
 
 // MARK: - Raw
 
 static inline
-void openvpn_pkt_proc_recv(const openvpn_pkt_proc *_Nonnull proc,
-                           uint8_t *_Nonnull dst,
-                           const uint8_t *_Nonnull src,
+void openvpn_pkt_proc_recv(const openvpn_pkt_proc *proc,
+                           uint8_t *dst,
+                           const uint8_t *src,
                            size_t src_len) {
-
     const openvpn_pkt_proc_alg_ctx ctx = {
         dst, 0,
         src, 0, src_len,
@@ -62,11 +63,10 @@ void openvpn_pkt_proc_recv(const openvpn_pkt_proc *_Nonnull proc,
 }
 
 static inline
-void openvpn_pkt_proc_send(const openvpn_pkt_proc *_Nonnull proc,
-                           uint8_t *_Nonnull dst,
-                           const uint8_t *_Nonnull src,
+void openvpn_pkt_proc_send(const openvpn_pkt_proc *proc,
+                           uint8_t *dst,
+                           const uint8_t *src,
                            size_t src_len) {
-
     const openvpn_pkt_proc_alg_ctx ctx = {
         dst, 0,
         src, 0, src_len,
@@ -83,11 +83,10 @@ void openvpn_pkt_proc_send(const openvpn_pkt_proc *_Nonnull proc,
 // loop until 0
 // stream -> parse packet and return new offset
 static inline
-pp_zd *_Nullable openvpn_pkt_proc_stream_recv(const void *_Nonnull vproc,
-                                              const uint8_t *_Nonnull src,
+pp_zd *_Nullable openvpn_pkt_proc_stream_recv(const void *vproc,
+                                              const uint8_t *src,
                                               size_t src_len,
                                               size_t *_Nullable src_rcvd) {
-
     if (src_len < OpenVPNPktProcStreamHeaderLength) {
         return NULL;
     }
@@ -114,12 +113,11 @@ size_t openvpn_pkt_proc_stream_send_bufsize(const int num, const size_t len) {
 }
 
 static inline
-size_t openvpn_pkt_proc_stream_send(const void *_Nonnull vproc,
-                                    pp_zd *_Nonnull dst,
+size_t openvpn_pkt_proc_stream_send(const void *vproc,
+                                    pp_zd *dst,
                                     size_t dst_offset,
-                                    const uint8_t *_Nonnull src,
+                                    const uint8_t *src,
                                     size_t src_len) {
-
     const size_t buf_len = OpenVPNPktProcStreamHeaderLength + src_len;
     pp_assert(dst->length >= dst_offset + buf_len);
 
@@ -131,3 +129,5 @@ size_t openvpn_pkt_proc_stream_send(const void *_Nonnull vproc,
     openvpn_pkt_proc_send(proc, ptr, src, src_len);
     return dst_offset + buf_len;
 }
+
+#pragma clang assume_nonnull end
