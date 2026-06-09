@@ -406,7 +406,7 @@ int pp_mux_wait(pp_mux mux, int *error_code) {
                 PP_IO_RETRY(ret, eventfd_read(mux->wake_fd, &value));
                 if (ret < 0) {
                     /* Fully drained */
-                    if (PP_IO_WOULDBLOCK()) break;
+                    if (pp_io_wouldblock()) break;
                     /* Unexpected error */
                     pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait eventfd_read() failed: errno=%d", errno);
                     return ret;

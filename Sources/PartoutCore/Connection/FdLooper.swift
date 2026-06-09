@@ -845,7 +845,7 @@ private extension FdLooper {
         let code: Int32
 
         var debugDescription: String {
-            "wait: errno=\(code)"
+            "wait: last_error=\(code)"
         }
     }
 
@@ -871,7 +871,7 @@ private extension FdLooper {
             case .wouldBlock(let side): "\(side): would block"
             case .noBufSpace(let side): "\(side): no buffer space"
             case .eof(let side): "\(side): EOF"
-            case .libc(let side, let code): "\(side): libc errno=\(code)"
+            case .libc(let side, let code): "\(side): last_error=\(code)"
             case .user(let side, let reason): "\(side): user error, \(reason.debugDescription)"
             }
         }
@@ -1005,7 +1005,7 @@ private extension FdLooper.SideIO {
                     throw FdLooper.IOError.wouldBlock(.link)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.libc(.link, errno)
+                    throw FdLooper.IOError.libc(.link, pp_io_last_error())
                 }
                 guard count > 0 else {
                     if closesOnEmptyRead {
@@ -1030,7 +1030,7 @@ private extension FdLooper.SideIO {
                     throw FdLooper.IOError.noBufSpace(.link)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.libc(.link, errno)
+                    throw FdLooper.IOError.libc(.link, pp_io_last_error())
                 }
                 return Int(count)
             },
@@ -1059,7 +1059,7 @@ private extension FdLooper.SideIO {
                     throw FdLooper.IOError.wouldBlock(.tun)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.libc(.tun, errno)
+                    throw FdLooper.IOError.libc(.tun, pp_io_last_error())
                 }
                 guard count > 0 else {
                     return nil
@@ -1081,7 +1081,7 @@ private extension FdLooper.SideIO {
                     throw FdLooper.IOError.noBufSpace(.tun)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.libc(.tun, errno)
+                    throw FdLooper.IOError.libc(.tun, pp_io_last_error())
                 }
                 return Int(count)
             },
