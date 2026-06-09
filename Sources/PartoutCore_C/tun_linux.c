@@ -122,7 +122,7 @@ pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json
 }
 
 bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
-                                   const int *fds, const size_t fds_len) {
+                                   const pp_socket_fd *fds, const size_t fds_len) {
     (void)ref;
     (void)info;
     (void)fds;

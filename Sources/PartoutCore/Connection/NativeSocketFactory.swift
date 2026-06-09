@@ -151,7 +151,12 @@ final class SocketWrapper: @unchecked Sendable {
 
 extension SocketWrapper: LinkInterface {
     var fileDescriptor: FileDescriptor? {
+#if os(Windows)
+        // FIXME: ###, Get HANDLE from SOCKET
+        nil
+#else
         pp_socket_get_fd(socket)
+#endif
     }
 
     var remoteAddress: String {

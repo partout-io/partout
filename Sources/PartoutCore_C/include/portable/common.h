@@ -113,7 +113,13 @@ extern const int PPIOErrorNoBufs;
 
 #if PARTOUT_WINDOWS
 #include <ws2tcpip.h>
-typedef SOCKET pp_fd;
+typedef _Nonnull HANDLE pp_fd;
+typedef SOCKET pp_socket_fd;
+
+#pragma clang assume_nonnull begin
+int pp_fd_set_nonblocking(pp_socket_fd fd, int *_Nullable original_flags);
+int pp_fd_restore_blocking(pp_socket_fd fd, int original_flags);
+#pragma clang assume_nonnull end
 
 #define PP_IO_RETRY(result, fn) \
     do { \
@@ -136,6 +142,12 @@ static inline bool PP_IO_NOBUFS(void) {
 #else
 #include <errno.h>
 typedef int pp_fd;
+typedef pp_fd pp_socket_fd;
+
+#pragma clang assume_nonnull begin
+int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
+int pp_fd_restore_blocking(pp_fd fd, int original_flags);
+#pragma clang assume_nonnull end
 
 #define PP_IO_RETRY(result, fn) \
     do { \
@@ -156,11 +168,6 @@ static inline bool PP_IO_NOBUFS(void) {
     return errno == ENOBUFS;
 }
 #endif
-
-#pragma clang assume_nonnull begin
-int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
-int pp_fd_restore_blocking(pp_fd fd, int original_flags);
-#pragma clang assume_nonnull end
 
 /* Android only. */
 

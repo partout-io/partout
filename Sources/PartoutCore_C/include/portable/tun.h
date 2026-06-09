@@ -91,7 +91,7 @@ pp_tun _Nullable pp_tun_ctrl_set_tunnel(void *_Nullable ref,
                                         const char *_Nullable info_json);
 bool pp_tun_ctrl_configure_sockets(void *_Nullable ref,
                                    const pp_reachability *_Nullable info,
-                                   const int *_Nullable fds,
+                                   const pp_socket_fd *_Nonnull fds,
                                    const size_t fds_len);
 void pp_tun_ctrl_report_snapshot(void *_Nullable ref,
                                  const char *snapshot_json);

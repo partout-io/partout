@@ -193,7 +193,7 @@ cleanup:
 }
 
 bool pp_tun_ctrl_configure_sockets(void *jni_ref, const pp_reachability *info,
-                                   const int *fds, const size_t fds_len) {
+                                   const pp_socket_fd *fds, const size_t fds_len) {
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_configure_sockets(%p)", jni_ref);
     if (!fds || fds_len == 0) return false;
