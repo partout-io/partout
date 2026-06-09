@@ -5,26 +5,6 @@ set(OUTPUT_DIR ${PP_BUILD_OUTPUT}/partout)
 # Include file lists
 include("partout.cmake")
 
-# Partout_C ############################################
-
-# Base configuration
-add_library(partout_c STATIC "")
-target_compile_options(partout_c PRIVATE
-    -DUSE_CMAKE
-)
-
-# Header search paths from all C targets
-set(PARTOUT_C_INCLUDE_DIRS
-    ${CMAKE_CURRENT_SOURCE_DIR}/MiniFoundation_C/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCore_C/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/PartoutOpenVPNConnection_C/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuard_C/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuardConnection_C/include
-)
-if(WIN32)
-    list(APPEND PARTOUT_C_INCLUDE_DIRS ${PP_BUILD_OUTPUT}/wintun)
-endif()
-
 # Set up exclusions
 set(EXCLUDED_PATTERNS "")
 
@@ -58,11 +38,42 @@ if(PP_BUILD_USE_OPENVPN)
     if(NOT HAS_CRYPTO)
         message(FATAL_ERROR "OpenVPN requires a crypto vendor")
     endif()
+    list(APPEND PARTOUT_C_INCLUDE_DIRS
+        ${CMAKE_CURRENT_SOURCE_DIR}/PartoutOpenVPNConnection_C/include
+    )
 else()
-    list(APPEND EXCLUDED_PATTERNS PartoutOpenVPNConnection_C\/)
+    list(APPEND EXCLUDED_PATTERNS
+        PartoutOpenVPNConnection\/
+        PartoutOpenVPNConnection_C\/
+    )
 endif()
-if(NOT PP_BUILD_USE_WIREGUARD)
-    list(APPEND EXCLUDED_PATTERNS PartoutWireGuardConnection_C\/)
+if(PP_BUILD_USE_WIREGUARD)
+    list(APPEND PARTOUT_C_INCLUDE_DIRS
+        ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuardConnection_C/include
+    )
+else()
+    list(APPEND EXCLUDED_PATTERNS
+        PartoutWireGuardConnection\/
+        PartoutWireGuardConnection_C\/
+    )
+endif()
+
+# Partout_C ############################################
+
+# Base configuration
+add_library(partout_c STATIC "")
+target_compile_options(partout_c PRIVATE
+    -DUSE_CMAKE
+)
+
+# Header search paths from all C targets
+set(PARTOUT_C_INCLUDE_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/MiniFoundation_C/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCore_C/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuard_C/include
+)
+if(WIN32)
+    list(APPEND PARTOUT_C_INCLUDE_DIRS ${PP_BUILD_OUTPUT}/wintun)
 endif()
 
 # Account for exclusions in source files
@@ -97,7 +108,7 @@ if(USE_COMPAT)
     target_compile_options(partout PRIVATE
         -DMINIF_COMPAT
     )
-    set(EXCLUDED_PATTERNS
+    list(APPEND EXCLUDED_PATTERNS
         PartoutOpenVPNConnection\/V1
         PartoutOS\/Apple.*
         PartoutWireGuardConnection\/V1
