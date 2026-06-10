@@ -123,7 +123,7 @@ void pp_tun_free_and_close(pp_tun tun, bool and_close) {
 
 pp_tun pp_tun_lookup(void) {
     const int fd = pp_tun_network_extension_fd();
-    pp_assert(fd >= 0);
+    if (fd < 0) return NULL;
     /* iOS/tvOS requires the file descriptor to be duplicated. */
     // FIXME: ###, and macOS NE?
     const int dup_fd = dup(fd);
