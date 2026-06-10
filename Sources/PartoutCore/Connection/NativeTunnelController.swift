@@ -4,7 +4,7 @@
 
 internal import _PartoutCore_C
 
-/// A controller that operates on a virtual tun interface.
+/// A ``TunnelController`` that interacts with a tun interface through the native platform.
 public final class NativeTunnelController: TunnelController, Sendable {
     private let ctx: PartoutLoggerContext
 
@@ -12,6 +12,8 @@ public final class NativeTunnelController: TunnelController, Sendable {
     private let ref: UnsafeMutableRawPointer?
 
     private let environment: TunnelEnvironmentReader
+
+    private let encodeInfo: @Sendable (TunnelRemoteInfo) throws -> String
 
     private let maxReadLength: Int
 
@@ -27,6 +29,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
         environment: TunnelEnvironmentReader,
+        encodeInfo: @escaping @Sendable (TunnelRemoteInfo) throws -> String,
         maxReadLength: Int = 128 * 1024
     ) throws {
         self.ctx = ctx
@@ -40,6 +43,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         self.ref = ref
 #endif
         self.environment = environment
+        self.encodeInfo = encodeInfo
         self.maxReadLength = maxReadLength
         onReachableStream = CurrentValueStream(false)
         reachabilityHolder = ReachabilityHolder()
@@ -81,7 +85,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
 #endif
     }
 
-    public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
+    public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> TunInterface {
         guard let info else {
             throw PartoutError(.notFound)
         }
@@ -89,14 +93,8 @@ public final class NativeTunnelController: TunnelController, Sendable {
             return DummyTunnelInterface()
         }
 
-        let infoJSON = try {
-            let wrapped = TunnelRemoteInfoWrapper(info)
-            do {
-                return try JSONEncoder.shared().encodeJSON(wrapped)
-            } catch {
-                throw PartoutError(error)
-            }
-        }()
+        // Encode with external provider
+        let infoJSON = try encodeInfo(info)
 
         // Create tun with optional implementation from controller
         guard let tun = info.originalModuleId.uuidString.withCString({ uuid in
@@ -109,15 +107,18 @@ public final class NativeTunnelController: TunnelController, Sendable {
         return TunWrapper(ctx, tun: tun)
     }
 
-    public func configureSockets(with descriptors: [FileDescriptor]) throws {
+    public func configureSockets(with descriptors: [SocketDescriptor]) throws {
         let result = descriptors
             .withUnsafeBufferPointer { fds in
+                guard let fdsBase = fds.baseAddress else {
+                    return false
+                }
                 if let info = reachabilityInfo?.toCReachability {
-                    withUnsafePointer(to: info) { infoPtr in
-                        pp_tun_ctrl_configure_sockets(ref, infoPtr, fds.baseAddress, fds.count)
+                    return withUnsafePointer(to: info) { infoPtr in
+                        pp_tun_ctrl_configure_sockets(ref, infoPtr, fdsBase, fds.count)
                     }
                 } else {
-                    pp_tun_ctrl_configure_sockets(ref, nil, fds.baseAddress, fds.count)
+                    return pp_tun_ctrl_configure_sockets(ref, nil, fdsBase, fds.count)
                 }
             }
         guard result else {
@@ -142,13 +143,8 @@ public final class NativeTunnelController: TunnelController, Sendable {
         return environment.environmentData(forKey: key)
     }
 
-    public func clearTunnelSettings(_ io: IOInterface, withKillSwitch: Bool) async {
-        // FIXME: #188, revert settings (record)
-        if let tunnel = io as? TunWrapper {
-//            tun.deviceName
-            tunnel.close()
-        }
-        // Wrap up clear in native layer
+    public func clearTunnelSettings(withKillSwitch: Bool) async {
+        pp_log(ctx, .core, .debug, "Clear tunnel settings: withKillSwitch=\(withKillSwitch)")
         pp_tun_ctrl_clear_tunnel(ref, withKillSwitch)
     }
 
@@ -326,24 +322,7 @@ private extension ReachabilityInfo {
     }
 }
 
-struct TunnelRemoteInfoWrapper: Encodable, Sendable {
-    let originalModuleId: UniqueID
-
-    let address: Address?
-
-    let requiresVirtualDevice: Bool
-
-    let modules: [TaggedModule]?
-
-    init(_ info: TunnelRemoteInfo) {
-        originalModuleId = info.originalModuleId
-        address = info.address
-        requiresVirtualDevice = info.requiresVirtualDevice
-        modules = info.modules?.compactMap(\.taggedModule)
-    }
-}
-
-final class DummyTunnelInterface: IOInterface {
+final class DummyTunnelInterface: TunInterface {
     func readPackets() async throws -> [Data] {
         []
     }

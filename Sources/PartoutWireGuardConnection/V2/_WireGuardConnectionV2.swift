@@ -154,12 +154,12 @@ extension _WireGuardConnectionV2: WireGuardAdapterDelegate {
         }
     }
 
-    nonisolated func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [FileDescriptor]) throws {
+    nonisolated func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [SocketDescriptor]) throws {
         try controller.configureSockets(with: descriptors)
     }
 
     func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapter, tunnel: IOInterface) async {
-        await controller.clearTunnelSettings(tunnel)
+        await controller.clearTunnelSettings()
     }
 }
 

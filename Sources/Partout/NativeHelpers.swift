@@ -4,6 +4,31 @@
 
 internal import _PartoutCore_C
 
+extension NativeTunnelController {
+    public static let encodeInfoAsJSON: @Sendable (TunnelRemoteInfo) throws -> String = {
+        let wrapped = TunnelRemoteInfoWrapper($0)
+        do {
+            return try JSONEncoder.shared().encodeJSON(wrapped)
+        } catch {
+            throw PartoutError(error)
+        }
+    }
+}
+
+struct TunnelRemoteInfoWrapper: Encodable, Sendable {
+    let originalModuleId: UniqueID
+    let address: Address?
+    let requiresVirtualDevice: Bool
+    let modules: [TaggedModule]?
+
+    init(_ info: TunnelRemoteInfo) {
+        originalModuleId = info.originalModuleId
+        address = info.address
+        requiresVirtualDevice = info.requiresVirtualDevice
+        modules = info.modules?.compactMap(\.taggedModule)
+    }
+}
+
 final class NativeCompletion {
     static let callback: pp_completion = { ctx, code in
         guard let ctx else { return }

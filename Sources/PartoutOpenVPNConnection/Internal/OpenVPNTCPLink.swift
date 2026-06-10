@@ -58,8 +58,8 @@ extension OpenVPNTCPLink: LinkInterface {
 // MARK: - IOInterface
 
 extension OpenVPNTCPLink {
-    var fileDescriptor: FileDescriptor? {
-        link.fileDescriptor
+    var muxDescriptor: FileDescriptor? {
+        link.muxDescriptor
     }
 
     func readPackets() async throws -> [Data] {

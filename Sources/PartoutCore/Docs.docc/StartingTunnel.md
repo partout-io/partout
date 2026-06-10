@@ -53,8 +53,12 @@ Given the main app and the daemon:
 - ``IOInterface``
 - ``LinkInterface``
 - ``LinkObserver``
+- ``NativeIOInterface``
+- ``TunInterface``
 
 ### Applying network settings
 
+- ``NativeTunnelController``
 - ``TunnelController``
 - ``TunnelRemoteInfo``
+- ``TunWrapper``

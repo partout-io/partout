@@ -33,7 +33,7 @@ final class WireGuardBackend: @unchecked Sendable {
     }
 #endif
 
-    func socketDescriptors(_ handle: Int32) -> [Int32] {
+    func socketDescriptors(_ handle: Int32) -> [SocketDescriptor] {
 #if os(Android)
         [pp_wg_get_socket_v4(handle), pp_wg_get_socket_v6(handle)]
 #else

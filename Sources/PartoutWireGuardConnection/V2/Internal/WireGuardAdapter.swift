@@ -8,7 +8,7 @@ protocol WireGuardAdapterDelegate: AnyObject, Sendable {
 
     func adapterShouldSetNetworkSettings(_ adapter: WireGuardAdapter, settings: TunnelRemoteInfo) async throws -> IOInterface
 
-    func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [FileDescriptor]) throws
+    func adapterShouldConfigureSockets(_ adapter: WireGuardAdapter, descriptors: [SocketDescriptor]) throws
 
     func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapter, tunnel: IOInterface) async
 }
@@ -233,7 +233,7 @@ actor WireGuardAdapter {
         guard let delegate else { return }
         tunnel = try await delegate.adapterShouldSetNetworkSettings(self, settings: networkSettings)
 #if !os(Windows)
-        guard let tunFd = tunnel?.fileDescriptor else {
+        guard let tunFd = tunnel?.muxDescriptor else {
             throw WireGuardAdapterError.cannotLocateTunnelFileDescriptor
         }
         tunnelFileDescriptor = tunFd
@@ -267,7 +267,7 @@ actor WireGuardAdapter {
     }
 
     @discardableResult
-    private func configureSockets(for handle: Int32) throws -> [FileDescriptor] {
+    private func configureSockets(for handle: Int32) throws -> [SocketDescriptor] {
         let descriptors = backend.socketDescriptors(handle)
             .filter { $0 >= 0 }
         pp_log(ctx, .wireguard, .info, "Socket descriptors: \(descriptors)")
