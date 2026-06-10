@@ -12,6 +12,11 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+/* POSIX systems use int for both I/O and watching.  */
+struct __pp_socket_struct {
+    pp_socket_fd fd;
+};
+
 typedef socklen_t os_socklen_t;
 
 static inline void local_print_error(const char *msg) {
@@ -27,7 +32,15 @@ static inline pp_socket_fd local_invalid_fd(void) {
 }
 
 static inline bool local_is_invalid_fd(pp_socket_fd fd) {
-    return fd == -1;
+    return fd == local_invalid_fd();
+}
+
+static inline pp_fd local_invalid_watch_fd(void) {
+    return -1;
+}
+
+static inline pp_fd local_socket_watch_fd(const pp_socket sock) {
+    return sock->fd;
 }
 
 static inline void local_set_not_socket_error(void) {
@@ -70,6 +83,15 @@ static inline int local_select_nfds(pp_socket_fd fd) {
     return fd + 1;
 }
 
+static inline bool local_init_socket(pp_socket sock) {
+    (void)sock;
+    return true;
+}
+
+static inline void local_cleanup_socket(pp_socket sock) {
+    (void)sock;
+}
+
 static inline bool local_is_interrupted(void) {
     return errno == EINTR;
 }
@@ -100,8 +122,10 @@ int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags) {
     return ret;
 }
 
-bool pp_socket_reset_event(pp_socket_fd fd, pp_fd event) {
-    (void)fd;
-    (void)event;
+bool pp_socket_reset_events(pp_socket sock) {
+    if (!sock || local_is_invalid_fd(sock->fd)) {
+        local_set_not_socket_error();
+        return false;
+    }
     return true;
 }

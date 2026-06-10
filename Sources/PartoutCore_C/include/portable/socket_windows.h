@@ -7,6 +7,12 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
+/* Windows uses SOCKET for I/O and HANDLE for watching.  */
+struct __pp_socket_struct {
+    pp_socket_fd fd;
+    pp_fd handle;
+};
+
 typedef int os_socklen_t;
 
 static inline void local_print_error(const char *msg) {
@@ -31,7 +37,18 @@ static inline pp_socket_fd local_invalid_fd(void) {
 }
 
 static inline bool local_is_invalid_fd(pp_socket_fd fd) {
-    return fd == INVALID_SOCKET;
+    return fd == local_invalid_fd();
+}
+
+static inline pp_fd local_invalid_watch_fd(void) {
+    return INVALID_HANDLE_VALUE;
+}
+
+static inline pp_fd local_socket_watch_fd(const pp_socket sock) {
+    if (sock->handle == WSA_INVALID_EVENT || !pp_fd_is_valid(sock->handle)) {
+        return local_invalid_watch_fd();
+    }
+    return sock->handle;
 }
 
 static inline void local_set_not_socket_error(void) {
@@ -76,6 +93,34 @@ static inline int local_select_nfds(pp_socket_fd fd) {
     return 0;
 }
 
+static inline bool local_init_socket(pp_socket sock) {
+    if (!sock || local_is_invalid_fd(sock->fd)) {
+        local_set_not_socket_error();
+        return false;
+    }
+    sock->handle = WSACreateEvent();
+    if (sock->handle == WSA_INVALID_EVENT) {
+        local_print_error("WSACreateEvent()");
+        return false;
+    }
+    if (WSAEventSelect(sock->fd, sock->handle, FD_READ | FD_WRITE | FD_CLOSE) == SOCKET_ERROR) {
+        local_print_error("WSAEventSelect()");
+        WSACloseEvent(sock->handle);
+        sock->handle = WSA_INVALID_EVENT;
+        return false;
+    }
+    return true;
+}
+
+static inline void local_cleanup_socket(pp_socket sock) {
+    if (!sock || sock->handle == WSA_INVALID_EVENT || !pp_fd_is_valid(sock->handle)) return;
+    if (!local_is_invalid_fd(sock->fd)) {
+        (void)WSAEventSelect(sock->fd, WSA_INVALID_EVENT, 0);
+    }
+    WSACloseEvent(sock->handle);
+    sock->handle = WSA_INVALID_EVENT;
+}
+
 static inline bool local_is_interrupted(void) {
     return WSAGetLastError() == WSAEINTR;
 }
@@ -108,13 +153,16 @@ int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags) {
     return 0;
 }
 
-bool pp_socket_reset_event(pp_socket_fd fd, pp_fd event) {
-    if (local_is_invalid_fd(fd) || !event || !pp_fd_is_valid(event)) {
+bool pp_socket_reset_events(pp_socket sock) {
+    if (!sock ||
+        local_is_invalid_fd(sock->fd) ||
+        sock->handle == WSA_INVALID_EVENT ||
+        !pp_fd_is_valid(sock->handle)) {
         local_set_not_socket_error();
         return false;
     }
     WSANETWORKEVENTS events;
-    if (WSAEnumNetworkEvents(fd, event, &events) == SOCKET_ERROR) {
+    if (WSAEnumNetworkEvents(sock->fd, sock->handle, &events) == SOCKET_ERROR) {
         local_print_error("WSAEnumNetworkEvents()");
         return false;
     }

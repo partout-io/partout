@@ -58,15 +58,18 @@ bool pp_socket_set_buffers(pp_socket sock,
                            int recvbuf_len,
                            int sendbuf_len);
 
-/* Universal file descriptor. */
+/* Native socket descriptor. */
 pp_socket_fd pp_socket_get_fd(pp_socket sock);
+
+/* Return the file descriptor to watch. Check result with pp_fd_is_valid(). */
+pp_fd pp_socket_get_watch_fd(pp_socket sock);
 
 /* These are tied to sockets on Windows. */
 int pp_socket_set_nonblocking(pp_socket_fd fd, int *_Nullable original_flags);
 int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags);
 
 /* Call this before any event loop. */
-bool pp_socket_reset_event(pp_socket_fd fd, pp_fd event);
+bool pp_socket_reset_events(pp_socket sock);
 
 #if PARTOUT_WINDOWS
 static inline int pp_socket_last_error(void) {
