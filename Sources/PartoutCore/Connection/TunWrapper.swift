@@ -12,6 +12,27 @@ public final class TunWrapper: NativeIOInterface, @unchecked Sendable {
 
     // WARNING: Ownership of pp_tun handle is transferred!
 
+#if canImport(Darwin)
+    public convenience init(_ ctx: PartoutLoggerContext, fd: Int32?) throws {
+        let tun: pp_tun?
+
+        // Look up Network Extension fd first
+        if let fd {
+            tun = pp_tun_dup(fd)
+        } else {
+            // Otherwise, try raw access to device
+            let uuid = ctx.profileId ?? UUID()
+            tun = uuid.uuidString.withCString {
+                pp_tun_open($0)
+            }
+        }
+        guard let tun else {
+            throw PartoutError(.tunNotAvailable)
+        }
+        self.init(ctx, tun: tun)
+    }
+#endif
+
     init(_ ctx: PartoutLoggerContext, tun: pp_tun) {
         self.ctx = ctx
         self.tun = tun

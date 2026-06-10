@@ -19,10 +19,14 @@ public final class NETunnelInterface: TunInterface {
 
     // MARK: TunInterface
 
-    // FIXME: ###, Must retain TunWrapper
     public var ioInterface: NativeIOInterface? {
-        guard let fd = Self.existingFileDescriptor else { return nil }
-        fatalError()
+        let fd = Self.existingFileDescriptor
+        do {
+            return try TunWrapper(ctx, fd: fd)
+        } catch {
+            pp_log(ctx, .os, .fault, "Unable to create or look up tun I/O interface: \(error)")
+            return nil
+        }
     }
 
     public var muxDescriptor: FileDescriptor? {
