@@ -473,6 +473,11 @@ private extension FdLooper {
     }
 
     func process(mux: pp_mux, fdSet: FdSet) throws {
+        // Prepare link before processing
+        if let link, fdSet.readable.contains(link.fd) {
+            try link.prepare?()
+        }
+
         // Write link
         if let link, fdSet.writable.contains(link.fd) {
             var watchWrites = false
@@ -902,6 +907,7 @@ private extension FdLooper {
         private let onRead: OnRead?
         private let onFailure: OnFailure?
 
+        let prepare: (() throws -> Void)?
         private let read: (inout [UInt8]) throws -> Data?
         private let write: (PendingWrite) throws -> Int
         private var cleanup: (() -> Void)?
@@ -915,6 +921,7 @@ private extension FdLooper {
             fd: FileDescriptor,
             readBufSize: Int,
             arguments: FdLooper.AttachArguments,
+            prepare: (() throws -> Void)? = nil,
             read: @escaping (inout [UInt8]) throws -> Data?,
             write: @escaping (PendingWrite) throws -> Int,
             cleanup: @escaping () -> Void,
@@ -924,6 +931,7 @@ private extension FdLooper {
             transformWrite = arguments.transformWrite
             onRead = arguments.onRead
             onFailure = arguments.onFailure
+            self.prepare = prepare
             self.read = read
             self.write = write
             self.cleanup = cleanup
@@ -1031,6 +1039,11 @@ private extension FdLooper.SideIO {
             fd: linkFd,
             readBufSize: readBufSize,
             arguments: arguments,
+            prepare: {
+                guard pp_socket_reset_event(socketFd, linkFd) else {
+                    throw FdLooper.IOError.libc(.link, pp_socket_last_error())
+                }
+            },
             read: { buf in
                 let count = ioFd.read(&buf)
                 guard count != PPIOErrorWouldBlock else {

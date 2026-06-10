@@ -85,9 +85,23 @@ static inline bool local_is_nobufs(void) {
 // pp_socket_fd == pp_fd in POSIX
 
 int pp_socket_set_nonblocking(pp_socket_fd fd, int *original_flags) {
-    return pp_fd_set_nonblocking(fd, original_flags);
+    const int ret = pp_fd_set_nonblocking(fd, original_flags);
+    if (ret < 0) {
+        local_print_error("pp_fd_set_nonblocking()");
+    }
+    return ret;
 }
 
 int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags) {
-    return pp_fd_restore_blocking(fd, original_flags);
+    const int ret = pp_fd_restore_blocking(fd, original_flags);
+    if (ret < 0) {
+        local_print_error("pp_socket_restore_blocking()");
+    }
+    return ret;
+}
+
+bool pp_socket_reset_event(pp_socket_fd fd, pp_fd event) {
+    (void)fd;
+    (void)event;
+    return true;
 }
