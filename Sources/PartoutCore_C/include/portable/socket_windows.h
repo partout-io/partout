@@ -40,6 +40,13 @@ static inline bool local_is_invalid_fd(pp_socket_fd fd) {
     return fd == local_invalid_fd();
 }
 
+static inline bool local_is_valid_socket(pp_socket sock) {
+    return (sock &&
+            !local_is_invalid_fd(sock->fd) &&
+            sock->handle != WSA_INVALID_EVENT &&
+            pp_fd_is_valid(sock->handle));
+}
+
 static inline pp_fd local_invalid_watch_fd(void) {
     return INVALID_HANDLE_VALUE;
 }
@@ -154,10 +161,7 @@ int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags) {
 }
 
 bool pp_socket_set_event_mask(pp_socket sock, bool read, bool write) {
-    if (!sock ||
-        local_is_invalid_fd(sock->fd) ||
-        sock->handle == WSA_INVALID_EVENT ||
-        !pp_fd_is_valid(sock->handle)) {
+    if (!local_is_valid_socket(sock)) {
         local_set_not_socket_error();
         return false;
     }
@@ -172,10 +176,7 @@ bool pp_socket_set_event_mask(pp_socket sock, bool read, bool write) {
 }
 
 bool pp_socket_reset_events(pp_socket sock) {
-    if (!sock ||
-        local_is_invalid_fd(sock->fd) ||
-        sock->handle == WSA_INVALID_EVENT ||
-        !pp_fd_is_valid(sock->handle)) {
+    if (!local_is_valid_socket(sock)) {
         local_set_not_socket_error();
         return false;
     }
