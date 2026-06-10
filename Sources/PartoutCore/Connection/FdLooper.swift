@@ -473,9 +473,12 @@ private extension FdLooper {
     }
 
     func process(mux: pp_mux, fdSet: FdSet) throws {
-        // Prepare link before processing
+        // Prepare fds before processing
         if let link, fdSet.readable.contains(link.fd) {
             try link.prepare?()
+        }
+        if let tun, fdSet.readable.contains(tun.fd) {
+            try tun.prepare?()
         }
 
         // Write link
