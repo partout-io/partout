@@ -24,17 +24,6 @@ struct __pp_tun_struct {
     const char *dev_name;
 };
 
-pp_tun pp_tun_retain(pp_tun other) {
-    pp_assert(other);
-    pp_tun tun = pp_alloc(sizeof(*tun));
-#if PARTOUT_MACOS
-    tun->fd = other->fd;
-#else
-    tun->fd = dup(other->fd);
-#endif
-    return tun;
-}
-
 #if PARTOUT_MACOS
 #include <sys/sys_domain.h>
 #include <sys/kern_control.h>
@@ -91,6 +80,16 @@ failure:
     return NULL;
 }
 #endif
+
+/* iOS/tvOS requires the file descriptor to be duplicated. */
+pp_tun pp_tun_dup(pp_fd fd) {
+    pp_assert(fd >= 0);
+    const int dup_fd = dup(fd);
+    if (dup_fd < 0) return NULL;
+    pp_tun tun = pp_alloc(sizeof(*tun));
+    tun->fd = dup_fd;
+    return tun;
+}
 
 void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     if (!tun) return;

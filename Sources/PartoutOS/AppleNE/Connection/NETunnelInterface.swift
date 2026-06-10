@@ -51,6 +51,7 @@ public final class NETunnelInterface: TunInterface {
 extension NETunnelInterface {
     private static let CTLIOCGINFO: UInt = 0xc0644e03
 
+    // FIXME: ###, This is better done in C to also omit the manual structs from tun.h
     public static var existingFileDescriptor: Int32? {
         var ctlInfo = ctl_info()
         withUnsafeMutablePointer(to: &ctlInfo.ctl_name) {

@@ -12,9 +12,18 @@
 #include "portable/common.h"
 #include "portable/socket.h"
 
+#pragma clang assume_nonnull begin
+
+/* Opaque tun device. */
+typedef struct __pp_tun_struct *pp_tun;
+
+#if PARTOUT_APPLE
+/* Duplicate Network Extension fd. */
+pp_tun _Nullable pp_tun_dup(pp_fd fd);
+
+#if !PARTOUT_MACOS
 /* Redefine these manually because the <sys/kern_control.h>
  * header is not exposed to iOS/tvOS */
-#if PARTOUT_APPLE && !PARTOUT_MACOS
 struct ctl_info {
     u_int32_t   ctl_id;
     char        ctl_name[96];
@@ -28,11 +37,7 @@ struct sockaddr_ctl {
     u_int32_t   sc_reserved[5];
 };
 #endif
-
-#pragma clang assume_nonnull begin
-
-/* Opaque tun device. */
-typedef struct __pp_tun_struct *pp_tun;
+#endif
 
 /* Platform-specific implementations. */
 pp_tun _Nullable pp_tun_open(const char *uuid);
@@ -43,16 +48,6 @@ void pp_tun_free_and_close(pp_tun tun, bool and_close);
 
 static inline void pp_tun_free(pp_tun tun) {
     pp_tun_free_and_close(tun, true);
-}
-
-/* With manual file descriptor. */
-pp_tun pp_tun_retain(pp_tun other);
-static inline void pp_tun_release(pp_tun tun) {
-#if PARTOUT_APPLE && !PARTOUT_MACOS
-    pp_tun_free_and_close(tun, true);
-#else
-    pp_tun_free_and_close(tun, false);
-#endif
 }
 
 /* Return the file descriptor. Check result with pp_fd_is_valid(). */

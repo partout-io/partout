@@ -64,17 +64,6 @@ GUID guid_from_wstring(const wchar_t *wstr) {
     return guid;
 }
 
-pp_tun pp_tun_retain(pp_tun other) {
-    pp_assert(other);
-    pp_tun tun = pp_alloc(sizeof(*tun));
-    tun->name = pp_dup(other->name);
-    tun->wname = _wcsdup(other->wname); // Can fail
-    // FIXME: ###, Sharing these is unsafe and prone to dangling pointers
-    tun->adapter = other->adapter;
-    tun->session = other->session;
-    return tun;
-}
-
 pp_tun pp_tun_open(const char *uuid) {
     if (!uuid) return NULL;
     WINTUN_ADAPTER_HANDLE adapter = NULL;
