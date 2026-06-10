@@ -24,8 +24,8 @@ public final class FdLooper: @unchecked Sendable {
 
     public struct AttachArguments: Sendable {
         public enum DescriptorPair: @unchecked Sendable {
-            case link(FileDescriptor, SocketDescriptor)
-            case tun(FileDescriptor, Any)
+            case link(FileDescriptor, NativeIOInterface)
+            case tun(FileDescriptor, NativeIOInterface)
         }
 
         public let pair: DescriptorPair
@@ -294,6 +294,7 @@ public final class FdLooper: @unchecked Sendable {
         }
     }
 
+    // WARNING: link/tun ownership is transferred after a successful attach!
     public func attach(_ arguments: AttachArguments) async throws {
         try await withCheckedThrowingContinuation { continuation in
             lock.with {
@@ -691,7 +692,7 @@ private extension FdLooper {
         results: inout [CommandResult]
     ) {
         switch arguments.pair {
-        case .link(let linkFd, let socketFd):
+        case .link(let linkFd, let ioFd):
             // Cancel attach if stopping
             guard state != .stopping else {
                 results.append(.attach(continuation, .failure(CancellationError())))
@@ -713,7 +714,7 @@ private extension FdLooper {
             link = SideIO(
                 mux: mux,
                 linkFd: linkFd,
-                socketFd: socketFd,
+                ioFd: ioFd,
                 readBufSize: linkBufSize,
                 arguments: arguments
             )
@@ -995,11 +996,11 @@ extension LinkInterface {
             pp_log_g(.core, .fault, "LinkInterface has no .muxDescriptor")
             return nil
         }
-        guard let socketDescriptor else {
-            pp_log_g(.core, .fault, "LinkInterface has no .socketDescriptor")
+        guard let nativeIO else {
+            pp_log_g(.core, .fault, "LinkInterface has no .nativeIO")
             return nil
         }
-        return .link(muxDescriptor, socketDescriptor)
+        return .link(muxDescriptor, nativeIO)
     }
 }
 
@@ -1009,11 +1010,11 @@ extension TunInterface {
             pp_log_g(.core, .fault, "TunInterface has no .muxDescriptor")
             return nil
         }
-        guard let ioDescriptor else {
-            pp_log_g(.core, .fault, "TunInterface has no .ioDescriptor")
+        guard let nativeIO else {
+            pp_log_g(.core, .fault, "TunInterface has no .nativeIO")
             return nil
         }
-        return .tun(muxDescriptor, ioDescriptor)
+        return .tun(muxDescriptor, nativeIO)
     }
 }
 
@@ -1021,11 +1022,10 @@ private extension FdLooper.SideIO {
     convenience init(
         mux: pp_mux,
         linkFd: FileDescriptor,
-        socketFd: SocketDescriptor,
+        ioFd: NativeIOInterface,
         readBufSize: Int,
         arguments: FdLooper.AttachArguments
     ) {
-        let socketHandle = pp_socket_retain(socketFd)
         let closesOnEmptyRead = arguments.closesOnEmptyRead
         self.init(
             side: .link,
@@ -1033,12 +1033,12 @@ private extension FdLooper.SideIO {
             readBufSize: readBufSize,
             arguments: arguments,
             read: { buf in
-                let count = pp_socket_read(socketHandle, &buf, buf.count)
+                let count = ioFd.read(&buf)
                 guard count != PPIOErrorWouldBlock else {
                     throw FdLooper.IOError.wouldBlock(.link)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.libc(.link, pp_socket_last_error())
+                    throw FdLooper.IOError.libc(.link, ioFd.lastErrorCode)
                 }
                 guard count > 0 else {
                     if closesOnEmptyRead {
@@ -1049,13 +1049,7 @@ private extension FdLooper.SideIO {
                 return Data(buf[0..<Int(count)])
             },
             write: { pending in
-                let count = pending.data.withUnsafeBytes {
-                    pp_socket_write(
-                        socketHandle,
-                        $0.bytePointer + pending.offset,
-                        pending.count
-                    )
-                }
+                let count = ioFd.write(pending.data, offset: pending.offset)
                 guard count != PPIOErrorWouldBlock else {
                     throw FdLooper.IOError.wouldBlock(.link)
                 }
@@ -1063,13 +1057,13 @@ private extension FdLooper.SideIO {
                     throw FdLooper.IOError.noBufSpace(.link)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.libc(.link, pp_socket_last_error())
+                    throw FdLooper.IOError.libc(.link, ioFd.lastErrorCode)
                 }
                 return Int(count)
             },
             cleanup: {
                 pp_mux_delete(mux, linkFd)
-                pp_socket_release(socketHandle)
+                ioFd.cleanup()
             }
         )
     }
@@ -1077,27 +1071,22 @@ private extension FdLooper.SideIO {
     convenience init(
         mux: pp_mux,
         tunFd: FileDescriptor,
-        ioFd: Any,
+        ioFd: NativeIOInterface,
         readBufSize: Int,
         arguments: FdLooper.AttachArguments
     ) throws {
-        // FIXME: ###, Assume pp_tun (private type)
-        guard let ctrlTun = ioFd as? pp_tun else {
-            throw PartoutError(.tunNotAvailable)
-        }
-        let tunHandle = pp_tun_retain(ctrlTun)
         self.init(
             side: .tun,
             fd: tunFd,
             readBufSize: readBufSize,
             arguments: arguments,
             read: { buf in
-                let count = pp_tun_read(tunHandle, &buf, buf.count)
+                let count = ioFd.read(&buf)
                 guard count != PPIOErrorWouldBlock else {
                     throw FdLooper.IOError.wouldBlock(.tun)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.libc(.tun, pp_io_last_error())
+                    throw FdLooper.IOError.libc(.tun, ioFd.lastErrorCode)
                 }
                 guard count > 0 else {
                     return nil
@@ -1105,13 +1094,7 @@ private extension FdLooper.SideIO {
                 return Data(buf[0..<Int(count)])
             },
             write: { pending in
-                let count = pending.data.withUnsafeBytes {
-                    pp_tun_write(
-                        tunHandle,
-                        $0.bytePointer + pending.offset,
-                        pending.count
-                    )
-                }
+                let count = ioFd.write(pending.data, offset: pending.offset)
                 guard count != PPIOErrorWouldBlock else {
                     throw FdLooper.IOError.wouldBlock(.tun)
                 }
@@ -1119,13 +1102,13 @@ private extension FdLooper.SideIO {
                     throw FdLooper.IOError.noBufSpace(.tun)
                 }
                 guard count >= 0 else {
-                    throw FdLooper.IOError.libc(.tun, pp_io_last_error())
+                    throw FdLooper.IOError.libc(.tun, ioFd.lastErrorCode)
                 }
                 return Int(count)
             },
             cleanup: {
                 pp_mux_delete(mux, tunFd)
-                pp_tun_release(tunHandle)
+                ioFd.cleanup()
             }
         )
     }

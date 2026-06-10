@@ -21,13 +21,6 @@ struct __pp_tun_struct {
     pp_fd fd;
 };
 
-pp_tun pp_tun_retain(pp_tun other) {
-    pp_assert(other);
-    pp_tun tun = pp_alloc(sizeof(*tun));
-    tun->fd = other->fd;
-    return tun;
-}
-
 void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     if (!tun) return;
     if (and_close) {

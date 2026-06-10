@@ -49,9 +49,8 @@ struct __pp_socket_struct {
     pp_socket_fd fd;
 };
 
-/* Create a socket from a formerly opened file descriptor. Use uint64_t to
- * cover the whole range of possible platform values. */
-pp_socket pp_socket_retain(pp_socket_fd fd) {
+/* Create a socket from a formerly opened file descriptor. */
+static pp_socket pp_socket_create(pp_socket_fd fd) {
     pp_socket sock = pp_alloc(sizeof(*sock));
     sock->fd = (pp_socket_fd)fd;
     return sock;
@@ -108,7 +107,7 @@ pp_socket pp_socket_open(const char *ip_addr,
             local_print_error("connect()");
             goto failure;
         }
-        return pp_socket_retain(new_fd);
+        return pp_socket_create(new_fd);
     }
 
     pp_zero(&hints, sizeof(hints));
@@ -174,7 +173,7 @@ pp_socket pp_socket_open(const char *ip_addr,
     }
 
     // Success
-    return pp_socket_retain(new_fd);
+    return pp_socket_create(new_fd);
 
 failure:
     if (!local_is_invalid_fd(new_fd)) local_close_fd(new_fd);

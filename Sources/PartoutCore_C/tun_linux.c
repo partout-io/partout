@@ -25,14 +25,6 @@ struct __pp_tun_struct {
     const char *dev_name;
 };
 
-pp_tun pp_tun_retain(pp_tun other) {
-    pp_assert(other);
-    pp_tun tun = pp_alloc(sizeof(*tun));
-    tun->fd = other->fd;
-    tun->dev_name = pp_dup(other->dev_name);
-    return tun;
-}
-
 pp_tun pp_tun_open(const char *uuid) {
     (void)uuid;
     const char *dev_path = "/dev/net/tun";

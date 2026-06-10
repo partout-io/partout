@@ -39,12 +39,6 @@ static inline void pp_socket_free(pp_socket sock) {
     pp_socket_free_and_close(sock, true);
 }
 
-/* Create a socket wrapper from an already open native descriptor. */
-pp_socket pp_socket_retain(pp_socket_fd fd);
-static inline void pp_socket_release(pp_socket sock) {
-    pp_socket_free_and_close(sock, false);
-}
-
 /* Create socket to endpoint. */
 pp_socket _Nullable pp_socket_open(const char *ip_addr,
                                    pp_socket_proto proto,

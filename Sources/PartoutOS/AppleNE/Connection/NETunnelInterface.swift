@@ -19,12 +19,17 @@ public final class NETunnelInterface: TunInterface {
 
     // MARK: TunInterface
 
-    public var ioDescriptor: Any? {
-        Self.existingFileDescriptor
+    public var nativeIO: NativeIOInterface? {
+        do {
+            return try TunWrapper.forNetworkExtension(ctx)
+        } catch {
+            pp_log(ctx, .os, .fault, "Unable to create or look up tun I/O interface: \(error)")
+            return nil
+        }
     }
 
     public var muxDescriptor: FileDescriptor? {
-        Self.existingFileDescriptor
+        TunWrapper.networkExtensionFd
     }
 
     public func readPackets() async throws -> [Data] {
@@ -39,41 +44,5 @@ public final class NETunnelInterface: TunInterface {
     public func writePackets(_ packets: [Data]) {
         let protocols = packets.map(IPHeader.protocolNumber(inPacket:))
         impl?.writePackets(packets, withProtocols: protocols as [NSNumber])
-    }
-}
-
-extension NETunnelInterface {
-    private static let CTLIOCGINFO: UInt = 0xc0644e03
-
-    public static var existingFileDescriptor: Int32? {
-        var ctlInfo = ctl_info()
-        withUnsafeMutablePointer(to: &ctlInfo.ctl_name) {
-            $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: $0.pointee)) {
-                _ = strcpy($0, "com.apple.net.utun_control")
-            }
-        }
-        for fd: Int32 in 0...1024 {
-            var addr = sockaddr_ctl()
-            var len = socklen_t(MemoryLayout.size(ofValue: addr))
-            let ret = withUnsafeMutablePointer(to: &addr) {
-                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                    getpeername(fd, $0, &len)
-                }
-            }
-            guard ret == 0 && addr.sc_family == AF_SYSTEM else {
-                continue
-            }
-            if ctlInfo.ctl_id == 0 {
-                let ret = ioctl(fd, Self.CTLIOCGINFO, &ctlInfo)
-                guard ret == 0 else {
-                    continue
-                }
-            }
-            guard addr.sc_id == ctlInfo.ctl_id else {
-                continue
-            }
-            return fd
-        }
-        return nil
     }
 }
