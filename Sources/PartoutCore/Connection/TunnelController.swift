@@ -4,7 +4,7 @@
 
 /// Abstracts tunnel configuration.
 public protocol TunnelController: AnyObject, Sendable {
-    func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface
+    func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> TunInterface
 
     func configureSockets(with descriptors: [SocketDescriptor]) throws
 

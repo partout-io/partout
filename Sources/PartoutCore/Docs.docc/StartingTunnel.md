@@ -53,6 +53,7 @@ Given the main app and the daemon:
 - ``IOInterface``
 - ``LinkInterface``
 - ``LinkObserver``
+- ``TunInterface``
 
 ### Applying network settings
 

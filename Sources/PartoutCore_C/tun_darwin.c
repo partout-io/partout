@@ -20,16 +20,17 @@
 #include "portable/endian.h"
 
 struct __pp_tun_struct {
-    int fd;
+    pp_fd fd;
     const char *dev_name;
 };
 
-pp_tun pp_tun_retain(int fd) {
+pp_tun pp_tun_retain(pp_tun other) {
+    pp_assert(other);
     pp_tun tun = pp_alloc(sizeof(*tun));
 #if PARTOUT_MACOS
-    tun->fd = fd;
+    tun->fd = other->fd;
 #else
-    tun->fd = dup(fd);
+    tun->fd = dup(other->fd);
 #endif
     return tun;
 }
@@ -164,7 +165,7 @@ void pp_tun_close(const pp_tun tun) {
     tun->fd = -1;
 }
 
-int pp_tun_get_fd(const pp_tun tun) {
+pp_fd pp_tun_get_watch_fd(const pp_tun tun) {
     if (!tun) return -1;
     return tun->fd;
 }
@@ -184,7 +185,7 @@ pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json
     (void)uuid;
     (void)info_json;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_darwin: ctrl_set_tunnel(%p)", ref);
-    return NULL;
+    return pp_tun_open(uuid);
 }
 
 bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,

@@ -158,8 +158,7 @@ extension _OpenVPNConnectionV2: OpenVPNSessionDelegate {
         _ session: OpenVPNSessionProtocol,
         remoteAddress: String,
         remoteProtocol: EndpointProtocol,
-        remoteOptions: OpenVPN.Configuration,
-        remoteFd: FileDescriptor?
+        remoteOptions: OpenVPN.Configuration
     ) async {
         let addressObject = Address(rawValue: remoteAddress)
         if addressObject == nil {

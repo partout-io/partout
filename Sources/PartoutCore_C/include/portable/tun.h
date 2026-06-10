@@ -9,7 +9,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <errno.h>
 #include "portable/common.h"
 #include "portable/socket.h"
 
@@ -46,9 +45,8 @@ static inline void pp_tun_free(pp_tun tun) {
     pp_tun_free_and_close(tun, true);
 }
 
-#if !PARTOUT_WINDOWS
 /* With manual file descriptor. */
-pp_tun pp_tun_retain(int fd);
+pp_tun pp_tun_retain(pp_tun other);
 static inline void pp_tun_release(pp_tun tun) {
 #if PARTOUT_APPLE && !PARTOUT_MACOS
     pp_tun_free_and_close(tun, true);
@@ -56,10 +54,9 @@ static inline void pp_tun_release(pp_tun tun) {
     pp_tun_free_and_close(tun, false);
 #endif
 }
-#endif
 
-/* Return the file descriptor or -1 if none. */
-int pp_tun_get_fd(const pp_tun tun);
+/* Return the file descriptor. Check result with pp_fd_is_valid(). */
+pp_fd pp_tun_get_watch_fd(const pp_tun tun);
 
 /* Return the device name or NULL if none. */
 const char *_Nullable pp_tun_name(const pp_tun tun);

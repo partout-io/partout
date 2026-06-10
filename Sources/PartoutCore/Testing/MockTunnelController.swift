@@ -10,7 +10,7 @@ public final class MockTunnelController: TunnelController, @unchecked Sendable {
     public init() {
     }
 
-    public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
+    public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> TunInterface {
         try await onSetTunnelSettings(info)
         return MockTunnelInterface()
     }

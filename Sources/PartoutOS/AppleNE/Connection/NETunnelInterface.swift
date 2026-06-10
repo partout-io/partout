@@ -6,7 +6,7 @@ internal import _PartoutCore_C
 import NetworkExtension
 
 /// A tunnel interface based on `NEPacketTunnelFlow`.
-public final class NETunnelInterface: IOInterface {
+public final class NETunnelInterface: TunInterface {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
@@ -17,9 +17,13 @@ public final class NETunnelInterface: IOInterface {
         self.impl = impl
     }
 
-    // MARK: TunnelInterface
+    // MARK: TunInterface
 
-    public var fileDescriptor: FileDescriptor? {
+    public var ioDescriptor: Any? {
+        Self.existingFileDescriptor
+    }
+
+    public var muxDescriptor: FileDescriptor? {
         Self.existingFileDescriptor
     }
 

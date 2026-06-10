@@ -81,7 +81,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
 #endif
     }
 
-    public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
+    public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> TunInterface {
         guard let info else {
             throw PartoutError(.notFound)
         }
@@ -346,7 +346,11 @@ struct TunnelRemoteInfoWrapper: Encodable, Sendable {
     }
 }
 
-final class DummyTunnelInterface: IOInterface {
+final class DummyTunnelInterface: TunInterface {
+    var ioDescriptor: Any? {
+        nil
+    }
+
     func readPackets() async throws -> [Data] {
         []
     }

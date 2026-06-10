@@ -88,6 +88,9 @@ final class SocketWrapper: @unchecked Sendable {
     private let ctx: PartoutLoggerContext
     let socket: pp_socket
     private let options: Options
+#if os(Windows)
+    private let handle: FileDescriptor
+#endif
 
     init(_ ctx: PartoutLoggerContext, options: Options) async throws {
         let socket: pp_socket = try await withCheckedThrowingContinuation { continuation in
@@ -138,6 +141,28 @@ final class SocketWrapper: @unchecked Sendable {
                 continuation.resume(returning: newSock)
             }
         }
+#if os(Windows)
+        let handle = WSACreateEvent()
+        do {
+            guard let handle else {
+                throw PartoutError(.fdUnavailable)
+            }
+            guard WSAEventSelect(
+                pp_socket_get_fd(socket),
+                handle,
+                FD_READ | FD_WRITE | FD_CLOSE
+            ) == 0 else {
+                throw PartoutError(.linkNotActive)
+            }
+        } catch {
+            if let handle {
+                WSACloseEvent(handle)
+            }
+            pp_socket_free(socket)
+            throw error
+        }
+        self.handle = handle
+#endif
         self.ctx = ctx
         self.socket = socket
         self.options = options
@@ -145,18 +170,24 @@ final class SocketWrapper: @unchecked Sendable {
 
     deinit {
         pp_log(ctx, .core, .debug, "Deinit SocketWrapper")
+#if os(Windows)
+        WSACloseEvent(handle)
+#endif
         pp_socket_free(socket)
     }
 }
 
 extension SocketWrapper: LinkInterface {
-    var fileDescriptor: FileDescriptor? {
+    var muxDescriptor: FileDescriptor? {
 #if os(Windows)
-        // FIXME: ###, Get HANDLE from SOCKET
-        nil
+        handle
 #else
-        pp_socket_get_fd(socket)
+        socketDescriptor
 #endif
+    }
+
+    var socketDescriptor: SocketDescriptor? {
+        pp_socket_get_fd(socket)
     }
 
     var remoteAddress: String {

@@ -17,7 +17,8 @@
 // FIXME: #188, convert debug messages to logs
 
 struct __pp_tun_struct {
-    LPWSTR name;
+    const char *name;
+    LPWSTR wname;
     WINTUN_ADAPTER_HANDLE adapter;
     WINTUN_SESSION_HANDLE session;
 };
@@ -63,12 +64,23 @@ GUID guid_from_wstring(const wchar_t *wstr) {
     return guid;
 }
 
+pp_tun pp_tun_retain(pp_tun other) {
+    pp_assert(other);
+    pp_tun tun = pp_alloc(sizeof(*tun));
+    tun->name = pp_dup(other->name);
+    tun->wname = _wcsdup(other->wname); // Can fail
+    // FIXME: ###, Sharing these is unsafe and prone to dangling pointers
+    tun->adapter = other->adapter;
+    tun->session = other->session;
+    return tun;
+}
+
 pp_tun pp_tun_open(const char *uuid) {
     if (!uuid) return NULL;
     WINTUN_ADAPTER_HANDLE adapter = NULL;
     WINTUN_SESSION_HANDLE session = NULL;
     LPCWSTR tun_type = NULL;
-    LPCWSTR dev_name = NULL;
+    LPWSTR dev_name = NULL;
 
     // Load DLL before anything (do it once)
     if (!wintun) {
@@ -118,7 +130,8 @@ pp_tun pp_tun_open(const char *uuid) {
 
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: Created wintun device %ls", dev_name);
     pp_tun tun = pp_alloc(sizeof(*tun));
-    tun->name = _wcsdup(dev_name);
+    tun->name = pp_dup(uuid);
+    tun->wname = dev_name;
     tun->adapter = adapter;
     tun->session = session;
     return tun;
@@ -127,7 +140,6 @@ failure:
     if (session) WintunEndSession(session);
     if (adapter) WintunCloseAdapter(adapter);
     if (dev_name) pp_free((LPWSTR)dev_name);
-    if (wintun) FreeLibrary(wintun);
     return NULL;
 }
 
@@ -135,15 +147,10 @@ void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     if (!tun) return;
     if (and_close) {
         pp_tun_close(tun);
-        if (tun->adapter) {
-            WintunCloseAdapter(tun->adapter);
-        }
     }
-    pp_free(tun->name);
+    pp_free((char *)tun->name);
+    pp_free(tun->wname);
     pp_free(tun);
-
-    // XXX: Static library allocations are retained
-    // FreeLibrary(wintun);
 }
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
@@ -152,29 +159,24 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
         return -1;
     }
     DWORD packet_len;
-    BYTE *packet = NULL;
-    while (!packet) {
-        // printf(">>> tun_read looping, packet is %p, session is %p", packet, tun->session);
-        packet = WintunReceivePacket(tun->session, &packet_len);
-        // printf(">>> tun_read received: %p\n", packet);
-        if (packet) break;
+    BYTE *packet = WintunReceivePacket(tun->session, &packet_len);
+    if (!packet) {
         const DWORD err = GetLastError();
-        if (err != ERROR_NO_MORE_ITEMS) {
-            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: read(), %lu", err);
-            return -1;
+        if (err == ERROR_NO_MORE_ITEMS) {
+            return PPIOErrorWouldBlock;
         }
-        WaitForSingleObject(WintunGetReadWaitEvent(tun->session), INFINITE);
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: read(), %lu", err);
+        return -1;
     }
-    // FIXME: #188, dst_len must accomodate max packet_len (can we know the MTU beforehand?)
-    // WINTUN_MAX_IP_PACKET_SIZE
-    // printf(">>> tun_read read %lu bytes\n", packet_len);
-    pp_assert(dst_len >= packet_len);
-    if (dst_len >= packet_len) {
-        memcpy(dst, packet, packet_len);
+
+    if (dst_len < packet_len) {
+        WintunReleaseReceivePacket(tun->session, packet);
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return -1;
     }
+    memcpy(dst, packet, packet_len);
     WintunReleaseReceivePacket(tun->session, packet);
-    // printf(">>> tun_read released\n");
-    return packet_len;
+    return (int)packet_len;
 }
 
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
@@ -182,36 +184,38 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
         SetLastError(ERROR_INVALID_HANDLE);
         return -1;
     }
-    // printf(">>> tun_write write %llu bytes\n", src_len);
+
     BYTE *packet = WintunAllocateSendPacket(tun->session, src_len);
     if (!packet) {
         const DWORD err = GetLastError();
-        // Silently drop packets if the ring is full
-        if (err == ERROR_BUFFER_OVERFLOW) return 0;
+        if (err == ERROR_BUFFER_OVERFLOW) {
+            return PPIOErrorNoBufs;
+        }
         pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: write(), %lu", err);
         return -1;
     }
-    // printf(">>> tun_write allocated\n");
+
     memcpy(packet, src, src_len);
     WintunSendPacket(tun->session, packet);
-    // printf(">>> tun_write written\n");
-    return src_len;
+    return (int)src_len;
 }
 
 void pp_tun_close(const pp_tun tun) {
     if (!tun || !tun->session) return;
     WintunEndSession(tun->session);
     tun->session = NULL;
+    WintunCloseAdapter(tun->adapter);
+    tun->adapter = NULL;
 }
 
-int pp_tun_get_fd(const pp_tun tun) {
-    (void)tun;
-    return -1;
+pp_fd pp_tun_get_watch_fd(const pp_tun tun) {
+    if (!tun || !tun->session) return INVALID_HANDLE_VALUE;
+    return WintunGetReadWaitEvent(tun->session);
 }
 
 const char *pp_tun_name(const pp_tun tun) {
-    (void)tun;
-    return NULL;
+    if (!tun) return NULL;
+    return tun->name;
 }
 
 void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
@@ -225,7 +229,7 @@ pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json
     (void)uuid;
     (void)info_json;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_set_tunnel(%p)", ref);
-    return NULL;
+    return pp_tun_open(uuid);
 }
 
 bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
