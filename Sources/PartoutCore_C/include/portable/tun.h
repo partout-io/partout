@@ -17,31 +17,12 @@
 /* Opaque tun device. */
 typedef struct __pp_tun_struct *pp_tun;
 
-#if PARTOUT_APPLE
-/* Duplicate Network Extension fd. */
-pp_tun _Nullable pp_tun_dup(pp_fd fd);
-
-#if !PARTOUT_MACOS
-/* Redefine these manually because the <sys/kern_control.h>
- * header is not exposed to iOS/tvOS */
-struct ctl_info {
-    u_int32_t   ctl_id;
-    char        ctl_name[96];
-};
-struct sockaddr_ctl {
-    u_char      sc_len;
-    u_char      sc_family;
-    u_int16_t   ss_sysaddr;
-    u_int32_t   sc_id;
-    u_int32_t   sc_unit;
-    u_int32_t   sc_reserved[5];
-};
-#endif
-#endif
-
-#if PARTOUT_MACOS || PARTOUT_LINUX || PARTOUT_WINDOWS
-/* On desktop, we can request a new device. */
+/* Request a new device. */
 pp_tun _Nullable pp_tun_open(const char *uuid);
+#if PARTOUT_APPLE
+/* Look up Network Extension fd. */
+pp_tun _Nullable pp_tun_lookup(void);
+pp_fd pp_tun_network_extension_fd(void);
 #endif
 
 /* Platform-specific implementations. */
