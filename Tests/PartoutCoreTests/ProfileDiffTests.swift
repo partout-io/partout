@@ -43,7 +43,6 @@ struct ProfileDiffTests {
         sut.modules = [dnsModule]
         let profileWithDNS = try sut.build()
         diff = profileWithDNS.differences(from: original)
-        print(diff)
         #expect(diff == [
             .addedModules([dnsModule.id])
         ])
@@ -51,22 +50,18 @@ struct ProfileDiffTests {
         sut.modules = []
         let profileWithoutDNS = try sut.build()
         diff = profileWithoutDNS.differences(from: original)
-        print(diff)
         #expect(diff.isEmpty)
         diff = profileWithoutDNS.differences(from: profileWithDNS)
-        print(diff)
         #expect(diff == [
             .removedModules([dnsModule.id])
         ])
 
         sut.activeModulesIds = [dnsModule.id]
         diff = try sut.build().differences(from: original)
-        print(diff)
         #expect(diff.isEmpty)
 
         sut.modules = [dnsModule]
         diff = try sut.build().differences(from: original)
-        print(diff)
         #expect(diff == [
             .addedModules([dnsModule.id]),
             .changedActiveModules,
@@ -75,7 +70,59 @@ struct ProfileDiffTests {
 
         sut.modules = [] // also clears stale ID in activeModulesIds
         diff = try sut.build().differences(from: original)
-        print(diff)
         #expect(diff.isEmpty)
+    }
+
+    @Test
+    func givenInactiveModule_whenEnableModule_thenDiffIsExpected() throws {
+        let dnsModule = try DNSModule.Builder(servers: ["6.6.6.6"]).build()
+        let original = try Profile.Builder(
+            modules: [dnsModule],
+            activatingModules: false
+        ).build()
+
+        var sut = original.builder()
+        sut.activeModulesIds = [dnsModule.id]
+
+        #expect(try sut.build().differences(from: original) == [
+            .changedActiveModules,
+            .enabledModules([dnsModule.id])
+        ])
+    }
+
+    @Test
+    func givenActiveModule_whenDisableModule_thenDiffIsExpected() throws {
+        let dnsModule = try DNSModule.Builder(servers: ["6.6.6.6"]).build()
+        let original = try Profile.Builder(
+            modules: [dnsModule],
+            activatingModules: true
+        ).build()
+
+        var sut = original.builder()
+        sut.activeModulesIds = []
+
+        #expect(try sut.build().differences(from: original) == [
+            .changedActiveModules,
+            .disabledModules([dnsModule.id])
+        ])
+    }
+
+    @Test
+    func givenActiveModules_whenSwapEnabledModule_thenDiffIsExpected() throws {
+        let dnsModule = try DNSModule.Builder(servers: ["6.6.6.6"]).build()
+        let proxyModule = try HTTPProxyModule.Builder(address: "1.1.1.1", port: 1080).build()
+        let original = try Profile.Builder(
+            modules: [dnsModule, proxyModule],
+            activeModulesIds: [dnsModule.id]
+        ).build()
+
+        var sut = original.builder()
+        sut.activeModulesIds = [proxyModule.id]
+
+        #expect(try sut.build().differences(from: original) == [
+            .changedActiveModules,
+            .enabledModules([proxyModule.id]),
+            .disabledModules([dnsModule.id])
+        ])
     }
 }
