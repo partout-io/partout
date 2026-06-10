@@ -21,15 +21,9 @@
 #include <sys/unistd.h>
 
 struct __pp_tun_struct {
-    int fd;
+    pp_fd fd;
     const char *dev_name;
 };
-
-pp_tun pp_tun_retain(int fd) {
-    pp_tun tun = pp_alloc(sizeof(*tun));
-    tun->fd = fd;
-    return tun;
-}
 
 pp_tun pp_tun_open(const char *uuid) {
     (void)uuid;
@@ -98,7 +92,7 @@ void pp_tun_close(const pp_tun tun) {
     tun->fd = -1;
 }
 
-int pp_tun_get_fd(const pp_tun tun) {
+pp_fd pp_tun_get_watch_fd(const pp_tun tun) {
     if (!tun) return -1;
     return tun->fd;
 }
@@ -118,11 +112,11 @@ pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json
     (void)uuid;
     (void)info_json;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_linux: ctrl_set_tunnel(%p)", ref);
-    return NULL;
+    return pp_tun_open(uuid);
 }
 
 bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
-                                   const int *fds, const size_t fds_len) {
+                                   const pp_socket_fd *fds, const size_t fds_len) {
     (void)ref;
     (void)info;
     (void)fds;

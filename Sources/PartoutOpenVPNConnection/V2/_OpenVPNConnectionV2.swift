@@ -158,8 +158,7 @@ extension _OpenVPNConnectionV2: OpenVPNSessionDelegate {
         _ session: OpenVPNSessionProtocol,
         remoteAddress: String,
         remoteProtocol: EndpointProtocol,
-        remoteOptions: OpenVPN.Configuration,
-        remoteFd: FileDescriptor?
+        remoteOptions: OpenVPN.Configuration
     ) async {
         let addressObject = Address(rawValue: remoteAddress)
         if addressObject == nil {
@@ -219,8 +218,8 @@ extension _OpenVPNConnectionV2: OpenVPNSessionDelegate {
         }
 
         // Clean up tunnel
-        if let tunnelInterface {
-            await controller.clearTunnelSettings(tunnelInterface)
+        if tunnelInterface != nil {
+            await controller.clearTunnelSettings()
             self.tunnelInterface = nil
         }
 

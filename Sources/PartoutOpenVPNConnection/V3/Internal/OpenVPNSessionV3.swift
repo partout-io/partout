@@ -107,8 +107,8 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             pp_log(ctx, .openvpn, .error, "Link interface already set")
             return
         }
-        guard let fd = link.fileDescriptor else {
-            fatalError("Link has no file descriptor")
+        guard let pair = link.descriptorPair else {
+            fatalError("Link lacks descriptors")
         }
 
         pp_log(ctx, .openvpn, .info, "Attach LINK")
@@ -119,8 +119,7 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
         var didAttach = false
         do {
             try await looper.attach(.init(
-                side: .link,
-                fd: fd,
+                pair: pair,
                 closesOnEmptyRead: isTCP,
                 transformWrite: rw.beforeWrite,
                 onRead: { [weak self] packets in
@@ -146,7 +145,7 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
         }
     }
 
-    func setTunnel(_ tunnel: IOInterface) async throws {
+    func setTunnel(_ tunnel: TunInterface) async throws {
         guard looper.isLinkAttached else {
             pp_log(ctx, .openvpn, .error, "Set link interface first")
             return
@@ -155,14 +154,13 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             pp_log(ctx, .openvpn, .error, "Tunnel interface already set")
             return
         }
-        guard let fd = tunnel.fileDescriptor else {
-            fatalError("Tunnel has no file descriptor")
+        guard let pair = tunnel.descriptorPair else {
+            fatalError("Tunnel lacks descriptors")
         }
 
         pp_log(ctx, .openvpn, .info, "Attach TUN")
         try await looper.attach(.init(
-            side: .tun,
-            fd: fd,
+            pair: pair,
             closesOnEmptyRead: false,
             transformWrite: nil,
             onRead: { [weak self] packets in

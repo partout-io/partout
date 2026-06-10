@@ -6,7 +6,7 @@ internal import _PartoutCore_C
 import NetworkExtension
 
 /// A tunnel interface based on `NEPacketTunnelFlow`.
-public final class NETunnelInterface: IOInterface {
+public final class NETunnelInterface: TunInterface {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
@@ -17,10 +17,21 @@ public final class NETunnelInterface: IOInterface {
         self.impl = impl
     }
 
-    // MARK: TunnelInterface
+    // MARK: TunInterface
 
-    public var fileDescriptor: FileDescriptor? {
-        Self.existingFileDescriptor
+    public var nativeIO: NativeIOInterface? {
+        do {
+            return try TunWrapper.forNetworkExtension(ctx)
+        } catch {
+            pp_log(ctx, .os, .fault, "Unable to create or look up tun I/O interface: \(error)")
+            return nil
+        }
+    }
+
+    public var muxDescriptor: FileDescriptor? {
+        let fd = pp_tun_network_extension_fd()
+        guard pp_fd_is_valid(fd) else { return nil }
+        return fd
     }
 
     public func readPackets() async throws -> [Data] {
@@ -35,41 +46,5 @@ public final class NETunnelInterface: IOInterface {
     public func writePackets(_ packets: [Data]) {
         let protocols = packets.map(IPHeader.protocolNumber(inPacket:))
         impl?.writePackets(packets, withProtocols: protocols as [NSNumber])
-    }
-}
-
-extension NETunnelInterface {
-    private static let CTLIOCGINFO: UInt = 0xc0644e03
-
-    public static var existingFileDescriptor: Int32? {
-        var ctlInfo = ctl_info()
-        withUnsafeMutablePointer(to: &ctlInfo.ctl_name) {
-            $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: $0.pointee)) {
-                _ = strcpy($0, "com.apple.net.utun_control")
-            }
-        }
-        for fd: Int32 in 0...1024 {
-            var addr = sockaddr_ctl()
-            var len = socklen_t(MemoryLayout.size(ofValue: addr))
-            let ret = withUnsafeMutablePointer(to: &addr) {
-                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                    getpeername(fd, $0, &len)
-                }
-            }
-            guard ret == 0 && addr.sc_family == AF_SYSTEM else {
-                continue
-            }
-            if ctlInfo.ctl_id == 0 {
-                let ret = ioctl(fd, Self.CTLIOCGINFO, &ctlInfo)
-                guard ret == 0 else {
-                    continue
-                }
-            }
-            guard addr.sc_id == ctlInfo.ctl_id else {
-                continue
-            }
-            return fd
-        }
-        return nil
     }
 }

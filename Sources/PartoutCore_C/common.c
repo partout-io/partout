@@ -16,7 +16,9 @@ pp_log_category PPLogCategoryCore = "core";
 void pp_clog_v(pp_log_category category,
                pp_log_level level,
                const char *fmt, ...) {
+#if !PARTOUT_WINDOWS
     const int saved_errno = errno;
+#endif
     va_list args;
     va_start(args, fmt);
     // Add 1 to include the null terminator
@@ -26,7 +28,9 @@ void pp_clog_v(pp_log_category category,
     va_end(args);
     pp_clog(category, level, msg);
     pp_free(msg);
+#if !PARTOUT_WINDOWS
     errno = saved_errno;
+#endif
 }
 
 #if PARTOUT_ANDROID
@@ -117,29 +121,7 @@ void pp_log_simple_append(const char *tag, pp_log_level level, const char *messa
 }
 #endif
 
-#if PARTOUT_WINDOWS
-#include <winsock2.h>
-
-int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {
-    (void)original_flags;
-    u_long mode = 1;
-    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "ioctlsocket(): set");
-        return -1;
-    }
-    return 0;
-}
-
-int pp_fd_restore_blocking(pp_fd fd, int original_flags) {
-    (void)original_flags;
-    u_long mode = 0;
-    if (ioctlsocket(fd, FIONBIO, &mode) == SOCKET_ERROR) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "ioctlsocket(): restore");
-        return -1;
-    }
-    return 0;
-}
-#else
+#if !PARTOUT_WINDOWS
 #include <fcntl.h>
 
 int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {

@@ -39,12 +39,6 @@ static inline void pp_socket_free(pp_socket sock) {
     pp_socket_free_and_close(sock, true);
 }
 
-/* Create a socket wrapper from an already open native descriptor. */
-pp_socket pp_socket_retain(pp_fd fd);
-static inline void pp_socket_release(pp_socket sock) {
-    pp_socket_free_and_close(sock, false);
-}
-
 /* Create socket to endpoint. */
 pp_socket _Nullable pp_socket_open(const char *ip_addr,
                                    pp_socket_proto proto,
@@ -52,7 +46,7 @@ pp_socket _Nullable pp_socket_open(const char *ip_addr,
                                    bool blocking,
                                    int timeout_ms,
                                    const pp_reachability *_Nullable info,
-                                   bool (*_Nullable configure)(void *_Nullable ctx, pp_fd fd),
+                                   bool (*_Nullable configure)(void *_Nullable ctx, pp_socket_fd fd),
                                    void *_Nullable configure_ctx);
 
 /* I/O. Returns PPIOErrorWouldBlock when a non-blocking operation would block. */
@@ -64,7 +58,28 @@ bool pp_socket_set_buffers(pp_socket sock,
                            int recvbuf_len,
                            int sendbuf_len);
 
-/* Universal file descriptor. */
-pp_fd pp_socket_get_fd(pp_socket sock);
+/* Native socket descriptor. */
+pp_socket_fd pp_socket_get_fd(pp_socket sock);
+
+/* Return the file descriptor to watch. Check result with pp_fd_is_valid(). */
+pp_fd pp_socket_get_watch_fd(pp_socket sock);
+
+/* These are tied to sockets on Windows. */
+int pp_socket_set_nonblocking(pp_socket_fd fd, int *_Nullable original_flags);
+int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags);
+
+/* Configure and reset the socket events associated with the watch fd. */
+bool pp_socket_set_event_mask(pp_socket sock, bool read, bool write);
+bool pp_socket_reset_events(pp_socket sock);
+
+#if PARTOUT_WINDOWS
+static inline int pp_socket_last_error(void) {
+    return WSAGetLastError();
+}
+#else
+static inline int pp_socket_last_error(void) {
+    return errno;
+}
+#endif
 
 #pragma clang assume_nonnull end

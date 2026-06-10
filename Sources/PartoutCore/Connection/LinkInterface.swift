@@ -17,6 +17,7 @@ public protocol LinkInterface: IOInterface {
     nonisolated var hasBetterPath: AsyncStream<Void> { get }
 
     /// Returns an upgraded link if available (e.g. when a better path exists).
+    @available(*, deprecated, message: "Reconnect manually to an endpoint")
     nonisolated func upgraded() async throws -> LinkInterface
 
     /// Shuts down the link.

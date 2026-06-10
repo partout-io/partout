@@ -18,14 +18,8 @@
 #include <sys/socket.h>
 
 struct __pp_tun_struct {
-    int fd;
+    pp_fd fd;
 };
-
-pp_tun pp_tun_retain(int fd) {
-    pp_tun tun = pp_alloc(sizeof(*tun));
-    tun->fd = fd;
-    return tun;
-}
 
 void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     if (!tun) return;
@@ -54,7 +48,7 @@ void pp_tun_close(const pp_tun tun) {
     shutdown(tun->fd, SHUT_RDWR);
 }
 
-int pp_tun_get_fd(const pp_tun tun) {
+pp_fd pp_tun_get_watch_fd(const pp_tun tun) {
     if (!tun) return -1;
     return tun->fd;
 }
@@ -193,7 +187,7 @@ cleanup:
 }
 
 bool pp_tun_ctrl_configure_sockets(void *jni_ref, const pp_reachability *info,
-                                   const int *fds, const size_t fds_len) {
+                                   const pp_socket_fd *fds, const size_t fds_len) {
     assert(jni_ref);
     pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_configure_sockets(%p)", jni_ref);
     if (!fds || fds_len == 0) return false;

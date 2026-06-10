@@ -9,34 +9,26 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <errno.h>
 #include "portable/common.h"
 #include "portable/socket.h"
-
-/* Redefine these manually because the <sys/kern_control.h>
- * header is not exposed to iOS/tvOS */
-#if PARTOUT_APPLE && !PARTOUT_MACOS
-struct ctl_info {
-    u_int32_t   ctl_id;
-    char        ctl_name[96];
-};
-struct sockaddr_ctl {
-    u_char      sc_len;
-    u_char      sc_family;
-    u_int16_t   ss_sysaddr;
-    u_int32_t   sc_id;
-    u_int32_t   sc_unit;
-    u_int32_t   sc_reserved[5];
-};
-#endif
 
 #pragma clang assume_nonnull begin
 
 /* Opaque tun device. */
 typedef struct __pp_tun_struct *pp_tun;
 
-/* Platform-specific implementations. */
+#if PARTOUT_MACOS || PARTOUT_LINUX || PARTOUT_WINDOWS
+/* Request a new device. */
 pp_tun _Nullable pp_tun_open(const char *uuid);
+#endif
+
+#if PARTOUT_APPLE
+/* Look up Network Extension fd. */
+pp_tun _Nullable pp_tun_lookup(void);
+pp_fd pp_tun_network_extension_fd(void);
+#endif
+
+/* Platform-specific implementations. */
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len);
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len);
 void pp_tun_close(const pp_tun tun);
@@ -46,36 +38,26 @@ static inline void pp_tun_free(pp_tun tun) {
     pp_tun_free_and_close(tun, true);
 }
 
-#if !PARTOUT_WINDOWS
-/* With manual file descriptor. */
-pp_tun pp_tun_retain(int fd);
-static inline void pp_tun_release(pp_tun tun) {
-#if PARTOUT_APPLE && !PARTOUT_MACOS
-    pp_tun_free_and_close(tun, true);
-#else
-    pp_tun_free_and_close(tun, false);
-#endif
-}
-#endif
-
-/* Return the file descriptor or -1 if none. */
-int pp_tun_get_fd(const pp_tun tun);
+/* Return the file descriptor. Check result with pp_fd_is_valid(). */
+pp_fd pp_tun_get_watch_fd(const pp_tun tun);
 
 /* Return the device name or NULL if none. */
 const char *_Nullable pp_tun_name(const pp_tun tun);
 
-/* Reusable cross-platform. */
+#if !PARTOUT_WINDOWS
+/* Reusable with POSIX-like tun device. */
 static inline int pp_tun_handle_result(int ret) {
     if (ret < 0) {
-        if (PP_IO_WOULDBLOCK()) {
+        if (pp_io_wouldblock()) {
             return PPIOErrorWouldBlock;
         }
-        if (PP_IO_NOBUFS()) {
+        if (pp_io_nobufs()) {
             return PPIOErrorNoBufs;
         }
     }
     return ret;
 }
+#endif
 
 /* Tunnel controller. */
 typedef struct {
@@ -91,7 +73,7 @@ pp_tun _Nullable pp_tun_ctrl_set_tunnel(void *_Nullable ref,
                                         const char *_Nullable info_json);
 bool pp_tun_ctrl_configure_sockets(void *_Nullable ref,
                                    const pp_reachability *_Nullable info,
-                                   const int *_Nullable fds,
+                                   const pp_socket_fd *_Nonnull fds,
                                    const size_t fds_len);
 void pp_tun_ctrl_report_snapshot(void *_Nullable ref,
                                  const char *snapshot_json);
