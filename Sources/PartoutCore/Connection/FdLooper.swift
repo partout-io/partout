@@ -989,6 +989,34 @@ private extension FdLooper {
 
 // MARK: - Link/Tun initializers
 
+extension LinkInterface {
+    public var descriptorPair: FdLooper.AttachArguments.DescriptorPair? {
+        guard let muxDescriptor else {
+            pp_log_g(.core, .fault, "LinkInterface has no .muxDescriptor")
+            return nil
+        }
+        guard let socketDescriptor else {
+            pp_log_g(.core, .fault, "LinkInterface has no .socketDescriptor")
+            return nil
+        }
+        return .link(muxDescriptor, socketDescriptor)
+    }
+}
+
+extension TunInterface {
+    public var descriptorPair: FdLooper.AttachArguments.DescriptorPair? {
+        guard let muxDescriptor else {
+            pp_log_g(.core, .fault, "TunInterface has no .muxDescriptor")
+            return nil
+        }
+        guard let ioDescriptor else {
+            pp_log_g(.core, .fault, "TunInterface has no .ioDescriptor")
+            return nil
+        }
+        return .tun(muxDescriptor, ioDescriptor)
+    }
+}
+
 private extension FdLooper.SideIO {
     convenience init(
         mux: pp_mux,

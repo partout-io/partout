@@ -107,11 +107,8 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             pp_log(ctx, .openvpn, .error, "Link interface already set")
             return
         }
-        guard let fd = link.muxDescriptor else {
-            fatalError("Link has no file descriptor")
-        }
-        guard let socketFd = link.socketDescriptor else {
-            fatalError("Link has no socket descriptor")
+        guard let pair = link.descriptorPair else {
+            fatalError("Link lacks descriptors")
         }
 
         pp_log(ctx, .openvpn, .info, "Attach LINK")
@@ -122,7 +119,7 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
         var didAttach = false
         do {
             try await looper.attach(.init(
-                pair: .link(fd, socketFd),
+                pair: pair,
                 closesOnEmptyRead: isTCP,
                 transformWrite: rw.beforeWrite,
                 onRead: { [weak self] packets in
@@ -157,16 +154,13 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
             pp_log(ctx, .openvpn, .error, "Tunnel interface already set")
             return
         }
-        guard let fd = tunnel.muxDescriptor else {
-            fatalError("Tunnel has no file descriptor")
-        }
-        guard let ioFd = tunnel.ioDescriptor else {
-            fatalError("Tunnel has no I/O descriptor")
+        guard let pair = tunnel.descriptorPair else {
+            fatalError("Tunnel lacks descriptors")
         }
 
         pp_log(ctx, .openvpn, .info, "Attach TUN")
         try await looper.attach(.init(
-            pair: .tun(fd, ioFd),
+            pair: pair,
             closesOnEmptyRead: false,
             transformWrite: nil,
             onRead: { [weak self] packets in
