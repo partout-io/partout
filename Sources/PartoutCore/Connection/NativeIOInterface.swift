@@ -4,6 +4,8 @@
 
 /// Provides an abstraction for the I/O of a native device.
 public protocol NativeIOInterface: Sendable {
+    func setEventMask(read: Bool, write: Bool) throws
+    func resetEvents() throws
     func read(_ buf: inout [UInt8]) -> Int32
     func write(_ data: Data, offset: Int) -> Int32
     func cleanup()

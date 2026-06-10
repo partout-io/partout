@@ -12,22 +12,31 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-typedef socklen_t os_socklen_t;
+/* POSIX systems use int for both I/O and watching.  */
+struct __pp_socket_struct {
+    pp_socket_fd fd;
+};
 
-static inline bool local_platform_init(void) {
-    return true;
-}
+typedef socklen_t os_socklen_t;
 
 static inline void local_print_error(const char *msg) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed: %s", msg, strerror(errno));
+}
+
+static inline bool local_platform_init(void) {
+    return true;
 }
 
 static inline pp_socket_fd local_invalid_fd(void) {
     return -1;
 }
 
-static inline bool local_is_invalid_fd(pp_socket_fd fd) {
-    return fd == -1;
+static inline pp_fd local_invalid_watch_fd(void) {
+    return -1;
+}
+
+static inline pp_fd local_socket_watch_fd(const pp_socket sock) {
+    return sock->fd;
 }
 
 static inline void local_set_not_socket_error(void) {
@@ -70,6 +79,15 @@ static inline int local_select_nfds(pp_socket_fd fd) {
     return fd + 1;
 }
 
+static inline bool local_init_socket(pp_socket sock) {
+    (void)sock;
+    return true;
+}
+
+static inline void local_cleanup_socket(pp_socket sock) {
+    (void)sock;
+}
+
 static inline bool local_is_interrupted(void) {
     return errno == EINTR;
 }
@@ -85,9 +103,35 @@ static inline bool local_is_nobufs(void) {
 // pp_socket_fd == pp_fd in POSIX
 
 int pp_socket_set_nonblocking(pp_socket_fd fd, int *original_flags) {
-    return pp_fd_set_nonblocking(fd, original_flags);
+    const int ret = pp_fd_set_nonblocking(fd, original_flags);
+    if (ret < 0) {
+        local_print_error("pp_fd_set_nonblocking()");
+    }
+    return ret;
 }
 
 int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags) {
-    return pp_fd_restore_blocking(fd, original_flags);
+    const int ret = pp_fd_restore_blocking(fd, original_flags);
+    if (ret < 0) {
+        local_print_error("pp_socket_restore_blocking()");
+    }
+    return ret;
+}
+
+bool pp_socket_set_event_mask(pp_socket sock, bool read, bool write) {
+    if (!local_is_valid_socket(sock)) {
+        local_set_not_socket_error();
+        return false;
+    }
+    (void)read;
+    (void)write;
+    return true;
+}
+
+bool pp_socket_reset_events(pp_socket sock) {
+    if (!local_is_valid_socket(sock)) {
+        local_set_not_socket_error();
+        return false;
+    }
+    return true;
 }

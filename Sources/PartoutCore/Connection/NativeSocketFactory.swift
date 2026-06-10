@@ -88,9 +88,6 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
     let socket: pp_socket
     private let options: Options
-#if os(Windows)
-    private let handle: FileDescriptor
-#endif
     private var isClosed = false
 
     init(_ ctx: PartoutLoggerContext, options: Options) async throws {
@@ -142,28 +139,6 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
                 continuation.resume(returning: newSock)
             }
         }
-#if os(Windows)
-        let handle = WSACreateEvent()
-        do {
-            guard let handle else {
-                throw PartoutError(.fdUnavailable)
-            }
-            guard WSAEventSelect(
-                pp_socket_get_fd(socket),
-                handle,
-                FD_READ | FD_WRITE | FD_CLOSE
-            ) == 0 else {
-                throw PartoutError(.linkNotActive)
-            }
-        } catch {
-            if let handle {
-                WSACloseEvent(handle)
-            }
-            pp_socket_free(socket)
-            throw error
-        }
-        self.handle = handle
-#endif
         self.ctx = ctx
         self.socket = socket
         self.options = options
@@ -171,10 +146,19 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
 
     deinit {
         pp_log(ctx, .core, .debug, "Deinit SocketWrapper")
-#if os(Windows)
-        WSACloseEvent(handle)
-#endif
         cleanup()
+    }
+
+    func setEventMask(read: Bool, write: Bool) throws {
+        guard pp_socket_set_event_mask(socket, read, write) else {
+            throw PartoutError(.ioFailure)
+        }
+    }
+
+    func resetEvents() throws {
+        guard pp_socket_reset_events(socket) else {
+            throw PartoutError(.ioFailure)
+        }
     }
 
     func read(_ buf: inout [UInt8]) -> Int32 {
@@ -205,11 +189,9 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
 
 extension SocketWrapper: LinkInterface {
     var muxDescriptor: FileDescriptor? {
-#if os(Windows)
-        handle
-#else
-        pp_socket_get_fd(socket)
-#endif
+        let fd = pp_socket_get_watch_fd(socket)
+        guard pp_fd_is_valid(fd) else { return nil }
+        return fd
     }
 
     var nativeIO: NativeIOInterface? {
