@@ -4,6 +4,9 @@
 
 /// Represents a specific I/O interface meant to work at the link layer (e.g. TCP/IP).
 public protocol LinkInterface: IOInterface {
+    /// The socket descriptor, if available.
+    var socketDescriptor: SocketDescriptor? { get }
+
     /// The link description.
     nonisolated var linkDescription: String { get }
 
@@ -24,6 +27,10 @@ public protocol LinkInterface: IOInterface {
 }
 
 extension LinkInterface {
+    public var socketDescriptor: SocketDescriptor? {
+        nil
+    }
+
     /// The link type (UDP/TCP).
     public var linkType: IPSocketType {
         remoteProtocol.socketType

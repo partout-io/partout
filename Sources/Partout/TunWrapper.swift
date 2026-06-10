@@ -24,18 +24,15 @@ final class TunWrapper: @unchecked Sendable {
     }
 }
 
-extension TunWrapper: IOInterface {
-    var fileDescriptor: FileDescriptor? {
-#if os(Windows)
-        nil
-#else
-        let fd = pp_tun_get_fd(tun)
-        guard fd >= 0 else {
-            assertionFailure("Invalid fd")
-            return nil
-        }
+extension TunWrapper: TunInterface {
+    var ioDescriptor: Any? {
+        tun
+    }
+
+    var muxDescriptor: FileDescriptor? {
+        let fd = pp_tun_get_watch_fd(tun)
+        guard pp_fd_is_valid(fd) else { return nil }
         return fd
-#endif
     }
 
     func readPackets() async throws -> [Data] {

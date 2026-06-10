@@ -5,7 +5,7 @@
 /// Represents an I/O interface able to read and write data.
 public protocol IOInterface: AnyObject, Sendable {
     /// The file descriptor, if available.
-    var fileDescriptor: FileDescriptor? { get }
+    var muxDescriptor: FileDescriptor? { get }
 
     /// Reads packets from the interface.
     func readPackets() async throws -> [Data]
@@ -17,7 +17,7 @@ public protocol IOInterface: AnyObject, Sendable {
 }
 
 extension IOInterface {
-    public var fileDescriptor: FileDescriptor? {
+    public var muxDescriptor: FileDescriptor? {
         nil
     }
 }
