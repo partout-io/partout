@@ -19,6 +19,20 @@
 #include <string.h>
 #include "portable/endian.h"
 
+#if defined(UTUN_CONTROL_NAME)
+#define PP_UTUN_CONTROL_NAME UTUN_CONTROL_NAME
+#else
+#define PP_UTUN_CONTROL_NAME "com.apple.net.utun_control"
+#endif
+
+#if defined(CTLIOCGINFO)
+#define PP_CTLIOCGINFO CTLIOCGINFO
+#else
+#define PP_CTLIOCGINFO 0xc0644e03UL
+#endif
+
+#define PP_TUN_NE_FD_MAX 1024
+
 struct __pp_tun_struct {
     pp_fd fd;
     const char *dev_name;
@@ -79,17 +93,22 @@ failure:
     if (fd != -1) close(fd);
     return NULL;
 }
+#else
+/* Redefine these manually because the <sys/kern_control.h>
+ * header is not exposed to iOS/tvOS */
+struct ctl_info {
+    u_int32_t   ctl_id;
+    char        ctl_name[96];
+};
+struct sockaddr_ctl {
+    u_char      sc_len;
+    u_char      sc_family;
+    u_int16_t   ss_sysaddr;
+    u_int32_t   sc_id;
+    u_int32_t   sc_unit;
+    u_int32_t   sc_reserved[5];
+};
 #endif
-
-/* iOS/tvOS requires the file descriptor to be duplicated. */
-pp_tun pp_tun_dup(pp_fd fd) {
-    pp_assert(fd >= 0);
-    const int dup_fd = dup(fd);
-    if (dup_fd < 0) return NULL;
-    pp_tun tun = pp_alloc(sizeof(*tun));
-    tun->fd = dup_fd;
-    return tun;
-}
 
 void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     if (!tun) return;
@@ -100,6 +119,43 @@ void pp_tun_free_and_close(pp_tun tun, bool and_close) {
         pp_free((void *)tun->dev_name);
     }
     pp_free(tun);
+}
+
+pp_tun pp_tun_lookup(void) {
+    const int fd = pp_tun_network_extension_fd();
+    if (fd < 0) return NULL;
+    /* iOS/tvOS requires the file descriptor to be duplicated. */
+    // FIXME: ###, and macOS NE?
+    const int dup_fd = dup(fd);
+    if (dup_fd < 0) return NULL;
+    pp_tun tun = pp_alloc(sizeof(*tun));
+    tun->fd = dup_fd;
+    tun->dev_name = NULL;
+    return tun;
+}
+
+pp_fd pp_tun_network_extension_fd(void) {
+    struct ctl_info ctl_info = { 0 };
+    snprintf(ctl_info.ctl_name, sizeof(ctl_info.ctl_name), "%s", PP_UTUN_CONTROL_NAME);
+    for (pp_fd fd = 0; fd <= PP_TUN_NE_FD_MAX; ++fd) {
+        struct sockaddr_ctl addr = { 0 };
+        socklen_t len = sizeof(addr);
+        int ret;
+        PP_IO_RETRY(ret, getpeername(fd, (struct sockaddr *)&addr, &len));
+        if (ret != 0 || addr.sc_family != AF_SYSTEM) {
+            continue;
+        }
+        if (ctl_info.ctl_id == 0) {
+            PP_IO_RETRY(ret, ioctl(fd, PP_CTLIOCGINFO, &ctl_info));
+            if (ret != 0) {
+                continue;
+            }
+        }
+        if (addr.sc_id == ctl_info.ctl_id) {
+            return fd;
+        }
+    }
+    return -1;
 }
 
 /* The first 4 bits of a local packet identify the IP family. */

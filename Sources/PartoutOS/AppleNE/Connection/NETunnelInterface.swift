@@ -29,7 +29,9 @@ public final class NETunnelInterface: TunInterface {
     }
 
     public var muxDescriptor: FileDescriptor? {
-        TunWrapper.networkExtensionFd
+        let fd = pp_tun_network_extension_fd()
+        guard pp_fd_is_valid(fd) else { return nil }
+        return fd
     }
 
     public func readPackets() async throws -> [Data] {
