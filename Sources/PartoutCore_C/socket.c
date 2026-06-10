@@ -8,22 +8,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
-#include <errno.h>
 #include "portable/common.h"
 #include "portable/socket.h"
 
 #if PARTOUT_WINDOWS
-#include <winsock2.h>
-#include <ws2tcpip.h>
-typedef int os_socklen_t;
+#include "portable/socket_windows.h"
 #else
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/select.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-typedef socklen_t os_socklen_t;
+#include "portable/socket_posix.h"
 #endif
 
 static bool local_platform_init(void);
@@ -51,12 +42,6 @@ static bool local_parse_numeric_addr(const char *ip_addr,
                                      struct sockaddr_storage *addr,
                                      os_socklen_t *addrlen);
 static void local_close_impl(pp_socket sock);
-
-#if PARTOUT_WINDOWS
-#include "portable/socket_windows.h"
-#else
-#include "portable/socket_posix.h"
-#endif
 
 /* Host a file descriptor with the specific platform type. POSIX systems
  * use int, whereas Windows uses SOCKET.  */

@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
+typedef int os_socklen_t;
+
 static inline bool local_platform_init(void) {
     static int wsa_initialized = 0;
     if (!wsa_initialized) {

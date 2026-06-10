@@ -4,6 +4,16 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include <errno.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+
+typedef socklen_t os_socklen_t;
+
 static inline bool local_platform_init(void) {
     return true;
 }
