@@ -23,23 +23,25 @@ public final class FdLooper: @unchecked Sendable {
     public typealias OnFinish = @Sendable (_ error: Error?) -> Void
 
     public struct AttachArguments: Sendable {
-        public let side: Side
-        public let fd: FileDescriptor
+        public enum DescriptorPair: @unchecked Sendable {
+            case link(FileDescriptor, SocketDescriptor)
+            case tun(FileDescriptor, Any)
+        }
+
+        public let pair: DescriptorPair
         public let closesOnEmptyRead: Bool
         public let transformWrite: TransformWrite?
         public let onRead: OnRead?
         public let onFailure: OnFailure?
 
         public init(
-            side: Side,
-            fd: FileDescriptor,
+            pair: DescriptorPair,
             closesOnEmptyRead: Bool,
             transformWrite: TransformWrite?,
             onRead: OnRead?,
             onFailure: OnFailure?
         ) {
-            self.side = side
-            self.fd = fd
+            self.pair = pair
             self.closesOnEmptyRead = closesOnEmptyRead
             self.transformWrite = transformWrite
             self.onRead = onRead
@@ -83,7 +85,7 @@ public final class FdLooper: @unchecked Sendable {
     ) throws {
         guard let newMux = pp_mux_create(Int32(Self.numberOfDescriptors)) else {
             pp_log(ctx, .core, .fault, "Unable to create mux")
-            throw PartoutError(.muxFailure)
+            throw MuxError(side: nil)
         }
 
         self.ctx = ctx
@@ -176,7 +178,7 @@ public final class FdLooper: @unchecked Sendable {
 
                 do {
                     // Handle commands on wake signal (true = continue)
-                    guard try handleCommands() else {
+                    guard try handleCommands(fdSet: fdSet) else {
                         pp_log(.global, .core, .info, "Looper: stop requested")
                         break
                     }
@@ -432,7 +434,7 @@ private extension FdLooper {
         case detach(CheckedContinuation<Void, Never>)
     }
 
-    func handleCommands() throws -> Bool {
+    func handleCommands(fdSet: FdSet) throws -> Bool {
         lock.lock()
         let pendingCommands = commands
         commands.removeAll(keepingCapacity: true)
@@ -447,7 +449,7 @@ private extension FdLooper {
             case .enableRead(let side, let id):
                 handleEnableRead(side, id: id)
             case .enableWrite(let side, let id):
-                handleEnableWrite(side, id: id)
+                handleEnableWrite(side, id: id, fdSet: fdSet)
             case .custom(let body):
                 lock.unlock()
                 try body()
@@ -688,8 +690,8 @@ private extension FdLooper {
         continuation: CheckedContinuation<Void, Error>,
         results: inout [CommandResult]
     ) {
-        switch arguments.side {
-        case .link:
+        switch arguments.pair {
+        case .link(let linkFd, let socketFd):
             // Cancel attach if stopping
             guard state != .stopping else {
                 results.append(.attach(continuation, .failure(CancellationError())))
@@ -700,15 +702,9 @@ private extension FdLooper {
                 results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
                 break
             }
-            let linkFd = arguments.fd
-            guard pp_fd_set_nonblocking(linkFd, nil) == 0 else {
-                pp_log(ctx, .core, .fault, "Unable to set link non-blocking mode")
-                results.append(.attach(continuation, .failure(PartoutError(.muxFailure, linkFd))))
-                break
-            }
             guard pp_mux_add(mux, linkFd) else {
-                pp_log(ctx, .core, .fault, "Unable to attach link")
-                results.append(.attach(continuation, .failure(PartoutError(.muxFailure, linkFd))))
+                pp_log(ctx, .core, .fault, "Unable to attach link (fd=\(linkFd))")
+                results.append(.attach(continuation, .failure(MuxError(side: .link))))
                 break
             }
             pp_log(ctx, .core, .info, "Attach link (fd=\(linkFd))")
@@ -717,11 +713,12 @@ private extension FdLooper {
             link = SideIO(
                 mux: mux,
                 linkFd: linkFd,
+                socketFd: socketFd,
                 readBufSize: linkBufSize,
                 arguments: arguments
             )
             results.append(.attach(continuation, .success(())))
-        case .tun:
+        case .tun(let tunFd, let ioFd):
             // Cancel attach if stopping
             guard state != .stopping else {
                 results.append(.attach(continuation, .failure(CancellationError())))
@@ -732,27 +729,28 @@ private extension FdLooper {
                 results.append(.attach(continuation, .failure(PartoutError(.operationCancelled))))
                 break
             }
-            let tunFd = arguments.fd
-            guard pp_fd_set_nonblocking(tunFd, nil) == 0 else {
-                pp_log(ctx, .core, .fault, "Unable to set tun non-blocking mode")
-                results.append(.attach(continuation, .failure(PartoutError(.muxFailure, tunFd))))
-                break
-            }
             guard pp_mux_add(mux, tunFd) else {
-                pp_log(ctx, .core, .fault, "Unable to attach tun")
-                results.append(.attach(continuation, .failure(PartoutError(.muxFailure, tunFd))))
+                pp_log(ctx, .core, .fault, "Unable to attach tun (fd=\(tunFd))")
+                results.append(.attach(continuation, .failure(MuxError(side: .tun))))
                 break
             }
             pp_log(ctx, .core, .info, "Attach tun (fd=\(tunFd))")
 
             // Create new side
-            tun = SideIO(
-                mux: mux,
-                tunFd: tunFd,
-                readBufSize: tunBufSize,
-                arguments: arguments
-            )
-            results.append(.attach(continuation, .success(())))
+            do {
+                tun = try SideIO(
+                    mux: mux,
+                    tunFd: tunFd,
+                    ioFd: ioFd,
+                    readBufSize: tunBufSize,
+                    arguments: arguments
+                )
+                results.append(.attach(continuation, .success(())))
+            } catch {
+                pp_log(ctx, .core, .fault, "Unable to retain tun: \(error)")
+                pp_mux_delete(mux, tunFd)
+                results.append(.attach(continuation, .failure(MuxError(side: .tun))))
+            }
         }
     }
 
@@ -799,7 +797,7 @@ private extension FdLooper {
         }
     }
 
-    func handleEnableWrite(_ side: Side, id: UUID?) {
+    func handleEnableWrite(_ side: Side, id: UUID?, fdSet: FdSet) {
         if let id {
             guard !isOutdated(id, side: side) else {
                 return
@@ -809,12 +807,14 @@ private extension FdLooper {
         case .link:
             if let link {
                 pp_mux_set_write(mux, link.fd, true)
+                fdSet.writable.insert(link.fd)
             } else {
                 pp_log(ctx, .core, .error, "Ignoring enableWrite(.link), not attached")
             }
         case .tun:
             if let tun {
                 pp_mux_set_write(mux, tun.fd, true)
+                fdSet.writable.insert(tun.fd)
             } else {
                 pp_log(ctx, .core, .error, "Ignoring enableWrite(.tun), not attached")
             }
@@ -841,6 +841,10 @@ private final class FdSet {
 // MARK: - SideIO
 
 private extension FdLooper {
+    struct MuxError: Error {
+        let side: Side?
+    }
+
     struct WaitError: Error, CustomDebugStringConvertible {
         let code: Int32
 
@@ -989,10 +993,11 @@ private extension FdLooper.SideIO {
     convenience init(
         mux: pp_mux,
         linkFd: FileDescriptor,
+        socketFd: SocketDescriptor,
         readBufSize: Int,
         arguments: FdLooper.AttachArguments
     ) {
-        let linkHandle = pp_socket_retain(linkFd)
+        let socketHandle = pp_socket_retain(socketFd)
         let closesOnEmptyRead = arguments.closesOnEmptyRead
         self.init(
             side: .link,
@@ -1000,7 +1005,7 @@ private extension FdLooper.SideIO {
             readBufSize: readBufSize,
             arguments: arguments,
             read: { buf in
-                let count = pp_socket_read(linkHandle, &buf, buf.count)
+                let count = pp_socket_read(socketHandle, &buf, buf.count)
                 guard count != PPIOErrorWouldBlock else {
                     throw FdLooper.IOError.wouldBlock(.link)
                 }
@@ -1018,7 +1023,7 @@ private extension FdLooper.SideIO {
             write: { pending in
                 let count = pending.data.withUnsafeBytes {
                     pp_socket_write(
-                        linkHandle,
+                        socketHandle,
                         $0.bytePointer + pending.offset,
                         pending.count
                     )
@@ -1036,7 +1041,7 @@ private extension FdLooper.SideIO {
             },
             cleanup: {
                 pp_mux_delete(mux, linkFd)
-                pp_socket_release(linkHandle)
+                pp_socket_release(socketHandle)
             }
         )
     }
@@ -1044,10 +1049,14 @@ private extension FdLooper.SideIO {
     convenience init(
         mux: pp_mux,
         tunFd: FileDescriptor,
+        ioFd: Any,
         readBufSize: Int,
         arguments: FdLooper.AttachArguments
-    ) {
-        let tunHandle = pp_tun_retain(tunFd)
+    ) throws {
+        guard let ctrlTun = ioFd as? pp_tun else {
+            throw PartoutError(.tunNotAvailable)
+        }
+        let tunHandle = pp_tun_retain(ctrlTun)
         self.init(
             side: .tun,
             fd: tunFd,

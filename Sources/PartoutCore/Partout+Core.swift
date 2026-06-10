@@ -99,9 +99,6 @@ extension PartoutError.Code {
     /// Link device is not active.
     public static let linkNotActive = Self("linkNotActive")
 
-    /// Multiplexer failure.
-    public static let muxFailure = Self("muxFailure")
-
     /// Network changed.
     public static let networkChanged = Self("networkChanged")
 
