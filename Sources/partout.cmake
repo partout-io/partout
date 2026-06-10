@@ -59,6 +59,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/IOInterface.swift
 ./PartoutCore/Connection/LinkInterface.swift
 ./PartoutCore/Connection/LinkObserver.swift
+./PartoutCore/Connection/NativeIOInterface.swift
 ./PartoutCore/Connection/NativeSocketFactory.swift
 ./PartoutCore/Connection/NetworkInterfaceFactory.swift
 ./PartoutCore/Connection/NetworkObserver.swift

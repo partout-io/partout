@@ -146,12 +146,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
     }
 
     public func clearTunnelSettings(_ io: IOInterface, withKillSwitch: Bool) async {
-        // FIXME: #188, revert settings (record)
-        if let tunnel = io as? TunWrapper {
-//            tun.deviceName
-            tunnel.close()
-        }
-        // Wrap up clear in native layer
+        pp_log(ctx, .core, .debug, "Clear tunnel settings: withKillSwitch=\(withKillSwitch)")
         pp_tun_ctrl_clear_tunnel(ref, withKillSwitch)
     }
 
@@ -347,7 +342,7 @@ struct TunnelRemoteInfoWrapper: Encodable, Sendable {
 }
 
 final class DummyTunnelInterface: TunInterface {
-    var ioDescriptor: Any? {
+    var ioInterface: NativeIOInterface? {
         nil
     }
 

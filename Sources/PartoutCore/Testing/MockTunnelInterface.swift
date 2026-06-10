@@ -6,7 +6,7 @@ public final class MockTunnelInterface: TunInterface {
     public init() {
     }
 
-    public var ioDescriptor: Any? {
+    public var ioInterface: NativeIOInterface? {
         nil
     }
 

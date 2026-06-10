@@ -19,8 +19,10 @@ public final class NETunnelInterface: TunInterface {
 
     // MARK: TunInterface
 
-    public var ioDescriptor: Any? {
-        Self.existingFileDescriptor
+    // FIXME: ###, Must retain TunWrapper
+    public var ioInterface: NativeIOInterface? {
+        guard let fd = Self.existingFileDescriptor else { return nil }
+        fatalError()
     }
 
     public var muxDescriptor: FileDescriptor? {

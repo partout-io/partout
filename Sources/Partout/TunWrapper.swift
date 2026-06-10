@@ -4,11 +4,14 @@
 
 internal import _PartoutCore_C
 
-final class TunWrapper: @unchecked Sendable {
+/// A wrapper for a virtual tun device.
+public final class TunWrapper: NativeIOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
-    let tun: pp_tun
+    private let tun: pp_tun
+    private var isClosed = false
 
-    // WARNING: Handle ownership is transferred
+    // WARNING: Ownership of pp_tun handle is transferred!
+
     init(_ ctx: PartoutLoggerContext, tun: pp_tun) {
         self.ctx = ctx
         self.tun = tun
@@ -16,30 +19,47 @@ final class TunWrapper: @unchecked Sendable {
 
     deinit {
         pp_log(ctx, .core, .debug, "Deinit TunWrapper")
-        pp_tun_free(tun)
+        cleanup()
     }
 
-    func close() {
-        pp_tun_close(tun)
+    public func read(_ buf: inout [UInt8]) -> Int32 {
+        pp_tun_read(tun, &buf, buf.count)
+    }
+
+    public func write(_ data: Data, offset: Int) -> Int32 {
+        let count = data.count - offset
+        return data.withUnsafeBytes {
+            pp_tun_write(
+                tun,
+                $0.bytePointer + offset,
+                count
+            )
+        }
+    }
+
+    public func cleanup() {
+        guard !isClosed else { return }
+        isClosed = true
+        pp_tun_free(tun)
     }
 }
 
 extension TunWrapper: TunInterface {
-    var ioDescriptor: Any? {
-        tun
+    public var ioInterface: NativeIOInterface? {
+        self
     }
 
-    var muxDescriptor: FileDescriptor? {
+    public var muxDescriptor: FileDescriptor? {
         let fd = pp_tun_get_watch_fd(tun)
         guard pp_fd_is_valid(fd) else { return nil }
         return fd
     }
 
-    func readPackets() async throws -> [Data] {
+    public func readPackets() async throws -> [Data] {
         fatalError("Not implemented")
     }
 
-    func writePackets(_ packets: [Data]) async throws {
+    public func writePackets(_ packets: [Data]) async throws {
         fatalError("Not implemented")
     }
 }
