@@ -18,7 +18,7 @@ public final class MockTunnelController: TunnelController, @unchecked Sendable {
     public func configureSockets(with descriptors: [SocketDescriptor]) {
     }
 
-    public func clearTunnelSettings(_ tunnel: IOInterface, withKillSwitch: Bool) async {
+    public func clearTunnelSettings(withKillSwitch: Bool) async {
     }
 
     public func setReasserting(_ reasserting: Bool) {

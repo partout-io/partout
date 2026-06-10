@@ -143,7 +143,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         return environment.environmentData(forKey: key)
     }
 
-    public func clearTunnelSettings(_ io: IOInterface, withKillSwitch: Bool) async {
+    public func clearTunnelSettings(withKillSwitch: Bool) async {
         pp_log(ctx, .core, .debug, "Clear tunnel settings: withKillSwitch=\(withKillSwitch)")
         pp_tun_ctrl_clear_tunnel(ref, withKillSwitch)
     }

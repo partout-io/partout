@@ -218,8 +218,8 @@ extension _OpenVPNConnectionV2: OpenVPNSessionDelegate {
         }
 
         // Clean up tunnel
-        if let tunnelInterface {
-            await controller.clearTunnelSettings(tunnelInterface)
+        if tunnelInterface != nil {
+            await controller.clearTunnelSettings()
             self.tunnelInterface = nil
         }
 

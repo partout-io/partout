@@ -288,6 +288,9 @@ private extension _OpenVPNConnectionV3 {
                 pp_log(ctx, .openvpn, .notice, "Session did stop")
             }
 
+            // Clean up tunnel
+            await controller.clearTunnelSettings()
+
             // If user stopped the tunnel, let it go
             guard status != .disconnecting else {
                 pp_log(ctx, .openvpn, .info, "User requested disconnection")

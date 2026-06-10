@@ -159,7 +159,7 @@ extension _WireGuardConnectionV2: WireGuardAdapterDelegate {
     }
 
     func adapterShouldClearNetworkSettings(_ adapter: WireGuardAdapter, tunnel: IOInterface) async {
-        await controller.clearTunnelSettings(tunnel)
+        await controller.clearTunnelSettings()
     }
 }
 

@@ -10,7 +10,7 @@ public protocol TunnelController: AnyObject, Sendable {
 
     func reportSnapshot(_ snapshot: TunnelSnapshot)
 
-    func clearTunnelSettings(_ tunnel: IOInterface, withKillSwitch: Bool) async
+    func clearTunnelSettings(withKillSwitch: Bool) async
 
     func setReasserting(_ reasserting: Bool)
 
@@ -21,7 +21,7 @@ extension TunnelController {
     public func reportSnapshot(_ snapshot: TunnelSnapshot) {
     }
 
-    public func clearTunnelSettings(_ tunnel: IOInterface) async {
-        await clearTunnelSettings(tunnel, withKillSwitch: false)
+    public func clearTunnelSettings() async {
+        await clearTunnelSettings(withKillSwitch: false)
     }
 }
