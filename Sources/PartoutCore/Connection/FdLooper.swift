@@ -294,6 +294,7 @@ public final class FdLooper: @unchecked Sendable {
         }
     }
 
+    // WARNING: link/tun ownership is transferred after a successful attach!
     public func attach(_ arguments: AttachArguments) async throws {
         try await withCheckedThrowingContinuation { continuation in
             lock.with {
