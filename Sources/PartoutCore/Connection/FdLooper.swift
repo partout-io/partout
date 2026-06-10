@@ -1093,6 +1093,9 @@ private extension FdLooper.SideIO {
             fd: tunFd,
             readBufSize: readBufSize,
             arguments: arguments,
+            prepare: {
+                try ioFd.resetEvents()
+            },
             read: { buf in
                 let count = ioFd.read(&buf)
                 guard count != PPIOErrorWouldBlock else {
