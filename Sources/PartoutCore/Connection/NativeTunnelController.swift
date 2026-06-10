@@ -4,7 +4,7 @@
 
 internal import _PartoutCore_C
 
-/// A controller that operates on a virtual tun interface.
+/// A ``TunnelController`` that interacts with a tun interface through the native platform.
 public final class NativeTunnelController: TunnelController, Sendable {
     private let ctx: PartoutLoggerContext
 
@@ -12,6 +12,8 @@ public final class NativeTunnelController: TunnelController, Sendable {
     private let ref: UnsafeMutableRawPointer?
 
     private let environment: TunnelEnvironmentReader
+
+    private let encodeInfo: @Sendable (TunnelRemoteInfo) throws -> String
 
     private let maxReadLength: Int
 
@@ -27,6 +29,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
         environment: TunnelEnvironmentReader,
+        encodeInfo: @escaping @Sendable (TunnelRemoteInfo) throws -> String,
         maxReadLength: Int = 128 * 1024
     ) throws {
         self.ctx = ctx
@@ -40,6 +43,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         self.ref = ref
 #endif
         self.environment = environment
+        self.encodeInfo = encodeInfo
         self.maxReadLength = maxReadLength
         onReachableStream = CurrentValueStream(false)
         reachabilityHolder = ReachabilityHolder()
@@ -89,14 +93,8 @@ public final class NativeTunnelController: TunnelController, Sendable {
             return DummyTunnelInterface()
         }
 
-        let infoJSON = try {
-            let wrapped = TunnelRemoteInfoWrapper(info)
-            do {
-                return try JSONEncoder.shared().encodeJSON(wrapped)
-            } catch {
-                throw PartoutError(error)
-            }
-        }()
+        // Encode with external provider
+        let infoJSON = try encodeInfo(info)
 
         // Create tun with optional implementation from controller
         guard let tun = info.originalModuleId.uuidString.withCString({ uuid in
@@ -321,23 +319,6 @@ private extension ReachabilityInfo {
             reachable: isReachable
         )
 #endif
-    }
-}
-
-struct TunnelRemoteInfoWrapper: Encodable, Sendable {
-    let originalModuleId: UniqueID
-
-    let address: Address?
-
-    let requiresVirtualDevice: Bool
-
-    let modules: [TaggedModule]?
-
-    init(_ info: TunnelRemoteInfo) {
-        originalModuleId = info.originalModuleId
-        address = info.address
-        requiresVirtualDevice = info.requiresVirtualDevice
-        modules = info.modules?.compactMap(\.taggedModule)
     }
 }
 

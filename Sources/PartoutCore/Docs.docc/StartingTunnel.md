@@ -58,5 +58,7 @@ Given the main app and the daemon:
 
 ### Applying network settings
 
+- ``NativeTunnelController``
 - ``TunnelController``
 - ``TunnelRemoteInfo``
+- ``TunWrapper``
