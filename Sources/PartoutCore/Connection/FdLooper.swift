@@ -447,9 +447,9 @@ private extension FdLooper {
             case .detach(let side, let continuation):
                 handleDetach(side, continuation: continuation, results: &results)
             case .enableRead(let side, let id):
-                handleEnableRead(side, id: id)
+                try handleEnableRead(side, id: id)
             case .enableWrite(let side, let id):
-                handleEnableWrite(side, id: id, fdSet: fdSet)
+                try handleEnableWrite(side, id: id, fdSet: fdSet)
             case .custom(let body):
                 lock.unlock()
                 try body()
@@ -474,10 +474,10 @@ private extension FdLooper {
 
     func process(mux: pp_mux, fdSet: FdSet) throws {
         // Prepare fds before processing
-        if let link, fdSet.readable.contains(link.fd) {
+        if let link, fdSet.readable.contains(link.fd) || fdSet.writable.contains(link.fd) {
             try link.prepare?()
         }
-        if let tun, fdSet.readable.contains(tun.fd) {
+        if let tun, fdSet.readable.contains(tun.fd) || fdSet.writable.contains(tun.fd) {
             try tun.prepare?()
         }
 
@@ -493,7 +493,7 @@ private extension FdLooper {
                     break
                 } catch IOError.noBufSpace {
                     if let tun {
-                        suspendReadAndScheduleRetry(from: tun, fdSet: fdSet)
+                        try suspendReadAndScheduleRetry(from: tun, fdSet: fdSet)
                     }
                     scheduleWriteRetry(to: link)
                     watchWrites = false
@@ -501,7 +501,7 @@ private extension FdLooper {
                 }
             }
             // Stop watching if no blocks
-            pp_mux_set_write(mux, link.fd, watchWrites)
+            try link.setWrite(watchWrites, mux: mux)
             if !watchWrites {
                 fdSet.writable.remove(link.fd)
             }
@@ -519,7 +519,7 @@ private extension FdLooper {
                     break
                 } catch IOError.noBufSpace {
                     if let link {
-                        suspendReadAndScheduleRetry(from: link, fdSet: fdSet)
+                        try suspendReadAndScheduleRetry(from: link, fdSet: fdSet)
                     }
                     scheduleWriteRetry(to: tun)
                     watchWrites = false
@@ -527,7 +527,7 @@ private extension FdLooper {
                 }
             }
             // Stop watching if no blocks
-            pp_mux_set_write(mux, tun.fd, watchWrites)
+            try tun.setWrite(watchWrites, mux: mux)
             if !watchWrites {
                 fdSet.writable.remove(tun.fd)
             }
@@ -556,7 +556,7 @@ private extension FdLooper {
             if !inbox.isEmpty {
                 let action = try tun.processReadPackets(inbox)
                 if action == .pause {
-                    pp_mux_set_read(mux, tun.fd, false)
+                    try tun.setRead(false, mux: mux)
                 }
             }
         }
@@ -584,14 +584,14 @@ private extension FdLooper {
             if !inbox.isEmpty {
                 let action = try link.processReadPackets(inbox)
                 if action == .pause {
-                    pp_mux_set_read(mux, link.fd, false)
+                    try link.setRead(false, mux: mux)
                 }
             }
         }
     }
 
-    func suspendReadAndScheduleRetry(from io: SideIO, fdSet: FdSet) {
-        pp_mux_set_read(mux, io.fd, false)
+    func suspendReadAndScheduleRetry(from io: SideIO, fdSet: FdSet) throws {
+        try io.setRead(false, mux: mux)
         fdSet.readable.remove(io.fd)
 
         lock.lock()
@@ -718,14 +718,22 @@ private extension FdLooper {
             pp_log(ctx, .core, .info, "Attach link (fd=\(linkFd))")
 
             // Create new side
-            link = SideIO(
+            let newLink = SideIO(
                 mux: mux,
                 linkFd: linkFd,
                 ioFd: ioFd,
                 readBufSize: linkBufSize,
                 arguments: arguments
             )
-            results.append(.attach(continuation, .success(())))
+            do {
+                try newLink.syncEventMask()
+                link = newLink
+                results.append(.attach(continuation, .success(())))
+            } catch {
+                pp_log(ctx, .core, .fault, "Unable to retain link: \(error)")
+                pp_mux_delete(mux, linkFd)
+                results.append(.attach(continuation, .failure(MuxError(side: .link))))
+            }
         case .tun(let tunFd, let ioFd):
             // Cancel attach if stopping
             guard state != .stopping else {
@@ -745,14 +753,16 @@ private extension FdLooper {
             pp_log(ctx, .core, .info, "Attach tun (fd=\(tunFd))")
 
             // Create new side
+            let newTun = SideIO(
+                mux: mux,
+                tunFd: tunFd,
+                ioFd: ioFd,
+                readBufSize: tunBufSize,
+                arguments: arguments
+            )
             do {
-                tun = try SideIO(
-                    mux: mux,
-                    tunFd: tunFd,
-                    ioFd: ioFd,
-                    readBufSize: tunBufSize,
-                    arguments: arguments
-                )
+                try newTun.syncEventMask()
+                tun = newTun
                 results.append(.attach(continuation, .success(())))
             } catch {
                 pp_log(ctx, .core, .fault, "Unable to retain tun: \(error)")
@@ -783,7 +793,7 @@ private extension FdLooper {
         }
     }
 
-    func handleEnableRead(_ side: Side, id: UUID?) {
+    func handleEnableRead(_ side: Side, id: UUID?) throws {
         if let id {
             guard !isOutdated(id, side: side) else {
                 return
@@ -792,20 +802,20 @@ private extension FdLooper {
         switch side {
         case .link:
             if let link {
-                pp_mux_set_read(mux, link.fd, true)
+                try link.setRead(true, mux: mux)
             } else {
                 pp_log(ctx, .core, .error, "Ignoring enableRead(.link), not attached")
             }
         case .tun:
             if let tun {
-                pp_mux_set_read(mux, tun.fd, true)
+                try tun.setRead(true, mux: mux)
             } else {
                 pp_log(ctx, .core, .error, "Ignoring enableRead(.tun), not attached")
             }
         }
     }
 
-    func handleEnableWrite(_ side: Side, id: UUID?, fdSet: FdSet) {
+    func handleEnableWrite(_ side: Side, id: UUID?, fdSet: FdSet) throws {
         if let id {
             guard !isOutdated(id, side: side) else {
                 return
@@ -814,14 +824,14 @@ private extension FdLooper {
         switch side {
         case .link:
             if let link {
-                pp_mux_set_write(mux, link.fd, true)
+                try link.setWrite(true, mux: mux)
                 fdSet.writable.insert(link.fd)
             } else {
                 pp_log(ctx, .core, .error, "Ignoring enableWrite(.link), not attached")
             }
         case .tun:
             if let tun {
-                pp_mux_set_write(mux, tun.fd, true)
+                try tun.setWrite(true, mux: mux)
                 fdSet.writable.insert(tun.fd)
             } else {
                 pp_log(ctx, .core, .error, "Ignoring enableWrite(.tun), not attached")
@@ -911,6 +921,7 @@ private extension FdLooper {
         private let onFailure: OnFailure?
 
         let prepare: (() throws -> Void)?
+        private let setEventMask: (Bool, Bool) throws -> Void
         private let read: (inout [UInt8]) throws -> Data?
         private let write: (PendingWrite) throws -> Int
         private var cleanup: (() -> Void)?
@@ -918,6 +929,8 @@ private extension FdLooper {
         private var readBuf: [UInt8]
         private var writeQueue: RingQueue<Data>
         private var writeOffset: Int
+        private var isReading: Bool
+        private var isWriting: Bool
 
         init(
             side: Side,
@@ -925,6 +938,7 @@ private extension FdLooper {
             readBufSize: Int,
             arguments: FdLooper.AttachArguments,
             prepare: (() throws -> Void)? = nil,
+            setEventMask: @escaping (Bool, Bool) throws -> Void = { _, _ in },
             read: @escaping (inout [UInt8]) throws -> Data?,
             write: @escaping (PendingWrite) throws -> Int,
             cleanup: @escaping () -> Void,
@@ -935,16 +949,35 @@ private extension FdLooper {
             onRead = arguments.onRead
             onFailure = arguments.onFailure
             self.prepare = prepare
+            self.setEventMask = setEventMask
             self.read = read
             self.write = write
             self.cleanup = cleanup
             readBuf = Array(repeating: 0, count: readBufSize)
             writeQueue = RingQueue()
             writeOffset = 0
+            isReading = true
+            isWriting = false
         }
 
         func dequeueRead() throws -> Data? {
             try read(&readBuf)
+        }
+
+        func setRead(_ enabled: Bool, mux: pp_mux) throws {
+            pp_mux_set_read(mux, fd, enabled)
+            isReading = enabled
+            try setEventMask(isReading, isWriting)
+        }
+
+        func setWrite(_ enabled: Bool, mux: pp_mux) throws {
+            pp_mux_set_write(mux, fd, enabled)
+            isWriting = enabled
+            try setEventMask(isReading, isWriting)
+        }
+
+        func syncEventMask() throws {
+            try setEventMask(isReading, isWriting)
         }
 
         func processReadPackets(_ packets: [Data]) throws -> FdLooper.ReadAction {
@@ -1045,6 +1078,9 @@ private extension FdLooper.SideIO {
             prepare: {
                 try ioFd.resetEvents()
             },
+            setEventMask: { read, write in
+                try ioFd.setEventMask(read: read, write: write)
+            },
             read: { buf in
                 let count = ioFd.read(&buf)
                 guard count != PPIOErrorWouldBlock else {
@@ -1087,7 +1123,7 @@ private extension FdLooper.SideIO {
         ioFd: NativeIOInterface,
         readBufSize: Int,
         arguments: FdLooper.AttachArguments
-    ) throws {
+    ) {
         self.init(
             side: .tun,
             fd: tunFd,
@@ -1095,6 +1131,9 @@ private extension FdLooper.SideIO {
             arguments: arguments,
             prepare: {
                 try ioFd.resetEvents()
+            },
+            setEventMask: { read, write in
+                try ioFd.setEventMask(read: read, write: write)
             },
             read: { buf in
                 let count = ioFd.read(&buf)

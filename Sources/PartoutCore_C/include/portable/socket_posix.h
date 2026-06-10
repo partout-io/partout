@@ -122,6 +122,16 @@ int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags) {
     return ret;
 }
 
+bool pp_socket_set_event_mask(pp_socket sock, bool read, bool write) {
+    if (!sock || local_is_invalid_fd(sock->fd)) {
+        local_set_not_socket_error();
+        return false;
+    }
+    (void)read;
+    (void)write;
+    return true;
+}
+
 bool pp_socket_reset_events(pp_socket sock) {
     if (!sock || local_is_invalid_fd(sock->fd)) {
         local_set_not_socket_error();

@@ -21,6 +21,9 @@ public final class TunWrapper: NativeIOInterface, @unchecked Sendable {
         cleanup()
     }
 
+    public func setEventMask(read: Bool, write: Bool) throws {
+    }
+
     public func resetEvents() throws {
     }
 

@@ -149,6 +149,12 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
         cleanup()
     }
 
+    func setEventMask(read: Bool, write: Bool) throws {
+        guard pp_socket_set_event_mask(socket, read, write) else {
+            throw PartoutError(.ioFailure)
+        }
+    }
+
     func resetEvents() throws {
         guard pp_socket_reset_events(socket) else {
             throw PartoutError(.ioFailure)

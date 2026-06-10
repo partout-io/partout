@@ -153,6 +153,24 @@ int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags) {
     return 0;
 }
 
+bool pp_socket_set_event_mask(pp_socket sock, bool read, bool write) {
+    if (!sock ||
+        local_is_invalid_fd(sock->fd) ||
+        sock->handle == WSA_INVALID_EVENT ||
+        !pp_fd_is_valid(sock->handle)) {
+        local_set_not_socket_error();
+        return false;
+    }
+    long events = FD_CLOSE;
+    if (read) events |= FD_READ;
+    if (write) events |= FD_WRITE;
+    if (WSAEventSelect(sock->fd, sock->handle, events) == SOCKET_ERROR) {
+        local_print_error("WSAEventSelect()");
+        return false;
+    }
+    return true;
+}
+
 bool pp_socket_reset_events(pp_socket sock) {
     if (!sock ||
         local_is_invalid_fd(sock->fd) ||

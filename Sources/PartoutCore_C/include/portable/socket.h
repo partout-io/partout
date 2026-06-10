@@ -68,7 +68,8 @@ pp_fd pp_socket_get_watch_fd(pp_socket sock);
 int pp_socket_set_nonblocking(pp_socket_fd fd, int *_Nullable original_flags);
 int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags);
 
-/* Call this before any event loop. */
+/* Configure and reset the socket events associated with the watch fd. */
+bool pp_socket_set_event_mask(pp_socket sock, bool read, bool write);
 bool pp_socket_reset_events(pp_socket sock);
 
 #if PARTOUT_WINDOWS
