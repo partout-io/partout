@@ -177,6 +177,14 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
         cleanup()
     }
 
+    func resetEvents() throws {
+#if os(Windows)
+        guard pp_socket_reset_event(socket, handle) else {
+            throw FdLooper.IOError.libc(.link, lastErrorCode)
+        }
+#endif
+    }
+
     func read(_ buf: inout [UInt8]) -> Int32 {
         pp_socket_read(socket, &buf, buf.count)
     }

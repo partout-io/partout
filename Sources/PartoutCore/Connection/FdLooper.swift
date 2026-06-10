@@ -1043,9 +1043,7 @@ private extension FdLooper.SideIO {
             readBufSize: readBufSize,
             arguments: arguments,
             prepare: {
-                guard pp_socket_reset_event(socketFd, linkFd) else {
-                    throw FdLooper.IOError.libc(.link, pp_socket_last_error())
-                }
+                try ioFd.resetEvents()
             },
             read: { buf in
                 let count = ioFd.read(&buf)

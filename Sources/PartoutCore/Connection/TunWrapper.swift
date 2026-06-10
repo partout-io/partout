@@ -21,6 +21,9 @@ public final class TunWrapper: NativeIOInterface, @unchecked Sendable {
         cleanup()
     }
 
+    public func resetEvents() throws {
+    }
+
     public func read(_ buf: inout [UInt8]) -> Int32 {
         pp_tun_read(tun, &buf, buf.count)
     }
