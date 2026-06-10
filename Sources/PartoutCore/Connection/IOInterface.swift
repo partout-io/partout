@@ -8,11 +8,13 @@ public protocol IOInterface: AnyObject, Sendable {
     var muxDescriptor: FileDescriptor? { get }
 
     /// Reads packets from the interface.
+    @available(*, deprecated, message: "Use FdLooper")
     func readPackets() async throws -> [Data]
 
     /// Writes packets to the interface.
     ///
     /// - Parameter packets: The packets to write.
+    @available(*, deprecated, message: "Use FdLooper")
     func writePackets(_ packets: [Data]) async throws
 }
 
