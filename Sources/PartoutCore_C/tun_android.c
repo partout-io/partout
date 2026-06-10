@@ -18,12 +18,13 @@
 #include <sys/socket.h>
 
 struct __pp_tun_struct {
-    int fd;
+    pp_fd fd;
 };
 
-pp_tun pp_tun_retain(int fd) {
+pp_tun pp_tun_retain(pp_tun other) {
+    pp_assert(other);
     pp_tun tun = pp_alloc(sizeof(*tun));
-    tun->fd = fd;
+    tun->fd = other->fd;
     return tun;
 }
 
@@ -54,7 +55,7 @@ void pp_tun_close(const pp_tun tun) {
     shutdown(tun->fd, SHUT_RDWR);
 }
 
-int pp_tun_get_fd(const pp_tun tun) {
+pp_fd pp_tun_get_watch_fd(const pp_tun tun) {
     if (!tun) return -1;
     return tun->fd;
 }

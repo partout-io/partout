@@ -119,6 +119,10 @@ extern const int PPIOErrorNoBufs;
 typedef _Nonnull HANDLE pp_fd;
 typedef SOCKET pp_socket_fd;
 
+static inline bool pp_fd_is_valid(pp_fd fd) {
+    return fd != INVALID_HANDLE_VALUE;
+}
+
 #define PP_IO_RETRY(result, fn) \
     do { \
         do { \
@@ -138,6 +142,10 @@ static inline int pp_io_last_error(void) {
 
 typedef int pp_fd;
 typedef pp_fd pp_socket_fd;
+
+static inline bool pp_fd_is_valid(pp_fd fd) {
+    return fd != -1;
+}
 
 int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
 int pp_fd_restore_blocking(pp_fd fd, int original_flags);
