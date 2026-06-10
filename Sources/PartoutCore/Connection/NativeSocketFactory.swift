@@ -142,15 +142,24 @@ final class SocketWrapper: @unchecked Sendable {
             }
         }
 #if os(Windows)
-        guard let handle = WSACreateEvent() else {
-            throw PartoutError(.fdUnavailable)
-        }
-        guard WSAEventSelect(
-            pp_socket_get_fd(socket),
-            handle,
-            FD_READ | FD_WRITE | FD_CLOSE
-        ) == 0 else {
-            throw PartoutError(.linkNotActive)
+        let handle = WSACreateEvent()
+        do {
+            guard let handle else {
+                throw PartoutError(.fdUnavailable)
+            }
+            guard WSAEventSelect(
+                pp_socket_get_fd(socket),
+                handle,
+                FD_READ | FD_WRITE | FD_CLOSE
+            ) == 0 else {
+                throw PartoutError(.linkNotActive)
+            }
+        } catch {
+            if let handle {
+                WSACloseEvent(handle)
+            }
+            pp_socket_free(socket)
+            throw error
         }
         self.handle = handle
 #endif
