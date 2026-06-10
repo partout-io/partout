@@ -7,4 +7,5 @@ public protocol NativeIOInterface: Sendable {
     func read(_ buf: inout [UInt8]) -> Int32
     func write(_ data: Data, offset: Int) -> Int32
     func cleanup()
+    var lastErrorCode: Int32 { get }
 }

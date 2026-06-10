@@ -76,7 +76,7 @@ final class NativeSocketObserver: LinkObserver {
     }
 }
 
-final class SocketWrapper: @unchecked Sendable {
+final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
     struct Options: Sendable {
         let endpoint: ExtendedEndpoint
         let timeout: Int
@@ -91,6 +91,7 @@ final class SocketWrapper: @unchecked Sendable {
 #if os(Windows)
     private let handle: FileDescriptor
 #endif
+    private var isClosed = false
 
     init(_ ctx: PartoutLoggerContext, options: Options) async throws {
         let socket: pp_socket = try await withCheckedThrowingContinuation { continuation in
@@ -173,7 +174,32 @@ final class SocketWrapper: @unchecked Sendable {
 #if os(Windows)
         WSACloseEvent(handle)
 #endif
+        cleanup()
+    }
+
+    func read(_ buf: inout [UInt8]) -> Int32 {
+        pp_socket_read(socket, &buf, buf.count)
+    }
+
+    func write(_ data: Data, offset: Int) -> Int32 {
+        let count = data.count - offset
+        return data.withUnsafeBytes {
+            pp_socket_write(
+                socket,
+                $0.bytePointer + offset,
+                count
+            )
+        }
+    }
+
+    func cleanup() {
+        guard !isClosed else { return }
+        isClosed = true
         pp_socket_free(socket)
+    }
+
+    var lastErrorCode: Int32 {
+        pp_socket_last_error()
     }
 }
 
@@ -182,12 +208,12 @@ extension SocketWrapper: LinkInterface {
 #if os(Windows)
         handle
 #else
-        socketDescriptor
+        pp_socket_get_fd(socket)
 #endif
     }
 
-    var socketDescriptor: SocketDescriptor? {
-        pp_socket_get_fd(socket)
+    var nativeIO: NativeIOInterface? {
+        self
     }
 
     var remoteAddress: String {

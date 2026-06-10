@@ -7,6 +7,9 @@ public protocol IOInterface: AnyObject, Sendable {
     /// The file descriptor, if available.
     var muxDescriptor: FileDescriptor? { get }
 
+    /// A ``NativeIOInterface`` object to perform native I/O.
+    var nativeIO: NativeIOInterface? { get }
+
     /// Reads packets from the interface.
     @available(*, deprecated, message: "Use FdLooper")
     func readPackets() async throws -> [Data]
@@ -20,6 +23,10 @@ public protocol IOInterface: AnyObject, Sendable {
 
 extension IOInterface {
     public var muxDescriptor: FileDescriptor? {
+        nil
+    }
+
+    public var nativeIO: NativeIOInterface? {
         nil
     }
 }

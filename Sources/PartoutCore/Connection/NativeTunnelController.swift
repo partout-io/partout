@@ -323,10 +323,6 @@ private extension ReachabilityInfo {
 }
 
 final class DummyTunnelInterface: TunInterface {
-    var ioInterface: NativeIOInterface? {
-        nil
-    }
-
     func readPackets() async throws -> [Data] {
         []
     }

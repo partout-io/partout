@@ -19,7 +19,7 @@ public final class NETunnelInterface: TunInterface {
 
     // MARK: TunInterface
 
-    public var ioInterface: NativeIOInterface? {
+    public var nativeIO: NativeIOInterface? {
         let fd = Self.existingFileDescriptor
         do {
             return try TunWrapper(ctx, fd: fd)

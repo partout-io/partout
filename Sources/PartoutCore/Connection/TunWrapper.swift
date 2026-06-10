@@ -63,10 +63,14 @@ public final class TunWrapper: NativeIOInterface, @unchecked Sendable {
         isClosed = true
         pp_tun_free(tun)
     }
+
+    public var lastErrorCode: Int32 {
+        pp_io_last_error()
+    }
 }
 
 extension TunWrapper: TunInterface {
-    public var ioInterface: NativeIOInterface? {
+    public var nativeIO: NativeIOInterface? {
         self
     }
 

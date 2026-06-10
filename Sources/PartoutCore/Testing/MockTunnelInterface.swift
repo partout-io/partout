@@ -6,10 +6,6 @@ public final class MockTunnelInterface: TunInterface {
     public init() {
     }
 
-    public var ioInterface: NativeIOInterface? {
-        nil
-    }
-
     public func readPackets() async throws -> [Data] {
         []
     }
