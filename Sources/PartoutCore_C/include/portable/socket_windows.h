@@ -36,17 +36,6 @@ static inline pp_socket_fd local_invalid_fd(void) {
     return INVALID_SOCKET;
 }
 
-static inline bool local_is_invalid_fd(pp_socket_fd fd) {
-    return fd == local_invalid_fd();
-}
-
-static inline bool local_is_valid_socket(pp_socket sock) {
-    return (sock &&
-            !local_is_invalid_fd(sock->fd) &&
-            sock->handle != WSA_INVALID_EVENT &&
-            pp_fd_is_valid(sock->handle));
-}
-
 static inline pp_fd local_invalid_watch_fd(void) {
     return INVALID_HANDLE_VALUE;
 }

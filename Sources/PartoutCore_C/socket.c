@@ -11,6 +11,10 @@
 #include "portable/common.h"
 #include "portable/socket.h"
 
+static pp_socket_fd local_invalid_fd(void);
+static bool local_is_invalid_fd(pp_socket_fd fd);
+static bool local_is_valid_socket(pp_socket sock);
+
 #if PARTOUT_WINDOWS
 #include "portable/socket_windows.h"
 #else
@@ -18,8 +22,6 @@
 #endif
 
 static bool local_platform_init(void);
-static pp_socket_fd local_invalid_fd(void);
-static bool local_is_invalid_fd(pp_socket_fd fd);
 static void local_print_error(const char *msg);
 static void local_set_not_socket_error(void);
 static void local_set_timeout_error(void);
@@ -46,6 +48,16 @@ static bool local_parse_numeric_addr(const char *ip_addr,
                                      struct sockaddr_storage *addr,
                                      os_socklen_t *addrlen);
 static void local_close_impl(pp_socket sock);
+
+static bool local_is_invalid_fd(pp_socket_fd fd) {
+    return fd == local_invalid_fd();
+}
+
+static bool local_is_valid_socket(pp_socket sock) {
+    return sock &&
+           !local_is_invalid_fd(sock->fd) &&
+           pp_fd_is_valid(local_socket_watch_fd(sock));
+}
 
 /* Create a socket from a formerly opened file descriptor. */
 static pp_socket pp_socket_create(pp_socket_fd fd) {
@@ -194,7 +206,7 @@ failure:
 
 /* Close the native file descriptor without freeing the wrapper. */
 void pp_socket_shutdown(pp_socket sock) {
-    if (!sock || local_is_invalid_fd(sock->fd)) return;
+    if (!local_is_valid_socket(sock)) return;
     (void)local_shutdown_fd(sock->fd);
 }
 
@@ -218,7 +230,7 @@ void pp_socket_free_and_close(pp_socket sock, bool and_close) {
 /* Read up to dst_len bytes, and return the amount of the actually read
  * bytes. Returns < 0 on failure. */
 int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
-    if (!sock || local_is_invalid_fd(sock->fd)) {
+    if (!local_is_valid_socket(sock)) {
         local_set_not_socket_error();
         return -1;
     }
@@ -245,7 +257,7 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
 /* Write src_len bytes, and repeat until fully written. Returns the amount
  * of written bytes, expected to always be src_len. Returns < 0 on failure. */
 int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
-    if (!sock || local_is_invalid_fd(sock->fd)) {
+    if (!local_is_valid_socket(sock)) {
         local_set_not_socket_error();
         return -1;
     }
@@ -280,7 +292,7 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
 }
 
 bool pp_socket_set_buffers(pp_socket sock, int recvbuf_len, int sendbuf_len) {
-    if (!sock || local_is_invalid_fd(sock->fd)) {
+    if (!local_is_valid_socket(sock)) {
         local_set_not_socket_error();
         return false;
     }
@@ -303,13 +315,13 @@ bool pp_socket_set_buffers(pp_socket sock, int recvbuf_len, int sendbuf_len) {
 
 /* Return the native file descriptor. */
 pp_socket_fd pp_socket_get_fd(const pp_socket sock) {
-    pp_assert(sock && !local_is_invalid_fd(sock->fd));
+    pp_assert(local_is_valid_socket(sock));
     return sock->fd;
 }
 
 /* Return the native watch file descriptor. */
 pp_fd pp_socket_get_watch_fd(const pp_socket sock) {
-    if (!sock || local_is_invalid_fd(sock->fd)) {
+    if (!local_is_valid_socket(sock)) {
         return local_invalid_watch_fd();
     }
     return local_socket_watch_fd(sock);
