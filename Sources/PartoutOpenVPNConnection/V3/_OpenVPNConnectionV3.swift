@@ -454,9 +454,9 @@ private extension _OpenVPNConnectionV3 {
 
     func observeBetterPath(on link: LinkInterface) {
         pathSubscription?.cancel()
-        pathSubscription = Task { [weak self, weak link] in
-            guard let link else { return }
-            for await _ in link.hasBetterPath {
+        let hasBetterPath = link.hasBetterPath
+        pathSubscription = Task { [weak self] in
+            for await _ in hasBetterPath {
                 guard let self else { return }
                 guard !Task.isCancelled else {
                     pp_log(ctx, .openvpn, .debug, "Cancelled CyclingConnection.pathSubscription")
