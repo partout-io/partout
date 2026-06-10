@@ -69,7 +69,8 @@ struct ProfileDiffTests {
         print(diff)
         #expect(diff == [
             .addedModules([dnsModule.id]),
-            .changedActiveModules
+            .changedActiveModules,
+            .enabledModules([dnsModule.id])
         ])
 
         sut.modules = [] // also clears stale ID in activeModulesIds
