@@ -14,12 +14,12 @@
 
 typedef socklen_t os_socklen_t;
 
-static inline bool local_platform_init(void) {
-    return true;
-}
-
 static inline void local_print_error(const char *msg) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed: %s", msg, strerror(errno));
+}
+
+static inline bool local_platform_init(void) {
+    return true;
 }
 
 static inline pp_socket_fd local_invalid_fd(void) {

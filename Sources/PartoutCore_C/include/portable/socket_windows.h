@@ -9,6 +9,10 @@
 
 typedef int os_socklen_t;
 
+static inline void local_print_error(const char *msg) {
+    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed with error %d", msg, WSAGetLastError());
+}
+
 static inline bool local_platform_init(void) {
     static int wsa_initialized = 0;
     if (!wsa_initialized) {
@@ -20,10 +24,6 @@ static inline bool local_platform_init(void) {
         wsa_initialized = 1;
     }
     return true;
-}
-
-static inline void local_print_error(const char *msg) {
-    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed with error %d", msg, WSAGetLastError());
 }
 
 static inline pp_socket_fd local_invalid_fd(void) {
