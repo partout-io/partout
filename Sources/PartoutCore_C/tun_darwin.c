@@ -184,7 +184,11 @@ pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json
     (void)uuid;
     (void)info_json;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_darwin: ctrl_set_tunnel(%p)", ref);
+#if PARTOUT_MACOS
     return pp_tun_open(uuid);
+#else
+    return NULL;
+#endif
 }
 
 bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,

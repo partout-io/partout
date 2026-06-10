@@ -11,28 +11,6 @@ public final class TunWrapper: NativeIOInterface, @unchecked Sendable {
     private var isClosed = false
 
     // WARNING: Ownership of pp_tun handle is transferred!
-
-#if canImport(Darwin)
-    public convenience init(_ ctx: PartoutLoggerContext, fd: Int32?) throws {
-        let tun: pp_tun?
-
-        // Look up Network Extension fd first
-        if let fd {
-            tun = pp_tun_dup(fd)
-        } else {
-            // Otherwise, try raw access to device
-            let uuid = ctx.profileId ?? UUID()
-            tun = uuid.uuidString.withCString {
-                pp_tun_open($0)
-            }
-        }
-        guard let tun else {
-            throw PartoutError(.tunNotAvailable)
-        }
-        self.init(ctx, tun: tun)
-    }
-#endif
-
     init(_ ctx: PartoutLoggerContext, tun: pp_tun) {
         self.ctx = ctx
         self.tun = tun
@@ -88,3 +66,64 @@ extension TunWrapper: TunInterface {
         fatalError("Not implemented")
     }
 }
+
+#if canImport(Darwin)
+extension TunWrapper {
+    public static func forNetworkExtension(_ ctx: PartoutLoggerContext) throws -> TunWrapper {
+        var tun: pp_tun?
+
+        // Look up Network Extension fd first
+        if let networkExtensionFd {
+            tun = pp_tun_dup(networkExtensionFd)
+        }
+#if os(macOS)
+        // Otherwise, open new device
+        if tun == nil {
+            let uuid = ctx.profileId ?? UUID()
+            tun = uuid.uuidString.withCString {
+                pp_tun_open($0)
+            }
+        }
+#endif
+        guard let tun else {
+            throw PartoutError(.tunNotAvailable)
+        }
+        return TunWrapper(ctx, tun: tun)
+    }
+
+    // FIXME: ###, This is better done in C to also omit the manual structs from tun.h
+    public static var networkExtensionFd: Int32? {
+        var ctlInfo = ctl_info()
+        withUnsafeMutablePointer(to: &ctlInfo.ctl_name) {
+            $0.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: $0.pointee)) {
+                _ = strcpy($0, "com.apple.net.utun_control")
+            }
+        }
+        for fd: Int32 in 0...1024 {
+            var addr = sockaddr_ctl()
+            var len = socklen_t(MemoryLayout.size(ofValue: addr))
+            let ret = withUnsafeMutablePointer(to: &addr) {
+                $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                    getpeername(fd, $0, &len)
+                }
+            }
+            guard ret == 0 && addr.sc_family == AF_SYSTEM else {
+                continue
+            }
+            if ctlInfo.ctl_id == 0 {
+                let ret = ioctl(fd, Self.CTLIOCGINFO, &ctlInfo)
+                guard ret == 0 else {
+                    continue
+                }
+            }
+            guard addr.sc_id == ctlInfo.ctl_id else {
+                continue
+            }
+            return fd
+        }
+        return nil
+    }
+
+    private static let CTLIOCGINFO: UInt = 0xc0644e03
+}
+#endif

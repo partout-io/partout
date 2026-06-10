@@ -46,7 +46,7 @@ class LegacyWireGuardAdapter: @unchecked Sendable {
 
     /// Tunnel device file descriptor.
     private var tunnelFileDescriptor: Int32? {
-        NETunnelInterface.existingFileDescriptor
+        TunWrapper.networkExtensionFd
     }
 
     /// Returns a WireGuard version.

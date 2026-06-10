@@ -39,8 +39,12 @@ struct sockaddr_ctl {
 #endif
 #endif
 
-/* Platform-specific implementations. */
+#if PARTOUT_MACOS || PARTOUT_LINUX || PARTOUT_WINDOWS
+/* On desktop, we can request a new device. */
 pp_tun _Nullable pp_tun_open(const char *uuid);
+#endif
+
+/* Platform-specific implementations. */
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len);
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len);
 void pp_tun_close(const pp_tun tun);
