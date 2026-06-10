@@ -424,7 +424,7 @@ private final class MockOpenVPNSession: OpenVPNSessionProtocolV3, @unchecked Sen
         mockHasLink
     }
 
-    func setTunnel(_ tunnel: IOInterface) async throws {
+    func setTunnel(_ tunnel: TunInterface) async throws {
         onSetTunnel()
     }
 

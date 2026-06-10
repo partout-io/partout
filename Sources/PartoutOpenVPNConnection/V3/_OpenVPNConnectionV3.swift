@@ -40,9 +40,7 @@ public actor _OpenVPNConnectionV3 {
 
     private var endpointResolver: EndpointResolver
 
-    private var currentLink: LinkInterface?
-
-    private var tunnelInterface: IOInterface?
+    private var currentEndpoint: ExtendedEndpoint?
 
     private var pathSubscription: Task<Void, Never>?
 
@@ -264,7 +262,6 @@ private extension _OpenVPNConnectionV3 {
                         requiresVirtualDevice: true
                     )
                 )
-                self.tunnelInterface = tunnelInterface
                 try await session.setTunnel(tunnelInterface)
 
                 // In this suspended interval, sessionDidStop may have been called and
@@ -282,6 +279,9 @@ private extension _OpenVPNConnectionV3 {
                 await session.shutdown(error)
             }
         case .didStop(_, let error):
+            pathSubscription?.cancel()
+            pathSubscription = nil
+            currentEndpoint = nil
             if let error {
                 pp_log(ctx, .openvpn, .error, "Session did stop: \(error)")
             } else {
@@ -289,10 +289,7 @@ private extension _OpenVPNConnectionV3 {
             }
 
             // Clean up tunnel
-            if let tunnelInterface {
-                await controller.clearTunnelSettings(tunnelInterface)
-                self.tunnelInterface = nil
-            }
+            await controller.clearTunnelSettings()
 
             // If user stopped the tunnel, let it go
             guard status != .disconnecting else {
@@ -417,12 +414,13 @@ private extension _OpenVPNConnectionV3 {
             pp_log(ctx, .openvpn, .notice, "Create new link")
             var newLink: LinkInterface
 
-            // upgrade current link if possible
-            if upgradingCurrent, let upgradedLink = try await currentLink?.upgraded() {
+            // Upgrade current link if possible
+            if upgradingCurrent, let currentEndpoint {
                 pp_log(ctx, .openvpn, .notice, "Will reconnect to current link")
-                newLink = upgradedLink
+                let linkObserver = try factory.linkObserver(to: currentEndpoint)
+                newLink = try await linkObserver.waitForActivity(timeout: options.linkActivityTimeout)
             }
-            // create new link
+            // Create new link
             else {
                 pp_log(ctx, .openvpn, .notice, "Cycle to next endpoint")
                 let result = try await endpointResolver.withNextEndpoint(
@@ -434,12 +432,12 @@ private extension _OpenVPNConnectionV3 {
                 let linkObserver = try factory.linkObserver(to: result.endpoint)
                 pp_log(ctx, .openvpn, .notice, "Connect to \(result.endpoint.asSensitiveAddress(ctx))")
                 newLink = try await linkObserver.waitForActivity(timeout: options.linkActivityTimeout)
+                currentEndpoint = result.endpoint
 
                 pp_log(ctx, .openvpn, .notice, "Link is active")
                 pp_log(ctx, .openvpn, .info, "Link type is \(newLink.linkDescription)")
             }
 
-            currentLink = newLink
             return newLink
         } catch {
             pp_log(ctx, .openvpn, .fault, "Unable to create link: \(error)")
@@ -456,9 +454,9 @@ private extension _OpenVPNConnectionV3 {
 
     func observeBetterPath(on link: LinkInterface) {
         pathSubscription?.cancel()
-        pathSubscription = Task { [weak self, weak link] in
-            guard let link else { return }
-            for await _ in link.hasBetterPath {
+        let hasBetterPath = link.hasBetterPath
+        pathSubscription = Task { [weak self] in
+            for await _ in hasBetterPath {
                 guard let self else { return }
                 guard !Task.isCancelled else {
                     pp_log(ctx, .openvpn, .debug, "Cancelled CyclingConnection.pathSubscription")

@@ -215,8 +215,8 @@ public actor SimpleConnectionDaemon: ConnectionDaemon {
         snapshotSubscription = nil
 
         // Clear tunnel settings
-        if let settingsOnlyTunnel {
-            await controller.clearTunnelSettings(settingsOnlyTunnel, withKillSwitch: false)
+        if settingsOnlyTunnel != nil {
+            await controller.clearTunnelSettings(withKillSwitch: false)
         }
 
         // Make sure to clear environment on stop, especially last error code

@@ -112,8 +112,16 @@ extern const int PPIOErrorWouldBlock;
 extern const int PPIOErrorNoBufs;
 
 #if PARTOUT_WINDOWS
+
 #include <ws2tcpip.h>
-typedef SOCKET pp_fd;
+#pragma clang assume_nonnull begin
+
+typedef _Nonnull HANDLE pp_fd;
+typedef SOCKET pp_socket_fd;
+
+static inline bool pp_fd_is_valid(pp_fd fd) {
+    return fd != INVALID_HANDLE_VALUE;
+}
 
 #define PP_IO_RETRY(result, fn) \
     do { \
@@ -122,20 +130,25 @@ typedef SOCKET pp_fd;
         } while ((result) < 0 && WSAGetLastError() == WSAEINTR); \
     } while (0)
 
-static inline bool PP_IO_INTR(void) {
-    return WSAGetLastError() == WSAEINTR;
+static inline int pp_io_last_error(void) {
+    return GetLastError();
 }
+#pragma clang assume_nonnull end
 
-static inline bool PP_IO_WOULDBLOCK(void) {
-    return WSAGetLastError() == WSAEWOULDBLOCK;
-}
-
-static inline bool PP_IO_NOBUFS(void) {
-    return WSAGetLastError() == WSAENOBUFS;
-}
 #else
+
 #include <errno.h>
+#pragma clang assume_nonnull begin
+
 typedef int pp_fd;
+typedef pp_fd pp_socket_fd;
+
+static inline bool pp_fd_is_valid(pp_fd fd) {
+    return fd != -1;
+}
+
+int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
+int pp_fd_restore_blocking(pp_fd fd, int original_flags);
 
 #define PP_IO_RETRY(result, fn) \
     do { \
@@ -144,23 +157,20 @@ typedef int pp_fd;
         } while ((result) < 0 && errno == EINTR); \
     } while (0)
 
-static inline bool PP_IO_INTR(void) {
-    return errno == EINTR;
+static inline int pp_io_last_error(void) {
+    return errno;
 }
 
-static inline bool PP_IO_WOULDBLOCK(void) {
+static inline bool pp_io_wouldblock(void) {
     return errno == EAGAIN || errno == EWOULDBLOCK;
 }
 
-static inline bool PP_IO_NOBUFS(void) {
+static inline bool pp_io_nobufs(void) {
     return errno == ENOBUFS;
 }
-#endif
-
-#pragma clang assume_nonnull begin
-int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
-int pp_fd_restore_blocking(pp_fd fd, int original_flags);
 #pragma clang assume_nonnull end
+
+#endif
 
 /* Android only. */
 

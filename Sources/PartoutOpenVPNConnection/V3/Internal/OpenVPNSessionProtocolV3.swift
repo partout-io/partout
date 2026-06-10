@@ -47,9 +47,9 @@ protocol OpenVPNSessionProtocolV3: AnyObject, Sendable {
 
      - Precondition: `tunnel` is an active network interface.
      - Postcondition: The VPN data channel is open.
-     - Parameter tunnel: The `IOInterface` on which to exchange the VPN data traffic.
+     - Parameter tunnel: The `TunInterface` on which to exchange the VPN data traffic.
      */
-    func setTunnel(_ tunnel: IOInterface) async throws
+    func setTunnel(_ tunnel: TunInterface) async throws
 
     /**
      Shuts down the session with an optional `Error` reason. Does nothing if the session is already stopped or about to stop.

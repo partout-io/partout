@@ -76,7 +76,7 @@ final class NativeSocketObserver: LinkObserver {
     }
 }
 
-final class SocketWrapper: @unchecked Sendable {
+final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
     struct Options: Sendable {
         let endpoint: ExtendedEndpoint
         let timeout: Int
@@ -88,6 +88,7 @@ final class SocketWrapper: @unchecked Sendable {
     private let ctx: PartoutLoggerContext
     let socket: pp_socket
     private let options: Options
+    private var isClosed = false
 
     init(_ ctx: PartoutLoggerContext, options: Options) async throws {
         let socket: pp_socket = try await withCheckedThrowingContinuation { continuation in
@@ -145,13 +146,56 @@ final class SocketWrapper: @unchecked Sendable {
 
     deinit {
         pp_log(ctx, .core, .debug, "Deinit SocketWrapper")
+        cleanup()
+    }
+
+    func setEventMask(read: Bool, write: Bool) throws {
+        guard pp_socket_set_event_mask(socket, read, write) else {
+            throw PartoutError(.ioFailure)
+        }
+    }
+
+    func resetEvents() throws {
+        guard pp_socket_reset_events(socket) else {
+            throw PartoutError(.ioFailure)
+        }
+    }
+
+    func read(_ buf: inout [UInt8]) -> Int32 {
+        pp_socket_read(socket, &buf, buf.count)
+    }
+
+    func write(_ data: Data, offset: Int) -> Int32 {
+        let count = data.count - offset
+        return data.withUnsafeBytes {
+            pp_socket_write(
+                socket,
+                $0.bytePointer + offset,
+                count
+            )
+        }
+    }
+
+    func cleanup() {
+        guard !isClosed else { return }
+        isClosed = true
         pp_socket_free(socket)
+    }
+
+    var lastErrorCode: Int32 {
+        pp_socket_last_error()
     }
 }
 
 extension SocketWrapper: LinkInterface {
-    var fileDescriptor: FileDescriptor? {
-        pp_socket_get_fd(socket)
+    var muxDescriptor: FileDescriptor? {
+        let fd = pp_socket_get_watch_fd(socket)
+        guard pp_fd_is_valid(fd) else { return nil }
+        return fd
+    }
+
+    var nativeIO: NativeIOInterface? {
+        self
     }
 
     var remoteAddress: String {
@@ -171,6 +215,7 @@ extension SocketWrapper: LinkInterface {
     }
 
     func close() {
+        guard !isClosed else { return }
         pp_socket_close(socket)
     }
 

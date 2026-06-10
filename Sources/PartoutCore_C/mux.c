@@ -5,370 +5,141 @@
  */
 
 #include "portable/mux.h"
-#include <errno.h>
+#include "portable/common.h"
 
 const int PPMuxErrorNull = -2;
 
-#if PARTOUT_APPLE
-#include <sys/types.h>
-#include <sys/event.h>
-#include <sys/time.h>
-#include <unistd.h>
+#if PARTOUT_WINDOWS
+#include <windows.h>
 
-#define PP_MUX_WAKE_ID 1
-
-struct __pp_mux {
-    int handle;
-    struct kevent *events;
-    int events_len;
-    void (*on_readable)(void *ctx, pp_fd fd);
-    void (*on_writable)(void *ctx, pp_fd fd);
-    void *read_ctx;
-    void *write_ctx;
-};
-
-pp_mux pp_mux_create(int num) {
-    int handle = kqueue();
-    if (handle < 0) return NULL;
-    pp_mux mux = pp_alloc(sizeof(*mux));
-    mux->handle = handle;
-    const int max_events = 1 + 2 * num;
-    mux->events = pp_alloc(max_events * sizeof(struct kevent));
-    mux->events_len = max_events;
-
-    /* EV_CLEAR resets the fd after wake delivery. */
-    struct kevent ev;
-    EV_SET(&ev, PP_MUX_WAKE_ID, EVFILT_USER, EV_ADD | EV_CLEAR, 0, 0, NULL);
-    int ret;
-    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
-    if (ret != 0) {
-        pp_mux_free(mux);
-        return NULL;
-    }
-    return mux;
-}
-
-void pp_mux_free(pp_mux mux) {
-    if (!mux) return;
-    close(mux->handle);
-    pp_free(mux->events);
-    pp_free(mux);
-}
-
-bool pp_mux_add(pp_mux mux, pp_fd fd) {
-    if (!mux) return false;
-    struct kevent ev;
-    EV_SET(&ev, fd, EVFILT_READ, EV_ADD, 0, 0, 0);
-    int ret;
-    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
-    return ret == 0;
-}
-
-bool pp_mux_delete(pp_mux mux, pp_fd fd) {
-    if (!mux) return false;
-    struct kevent ev[2];
-    EV_SET(&ev[0], fd, EVFILT_READ, EV_DELETE, 0, 0, 0);
-    EV_SET(&ev[1], fd, EVFILT_WRITE, EV_DELETE, 0, 0, 0);
-
-    bool ok = true;
-    for (int i = 0; i < 2; ++i) {
-        int ret;
-        PP_IO_RETRY(ret, kevent(mux->handle, &ev[i], 1, NULL, 0, NULL));
-        if (ret < 0 && errno != ENOENT) {
-            ok = false;
-        }
-    }
-    return ok;
-}
-
-bool pp_mux_set_read(pp_mux mux, pp_fd fd, bool enable) {
-    if (!mux) return false;
-    struct kevent ev;
-    EV_SET(&ev, fd, EVFILT_READ, enable ? EV_ADD : EV_DELETE, 0, 0, 0);
-    int ret;
-    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
-    if (ret < 0) {
-        /* Ignore failed deletion. */
-        if (!enable && errno == ENOENT) return true;
-        return false;
-    }
-    return true;
-}
-
-bool pp_mux_set_write(pp_mux mux, pp_fd fd, bool enable) {
-    if (!mux) return false;
-    struct kevent ev;
-    EV_SET(&ev, fd, EVFILT_WRITE, enable ? EV_ADD : EV_DELETE, 0, 0, 0);
-    int ret;
-    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
-    if (ret < 0) {
-        /* Ignore failed deletion. */
-        if (!enable && errno == ENOENT) return true;
-        return false;
-    }
-    return true;
-}
-
-void pp_mux_set_on_readable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), void *ctx) {
-    if (!mux) return;
-    mux->on_readable = callback;
-    mux->read_ctx = ctx;
-}
-
-void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), void *ctx) {
-    if (!mux) return;
-    mux->on_writable = callback;
-    mux->write_ctx = ctx;
-}
-
-int pp_mux_wait(pp_mux mux, int *error_code) {
-    if (!mux) return PPMuxErrorNull;
-
-    int num;
-    PP_IO_RETRY(num, kevent(mux->handle, NULL, 0, mux->events, mux->events_len, NULL));
-    if (num < 0) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait kevent() failed: errno=%d", errno);
-        if (error_code) *error_code = errno;
-        return num;
-    }
-
-    for (int i = 0; i < num; ++i) {
-        const struct kevent *ev = mux->events + i;
-        const int fd = (int)ev->ident;
-        if (ev->filter == EVFILT_READ) {
-            if (mux->on_readable) {
-                mux->on_readable(mux->read_ctx, fd);
-            }
-        } else if (ev->filter == EVFILT_WRITE) {
-            if (mux->on_writable) {
-                mux->on_writable(mux->write_ctx, fd);
-            }
-        } else if (ev->filter == EVFILT_USER && ev->ident == PP_MUX_WAKE_ID) {
-            continue;
-        }
-    }
-    return num;
-}
-
-bool pp_mux_wake(pp_mux mux) {
-    if (!mux) return false;
-    struct kevent ev;
-    EV_SET(&ev, PP_MUX_WAKE_ID, EVFILT_USER, 0, NOTE_TRIGGER, 0, NULL);
-    int ret;
-    PP_IO_RETRY(ret, kevent(mux->handle, &ev, 1, NULL, 0, NULL));
-    return ret == 0;
-}
-
-#elif PARTOUT_LINUX || PARTOUT_ANDROID
-#include <sys/epoll.h>
-#include <sys/eventfd.h>
-#include <stdint.h>
-#include <unistd.h>
-
-#ifndef EPOLLRDHUP
-#define EPOLLRDHUP 0
-#endif
-
-#define PP_MUX_ERROR_EVENTS (EPOLLERR | EPOLLHUP | EPOLLRDHUP)
-
-struct pp_mux_fd {
-    int fd;
+struct pp_mux_entry {
+    pp_fd fd;
     bool read;
     bool write;
-    bool registered;
 };
 
 struct __pp_mux {
-    int handle;
-    int wake_fd;
-    struct epoll_event *events;
-    int events_len;
-    struct pp_mux_fd *fds;
-    int fds_len;
-    int fds_count;
+    struct pp_mux_entry *entries;
+    int entries_len;
+    pp_fd wake_event;
+    pp_fd *handles;
+    int num_tracked;
     void (*on_readable)(void *ctx, pp_fd fd);
     void (*on_writable)(void *ctx, pp_fd fd);
     void *read_ctx;
     void *write_ctx;
 };
 
-static struct pp_mux_fd *pp_mux_find_fd(pp_mux mux, pp_fd fd) {
-    for (int i = 0; i < mux->fds_count; ++i) {
-        if (mux->fds[i].fd == fd) return mux->fds + i;
+static bool pp_mux_is_valid_handle(pp_fd fd) {
+    return fd && fd != INVALID_HANDLE_VALUE;
+}
+
+static struct pp_mux_entry *pp_mux_entry_find(pp_mux mux, pp_fd fd) {
+    for (int i = 0; i < mux->num_tracked; ++i) {
+        if (mux->entries[i].fd == fd) return mux->entries + i;
     }
     return NULL;
 }
 
-static struct pp_mux_fd *pp_mux_track_fd(pp_mux mux, pp_fd fd) {
-    struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
+static struct pp_mux_entry *pp_mux_track_fd(pp_mux mux, pp_fd fd) {
+    struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
     if (tracked) return tracked;
-    if (mux->fds_count >= mux->fds_len) return NULL;
-    tracked = mux->fds + mux->fds_count;
+    /* Do not track more than fds_len. */
+    if (mux->num_tracked >= mux->entries_len) {
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "Too many tracked fds");
+        return NULL;
+    }
+    tracked = mux->entries + mux->num_tracked;
     tracked->fd = fd;
     tracked->read = false;
     tracked->write = false;
-    tracked->registered = false;
-    ++mux->fds_count;
+    ++mux->num_tracked;
     return tracked;
 }
 
-static void pp_mux_untrack_fd(pp_mux mux, struct pp_mux_fd *fd) {
-    const int index = (int)(fd - mux->fds);
-    --mux->fds_count;
-    if (index != mux->fds_count) {
-        mux->fds[index] = mux->fds[mux->fds_count];
+static void pp_mux_untrack_fd(pp_mux mux, struct pp_mux_entry *entry) {
+    const int index = (int)(entry - mux->entries);
+    --mux->num_tracked;
+    if (index != mux->num_tracked) {
+        mux->entries[index] = mux->entries[mux->num_tracked];
     }
 }
 
-static uint32_t pp_mux_events(const struct pp_mux_fd *fd) {
-    uint32_t events = 0;
-    if (fd->read || fd->write) events |= PP_MUX_ERROR_EVENTS;
-    if (fd->read) events |= EPOLLIN;
-    if (fd->write) events |= EPOLLOUT;
-    return events;
+static bool pp_mux_is_enabled(const struct pp_mux_entry *entry) {
+    return entry->read || entry->write;
 }
 
-static bool pp_mux_sync_fd(pp_mux mux, struct pp_mux_fd *fd) {
-    const uint32_t events = pp_mux_events(fd);
-    if (events == 0) {
-        if (!fd->registered) return true;
-        const int ret = epoll_ctl(mux->handle, EPOLL_CTL_DEL, fd->fd, NULL);
-        if (ret != 0 && errno != ENOENT) return false;
-        fd->registered = false;
-        return true;
-    }
+static int pp_mux_build_handles(pp_mux mux) {
+    int count = 0;
+    mux->handles[count] = mux->wake_event;
+    ++count;
 
-    struct epoll_event ev;
-    pp_zero(&ev, sizeof(ev));
-    ev.events = events;
-    ev.data.fd = fd->fd;
-
-    if (fd->registered) {
-        const int ret = epoll_ctl(mux->handle, EPOLL_CTL_MOD, fd->fd, &ev);
-        if (ret == 0) return true;
-        if (errno != ENOENT) return false;
-        fd->registered = false;
+    for (int i = 0; i < mux->num_tracked; ++i) {
+        const struct pp_mux_entry *tracked = mux->entries + i;
+        if (!pp_mux_is_enabled(tracked)) continue;
+        mux->handles[count] = tracked->fd;
+        ++count;
     }
-
-    const int ret = epoll_ctl(mux->handle, EPOLL_CTL_ADD, fd->fd, &ev);
-    if (ret == 0) {
-        fd->registered = true;
-        return true;
-    }
-    if (errno == EEXIST) {
-        fd->registered = true;
-        if (epoll_ctl(mux->handle, EPOLL_CTL_MOD, fd->fd, &ev) == 0) {
-            return true;
-        }
-    }
-    return false;
+    return count;
 }
 
 pp_mux pp_mux_create(int num) {
-    int handle = epoll_create(1); /* Size is ignored */
-    if (handle < 0) return NULL;
-    int wake_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-    if (wake_fd < 0) {
-        close(handle);
-        return NULL;
-    }
+    if (num <= 0) return NULL;
+    /* Adds 1 to account for wake_event. */
+    if (num > MAXIMUM_WAIT_OBJECTS - 1) return NULL;
+
+    pp_fd wake_event = CreateEventW(NULL, FALSE, FALSE, NULL);
+    if (!wake_event) return NULL;
 
     pp_mux mux = pp_alloc(sizeof(*mux));
-    mux->handle = handle;
-    mux->wake_fd = wake_fd;
-    mux->events = pp_alloc((1 + num) * sizeof(struct epoll_event));
-    mux->events_len = 1 + num;
-    mux->fds = pp_alloc(num * sizeof(struct pp_mux_fd));
-    mux->fds_len = num;
-
-    struct epoll_event ev;
-    pp_zero(&ev, sizeof(ev));
-    ev.events = EPOLLIN;
-    ev.data.fd = mux->wake_fd;
-    if (epoll_ctl(mux->handle, EPOLL_CTL_ADD, mux->wake_fd, &ev) != 0) {
-        pp_mux_free(mux);
-        return NULL;
-    }
+    mux->entries = pp_alloc(num * sizeof(struct pp_mux_entry));
+    mux->entries_len = num;
+    mux->wake_event = wake_event;
+    mux->handles = pp_alloc((1 + num) * sizeof(pp_fd));
 
     return mux;
 }
 
 void pp_mux_free(pp_mux mux) {
     if (!mux) return;
-    close(mux->handle);
-    close(mux->wake_fd);
-    pp_free(mux->events);
-    pp_free(mux->fds);
+    CloseHandle(mux->wake_event);
+    pp_free(mux->handles);
+    pp_free(mux->entries);
     pp_free(mux);
 }
 
 bool pp_mux_add(pp_mux mux, pp_fd fd) {
-    if (!mux) return false;
-    const int previous_count = mux->fds_count;
-    struct pp_mux_fd *tracked = pp_mux_track_fd(mux, fd);
+    if (!mux || !pp_mux_is_valid_handle(fd)) return false;
+    struct pp_mux_entry *tracked = pp_mux_track_fd(mux, fd);
     if (!tracked) return false;
-    const bool previous_read = tracked->read;
-    const bool previous_write = tracked->write;
     tracked->read = true;
     tracked->write = false;
-    const bool ok = pp_mux_sync_fd(mux, tracked);
-    if (!ok) {
-        tracked->read = previous_read;
-        tracked->write = previous_write;
-        pp_mux_sync_fd(mux, tracked);
-        mux->fds_count = previous_count;
-        return false;
-    }
     return true;
 }
 
 bool pp_mux_delete(pp_mux mux, pp_fd fd) {
     if (!mux) return false;
-    struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
+    struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
     if (!tracked) return true;
-
-    if (tracked->registered) {
-        const int ret = epoll_ctl(mux->handle, EPOLL_CTL_DEL, fd, NULL);
-        if (ret != 0 && errno != ENOENT) {
-            return false;
-        }
-        tracked->registered = false;
-    }
     pp_mux_untrack_fd(mux, tracked);
     return true;
 }
 
 bool pp_mux_set_read(pp_mux mux, pp_fd fd, bool enable) {
     if (!mux) return false;
-    struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
+    struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
     if (!tracked && !enable) return true;
     if (!tracked) return false;
-
-    const bool previous_read = tracked->read;
     tracked->read = enable;
-    const bool ok = pp_mux_sync_fd(mux, tracked);
-    if (!ok) {
-        tracked->read = previous_read;
-        pp_mux_sync_fd(mux, tracked);
-        return false;
-    }
     return true;
 }
 
 bool pp_mux_set_write(pp_mux mux, pp_fd fd, bool enable) {
     if (!mux) return false;
-    struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
+    struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
     if (!tracked && !enable) return true;
     if (!tracked) return false;
-
-    const bool previous_write = tracked->write;
     tracked->write = enable;
-    const bool ok = pp_mux_sync_fd(mux, tracked);
-    if (!ok) {
-        tracked->write = previous_write;
-        pp_mux_sync_fd(mux, tracked);
-        return false;
-    }
     return true;
 }
 
@@ -387,38 +158,259 @@ void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), v
 int pp_mux_wait(pp_mux mux, int *error_code) {
     if (!mux) return PPMuxErrorNull;
 
+    const int handles_count = pp_mux_build_handles(mux);
+    const DWORD ret = WaitForMultipleObjects((DWORD)handles_count, mux->handles, FALSE, INFINITE);
+    if (ret == WAIT_FAILED) {
+        const DWORD error = GetLastError();
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait WaitForMultipleObjects() failed: error=%lu", error);
+        if (error_code) *error_code = (int)error;
+        return -1;
+    }
+
+    const DWORD first = WAIT_OBJECT_0;
+    const DWORD last = WAIT_OBJECT_0 + (DWORD)handles_count;
+    if (ret < first || ret >= last) {
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait WaitForMultipleObjects() unexpected status: %lu", ret);
+        if (error_code) *error_code = (int)ret;
+        return -1;
+    }
+
+    const int index = (int)(ret - WAIT_OBJECT_0);
+    const pp_fd fd = mux->handles[index];
+    if (fd == mux->wake_event) {
+        return 1;
+    }
+
+    const struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
+    if (!tracked) return 1;
+    if (tracked->read && mux->on_readable) {
+        mux->on_readable(mux->read_ctx, fd);
+    }
+    if (tracked->write && mux->on_writable) {
+        mux->on_writable(mux->write_ctx, fd);
+    }
+    return 1;
+}
+
+bool pp_mux_wake(pp_mux mux) {
+    if (!mux) return false;
+    return SetEvent(mux->wake_event);
+}
+#else
+#include <fcntl.h>
+#include <poll.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <errno.h>
+
+#define PP_MUX_ERROR_EVENTS (POLLERR | POLLHUP | POLLNVAL)
+
+struct pp_mux_entry {
+    pp_fd fd;
+    bool read;
+    bool write;
+};
+
+struct __pp_mux {
+    struct pp_mux_entry *entries;
+    int entries_len;
+    pp_fd wake_pipe[2];
+    struct pollfd *pollfds;
+    int num_tracked;
+    void (*on_readable)(void *ctx, pp_fd fd);
+    void (*on_writable)(void *ctx, pp_fd fd);
+    void *read_ctx;
+    void *write_ctx;
+};
+
+static struct pp_mux_entry *pp_mux_entry_find(pp_mux mux, pp_fd fd) {
+    for (int i = 0; i < mux->num_tracked; ++i) {
+        if (mux->entries[i].fd == fd) return mux->entries + i;
+    }
+    return NULL;
+}
+
+static struct pp_mux_entry *pp_mux_track_fd(pp_mux mux, pp_fd fd) {
+    struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
+    if (tracked) return tracked;
+    /* Do not track more than fds_len. */
+    if (mux->num_tracked >= mux->entries_len) {
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "Too many tracked fds");
+        return NULL;
+    }
+    tracked = mux->entries + mux->num_tracked;
+    tracked->fd = fd;
+    tracked->read = false;
+    tracked->write = false;
+    ++mux->num_tracked;
+    return tracked;
+}
+
+static void pp_mux_untrack_fd(pp_mux mux, struct pp_mux_entry *entry) {
+    const int index = (int)(entry - mux->entries);
+    --mux->num_tracked;
+    if (index != mux->num_tracked) {
+        mux->entries[index] = mux->entries[mux->num_tracked];
+    }
+}
+
+static short pp_mux_events(const struct pp_mux_entry *entry) {
+    short events = 0;
+    if (entry->read) events |= POLLIN;
+    if (entry->write) events |= POLLOUT;
+    return events;
+}
+
+static int pp_mux_build_pollfds(pp_mux mux) {
+    int count = 0;
+    mux->pollfds[count].fd = mux->wake_pipe[0];
+    mux->pollfds[count].events = POLLIN;
+    mux->pollfds[count].revents = 0;
+    ++count;
+
+    for (int i = 0; i < mux->num_tracked; ++i) {
+        const struct pp_mux_entry *tracked = mux->entries + i;
+        const short events = pp_mux_events(tracked);
+        if (events == 0) continue;
+        mux->pollfds[count].fd = tracked->fd;
+        mux->pollfds[count].events = events;
+        mux->pollfds[count].revents = 0;
+        ++count;
+    }
+    return count;
+}
+
+static bool pp_mux_set_cloexec(pp_fd fd) {
+    const int flags = fcntl(fd, F_GETFD, 0);
+    if (flags < 0) return false;
+    return fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == 0;
+}
+
+static int pp_mux_drain_wake(pp_mux mux) {
+    uint8_t buffer[64];
+    while (true) {
+        ssize_t ret;
+        /* Context: wake_pipe[0] is non-blocking. */
+        PP_IO_RETRY(ret, read(mux->wake_pipe[0], buffer, sizeof(buffer)));
+        if (ret < 0) {
+            if (pp_io_wouldblock()) return 0;
+            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait wake read() failed: errno=%d", errno);
+            return (int)ret;
+        }
+        if (ret == 0) return 0;
+    }
+}
+
+pp_mux pp_mux_create(int num) {
+    if (num <= 0) return NULL;
+    pp_fd wake_pipe[2];
+    if (pipe(wake_pipe) != 0) return NULL;
+    if (!pp_mux_set_cloexec(wake_pipe[0]) ||
+        !pp_mux_set_cloexec(wake_pipe[1]) ||
+        pp_fd_set_nonblocking(wake_pipe[0], NULL) != 0 ||
+        pp_fd_set_nonblocking(wake_pipe[1], NULL) != 0) {
+        close(wake_pipe[0]);
+        close(wake_pipe[1]);
+        return NULL;
+    }
+
+    pp_mux mux = pp_alloc(sizeof(*mux));
+    mux->entries = pp_alloc(num * sizeof(struct pp_mux_entry));
+    mux->entries_len = num;
+    mux->wake_pipe[0] = wake_pipe[0];
+    mux->wake_pipe[1] = wake_pipe[1];
+    /* Adds 1 to account for wake_pipe. */
+    mux->pollfds = pp_alloc((1 + num) * sizeof(struct pollfd));
+
+    return mux;
+}
+
+void pp_mux_free(pp_mux mux) {
+    if (!mux) return;
+    close(mux->wake_pipe[1]);
+    close(mux->wake_pipe[0]);
+    pp_free(mux->pollfds);
+    pp_free(mux->entries);
+    pp_free(mux);
+}
+
+bool pp_mux_add(pp_mux mux, pp_fd fd) {
+    if (!mux) return false;
+    struct pp_mux_entry *tracked = pp_mux_track_fd(mux, fd);
+    if (!tracked) return false;
+    tracked->read = true;
+    tracked->write = false;
+    return true;
+}
+
+bool pp_mux_delete(pp_mux mux, pp_fd fd) {
+    if (!mux) return false;
+    struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
+    if (!tracked) return true;
+    pp_mux_untrack_fd(mux, tracked);
+    return true;
+}
+
+bool pp_mux_set_read(pp_mux mux, pp_fd fd, bool enable) {
+    if (!mux) return false;
+    struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
+    if (!tracked && !enable) return true;
+    if (!tracked) return false;
+    tracked->read = enable;
+    return true;
+}
+
+bool pp_mux_set_write(pp_mux mux, pp_fd fd, bool enable) {
+    if (!mux) return false;
+    struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
+    if (!tracked && !enable) return true;
+    if (!tracked) return false;
+    tracked->write = enable;
+    return true;
+}
+
+void pp_mux_set_on_readable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), void *ctx) {
+    if (!mux) return;
+    mux->on_readable = callback;
+    mux->read_ctx = ctx;
+}
+
+void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), void *ctx) {
+    if (!mux) return;
+    mux->on_writable = callback;
+    mux->write_ctx = ctx;
+}
+
+int pp_mux_wait(pp_mux mux, int *error_code) {
+    if (!mux) return PPMuxErrorNull;
+
+    const int pollfds_count = pp_mux_build_pollfds(mux);
     int num;
-    PP_IO_RETRY(num, epoll_wait(mux->handle, mux->events, mux->events_len, -1));
+    PP_IO_RETRY(num, poll(mux->pollfds, (nfds_t)pollfds_count, -1));
     if (num < 0) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait epoll_wait() failed: errno=%d", errno);
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait poll() failed: errno=%d", errno);
         if (error_code) *error_code = errno;
         return num;
     }
 
-    for (int i = 0; i < num; ++i) {
-        const struct epoll_event *ev = mux->events + i;
-        const int fd = ev->data.fd;
-        if (fd == mux->wake_fd) {
-            eventfd_t value;
-            while (true) {
-                int ret;
-                /* Context: wake_fd is non-blocking */
-                PP_IO_RETRY(ret, eventfd_read(mux->wake_fd, &value));
-                if (ret < 0) {
-                    /* Fully drained */
-                    if (PP_IO_WOULDBLOCK()) break;
-                    /* Unexpected error */
-                    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait eventfd_read() failed: errno=%d", errno);
-                    return ret;
-                }
+    for (int i = 0; i < pollfds_count; ++i) {
+        const struct pollfd *pollfd = mux->pollfds + i;
+        const short revents = pollfd->revents;
+        if (revents == 0) continue;
+        const pp_fd fd = pollfd->fd;
+        if (fd == mux->wake_pipe[0]) {
+            const int ret = pp_mux_drain_wake(mux);
+            if (ret < 0) {
+                if (error_code) *error_code = errno;
+                return ret;
             }
             continue;
         }
-        const struct pp_mux_fd *tracked = pp_mux_find_fd(mux, fd);
+        const struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
         if (!tracked) continue;
-        const bool failed = ev->events & PP_MUX_ERROR_EVENTS;
-        const bool readable = tracked->read && ((ev->events & EPOLLIN) || failed);
-        const bool writable = tracked->write && ((ev->events & EPOLLOUT) || failed);
+        const bool failed = revents & PP_MUX_ERROR_EVENTS;
+        const bool readable = tracked->read && ((revents & POLLIN) || failed);
+        const bool writable = tracked->write && ((revents & POLLOUT) || failed);
         if (readable && mux->on_readable) {
             mux->on_readable(mux->read_ctx, fd);
         }
@@ -431,9 +423,10 @@ int pp_mux_wait(pp_mux mux, int *error_code) {
 
 bool pp_mux_wake(pp_mux mux) {
     if (!mux) return false;
-    int ret;
-    PP_IO_RETRY(ret, eventfd_write(mux->wake_fd, 1));
-    if (ret == 0) return true;
-    return errno == EAGAIN;
+    const uint8_t byte = 1;
+    ssize_t ret;
+    PP_IO_RETRY(ret, write(mux->wake_pipe[1], &byte, sizeof(byte)));
+    if (ret == (ssize_t)sizeof(byte)) return true;
+    return pp_io_wouldblock();
 }
 #endif
