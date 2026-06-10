@@ -63,16 +63,16 @@ extension Profile {
             .map(\.id)
 
         // Enabled/Disabled
+        let enabledModuleIds = activeModulesIds.subtracting(previous.activeModulesIds)
+        let disabledModuleIds = previous.activeModulesIds.subtracting(activeModulesIds)
         let enabledModules = modules
             .filter {
-                !previous.activeModulesIds.contains($0.id) &&
-                    activeModulesIds.contains($0.id)
+                enabledModuleIds.contains($0.id)
             }
             .map(\.id)
-        let disabledModules = modules
+        let disabledModules = previous.modules
             .filter {
-                previous.activeModulesIds.contains($0.id) &&
-                    !activeModulesIds.contains($0.id)
+                disabledModuleIds.contains($0.id)
             }
             .map(\.id)
 

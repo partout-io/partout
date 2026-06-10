@@ -108,6 +108,24 @@ struct ProfileDiffTests {
     }
 
     @Test
+    func givenActiveModule_whenRemoveModule_thenDiffIsExpected() throws {
+        let dnsModule = try DNSModule.Builder(servers: ["6.6.6.6"]).build()
+        let original = try Profile.Builder(
+            modules: [dnsModule],
+            activatingModules: true
+        ).build()
+
+        var sut = original.builder()
+        sut.modules = []
+
+        #expect(try sut.build().differences(from: original) == [
+            .changedActiveModules,
+            .removedModules([dnsModule.id]),
+            .disabledModules([dnsModule.id])
+        ])
+    }
+
+    @Test
     func givenActiveModules_whenSwapEnabledModule_thenDiffIsExpected() throws {
         let dnsModule = try DNSModule.Builder(servers: ["6.6.6.6"]).build()
         let proxyModule = try HTTPProxyModule.Builder(address: "1.1.1.1", port: 1080).build()
