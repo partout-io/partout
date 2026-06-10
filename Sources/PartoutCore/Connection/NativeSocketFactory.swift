@@ -233,6 +233,7 @@ extension SocketWrapper: LinkInterface {
     }
 
     func close() {
+        guard !isClosed else { return }
         pp_socket_close(socket)
     }
 
