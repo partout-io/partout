@@ -5,7 +5,7 @@
  */
 
 #include "portable/mux.h"
-#include <errno.h>
+#include "portable/common.h"
 
 const int PPMuxErrorNull = -2;
 
@@ -45,7 +45,10 @@ static struct pp_mux_entry *pp_mux_track_fd(pp_mux mux, pp_fd fd) {
     struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
     if (tracked) return tracked;
     /* Do not track more than fds_len. */
-    if (mux->num_tracked >= mux->entries_len) return NULL;
+    if (mux->num_tracked >= mux->entries_len) {
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "Too many tracked fds");
+        return NULL;
+    }
     tracked = mux->entries + mux->num_tracked;
     tracked->fd = fd;
     tracked->read = false;
@@ -198,6 +201,7 @@ bool pp_mux_wake(pp_mux mux) {
 #include <poll.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <errno.h>
 
 #define PP_MUX_ERROR_EVENTS (POLLERR | POLLHUP | POLLNVAL)
 
@@ -230,7 +234,10 @@ static struct pp_mux_entry *pp_mux_track_fd(pp_mux mux, pp_fd fd) {
     struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
     if (tracked) return tracked;
     /* Do not track more than fds_len. */
-    if (mux->num_tracked >= mux->entries_len) return NULL;
+    if (mux->num_tracked >= mux->entries_len) {
+        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "Too many tracked fds");
+        return NULL;
+    }
     tracked = mux->entries + mux->num_tracked;
     tracked->fd = fd;
     tracked->read = false;
