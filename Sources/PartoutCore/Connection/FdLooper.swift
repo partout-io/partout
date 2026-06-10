@@ -1081,6 +1081,7 @@ private extension FdLooper.SideIO {
         readBufSize: Int,
         arguments: FdLooper.AttachArguments
     ) throws {
+        // FIXME: ###, Assume pp_tun (private type)
         guard let ctrlTun = ioFd as? pp_tun else {
             throw PartoutError(.tunNotAvailable)
         }
