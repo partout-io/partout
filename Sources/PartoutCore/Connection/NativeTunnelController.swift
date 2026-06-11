@@ -89,7 +89,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
             return DummyTunnelInterface()
         }
 
-        // Encode with external provider
+        // Encode to JSON for native receivers
         let infoJSON = try info.encodedAsJSON()
 
         // Create tun with optional implementation from controller
