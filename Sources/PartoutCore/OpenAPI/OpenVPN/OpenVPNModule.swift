@@ -21,10 +21,6 @@ public struct OpenVPNModule: Module, BuildableType, Hashable, Codable {
         return configuration?.staticChallenge ?? requiresInteractiveCredentials ?? false
     }
 
-    public var preferredExtension: String {
-        "ovpn"
-    }
-
     fileprivate init(id: UniqueID, configuration: OpenVPN.Configuration?, credentials: OpenVPN.Credentials?, requiresInteractiveCredentials: Bool?) {
         self.id = id
         self.configuration = configuration

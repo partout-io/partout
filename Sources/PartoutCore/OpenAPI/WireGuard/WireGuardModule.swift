@@ -21,10 +21,6 @@ public struct WireGuardModule: Module, BuildableType, Hashable, Codable {
             configurationBuilder: configuration?.builder()
         )
     }
-
-    public var preferredExtension: String {
-        "conf"
-    }
 }
 
 extension WireGuardModule {

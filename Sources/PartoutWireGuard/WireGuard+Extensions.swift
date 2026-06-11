@@ -7,6 +7,10 @@
 #endif
 
 extension WireGuardModule: SerializableModule, ConnectionModule {
+    public var preferredExtension: String {
+        "conf"
+    }
+
     public func serialized() throws -> String {
         guard let configuration else {
             throw PartoutError(.incompleteModule, self)

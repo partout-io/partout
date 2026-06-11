@@ -7,6 +7,10 @@
 #endif
 
 extension OpenVPNModule: SerializableModule, ConnectionModule {
+    public var preferredExtension: String {
+        "ovpn"
+    }
+
     public func serialized() throws -> String {
         guard let configuration else {
             throw PartoutError(.incompleteModule, self)
