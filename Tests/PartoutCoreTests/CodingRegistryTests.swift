@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@testable import Partout
+@testable import PartoutCore
 import Testing
 
 struct CodingRegistryTests {
@@ -90,5 +90,11 @@ struct CodingRegistryTests {
         #expect(decodedProfile.modules[0] as? DNSModule == dnsModule)
         #expect(decodedProfile.modules[1] as? IPModule == ipModule)
         #expect(decodedProfile == profile)
+    }
+}
+
+extension Registry {
+    func withLegacyEncoding(_ legacy: Bool) -> CodingRegistry {
+        CodingRegistry(registry: self, withLegacyEncoding: { legacy })
     }
 }

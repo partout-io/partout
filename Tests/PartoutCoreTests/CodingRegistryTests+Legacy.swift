@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@testable import Partout
+@testable import PartoutCore
 import Testing
 
 // `withLegacyEncoding` only changes `string(fromProfile:)`; decode always probes

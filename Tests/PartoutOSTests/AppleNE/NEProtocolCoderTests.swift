@@ -4,7 +4,6 @@
 
 #if canImport(NetworkExtension)
 
-import Partout
 @testable import PartoutOS
 import Testing
 
@@ -103,4 +102,9 @@ private final class MockKeychain: Keychain {
     }
 }
 
+private extension Registry {
+    func withLegacyEncoding(_ legacy: Bool) -> CodingRegistry {
+        CodingRegistry(registry: self, withLegacyEncoding: { legacy })
+    }
+}
 #endif

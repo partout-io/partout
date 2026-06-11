@@ -81,14 +81,6 @@ let package = Package(
             swiftSettings: areas.compactMap(\.define).map {
                 .define($0)
             } + useFoundationCompatibility.swiftSettings
-        ),
-        .testTarget(
-            name: "PartoutTests",
-            dependencies: ["Partout"],
-            exclude: useFoundationCompatibility.partoutTestsExclude,
-            swiftSettings: areas.compactMap(\.define).map {
-                .define($0)
-            } + useFoundationCompatibility.swiftSettings
         )
     ]
 )
