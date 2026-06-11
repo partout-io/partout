@@ -6,18 +6,7 @@
 @_exported import PartoutCore
 #endif
 
-extension WireGuardModule: SerializableModule, ConnectionModule {
-    public var preferredExtension: String {
-        "conf"
-    }
-
-    public func serialized() throws -> String {
-        guard let configuration else {
-            throw PartoutError(.incompleteModule, self)
-        }
-        return try configuration.serialized()
-    }
-
+extension WireGuardModule: ConnectionModule {
     /// - Throws: If `impl` is not of type ``WireGuardModule/Implementation``.
     public func newConnection(
         with impl: ModuleImplementation?,
@@ -27,6 +16,19 @@ extension WireGuardModule: SerializableModule, ConnectionModule {
             throw PartoutError(.requiredImplementation)
         }
         return try impl.connectionBlock(parameters, self)
+    }
+}
+
+extension WireGuardModule: SerializableModule {
+    public var preferredExtension: String {
+        "conf"
+    }
+
+    public func serialized() throws -> String {
+        guard let configuration else {
+            throw PartoutError(.incompleteModule, self)
+        }
+        return try configuration.serialized()
     }
 }
 

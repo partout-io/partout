@@ -6,18 +6,7 @@
 @_exported import PartoutCore
 #endif
 
-extension OpenVPNModule: SerializableModule, ConnectionModule {
-    public var preferredExtension: String {
-        "ovpn"
-    }
-
-    public func serialized() throws -> String {
-        guard let configuration else {
-            throw PartoutError(.incompleteModule, self)
-        }
-        return try configuration.serialized()
-    }
-
+extension OpenVPNModule: ConnectionModule {
     /// - Throws: If `impl` is not of type ``OpenVPNModule/Implementation``.
     public func newConnection(
         with impl: ModuleImplementation?,
@@ -27,6 +16,19 @@ extension OpenVPNModule: SerializableModule, ConnectionModule {
             throw PartoutError(.requiredImplementation)
         }
         return try impl.connectionBlock(parameters, self)
+    }
+}
+
+extension OpenVPNModule: SerializableModule {
+    public var preferredExtension: String {
+        "ovpn"
+    }
+
+    public func serialized() throws -> String {
+        guard let configuration else {
+            throw PartoutError(.incompleteModule, self)
+        }
+        return try configuration.serialized()
     }
 }
 
