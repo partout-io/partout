@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import _PartoutOpenVPNConnection_C
+import _PartoutOpenVPN_C
 import PartoutCore
-@testable import PartoutOpenVPNConnection
+@testable import PartoutOpenVPN
 import Testing
 
 private func cryptoFree(_: pp_crypto_ctx) {
