@@ -124,8 +124,7 @@ void pp_tun_free_and_close(pp_tun tun, bool and_close) {
 pp_tun pp_tun_lookup(void) {
     const int fd = pp_tun_network_extension_fd();
     if (fd < 0) return NULL;
-    /* iOS/tvOS requires the file descriptor to be duplicated. */
-    // FIXME: ###, and macOS NE?
+    /* iOS/tvOS require the file descriptor to be duplicated. */
     const int dup_fd = dup(fd);
     if (dup_fd < 0) return NULL;
     pp_tun tun = pp_alloc(sizeof(*tun));

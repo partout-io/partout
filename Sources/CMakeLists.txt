@@ -49,22 +49,22 @@ if(PP_BUILD_USE_OPENVPN)
         message(FATAL_ERROR "OpenVPN requires a crypto vendor")
     endif()
     list(APPEND PARTOUT_C_INCLUDE_DIRS
-        ${CMAKE_CURRENT_SOURCE_DIR}/PartoutOpenVPNConnection_C/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/PartoutOpenVPN_C/include
     )
 else()
     list(APPEND EXCLUDED_PATTERNS
-        PartoutOpenVPNConnection\/
-        PartoutOpenVPNConnection_C\/
+        PartoutOpenVPN\/
+        PartoutOpenVPN_C\/
     )
 endif()
 if(PP_BUILD_USE_WIREGUARD)
     list(APPEND PARTOUT_C_INCLUDE_DIRS
-        ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuardConnection_C/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuardBackend_C/include
     )
 else()
     list(APPEND EXCLUDED_PATTERNS
-        PartoutWireGuardConnection\/
-        PartoutWireGuardConnection_C\/
+        PartoutWireGuard\/
+        PartoutWireGuardBackend_C\/
     )
 endif()
 
@@ -115,8 +115,8 @@ endif()
 
 # Exclude legacy connections
 list(APPEND EXCLUDED_PATTERNS
-    PartoutOpenVPNConnection\/V1
-    PartoutWireGuardConnection\/V1
+    PartoutOpenVPN\/V1
+    PartoutWireGuard\/V1
 )
 
 foreach(pattern ${EXCLUDED_PATTERNS})

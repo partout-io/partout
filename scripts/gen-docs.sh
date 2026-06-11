@@ -6,13 +6,8 @@ set -e
 
 PP_BUILD_DOCS="1" swift package generate-documentation \
     --enable-experimental-combined-documentation \
-    --target Partout \
     --target PartoutCore \
-    --target PartoutOS \
-    --target PartoutOpenVPN \
-    --target PartoutOpenVPNConnection \
-    --target PartoutWireGuard \
-    --target PartoutWireGuardConnection
+    --target PartoutOS
 
 if [[ -z $1 ]]; then
     exit

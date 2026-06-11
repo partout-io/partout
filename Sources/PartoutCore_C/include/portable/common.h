@@ -40,8 +40,6 @@ void pp_log_simple_append(const char *_Nullable tag,
                           pp_log_level level,
                           const char *message);
 
-typedef void (*pp_completion)(void *_Nullable ctx, const int error_code);
-
 /* Use inline rather than #define to make available to Swift. */
 
 static inline
