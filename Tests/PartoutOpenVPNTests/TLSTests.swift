@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import PartoutCore
-@testable import PartoutOpenVPNConnection
+@testable import PartoutOpenVPN
 import Testing
 
 struct TLSTests {

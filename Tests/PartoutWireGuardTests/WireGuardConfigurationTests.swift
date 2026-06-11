@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import PartoutCore
-@testable import PartoutWireGuardConnection
+@testable import PartoutWireGuard
 import Testing
 
 struct WireGuardConfigurationTests {
