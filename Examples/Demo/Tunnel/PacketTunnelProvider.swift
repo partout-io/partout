@@ -49,7 +49,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
                 profile: profile,
                 connectionFactory: Registry.shared,
                 controller: controller,
-                environment: environment
+                environment: environment,
+                cancelsUnrecoverable: false
             )
             try await fwd?.startTunnel(options: [:])
         } catch {
