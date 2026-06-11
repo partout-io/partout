@@ -48,20 +48,6 @@ public struct PartoutError: Error {
     }
 }
 
-extension PartoutError {
-    public struct Code: RawRepresentable, Hashable, Codable, Sendable {
-        public let rawValue: String
-
-        public init(rawValue: String) {
-            self.rawValue = rawValue
-        }
-
-        public init(_ string: String) {
-            rawValue = string
-        }
-    }
-}
-
 extension PartoutError: Equatable {
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.code == rhs.code
