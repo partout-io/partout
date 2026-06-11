@@ -24,6 +24,8 @@ Partout features a set of [general-purpose entities](<doc:Misc>), including [log
 
 ## Topics
 
+### Core
+
 - <doc:Globals>
 - <doc:BuildingProfiles>
 - <doc:StartingTunnel>
@@ -31,3 +33,8 @@ Partout features a set of [general-purpose entities](<doc:Misc>), including [log
 - <doc:LoggingErrors>
 - <doc:Misc>
 - <doc:Testing>
+
+### Implementations
+
+- <doc:ProtocolsOpenVPN>
+- <doc:ProtocolsWireGuard>

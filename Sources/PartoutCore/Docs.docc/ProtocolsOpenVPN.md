@@ -1,4 +1,4 @@
-# ``PartoutOpenVPN``
+# OpenVPN
 
 A Swift/C implementation of the OpenVPN® protocol.
 
@@ -29,10 +29,6 @@ The client is known to work with OpenVPN® 2.3+ servers.
 
 The library therefore supports compression framing, just not compression. Remember to match server-side compression framing, otherwise the client will shut down with an error. E.g. if server has `comp-lzo no`, client must use `compressionFraming = .compLZO`.
 
-### Support for .ovpn files
-
-Most options seen in .ovpn configuration files can be parsed with ``StandardOpenVPNParser``.
-
 ### Tunnelblick XOR patch
 
 Partout fully supports the non-standard [Tunnelblick XOR patch][dep-tunnelblick-xor]:
@@ -54,18 +50,10 @@ See ``OpenVPN/ObfuscationMethod`` for more details.
 
 ## Topics
 
-### Module
-
 - ``OpenVPN``
 - ``OpenVPN/Configuration``
 - ``OpenVPNConfiguration``
 - ``OpenVPNModule``
-
-### Parser
-
-- ``KeyDecrypter``
-- ``StandardOpenVPNParser``
-- ``StandardOpenVPNParserError``
 
 [dep-openvpn]: https://openvpn.net/index.php/open-source/overview.html
 [dep-tunnelblick-xor]: https://tunnelblick.net/cOpenvpn_xorpatch.html

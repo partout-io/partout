@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+/// An encodable wrapper of ``TunnelRemoteInfo``.
 public struct TunnelRemoteInfoWrapper: Encodable, Sendable {
     public let originalModuleId: UniqueID
     public let address: Address?
