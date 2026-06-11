@@ -15,20 +15,6 @@ extension NativeTunnelController {
     }
 }
 
-struct TunnelRemoteInfoWrapper: Encodable, Sendable {
-    let originalModuleId: UniqueID
-    let address: Address?
-    let requiresVirtualDevice: Bool
-    let modules: [TaggedModule]?
-
-    init(_ info: TunnelRemoteInfo) {
-        originalModuleId = info.originalModuleId
-        address = info.address
-        requiresVirtualDevice = info.requiresVirtualDevice
-        modules = info.modules?.compactMap(\.taggedModule)
-    }
-}
-
 final class NativeCompletion {
     static let callback: pp_completion = { ctx, code in
         guard let ctx else { return }
