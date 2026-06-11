@@ -50,3 +50,4 @@ Generic entities and helpers.
 - ``Keychain``
 - ``ScriptingEngine``
 - ``SemaphoreMutex``
+- ``SocketDescriptor``

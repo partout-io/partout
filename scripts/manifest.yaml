@@ -1,14 +1,9 @@
 paths:
-  - Partout
-  - Partout/Modules
-  - PartoutCore
-  - PartoutCore/Connection
-  - PartoutCore/IP
-  - PartoutCore/Modules
-  - PartoutCore/Profile
-  - PartoutCore/Tunnel
-  - PartoutOpenVPN
-  - PartoutWireGuard
+  - PartoutCore/OpenAPI
+  - PartoutCore/OpenAPI/Core
+  - PartoutCore/OpenAPI/Modules
+  - PartoutCore/OpenAPI/OpenVPN
+  - PartoutCore/OpenAPI/WireGuard
 entities:
   - Address
   - ConnectionStatus
