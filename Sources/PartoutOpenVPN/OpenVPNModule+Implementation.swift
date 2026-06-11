@@ -25,16 +25,3 @@ extension OpenVPNModule.Implementation: ModuleImporter {
         try importerBlock().module(fromContents: contents, object: object)
     }
 }
-
-extension OpenVPNModule: ConnectionModule {
-    /// - Throws: If `impl` is not of type ``OpenVPNModule/Implementation``.
-    public func newConnection(
-        with impl: ModuleImplementation?,
-        parameters: ConnectionParameters
-    ) throws -> Connection {
-        guard let impl = impl as? Implementation else {
-            throw PartoutError(.requiredImplementation)
-        }
-        return try impl.connectionBlock(parameters, self)
-    }
-}

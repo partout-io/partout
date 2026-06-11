@@ -52,12 +52,6 @@ extension WireGuard.LocalInterface {
             addresses = []
         }
 
-        public init(keyGenerator: WireGuardKeyGenerator) {
-            privateKey = keyGenerator.newPrivateKey()
-            dns = nil
-            addresses = []
-        }
-
         public func build() throws -> WireGuard.LocalInterface {
             guard let validPrivateKey = WireGuard.Key(rawValue: privateKey) else {
                 throw PartoutError.invalidField(.WireGuard.privateKey)

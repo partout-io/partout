@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 extension OpenVPN {
-
     /// Represents a cryptographic container in PEM format.
     public struct CryptoContainer: Hashable, Sendable {
         private static let begin = "-----BEGIN "
@@ -27,11 +26,6 @@ extension OpenVPN {
 
         public func write(to url: URL) throws {
             try pem.write(toFile: url.filePath(), encoding: .ascii)
-        }
-
-        public func decrypted(with decrypter: KeyDecrypter, passphrase: String) throws -> CryptoContainer {
-            let decryptedPEM = try decrypter.decryptedKey(fromPEM: pem, passphrase: passphrase)
-            return CryptoContainer(pem: decryptedPEM)
         }
     }
 }

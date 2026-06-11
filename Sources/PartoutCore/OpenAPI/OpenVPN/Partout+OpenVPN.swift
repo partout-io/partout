@@ -2,11 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !USE_CMAKE
-@_exported import PartoutCore
-@_exported import PartoutOS
-#endif
-
 extension LoggerCategory {
     public static let openvpn = Self(rawValue: "openvpn")
 }
@@ -14,12 +9,6 @@ extension LoggerCategory {
 // XXX: Workaround for name clash
 /// Alias for ``OpenVPN/Configuration``.
 public typealias OpenVPNConfiguration = OpenVPN.Configuration
-
-extension TunnelEnvironmentKeys {
-    public enum OpenVPN {
-        public static let serverConfiguration = TunnelEnvironmentKey<OpenVPNConfiguration>("OpenVPN.serverConfiguration")
-    }
-}
 
 extension PartoutError.Code {
     public enum OpenVPN {

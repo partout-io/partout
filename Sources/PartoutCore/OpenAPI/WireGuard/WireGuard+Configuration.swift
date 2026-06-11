@@ -29,12 +29,6 @@ extension WireGuard {
     }
 }
 
-extension WireGuard.Configuration: SerializableConfiguration {
-    public func serialized() throws -> String {
-        asWgQuickConfig()
-    }
-}
-
 extension WireGuard.Configuration {
     public struct Builder: BuilderType, Hashable, Sendable {
         public var interface: WireGuard.LocalInterface.Builder
@@ -44,13 +38,6 @@ extension WireGuard.Configuration {
         public init(privateKey: String) {
             self.init(
                 interface: WireGuard.LocalInterface.Builder(privateKey: privateKey),
-                peers: []
-            )
-        }
-
-        public init(keyGenerator: WireGuardKeyGenerator) {
-            self.init(
-                interface: WireGuard.LocalInterface.Builder(keyGenerator: keyGenerator),
                 peers: []
             )
         }
