@@ -33,6 +33,11 @@ Profiles are the foundations of Partout, and profiles are made of modules. A bas
 - ``ConnectionFactory``
 - ``Resolver``
 
+### Registry
+
+- ``CodingRegistry``
+- ``Registry``
+
 ### Serialization
 
 - ``ConfigurationCoder``

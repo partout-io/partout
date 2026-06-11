@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-/// Extends a registry with encoding capabilities.
+/// Extends a ``Registry`` with encoding capabilities.
 public final class CodingRegistry {
     public typealias PostDecodeBlock = @Sendable (Profile) -> Profile?
 
