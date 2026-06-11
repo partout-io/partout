@@ -38,3 +38,11 @@ Partout features a set of [general-purpose entities](<doc:Misc>), including [log
 
 - <doc:ProtocolsOpenVPN>
 - <doc:ProtocolsWireGuard>
+
+### Legacy
+
+- ``LegacyCodableModuleV2``
+- ``LegacyCodableProfileV2``
+- ``LegacyModuleDecoder``
+- ``ModuleHandler``
+- ``TransientModule``

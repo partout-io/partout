@@ -48,7 +48,6 @@ Profiles are the foundations of Partout, and profiles are made of modules. A bas
 - ``ProfileCoder``
 - ``ProfileEncoder``
 - ``ProfileDecoder``
-- ``LegacyModuleDecoder``
 
 ### Bundled modules
 
@@ -59,7 +58,6 @@ Profiles are the foundations of Partout, and profiles are made of modules. A bas
 - ``IPModule``
 - ``OnDemandModule``
 - ``TaggedModule``
-- ``TransientModule``
 
 ### Builder pattern
 
