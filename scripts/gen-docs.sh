@@ -10,8 +10,6 @@ PP_BUILD_DOCS="1" swift package generate-documentation \
     --target PartoutCore \
     --target PartoutOS \
     --target PartoutOpenVPN \
-    --target PartoutOpenVPN \
-    --target PartoutWireGuard \
     --target PartoutWireGuard
 
 if [[ -z $1 ]]; then
