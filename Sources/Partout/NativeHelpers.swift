@@ -4,17 +4,6 @@
 
 internal import _PartoutCore_C
 
-extension NativeTunnelController {
-    public static let encodeInfoAsJSON: @Sendable (TunnelRemoteInfo) throws -> String = {
-        let wrapped = TunnelRemoteInfoWrapper($0)
-        do {
-            return try JSONEncoder.shared().encodeJSON(wrapped)
-        } catch {
-            throw PartoutError(error)
-        }
-    }
-}
-
 final class NativeCompletion {
     static let callback: pp_completion = { ctx, code in
         guard let ctx else { return }

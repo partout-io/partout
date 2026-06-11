@@ -16,3 +16,14 @@ public struct TunnelRemoteInfoWrapper: Encodable, Sendable {
         modules = info.modules?.compactMap(\.taggedModule)
     }
 }
+
+extension TunnelRemoteInfo {
+    public static let encodeAsJSON: @Sendable (Self) throws -> String = {
+        let wrapped = TunnelRemoteInfoWrapper($0)
+        do {
+            return try JSONEncoder.shared().encodeJSON(wrapped)
+        } catch {
+            throw PartoutError(error)
+        }
+    }
+}
