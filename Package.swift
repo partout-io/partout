@@ -173,14 +173,14 @@ package.targets.append(contentsOf: [
 
 // MARK: OpenVPN
 
-package.products.append(
-    .library(
-        name: "PartoutOpenVPN",
-        targets: ["PartoutOpenVPN"]
-    )
-)
 // OpenVPN requires Crypto/TLS wrappers
 if areas.contains(.openVPN), cryptoMode != nil {
+    package.products.append(
+        .library(
+            name: "PartoutOpenVPN",
+            targets: ["PartoutOpenVPN"]
+        )
+    )
     package.targets.append(contentsOf: [
         .target(
             name: "PartoutOpenVPN_C",
@@ -208,14 +208,13 @@ if areas.contains(.openVPN), cryptoMode != nil {
 
 // MARK: WireGuard
 
-package.products.append(
-    .library(
-        name: "PartoutWireGuard",
-        targets: ["PartoutWireGuard"]
-    )
-)
-
 if areas.contains(.wireGuard) {
+    package.products.append(
+        .library(
+            name: "PartoutWireGuard",
+            targets: ["PartoutWireGuard"]
+        )
+    )
     switch OS.current {
     case .apple:
         // Require static wg-go backend
