@@ -6,7 +6,6 @@ set -e
 
 PP_BUILD_DOCS="1" swift package generate-documentation \
     --enable-experimental-combined-documentation \
-    --target Partout \
     --target PartoutCore \
     --target PartoutOS
 
