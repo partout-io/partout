@@ -2,14 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-/// An encodable wrapper of ``TunnelRemoteInfo``.
-public struct TunnelRemoteInfoWrapper: Encodable, Sendable {
-    public let originalModuleId: UniqueID
-    public let address: Address?
-    public let requiresVirtualDevice: Bool
-    public let modules: [TaggedModule]?
+struct TunnelRemoteInfoWrapper: Encodable, Sendable {
+    let originalModuleId: UniqueID
+    let address: Address?
+    let requiresVirtualDevice: Bool
+    let modules: [TaggedModule]?
 
-    public init(_ info: TunnelRemoteInfo) {
+    init(_ info: TunnelRemoteInfo) {
         originalModuleId = info.originalModuleId
         address = info.address
         requiresVirtualDevice = info.requiresVirtualDevice
@@ -18,8 +17,8 @@ public struct TunnelRemoteInfoWrapper: Encodable, Sendable {
 }
 
 extension TunnelRemoteInfo {
-    public static let encodeAsJSON: @Sendable (Self) throws -> String = {
-        let wrapped = TunnelRemoteInfoWrapper($0)
+    func encodedAsJSON() throws -> String {
+        let wrapped = TunnelRemoteInfoWrapper(self)
         do {
             return try JSONEncoder.shared().encodeJSON(wrapped)
         } catch {

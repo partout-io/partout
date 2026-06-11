@@ -13,8 +13,6 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     private let environment: TunnelEnvironmentReader
 
-    private let encodeInfo: @Sendable (TunnelRemoteInfo) throws -> String
-
     private let maxReadLength: Int
 
     private let onReachableStream: CurrentValueStream<Bool>
@@ -29,7 +27,6 @@ public final class NativeTunnelController: TunnelController, Sendable {
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
         environment: TunnelEnvironmentReader,
-        encodeInfo: @escaping @Sendable (TunnelRemoteInfo) throws -> String,
         maxReadLength: Int = 128 * 1024
     ) throws {
         self.ctx = ctx
@@ -43,7 +40,6 @@ public final class NativeTunnelController: TunnelController, Sendable {
         self.ref = ref
 #endif
         self.environment = environment
-        self.encodeInfo = encodeInfo
         self.maxReadLength = maxReadLength
         onReachableStream = CurrentValueStream(false)
         reachabilityHolder = ReachabilityHolder()
@@ -94,7 +90,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         }
 
         // Encode with external provider
-        let infoJSON = try encodeInfo(info)
+        let infoJSON = try info.encodedAsJSON()
 
         // Create tun with optional implementation from controller
         guard let tun = info.originalModuleId.uuidString.withCString({ uuid in
