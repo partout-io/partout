@@ -289,32 +289,33 @@ extension NativeTunnelController: NetworkInterfaceFactory {
 
         func waitForActivity(timeout: Int) async throws -> LinkInterface {
             let reachability = factory.currentReachability
+            let options = SocketWrapper.Options(
+                endpoint: endpoint,
+                timeout: timeout,
+                bufSize: factory.bufSize,
+                betterPathStream: factory.betterPathFactory.newStream(),
+                reachability: reachability?.toCReachability,
+                configure: { ctx, fd, reachability in
+                    guard let ctx else { return true }
+                    let ctrl = Unmanaged<NativeTunnelController>
+                        .fromOpaque(ctx)
+                        .takeUnretainedValue()
+                    do {
+                        try ctrl.configureSockets(
+                            with: [fd],
+                            reachability: reachability?.pointee
+                        )
+                        return true
+                    } catch {
+                        pp_log(ctrl.ctx, .core, .fault, "Unable to configure sockets: \(error)")
+                        return false
+                    }
+                },
+                configureCtx: UnsafeMutableRawPointer.fromSelf(factory)
+            )
             return try await SocketWrapper(
                 factory.ctx,
-                options: SocketWrapper.Options(
-                    endpoint: endpoint,
-                    timeout: timeout,
-                    bufSize: factory.bufSize,
-                    betterPathStream: factory.betterPathFactory.newStream(),
-                    reachability: reachability?.toCReachability,
-                    configure: { ctx, fd, reachability in
-                        guard let ctx else { return true }
-                        let ctrl = Unmanaged<NativeTunnelController>
-                            .fromOpaque(ctx)
-                            .takeUnretainedValue()
-                        do {
-                            try ctrl.configureSockets(
-                                with: [fd],
-                                reachability: reachability?.pointee
-                            )
-                            return true
-                        } catch {
-                            pp_log(ctrl.ctx, .core, .fault, "Unable to configure sockets: \(error)")
-                            return false
-                        }
-                    },
-                    configureCtx: UnsafeMutableRawPointer.fromSelf(factory)
-                )
+                options: options
             )
         }
     }
