@@ -93,50 +93,11 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
     init(_ ctx: PartoutLoggerContext, options: Options) async throws {
         let socket: pp_socket = try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                // Socket properties
-                let proto = options.endpoint.socketProto
-                let port = options.endpoint.proto.port
-                let blocking = false
-
-                // Configurator
-                let reachability = options.configurator?.reachability()
-                var cReachability = pp_reachability()
-                cReachability.reachable = reachability?.isReachable ?? false
-#if os(Android)
-                cReachability.network_handle = reachability?.networkHandle ?? 0
-#endif
-                let cConfigurator = options.configurator.map {
-                    Unmanaged.passUnretained($0).toOpaque()
-                }
-
-                let newSock = options.endpoint.address.rawValue.withCString { cAddr in
-                    pp_socket_open(
-                        cAddr,
-                        proto,
-                        port,
-                        blocking,
-                        Int32(options.timeout),
-                        &cReachability,
-                        { ctx, fd in
-                            guard let ctx else { return true }
-                            let cfg = Unmanaged<SocketConfigurator>
-                                .fromOpaque(ctx)
-                                .takeUnretainedValue()
-                            return cfg.configureSocket(fd)
-                        },
-                        cConfigurator
-                    )
-                }
-                guard let newSock else {
+                guard let newSocket = Self.openSocket(withOptions: options) else {
                     continuation.resume(throwing: PartoutError(.linkNotActive))
                     return
                 }
-                _ = pp_socket_set_buffers(
-                    newSock,
-                    Int32(options.bufSize),
-                    Int32(options.bufSize)
-                )
-                continuation.resume(returning: newSock)
+                continuation.resume(returning: newSocket)
             }
         }
         self.ctx = ctx
@@ -225,5 +186,61 @@ extension SocketWrapper: LinkInterface {
 
     func writePackets(_ packets: [Data]) async throws {
         fatalError("Not implemented")
+    }
+}
+
+// MARK: - C socket creation
+
+private extension SocketWrapper {
+    static func openSocket(withOptions options: Options) -> pp_socket? {
+        let proto = options.endpoint.socketProto
+        let port = options.endpoint.proto.port
+
+        // WARNING: Non-blocking mode is crucial to work with FdLooper
+        let blocking = false
+
+        // Fetch current reachability
+        let reachability = options.configurator?.reachability()
+        var cReachability = reachability?.toCReachability ?? pp_reachability_none()
+
+        // Run the configurator right after socket creation
+        let cConfigure: pp_socket_configure?
+        let cConfigurator: UnsafeMutableRawPointer?
+        if let configurator = options.configurator {
+            cConfigure = { ctx, fd in
+                guard let ctx else { return true }
+                let cfg = Unmanaged<SocketConfigurator>
+                    .fromOpaque(ctx)
+                    .takeUnretainedValue()
+                return cfg.configureSocket(fd)
+            }
+            cConfigurator = Unmanaged.passUnretained(configurator).toOpaque()
+        } else {
+            cConfigure = nil
+            cConfigurator = nil
+        }
+
+        // Open a connected socket
+        let socket = options.endpoint.address.rawValue.withCString { cAddress in
+            pp_socket_open(
+                cAddress,
+                proto,
+                port,
+                blocking,
+                Int32(options.timeout),
+                &cReachability,
+                cConfigure,
+                cConfigurator
+            )
+        }
+        guard let socket else {
+            return nil
+        }
+        _ = pp_socket_set_buffers(
+            socket,
+            Int32(options.bufSize),
+            Int32(options.bufSize)
+        )
+        return socket
     }
 }

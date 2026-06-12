@@ -303,7 +303,7 @@ private extension UnsafeMutableRawPointer {
     }
 }
 
-private extension ReachabilityInfo {
+extension ReachabilityInfo {
     var toCReachability: pp_reachability {
 #if os(Android)
         pp_reachability(
