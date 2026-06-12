@@ -104,12 +104,19 @@ public final class NativeTunnelController: TunnelController, Sendable {
     }
 
     public func configureSockets(with descriptors: [SocketDescriptor]) throws {
+        try configureSockets(with: descriptors, reachability: currentReachability)
+    }
+
+    private func configureSockets(
+        with descriptors: [SocketDescriptor],
+        reachability: ReachabilityInfo?
+    ) throws {
         let result = descriptors
             .withUnsafeBufferPointer { fds in
                 guard let fdsBase = fds.baseAddress else {
                     return false
                 }
-                if let info = reachabilityInfo?.toCReachability {
+                if let info = reachability?.toCReachability {
                     return withUnsafePointer(to: info) { infoPtr in
                         pp_tun_ctrl_configure_sockets(ref, infoPtr, fdsBase, fds.count)
                     }
@@ -162,7 +169,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
 // MARK: - DNS
 
 extension NativeTunnelController: DNSResolver {
-    public var reachabilityInfo: ReachabilityInfo? {
+    public var currentReachability: ReachabilityInfo? {
         reachabilityHolder.get()
     }
 
@@ -175,7 +182,7 @@ extension NativeTunnelController: DNSResolver {
         try await dns.resolve(
             hostname,
             flags: flags,
-            reachability: reachability ?? reachabilityInfo,
+            reachability: reachability ?? currentReachability,
             timeout: timeout
         )
     }
@@ -278,7 +285,7 @@ extension NativeTunnelController: NetworkInterfaceFactory {
         let endpoint: ExtendedEndpoint
 
         func waitForActivity(timeout: Int) async throws -> LinkInterface {
-            let reachability = factory.reachabilityInfo
+            let reachability = factory.currentReachability
             return try await SocketWrapper(
                 factory.ctx,
                 options: SocketWrapper.Options(
@@ -287,13 +294,16 @@ extension NativeTunnelController: NetworkInterfaceFactory {
                     bufSize: factory.bufSize,
                     betterPathStream: factory.betterPathFactory.newStream(),
                     reachability: reachability?.toCReachability,
-                    configure: { ctx, fd in
+                    configure: { ctx, fd, reachability in
                         guard let ctx else { return true }
                         let ctrl = Unmanaged<NativeTunnelController>
                             .fromOpaque(ctx)
                             .takeUnretainedValue()
                         do {
-                            try ctrl.configureSockets(with: [fd])
+                            try ctrl.configureSockets(
+                                with: [fd],
+                                reachability: reachability?.pointee.fromCReachability
+                            )
                             return true
                         } catch {
                             pp_log(ctrl.ctx, .core, .fault, "Unable to configure sockets: \(error)")
@@ -334,6 +344,19 @@ private extension ReachabilityInfo {
         pp_reachability(
             reachable: isReachable
         )
+#endif
+    }
+}
+
+private extension pp_reachability {
+    var fromCReachability: ReachabilityInfo {
+#if os(Android)
+        ReachabilityInfo(
+            isReachable: reachable,
+            networkHandle: network_handle != 0 ? network_handle : nil
+        )
+#else
+        ReachabilityInfo(isReachable: reachable)
 #endif
     }
 }

@@ -53,7 +53,9 @@ static inline void pp_socket_free(pp_socket sock) {
 }
 
 /* Create socket to endpoint. */
-typedef bool (*pp_socket_configure)(void *_Nullable ctx, pp_socket_fd fd);
+typedef bool (*pp_socket_configure)(void *_Nullable ctx,
+                                    pp_socket_fd fd,
+                                    const pp_reachability *_Nullable reachability);
 pp_socket _Nullable pp_socket_open(const char *ip_addr,
                                    pp_socket_proto proto,
                                    uint16_t port,

@@ -108,7 +108,7 @@ pp_socket pp_socket_open(const char *ip_addr,
             local_print_error("socket()");
             goto failure;
         }
-        if (configure && !configure(configure_ctx, new_fd)) {
+        if (configure && !configure(configure_ctx, new_fd, reachability)) {
             local_print_error("configure()");
             goto failure;
         }
@@ -167,7 +167,7 @@ pp_socket pp_socket_open(const char *ip_addr,
             local_print_error("socket()");
             continue;
         }
-        if (configure && !configure(configure_ctx, new_fd)) {
+        if (configure && !configure(configure_ctx, new_fd, reachability)) {
             local_print_error("configure()");
             goto failure;
         }
