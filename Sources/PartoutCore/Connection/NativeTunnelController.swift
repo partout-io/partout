@@ -297,9 +297,7 @@ extension NativeTunnelController: NetworkInterfaceFactory {
                 reachability: reachability?.toCReachability,
                 configure: { ctx, fd, reachability in
                     guard let ctx else { return true }
-                    let ctrl = Unmanaged<NativeTunnelController>
-                        .fromOpaque(ctx)
-                        .takeUnretainedValue()
+                    let ctrl = ctx.toSelf
                     do {
                         try ctrl.configureSockets(
                             with: [fd],
