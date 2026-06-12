@@ -130,12 +130,12 @@ class PartoutVpnServiceRuntime(
         }
     }
 
-    override fun sendSnapshot(snapshot: TunnelSnapshot) {
+    override fun onSnapshot(snapshot: TunnelSnapshot) {
         snapshotEmitter.emit(snapshot)
         engine.onSnapshot(snapshot)
     }
 
-    override fun disconnect(controller: JNITunnelController) = launchCommand {
+    override fun shouldDisconnect(controller: JNITunnelController) = launchCommand {
         if (controller != this.controller) { return@launchCommand }
         stopTunnel()
         stopService()

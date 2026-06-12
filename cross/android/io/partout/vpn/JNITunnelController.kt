@@ -61,8 +61,8 @@ interface TunnelController: NativeTunnelController, NativeTunnelControllerJNI {
 
 // Delegated to the runtime
 interface TunnelControllerDelegate {
-    fun sendSnapshot(snapshot: TunnelSnapshot)
-    fun disconnect(controller: JNITunnelController)
+    fun onSnapshot(snapshot: TunnelSnapshot)
+    fun shouldDisconnect(controller: JNITunnelController)
 }
 
 class JNITunnelController(
@@ -218,7 +218,7 @@ class JNITunnelController(
         if (isNativeCancelled) { return }
         Log.d(logTag, "onSnapshot(${snapshotJSON})")
         val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
-        delegate.sendSnapshot(snapshot)
+        delegate.onSnapshot(snapshot)
         return@synchronized
     }
 
@@ -276,8 +276,8 @@ class JNITunnelController(
             Log.i(logTag, "VPN daemon cancelled")
         }
 
-        // Signal disconnection to delegate (runtime)
-        delegate.disconnect(this)
+        // Request disconnection from delegate (runtime)
+        delegate.shouldDisconnect(this)
         return@synchronized
     }
 
