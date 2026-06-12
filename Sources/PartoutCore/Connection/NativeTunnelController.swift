@@ -104,20 +104,23 @@ public final class NativeTunnelController: TunnelController, Sendable {
     }
 
     public func configureSockets(with descriptors: [SocketDescriptor]) throws {
-        try configureSockets(with: descriptors, reachability: currentReachability)
+        try configureSockets(
+            with: descriptors,
+            reachability: currentReachability?.toCReachability
+        )
     }
 
     private func configureSockets(
         with descriptors: [SocketDescriptor],
-        reachability: ReachabilityInfo?
+        reachability: pp_reachability?
     ) throws {
         let result = descriptors
             .withUnsafeBufferPointer { fds in
                 guard let fdsBase = fds.baseAddress else {
                     return false
                 }
-                if let info = reachability?.toCReachability {
-                    return withUnsafePointer(to: info) { infoPtr in
+                if let reachability {
+                    return withUnsafePointer(to: reachability) { infoPtr in
                         pp_tun_ctrl_configure_sockets(ref, infoPtr, fdsBase, fds.count)
                     }
                 } else {
@@ -302,7 +305,7 @@ extension NativeTunnelController: NetworkInterfaceFactory {
                         do {
                             try ctrl.configureSockets(
                                 with: [fd],
-                                reachability: reachability?.pointee.fromCReachability
+                                reachability: reachability?.pointee
                             )
                             return true
                         } catch {
