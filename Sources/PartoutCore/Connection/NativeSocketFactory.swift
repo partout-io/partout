@@ -5,6 +5,24 @@
 internal import _PartoutCore_C
 
 public final class NativeSocketFactory: NetworkInterfaceFactory {
+    private struct Observer: LinkObserver {
+        let factory: NativeSocketFactory
+        let endpoint: ExtendedEndpoint
+
+        func waitForActivity(timeout: Int) async throws -> LinkInterface {
+            try await SocketWrapper(
+                factory.ctx,
+                options: SocketWrapper.Options(
+                    endpoint: endpoint,
+                    timeout: timeout,
+                    bufSize: factory.bufSize,
+                    configurator: factory.configurator,
+                    betterPathStream: factory.betterPathFactory.newStream()
+                )
+            )
+        }
+    }
+
     private let ctx: PartoutLoggerContext
     private let betterPathFactory: BetterPathStreamFactory
     private let configurator: SocketConfigurator?
@@ -27,52 +45,7 @@ public final class NativeSocketFactory: NetworkInterfaceFactory {
     }
 
     public func linkObserver(to endpoint: ExtendedEndpoint) -> LinkObserver {
-        NativeSocketObserver(
-            ctx,
-            betterPathFactory: betterPathFactory,
-            configurator: configurator,
-            bufSize: bufSize,
-            endpoint: endpoint
-        )
-    }
-}
-
-final class NativeSocketObserver: LinkObserver {
-    private let ctx: PartoutLoggerContext
-    private let betterPathFactory: BetterPathStreamFactory
-    private let configurator: SocketConfigurator?
-    private let bufSize: Int
-    private let endpoint: ExtendedEndpoint
-
-    init(
-        _ ctx: PartoutLoggerContext,
-        betterPathFactory: BetterPathStreamFactory,
-        configurator: SocketConfigurator?,
-        bufSize: Int,
-        endpoint: ExtendedEndpoint
-    ) {
-        self.ctx = ctx
-        self.betterPathFactory = betterPathFactory
-        self.configurator = configurator
-        self.bufSize = bufSize
-        self.endpoint = endpoint
-    }
-
-    deinit {
-        pp_log(ctx, .core, .debug, "Deinit NativeSocketObserver")
-    }
-
-    func waitForActivity(timeout: Int) async throws -> LinkInterface {
-        try await SocketWrapper(
-            ctx,
-            options: SocketWrapper.Options(
-                endpoint: endpoint,
-                timeout: timeout,
-                bufSize: bufSize,
-                configurator: configurator,
-                betterPathStream: betterPathFactory.newStream()
-            )
-        )
+        Observer(factory: self, endpoint: endpoint)
     }
 }
 
