@@ -13,7 +13,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     private let environment: TunnelEnvironmentReader
 
-    private let maxReadLength: Int
+    private let bufSize: Int
 
     private let onReachableStream: CurrentValueStream<Bool>
 
@@ -27,7 +27,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
         environment: TunnelEnvironmentReader,
-        maxReadLength: Int = 128 * 1024
+        bufSize: Int = 1 * 1024 * 1024 // 1MB
     ) throws {
         self.ctx = ctx
 #if os(Android)
@@ -40,7 +40,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         self.ref = ref
 #endif
         self.environment = environment
-        self.maxReadLength = maxReadLength
+        self.bufSize = bufSize
         onReachableStream = CurrentValueStream(false)
         reachabilityHolder = ReachabilityHolder()
         betterPathProxy = BetterPathProxy()
@@ -270,24 +270,44 @@ private final class BetterPathProxy: BetterPathStreamFactory, @unchecked Sendabl
     }
 }
 
-// MARK: - SocketConfigurator
+// MARK: - NetworkInterfaceFactory
 
-extension NativeTunnelController {
-    public func socketConfigurator() -> SocketConfigurator {
-        SocketConfigurator(
-            reachability: { [weak self] in
-                self?.reachabilityInfo
-            },
-            configureSocket: { [weak self] fd in
-                do {
-                    try self?.configureSockets(with: [fd])
-                    return true
-                } catch {
-                    pp_log(self?.ctx ?? .global, .core, .fault, "Unable to configure sockets: \(error)")
-                    return false
-                }
-            }
-        )
+extension NativeTunnelController: NetworkInterfaceFactory {
+    private struct Observer: LinkObserver {
+        let factory: NativeTunnelController
+        let endpoint: ExtendedEndpoint
+
+        func waitForActivity(timeout: Int) async throws -> LinkInterface {
+            let reachability = factory.reachabilityInfo
+            return try await SocketWrapper(
+                factory.ctx,
+                options: SocketWrapper.Options(
+                    endpoint: endpoint,
+                    timeout: timeout,
+                    bufSize: factory.bufSize,
+                    betterPathStream: factory.betterPathFactory.newStream(),
+                    reachability: reachability?.toCReachability,
+                    configure: { ctx, fd in
+                        guard let ctx else { return true }
+                        let ctrl = Unmanaged<NativeTunnelController>
+                            .fromOpaque(ctx)
+                            .takeUnretainedValue()
+                        do {
+                            try ctrl.configureSockets(with: [fd])
+                            return true
+                        } catch {
+                            pp_log(ctrl.ctx, .core, .fault, "Unable to configure sockets: \(error)")
+                            return false
+                        }
+                    },
+                    configureCtx: UnsafeMutableRawPointer.fromSelf(factory)
+                )
+            )
+        }
+    }
+
+    public func linkObserver(to endpoint: ExtendedEndpoint) -> LinkObserver {
+        Observer(factory: self, endpoint: endpoint)
     }
 }
 
@@ -303,7 +323,7 @@ private extension UnsafeMutableRawPointer {
     }
 }
 
-extension ReachabilityInfo {
+private extension ReachabilityInfo {
     var toCReachability: pp_reachability {
 #if os(Android)
         pp_reachability(

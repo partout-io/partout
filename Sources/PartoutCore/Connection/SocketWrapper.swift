@@ -4,58 +4,15 @@
 
 internal import _PartoutCore_C
 
-public final class NativeSocketFactory: NetworkInterfaceFactory {
-    private struct Observer: LinkObserver {
-        let factory: NativeSocketFactory
-        let endpoint: ExtendedEndpoint
-
-        func waitForActivity(timeout: Int) async throws -> LinkInterface {
-            try await SocketWrapper(
-                factory.ctx,
-                options: SocketWrapper.Options(
-                    endpoint: endpoint,
-                    timeout: timeout,
-                    bufSize: factory.bufSize,
-                    configurator: factory.configurator,
-                    betterPathStream: factory.betterPathFactory.newStream()
-                )
-            )
-        }
-    }
-
-    private let ctx: PartoutLoggerContext
-    private let betterPathFactory: BetterPathStreamFactory
-    private let configurator: SocketConfigurator?
-    private let bufSize: Int
-
-    public init(
-        _ ctx: PartoutLoggerContext,
-        betterPathFactory: BetterPathStreamFactory,
-        configurator: SocketConfigurator? = nil,
-        bufSize: Int = 1 * 1024 * 1024, // 1MB
-    ) {
-        self.ctx = ctx
-        self.betterPathFactory = betterPathFactory
-        self.configurator = configurator
-        self.bufSize = bufSize
-    }
-
-    deinit {
-        pp_log(ctx, .core, .debug, "Deinit NativeSocketFactory")
-    }
-
-    public func linkObserver(to endpoint: ExtendedEndpoint) -> LinkObserver {
-        Observer(factory: self, endpoint: endpoint)
-    }
-}
-
 final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
-    struct Options: Sendable {
+    struct Options: @unchecked Sendable {
         let endpoint: ExtendedEndpoint
         let timeout: Int
         let bufSize: Int
-        let configurator: SocketConfigurator?
         let betterPathStream: PassthroughStream<Void>
+        let reachability: pp_reachability?
+        let configure: pp_socket_configure?
+        let configureCtx: UnsafeMutableRawPointer?
     }
 
     private let ctx: PartoutLoggerContext
@@ -173,25 +130,8 @@ private extension SocketWrapper {
         let blocking = false
 
         // Fetch current reachability
-        let reachability = options.configurator?.reachability()
-        var cReachability = reachability?.toCReachability ?? pp_reachability_none()
-
-        // Run the configurator right after socket creation
-        let cConfigure: pp_socket_configure?
-        let cConfigurator: UnsafeMutableRawPointer?
-        if let configurator = options.configurator {
-            cConfigure = { ctx, fd in
-                guard let ctx else { return true }
-                let cfg = Unmanaged<SocketConfigurator>
-                    .fromOpaque(ctx)
-                    .takeUnretainedValue()
-                return cfg.configureSocket(fd)
-            }
-            cConfigurator = Unmanaged.passUnretained(configurator).toOpaque()
-        } else {
-            cConfigure = nil
-            cConfigurator = nil
-        }
+        let reachability = options.reachability
+        var cReachability = reachability ?? pp_reachability_none()
 
         // Open a connected socket
         let socket = options.endpoint.address.rawValue.withCString { cAddress in
@@ -202,8 +142,8 @@ private extension SocketWrapper {
                 blocking,
                 Int32(options.timeout),
                 &cReachability,
-                cConfigure,
-                cConfigurator
+                options.configure,
+                options.configureCtx
             )
         }
         guard let socket else {

@@ -47,7 +47,6 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/LinkInterface.swift
 ./PartoutCore/Connection/LinkObserver.swift
 ./PartoutCore/Connection/NativeIOInterface.swift
-./PartoutCore/Connection/NativeSocketFactory.swift
 ./PartoutCore/Connection/NativeTunnelController.swift
 ./PartoutCore/Connection/NetworkInterfaceFactory.swift
 ./PartoutCore/Connection/NetworkObserver.swift
@@ -57,7 +56,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/SharedTunnelEnvironment.swift
 ./PartoutCore/Connection/SimpleConnectionDaemon.swift
 ./PartoutCore/Connection/SimpleDNSResolver.swift
-./PartoutCore/Connection/SocketConfigurator.swift
+./PartoutCore/Connection/SocketWrapper.swift
 ./PartoutCore/Connection/StaticTunnelEnvironment.swift
 ./PartoutCore/Connection/TunInterface.swift
 ./PartoutCore/Connection/TunWrapper.swift
