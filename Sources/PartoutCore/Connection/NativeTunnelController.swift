@@ -169,35 +169,60 @@ public final class NativeTunnelController: TunnelController, Sendable {
     }
 }
 
-// MARK: - DNS
+// MARK: - NetworkInterfaceFactory
 
-extension NativeTunnelController: DNSResolver {
-    public var currentReachability: ReachabilityInfo? {
-        reachabilityHolder.get()
+extension NativeTunnelController: NetworkInterfaceFactory {
+    private struct Observer: LinkObserver {
+        let factory: NativeTunnelController
+        let endpoint: ExtendedEndpoint
+
+        func waitForActivity(timeout: Int) async throws -> LinkInterface {
+            let reachability = factory.currentReachability
+            let options = SocketWrapper.Options(
+                endpoint: endpoint,
+                timeout: timeout,
+                bufSize: factory.bufSize,
+                betterPathStream: factory.betterPathFactory.newStream(),
+                reachability: reachability?.toCReachability,
+                configure: { ctx, fd, reachability in
+                    guard let ctx else { return true }
+                    let ctrl = ctx.toSelf
+                    do {
+                        try ctrl.configureSockets(
+                            with: [fd],
+                            reachability: reachability?.pointee
+                        )
+                        return true
+                    } catch {
+                        pp_log(ctrl.ctx, .core, .fault, "Unable to configure sockets: \(error)")
+                        return false
+                    }
+                },
+                configureCtx: UnsafeMutableRawPointer.fromSelf(factory)
+            )
+            return try await SocketWrapper(
+                factory.ctx,
+                options: options
+            )
+        }
     }
 
-    public func resolve(
-        _ hostname: String,
-        flags: Set<DNSResolverFlag>,
-        reachability: ReachabilityInfo?,
-        timeout: Int
-    ) async throws -> [DNSRecord] {
-        try await dns.resolve(
-            hostname,
-            flags: flags,
-            reachability: reachability ?? currentReachability,
-            timeout: timeout
-        )
+    public func linkObserver(to endpoint: ExtendedEndpoint) -> LinkObserver {
+        Observer(factory: self, endpoint: endpoint)
     }
 }
 
-// MARK: - Streams
+// MARK: - Reachability
 
 extension NativeTunnelController: ReachabilityObserver {
     public func startObserving() {
     }
 
     public func stopObserving() {
+    }
+
+    public var currentReachability: ReachabilityInfo? {
+        reachabilityHolder.get()
     }
 
     public var isReachable: Bool {
@@ -280,46 +305,21 @@ private final class BetterPathProxy: BetterPathStreamFactory, @unchecked Sendabl
     }
 }
 
-// MARK: - NetworkInterfaceFactory
+// MARK: - DNS
 
-extension NativeTunnelController: NetworkInterfaceFactory {
-    private struct Observer: LinkObserver {
-        let factory: NativeTunnelController
-        let endpoint: ExtendedEndpoint
-
-        func waitForActivity(timeout: Int) async throws -> LinkInterface {
-            let reachability = factory.currentReachability
-            let options = SocketWrapper.Options(
-                endpoint: endpoint,
-                timeout: timeout,
-                bufSize: factory.bufSize,
-                betterPathStream: factory.betterPathFactory.newStream(),
-                reachability: reachability?.toCReachability,
-                configure: { ctx, fd, reachability in
-                    guard let ctx else { return true }
-                    let ctrl = ctx.toSelf
-                    do {
-                        try ctrl.configureSockets(
-                            with: [fd],
-                            reachability: reachability?.pointee
-                        )
-                        return true
-                    } catch {
-                        pp_log(ctrl.ctx, .core, .fault, "Unable to configure sockets: \(error)")
-                        return false
-                    }
-                },
-                configureCtx: UnsafeMutableRawPointer.fromSelf(factory)
-            )
-            return try await SocketWrapper(
-                factory.ctx,
-                options: options
-            )
-        }
-    }
-
-    public func linkObserver(to endpoint: ExtendedEndpoint) -> LinkObserver {
-        Observer(factory: self, endpoint: endpoint)
+extension NativeTunnelController: DNSResolver {
+    public func resolve(
+        _ hostname: String,
+        flags: Set<DNSResolverFlag>,
+        reachability: ReachabilityInfo?,
+        timeout: Int
+    ) async throws -> [DNSRecord] {
+        try await dns.resolve(
+            hostname,
+            flags: flags,
+            reachability: reachability ?? currentReachability,
+            timeout: timeout
+        )
     }
 }
 
