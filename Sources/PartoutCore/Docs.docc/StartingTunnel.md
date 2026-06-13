@@ -65,4 +65,3 @@ Given the main app and the daemon:
 - ``NativeTunnelController``
 - ``TunnelController``
 - ``TunnelRemoteInfo``
-- ``TunWrapper``
