@@ -13,13 +13,13 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     private let environment: TunnelEnvironmentReader
 
+    private let betterPathProxy: BetterPathProxy
+
     private let bufSize: Int
 
     private let onReachableStream: CurrentValueStream<Bool>
 
     private let reachabilityHolder: ReachabilityHolder
-
-    private let betterPathProxy: BetterPathProxy
 
     private let dns: DNSResolver
 
@@ -27,6 +27,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
         environment: TunnelEnvironmentReader,
+        betterPathFactory: BetterPathStreamFactory? = nil,
         bufSize: Int = 1 * 1024 * 1024 // 1MB
     ) throws {
         self.ctx = ctx
@@ -40,10 +41,11 @@ public final class NativeTunnelController: TunnelController, Sendable {
         self.ref = ref
 #endif
         self.environment = environment
+        betterPathProxy = BetterPathProxy(factory: betterPathFactory)
         self.bufSize = bufSize
+
         onReachableStream = CurrentValueStream(false)
         reachabilityHolder = ReachabilityHolder()
-        betterPathProxy = BetterPathProxy()
 
         // Native resolver requires network handle on Android
         dns = SimpleDNSResolver {
@@ -182,7 +184,7 @@ extension NativeTunnelController: NetworkInterfaceFactory {
                 endpoint: endpoint,
                 timeout: timeout,
                 bufSize: factory.bufSize,
-                betterPathStream: factory.betterPathFactory.newStream(),
+                betterPathStream: factory.betterPathProxy.newStream(),
                 reachability: reachability?.toCReachability,
                 configure: { ctx, fd, reachability in
                     guard let ctx else { return true }
@@ -232,10 +234,6 @@ extension NativeTunnelController: ReachabilityObserver {
     public var isReachableStream: AsyncStream<Bool> {
         onReachableStream.subscribe()
     }
-
-    public var betterPathFactory: BetterPathStreamFactory {
-        betterPathProxy
-    }
 }
 
 private extension NativeTunnelController {
@@ -284,10 +282,15 @@ private final class ReachabilityHolder: @unchecked Sendable {
 
 private final class BetterPathProxy: BetterPathStreamFactory, @unchecked Sendable {
     private let lock = SemaphoreMutex()
+    private let factory: BetterPathStreamFactory?
     private var stream: PassthroughStream<Void>?
 
+    init(factory: BetterPathStreamFactory?) {
+        self.factory = factory
+    }
+
     nonisolated func newStream() -> PassthroughStream<Void> {
-        let new = PassthroughStream<Void>()
+        let new = factory?.newStream() ?? PassthroughStream<Void>()
         let oldStream = lock.with {
             let old = stream
             stream = new
