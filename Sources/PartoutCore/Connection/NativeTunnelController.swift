@@ -181,21 +181,19 @@ extension NativeTunnelController {
             currentReachability: { [weak self] in
                 self?.currentReachability
             },
-            configureSocket: { ctx, fd, reachability in
-                guard let ctx else { return true }
-                let ctrl = ctx.toSelf
+            configureSocket: { [weak self] fd, reachability in
+                guard let self else { return true }
                 do {
-                    try ctrl.configureSockets(
+                    try configureSockets(
                         with: [fd],
-                        reachability: reachability?.pointee
+                        reachability: reachability?.toCReachability
                     )
                     return true
                 } catch {
-                    pp_log(ctrl.ctx, .core, .fault, "Unable to configure sockets: \(error)")
+                    pp_log(ctx, .core, .fault, "Unable to configure sockets: \(error)")
                     return false
                 }
             },
-            configureSocketCtx: .fromSelf(self),
             bufSize: bufSize
         )
     }

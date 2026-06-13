@@ -36,7 +36,7 @@ extension ReachabilityInfo {
     }
 }
 
-private extension pp_reachability {
+extension pp_reachability {
     var fromCReachability: ReachabilityInfo {
 #if os(Android)
         ReachabilityInfo(
