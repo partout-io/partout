@@ -12,17 +12,12 @@ public protocol NativeIOInterface: Sendable {
     var lastErrorCode: Int32 { get }
 }
 
-public enum Side: Hashable, Sendable {
-    case link
-    case tun
-}
-
-public enum IOError: Error, CustomDebugStringConvertible {
+/// Errors thrown by ``NativeIOInterface``.
+public enum NativeIOError: Error, CustomDebugStringConvertible {
     case wouldBlock(Side)
     case noBufSpace(Side)
     case eof(Side)
     case libc(Side, Int32)
-    case user(Side, Error? = nil)
 
     var side: Side {
         switch self {
@@ -30,7 +25,6 @@ public enum IOError: Error, CustomDebugStringConvertible {
         case .noBufSpace(let side): side
         case .eof(let side): side
         case .libc(let side, _): side
-        case .user(let side, _): side
         }
     }
 
@@ -40,7 +34,6 @@ public enum IOError: Error, CustomDebugStringConvertible {
         case .noBufSpace(let side): "\(side): no buffer space"
         case .eof(let side): "\(side): EOF"
         case .libc(let side, let code): "\(side): last_error=\(code)"
-        case .user(let side, let reason): "\(side): user error, \(reason.debugDescription)"
         }
     }
 }

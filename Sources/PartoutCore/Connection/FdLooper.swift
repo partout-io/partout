@@ -176,11 +176,11 @@ public final class FdLooper: @unchecked Sendable {
 
                     // Iterate through the fds
                     try process(mux: mux, fdSet: fdSet)
-                } catch IOError.user(let side, let reason) {
+                } catch SideError.user(let side, let reason) {
                     // Unwrap user-defined errors
                     detachImmediately(side, withReason: reason)
-                } catch let reason as IOError {
-                    // Rethrow any other IOError as is
+                } catch let reason as NativeIOError {
+                    // Rethrow any other I/O error as is
                     detachImmediately(reason.side, withReason: reason)
                 } catch {
                     pp_log(ctx, .core, .fault, "Unable to process: \(error)")
@@ -426,6 +426,16 @@ private extension FdLooper {
         case detach(CheckedContinuation<Void, Never>)
     }
 
+    enum SideError: Error, CustomDebugStringConvertible {
+        case user(Side, Error? = nil)
+
+        var debugDescription: String {
+            switch self {
+            case .user(let side, let reason): "\(side): user error, \(reason.debugDescription)"
+            }
+        }
+    }
+
     func handleCommands(fdSet: FdSet) throws -> Bool {
         lock.lock()
         let pendingCommands = commands
@@ -480,10 +490,10 @@ private extension FdLooper {
                 do {
                     let didComplete = try link.performWrite(pending, lock: lock)
                     watchWrites = !didComplete
-                } catch IOError.wouldBlock {
+                } catch NativeIOError.wouldBlock {
                     watchWrites = true
                     break
-                } catch IOError.noBufSpace {
+                } catch NativeIOError.noBufSpace {
                     if let tun {
                         try suspendReadAndScheduleRetry(from: tun, fdSet: fdSet)
                     }
@@ -506,10 +516,10 @@ private extension FdLooper {
                 do {
                     let didComplete = try tun.performWrite(pending, lock: lock)
                     watchWrites = !didComplete
-                } catch IOError.wouldBlock {
+                } catch NativeIOError.wouldBlock {
                     watchWrites = true
                     break
-                } catch IOError.noBufSpace {
+                } catch NativeIOError.noBufSpace {
                     if let link {
                         try suspendReadAndScheduleRetry(from: link, fdSet: fdSet)
                     }
@@ -537,9 +547,9 @@ private extension FdLooper {
                         readSize += packet.count
                     }
                     readCount += 1
-                } catch IOError.wouldBlock {
+                } catch NativeIOError.wouldBlock {
                     break
-                } catch let error as IOError {
+                } catch let error as NativeIOError {
                     throw error
                 } catch {
                     throw PartoutError(.ioFailure)
@@ -565,9 +575,9 @@ private extension FdLooper {
                         readSize += packet.count
                     }
                     readCount += 1
-                } catch IOError.wouldBlock {
+                } catch NativeIOError.wouldBlock {
                     break
-                } catch let error as IOError {
+                } catch let error as NativeIOError {
                     throw error
                 } catch {
                     throw PartoutError(.ioFailure)
@@ -949,7 +959,7 @@ private extension FdLooper {
                 return try onRead?(packets) ?? .keep
             } catch {
                 // IMPORTANT: Wrap user-defined errors to prevent premature finish
-                throw IOError.user(side, error)
+                throw SideError.user(side, error)
             }
         }
 

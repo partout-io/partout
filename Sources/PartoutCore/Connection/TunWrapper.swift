@@ -30,10 +30,10 @@ public final class TunWrapper: NativeIOInterface, @unchecked Sendable {
     public func read(_ buf: inout [UInt8]) throws -> Int {
         let read = pp_tun_read(tun, &buf, buf.count)
         guard read != PPIOErrorWouldBlock else {
-            throw IOError.wouldBlock(.tun)
+            throw NativeIOError.wouldBlock(.tun)
         }
         guard read >= 0 else {
-            throw IOError.libc(.tun, lastErrorCode)
+            throw NativeIOError.libc(.tun, lastErrorCode)
         }
         return Int(read)
     }
@@ -48,13 +48,13 @@ public final class TunWrapper: NativeIOInterface, @unchecked Sendable {
             )
         }
         guard written != PPIOErrorWouldBlock else {
-            throw IOError.wouldBlock(.tun)
+            throw NativeIOError.wouldBlock(.tun)
         }
         guard written != PPIOErrorNoBufs else {
-            throw IOError.noBufSpace(.tun)
+            throw NativeIOError.noBufSpace(.tun)
         }
         guard written >= 0 else {
-            throw IOError.libc(.tun, lastErrorCode)
+            throw NativeIOError.libc(.tun, lastErrorCode)
         }
         return Int(written)
     }

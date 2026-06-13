@@ -57,14 +57,14 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
     func read(_ buf: inout [UInt8]) throws -> Int {
         let read = pp_socket_read(socket, &buf, buf.count)
         guard read != PPIOErrorWouldBlock else {
-            throw IOError.wouldBlock(.link)
+            throw NativeIOError.wouldBlock(.link)
         }
         guard read >= 0 else {
-            throw IOError.libc(.link, lastErrorCode)
+            throw NativeIOError.libc(.link, lastErrorCode)
         }
         guard read > 0 else {
             if closesOnEmptyRead {
-                throw IOError.eof(.link)
+                throw NativeIOError.eof(.link)
             }
             return 0
         }
@@ -81,13 +81,13 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
             )
         }
         guard written != PPIOErrorWouldBlock else {
-            throw IOError.wouldBlock(.link)
+            throw NativeIOError.wouldBlock(.link)
         }
         guard written != PPIOErrorNoBufs else {
-            throw IOError.noBufSpace(.link)
+            throw NativeIOError.noBufSpace(.link)
         }
         guard written >= 0 else {
-            throw IOError.libc(.link, lastErrorCode)
+            throw NativeIOError.libc(.link, lastErrorCode)
         }
         return Int(written)
     }

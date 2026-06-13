@@ -55,6 +55,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/ReachabilityInfo.swift
 ./PartoutCore/Connection/ReachabilityObserver.swift
 ./PartoutCore/Connection/SharedTunnelEnvironment.swift
+./PartoutCore/Connection/Side.swift
 ./PartoutCore/Connection/SimpleConnectionDaemon.swift
 ./PartoutCore/Connection/SimpleDNSResolver.swift
 ./PartoutCore/Connection/SocketWrapper.swift
