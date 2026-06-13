@@ -47,6 +47,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/LinkInterface.swift
 ./PartoutCore/Connection/LinkObserver.swift
 ./PartoutCore/Connection/NativeIOInterface.swift
+./PartoutCore/Connection/NativeSocketFactory.swift
 ./PartoutCore/Connection/NativeTunnelController.swift
 ./PartoutCore/Connection/NetworkInterfaceFactory.swift
 ./PartoutCore/Connection/NetworkObserver.swift
