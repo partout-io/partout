@@ -120,7 +120,6 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
         do {
             try await looper.attach(.init(
                 pair: pair,
-                closesOnEmptyRead: isTCP,
                 transformWrite: rw.beforeWrite,
                 onRead: { [weak self] packets in
                     let processed = try rw.beforeRead(packets)
@@ -161,7 +160,6 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
         pp_log(ctx, .openvpn, .info, "Attach TUN")
         try await looper.attach(.init(
             pair: pair,
-            closesOnEmptyRead: false,
             transformWrite: nil,
             onRead: { [weak self] packets in
                 try self?.receiveTunnel(packets)

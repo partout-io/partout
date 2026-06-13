@@ -27,19 +27,36 @@ public final class TunWrapper: NativeIOInterface, @unchecked Sendable {
     public func resetEvents() throws {
     }
 
-    public func read(_ buf: inout [UInt8]) -> Int32 {
-        pp_tun_read(tun, &buf, buf.count)
+    public func read(_ buf: inout [UInt8]) throws -> Int {
+        let read = pp_tun_read(tun, &buf, buf.count)
+        guard read != PPIOErrorWouldBlock else {
+            throw IOError.wouldBlock(.tun)
+        }
+        guard read >= 0 else {
+            throw IOError.libc(.tun, lastErrorCode)
+        }
+        return Int(read)
     }
 
-    public func write(_ data: Data, offset: Int) -> Int32 {
-        let count = data.count - offset
-        return data.withUnsafeBytes {
+    public func write(_ data: Data, offset: Int) throws -> Int {
+        let writeCount = data.count - offset
+        let written = data.withUnsafeBytes {
             pp_tun_write(
                 tun,
                 $0.bytePointer + offset,
-                count
+                writeCount
             )
         }
+        guard written != PPIOErrorWouldBlock else {
+            throw IOError.wouldBlock(.tun)
+        }
+        guard written != PPIOErrorNoBufs else {
+            throw IOError.noBufSpace(.tun)
+        }
+        guard written >= 0 else {
+            throw IOError.libc(.tun, lastErrorCode)
+        }
+        return Int(written)
     }
 
     public func cleanup() {

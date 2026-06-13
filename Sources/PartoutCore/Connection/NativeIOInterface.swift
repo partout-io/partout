@@ -6,8 +6,41 @@
 public protocol NativeIOInterface: Sendable {
     func setEventMask(read: Bool, write: Bool) throws
     func resetEvents() throws
-    func read(_ buf: inout [UInt8]) -> Int32
-    func write(_ data: Data, offset: Int) -> Int32
+    func read(_ buf: inout [UInt8]) throws -> Int
+    func write(_ data: Data, offset: Int) throws -> Int
     func cleanup()
     var lastErrorCode: Int32 { get }
+}
+
+public enum Side: Hashable, Sendable {
+    case link
+    case tun
+}
+
+public enum IOError: Error, CustomDebugStringConvertible {
+    case wouldBlock(Side)
+    case noBufSpace(Side)
+    case eof(Side)
+    case libc(Side, Int32)
+    case user(Side, Error? = nil)
+
+    var side: Side {
+        switch self {
+        case .wouldBlock(let side): side
+        case .noBufSpace(let side): side
+        case .eof(let side): side
+        case .libc(let side, _): side
+        case .user(let side, _): side
+        }
+    }
+
+    public var debugDescription: String {
+        switch self {
+        case .wouldBlock(let side): "\(side): would block"
+        case .noBufSpace(let side): "\(side): no buffer space"
+        case .eof(let side): "\(side): EOF"
+        case .libc(let side, let code): "\(side): last_error=\(code)"
+        case .user(let side, let reason): "\(side): user error, \(reason.debugDescription)"
+        }
+    }
 }

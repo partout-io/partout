@@ -18,6 +18,7 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
     let socket: pp_socket
     private let options: Options
+    private let closesOnEmptyRead: Bool
     private var isClosed = false
 
     init(_ ctx: PartoutLoggerContext, options: Options) async throws {
@@ -33,6 +34,7 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
         self.ctx = ctx
         self.socket = socket
         self.options = options
+        closesOnEmptyRead = options.endpoint.plainSocketType == .tcp
     }
 
     deinit {
@@ -52,19 +54,42 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
         }
     }
 
-    func read(_ buf: inout [UInt8]) -> Int32 {
-        pp_socket_read(socket, &buf, buf.count)
+    func read(_ buf: inout [UInt8]) throws -> Int {
+        let read = pp_socket_read(socket, &buf, buf.count)
+        guard read != PPIOErrorWouldBlock else {
+            throw IOError.wouldBlock(.link)
+        }
+        guard read >= 0 else {
+            throw IOError.libc(.link, lastErrorCode)
+        }
+        guard read > 0 else {
+            if closesOnEmptyRead {
+                throw IOError.eof(.link)
+            }
+            return 0
+        }
+        return Int(read)
     }
 
-    func write(_ data: Data, offset: Int) -> Int32 {
-        let count = data.count - offset
-        return data.withUnsafeBytes {
+    func write(_ data: Data, offset: Int) throws -> Int {
+        let writeCount = data.count - offset
+        let written = data.withUnsafeBytes {
             pp_socket_write(
                 socket,
                 $0.bytePointer + offset,
-                count
+                writeCount
             )
         }
+        guard written != PPIOErrorWouldBlock else {
+            throw IOError.wouldBlock(.link)
+        }
+        guard written != PPIOErrorNoBufs else {
+            throw IOError.noBufSpace(.link)
+        }
+        guard written >= 0 else {
+            throw IOError.libc(.link, lastErrorCode)
+        }
+        return Int(written)
     }
 
     func cleanup() {

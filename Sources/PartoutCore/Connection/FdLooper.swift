@@ -6,11 +6,6 @@ internal import _PartoutCore_C
 
 /// Loops through a set of file descriptors.
 public final class FdLooper: @unchecked Sendable {
-    public enum Side: Hashable, Sendable {
-        case link
-        case tun
-    }
-
     public enum ReadAction: Sendable {
         case keep
         case pause
@@ -28,20 +23,17 @@ public final class FdLooper: @unchecked Sendable {
         }
 
         public let pair: DescriptorPair
-        public let closesOnEmptyRead: Bool
         public let transformWrite: TransformWrite?
         public let onRead: OnRead?
         public let onFailure: OnFailure?
 
         public init(
             pair: DescriptorPair,
-            closesOnEmptyRead: Bool,
             transformWrite: TransformWrite?,
             onRead: OnRead?,
             onFailure: OnFailure?
         ) {
             self.pair = pair
-            self.closesOnEmptyRead = closesOnEmptyRead
             self.transformWrite = transformWrite
             self.onRead = onRead
             self.onFailure = onFailure
@@ -871,34 +863,6 @@ private extension FdLooper {
         }
     }
 
-    enum IOError: Error, CustomDebugStringConvertible {
-        case wouldBlock(Side)
-        case noBufSpace(Side)
-        case eof(Side)
-        case libc(Side, Int32)
-        case user(Side, Error? = nil)
-
-        var side: Side {
-            switch self {
-            case .wouldBlock(let side): side
-            case .noBufSpace(let side): side
-            case .eof(let side): side
-            case .libc(let side, _): side
-            case .user(let side, _): side
-            }
-        }
-
-        var debugDescription: String {
-            switch self {
-            case .wouldBlock(let side): "\(side): would block"
-            case .noBufSpace(let side): "\(side): no buffer space"
-            case .eof(let side): "\(side): EOF"
-            case .libc(let side, let code): "\(side): last_error=\(code)"
-            case .user(let side, let reason): "\(side): user error, \(reason.debugDescription)"
-            }
-        }
-    }
-
     struct PendingWrite {
         let data: Data
         let offset: Int
@@ -1069,7 +1033,6 @@ private extension FdLooper.SideIO {
         readBufSize: Int,
         arguments: FdLooper.AttachArguments
     ) {
-        let closesOnEmptyRead = arguments.closesOnEmptyRead
         self.init(
             side: .link,
             fd: linkFd,
@@ -1082,33 +1045,12 @@ private extension FdLooper.SideIO {
                 try ioFd.setEventMask(read: read, write: write)
             },
             read: { buf in
-                let count = ioFd.read(&buf)
-                guard count != PPIOErrorWouldBlock else {
-                    throw FdLooper.IOError.wouldBlock(.link)
-                }
-                guard count >= 0 else {
-                    throw FdLooper.IOError.libc(.link, ioFd.lastErrorCode)
-                }
-                guard count > 0 else {
-                    if closesOnEmptyRead {
-                        throw FdLooper.IOError.eof(.link)
-                    }
-                    return nil
-                }
+                let count = try ioFd.read(&buf)
+                guard count >= 0 else { return nil }
                 return Data(buf[0..<Int(count)])
             },
             write: { pending in
-                let count = ioFd.write(pending.data, offset: pending.offset)
-                guard count != PPIOErrorWouldBlock else {
-                    throw FdLooper.IOError.wouldBlock(.link)
-                }
-                guard count != PPIOErrorNoBufs else {
-                    throw FdLooper.IOError.noBufSpace(.link)
-                }
-                guard count >= 0 else {
-                    throw FdLooper.IOError.libc(.link, ioFd.lastErrorCode)
-                }
-                return Int(count)
+                try ioFd.write(pending.data, offset: pending.offset)
             },
             cleanup: {
                 pp_mux_delete(mux, linkFd)
@@ -1136,30 +1078,12 @@ private extension FdLooper.SideIO {
                 try ioFd.setEventMask(read: read, write: write)
             },
             read: { buf in
-                let count = ioFd.read(&buf)
-                guard count != PPIOErrorWouldBlock else {
-                    throw FdLooper.IOError.wouldBlock(.tun)
-                }
-                guard count >= 0 else {
-                    throw FdLooper.IOError.libc(.tun, ioFd.lastErrorCode)
-                }
-                guard count > 0 else {
-                    return nil
-                }
+                let count = try ioFd.read(&buf)
+                guard count >= 0 else { return nil }
                 return Data(buf[0..<Int(count)])
             },
             write: { pending in
-                let count = ioFd.write(pending.data, offset: pending.offset)
-                guard count != PPIOErrorWouldBlock else {
-                    throw FdLooper.IOError.wouldBlock(.tun)
-                }
-                guard count != PPIOErrorNoBufs else {
-                    throw FdLooper.IOError.noBufSpace(.tun)
-                }
-                guard count >= 0 else {
-                    throw FdLooper.IOError.libc(.tun, ioFd.lastErrorCode)
-                }
-                return Int(count)
+                try ioFd.write(pending.data, offset: pending.offset)
             },
             cleanup: {
                 pp_mux_delete(mux, tunFd)
