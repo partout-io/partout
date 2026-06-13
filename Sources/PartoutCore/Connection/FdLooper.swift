@@ -1056,7 +1056,7 @@ private extension FdLooper.SideIO {
             },
             read: { buf in
                 let count = try ioFd.read(&buf)
-                guard count >= 0 else { return nil }
+                guard count > 0 else { return nil }
                 return Data(buf[0..<Int(count)])
             },
             write: { pending in
@@ -1089,7 +1089,7 @@ private extension FdLooper.SideIO {
             },
             read: { buf in
                 let count = try ioFd.read(&buf)
-                guard count >= 0 else { return nil }
+                guard count > 0 else { return nil }
                 return Data(buf[0..<Int(count)])
             },
             write: { pending in
