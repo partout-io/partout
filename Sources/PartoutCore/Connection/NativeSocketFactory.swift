@@ -31,7 +31,7 @@ public final class NativeSocketFactory: NetworkInterfaceFactory {
     private let betterPathFactory: BetterPathStreamFactory
     private let currentReachability: (@Sendable () -> ReachabilityInfo?)?
     private let configureSocket: pp_socket_configure?
-    private let configureSocketCtx: UnsafeMutableRawPointer?
+    private nonisolated(unsafe) let configureSocketCtx: UnsafeMutableRawPointer?
     private let bufSize: Int
 
     public init(

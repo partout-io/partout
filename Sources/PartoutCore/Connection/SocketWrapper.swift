@@ -5,14 +5,14 @@
 internal import _PartoutCore_C
 
 final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
-    struct Options: @unchecked Sendable {
+    struct Options: Sendable {
         let endpoint: ExtendedEndpoint
         let timeout: Int
         let bufSize: Int
         let betterPathStream: PassthroughStream<Void>
         let reachability: pp_reachability?
         let configure: pp_socket_configure?
-        let configureCtx: UnsafeMutableRawPointer?
+        nonisolated(unsafe) let configureCtx: UnsafeMutableRawPointer?
     }
 
     private let ctx: PartoutLoggerContext
