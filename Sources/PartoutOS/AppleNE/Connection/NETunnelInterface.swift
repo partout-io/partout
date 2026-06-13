@@ -21,7 +21,7 @@ public final class NETunnelInterface: TunInterface {
 
     public var nativeIO: NativeIOInterface? {
         do {
-            return try TunWrapper.forNetworkExtension(ctx)
+            return try NEPacketTunnelFlow.forNativeIO(ctx)
         } catch {
             pp_log(ctx, .os, .fault, "Unable to create or look up tun I/O interface: \(error)")
             return nil

@@ -21,6 +21,19 @@ typedef struct {
     uint64_t network_handle;
 #endif
 } pp_reachability;
+static inline pp_reachability pp_reachability_none() {
+#if PARTOUT_ANDROID
+    static const pp_reachability none = {
+        .reachable = false,
+        .network_handle = 0
+    };
+#else
+    static const pp_reachability none = {
+        .reachable = false
+    };
+#endif
+    return none;
+}
 
 /* The available protocols. */
 typedef enum {
@@ -40,13 +53,16 @@ static inline void pp_socket_free(pp_socket sock) {
 }
 
 /* Create socket to endpoint. */
+typedef bool (*pp_socket_configure)(void *_Nullable ctx,
+                                    pp_socket_fd fd,
+                                    const pp_reachability *_Nullable reachability);
 pp_socket _Nullable pp_socket_open(const char *ip_addr,
                                    pp_socket_proto proto,
                                    uint16_t port,
                                    bool blocking,
                                    int timeout_ms,
-                                   const pp_reachability *_Nullable info,
-                                   bool (*_Nullable configure)(void *_Nullable ctx, pp_socket_fd fd),
+                                   const pp_reachability *_Nullable reachability,
+                                   pp_socket_configure _Nullable configure,
                                    void *_Nullable configure_ctx);
 
 /* I/O. Returns PPIOErrorWouldBlock when a non-blocking operation would block. */
