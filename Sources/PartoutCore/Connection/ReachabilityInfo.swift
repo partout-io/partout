@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+internal import _PartoutCore_C
+
 /// Platform-specific metadata about network reachability.
 public struct ReachabilityInfo: Sendable {
     public let isReachable: Bool
@@ -17,4 +19,32 @@ public struct ReachabilityInfo: Sendable {
         self.isReachable = isReachable
     }
 #endif
+}
+
+extension ReachabilityInfo {
+    var toCReachability: pp_reachability {
+#if os(Android)
+        pp_reachability(
+            reachable: isReachable,
+            network_handle: networkHandle ?? 0
+        )
+#else
+        pp_reachability(
+            reachable: isReachable
+        )
+#endif
+    }
+}
+
+private extension pp_reachability {
+    var fromCReachability: ReachabilityInfo {
+#if os(Android)
+        ReachabilityInfo(
+            isReachable: reachable,
+            networkHandle: network_handle != 0 ? network_handle : nil
+        )
+#else
+        ReachabilityInfo(isReachable: reachable)
+#endif
+    }
 }

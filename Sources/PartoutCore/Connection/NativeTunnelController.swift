@@ -173,44 +173,31 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
 // MARK: - NetworkInterfaceFactory
 
-extension NativeTunnelController: NetworkInterfaceFactory {
-    private struct Observer: LinkObserver {
-        let factory: NativeTunnelController
-        let endpoint: ExtendedEndpoint
-
-        func waitForActivity(timeout: Int) async throws -> LinkInterface {
-            let reachability = factory.currentReachability
-            let options = SocketWrapper.Options(
-                endpoint: endpoint,
-                timeout: timeout,
-                bufSize: factory.bufSize,
-                betterPathStream: factory.betterPathProxy.newStream(),
-                reachability: reachability?.toCReachability,
-                configure: { ctx, fd, reachability in
-                    guard let ctx else { return true }
-                    let ctrl = ctx.toSelf
-                    do {
-                        try ctrl.configureSockets(
-                            with: [fd],
-                            reachability: reachability?.pointee
-                        )
-                        return true
-                    } catch {
-                        pp_log(ctrl.ctx, .core, .fault, "Unable to configure sockets: \(error)")
-                        return false
-                    }
-                },
-                configureCtx: UnsafeMutableRawPointer.fromSelf(factory)
-            )
-            return try await SocketWrapper(
-                factory.ctx,
-                options: options
-            )
-        }
-    }
-
-    public func linkObserver(to endpoint: ExtendedEndpoint) -> LinkObserver {
-        Observer(factory: self, endpoint: endpoint)
+extension NativeTunnelController {
+    public func newSocketFactory() -> NativeSocketFactory {
+        NativeSocketFactory(
+            ctx,
+            betterPathFactory: betterPathProxy,
+            currentReachability: { [weak self] in
+                self?.currentReachability
+            },
+            configureSocket: { ctx, fd, reachability in
+                guard let ctx else { return true }
+                let ctrl = ctx.toSelf
+                do {
+                    try ctrl.configureSockets(
+                        with: [fd],
+                        reachability: reachability?.pointee
+                    )
+                    return true
+                } catch {
+                    pp_log(ctrl.ctx, .core, .fault, "Unable to configure sockets: \(error)")
+                    return false
+                }
+            },
+            configureSocketCtx: .fromSelf(self),
+            bufSize: bufSize
+        )
     }
 }
 
@@ -335,34 +322,6 @@ private extension UnsafeMutableRawPointer {
 
     var toSelf: NativeTunnelController {
         Unmanaged.fromOpaque(self).takeUnretainedValue()
-    }
-}
-
-private extension ReachabilityInfo {
-    var toCReachability: pp_reachability {
-#if os(Android)
-        pp_reachability(
-            reachable: isReachable,
-            network_handle: networkHandle ?? 0
-        )
-#else
-        pp_reachability(
-            reachable: isReachable
-        )
-#endif
-    }
-}
-
-private extension pp_reachability {
-    var fromCReachability: ReachabilityInfo {
-#if os(Android)
-        ReachabilityInfo(
-            isReachable: reachable,
-            networkHandle: network_handle != 0 ? network_handle : nil
-        )
-#else
-        ReachabilityInfo(isReachable: reachable)
-#endif
     }
 }
 
