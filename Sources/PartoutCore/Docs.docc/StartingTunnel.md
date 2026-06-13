@@ -35,7 +35,6 @@ Given the main app and the daemon:
 - ``EndpointResolver``
 - ``NativeSocketFactory``
 - ``NetworkInterfaceFactory``
-- ``SocketConfigurator``
 
 ### Event loop
 
