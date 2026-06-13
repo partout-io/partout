@@ -13,7 +13,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     private let environment: TunnelEnvironmentReader
 
-    private let betterPathProxy: BetterPathProxy
+    private let betterPathFactory: BetterPathStreamFactory
 
     private let bufSize: Int
 
@@ -41,7 +41,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         self.ref = ref
 #endif
         self.environment = environment
-        betterPathProxy = BetterPathProxy(factory: betterPathFactory)
+        self.betterPathFactory = betterPathFactory ?? BetterPathProxy()
         self.bufSize = bufSize
 
         onReachableStream = CurrentValueStream(false)
@@ -177,7 +177,7 @@ extension NativeTunnelController {
     public func newSocketFactory() -> NativeSocketFactory {
         NativeSocketFactory(
             ctx,
-            betterPathFactory: betterPathProxy,
+            betterPathFactory: betterPathFactory,
             currentReachability: { [weak self] in
                 self?.currentReachability
             },
@@ -236,6 +236,10 @@ private extension NativeTunnelController {
     }
 
     func onBetterPath() {
+        guard let betterPathProxy = betterPathFactory as? BetterPathProxy else {
+            assertionFailure("A custom betterPathFactory was already set. We shouldn't be delegating .onBetterPath() events from C.")
+            return
+        }
         betterPathProxy.onBetterPath()
     }
 }
@@ -269,15 +273,10 @@ private final class ReachabilityHolder: @unchecked Sendable {
 
 private final class BetterPathProxy: BetterPathStreamFactory, @unchecked Sendable {
     private let lock = SemaphoreMutex()
-    private let factory: BetterPathStreamFactory?
     private var stream: PassthroughStream<Void>?
 
-    init(factory: BetterPathStreamFactory?) {
-        self.factory = factory
-    }
-
     nonisolated func newStream() -> PassthroughStream<Void> {
-        let new = factory?.newStream() ?? PassthroughStream<Void>()
+        let new = PassthroughStream<Void>()
         let oldStream = lock.with {
             let old = stream
             stream = new
