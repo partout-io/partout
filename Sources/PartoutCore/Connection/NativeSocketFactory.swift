@@ -46,7 +46,7 @@ public final class NativeSocketFactory: NetworkInterfaceFactory {
 
     public init(
         _ ctx: PartoutLoggerContext,
-        currentReachabilityBlock: (@Sendable () -> ReachabilityInfo?)?,
+        currentReachabilityBlock: (@Sendable () -> ReachabilityInfo?)? = nil,
         betterPathFactory: BetterPathStreamFactory,
         bufSize: Int = 1 * 1024 * 1024, // 1MB
     ) {
@@ -83,6 +83,6 @@ public final class NativeSocketFactory: NetworkInterfaceFactory {
         to endpoint: ExtendedEndpoint,
         reachability: ReachabilityInfo?
     ) -> LinkObserver {
-        return Observer(factory: self, endpoint: endpoint, reachability: reachability)
+        Observer(factory: self, endpoint: endpoint, reachability: reachability)
     }
 }
