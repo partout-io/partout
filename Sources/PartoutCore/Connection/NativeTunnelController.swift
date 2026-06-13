@@ -177,10 +177,10 @@ extension NativeTunnelController {
     public func newSocketFactory() -> NativeSocketFactory {
         NativeSocketFactory(
             ctx,
-            betterPathFactory: betterPathFactory,
-            currentReachability: { [weak self] in
+            currentReachabilityBlock: { [weak self] in
                 self?.currentReachability
             },
+            betterPathFactory: betterPathFactory,
             configureSocket: { [weak self] fd, reachability in
                 guard let self else {
                     let msg = "Configuring sockets, but NativeTunnelController was released"

@@ -12,7 +12,7 @@ struct SimpleDNSResolverTests {
         let sut = SimpleDNSResolver { _, _ in
             MockStrategy(records: records, delay: 100)
         }
-        let result = try await sut.resolve("foobar.com", timeout: 500)
+        let result = try await sut.resolve("foobar.com", reachability: nil, timeout: 500)
         #expect(result == records)
     }
 
@@ -23,7 +23,7 @@ struct SimpleDNSResolverTests {
             MockStrategy(records: records, delay: 500)
         }
         do {
-            _ = try await sut.resolve("foobar.com", timeout: 100)
+            _ = try await sut.resolve("foobar.com", reachability: nil,timeout: 100)
             #expect(Bool(false), ".resolve must fail")
         } catch let error as PartoutError {
             #expect(error.code == .timeout)
@@ -38,7 +38,7 @@ struct SimpleDNSResolverTests {
             CancellationIgnoringStrategy()
         }
         do {
-            _ = try await sut.resolve("foobar.com", timeout: 100)
+            _ = try await sut.resolve("foobar.com", reachability: nil,timeout: 100)
             #expect(Bool(false), ".resolve must fail")
         } catch let error as PartoutError {
             #expect(error.code == .timeout)

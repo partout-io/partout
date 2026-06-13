@@ -82,6 +82,7 @@ extension WireGuard.Configuration {
                         let resolvedRecords = try await resolver.resolve(
                             endpoint.address.rawValue,
                             flags: flags,
+                            reachability: nil, // Relies on default
                             timeout: timeout
                         )
                         var currentResolved: [Endpoint] = []
