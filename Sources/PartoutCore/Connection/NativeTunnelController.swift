@@ -182,7 +182,12 @@ extension NativeTunnelController {
                 self?.currentReachability
             },
             configureSocket: { [weak self] fd, reachability in
-                guard let self else { return true }
+                guard let self else {
+                    let msg = "Configuring sockets, but NativeTunnelController was released"
+                    pp_log(.global, .core, .error, msg)
+                    assertionFailure(msg)
+                    return false
+                }
                 do {
                     try configureSockets(
                         with: [fd],
