@@ -92,7 +92,7 @@ extension TunWrapper: TunInterface {
     }
 }
 
-#if canImport(Darwin)
+#if canImport(NetworkExtension)
 import NetworkExtension
 
 extension NEPacketTunnelFlow {
