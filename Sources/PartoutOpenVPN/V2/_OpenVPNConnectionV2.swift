@@ -352,6 +352,7 @@ private extension _OpenVPNConnectionV2 {
     func setupLink(upgradingCurrent: Bool) async throws -> LinkInterface {
         do {
             pp_log(ctx, .core, .notice, "Create new link")
+            let reachability = factory.currentReachability()
             var newLink: LinkInterface
 
             // upgrade current link if possible
@@ -364,14 +365,14 @@ private extension _OpenVPNConnectionV2 {
                 pp_log(ctx, .core, .notice, "Cycle to next endpoint")
                 let result = try await endpointResolver.withNextEndpoint(
                     dns: dns,
-                    reachability: nil,
+                    reachability: reachability,
                     timeout: options.dnsTimeout
                 )
                 endpointResolver = result.nextResolver
 
                 let linkObserver = try factory.linkObserver(
                     to: result.endpoint,
-                    reachability: nil
+                    reachability: reachability
                 )
                 pp_log(ctx, .core, .notice, "Connect to \(result.endpoint.asSensitiveAddress(ctx))")
                 newLink = try await linkObserver.waitForActivity(timeout: options.linkActivityTimeout)
