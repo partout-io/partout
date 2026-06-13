@@ -16,6 +16,7 @@ import android.os.Messenger
 import android.util.Log
 import io.partout.models.TaggedProfile
 import io.partout.models.TunnelSnapshot
+import io.partout.models.TunnelStatus
 import io.partout.vpn.JNITunnelController
 import io.partout.vpn.TunnelControllerDelegate
 import kotlinx.coroutines.CancellationException
@@ -120,7 +121,7 @@ class PartoutVpnServiceRuntime(
             controller = newController
             newController.startObserving()
         } catch (e: Exception) {
-            snapshotEmitter.shutdown()
+            snapshotEmitter.emitInactive(profileId)
             controller = null
             isRunning = false
             e.throwIfCancellation()
@@ -186,6 +187,7 @@ class PartoutVpnServiceRuntime(
 
     private fun stopService() {
         service.stopSelf()
+        engine.onServiceStopped()
     }
 
     private fun close() {
@@ -238,6 +240,18 @@ class PartoutVpnServiceRuntime(
             activeProfileId = null
         }
 
+        fun emitInactive(profileId: String) {
+            emit(
+                TunnelSnapshot(
+                    id = profileId,
+                    isEnabled = false,
+                    onDemand = false,
+                    status = TunnelStatus.inactive
+                )
+            )
+            shutdown()
+        }
+
         fun latest(): TunnelSnapshot? = synchronized(lock) {
             latestSnapshot
         }
@@ -256,7 +270,7 @@ class PartoutVpnServiceRuntime(
             id,
             false,
             false,
-            status,
+            TunnelStatus.inactive,
             environment
         )
     }
@@ -341,6 +355,7 @@ class PartoutVpnServiceRuntime(
         suspend fun readLastProfile(): String
         suspend fun writeLastProfile(json: String)
         fun onSnapshot(snapshot: TunnelSnapshot)
+        fun onServiceStopped() {}
     }
     //endregion
 
