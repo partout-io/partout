@@ -39,33 +39,34 @@ public final class NativeSocketFactory: NetworkInterfaceFactory {
     }
 
     private let ctx: PartoutLoggerContext
+    private let currentReachabilityBlock: (@Sendable () -> ReachabilityInfo?)?
     private let betterPathFactory: BetterPathStreamFactory
-    private let currentReachability: (@Sendable () -> ReachabilityInfo?)?
     private let configureSocket: ConfigureSocket?
     private let bufSize: Int
 
     public init(
         _ ctx: PartoutLoggerContext,
+        currentReachabilityBlock: (@Sendable () -> ReachabilityInfo?)?,
         betterPathFactory: BetterPathStreamFactory,
         bufSize: Int = 1 * 1024 * 1024, // 1MB
     ) {
         self.ctx = ctx
+        self.currentReachabilityBlock = currentReachabilityBlock
         self.betterPathFactory = betterPathFactory
-        currentReachability = nil
         configureSocket = nil
         self.bufSize = bufSize
     }
 
     init(
         _ ctx: PartoutLoggerContext,
+        currentReachabilityBlock: (@Sendable () -> ReachabilityInfo?)?,
         betterPathFactory: BetterPathStreamFactory,
-        currentReachability: (@Sendable () -> ReachabilityInfo?)?,
         configureSocket: ConfigureSocket?,
         bufSize: Int = 1 * 1024 * 1024, // 1MB
     ) {
         self.ctx = ctx
+        self.currentReachabilityBlock = currentReachabilityBlock
         self.betterPathFactory = betterPathFactory
-        self.currentReachability = currentReachability
         self.configureSocket = configureSocket
         self.bufSize = bufSize
     }
@@ -74,8 +75,14 @@ public final class NativeSocketFactory: NetworkInterfaceFactory {
         pp_log(ctx, .core, .debug, "Deinit NativeSocketFactory")
     }
 
-    public func linkObserver(to endpoint: ExtendedEndpoint) -> LinkObserver {
-        let reachability = currentReachability?()
+    public func currentReachability() -> ReachabilityInfo? {
+        currentReachabilityBlock?()
+    }
+
+    public func linkObserver(
+        to endpoint: ExtendedEndpoint,
+        reachability: ReachabilityInfo?
+    ) -> LinkObserver {
         return Observer(factory: self, endpoint: endpoint, reachability: reachability)
     }
 }

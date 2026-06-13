@@ -364,11 +364,15 @@ private extension _OpenVPNConnectionV2 {
                 pp_log(ctx, .core, .notice, "Cycle to next endpoint")
                 let result = try await endpointResolver.withNextEndpoint(
                     dns: dns,
+                    reachability: nil,
                     timeout: options.dnsTimeout
                 )
                 endpointResolver = result.nextResolver
 
-                let linkObserver = try factory.linkObserver(to: result.endpoint)
+                let linkObserver = try factory.linkObserver(
+                    to: result.endpoint,
+                    reachability: nil
+                )
                 pp_log(ctx, .core, .notice, "Connect to \(result.endpoint.asSensitiveAddress(ctx))")
                 newLink = try await linkObserver.waitForActivity(timeout: options.linkActivityTimeout)
 

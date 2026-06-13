@@ -34,7 +34,7 @@ struct EndpointResolverTests {
         var i = 0
         do {
             while true {
-                let result = try await sut.withNextEndpoint(dns: dns, timeout: 1000)
+                let result = try await sut.withNextEndpoint(dns: dns, reachability: nil,timeout: 1000)
                 sut = result.nextResolver
                 #expect(result.endpoint.description == expected[i])
                 i += 1
@@ -67,7 +67,7 @@ struct EndpointResolverTests {
         var i = 0
         do {
             while true {
-                let result = try await sut.withNextEndpoint(dns: dns, timeout: 1000)
+                let result = try await sut.withNextEndpoint(dns: dns, reachability: nil,timeout: 1000)
                 sut = result.nextResolver
                 #expect(result.endpoint.description == expected[i])
                 i += 1
@@ -100,7 +100,7 @@ struct EndpointResolverTests {
         var i = 0
         do {
             while true {
-                let result = try await sut.withNextEndpoint(dns: dns, timeout: 1000)
+                let result = try await sut.withNextEndpoint(dns: dns, reachability: nil,timeout: 1000)
                 sut = result.nextResolver
                 #expect(result.endpoint.description == expected[i])
                 i += 1
@@ -150,7 +150,7 @@ struct EndpointResolverTests {
         var i = 0
         do {
             while true {
-                let result = try await sut.withNextEndpoint(dns: dns, timeout: 1000)
+                let result = try await sut.withNextEndpoint(dns: dns, reachability: nil,timeout: 1000)
                 sut = result.nextResolver
                 #expect(result.endpoint == expected[i])
                 i += 1

@@ -12,7 +12,7 @@ struct DNSResolverTests {
 
         let sut = MockDNSResolver()
         sut.resolvedRecords = ["www.google.com": expRecords]
-        let records = try await sut.resolve("www.google.com", timeout: 1000)
+        let records = try await sut.resolve("www.google.com", reachability: nil,timeout: 1000)
         #expect(records == expRecords)
     }
 
@@ -21,7 +21,7 @@ struct DNSResolverTests {
         let sut = MockDNSResolver()
         sut.error = PartoutError(.dnsFailure)
         do {
-            _ = try await sut.resolve("www.google.com", timeout: 1000)
+            _ = try await sut.resolve("www.google.com", reachability: nil,timeout: 1000)
         } catch let error as PartoutError {
             #expect(error.code == .dnsFailure)
         } catch {
@@ -34,7 +34,7 @@ struct DNSResolverTests {
         let sut = MockDNSResolver()
         sut.error = PartoutError(.timeout)
         do {
-            _ = try await sut.resolve("www.google.com", timeout: 1000)
+            _ = try await sut.resolve("www.google.com", reachability: nil,timeout: 1000)
         } catch let error as PartoutError {
             #expect(error.code == .timeout)
         } catch {

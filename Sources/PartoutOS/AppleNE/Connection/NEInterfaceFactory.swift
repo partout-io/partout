@@ -35,7 +35,14 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
         self.options = options
     }
 
-    public func linkObserver(to endpoint: ExtendedEndpoint) throws -> LinkObserver {
+    public func currentReachability() -> ReachabilityInfo? {
+        nil
+    }
+
+    public func linkObserver(
+        to endpoint: ExtendedEndpoint,
+        reachability: ReachabilityInfo?
+    ) throws -> LinkObserver {
         guard let provider else {
             pp_log(ctx, .os, .info, "NEInterfaceFactory: NEPacketTunnelProvider released")
             throw PartoutError(.releasedObject)

@@ -4,7 +4,6 @@
 
 /// Observes activity to eventually return a ``LinkInterface``.
 public protocol LinkObserver {
-
     /// Waits until the link is active.
     ///
     /// - Parameter timeout: The timeout for link activity.
