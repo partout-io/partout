@@ -999,6 +999,7 @@ private extension FdLooper {
                 onFailure?(reason)
             }
             guard !didCleanup else { return }
+            didCleanup = true
             pp_mux_delete(mux, fd)
             io.cleanup()
         }
