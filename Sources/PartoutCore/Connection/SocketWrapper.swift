@@ -54,7 +54,7 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
         }
     }
 
-    func read(_ buf: inout [UInt8]) throws -> Int {
+    func read(_ buf: inout [UInt8]) throws -> Int? {
         let read = pp_socket_read(socket, &buf, buf.count)
         guard read != PPIOErrorWouldBlock else {
             throw NativeIOError.wouldBlock(.link)
@@ -66,7 +66,7 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
             if closesOnEmptyRead {
                 throw NativeIOError.eof(.link)
             }
-            return 0
+            return nil
         }
         return Int(read)
     }

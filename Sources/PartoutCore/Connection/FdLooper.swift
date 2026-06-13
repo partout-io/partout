@@ -477,10 +477,10 @@ private extension FdLooper {
     func process(mux: pp_mux, fdSet: FdSet) throws {
         // Prepare fds before processing
         if let link, fdSet.readable.contains(link.fd) || fdSet.writable.contains(link.fd) {
-            try link.prepare?()
+            try link.resetEvents()
         }
         if let tun, fdSet.readable.contains(tun.fd) || fdSet.writable.contains(tun.fd) {
-            try tun.prepare?()
+            try tun.resetEvents()
         }
 
         // Write link
@@ -701,7 +701,7 @@ private extension FdLooper {
         results: inout [CommandResult]
     ) {
         switch arguments.pair {
-        case .link(let linkFd, let ioFd):
+        case .link(let linkFd, let io):
             // Cancel attach if stopping
             guard state != .stopping else {
                 results.append(.attach(continuation, .failure(CancellationError())))
@@ -722,8 +722,9 @@ private extension FdLooper {
             // Create new side
             let newLink = SideIO(
                 mux: mux,
-                linkFd: linkFd,
-                ioFd: ioFd,
+                side: .link,
+                fd: linkFd,
+                io: io,
                 readBufSize: linkBufSize,
                 arguments: arguments
             )
@@ -736,7 +737,7 @@ private extension FdLooper {
                 pp_mux_delete(mux, linkFd)
                 results.append(.attach(continuation, .failure(MuxError(side: .link))))
             }
-        case .tun(let tunFd, let ioFd):
+        case .tun(let tunFd, let io):
             // Cancel attach if stopping
             guard state != .stopping else {
                 results.append(.attach(continuation, .failure(CancellationError())))
@@ -757,8 +758,9 @@ private extension FdLooper {
             // Create new side
             let newTun = SideIO(
                 mux: mux,
-                tunFd: tunFd,
-                ioFd: ioFd,
+                side: .tun,
+                fd: tunFd,
+                io: io,
                 readBufSize: tunBufSize,
                 arguments: arguments
             )
@@ -887,71 +889,68 @@ private extension FdLooper {
 
     final class SideIO: Identifiable {
         let id = UUID()
+        private let mux: pp_mux
         let side: Side
         let fd: FileDescriptor
+        let io: NativeIOInterface
 
         let transformWrite: TransformWrite?
         private let onRead: OnRead?
         private let onFailure: OnFailure?
-
-        let prepare: (() throws -> Void)?
-        private let setEventMask: (Bool, Bool) throws -> Void
-        private let read: (inout [UInt8]) throws -> Data?
-        private let write: (PendingWrite) throws -> Int
-        private var cleanup: (() -> Void)?
 
         private var readBuf: [UInt8]
         private var writeQueue: RingQueue<Data>
         private var writeOffset: Int
         private var isReading: Bool
         private var isWriting: Bool
+        private var didCleanup: Bool
 
         init(
+            mux: pp_mux,
             side: Side,
             fd: FileDescriptor,
+            io: NativeIOInterface,
             readBufSize: Int,
-            arguments: FdLooper.AttachArguments,
-            prepare: (() throws -> Void)? = nil,
-            setEventMask: @escaping (Bool, Bool) throws -> Void = { _, _ in },
-            read: @escaping (inout [UInt8]) throws -> Data?,
-            write: @escaping (PendingWrite) throws -> Int,
-            cleanup: @escaping () -> Void,
+            arguments: FdLooper.AttachArguments
         ) {
+            self.mux = mux
             self.side = side
             self.fd = fd
+            self.io = io
             transformWrite = arguments.transformWrite
             onRead = arguments.onRead
             onFailure = arguments.onFailure
-            self.prepare = prepare
-            self.setEventMask = setEventMask
-            self.read = read
-            self.write = write
-            self.cleanup = cleanup
             readBuf = Array(repeating: 0, count: readBufSize)
             writeQueue = RingQueue()
             writeOffset = 0
             isReading = true
             isWriting = false
+            didCleanup = false
+        }
+
+        func resetEvents() throws {
+            try io.resetEvents()
         }
 
         func dequeueRead() throws -> Data? {
-            try read(&readBuf)
+            guard let count = try io.read(&readBuf) else { return nil }
+            return Data(readBuf[0..<Int(count)])
         }
 
         func setRead(_ enabled: Bool, mux: pp_mux) throws {
             pp_mux_set_read(mux, fd, enabled)
             isReading = enabled
-            try setEventMask(isReading, isWriting)
+            try syncEventMask()
         }
 
         func setWrite(_ enabled: Bool, mux: pp_mux) throws {
             pp_mux_set_write(mux, fd, enabled)
             isWriting = enabled
-            try setEventMask(isReading, isWriting)
+            try syncEventMask()
         }
 
         func syncEventMask() throws {
-            try setEventMask(isReading, isWriting)
+            try io.setEventMask(read: isReading, write: isWriting)
         }
 
         func processReadPackets(_ packets: [Data]) throws -> FdLooper.ReadAction {
@@ -964,7 +963,7 @@ private extension FdLooper {
         }
 
         func performWrite(_ pending: PendingWrite, lock: SemaphoreMutex) throws -> Bool {
-            let count = try write(pending)
+            let count = try io.write(pending)
             let didComplete = count == pending.count
             lock.with {
                 if didComplete {
@@ -990,7 +989,7 @@ private extension FdLooper {
         }
 
         func writeOutOfBand(_ data: Data) throws {
-            guard try write(PendingWrite(data)) == data.count else {
+            guard try io.write(PendingWrite(data)) == data.count else {
                 throw PartoutError(.ioFailure)
             }
         }
@@ -999,8 +998,9 @@ private extension FdLooper {
             if let reason {
                 onFailure?(reason)
             }
-            cleanup?()
-            cleanup = nil
+            guard !didCleanup else { return }
+            pp_mux_delete(mux, fd)
+            io.cleanup()
         }
     }
 }
@@ -1035,70 +1035,8 @@ extension TunInterface {
     }
 }
 
-private extension FdLooper.SideIO {
-    convenience init(
-        mux: pp_mux,
-        linkFd: FileDescriptor,
-        ioFd: NativeIOInterface,
-        readBufSize: Int,
-        arguments: FdLooper.AttachArguments
-    ) {
-        self.init(
-            side: .link,
-            fd: linkFd,
-            readBufSize: readBufSize,
-            arguments: arguments,
-            prepare: {
-                try ioFd.resetEvents()
-            },
-            setEventMask: { read, write in
-                try ioFd.setEventMask(read: read, write: write)
-            },
-            read: { buf in
-                let count = try ioFd.read(&buf)
-                guard count > 0 else { return nil }
-                return Data(buf[0..<Int(count)])
-            },
-            write: { pending in
-                try ioFd.write(pending.data, offset: pending.offset)
-            },
-            cleanup: {
-                pp_mux_delete(mux, linkFd)
-                ioFd.cleanup()
-            }
-        )
-    }
-
-    convenience init(
-        mux: pp_mux,
-        tunFd: FileDescriptor,
-        ioFd: NativeIOInterface,
-        readBufSize: Int,
-        arguments: FdLooper.AttachArguments
-    ) {
-        self.init(
-            side: .tun,
-            fd: tunFd,
-            readBufSize: readBufSize,
-            arguments: arguments,
-            prepare: {
-                try ioFd.resetEvents()
-            },
-            setEventMask: { read, write in
-                try ioFd.setEventMask(read: read, write: write)
-            },
-            read: { buf in
-                let count = try ioFd.read(&buf)
-                guard count > 0 else { return nil }
-                return Data(buf[0..<Int(count)])
-            },
-            write: { pending in
-                try ioFd.write(pending.data, offset: pending.offset)
-            },
-            cleanup: {
-                pp_mux_delete(mux, tunFd)
-                ioFd.cleanup()
-            }
-        )
+private extension NativeIOInterface {
+    func write(_ pending: FdLooper.PendingWrite) throws -> Int {
+        try write(pending.data, offset: pending.offset)
     }
 }

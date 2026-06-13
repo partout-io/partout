@@ -27,13 +27,16 @@ public final class TunWrapper: NativeIOInterface, @unchecked Sendable {
     public func resetEvents() throws {
     }
 
-    public func read(_ buf: inout [UInt8]) throws -> Int {
+    public func read(_ buf: inout [UInt8]) throws -> Int? {
         let read = pp_tun_read(tun, &buf, buf.count)
         guard read != PPIOErrorWouldBlock else {
             throw NativeIOError.wouldBlock(.tun)
         }
         guard read >= 0 else {
             throw NativeIOError.libc(.tun, lastErrorCode)
+        }
+        guard read > 0 else {
+            return nil
         }
         return Int(read)
     }

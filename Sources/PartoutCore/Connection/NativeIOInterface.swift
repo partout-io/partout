@@ -6,7 +6,7 @@
 public protocol NativeIOInterface: Sendable {
     func setEventMask(read: Bool, write: Bool) throws
     func resetEvents() throws
-    func read(_ buf: inout [UInt8]) throws -> Int
+    func read(_ buf: inout [UInt8]) throws -> Int?
     func write(_ data: Data, offset: Int) throws -> Int
     func cleanup()
     var lastErrorCode: Int32 { get }
