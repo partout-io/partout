@@ -96,6 +96,12 @@ extension TunWrapper: TunInterface {
 import NetworkExtension
 
 extension NEPacketTunnelFlow {
+    public static var nativeFileDescriptor: FileDescriptor? {
+        let fd = pp_tun_network_extension_fd()
+        guard pp_fd_is_valid(fd) else { return nil }
+        return fd
+    }
+
     public static func forNativeIO(_ ctx: PartoutLoggerContext) throws -> NativeIOInterface {
         guard let tun = pp_tun_lookup() else {
             throw PartoutError(.tunNotAvailable)
