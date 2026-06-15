@@ -69,6 +69,22 @@ else()
     )
 endif()
 
+# Exclude legacy connections
+list(APPEND EXCLUDED_PATTERNS
+    [=[PartoutOpenVPN/OpenVPNConnection[+]Alias[.]swift$]=]
+    PartoutOpenVPN\/V2
+    [=[PartoutWireGuard/WireGuardConnection[+]Alias[.]swift$]=]
+    PartoutWireGuard\/V1
+)
+
+# Use Foundation on Apple, compatible otherwise
+if(NOT APPLE)
+    set(USE_COMPAT ON)
+    list(APPEND EXCLUDED_PATTERNS
+        PartoutOS\/Apple.*
+    )
+endif()
+
 # Partout_C ############################################
 
 # Base configuration
@@ -77,14 +93,14 @@ target_compile_options(partout_c PRIVATE
     -DUSE_CMAKE
 )
 
-# Account for exclusions in source files
+# Apply exclusions
 foreach(pattern ${EXCLUDED_PATTERNS})
     list(FILTER PARTOUT_C_SOURCES EXCLUDE REGEX ${pattern})
 endforeach()
 
 # Add computed files
 target_sources(partout_c PRIVATE ${PARTOUT_C_SOURCES})
-target_include_directories(partout_c PUBLIC ${PARTOUT_C_INCLUDE_DIRS})
+target_include_directories(partout_c PRIVATE ${PARTOUT_C_INCLUDE_DIRS})
 if(LINUX OR ANDROID)
     target_compile_options(partout_c PRIVATE -fPIC)
 endif()
@@ -97,19 +113,12 @@ if(PP_BUILD_STATIC)
 else()
     add_library(partout SHARED "")
 endif()
+add_library(Partout::partout ALIAS partout)
 
 # Define symbols to skip Swift imports and legacy code
 target_compile_options(partout PRIVATE
     -DUSE_CMAKE
 )
-
-# Use Foundation on Apple, compatible otherwise
-if(NOT APPLE)
-    set(USE_COMPAT ON)
-    list(APPEND EXCLUDED_PATTERNS
-        PartoutOS\/Apple.*
-    )
-endif()
 
 # Exclude Foundation if compatibility is on
 if(USE_COMPAT)
@@ -118,24 +127,32 @@ if(USE_COMPAT)
     )
 endif()
 
-# Exclude legacy connections
-list(APPEND EXCLUDED_PATTERNS
-    PartoutOpenVPN\/V1
-    PartoutWireGuard\/V1
-)
-
+# Apply exclusions
 foreach(pattern ${EXCLUDED_PATTERNS})
     list(FILTER PARTOUT_SOURCES EXCLUDE REGEX ${pattern})
 endforeach()
 
-# Look for modulemaps in C "include" dirs
+# Look up internal partout_c modulemaps while building
 foreach(dir ${PARTOUT_C_INCLUDE_DIRS})
-    target_include_directories(partout PUBLIC ${dir})
+    target_include_directories(partout PRIVATE ${dir})
 endforeach()
+
+# Look up public headers
+target_include_directories(partout PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Partout_C/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
 
 # Depend on C target (include before)
 add_dependencies(partout partout_c)
-target_sources(partout PRIVATE ${PARTOUT_SOURCES})
+target_sources(partout
+    PRIVATE ${PARTOUT_SOURCES}
+    PUBLIC
+        FILE_SET api_headers
+        TYPE HEADERS
+        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/Partout_C/include
+        FILES ${CMAKE_CURRENT_SOURCE_DIR}/Partout_C/include/partout.h
+)
 target_link_libraries(partout PRIVATE partout_c)
 
 # Apple still requires Swift 5 for NE
@@ -165,13 +182,57 @@ set_target_properties(partout_c PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
 )
 
+# Platform specifics
 if(WIN32)
     set_target_properties(partout_c PROPERTIES PREFIX "lib")
     set_target_properties(partout PROPERTIES PREFIX "lib")
-elseif(LINUX)
+else()
+    if(APPLE)
+        set(RPATH_ORIGIN "@loader_path")
+    else()
+        set(RPATH_ORIGIN "\$ORIGIN")
+    endif()
+    set(PARTOUT_RPATH "${RPATH_ORIGIN}")
+    if(PP_BUILD_USE_OPENSSL)
+        list(APPEND PARTOUT_RPATH "${RPATH_ORIGIN}/../openssl/lib")
+    endif()
+    if(PP_BUILD_USE_WIREGUARD)
+        list(APPEND PARTOUT_RPATH "${RPATH_ORIGIN}/../wg-go/lib")
+    endif()
     set_target_properties(partout PROPERTIES
-        BUILD_RPATH "\$ORIGIN"
-        INSTALL_RPATH "\$ORIGIN"
+        BUILD_WITH_INSTALL_RPATH ON
+        INSTALL_RPATH "${PARTOUT_RPATH}"
         SKIP_BUILD_RPATH OFF
+    )
+    unset(PARTOUT_RPATH)
+    unset(RPATH_ORIGIN)
+endif()
+
+# Strip after build
+if((LINUX OR ANDROID) AND NOT PP_BUILD_STATIC)
+    add_custom_command(TARGET partout POST_BUILD
+        COMMAND ${CMAKE_STRIP} $<TARGET_FILE:partout>
+        COMMENT "Stripping $<TARGET_FILE_NAME:partout>"
+    )
+endif()
+
+# Configure install
+install(TARGETS partout
+    EXPORT PartoutTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    FILE_SET api_headers DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/Partout_C/include/module.modulemap
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+# Include partout_c if building statically (cannot embed)
+if(PP_BUILD_STATIC)
+    install(TARGETS partout_c
+        EXPORT PartoutTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
 endif()
