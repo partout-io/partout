@@ -85,7 +85,39 @@ if(PP_BUILD_LIBRARY)
         target_link_libraries(partout_c PRIVATE "$<BUILD_LOCAL_INTERFACE:WireGuardGoInterface>")
     endif()
 
+    # Install
     set(PARTOUT_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/Partout")
+    if(PP_BUILD_USE_OPENSSL)
+        list(APPEND PARTOUT_VENDOR_BYPRODUCTS
+            "${OPENSSL_DIR}/${LIBSSL}"
+            "${OPENSSL_DIR}/${LIBCRYPTO}"
+        )
+        if(WIN32)
+            list(APPEND PARTOUT_VENDOR_BYPRODUCTS
+                "${OPENSSL_DIR}/${LIBSSL_IMP}"
+                "${OPENSSL_DIR}/${LIBCRYPTO_IMP}"
+            )
+        endif()
+    endif()
+    if(PP_BUILD_USE_MBEDTLS)
+        list(APPEND PARTOUT_VENDOR_BYPRODUCTS
+            "${MBEDTLS_DIR}/${LIBTLS}"
+            "${MBEDTLS_DIR}/${LIBX509}"
+            "${MBEDTLS_DIR}/${LIBCRYPTO}"
+        )
+    endif()
+    if(PP_BUILD_USE_WIREGUARD)
+        list(APPEND PARTOUT_VENDOR_BYPRODUCTS ${WGGO_BYPRODUCTS})
+    endif()
+    if(WIN32)
+        list(APPEND PARTOUT_VENDOR_BYPRODUCTS "${WINTUN_DIR}/wintun.dll")
+    endif()
+    foreach(vendor_byproduct ${PARTOUT_VENDOR_BYPRODUCTS})
+        file(RELATIVE_PATH vendor_byproduct_rel "${PP_BUILD_OUTPUT}" "${vendor_byproduct}")
+        get_filename_component(vendor_byproduct_dir "${vendor_byproduct_rel}" DIRECTORY)
+        install(FILES "${vendor_byproduct}" DESTINATION "${vendor_byproduct_dir}")
+    endforeach()
+    unset(PARTOUT_VENDOR_BYPRODUCTS)
     configure_package_config_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PartoutConfig.cmake.in"
         "${CMAKE_CURRENT_BINARY_DIR}/PartoutConfig.cmake"
