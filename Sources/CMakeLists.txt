@@ -138,6 +138,7 @@ foreach(dir ${PARTOUT_C_INCLUDE_DIRS})
 endforeach()
 
 # Look up public headers
+set(PARTOUT_C_API_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/Partout_C/include/partout.h")
 target_include_directories(partout PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Partout_C/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -145,13 +146,25 @@ target_include_directories(partout PUBLIC
 
 # Depend on C target (include before)
 add_dependencies(partout partout_c)
+
+# Make partout.h an explicit Swift input, so Ninja reinvokes swiftc when the C ABI changes.
+set(PARTOUT_C_HEADER_DEPENDENCY_SWIFT "${CMAKE_CURRENT_BINARY_DIR}/PartoutCHeaderDependency.swift")
+add_custom_command(
+    OUTPUT "${PARTOUT_C_HEADER_DEPENDENCY_SWIFT}"
+    COMMAND "${CMAKE_COMMAND}" -E touch "${PARTOUT_C_HEADER_DEPENDENCY_SWIFT}"
+    DEPENDS "${PARTOUT_C_API_HEADER}"
+    VERBATIM
+)
+set_source_files_properties("${PARTOUT_C_HEADER_DEPENDENCY_SWIFT}" PROPERTIES GENERATED TRUE)
 target_sources(partout
-    PRIVATE ${PARTOUT_SOURCES}
+    PRIVATE
+        ${PARTOUT_SOURCES}
+        "${PARTOUT_C_HEADER_DEPENDENCY_SWIFT}"
     PUBLIC
         FILE_SET api_headers
         TYPE HEADERS
         BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/Partout_C/include
-        FILES ${CMAKE_CURRENT_SOURCE_DIR}/Partout_C/include/partout.h
+        FILES "${PARTOUT_C_API_HEADER}"
 )
 target_link_libraries(partout PRIVATE partout_c)
 
