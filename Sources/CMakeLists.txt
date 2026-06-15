@@ -8,6 +8,7 @@ include("partout.cmake")
 # Header search paths from all C targets
 set(PARTOUT_C_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/MiniFoundation_C/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Partout_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCore_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuard_C/include
 )
