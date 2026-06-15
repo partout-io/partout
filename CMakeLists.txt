@@ -5,6 +5,8 @@ endif()
 project(Partout LANGUAGES Swift C CXX)
 include(ExternalProject)
 include(FetchContent)
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 # Command line options
 option(PP_BUILD_LIBRARY "Include main library" 0)
@@ -75,11 +77,27 @@ endif()
 if(PP_BUILD_LIBRARY)
     add_subdirectory(Sources)
     if(PP_BUILD_USE_OPENSSL)
-        target_link_libraries(partout_c PUBLIC OpenSSLInterface)
+        target_link_libraries(partout_c PRIVATE "$<BUILD_LOCAL_INTERFACE:OpenSSLInterface>")
     elseif(PP_BUILD_USE_MBEDTLS)
-        target_link_libraries(partout_c PUBLIC MbedTLSInterface)
+        target_link_libraries(partout_c PRIVATE "$<BUILD_LOCAL_INTERFACE:MbedTLSInterface>")
     endif()
     if(PP_BUILD_USE_WIREGUARD)
-        target_link_libraries(partout_c PUBLIC WireGuardGoInterface)
+        target_link_libraries(partout_c PRIVATE "$<BUILD_LOCAL_INTERFACE:WireGuardGoInterface>")
     endif()
+
+    set(PARTOUT_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/Partout")
+    configure_package_config_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PartoutConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/PartoutConfig.cmake"
+        INSTALL_DESTINATION "${PARTOUT_INSTALL_CMAKEDIR}"
+    )
+    install(EXPORT PartoutTargets
+        FILE PartoutTargets.cmake
+        NAMESPACE Partout::
+        DESTINATION "${PARTOUT_INSTALL_CMAKEDIR}"
+    )
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/PartoutConfig.cmake"
+        DESTINATION "${PARTOUT_INSTALL_CMAKEDIR}"
+    )
 endif()
