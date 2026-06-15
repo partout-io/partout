@@ -8,17 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "partout.h"
+#include "portable/common.h"
 
-static char *partout_strdup(const char *value) {
-#ifdef _WIN32
-    return _strdup(value);
-#else
-    return strdup(value);
-#endif
-}
-
-static FILE *partout_fopen_read(const char *path) {
+static FILE *pp_file_open_read(const char *path) {
 #ifdef _WIN32
     FILE *file = NULL;
     return (fopen_s(&file, path, "rb") == 0) ? file : NULL;
@@ -27,7 +19,7 @@ static FILE *partout_fopen_read(const char *path) {
 #endif
 }
 
-char *partout_readfile(const char *rel_path, const char *parent) {
+char *pp_file_read(const char *rel_path, const char *parent) {
     char *abs_path = NULL;
     FILE *file = NULL;
     char *buffer = NULL;
@@ -40,12 +32,12 @@ char *partout_readfile(const char *rel_path, const char *parent) {
         if (!abs_path) goto failure;
         snprintf(abs_path, path_len + 1, "%s/%s", parent, rel_path);
     } else {
-        abs_path = partout_strdup(rel_path);
+        abs_path = pp_dup(rel_path);
         if (!abs_path) goto failure;
     }
 
     /* Open file at absolute path. */
-    file = partout_fopen_read(abs_path);
+    file = pp_file_open_read(abs_path);
     if (!file) goto failure;
     free(abs_path);
     abs_path = NULL;

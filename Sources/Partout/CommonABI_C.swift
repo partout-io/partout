@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+internal import _PartoutCore_C
 import Partout_C
 
 #if canImport(Darwin)
@@ -99,4 +100,13 @@ extension ABI {
             completion.callback?(completion.ctx, code, payloadJSON)
         }
     }
+}
+
+@c(partout_readfile)
+public func __partout_readfile(
+    relPath: UnsafePointer<CChar>?,
+    parent: UnsafePointer<CChar>?
+) -> UnsafeMutablePointer<CChar>? {
+    guard let relPath else { return nil }
+    return pp_file_read(relPath, parent)
 }

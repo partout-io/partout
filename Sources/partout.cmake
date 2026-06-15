@@ -349,6 +349,7 @@ set(PARTOUT_C_SOURCES
 ./MiniFoundation_C/rx.cc
 ./MiniFoundation_C/std.c
 ./PartoutCore_C/common.c
+./PartoutCore_C/file.c
 ./PartoutCore_C/lib.c
 ./PartoutCore_C/mux.c
 ./PartoutCore_C/network.c
@@ -388,5 +389,4 @@ set(PARTOUT_C_SOURCES
 ./PartoutWireGuard_C/key.c
 ./PartoutWireGuard_C/logging.c
 ./PartoutWireGuard_C/x25519.c
-./Partout_C/partout.c
 )
