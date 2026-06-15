@@ -285,7 +285,6 @@ set(PARTOUT_SOURCES
 ./PartoutOpenVPN/KeyDecrypter.swift
 ./PartoutOpenVPN/OpenVPN+Extensions.swift
 ./PartoutOpenVPN/OpenVPN+Serialization.swift
-./PartoutOpenVPN/OpenVPNConnection+Alias.swift
 ./PartoutOpenVPN/OpenVPNConnectionOptions.swift
 ./PartoutOpenVPN/OpenVPNModule+Implementation.swift
 ./PartoutOpenVPN/OpenVPNOption.swift
@@ -341,7 +340,7 @@ set(PARTOUT_SOURCES
 ./PartoutWireGuard/V2/Internal/WireGuardAdapterError.swift
 ./PartoutWireGuard/V2/_WireGuardConnectionV2.swift
 ./PartoutWireGuard/WireGuard+Extensions.swift
-./PartoutWireGuard/WireGuardConnection+Alias.swift
+./PartoutWireGuard/WireGuardConnectionError.swift
 ./PartoutWireGuard/WireGuardKeyGenerator.swift
 ./PartoutWireGuard/WireGuardModule+Implementation.swift
 ./PartoutWireGuard/WireGuardParseError.swift

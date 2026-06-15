@@ -37,37 +37,12 @@ public final class DaemonABI {
         let profile = options.profile
         let ctx = PartoutLoggerContext(profile.id)
         let environment = SharedTunnelEnvironment(profileId: profile.id)
-        let registry = Registry(withKnown: true, allImplementations: [
-            OpenVPNModule.Implementation(
-                importerBlock: {
-                    StandardOpenVPNParser()
-                },
-                connectionBlock: { parameters, module in
-                    try _OpenVPNConnectionV3(
-                        ctx,
-                        parameters: parameters,
-                        module: module,
-                        cachesURL: options.cachesURL
-                    )
-                }
-            ),
-            WireGuardModule.Implementation(
-                keyGenerator: StandardWireGuardKeyGenerator(),
-                importerBlock: {
-                    StandardWireGuardParser()
-                },
-                validatorBlock: {
-                    StandardWireGuardParser()
-                },
-                connectionBlock: { parameters, module in
-                    try _WireGuardConnectionV2(
-                        ctx,
-                        parameters: parameters,
-                        module: module
-                    )
-                }
-            )
-        ])
+
+        // Compute known implementations
+        let registry = Registry(
+            withKnown: true,
+            allImplementations: Self.moduleImplementations(ctx, options: options)
+        )
 
         // Create platform-specific objects
         let betterPathFactory: BetterPathStreamFactory?
@@ -118,5 +93,51 @@ public final class DaemonABI {
 
     func stop() async {
         await daemon.stop()
+    }
+}
+
+private extension DaemonABI {
+    typealias OpenVPNConnection = _OpenVPNConnectionV3
+    typealias WireGuardConnection = _WireGuardConnectionV2
+
+    static func moduleImplementations(
+        _ ctx: PartoutLoggerContext,
+        options: Options
+    ) -> [ModuleImplementation] {
+        var list: [ModuleImplementation] = []
+#if PARTOUT_OPENVPN
+        list.append(OpenVPNModule.Implementation(
+            importerBlock: {
+                StandardOpenVPNParser()
+            },
+            connectionBlock: { parameters, module in
+                try OpenVPNConnection(
+                    ctx,
+                    parameters: parameters,
+                    module: module,
+                    cachesURL: options.cachesURL
+                )
+            }
+        ))
+#endif
+#if PARTOUT_WIREGUARD
+        list.append(WireGuardModule.Implementation(
+            keyGenerator: StandardWireGuardKeyGenerator(),
+            importerBlock: {
+                StandardWireGuardParser()
+            },
+            validatorBlock: {
+                StandardWireGuardParser()
+            },
+            connectionBlock: { parameters, module in
+                try WireGuardConnection(
+                    ctx,
+                    parameters: parameters,
+                    module: module
+                )
+            }
+        ))
+#endif
+        return list
     }
 }
