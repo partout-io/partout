@@ -97,7 +97,7 @@ Building for Android requires access to the Android NDK and the Swift Android SD
 - `SWIFT_ANDROID_API_LEVEL` sets the API level (e.g. 28).
 - `SWIFT_ANDROID_VERSION` defines the Swift version of the Swift Android SDK.
 
-Check out `scripts/build.sh` and the `toolchains/android.toolchain.cmake` toolchain file for more details. The build script runs on macOS and Linux.
+Check out `scripts/build.sh` and the `cmake/android.toolchain.cmake` toolchain file for more details. The build script runs on macOS and Linux.
 
 #### Codegen
 
@@ -183,7 +183,7 @@ Website: [partout.io][about-website]
 [openapi-generator]: https://openapi-generator.tech/
 
 [github-releases]: https://github.com/partout-io/partout/releases
-[github-toolchains]: https://github.com/partout-io/partout/tree/master/toolchains
+[github-toolchains]: https://github.com/partout-io/partout/tree/master/cmake
 [credits-genericjson]: https://github.com/iwill/generic-json-swift
 [credits-mbedtls]: https://github.com/Mbed-TLS/mbedtls
 [credits-openssl]: https://github.com/openssl/openssl
