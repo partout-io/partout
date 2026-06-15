@@ -180,6 +180,24 @@ target_compile_options(partout PRIVATE
 
 ################################################
 
+# Set vendor symbols
+if(PP_BUILD_USE_OPENVPN)
+    target_compile_options(partout_c PRIVATE
+        -DPARTOUT_OPENVPN
+    )
+    target_compile_options(partout PRIVATE
+        -DPARTOUT_OPENVPN
+    )
+endif()
+if(PP_BUILD_USE_WIREGUARD)
+    target_compile_options(partout_c PRIVATE
+        -DPARTOUT_WIREGUARD
+    )
+    target_compile_options(partout PRIVATE
+        -DPARTOUT_WIREGUARD
+    )
+endif()
+
 # Set overall output properties
 set_target_properties(partout PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${OUTPUT_DIR}
