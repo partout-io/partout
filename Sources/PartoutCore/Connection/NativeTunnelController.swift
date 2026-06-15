@@ -44,7 +44,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         self.betterPathFactory = betterPathFactory ?? BetterPathProxy()
         self.bufSize = bufSize
 
-        onReachableStream = CurrentValueStream(true)
+        onReachableStream = CurrentValueStream(false)
         reachabilityHolder = ReachabilityHolder()
 
         // Native resolver requires network handle on Android
