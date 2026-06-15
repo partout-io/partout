@@ -8,6 +8,7 @@ include(FetchContent)
 
 # Command line options
 option(PP_BUILD_LIBRARY "Include main library" 0)
+option(PP_BUILD_STATIC "Build as static library" 0)
 option(PP_BUILD_USE_OPENSSL "Use OpenSSL" 0)
 option(PP_BUILD_USE_MBEDTLS "Use MbedTLS" 0)
 option(PP_BUILD_USE_OPENVPN "Use OpenVPN" 0)
@@ -26,6 +27,7 @@ endif()
 # Options
 message(STATUS "Option CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 message(STATUS "Option PP_BUILD_LIBRARY = ${PP_BUILD_LIBRARY}")
+message(STATUS "Option PP_BUILD_STATIC = ${PP_BUILD_STATIC}")
 message(STATUS "Option PP_BUILD_USE_OPENSSL = ${PP_BUILD_USE_OPENSSL}")
 message(STATUS "Option PP_BUILD_USE_MBEDTLS = ${PP_BUILD_USE_MBEDTLS}")
 message(STATUS "Option PP_BUILD_USE_OPENVPN = ${PP_BUILD_USE_OPENVPN}")

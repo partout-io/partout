@@ -1,0 +1,63 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Davide De Rosa
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ */
+
+#ifndef __PARTOUT_H
+#define __PARTOUT_H
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+/* Common functions. */
+const char *partout_version(void);
+char *partout_readfile(const char *rel_path, const char *parent);
+
+/* Event callback. */
+typedef void (*partout_event_cb)(void *event_ctx, const char *event);
+
+/* Completion callback.
+ * - Success: code == 0, string = result
+ * - Error:   code != 0, string = error
+ * Both 'result' and 'error' are optional JSON payloads.
+ */
+typedef enum {
+    PartoutCompletionCodeOK         = 0,
+    PartoutCompletionCodeArgs       = -2,
+    PartoutCompletionCodeFailure    = -1
+} partout_completion_code;
+typedef void (*partout_completion_cb)(void *ctx, partout_completion_code code, const char *json);
+typedef struct {
+    partout_completion_cb callback;
+    void *ctx;
+} partout_completion;
+
+/* Macros for completion blocks. */
+static inline
+partout_completion PARTOUT_CB(partout_completion_cb callback, void *ctx) {
+    partout_completion completion = { callback, ctx };
+    return completion;
+}
+#define PARTOUT_CB_NOP() PARTOUT_CB(NULL, NULL)
+
+typedef struct __partout_daemon_bindings {
+    void *controller;
+    void (*free)(struct __partout_daemon_bindings *);
+} partout_daemon_bindings;
+
+/* Daemon initialization. */
+typedef struct {
+    const char *profile;
+    const char *cache_dir;
+    bool is_daemon;
+    uint64_t min_data_count_delta;
+    const partout_daemon_bindings *bindings;
+} partout_daemon_start_args;
+
+/* Daemon functions. */
+int partout_daemon_start(const partout_daemon_start_args *args);
+void partout_daemon_stop(partout_completion completion);
+
+#endif

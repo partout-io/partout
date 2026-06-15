@@ -31,6 +31,9 @@ set(PARTOUT_SOURCES
 ./MiniFoundation/Streams/CurrentValueStream.swift
 ./MiniFoundation/Streams/PassthroughStream.swift
 ./MiniFoundation/Streams/SubjectStream.swift
+./Partout/CommonABI_C.swift
+./Partout/DaemonABI.swift
+./Partout/DaemonABI_C.swift
 ./Partout/PartoutExports.swift
 ./PartoutCore/Connection/BetterPathStreamFactory.swift
 ./PartoutCore/Connection/Connection.swift
@@ -386,4 +389,5 @@ set(PARTOUT_C_SOURCES
 ./PartoutWireGuard_C/key.c
 ./PartoutWireGuard_C/logging.c
 ./PartoutWireGuard_C/x25519.c
+./Partout_C/partout.c
 )

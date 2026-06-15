@@ -8,6 +8,7 @@ include("partout.cmake")
 # Header search paths from all C targets
 set(PARTOUT_C_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/MiniFoundation_C/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Partout_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCore_C/include
     ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuard_C/include
 )
@@ -91,7 +92,11 @@ endif()
 # Partout_Swift ########################################
 
 # Partout library base configuration
-add_library(partout STATIC "")
+if(PP_BUILD_STATIC)
+    add_library(partout STATIC "")
+else()
+    add_library(partout SHARED "")
+endif()
 
 # Define symbols to skip Swift imports and legacy code
 target_compile_options(partout PRIVATE

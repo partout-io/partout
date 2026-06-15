@@ -18,3 +18,8 @@ public enum PartoutConstants {
         versionIdentifier.withCString(\.self)
     }
 }
+
+@c(partout_version)
+public func __partout_version() -> UnsafePointer<CChar> {
+    PartoutConstants.cVersionIdentifier
+}
