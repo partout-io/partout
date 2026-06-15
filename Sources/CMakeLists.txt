@@ -91,7 +91,11 @@ endif()
 # Partout_Swift ########################################
 
 # Partout library base configuration
-add_library(partout STATIC "")
+if(PP_BUILD_STATIC)
+    add_library(partout STATIC "")
+else()
+    add_library(partout SHARED "")
+endif()
 
 # Define symbols to skip Swift imports and legacy code
 target_compile_options(partout PRIVATE
