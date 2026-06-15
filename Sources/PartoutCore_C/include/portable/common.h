@@ -102,6 +102,8 @@ FILE *_Nullable pp_fopen(const char *filename, const char *mode) {
 #define pp_sscanf sscanf
 #endif
 
+char *pp_file_read(const char *rel_path, const char *parent);
+
 #pragma clang assume_nonnull end
 
 /* Syscalls. */
