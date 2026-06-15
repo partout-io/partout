@@ -7,6 +7,7 @@ include(ExternalProject)
 include(FetchContent)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+include("cmake/AddDistributionTarget.function.cmake")
 
 # Command line options
 option(PP_BUILD_LIBRARY "Include main library" 0)
