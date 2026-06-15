@@ -102,7 +102,8 @@ FILE *_Nullable pp_fopen(const char *filename, const char *mode) {
 #define pp_sscanf sscanf
 #endif
 
-char *pp_file_read(const char *rel_path, const char *parent);
+/* Read a whole file into a string. */
+char *pp_file_read(const char *rel_path, const char *_Nullable parent);
 
 #pragma clang assume_nonnull end
 
