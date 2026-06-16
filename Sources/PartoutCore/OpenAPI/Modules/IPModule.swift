@@ -4,7 +4,7 @@
 
 /// IP and routes.
 public struct IPModule: Module, BuildableType, Hashable, Codable {
-    public static let moduleType = ModuleType("IP")
+    public static let moduleType: ModuleType = .IP
 
     public let id: UniqueID
 

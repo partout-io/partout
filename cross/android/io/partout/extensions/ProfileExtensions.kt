@@ -4,7 +4,7 @@
 
 package io.partout.extensions
 
-import com.algoritmico.passepartout.models.ModuleType
+import io.partout.models.ModuleType
 import io.partout.models.OpenVPNCredentials
 import io.partout.models.OpenVPNCredentialsOTPMethod
 import io.partout.models.OpenVPNModule

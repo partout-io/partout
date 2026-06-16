@@ -18,7 +18,7 @@ public struct OnDemandModule: Module, BuildableType, Hashable, Codable {
         case ethernet
     }
 
-    public static let moduleType = ModuleType("OnDemand")
+    public static let moduleType: ModuleType = .OnDemand
 
     public let id: UniqueID
 

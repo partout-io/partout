@@ -3,15 +3,19 @@
 // SPDX-License-Identifier: GPL-3.0
 
 /// Raw type univocally associated to each ``Module`` implementation.
-public struct ModuleType: RawRepresentable, Identifiable, Hashable, Codable, Sendable {
-    public let rawValue: String
-
-    public init(rawValue: String) {
-        self.rawValue = rawValue
-    }
+public enum ModuleType: String, RawRepresentable, Identifiable, Hashable, Codable, Sendable {
+    case Custom
+    case DNS
+    case HTTPProxy
+    case IP
+    case OnDemand
+    case OpenVPN
+    case WireGuard
+    case Undefined
 
     public init(_ name: String) {
-        self.init(rawValue: name)
+        let value = ModuleType(rawValue: name)
+        self = value ?? .Undefined
     }
 
     public var id: String {
@@ -30,12 +34,12 @@ extension ModuleType {
         do {
             let container = try decoder.singleValueContainer()
             let name = try container.decode(String.self)
-            self.init(rawValue: name)
+            self.init(name)
         } catch {
             // legacy encoding
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let name = try container.decode(String.self, forKey: .name)
-            self.init(rawValue: name)
+            self.init(name)
         }
     }
 

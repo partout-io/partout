@@ -220,7 +220,25 @@ components:
     Int8:
       type: integer
     ModuleType:
+      enum:
+        - Custom
+        - DNS
+        - HTTPProxy
+        - IP
+        - OnDemand
+        - OpenVPN
+        - WireGuard
+        - Undefined
       type: string
+      x-enum-varnames:
+        - Custom
+        - DNS
+        - HTTPProxy
+        - IP
+        - OnDemand
+        - OpenVPN
+        - WireGuard
+        - Undefined
     OnDemandModule:
       additionalProperties: false
       properties:
