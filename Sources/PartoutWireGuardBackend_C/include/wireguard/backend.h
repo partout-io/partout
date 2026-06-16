@@ -10,10 +10,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-int pp_wg_init();
+int pp_wg_init(void);
 typedef void (*pp_wg_logger_fn)(void *context, int level, const char *msg);
 
-const char *pp_wg_version();
+const char *pp_wg_version(void);
 void pp_wg_set_logger(pp_wg_logger_fn logger_fn, void *context);
 #if PARTOUT_WINDOWS
 int pp_wg_turn_on(const char *settings, const char *ifname);

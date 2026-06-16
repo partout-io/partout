@@ -45,6 +45,7 @@ typedef enum {
 
 #define OpenVPNDataPacketV2Indicator       0x50
 #define OpenVPNDataPacketV2Uncompressed    0x00
+#define OpenVPNPacketKeyMask               0x07u
 
 // MARK: - Macros
 
@@ -67,7 +68,7 @@ void openvpn_packet_header_get(openvpn_packet_code *_Nullable dst_code,
         *dst_code = (openvpn_packet_code)(*src >> 3);
     }
     if (dst_key) {
-        *dst_key = *src & 0b111;
+        *dst_key = *src & OpenVPNPacketKeyMask;
     }
 }
 
@@ -76,7 +77,7 @@ size_t openvpn_packet_header_set(uint8_t *dst,
                                  openvpn_packet_code src_code,
                                  uint8_t src_key,
                                  const uint8_t *_Nullable src_session_id) {
-    *(uint8_t *)dst = (src_code << 3) | (src_key & 0b111);
+    *(uint8_t *)dst = (src_code << 3) | (src_key & OpenVPNPacketKeyMask);
     int offset = OpenVPNPacketOpcodeLength;
     if (src_session_id) {
         memcpy(dst + offset, src_session_id, OpenVPNPacketSessionIdLength);
@@ -89,7 +90,7 @@ static inline
 size_t openvpn_packet_header_v2_set(uint8_t *dst,
                                     uint8_t src_key,
                                     uint32_t src_peer_id) {
-    *(uint32_t *)dst = ((OpenVPNPacketCodeDataV2 << 3) | (src_key & 0b111)) | pp_endian_htonl(OPENVPN_PEER_ID_MASKED(src_peer_id));
+    *(uint32_t *)dst = ((OpenVPNPacketCodeDataV2 << 3) | (src_key & OpenVPNPacketKeyMask)) | pp_endian_htonl(OPENVPN_PEER_ID_MASKED(src_peer_id));
     return OpenVPNPacketOpcodeLength + OpenVPNPacketPeerIdLength;
 }
 

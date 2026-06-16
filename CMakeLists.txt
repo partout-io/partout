@@ -9,6 +9,13 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include("cmake/AddDistributionTarget.function.cmake")
 
+# Be quite strict
+set(CMAKE_C_FLAGS "
+    -W -Wall -Wextra -pedantic -Werror \
+    -Wno-nullability-extension"
+)
+set(CMAKE_CXX_FLAGS ${CMAKE_C_FLAGS})
+
 # Command line options
 option(PP_BUILD_LIBRARY "Include main library" 0)
 option(PP_BUILD_STATIC "Build as static library" 0)

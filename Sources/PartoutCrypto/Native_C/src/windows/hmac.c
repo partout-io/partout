@@ -6,7 +6,7 @@
 
 #include "crypto/hmac.h"
 
-pp_zd *pp_hmac_create() {
+pp_zd *pp_hmac_create(void) {
     // FIXME: #108, Implement with CNG
     return NULL;
 }

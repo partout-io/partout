@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutCore_C
+internal import _PartoutPortable_C
 
 /// A ``LoggerDestination`` that prints messages to the default platform logger.
 public struct SimpleLogDestination: LoggerDestination {

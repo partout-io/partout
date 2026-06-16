@@ -27,7 +27,7 @@ typedef struct {
 #define OpenVPNReplayWinSize                    (OpenVPNReplayHiddenWinSize - OpenVPNReplayRedundantBits)
 
 static inline
-openvpn_replay *openvpn_replay_create() {
+openvpn_replay *openvpn_replay_create(void) {
     openvpn_replay *rp = pp_alloc(sizeof(openvpn_replay));
     rp->highest_pid = 0;
     rp->bitmap =  pp_alloc(OpenVPNReplayBitmapLength * sizeof(uint32_t));

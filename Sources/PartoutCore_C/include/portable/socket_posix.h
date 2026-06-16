@@ -11,6 +11,7 @@
 #include <sys/select.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include "portable/socket.h"
 
 /* POSIX systems use int for both I/O and watching.  */
 struct __pp_socket_struct {

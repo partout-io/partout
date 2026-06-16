@@ -3,8 +3,12 @@
 // SPDX-License-Identifier: GPL-3.0
 
 extension Registry {
+#if PARTOUT_OPENVPN
     typealias OpenVPNConnection = _OpenVPNConnectionV3
+#endif
+#if PARTOUT_WIREGUARD
     typealias WireGuardConnection = _WireGuardConnectionV2
+#endif
 
     private static let noCacheURL = URL(filePath: "")
 

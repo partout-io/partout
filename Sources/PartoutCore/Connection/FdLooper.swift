@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutCore_C
+internal import _PartoutPortable_C
 
 /// Loops through a set of file descriptors.
 public final class FdLooper: @unchecked Sendable {

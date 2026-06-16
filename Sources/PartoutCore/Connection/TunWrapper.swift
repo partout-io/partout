@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutCore_C
+internal import _PartoutPortable_C
 
 final class TunWrapper: NativeIOInterface, @unchecked Sendable {
     private let ctx: PartoutLoggerContext
