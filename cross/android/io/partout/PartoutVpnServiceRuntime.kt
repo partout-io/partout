@@ -64,7 +64,7 @@ class PartoutVpnServiceRuntime(
     //region Lifecycle
     @Suppress("UNUSED_PARAMETER")
     fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.i(logTag, "PartoutVpnServiceRuntime.onStartCommand()")
+        Log.d(logTag, "PartoutVpnServiceRuntime.onStartCommand()")
         when (intent?.action) {
             ACTION_STOP_VPN -> {
                 disconnect(intent)
@@ -76,7 +76,7 @@ class PartoutVpnServiceRuntime(
     }
 
     fun onDestroy() {
-        Log.i(logTag, "PartoutVpnServiceRuntime.onDestroy()")
+        Log.d(logTag, "PartoutVpnServiceRuntime.onDestroy()")
         launchCommand {
             stopTunnel()
             close()
@@ -84,7 +84,7 @@ class PartoutVpnServiceRuntime(
     }
 
     fun onRevoke() {
-        Log.i(logTag, "PartoutVpnServiceRuntime.onRevoke()")
+        Log.d(logTag, "PartoutVpnServiceRuntime.onRevoke()")
         disconnect(null)
     }
     //endregion
@@ -211,7 +211,7 @@ class PartoutVpnServiceRuntime(
     }
 
     private fun close() {
-        Log.d(logTag, "Cancelling VPN runtime")
+        Log.d(logTag, "PartoutVpnServiceRuntime.close()")
         commandQueue.close()
         serviceScope.cancel()
     }
@@ -363,7 +363,7 @@ class PartoutVpnServiceRuntime(
         try {
             client.send(msg)
         } catch (e: Exception) {
-            Log.w(logTag, "Unable to reply with environment value", e)
+            Log.w(logTag, "Unable to reply with environment value of '$name'", e)
         }
     }
     //endregion
