@@ -49,6 +49,22 @@ extension CodingRegistry: ProfileCoder {
         }
         throw PartoutError(.decoding, errors.joined(separator: ", "))
     }
+
+    public func profileOrModule(fromString string: String, name: String?) throws -> Profile {
+        do {
+            return try profile(fromString: string)
+        } catch {
+            let module = try module(fromContents: string)
+            var builder = Profile.Builder(
+                modules: [module],
+                activatingModules: true
+            )
+            if let name {
+                builder.name = name
+            }
+            return try builder.build()
+        }
+    }
 }
 
 // MARK: Versions and fallback

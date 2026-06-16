@@ -25,7 +25,6 @@ public func __partout_daemon_start(
     guard let args = argsPointer?.pointee else {
         return PartoutCompletionCodeArgs
     }
-
     let options: ABIDaemon.Options
     nonisolated(unsafe) let bindings = args.bindings?.pointee
     do {
@@ -93,20 +92,7 @@ public func __partout_import_profile(
         let registry = Registry.forImport(.global)
         let coding = CodingRegistry(registry: registry, withLegacyEncoding: { false })
         do {
-            let profile: Profile
-            do {
-                profile = try coding.profile(fromString: text)
-            } catch {
-                let module = try coding.module(fromContents: text)
-                var builder = Profile.Builder(
-                    modules: [module],
-                    activatingModules: true
-                )
-                if let name {
-                    builder.name = name
-                }
-                profile = try builder.build()
-            }
+            let profile = try coding.profileOrModule(fromString: text, name: name)
             callback.succeed(profile.asTaggedProfile)
         } catch {
             callback.fail(error.localizedDescription)
