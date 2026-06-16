@@ -47,7 +47,9 @@ val TaggedModule.isInteractive: Boolean
     }
 
 val TaggedProfile.isInteractive: Boolean
-    get() = modules.any { it.isInteractive }
+    get() = modules.any {
+        activeModulesIds.contains(it.moduleId) && it.isInteractive
+    }
 
 val OpenVPNModule.isInteractive: Boolean
     get() {
