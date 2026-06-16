@@ -40,7 +40,7 @@ default:
 // The global settings for C targets
 let globalCSettings: [CSetting] = [
     .unsafeFlags([
-        "-Wall", "-Wextra", "-pedantic", "-Werror",
+        "-W", "-Wall", "-Wextra", "-pedantic", "-Werror",
         "-Wno-nullability-extension"
     ])
 ]
