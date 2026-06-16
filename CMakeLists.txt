@@ -9,6 +9,10 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include("cmake/AddDistributionTarget.function.cmake")
 
+# Be strict
+set(CMAKE_C_FLAGS "-Wall -W -pedantic")
+set(CMAKE_CXX_FLAGS "-Wall -W -pedantic")
+
 # Command line options
 option(PP_BUILD_LIBRARY "Include main library" 0)
 option(PP_BUILD_STATIC "Build as static library" 0)
