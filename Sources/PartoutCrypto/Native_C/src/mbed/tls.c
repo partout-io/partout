@@ -5,7 +5,7 @@
  */
 
 #include "portable/common.h"
-#include "tls/tls.h"
+#include "tls/tls_base.h"
 
 // FIXME: #108, Implement with mbedTLS
 

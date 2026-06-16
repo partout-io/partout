@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
-internal import _PartoutCore_C
+internal import _PartoutPortable_C
 internal import _PartoutWireGuardBackend_C
 
 /// A enum describing WireGuard log levels defined in `api-apple.go`.

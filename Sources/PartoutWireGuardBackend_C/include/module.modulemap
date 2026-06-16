@@ -1,4 +1,4 @@
 module _PartoutWireGuardBackend_C {
-    header "wireguard/wireguard.h"
+    header "wireguard/backend.h"
     export *
 }

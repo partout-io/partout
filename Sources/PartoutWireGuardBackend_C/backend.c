@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include "portable/lib.h"
 #include "wireguard/logging.h"
-#include "wireguard/wireguard.h"
+#include "wireguard/backend.h"
 
 /* The Apple library is statically linked as a Swift package, except
  * when built as monolith in CMake. The library is dynamic everywhere

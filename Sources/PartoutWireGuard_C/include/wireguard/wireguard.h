@@ -4,6 +4,6 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#pragma once
-
-#include "tls/tls_base.h"
+#include "wireguard/key.h"
+#include "wireguard/sys.h"
+#include "wireguard/x25519.h"
