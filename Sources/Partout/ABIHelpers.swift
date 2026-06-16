@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutCore_C
 import Partout_C
 
 #if canImport(Darwin)
@@ -68,45 +67,50 @@ enum ABI {
 
     static func run(
         _ completion: partout_completion,
-        block: @escaping @Sendable @PartoutABI (RunCallback) async -> Void
+        block: @escaping @Sendable @PartoutABI (partout_completion) async -> Void
     ) {
-        let completer = RunCallback(completion: completion)
-        Task { @PartoutABI in
-            await block(completer)
+        nonisolated(unsafe) let unsafeCompletion = completion
+        Task { @Sendable @PartoutABI in
+            await block(unsafeCompletion)
         }
     }
 }
 
-extension ABI {
-    struct RunCallback: @unchecked Sendable {
-        private let completion: partout_completion
+extension partout_completion {
+    func arguments(name: String) {
+        complete(PartoutCompletionCodeArgs, name)
+    }
 
-        fileprivate init(completion: partout_completion) {
-            self.completion = completion
-        }
+    func succeed() {
+        complete(PartoutCompletionCodeOK)
+    }
 
-        func complete(_ code: partout_completion_code) {
-            completion.callback?(completion.ctx, code, nil)
-        }
+    func succeed<T>(_ payload: T) where T: Encodable {
+        complete(PartoutCompletionCodeOK, payload)
+    }
 
-        func complete<T>(_ code: partout_completion_code, payload: T) where T: Encodable {
-            let payloadJSON: String?
-            do {
-                payloadJSON = try JSONEncoder.shared().encodeJSON(payload)
-            } catch {
-                pp_log_g(.abi, .error, "Unable to encode returned payload: \(error)")
-                payloadJSON = nil
-            }
-            completion.callback?(completion.ctx, code, payloadJSON)
-        }
+    func fail() {
+        complete(PartoutCompletionCodeFailure)
+    }
+
+    func fail(_ payload: String?) {
+        complete(PartoutCompletionCodeFailure, payload)
     }
 }
 
-@c(partout_readfile)
-public func __partout_readfile(
-    relPath: UnsafePointer<CChar>?,
-    parent: UnsafePointer<CChar>?
-) -> UnsafeMutablePointer<CChar>? {
-    guard let relPath else { return nil }
-    return pp_file_read(relPath, parent)
+private extension partout_completion {
+    func complete(_ code: partout_completion_code) {
+        callback?(ctx, code, nil)
+    }
+
+    func complete<T>(_ code: partout_completion_code, _ payload: T) where T: Encodable {
+        let payloadJSON: String?
+        do {
+            payloadJSON = try JSONEncoder.shared().encodeJSON(payload)
+        } catch {
+            pp_log_g(.abi, .error, "Unable to encode returned payload: \(error)")
+            payloadJSON = nil
+        }
+        callback?(ctx, code, payloadJSON)
+    }
 }

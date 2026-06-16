@@ -11,6 +11,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+/* Library initializiation, call it ASAP. */
+void partout_init();
+
 /* Common functions. */
 const char *partout_version(void);
 char *partout_readfile(const char *rel_path, const char *parent);
@@ -40,7 +43,9 @@ partout_completion PARTOUT_CB(partout_completion_cb callback, void *ctx) {
     partout_completion completion = { callback, ctx };
     return completion;
 }
-#define PARTOUT_CB_NOP() PARTOUT_CB(NULL, NULL)
+
+/* Import profiles. */
+void partout_import_profile(const char *text, const char *name, partout_completion completion);
 
 typedef struct __partout_daemon_bindings {
     void *controller;
