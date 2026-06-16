@@ -13,7 +13,7 @@
 
 #pragma clang assume_nonnull begin
 
-static
+static inline
 void openvpn_dp_framing_assemble_disabled(openvpn_dp_framing_assemble_ctx *ctx) {
     memcpy(ctx->dst, ctx->src, ctx->src_len);
     if (ctx->mss_val) {
@@ -22,7 +22,7 @@ void openvpn_dp_framing_assemble_disabled(openvpn_dp_framing_assemble_ctx *ctx) 
     *ctx->dst_len_offset = 0;
 }
 
-static
+static inline
 bool openvpn_dp_framing_parse_disabled(openvpn_dp_framing_parse_ctx *ctx) {
     *ctx->dst_payload_offset = 0;
     *ctx->dst_header = 0x00;
@@ -32,7 +32,7 @@ bool openvpn_dp_framing_parse_disabled(openvpn_dp_framing_parse_ctx *ctx) {
 
 // MARK: -
 
-static
+static inline
 bool openvpn_dp_framing_parse_v1(openvpn_dp_framing_parse_ctx *ctx) {
     *ctx->dst_header = ctx->dst_payload[0];
     *ctx->dst_payload_offset = 0;
@@ -60,7 +60,7 @@ bool openvpn_dp_framing_parse_v1(openvpn_dp_framing_parse_ctx *ctx) {
     return true;
 }
 
-static
+static inline
 bool openvpn_dp_framing_parse_v2(openvpn_dp_framing_parse_ctx *ctx) {
     *ctx->dst_header = ctx->dst_payload[0];
     *ctx->dst_payload_offset = 0;
@@ -85,7 +85,7 @@ bool openvpn_dp_framing_parse_v2(openvpn_dp_framing_parse_ctx *ctx) {
     return true;
 }
 
-static
+static inline
 void openvpn_dp_framing_assemble_lzo(openvpn_dp_framing_assemble_ctx *ctx) {
     ctx->dst[0] = OpenVPNDataPacketNoCompress;
     *ctx->dst_len_offset = 1;
@@ -95,12 +95,12 @@ void openvpn_dp_framing_assemble_lzo(openvpn_dp_framing_assemble_ctx *ctx) {
     }
 }
 
-static
+static inline
 bool openvpn_dp_framing_parse_lzo(openvpn_dp_framing_parse_ctx *ctx) {
     return openvpn_dp_framing_parse_v1(ctx);
 }
 
-static
+static inline
 void openvpn_dp_framing_assemble_compress(openvpn_dp_framing_assemble_ctx *ctx) {
     *ctx->dst_len_offset = 1;
     memcpy(ctx->dst, ctx->src, ctx->src_len);
@@ -112,12 +112,12 @@ void openvpn_dp_framing_assemble_compress(openvpn_dp_framing_assemble_ctx *ctx) 
     ctx->dst[0] = OpenVPNDataPacketNoCompressSwap;
 }
 
-static
+static inline
 bool openvpn_dp_framing_parse_compress(openvpn_dp_framing_parse_ctx *ctx) {
     return openvpn_dp_framing_parse_v1(ctx);
 }
 
-static
+static inline
 void openvpn_dp_framing_assemble_compress_v2(openvpn_dp_framing_assemble_ctx *ctx) {
     // assume no compression (v2 algorithms unsupported)
 
@@ -136,7 +136,7 @@ void openvpn_dp_framing_assemble_compress_v2(openvpn_dp_framing_assemble_ctx *ct
     }
 }
 
-static
+static inline
 bool openvpn_dp_framing_parse_compress_v2(openvpn_dp_framing_parse_ctx *ctx) {
     return openvpn_dp_framing_parse_v2(ctx);
 }
