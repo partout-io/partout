@@ -12,7 +12,7 @@
 #include <stdlib.h>
 
 /* Library initializiation, call it ASAP. */
-void partout_init(void);
+void partout_init(const char *tag);
 
 /* Common functions. */
 const char *partout_version(void);

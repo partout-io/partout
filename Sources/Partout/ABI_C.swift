@@ -11,8 +11,11 @@ nonisolated(unsafe)
 private var globalDaemon: ABIDaemon?
 
 @c(partout_init)
-public func __partout_init() {
-    ABI.registerDefaultLogger()
+public func __partout_init(
+    cTag: UnsafePointer<CChar>?
+) {
+    let tag = cTag.map { String(cString: $0) }
+    ABI.registerDefaultLogger(tag: tag)
 }
 
 @c(partout_daemon_start)
