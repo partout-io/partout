@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutCore_C
+internal import _PartoutPortable_C
 
 /// A ``TunnelController`` that interacts with a tun interface through the native platform.
 public final class NativeTunnelController: TunnelController, Sendable {
@@ -13,13 +13,13 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     private let environment: TunnelEnvironmentReader
 
-    private let maxReadLength: Int
+    private let betterPathFactory: BetterPathStreamFactory
+
+    private let bufSize: Int
 
     private let onReachableStream: CurrentValueStream<Bool>
 
     private let reachabilityHolder: ReachabilityHolder
-
-    private let betterPathProxy: BetterPathProxy
 
     private let dns: DNSResolver
 
@@ -27,7 +27,8 @@ public final class NativeTunnelController: TunnelController, Sendable {
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
         environment: TunnelEnvironmentReader,
-        maxReadLength: Int = 128 * 1024
+        betterPathFactory: BetterPathStreamFactory? = nil,
+        bufSize: Int = 1 * 1024 * 1024 // 1MB
     ) throws {
         self.ctx = ctx
 #if os(Android)
@@ -40,10 +41,11 @@ public final class NativeTunnelController: TunnelController, Sendable {
         self.ref = ref
 #endif
         self.environment = environment
-        self.maxReadLength = maxReadLength
+        self.betterPathFactory = betterPathFactory ?? BetterPathProxy()
+        self.bufSize = bufSize
+
         onReachableStream = CurrentValueStream(false)
         reachabilityHolder = ReachabilityHolder()
-        betterPathProxy = BetterPathProxy()
 
         // Native resolver requires network handle on Android
         dns = SimpleDNSResolver {
@@ -104,13 +106,23 @@ public final class NativeTunnelController: TunnelController, Sendable {
     }
 
     public func configureSockets(with descriptors: [SocketDescriptor]) throws {
+        try configureSockets(
+            with: descriptors,
+            reachability: currentReachability?.toCReachability
+        )
+    }
+
+    private func configureSockets(
+        with descriptors: [SocketDescriptor],
+        reachability: pp_reachability?
+    ) throws {
         let result = descriptors
             .withUnsafeBufferPointer { fds in
                 guard let fdsBase = fds.baseAddress else {
                     return false
                 }
-                if let info = reachabilityInfo?.toCReachability {
-                    return withUnsafePointer(to: info) { infoPtr in
+                if let reachability {
+                    return withUnsafePointer(to: reachability) { infoPtr in
                         pp_tun_ctrl_configure_sockets(ref, infoPtr, fdsBase, fds.count)
                     }
                 } else {
@@ -159,29 +171,40 @@ public final class NativeTunnelController: TunnelController, Sendable {
     }
 }
 
-// MARK: - DNS
+// MARK: - NetworkInterfaceFactory
 
-extension NativeTunnelController: DNSResolver {
-    public var reachabilityInfo: ReachabilityInfo? {
-        reachabilityHolder.get()
-    }
-
-    public func resolve(
-        _ hostname: String,
-        flags: Set<DNSResolverFlag>,
-        reachability: ReachabilityInfo?,
-        timeout: Int
-    ) async throws -> [DNSRecord] {
-        try await dns.resolve(
-            hostname,
-            flags: flags,
-            reachability: reachability ?? reachabilityInfo,
-            timeout: timeout
+extension NativeTunnelController {
+    public func newSocketFactory() -> NativeSocketFactory {
+        NativeSocketFactory(
+            ctx,
+            currentReachabilityBlock: { [weak self] in
+                self?.currentReachability
+            },
+            betterPathFactory: betterPathFactory,
+            configureSocket: { [weak self] fd, reachability in
+                guard let self else {
+                    let msg = "Configuring sockets, but NativeTunnelController was released"
+                    pp_log(.global, .core, .error, msg)
+                    assertionFailure(msg)
+                    return false
+                }
+                do {
+                    try configureSockets(
+                        with: [fd],
+                        reachability: reachability?.toCReachability
+                    )
+                    return true
+                } catch {
+                    pp_log(ctx, .core, .fault, "Unable to configure sockets: \(error)")
+                    return false
+                }
+            },
+            bufSize: bufSize
         )
     }
 }
 
-// MARK: - Streams
+// MARK: - Reachability
 
 extension NativeTunnelController: ReachabilityObserver {
     public func startObserving() {
@@ -190,16 +213,16 @@ extension NativeTunnelController: ReachabilityObserver {
     public func stopObserving() {
     }
 
+    public var currentReachability: ReachabilityInfo? {
+        reachabilityHolder.get()
+    }
+
     public var isReachable: Bool {
         onReachableStream.value
     }
 
     public var isReachableStream: AsyncStream<Bool> {
         onReachableStream.subscribe()
-    }
-
-    public var betterPathFactory: BetterPathStreamFactory {
-        betterPathProxy
     }
 }
 
@@ -216,6 +239,10 @@ private extension NativeTunnelController {
     }
 
     func onBetterPath() {
+        guard let betterPathProxy = betterPathFactory as? BetterPathProxy else {
+            assertionFailure("A custom betterPathFactory was already set. We shouldn't be delegating .onBetterPath() events from C.")
+            return
+        }
         betterPathProxy.onBetterPath()
     }
 }
@@ -270,23 +297,20 @@ private final class BetterPathProxy: BetterPathStreamFactory, @unchecked Sendabl
     }
 }
 
-// MARK: - SocketConfigurator
+// MARK: - DNS
 
-extension NativeTunnelController {
-    public func socketConfigurator() -> SocketConfigurator {
-        SocketConfigurator(
-            reachability: { [weak self] in
-                self?.reachabilityInfo
-            },
-            configureSocket: { [weak self] fd in
-                do {
-                    try self?.configureSockets(with: [fd])
-                    return true
-                } catch {
-                    pp_log(self?.ctx ?? .global, .core, .fault, "Unable to configure sockets: \(error)")
-                    return false
-                }
-            }
+extension NativeTunnelController: DNSResolver {
+    public func resolve(
+        _ hostname: String,
+        flags: Set<DNSResolverFlag>,
+        reachability: ReachabilityInfo?,
+        timeout: Int
+    ) async throws -> [DNSRecord] {
+        try await dns.resolve(
+            hostname,
+            flags: flags,
+            reachability: reachability ?? currentReachability,
+            timeout: timeout
         )
     }
 }
@@ -300,21 +324,6 @@ private extension UnsafeMutableRawPointer {
 
     var toSelf: NativeTunnelController {
         Unmanaged.fromOpaque(self).takeUnretainedValue()
-    }
-}
-
-private extension ReachabilityInfo {
-    var toCReachability: pp_reachability {
-#if os(Android)
-        pp_reachability(
-            reachable: isReachable,
-            network_handle: networkHandle ?? 0
-        )
-#else
-        pp_reachability(
-            reachable: isReachable
-        )
-#endif
     }
 }
 

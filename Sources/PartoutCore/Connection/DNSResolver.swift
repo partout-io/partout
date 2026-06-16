@@ -40,7 +40,7 @@ public protocol DNSResolver: AnyObject, Sendable {
 }
 
 extension DNSResolver {
-    public func resolve(_ hostname: String, flags: Set<DNSResolverFlag> = [], timeout: Int) async throws -> [DNSRecord] {
-        try await resolve(hostname, flags: flags, reachability: nil, timeout: timeout)
+    public func resolve(_ hostname: String, flags: Set<DNSResolverFlag> = [], reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
+        try await resolve(hostname, flags: flags, reachability: reachability, timeout: timeout)
     }
 }

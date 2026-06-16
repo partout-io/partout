@@ -5,9 +5,20 @@ endif()
 project(Partout LANGUAGES Swift C CXX)
 include(ExternalProject)
 include(FetchContent)
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+include("cmake/AddDistributionTarget.function.cmake")
+
+# Be quite strict
+set(CMAKE_C_FLAGS "
+    -W -Wall -Wextra -pedantic -Werror \
+    -Wno-nullability-extension"
+)
+set(CMAKE_CXX_FLAGS ${CMAKE_C_FLAGS})
 
 # Command line options
 option(PP_BUILD_LIBRARY "Include main library" 0)
+option(PP_BUILD_STATIC "Build as static library" 0)
 option(PP_BUILD_USE_OPENSSL "Use OpenSSL" 0)
 option(PP_BUILD_USE_MBEDTLS "Use MbedTLS" 0)
 option(PP_BUILD_USE_OPENVPN "Use OpenVPN" 0)
@@ -26,6 +37,7 @@ endif()
 # Options
 message(STATUS "Option CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 message(STATUS "Option PP_BUILD_LIBRARY = ${PP_BUILD_LIBRARY}")
+message(STATUS "Option PP_BUILD_STATIC = ${PP_BUILD_STATIC}")
 message(STATUS "Option PP_BUILD_USE_OPENSSL = ${PP_BUILD_USE_OPENSSL}")
 message(STATUS "Option PP_BUILD_USE_MBEDTLS = ${PP_BUILD_USE_MBEDTLS}")
 message(STATUS "Option PP_BUILD_USE_OPENVPN = ${PP_BUILD_USE_OPENVPN}")
@@ -73,11 +85,59 @@ endif()
 if(PP_BUILD_LIBRARY)
     add_subdirectory(Sources)
     if(PP_BUILD_USE_OPENSSL)
-        target_link_libraries(partout_c PUBLIC OpenSSLInterface)
+        target_link_libraries(partout_c PRIVATE "$<BUILD_LOCAL_INTERFACE:OpenSSLInterface>")
     elseif(PP_BUILD_USE_MBEDTLS)
-        target_link_libraries(partout_c PUBLIC MbedTLSInterface)
+        target_link_libraries(partout_c PRIVATE "$<BUILD_LOCAL_INTERFACE:MbedTLSInterface>")
     endif()
     if(PP_BUILD_USE_WIREGUARD)
-        target_link_libraries(partout_c PUBLIC WireGuardGoInterface)
+        target_link_libraries(partout_c PRIVATE "$<BUILD_LOCAL_INTERFACE:WireGuardGoInterface>")
     endif()
+
+    # Install
+    set(PARTOUT_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/Partout")
+    if(PP_BUILD_USE_OPENSSL)
+        list(APPEND PARTOUT_VENDOR_BYPRODUCTS
+            "${OPENSSL_DIR}/${LIBSSL}"
+            "${OPENSSL_DIR}/${LIBCRYPTO}"
+        )
+        if(WIN32)
+            list(APPEND PARTOUT_VENDOR_BYPRODUCTS
+                "${OPENSSL_DIR}/${LIBSSL_IMP}"
+                "${OPENSSL_DIR}/${LIBCRYPTO_IMP}"
+            )
+        endif()
+    endif()
+    if(PP_BUILD_USE_MBEDTLS)
+        list(APPEND PARTOUT_VENDOR_BYPRODUCTS
+            "${MBEDTLS_DIR}/${LIBTLS}"
+            "${MBEDTLS_DIR}/${LIBX509}"
+            "${MBEDTLS_DIR}/${LIBCRYPTO}"
+        )
+    endif()
+    if(PP_BUILD_USE_WIREGUARD)
+        list(APPEND PARTOUT_VENDOR_BYPRODUCTS ${WGGO_BYPRODUCTS})
+    endif()
+    if(WIN32)
+        list(APPEND PARTOUT_VENDOR_BYPRODUCTS "${WINTUN_DIR}/wintun.dll")
+    endif()
+    foreach(vendor_byproduct ${PARTOUT_VENDOR_BYPRODUCTS})
+        file(RELATIVE_PATH vendor_byproduct_rel "${PP_BUILD_OUTPUT}" "${vendor_byproduct}")
+        get_filename_component(vendor_byproduct_dir "${vendor_byproduct_rel}" DIRECTORY)
+        install(FILES "${vendor_byproduct}" DESTINATION "${vendor_byproduct_dir}")
+    endforeach()
+    unset(PARTOUT_VENDOR_BYPRODUCTS)
+    configure_package_config_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/PartoutConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/PartoutConfig.cmake"
+        INSTALL_DESTINATION "${PARTOUT_INSTALL_CMAKEDIR}"
+    )
+    install(EXPORT PartoutTargets
+        FILE PartoutTargets.cmake
+        NAMESPACE Partout::
+        DESTINATION "${PARTOUT_INSTALL_CMAKEDIR}"
+    )
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/PartoutConfig.cmake"
+        DESTINATION "${PARTOUT_INSTALL_CMAKEDIR}"
+    )
 endif()

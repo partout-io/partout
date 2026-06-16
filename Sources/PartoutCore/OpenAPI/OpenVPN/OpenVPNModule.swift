@@ -4,7 +4,7 @@
 
 /// A connection module providing an OpenVPN connection.
 public struct OpenVPNModule: Module, BuildableType, Hashable, Codable {
-    public static let moduleType = ModuleType("OpenVPN")
+    public static let moduleType: ModuleType = .OpenVPN
 
     public let id: UniqueID
 

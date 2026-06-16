@@ -6,7 +6,7 @@ extension OpenVPN {
 
     /// A set of credentials for authentication.
     public struct Credentials: Hashable, Sendable {
-        public enum OTPMethod: Hashable, Codable, Sendable {
+        public enum OTPMethod: String, Hashable, Codable, Sendable {
             case none
 
             case append

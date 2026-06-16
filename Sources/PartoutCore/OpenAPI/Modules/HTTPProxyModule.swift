@@ -4,7 +4,7 @@
 
 /// HTTP proxy settings.
 public struct HTTPProxyModule: Module, BuildableType, Hashable, Codable {
-    public static let moduleType = ModuleType("HTTPProxy")
+    public static let moduleType: ModuleType = .HTTPProxy
 
     public let id: UniqueID
 

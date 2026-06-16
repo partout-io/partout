@@ -4,7 +4,7 @@
 
 /// A connection module providing a WireGuard connection.
 public struct WireGuardModule: Module, BuildableType, Hashable, Codable {
-    public static let moduleType = ModuleType("WireGuard")
+    public static let moduleType: ModuleType = .WireGuard
 
     public let id: UniqueID
 

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "crypto.h"
+#include "crypto_base.h"
 
 #pragma clang assume_nonnull begin
 

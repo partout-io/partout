@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-internal import _PartoutCore_C
 import NetworkExtension
 
 /// A tunnel interface based on `NEPacketTunnelFlow`.
@@ -19,19 +18,17 @@ public final class NETunnelInterface: TunInterface {
 
     // MARK: TunInterface
 
+    public var muxDescriptor: FileDescriptor? {
+        NEPacketTunnelFlow.nativeFileDescriptor
+    }
+
     public var nativeIO: NativeIOInterface? {
         do {
-            return try TunWrapper.forNetworkExtension(ctx)
+            return try NEPacketTunnelFlow.forNativeIO(ctx)
         } catch {
             pp_log(ctx, .os, .fault, "Unable to create or look up tun I/O interface: \(error)")
             return nil
         }
-    }
-
-    public var muxDescriptor: FileDescriptor? {
-        let fd = pp_tun_network_extension_fd()
-        guard pp_fd_is_valid(fd) else { return nil }
-        return fd
     }
 
     public func readPackets() async throws -> [Data] {

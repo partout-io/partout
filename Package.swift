@@ -40,7 +40,8 @@ default:
 // The global settings for C targets
 let globalCSettings: [CSetting] = [
     .unsafeFlags([
-        "-Wall", "-Wextra"//, "-pedantic", "-Werror"
+        "-W", "-Wall", "-Wextra", "-pedantic", "-Werror",
+        "-Wno-nullability-extension"
     ])
 ]
 
@@ -56,6 +57,10 @@ let package = Package(
             name: "partout",
             type: libraryType,
             targets: ["Partout"]
+        ),
+        .library(
+            name: "Partout_C",
+            targets: ["Partout_C"]
         )
     ],
     targets: [
@@ -64,6 +69,7 @@ let package = Package(
             dependencies: {
                 // These are always included
                 var list: [Target.Dependency] = [
+                    "Partout_C",
                     "PartoutCore",
                     "PartoutOS"
                 ]
@@ -81,6 +87,35 @@ let package = Package(
             swiftSettings: areas.compactMap(\.define).map {
                 .define($0)
             } + useFoundationCompatibility.swiftSettings
+        ),
+        .target(
+            name: "Partout_C",
+            dependencies: {
+                var list: [Target.Dependency] = [
+                    "PartoutCore_C"
+                ]
+                if cryptoMode != nil {
+                    list.append("_PartoutCryptoImpl_C")
+                    if areas.contains(.openVPN) {
+                        list.append("PartoutOpenVPN_C")
+                    }
+                }
+                if areas.contains(.wireGuard) {
+                    list.append("PartoutWireGuard_C")
+                    list.append("PartoutWireGuardBackend_C")
+                }
+                return list
+            }(),
+            cSettings: globalCSettings + {
+                var list: [CSetting] = []
+                if areas.contains(.openVPN), cryptoMode != nil {
+                    list.append(.define("PARTOUT_OPENVPN"))
+                }
+                if areas.contains(.wireGuard) {
+                    list.append(.define("PARTOUT_WIREGUARD"))
+                }
+                return list
+            }()
         )
     ]
 )

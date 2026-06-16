@@ -72,7 +72,7 @@ bool mock_verify(void *vctx, const uint8_t *in, size_t in_len, pp_crypto_error_c
 
 // MARK: -
 
-pp_crypto_ctx openvpn_crypto_mock_create() {
+pp_crypto_ctx openvpn_crypto_mock_create(void) {
     OPENVPN_DP_LOG("openvpn_crypto_mock_create");
     openvpn_crypto_mock *ctx = pp_alloc(sizeof(openvpn_crypto_mock));
     ctx->crypto.encrypter.encrypt = mock_encrypt;

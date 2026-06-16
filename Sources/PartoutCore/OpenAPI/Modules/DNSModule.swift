@@ -17,7 +17,7 @@ public struct DNSModule: Module, BuildableType, Hashable, Codable {
         case matchAndSearch
     }
 
-    public static let moduleType = ModuleType("DNS")
+    public static let moduleType: ModuleType = .DNS
 
     public let id: UniqueID
 

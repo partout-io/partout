@@ -78,10 +78,9 @@ pp_socket pp_socket_open(const char *ip_addr,
                          uint16_t port,
                          bool blocking,
                          int timeout_ms,
-                         const pp_reachability *info,
-                         bool (*configure)(void *ctx, pp_socket_fd fd),
+                         const pp_reachability *reachability,
+                         pp_socket_configure configure,
                          void *configure_ctx) {
-    (void)info;
     int socktype = 0;
     struct addrinfo hints, *resolved = NULL;
     char port_str[16] = { 0 };
@@ -109,7 +108,7 @@ pp_socket pp_socket_open(const char *ip_addr,
             local_print_error("socket()");
             goto failure;
         }
-        if (configure && !configure(configure_ctx, new_fd)) {
+        if (configure && !configure(configure_ctx, new_fd, reachability)) {
             local_print_error("configure()");
             goto failure;
         }
@@ -147,12 +146,13 @@ pp_socket pp_socket_open(const char *ip_addr,
     snprintf(port_str, sizeof(port_str), "%u", port);
     int ret;
 #if PARTOUT_ANDROID
-    if (!info || info->network_handle <= 0) {
+    if (!reachability || reachability->network_handle <= 0) {
         local_print_error("android_getaddrinfofornetwork(): missing network handle");
         goto failure;
     }
-    ret = android_getaddrinfofornetwork(info->network_handle, ip_addr, port_str, &hints, &resolved);
+    ret = android_getaddrinfofornetwork(reachability->network_handle, ip_addr, port_str, &hints, &resolved);
 #else
+    (void)reachability;
     ret = getaddrinfo(ip_addr, port_str, &hints, &resolved);
 #endif
     if (ret != 0) {
@@ -167,7 +167,7 @@ pp_socket pp_socket_open(const char *ip_addr,
             local_print_error("socket()");
             continue;
         }
-        if (configure && !configure(configure_ctx, new_fd)) {
+        if (configure && !configure(configure_ctx, new_fd, reachability)) {
             local_print_error("configure()");
             goto failure;
         }

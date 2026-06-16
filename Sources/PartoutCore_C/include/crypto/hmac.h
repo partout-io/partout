@@ -21,7 +21,7 @@ typedef struct {
     size_t data_len;
 } pp_hmac_ctx;
 
-pp_zd *pp_hmac_create();
+pp_zd *pp_hmac_create(void);
 size_t pp_hmac_do(pp_hmac_ctx *ctx);
 
 #pragma clang assume_nonnull end

@@ -5,7 +5,7 @@
  */
 
 #include "portable/common.h"
-#include "tls/tls.h"
+#include "tls/tls_base.h"
 
 pp_tls_options *pp_tls_options_create(int sec_level,
                                       size_t buf_len,

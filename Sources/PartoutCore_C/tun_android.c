@@ -194,20 +194,19 @@ bool pp_tun_ctrl_configure_sockets(void *jni_ref, const pp_reachability *info,
 
     PP_JNI_ATTACH_OR_RETURN(env, false);
 
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    jintArray j_fds = NULL;
     bool success = false;
 
     if (info && info->network_handle > 0) {
-        for (int i = 0; i < fds_len; ++i) {
+        for (size_t i = 0; i < fds_len; ++i) {
             if (android_setsocknetwork(info->network_handle, fds[i]) != 0) {
                 pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_android: ctrl_configure_sockets(), android_setsocknetwork(%d)", fds[i]);
                 goto cleanup;
             }
         }
     }
-
-    jclass cls = NULL;
-    jmethodID method = NULL;
-    jintArray j_fds = NULL;
 
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
@@ -353,6 +352,7 @@ Java_io_partout_vpn_JNITunnelController_onNativeReachabilityUpdate(JNIEnv *env,
                                                                    jobject thiz,
                                                                    jlong delegate,
                                                                    jlong net_handle) {
+    (void)env;
     (void)thiz;
     pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
     if (!ctrl_delegate || !ctrl_delegate->ctx) return;
@@ -367,6 +367,7 @@ JNIEXPORT void JNICALL
 Java_io_partout_vpn_JNITunnelController_onNativeBetterPathUpdate(JNIEnv *env,
                                                                  jobject thiz,
                                                                  jlong delegate) {
+    (void)env;
     (void)thiz;
     pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
     if (!ctrl_delegate || !ctrl_delegate->ctx) return;

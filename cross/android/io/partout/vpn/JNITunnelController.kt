@@ -23,28 +23,46 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
-// Must match signatures in tun_android.c
-interface TunnelController {
-    // Runtime
-    fun startObserving()
-    fun stopObserving()
+/*
+Three layers are involved in this:
+- PartoutVpnServiceRuntime.kt
+- JNITunnelController.kt
+- NativeTunnelController.swift (+ tun_android.c)
 
-    // JNI -> Jotlin
+Where:
+- PartoutVpnServiceRuntime owns JNITunnelController and forwards its JNI ref to Engine.start()
+- The engine sets up the Swift/C NativeTunnelController with the JNI ref
+- On setup, NativeTunnelController sets itself (via C) as the JNITunnelController delegate
+- When needed, NativeTunnelController calls JNITunnelController methods via JNI
+- When needed, JNITunnelController calls NativeTunnelController methods via the JNI delegate
+ */
+
+// Swift/C -> Kotlin: ProGuard rules MUST MATCH!
+interface NativeTunnelControllerJNI {
     fun setDelegate(delegate: Long): Long
     fun setTunnel(infoJSON: String): Int
     fun configureSockets(fds: IntArray)
     fun onSnapshot(snapshotJSON: String)
     fun clearTunnel(killSwitch: Boolean)
     fun cancelTunnel(errorCode: String?)
+}
 
-    // Kotlin -> JNI
+// Kotlin -> JNI -> C
+interface NativeTunnelController {
     fun onReachabilityUpdate(info: NetworkInfo)
     fun getEnvironmentValue(key: String): String?
 }
 
+// Called by the runtime
+interface TunnelController: NativeTunnelController, NativeTunnelControllerJNI {
+    fun startObserving()
+    fun stopObserving()
+}
+
+// Delegated to the runtime
 interface TunnelControllerDelegate {
-    fun sendSnapshot(snapshot: TunnelSnapshot)
-    fun disconnect(controller: JNITunnelController)
+    fun onSnapshot(snapshot: TunnelSnapshot)
+    fun shouldDisconnect(controller: JNITunnelController)
 }
 
 class JNITunnelController(
@@ -200,7 +218,7 @@ class JNITunnelController(
         if (isNativeCancelled) { return }
         Log.d(logTag, "onSnapshot(${snapshotJSON})")
         val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
-        delegate.sendSnapshot(snapshot)
+        delegate.onSnapshot(snapshot)
         return@synchronized
     }
 
@@ -258,8 +276,8 @@ class JNITunnelController(
             Log.i(logTag, "VPN daemon cancelled")
         }
 
-        // Signal disconnection to delegate (runtime)
-        delegate.disconnect(this)
+        // Request disconnection from delegate (runtime)
+        delegate.shouldDisconnect(this)
         return@synchronized
     }
 
@@ -280,6 +298,7 @@ class JNITunnelController(
         return getNativeEnvironmentValue(nativeDelegate, key)
     }
 
+    // Signatures in tun_android.c MUST MATCH!
     private external fun onNativeReachabilityUpdate(delegate: Long, networkHandle: Long)
     private external fun onNativeBetterPathUpdate(delegate: Long)
     private external fun getNativeEnvironmentValue(delegate: Long, key: String): String?

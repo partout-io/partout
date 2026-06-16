@@ -7,7 +7,7 @@ public enum PartoutConstants {
     public static let identifier = "io.partout"
 
     /// The library version.
-    public static let version = "0.131.0"
+    public static let version = "0.140.0"
 
     /// The computed version identifier.
     public static let versionIdentifier: String = "\(identifier) \(version)"
@@ -17,4 +17,9 @@ public enum PartoutConstants {
         // This is safe because the subject is statically allocated.
         versionIdentifier.withCString(\.self)
     }
+}
+
+@c(partout_version)
+public func __partout_version() -> UnsafePointer<CChar> {
+    PartoutConstants.cVersionIdentifier
 }

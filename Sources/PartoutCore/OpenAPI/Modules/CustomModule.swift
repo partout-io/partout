@@ -4,7 +4,7 @@
 
 /// A type-erased ``Module`` for encoding external implementations.
 public struct CustomModule: Module, Hashable, Codable {
-    public static let moduleType = ModuleType("Custom")
+    public static let moduleType: ModuleType = .Custom
 
     public let innerType: ModuleType
 

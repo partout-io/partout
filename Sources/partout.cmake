@@ -31,7 +31,11 @@ set(PARTOUT_SOURCES
 ./MiniFoundation/Streams/CurrentValueStream.swift
 ./MiniFoundation/Streams/PassthroughStream.swift
 ./MiniFoundation/Streams/SubjectStream.swift
+./Partout/ABIDaemon.swift
+./Partout/ABIHelpers.swift
+./Partout/ABI_C.swift
 ./Partout/PartoutExports.swift
+./Partout/Registry+ABI.swift
 ./PartoutCore/Connection/BetterPathStreamFactory.swift
 ./PartoutCore/Connection/Connection.swift
 ./PartoutCore/Connection/ConnectionDaemon.swift
@@ -55,9 +59,10 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/ReachabilityInfo.swift
 ./PartoutCore/Connection/ReachabilityObserver.swift
 ./PartoutCore/Connection/SharedTunnelEnvironment.swift
+./PartoutCore/Connection/Side.swift
 ./PartoutCore/Connection/SimpleConnectionDaemon.swift
 ./PartoutCore/Connection/SimpleDNSResolver.swift
-./PartoutCore/Connection/SocketConfigurator.swift
+./PartoutCore/Connection/SocketWrapper.swift
 ./PartoutCore/Connection/StaticTunnelEnvironment.swift
 ./PartoutCore/Connection/TunInterface.swift
 ./PartoutCore/Connection/TunWrapper.swift
@@ -117,7 +122,6 @@ set(PARTOUT_SOURCES
 ./PartoutCore/OpenAPI/Core/TunnelRemoteInfoWrapper.swift
 ./PartoutCore/OpenAPI/Core/TunnelSnapshot.swift
 ./PartoutCore/OpenAPI/Core/TunnelStatus.swift
-./PartoutCore/OpenAPI/ModuleType+Extensions.swift
 ./PartoutCore/OpenAPI/Modules/CustomModule.swift
 ./PartoutCore/OpenAPI/Modules/DNSModule.swift
 ./PartoutCore/OpenAPI/Modules/DNSProtocol.swift
@@ -279,7 +283,6 @@ set(PARTOUT_SOURCES
 ./PartoutOpenVPN/KeyDecrypter.swift
 ./PartoutOpenVPN/OpenVPN+Extensions.swift
 ./PartoutOpenVPN/OpenVPN+Serialization.swift
-./PartoutOpenVPN/OpenVPNConnection+Alias.swift
 ./PartoutOpenVPN/OpenVPNConnectionOptions.swift
 ./PartoutOpenVPN/OpenVPNModule+Implementation.swift
 ./PartoutOpenVPN/OpenVPNOption.swift
@@ -316,7 +319,7 @@ set(PARTOUT_SOURCES
 ./PartoutWireGuard/V2/Internal/WireGuardAdapterError.swift
 ./PartoutWireGuard/V2/_WireGuardConnectionV2.swift
 ./PartoutWireGuard/WireGuard+Extensions.swift
-./PartoutWireGuard/WireGuardConnection+Alias.swift
+./PartoutWireGuard/WireGuardConnectionError.swift
 ./PartoutWireGuard/WireGuardKeyGenerator.swift
 ./PartoutWireGuard/WireGuardModule+Implementation.swift
 ./PartoutWireGuard/WireGuardParseError.swift
@@ -325,6 +328,7 @@ set(PARTOUT_C_SOURCES
 ./MiniFoundation_C/rx.cc
 ./MiniFoundation_C/std.c
 ./PartoutCore_C/common.c
+./PartoutCore_C/file.c
 ./PartoutCore_C/lib.c
 ./PartoutCore_C/mux.c
 ./PartoutCore_C/network.c
@@ -360,8 +364,9 @@ set(PARTOUT_C_SOURCES
 ./PartoutOpenVPN_C/mss_fix.c
 ./PartoutOpenVPN_C/pkt_proc.c
 ./PartoutOpenVPN_C/test/crypto_mock.c
-./PartoutWireGuardBackend_C/wireguard.c
+./PartoutWireGuardBackend_C/backend.c
 ./PartoutWireGuard_C/key.c
 ./PartoutWireGuard_C/logging.c
 ./PartoutWireGuard_C/x25519.c
+./Partout_C/partout.c
 )

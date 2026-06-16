@@ -33,10 +33,13 @@ Given the main app and the daemon:
 - ``ConnectionStatus``
 - ``DataCount``
 - ``EndpointResolver``
-- ``FdLooper``
 - ``NativeSocketFactory``
 - ``NetworkInterfaceFactory``
-- ``SocketConfigurator``
+
+### Event loop
+
+- ``FdLooper``
+- ``Side``
 
 ### DNS resolution
 
@@ -53,6 +56,7 @@ Given the main app and the daemon:
 - ``IOInterface``
 - ``LinkInterface``
 - ``LinkObserver``
+- ``NativeIOError``
 - ``NativeIOInterface``
 - ``TunInterface``
 
@@ -61,4 +65,3 @@ Given the main app and the daemon:
 - ``NativeTunnelController``
 - ``TunnelController``
 - ``TunnelRemoteInfo``
-- ``TunWrapper``

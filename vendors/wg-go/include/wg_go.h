@@ -25,4 +25,4 @@ extern char *wgGetConfig(int handle);
 extern void wgBumpSockets(int handle);
 extern void wgBumpSocketsAndWait(int handle);
 extern void wgDisableSomeRoamingForBrokenMobileSemantics(int handle);
-extern const char *wgVersion();
+extern const char *wgVersion(void);

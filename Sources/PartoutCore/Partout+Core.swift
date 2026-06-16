@@ -7,6 +7,7 @@
 #endif
 
 extension LoggerCategory {
+    public static let abi = Self(rawValue: "abi")
     public static let core = Self(rawValue: "core")
 }
 

@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include "portable/prng.h"
 
-uint32_t pp_prng_rand() {
+uint32_t pp_prng_rand(void) {
 #if PARTOUT_WINDOWS
     return rand();
 #else

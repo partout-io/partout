@@ -38,17 +38,32 @@ extension CodingRegistry: ProfileCoder {
             DecoderPair(version: 3, decoder: rawProfileV3),
             DecoderPair(version: 2, decoder: rawProfileLegacyV2)
         ]
-        var lastError: Error?
+        var errors: [String] = []
         for pair in decoders {
             do {
                 let parsed = try pair.decoder(string)
                 return postDecodeBlock?(parsed) ?? parsed
             } catch {
-//                print("Unable to parse profile V\(pair.version): \(error)")
-                lastError = error
+                errors.append("V\(pair.version): \(error)")
             }
         }
-        throw lastError ?? PartoutError(.decoding)
+        throw PartoutError(.decoding, errors.joined(separator: ", "))
+    }
+
+    public func profileOrModule(fromString string: String, name: String?) throws -> Profile {
+        do {
+            return try profile(fromString: string)
+        } catch {
+            let module = try module(fromContents: string)
+            var builder = Profile.Builder(
+                modules: [module],
+                activatingModules: true
+            )
+            if let name {
+                builder.name = name
+            }
+            return try builder.build()
+        }
     }
 }
 
