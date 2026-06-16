@@ -5,7 +5,7 @@
 import Partout_C
 
 @PartoutABI
-public final class DaemonABI {
+public final class ABIDaemon {
     public struct Options: Sendable {
         let profile: Profile
         let cachesURL: URL
@@ -29,7 +29,6 @@ public final class DaemonABI {
     private let daemon: SimpleConnectionDaemon
     private nonisolated(unsafe) let bindings: partout_daemon_bindings?
 
-    // TODO: #218, cachesURL must be per-profile
     public init(
         options: Options,
         bindings: partout_daemon_bindings?
@@ -39,10 +38,8 @@ public final class DaemonABI {
         let environment = SharedTunnelEnvironment(profileId: profile.id)
 
         // Compute known implementations
-        let registry = Registry(
-            withKnown: true,
-            allImplementations: Self.moduleImplementations(ctx, options: options)
-        )
+        // TODO: #218, cachesURL must be per-profile
+        let registry = Registry.forDaemon(ctx, cachesURL: options.cachesURL)
 
         // Create platform-specific objects
         let betterPathFactory: BetterPathStreamFactory?
@@ -93,51 +90,5 @@ public final class DaemonABI {
 
     func stop() async {
         await daemon.stop()
-    }
-}
-
-private extension DaemonABI {
-    typealias OpenVPNConnection = _OpenVPNConnectionV3
-    typealias WireGuardConnection = _WireGuardConnectionV2
-
-    static func moduleImplementations(
-        _ ctx: PartoutLoggerContext,
-        options: Options
-    ) -> [ModuleImplementation] {
-        var list: [ModuleImplementation] = []
-#if PARTOUT_OPENVPN
-        list.append(OpenVPNModule.Implementation(
-            importerBlock: {
-                StandardOpenVPNParser()
-            },
-            connectionBlock: { parameters, module in
-                try OpenVPNConnection(
-                    ctx,
-                    parameters: parameters,
-                    module: module,
-                    cachesURL: options.cachesURL
-                )
-            }
-        ))
-#endif
-#if PARTOUT_WIREGUARD
-        list.append(WireGuardModule.Implementation(
-            keyGenerator: StandardWireGuardKeyGenerator(),
-            importerBlock: {
-                StandardWireGuardParser()
-            },
-            validatorBlock: {
-                StandardWireGuardParser()
-            },
-            connectionBlock: { parameters, module in
-                try WireGuardConnection(
-                    ctx,
-                    parameters: parameters,
-                    module: module
-                )
-            }
-        ))
-#endif
-        return list
     }
 }

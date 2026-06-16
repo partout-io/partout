@@ -31,10 +31,11 @@ set(PARTOUT_SOURCES
 ./MiniFoundation/Streams/CurrentValueStream.swift
 ./MiniFoundation/Streams/PassthroughStream.swift
 ./MiniFoundation/Streams/SubjectStream.swift
-./Partout/CommonABI_C.swift
-./Partout/DaemonABI.swift
-./Partout/DaemonABI_C.swift
+./Partout/ABIDaemon.swift
+./Partout/ABIHelpers.swift
+./Partout/ABI_C.swift
 ./Partout/PartoutExports.swift
+./Partout/Registry+ABI.swift
 ./PartoutCore/Connection/BetterPathStreamFactory.swift
 ./PartoutCore/Connection/Connection.swift
 ./PartoutCore/Connection/ConnectionDaemon.swift
@@ -121,7 +122,6 @@ set(PARTOUT_SOURCES
 ./PartoutCore/OpenAPI/Core/TunnelRemoteInfoWrapper.swift
 ./PartoutCore/OpenAPI/Core/TunnelSnapshot.swift
 ./PartoutCore/OpenAPI/Core/TunnelStatus.swift
-./PartoutCore/OpenAPI/ModuleType+Extensions.swift
 ./PartoutCore/OpenAPI/Modules/CustomModule.swift
 ./PartoutCore/OpenAPI/Modules/DNSModule.swift
 ./PartoutCore/OpenAPI/Modules/DNSProtocol.swift

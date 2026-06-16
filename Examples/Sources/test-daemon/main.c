@@ -7,6 +7,7 @@
 #include "partout.h"
 
 int main(int argc, const char *argv[]) {
+    partout_init();
     puts(partout_version());
     if (argc < 2) {
         fprintf(stderr, "Missing profile");

@@ -2,10 +2,18 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+internal import _PartoutCore_C
 import Partout_C
 
+// MARK: Daemon
+
 nonisolated(unsafe)
-private var globalDaemon: DaemonABI?
+private var globalDaemon: ABIDaemon?
+
+@c(partout_init)
+public func __partout_init() {
+    ABI.registerDefaultLogger()
+}
 
 @c(partout_daemon_start)
 public func __partout_daemon_start(
@@ -17,19 +25,17 @@ public func __partout_daemon_start(
     guard let args = argsPointer?.pointee else {
         return PartoutCompletionCodeArgs
     }
-    ABI.registerDefaultLogger()
-
-    let options: DaemonABI.Options
+    let options: ABIDaemon.Options
     nonisolated(unsafe) let bindings = args.bindings?.pointee
     do {
-        options = try DaemonABI.Options(args)
+        options = try ABIDaemon.Options(args)
     } catch {
         pp_log_g(.abi, .fault, "Unable to decode args: \(error)")
         return PartoutCompletionCodeArgs
     }
     let result = ABI.runBlocking {
         do {
-            globalDaemon = try DaemonABI(options: options, bindings: bindings)
+            globalDaemon = try ABIDaemon(options: options, bindings: bindings)
             try await globalDaemon?.start()
             return PartoutCompletionCodeOK
         } catch {
@@ -54,7 +60,7 @@ public func __partout_daemon_stop(completion: partout_completion) {
     ABI.run(completion) { callback in
         await globalDaemon?.stop()
         globalDaemon = nil
-        callback.complete(PartoutCompletionCodeOK)
+        callback.succeed()
     }
 }
 
@@ -66,4 +72,39 @@ private func lockProcess() {
     let semaphore = DispatchSemaphore(value: 0)
     semaphore.wait()
 #endif
+}
+
+// MARK: - Stateless
+
+@c(partout_import_profile)
+public func __partout_import_profile(
+    cText: UnsafePointer<CChar>?,
+    cName: UnsafePointer<CChar>?,
+    completion: partout_completion
+) {
+    guard let cText else {
+        completion.arguments(name: "text")
+        return
+    }
+    let text = String(cString: cText)
+    let name = cName.map { String(cString: $0) }
+    ABI.run(completion) { callback in
+        let registry = Registry.forImport(.global)
+        let coding = CodingRegistry(registry: registry, withLegacyEncoding: { false })
+        do {
+            let profile = try coding.profileOrModule(fromString: text, name: name)
+            callback.succeed(profile.asTaggedProfile)
+        } catch {
+            callback.fail(error.localizedDescription)
+        }
+    }
+}
+
+@c(partout_readfile)
+public func __partout_readfile(
+    cRelativePath: UnsafePointer<CChar>?,
+    cParent: UnsafePointer<CChar>?
+) -> UnsafeMutablePointer<CChar>? {
+    guard let cRelativePath else { return nil }
+    return pp_file_read(cRelativePath, cParent)
 }
