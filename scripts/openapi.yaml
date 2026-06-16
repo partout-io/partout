@@ -227,6 +227,7 @@ components:
         - IP
         - OnDemand
         - OpenVPN
+        - Provider
         - WireGuard
         - Undefined
       type: string
@@ -237,6 +238,7 @@ components:
         - IP
         - OnDemand
         - OpenVPN
+        - Provider
         - WireGuard
         - Undefined
     OnDemandModule:

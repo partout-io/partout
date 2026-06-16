@@ -10,6 +10,7 @@ public enum ModuleType: String, RawRepresentable, Identifiable, Hashable, Codabl
     case IP
     case OnDemand
     case OpenVPN
+    case Provider
     case WireGuard
     case Undefined
 
