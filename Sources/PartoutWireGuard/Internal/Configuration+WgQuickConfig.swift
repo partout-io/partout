@@ -45,7 +45,7 @@ extension WireGuard.Configuration {
                     } else {
                         attributes[key] = value
                     }
-                    let interfaceSectionKeys: Set<String> = ["privatekey", "listenport", "address", "dns", "dnsoverhttpsurl", "dnsovertlsservername", "mtu"]
+                    let interfaceSectionKeys: Set<String> = ["privatekey", "listenport", "address", "dns", "dnsoverhttpsurl", "dnsovertlsservername", "mtu", "jc", "jmin", "jmax", "s1", "s2", "s3", "s4", "h1", "h2", "h3", "h4", "i1", "i2", "i3", "i4", "i5"]
                     let peerSectionKeys: Set<String> = ["publickey", "presharedkey", "allowedips", "endpoint", "persistentkeepalive"]
                     if parserState == .inInterfaceSection {
                         guard interfaceSectionKeys.contains(key) else {
@@ -117,6 +117,24 @@ extension WireGuard.Configuration {
         if let mtu = interface.mtu {
             output.append("MTU = \(mtu)\n")
         }
+        if let awg = interface.amneziaParameters {
+            if let jc = awg.jc { output.append("Jc = \(jc)\n") }
+            if let jmin = awg.jmin { output.append("Jmin = \(jmin)\n") }
+            if let jmax = awg.jmax { output.append("Jmax = \(jmax)\n") }
+            if let s1 = awg.s1 { output.append("S1 = \(s1)\n") }
+            if let s2 = awg.s2 { output.append("S2 = \(s2)\n") }
+            if let s3 = awg.s3 { output.append("S3 = \(s3)\n") }
+            if let s4 = awg.s4 { output.append("S4 = \(s4)\n") }
+            if let h1 = awg.h1 { output.append("H1 = \(h1)\n") }
+            if let h2 = awg.h2 { output.append("H2 = \(h2)\n") }
+            if let h3 = awg.h3 { output.append("H3 = \(h3)\n") }
+            if let h4 = awg.h4 { output.append("H4 = \(h4)\n") }
+            if let i1 = awg.i1 { output.append("I1 = \(i1)\n") }
+            if let i2 = awg.i2 { output.append("I2 = \(i2)\n") }
+            if let i3 = awg.i3 { output.append("I3 = \(i3)\n") }
+            if let i4 = awg.i4 { output.append("I4 = \(i4)\n") }
+            if let i5 = awg.i5 { output.append("I5 = \(i5)\n") }
+        }
 
         for peer in peers {
             output.append("\n[Peer]\n")
@@ -186,6 +204,29 @@ extension WireGuard.Configuration {
             }
             interface.mtu = mtu
         }
+
+        let awgKeys = ["jc", "jmin", "jmax", "s1", "s2", "s3", "s4", "h1", "h2", "h3", "h4", "i1", "i2", "i3", "i4", "i5"]
+        if awgKeys.contains(where: { attributes[$0] != nil }) {
+            var awg = WireGuard.AmneziaParameters.Builder()
+            awg.jc = attributes["jc"].flatMap { UInt16($0) }
+            awg.jmin = attributes["jmin"].flatMap { UInt16($0) }
+            awg.jmax = attributes["jmax"].flatMap { UInt16($0) }
+            awg.s1 = attributes["s1"].flatMap { UInt16($0) }
+            awg.s2 = attributes["s2"].flatMap { UInt16($0) }
+            awg.s3 = attributes["s3"].flatMap { UInt16($0) }
+            awg.s4 = attributes["s4"].flatMap { UInt16($0) }
+            awg.h1 = attributes["h1"]
+            awg.h2 = attributes["h2"]
+            awg.h3 = attributes["h3"]
+            awg.h4 = attributes["h4"]
+            awg.i1 = attributes["i1"]
+            awg.i2 = attributes["i2"]
+            awg.i3 = attributes["i3"]
+            awg.i4 = attributes["i4"]
+            awg.i5 = attributes["i5"]
+            interface.amneziaParameters = awg
+        }
+
         return try interface.build()
     }
 

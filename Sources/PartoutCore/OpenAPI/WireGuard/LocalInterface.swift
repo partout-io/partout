@@ -19,11 +19,14 @@ extension WireGuard {
         /// The optional MTU.
         public let mtu: UInt16?
 
-        public init(privateKey: Key, addresses: [Subnet], dns: DNSModule?, mtu: UInt16?) {
+        public let amneziaParameters: AmneziaParameters?
+
+        public init(privateKey: Key, addresses: [Subnet], dns: DNSModule?, mtu: UInt16?, amneziaParameters: AmneziaParameters? = nil) {
             self.privateKey = privateKey
             self.addresses = addresses
             self.dns = dns
             self.mtu = mtu
+            self.amneziaParameters = amneziaParameters
         }
 
         public func builder() -> Builder {
@@ -31,6 +34,7 @@ extension WireGuard {
             copy.addresses = addresses.map(\.rawValue)
             copy.dns = dns?.builder()
             copy.mtu = mtu
+            copy.amneziaParameters = amneziaParameters?.builder()
             return copy
         }
     }
@@ -45,6 +49,8 @@ extension WireGuard.LocalInterface {
         public var dns: DNSModule.Builder?
 
         public var mtu: UInt16?
+
+        public var amneziaParameters: WireGuard.AmneziaParameters.Builder?
 
         public init(privateKey: String) {
             self.privateKey = privateKey
@@ -66,7 +72,8 @@ extension WireGuard.LocalInterface {
                 privateKey: validPrivateKey,
                 addresses: validAddresses,
                 dns: try dns?.build(),
-                mtu: mtu
+                mtu: mtu,
+                amneziaParameters: try amneziaParameters?.build()
             )
         }
     }

@@ -6,8 +6,8 @@
 package main
 
 import (
+	"github.com/amnezia-vpn/amneziawg-go/tun"
 	"os"
-	"golang.zx2c4.com/wireguard/tun"
 )
 
 func wgCreateTun(tunFd int) (tun.Device, error) {
