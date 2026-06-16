@@ -50,11 +50,11 @@ class PartoutVpnServiceRuntime(
     init {
         serviceScope.launch {
             for (action in commandQueue) {
-                try {
+                runCatching {
                     action()
-                } catch (e: Exception) {
-                    e.throwIfCancellation()
-                    Log.e(logTag, "Unhandled VPN command failure", e)
+                }.onFailure {
+                    it.throwIfCancellation()
+                    Log.e(logTag, "Unhandled VPN command failure", it)
                     stopService()
                 }
             }
@@ -91,19 +91,19 @@ class PartoutVpnServiceRuntime(
 
     //region Actions (Service)
     private fun connect(intent: Intent?) = launchCommand {
-        val profileJSON = try {
+        val profileJSON = runCatching {
             loadOrPersistProfile(intent)
-        } catch (e: Exception) {
-            e.throwIfCancellation()
-            Log.e(logTag, "Unable to load profile JSON", e)
+        }.getOrElse {
+            it.throwIfCancellation()
+            Log.e(logTag, "Unable to load profile JSON", it)
             stopService()
             return@launchCommand
         }
-        val profileId = try {
+        val profileId = runCatching {
             decodeProfileId(profileJSON)
-        } catch (e: Exception) {
-            e.throwIfCancellation()
-            Log.e(logTag, "Unable to decode profile JSON", e)
+        }.getOrElse {
+            it.throwIfCancellation()
+            Log.e(logTag, "Unable to decode profile JSON", it)
             stopService()
             return@launchCommand
         }
@@ -117,20 +117,20 @@ class PartoutVpnServiceRuntime(
         isRunning = true
         activeProfileId = profileId
         Log.i(logTag, "Starting VPN daemon")
-        try {
+        runCatching {
             val newController = JNITunnelController(jniLogTag, service, serviceScope, this)
             engine.start(intent, newController, profileJSON)
             // Does not throw from now
             Log.i(logTag, "Started VPN daemon")
             controller = newController
             newController.startObserving()
-        } catch (e: Exception) {
+        }.onFailure {
             snapshotEmitter.emitInactive(profileId)
             controller = null
             isRunning = false
             activeProfileId = null
-            e.throwIfCancellation()
-            Log.e(logTag, "Unable to start VPN daemon", e)
+            it.throwIfCancellation()
+            Log.e(logTag, "Unable to start VPN daemon", it)
             stopService()
             return@launchCommand
         }
@@ -156,11 +156,11 @@ class PartoutVpnServiceRuntime(
             return engine.readLastProfile()
         }
         Log.i(logTag, "Profile from VPN start intent, persisting it")
-        try {
+        runCatching {
             engine.writeLastProfile(json)
-        } catch (e: Exception) {
-            e.throwIfCancellation()
-            Log.w(logTag, "Unable to persist profile JSON, continuing with intent profile", e)
+        }.onFailure {
+            it.throwIfCancellation()
+            Log.w(logTag, "Unable to persist profile JSON, continuing with intent profile", it)
         }
         return json
     }
@@ -175,16 +175,15 @@ class PartoutVpnServiceRuntime(
             return
         }
         Log.i(logTag, "Stopping VPN daemon")
-        try {
+        runCatching {
             engine.stop()
-        } catch (e: Exception) {
-            Log.e(logTag, "Unable to stop VPN daemon", e)
-        } finally {
-            controller?.stopObserving()
-            controller?.cancelTunnel(null)
-            controller = null
+        }.onFailure {
+            Log.e(logTag, "Unable to stop VPN daemon", it)
         }
         isRunning = false
+        controller?.stopObserving()
+        controller?.cancelTunnel(null)
+        controller = null
         activeProfileId = null
         snapshotEmitter.emitFinal()
     }
@@ -343,10 +342,10 @@ class PartoutVpnServiceRuntime(
                 }
             }
         }
-        try {
+        runCatching {
             client.send(msg)
-        } catch (e: Exception) {
-            Log.w(logTag, "Unable to reply with VPN snapshot", e)
+        }.onFailure {
+            Log.w(logTag, "Unable to reply with VPN snapshot", it)
         }
     }
 
@@ -360,10 +359,10 @@ class PartoutVpnServiceRuntime(
                 putString(MSG_KEY_JSON, value)
             }
         }
-        try {
+        runCatching {
             client.send(msg)
-        } catch (e: Exception) {
-            Log.w(logTag, "Unable to reply with environment value of '$name'", e)
+        }.onFailure {
+            Log.w(logTag, "Unable to reply with environment value of '$name'", it)
         }
     }
     //endregion
@@ -387,7 +386,7 @@ class PartoutVpnServiceRuntime(
         }
     }
 
-    private fun Exception.throwIfCancellation() {
+    private fun Throwable.throwIfCancellation() {
         if (this is CancellationException) {
             throw this
         }
