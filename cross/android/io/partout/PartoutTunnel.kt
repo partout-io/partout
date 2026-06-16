@@ -94,7 +94,11 @@ class PartoutTunnel(
         connection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName, service: IBinder) {
                 serviceMessenger = Messenger(service)
-                service.linkToDeath(deathRecipient, 0)
+                runCatching {
+                    service.linkToDeath(deathRecipient, 0)
+                }.onFailure {
+                    Log.e(logTag, "Unable to link to death", it)
+                }
                 // Ask the service for its current snapshot
                 requestSnapshot()
             }
@@ -188,7 +192,11 @@ class PartoutTunnel(
         val msg = Message.obtain(null, PartoutVpnServiceRuntime.MSG_GET_STATUS).apply {
             replyTo = clientMessenger
         }
-        serviceMessenger?.send(msg)
+        runCatching {
+            serviceMessenger?.send(msg)
+        }.onFailure {
+            Log.e(logTag, "Unable to request snapshot", it)
+        }
     }
 
     suspend fun requestEnvironmentValue(name: String): String? =
@@ -210,10 +218,11 @@ class PartoutTunnel(
                 pendingRequests.remove(reqId)?.resumeWithException(RemoteException())
                 return@suspendCancellableCoroutine
             }
-            try {
+            runCatching {
                 messenger.send(msg)
-            } catch (e: Exception) {
-                pendingRequests.remove(reqId)?.resumeWithException(e)
+            }.onFailure {
+                Log.e(logTag, "Unable to request environment", it)
+                pendingRequests.remove(reqId)?.resumeWithException(it)
             }
         }
 
