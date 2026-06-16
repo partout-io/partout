@@ -389,4 +389,5 @@ set(PARTOUT_C_SOURCES
 ./PartoutWireGuard_C/key.c
 ./PartoutWireGuard_C/logging.c
 ./PartoutWireGuard_C/x25519.c
+./Partout_C/partout.c
 )
