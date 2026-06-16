@@ -23,7 +23,7 @@ import kotlinx.serialization.Serializable
 /**
  * 
  *
- * Values: Custom,DNS,HTTPProxy,IP,OnDemand,OpenVPN,WireGuard,Undefined
+ * Values: Custom,DNS,HTTPProxy,IP,OnDemand,OpenVPN,Provider,WireGuard,Undefined
  */
 @Serializable
 enum class ModuleType(val value: kotlin.String) {
@@ -45,6 +45,9 @@ enum class ModuleType(val value: kotlin.String) {
 
     @SerialName(value = "OpenVPN")
     OpenVPN("OpenVPN"),
+
+    @SerialName(value = "Provider")
+    Provider("Provider"),
 
     @SerialName(value = "WireGuard")
     WireGuard("WireGuard"),
