@@ -15,17 +15,17 @@
  */
 #include "wg_go.h"
 
-int pp_wg_init() {
+int pp_wg_init(void) {
     pp_clog_v(PPLogCategoryWireGuard, PPLogLevelInfo, "wg-go version: %s", pp_wg_version());
     return 0;
 }
 
-const char *pp_wg_version() {
+const char *pp_wg_version(void) {
     return wgVersion();
 }
 
 void pp_wg_set_logger(pp_wg_logger_fn logger_fn, void *context) {
-    return wgSetLogger(context, logger_fn);
+    wgSetLogger(context, logger_fn);
 }
 
 #if PARTOUT_WINDOWS
@@ -52,14 +52,14 @@ char *pp_wg_get_config(int handle) {
 
 void pp_wg_bump_sockets(int handle, bool sync) {
     if (sync) {
-        return wgBumpSocketsAndWait(handle);
+        wgBumpSocketsAndWait(handle);
     } else {
-        return wgBumpSockets(handle);
+        wgBumpSockets(handle);
     }
 }
 
 void pp_wg_tweak_mobile_roaming(int handle) {
-    return wgDisableSomeRoamingForBrokenMobileSemantics(handle);
+    wgDisableSomeRoamingForBrokenMobileSemantics(handle);
 }
 
 #if PARTOUT_ANDROID

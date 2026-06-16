@@ -40,7 +40,7 @@ bool pp_crypto_init_seed(const uint8_t *src, const size_t len) {
     return false;
 }
 
-pp_zd *pp_hmac_create() {
+pp_zd *pp_hmac_create(void) {
     return NULL;
 }
 

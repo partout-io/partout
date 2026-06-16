@@ -14,7 +14,7 @@ typedef struct {
     pp_crypto crypto;
 } openvpn_crypto_mock;
 
-pp_crypto_ctx openvpn_crypto_mock_create();
+pp_crypto_ctx openvpn_crypto_mock_create(void);
 void openvpn_crypto_mock_free(pp_crypto_ctx ctx);
 
 #pragma clang assume_nonnull end

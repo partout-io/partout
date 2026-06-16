@@ -21,7 +21,7 @@ typedef struct {
     uint64_t network_handle;
 #endif
 } pp_reachability;
-static inline pp_reachability pp_reachability_none() {
+static inline pp_reachability pp_reachability_none(void) {
 #if PARTOUT_ANDROID
     static const pp_reachability none = {
         .reachable = false,
