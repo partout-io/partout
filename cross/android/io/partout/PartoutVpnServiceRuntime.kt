@@ -39,6 +39,7 @@ class PartoutVpnServiceRuntime(
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandQueue = Channel<suspend () -> Unit>(Channel.UNLIMITED)
     private var isRunning = false
+    private var activeProfileId: String? = null
 
     // C/JNI controller
     private var controller: JNITunnelController? = null
@@ -114,6 +115,7 @@ class PartoutVpnServiceRuntime(
         snapshotEmitter.accept(profileId)
 
         isRunning = true
+        activeProfileId = profileId
         Log.i(logTag, "Starting VPN daemon")
         try {
             val newController = JNITunnelController(jniLogTag, service, serviceScope, this)
@@ -126,6 +128,7 @@ class PartoutVpnServiceRuntime(
             snapshotEmitter.emitInactive(profileId)
             controller = null
             isRunning = false
+            activeProfileId = null
             e.throwIfCancellation()
             Log.e(logTag, "Unable to start VPN daemon", e)
             stopService()
@@ -167,7 +170,10 @@ class PartoutVpnServiceRuntime(
     }
 
     private suspend fun stopTunnel() {
-        if (!isRunning) { return }
+        if (!isRunning) {
+            activeProfileId = null
+            return
+        }
         Log.i(logTag, "Stopping VPN daemon")
         try {
             engine.stop()
@@ -179,12 +185,21 @@ class PartoutVpnServiceRuntime(
             controller = null
         }
         isRunning = false
+        activeProfileId = null
         snapshotEmitter.emitFinal()
     }
 
     private fun disconnect(intent: Intent?) = launchCommand {
-        intent?.getStringExtra(EXTRA_FORGET_ID)?.let {
-            engine.deleteLastProfile(it)
+        val forgetId = intent?.getStringExtra(EXTRA_FORGET_ID)
+        if (forgetId != null) {
+            engine.deleteLastProfile(forgetId)
+            if (forgetId != activeProfileId) {
+                Log.i(logTag, "Forgot profile $forgetId without stopping active profile $activeProfileId")
+                if (!isRunning) {
+                    stopService()
+                }
+                return@launchCommand
+            }
         }
         stopTunnel()
         stopService()
