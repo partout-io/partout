@@ -11,7 +11,7 @@ include("cmake/AddDistributionTarget.function.cmake")
 
 # Be quite strict
 set(CMAKE_C_FLAGS "
-    -Wall -W -pedantic \
+    -Wall -W -pedantic -Werror \
     -Wno-nullability-extension \
     -Wno-language-extension-token \
     -Wno-empty-translation-unit"
