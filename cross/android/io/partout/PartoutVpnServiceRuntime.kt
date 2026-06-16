@@ -64,9 +64,11 @@ class PartoutVpnServiceRuntime(
     @Suppress("UNUSED_PARAMETER")
     fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(logTag, "PartoutVpnServiceRuntime.onStartCommand()")
-        if (intent?.action == ACTION_STOP_VPN) {
-            disconnect()
-            return Service.START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_STOP_VPN -> {
+                disconnect(intent)
+                return Service.START_NOT_STICKY
+            }
         }
         connect(intent)
         return Service.START_STICKY
@@ -82,7 +84,7 @@ class PartoutVpnServiceRuntime(
 
     fun onRevoke() {
         Log.i(logTag, "PartoutVpnServiceRuntime.onRevoke()")
-        disconnect()
+        disconnect(null)
     }
     //endregion
 
@@ -180,7 +182,10 @@ class PartoutVpnServiceRuntime(
         snapshotEmitter.emitFinal()
     }
 
-    private fun disconnect() = launchCommand {
+    private fun disconnect(intent: Intent?) = launchCommand {
+        intent?.getStringExtra(EXTRA_FORGET_ID)?.let {
+            engine.deleteLastProfile(it)
+        }
         stopTunnel()
         stopService()
     }
@@ -354,6 +359,7 @@ class PartoutVpnServiceRuntime(
         suspend fun stop()
         suspend fun readLastProfile(): String
         suspend fun writeLastProfile(json: String)
+        suspend fun deleteLastProfile(id: String)
         fun onSnapshot(snapshot: TunnelSnapshot)
         fun onServiceStopped() {}
     }
@@ -377,9 +383,9 @@ class PartoutVpnServiceRuntime(
     companion object {
         const val ACTION_STOP_VPN = "io.partout.action.STOP_VPN"
         const val ACTION_SNAPSHOT = "io.partout.action.SNAPSHOT"
-        const val EXTRA_PROFILE_ID = "io.partout.extra.PROFILE_ID"
         const val EXTRA_PROFILE_JSON = "io.partout.extra.PROFILE_JSON"
         const val EXTRA_SNAPSHOT_JSON = "io.partout.extra.SNAPSHOT_JSON"
+        const val EXTRA_FORGET_ID = "io.partout.extra.FORGET_ID"
 
         const val MSG_GET_STATUS = 1
         const val MSG_GET_ENVIRONMENT = 2

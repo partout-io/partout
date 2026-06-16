@@ -179,10 +179,10 @@ class PartoutTunnel(
         completion(ERROR_NONE)
     }
 
-    fun disconnect(profileId: String? = null, completion: (Int) -> Unit) {
+    fun disconnect(profileId: String? = null, forget: Boolean = false, completion: (Int) -> Unit) {
         pendingPermission?.completion?.invoke(ERROR_PERMISSION_DENIED)
         pendingPermission = null
-        stopVpnService(profileId)
+        stopVpnService(profileId, forget)
         completion(ERROR_NONE)
     }
     //endregion
@@ -257,11 +257,11 @@ class PartoutTunnel(
         }
     }
 
-    private fun stopVpnService(profileId: String?) {
+    private fun stopVpnService(profileId: String?, forget: Boolean) {
         val stopIntent = Intent(appContext, vpnServiceClass).apply {
             action = PartoutVpnServiceRuntime.ACTION_STOP_VPN
-            if (profileId != null) {
-                putExtra(PartoutVpnServiceRuntime.EXTRA_PROFILE_ID, profileId)
+            if (forget && profileId != null) {
+                putExtra(PartoutVpnServiceRuntime.EXTRA_FORGET_ID, profileId)
             }
         }
         if (isForeground) {
@@ -275,7 +275,7 @@ class PartoutTunnel(
         runCatching {
             json.decodeFromString<TunnelSnapshot>(snapshotJSON)
         }.onSuccess { snapshot ->
-            Log.d(logTag, ">>> Snapshot received: ${snapshot}")
+            Log.d(logTag, ">>> Snapshot received: $snapshot")
             _state.update {
                 it.copy(mapOf(snapshot.id to snapshot))
             }
