@@ -7,10 +7,10 @@
 #include "partout.h"
 
 int main(int argc, const char *argv[]) {
-    partout_init();
+    partout_init(NULL);
     puts(partout_version());
     if (argc < 2) {
-        fprintf(stderr, "Missing profile");
+        fprintf(stderr, "Missing profile\n");
         return -1;
     }
     const char *parent = "PartoutExamples_test-daemon.bundle/Contents/Resources/profiles";
