@@ -264,11 +264,7 @@ class PartoutTunnel(
                 putExtra(PartoutVpnServiceRuntime.EXTRA_FORGET_ID, profileId)
             }
         }
-        if (isForeground) {
-            ContextCompat.startForegroundService(context, stopIntent)
-        } else {
-            appContext.startService(stopIntent)
-        }
+        appContext.startService(stopIntent)
     }
 
     private fun onSnapshotJSON(snapshotJSON: String) {
