@@ -179,7 +179,7 @@ class PartoutTunnel(
         completion(ERROR_NONE)
     }
 
-    fun disconnect(profileId: String? = null, forget: Boolean = false, completion: (Int) -> Unit) {
+    fun disconnect(profileId: String, forget: Boolean = false, completion: (Int) -> Unit) {
         pendingPermission?.completion?.invoke(ERROR_PERMISSION_DENIED)
         pendingPermission = null
         stopVpnService(profileId, forget)
@@ -257,10 +257,10 @@ class PartoutTunnel(
         }
     }
 
-    private fun stopVpnService(profileId: String?, forget: Boolean) {
+    private fun stopVpnService(profileId: String, forget: Boolean) {
         val stopIntent = Intent(appContext, vpnServiceClass).apply {
             action = PartoutVpnServiceRuntime.ACTION_STOP_VPN
-            if (forget && profileId != null) {
+            if (forget) {
                 putExtra(PartoutVpnServiceRuntime.EXTRA_FORGET_ID, profileId)
             }
         }
