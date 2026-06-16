@@ -8,6 +8,7 @@
 
 #include "common.h"
 #include "endian.h"
+#include "lib.h"
 #include "mux.h"
 #include "network.h"
 #include "prng.h"

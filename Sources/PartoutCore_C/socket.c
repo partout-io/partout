@@ -9,7 +9,6 @@
 #include <string.h>
 #include <fcntl.h>
 #include "portable/common.h"
-#include "portable/socket.h"
 
 static pp_socket_fd local_invalid_fd(void);
 static bool local_is_invalid_fd(pp_socket_fd fd);

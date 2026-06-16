@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <errno.h>
+#include "portable/mux.h"
 
 #define PP_MUX_ERROR_EVENTS (POLLERR | POLLHUP | POLLNVAL)
 

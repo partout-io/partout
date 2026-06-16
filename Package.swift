@@ -89,7 +89,33 @@ let package = Package(
             } + useFoundationCompatibility.swiftSettings
         ),
         .target(
-            name: "Partout_C"
+            name: "Partout_C",
+            dependencies: {
+                var list: [Target.Dependency] = [
+                    "PartoutCore_C"
+                ]
+                if cryptoMode != nil {
+                    list.append("_PartoutCryptoImpl_C")
+                    if areas.contains(.openVPN) {
+                        list.append("PartoutOpenVPN_C")
+                    }
+                }
+                if areas.contains(.wireGuard) {
+                    list.append("PartoutWireGuard_C")
+                    list.append("PartoutWireGuardBackend_C")
+                }
+                return list
+            }(),
+            cSettings: globalCSettings + {
+                var list: [CSetting] = []
+                if areas.contains(.openVPN), cryptoMode != nil {
+                    list.append(.define("PARTOUT_OPENVPN"))
+                }
+                if areas.contains(.wireGuard) {
+                    list.append(.define("PARTOUT_WIREGUARD"))
+                }
+                return list
+            }()
         )
     ]
 )

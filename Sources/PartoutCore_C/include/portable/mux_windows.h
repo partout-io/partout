@@ -5,6 +5,7 @@
  */
 
 #include <windows.h>
+#include "portable/mux.h"
 
 struct pp_mux_entry {
     pp_fd fd;

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include "portable/mux.h"
 #include "portable/common.h"
 
 const int PPMuxErrorNull = -2;

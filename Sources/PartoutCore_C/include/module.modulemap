@@ -5,6 +5,10 @@ module _PartoutCrypto_C {
 
 module _PartoutPortable_C {
     umbrella header "portable/portable.h"
+    exclude header "portable/mux_posix.h"
+    exclude header "portable/mux_windows.h"
+    exclude header "portable/socket_posix.h"
+    exclude header "portable/socket_windows.h"
     export *
 }
 
