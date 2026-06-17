@@ -12,10 +12,13 @@ private var globalDaemon: ABIDaemon?
 
 @c(partout_init)
 public func __partout_init(
-    cTag: UnsafePointer<CChar>?
+    argsPointer: UnsafePointer<partout_init_args>?
 ) {
-    let tag = cTag.map { String(cString: $0) }
-    ABI.registerDefaultLogger(tag: tag)
+    guard let args = argsPointer?.pointee else {
+        return
+    }
+    let tag = args.log_tag.map { String(cString: $0) }
+    ABI.registerDefaultLogger(tag: tag, logsPrivateData: args.logs_private_data)
 }
 
 @c(partout_daemon_start)
