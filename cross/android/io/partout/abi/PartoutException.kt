@@ -6,5 +6,5 @@ package io.partout.abi
 
 class PartoutException(
     val code: Int,
-    payload: String?
+    val payload: String?
 ) : RuntimeException("ABI call failed (code=$code): $payload")
