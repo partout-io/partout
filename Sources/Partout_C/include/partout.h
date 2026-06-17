@@ -12,7 +12,11 @@
 #include <stdlib.h>
 
 /* Library initializiation, call it ASAP. */
-void partout_init(const char *tag);
+typedef struct {
+    const char *log_tag;
+    bool logs_private_data;
+} partout_init_args;
+void partout_init(const partout_init_args *args);
 
 /* Common functions. */
 const char *partout_version(void);

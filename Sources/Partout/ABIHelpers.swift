@@ -20,8 +20,10 @@ public actor PartoutABI: GlobalActor {
 // MUST NEVER block the current thread. Use run() variants instead.
 //
 enum ABI {
-    static func registerDefaultLogger(tag: String?) {
+    static func registerDefaultLogger(tag: String?, logsPrivateData: Bool) {
         var logger = PartoutLogger.Builder()
+        logger.logsAddresses = logsPrivateData
+        logger.logsModules = logsPrivateData
         logger.setDestination(
             SimpleLogDestination(tag: tag),
             for: LoggerCategory.partoutCategories
