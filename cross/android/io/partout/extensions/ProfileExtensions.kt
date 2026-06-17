@@ -18,6 +18,7 @@ import io.partout.models.TaggedModuleWireGuard
 import io.partout.models.TaggedProfile
 import java.util.Base64
 
+//region TaggedModule
 val TaggedModule.moduleType: ModuleType?
     get() = when (this) {
         is TaggedModuleDNS -> ModuleType.DNS
@@ -45,12 +46,21 @@ val TaggedModule.isInteractive: Boolean
         is TaggedModuleOpenVPN -> value.isInteractive
         else -> false
     }
+//endregion
 
+//region TaggedProfile
 val TaggedProfile.isInteractive: Boolean
     get() = modules.any {
         activeModulesIds.contains(it.moduleId) && it.isInteractive
     }
 
+val TaggedProfile.interactiveModule: TaggedModule?
+    get() = modules.firstOrNull {
+        it.moduleId in activeModulesIds && it.isInteractive
+    }
+//endregion
+
+//region OpenVPN
 val OpenVPNModule.isInteractive: Boolean
     get() {
         if (requiresCredentials) {
@@ -81,3 +91,49 @@ fun OpenVPNCredentialsOTPMethod.encodedPassword(
         }
     }
 }
+
+fun TaggedProfile.withInteractiveOpenVPNCredentials(
+    username: String,
+    password: String,
+    otp: String? = null
+): TaggedProfile {
+    val candidate = interactiveModule
+    if (candidate !is TaggedModuleOpenVPN) {
+        return this
+    }
+    val module = candidate.value
+    val existingCredentials = module.credentials
+    val otpMethod = existingCredentials?.otpMethod ?: OpenVPNCredentialsOTPMethod.none
+    val credentialUsername = if (otpMethod == OpenVPNCredentialsOTPMethod.none) {
+        username
+    } else {
+        existingCredentials?.username.orEmpty()
+    }
+    val credentialPassword = if (otpMethod == OpenVPNCredentialsOTPMethod.none) {
+        password
+    } else {
+        otpMethod.encodedPassword(
+            password = existingCredentials?.password.orEmpty(),
+            otp = otp.orEmpty()
+        )
+    }
+    val credentials = OpenVPNCredentials(
+        otpMethod = OpenVPNCredentialsOTPMethod.none,
+        password = credentialPassword,
+        username = credentialUsername
+    )
+    return copy(
+        modules = modules.map { tagged ->
+            if (tagged is TaggedModuleOpenVPN && tagged.value.id == module.id) {
+                tagged.copy(
+                    value = tagged.value.copy(
+                        credentials = credentials
+                    )
+                )
+            } else {
+                tagged
+            }
+        }
+    )
+}
+//endregion
