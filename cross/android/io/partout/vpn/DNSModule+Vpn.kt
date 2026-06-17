@@ -14,54 +14,56 @@ class DNSModuleApplying(
     private val module: DNSModule
 ): VpnServiceApplying {
     override fun apply(logTag: String, builder: VpnService.Builder): Boolean {
-        var applied = when (module.protocolType) {
-            is DNSModuleProtocolTypehttps, is DNSModuleProtocolTypetls -> true
-            else -> module.servers.isNotEmpty()
-        }
-
-        when (module.protocolType) {
-            is DNSModuleProtocolTypehttps -> {
-                Log.i(
-                    logTag,
-                    "DNS: DoH is not supported by VpnService.Builder, using numeric servers only"
-                )
-                module.addServers(logTag, builder, routed = module.routesThroughVPN == true)
-            }
-
-            is DNSModuleProtocolTypetls -> {
-                Log.i(
-                    logTag,
-                    "DNS: DoT is not supported by VpnService.Builder, using numeric servers only"
-                )
-                module.addServers(logTag, builder, routed = module.routesThroughVPN == true)
-            }
-
-            else -> {
-                if (module.servers.isNotEmpty()) {
-                    module.addServers(logTag, builder, routed = module.routesThroughVPN == true)
-                } else {
-                    Log.i(logTag, "DNS: cleartext DNS without servers is ignored")
-                }
-            }
-        }
-
-        if (!applied) {
+        if (!module.applyServers(logTag, builder)) {
             return false
         }
+        module.addSearchDomains(logTag, builder)
+        return true
+    }
+}
 
-        module.domainName?.takeIf { it.isNotBlank() }?.let {
-            Log.i(logTag, "DNS: Search domain (domainName): $it")
-            builder.addSearchDomain(it)
+private fun DNSModule.applyServers(
+    logTag: String,
+    builder: VpnService.Builder
+): Boolean {
+    val unsupportedProtocolName = unsupportedProtocolName()
+    if (unsupportedProtocolName != null) {
+        Log.i(
+            logTag,
+            "DNS: $unsupportedProtocolName is not supported by VpnService.Builder, using numeric servers only"
+        )
+        addServers(logTag, builder, routed = routesThroughVPN == true)
+        return true
+    }
+    if (servers.isEmpty()) {
+        Log.i(logTag, "DNS: cleartext DNS without servers is ignored")
+        return false
+    }
+    addServers(logTag, builder, routed = routesThroughVPN == true)
+    return true
+}
+
+private fun DNSModule.unsupportedProtocolName(): String? {
+    return when (protocolType) {
+        is DNSModuleProtocolTypehttps -> "DoH"
+        is DNSModuleProtocolTypetls -> "DoT"
+        else -> null
+    }
+}
+
+private fun DNSModule.addSearchDomains(
+    logTag: String,
+    builder: VpnService.Builder
+) {
+    domainName?.takeIf { it.isNotBlank() }?.let {
+        Log.i(logTag, "DNS: Search domain (domainName): $it")
+        builder.addSearchDomain(it)
+    }
+    searchDomains.orEmpty().forEach { domain ->
+        if (domain.isNotBlank()) {
+            Log.i(logTag, "DNS: Search domain: $domain")
+            builder.addSearchDomain(domain)
         }
-
-        module.searchDomains.orEmpty().forEach { domain ->
-            if (domain.isNotBlank()) {
-                Log.i(logTag, "DNS: Search domain: $domain")
-                builder.addSearchDomain(domain)
-            }
-        }
-
-        return applied
     }
 }
 
@@ -76,10 +78,8 @@ fun DNSModule.addServers(
             Log.w(logTag, "DNS: Ignoring invalid server '$server'")
             return@forEach
         }
-
         Log.i(logTag, "DNS: Server: ${route.address}/${route.prefixLength}")
         builder.addDnsServer(route.address)
-
         when {
             routed -> {
                 Log.i(logTag, "DNS: Route server through VPN: ${route.address}/${route.prefixLength}")
@@ -95,28 +95,24 @@ private data class DnsNumericSubnet(
 )
 
 private fun subnetFrom(raw: String): DnsNumericSubnet? {
-    val trimmed = raw.trim()
-    if (trimmed.isEmpty()) {
-        return null
-    }
+    return runCatching {
+        val trimmed = raw.trim()
+        require(trimmed.isNotEmpty())
 
-    val parts = trimmed.split("/", limit = 2)
-    val address = parts[0].trim()
-    val prefixLength = parts.getOrNull(1)?.toIntOrNull() ?: defaultPrefixLength(address)
-    if (prefixLength == null) {
-        return null
-    }
-    if (!isNumericAddress(address)) {
-        return null
-    }
-    return DnsNumericSubnet(address, prefixLength)
+        val parts = trimmed.split("/", limit = 2)
+        val address = parts[0].trim()
+        require(isNumericAddress(address))
+
+        val prefixLength = parts.getOrNull(1)?.toInt() ?: defaultPrefixLength(address)
+        DnsNumericSubnet(address, prefixLength)
+    }.getOrNull()
 }
 
-private fun defaultPrefixLength(address: String): Int? {
+private fun defaultPrefixLength(address: String): Int {
     return when {
         address.contains(":") -> 128
         address.contains(".") -> 32
-        else -> null
+        else -> throw IllegalArgumentException("Unsupported DNS server address")
     }
 }
 

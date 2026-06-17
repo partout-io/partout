@@ -9,9 +9,9 @@ import android.util.Log
 import io.partout.models.OnDemandModule
 
 class OnDemandModuleApplying(
-    private val module: OnDemandModule
+    @Suppress("UNUSED_PARAMETER")
+    module: OnDemandModule
 ): VpnServiceApplying {
-
     @Suppress("UNUSED_PARAMETER")
     override fun apply(logTag: String, builder: VpnService.Builder): Boolean {
         Log.i(

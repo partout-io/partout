@@ -14,22 +14,7 @@ class HTTPProxyModuleApplying(
     private val module: HTTPProxyModule
 ): VpnServiceApplying {
     override fun apply(logTag: String, builder: VpnService.Builder): Boolean {
-        val endpoint = module.proxy ?: module.secureProxy
-        if (endpoint == null) {
-            if (module.pacURL != null) {
-                Log.i(logTag, "HTTP Proxy: PAC is not supported by VpnService.Builder, skipping")
-            } else {
-                Log.i(logTag, "HTTP Proxy: no proxy configured")
-            }
-            return false
-        }
-
-        if (module.proxy != null && module.secureProxy != null && module.proxy != module.secureProxy) {
-            Log.i(
-                logTag,
-                "HTTP Proxy: both HTTP and HTTPS proxies are set; Android can use only one proxy, preferring HTTP"
-            )
-        }
+        val endpoint = module.proxyEndpoint(logTag) ?: return false
 
         val (host, port) = endpoint.asHostPort()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
@@ -40,19 +25,47 @@ class HTTPProxyModuleApplying(
         Log.i(logTag, "HTTP Proxy: proxy=$host:$port bypass=${module.bypassDomains.joinToString()}")
         builder.setHttpProxy(proxyInfo)
 
-        if (module.pacURL != null) {
-            Log.i(logTag, "HTTP Proxy: PAC URL is ignored on Android VPNs: $module.pacURL")
-        }
+        module.logIgnoredPacURL(logTag)
         return true
     }
 }
 
-private fun String.asHostPort(): Pair<String, Int> {
-    val idx = lastIndexOf(':')
-    if (idx <= 0 || idx == lastIndex) {
-        return this to 0
+private fun HTTPProxyModule.proxyEndpoint(logTag: String): String? {
+    val endpoint = proxy ?: secureProxy
+    if (endpoint == null) {
+        if (pacURL != null) {
+            Log.i(logTag, "HTTP Proxy: PAC is not supported by VpnService.Builder, skipping")
+        } else {
+            Log.i(logTag, "HTTP Proxy: no proxy configured")
+        }
+        return null
     }
-    val host = substring(0, idx)
-    val port = substring(idx + 1).toIntOrNull() ?: 0
-    return host to port
+    if (proxy != null && secureProxy != null && proxy != secureProxy) {
+        Log.i(
+            logTag,
+            "HTTP Proxy: both HTTP and HTTPS proxies are set; Android can use only one proxy, preferring HTTP"
+        )
+    }
+    return endpoint
+}
+
+private fun HTTPProxyModule.logIgnoredPacURL(logTag: String) {
+    pacURL?.let {
+        Log.i(logTag, "HTTP Proxy: PAC URL is ignored on Android VPNs: $it")
+    }
+}
+
+private data class HostPort(
+    val host: String,
+    val port: Int
+)
+
+private fun String.asHostPort(): HostPort {
+    val separator = lastIndexOf(':')
+    if (separator <= 0 || separator == lastIndex) {
+        return HostPort(this, 0)
+    }
+    val host = substring(0, separator)
+    val port = substring(separator + 1).toIntOrNull() ?: 0
+    return HostPort(host, port)
 }
