@@ -38,6 +38,7 @@ class PartoutTunnel(
     private val context: Context,
     private val vpnServiceClass: Class<out VpnService>,
     private val isForeground: Boolean,
+    private val logsSnapshots: Boolean,
     private val requestVpnPermission: (Intent) -> Unit
 ) : Closeable {
     private val appContext = context.applicationContext
@@ -271,7 +272,9 @@ class PartoutTunnel(
         runCatching {
             json.decodeFromString<TunnelSnapshot>(snapshotJSON)
         }.onSuccess { snapshot ->
-            Log.d(logTag, "Snapshot received: $snapshot")
+            if (logsSnapshots) {
+                Log.d(logTag, "Snapshot received: $snapshot")
+            }
             _state.update {
                 it.copy(mapOf(snapshot.id to snapshot))
             }

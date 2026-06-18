@@ -61,6 +61,7 @@ typedef struct {
     const char *profile;
     const char *cache_dir;
     bool is_daemon;
+    bool logs_snapshots;
     uint64_t min_data_count_delta;
     const partout_daemon_bindings *bindings;
 } partout_daemon_start_args;

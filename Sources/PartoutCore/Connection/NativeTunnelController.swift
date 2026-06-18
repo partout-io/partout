@@ -23,11 +23,14 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     private let dns: DNSResolver
 
+    private let logsSnapshots: Bool
+
     public init(
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
         environment: TunnelEnvironmentReader,
         betterPathFactory: BetterPathStreamFactory? = nil,
+        logsSnapshots: Bool,
         bufSize: Int = 1 * 1024 * 1024 // 1MB
     ) throws {
         self.ctx = ctx
@@ -42,6 +45,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
 #endif
         self.environment = environment
         self.betterPathFactory = betterPathFactory ?? BetterPathProxy()
+        self.logsSnapshots = logsSnapshots
         self.bufSize = bufSize
 
         onReachableStream = CurrentValueStream(false)
@@ -135,11 +139,13 @@ public final class NativeTunnelController: TunnelController, Sendable {
     }
 
     public func reportSnapshot(_ snapshot: TunnelSnapshot) {
-        pp_log(ctx, .core, .debug, "Report tunnel snapshot: \(snapshot)")
+        if (logsSnapshots) {
+            pp_log(ctx, .core, .debug, "Report tunnel snapshot: \(snapshot)")
+        }
         do {
             let json = try JSONEncoder.shared().encodeJSON(snapshot)
             json.withCString {
-                pp_tun_ctrl_report_snapshot(ref, $0)
+                pp_tun_ctrl_report_snapshot(ref, $0, logsSnapshots)
             }
         } catch {
             pp_log(ctx, .core, .error, "Unable to encode snapshots: \(error)")

@@ -41,7 +41,8 @@ internal class JNITunnelController(
     private val logTag: String,
     private val service: VpnService,
     private val scope: CoroutineScope,
-    private val delegate: TunnelControllerDelegate
+    private val logsSnapshots: Boolean,
+    private val delegate: TunnelControllerDelegate,
 ) : TunnelController {
     //region State
     // All accesses must be synchronized against the lock
@@ -187,7 +188,9 @@ internal class JNITunnelController(
 
     override fun onSnapshot(snapshotJSON: String) = synchronized(lock) {
         if (isNativeCancelled) { return }
-        Log.d(logTag, "onSnapshot(${snapshotJSON})")
+        if (logsSnapshots) {
+            Log.d(logTag, "onSnapshot(${snapshotJSON})")
+        }
         val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
         delegate.onSnapshot(snapshot)
         return@synchronized
