@@ -55,13 +55,14 @@ public final class ABIDaemon {
 #else
         betterPathFactory = nil // Delegated from C
 #endif
+        let controllerOptions = options.forNativeController()
         let controller = try NativeTunnelController(
             ctx,
             ref: bindings?.controller,
             profile: profile,
             environment: environment,
             betterPathFactory: betterPathFactory,
-            logsSnapshots: options.logsSnapshots
+            options: controllerOptions
         )
         let factory = controller.newSocketFactory()
 
@@ -99,5 +100,14 @@ public final class ABIDaemon {
 
     func stop() async {
         await daemon.stop()
+    }
+}
+
+private extension ABIDaemon.Options {
+    func forNativeController() -> NativeTunnelController.Options {
+        var options = NativeTunnelController.Options()
+        options.dnsFallbackServers = dnsFallbackServers
+        options.logsSnapshots = logsSnapshots
+        return options
     }
 }

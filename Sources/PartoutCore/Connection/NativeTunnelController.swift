@@ -6,6 +6,14 @@ internal import _PartoutPortable_C
 
 /// A ``TunnelController`` that interacts with a tun interface through the native platform.
 public final class NativeTunnelController: TunnelController, Sendable {
+    public struct Options: Sendable {
+        public var dnsFallbackServers: [String] = []
+        public var logsSnapshots: Bool = false
+        public var bufSize: Int = 1 * 1024 * 1024 // 1MB
+
+        public init() {}
+    }
+
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
@@ -17,7 +25,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     private let betterPathFactory: BetterPathStreamFactory
 
-    private let bufSize: Int
+    private let options: Options
 
     private let onReachableStream: CurrentValueStream<Bool>
 
@@ -25,16 +33,13 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     private let dns: DNSResolver
 
-    private let logsSnapshots: Bool
-
     public init(
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
         profile: Profile,
         environment: TunnelEnvironmentReader,
         betterPathFactory: BetterPathStreamFactory? = nil,
-        logsSnapshots: Bool,
-        bufSize: Int = 1 * 1024 * 1024 // 1MB
+        options: Options
     ) throws {
         self.ctx = ctx
 #if os(Android)
@@ -49,8 +54,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         self.profile = profile
         self.environment = environment
         self.betterPathFactory = betterPathFactory ?? BetterPathProxy()
-        self.logsSnapshots = logsSnapshots
-        self.bufSize = bufSize
+        self.options = options
 
         onReachableStream = CurrentValueStream(false)
         reachabilityHolder = ReachabilityHolder()
@@ -143,13 +147,13 @@ public final class NativeTunnelController: TunnelController, Sendable {
     }
 
     public func reportSnapshot(_ snapshot: TunnelSnapshot) {
-        if (logsSnapshots) {
+        if (options.logsSnapshots) {
             pp_log(ctx, .core, .debug, "Report tunnel snapshot: \(snapshot)")
         }
         do {
             let json = try JSONEncoder.shared().encodeJSON(snapshot)
             json.withCString {
-                pp_tun_ctrl_report_snapshot(ref, $0, logsSnapshots)
+                pp_tun_ctrl_report_snapshot(ref, $0, options.logsSnapshots)
             }
         } catch {
             pp_log(ctx, .core, .error, "Unable to encode snapshots: \(error)")
@@ -209,7 +213,7 @@ extension NativeTunnelController {
                     return false
                 }
             },
-            bufSize: bufSize
+            bufSize: options.bufSize
         )
     }
 }
