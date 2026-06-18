@@ -785,6 +785,22 @@ components:
         - modules
         - activeModulesIds
       type: object
+    TunnelControllerOptions:
+      additionalProperties: false
+      properties:
+        dnsFallbackServers:
+          items:
+            type: string
+          type: array
+        logsSnapshots:
+          type: boolean
+        minDataCountDelta:
+          "$ref": "#/components/schemas/UInt64"
+      required:
+        - dnsFallbackServers
+        - logsSnapshots
+        - minDataCountDelta
+      type: object
     TunnelRemoteInfoWrapper:
       additionalProperties: false
       properties:
@@ -794,11 +810,17 @@ components:
           items:
             "$ref": "#/components/schemas/TaggedModule"
           type: array
+        options:
+          "$ref": "#/components/schemas/TunnelControllerOptions"
         originalModuleId:
           "$ref": "#/components/schemas/UniqueID"
+        profile:
+          "$ref": "#/components/schemas/TaggedProfile"
         requiresVirtualDevice:
           type: boolean
       required:
+        - profile
+        - options
         - originalModuleId
         - requiresVirtualDevice
       type: object

@@ -116,3 +116,15 @@ private extension partout_completion {
         callback?(ctx, code, payloadJSON)
     }
 }
+
+func stringsFromCStrings(
+    _ ptrs: UnsafePointer<UnsafePointer<CChar>?>?,
+    count: Int
+) -> [String] {
+    (0..<count)
+        .compactMap { i in
+            ptrs?[i].map {
+                String(cString: $0)
+            }
+        }
+}

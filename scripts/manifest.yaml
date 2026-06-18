@@ -47,6 +47,7 @@ entities:
   - Subnet
   - TaggedModule
   - TaggedProfile
+  - TunnelControllerOptions
   - TunnelRemoteInfoWrapper
   - TunnelSnapshot
   - TunnelSnapshot.Environment
