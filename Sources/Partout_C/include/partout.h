@@ -63,6 +63,8 @@ typedef struct {
     bool is_daemon;
     bool logs_snapshots;
     uint64_t min_data_count_delta;
+    const char *const *dns_fallback;
+    const size_t dns_fallback_len;
     const partout_daemon_bindings *bindings;
 } partout_daemon_start_args;
 

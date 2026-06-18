@@ -12,6 +12,7 @@ public final class ABIDaemon {
         let isDaemon: Bool
         let logsSnapshots: Bool
         let minDataCountDelta: UInt64
+        let dnsFallbackServers: [String]
 
         init(_ args: partout_daemon_start_args) throws {
             guard let cProfileJSON = args.profile,
@@ -25,6 +26,10 @@ public final class ABIDaemon {
             isDaemon = args.is_daemon
             logsSnapshots = args.logs_snapshots
             minDataCountDelta = args.min_data_count_delta
+            dnsFallbackServers = stringsFromCStrings(
+                args.dns_fallback,
+                count: args.dns_fallback_len
+            )
         }
     }
 
