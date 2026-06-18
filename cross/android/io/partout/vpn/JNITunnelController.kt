@@ -37,11 +37,6 @@ internal interface TunnelControllerDelegate {
     fun shouldDisconnect(controller: NativeTunnelControllerJNI)
 }
 
-// Applies module settings to a VpnService
-internal interface VpnServiceApplying {
-    fun apply(logTag: String, builder: VpnService.Builder): Boolean
-}
-
 internal class JNITunnelController(
     private val logTag: String,
     private val service: VpnService,
