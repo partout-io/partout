@@ -6,7 +6,7 @@ internal import _PartoutPortable_C
 
 /// A ``TunnelController`` that interacts with a tun interface through the native platform.
 public final class NativeTunnelController: TunnelController, Sendable {
-    public struct Options: Sendable {
+    public struct Options: Codable, Sendable {
         public var dnsFallbackServers: [String] = []
         public var logsSnapshots: Bool = false
         public var bufSize: Int = 1 * 1024 * 1024 // 1MB
@@ -104,7 +104,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         }
 
         // Encode to JSON for native receivers
-        let infoJSON = try info.encodedAsJSON(profile)
+        let infoJSON = try info.encodedAsJSON(profile, options: options)
 
         // Create tun with optional implementation from controller
         guard let tun = info.originalModuleId.uuidString.withCString({ uuid in
