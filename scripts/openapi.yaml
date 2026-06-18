@@ -785,6 +785,19 @@ components:
         - modules
         - activeModulesIds
       type: object
+    TunnelControllerOptions:
+      additionalProperties: false
+      properties:
+        dnsFallbackServers:
+          items:
+            type: string
+          type: array
+        logsSnapshots:
+          type: boolean
+      required:
+        - dnsFallbackServers
+        - logsSnapshots
+      type: object
     TunnelRemoteInfoWrapper:
       additionalProperties: false
       properties:
@@ -794,6 +807,8 @@ components:
           items:
             "$ref": "#/components/schemas/TaggedModule"
           type: array
+        options:
+          "$ref": "#/components/schemas/TunnelControllerOptions"
         originalModuleId:
           "$ref": "#/components/schemas/UniqueID"
         profile:
@@ -802,6 +817,7 @@ components:
           type: boolean
       required:
         - profile
+        - options
         - originalModuleId
         - requiresVirtualDevice
       type: object
