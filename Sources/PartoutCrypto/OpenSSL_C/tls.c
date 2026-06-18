@@ -10,7 +10,7 @@
 #include <openssl/err.h>
 #include <stdio.h>
 #include "portable/common.h"
-#include "tls/tls.h"
+#include "tls/tls_base.h"
 #include "tls/macros.h"
 
 //static const char *const TLSBoxClientEKU = "TLS Web Client Authentication";
@@ -161,7 +161,7 @@ void pp_tls_free(pp_tls tls) {
     SSL_CTX_free(tls->ssl_ctx);
 }
 
-bool pp_tls_start(pp_tls _Nonnull tls) {
+bool pp_tls_start(pp_tls tls) {
     if (tls->bio_plain) {
         BIO_free_all(tls->bio_plain);
         tls->bio_plain = NULL;
@@ -194,17 +194,16 @@ bool pp_tls_start(pp_tls _Nonnull tls) {
     return SSL_do_handshake(tls->ssl);
 }
 
-bool pp_tls_is_connected(pp_tls _Nonnull tls) {
+bool pp_tls_is_connected(pp_tls tls) {
     return tls->is_connected;
 }
 
 // MARK: - I/O
 
-bool pp_tls_verify_ssl_eku(SSL *_Nonnull ssl);
-bool pp_tls_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hostname);
+bool pp_tls_verify_ssl_eku(SSL *ssl);
+bool pp_tls_verify_ssl_san_host(SSL *ssl, const char *hostname);
 
-pp_zd *_Nullable pp_tls_pull_cipher(pp_tls _Nonnull tls,
-                                                  pp_tls_error_code *_Nullable error) {
+pp_zd *_Nullable pp_tls_pull_cipher(pp_tls tls, pp_tls_error_code *_Nullable error) {
     if (error) {
         *error = PPTLSErrorNone;
     }
@@ -242,8 +241,7 @@ pp_zd *_Nullable pp_tls_pull_cipher(pp_tls _Nonnull tls,
     return pp_zd_create_from_data(tls->buf_cipher, ret);
 }
 
-pp_zd *_Nullable pp_tls_pull_plain(pp_tls _Nonnull tls,
-                                                 pp_tls_error_code *_Nullable error) {
+pp_zd *_Nullable pp_tls_pull_plain(pp_tls tls, pp_tls_error_code *_Nullable error) {
     const int ret = BIO_read(tls->bio_plain, tls->buf_plain, (int)tls->opt->buf_len);
     if (error) {
         *error = PPTLSErrorNone;
@@ -260,9 +258,9 @@ pp_zd *_Nullable pp_tls_pull_plain(pp_tls _Nonnull tls,
     return pp_zd_create_from_data(tls->buf_plain, ret);
 }
 
-bool pp_tls_put_cipher(pp_tls _Nonnull tls,
-                            const uint8_t *_Nonnull src, size_t src_len,
-                            pp_tls_error_code *_Nullable error) {
+bool pp_tls_put_cipher(pp_tls tls,
+                       const uint8_t *src, size_t src_len,
+                       pp_tls_error_code *_Nullable error) {
     if (error) {
         *error = PPTLSErrorNone;
     }
@@ -276,9 +274,9 @@ bool pp_tls_put_cipher(pp_tls _Nonnull tls,
     return true;
 }
 
-bool pp_tls_put_plain(pp_tls _Nonnull tls,
-                           const uint8_t *_Nonnull src, size_t src_len,
-                           pp_tls_error_code *_Nullable error) {
+bool pp_tls_put_plain(pp_tls tls,
+                      const uint8_t *src, size_t src_len,
+                      pp_tls_error_code *_Nullable error) {
     if (error) {
         *error = PPTLSErrorNone;
     }
@@ -327,7 +325,7 @@ failure:
 
 // MARK: - Verifications
 
-bool pp_tls_verify_ssl_eku(SSL *_Nonnull ssl) {
+bool pp_tls_verify_ssl_eku(SSL *ssl) {
     X509 *cert = NULL;
     EXTENDED_KEY_USAGE *eku = NULL;
 
@@ -374,7 +372,7 @@ failure:
     return false;
 }
 
-bool pp_tls_verify_ssl_san_host(SSL *_Nonnull ssl, const char *_Nonnull hostname) {
+bool pp_tls_verify_ssl_san_host(SSL *ssl, const char *hostname) {
     X509 *cert = NULL;
     GENERAL_NAMES *names = NULL;
 

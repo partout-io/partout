@@ -29,6 +29,13 @@ while [[ $# -gt 0 ]]; do
             shift
             shift
             ;;
+        -install)
+            install_dir=$2
+            mkdir $install_dir || true
+            cmake_opts+=("-DCMAKE_INSTALL_PREFIX=$install_dir")
+            shift
+            shift
+            ;;
         -a)
             cmake_opts+=("-DPP_BUILD_LIBRARY=ON")
             cmake_opts+=("-DPP_BUILD_USE_OPENSSL=ON")
@@ -71,6 +78,7 @@ while [[ $# -gt 0 ]]; do
             export SWIFT_ANDROID_ARCH=aarch64
             export SWIFT_ANDROID_API_LEVEL=28
             export SWIFT_ANDROID_VERSION=6.3.1
+            build_dir=.cmake-android
             cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=toolchains/android.toolchain.cmake")
             shift
             ;;
@@ -95,13 +103,14 @@ if [[ ! -d $bin_dir ]]; then
 fi
 if [[ $gen_build == 1 ]]; then
     scripts/gen-cmake-files.sh
-    pushd $build_dir
-    cmake -G Ninja "${cmake_opts[@]}" ..
-else
-    pushd $build_dir
+    cmake -G Ninja -S . -B $build_dir "${cmake_opts[@]}"
 fi
-cmake --build .
-popd
+
+# Execute
+cmake --build $build_dir
+if [[ -n $install_dir ]]; then
+    cmake --install $build_dir
+fi
 
 # Generate foreign models
 if [[ $gen_models == 1 ]]; then
@@ -118,4 +127,4 @@ if [[ $gen_models == 1 ]]; then
     rm -rf cross-models
 fi
 
-popd root_dir
+popd

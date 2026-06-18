@@ -6,10 +6,14 @@
 
 #pragma once
 
-#include "crypto.h"
+#include "crypto_base.h"
 
-pp_crypto_ctx _Nullable pp_crypto_ctr_create(const char *_Nonnull cipher_name,
-                                             const char *_Nonnull digest_name,
+#pragma clang assume_nonnull begin
+
+pp_crypto_ctx _Nullable pp_crypto_ctr_create(const char *cipher_name,
+                                             const char *digest_name,
                                              size_t tag_len, size_t payload_len,
                                              const pp_crypto_keys *_Nullable keys);
-void pp_crypto_ctr_free(pp_crypto_ctx _Nonnull ctx);
+void pp_crypto_ctr_free(pp_crypto_ctx ctx);
+
+#pragma clang assume_nonnull end

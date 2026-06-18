@@ -185,8 +185,6 @@ components:
           items:
             "$ref": "#/components/schemas/Route"
           type: array
-        legacySingleSubnet:
-          "$ref": "#/components/schemas/Subnet"
         subnets:
           items:
             "$ref": "#/components/schemas/Subnet"
@@ -222,7 +220,27 @@ components:
     Int8:
       type: integer
     ModuleType:
+      enum:
+        - Custom
+        - DNS
+        - HTTPProxy
+        - IP
+        - OnDemand
+        - OpenVPN
+        - Provider
+        - WireGuard
+        - Undefined
       type: string
+      x-enum-varnames:
+        - Custom
+        - DNS
+        - HTTPProxy
+        - IP
+        - OnDemand
+        - OpenVPN
+        - Provider
+        - WireGuard
+        - Undefined
     OnDemandModule:
       additionalProperties: false
       properties:
@@ -772,10 +790,6 @@ components:
       properties:
         address:
           "$ref": "#/components/schemas/Address"
-        fileDescriptors:
-          items:
-            "$ref": "#/components/schemas/UInt64"
-          type: array
         modules:
           items:
             "$ref": "#/components/schemas/TaggedModule"
@@ -786,7 +800,6 @@ components:
           type: boolean
       required:
         - originalModuleId
-        - fileDescriptors
         - requiresVirtualDevice
       type: object
     TunnelSnapshot:

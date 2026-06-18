@@ -12,10 +12,10 @@
 #include "wireguard/key.h"
 #include "wireguard/x25519.h"
 
+// FIXME: ###, Delete after using pp_tun_network_extension_fd()
 /* Redefine these manually because the <sys/kern_control.h>
- * header is not exposed to iOS */
-#if PARTOUT_APPLE
-#define CTLIOCGINFO 0xc0644e03UL
+ * header is not exposed to iOS/tvOS */
+#if PARTOUT_APPLE && !PARTOUT_MACOS
 struct ctl_info {
     u_int32_t   ctl_id;
     char        ctl_name[96];

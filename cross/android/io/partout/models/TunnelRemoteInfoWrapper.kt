@@ -24,7 +24,6 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param fileDescriptors 
  * @param originalModuleId 
  * @param requiresVirtualDevice 
  * @param address 
@@ -33,9 +32,6 @@ import kotlinx.serialization.Contextual
 @Serializable
 
 data class TunnelRemoteInfoWrapper (
-
-    @SerialName(value = "fileDescriptors")
-    val fileDescriptors: kotlin.collections.List<kotlin.Long>,
 
     @SerialName(value = "originalModuleId")
     val originalModuleId: kotlin.String,

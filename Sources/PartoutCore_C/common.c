@@ -5,13 +5,20 @@
  */
 
 #include <stdarg.h>
+#include <errno.h>
 #include "portable/common.h"
+
+const int PPIOErrorWouldBlock   = -11;
+const int PPIOErrorNoBufs       = -12;
 
 pp_log_category PPLogCategoryCore = "core";
 
 void pp_clog_v(pp_log_category category,
                pp_log_level level,
-               const char *_Nonnull fmt, ...) {
+               const char *fmt, ...) {
+#if !PARTOUT_WINDOWS
+    const int saved_errno = errno;
+#endif
     va_list args;
     va_start(args, fmt);
     // Add 1 to include the null terminator
@@ -21,6 +28,9 @@ void pp_clog_v(pp_log_category category,
     va_end(args);
     pp_clog(category, level, msg);
     pp_free(msg);
+#if !PARTOUT_WINDOWS
+    errno = saved_errno;
+#endif
 }
 
 #if PARTOUT_ANDROID
@@ -47,7 +57,33 @@ JNIEnv *pp_jni_attach_thread(bool *did_attach) {
     }
 }
 
-void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonnull message) {
+void *pp_jni_new_global_ref(void *ref) {
+    if (!ref) return NULL;
+
+    PP_JNI_ATTACH_OR_RETURN(env, NULL);
+
+    jobject global_ref = (*env)->NewGlobalRef(env, (jobject)ref);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        global_ref = NULL;
+    }
+
+    PP_JNI_DETACH(env);
+    return global_ref;
+}
+
+void pp_jni_delete_global_ref(void *ref) {
+    if (!ref) return;
+
+    PP_JNI_ATTACH_OR_RETURN_VOID(env);
+
+    (*env)->DeleteGlobalRef(env, (jobject)ref);
+
+    PP_JNI_DETACH(env);
+}
+
+void pp_log_simple_append(const char *tag, pp_log_level level, const char *message) {
     const char *log_tag = tag ? tag : "Partout";
     int android_level = 0;
     switch (level) {
@@ -70,7 +106,7 @@ void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonn
     __android_log_print(android_level, log_tag, "%s", message);
 }
 #else
-void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonnull message) {
+void pp_log_simple_append(const char *tag, pp_log_level level, const char *message) {
     FILE *out = NULL;
     switch (level) {
     case PPLogLevelError:
@@ -82,5 +118,33 @@ void pp_log_simple_append(const char *tag, pp_log_level level, const char *_Nonn
         break;
     }
     fprintf(out, "%s[%d]: %s\n", tag ? tag : "Partout", level, message);
+}
+#endif
+
+#if !PARTOUT_WINDOWS
+#include <fcntl.h>
+
+int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {
+    const int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "fcntl(): set, F_GETFL");
+        return -1;
+    }
+    if (original_flags) {
+        *original_flags = flags;
+    }
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "fcntl(): set, F_SETFL");
+        return -1;
+    }
+    return 0;
+}
+
+int pp_fd_restore_blocking(pp_fd fd, int original_flags) {
+    if (fcntl(fd, F_SETFL, original_flags) < 0) {
+        pp_clog(PPLogCategoryCore, PPLogLevelFault, "fcntl(): restore");
+        return -1;
+    }
+    return 0;
 }
 #endif

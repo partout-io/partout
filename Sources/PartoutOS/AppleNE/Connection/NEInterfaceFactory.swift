@@ -13,8 +13,6 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
 
         public var maxTCPLength = 512 * 1024
 
-        public var withReadPackets = false
-
         public init() {
         }
     }
@@ -37,12 +35,19 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
         self.options = options
     }
 
-    public func linkObserver(to endpoint: ExtendedEndpoint) throws -> LinkObserver {
+    public func currentReachability() -> ReachabilityInfo? {
+        nil
+    }
+
+    public func linkObserver(
+        to endpoint: ExtendedEndpoint,
+        reachability: ReachabilityInfo?
+    ) throws -> LinkObserver {
         guard let provider else {
             pp_log(ctx, .os, .info, "NEInterfaceFactory: NEPacketTunnelProvider released")
             throw PartoutError(.releasedObject)
         }
-        switch endpoint.proto.socketType.plainType {
+        switch endpoint.plainSocketType {
         case .udp:
 #if swift(>=6.0)
             fatalError("Unavailable in Swift 6")
@@ -55,8 +60,7 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
                 ctx,
                 nwSession: impl,
                 options: .init(
-                    maxDatagrams: options.maxUDPDatagrams,
-                    withReadPackets: options.withReadPackets
+                    maxDatagrams: options.maxUDPDatagrams
                 )
             )
 #endif
@@ -89,7 +93,6 @@ private extension ExtendedEndpoint {
     }
 
 #if swift(<6.0)
-    @available(*, deprecated, message: "NetworkExtension UDP/TCP sockets were removed in Swift 6")
     var nwHostEndpoint: NWHostEndpoint {
         NWHostEndpoint(hostname: address.rawValue, port: proto.port.description)
     }

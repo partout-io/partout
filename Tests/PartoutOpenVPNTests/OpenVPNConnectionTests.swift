@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import PartoutCore
-@testable import PartoutOpenVPNConnection
+@testable import PartoutOpenVPN
 import Testing
 
 private typealias OpenVPNConnectionType = _OpenVPNConnectionV2
@@ -386,8 +386,7 @@ private final class MockOpenVPNSession: OpenVPNSessionProtocol, @unchecked Senda
                 self,
                 remoteAddress: "100.200.100.200",
                 remoteProtocol: .init(.udp, 1234),
-                remoteOptions: options,
-                remoteFd: nil
+                remoteOptions: options
             )
             onConnected()
         } catch {

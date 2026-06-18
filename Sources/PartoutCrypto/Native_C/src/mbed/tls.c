@@ -5,7 +5,7 @@
  */
 
 #include "portable/common.h"
-#include "tls/tls.h"
+#include "tls/tls_base.h"
 
 // FIXME: #108, Implement with mbedTLS
 
@@ -19,35 +19,33 @@ pp_tls pp_tls_create(const pp_tls_options *opt, pp_tls_error_code *error) {
 void pp_tls_free(pp_tls tls) {
 }
 
-bool pp_tls_start(pp_tls _Nonnull tls) {
+bool pp_tls_start(pp_tls tls) {
     return false;
 }
 
-bool pp_tls_is_connected(pp_tls _Nonnull tls) {
+bool pp_tls_is_connected(pp_tls tls) {
     return false;
 }
 
 // MARK: - I/O
 
-pp_zd *_Nullable pp_tls_pull_cipher(pp_tls _Nonnull tls,
-                                                  pp_tls_error_code *_Nullable error) {
+pp_zd *_Nullable pp_tls_pull_cipher(pp_tls tls, pp_tls_error_code *_Nullable error) {
     return NULL;
 }
 
-pp_zd *_Nullable pp_tls_pull_plain(pp_tls _Nonnull tls,
-                                                 pp_tls_error_code *_Nullable error) {
+pp_zd *_Nullable pp_tls_pull_plain(pp_tls tls, pp_tls_error_code *_Nullable error) {
     return NULL;
 }
 
-bool pp_tls_put_cipher(pp_tls _Nonnull tls,
-                            const uint8_t *_Nonnull src, size_t src_len,
-                            pp_tls_error_code *_Nullable error) {
+bool pp_tls_put_cipher(pp_tls tls,
+                       const uint8_t *src, size_t src_len,
+                       pp_tls_error_code *_Nullable error) {
     return false;
 }
 
-bool pp_tls_put_plain(pp_tls _Nonnull tls,
-                           const uint8_t *_Nonnull src, size_t src_len,
-                           pp_tls_error_code *_Nullable error) {
+bool pp_tls_put_plain(pp_tls tls,
+                      const uint8_t *src, size_t src_len,
+                      pp_tls_error_code *_Nullable error) {
     return false;
 }
 

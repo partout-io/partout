@@ -46,6 +46,13 @@ public actor Tunnel {
         observeObjects()
 #endif
     }
+
+    deinit {
+        pendingInstall?.cancel()
+        subscriptions.forEach {
+            $0.cancel()
+        }
+    }
 }
 
 // MARK: - TunnelStrategy
@@ -59,8 +66,8 @@ extension Tunnel: TunnelStrategy {
         try await strategy.prepare(purge: purge)
     }
 
-    public func install(_ preProfile: Profile, connect: Bool, options: Sendable?) async throws {
-        guard !preProfile.activeModulesIds.isEmpty else {
+    public func install(_ profile: Profile, connect: Bool, options: Sendable?) async throws {
+        guard !profile.activeModulesIds.isEmpty else {
             throw PartoutError(.noActiveModules)
         }
         if let pendingInstall, !pendingInstall.isCancelled {
@@ -68,22 +75,22 @@ extension Tunnel: TunnelStrategy {
             try? await pendingInstall.value
         }
         guard !Task.isCancelled else {
-            pp_log(ctx, .core, .info, "Cancelled installation of profile \(preProfile.id)")
+            pp_log(ctx, .core, .info, "Cancelled installation of profile \(profile.id)")
             return
         }
         // Optionally pre-process profile
-        let profile: Profile
+        let postProfile: Profile
         if let willInstall {
-            pp_log(ctx, .core, .info, "Pre-process profile \(preProfile.id) before installing")
-            profile = try await willInstall(preProfile)
+            pp_log(ctx, .core, .info, "Pre-process profile \(profile.id) before installing")
+            postProfile = try await willInstall(profile)
         } else {
-            profile = preProfile
+            postProfile = profile
         }
         pendingInstall = Task {
-            pp_log(ctx, .core, .info, "Install profile \(profile.id)...")
-            try await strategy.install(profile, connect: connect, options: options)
+            pp_log(ctx, .core, .info, "Install profile \(postProfile.id)...")
+            try await strategy.install(postProfile, connect: connect, options: options)
             guard !Task.isCancelled else {
-                pp_log(ctx, .core, .info, "Cancelled installation of profile \(profile.id)")
+                pp_log(ctx, .core, .info, "Cancelled installation of profile \(postProfile.id)")
                 return
             }
         }
@@ -171,9 +178,8 @@ private extension Tunnel {
             guard let ctx = self?.ctx else { return }
             guard let stream = self?.strategy.didUpdateActiveProfiles else { return }
             for await snapshots in stream {
-                guard let self else { break }
                 guard !Task.isCancelled else { break }
-                await handleStrategySnapshots(snapshots)
+                await self?.handleStrategySnapshots(snapshots)
             }
             pp_log(ctx, .core, .debug, "Cancelled Tunnel.strategy.didUpdateActiveProfiles (observed)")
         })
@@ -181,9 +187,8 @@ private extension Tunnel {
             subscriptions.append(Task { [weak self] in
                 guard let ctx = self?.ctx else { return }
                 while true {
-                    guard let self else { break }
                     guard !Task.isCancelled else { break }
-                    await refreshSnapshotEnvironments()
+                    await self?.refreshSnapshotEnvironments()
                     try? await Task.sleep(milliseconds: refreshInterval)
                 }
                 pp_log(ctx, .core, .debug, "Cancelled Tunnel.timerSubscription")

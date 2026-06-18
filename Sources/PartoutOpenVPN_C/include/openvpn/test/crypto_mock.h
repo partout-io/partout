@@ -1,0 +1,20 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Davide De Rosa
+ *
+ * SPDX-License-Identifier: GPL-3.0
+ */
+
+#pragma once
+
+#include "crypto/crypto.h"
+
+#pragma clang assume_nonnull begin
+
+typedef struct {
+    pp_crypto crypto;
+} openvpn_crypto_mock;
+
+pp_crypto_ctx openvpn_crypto_mock_create(void);
+void openvpn_crypto_mock_free(pp_crypto_ctx ctx);
+
+#pragma clang assume_nonnull end

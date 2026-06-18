@@ -6,12 +6,12 @@
 
 #include "crypto/hmac.h"
 
-pp_zd *_Nonnull pp_hmac_create() {
+pp_zd *pp_hmac_create(void) {
     // FIXME: #108, Implement with CNG
     return NULL;
 }
 
-size_t pp_hmac_do(pp_hmac_ctx *_Nonnull ctx) {
+size_t pp_hmac_do(pp_hmac_ctx *ctx) {
     // FIXME: #108, Implement with CNG
     return 0;
 }

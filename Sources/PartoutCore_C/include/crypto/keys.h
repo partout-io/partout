@@ -5,9 +5,12 @@
  */
 
 #pragma once
+#pragma clang assume_nonnull begin
 
-char *_Nullable pp_key_decrypted_from_path(const char *_Nonnull path,
-                                           const char *_Nonnull passphrase);
+char *_Nullable pp_key_decrypted_from_path(const char *path,
+                                           const char *passphrase);
 
-char *_Nullable pp_key_decrypted_from_pem(const char *_Nonnull pem,
-                                          const char *_Nonnull passphrase);
+char *_Nullable pp_key_decrypted_from_pem(const char *pem,
+                                          const char *passphrase);
+
+#pragma clang assume_nonnull end

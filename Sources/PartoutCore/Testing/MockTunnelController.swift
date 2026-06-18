@@ -10,15 +10,15 @@ public final class MockTunnelController: TunnelController, @unchecked Sendable {
     public init() {
     }
 
-    public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> IOInterface {
+    public func setTunnelSettings(with info: TunnelRemoteInfo?) async throws -> TunInterface {
         try await onSetTunnelSettings(info)
         return MockTunnelInterface()
     }
 
-    public func configureSockets(with descriptors: [UInt64]) {
+    public func configureSockets(with descriptors: [SocketDescriptor]) {
     }
 
-    public func clearTunnelSettings(_ tunnel: IOInterface, withKillSwitch: Bool) async {
+    public func clearTunnelSettings(withKillSwitch: Bool) async {
     }
 
     public func setReasserting(_ reasserting: Bool) {

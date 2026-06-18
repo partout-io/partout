@@ -48,8 +48,14 @@ public func pp_clog(
     _ cLevel: Int,
     _ cMessage: UnsafePointer<CChar>
 ) {
+#if !os(Windows)
+    let savedErrno = errno
+#endif
     let category = LoggerCategory(rawValue: String(cString: cCategory))
     let level = DebugLog.Level(rawValue: cLevel) ?? .info
     let message = String(cString: cMessage)
     pp_log_g(category, level, message)
+#if !os(Windows)
+    errno = savedErrno
+#endif
 }

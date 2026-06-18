@@ -1,25 +1,18 @@
-module _PartoutCore_C {
-    header "portable/common.h"
-    header "portable/endian.h"
-    header "portable/network.h"
-    header "portable/prng.h"
-    header "portable/socket.h"
-    header "portable/tun.h"
-    header "portable/zd.h"
+module _PartoutCrypto_C {
+    umbrella header "crypto/crypto.h"
     export *
 }
 
-module _PartoutCrypto_C {
-    header "crypto/crypto.h"
-    header "crypto/crypto_aead.h"
-    header "crypto/crypto_cbc.h"
-    header "crypto/crypto_ctr.h"
-    header "crypto/hmac.h"
-    header "crypto/keys.h"
+module _PartoutPortable_C {
+    umbrella header "portable/portable.h"
+    exclude header "portable/mux_posix.h"
+    exclude header "portable/mux_windows.h"
+    exclude header "portable/socket_posix.h"
+    exclude header "portable/socket_windows.h"
     export *
 }
 
 module _PartoutTLS_C {
-    header "tls/tls.h"
+    umbrella header "tls/tls.h"
     export *
 }

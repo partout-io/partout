@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include "portable/prng.h"
 
-uint32_t pp_prng_rand() {
+uint32_t pp_prng_rand(void) {
 #if PARTOUT_WINDOWS
     return rand();
 #else
@@ -28,7 +28,7 @@ bool pp_prng_do(uint8_t *dst, size_t len) {
 #include <windows.h>
 #include <bcrypt.h>
 
-bool pp_prng_do(uint8_t *_Nonnull dst, size_t len) {
+bool pp_prng_do(uint8_t *dst, size_t len) {
     NTSTATUS status = BCryptGenRandom(
         NULL,
         dst,

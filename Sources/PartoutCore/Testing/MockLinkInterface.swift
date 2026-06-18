@@ -28,9 +28,6 @@ public final class MockLinkObserver: LinkObserver {
         linkBlock(newLink)
         return newLink
     }
-
-    public func shutdown() {
-    }
 }
 
 public final class MockLinkInterface: LinkInterface {
@@ -49,19 +46,8 @@ public final class MockLinkInterface: LinkInterface {
         }
     }
 
-    public var fileDescriptor: UInt64? {
-        nil
-    }
-
     public func upgraded() -> LinkInterface {
         self
-    }
-
-    public func shutdown() {
-    }
-
-    @available(*, deprecated)
-    public func setReadHandler(_ handler: @escaping ([Data]?, Error?) -> Void) {
     }
 
     public func readPackets() async throws -> [Data] {
@@ -69,5 +55,8 @@ public final class MockLinkInterface: LinkInterface {
     }
 
     public func writePackets(_ packets: [Data]) async throws {
+    }
+
+    public func close() {
     }
 }
