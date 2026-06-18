@@ -174,12 +174,14 @@ internal class JNITunnelController(
         if (isNativeCancelled) { return }
         Log.d(logTag, "configureSockets(${fds.toList()})")
         fds.forEach {
-            require(it in 0..Int.MAX_VALUE.toLong()) {
+            require(it >= 0) {
                 "Invalid Android file descriptor: $it"
             }
             val protected = service.protect(it)
-            // FIXME: Throw exception on protect() failure?
             Log.d(logTag, "protect($it) = $protected")
+            if (!protected) {
+                throw IllegalStateException("Unable to protect Android file descriptor: $it")
+            }
         }
     }
 
@@ -196,12 +198,7 @@ internal class JNITunnelController(
 
         // Optionally replace with catch-all fake tun
         if (killSwitch) {
-            val builder = service.Builder()
-            // FIXME: Externalize these constants
-            builder.addAddress("192.0.2.1", 32)
-            builder.addAddress("fd00::1", 128)
-            builder.addRoute("0.0.0.0", 0)
-            builder.addRoute("::", 0)
+            val builder = service.Builder().setUpKillSwitch()
             runCatching {
                 val oldDescriptor = tunDescriptor
                 val newDescriptor = builder.establish()
@@ -348,6 +345,14 @@ internal class JNITunnelController(
         lastEmittedNetworkPreference = null
     }
     //endregion
+
+    private fun VpnService.Builder.setUpKillSwitch(): VpnService.Builder {
+        addAddress("192.0.2.1", 32)
+        addAddress("fd00::1", 128)
+        addRoute("0.0.0.0", 0)
+        addRoute("::", 0)
+        return this
+    }
 
     companion object {
         private const val INVALID_TUN_FD = -1
