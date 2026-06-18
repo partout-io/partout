@@ -7,10 +7,13 @@ package io.partout.vpn
 import android.net.VpnService
 import io.partout.extensions.VpnSubnet
 
+//region Interface
 internal interface VpnServiceApplying {
     fun apply(logTag: String, builder: VpnService.Builder): Boolean
 }
+//endregion
 
+//region Shared helpers
 internal fun VpnService.Builder.addDnsServer(subnet: VpnSubnet) {
     addDnsServer(subnet.address)
 }
@@ -30,3 +33,4 @@ internal fun VpnService.Builder.tryAddRoute(subnet: VpnSubnet): Throwable? {
         addRoute(subnet)
     }.exceptionOrNull()
 }
+//endregion

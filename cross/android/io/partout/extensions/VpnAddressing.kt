@@ -8,14 +8,6 @@ import io.partout.models.Route
 import java.net.Inet6Address
 import java.net.InetAddress
 
-internal enum class VpnAddressFamily(
-    val defaultRouteAddress: String,
-    val maxPrefixLength: Int
-) {
-    IPv4("0.0.0.0", 32),
-    IPv6("::", 128)
-}
-
 internal data class VpnSubnet(
     val address: InetAddress,
     val prefixLength: Int
@@ -49,6 +41,14 @@ internal data class VpnSubnet(
             return VpnSubnet(address, prefixLength = 0)
         }
     }
+}
+
+internal enum class VpnAddressFamily(
+    val defaultRouteAddress: String,
+    val maxPrefixLength: Int
+) {
+    IPv4("0.0.0.0", 32),
+    IPv6("::", 128)
 }
 
 internal fun Route.destinationPrefix(family: VpnAddressFamily): VpnSubnet? {
