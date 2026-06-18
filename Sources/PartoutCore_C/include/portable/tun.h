@@ -76,7 +76,8 @@ bool pp_tun_ctrl_configure_sockets(void *_Nullable ref,
                                    const pp_socket_fd *_Nonnull fds,
                                    const size_t fds_len);
 void pp_tun_ctrl_report_snapshot(void *_Nullable ref,
-                                 const char *snapshot_json);
+                                 const char *snapshot_json,
+                                 bool log);
 void pp_tun_ctrl_clear_tunnel(void *_Nullable ref, bool kill_switch);
 void pp_tun_ctrl_cancel_tunnel(void *_Nullable ref,
                                const char *_Nullable error_message);

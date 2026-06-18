@@ -256,10 +256,12 @@ bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
     return true;
 }
 
-void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
+void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json, bool log) {
     (void)ref;
     (void)snapshot_json;
-//    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_darwin: ctrl_report_snapshot(%p)", ref);
+    if (log) {
+        pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_darwin: ctrl_report_snapshot(%p)", ref);
+    }
 }
 
 void pp_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {

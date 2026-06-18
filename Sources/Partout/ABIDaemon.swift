@@ -10,6 +10,7 @@ public final class ABIDaemon {
         let profile: Profile
         let cachesURL: URL
         let isDaemon: Bool
+        let logsSnapshots: Bool
         let minDataCountDelta: UInt64
 
         init(_ args: partout_daemon_start_args) throws {
@@ -22,6 +23,7 @@ public final class ABIDaemon {
             profile = try decoder.decode(TaggedProfile.self, from: profileData).asProfile()
             cachesURL = URL(filePath: String(cString: cCacheDir))
             isDaemon = args.is_daemon
+            logsSnapshots = args.logs_snapshots
             minDataCountDelta = args.min_data_count_delta
         }
     }
@@ -52,7 +54,8 @@ public final class ABIDaemon {
             ctx,
             ref: bindings?.controller,
             environment: environment,
-            betterPathFactory: betterPathFactory
+            betterPathFactory: betterPathFactory,
+            logsSnapshots: options.logsSnapshots
         )
         let factory = controller.newSocketFactory()
 
