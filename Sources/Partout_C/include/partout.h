@@ -56,15 +56,20 @@ typedef struct __partout_daemon_bindings {
     void (*free)(struct __partout_daemon_bindings *);
 } partout_daemon_bindings;
 
+/* Daemon options. */
+typedef struct {
+    bool logs_snapshots;
+    uint64_t min_data_count_delta;
+    const char **dns_fallback;
+    size_t dns_fallback_len;
+} partout_daemon_options;
+
 /* Daemon initialization. */
 typedef struct {
     const char *profile;
     const char *cache_dir;
     bool is_daemon;
-    bool logs_snapshots;
-    uint64_t min_data_count_delta;
-    const char *const *dns_fallback;
-    const size_t dns_fallback_len;
+    partout_daemon_options options;
     const partout_daemon_bindings *bindings;
 } partout_daemon_start_args;
 

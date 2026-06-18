@@ -10,9 +10,7 @@ public final class ABIDaemon {
         let profile: Profile
         let cachesURL: URL
         let isDaemon: Bool
-        let logsSnapshots: Bool
-        let minDataCountDelta: UInt64
-        let dnsFallbackServers: [String]
+        let controllerOptions: TunnelControllerOptions
 
         init(_ args: partout_daemon_start_args) throws {
             guard let cProfileJSON = args.profile,
@@ -24,12 +22,7 @@ public final class ABIDaemon {
             profile = try decoder.decode(TaggedProfile.self, from: profileData).asProfile()
             cachesURL = URL(filePath: String(cString: cCacheDir))
             isDaemon = args.is_daemon
-            logsSnapshots = args.logs_snapshots
-            minDataCountDelta = args.min_data_count_delta
-            dnsFallbackServers = stringsFromCStrings(
-                args.dns_fallback,
-                count: args.dns_fallback_len
-            )
+            controllerOptions = args.options.forTunnelController()
         }
     }
 
@@ -55,14 +48,13 @@ public final class ABIDaemon {
 #else
         betterPathFactory = nil // Delegated from C
 #endif
-        let controllerOptions = TunnelControllerOptions()
         let controller = try NativeTunnelController(
             ctx,
             ref: bindings?.controller,
             profile: profile,
             environment: environment,
             betterPathFactory: betterPathFactory,
-            options: controllerOptions
+            options: options.controllerOptions
         )
         let factory = controller.newSocketFactory()
 
@@ -81,7 +73,7 @@ public final class ABIDaemon {
             messageHandler: DefaultMessageHandler(ctx, environment: environment),
             startsImmediately: false,
             cancelsUnrecoverable: true,
-            minDataCountDelta: options.minDataCountDelta
+            minDataCountDelta: options.controllerOptions.minDataCountDelta
         )
 
         daemon = try SimpleConnectionDaemon(params: daemonParameters)
@@ -103,11 +95,15 @@ public final class ABIDaemon {
     }
 }
 
-private extension ABIDaemon.Options {
+private extension partout_daemon_options {
     func forTunnelController() -> TunnelControllerOptions {
         var options = TunnelControllerOptions()
-        options.dnsFallbackServers = dnsFallbackServers
-        options.logsSnapshots = logsSnapshots
+        options.dnsFallbackServers = stringsFromCStrings(
+            dns_fallback,
+            count: dns_fallback_len
+        )
+        options.logsSnapshots = logs_snapshots
+        options.minDataCountDelta = min_data_count_delta
         return options
     }
 }

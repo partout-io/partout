@@ -794,9 +794,12 @@ components:
           type: array
         logsSnapshots:
           type: boolean
+        minDataCountDelta:
+          "$ref": "#/components/schemas/UInt64"
       required:
         - dnsFallbackServers
         - logsSnapshots
+        - minDataCountDelta
       type: object
     TunnelRemoteInfoWrapper:
       additionalProperties: false

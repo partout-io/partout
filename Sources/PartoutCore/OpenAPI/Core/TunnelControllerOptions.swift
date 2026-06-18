@@ -6,6 +6,7 @@
 public struct TunnelControllerOptions: Codable, Sendable {
     public var dnsFallbackServers: [String] = []
     public var logsSnapshots: Bool = false
+    public var minDataCountDelta: UInt64 = .zero
 
     public init() {}
 }
