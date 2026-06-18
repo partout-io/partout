@@ -142,6 +142,10 @@ internal class JNITunnelController(
                 else -> {}
             }
         }
+        if (!appliedDnsSettings && info.options.dnsFallbackServers.isNotEmpty()) {
+            Log.i(logTag, "DNS: Apply fallback servers: ${info.options.dnsFallbackServers}")
+            info.options.dnsFallbackServers.addDNSServers(logTag, builder)
+        }
         if (!appliedAddressSettings) {
             Log.e(logTag, "Unable to set interface address")
             return INVALID_TUN_FD
