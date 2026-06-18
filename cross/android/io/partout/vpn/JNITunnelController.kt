@@ -187,7 +187,7 @@ internal class JNITunnelController(
 
     override fun onSnapshot(snapshotJSON: String) = synchronized(lock) {
         if (isNativeCancelled) { return }
-        Log.d(logTag, "onSnapshot(${snapshotJSON})")
+//        Log.d(logTag, "onSnapshot(${snapshotJSON})")
         val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
         delegate.onSnapshot(snapshot)
         return@synchronized

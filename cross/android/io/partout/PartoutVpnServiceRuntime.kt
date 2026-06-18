@@ -276,7 +276,7 @@ class PartoutVpnServiceRuntime(
         }
 
         private fun broadcast(snapshot: TunnelSnapshot) {
-            Log.d(logTag, "Emit daemon snapshot: $snapshot")
+//            Log.d(logTag, "Emit daemon snapshot: $snapshot")
             val intent = Intent(ACTION_SNAPSHOT).apply {
                 setPackage(service.packageName)
                 putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))

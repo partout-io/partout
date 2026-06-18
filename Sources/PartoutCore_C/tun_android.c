@@ -244,7 +244,7 @@ cleanup:
 
 void pp_tun_ctrl_report_snapshot(void *_Nullable ref, const char *snapshot_json) {
     assert(ref);
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_report_snapshot(%p)", ref);
+//    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_android: ctrl_report_snapshot(%p)", ref);
 
     PP_JNI_ATTACH_OR_RETURN_VOID(env);
 

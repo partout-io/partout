@@ -135,7 +135,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
     }
 
     public func reportSnapshot(_ snapshot: TunnelSnapshot) {
-        pp_log(ctx, .core, .debug, "Report tunnel snapshot: \(snapshot)")
+//        pp_log(ctx, .core, .debug, "Report tunnel snapshot: \(snapshot)")
         do {
             let json = try JSONEncoder.shared().encodeJSON(snapshot)
             json.withCString {
