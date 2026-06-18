@@ -55,7 +55,7 @@ internal class JNITunnelController(
     private val reachabilityObserver = ReachabilityObserver(service)
     private var reachabilityJob: Job? = null
     private var betterPathJob: Job? = null
-    private var networkInfo = NetworkInfo.Companion.empty
+    private var networkInfo = NetworkInfo.empty
     private var lastEmittedNetwork: Network? = null
     private var lastEmittedNetworkPreference: NetworkPathPreference? = null
 

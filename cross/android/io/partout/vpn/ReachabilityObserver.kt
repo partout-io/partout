@@ -26,7 +26,7 @@ internal class NetworkInfo private constructor(
         return sortedNetworks
     }
 
-    internal fun preferenceFor(network: Network?): NetworkPathPreference? {
+    fun preferenceFor(network: Network?): NetworkPathPreference? {
         if (network == null) {
             return null
         }
@@ -57,9 +57,9 @@ internal class NetworkInfo private constructor(
     }
 
     companion object {
-        internal val empty = NetworkInfo(emptySet(), emptyMap(), emptyList())
+        val empty = NetworkInfo(emptySet(), emptyMap(), emptyList())
 
-        internal fun from(
+        fun from(
             currentNetworks: Set<Network>,
             preferences: Map<Network, NetworkPathPreference>
         ): NetworkInfo {
