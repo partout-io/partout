@@ -73,49 +73,18 @@ fun DNSModule.addServers(
     routed: Boolean
 ) {
     servers.forEach { server ->
-        val route = subnetFrom(server)
+        val route = VpnSubnet.parse(server)
         if (route == null) {
             Log.w(logTag, "DNS: Ignoring invalid server '$server'")
             return@forEach
         }
-        Log.i(logTag, "DNS: Server: ${route.address}/${route.prefixLength}")
-        builder.addDnsServer(route.address)
+        Log.i(logTag, "DNS: Server: ${route.cidr}")
+        builder.addDnsServer(route)
         when {
             routed -> {
-                Log.i(logTag, "DNS: Route server through VPN: ${route.address}/${route.prefixLength}")
-                builder.addRoute(route.address, route.prefixLength)
+                Log.i(logTag, "DNS: Route server through VPN: ${route.cidr}")
+                builder.addRoute(route)
             }
         }
     }
-}
-
-private data class DnsNumericSubnet(
-    val address: String,
-    val prefixLength: Int
-)
-
-private fun subnetFrom(raw: String): DnsNumericSubnet? {
-    return runCatching {
-        val trimmed = raw.trim()
-        require(trimmed.isNotEmpty())
-
-        val parts = trimmed.split("/", limit = 2)
-        val address = parts[0].trim()
-        require(isNumericAddress(address))
-
-        val prefixLength = parts.getOrNull(1)?.toInt() ?: defaultPrefixLength(address)
-        DnsNumericSubnet(address, prefixLength)
-    }.getOrNull()
-}
-
-private fun defaultPrefixLength(address: String): Int {
-    return when {
-        address.contains(":") -> 128
-        address.contains(".") -> 32
-        else -> throw IllegalArgumentException("Unsupported DNS server address")
-    }
-}
-
-private fun isNumericAddress(address: String): Boolean {
-    return address.contains(":") || address.matches(Regex("""\d{1,3}(\.\d{1,3}){3}"""))
 }
