@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-package io.partout.vpn
+package io.partout
 
 import android.net.Network
 import android.net.VpnService
@@ -14,6 +14,13 @@ import io.partout.models.TaggedModuleIP
 import io.partout.models.TaggedModuleOnDemand
 import io.partout.models.TunnelRemoteInfoWrapper
 import io.partout.models.TunnelSnapshot
+import io.partout.vpn.DNSModuleApplying
+import io.partout.vpn.HTTPProxyModuleApplying
+import io.partout.vpn.IPModuleApplying
+import io.partout.vpn.NetworkInfo
+import io.partout.vpn.NetworkPathPreference
+import io.partout.vpn.OnDemandModuleApplying
+import io.partout.vpn.ReachabilityObserver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -21,48 +28,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-
-/*
-Three layers are involved in this:
-- PartoutVpnServiceRuntime.kt
-- JNITunnelController.kt
-- NativeTunnelController.swift (+ tun_android.c)
-
-Where:
-- PartoutVpnServiceRuntime owns JNITunnelController and forwards its JNI ref to Engine.start()
-- The engine sets up the Swift/C NativeTunnelController with the JNI ref
-- On setup, NativeTunnelController sets itself (via C) as the JNITunnelController delegate
-- When needed, NativeTunnelController calls JNITunnelController methods via JNI
-- When needed, JNITunnelController calls NativeTunnelController methods via the JNI delegate
- */
-
-// Swift/C -> Kotlin: ProGuard rules MUST MATCH!
-interface NativeTunnelControllerJNI {
-    fun setDelegate(delegate: Long): Long
-    fun setTunnel(infoJSON: String): Int
-    fun configureSockets(fds: IntArray)
-    fun onSnapshot(snapshotJSON: String)
-    fun clearTunnel(killSwitch: Boolean)
-    fun cancelTunnel(errorCode: String?)
-}
-
-// Kotlin -> JNI -> C
-interface NativeTunnelController {
-    fun onReachabilityUpdate(info: NetworkInfo)
-    fun getEnvironmentValue(key: String): String?
-}
-
-// Called by the runtime
-interface TunnelController: NativeTunnelController, NativeTunnelControllerJNI {
-    fun startObserving()
-    fun stopObserving()
-}
-
-// Delegated to the runtime
-interface TunnelControllerDelegate {
-    fun onSnapshot(snapshot: TunnelSnapshot)
-    fun shouldDisconnect(controller: JNITunnelController)
-}
 
 class JNITunnelController(
     private val logTag: String,
@@ -82,7 +47,7 @@ class JNITunnelController(
     private val reachabilityObserver = ReachabilityObserver(service)
     private var reachabilityJob: Job? = null
     private var betterPathJob: Job? = null
-    private var networkInfo = NetworkInfo.empty
+    private var networkInfo = NetworkInfo.Companion.empty
     private var lastEmittedNetwork: Network? = null
     private var lastEmittedNetworkPreference: NetworkPathPreference? = null
 

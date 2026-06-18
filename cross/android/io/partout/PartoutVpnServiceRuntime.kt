@@ -17,8 +17,6 @@ import android.util.Log
 import io.partout.models.TaggedProfile
 import io.partout.models.TunnelSnapshot
 import io.partout.models.TunnelStatus
-import io.partout.vpn.JNITunnelController
-import io.partout.vpn.TunnelControllerDelegate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
