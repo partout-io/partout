@@ -19,13 +19,13 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     private let options: TunnelControllerOptions
 
+    private let bufSize: Int
+
     private let onReachableStream: CurrentValueStream<Bool>
 
     private let reachabilityHolder: ReachabilityHolder
 
     private let dns: DNSResolver
-
-    private let bufSize: Int
 
     public init(
         _ ctx: PartoutLoggerContext,
