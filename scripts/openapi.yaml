@@ -796,9 +796,12 @@ components:
           type: array
         originalModuleId:
           "$ref": "#/components/schemas/UniqueID"
+        profile:
+          "$ref": "#/components/schemas/TaggedProfile"
         requiresVirtualDevice:
           type: boolean
       required:
+        - profile
         - originalModuleId
         - requiresVirtualDevice
       type: object

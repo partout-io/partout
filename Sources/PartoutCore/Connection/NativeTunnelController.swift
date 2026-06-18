@@ -11,6 +11,8 @@ public final class NativeTunnelController: TunnelController, Sendable {
     nonisolated(unsafe)
     private let ref: UnsafeMutableRawPointer?
 
+    private let profile: Profile
+
     private let environment: TunnelEnvironmentReader
 
     private let betterPathFactory: BetterPathStreamFactory
@@ -28,6 +30,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
     public init(
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
+        profile: Profile,
         environment: TunnelEnvironmentReader,
         betterPathFactory: BetterPathStreamFactory? = nil,
         logsSnapshots: Bool,
@@ -43,6 +46,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
 #else
         self.ref = ref
 #endif
+        self.profile = profile
         self.environment = environment
         self.betterPathFactory = betterPathFactory ?? BetterPathProxy()
         self.logsSnapshots = logsSnapshots
@@ -96,7 +100,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         }
 
         // Encode to JSON for native receivers
-        let infoJSON = try info.encodedAsJSON()
+        let infoJSON = try info.encodedAsJSON(profile)
 
         // Create tun with optional implementation from controller
         guard let tun = info.originalModuleId.uuidString.withCString({ uuid in

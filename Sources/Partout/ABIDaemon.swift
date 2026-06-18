@@ -58,6 +58,7 @@ public final class ABIDaemon {
         let controller = try NativeTunnelController(
             ctx,
             ref: bindings?.controller,
+            profile: profile,
             environment: environment,
             betterPathFactory: betterPathFactory,
             logsSnapshots: options.logsSnapshots
