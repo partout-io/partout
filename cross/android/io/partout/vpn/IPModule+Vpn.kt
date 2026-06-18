@@ -48,10 +48,11 @@ private fun String.addAddress(logTag: String, builder: VpnService.Builder, famil
         return false
     }
     Log.i(logTag, "IP: Address = ${subnet.cidr}")
-    return builder.tryAddAddress(subnet)?.let {
+    return runCatching {
+        builder.addAddress(subnet)
+    }.onFailure {
         Log.w(logTag, "IP: Unable to add address '$this'", it)
-        false
-    } ?: true
+    }.isSuccess
 }
 
 private fun Route.apply(logTag: String, builder: VpnService.Builder, isExcluded: Boolean, family: VpnAddressFamily) {
@@ -72,7 +73,9 @@ private fun Route.apply(logTag: String, builder: VpnService.Builder, isExcluded:
 
 private fun VpnSubnet.includeRoute(logTag: String, builder: VpnService.Builder, route: Route) {
     Log.i(logTag, "IP: Include route $cidr")
-    builder.tryAddRoute(this)?.let {
+    runCatching {
+        builder.addRoute(this)
+    }.onFailure {
         Log.w(logTag, "IP: Unable to add route '$route'", it)
     }
 }

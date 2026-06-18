@@ -22,15 +22,7 @@ internal fun VpnService.Builder.addRoute(subnet: VpnSubnet) {
     addRoute(subnet.address, subnet.prefixLength)
 }
 
-internal fun VpnService.Builder.tryAddAddress(subnet: VpnSubnet): Throwable? {
-    return runCatching {
-        addAddress(subnet.address, subnet.prefixLength)
-    }.exceptionOrNull()
-}
-
-internal fun VpnService.Builder.tryAddRoute(subnet: VpnSubnet): Throwable? {
-    return runCatching {
-        addRoute(subnet)
-    }.exceptionOrNull()
+internal fun VpnService.Builder.addAddress(subnet: VpnSubnet) {
+    addAddress(subnet.address, subnet.prefixLength)
 }
 //endregion
