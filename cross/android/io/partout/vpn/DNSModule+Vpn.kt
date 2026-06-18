@@ -32,15 +32,13 @@ private fun DNSModule.applyServers(
             logTag,
             "DNS: $protocolName is not supported by VpnService.Builder, using numeric servers only"
         )
-        addServers(logTag, builder, routed = routesThroughVPN == true)
-        return true
+        return addServers(logTag, builder, routed = routesThroughVPN == true)
     }
     if (servers.isEmpty()) {
         Log.i(logTag, "DNS: cleartext DNS without servers is ignored")
         return false
     }
-    addServers(logTag, builder, routed = routesThroughVPN == true)
-    return true
+    return addServers(logTag, builder, routed = routesThroughVPN == true)
 }
 
 private fun DNSModule.addSearchDomains(
@@ -63,7 +61,8 @@ internal fun DNSModule.addServers(
     logTag: String,
     builder: VpnService.Builder,
     routed: Boolean
-) {
+): Boolean {
+    var addedServers = false
     servers.forEach { server ->
         val route = VpnSubnet.parse(server)
         if (route == null) {
@@ -72,6 +71,7 @@ internal fun DNSModule.addServers(
         }
         Log.i(logTag, "DNS: Server: ${route.cidr}")
         builder.addDnsServer(route)
+        addedServers = true
         when {
             routed -> {
                 Log.i(logTag, "DNS: Route server through VPN: ${route.cidr}")
@@ -79,6 +79,7 @@ internal fun DNSModule.addServers(
             }
         }
     }
+    return addedServers
 }
 
 internal fun List<String>.addDNSServers(
