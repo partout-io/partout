@@ -6,9 +6,9 @@ package io.partout.vpn
 
 import android.net.VpnService
 import android.util.Log
+import io.partout.extensions.VpnSubnet
+import io.partout.extensions.unsupportedProtocolName
 import io.partout.models.DNSModule
-import io.partout.models.DNSModuleProtocolTypehttps
-import io.partout.models.DNSModuleProtocolTypetls
 
 class DNSModuleApplying(
     private val module: DNSModule
@@ -26,11 +26,11 @@ private fun DNSModule.applyServers(
     logTag: String,
     builder: VpnService.Builder
 ): Boolean {
-    val unsupportedProtocolName = unsupportedProtocolName()
-    if (unsupportedProtocolName != null) {
+    val protocolName = unsupportedProtocolName
+    if (protocolName != null) {
         Log.i(
             logTag,
-            "DNS: $unsupportedProtocolName is not supported by VpnService.Builder, using numeric servers only"
+            "DNS: $protocolName is not supported by VpnService.Builder, using numeric servers only"
         )
         addServers(logTag, builder, routed = routesThroughVPN == true)
         return true
@@ -41,14 +41,6 @@ private fun DNSModule.applyServers(
     }
     addServers(logTag, builder, routed = routesThroughVPN == true)
     return true
-}
-
-private fun DNSModule.unsupportedProtocolName(): String? {
-    return when (protocolType) {
-        is DNSModuleProtocolTypehttps -> "DoH"
-        is DNSModuleProtocolTypetls -> "DoT"
-        else -> null
-    }
 }
 
 private fun DNSModule.addSearchDomains(

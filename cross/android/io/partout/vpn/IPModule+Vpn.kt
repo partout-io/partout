@@ -7,6 +7,9 @@ package io.partout.vpn
 import android.net.VpnService
 import android.os.Build
 import android.util.Log
+import io.partout.extensions.VpnAddressFamily
+import io.partout.extensions.VpnSubnet
+import io.partout.extensions.destinationPrefix
 import io.partout.models.IPModule
 import io.partout.models.IPSettings
 import io.partout.models.Route

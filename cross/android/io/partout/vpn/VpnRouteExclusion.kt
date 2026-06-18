@@ -6,6 +6,7 @@ package io.partout.vpn
 
 import android.net.VpnService
 import android.os.Build
+import io.partout.extensions.VpnSubnet
 import java.lang.reflect.InvocationTargetException
 import java.net.InetAddress
 
