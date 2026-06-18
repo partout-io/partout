@@ -55,7 +55,7 @@ public final class ABIDaemon {
 #else
         betterPathFactory = nil // Delegated from C
 #endif
-        let controllerOptions = options.forNativeController()
+        let controllerOptions = TunnelControllerOptions()
         let controller = try NativeTunnelController(
             ctx,
             ref: bindings?.controller,
@@ -104,8 +104,8 @@ public final class ABIDaemon {
 }
 
 private extension ABIDaemon.Options {
-    func forNativeController() -> NativeTunnelController.Options {
-        var options = NativeTunnelController.Options()
+    func forTunnelController() -> TunnelControllerOptions {
+        var options = TunnelControllerOptions()
         options.dnsFallbackServers = dnsFallbackServers
         options.logsSnapshots = logsSnapshots
         return options

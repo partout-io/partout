@@ -6,14 +6,6 @@ internal import _PartoutPortable_C
 
 /// A ``TunnelController`` that interacts with a tun interface through the native platform.
 public final class NativeTunnelController: TunnelController, Sendable {
-    public struct Options: Codable, Sendable {
-        public var dnsFallbackServers: [String] = []
-        public var logsSnapshots: Bool = false
-        public var bufSize: Int = 1 * 1024 * 1024 // 1MB
-
-        public init() {}
-    }
-
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
@@ -25,7 +17,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     private let betterPathFactory: BetterPathStreamFactory
 
-    private let options: Options
+    private let options: TunnelControllerOptions
 
     private let onReachableStream: CurrentValueStream<Bool>
 
@@ -33,13 +25,16 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     private let dns: DNSResolver
 
+    private let bufSize: Int
+
     public init(
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
         profile: Profile,
         environment: TunnelEnvironmentReader,
         betterPathFactory: BetterPathStreamFactory? = nil,
-        options: Options
+        options: TunnelControllerOptions,
+        bufSize: Int = 1 * 1024 * 1024 // 1MB
     ) throws {
         self.ctx = ctx
 #if os(Android)
@@ -55,6 +50,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         self.environment = environment
         self.betterPathFactory = betterPathFactory ?? BetterPathProxy()
         self.options = options
+        self.bufSize = bufSize
 
         onReachableStream = CurrentValueStream(false)
         reachabilityHolder = ReachabilityHolder()
@@ -213,7 +209,7 @@ extension NativeTunnelController {
                     return false
                 }
             },
-            bufSize: options.bufSize
+            bufSize: bufSize
         )
     }
 }

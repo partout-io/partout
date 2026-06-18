@@ -4,13 +4,13 @@
 
 struct TunnelRemoteInfoWrapper: Encodable, Sendable {
     let profile: TaggedProfile
-    let options: NativeTunnelController.Options
+    let options: TunnelControllerOptions
     let originalModuleId: UniqueID
     let address: Address?
     let requiresVirtualDevice: Bool
     let modules: [TaggedModule]?
 
-    init(_ profile: Profile, options: NativeTunnelController.Options, info: TunnelRemoteInfo) {
+    init(_ profile: Profile, options: TunnelControllerOptions, info: TunnelRemoteInfo) {
         self.profile = profile.asTaggedProfile
         self.options = options
         originalModuleId = info.originalModuleId
@@ -21,7 +21,7 @@ struct TunnelRemoteInfoWrapper: Encodable, Sendable {
 }
 
 extension TunnelRemoteInfo {
-    func encodedAsJSON(_ profile: Profile, options: NativeTunnelController.Options) throws -> String {
+    func encodedAsJSON(_ profile: Profile, options: TunnelControllerOptions) throws -> String {
         let wrapped = TunnelRemoteInfoWrapper(profile, options: options, info: self)
         do {
             return try JSONEncoder.shared().encodeJSON(wrapped)

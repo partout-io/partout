@@ -25,3 +25,11 @@ extension TunnelController {
         await clearTunnelSettings(withKillSwitch: false)
     }
 }
+
+/// Common options to give to ``TunnelController``.
+public struct TunnelControllerOptions: Codable, Sendable {
+    public var dnsFallbackServers: [String] = []
+    public var logsSnapshots: Bool = false
+
+    public init() {}
+}

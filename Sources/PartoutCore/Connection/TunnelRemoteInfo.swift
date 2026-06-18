@@ -4,7 +4,6 @@
 
 /// A set of extra info that a ``Connection`` may signal to the tunnel to complete the configuration stage.
 public struct TunnelRemoteInfo: Sendable {
-
     /// The originating module identifier.
     public let originalModuleId: UniqueID
 
