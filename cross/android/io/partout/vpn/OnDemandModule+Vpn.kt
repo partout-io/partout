@@ -8,7 +8,7 @@ import android.net.VpnService
 import android.util.Log
 import io.partout.models.OnDemandModule
 
-class OnDemandModuleApplying(
+internal class OnDemandModuleApplying(
     @Suppress("UNUSED_PARAMETER")
     module: OnDemandModule
 ): VpnServiceApplying {

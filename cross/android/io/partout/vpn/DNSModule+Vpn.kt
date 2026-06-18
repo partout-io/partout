@@ -10,7 +10,7 @@ import io.partout.extensions.VpnSubnet
 import io.partout.extensions.unsupportedProtocolName
 import io.partout.models.DNSModule
 
-class DNSModuleApplying(
+internal class DNSModuleApplying(
     private val module: DNSModule
 ): VpnServiceApplying {
     override fun apply(logTag: String, builder: VpnService.Builder): Boolean {
@@ -59,7 +59,7 @@ private fun DNSModule.addSearchDomains(
     }
 }
 
-fun DNSModule.addServers(
+internal fun DNSModule.addServers(
     logTag: String,
     builder: VpnService.Builder,
     routed: Boolean

@@ -14,7 +14,7 @@ import io.partout.models.IPModule
 import io.partout.models.IPSettings
 import io.partout.models.Route
 
-class IPModuleApplying(
+internal class IPModuleApplying(
     private val module: IPModule
 ): VpnServiceApplying {
     override fun apply(logTag: String, builder: VpnService.Builder): Boolean {

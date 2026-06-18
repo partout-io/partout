@@ -4,9 +4,6 @@
 
 package io.partout
 
-import io.partout.models.TunnelSnapshot
-import io.partout.vpn.NetworkInfo
-
 /*
 Three layers are involved in this:
 - PartoutVpnServiceRuntime.kt
@@ -29,22 +26,4 @@ interface NativeTunnelControllerJNI {
     fun onSnapshot(snapshotJSON: String)
     fun clearTunnel(killSwitch: Boolean)
     fun cancelTunnel(errorCode: String?)
-}
-
-// Kotlin -> JNI -> C
-interface NativeTunnelController {
-    fun onReachabilityUpdate(info: NetworkInfo)
-    fun getEnvironmentValue(key: String): String?
-}
-
-// Called by the runtime
-interface TunnelController: NativeTunnelController, NativeTunnelControllerJNI {
-    fun startObserving()
-    fun stopObserving()
-}
-
-// Delegated to the runtime
-interface TunnelControllerDelegate {
-    fun onSnapshot(snapshot: TunnelSnapshot)
-    fun shouldDisconnect(controller: JNITunnelController)
 }

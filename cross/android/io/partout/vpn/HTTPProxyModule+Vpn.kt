@@ -13,7 +13,7 @@ import io.partout.extensions.hasProxyConflict
 import io.partout.extensions.proxyEndpoint
 import io.partout.models.HTTPProxyModule
 
-class HTTPProxyModuleApplying(
+internal class HTTPProxyModuleApplying(
     private val module: HTTPProxyModule
 ): VpnServiceApplying {
     override fun apply(logTag: String, builder: VpnService.Builder): Boolean {

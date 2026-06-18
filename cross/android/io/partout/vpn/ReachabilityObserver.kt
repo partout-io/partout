@@ -13,11 +13,11 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 
-interface ReachabilityObserverProtocol {
+internal interface ReachabilityObserverProtocol {
     fun flow(): Flow<NetworkInfo>
 }
 
-class NetworkInfo private constructor(
+internal class NetworkInfo private constructor(
     val currentNetworks: Set<Network>,
     private val preferences: Map<Network, NetworkPathPreference>,
     private val sortedNetworks: List<Network>
@@ -73,7 +73,7 @@ class NetworkInfo private constructor(
     }
 }
 
-class ReachabilityObserver(
+internal class ReachabilityObserver(
     context: Context,
     private val appContext: Context = context.applicationContext,
     private val connectivityManager: ConnectivityManager =

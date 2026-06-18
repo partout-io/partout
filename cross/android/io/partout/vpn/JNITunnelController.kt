@@ -1,26 +1,16 @@
-// SPDX-FileCopyrightText: 2026 Davide De Rosa
-//
-// SPDX-License-Identifier: GPL-3.0
-
-package io.partout
+package io.partout.vpn
 
 import android.net.Network
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import io.partout.NativeTunnelControllerJNI
 import io.partout.models.TaggedModuleDNS
 import io.partout.models.TaggedModuleHTTPProxy
 import io.partout.models.TaggedModuleIP
 import io.partout.models.TaggedModuleOnDemand
 import io.partout.models.TunnelRemoteInfoWrapper
 import io.partout.models.TunnelSnapshot
-import io.partout.vpn.DNSModuleApplying
-import io.partout.vpn.HTTPProxyModuleApplying
-import io.partout.vpn.IPModuleApplying
-import io.partout.vpn.NetworkInfo
-import io.partout.vpn.NetworkPathPreference
-import io.partout.vpn.OnDemandModuleApplying
-import io.partout.vpn.ReachabilityObserver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -29,7 +19,30 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
-class JNITunnelController(
+// Kotlin -> JNI -> C
+internal interface NativeTunnelController {
+    fun onReachabilityUpdate(info: NetworkInfo)
+    fun getEnvironmentValue(key: String): String?
+}
+
+// Called by the runtime
+internal interface TunnelController: NativeTunnelController, NativeTunnelControllerJNI {
+    fun startObserving()
+    fun stopObserving()
+}
+
+// Delegated to the runtime
+internal interface TunnelControllerDelegate {
+    fun onSnapshot(snapshot: TunnelSnapshot)
+    fun shouldDisconnect(controller: NativeTunnelControllerJNI)
+}
+
+// Applies module settings to a VpnService
+internal interface VpnServiceApplying {
+    fun apply(logTag: String, builder: VpnService.Builder): Boolean
+}
+
+internal class JNITunnelController(
     private val logTag: String,
     private val service: VpnService,
     private val scope: CoroutineScope,
