@@ -4,47 +4,10 @@
 
 package io.partout.extensions
 
-import io.partout.models.DNSModule
-import io.partout.models.DNSModuleProtocolTypehttps
-import io.partout.models.DNSModuleProtocolTypetls
-import io.partout.models.HTTPProxyModule
 import io.partout.models.Route
 import java.net.Inet6Address
 import java.net.InetAddress
 
-//region DNS
-internal val DNSModule.unsupportedProtocolName: String?
-    get() = when (protocolType) {
-        is DNSModuleProtocolTypehttps -> "DoH"
-        is DNSModuleProtocolTypetls -> "DoT"
-        else -> null
-    }
-//endregion
-
-//region HTTPProxy
-internal val HTTPProxyModule.proxyEndpoint: String?
-    get() = proxy ?: secureProxy
-
-internal val HTTPProxyModule.hasProxyConflict: Boolean
-    get() = proxy != null && secureProxy != null && proxy != secureProxy
-
-internal data class HostPort(
-    val host: String,
-    val port: Int
-)
-
-internal fun String.asHostPort(): HostPort {
-    val separator = lastIndexOf(':')
-    if (separator <= 0 || separator == lastIndex) {
-        return HostPort(this, 0)
-    }
-    val host = substring(0, separator)
-    val port = substring(separator + 1).toIntOrNull() ?: 0
-    return HostPort(host, port)
-}
-//endregion
-
-//region IP
 internal enum class VpnAddressFamily(
     val defaultRouteAddress: String,
     val maxPrefixLength: Int
@@ -127,4 +90,3 @@ private fun String.isDottedDecimal(): Boolean {
         octet.isNotEmpty() && octet.all(Char::isDigit) && octet.toIntOrNull()?.let { it in 0..255 } == true
     }
 }
-//endregion
