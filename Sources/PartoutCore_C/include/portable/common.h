@@ -45,6 +45,7 @@ void pp_log_simple_append(const char *_Nullable tag,
 static inline
 void pp_assert(bool condition) {
     assert(condition);
+    (void)condition;
 }
 
 static inline
