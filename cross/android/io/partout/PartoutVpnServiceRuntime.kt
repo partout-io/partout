@@ -33,7 +33,8 @@ class PartoutVpnServiceRuntime(
     private val logTag: String,
     private val jniLogTag: String,
     val service: VpnService,
-    private val engine: Engine
+    private val engine: Engine,
+    logsSnapshots: Boolean
 ): TunnelControllerDelegate {
     // Execute actions in serial queue
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -45,7 +46,10 @@ class PartoutVpnServiceRuntime(
     private var controller: JNITunnelController? = null
 
     // Deliver snapshots with mutex
-    private val snapshotEmitter = SnapshotEmitter(logTag, service)
+    private val snapshotEmitter = SnapshotEmitter(
+        if (logsSnapshots) logTag else null,
+        service
+    )
 
     init {
         serviceScope.launch {
@@ -118,7 +122,13 @@ class PartoutVpnServiceRuntime(
         activeProfileId = profileId
         Log.i(logTag, "Starting VPN daemon")
         runCatching {
-            val newController = JNITunnelController(jniLogTag, service, serviceScope, this)
+            val newController = JNITunnelController(
+                jniLogTag,
+                service,
+                serviceScope,
+                logsSnapshots,
+                this
+            )
             engine.start(intent, newController, profileJSON)
             // Does not throw from now
             Log.i(logTag, "Started VPN daemon")
@@ -218,7 +228,7 @@ class PartoutVpnServiceRuntime(
 
     //region Snapshots
     private class SnapshotEmitter(
-        private val logTag: String,
+        private val logTag: String?,
         private val service: Service
     ) {
         private val lock = Any()
@@ -244,14 +254,14 @@ class PartoutVpnServiceRuntime(
         fun emit(snapshot: TunnelSnapshot) = synchronized(lock) {
             if (!isAccepting) { return }
             if (snapshot.id != activeProfileId) {
-                Log.d(logTag, "Drop stale daemon snapshot: $snapshot")
+                logIfNeeded("Drop stale daemon snapshot: $snapshot")
                 return
             }
             broadcast(snapshot)
         }
 
         fun emitFinal() = synchronized(lock) {
-            Log.d(logTag, "Emit final daemon snapshot")
+            logIfNeeded("Emit final daemon snapshot")
             latestSnapshot?.let {
                 emit(it.disabled())
             }
@@ -276,13 +286,19 @@ class PartoutVpnServiceRuntime(
         }
 
         private fun broadcast(snapshot: TunnelSnapshot) {
-//            Log.d(logTag, "Emit daemon snapshot: $snapshot")
+            logIfNeeded("Emit daemon snapshot: $snapshot")
             val intent = Intent(ACTION_SNAPSHOT).apply {
                 setPackage(service.packageName)
                 putExtra(EXTRA_SNAPSHOT_JSON, json.encodeToString(snapshot))
             }
             latestSnapshot = snapshot
             service.sendBroadcast(intent)
+        }
+
+        private fun logIfNeeded(message: String) {
+            logTag?.let {
+                Log.d(it, message)
+            }
         }
 
         private fun TunnelSnapshot.disabled() = TunnelSnapshot(
