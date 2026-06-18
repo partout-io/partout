@@ -141,7 +141,7 @@ class PartoutVpnServiceRuntime(
         engine.onSnapshot(snapshot)
     }
 
-    override fun shouldDisconnect(controller: JNITunnelController) = launchCommand {
+    override fun shouldDisconnect(controller: NativeTunnelControllerJNI) = launchCommand {
         if (controller != this.controller) { return@launchCommand }
         stopTunnel()
         stopService()
@@ -369,7 +369,7 @@ class PartoutVpnServiceRuntime(
 
     //region Engine
     interface Engine {
-        suspend fun start(intent: Intent?, controller: JNITunnelController, profileJSON: String)
+        suspend fun start(intent: Intent?, controller: NativeTunnelControllerJNI, profileJSON: String)
         suspend fun stop()
         suspend fun readLastProfile(): String
         suspend fun writeLastProfile(json: String)
