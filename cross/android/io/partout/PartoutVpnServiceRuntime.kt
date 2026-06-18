@@ -33,8 +33,7 @@ class PartoutVpnServiceRuntime(
     private val logTag: String,
     private val jniLogTag: String,
     val service: VpnService,
-    private val engine: Engine,
-    logsSnapshots: Boolean
+    private val engine: Engine
 ): TunnelControllerDelegate {
     // Execute actions in serial queue
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -47,7 +46,7 @@ class PartoutVpnServiceRuntime(
 
     // Deliver snapshots with mutex
     private val snapshotEmitter = SnapshotEmitter(
-        if (logsSnapshots) logTag else null,
+        if (engine.logsSnapshots) logTag else null,
         service
     )
 
@@ -126,7 +125,7 @@ class PartoutVpnServiceRuntime(
                 jniLogTag,
                 service,
                 serviceScope,
-                logsSnapshots,
+                engine.logsSnapshots,
                 this
             )
             engine.start(intent, newController, profileJSON)
@@ -392,6 +391,7 @@ class PartoutVpnServiceRuntime(
         suspend fun deleteLastProfile(id: String)
         fun onSnapshot(snapshot: TunnelSnapshot)
         fun onServiceStopped() {}
+        val logsSnapshots: Boolean
     }
     //endregion
 
