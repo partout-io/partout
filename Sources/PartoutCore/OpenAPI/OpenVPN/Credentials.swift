@@ -137,3 +137,48 @@ private extension OpenVPN.Credentials.OTPMethod {
         }
     }
 }
+
+// MARK: - Custom Codable
+
+extension OpenVPN.Credentials.OTPMethod {
+    private enum LegacyCodingKeys: String, CodingKey {
+        case none
+        case append
+        case encode
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let rawValue = try? container.decode(String.self) {
+            guard let method = Self(rawValue: rawValue) else {
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "Unknown OTP method '\(rawValue)'"
+                )
+            }
+            self = method
+            return
+        }
+
+        let legacyContainer = try decoder.container(keyedBy: LegacyCodingKeys.self)
+        if legacyContainer.contains(.none) {
+            self = .none
+        } else if legacyContainer.contains(.append) {
+            self = .append
+        } else if legacyContainer.contains(.encode) {
+            self = .encode
+        } else {
+            throw DecodingError.dataCorrupted(
+                .init(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Unknown legacy OTP method"
+                )
+            )
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+}
