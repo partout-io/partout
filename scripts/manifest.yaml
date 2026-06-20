@@ -40,7 +40,7 @@ entities:
   - OpenVPN.TLSWrap
   - OpenVPN.TLSWrap.Strategy
   - OpenVPNModule
-  - PartoutError.Code
+  - PartoutErrorCode
   - ProfileBehavior
   - Route
   - SocketType

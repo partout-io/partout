@@ -113,7 +113,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/OpenAPI/Core/IPHeader.swift
 ./PartoutCore/OpenAPI/Core/IPSettings.swift
 ./PartoutCore/OpenAPI/Core/ModuleType.swift
-./PartoutCore/OpenAPI/Core/PartoutError+Code.swift
+./PartoutCore/OpenAPI/PartoutError+Code.swift
 ./PartoutCore/OpenAPI/Core/ProfileBehavior.swift
 ./PartoutCore/OpenAPI/Core/Route.swift
 ./PartoutCore/OpenAPI/Core/SecureData.swift
