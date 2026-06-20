@@ -79,3 +79,29 @@ public enum PartoutErrorCode: String, Hashable, Codable, Sendable {
 extension PartoutError {
     public typealias Code = PartoutErrorCode
 }
+
+// MARK: - Raw Values
+
+public func == (lhs: String, rhs: PartoutError.Code) -> Bool {
+    PartoutError.Code(rawValue: lhs) == rhs
+}
+
+public func == (lhs: PartoutError.Code, rhs: String) -> Bool {
+    rhs == lhs
+}
+
+public func == (lhs: String?, rhs: PartoutError.Code) -> Bool {
+    lhs.map { $0 == rhs } ?? false
+}
+
+public func == (lhs: PartoutError.Code, rhs: String?) -> Bool {
+    rhs == lhs
+}
+
+public func ~= (pattern: PartoutError.Code, value: String) -> Bool {
+    value == pattern
+}
+
+public func ~= (pattern: PartoutError.Code, value: String?) -> Bool {
+    value == pattern
+}
