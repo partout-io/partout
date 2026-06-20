@@ -119,6 +119,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/OpenAPI/Core/SecureData.swift
 ./PartoutCore/OpenAPI/Core/SocketType.swift
 ./PartoutCore/OpenAPI/Core/Subnet.swift
+./PartoutCore/OpenAPI/Core/TunnelControllerOptions.swift
 ./PartoutCore/OpenAPI/Core/TunnelRemoteInfoWrapper.swift
 ./PartoutCore/OpenAPI/Core/TunnelSnapshot.swift
 ./PartoutCore/OpenAPI/Core/TunnelStatus.swift

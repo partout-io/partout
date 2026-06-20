@@ -12,7 +12,11 @@
 #include <stdlib.h>
 
 /* Library initializiation, call it ASAP. */
-void partout_init(void);
+typedef struct {
+    const char *log_tag;
+    bool logs_private_data;
+} partout_init_args;
+void partout_init(const partout_init_args *args);
 
 /* Common functions. */
 const char *partout_version(void);
@@ -52,12 +56,20 @@ typedef struct __partout_daemon_bindings {
     void (*free)(struct __partout_daemon_bindings *);
 } partout_daemon_bindings;
 
+/* Daemon options. */
+typedef struct {
+    bool logs_snapshots;
+    uint64_t min_data_count_delta;
+    const char **dns_fallback;
+    size_t dns_fallback_len;
+} partout_daemon_options;
+
 /* Daemon initialization. */
 typedef struct {
     const char *profile;
     const char *cache_dir;
     bool is_daemon;
-    uint64_t min_data_count_delta;
+    partout_daemon_options options;
     const partout_daemon_bindings *bindings;
 } partout_daemon_start_args;
 

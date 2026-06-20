@@ -20,10 +20,12 @@ public actor PartoutABI: GlobalActor {
 // MUST NEVER block the current thread. Use run() variants instead.
 //
 enum ABI {
-    static func registerDefaultLogger() {
+    static func registerDefaultLogger(tag: String?, logsPrivateData: Bool) {
         var logger = PartoutLogger.Builder()
+        logger.logsAddresses = logsPrivateData
+        logger.logsModules = logsPrivateData
         logger.setDestination(
-            SimpleLogDestination(tag: nil),
+            SimpleLogDestination(tag: tag),
             for: LoggerCategory.partoutCategories
         )
         PartoutLogger.register(logger.build())
@@ -113,4 +115,16 @@ private extension partout_completion {
         }
         callback?(ctx, code, payloadJSON)
     }
+}
+
+func stringsFromCStrings(
+    _ ptrs: UnsafePointer<UnsafePointer<CChar>?>?,
+    count: Int
+) -> [String] {
+    (0..<count)
+        .compactMap { i in
+            ptrs?[i].map {
+                String(cString: $0)
+            }
+        }
 }

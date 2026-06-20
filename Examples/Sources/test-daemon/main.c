@@ -7,24 +7,30 @@
 #include "partout.h"
 
 int main(int argc, const char *argv[]) {
-    partout_init();
+    partout_init_args init_args = { 0 };
+    init_args.log_tag = "test-daemon";
+    partout_init(&init_args);
     puts(partout_version());
     if (argc < 2) {
-        fprintf(stderr, "Missing profile");
+        fprintf(stderr, "Missing profile\n");
         return -1;
     }
-    const char *parent = "PartoutExamples_test-daemon.bundle/Contents/Resources/profiles";
+    const char *parent = NULL;
+    if (getenv("__XCODE_BUILT_PRODUCTS_DIR_PATHS") != NULL) {
+        parent = "PartoutExamples_test-daemon.bundle/Contents/Resources/profiles";
+    }
     const char *profile_filename = argv[1];
     char *profile = partout_readfile(profile_filename, parent);
     if (!profile) {
         fprintf(stderr, "Unable to read profile\n");
         return -1;
     }
-    partout_daemon_start_args args;
+    partout_daemon_start_args args = { 0 };
     args.profile = profile;
     args.is_daemon = true;
     args.cache_dir = ".";
     args.bindings = NULL;
+    args.options.logs_snapshots = true;
     const partout_completion_code result = partout_daemon_start(&args);
     free(profile);
     if (result != PartoutCompletionCodeOK) {

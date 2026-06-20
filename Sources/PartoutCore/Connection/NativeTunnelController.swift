@@ -11,9 +11,13 @@ public final class NativeTunnelController: TunnelController, Sendable {
     nonisolated(unsafe)
     private let ref: UnsafeMutableRawPointer?
 
+    private let profile: Profile
+
     private let environment: TunnelEnvironmentReader
 
     private let betterPathFactory: BetterPathStreamFactory
+
+    private let options: TunnelControllerOptions
 
     private let bufSize: Int
 
@@ -26,8 +30,10 @@ public final class NativeTunnelController: TunnelController, Sendable {
     public init(
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
+        profile: Profile,
         environment: TunnelEnvironmentReader,
         betterPathFactory: BetterPathStreamFactory? = nil,
+        options: TunnelControllerOptions,
         bufSize: Int = 1 * 1024 * 1024 // 1MB
     ) throws {
         self.ctx = ctx
@@ -40,8 +46,10 @@ public final class NativeTunnelController: TunnelController, Sendable {
 #else
         self.ref = ref
 #endif
+        self.profile = profile
         self.environment = environment
         self.betterPathFactory = betterPathFactory ?? BetterPathProxy()
+        self.options = options
         self.bufSize = bufSize
 
         onReachableStream = CurrentValueStream(false)
@@ -92,7 +100,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         }
 
         // Encode to JSON for native receivers
-        let infoJSON = try info.encodedAsJSON()
+        let infoJSON = try info.encodedAsJSON(profile, options: options)
 
         // Create tun with optional implementation from controller
         guard let tun = info.originalModuleId.uuidString.withCString({ uuid in
@@ -135,11 +143,13 @@ public final class NativeTunnelController: TunnelController, Sendable {
     }
 
     public func reportSnapshot(_ snapshot: TunnelSnapshot) {
-        pp_log(ctx, .core, .debug, "Report tunnel snapshot: \(snapshot)")
+        if (options.logsSnapshots) {
+            pp_log(ctx, .core, .debug, "Report tunnel snapshot: \(snapshot)")
+        }
         do {
             let json = try JSONEncoder.shared().encodeJSON(snapshot)
             json.withCString {
-                pp_tun_ctrl_report_snapshot(ref, $0)
+                pp_tun_ctrl_report_snapshot(ref, $0, options.logsSnapshots)
             }
         } catch {
             pp_log(ctx, .core, .error, "Unable to encode snapshots: \(error)")

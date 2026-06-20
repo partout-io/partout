@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import _PartoutCore_C
+import _PartoutPortable_C
 import Partout
 import Testing
 
@@ -30,7 +30,7 @@ func tryTCPConnection() async throws {
     let endpoint = try ExtendedEndpoint("google.com", .init(.tcp, 80))
     let betterPathFactory = DummyFactory()
     let factory = NativeSocketFactory(.global, betterPathFactory: betterPathFactory)
-    let observer = factory.linkObserver(to: endpoint)
+    let observer = factory.linkObserver(to: endpoint, reachability: nil)
     let sut = try await observer.waitForActivity(timeout: 5000)
     guard let io = sut.nativeIO else {
         fatalError("Missing .nativeIO")
@@ -41,7 +41,9 @@ func tryTCPConnection() async throws {
     pp_log(.global, .core, .fault, ">>> WRITING")
     var offset = 0
     while offset < reqData.count {
-        let written = io.write(reqData, offset: offset)
+        guard let written = try? io.write(reqData, offset: offset) else {
+            continue
+        }
         offset += Int(written)
         print("total=\(reqData.count), written=\(written)")
     }
@@ -51,14 +53,8 @@ func tryTCPConnection() async throws {
     let expected = 256
     var buf: [UInt8] = Array(repeating: 0, count: expected)
     while data.count < expected {
-        let count = io.read(&buf)
-        switch count {
-        case 0, PPIOErrorWouldBlock, PPIOErrorNoBufs:
+        guard let count = try? io.read(&buf) else {
             continue
-        default:
-            guard count > 0 else {
-                fatalError("I/O failure")
-            }
         }
         data.append(Data(buf[0..<Int(count)]))
     }

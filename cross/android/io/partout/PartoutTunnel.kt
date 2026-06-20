@@ -38,6 +38,7 @@ class PartoutTunnel(
     private val context: Context,
     private val vpnServiceClass: Class<out VpnService>,
     private val isForeground: Boolean,
+    private val logsSnapshots: Boolean,
     private val requestVpnPermission: (Intent) -> Unit
 ) : Closeable {
     private val appContext = context.applicationContext
@@ -94,7 +95,11 @@ class PartoutTunnel(
         connection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName, service: IBinder) {
                 serviceMessenger = Messenger(service)
-                service.linkToDeath(deathRecipient, 0)
+                runCatching {
+                    service.linkToDeath(deathRecipient, 0)
+                }.onFailure {
+                    Log.e(logTag, "Unable to link to death", it)
+                }
                 // Ask the service for its current snapshot
                 requestSnapshot()
             }
@@ -175,10 +180,10 @@ class PartoutTunnel(
         completion(ERROR_NONE)
     }
 
-    fun disconnect(profileId: String? = null, completion: (Int) -> Unit) {
+    fun disconnect(profileId: String, forget: Boolean = false, completion: (Int) -> Unit) {
         pendingPermission?.completion?.invoke(ERROR_PERMISSION_DENIED)
         pendingPermission = null
-        stopVpnService(profileId)
+        stopVpnService(profileId, forget)
         completion(ERROR_NONE)
     }
     //endregion
@@ -188,7 +193,11 @@ class PartoutTunnel(
         val msg = Message.obtain(null, PartoutVpnServiceRuntime.MSG_GET_STATUS).apply {
             replyTo = clientMessenger
         }
-        serviceMessenger?.send(msg)
+        runCatching {
+            serviceMessenger?.send(msg)
+        }.onFailure {
+            Log.e(logTag, "Unable to request snapshot", it)
+        }
     }
 
     suspend fun requestEnvironmentValue(name: String): String? =
@@ -210,10 +219,11 @@ class PartoutTunnel(
                 pendingRequests.remove(reqId)?.resumeWithException(RemoteException())
                 return@suspendCancellableCoroutine
             }
-            try {
+            runCatching {
                 messenger.send(msg)
-            } catch (e: Exception) {
-                pendingRequests.remove(reqId)?.resumeWithException(e)
+            }.onFailure {
+                Log.e(logTag, "Unable to request environment", it)
+                pendingRequests.remove(reqId)?.resumeWithException(it)
             }
         }
 
@@ -248,30 +258,28 @@ class PartoutTunnel(
         }
     }
 
-    private fun stopVpnService(profileId: String?) {
+    private fun stopVpnService(profileId: String, forget: Boolean) {
         val stopIntent = Intent(appContext, vpnServiceClass).apply {
             action = PartoutVpnServiceRuntime.ACTION_STOP_VPN
-            if (profileId != null) {
-                putExtra(PartoutVpnServiceRuntime.EXTRA_PROFILE_ID, profileId)
+            if (forget) {
+                putExtra(PartoutVpnServiceRuntime.EXTRA_FORGET_ID, profileId)
             }
         }
-        if (isForeground) {
-            ContextCompat.startForegroundService(context, stopIntent)
-        } else {
-            appContext.startService(stopIntent)
-        }
+        appContext.startService(stopIntent)
     }
 
     private fun onSnapshotJSON(snapshotJSON: String) {
         runCatching {
             json.decodeFromString<TunnelSnapshot>(snapshotJSON)
         }.onSuccess { snapshot ->
-            Log.d(logTag, ">>> Snapshot received: ${snapshot}")
+            if (logsSnapshots) {
+                Log.d(logTag, "Snapshot received: $snapshot")
+            }
             _state.update {
                 it.copy(mapOf(snapshot.id to snapshot))
             }
         }.onFailure {
-            Log.e(logTag, ">>> Unable to decode snapshot: ${0}")
+            Log.e(logTag, "Unable to decode snapshot", it)
         }
     }
     //endregion
