@@ -121,42 +121,42 @@ public enum PartoutErrorCode: String, Hashable, Codable, Sendable {
 
     // MARK: OpenVPN
 
-    /// OpenVPN compression settings mismatch.
+    /// Compression settings mismatch.
     case openVPNCompressionMismatch = "OpenVPN.compressionMismatch"
 
-    /// OpenVPN connection failure.
+    /// Connection failure.
     case openVPNConnectionFailure = "OpenVPN.connectionFailure"
 
-    /// OpenVPN has no routing configuration.
+    /// No routing configuration.
     case openVPNNoRouting = "OpenVPN.noRouting"
 
-    /// OpenVPN one-time password is required.
+    /// One-time password is required.
     case openVPNOTPRequired = "OpenVPN.otpRequired"
 
-    /// OpenVPN passphrase is required.
+    /// Passphrase is required.
     case openVPNPassphraseRequired = "OpenVPN.passphraseRequired"
 
-    /// OpenVPN authentication can be retried.
+    /// Authentication can be retried.
     case openVPNRecoverableAuthentication = "OpenVPN.recoverableAuthentication"
 
-    /// OpenVPN server requested shutdown.
+    /// Server requested shutdown.
     case openVPNServerShutdown = "OpenVPN.serverShutdown"
 
-    /// OpenVPN TLS failure.
+    /// TLS failure.
     case openVPNTLSFailure = "OpenVPN.tlsFailure"
 
-    /// OpenVPN algorithm is unsupported.
+    /// Algorithm is unsupported.
     case openVPNUnsupportedAlgorithm = "OpenVPN.unsupportedAlgorithm"
 
-    /// OpenVPN compression setting is unsupported.
+    /// Compression setting is unsupported.
     case openVPNUnsupportedCompression = "OpenVPN.unsupportedCompression"
 
-    /// OpenVPN option is unsupported.
+    /// Option is unsupported.
     case openVPNUnsupportedOption = "OpenVPN.unsupportedOption"
 
     // MARK: WireGuard
 
-    /// WireGuard configuration has no peers.
+    /// Configuration has no peers.
     case wireGuardEmptyPeers = "WireGuard.emptyPeers"
 }
 
