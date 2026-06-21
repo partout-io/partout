@@ -19,152 +19,116 @@ package io.partout.models
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializer
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+
 
 /**
  * 
  *
- * Values: cached,notFound,operationCancelled,releasedObject,scriptException,timeout,unhandled,incompatibleModules,incompleteModule,noActiveModules,nonFinalModules,requiredImplementation,unexpectedModuleType,unknownImportedModule,unknownModuleHandler,authentication,crypto,dnsFailure,exhaustedEndpoints,fdUnavailable,ioFailure,linkNotActive,networkChanged,networkUnreachable,socketConfiguration,tunNotActive,tunNotAvailable,decoding,encoding,invalidField,invalidValue,parsing,keychainAddItem,keychainItemNotFound,openVPNCompressionMismatch,openVPNConnectionFailure,openVPNNoRouting,openVPNOTPRequired,openVPNPassphraseRequired,openVPNRecoverableAuthentication,openVPNServerShutdown,openVPNTLSFailure,openVPNUnsupportedAlgorithm,openVPNUnsupportedCompression,openVPNUnsupportedOption,wireGuardEmptyPeers
+ * Values: success,cached,notFound,operationCancelled,releasedObject,scriptException,timeout,unhandled,incompatibleModules,incompleteModule,noActiveModules,nonFinalModules,requiredImplementation,unexpectedModuleType,unknownImportedModule,unknownModuleHandler,authentication,crypto,dnsFailure,exhaustedEndpoints,fdUnavailable,ioFailure,linkNotActive,networkChanged,networkUnreachable,socketConfiguration,tunNotActive,tunNotAvailable,decoding,encoding,invalidField,invalidValue,parsing,keychainAddItem,keychainItemNotFound,openVPNCompressionMismatch,openVPNConnectionFailure,openVPNNoRouting,openVPNOTPRequired,openVPNPassphraseRequired,openVPNRecoverableAuthentication,openVPNServerShutdown,openVPNTLSFailure,openVPNUnsupportedAlgorithm,openVPNUnsupportedCompression,openVPNUnsupportedOption,wireGuardEmptyPeers
  */
-@Serializable
-enum class PartoutErrorCode(val value: kotlin.String) {
+@Serializable(with = PartoutErrorCodeSerializer::class)
+enum class PartoutErrorCode(val value: kotlin.Int) {
 
-    @SerialName(value = "cached")
-    cached("cached"),
+    success(0),
 
-    @SerialName(value = "notFound")
-    notFound("notFound"),
+    cached(1),
 
-    @SerialName(value = "operationCancelled")
-    operationCancelled("operationCancelled"),
+    notFound(2),
 
-    @SerialName(value = "releasedObject")
-    releasedObject("releasedObject"),
+    operationCancelled(3),
 
-    @SerialName(value = "scriptException")
-    scriptException("scriptException"),
+    releasedObject(4),
 
-    @SerialName(value = "timeout")
-    timeout("timeout"),
+    scriptException(5),
 
-    @SerialName(value = "unhandled")
-    unhandled("unhandled"),
+    timeout(6),
 
-    @SerialName(value = "incompatibleModules")
-    incompatibleModules("incompatibleModules"),
+    unhandled(7),
 
-    @SerialName(value = "incompleteModule")
-    incompleteModule("incompleteModule"),
+    incompatibleModules(8),
 
-    @SerialName(value = "noActiveModules")
-    noActiveModules("noActiveModules"),
+    incompleteModule(9),
 
-    @SerialName(value = "nonFinalModules")
-    nonFinalModules("nonFinalModules"),
+    noActiveModules(10),
 
-    @SerialName(value = "requiredImplementation")
-    requiredImplementation("requiredImplementation"),
+    nonFinalModules(11),
 
-    @SerialName(value = "unexpectedModuleType")
-    unexpectedModuleType("unexpectedModuleType"),
+    requiredImplementation(12),
 
-    @SerialName(value = "unknownImportedModule")
-    unknownImportedModule("unknownImportedModule"),
+    unexpectedModuleType(13),
 
-    @SerialName(value = "unknownModuleHandler")
-    unknownModuleHandler("unknownModuleHandler"),
+    unknownImportedModule(14),
 
-    @SerialName(value = "authentication")
-    authentication("authentication"),
+    unknownModuleHandler(15),
 
-    @SerialName(value = "crypto")
-    crypto("crypto"),
+    authentication(16),
 
-    @SerialName(value = "dnsFailure")
-    dnsFailure("dnsFailure"),
+    crypto(17),
 
-    @SerialName(value = "exhaustedEndpoints")
-    exhaustedEndpoints("exhaustedEndpoints"),
+    dnsFailure(18),
 
-    @SerialName(value = "fdUnavailable")
-    fdUnavailable("fdUnavailable"),
+    exhaustedEndpoints(19),
 
-    @SerialName(value = "ioFailure")
-    ioFailure("ioFailure"),
+    fdUnavailable(20),
 
-    @SerialName(value = "linkNotActive")
-    linkNotActive("linkNotActive"),
+    ioFailure(21),
 
-    @SerialName(value = "networkChanged")
-    networkChanged("networkChanged"),
+    linkNotActive(22),
 
-    @SerialName(value = "networkUnreachable")
-    networkUnreachable("networkUnreachable"),
+    networkChanged(23),
 
-    @SerialName(value = "socketConfiguration")
-    socketConfiguration("socketConfiguration"),
+    networkUnreachable(24),
 
-    @SerialName(value = "tunNotActive")
-    tunNotActive("tunNotActive"),
+    socketConfiguration(25),
 
-    @SerialName(value = "tunNotAvailable")
-    tunNotAvailable("tunNotAvailable"),
+    tunNotActive(26),
 
-    @SerialName(value = "decoding")
-    decoding("decoding"),
+    tunNotAvailable(27),
 
-    @SerialName(value = "encoding")
-    encoding("encoding"),
+    decoding(28),
 
-    @SerialName(value = "invalidField")
-    invalidField("invalidField"),
+    encoding(29),
 
-    @SerialName(value = "invalidValue")
-    invalidValue("invalidValue"),
+    invalidField(30),
 
-    @SerialName(value = "parsing")
-    parsing("parsing"),
+    invalidValue(31),
 
-    @SerialName(value = "keychainAddItem")
-    keychainAddItem("keychainAddItem"),
+    parsing(32),
 
-    @SerialName(value = "keychainItemNotFound")
-    keychainItemNotFound("keychainItemNotFound"),
+    keychainAddItem(33),
 
-    @SerialName(value = "OpenVPN.compressionMismatch")
-    openVPNCompressionMismatch("OpenVPN.compressionMismatch"),
+    keychainItemNotFound(34),
 
-    @SerialName(value = "OpenVPN.connectionFailure")
-    openVPNConnectionFailure("OpenVPN.connectionFailure"),
+    openVPNCompressionMismatch(35),
 
-    @SerialName(value = "OpenVPN.noRouting")
-    openVPNNoRouting("OpenVPN.noRouting"),
+    openVPNConnectionFailure(36),
 
-    @SerialName(value = "OpenVPN.otpRequired")
-    openVPNOTPRequired("OpenVPN.otpRequired"),
+    openVPNNoRouting(37),
 
-    @SerialName(value = "OpenVPN.passphraseRequired")
-    openVPNPassphraseRequired("OpenVPN.passphraseRequired"),
+    openVPNOTPRequired(38),
 
-    @SerialName(value = "OpenVPN.recoverableAuthentication")
-    openVPNRecoverableAuthentication("OpenVPN.recoverableAuthentication"),
+    openVPNPassphraseRequired(39),
 
-    @SerialName(value = "OpenVPN.serverShutdown")
-    openVPNServerShutdown("OpenVPN.serverShutdown"),
+    openVPNRecoverableAuthentication(40),
 
-    @SerialName(value = "OpenVPN.tlsFailure")
-    openVPNTLSFailure("OpenVPN.tlsFailure"),
+    openVPNServerShutdown(41),
 
-    @SerialName(value = "OpenVPN.unsupportedAlgorithm")
-    openVPNUnsupportedAlgorithm("OpenVPN.unsupportedAlgorithm"),
+    openVPNTLSFailure(42),
 
-    @SerialName(value = "OpenVPN.unsupportedCompression")
-    openVPNUnsupportedCompression("OpenVPN.unsupportedCompression"),
+    openVPNUnsupportedAlgorithm(43),
 
-    @SerialName(value = "OpenVPN.unsupportedOption")
-    openVPNUnsupportedOption("OpenVPN.unsupportedOption"),
+    openVPNUnsupportedCompression(44),
 
-    @SerialName(value = "WireGuard.emptyPeers")
-    wireGuardEmptyPeers("WireGuard.emptyPeers");
+    openVPNUnsupportedOption(45),
+
+    wireGuardEmptyPeers(46);
 
     /**
      * Override [toString()] to avoid using the enum variable name as the value, and instead use
@@ -173,7 +137,7 @@ enum class PartoutErrorCode(val value: kotlin.String) {
      * This solves a problem when the variable name and its value are different, and ensures that
      * the client sends the correct enum values to the server always.
      */
-    override fun toString(): kotlin.String = value
+    override fun toString(): kotlin.String = value.toString()
 
     companion object {
         /**
@@ -190,6 +154,20 @@ enum class PartoutErrorCode(val value: kotlin.String) {
             it == value || normalizedData == "$value".lowercase()
           }
         }
+    }
+}
+
+internal object PartoutErrorCodeSerializer : KSerializer<PartoutErrorCode> {
+    override val descriptor = kotlin.Int.serializer().descriptor
+
+    override fun deserialize(decoder: Decoder): PartoutErrorCode {
+        val value = decoder.decodeSerializableValue(kotlin.Int.serializer())
+        return PartoutErrorCode.entries.firstOrNull { it.value == value }
+            ?: throw IllegalArgumentException("Unknown enum value: $value")
+    }
+
+    override fun serialize(encoder: Encoder, value: PartoutErrorCode) {
+        encoder.encodeSerializableValue(kotlin.Int.serializer(), value.value)
     }
 }
 

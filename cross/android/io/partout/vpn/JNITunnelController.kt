@@ -231,7 +231,7 @@ internal class JNITunnelController(
         return@synchronized
     }
 
-    override fun cancelTunnel(errorCode: String?) = synchronized(lock) {
+    override fun cancelTunnel(errorCode: Int) = synchronized(lock) {
         if (isNativeCancelled) { return }
         Log.d(logTag, "cancelTunnel()")
 

@@ -9,12 +9,12 @@ public struct TunnelSnapshot: Hashable, Codable, Sendable, CustomStringConvertib
 
         public private(set) var dataCount: DataCount
 
-        public private(set) var lastErrorCode: String?
+        public private(set) var lastErrorCode: Int?
 
         public init(
             connectionStatus: ConnectionStatus = .disconnected,
             dataCount: DataCount = DataCount(),
-            lastErrorCode: String? = nil
+            lastErrorCode: Int? = nil
         ) {
             self.connectionStatus = connectionStatus
             self.dataCount = dataCount
@@ -33,7 +33,7 @@ public struct TunnelSnapshot: Hashable, Codable, Sendable, CustomStringConvertib
             return copy
         }
 
-        public func with(lastErrorCode: String) -> Self {
+        public func with(lastErrorCode: Int) -> Self {
             var copy = self
             copy.lastErrorCode = lastErrorCode
             return copy

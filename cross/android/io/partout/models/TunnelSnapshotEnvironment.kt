@@ -40,7 +40,7 @@ data class TunnelSnapshotEnvironment (
     val dataCount: DataCount,
 
     @SerialName(value = "lastErrorCode")
-    val lastErrorCode: kotlin.String? = null
+    val lastErrorCode: kotlin.Int? = null
 
 ) {
 

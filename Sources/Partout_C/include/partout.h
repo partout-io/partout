@@ -27,15 +27,13 @@ typedef void (*partout_event_cb)(void *event_ctx, const char *event);
 
 /* Completion callback.
  * - Success: code == 0, string = result
- * - Error:   code != 0, string = error
+ * - Error:   code != 0, string = error (if >0, code is PartoutError.Code)
  * Both 'result' and 'error' are optional JSON payloads.
  */
-typedef enum {
-    PartoutCompletionCodeOK         = 0,
-    PartoutCompletionCodeArgs       = -2,
-    PartoutCompletionCodeFailure    = -1
-} partout_completion_code;
-typedef void (*partout_completion_cb)(void *ctx, partout_completion_code code, const char *json);
+#define PartoutCompletionCodeOK         0
+#define PartoutCompletionCodeArgs       -2
+#define PartoutCompletionCodeFailure    -1
+typedef void (*partout_completion_cb)(void *ctx, int code, const char *json);
 typedef struct {
     partout_completion_cb callback;
     void *ctx;

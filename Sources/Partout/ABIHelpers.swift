@@ -32,8 +32,8 @@ enum ABI {
     }
 
     static func runBlocking(
-        _ block: @escaping @Sendable @PartoutABI () async -> partout_completion_code
-    ) -> partout_completion_code {
+        _ block: @escaping @Sendable @PartoutABI () async -> Int32
+    ) -> Int32 {
         let isABIRunningOnMainThread = PartoutABI.self == MainActor.self
         let semaphore = DispatchSemaphore(value: 0)
         nonisolated(unsafe) var result = PartoutCompletionCodeFailure
@@ -95,17 +95,17 @@ extension partout_completion {
         complete(PartoutCompletionCodeFailure)
     }
 
-    func fail(_ payload: String?) {
-        complete(PartoutCompletionCodeFailure, payload)
+    func fail(_ error: Error) {
+        complete(Int32(error.partoutErrorCode.rawValue), ABIErrorPayload(error))
     }
 }
 
 private extension partout_completion {
-    func complete(_ code: partout_completion_code) {
+    func complete(_ code: Int32) {
         callback?(ctx, code, nil)
     }
 
-    func complete<T>(_ code: partout_completion_code, _ payload: T) where T: Encodable {
+    func complete<T>(_ code: Int32, _ payload: T) where T: Encodable {
         let payloadJSON: String?
         do {
             payloadJSON = try JSONEncoder.shared().encodeJSON(payload)
@@ -114,6 +114,22 @@ private extension partout_completion {
             payloadJSON = nil
         }
         callback?(ctx, code, payloadJSON)
+    }
+}
+
+private struct ABIErrorPayload: Encodable {
+    let userInfo: JSON?
+
+    init(_ error: Error) {
+        guard let partoutError = error as? PartoutError else {
+            userInfo = try? JSON(["localizedDescription": error.localizedDescription])
+            return
+        }
+        guard let userInfo = partoutError.userInfo as? Encodable else {
+            userInfo = nil
+            return
+        }
+        self.userInfo = try? JSON(encodable: userInfo)
     }
 }
 

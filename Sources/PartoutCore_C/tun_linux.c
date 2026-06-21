@@ -139,7 +139,7 @@ void pp_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_linux: ctrl_clear_tunnel(%p)", ref);
 }
 
-void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_code) {
+void pp_tun_ctrl_cancel_tunnel(void *ref, int error_code) {
     (void)ref;
     (void)error_code;
     pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_linux: ctrl_cancel_tunnel(%p)", ref);
