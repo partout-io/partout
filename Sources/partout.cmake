@@ -32,6 +32,7 @@ set(PARTOUT_SOURCES
 ./MiniFoundation/Streams/PassthroughStream.swift
 ./MiniFoundation/Streams/SubjectStream.swift
 ./Partout/ABIDaemon.swift
+./Partout/ABIErrorPayload.swift
 ./Partout/ABIHelpers.swift
 ./Partout/ABI_C.swift
 ./Partout/PartoutExports.swift
@@ -113,7 +114,6 @@ set(PARTOUT_SOURCES
 ./PartoutCore/OpenAPI/Core/IPHeader.swift
 ./PartoutCore/OpenAPI/Core/IPSettings.swift
 ./PartoutCore/OpenAPI/Core/ModuleType.swift
-./PartoutCore/OpenAPI/Core/PartoutError+Code.swift
 ./PartoutCore/OpenAPI/Core/ProfileBehavior.swift
 ./PartoutCore/OpenAPI/Core/Route.swift
 ./PartoutCore/OpenAPI/Core/SecureData.swift
@@ -140,6 +140,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/OpenAPI/OpenVPN/OpenVPNModule.swift
 ./PartoutCore/OpenAPI/OpenVPN/StaticKey.swift
 ./PartoutCore/OpenAPI/OpenVPN/TLSWrap.swift
+./PartoutCore/OpenAPI/PartoutError+Code.swift
 ./PartoutCore/OpenAPI/TaggedModule.swift
 ./PartoutCore/OpenAPI/TaggedProfile.swift
 ./PartoutCore/OpenAPI/WireGuard/Key.swift

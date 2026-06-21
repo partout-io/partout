@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 
 data class PartoutResult(
     val code: Int,
-    val payload: String?
+    val json: String?
 ) {
     companion object {
         suspend fun await(
@@ -22,7 +22,7 @@ data class PartoutResult(
             }
             val result = future.await()
             if (result.code != 0) {
-                throw PartoutException(result.code, result.payload)
+                throw PartoutException(result.code, result.json)
             }
             result
         }

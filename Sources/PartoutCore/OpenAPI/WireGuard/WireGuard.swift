@@ -9,9 +9,3 @@ public enum WireGuard {
 extension LoggerCategory {
     public static let wireguard = Self(rawValue: "wireguard")
 }
-
-extension PartoutError.Code {
-    public enum WireGuard {
-        public static let emptyPeers = PartoutError.Code("WireGuard.emptyPeers")
-    }
-}

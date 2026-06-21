@@ -95,8 +95,8 @@ extension partout_completion {
         complete(PartoutCompletionCodeFailure)
     }
 
-    func fail(_ payload: String?) {
-        complete(PartoutCompletionCodeFailure, payload)
+    func fail(_ error: Error) {
+        complete(PartoutCompletionCodeFailure, ABIErrorPayload(error))
     }
 }
 
