@@ -45,4 +45,3 @@ Partout features a set of [general-purpose entities](<doc:Misc>), including [log
 - ``LegacyCodableProfileV2``
 - ``LegacyModuleDecoder``
 - ``ModuleHandler``
-- ``TransientModule``

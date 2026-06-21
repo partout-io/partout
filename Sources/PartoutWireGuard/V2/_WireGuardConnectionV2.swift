@@ -55,7 +55,7 @@ public actor _WireGuardConnectionV2: Connection {
     }
 
     deinit {
-        pp_log(ctx, .wireguard, .debug, "Deinit WireGuardConnection")
+        pp_log(ctx, .wireguard, .debug, "Deinit _WireGuardConnectionV2")
     }
 
     public nonisolated var statusStream: AsyncThrowingStream<ConnectionStatus, Error> {
