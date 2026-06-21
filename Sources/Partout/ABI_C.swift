@@ -24,7 +24,7 @@ public func __partout_init(
 @c(partout_daemon_start)
 public func __partout_daemon_start(
     argsPointer: UnsafePointer<partout_daemon_start_args>?
-) -> Int32 {
+) -> partout_completion_code {
     guard globalDaemon == nil else {
         fatalError("Daemon already started")
     }
@@ -101,7 +101,7 @@ public func __partout_import_profile(
             let profile = try coding.profileOrModule(fromString: text, name: name)
             callback.succeed(profile.asTaggedProfile)
         } catch {
-            callback.fail(error)
+            callback.fail(error.localizedDescription)
         }
     }
 }

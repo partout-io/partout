@@ -2,9 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-public enum PartoutErrorCode: Int, Hashable, Codable, Sendable {
-    /// No error.
-    case success = 0
+public enum PartoutErrorCode: String, Hashable, Codable, Sendable {
 
     // MARK: Generic
 
@@ -124,42 +122,42 @@ public enum PartoutErrorCode: Int, Hashable, Codable, Sendable {
     // MARK: OpenVPN
 
     /// Compression settings mismatch.
-    case openVPNCompressionMismatch
+    case openVPNCompressionMismatch = "OpenVPN.compressionMismatch"
 
     /// Connection failure.
-    case openVPNConnectionFailure
+    case openVPNConnectionFailure = "OpenVPN.connectionFailure"
 
     /// No routing configuration.
-    case openVPNNoRouting
+    case openVPNNoRouting = "OpenVPN.noRouting"
 
     /// One-time password is required.
-    case openVPNOTPRequired
+    case openVPNOTPRequired = "OpenVPN.otpRequired"
 
     /// Passphrase is required.
-    case openVPNPassphraseRequired
+    case openVPNPassphraseRequired = "OpenVPN.passphraseRequired"
 
     /// Authentication can be retried.
-    case openVPNRecoverableAuthentication
+    case openVPNRecoverableAuthentication = "OpenVPN.recoverableAuthentication"
 
     /// Server requested shutdown.
-    case openVPNServerShutdown
+    case openVPNServerShutdown = "OpenVPN.serverShutdown"
 
     /// TLS failure.
-    case openVPNTLSFailure
+    case openVPNTLSFailure = "OpenVPN.tlsFailure"
 
     /// Algorithm is unsupported.
-    case openVPNUnsupportedAlgorithm
+    case openVPNUnsupportedAlgorithm = "OpenVPN.unsupportedAlgorithm"
 
     /// Compression setting is unsupported.
-    case openVPNUnsupportedCompression
+    case openVPNUnsupportedCompression = "OpenVPN.unsupportedCompression"
 
     /// Option is unsupported.
-    case openVPNUnsupportedOption
+    case openVPNUnsupportedOption = "OpenVPN.unsupportedOption"
 
     // MARK: WireGuard
 
     /// Configuration has no peers.
-    case wireGuardEmptyPeers
+    case wireGuardEmptyPeers = "WireGuard.emptyPeers"
 }
 
 extension PartoutError {
@@ -168,26 +166,26 @@ extension PartoutError {
 
 // MARK: - Raw Values
 
-public func == (lhs: Int, rhs: PartoutError.Code) -> Bool {
+public func == (lhs: String, rhs: PartoutError.Code) -> Bool {
     PartoutError.Code(rawValue: lhs) == rhs
 }
 
-public func == (lhs: PartoutError.Code, rhs: Int) -> Bool {
+public func == (lhs: PartoutError.Code, rhs: String) -> Bool {
     rhs == lhs
 }
 
-public func == (lhs: Int?, rhs: PartoutError.Code) -> Bool {
+public func == (lhs: String?, rhs: PartoutError.Code) -> Bool {
     lhs.map { $0 == rhs } ?? false
 }
 
-public func == (lhs: PartoutError.Code, rhs: Int?) -> Bool {
+public func == (lhs: PartoutError.Code, rhs: String?) -> Bool {
     rhs == lhs
 }
 
-public func ~= (pattern: PartoutError.Code, value: Int) -> Bool {
+public func ~= (pattern: PartoutError.Code, value: String) -> Bool {
     value == pattern
 }
 
-public func ~= (pattern: PartoutError.Code, value: Int?) -> Bool {
+public func ~= (pattern: PartoutError.Code, value: String?) -> Bool {
     value == pattern
 }

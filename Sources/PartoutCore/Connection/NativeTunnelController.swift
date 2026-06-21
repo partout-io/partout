@@ -172,10 +172,12 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     public func cancelTunnelConnection(with error: Error?) {
         guard let error else {
-            pp_tun_ctrl_cancel_tunnel(ref, 0)
+            pp_tun_ctrl_cancel_tunnel(ref, nil)
             return
         }
-        pp_tun_ctrl_cancel_tunnel(ref, Int32(error.partoutErrorCode.rawValue))
+        error.partoutErrorCode.rawValue.withCString {
+            pp_tun_ctrl_cancel_tunnel(ref, $0)
+        }
     }
 }
 

@@ -25,5 +25,5 @@ interface NativeTunnelControllerJNI {
     fun configureSockets(fds: IntArray)
     fun onSnapshot(snapshotJSON: String)
     fun clearTunnel(killSwitch: Boolean)
-    fun cancelTunnel(errorCode: Int)
+    fun cancelTunnel(errorCode: String?)
 }

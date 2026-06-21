@@ -191,7 +191,7 @@ class PartoutVpnServiceRuntime(
         }
         isRunning = false
         controller?.stopObserving()
-        controller?.cancelTunnel(0)
+        controller?.cancelTunnel(null)
         controller = null
         activeProfileId = null
         snapshotEmitter.emitFinal()

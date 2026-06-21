@@ -79,6 +79,7 @@ void pp_tun_ctrl_report_snapshot(void *_Nullable ref,
                                  const char *snapshot_json,
                                  bool log);
 void pp_tun_ctrl_clear_tunnel(void *_Nullable ref, bool kill_switch);
-void pp_tun_ctrl_cancel_tunnel(void *_Nullable ref, const int error_code);
+void pp_tun_ctrl_cancel_tunnel(void *_Nullable ref,
+                               const char *_Nullable error_message);
 
 #pragma clang assume_nonnull end
