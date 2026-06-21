@@ -9,5 +9,6 @@ public protocol NetworkInterfaceFactory: Sendable {
     /// Returns a `LinkObserver` to establish a link to the specified endpoint.
     ///
     /// - Parameter endpoint: The endpoint to connect to.
+    /// /// - Parameter reachability: The optional info about current reachability.
     func linkObserver(to endpoint: ExtendedEndpoint, reachability: ReachabilityInfo?) throws -> LinkObserver
 }
