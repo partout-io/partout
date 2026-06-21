@@ -19,16 +19,16 @@ extension OpenVPNSessionError: PartoutErrorMappable {
             return .authentication
 
         case .badCredentialsWithLocalOptions:
-            return .OpenVPN.recoverableAuthentication
+            return .openVPNRecoverableAuthentication
 
         case .serverCompression:
-            return .OpenVPN.compressionMismatch
+            return .openVPNCompressionMismatch
 
         case .serverShutdown:
-            return .OpenVPN.serverShutdown
+            return .openVPNServerShutdown
 
         case .noRouting:
-            return .OpenVPN.noRouting
+            return .openVPNNoRouting
 
         case .native(let code):
             switch code {
@@ -36,17 +36,17 @@ extension OpenVPNSessionError: PartoutErrorMappable {
                 return .crypto
 
             case .cryptoAlgorithm:
-                return .OpenVPN.unsupportedAlgorithm
+                return .openVPNUnsupportedAlgorithm
 
             case .tlscaUse, .tlscaPeerVerification,
                     .tlsClientCertificateRead, .tlsClientCertificateUse,
                     .tlsClientKeyRead, .tlsClientKeyUse,
                     .tlsServerCertificate, .tlsServerEKU, .tlsServerHost,
                     .tlsHandshake:
-                return .OpenVPN.tlsFailure
+                return .openVPNTLSFailure
 
             case .dataPathCompression:
-                return .OpenVPN.compressionMismatch
+                return .openVPNCompressionMismatch
 
             default:
                 break
@@ -60,7 +60,7 @@ extension OpenVPNSessionError: PartoutErrorMappable {
         default:
             break
         }
-        return .OpenVPN.connectionFailure
+        return .openVPNConnectionFailure
     }
 }
 

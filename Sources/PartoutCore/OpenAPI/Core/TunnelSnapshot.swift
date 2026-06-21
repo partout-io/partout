@@ -9,12 +9,12 @@ public struct TunnelSnapshot: Hashable, Codable, Sendable, CustomStringConvertib
 
         public private(set) var dataCount: DataCount
 
-        public private(set) var lastErrorCode: PartoutError.Code?
+        public private(set) var lastErrorCode: String?
 
         public init(
             connectionStatus: ConnectionStatus = .disconnected,
             dataCount: DataCount = DataCount(),
-            lastErrorCode: PartoutError.Code? = nil
+            lastErrorCode: String? = nil
         ) {
             self.connectionStatus = connectionStatus
             self.dataCount = dataCount
@@ -33,10 +33,14 @@ public struct TunnelSnapshot: Hashable, Codable, Sendable, CustomStringConvertib
             return copy
         }
 
-        public func with(lastErrorCode: PartoutError.Code) -> Self {
+        public func with(lastErrorCode: String) -> Self {
             var copy = self
             copy.lastErrorCode = lastErrorCode
             return copy
+        }
+
+        public func with(lastErrorCode: PartoutError.Code) -> Self {
+            with(lastErrorCode: lastErrorCode.rawValue)
         }
     }
 
@@ -108,7 +112,7 @@ extension TunnelEnvironmentReader {
         return TunnelSnapshot.Environment(
             connectionStatus: connectionStatus ?? .disconnected,
             dataCount: dataCount ?? DataCount(),
-            lastErrorCode: lastError
+            lastErrorCode: lastError?.rawValue
         )
     }
 }

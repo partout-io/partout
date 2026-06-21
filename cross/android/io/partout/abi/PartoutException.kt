@@ -4,7 +4,20 @@
 
 package io.partout.abi
 
+import io.partout.models.ABIErrorPayload
+import kotlinx.serialization.json.Json
+
 class PartoutException(
     val code: Int,
-    val payload: String?
-) : RuntimeException("ABI call failed (code=$code): $payload")
+    json: String?
+) : RuntimeException("ABI call failed (code=$code): $json") {
+    val payload: ABIErrorPayload?
+
+    init {
+        payload = json?.let {
+            runCatching {
+                Json.decodeFromString<ABIErrorPayload>(json)
+            }.getOrNull()
+        }
+    }
+}

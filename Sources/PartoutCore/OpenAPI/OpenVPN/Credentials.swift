@@ -123,13 +123,13 @@ private extension OpenVPN.Credentials.OTPMethod {
 
         case .append:
             guard let otp else {
-                throw PartoutError(.OpenVPN.otpRequired)
+                throw PartoutError(.openVPNOTPRequired)
             }
             return password + otp
 
         case .encode:
             guard let otp else {
-                throw PartoutError(.OpenVPN.otpRequired)
+                throw PartoutError(.openVPNOTPRequired)
             }
             let base64Password = password.data(using: .utf8)?.base64EncodedString() ?? ""
             let base64OTP = otp.data(using: .utf8)?.base64EncodedString() ?? ""

@@ -1,5 +1,14 @@
 components:
   schemas:
+    ABIErrorPayload:
+      additionalProperties: false
+      properties:
+        code:
+          "$ref": "#/components/schemas/PartoutErrorCode"
+        userInfo: {}
+      required:
+        - code
+      type: object
     Address:
       type: string
     ConnectionStatus:
@@ -611,8 +620,102 @@ components:
       required:
         - id
       type: object
-    PartoutError.Code:
+    PartoutErrorCode:
+      enum:
+        - cached
+        - notFound
+        - operationCancelled
+        - releasedObject
+        - scriptException
+        - timeout
+        - unhandled
+        - incompatibleModules
+        - incompleteModule
+        - noActiveModules
+        - nonFinalModules
+        - requiredImplementation
+        - unexpectedModuleType
+        - unknownImportedModule
+        - unknownModuleHandler
+        - authentication
+        - crypto
+        - dnsFailure
+        - exhaustedEndpoints
+        - fdUnavailable
+        - ioFailure
+        - linkNotActive
+        - networkChanged
+        - networkUnreachable
+        - socketConfiguration
+        - tunNotActive
+        - tunNotAvailable
+        - decoding
+        - encoding
+        - invalidField
+        - invalidValue
+        - parsing
+        - keychainAddItem
+        - keychainItemNotFound
+        - OpenVPN.compressionMismatch
+        - OpenVPN.connectionFailure
+        - OpenVPN.noRouting
+        - OpenVPN.otpRequired
+        - OpenVPN.passphraseRequired
+        - OpenVPN.recoverableAuthentication
+        - OpenVPN.serverShutdown
+        - OpenVPN.tlsFailure
+        - OpenVPN.unsupportedAlgorithm
+        - OpenVPN.unsupportedCompression
+        - OpenVPN.unsupportedOption
+        - WireGuard.emptyPeers
       type: string
+      x-enum-varnames:
+        - cached
+        - notFound
+        - operationCancelled
+        - releasedObject
+        - scriptException
+        - timeout
+        - unhandled
+        - incompatibleModules
+        - incompleteModule
+        - noActiveModules
+        - nonFinalModules
+        - requiredImplementation
+        - unexpectedModuleType
+        - unknownImportedModule
+        - unknownModuleHandler
+        - authentication
+        - crypto
+        - dnsFailure
+        - exhaustedEndpoints
+        - fdUnavailable
+        - ioFailure
+        - linkNotActive
+        - networkChanged
+        - networkUnreachable
+        - socketConfiguration
+        - tunNotActive
+        - tunNotAvailable
+        - decoding
+        - encoding
+        - invalidField
+        - invalidValue
+        - parsing
+        - keychainAddItem
+        - keychainItemNotFound
+        - openVPNCompressionMismatch
+        - openVPNConnectionFailure
+        - openVPNNoRouting
+        - openVPNOTPRequired
+        - openVPNPassphraseRequired
+        - openVPNRecoverableAuthentication
+        - openVPNServerShutdown
+        - openVPNTLSFailure
+        - openVPNUnsupportedAlgorithm
+        - openVPNUnsupportedCompression
+        - openVPNUnsupportedOption
+        - wireGuardEmptyPeers
     ProfileBehavior:
       additionalProperties: false
       properties:
@@ -851,7 +954,7 @@ components:
         dataCount:
           "$ref": "#/components/schemas/DataCount"
         lastErrorCode:
-          "$ref": "#/components/schemas/PartoutError.Code"
+          type: string
       required:
         - connectionStatus
         - dataCount

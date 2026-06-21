@@ -1,10 +1,12 @@
 paths:
+  - Partout
   - PartoutCore/OpenAPI
   - PartoutCore/OpenAPI/Core
   - PartoutCore/OpenAPI/Modules
   - PartoutCore/OpenAPI/OpenVPN
   - PartoutCore/OpenAPI/WireGuard
 entities:
+  - ABIErrorPayload
   - Address
   - ConnectionStatus
   - CustomModule
@@ -40,7 +42,7 @@ entities:
   - OpenVPN.TLSWrap
   - OpenVPN.TLSWrap.Strategy
   - OpenVPNModule
-  - PartoutError.Code
+  - PartoutErrorCode
   - ProfileBehavior
   - Route
   - SocketType

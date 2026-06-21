@@ -182,7 +182,7 @@ extension StandardOpenVPNParser: ModuleImporter {
         } catch let error as StandardOpenVPNParserError {
             switch error {
             case .encryptionPassphrase:
-                throw PartoutError(.OpenVPN.passphraseRequired)
+                throw PartoutError(.openVPNPassphraseRequired)
             case .invalidFormat:
                 throw PartoutError(.unknownImportedModule)
             default:
