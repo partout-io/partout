@@ -112,7 +112,7 @@ extension TunnelEnvironmentReader {
         return TunnelSnapshot.Environment(
             connectionStatus: connectionStatus ?? .disconnected,
             dataCount: dataCount ?? DataCount(),
-            lastErrorCode: lastError?.rawValue
+            lastErrorCode: lastError
         )
     }
 }
