@@ -32,6 +32,7 @@ set(PARTOUT_SOURCES
 ./MiniFoundation/Streams/PassthroughStream.swift
 ./MiniFoundation/Streams/SubjectStream.swift
 ./Partout/ABIDaemon.swift
+./Partout/ABIErrorPayload.swift
 ./Partout/ABIHelpers.swift
 ./Partout/ABI_C.swift
 ./Partout/PartoutExports.swift

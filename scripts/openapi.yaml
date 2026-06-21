@@ -1,5 +1,14 @@
 components:
   schemas:
+    ABIErrorPayload:
+      additionalProperties: false
+      properties:
+        code:
+          "$ref": "#/components/schemas/PartoutErrorCode"
+        userInfo: {}
+      required:
+        - code
+      type: object
     Address:
       type: string
     ConnectionStatus:

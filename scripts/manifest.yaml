@@ -1,10 +1,12 @@
 paths:
+  - Partout
   - PartoutCore/OpenAPI
   - PartoutCore/OpenAPI/Core
   - PartoutCore/OpenAPI/Modules
   - PartoutCore/OpenAPI/OpenVPN
   - PartoutCore/OpenAPI/WireGuard
 entities:
+  - ABIErrorPayload
   - Address
   - ConnectionStatus
   - CustomModule
