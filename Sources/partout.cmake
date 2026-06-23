@@ -207,6 +207,7 @@ set(PARTOUT_SOURCES
 ./PartoutOS/AppleNE/Connection/NETunnelController.swift
 ./PartoutOS/AppleNE/Connection/NETunnelInterface.swift
 ./PartoutOS/AppleNE/Connection/NEUDPSocket.swift
+./PartoutOS/AppleNE/Connection/SafeValueObserver.swift
 ./PartoutOS/AppleNE/Connection/ValueObserver.swift
 ./PartoutOS/AppleNE/Extensions/Module+Requirements.swift
 ./PartoutOS/AppleNE/Extensions/NE+Hacks.swift
