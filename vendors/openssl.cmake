@@ -33,6 +33,7 @@ set(OPENSSL_CFG_FLAGS no-apps no-docs no-dsa no-engine no-gost no-legacy shared 
 # Add some flags if -DANDROID
 if(ANDROID)
     set(OPENSSL_TARGET "android-arm64")
+    list(APPEND VENDOR_ENV ANDROID_NDK_ROOT=${CMAKE_ANDROID_NDK})
 else()
     set(OPENSSL_TARGET "")
 endif()
