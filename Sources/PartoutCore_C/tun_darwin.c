@@ -173,6 +173,7 @@ uint32_t pp_tun_proto_for(uint8_t byte) {
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     if (!tun || tun->fd < 0) return -1;
+    if (!dst || dst_len == 0) return -1;
     uint32_t pi = 0; // 4-byte utun protocol header
 
     struct iovec iov[2];
@@ -195,6 +196,7 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
 
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     if (!tun || tun->fd < 0) return -1;
+    if (!src || src_len == 0) return -1;
     const uint32_t pi = pp_endian_htonl(pp_tun_proto_for(*src));
     const size_t pi_len = sizeof(pi);
 
