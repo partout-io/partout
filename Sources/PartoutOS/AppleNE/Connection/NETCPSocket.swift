@@ -8,8 +8,15 @@ import NetworkExtension
 public final class NETCPObserver: LinkObserver {
     public struct Options: Sendable {
         public let minLength: Int
-
         public let maxLength: Int
+        public let withSafeValueObserver: Bool
+    }
+
+    protocol StateObserver {
+        func waitForState(
+            timeout: Int,
+            onState: @escaping (NWTCPConnectionState) throws -> Bool
+        ) async throws
     }
 
     private let ctx: PartoutLoggerContext
@@ -18,7 +25,7 @@ public final class NETCPObserver: LinkObserver {
 
     private let options: Options
 
-    private var observer: ValueObserver<NWTCPConnection>?
+    private var observer: StateObserver?
 
     public init(_ ctx: PartoutLoggerContext, nwConnection: NWTCPConnection, options: Options) {
         self.ctx = ctx
@@ -27,11 +34,15 @@ public final class NETCPObserver: LinkObserver {
     }
 
     public func waitForActivity(timeout: Int) async throws -> LinkInterface {
-        observer = ValueObserver(nwConnection)
+        if options.withSafeValueObserver {
+            observer = SafeObserver(nwConnection)
+        } else {
+            observer = LegacyObserver(nwConnection)
+        }
         defer {
             observer = nil
         }
-        try await observer?.waitForValue(on: \.state, timeout: timeout) { [weak self] state in
+        try await observer?.waitForState(timeout: timeout) { [weak self] state in
             guard let self else {
                 return false
             }
@@ -148,6 +159,36 @@ private extension NETCPSocket {
             }
         } onCancel: {
             nwConnection.cancel()
+        }
+    }
+}
+
+// MARK: - State observers
+
+private struct SafeObserver: NETCPObserver.StateObserver {
+    let backend: SafeValueObserver<NWTCPConnection>
+
+    init(_ connection: NWTCPConnection) {
+        backend = SafeValueObserver(connection)
+    }
+
+    func waitForState(timeout: Int, onState: @escaping (NWTCPConnectionState) throws -> Bool) async throws {
+        try await backend.waitForValue(on: \.state, timeout: timeout) { state in
+            try onState(state)
+        }
+    }
+}
+
+private struct LegacyObserver: NETCPObserver.StateObserver {
+    let backend: ValueObserver<NWTCPConnection>
+
+    init(_ connection: NWTCPConnection) {
+        backend = ValueObserver(connection)
+    }
+
+    func waitForState(timeout: Int, onState: @escaping (NWTCPConnectionState) throws -> Bool) async throws {
+        try await backend.waitForValue(on: \.state, timeout: timeout) { state in
+            try onState(state)
         }
     }
 }

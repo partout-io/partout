@@ -8,10 +8,9 @@
 public final class NEInterfaceFactory: NetworkInterfaceFactory {
     public struct Options: Sendable {
         public var maxUDPDatagrams = 200
-
         public var minTCPLength = 2
-
         public var maxTCPLength = 512 * 1024
+        public var withSafeValueObserver = false
 
         public init() {
         }
@@ -60,7 +59,8 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
                 ctx,
                 nwSession: impl,
                 options: .init(
-                    maxDatagrams: options.maxUDPDatagrams
+                    maxDatagrams: options.maxUDPDatagrams,
+                    withSafeValueObserver: options.withSafeValueObserver
                 )
             )
 #endif
@@ -79,7 +79,8 @@ public final class NEInterfaceFactory: NetworkInterfaceFactory {
                 nwConnection: impl,
                 options: .init(
                     minLength: options.minTCPLength,
-                    maxLength: options.maxTCPLength
+                    maxLength: options.maxTCPLength,
+                    withSafeValueObserver: options.withSafeValueObserver
                 )
             )
 #endif
