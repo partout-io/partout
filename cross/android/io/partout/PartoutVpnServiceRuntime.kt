@@ -89,7 +89,7 @@ class PartoutVpnServiceRuntime(
 
     fun onRevoke() {
         Log.d(logTag, "PartoutVpnServiceRuntime.onRevoke()")
-        disconnect(null)
+        disconnect(null, wasRevoked = true)
     }
     //endregion
 
@@ -146,8 +146,9 @@ class PartoutVpnServiceRuntime(
     }
 
     override fun onSnapshot(snapshot: TunnelSnapshot) {
-        snapshotEmitter.emit(snapshot)
-        engine.onSnapshot(snapshot)
+        if (snapshotEmitter.emit(snapshot)) {
+            engine.onSnapshot(snapshot)
+        }
     }
 
     override fun shouldDisconnect(controller: NativeTunnelControllerJNI) = launchCommand {
@@ -197,7 +198,7 @@ class PartoutVpnServiceRuntime(
         snapshotEmitter.emitFinal()
     }
 
-    private fun disconnect(intent: Intent?) = launchCommand {
+    private fun disconnect(intent: Intent?, wasRevoked: Boolean = false) = launchCommand {
         val forgetId = intent?.getStringExtra(EXTRA_FORGET_ID)
         if (forgetId != null) {
             engine.deleteLastProfile(forgetId)
@@ -210,12 +211,12 @@ class PartoutVpnServiceRuntime(
             }
         }
         stopTunnel()
-        stopService()
+        stopService(wasRevoked)
     }
 
-    private fun stopService() {
+    private fun stopService(wasRevoked: Boolean = false) {
         service.stopSelf()
-        engine.onServiceStopped()
+        engine.onServiceStopped(wasRevoked)
     }
 
     private fun close() {
@@ -250,19 +251,21 @@ class PartoutVpnServiceRuntime(
             }
         }
 
-        fun emit(snapshot: TunnelSnapshot) = synchronized(lock) {
-            if (!isAccepting) { return }
+        fun emit(snapshot: TunnelSnapshot): Boolean = synchronized(lock) {
+            if (!isAccepting) { return@synchronized false }
             if (snapshot.id != activeProfileId) {
                 logIfNeeded("Drop stale daemon snapshot: $snapshot")
-                return
+                return@synchronized false
             }
             broadcast(snapshot)
+            return@synchronized true
         }
 
         fun emitFinal() = synchronized(lock) {
             logIfNeeded("Emit final daemon snapshot")
-            latestSnapshot?.let {
-                emit(it.disabled())
+            val finalSnapshot = if (isAccepting) latestSnapshot?.disabled() else null
+            if (finalSnapshot != null) {
+                broadcast(finalSnapshot)
             }
             isAccepting = false
             activeProfileId = null
@@ -390,7 +393,7 @@ class PartoutVpnServiceRuntime(
         suspend fun writeLastProfile(json: String)
         suspend fun deleteLastProfile(id: String)
         fun onSnapshot(snapshot: TunnelSnapshot)
-        fun onServiceStopped() {}
+        fun onServiceStopped(wasRevoked: Boolean) {}
     }
     //endregion
 
