@@ -146,8 +146,9 @@ class PartoutVpnServiceRuntime(
     }
 
     override fun onSnapshot(snapshot: TunnelSnapshot) {
-        snapshotEmitter.emit(snapshot)
-        engine.onSnapshot(snapshot)
+        if (snapshotEmitter.emit(snapshot)) {
+            engine.onSnapshot(snapshot)
+        }
     }
 
     override fun shouldDisconnect(controller: NativeTunnelControllerJNI) = launchCommand {
@@ -250,19 +251,21 @@ class PartoutVpnServiceRuntime(
             }
         }
 
-        fun emit(snapshot: TunnelSnapshot) = synchronized(lock) {
-            if (!isAccepting) { return }
+        fun emit(snapshot: TunnelSnapshot): Boolean = synchronized(lock) {
+            if (!isAccepting) { return@synchronized false }
             if (snapshot.id != activeProfileId) {
                 logIfNeeded("Drop stale daemon snapshot: $snapshot")
-                return
+                return@synchronized false
             }
             broadcast(snapshot)
+            return@synchronized true
         }
 
         fun emitFinal() = synchronized(lock) {
             logIfNeeded("Emit final daemon snapshot")
-            latestSnapshot?.let {
-                emit(it.disabled())
+            val finalSnapshot = if (isAccepting) latestSnapshot?.disabled() else null
+            if (finalSnapshot != null) {
+                broadcast(finalSnapshot)
             }
             isAccepting = false
             activeProfileId = null
