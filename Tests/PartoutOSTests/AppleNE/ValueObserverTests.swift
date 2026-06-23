@@ -108,6 +108,24 @@ struct ValueObserverTests {
     }
 
     @Test
+    func givenBackToBackChanges_whenWaitingForFirstChange_thenUsesObservedSnapshot() async throws {
+        let subject = SomeObject()
+        let sut = SafeValueObserver(subject)
+
+        let task = Task {
+            try await sut.waitForValue(on: \.value, timeout: 1000) {
+                $0 == 10
+            }
+        }
+        try await Task.sleep(milliseconds: 50)
+
+        subject.value = 10
+        subject.value = 20
+
+        try await task.value
+    }
+
+    @Test
     func givenWaitIsPending_whenWaitForValueAgain_thenFailsWithInvalidValue() async throws {
         let subject = SomeObject()
         let sut = SafeValueObserver(subject)
