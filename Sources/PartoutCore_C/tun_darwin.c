@@ -160,13 +160,14 @@ pp_fd pp_tun_network_extension_fd(void) {
 /* The first 4 bits of a local packet identify the IP family. */
 static inline
 uint32_t pp_tun_proto_for(uint8_t byte) {
-    switch ((byte & 0xf0) >> 4) {
+    const uint8_t header = (byte & 0xf0) >> 4;
+    switch (header) {
         case 4:
             return AF_INET;
         case 6:
             return AF_INET6;
         default:
-            pp_assert(false);
+            pp_clog_v(PPLogCategoryCore, PPLogLevelError, "tun_darwin: Unexpected utun packet header (%u)", header);
             return 0;
     }
 }
@@ -188,7 +189,7 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
         return pp_tun_handle_result(read_len);
     }
     if (read_len < (int)sizeof(pi)) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: Missing 4-byte utun packet header");
+        pp_clog(PPLogCategoryCore, PPLogLevelError, "tun_darwin: Missing 4-byte utun packet header");
         return -1;
     }
     return read_len - (int)sizeof(pi);
@@ -197,7 +198,9 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     if (!tun || tun->fd < 0) return -1;
     if (!src || src_len == 0) return -1;
-    const uint32_t pi = pp_endian_htonl(pp_tun_proto_for(*src));
+    const uint32_t proto_byte = pp_tun_proto_for(*src);
+    if (proto_byte == 0) return -1;
+    const uint32_t pi = pp_endian_htonl(proto_byte);
     const size_t pi_len = sizeof(pi);
 
     struct iovec iov[2];
