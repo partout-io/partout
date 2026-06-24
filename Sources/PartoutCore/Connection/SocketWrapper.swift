@@ -83,7 +83,7 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
         guard written != PPIOErrorWouldBlock else {
             throw NativeIOError.wouldBlock(.link)
         }
-        guard written != PPIOErrorNoBufs else {
+        guard written != PPIOErrorNoBufs, written != PPIOErrorNoSpace else {
             throw NativeIOError.noBufSpace(.link)
         }
         guard written >= 0 else {
