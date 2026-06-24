@@ -12,58 +12,39 @@ struct ValueObserverTests {
         let subject = SomeObject()
         let sut = SafeValueObserver(subject)
 
-        Task {
-            try await Task.sleep(milliseconds: 100)
-            subject.value = 10
-            try await Task.sleep(milliseconds: 100)
-            subject.value = 20
-            try await Task.sleep(milliseconds: 100)
-            subject.value = 30
+        let (waitTask, didStartWaiting) = startWait(sut) { newValue in
+            newValue == 30
         }
+        try await didStartWaiting.fulfillment(timeout: 1000)
 
-        try await sut.waitForValue(on: \.value, timeout: 1000) { newValue in
-            switch newValue {
-            case 30:
-                print("Succeed on \(newValue)")
-                return true
+        subject.value = 10
+        subject.value = 20
+        subject.value = 30
 
-            default:
-                print("Ignore \(newValue)")
-                return false
-            }
-        }
+        try await waitTask.value
     }
 
     @Test
-    func givenSubject_whenValueIsUndesired_thenFails() async {
+    func givenSubject_whenValueIsUndesired_thenFails() async throws {
         let subject = SomeObject()
         let sut = SafeValueObserver(subject)
 
-        Task {
-            try await Task.sleep(milliseconds: 100)
-            subject.value = 10
-            try await Task.sleep(milliseconds: 100)
-            subject.value = 20
-            try await Task.sleep(milliseconds: 100)
-            subject.value = 30
+        let (waitTask, didStartWaiting) = startWait(sut) { newValue in
+            switch newValue {
+            case 20:
+                throw SomeError()
+
+            default:
+                return false
+            }
         }
+        try await didStartWaiting.fulfillment(timeout: 1000)
+
+        subject.value = 10
+        subject.value = 20
 
         do {
-            try await sut.waitForValue(on: \.value, timeout: 1000) { newValue in
-                switch newValue {
-                case 20:
-                    print("Fail on \(newValue)")
-                    throw SomeError()
-
-                case 30:
-                    print("Succeed on \(newValue)")
-                    return true
-
-                default:
-                    print("Ignore \(newValue)")
-                    return false
-                }
-            }
+            try await waitTask.value
             #expect(Bool(false), "Undesired value should fail")
         } catch {
             #expect(type(of: error) == SomeError.self)
@@ -92,19 +73,21 @@ struct ValueObserverTests {
         let subject = SomeObject()
         let sut = SafeValueObserver(subject)
 
-        Task {
-            try await Task.sleep(milliseconds: 50)
-            subject.value = 10
-            try await Task.sleep(milliseconds: 200)
-            subject.value = 20
-        }
-
-        try await sut.waitForValue(on: \.value, timeout: 150) {
+        let previousTimeout = 500
+        let (firstWaitTask, didStartFirstWait) = startWait(sut, timeout: previousTimeout) {
             $0 == 10
         }
-        try await sut.waitForValue(on: \.value, timeout: 500) {
+        try await didStartFirstWait.fulfillment(timeout: 1000)
+        subject.value = 10
+        try await firstWaitTask.value
+
+        let (secondWaitTask, didStartSecondWait) = startWait(sut, timeout: 1500) {
             $0 == 20
         }
+        try await didStartSecondWait.fulfillment(timeout: 1000)
+        try await Task.sleep(milliseconds: previousTimeout + 100)
+        subject.value = 20
+        try await secondWaitTask.value
     }
 
     @Test
@@ -112,12 +95,10 @@ struct ValueObserverTests {
         let subject = SomeObject()
         let sut = SafeValueObserver(subject)
 
-        let task = Task {
-            try await sut.waitForValue(on: \.value, timeout: 1000) {
-                $0 == 10
-            }
+        let (task, didStartWaiting) = startWait(sut) {
+            $0 == 10
         }
-        try await Task.sleep(milliseconds: 50)
+        try await didStartWaiting.fulfillment(timeout: 1000)
 
         subject.value = 10
         subject.value = 20
@@ -130,12 +111,10 @@ struct ValueObserverTests {
         let subject = SomeObject()
         let sut = SafeValueObserver(subject)
 
-        let pendingTask = Task {
-            try await sut.waitForValue(on: \.value, timeout: 1000) {
-                $0 == 10
-            }
+        let (pendingTask, didStartWaiting) = startWait(sut) {
+            $0 == 10
         }
-        try await Task.sleep(milliseconds: 50)
+        try await didStartWaiting.fulfillment(timeout: 1000)
 
         do {
             try await sut.waitForValue(on: \.value, timeout: 1000) { _ in
@@ -157,12 +136,10 @@ struct ValueObserverTests {
         let subject = SomeObject()
         let sut = SafeValueObserver(subject)
 
-        let task = Task {
-            try await sut.waitForValue(on: \.value, timeout: 1000) { _ in
-                false
-            }
+        let (task, didStartWaiting) = startWait(sut) { _ in
+            false
         }
-        try await Task.sleep(milliseconds: 50)
+        try await didStartWaiting.fulfillment(timeout: 1000)
         task.cancel()
 
         do {
@@ -173,13 +150,12 @@ struct ValueObserverTests {
             #expect(Bool(false), "Unexpected error: \(error)")
         }
 
-        Task {
-            try await Task.sleep(milliseconds: 50)
-            subject.value = 10
-        }
-        try await sut.waitForValue(on: \.value, timeout: 500) {
+        let (nextWaitTask, didStartNextWait) = startWait(sut, timeout: 500) {
             $0 == 10
         }
+        try await didStartNextWait.fulfillment(timeout: 1000)
+        subject.value = 10
+        try await nextWaitTask.value
     }
 
     @Test
@@ -210,6 +186,25 @@ struct ValueObserverTests {
 }
 
 // MARK: - Helpers
+
+private extension ValueObserverTests {
+    func startWait(
+        _ sut: SafeValueObserver<SomeObject>,
+        timeout: Int = 1000,
+        onValue: @escaping @Sendable (Int) throws -> Bool
+    ) -> (Task<Void, Error>, MiniFoundation.Expectation) {
+        let didStartWaiting = MiniFoundation.Expectation()
+        let task = Task {
+            try await sut.waitForValue(on: \.value, timeout: timeout) { newValue in
+                Task {
+                    await didStartWaiting.fulfill()
+                }
+                return try onValue(newValue)
+            }
+        }
+        return (task, didStartWaiting)
+    }
+}
 
 private struct SomeError: Error {
 }

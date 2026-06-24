@@ -87,14 +87,25 @@ private extension SafeValueObserver {
                 return
             }
             Task { [weak self] in
-                do {
-                    if try onValue(value) {
-                        await self?.resumeWait(waitId, with: .success(()))
-                    }
-                } catch {
-                    await self?.resumeWait(waitId, with: .failure(error))
-                }
+                await self?.handleValue(waitId, value, onValue: onValue)
             }
+        }
+    }
+
+    func handleValue<V>(
+        _ waitId: UInt64,
+        _ value: V,
+        onValue: @escaping (V) throws -> Bool
+    ) {
+        guard pendingWaitId == waitId, pendingWait != nil else {
+            return
+        }
+        do {
+            if try onValue(value) {
+                resumeWait(waitId, with: .success(()))
+            }
+        } catch {
+            resumeWait(waitId, with: .failure(error))
         }
     }
 
