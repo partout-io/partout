@@ -112,6 +112,7 @@ char *_Nullable pp_file_read(const char *rel_path, const char *_Nullable parent)
 
 extern const int PPIOErrorWouldBlock;
 extern const int PPIOErrorNoBufs;
+extern const int PPIOErrorNoSpace;
 
 #if PARTOUT_WINDOWS
 
@@ -169,6 +170,10 @@ static inline bool pp_io_wouldblock(void) {
 
 static inline bool pp_io_nobufs(void) {
     return errno == ENOBUFS;
+}
+
+static inline bool pp_io_nospace(void) {
+    return errno == ENOSPC;
 }
 #pragma clang assume_nonnull end
 

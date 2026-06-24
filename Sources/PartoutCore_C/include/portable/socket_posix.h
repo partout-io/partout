@@ -101,6 +101,10 @@ static inline bool local_is_nobufs(void) {
     return errno == ENOBUFS;
 }
 
+static inline bool local_is_nospace(void) {
+    return errno == ENOSPC;
+}
+
 // pp_socket_fd == pp_fd in POSIX
 
 int pp_socket_set_nonblocking(pp_socket_fd fd, int *original_flags) {
