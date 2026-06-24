@@ -10,6 +10,7 @@
 
 const int PPIOErrorWouldBlock   = -11;
 const int PPIOErrorNoBufs       = -12;
+const int PPIOErrorNoSpace      = -13;
 
 pp_log_category PPLogCategoryCore = "core";
 

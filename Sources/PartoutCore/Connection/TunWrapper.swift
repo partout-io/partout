@@ -52,8 +52,8 @@ final class TunWrapper: NativeIOInterface, @unchecked Sendable {
         guard written != PPIOErrorWouldBlock else {
             throw NativeIOError.wouldBlock(.tun)
         }
-        guard written != PPIOErrorNoBufs else {
-            throw NativeIOError.noBufSpace(.tun)
+        guard written != PPIOErrorNoBufs, written != PPIOErrorNoSpace else {
+            throw NativeIOError.backpressure(.tun)
         }
         guard written >= 0 else {
             throw NativeIOError.libc(.tun, lastErrorCode)

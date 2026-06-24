@@ -15,14 +15,14 @@ public protocol NativeIOInterface: Sendable {
 /// Errors thrown by ``NativeIOInterface``.
 public enum NativeIOError: Error, CustomDebugStringConvertible {
     case wouldBlock(Side)
-    case noBufSpace(Side)
+    case backpressure(Side)
     case eof(Side)
     case libc(Side, Int32)
 
     var side: Side {
         switch self {
         case .wouldBlock(let side): side
-        case .noBufSpace(let side): side
+        case .backpressure(let side): side
         case .eof(let side): side
         case .libc(let side, _): side
         }
@@ -31,7 +31,7 @@ public enum NativeIOError: Error, CustomDebugStringConvertible {
     public var debugDescription: String {
         switch self {
         case .wouldBlock(let side): "\(side): would block"
-        case .noBufSpace(let side): "\(side): no buffer space"
+        case .backpressure(let side): "\(side): backpressure"
         case .eof(let side): "\(side): EOF"
         case .libc(let side, let code): "\(side): last_error=\(code)"
         }

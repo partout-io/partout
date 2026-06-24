@@ -493,7 +493,7 @@ private extension FdLooper {
                 } catch NativeIOError.wouldBlock {
                     watchWrites = true
                     break
-                } catch NativeIOError.noBufSpace {
+                } catch NativeIOError.backpressure {
                     if let tun {
                         try suspendReadAndScheduleRetry(from: tun, fdSet: fdSet)
                     }
@@ -519,7 +519,7 @@ private extension FdLooper {
                 } catch NativeIOError.wouldBlock {
                     watchWrites = true
                     break
-                } catch NativeIOError.noBufSpace {
+                } catch NativeIOError.backpressure {
                     if let link {
                         try suspendReadAndScheduleRetry(from: link, fdSet: fdSet)
                     }
