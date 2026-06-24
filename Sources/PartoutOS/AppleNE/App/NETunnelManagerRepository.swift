@@ -8,7 +8,7 @@ import NetworkExtension
 public protocol NETunnelManagerRepository: Sendable {
     func fetch() async throws -> [NETunnelProviderManager]
 
-    func save<O>(_ profile: Profile, forConnecting: Bool, options: O?) async throws where O: Sendable
+    func save<O>(_ profile: Profile, forConnecting: Bool, options: O?) async throws -> NETunnelProviderManager where O: Sendable
 
     func remove(profileId: Profile.ID) async throws
 

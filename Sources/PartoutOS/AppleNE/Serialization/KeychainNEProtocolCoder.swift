@@ -53,11 +53,10 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
         keychain.removePassword(for: profileId.uuidString)
     }
 
-    public func purge(managers: [NETunnelProviderManager]) async {
-
-        // remove those managers (plus their keychain entry) we cannot decode a profile from
+    public func purge(managers: [NETunnelProviderManager]) async -> [Profile] {
+        // Remove those managers (plus their keychain entry) we cannot decode a profile from
         var managersToRemove: [NETunnelProviderManager] = []
-        var keychainToRetain: [Data] = []
+        var keychainToRetain: Set<Data> = []
         managers.forEach {
             do {
                 guard let proto = $0.protocolConfiguration as? NETunnelProviderProtocol else {
@@ -65,7 +64,7 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
                 }
                 _ = try profile(from: proto)
                 if let item = $0.protocolConfiguration?.passwordReference {
-                    keychainToRetain.append(item)
+                    keychainToRetain.insert(item)
                 }
             } catch {
                 pp_log(ctx, .os, .error, "Unable to decode profile, will delete NE manager '\($0.localizedDescription ?? "")': \(error)")
@@ -79,16 +78,24 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
             try? await manager.removeFromPreferences()
         }
 
-        // remove keychain entries that do not belong to any active manager
+        // Recreate managers from stale keychain entries
+        var staleProfiles: [Profile] = []
         do {
             let entries = try keychain.allPasswordReferences()
-            entries.forEach {
-                if !keychainToRetain.contains($0) {
-                    keychain.removePassword(forReference: $0)
+            entries.forEach { ref in
+                guard !keychainToRetain.contains(ref) else { return }
+                do {
+                    let pwd = try keychain.password(forReference: ref)
+                    let profile = try coder.profile(fromString: pwd)
+                    staleProfiles.append(profile)
+                } catch {
+                    pp_log(ctx, .os, .error, "Unable to fetch keychain reference, delete: \(error)")
+                    keychain.removePassword(forReference: ref)
                 }
             }
         } catch {
             pp_log(ctx, .os, .error, "Unable to fetch keychain items: \(error)")
         }
+        return staleProfiles
     }
 }
