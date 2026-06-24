@@ -130,10 +130,6 @@ static inline bool local_is_nobufs(void) {
     return WSAGetLastError() == WSAENOBUFS;
 }
 
-static inline bool local_is_nospace(void) {
-    return WSAGetLastError() == WSAENOSPC;
-}
-
 int pp_socket_set_nonblocking(pp_socket_fd fd, int *original_flags) {
     (void)original_flags;
     u_long mode = 1;

@@ -278,9 +278,6 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
             if (local_is_nobufs()) {
                 return offset > 0 ? (int)offset : PPIOErrorNoBufs;
             }
-            if (local_is_nospace()) {
-                return offset > 0 ? (int)offset : PPIOErrorNoSpace;
-            }
             local_print_error("send()");
             return written_len;
         }
