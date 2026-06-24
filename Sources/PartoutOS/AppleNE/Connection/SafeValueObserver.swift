@@ -4,6 +4,11 @@
 
 /// Observes KVO updates asynchronously.
 actor SafeValueObserver<O> where O: NSObject {
+    // Key paths are immutable, but generic KeyPath is not modeled as Sendable.
+    private struct SendableKeyPath<Root, Value>: @unchecked Sendable {
+        let rawValue: KeyPath<Root, Value>
+    }
+
     private struct PendingWait {
         let continuation: CheckedContinuation<Void, Error>
 
@@ -67,6 +72,7 @@ private extension SafeValueObserver {
         continuation: CheckedContinuation<Void, Error>,
         onValue: @escaping (V) throws -> Bool
     ) {
+        let observedKeyPath = SendableKeyPath(rawValue: keyPath)
         guard pendingWait == nil else {
             continuation.resume(throwing: PartoutError(.invalidValue, "waitForValue"))
             return
@@ -82,10 +88,8 @@ private extension SafeValueObserver {
             }
             resumeWait(waitId, with: .failure(PartoutError(.timeout)))
         }
-        pendingWait?.observer = subject.observe(keyPath, options: [.initial, .new]) { _, change in
-            guard let value = change.newValue else {
-                return
-            }
+        pendingWait?.observer = subject.observe(keyPath, options: [.initial, .new]) { object, change in
+            let value = change.newValue ?? object[keyPath: observedKeyPath.rawValue]
             Task { [weak self] in
                 await self?.handleValue(waitId, value, onValue: onValue)
             }
