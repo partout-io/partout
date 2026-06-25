@@ -1,4 +1,42 @@
-{{^objcCompatible}}{{#nonPublicApi}}internal{{/nonPublicApi}}{{^nonPublicApi}}public{{/nonPublicApi}} {{#useClasses}}final class{{/useClasses}}{{^useClasses}}struct{{/useClasses}} {{{classname}}}: {{#useVapor}}Content{{/useVapor}}{{^useVapor}}Codable{{#useJsonEncodable}}, JSONEncodable{{/useJsonEncodable}}{{/useVapor}}{{#vendorExtensions.x-swift-hashable}}, Hashable{{/vendorExtensions.x-swift-hashable}}{{#useSendable}}, Sendable{{/useSendable}} {
+{{#vendorExtensions.x-partout-tagged-module}}
+{{#nonPublicApi}}internal{{/nonPublicApi}}{{^nonPublicApi}}public{{/nonPublicApi}} enum {{classname}}: Codable{{#vendorExtensions.x-swift-hashable}}, Hashable{{/vendorExtensions.x-swift-hashable}}{{#useSendable}}, Sendable{{/useSendable}} {
+    {{#discriminator.mappedModels}}
+    case {{mappingName}}({{mappingName}}Module)
+    {{/discriminator.mappedModels}}
+
+    private enum CodingKeys: String, CodingKey {
+        case {{discriminator.propertyName}}
+        case value
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let rawType = try container.decode(String.self, forKey: .{{discriminator.propertyName}})
+        let value = try container.superDecoder(forKey: .value)
+        switch rawType {
+        {{#discriminator.mappedModels}}
+        case "{{mappingName}}":
+            self = .{{mappingName}}(try {{mappingName}}Module(from: value))
+        {{/discriminator.mappedModels}}
+        default:
+            throw DecodingError.dataCorrupted(
+                .init(codingPath: decoder.codingPath, debugDescription: "Unknown discriminator '\(rawType)'")
+            )
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        {{#discriminator.mappedModels}}
+        case .{{mappingName}}(let value):
+            try container.encode("{{mappingName}}", forKey: .{{discriminator.propertyName}})
+            try container.encode(value, forKey: .value)
+        {{/discriminator.mappedModels}}
+        }
+    }
+}
+{{/vendorExtensions.x-partout-tagged-module}}{{^vendorExtensions.x-partout-tagged-module}}{{^objcCompatible}}{{#nonPublicApi}}internal{{/nonPublicApi}}{{^nonPublicApi}}public{{/nonPublicApi}} {{#useClasses}}final class{{/useClasses}}{{^useClasses}}struct{{/useClasses}} {{{classname}}}: {{#useVapor}}Content{{/useVapor}}{{^useVapor}}Codable{{#useJsonEncodable}}, JSONEncodable{{/useJsonEncodable}}{{/useVapor}}{{#vendorExtensions.x-swift-hashable}}, Hashable{{/vendorExtensions.x-swift-hashable}}{{#useSendable}}, Sendable{{/useSendable}} {
 {{/objcCompatible}}{{#objcCompatible}}@objcMembers {{#nonPublicApi}}internal{{/nonPublicApi}}{{^nonPublicApi}}public{{/nonPublicApi}} class {{classname}}: NSObject, Codable{{#useJsonEncodable}}, JSONEncodable{{/useJsonEncodable}} {
 {{/objcCompatible}}
 
@@ -56,3 +94,4 @@
         {{/allVars}}
     }{{/vendorExtensions.x-swift-hashable}}{{/useClasses}}{{/objcCompatible}}
 }
+{{/vendorExtensions.x-partout-tagged-module}}

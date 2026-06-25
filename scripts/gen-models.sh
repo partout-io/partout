@@ -76,7 +76,6 @@ case $language in
             --schema-mappings EndpointProtocol=EndpointProtocol \
             --schema-mappings ExtendedEndpoint=ExtendedEndpoint \
             --schema-mappings Subnet=Subnet \
-            --schema-mappings TaggedModule=TaggedModule \
             --schema-mappings UniqueID=UniqueID \
             --schema-mappings UInt16=UInt16 \
             --schema-mappings UInt32=UInt32 \

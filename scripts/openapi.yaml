@@ -943,6 +943,7 @@ components:
         - type
       type: object
       description: A codable wrapper for all known modules.
+      x-partout-tagged-module: true
     TaggedModule.Custom:
       additionalProperties: false
       allOf:
