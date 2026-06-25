@@ -7,6 +7,55 @@ bin_dir=bin
 root_dir="$(dirname "$0")"/..
 pushd $root_dir
 
+generate_swift_models() {
+    local openapi=$1
+
+    scripts/gen-models.sh $openapi swift Sources/PartoutCore/OpenAPI/Codegen PartoutCore
+}
+
+generate_kotlin_models() {
+    local openapi=$1
+    local package=io.partout.models
+    local models=cross
+    local tmpmodels=cross-models
+
+    scripts/gen-models.sh $openapi kotlin $tmpmodels $package
+    rm -rf $models/android/io/partout/models
+    mv $tmpmodels/src/main/kotlin/io/partout/models $models/android/io/partout
+    rm -rf $tmpmodels
+}
+
+generate_cpp_models() {
+    # TODO
+    :
+}
+
+generate_models() {
+    local language=${1:-all}
+    local openapi=scripts/openapi.yaml
+
+    case $language in
+        all)
+            generate_swift_models $openapi
+            generate_kotlin_models $openapi
+            generate_cpp_models $openapi
+            ;;
+        swift)
+            generate_swift_models $openapi
+            ;;
+        kotlin)
+            generate_kotlin_models $openapi
+            ;;
+        cpp)
+            generate_cpp_models $openapi
+            ;;
+        *)
+            echo "Unknown models language '$language'; expected 'all', 'swift', 'kotlin', or 'cpp'"
+            exit 1
+            ;;
+    esac
+}
+
 positional_args=()
 cmake_opts=()
 while [[ $# -gt 0 ]]; do
@@ -22,6 +71,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -gen-models)
             gen_models=1
+            if [[ -n $2 && $2 != -* ]]; then
+                gen_models_language=$2
+                shift
+            fi
             shift
             ;;
         -config)
@@ -98,22 +151,8 @@ done
 set -- "${positional_args[@]}"
 
 # Generate models
-openapi=scripts/openapi.yaml
 if [[ $gen_models == 1 ]]; then
-    # Swift
-    scripts/gen-models.sh $openapi swift Sources/PartoutCore/OpenAPI/Codegen PartoutCore
-
-    # Kotlin
-    package=io.partout.models
-    models=cross
-    tmpmodels=cross-models
-    scripts/gen-models.sh $openapi kotlin $tmpmodels $package
-    rm -rf $models/android/io/partout/models
-    mv $tmpmodels/src/main/kotlin/io/partout/models $models/android/io/partout
-    rm -rf $tmpmodels
-
-    # C++ (TODO)
-    ######
+    generate_models $gen_models_language
 fi
 
 # Generate CMake files

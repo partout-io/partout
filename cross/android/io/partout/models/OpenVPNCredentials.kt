@@ -26,7 +26,7 @@ import kotlinx.serialization.Contextual
  *
  * @param username The username.
  * @param password The password.
- * @param otpMethod The OTP method (defaults to ``OTPMethod-swift.enum/none``).
+ * @param otpMethod The OTP method (defaults to none).
  * @param otp The OTP.
  */
 @Serializable
@@ -41,7 +41,7 @@ data class OpenVPNCredentials (
     @SerialName(value = "password")
     val password: kotlin.String,
 
-    /* The OTP method (defaults to ``OTPMethod-swift.enum/none``). */
+    /* The OTP method (defaults to none). */
     @Contextual @SerialName(value = "otpMethod")
     val otpMethod: OpenVPNCredentialsOTPMethod,
 

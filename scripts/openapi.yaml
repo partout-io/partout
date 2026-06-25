@@ -530,7 +530,7 @@ components:
           description: The password.
         otpMethod:
           "$ref": "#/components/schemas/OpenVPN.Credentials.OTPMethod"
-          description: The OTP method (defaults to ``OTPMethod-swift.enum/none``).
+          description: The OTP method (defaults to none).
         otp:
           type: string
           description: The OTP.
