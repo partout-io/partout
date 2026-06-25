@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** IP and routes. */
 public struct IPModule: Codable, Hashable, Sendable {
 
@@ -20,7 +19,5 @@ public struct IPModule: Codable, Hashable, Sendable {
         self.ipv6 = ipv6
         self.mtu = mtu
     }
-
 }
-
 

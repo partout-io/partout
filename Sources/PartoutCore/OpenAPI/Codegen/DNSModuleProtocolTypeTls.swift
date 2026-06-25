@@ -5,13 +5,11 @@
 // https://openapi-generator.tech
 //
 
-
 public struct DNSModuleProtocolTypeTls: Codable, Hashable, Sendable {
 
     public enum ModelType: String, Codable, CaseIterable, Sendable {
         case tls = "tls"
     }
-
     public var type: ModelType
     public var hostname: String
 
@@ -19,7 +17,5 @@ public struct DNSModuleProtocolTypeTls: Codable, Hashable, Sendable {
         self.type = type
         self.hostname = hostname
     }
-
 }
-
 

@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** Holds parameters for TLS wrapping. */
 public struct OpenVPNTLSWrap: Codable, Hashable, Sendable {
 
@@ -21,7 +20,5 @@ public struct OpenVPNTLSWrap: Codable, Hashable, Sendable {
         self.strategy = strategy
         self.wrappedKey = wrappedKey
     }
-
 }
-
 

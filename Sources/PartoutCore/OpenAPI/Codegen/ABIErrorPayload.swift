@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 public struct ABIErrorPayload: Codable, Hashable, Sendable {
 
     public var code: PartoutErrorCode
@@ -15,7 +14,5 @@ public struct ABIErrorPayload: Codable, Hashable, Sendable {
         self.code = code
         self.userInfo = userInfo
     }
-
 }
-
 

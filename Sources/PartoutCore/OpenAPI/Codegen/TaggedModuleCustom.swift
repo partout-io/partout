@@ -5,13 +5,11 @@
 // https://openapi-generator.tech
 //
 
-
 public struct TaggedModuleCustom: Codable, Hashable, Sendable {
 
     public enum ModelType: String, Codable, CaseIterable, Sendable {
         case custom = "Custom"
     }
-
     public var type: ModelType
     public var value: CustomModule
 
@@ -19,7 +17,5 @@ public struct TaggedModuleCustom: Codable, Hashable, Sendable {
         self.type = type
         self.value = value
     }
-
 }
-
 

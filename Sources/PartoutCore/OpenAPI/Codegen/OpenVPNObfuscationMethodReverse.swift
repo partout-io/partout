@@ -5,19 +5,15 @@
 // https://openapi-generator.tech
 //
 
-
 public struct OpenVPNObfuscationMethodReverse: Codable, Hashable, Sendable {
 
     public enum ModelType: String, Codable, CaseIterable, Sendable {
         case reverse = "reverse"
     }
-
     public var type: ModelType
 
     public init(type: ModelType) {
         self.type = type
     }
-
 }
-
 

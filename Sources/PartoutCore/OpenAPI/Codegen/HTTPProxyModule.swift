@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** HTTP proxy settings. */
 public struct HTTPProxyModule: Codable, Hashable, Sendable {
 
@@ -22,7 +21,5 @@ public struct HTTPProxyModule: Codable, Hashable, Sendable {
         self.proxy = proxy
         self.secureProxy = secureProxy
     }
-
 }
-
 

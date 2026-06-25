@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** Represents a WireGuard configuration. */
 public struct WireGuardConfiguration: Codable, Hashable, Sendable {
 
@@ -18,7 +17,5 @@ public struct WireGuardConfiguration: Codable, Hashable, Sendable {
         self.interface = interface
         self.peers = peers
     }
-
 }
-
 

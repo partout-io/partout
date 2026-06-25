@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** The immutable configuration for `OpenVPNSession`. */
 public struct OpenVPNConfiguration: Codable, Hashable, Sendable {
 
@@ -135,7 +134,5 @@ public struct OpenVPNConfiguration: Codable, Hashable, Sendable {
         self.usesPIAPatches = usesPIAPatches
         self.xorMethod = xorMethod
     }
-
 }
-
 

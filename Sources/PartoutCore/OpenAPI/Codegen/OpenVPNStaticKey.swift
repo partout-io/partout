@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** Represents an OpenVPN static key file (as generated with --genkey) */
 public struct OpenVPNStaticKey: Codable, Hashable, Sendable {
 
@@ -16,7 +15,5 @@ public struct OpenVPNStaticKey: Codable, Hashable, Sendable {
         self.data = data
         self.dir = dir
     }
-
 }
-
 

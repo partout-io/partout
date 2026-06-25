@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** The protocol used in DNS servers. */
 public enum DNSProtocol: String, Codable, CaseIterable, Sendable {
     /// The value to fall back to when unset. Standard cleartext DNS (port 53).
@@ -15,5 +14,3 @@ public enum DNSProtocol: String, Codable, CaseIterable, Sendable {
     /// DNS over TLS (port 853).
     case tls = "tls"
 }
-
-

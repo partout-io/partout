@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** Defines the type of compression framing. */
 public enum OpenVPNCompressionFraming: Int, Codable, CaseIterable, Sendable {
     case disabled = 0
@@ -13,5 +12,3 @@ public enum OpenVPNCompressionFraming: Int, Codable, CaseIterable, Sendable {
     case compress = 2
     case compressV2 = 3
 }
-
-

@@ -5,10 +5,7 @@
 // https://openapi-generator.tech
 //
 
-
 public enum OnDemandModuleOtherNetwork: String, Codable, CaseIterable, Sendable {
     case mobile = "mobile"
     case ethernet = "ethernet"
 }
-
-

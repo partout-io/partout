@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** Common options to give to ``TunnelController``. */
 public struct TunnelControllerOptions: Codable, Hashable, Sendable {
 
@@ -18,7 +17,5 @@ public struct TunnelControllerOptions: Codable, Hashable, Sendable {
         self.logsSnapshots = logsSnapshots
         self.minDataCountDelta = minDataCountDelta
     }
-
 }
-
 

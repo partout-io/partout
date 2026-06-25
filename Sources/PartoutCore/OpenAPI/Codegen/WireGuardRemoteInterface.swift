@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** The parameters of the remote interface. */
 public struct WireGuardRemoteInterface: Codable, Hashable, Sendable {
 
@@ -27,7 +26,5 @@ public struct WireGuardRemoteInterface: Codable, Hashable, Sendable {
         self.preSharedKey = preSharedKey
         self.publicKey = publicKey
     }
-
 }
-
 

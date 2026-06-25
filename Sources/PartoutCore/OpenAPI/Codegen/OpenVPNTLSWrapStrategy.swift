@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** The wrapping strategy. */
 public enum OpenVPNTLSWrapStrategy: String, Codable, CaseIterable, Sendable {
     /// Authenticates payload (--tls-auth).
@@ -15,5 +14,3 @@ public enum OpenVPNTLSWrapStrategy: String, Codable, CaseIterable, Sendable {
     /// Encrypts payload with a client-specific key (--tls-crypt-v2).
     case cryptV2 = "crypt-v2"
 }
-
-

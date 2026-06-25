@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** DNS settings. */
 public struct DNSModule: Codable, Hashable, Sendable {
 
@@ -28,7 +27,5 @@ public struct DNSModule: Codable, Hashable, Sendable {
         self.searchDomains = searchDomains
         self.servers = servers
     }
-
 }
-
 

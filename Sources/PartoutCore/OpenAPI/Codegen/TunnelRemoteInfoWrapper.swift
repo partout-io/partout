@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 public struct TunnelRemoteInfoWrapper: Codable, Hashable, Sendable {
 
     public var address: Address?
@@ -23,7 +22,5 @@ public struct TunnelRemoteInfoWrapper: Codable, Hashable, Sendable {
         self.profile = profile
         self.requiresVirtualDevice = requiresVirtualDevice
     }
-
 }
-
 

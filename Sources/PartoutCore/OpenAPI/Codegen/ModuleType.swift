@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** Raw type univocally associated to each ``Module`` implementation. */
 public enum ModuleType: String, Codable, CaseIterable, Sendable {
     case Custom = "Custom"
@@ -18,5 +17,3 @@ public enum ModuleType: String, Codable, CaseIterable, Sendable {
     case WireGuard = "WireGuard"
     case Undefined = "Undefined"
 }
-
-

@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** Message digest algorithm. */
 public enum OpenVPNDigest: String, Codable, CaseIterable, Sendable {
     /// SHA1 message digest.
@@ -19,5 +18,3 @@ public enum OpenVPNDigest: String, Codable, CaseIterable, Sendable {
     /// SHA256 message digest.
     case sha512 = "SHA512"
 }
-
-

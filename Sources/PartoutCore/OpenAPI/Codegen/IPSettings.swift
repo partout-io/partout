@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** IP settings and routes. */
 public struct IPSettings: Codable, Hashable, Sendable {
 
@@ -21,7 +20,5 @@ public struct IPSettings: Codable, Hashable, Sendable {
         self.includedRoutes = includedRoutes
         self.subnets = subnets
     }
-
 }
-
 

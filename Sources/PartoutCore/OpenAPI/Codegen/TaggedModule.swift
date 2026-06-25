@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** A codable wrapper for all known modules. */
 public enum TaggedModule: Codable, Hashable, Sendable {
     case Custom(CustomModule)
@@ -17,13 +16,13 @@ public enum TaggedModule: Codable, Hashable, Sendable {
     case WireGuard(WireGuardModule)
 
     private enum CodingKeys: String, CodingKey {
-        case type
+        case discriminator = "type"
         case value
     }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let rawType = try container.decode(String.self, forKey: .type)
+        let rawType = try container.decode(String.self, forKey: .discriminator)
         let value = try container.superDecoder(forKey: .value)
         switch rawType {
         case "Custom":
@@ -51,28 +50,27 @@ public enum TaggedModule: Codable, Hashable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
         case .Custom(let value):
-            try container.encode("Custom", forKey: .type)
+            try container.encode("Custom", forKey: .discriminator)
             try container.encode(value, forKey: .value)
         case .DNS(let value):
-            try container.encode("DNS", forKey: .type)
+            try container.encode("DNS", forKey: .discriminator)
             try container.encode(value, forKey: .value)
         case .HTTPProxy(let value):
-            try container.encode("HTTPProxy", forKey: .type)
+            try container.encode("HTTPProxy", forKey: .discriminator)
             try container.encode(value, forKey: .value)
         case .IP(let value):
-            try container.encode("IP", forKey: .type)
+            try container.encode("IP", forKey: .discriminator)
             try container.encode(value, forKey: .value)
         case .OnDemand(let value):
-            try container.encode("OnDemand", forKey: .type)
+            try container.encode("OnDemand", forKey: .discriminator)
             try container.encode(value, forKey: .value)
         case .OpenVPN(let value):
-            try container.encode("OpenVPN", forKey: .type)
+            try container.encode("OpenVPN", forKey: .discriminator)
             try container.encode(value, forKey: .value)
         case .WireGuard(let value):
-            try container.encode("WireGuard", forKey: .type)
+            try container.encode("WireGuard", forKey: .discriminator)
             try container.encode(value, forKey: .value)
         }
     }
 }
-
 

@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** A socket type with optional info about the IP endpoint. */
 public enum IPSocketType: String, Codable, CaseIterable, Sendable {
     /// UDP socket type.
@@ -21,5 +20,3 @@ public enum IPSocketType: String, Codable, CaseIterable, Sendable {
     /// TCP socket type (IPv6).
     case tcp6 = "TCP6"
 }
-
-

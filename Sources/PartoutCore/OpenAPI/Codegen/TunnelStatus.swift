@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** The status of a ``Tunnel``. */
 public enum TunnelStatus: String, Codable, CaseIterable, Sendable {
     case inactive = "inactive"
@@ -13,5 +12,3 @@ public enum TunnelStatus: String, Codable, CaseIterable, Sendable {
     case active = "active"
     case deactivating = "deactivating"
 }
-
-

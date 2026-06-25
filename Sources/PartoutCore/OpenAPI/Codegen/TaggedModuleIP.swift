@@ -5,13 +5,11 @@
 // https://openapi-generator.tech
 //
 
-
 public struct TaggedModuleIP: Codable, Hashable, Sendable {
 
     public enum ModelType: String, Codable, CaseIterable, Sendable {
         case ip = "IP"
     }
-
     public var type: ModelType
     public var value: IPModule
 
@@ -19,7 +17,5 @@ public struct TaggedModuleIP: Codable, Hashable, Sendable {
         self.type = type
         self.value = value
     }
-
 }
-
 

@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** A codable wrapper for a profile with all known modules. */
 public struct TaggedProfile: Codable, Hashable, Sendable {
 
@@ -26,7 +25,5 @@ public struct TaggedProfile: Codable, Hashable, Sendable {
         self.userInfo = userInfo
         self.version = version
     }
-
 }
-
 

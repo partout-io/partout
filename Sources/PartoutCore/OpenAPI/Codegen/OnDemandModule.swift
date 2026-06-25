@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** On-demand settings. */
 public struct OnDemandModule: Codable, Hashable, Sendable {
 
@@ -20,7 +19,5 @@ public struct OnDemandModule: Codable, Hashable, Sendable {
         self.withOtherNetworks = withOtherNetworks
         self.withSSIDs = withSSIDs
     }
-
 }
-
 

@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** A type-erased ``Module`` for encoding external implementations. */
 public struct CustomModule: Codable, Hashable, Sendable {
 
@@ -16,7 +15,5 @@ public struct CustomModule: Codable, Hashable, Sendable {
         self.innerType = innerType
         self.json = json
     }
-
 }
-
 

@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** A connection module providing a WireGuard connection. */
 public struct WireGuardModule: Codable, Hashable, Sendable {
 
@@ -16,7 +15,5 @@ public struct WireGuardModule: Codable, Hashable, Sendable {
         self.configuration = configuration
         self.id = id
     }
-
 }
-
 

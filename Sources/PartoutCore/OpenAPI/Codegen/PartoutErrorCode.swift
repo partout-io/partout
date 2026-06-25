@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 public enum PartoutErrorCode: String, Codable, CaseIterable, Sendable {
     /// Response is cached.
     case cached = "cached"
@@ -100,5 +99,3 @@ public enum PartoutErrorCode: String, Codable, CaseIterable, Sendable {
     /// Configuration has no peers.
     case wireGuardEmptyPeers = "WireGuard.emptyPeers"
 }
-
-

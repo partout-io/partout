@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** Advanced flags affecting the behavior of a ``Profile``. */
 public struct ProfileBehavior: Codable, Hashable, Sendable {
 
@@ -18,7 +17,5 @@ public struct ProfileBehavior: Codable, Hashable, Sendable {
         self.disconnectsOnSleep = disconnectsOnSleep
         self.includesAllNetworks = includesAllNetworks
     }
-
 }
-
 

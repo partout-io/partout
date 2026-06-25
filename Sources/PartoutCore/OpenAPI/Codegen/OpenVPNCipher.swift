@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** Encryption algorithm. */
 public enum OpenVPNCipher: String, Codable, CaseIterable, Sendable {
     /// AES encryption with 128-bit key size and CBC.
@@ -21,5 +20,3 @@ public enum OpenVPNCipher: String, Codable, CaseIterable, Sendable {
     /// AES encryption with 256-bit key size and GCM.
     case aes256gcm = "AES-256-GCM"
 }
-
-

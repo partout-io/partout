@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** The parameters of the local interface. */
 public struct WireGuardLocalInterface: Codable, Hashable, Sendable {
 
@@ -24,7 +23,5 @@ public struct WireGuardLocalInterface: Codable, Hashable, Sendable {
         self.mtu = mtu
         self.privateKey = privateKey
     }
-
 }
-
 

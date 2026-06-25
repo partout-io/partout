@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** Routing policy. */
 public enum OpenVPNRoutingPolicy: String, Codable, CaseIterable, Sendable {
     /// All IPv4 traffic goes through the VPN.
@@ -15,5 +14,3 @@ public enum OpenVPNRoutingPolicy: String, Codable, CaseIterable, Sendable {
     /// Block LAN while connected.
     case blockLocal = "blockLocal"
 }
-
-

@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** Settings that can be pulled from server. */
 public enum OpenVPNPullMask: String, Codable, CaseIterable, Sendable {
     /// Routes and gateways.
@@ -15,5 +14,3 @@ public enum OpenVPNPullMask: String, Codable, CaseIterable, Sendable {
     /// Proxy settings.
     case proxy = "proxy"
 }
-
-

@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** Returns a tunnel-specific snapshot of a ``Profile``. */
 public struct TunnelSnapshot: Codable, Hashable, Sendable {
 
@@ -22,7 +21,5 @@ public struct TunnelSnapshot: Codable, Hashable, Sendable {
         self.onDemand = onDemand
         self.status = status
     }
-
 }
-
 

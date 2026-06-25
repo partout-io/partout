@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** The status of a ``Connection``. */
 public enum ConnectionStatus: String, Codable, CaseIterable, Sendable {
     case disconnected = "disconnected"
@@ -13,5 +12,3 @@ public enum ConnectionStatus: String, Codable, CaseIterable, Sendable {
     case connected = "connected"
     case disconnecting = "disconnecting"
 }
-
-

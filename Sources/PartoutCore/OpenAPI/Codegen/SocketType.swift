@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** A socket type between UDP and TCP. */
 public enum SocketType: String, Codable, CaseIterable, Sendable {
     /// UDP socket type.
@@ -13,5 +12,3 @@ public enum SocketType: String, Codable, CaseIterable, Sendable {
     /// TCP socket type.
     case tcp = "TCP"
 }
-
-

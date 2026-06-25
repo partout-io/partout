@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** Represents a route in the routing table. */
 public struct Route: Codable, Hashable, Sendable {
 
@@ -18,7 +17,5 @@ public struct Route: Codable, Hashable, Sendable {
         self.destination = destination
         self.gateway = gateway
     }
-
 }
-
 

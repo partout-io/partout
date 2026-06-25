@@ -5,13 +5,11 @@
 // https://openapi-generator.tech
 //
 
-
 public struct TaggedModuleOpenVPN: Codable, Hashable, Sendable {
 
     public enum ModelType: String, Codable, CaseIterable, Sendable {
         case openVPN = "OpenVPN"
     }
-
     public var type: ModelType
     public var value: OpenVPNModule
 
@@ -19,7 +17,5 @@ public struct TaggedModuleOpenVPN: Codable, Hashable, Sendable {
         self.type = type
         self.value = value
     }
-
 }
-
 

@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** A pair of received/sent bytes count. */
 public struct DataCount: Codable, Hashable, Sendable {
 
@@ -18,7 +17,5 @@ public struct DataCount: Codable, Hashable, Sendable {
         self.received = received
         self.sent = sent
     }
-
 }
-
 

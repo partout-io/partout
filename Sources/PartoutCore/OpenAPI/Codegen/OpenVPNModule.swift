@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** A connection module providing an OpenVPN connection. */
 public struct OpenVPNModule: Codable, Hashable, Sendable {
 
@@ -20,7 +19,5 @@ public struct OpenVPNModule: Codable, Hashable, Sendable {
         self.id = id
         self.requiresInteractiveCredentials = requiresInteractiveCredentials
     }
-
 }
-
 

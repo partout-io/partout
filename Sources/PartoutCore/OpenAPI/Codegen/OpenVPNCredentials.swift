@@ -5,7 +5,6 @@
 // https://openapi-generator.tech
 //
 
-
 /** A set of credentials for authentication. */
 public struct OpenVPNCredentials: Codable, Hashable, Sendable {
 
@@ -24,7 +23,5 @@ public struct OpenVPNCredentials: Codable, Hashable, Sendable {
         self.password = password
         self.username = username
     }
-
 }
-
 

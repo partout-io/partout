@@ -5,13 +5,11 @@
 // https://openapi-generator.tech
 //
 
-
 public struct TaggedModuleOnDemand: Codable, Hashable, Sendable {
 
     public enum ModelType: String, Codable, CaseIterable, Sendable {
         case onDemand = "OnDemand"
     }
-
     public var type: ModelType
     public var value: OnDemandModule
 
@@ -19,7 +17,5 @@ public struct TaggedModuleOnDemand: Codable, Hashable, Sendable {
         self.type = type
         self.value = value
     }
-
 }
-
 
