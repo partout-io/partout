@@ -10,48 +10,90 @@ import Foundation
 import AnyCodable
 #endif
 
+/** The immutable configuration for `OpenVPNSession`. */
 public struct OpenVPNConfiguration: Codable, Hashable {
 
+    /** - Seealso: `Configuration.Builder.authToken` */
     public var authToken: String?
+    /** - Seealso: `Configuration.Builder.authUserPass` */
     public var authUserPass: Bool?
+    /** - Seealso: `Configuration.Builder.ca` */
     public var ca: OpenVPNCryptoContainer?
+    /** - Seealso: `Configuration.Builder.checksEKU` */
     public var checksEKU: Bool?
+    /** - Seealso: `Configuration.Builder.checksSANHost` */
     public var checksSANHost: Bool?
+    /** - Seealso: `Configuration.Builder.cipher` */
     public var cipher: OpenVPNCipher?
+    /** - Seealso: `Configuration.Builder.clientCertificate` */
     public var clientCertificate: OpenVPNCryptoContainer?
+    /** - Seealso: `Configuration.Builder.clientKey` */
     public var clientKey: OpenVPNCryptoContainer?
+    /** - Seealso: `Configuration.Builder.compressionAlgorithm` */
     public var compressionAlgorithm: OpenVPNCompressionAlgorithm?
+    /** - Seealso: `Configuration.Builder.compressionFraming` */
     public var compressionFraming: OpenVPNCompressionFraming?
+    /** - Seealso: `Configuration.Builder.dataCiphers` */
     public var dataCiphers: [OpenVPNCipher]?
+    /** - Seealso: `Configuration.Builder.digest` */
     public var digest: OpenVPNDigest?
+    /** - Seealso: `Configuration.Builder.dnsDomain` */
     public var dnsDomain: String?
+    /** - Seealso: `Configuration.Builder.dnsServers` */
     public var dnsServers: [String]?
+    /** - Seealso: `Configuration.Builder.httpProxy` */
     public var httpProxy: String?
+    /** - Seealso: `Configuration.Builder.httpsProxy` */
     public var httpsProxy: String?
+    /** - Seealso: `Configuration.Builder.ipv4` */
     public var ipv4: IPSettings?
+    /** - Seealso: `Configuration.Builder.ipv6` */
     public var ipv6: IPSettings?
+    /** - Seealso: `Configuration.Builder.keepAliveInterval` */
     public var keepAliveInterval: Double?
+    /** - Seealso: `Configuration.Builder.keepAliveTimeout` */
     public var keepAliveTimeout: Double?
+    /** - Seealso: `Configuration.Builder.mtu` */
     public var mtu: Int?
+    /** - Seealso: `Configuration.Builder.noPullMask` */
     public var noPullMask: [OpenVPNPullMask]?
+    /** - Seealso: `Configuration.Builder.peerId` */
     public var peerId: Int?
+    /** - Seealso: `Configuration.Builder.proxyAutoConfigurationURL` */
     public var proxyAutoConfigurationURL: String?
+    /** - Seealso: `Configuration.Builder.proxyBypassDomains` */
     public var proxyBypassDomains: [String]?
+    /** - Seealso: `Configuration.Builder.randomizeEndpoint` */
     public var randomizeEndpoint: Bool?
+    /** - Seealso: `Configuration.Builder.randomizeHostnames` */
     public var randomizeHostnames: Bool?
+    /** - Seealso: `Configuration.Builder.remotes` */
     public var remotes: [String]?
+    /** - Seealso: `Configuration.Builder.renegotiatesAfter` */
     public var renegotiatesAfter: Double?
+    /** - Seealso: `Configuration.Builder.routeGateway4` */
     public var routeGateway4: String?
+    /** - Seealso: `Configuration.Builder.routeGateway6` */
     public var routeGateway6: String?
+    /** - Seealso: `Configuration.Builder.routes4` */
     public var routes4: [Route]?
+    /** - Seealso: `Configuration.Builder.routes6` */
     public var routes6: [Route]?
+    /** - Seealso: `Configuration.Builder.routingPolicies` */
     public var routingPolicies: [OpenVPNRoutingPolicy]?
+    /** - Seealso: `Configuration.Builder.sanHost` */
     public var sanHost: String?
+    /** - Seealso: `Configuration.Builder.searchDomains` */
     public var searchDomains: [String]?
+    /** - Seealso: `Configuration.Builder.staticChallenge` */
     public var staticChallenge: Bool?
+    /** - Seealso: `Configuration.Builder.tlsSecurityLevel` */
     public var tlsSecurityLevel: Int?
+    /** - Seealso: `Configuration.Builder.tlsWrap` */
     public var tlsWrap: OpenVPNTLSWrap?
+    /** - Seealso: `Configuration.Builder.usesPIAPatches` */
     public var usesPIAPatches: Bool?
+    /** - Seealso: `Configuration.Builder.xorMethod` */
     public var xorMethod: OpenVPNObfuscationMethod?
 
     public init(authToken: String? = nil, authUserPass: Bool? = nil, ca: OpenVPNCryptoContainer? = nil, checksEKU: Bool? = nil, checksSANHost: Bool? = nil, cipher: OpenVPNCipher? = nil, clientCertificate: OpenVPNCryptoContainer? = nil, clientKey: OpenVPNCryptoContainer? = nil, compressionAlgorithm: OpenVPNCompressionAlgorithm? = nil, compressionFraming: OpenVPNCompressionFraming? = nil, dataCiphers: [OpenVPNCipher]? = nil, digest: OpenVPNDigest? = nil, dnsDomain: String? = nil, dnsServers: [String]? = nil, httpProxy: String? = nil, httpsProxy: String? = nil, ipv4: IPSettings? = nil, ipv6: IPSettings? = nil, keepAliveInterval: Double? = nil, keepAliveTimeout: Double? = nil, mtu: Int? = nil, noPullMask: [OpenVPNPullMask]? = nil, peerId: Int? = nil, proxyAutoConfigurationURL: String? = nil, proxyBypassDomains: [String]? = nil, randomizeEndpoint: Bool? = nil, randomizeHostnames: Bool? = nil, remotes: [String]? = nil, renegotiatesAfter: Double? = nil, routeGateway4: String? = nil, routeGateway6: String? = nil, routes4: [Route]? = nil, routes6: [Route]? = nil, routingPolicies: [OpenVPNRoutingPolicy]? = nil, sanHost: String? = nil, searchDomains: [String]? = nil, staticChallenge: Bool? = nil, tlsSecurityLevel: Int? = nil, tlsWrap: OpenVPNTLSWrap? = nil, usesPIAPatches: Bool? = nil, xorMethod: OpenVPNObfuscationMethod? = nil) {

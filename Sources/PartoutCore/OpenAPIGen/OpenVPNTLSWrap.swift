@@ -10,10 +10,14 @@ import Foundation
 import AnyCodable
 #endif
 
+/** Holds parameters for TLS wrapping. */
 public struct OpenVPNTLSWrap: Codable, Hashable {
 
+    /** The static encryption key. */
     public var key: OpenVPNStaticKey
+    /** The wrapping strategy. */
     public var strategy: OpenVPNTLSWrapStrategy
+    /** The wrapped client key appended to initial tls-crypt-v2 packets. */
     public var wrappedKey: String?
 
     public init(key: OpenVPNStaticKey, strategy: OpenVPNTLSWrapStrategy, wrappedKey: String? = nil) {

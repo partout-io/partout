@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** Defines the type of compression framing. */
 public enum OpenVPNCompressionFraming: Int, Codable, CaseIterable {
     case disabled = 0
     case compLZO = 1

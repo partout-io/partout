@@ -10,12 +10,15 @@ import Foundation
 import AnyCodable
 #endif
 
+/** HTTP proxy settings. */
 public struct HTTPProxyModule: Codable, Hashable {
 
     public var bypassDomains: [String]
     public var id: String
     public var pacURL: String?
+    /** Represents an endpoint. */
     public var proxy: String?
+    /** Represents an endpoint. */
     public var secureProxy: String?
 
     public init(bypassDomains: [String], id: String, pacURL: String? = nil, proxy: String? = nil, secureProxy: String? = nil) {

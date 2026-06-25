@@ -10,9 +10,12 @@ import Foundation
 import AnyCodable
 #endif
 
+/** Represents a WireGuard configuration. */
 public struct WireGuardConfiguration: Codable, Hashable {
 
+    /** The local interface. */
     public var interface: WireGuardLocalInterface
+    /** The peers. */
     public var peers: [WireGuardRemoteInterface]
 
     public init(interface: WireGuardLocalInterface, peers: [WireGuardRemoteInterface]) {

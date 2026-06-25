@@ -10,10 +10,16 @@ import Foundation
 import AnyCodable
 #endif
 
+/** Message digest algorithm. */
 public enum OpenVPNDigest: String, Codable, CaseIterable {
+    /// SHA1 message digest.
     case sha1 = "SHA1"
+    /// SHA224 message digest.
     case sha224 = "SHA224"
+    /// SHA256 message digest.
     case sha256 = "SHA256"
+    /// SHA256 message digest.
     case sha384 = "SHA384"
+    /// SHA256 message digest.
     case sha512 = "SHA512"
 }

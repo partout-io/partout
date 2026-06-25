@@ -10,8 +10,12 @@ import Foundation
 import AnyCodable
 #endif
 
+/** Settings that can be pulled from server. */
 public enum OpenVPNPullMask: String, Codable, CaseIterable {
+    /// Routes and gateways.
     case routes = "routes"
+    /// DNS settings.
     case dns = "dns"
+    /// Proxy settings.
     case proxy = "proxy"
 }

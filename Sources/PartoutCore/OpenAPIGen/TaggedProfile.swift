@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** A codable wrapper for a profile with all known modules. */
 public struct TaggedProfile: Codable, Hashable {
 
     public var activeModulesIds: Set<String>

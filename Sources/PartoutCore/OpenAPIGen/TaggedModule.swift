@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** A codable wrapper for all known modules. */
 public struct TaggedModule: Codable, Hashable {
 
     public var type: String

@@ -10,8 +10,12 @@ import Foundation
 import AnyCodable
 #endif
 
+/** The wrapping strategy. */
 public enum OpenVPNTLSWrapStrategy: String, Codable, CaseIterable {
+    /// Authenticates payload (--tls-auth).
     case auth = "auth"
+    /// Encrypts payload (--tls-crypt).
     case crypt = "crypt"
+    /// Encrypts payload with a client-specific key (--tls-crypt-v2).
     case cryptV2 = "crypt-v2"
 }

@@ -10,7 +10,10 @@ import Foundation
 import AnyCodable
 #endif
 
+/** The key-direction field, usually 0 on servers and 1 on clients. */
 public enum OpenVPNStaticKeyDirection: Int, Codable, CaseIterable {
+    /// Conventional server direction (implicit for tls-crypt).
     case server = 0
+    /// Conventional client direction (implicit for tls-crypt).
     case client = 1
 }

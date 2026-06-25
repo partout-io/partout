@@ -12,6 +12,7 @@ import AnyCodable
 
 public struct TunnelRemoteInfoWrapper: Codable, Hashable {
 
+    /** A hostname or IP address. */
     public var address: String?
     public var modules: [TaggedModule]?
     public var options: TunnelControllerOptions

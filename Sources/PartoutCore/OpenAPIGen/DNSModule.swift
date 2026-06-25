@@ -10,8 +10,10 @@ import Foundation
 import AnyCodable
 #endif
 
+/** DNS settings. */
 public struct DNSModule: Codable, Hashable {
 
+    /** A hostname or IP address. */
     public var domainName: String?
     public var domainPolicy: DNSModuleDomainPolicy?
     public var id: String

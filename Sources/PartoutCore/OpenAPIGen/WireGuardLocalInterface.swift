@@ -10,11 +10,16 @@ import Foundation
 import AnyCodable
 #endif
 
+/** The parameters of the local interface. */
 public struct WireGuardLocalInterface: Codable, Hashable {
 
+    /** The local addresses. */
     public var addresses: [String]
+    /** The optional DNS settings. */
     public var dns: DNSModule?
+    /** The optional MTU. */
     public var mtu: Int?
+    /** The local private key. */
     public var privateKey: String
 
     public init(addresses: [String], dns: DNSModule? = nil, mtu: Int? = nil, privateKey: String) {

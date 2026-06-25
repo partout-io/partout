@@ -11,50 +11,96 @@ import AnyCodable
 #endif
 
 public enum PartoutErrorCode: String, Codable, CaseIterable {
+    /// Response is cached.
     case cached = "cached"
+    /// Entity not found.
     case notFound = "notFound"
+    /// Operation cancelled or unauthorized.
     case operationCancelled = "operationCancelled"
+    /// A required object was released prematurely.
     case releasedObject = "releasedObject"
+    /// An exception was raised during a script execution.
     case scriptException = "scriptException"
+    /// Operation timed out.
     case timeout = "timeout"
+    /// Generic failure.
     case unhandled = "unhandled"
+    /// Some modules are incompatible (`userInfo` is an array of incompatible ``Module``).
     case incompatibleModules = "incompatibleModules"
+    /// A module is incomplete (`userInfo` is the incomplete ``ModuleBuilder`` ID).
     case incompleteModule = "incompleteModule"
+    /// The profile has no active modules.
     case noActiveModules = "noActiveModules"
+    /// The profile has non-final modules that must be resolved to final modules first.
     case nonFinalModules = "nonFinalModules"
+    /// Missing a required implementation.
     case requiredImplementation = "requiredImplementation"
+    /// Module type is unexpected
     case unexpectedModuleType = "unexpectedModuleType"
+    /// Module content is unknown for the importer.
     case unknownImportedModule = "unknownImportedModule"
+    /// Module handler is unknown.
     case unknownModuleHandler = "unknownModuleHandler"
+    /// Authentication failure.
     case authentication = "authentication"
+    /// Crypto error.
     case crypto = "crypto"
+    /// DNS resolution failure.
     case dnsFailure = "dnsFailure"
+    /// No more endpoints available to try.
     case exhaustedEndpoints = "exhaustedEndpoints"
+    /// File descriptor is not available.
     case fdUnavailable = "fdUnavailable"
+    /// I/O failure.
     case ioFailure = "ioFailure"
+    /// Link device is not active.
     case linkNotActive = "linkNotActive"
+    /// Network changed.
     case networkChanged = "networkChanged"
+    /// Network is unreachable.
     case networkUnreachable = "networkUnreachable"
+    /// Native sockets could not be configured.
     case socketConfiguration = "socketConfiguration"
+    /// TUN device is not active.
     case tunNotActive = "tunNotActive"
+    /// TUN device is not available for I/O.
     case tunNotAvailable = "tunNotAvailable"
+    /// Decoding error.
     case decoding = "decoding"
+    /// Encoding error.
     case encoding = "encoding"
+    /// Invalid field.
     case invalidField = "invalidField"
+    /// Invalid value.
     case invalidValue = "invalidValue"
+    /// Parsing error.
     case parsing = "parsing"
+    /// Unable to add keychain item.
     case keychainAddItem = "keychainAddItem"
+    /// Keychain item not found.
     case keychainItemNotFound = "keychainItemNotFound"
+    /// Compression settings mismatch.
     case openVPNCompressionMismatch = "OpenVPN.compressionMismatch"
+    /// Connection failure.
     case openVPNConnectionFailure = "OpenVPN.connectionFailure"
+    /// No routing configuration.
     case openVPNNoRouting = "OpenVPN.noRouting"
+    /// One-time password is required.
     case openVPNOTPRequired = "OpenVPN.otpRequired"
+    /// Passphrase is required.
     case openVPNPassphraseRequired = "OpenVPN.passphraseRequired"
+    /// Authentication can be retried.
     case openVPNRecoverableAuthentication = "OpenVPN.recoverableAuthentication"
+    /// Server requested shutdown.
     case openVPNServerShutdown = "OpenVPN.serverShutdown"
+    /// TLS failure.
     case openVPNTLSFailure = "OpenVPN.tlsFailure"
+    /// Algorithm is unsupported.
     case openVPNUnsupportedAlgorithm = "OpenVPN.unsupportedAlgorithm"
+    /// Compression setting is unsupported.
     case openVPNUnsupportedCompression = "OpenVPN.unsupportedCompression"
+    /// Option is unsupported.
     case openVPNUnsupportedOption = "OpenVPN.unsupportedOption"
+    /// Configuration has no peers.
     case wireGuardEmptyPeers = "WireGuard.emptyPeers"
 }

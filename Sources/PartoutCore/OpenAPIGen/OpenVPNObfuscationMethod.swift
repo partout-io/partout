@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** The obfuscation method. */
 public struct OpenVPNObfuscationMethod: Codable, Hashable {
 
     public var type: String

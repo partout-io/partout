@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** The status of a ``Connection``. */
 public enum ConnectionStatus: String, Codable, CaseIterable {
     case disconnected = "disconnected"
     case connecting = "connecting"

@@ -10,11 +10,18 @@ import Foundation
 import AnyCodable
 #endif
 
+/** Encryption algorithm. */
 public enum OpenVPNCipher: String, Codable, CaseIterable {
+    /// AES encryption with 128-bit key size and CBC.
     case aes128cbc = "AES-128-CBC"
+    /// AES encryption with 192-bit key size and CBC.
     case aes192cbc = "AES-192-CBC"
+    /// AES encryption with 256-bit key size and CBC.
     case aes256cbc = "AES-256-CBC"
+    /// AES encryption with 128-bit key size and GCM.
     case aes128gcm = "AES-128-GCM"
+    /// AES encryption with 192-bit key size and GCM.
     case aes192gcm = "AES-192-GCM"
+    /// AES encryption with 256-bit key size and GCM.
     case aes256gcm = "AES-256-GCM"
 }

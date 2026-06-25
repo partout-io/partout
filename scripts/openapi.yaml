@@ -11,6 +11,7 @@ components:
       type: object
     Address:
       type: string
+      description: A hostname or IP address.
     ConnectionStatus:
       enum:
         - disconnected
@@ -23,6 +24,7 @@ components:
         - connecting
         - connected
         - disconnecting
+      description: The status of a ``Connection``.
     CustomModule:
       additionalProperties: false
       properties:
@@ -33,6 +35,7 @@ components:
         - innerType
         - json
       type: object
+      description: A type-erased ``Module`` for encoding external implementations.
     DNSModule:
       additionalProperties: false
       properties:
@@ -61,6 +64,7 @@ components:
         - protocolType
         - servers
       type: object
+      description: DNS settings.
     DNSModule.DomainPolicy:
       enum:
         - match
@@ -132,23 +136,34 @@ components:
         - cleartext
         - https
         - tls
+      description: The protocol used in DNS servers.
+      x-enum-descriptions:
+        - The value to fall back to when unset. Standard cleartext DNS (port 53).
+        - DNS over HTTPS.
+        - DNS over TLS (port 853).
     DataCount:
       additionalProperties: false
       properties:
         received:
           "$ref": "#/components/schemas/UInt64"
+          description: Received bytes count.
         sent:
           "$ref": "#/components/schemas/UInt64"
+          description: Sent bytes count.
       required:
         - received
         - sent
       type: object
+      description: A pair of received/sent bytes count.
     Endpoint:
       type: string
+      description: Represents an endpoint.
     EndpointProtocol:
       type: string
+      description: Defines the communication protocol of an endpoint.
     ExtendedEndpoint:
       type: string
+      description: Aggregates an address and an ``EndpointProtocol``.
     HTTPProxyModule:
       additionalProperties: false
       properties:
@@ -169,6 +184,7 @@ components:
         - id
         - bypassDomains
       type: object
+      description: HTTP proxy settings.
     IPModule:
       additionalProperties: false
       properties:
@@ -183,6 +199,7 @@ components:
       required:
         - id
       type: object
+      description: IP and routes.
     IPSettings:
       additionalProperties: false
       properties:
@@ -190,19 +207,23 @@ components:
           items:
             "$ref": "#/components/schemas/Route"
           type: array
+          description: The excluded routes.
         includedRoutes:
           items:
             "$ref": "#/components/schemas/Route"
           type: array
+          description: The included routes.
         subnets:
           items:
             "$ref": "#/components/schemas/Subnet"
           type: array
+          description: The subnets.
       required:
         - subnets
         - includedRoutes
         - excludedRoutes
       type: object
+      description: IP settings and routes.
     IPSocketType:
       enum:
         - UDP
@@ -219,6 +240,14 @@ components:
         - tcp4
         - udp6
         - tcp6
+      description: A socket type with optional info about the IP endpoint.
+      x-enum-descriptions:
+        - UDP socket type.
+        - TCP socket type.
+        - UDP socket type (IPv4).
+        - TCP socket type (IPv4).
+        - UDP socket type (IPv6).
+        - TCP socket type (IPv6).
     Int16:
       type: integer
     Int32:
@@ -250,6 +279,7 @@ components:
         - Provider
         - WireGuard
         - Undefined
+      description: Raw type univocally associated to each ``Module`` implementation.
     OnDemandModule:
       additionalProperties: false
       properties:
@@ -272,6 +302,7 @@ components:
         - withSSIDs
         - withOtherNetworks
       type: object
+      description: On-demand settings.
     OnDemandModule.OtherNetwork:
       enum:
         - mobile
@@ -306,6 +337,14 @@ components:
         - aes128gcm
         - aes192gcm
         - aes256gcm
+      description: Encryption algorithm.
+      x-enum-descriptions:
+        - AES encryption with 128-bit key size and CBC.
+        - AES encryption with 192-bit key size and CBC.
+        - AES encryption with 256-bit key size and CBC.
+        - AES encryption with 128-bit key size and GCM.
+        - AES encryption with 192-bit key size and GCM.
+        - AES encryption with 256-bit key size and GCM.
     OpenVPN.CompressionAlgorithm:
       enum:
         - 0
@@ -316,6 +355,7 @@ components:
         - disabled
         - LZO
         - other
+      description: Defines the type of compression algorithm.
     OpenVPN.CompressionFraming:
       enum:
         - 0
@@ -328,127 +368,175 @@ components:
         - compLZO
         - compress
         - compressV2
+      description: Defines the type of compression framing.
     OpenVPN.Configuration:
       additionalProperties: false
       properties:
         authToken:
           type: string
+          description: "- Seealso: `Configuration.Builder.authToken`"
         authUserPass:
           type: boolean
+          description: "- Seealso: `Configuration.Builder.authUserPass`"
         ca:
           "$ref": "#/components/schemas/OpenVPN.CryptoContainer"
+          description: "- Seealso: `Configuration.Builder.ca`"
         checksEKU:
           type: boolean
+          description: "- Seealso: `Configuration.Builder.checksEKU`"
         checksSANHost:
           type: boolean
+          description: "- Seealso: `Configuration.Builder.checksSANHost`"
         cipher:
           "$ref": "#/components/schemas/OpenVPN.Cipher"
+          description: "- Seealso: `Configuration.Builder.cipher`"
         clientCertificate:
           "$ref": "#/components/schemas/OpenVPN.CryptoContainer"
+          description: "- Seealso: `Configuration.Builder.clientCertificate`"
         clientKey:
           "$ref": "#/components/schemas/OpenVPN.CryptoContainer"
+          description: "- Seealso: `Configuration.Builder.clientKey`"
         compressionAlgorithm:
           "$ref": "#/components/schemas/OpenVPN.CompressionAlgorithm"
+          description: "- Seealso: `Configuration.Builder.compressionAlgorithm`"
         compressionFraming:
           "$ref": "#/components/schemas/OpenVPN.CompressionFraming"
+          description: "- Seealso: `Configuration.Builder.compressionFraming`"
         dataCiphers:
           items:
             "$ref": "#/components/schemas/OpenVPN.Cipher"
           type: array
+          description: "- Seealso: `Configuration.Builder.dataCiphers`"
         digest:
           "$ref": "#/components/schemas/OpenVPN.Digest"
+          description: "- Seealso: `Configuration.Builder.digest`"
         dnsDomain:
           type: string
+          description: "- Seealso: `Configuration.Builder.dnsDomain`"
         dnsServers:
           items:
             type: string
           type: array
+          description: "- Seealso: `Configuration.Builder.dnsServers`"
         httpProxy:
           "$ref": "#/components/schemas/Endpoint"
+          description: "- Seealso: `Configuration.Builder.httpProxy`"
         httpsProxy:
           "$ref": "#/components/schemas/Endpoint"
+          description: "- Seealso: `Configuration.Builder.httpsProxy`"
         ipv4:
           "$ref": "#/components/schemas/IPSettings"
+          description: "- Seealso: `Configuration.Builder.ipv4`"
         ipv6:
           "$ref": "#/components/schemas/IPSettings"
+          description: "- Seealso: `Configuration.Builder.ipv6`"
         keepAliveInterval:
           type: number
+          description: "- Seealso: `Configuration.Builder.keepAliveInterval`"
         keepAliveTimeout:
           type: number
+          description: "- Seealso: `Configuration.Builder.keepAliveTimeout`"
         mtu:
           type: integer
+          description: "- Seealso: `Configuration.Builder.mtu`"
         noPullMask:
           items:
             "$ref": "#/components/schemas/OpenVPN.PullMask"
           type: array
+          description: "- Seealso: `Configuration.Builder.noPullMask`"
         peerId:
           "$ref": "#/components/schemas/UInt32"
+          description: "- Seealso: `Configuration.Builder.peerId`"
         proxyAutoConfigurationURL:
           format: uri
           type: string
+          description: "- Seealso: `Configuration.Builder.proxyAutoConfigurationURL`"
         proxyBypassDomains:
           items:
             type: string
           type: array
+          description: "- Seealso: `Configuration.Builder.proxyBypassDomains`"
         randomizeEndpoint:
           type: boolean
+          description: "- Seealso: `Configuration.Builder.randomizeEndpoint`"
         randomizeHostnames:
           type: boolean
+          description: "- Seealso: `Configuration.Builder.randomizeHostnames`"
         remotes:
           items:
             "$ref": "#/components/schemas/ExtendedEndpoint"
           type: array
+          description: "- Seealso: `Configuration.Builder.remotes`"
         renegotiatesAfter:
           type: number
+          description: "- Seealso: `Configuration.Builder.renegotiatesAfter`"
         routeGateway4:
           "$ref": "#/components/schemas/Address"
+          description: "- Seealso: `Configuration.Builder.routeGateway4`"
         routeGateway6:
           "$ref": "#/components/schemas/Address"
+          description: "- Seealso: `Configuration.Builder.routeGateway6`"
         routes4:
           items:
             "$ref": "#/components/schemas/Route"
           type: array
+          description: "- Seealso: `Configuration.Builder.routes4`"
         routes6:
           items:
             "$ref": "#/components/schemas/Route"
           type: array
+          description: "- Seealso: `Configuration.Builder.routes6`"
         routingPolicies:
           items:
             "$ref": "#/components/schemas/OpenVPN.RoutingPolicy"
           type: array
+          description: "- Seealso: `Configuration.Builder.routingPolicies`"
         sanHost:
           type: string
+          description: "- Seealso: `Configuration.Builder.sanHost`"
         searchDomains:
           items:
             type: string
           type: array
+          description: "- Seealso: `Configuration.Builder.searchDomains`"
         staticChallenge:
           type: boolean
+          description: "- Seealso: `Configuration.Builder.staticChallenge`"
         tlsSecurityLevel:
           type: integer
+          description: "- Seealso: `Configuration.Builder.tlsSecurityLevel`"
         tlsWrap:
           "$ref": "#/components/schemas/OpenVPN.TLSWrap"
+          description: "- Seealso: `Configuration.Builder.tlsWrap`"
         usesPIAPatches:
           type: boolean
+          description: "- Seealso: `Configuration.Builder.usesPIAPatches`"
         xorMethod:
           "$ref": "#/components/schemas/OpenVPN.ObfuscationMethod"
+          description: "- Seealso: `Configuration.Builder.xorMethod`"
       type: object
+      description: The immutable configuration for `OpenVPNSession`.
     OpenVPN.Credentials:
       additionalProperties: false
       properties:
         otp:
           type: string
+          description: The OTP.
         otpMethod:
           "$ref": "#/components/schemas/OpenVPN.Credentials.OTPMethod"
+          description: The OTP method (defaults to ``OTPMethod-swift.enum/none``).
         password:
           type: string
+          description: The password.
         username:
           type: string
+          description: The username.
       required:
         - username
         - password
         - otpMethod
       type: object
+      description: A set of credentials for authentication.
     OpenVPN.Credentials.OTPMethod:
       enum:
         - none
@@ -464,9 +552,11 @@ components:
       properties:
         pem:
           type: string
+          description: The content in PEM format (ASCII).
       required:
         - pem
       type: object
+      description: Represents a cryptographic container in PEM format.
     OpenVPN.Digest:
       enum:
         - SHA1
@@ -481,6 +571,13 @@ components:
         - sha256
         - sha384
         - sha512
+      description: Message digest algorithm.
+      x-enum-descriptions:
+        - SHA1 message digest.
+        - SHA224 message digest.
+        - SHA256 message digest.
+        - SHA256 message digest.
+        - SHA256 message digest.
     OpenVPN.ObfuscationMethod:
       discriminator:
         mapping:
@@ -495,6 +592,7 @@ components:
       required:
         - type
       type: object
+      description: The obfuscation method.
     OpenVPN.ObfuscationMethod.obfuscate:
       additionalProperties: false
       allOf:
@@ -509,6 +607,7 @@ components:
         - type
         - mask
       type: object
+      description: Performs several of the above steps (xormask -> xorptrpos -> reverse -> xorptrpos).
     OpenVPN.ObfuscationMethod.reverse:
       additionalProperties: false
       allOf:
@@ -520,6 +619,7 @@ components:
       required:
         - type
       type: object
+      description: Reverses the order of bytes in each buffer except for the first (abcde becomes aedcb).
     OpenVPN.ObfuscationMethod.xormask:
       additionalProperties: false
       allOf:
@@ -534,6 +634,7 @@ components:
         - type
         - mask
       type: object
+      description: XORs the bytes in each buffer with the given mask.
     OpenVPN.ObfuscationMethod.xorptrpos:
       additionalProperties: false
       allOf:
@@ -545,6 +646,7 @@ components:
       required:
         - type
       type: object
+      description: XORs each byte with its position in the packet.
     OpenVPN.PullMask:
       enum:
         - routes
@@ -555,6 +657,11 @@ components:
         - routes
         - dns
         - proxy
+      description: Settings that can be pulled from server.
+      x-enum-descriptions:
+        - Routes and gateways.
+        - DNS settings.
+        - Proxy settings.
     OpenVPN.RoutingPolicy:
       enum:
         - IPv4
@@ -565,6 +672,11 @@ components:
         - IPv4
         - IPv6
         - blockLocal
+      description: Routing policy.
+      x-enum-descriptions:
+        - All IPv4 traffic goes through the VPN.
+        - All IPv6 traffic goes through the VPN.
+        - Block LAN while connected.
     OpenVPN.StaticKey:
       additionalProperties: false
       properties:
@@ -575,6 +687,7 @@ components:
       required:
         - data
       type: object
+      description: Represents an OpenVPN static key file (as generated with --genkey)
     OpenVPN.StaticKey.Direction:
       enum:
         - 0
@@ -583,19 +696,27 @@ components:
       x-enum-varnames:
         - server
         - client
+      description: The key-direction field, usually 0 on servers and 1 on clients.
+      x-enum-descriptions:
+        - Conventional server direction (implicit for tls-crypt).
+        - Conventional client direction (implicit for tls-crypt).
     OpenVPN.TLSWrap:
       additionalProperties: false
       properties:
         key:
           "$ref": "#/components/schemas/OpenVPN.StaticKey"
+          description: The static encryption key.
         strategy:
           "$ref": "#/components/schemas/OpenVPN.TLSWrap.Strategy"
+          description: The wrapping strategy.
         wrappedKey:
           "$ref": "#/components/schemas/SecureData"
+          description: "The wrapped client key appended to initial tls-crypt-v2 packets."
       required:
         - strategy
         - key
       type: object
+      description: Holds parameters for TLS wrapping.
     OpenVPN.TLSWrap.Strategy:
       enum:
         - auth
@@ -606,6 +727,11 @@ components:
         - auth
         - crypt
         - cryptV2
+      description: The wrapping strategy.
+      x-enum-descriptions:
+        - Authenticates payload (--tls-auth).
+        - Encrypts payload (--tls-crypt).
+        - "Encrypts payload with a client-specific key (--tls-crypt-v2)."
     OpenVPNModule:
       additionalProperties: false
       properties:
@@ -620,6 +746,7 @@ components:
       required:
         - id
       type: object
+      description: A connection module providing an OpenVPN connection.
     PartoutErrorCode:
       enum:
         - cached
@@ -716,26 +843,80 @@ components:
         - openVPNUnsupportedCompression
         - openVPNUnsupportedOption
         - wireGuardEmptyPeers
+      x-enum-descriptions:
+        - Response is cached.
+        - Entity not found.
+        - Operation cancelled or unauthorized.
+        - A required object was released prematurely.
+        - An exception was raised during a script execution.
+        - Operation timed out.
+        - Generic failure.
+        - Some modules are incompatible (`userInfo` is an array of incompatible ``Module``).
+        - A module is incomplete (`userInfo` is the incomplete ``ModuleBuilder`` ID).
+        - The profile has no active modules.
+        - The profile has non-final modules that must be resolved to final modules first.
+        - Missing a required implementation.
+        - Module type is unexpected
+        - Module content is unknown for the importer.
+        - Module handler is unknown.
+        - Authentication failure.
+        - Crypto error.
+        - DNS resolution failure.
+        - No more endpoints available to try.
+        - File descriptor is not available.
+        - I/O failure.
+        - Link device is not active.
+        - Network changed.
+        - Network is unreachable.
+        - Native sockets could not be configured.
+        - TUN device is not active.
+        - TUN device is not available for I/O.
+        - Decoding error.
+        - Encoding error.
+        - Invalid field.
+        - Invalid value.
+        - Parsing error.
+        - Unable to add keychain item.
+        - Keychain item not found.
+        - Compression settings mismatch.
+        - Connection failure.
+        - No routing configuration.
+        - One-time password is required.
+        - Passphrase is required.
+        - Authentication can be retried.
+        - Server requested shutdown.
+        - TLS failure.
+        - Algorithm is unsupported.
+        - Compression setting is unsupported.
+        - Option is unsupported.
+        - Configuration has no peers.
     ProfileBehavior:
       additionalProperties: false
       properties:
         disconnectsOnSleep:
           type: boolean
+          description: Disconnects when the device goes to sleep.
         includesAllNetworks:
           type: boolean
+          description: Attempts to route as much traffic as possible through the tunnel.
       required:
         - disconnectsOnSleep
       type: object
+      description: Advanced flags affecting the behavior of a ``Profile``.
     Route:
       additionalProperties: false
       properties:
         destination:
           "$ref": "#/components/schemas/Subnet"
+          description: The destination subnet or `nil` if default.
         gateway:
           "$ref": "#/components/schemas/Address"
+          description: The address of the gateway (falls back to global gateway).
       type: object
+      description: Represents a route in the routing table.
     SecureData:
       type: string
+      description: Wrapper of a byte array with safe encoding capabilities.
     SocketType:
       enum:
         - UDP
@@ -744,8 +925,13 @@ components:
       x-enum-varnames:
         - udp
         - tcp
+      description: A socket type between UDP and TCP.
+      x-enum-descriptions:
+        - UDP socket type.
+        - TCP socket type.
     Subnet:
       type: string
+      description: An IPv4/v6 subnet.
     TaggedModule:
       discriminator:
         mapping:
@@ -763,6 +949,7 @@ components:
       required:
         - type
       type: object
+      description: A codable wrapper for all known modules.
     TaggedModule.Custom:
       additionalProperties: false
       allOf:
@@ -888,6 +1075,7 @@ components:
         - modules
         - activeModulesIds
       type: object
+      description: A codable wrapper for a profile with all known modules.
     TunnelControllerOptions:
       additionalProperties: false
       properties:
@@ -904,6 +1092,7 @@ components:
         - logsSnapshots
         - minDataCountDelta
       type: object
+      description: Common options to give to ``TunnelController``.
     TunnelRemoteInfoWrapper:
       additionalProperties: false
       properties:
@@ -946,6 +1135,7 @@ components:
         - status
         - onDemand
       type: object
+      description: Returns a tunnel-specific snapshot of a ``Profile``.
     TunnelSnapshot.Environment:
       additionalProperties: false
       properties:
@@ -971,6 +1161,7 @@ components:
         - activating
         - active
         - deactivating
+      description: The status of a ``Tunnel``.
     UInt:
       type: integer
     UInt16:
@@ -989,16 +1180,20 @@ components:
       properties:
         interface:
           "$ref": "#/components/schemas/WireGuard.LocalInterface"
+          description: The local interface.
         peers:
           items:
             "$ref": "#/components/schemas/WireGuard.RemoteInterface"
           type: array
+          description: The peers.
       required:
         - interface
         - peers
       type: object
+      description: Represents a WireGuard configuration.
     WireGuard.Key:
       type: string
+      description: A Base64-encoded key.
     WireGuard.LocalInterface:
       additionalProperties: false
       properties:
@@ -1006,16 +1201,21 @@ components:
           items:
             "$ref": "#/components/schemas/Subnet"
           type: array
+          description: The local addresses.
         dns:
           "$ref": "#/components/schemas/DNSModule"
+          description: The optional DNS settings.
         mtu:
           "$ref": "#/components/schemas/UInt16"
+          description: The optional MTU.
         privateKey:
           "$ref": "#/components/schemas/WireGuard.Key"
+          description: The local private key.
       required:
         - privateKey
         - addresses
       type: object
+      description: The parameters of the local interface.
     WireGuard.RemoteInterface:
       additionalProperties: false
       properties:
@@ -1023,18 +1223,24 @@ components:
           items:
             "$ref": "#/components/schemas/Subnet"
           type: array
+          description: The list of allowed subnets.
         endpoint:
           "$ref": "#/components/schemas/Endpoint"
+          description: The optional endpoint.
         keepAlive:
           "$ref": "#/components/schemas/UInt16"
+          description: The keep-alive interval in seconds.
         preSharedKey:
           "$ref": "#/components/schemas/WireGuard.Key"
+          description: The optional endpoint pre-shared key.
         publicKey:
           "$ref": "#/components/schemas/WireGuard.Key"
+          description: The endpoint public key.
       required:
         - publicKey
         - allowedIPs
       type: object
+      description: The parameters of the remote interface.
     WireGuardModule:
       additionalProperties: false
       properties:
@@ -1045,6 +1251,7 @@ components:
       required:
         - id
       type: object
+      description: A connection module providing a WireGuard connection.
 info:
   title: codegen
   version: 1.0.0

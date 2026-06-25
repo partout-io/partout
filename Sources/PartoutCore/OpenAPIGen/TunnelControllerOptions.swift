@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** Common options to give to ``TunnelController``. */
 public struct TunnelControllerOptions: Codable, Hashable {
 
     public var dnsFallbackServers: [String]

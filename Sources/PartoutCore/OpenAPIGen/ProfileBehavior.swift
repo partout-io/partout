@@ -10,9 +10,12 @@ import Foundation
 import AnyCodable
 #endif
 
+/** Advanced flags affecting the behavior of a ``Profile``. */
 public struct ProfileBehavior: Codable, Hashable {
 
+    /** Disconnects when the device goes to sleep. */
     public var disconnectsOnSleep: Bool
+    /** Attempts to route as much traffic as possible through the tunnel. */
     public var includesAllNetworks: Bool?
 
     public init(disconnectsOnSleep: Bool, includesAllNetworks: Bool? = nil) {

@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** A connection module providing a WireGuard connection. */
 public struct WireGuardModule: Codable, Hashable {
 
     public var configuration: WireGuardConfiguration?

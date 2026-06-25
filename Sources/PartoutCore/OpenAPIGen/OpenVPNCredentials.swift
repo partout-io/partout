@@ -10,11 +10,16 @@ import Foundation
 import AnyCodable
 #endif
 
+/** A set of credentials for authentication. */
 public struct OpenVPNCredentials: Codable, Hashable {
 
+    /** The OTP. */
     public var otp: String?
+    /** The OTP method (defaults to ``OTPMethod-swift.enum/none``). */
     public var otpMethod: OpenVPNCredentialsOTPMethod
+    /** The password. */
     public var password: String
+    /** The username. */
     public var username: String
 
     public init(otp: String? = nil, otpMethod: OpenVPNCredentialsOTPMethod, password: String, username: String) {

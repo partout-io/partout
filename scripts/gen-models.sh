@@ -78,6 +78,7 @@ case $language in
         generated_models_dir="$tmp_dir/Sources/$project_name/Models"
         mkdir -p "$models_dir"
         cp "$generated_models_dir"/*.swift "$models_dir"/
+        perl -0pi -e 's/&#x60;/`/g; s/&quot;/"/g; s/&gt;/>/g; s/&lt;/</g; s/&amp;/&/g' "$models_dir"/*.swift
         ;;
     cpp)
         echo "cpp language is not implemented yet; exiting."

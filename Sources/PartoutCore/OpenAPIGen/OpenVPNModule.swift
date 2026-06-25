@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** A connection module providing an OpenVPN connection. */
 public struct OpenVPNModule: Codable, Hashable {
 
     public var configuration: OpenVPNConfiguration?

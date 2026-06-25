@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** Returns a tunnel-specific snapshot of a ``Profile``. */
 public struct TunnelSnapshot: Codable, Hashable {
 
     public var environment: TunnelSnapshotEnvironment?

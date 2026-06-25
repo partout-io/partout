@@ -10,8 +10,10 @@ import Foundation
 import AnyCodable
 #endif
 
+/** Represents an OpenVPN static key file (as generated with --genkey) */
 public struct OpenVPNStaticKey: Codable, Hashable {
 
+    /** Wrapper of a byte array with safe encoding capabilities. */
     public var data: String
     public var dir: OpenVPNStaticKeyDirection?
 

@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** IP and routes. */
 public struct IPModule: Codable, Hashable {
 
     public var id: String

@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** Raw type univocally associated to each ``Module`` implementation. */
 public enum ModuleType: String, Codable, CaseIterable {
     case Custom = "Custom"
     case DNS = "DNS"

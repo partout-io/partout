@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** The status of a ``Tunnel``. */
 public enum TunnelStatus: String, Codable, CaseIterable {
     case inactive = "inactive"
     case activating = "activating"

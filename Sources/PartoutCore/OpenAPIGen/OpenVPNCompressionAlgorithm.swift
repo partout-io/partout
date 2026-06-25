@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** Defines the type of compression algorithm. */
 public enum OpenVPNCompressionAlgorithm: Int, Codable, CaseIterable {
     case disabled = 0
     case LZO = 1

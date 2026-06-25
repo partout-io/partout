@@ -10,12 +10,18 @@ import Foundation
 import AnyCodable
 #endif
 
+/** The parameters of the remote interface. */
 public struct WireGuardRemoteInterface: Codable, Hashable {
 
+    /** The list of allowed subnets. */
     public var allowedIPs: [String]
+    /** The optional endpoint. */
     public var endpoint: String?
+    /** The keep-alive interval in seconds. */
     public var keepAlive: Int?
+    /** The optional endpoint pre-shared key. */
     public var preSharedKey: String?
+    /** The endpoint public key. */
     public var publicKey: String
 
     public init(allowedIPs: [String], endpoint: String? = nil, keepAlive: Int? = nil, preSharedKey: String? = nil, publicKey: String) {

@@ -10,9 +10,12 @@ import Foundation
 import AnyCodable
 #endif
 
+/** A pair of received/sent bytes count. */
 public struct DataCount: Codable, Hashable {
 
+    /** Received bytes count. */
     public var received: Int64
+    /** Sent bytes count. */
     public var sent: Int64
 
     public init(received: Int64, sent: Int64) {

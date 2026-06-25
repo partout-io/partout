@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** A type-erased ``Module`` for encoding external implementations. */
 public struct CustomModule: Codable, Hashable {
 
     public var innerType: ModuleType

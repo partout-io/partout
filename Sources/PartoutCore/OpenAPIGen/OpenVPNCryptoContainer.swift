@@ -10,8 +10,10 @@ import Foundation
 import AnyCodable
 #endif
 
+/** Represents a cryptographic container in PEM format. */
 public struct OpenVPNCryptoContainer: Codable, Hashable {
 
+    /** The content in PEM format (ASCII). */
     public var pem: String
 
     public init(pem: String) {

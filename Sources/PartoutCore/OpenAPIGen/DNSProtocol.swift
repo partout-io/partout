@@ -10,8 +10,12 @@ import Foundation
 import AnyCodable
 #endif
 
+/** The protocol used in DNS servers. */
 public enum DNSProtocol: String, Codable, CaseIterable {
+    /// The value to fall back to when unset. Standard cleartext DNS (port 53).
     case cleartext = "cleartext"
+    /// DNS over HTTPS.
     case https = "https"
+    /// DNS over TLS (port 853).
     case tls = "tls"
 }

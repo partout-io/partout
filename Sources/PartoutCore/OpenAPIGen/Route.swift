@@ -10,9 +10,12 @@ import Foundation
 import AnyCodable
 #endif
 
+/** Represents a route in the routing table. */
 public struct Route: Codable, Hashable {
 
+    /** The destination subnet or `nil` if default. */
     public var destination: String?
+    /** The address of the gateway (falls back to global gateway). */
     public var gateway: String?
 
     public init(destination: String? = nil, gateway: String? = nil) {

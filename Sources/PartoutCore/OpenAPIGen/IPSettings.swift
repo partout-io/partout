@@ -10,10 +10,14 @@ import Foundation
 import AnyCodable
 #endif
 
+/** IP settings and routes. */
 public struct IPSettings: Codable, Hashable {
 
+    /** The excluded routes. */
     public var excludedRoutes: [Route]
+    /** The included routes. */
     public var includedRoutes: [Route]
+    /** The subnets. */
     public var subnets: [String]
 
     public init(excludedRoutes: [Route], includedRoutes: [Route], subnets: [String]) {

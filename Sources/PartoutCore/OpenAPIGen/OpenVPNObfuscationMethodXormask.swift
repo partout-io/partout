@@ -16,6 +16,7 @@ public struct OpenVPNObfuscationMethodXormask: Codable, Hashable {
         case xormask = "xormask"
     }
     public var type: ModelType
+    /** Wrapper of a byte array with safe encoding capabilities. */
     public var mask: String
 
     public init(type: ModelType, mask: String) {

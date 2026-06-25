@@ -10,6 +10,7 @@ import Foundation
 import AnyCodable
 #endif
 
+/** On-demand settings. */
 public struct OnDemandModule: Codable, Hashable {
 
     public var id: String
