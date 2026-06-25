@@ -67,7 +67,7 @@ $(DESTDIR)/wireguard-go-version.h: go.mod $(GOROOT)/.prepared
 	sed -E -n 's/.*golang\.zx2c4\.com\/wireguard +v[0-9.]+-[0-9]+-([0-9a-f]{8})[0-9a-f]{4}.*/#define WIREGUARD_GO_VERSION "\1"/p' "$<" > "$@"
 
 clean:
-	rm -rf "$(BUILDDIR)" "$(DESTDIR)"
+	rm -rf "$(BUILDDIR)" "$(DESTDIR)" "$(TMPROOTDIR)"
 
 install: build
 	mkdir -p "$(DESTDIR)/lib"

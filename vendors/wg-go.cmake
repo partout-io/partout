@@ -22,22 +22,26 @@ endif()
 
 if(APPLE)
     set(WGGO_INSTALL_COMMAND
+        INSTALL_COMMAND
         install_name_tool -id "@rpath/libwg-go.dylib" "${WGGO_DIR}/lib/libwg-go.dylib"
     )
 elseif(WIN32)
     set(WGGO_INSTALL_COMMAND
+        INSTALL_COMMAND
         gendef "${WGGO_DIR}/lib/wg-go.dll"
         COMMAND dlltool -d wg-go.def -l "${WGGO_DIR}/lib/wg-go.lib"
     )
 else()
-    set(WGGO_INSTALL_COMMAND "")
+    set(WGGO_INSTALL_COMMAND
+        INSTALL_COMMAND ""
+    )
 endif()
 
 ExternalProject_Add(WireGuardGoProject
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/wg-go
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ${VENDOR_ENV} ${WGGO_CMD}
-    INSTALL_COMMAND ${WGGO_INSTALL_COMMAND}
+    ${WGGO_INSTALL_COMMAND}
     BUILD_IN_SOURCE 1
     BUILD_BYPRODUCTS ${WGGO_BYPRODUCTS}
 )
