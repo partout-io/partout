@@ -23,22 +23,25 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * Holds parameters for TLS wrapping.
  *
- * @param key 
- * @param strategy 
- * @param wrappedKey 
+ * @param key The static encryption key.
+ * @param strategy The wrapping strategy.
+ * @param wrappedKey The wrapped client key appended to initial tls-crypt-v2 packets.
  */
 @Serializable
 
 data class OpenVPNTLSWrap (
 
+    /* The static encryption key. */
     @SerialName(value = "key")
     val key: OpenVPNStaticKey,
 
+    /* The wrapping strategy. */
     @Contextual @SerialName(value = "strategy")
     val strategy: OpenVPNTLSWrapStrategy,
 
+    /* The wrapped client key appended to initial tls-crypt-v2 packets. */
     @SerialName(value = "wrappedKey")
     val wrappedKey: kotlin.String? = null
 

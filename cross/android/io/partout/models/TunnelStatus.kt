@@ -21,7 +21,7 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * 
+ * The status of a ``Tunnel``.
  *
  * Values: inactive,activating,active,deactivating
  */

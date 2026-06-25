@@ -29,7 +29,7 @@ import kotlinx.serialization.encoding.Encoder
 
 
 /**
- * 
+ * The key-direction field, usually 0 on servers and 1 on clients.
  *
  * Values: server,client
  */

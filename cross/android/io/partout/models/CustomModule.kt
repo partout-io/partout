@@ -22,7 +22,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * A type-erased ``Module`` for encoding external implementations.
  *
  * @param innerType 
  * @param json 

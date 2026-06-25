@@ -23,7 +23,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * A codable wrapper for a profile with all known modules.
  *
  * @param activeModulesIds 
  * @param id 

@@ -23,7 +23,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * Returns a tunnel-specific snapshot of a ``Profile``.
  *
  * @param id 
  * @param isEnabled 

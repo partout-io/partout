@@ -30,7 +30,7 @@ import kotlinx.serialization.Contextual
  * @param originalModuleId 
  * @param profile 
  * @param requiresVirtualDevice 
- * @param address 
+ * @param address A hostname or IP address.
  * @param modules 
  */
 @Serializable
@@ -49,6 +49,7 @@ data class TunnelRemoteInfoWrapper (
     @SerialName(value = "requiresVirtualDevice")
     val requiresVirtualDevice: kotlin.Boolean,
 
+    /* A hostname or IP address. */
     @SerialName(value = "address")
     val address: kotlin.String? = null,
 

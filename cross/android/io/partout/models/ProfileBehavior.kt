@@ -21,18 +21,20 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * Advanced flags affecting the behavior of a ``Profile``.
  *
- * @param disconnectsOnSleep 
- * @param includesAllNetworks 
+ * @param disconnectsOnSleep Disconnects when the device goes to sleep.
+ * @param includesAllNetworks Attempts to route as much traffic as possible through the tunnel.
  */
 @Serializable
 
 data class ProfileBehavior (
 
+    /* Disconnects when the device goes to sleep. */
     @SerialName(value = "disconnectsOnSleep")
     val disconnectsOnSleep: kotlin.Boolean,
 
+    /* Attempts to route as much traffic as possible through the tunnel. */
     @SerialName(value = "includesAllNetworks")
     val includesAllNetworks: kotlin.Boolean? = null
 

@@ -24,13 +24,14 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param mask 
+ * @param mask Wrapper of a byte array with safe encoding capabilities.
  */
 @Serializable
 
 @SerialName(value = "xormask")
 data class OpenVPNObfuscationMethodxormask (
 
+    /* Wrapper of a byte array with safe encoding capabilities. */
     @SerialName(value = "mask")
     val mask: kotlin.String
 

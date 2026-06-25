@@ -31,174 +31,215 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * The immutable configuration for `OpenVPNSession`.
  *
- * @param authToken 
- * @param authUserPass 
- * @param ca 
- * @param checksEKU 
- * @param checksSANHost 
- * @param cipher 
- * @param clientCertificate 
- * @param clientKey 
- * @param compressionAlgorithm 
- * @param compressionFraming 
- * @param dataCiphers 
- * @param digest 
- * @param dnsDomain 
- * @param dnsServers 
- * @param httpProxy 
- * @param httpsProxy 
- * @param ipv4 
- * @param ipv6 
- * @param keepAliveInterval 
- * @param keepAliveTimeout 
- * @param mtu 
- * @param noPullMask 
- * @param peerId 
- * @param proxyAutoConfigurationURL 
- * @param proxyBypassDomains 
- * @param randomizeEndpoint 
- * @param randomizeHostnames 
- * @param remotes 
- * @param renegotiatesAfter 
- * @param routeGateway4 
- * @param routeGateway6 
- * @param routes4 
- * @param routes6 
- * @param routingPolicies 
- * @param sanHost 
- * @param searchDomains 
- * @param staticChallenge 
- * @param tlsSecurityLevel 
- * @param tlsWrap 
- * @param usesPIAPatches 
- * @param xorMethod 
+ * @param authToken - Seealso: `Configuration.Builder.authToken`
+ * @param authUserPass - Seealso: `Configuration.Builder.authUserPass`
+ * @param ca - Seealso: `Configuration.Builder.ca`
+ * @param checksEKU - Seealso: `Configuration.Builder.checksEKU`
+ * @param checksSANHost - Seealso: `Configuration.Builder.checksSANHost`
+ * @param cipher - Seealso: `Configuration.Builder.cipher`
+ * @param clientCertificate - Seealso: `Configuration.Builder.clientCertificate`
+ * @param clientKey - Seealso: `Configuration.Builder.clientKey`
+ * @param compressionAlgorithm - Seealso: `Configuration.Builder.compressionAlgorithm`
+ * @param compressionFraming - Seealso: `Configuration.Builder.compressionFraming`
+ * @param dataCiphers - Seealso: `Configuration.Builder.dataCiphers`
+ * @param digest - Seealso: `Configuration.Builder.digest`
+ * @param dnsDomain - Seealso: `Configuration.Builder.dnsDomain`
+ * @param dnsServers - Seealso: `Configuration.Builder.dnsServers`
+ * @param httpProxy - Seealso: `Configuration.Builder.httpProxy`
+ * @param httpsProxy - Seealso: `Configuration.Builder.httpsProxy`
+ * @param ipv4 - Seealso: `Configuration.Builder.ipv4`
+ * @param ipv6 - Seealso: `Configuration.Builder.ipv6`
+ * @param keepAliveInterval - Seealso: `Configuration.Builder.keepAliveInterval`
+ * @param keepAliveTimeout - Seealso: `Configuration.Builder.keepAliveTimeout`
+ * @param mtu - Seealso: `Configuration.Builder.mtu`
+ * @param noPullMask - Seealso: `Configuration.Builder.noPullMask`
+ * @param peerId - Seealso: `Configuration.Builder.peerId`
+ * @param proxyAutoConfigurationURL - Seealso: `Configuration.Builder.proxyAutoConfigurationURL`
+ * @param proxyBypassDomains - Seealso: `Configuration.Builder.proxyBypassDomains`
+ * @param randomizeEndpoint - Seealso: `Configuration.Builder.randomizeEndpoint`
+ * @param randomizeHostnames - Seealso: `Configuration.Builder.randomizeHostnames`
+ * @param remotes - Seealso: `Configuration.Builder.remotes`
+ * @param renegotiatesAfter - Seealso: `Configuration.Builder.renegotiatesAfter`
+ * @param routeGateway4 - Seealso: `Configuration.Builder.routeGateway4`
+ * @param routeGateway6 - Seealso: `Configuration.Builder.routeGateway6`
+ * @param routes4 - Seealso: `Configuration.Builder.routes4`
+ * @param routes6 - Seealso: `Configuration.Builder.routes6`
+ * @param routingPolicies - Seealso: `Configuration.Builder.routingPolicies`
+ * @param sanHost - Seealso: `Configuration.Builder.sanHost`
+ * @param searchDomains - Seealso: `Configuration.Builder.searchDomains`
+ * @param staticChallenge - Seealso: `Configuration.Builder.staticChallenge`
+ * @param tlsSecurityLevel - Seealso: `Configuration.Builder.tlsSecurityLevel`
+ * @param tlsWrap - Seealso: `Configuration.Builder.tlsWrap`
+ * @param usesPIAPatches - Seealso: `Configuration.Builder.usesPIAPatches`
+ * @param xorMethod - Seealso: `Configuration.Builder.xorMethod`
  */
 @Serializable
 
 data class OpenVPNConfiguration (
 
+    /* - Seealso: `Configuration.Builder.authToken` */
     @SerialName(value = "authToken")
     val authToken: kotlin.String? = null,
 
+    /* - Seealso: `Configuration.Builder.authUserPass` */
     @SerialName(value = "authUserPass")
     val authUserPass: kotlin.Boolean? = null,
 
+    /* - Seealso: `Configuration.Builder.ca` */
     @SerialName(value = "ca")
     val ca: kotlin.String? = null,
 
+    /* - Seealso: `Configuration.Builder.checksEKU` */
     @SerialName(value = "checksEKU")
     val checksEKU: kotlin.Boolean? = null,
 
+    /* - Seealso: `Configuration.Builder.checksSANHost` */
     @SerialName(value = "checksSANHost")
     val checksSANHost: kotlin.Boolean? = null,
 
+    /* - Seealso: `Configuration.Builder.cipher` */
     @Contextual @SerialName(value = "cipher")
     val cipher: OpenVPNCipher? = null,
 
+    /* - Seealso: `Configuration.Builder.clientCertificate` */
     @SerialName(value = "clientCertificate")
     val clientCertificate: kotlin.String? = null,
 
+    /* - Seealso: `Configuration.Builder.clientKey` */
     @SerialName(value = "clientKey")
     val clientKey: kotlin.String? = null,
 
+    /* - Seealso: `Configuration.Builder.compressionAlgorithm` */
     @Contextual @SerialName(value = "compressionAlgorithm")
     val compressionAlgorithm: OpenVPNCompressionAlgorithm? = null,
 
+    /* - Seealso: `Configuration.Builder.compressionFraming` */
     @Contextual @SerialName(value = "compressionFraming")
     val compressionFraming: OpenVPNCompressionFraming? = null,
 
+    /* - Seealso: `Configuration.Builder.dataCiphers` */
     @SerialName(value = "dataCiphers")
     val dataCiphers: kotlin.collections.List<@Contextual OpenVPNCipher>? = null,
 
+    /* - Seealso: `Configuration.Builder.digest` */
     @Contextual @SerialName(value = "digest")
     val digest: OpenVPNDigest? = null,
 
+    /* - Seealso: `Configuration.Builder.dnsDomain` */
     @SerialName(value = "dnsDomain")
     val dnsDomain: kotlin.String? = null,
 
+    /* - Seealso: `Configuration.Builder.dnsServers` */
     @SerialName(value = "dnsServers")
     val dnsServers: kotlin.collections.List<kotlin.String>? = null,
 
+    /* - Seealso: `Configuration.Builder.httpProxy` */
     @SerialName(value = "httpProxy")
     val httpProxy: kotlin.String? = null,
 
+    /* - Seealso: `Configuration.Builder.httpsProxy` */
     @SerialName(value = "httpsProxy")
     val httpsProxy: kotlin.String? = null,
 
+    /* - Seealso: `Configuration.Builder.ipv4` */
     @SerialName(value = "ipv4")
     val ipv4: IPSettings? = null,
 
+    /* - Seealso: `Configuration.Builder.ipv6` */
     @SerialName(value = "ipv6")
     val ipv6: IPSettings? = null,
 
+    /* - Seealso: `Configuration.Builder.keepAliveInterval` */
     @SerialName(value = "keepAliveInterval")
     val keepAliveInterval: kotlin.Double? = null,
 
+    /* - Seealso: `Configuration.Builder.keepAliveTimeout` */
     @SerialName(value = "keepAliveTimeout")
     val keepAliveTimeout: kotlin.Double? = null,
 
+    /* - Seealso: `Configuration.Builder.mtu` */
     @SerialName(value = "mtu")
     val mtu: kotlin.Int? = null,
 
+    /* - Seealso: `Configuration.Builder.noPullMask` */
     @SerialName(value = "noPullMask")
     val noPullMask: kotlin.collections.List<@Contextual OpenVPNPullMask>? = null,
 
+    /* - Seealso: `Configuration.Builder.peerId` */
     @SerialName(value = "peerId")
     val peerId: kotlin.Int? = null,
 
+    /* - Seealso: `Configuration.Builder.proxyAutoConfigurationURL` */
     @SerialName(value = "proxyAutoConfigurationURL")
     val proxyAutoConfigurationURL: kotlin.String? = null,
 
+    /* - Seealso: `Configuration.Builder.proxyBypassDomains` */
     @SerialName(value = "proxyBypassDomains")
     val proxyBypassDomains: kotlin.collections.List<kotlin.String>? = null,
 
+    /* - Seealso: `Configuration.Builder.randomizeEndpoint` */
     @SerialName(value = "randomizeEndpoint")
     val randomizeEndpoint: kotlin.Boolean? = null,
 
+    /* - Seealso: `Configuration.Builder.randomizeHostnames` */
     @SerialName(value = "randomizeHostnames")
     val randomizeHostnames: kotlin.Boolean? = null,
 
+    /* - Seealso: `Configuration.Builder.remotes` */
     @SerialName(value = "remotes")
     val remotes: kotlin.collections.List<kotlin.String>? = null,
 
+    /* - Seealso: `Configuration.Builder.renegotiatesAfter` */
     @SerialName(value = "renegotiatesAfter")
     val renegotiatesAfter: kotlin.Double? = null,
 
+    /* - Seealso: `Configuration.Builder.routeGateway4` */
     @SerialName(value = "routeGateway4")
     val routeGateway4: kotlin.String? = null,
 
+    /* - Seealso: `Configuration.Builder.routeGateway6` */
     @SerialName(value = "routeGateway6")
     val routeGateway6: kotlin.String? = null,
 
+    /* - Seealso: `Configuration.Builder.routes4` */
     @SerialName(value = "routes4")
     val routes4: kotlin.collections.List<Route>? = null,
 
+    /* - Seealso: `Configuration.Builder.routes6` */
     @SerialName(value = "routes6")
     val routes6: kotlin.collections.List<Route>? = null,
 
+    /* - Seealso: `Configuration.Builder.routingPolicies` */
     @SerialName(value = "routingPolicies")
     val routingPolicies: kotlin.collections.List<@Contextual OpenVPNRoutingPolicy>? = null,
 
+    /* - Seealso: `Configuration.Builder.sanHost` */
     @SerialName(value = "sanHost")
     val sanHost: kotlin.String? = null,
 
+    /* - Seealso: `Configuration.Builder.searchDomains` */
     @SerialName(value = "searchDomains")
     val searchDomains: kotlin.collections.List<kotlin.String>? = null,
 
+    /* - Seealso: `Configuration.Builder.staticChallenge` */
     @SerialName(value = "staticChallenge")
     val staticChallenge: kotlin.Boolean? = null,
 
+    /* - Seealso: `Configuration.Builder.tlsSecurityLevel` */
     @SerialName(value = "tlsSecurityLevel")
     val tlsSecurityLevel: kotlin.Int? = null,
 
+    /* - Seealso: `Configuration.Builder.tlsWrap` */
     @SerialName(value = "tlsWrap")
     val tlsWrap: OpenVPNTLSWrap? = null,
 
+    /* - Seealso: `Configuration.Builder.usesPIAPatches` */
     @SerialName(value = "usesPIAPatches")
     val usesPIAPatches: kotlin.Boolean? = null,
 
+    /* - Seealso: `Configuration.Builder.xorMethod` */
     @SerialName(value = "xorMethod")
     val xorMethod: OpenVPNObfuscationMethod? = null
 

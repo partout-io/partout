@@ -23,12 +23,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * DNS settings.
  *
  * @param id 
  * @param protocolType 
  * @param servers 
- * @param domainName 
+ * @param domainName A hostname or IP address.
  * @param domainPolicy 
  * @param inheritsVPN 
  * @param routesThroughVPN 
@@ -47,6 +47,7 @@ data class DNSModule (
     @SerialName(value = "servers")
     val servers: kotlin.collections.List<kotlin.String>,
 
+    /* A hostname or IP address. */
     @SerialName(value = "domainName")
     val domainName: kotlin.String? = null,
 

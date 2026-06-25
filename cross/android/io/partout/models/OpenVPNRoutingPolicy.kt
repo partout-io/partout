@@ -21,7 +21,7 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * 
+ * Routing policy.
  *
  * Values: IPv4,IPv6,blockLocal
  */

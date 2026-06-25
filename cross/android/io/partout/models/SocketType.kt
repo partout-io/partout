@@ -21,7 +21,7 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * 
+ * A socket type between UDP and TCP.
  *
  * Values: udp,tcp
  */
