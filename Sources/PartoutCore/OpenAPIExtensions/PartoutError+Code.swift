@@ -26,7 +26,7 @@ public func ~= (pattern: PartoutError.Code, value: String?) -> Bool {
 }
 
 extension ABIErrorPayload {
-    init(_ error: Error) {
+    public init(_ error: Error) {
         guard let partoutError = error as? PartoutError else {
             self.init(
                 code: .unhandled,
