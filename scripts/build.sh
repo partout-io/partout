@@ -16,6 +16,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -gen)
+            do_build=1
             gen_build=1
             shift
             ;;
@@ -37,6 +38,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -a)
+            do_build=1
             cmake_opts+=("-DPP_BUILD_LIBRARY=ON")
             cmake_opts+=("-DPP_BUILD_USE_OPENSSL=ON")
             cmake_opts+=("-DPP_BUILD_USE_OPENVPN=ON")
@@ -69,6 +71,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -l)
+            do_build=1
             cmake_opts+=("-DPP_BUILD_LIBRARY=ON")
             shift
             ;;
@@ -79,7 +82,7 @@ while [[ $# -gt 0 ]]; do
             export SWIFT_ANDROID_API_LEVEL=28
             export SWIFT_ANDROID_VERSION=6.3.1
             build_dir=.cmake-android
-            cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=toolchains/android.toolchain.cmake")
+            cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=swift-cmake-toolchains/android.toolchain.cmake")
             shift
             ;;
         -*|--*)
@@ -124,9 +127,11 @@ if [[ $gen_build == 1 ]]; then
 fi
 
 # Execute
-cmake --build $build_dir
-if [[ -n $install_dir ]]; then
-    cmake --install $build_dir
+if [[ $do_build == 1 ]]; then
+    cmake --build $build_dir
+    if [[ -n $install_dir ]]; then
+        cmake --install $build_dir
+    fi
 fi
 
 popd
