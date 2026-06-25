@@ -2,7 +2,7 @@
 set -e
 
 usage() {
-    echo "Usage: $0 <openapi> <language:kotlin|swift|cpp> <models_dir> <package_name> [extra_imports]"
+    echo "Usage: $0 <openapi> <language:swift|kotlin|cpp> <models_dir> <package_name> [extra_imports]"
     exit 1
 }
 
@@ -28,38 +28,6 @@ postprocess_swift_models() {
 }
 
 case $language in
-    kotlin)
-        kotlin_extra_imports_opts=()
-        if [[ -n "$extra_imports" ]]; then
-            IFS=',' read -ra extra_import_names <<< "$extra_imports"
-            for name in "${extra_import_names[@]}"; do
-                name="${name#"${name%%[![:space:]]*}"}"
-                name="${name%"${name##*[![:space:]]}"}"
-
-                if [[ -n "$name" ]]; then
-                    kotlin_extra_imports_opts+=(
-                        --import-mappings "$name=io.partout.models.$name"
-                        --schema-mappings "$name=$name"
-                    )
-                fi
-            done
-        fi
-
-        package_dir=${package_name//./\/}
-        rm -rf $models_dir/src/main/kotlin/$package_dir
-        openapi-generator generate \
-            -i $infile \
-            -o $models_dir \
-            -g kotlin \
-            --global-property=models,modelDocs=false,modelTests=false \
-            --type-mappings number=Double,URI=String,kotlin.Any=kotlinx.serialization.json.JsonElement \
-            --import-mappings Double=kotlin.Double,String=kotlin.String \
-            --additional-properties=serializationLibrary=kotlinx_serialization \
-            --additional-properties=packageName=$package_name \
-            --additional-properties=modelPackage=$package_name \
-            --schema-mappings OpenVPN.CryptoContainer=kotlin.String \
-            "${kotlin_extra_imports_opts[@]}"
-        ;;
     swift)
         # Generate into a temporary client package, then keep only the models.
         #
@@ -105,12 +73,44 @@ case $language in
         cp "$generated_models_dir"/*.swift "$models_dir"/
         postprocess_swift_models "$models_dir"
         ;;
+    kotlin)
+        kotlin_extra_imports_opts=()
+        if [[ -n "$extra_imports" ]]; then
+            IFS=',' read -ra extra_import_names <<< "$extra_imports"
+            for name in "${extra_import_names[@]}"; do
+                name="${name#"${name%%[![:space:]]*}"}"
+                name="${name%"${name##*[![:space:]]}"}"
+
+                if [[ -n "$name" ]]; then
+                    kotlin_extra_imports_opts+=(
+                        --import-mappings "$name=io.partout.models.$name"
+                        --schema-mappings "$name=$name"
+                    )
+                fi
+            done
+        fi
+
+        package_dir=${package_name//./\/}
+        rm -rf $models_dir/src/main/kotlin/$package_dir
+        openapi-generator generate \
+            -i $infile \
+            -o $models_dir \
+            -g kotlin \
+            --global-property=models,modelDocs=false,modelTests=false \
+            --type-mappings number=Double,URI=String,kotlin.Any=kotlinx.serialization.json.JsonElement \
+            --import-mappings Double=kotlin.Double,String=kotlin.String \
+            --additional-properties=serializationLibrary=kotlinx_serialization \
+            --additional-properties=packageName=$package_name \
+            --additional-properties=modelPackage=$package_name \
+            --schema-mappings OpenVPN.CryptoContainer=kotlin.String \
+            "${kotlin_extra_imports_opts[@]}"
+        ;;
     cpp)
         echo "cpp language is not implemented yet; exiting."
         exit 0
         ;;
     *)
-        echo "unknown language '$language'; expected 'kotlin', 'swift', or 'cpp'"
+        echo "unknown language '$language'; expected 'swift', 'kotlin', or 'cpp'"
         exit 1
         ;;
 esac
