@@ -6,11 +6,12 @@
 //
 
 
-public struct OpenVPNObfuscationMethodXormask: Codable, Hashable {
+public struct OpenVPNObfuscationMethodXormask: Codable, Hashable, Sendable {
 
-    public enum ModelType: String, Codable, CaseIterable {
+    public enum ModelType: String, Codable, CaseIterable, Sendable {
         case xormask = "xormask"
     }
+
     public var type: ModelType
     public var mask: SecureData
 

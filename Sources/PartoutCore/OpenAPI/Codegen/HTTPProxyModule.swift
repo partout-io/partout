@@ -7,7 +7,7 @@
 
 
 /** HTTP proxy settings. */
-public struct HTTPProxyModule: Codable, Hashable {
+public struct HTTPProxyModule: Codable, Hashable, Sendable {
 
     public var bypassDomains: [Address]
     public var id: UniqueID

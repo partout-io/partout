@@ -7,7 +7,7 @@
 
 
 /** DNS settings. */
-public struct DNSModule: Codable, Hashable {
+public struct DNSModule: Codable, Hashable, Sendable {
 
     public var domainName: Address?
     public var domainPolicy: DNSModuleDomainPolicy?

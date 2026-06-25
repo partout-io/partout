@@ -6,7 +6,7 @@
 //
 
 
-public struct ABIErrorPayload: Codable, Hashable {
+public struct ABIErrorPayload: Codable, Hashable, Sendable {
 
     public var code: PartoutErrorCode
     public var userInfo: JSON?

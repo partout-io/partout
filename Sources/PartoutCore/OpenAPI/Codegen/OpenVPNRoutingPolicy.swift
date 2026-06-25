@@ -7,7 +7,7 @@
 
 
 /** Routing policy. */
-public enum OpenVPNRoutingPolicy: String, Codable, CaseIterable {
+public enum OpenVPNRoutingPolicy: String, Codable, CaseIterable, Sendable {
     /// All IPv4 traffic goes through the VPN.
     case IPv4 = "IPv4"
     /// All IPv6 traffic goes through the VPN.
@@ -15,4 +15,5 @@ public enum OpenVPNRoutingPolicy: String, Codable, CaseIterable {
     /// Block LAN while connected.
     case blockLocal = "blockLocal"
 }
+
 

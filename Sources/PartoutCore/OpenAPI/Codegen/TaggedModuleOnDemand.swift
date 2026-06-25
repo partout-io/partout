@@ -6,11 +6,12 @@
 //
 
 
-public struct TaggedModuleOnDemand: Codable, Hashable {
+public struct TaggedModuleOnDemand: Codable, Hashable, Sendable {
 
-    public enum ModelType: String, Codable, CaseIterable {
+    public enum ModelType: String, Codable, CaseIterable, Sendable {
         case onDemand = "OnDemand"
     }
+
     public var type: ModelType
     public var value: OnDemandModule
 

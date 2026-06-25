@@ -7,7 +7,7 @@
 
 
 /** Settings that can be pulled from server. */
-public enum OpenVPNPullMask: String, Codable, CaseIterable {
+public enum OpenVPNPullMask: String, Codable, CaseIterable, Sendable {
     /// Routes and gateways.
     case routes = "routes"
     /// DNS settings.
@@ -15,4 +15,5 @@ public enum OpenVPNPullMask: String, Codable, CaseIterable {
     /// Proxy settings.
     case proxy = "proxy"
 }
+
 

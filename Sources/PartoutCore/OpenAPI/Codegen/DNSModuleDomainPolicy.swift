@@ -6,8 +6,9 @@
 //
 
 
-public enum DNSModuleDomainPolicy: String, Codable, CaseIterable {
+public enum DNSModuleDomainPolicy: String, Codable, CaseIterable, Sendable {
     case match = "match"
     case matchAndSearch = "matchAndSearch"
 }
+
 

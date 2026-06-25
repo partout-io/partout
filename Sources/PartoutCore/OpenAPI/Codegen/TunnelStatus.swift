@@ -7,10 +7,11 @@
 
 
 /** The status of a ``Tunnel``. */
-public enum TunnelStatus: String, Codable, CaseIterable {
+public enum TunnelStatus: String, Codable, CaseIterable, Sendable {
     case inactive = "inactive"
     case activating = "activating"
     case active = "active"
     case deactivating = "deactivating"
 }
+
 

@@ -6,7 +6,7 @@
 //
 
 
-public struct TunnelRemoteInfoWrapper: Codable, Hashable {
+public struct TunnelRemoteInfoWrapper: Codable, Hashable, Sendable {
 
     public var address: Address?
     public var modules: [TaggedModule]?

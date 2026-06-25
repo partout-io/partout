@@ -6,11 +6,12 @@
 //
 
 
-public struct DNSModuleProtocolTypeCleartext: Codable, Hashable {
+public struct DNSModuleProtocolTypeCleartext: Codable, Hashable, Sendable {
 
-    public enum ModelType: String, Codable, CaseIterable {
+    public enum ModelType: String, Codable, CaseIterable, Sendable {
         case cleartext = "cleartext"
     }
+
     public var type: ModelType
 
     public init(type: ModelType) {

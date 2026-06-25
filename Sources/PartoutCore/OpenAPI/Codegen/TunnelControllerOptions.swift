@@ -7,7 +7,7 @@
 
 
 /** Common options to give to ``TunnelController``. */
-public struct TunnelControllerOptions: Codable, Hashable {
+public struct TunnelControllerOptions: Codable, Hashable, Sendable {
 
     public var dnsFallbackServers: [String]
     public var logsSnapshots: Bool

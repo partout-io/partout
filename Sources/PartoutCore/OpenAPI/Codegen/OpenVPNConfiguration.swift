@@ -7,7 +7,7 @@
 
 
 /** The immutable configuration for `OpenVPNSession`. */
-public struct OpenVPNConfiguration: Codable, Hashable {
+public struct OpenVPNConfiguration: Codable, Hashable, Sendable {
 
     /** - Seealso: `Configuration.Builder.authToken` */
     public var authToken: String?

@@ -6,11 +6,12 @@
 //
 
 
-public struct TaggedModuleHTTPProxy: Codable, Hashable {
+public struct TaggedModuleHTTPProxy: Codable, Hashable, Sendable {
 
-    public enum ModelType: String, Codable, CaseIterable {
+    public enum ModelType: String, Codable, CaseIterable, Sendable {
         case httpproxy = "HTTPProxy"
     }
+
     public var type: ModelType
     public var value: HTTPProxyModule
 

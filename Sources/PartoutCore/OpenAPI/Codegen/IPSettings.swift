@@ -7,7 +7,7 @@
 
 
 /** IP settings and routes. */
-public struct IPSettings: Codable, Hashable {
+public struct IPSettings: Codable, Hashable, Sendable {
 
     /** The excluded routes. */
     public var excludedRoutes: [Route]

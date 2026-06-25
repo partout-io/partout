@@ -6,11 +6,12 @@
 //
 
 
-public struct DNSModuleProtocolTypeTls: Codable, Hashable {
+public struct DNSModuleProtocolTypeTls: Codable, Hashable, Sendable {
 
-    public enum ModelType: String, Codable, CaseIterable {
+    public enum ModelType: String, Codable, CaseIterable, Sendable {
         case tls = "tls"
     }
+
     public var type: ModelType
     public var hostname: String
 

@@ -7,7 +7,7 @@
 
 
 /** The protocol used in DNS servers. */
-public enum DNSProtocol: String, Codable, CaseIterable {
+public enum DNSProtocol: String, Codable, CaseIterable, Sendable {
     /// The value to fall back to when unset. Standard cleartext DNS (port 53).
     case cleartext = "cleartext"
     /// DNS over HTTPS.
@@ -15,4 +15,5 @@ public enum DNSProtocol: String, Codable, CaseIterable {
     /// DNS over TLS (port 853).
     case tls = "tls"
 }
+
 

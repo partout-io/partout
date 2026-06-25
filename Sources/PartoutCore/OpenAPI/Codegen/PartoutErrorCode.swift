@@ -6,7 +6,7 @@
 //
 
 
-public enum PartoutErrorCode: String, Codable, CaseIterable {
+public enum PartoutErrorCode: String, Codable, CaseIterable, Sendable {
     /// Response is cached.
     case cached = "cached"
     /// Entity not found.
@@ -100,4 +100,5 @@ public enum PartoutErrorCode: String, Codable, CaseIterable {
     /// Configuration has no peers.
     case wireGuardEmptyPeers = "WireGuard.emptyPeers"
 }
+
 

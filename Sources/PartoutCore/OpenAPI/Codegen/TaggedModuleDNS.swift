@@ -6,11 +6,12 @@
 //
 
 
-public struct TaggedModuleDNS: Codable, Hashable {
+public struct TaggedModuleDNS: Codable, Hashable, Sendable {
 
-    public enum ModelType: String, Codable, CaseIterable {
+    public enum ModelType: String, Codable, CaseIterable, Sendable {
         case dns = "DNS"
     }
+
     public var type: ModelType
     public var value: DNSModule
 

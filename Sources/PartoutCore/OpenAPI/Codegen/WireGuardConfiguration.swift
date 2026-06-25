@@ -7,7 +7,7 @@
 
 
 /** Represents a WireGuard configuration. */
-public struct WireGuardConfiguration: Codable, Hashable {
+public struct WireGuardConfiguration: Codable, Hashable, Sendable {
 
     /** The local interface. */
     public var interface: WireGuardLocalInterface

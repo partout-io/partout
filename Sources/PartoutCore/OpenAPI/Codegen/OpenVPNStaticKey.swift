@@ -7,7 +7,7 @@
 
 
 /** Represents an OpenVPN static key file (as generated with --genkey) */
-public struct OpenVPNStaticKey: Codable, Hashable {
+public struct OpenVPNStaticKey: Codable, Hashable, Sendable {
 
     public var data: SecureData
     public var dir: OpenVPNStaticKeyDirection?

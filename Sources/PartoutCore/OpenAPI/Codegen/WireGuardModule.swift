@@ -7,7 +7,7 @@
 
 
 /** A connection module providing a WireGuard connection. */
-public struct WireGuardModule: Codable, Hashable {
+public struct WireGuardModule: Codable, Hashable, Sendable {
 
     public var configuration: WireGuardConfiguration?
     public var id: UniqueID

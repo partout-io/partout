@@ -6,8 +6,9 @@
 //
 
 
-public enum OnDemandModuleOtherNetwork: String, Codable, CaseIterable {
+public enum OnDemandModuleOtherNetwork: String, Codable, CaseIterable, Sendable {
     case mobile = "mobile"
     case ethernet = "ethernet"
 }
+
 

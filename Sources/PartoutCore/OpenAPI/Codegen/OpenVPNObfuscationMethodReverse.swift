@@ -6,11 +6,12 @@
 //
 
 
-public struct OpenVPNObfuscationMethodReverse: Codable, Hashable {
+public struct OpenVPNObfuscationMethodReverse: Codable, Hashable, Sendable {
 
-    public enum ModelType: String, Codable, CaseIterable {
+    public enum ModelType: String, Codable, CaseIterable, Sendable {
         case reverse = "reverse"
     }
+
     public var type: ModelType
 
     public init(type: ModelType) {

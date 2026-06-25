@@ -7,7 +7,7 @@
 
 
 /** A pair of received/sent bytes count. */
-public struct DataCount: Codable, Hashable {
+public struct DataCount: Codable, Hashable, Sendable {
 
     /** Received bytes count. */
     public var received: ModelUInt64

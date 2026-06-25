@@ -6,11 +6,12 @@
 //
 
 
-public struct OpenVPNObfuscationMethodObfuscate: Codable, Hashable {
+public struct OpenVPNObfuscationMethodObfuscate: Codable, Hashable, Sendable {
 
-    public enum ModelType: String, Codable, CaseIterable {
+    public enum ModelType: String, Codable, CaseIterable, Sendable {
         case obfuscate = "obfuscate"
     }
+
     public var type: ModelType
     public var mask: SecureData
 

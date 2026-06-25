@@ -7,7 +7,7 @@
 
 
 /** A type-erased ``Module`` for encoding external implementations. */
-public struct CustomModule: Codable, Hashable {
+public struct CustomModule: Codable, Hashable, Sendable {
 
     public var innerType: ModuleType
     public var json: JSON?

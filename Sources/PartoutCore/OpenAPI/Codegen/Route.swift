@@ -7,7 +7,7 @@
 
 
 /** Represents a route in the routing table. */
-public struct Route: Codable, Hashable {
+public struct Route: Codable, Hashable, Sendable {
 
     /** The destination subnet or `nil` if default. */
     public var destination: Subnet?

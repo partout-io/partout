@@ -7,7 +7,7 @@
 
 
 /** Returns a tunnel-specific snapshot of a ``Profile``. */
-public struct TunnelSnapshot: Codable, Hashable {
+public struct TunnelSnapshot: Codable, Hashable, Sendable {
 
     public var environment: TunnelSnapshotEnvironment?
     public var id: UniqueID

@@ -7,7 +7,7 @@
 
 
 /** The parameters of the remote interface. */
-public struct WireGuardRemoteInterface: Codable, Hashable {
+public struct WireGuardRemoteInterface: Codable, Hashable, Sendable {
 
     /** The list of allowed subnets. */
     public var allowedIPs: [Subnet]

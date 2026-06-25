@@ -7,7 +7,7 @@
 
 
 /** Advanced flags affecting the behavior of a ``Profile``. */
-public struct ProfileBehavior: Codable, Hashable {
+public struct ProfileBehavior: Codable, Hashable, Sendable {
 
     /** Disconnects when the device goes to sleep. */
     public var disconnectsOnSleep: Bool

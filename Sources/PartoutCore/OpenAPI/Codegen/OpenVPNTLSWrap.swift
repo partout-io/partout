@@ -7,7 +7,7 @@
 
 
 /** Holds parameters for TLS wrapping. */
-public struct OpenVPNTLSWrap: Codable, Hashable {
+public struct OpenVPNTLSWrap: Codable, Hashable, Sendable {
 
     /** The static encryption key. */
     public var key: OpenVPNStaticKey

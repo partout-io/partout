@@ -6,11 +6,12 @@
 //
 
 
-public struct DNSModuleProtocolTypeHttps: Codable, Hashable {
+public struct DNSModuleProtocolTypeHttps: Codable, Hashable, Sendable {
 
-    public enum ModelType: String, Codable, CaseIterable {
+    public enum ModelType: String, Codable, CaseIterable, Sendable {
         case https = "https"
     }
+
     public var type: ModelType
     public var url: URL
 

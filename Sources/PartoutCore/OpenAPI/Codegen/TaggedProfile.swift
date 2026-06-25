@@ -7,7 +7,7 @@
 
 
 /** A codable wrapper for a profile with all known modules. */
-public struct TaggedProfile: Codable, Hashable {
+public struct TaggedProfile: Codable, Hashable, Sendable {
 
     public var activeModulesIds: Set<UniqueID>
     public var behavior: ProfileBehavior?

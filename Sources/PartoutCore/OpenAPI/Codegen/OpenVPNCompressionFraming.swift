@@ -7,10 +7,11 @@
 
 
 /** Defines the type of compression framing. */
-public enum OpenVPNCompressionFraming: Int, Codable, CaseIterable {
+public enum OpenVPNCompressionFraming: Int, Codable, CaseIterable, Sendable {
     case disabled = 0
     case compLZO = 1
     case compress = 2
     case compressV2 = 3
 }
+
 

@@ -7,7 +7,7 @@
 
 
 /** A set of credentials for authentication. */
-public struct OpenVPNCredentials: Codable, Hashable {
+public struct OpenVPNCredentials: Codable, Hashable, Sendable {
 
     /** The OTP. */
     public var otp: String?

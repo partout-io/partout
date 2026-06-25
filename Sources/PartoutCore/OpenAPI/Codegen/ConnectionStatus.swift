@@ -7,10 +7,11 @@
 
 
 /** The status of a ``Connection``. */
-public enum ConnectionStatus: String, Codable, CaseIterable {
+public enum ConnectionStatus: String, Codable, CaseIterable, Sendable {
     case disconnected = "disconnected"
     case connecting = "connecting"
     case connected = "connected"
     case disconnecting = "disconnecting"
 }
+
 

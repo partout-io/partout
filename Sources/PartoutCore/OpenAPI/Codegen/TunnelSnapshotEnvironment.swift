@@ -6,7 +6,7 @@
 //
 
 
-public struct TunnelSnapshotEnvironment: Codable, Hashable {
+public struct TunnelSnapshotEnvironment: Codable, Hashable, Sendable {
 
     public var connectionStatus: ConnectionStatus
     public var dataCount: DataCount

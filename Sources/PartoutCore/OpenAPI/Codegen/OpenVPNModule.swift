@@ -7,7 +7,7 @@
 
 
 /** A connection module providing an OpenVPN connection. */
-public struct OpenVPNModule: Codable, Hashable {
+public struct OpenVPNModule: Codable, Hashable, Sendable {
 
     public var configuration: OpenVPNConfiguration?
     public var credentials: OpenVPNCredentials?

@@ -6,11 +6,12 @@
 //
 
 
-public struct OpenVPNObfuscationMethodXorptrpos: Codable, Hashable {
+public struct OpenVPNObfuscationMethodXorptrpos: Codable, Hashable, Sendable {
 
-    public enum ModelType: String, Codable, CaseIterable {
+    public enum ModelType: String, Codable, CaseIterable, Sendable {
         case xorptrpos = "xorptrpos"
     }
+
     public var type: ModelType
 
     public init(type: ModelType) {

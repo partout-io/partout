@@ -7,7 +7,7 @@
 
 
 /** The parameters of the local interface. */
-public struct WireGuardLocalInterface: Codable, Hashable {
+public struct WireGuardLocalInterface: Codable, Hashable, Sendable {
 
     /** The local addresses. */
     public var addresses: [Subnet]

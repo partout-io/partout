@@ -7,7 +7,7 @@
 
 
 /** IP and routes. */
-public struct IPModule: Codable, Hashable {
+public struct IPModule: Codable, Hashable, Sendable {
 
     public var id: UniqueID
     public var ipv4: IPSettings?

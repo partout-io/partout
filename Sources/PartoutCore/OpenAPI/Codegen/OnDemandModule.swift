@@ -7,7 +7,7 @@
 
 
 /** On-demand settings. */
-public struct OnDemandModule: Codable, Hashable {
+public struct OnDemandModule: Codable, Hashable, Sendable {
 
     public var id: UniqueID
     public var policy: OnDemandModulePolicy

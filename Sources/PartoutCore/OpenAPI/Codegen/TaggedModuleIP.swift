@@ -6,11 +6,12 @@
 //
 
 
-public struct TaggedModuleIP: Codable, Hashable {
+public struct TaggedModuleIP: Codable, Hashable, Sendable {
 
-    public enum ModelType: String, Codable, CaseIterable {
+    public enum ModelType: String, Codable, CaseIterable, Sendable {
         case ip = "IP"
     }
+
     public var type: ModelType
     public var value: IPModule
 

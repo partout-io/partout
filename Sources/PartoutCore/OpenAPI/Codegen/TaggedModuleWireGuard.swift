@@ -6,11 +6,12 @@
 //
 
 
-public struct TaggedModuleWireGuard: Codable, Hashable {
+public struct TaggedModuleWireGuard: Codable, Hashable, Sendable {
 
-    public enum ModelType: String, Codable, CaseIterable {
+    public enum ModelType: String, Codable, CaseIterable, Sendable {
         case wireGuard = "WireGuard"
     }
+
     public var type: ModelType
     public var value: WireGuardModule
 

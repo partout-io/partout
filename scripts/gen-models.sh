@@ -90,6 +90,7 @@ case $language in
             --additional-properties=responseAs=AsyncAwait \
             --additional-properties=useSPMFileStructure=true \
             --additional-properties=useJsonEncodable=false \
+            --additional-properties=useSendable=true \
             --additional-properties=validatable=false \
             --additional-properties=identifiableModels=false \
             --additional-properties=hashableModels=true
