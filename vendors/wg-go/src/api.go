@@ -21,8 +21,8 @@ import (
 	"time"
 	"unsafe"
 
-	"golang.zx2c4.com/wireguard/conn"
-	"golang.zx2c4.com/wireguard/device"
+	"github.com/amnezia-vpn/amneziawg-go/conn"
+	"github.com/amnezia-vpn/amneziawg-go/device"
 )
 
 var loggerFunc unsafe.Pointer
@@ -192,7 +192,7 @@ func wgVersion() *C.char {
 		return C.CString("unknown")
 	}
 	for _, dep := range info.Deps {
-		if dep.Path == "golang.zx2c4.com/wireguard" {
+		if dep.Path == "github.com/amnezia-vpn/amneziawg-go" {
 			parts := strings.Split(dep.Version, "-")
 			if len(parts) == 3 && len(parts[2]) == 12 {
 				return C.CString(parts[2][:7])

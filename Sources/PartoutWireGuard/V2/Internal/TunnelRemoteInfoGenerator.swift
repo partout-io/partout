@@ -93,6 +93,24 @@ final class TunnelRemoteInfoGenerator: Sendable {
 //        if let listenPort = tunnelConfiguration.interface.listenPort {
 //            wgSettings.append("listen_port=\(listenPort)\n")
 //        }
+        if let awg = tunnelConfiguration.interface.amneziaParameters {
+            if let jc = awg.jc { wgSettings.append("jc=\(jc)\n") }
+            if let jmin = awg.jmin { wgSettings.append("jmin=\(jmin)\n") }
+            if let jmax = awg.jmax { wgSettings.append("jmax=\(jmax)\n") }
+            if let s1 = awg.s1 { wgSettings.append("s1=\(s1)\n") }
+            if let s2 = awg.s2 { wgSettings.append("s2=\(s2)\n") }
+            if let s3 = awg.s3 { wgSettings.append("s3=\(s3)\n") }
+            if let s4 = awg.s4 { wgSettings.append("s4=\(s4)\n") }
+            if let h1 = awg.h1 { wgSettings.append("h1=\(h1)\n") }
+            if let h2 = awg.h2 { wgSettings.append("h2=\(h2)\n") }
+            if let h3 = awg.h3 { wgSettings.append("h3=\(h3)\n") }
+            if let h4 = awg.h4 { wgSettings.append("h4=\(h4)\n") }
+            if let i1 = awg.i1 { wgSettings.append("i1=\(i1)\n") }
+            if let i2 = awg.i2 { wgSettings.append("i2=\(i2)\n") }
+            if let i3 = awg.i3 { wgSettings.append("i3=\(i3)\n") }
+            if let i4 = awg.i4 { wgSettings.append("i4=\(i4)\n") }
+            if let i5 = awg.i5 { wgSettings.append("i5=\(i5)\n") }
+        }
         if !tunnelConfiguration.peers.isEmpty {
             wgSettings.append("replace_peers=true\n")
         }
