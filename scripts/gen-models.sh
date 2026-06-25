@@ -2,7 +2,7 @@
 set -e
 
 usage() {
-    echo "Usage: $0 <openapi> <language:kotlin|cpp> <models_dir> <package_name> [extra_imports]"
+    echo "Usage: $0 <openapi> <language:kotlin|swift|cpp> <models_dir> <package_name> [extra_imports]"
     exit 1
 }
 
@@ -15,10 +15,6 @@ language=$2
 models_dir=$3
 package_name=$4
 extra_imports=$5
-
-# First, update the OpenAPI metadata
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-$script_dir/gen-api.sh
 
 case $language in
     kotlin)
@@ -53,12 +49,42 @@ case $language in
             --schema-mappings OpenVPN.CryptoContainer=kotlin.String \
             "${kotlin_extra_imports_opts[@]}"
         ;;
+    swift)
+        # Generate into a temporary client package, then keep only the models.
+        #
+        # DocC comments are emitted by openapi-generator from OpenAPI schema
+        # descriptions. Keep descriptions in openapi.yaml to preserve them here.
+        tmp_dir="$(mktemp -d)"
+        cleanup() {
+            rm -rf "$tmp_dir"
+        }
+        trap cleanup EXIT
+
+        project_name=$package_name
+        rm -rf "$models_dir"
+        openapi-generator generate \
+            -i "$infile" \
+            -o "$tmp_dir" \
+            -g swift5 \
+            --global-property=models,modelDocs=false,modelTests=false \
+            --additional-properties=projectName="$project_name" \
+            --additional-properties=responseAs=AsyncAwait \
+            --additional-properties=useSPMFileStructure=true \
+            --additional-properties=useJsonEncodable=false \
+            --additional-properties=validatable=false \
+            --additional-properties=identifiableModels=false \
+            --additional-properties=hashableModels=true
+
+        generated_models_dir="$tmp_dir/Sources/$project_name/Models"
+        mkdir -p "$models_dir"
+        cp "$generated_models_dir"/*.swift "$models_dir"/
+        ;;
     cpp)
         echo "cpp language is not implemented yet; exiting."
         exit 0
         ;;
     *)
-        echo "unknown language '$language'; expected 'kotlin' or 'cpp'"
+        echo "unknown language '$language'; expected 'kotlin', 'swift', or 'cpp'"
         exit 1
         ;;
 esac
