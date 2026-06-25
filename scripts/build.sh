@@ -94,6 +94,23 @@ while [[ $# -gt 0 ]]; do
 done
 set -- "${positional_args[@]}"
 
+# Generate models
+openapi=scripts/openapi.yaml
+if [[ $gen_models == 1 ]]; then
+    # Swift
+    scripts/gen-models.sh $openapi swift Sources/PartoutCore/OpenAPI/Codegen PartoutCore
+    # Kotlin
+    package=io.partout.models
+    models=cross
+    tmpmodels=cross-models
+    scripts/gen-models.sh $openapi kotlin $tmpmodels $package
+    rm -rf $models/android/io/partout/models
+    mv $tmpmodels/src/main/kotlin/io/partout/models $models/android/io/partout
+    # C++ (TODO)
+    ######
+    rm -rf cross-models
+fi
+
 # Generate CMake files
 if [[ ! -d $build_dir ]]; then
     mkdir $build_dir
@@ -110,21 +127,6 @@ fi
 cmake --build $build_dir
 if [[ -n $install_dir ]]; then
     cmake --install $build_dir
-fi
-
-# Generate foreign models
-if [[ $gen_models == 1 ]]; then
-    openapi=scripts/openapi.yaml
-    package=io.partout.models
-    models=cross
-    tmpmodels=cross-models
-    # Kotlin
-    scripts/gen-models.sh $openapi kotlin $tmpmodels $package
-    rm -rf $models/android/io/partout/models
-    mv $tmpmodels/src/main/kotlin/io/partout/models $models/android/io/partout
-    # C++ (TODO)
-    ######
-    rm -rf cross-models
 fi
 
 popd
