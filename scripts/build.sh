@@ -102,6 +102,7 @@ openapi=scripts/openapi.yaml
 if [[ $gen_models == 1 ]]; then
     # Swift
     scripts/gen-models.sh $openapi swift Sources/PartoutCore/OpenAPI/Codegen PartoutCore
+
     # Kotlin
     package=io.partout.models
     models=cross
@@ -109,9 +110,10 @@ if [[ $gen_models == 1 ]]; then
     scripts/gen-models.sh $openapi kotlin $tmpmodels $package
     rm -rf $models/android/io/partout/models
     mv $tmpmodels/src/main/kotlin/io/partout/models $models/android/io/partout
+    rm -rf $tmpmodels
+
     # C++ (TODO)
     ######
-    rm -rf cross-models
 fi
 
 # Generate CMake files
