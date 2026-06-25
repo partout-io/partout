@@ -5,13 +5,13 @@
 // https://openapi-generator.tech
 //
 
-public struct DNSModuleProtocolTypeHttps: Codable, Hashable, Sendable {
+public struct DNSModuleProtocolTypeHttps: Sendable, Codable, Hashable {
 
-    public enum ModelType: String, Codable, CaseIterable, Sendable {
+    public enum ModelType: String, Sendable, Codable, CaseIterable {
         case https = "https"
     }
-    public var type: ModelType
-    public var url: URL
+    public let type: ModelType
+    public let url: URL
 
     public init(type: ModelType, url: URL) {
         self.type = type

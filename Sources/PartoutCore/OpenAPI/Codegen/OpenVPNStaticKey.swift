@@ -6,10 +6,10 @@
 //
 
 /** Represents an OpenVPN static key file (as generated with --genkey) */
-public struct OpenVPNStaticKey: Codable, Hashable, Sendable {
+public struct OpenVPNStaticKey: Sendable, Codable, Hashable {
 
-    public var data: SecureData
-    public var dir: OpenVPNStaticKeyDirection?
+    public let data: SecureData
+    public let dir: OpenVPNStaticKeyDirection?
 
     public init(data: SecureData, dir: OpenVPNStaticKeyDirection? = nil) {
         self.data = data

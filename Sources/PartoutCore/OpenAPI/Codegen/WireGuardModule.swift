@@ -6,10 +6,10 @@
 //
 
 /** A connection module providing a WireGuard connection. */
-public struct WireGuardModule: Codable, Hashable, Sendable {
+public struct WireGuardModule: Sendable, Codable, Hashable {
 
-    public var configuration: WireGuardConfiguration?
-    public var id: UniqueID
+    public let configuration: WireGuardConfiguration?
+    public let id: UniqueID
 
     public init(configuration: WireGuardConfiguration? = nil, id: UniqueID) {
         self.configuration = configuration

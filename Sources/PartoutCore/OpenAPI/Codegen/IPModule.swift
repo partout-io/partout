@@ -6,12 +6,12 @@
 //
 
 /** IP and routes. */
-public struct IPModule: Codable, Hashable, Sendable {
+public struct IPModule: Sendable, Codable, Hashable {
 
-    public var id: UniqueID
-    public var ipv4: IPSettings?
-    public var ipv6: IPSettings?
-    public var mtu: Int?
+    public let id: UniqueID
+    public let ipv4: IPSettings?
+    public let ipv6: IPSettings?
+    public let mtu: Int?
 
     public init(id: UniqueID, ipv4: IPSettings? = nil, ipv6: IPSettings? = nil, mtu: Int? = nil) {
         self.id = id

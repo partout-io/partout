@@ -5,11 +5,11 @@
 // https://openapi-generator.tech
 //
 
-public struct TunnelSnapshotEnvironment: Codable, Hashable, Sendable {
+public struct TunnelSnapshotEnvironment: Sendable, Codable, Hashable {
 
-    public var connectionStatus: ConnectionStatus
-    public var dataCount: DataCount
-    public var lastErrorCode: String?
+    public let connectionStatus: ConnectionStatus
+    public let dataCount: DataCount
+    public let lastErrorCode: String?
 
     public init(connectionStatus: ConnectionStatus, dataCount: DataCount, lastErrorCode: String? = nil) {
         self.connectionStatus = connectionStatus

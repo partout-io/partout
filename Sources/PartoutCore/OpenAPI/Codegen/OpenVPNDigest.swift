@@ -6,7 +6,7 @@
 //
 
 /** Message digest algorithm. */
-public enum OpenVPNDigest: String, Codable, CaseIterable, Sendable {
+public enum OpenVPNDigest: String, Sendable, Codable, CaseIterable {
     /// SHA1 message digest.
     case sha1 = "SHA1"
     /// SHA224 message digest.

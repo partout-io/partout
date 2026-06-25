@@ -6,11 +6,11 @@
 //
 
 /** Common options to give to ``TunnelController``. */
-public struct TunnelControllerOptions: Codable, Hashable, Sendable {
+public struct TunnelControllerOptions: Sendable, Codable, Hashable {
 
-    public var dnsFallbackServers: [String]
-    public var logsSnapshots: Bool
-    public var minDataCountDelta: ModelUInt64
+    public let dnsFallbackServers: [String]
+    public let logsSnapshots: Bool
+    public let minDataCountDelta: ModelUInt64
 
     public init(dnsFallbackServers: [String], logsSnapshots: Bool, minDataCountDelta: ModelUInt64) {
         self.dnsFallbackServers = dnsFallbackServers

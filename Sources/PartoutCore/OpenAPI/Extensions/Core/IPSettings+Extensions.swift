@@ -12,29 +12,27 @@ extension IPSettings {
     }
 
     public func with(subnet: Subnet?) -> Self {
-        var copy = self
-        copy.subnets = subnet.map { [$0] } ?? []
-        return copy
+        Self(
+            excludedRoutes: excludedRoutes,
+            includedRoutes: includedRoutes,
+            subnets: subnet.map { [$0] } ?? []
+        )
     }
 
     public mutating func include(_ route: Route) {
-        includedRoutes.append(route)
+        self = including(routes: includedRoutes + [route])
     }
 
     public mutating func removeIncluded(at offsets: IndexSet) {
-        offsets.forEach {
-            includedRoutes.remove(at: $0)
-        }
+        self = including(routes: includedRoutes.removing(at: offsets))
     }
 
     public mutating func exclude(_ route: Route) {
-        excludedRoutes.append(route)
+        self = excluding(routes: excludedRoutes + [route])
     }
 
     public mutating func removeExcluded(at offsets: IndexSet) {
-        offsets.forEach {
-            excludedRoutes.remove(at: $0)
-        }
+        self = excluding(routes: excludedRoutes.removing(at: offsets))
     }
 
     public func including(routes: [Route]) -> Self {
@@ -43,9 +41,7 @@ extension IPSettings {
                 $0.destination == nil || $0.destination?.address.family == subnet.address.family
             })
         }
-        var copy = self
-        copy.includedRoutes = routes
-        return copy
+        return Self(excludedRoutes: excludedRoutes, includedRoutes: routes, subnets: subnets)
     }
 
     public func excluding(routes: [Route]) -> Self {
@@ -54,9 +50,7 @@ extension IPSettings {
                 $0.destination == nil || $0.destination?.address.family == subnet.address.family
             })
         }
-        var copy = self
-        copy.excludedRoutes = routes
-        return copy
+        return Self(excludedRoutes: routes, includedRoutes: includedRoutes, subnets: subnets)
     }
 
     public var includesDefaultRoute: Bool {
@@ -72,6 +66,16 @@ extension IPSettings {
             return nil
         }
         return self
+    }
+}
+
+private extension Array {
+    func removing(at offsets: IndexSet) -> Self {
+        var copy = self
+        offsets.forEach {
+            copy.remove(at: $0)
+        }
+        return copy
     }
 }
 

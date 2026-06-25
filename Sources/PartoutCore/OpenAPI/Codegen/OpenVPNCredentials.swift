@@ -6,16 +6,16 @@
 //
 
 /** A set of credentials for authentication. */
-public struct OpenVPNCredentials: Codable, Hashable, Sendable {
+public struct OpenVPNCredentials: Sendable, Codable, Hashable {
 
     /** The OTP. */
-    public var otp: String?
+    public let otp: String?
     /** The OTP method (defaults to ``OTPMethod-swift.enum/none``). */
-    public var otpMethod: OpenVPNCredentialsOTPMethod
+    public let otpMethod: OpenVPNCredentialsOTPMethod
     /** The password. */
-    public var password: String
+    public let password: String
     /** The username. */
-    public var username: String
+    public let username: String
 
     public init(otp: String? = nil, otpMethod: OpenVPNCredentialsOTPMethod, password: String, username: String) {
         self.otp = otp

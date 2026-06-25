@@ -8,8 +8,6 @@ extension OpenVPN.TLSWrap {
 
     public init(strategy: Strategy, key: OpenVPN.StaticKey, wrappedKey: SecureData? = nil) {
         precondition(strategy != .cryptV2 || wrappedKey != nil)
-        self.strategy = strategy
-        self.key = key
-        self.wrappedKey = wrappedKey
+        self.init(key: key, strategy: strategy, wrappedKey: wrappedKey)
     }
 }

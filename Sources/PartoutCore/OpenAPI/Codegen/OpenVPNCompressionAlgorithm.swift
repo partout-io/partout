@@ -6,7 +6,7 @@
 //
 
 /** Defines the type of compression algorithm. */
-public enum OpenVPNCompressionAlgorithm: Int, Codable, CaseIterable, Sendable {
+public enum OpenVPNCompressionAlgorithm: Int, Sendable, Codable, CaseIterable {
     case disabled = 0
     case LZO = 1
     case other = 2

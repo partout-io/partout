@@ -6,7 +6,7 @@
 //
 
 /** A socket type with optional info about the IP endpoint. */
-public enum IPSocketType: String, Codable, CaseIterable, Sendable {
+public enum IPSocketType: String, Sendable, Codable, CaseIterable {
     /// UDP socket type.
     case udp = "UDP"
     /// TCP socket type.

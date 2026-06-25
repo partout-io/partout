@@ -5,7 +5,7 @@
 // https://openapi-generator.tech
 //
 
-public enum OpenVPNCredentialsOTPMethod: String, Codable, CaseIterable, Sendable {
+public enum OpenVPNCredentialsOTPMethod: String, Sendable, Codable, CaseIterable {
     case none = "none"
     case append = "append"
     case encode = "encode"

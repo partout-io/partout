@@ -5,13 +5,13 @@
 // https://openapi-generator.tech
 //
 
-public struct TaggedModuleDNS: Codable, Hashable, Sendable {
+public struct TaggedModuleDNS: Sendable, Codable, Hashable {
 
-    public enum ModelType: String, Codable, CaseIterable, Sendable {
+    public enum ModelType: String, Sendable, Codable, CaseIterable {
         case dns = "DNS"
     }
-    public var type: ModelType
-    public var value: DNSModule
+    public let type: ModelType
+    public let value: DNSModule
 
     public init(type: ModelType, value: DNSModule) {
         self.type = type

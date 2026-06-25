@@ -48,6 +48,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/Connection/EndpointResolver.swift
 ./PartoutCore/Connection/FdLooper.swift
 ./PartoutCore/Connection/IOInterface.swift
+./PartoutCore/Connection/IPHeader.swift
 ./PartoutCore/Connection/LinkInterface.swift
 ./PartoutCore/Connection/LinkObserver.swift
 ./PartoutCore/Connection/NativeIOInterface.swift
@@ -168,7 +169,6 @@ set(PARTOUT_SOURCES
 ./PartoutCore/OpenAPI/Extensions/Core/EndpointProtocol.swift
 ./PartoutCore/OpenAPI/Extensions/Core/ExtendedEndpoint+Socket.swift
 ./PartoutCore/OpenAPI/Extensions/Core/ExtendedEndpoint.swift
-./PartoutCore/OpenAPI/Extensions/Core/IPHeader.swift
 ./PartoutCore/OpenAPI/Extensions/Core/IPSettings+Extensions.swift
 ./PartoutCore/OpenAPI/Extensions/Core/ModuleType+Extensions.swift
 ./PartoutCore/OpenAPI/Extensions/Core/ProfileBehavior+Extensions.swift

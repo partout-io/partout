@@ -6,10 +6,10 @@
 //
 
 /** A type-erased ``Module`` for encoding external implementations. */
-public struct CustomModule: Codable, Hashable, Sendable {
+public struct CustomModule: Sendable, Codable, Hashable {
 
-    public var innerType: ModuleType
-    public var json: JSON?
+    public let innerType: ModuleType
+    public let json: JSON?
 
     public init(innerType: ModuleType, json: JSON?) {
         self.innerType = innerType

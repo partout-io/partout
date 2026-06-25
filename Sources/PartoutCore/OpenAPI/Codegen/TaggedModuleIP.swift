@@ -5,13 +5,13 @@
 // https://openapi-generator.tech
 //
 
-public struct TaggedModuleIP: Codable, Hashable, Sendable {
+public struct TaggedModuleIP: Sendable, Codable, Hashable {
 
-    public enum ModelType: String, Codable, CaseIterable, Sendable {
+    public enum ModelType: String, Sendable, Codable, CaseIterable {
         case ip = "IP"
     }
-    public var type: ModelType
-    public var value: IPModule
+    public let type: ModelType
+    public let value: IPModule
 
     public init(type: ModelType, value: IPModule) {
         self.type = type

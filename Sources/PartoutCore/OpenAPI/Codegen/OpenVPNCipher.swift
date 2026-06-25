@@ -6,7 +6,7 @@
 //
 
 /** Encryption algorithm. */
-public enum OpenVPNCipher: String, Codable, CaseIterable, Sendable {
+public enum OpenVPNCipher: String, Sendable, Codable, CaseIterable {
     /// AES encryption with 128-bit key size and CBC.
     case aes128cbc = "AES-128-CBC"
     /// AES encryption with 192-bit key size and CBC.

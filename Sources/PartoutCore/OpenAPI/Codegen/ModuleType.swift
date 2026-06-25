@@ -6,7 +6,7 @@
 //
 
 /** Raw type univocally associated to each ``Module`` implementation. */
-public enum ModuleType: String, Codable, CaseIterable, Sendable {
+public enum ModuleType: String, Sendable, Codable, CaseIterable {
     case Custom = "Custom"
     case DNS = "DNS"
     case HTTPProxy = "HTTPProxy"

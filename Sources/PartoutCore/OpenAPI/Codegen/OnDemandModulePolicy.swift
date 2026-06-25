@@ -5,7 +5,7 @@
 // https://openapi-generator.tech
 //
 
-public enum OnDemandModulePolicy: String, Codable, CaseIterable, Sendable {
+public enum OnDemandModulePolicy: String, Sendable, Codable, CaseIterable {
     case any = "any"
     case including = "including"
     case excluding = "excluding"

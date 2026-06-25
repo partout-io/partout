@@ -8,21 +8,15 @@ extension TunnelSnapshot.Environment {
     }
 
     public func with(connectionStatus: ConnectionStatus) -> Self {
-        var copy = self
-        copy.connectionStatus = connectionStatus
-        return copy
+        Self(connectionStatus: connectionStatus, dataCount: dataCount, lastErrorCode: lastErrorCode)
     }
 
     public func with(dataCount: DataCount) -> Self {
-        var copy = self
-        copy.dataCount = dataCount
-        return copy
+        Self(connectionStatus: connectionStatus, dataCount: dataCount, lastErrorCode: lastErrorCode)
     }
 
     public func with(lastErrorCode: String) -> Self {
-        var copy = self
-        copy.lastErrorCode = lastErrorCode
-        return copy
+        Self(connectionStatus: connectionStatus, dataCount: dataCount, lastErrorCode: lastErrorCode)
     }
 
     public func with(lastErrorCode: PartoutError.Code) -> Self {
@@ -36,9 +30,7 @@ extension TunnelSnapshot {
     }
 
     public func with(environment: Environment?) -> Self {
-        var copy = self
-        copy.environment = environment
-        return copy
+        Self(id: id, isEnabled: isEnabled, status: status, onDemand: onDemand, environment: environment)
     }
 
     public func isEquivalentExceptDataCount(to other: Self) -> Bool {

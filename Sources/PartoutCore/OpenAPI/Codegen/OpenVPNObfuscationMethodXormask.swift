@@ -5,13 +5,13 @@
 // https://openapi-generator.tech
 //
 
-public struct OpenVPNObfuscationMethodXormask: Codable, Hashable, Sendable {
+public struct OpenVPNObfuscationMethodXormask: Sendable, Codable, Hashable {
 
-    public enum ModelType: String, Codable, CaseIterable, Sendable {
+    public enum ModelType: String, Sendable, Codable, CaseIterable {
         case xormask = "xormask"
     }
-    public var type: ModelType
-    public var mask: SecureData
+    public let type: ModelType
+    public let mask: SecureData
 
     public init(type: ModelType, mask: SecureData) {
         self.type = type

@@ -5,13 +5,13 @@
 // https://openapi-generator.tech
 //
 
-public struct OpenVPNObfuscationMethodObfuscate: Codable, Hashable, Sendable {
+public struct OpenVPNObfuscationMethodObfuscate: Sendable, Codable, Hashable {
 
-    public enum ModelType: String, Codable, CaseIterable, Sendable {
+    public enum ModelType: String, Sendable, Codable, CaseIterable {
         case obfuscate = "obfuscate"
     }
-    public var type: ModelType
-    public var mask: SecureData
+    public let type: ModelType
+    public let mask: SecureData
 
     public init(type: ModelType, mask: SecureData) {
         self.type = type

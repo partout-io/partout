@@ -6,16 +6,16 @@
 //
 
 /** The parameters of the local interface. */
-public struct WireGuardLocalInterface: Codable, Hashable, Sendable {
+public struct WireGuardLocalInterface: Sendable, Codable, Hashable {
 
     /** The local addresses. */
-    public var addresses: [Subnet]
+    public let addresses: [Subnet]
     /** The optional DNS settings. */
-    public var dns: DNSModule?
+    public let dns: DNSModule?
     /** The optional MTU. */
-    public var mtu: ModelUInt16?
+    public let mtu: ModelUInt16?
     /** The local private key. */
-    public var privateKey: WireGuardKey
+    public let privateKey: WireGuardKey
 
     public init(addresses: [Subnet], dns: DNSModule? = nil, mtu: ModelUInt16? = nil, privateKey: WireGuardKey) {
         self.addresses = addresses

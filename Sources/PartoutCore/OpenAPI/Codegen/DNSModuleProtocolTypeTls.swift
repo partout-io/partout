@@ -5,13 +5,13 @@
 // https://openapi-generator.tech
 //
 
-public struct DNSModuleProtocolTypeTls: Codable, Hashable, Sendable {
+public struct DNSModuleProtocolTypeTls: Sendable, Codable, Hashable {
 
-    public enum ModelType: String, Codable, CaseIterable, Sendable {
+    public enum ModelType: String, Sendable, Codable, CaseIterable {
         case tls = "tls"
     }
-    public var type: ModelType
-    public var hostname: String
+    public let type: ModelType
+    public let hostname: String
 
     public init(type: ModelType, hostname: String) {
         self.type = type

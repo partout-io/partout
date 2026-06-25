@@ -5,7 +5,7 @@
 // https://openapi-generator.tech
 //
 
-public enum DNSModuleDomainPolicy: String, Codable, CaseIterable, Sendable {
+public enum DNSModuleDomainPolicy: String, Sendable, Codable, CaseIterable {
     case match = "match"
     case matchAndSearch = "matchAndSearch"
 }

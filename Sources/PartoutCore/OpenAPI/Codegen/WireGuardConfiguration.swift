@@ -6,12 +6,12 @@
 //
 
 /** Represents a WireGuard configuration. */
-public struct WireGuardConfiguration: Codable, Hashable, Sendable {
+public struct WireGuardConfiguration: Sendable, Codable, Hashable {
 
     /** The local interface. */
-    public var interface: WireGuardLocalInterface
+    public let interface: WireGuardLocalInterface
     /** The peers. */
-    public var peers: [WireGuardRemoteInterface]
+    public let peers: [WireGuardRemoteInterface]
 
     public init(interface: WireGuardLocalInterface, peers: [WireGuardRemoteInterface]) {
         self.interface = interface

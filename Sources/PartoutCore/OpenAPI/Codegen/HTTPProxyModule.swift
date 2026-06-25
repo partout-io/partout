@@ -6,13 +6,13 @@
 //
 
 /** HTTP proxy settings. */
-public struct HTTPProxyModule: Codable, Hashable, Sendable {
+public struct HTTPProxyModule: Sendable, Codable, Hashable {
 
-    public var bypassDomains: [Address]
-    public var id: UniqueID
-    public var pacURL: URL?
-    public var proxy: Endpoint?
-    public var secureProxy: Endpoint?
+    public let bypassDomains: [Address]
+    public let id: UniqueID
+    public let pacURL: URL?
+    public let proxy: Endpoint?
+    public let secureProxy: Endpoint?
 
     public init(bypassDomains: [Address], id: UniqueID, pacURL: URL? = nil, proxy: Endpoint? = nil, secureProxy: Endpoint? = nil) {
         self.bypassDomains = bypassDomains

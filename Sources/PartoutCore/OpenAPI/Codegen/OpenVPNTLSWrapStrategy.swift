@@ -6,7 +6,7 @@
 //
 
 /** The wrapping strategy. */
-public enum OpenVPNTLSWrapStrategy: String, Codable, CaseIterable, Sendable {
+public enum OpenVPNTLSWrapStrategy: String, Sendable, Codable, CaseIterable {
     /// Authenticates payload (--tls-auth).
     case auth = "auth"
     /// Encrypts payload (--tls-crypt).

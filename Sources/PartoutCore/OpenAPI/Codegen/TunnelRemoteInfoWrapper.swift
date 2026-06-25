@@ -5,14 +5,14 @@
 // https://openapi-generator.tech
 //
 
-public struct TunnelRemoteInfoWrapper: Codable, Hashable, Sendable {
+public struct TunnelRemoteInfoWrapper: Sendable, Codable, Hashable {
 
-    public var address: Address?
-    public var modules: [TaggedModule]?
-    public var options: TunnelControllerOptions
-    public var originalModuleId: UniqueID
-    public var profile: TaggedProfile
-    public var requiresVirtualDevice: Bool
+    public let address: Address?
+    public let modules: [TaggedModule]?
+    public let options: TunnelControllerOptions
+    public let originalModuleId: UniqueID
+    public let profile: TaggedProfile
+    public let requiresVirtualDevice: Bool
 
     public init(address: Address? = nil, modules: [TaggedModule]? = nil, options: TunnelControllerOptions, originalModuleId: UniqueID, profile: TaggedProfile, requiresVirtualDevice: Bool) {
         self.address = address

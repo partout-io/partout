@@ -6,18 +6,18 @@
 //
 
 /** The parameters of the remote interface. */
-public struct WireGuardRemoteInterface: Codable, Hashable, Sendable {
+public struct WireGuardRemoteInterface: Sendable, Codable, Hashable {
 
     /** The list of allowed subnets. */
-    public var allowedIPs: [Subnet]
+    public let allowedIPs: [Subnet]
     /** The optional endpoint. */
-    public var endpoint: Endpoint?
+    public let endpoint: Endpoint?
     /** The keep-alive interval in seconds. */
-    public var keepAlive: ModelUInt16?
+    public let keepAlive: ModelUInt16?
     /** The optional endpoint pre-shared key. */
-    public var preSharedKey: WireGuardKey?
+    public let preSharedKey: WireGuardKey?
     /** The endpoint public key. */
-    public var publicKey: WireGuardKey
+    public let publicKey: WireGuardKey
 
     public init(allowedIPs: [Subnet], endpoint: Endpoint? = nil, keepAlive: ModelUInt16? = nil, preSharedKey: WireGuardKey? = nil, publicKey: WireGuardKey) {
         self.allowedIPs = allowedIPs

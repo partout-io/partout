@@ -6,14 +6,14 @@
 //
 
 /** IP settings and routes. */
-public struct IPSettings: Codable, Hashable, Sendable {
+public struct IPSettings: Sendable, Codable, Hashable {
 
     /** The excluded routes. */
-    public var excludedRoutes: [Route]
+    public let excludedRoutes: [Route]
     /** The included routes. */
-    public var includedRoutes: [Route]
+    public let includedRoutes: [Route]
     /** The subnets. */
-    public var subnets: [Subnet]
+    public let subnets: [Subnet]
 
     public init(excludedRoutes: [Route], includedRoutes: [Route], subnets: [Subnet]) {
         self.excludedRoutes = excludedRoutes

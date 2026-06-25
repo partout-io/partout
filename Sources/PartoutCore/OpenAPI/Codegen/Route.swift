@@ -6,12 +6,12 @@
 //
 
 /** Represents a route in the routing table. */
-public struct Route: Codable, Hashable, Sendable {
+public struct Route: Sendable, Codable, Hashable {
 
     /** The destination subnet or `nil` if default. */
-    public var destination: Subnet?
+    public let destination: Subnet?
     /** The address of the gateway (falls back to global gateway). */
-    public var gateway: Address?
+    public let gateway: Address?
 
     public init(destination: Subnet? = nil, gateway: Address? = nil) {
         self.destination = destination

@@ -5,13 +5,13 @@
 // https://openapi-generator.tech
 //
 
-public struct TaggedModuleHTTPProxy: Codable, Hashable, Sendable {
+public struct TaggedModuleHTTPProxy: Sendable, Codable, Hashable {
 
-    public enum ModelType: String, Codable, CaseIterable, Sendable {
+    public enum ModelType: String, Sendable, Codable, CaseIterable {
         case httpproxy = "HTTPProxy"
     }
-    public var type: ModelType
-    public var value: HTTPProxyModule
+    public let type: ModelType
+    public let value: HTTPProxyModule
 
     public init(type: ModelType, value: HTTPProxyModule) {
         self.type = type

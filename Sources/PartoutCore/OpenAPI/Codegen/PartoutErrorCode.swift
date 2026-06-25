@@ -5,7 +5,7 @@
 // https://openapi-generator.tech
 //
 
-public enum PartoutErrorCode: String, Codable, CaseIterable, Sendable {
+public enum PartoutErrorCode: String, Sendable, Codable, CaseIterable {
     /// Response is cached.
     case cached = "cached"
     /// Entity not found.

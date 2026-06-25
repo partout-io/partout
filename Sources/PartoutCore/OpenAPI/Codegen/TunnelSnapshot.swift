@@ -6,13 +6,13 @@
 //
 
 /** Returns a tunnel-specific snapshot of a ``Profile``. */
-public struct TunnelSnapshot: Codable, Hashable, Sendable {
+public struct TunnelSnapshot: Sendable, Codable, Hashable {
 
-    public var environment: TunnelSnapshotEnvironment?
-    public var id: UniqueID
-    public var isEnabled: Bool
-    public var onDemand: Bool
-    public var status: TunnelStatus
+    public let environment: TunnelSnapshotEnvironment?
+    public let id: UniqueID
+    public let isEnabled: Bool
+    public let onDemand: Bool
+    public let status: TunnelStatus
 
     public init(environment: TunnelSnapshotEnvironment? = nil, id: UniqueID, isEnabled: Bool, onDemand: Bool, status: TunnelStatus) {
         self.environment = environment

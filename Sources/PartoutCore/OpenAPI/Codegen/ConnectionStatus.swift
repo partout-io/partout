@@ -6,7 +6,7 @@
 //
 
 /** The status of a ``Connection``. */
-public enum ConnectionStatus: String, Codable, CaseIterable, Sendable {
+public enum ConnectionStatus: String, Sendable, Codable, CaseIterable {
     case disconnected = "disconnected"
     case connecting = "connecting"
     case connected = "connected"

@@ -5,12 +5,12 @@
 // https://openapi-generator.tech
 //
 
-public struct DNSModuleProtocolTypeCleartext: Codable, Hashable, Sendable {
+public struct DNSModuleProtocolTypeCleartext: Sendable, Codable, Hashable {
 
-    public enum ModelType: String, Codable, CaseIterable, Sendable {
+    public enum ModelType: String, Sendable, Codable, CaseIterable {
         case cleartext = "cleartext"
     }
-    public var type: ModelType
+    public let type: ModelType
 
     public init(type: ModelType) {
         self.type = type

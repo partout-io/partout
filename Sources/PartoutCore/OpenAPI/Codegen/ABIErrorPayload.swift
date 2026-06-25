@@ -5,10 +5,10 @@
 // https://openapi-generator.tech
 //
 
-public struct ABIErrorPayload: Codable, Hashable, Sendable {
+public struct ABIErrorPayload: Sendable, Codable, Hashable {
 
-    public var code: PartoutErrorCode
-    public var userInfo: JSON?
+    public let code: PartoutErrorCode
+    public let userInfo: JSON?
 
     public init(code: PartoutErrorCode, userInfo: JSON? = nil) {
         self.code = code

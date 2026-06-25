@@ -5,12 +5,12 @@
 // https://openapi-generator.tech
 //
 
-public struct OpenVPNObfuscationMethodXorptrpos: Codable, Hashable, Sendable {
+public struct OpenVPNObfuscationMethodXorptrpos: Sendable, Codable, Hashable {
 
-    public enum ModelType: String, Codable, CaseIterable, Sendable {
+    public enum ModelType: String, Sendable, Codable, CaseIterable {
         case xorptrpos = "xorptrpos"
     }
-    public var type: ModelType
+    public let type: ModelType
 
     public init(type: ModelType) {
         self.type = type

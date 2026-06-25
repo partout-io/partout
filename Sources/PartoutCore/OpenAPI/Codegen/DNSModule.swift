@@ -6,16 +6,16 @@
 //
 
 /** DNS settings. */
-public struct DNSModule: Codable, Hashable, Sendable {
+public struct DNSModule: Sendable, Codable, Hashable {
 
-    public var domainName: Address?
-    public var domainPolicy: DNSModuleDomainPolicy?
-    public var id: UniqueID
-    public var inheritsVPN: Bool?
-    public var protocolType: DNSModuleProtocolType
-    public var routesThroughVPN: Bool?
-    public var searchDomains: [Address]?
-    public var servers: [Address]
+    public let domainName: Address?
+    public let domainPolicy: DNSModuleDomainPolicy?
+    public let id: UniqueID
+    public let inheritsVPN: Bool?
+    public let protocolType: DNSModuleProtocolType
+    public let routesThroughVPN: Bool?
+    public let searchDomains: [Address]?
+    public let servers: [Address]
 
     public init(domainName: Address? = nil, domainPolicy: DNSModuleDomainPolicy? = nil, id: UniqueID, inheritsVPN: Bool? = nil, protocolType: DNSModuleProtocolType, routesThroughVPN: Bool? = nil, searchDomains: [Address]? = nil, servers: [Address]) {
         self.domainName = domainName

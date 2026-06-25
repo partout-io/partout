@@ -6,12 +6,12 @@
 //
 
 /** A connection module providing an OpenVPN connection. */
-public struct OpenVPNModule: Codable, Hashable, Sendable {
+public struct OpenVPNModule: Sendable, Codable, Hashable {
 
-    public var configuration: OpenVPNConfiguration?
-    public var credentials: OpenVPNCredentials?
-    public var id: UniqueID
-    public var requiresInteractiveCredentials: Bool?
+    public let configuration: OpenVPNConfiguration?
+    public let credentials: OpenVPNCredentials?
+    public let id: UniqueID
+    public let requiresInteractiveCredentials: Bool?
 
     public init(configuration: OpenVPNConfiguration? = nil, credentials: OpenVPNCredentials? = nil, id: UniqueID, requiresInteractiveCredentials: Bool? = nil) {
         self.configuration = configuration

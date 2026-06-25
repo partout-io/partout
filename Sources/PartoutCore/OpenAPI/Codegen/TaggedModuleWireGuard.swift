@@ -5,13 +5,13 @@
 // https://openapi-generator.tech
 //
 
-public struct TaggedModuleWireGuard: Codable, Hashable, Sendable {
+public struct TaggedModuleWireGuard: Sendable, Codable, Hashable {
 
-    public enum ModelType: String, Codable, CaseIterable, Sendable {
+    public enum ModelType: String, Sendable, Codable, CaseIterable {
         case wireGuard = "WireGuard"
     }
-    public var type: ModelType
-    public var value: WireGuardModule
+    public let type: ModelType
+    public let value: WireGuardModule
 
     public init(type: ModelType, value: WireGuardModule) {
         self.type = type

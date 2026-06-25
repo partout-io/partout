@@ -6,12 +6,12 @@
 //
 
 /** A pair of received/sent bytes count. */
-public struct DataCount: Codable, Hashable, Sendable {
+public struct DataCount: Sendable, Codable, Hashable {
 
     /** Received bytes count. */
-    public var received: ModelUInt64
+    public let received: ModelUInt64
     /** Sent bytes count. */
-    public var sent: ModelUInt64
+    public let sent: ModelUInt64
 
     public init(received: ModelUInt64, sent: ModelUInt64) {
         self.received = received

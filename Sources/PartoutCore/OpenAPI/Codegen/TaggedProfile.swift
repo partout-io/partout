@@ -6,15 +6,14 @@
 //
 
 /** A codable wrapper for a profile with all known modules. */
-public struct TaggedProfile: Codable, Hashable, Sendable {
-
-    public var activeModulesIds: Set<UniqueID>
-    public var behavior: ProfileBehavior?
-    public var id: UniqueID
-    public var modules: [TaggedModule]
-    public var name: String
-    public var userInfo: JSON?
-    public var version: Int?
+public struct TaggedProfile: Sendable, Codable, Hashable {
+    public let activeModulesIds: Set<UniqueID>
+    public let behavior: ProfileBehavior?
+    public let id: UniqueID
+    public let modules: [TaggedModule]
+    public let name: String
+    public let userInfo: JSON?
+    public let version: Int?
 
     public init(activeModulesIds: Set<UniqueID>, behavior: ProfileBehavior? = nil, id: UniqueID, modules: [TaggedModule], name: String, userInfo: JSON? = nil, version: Int? = nil) {
         self.activeModulesIds = activeModulesIds
