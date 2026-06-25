@@ -22,26 +22,30 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * The parameters of the local interface.
  *
- * @param addresses 
- * @param privateKey 
- * @param dns 
- * @param mtu 
+ * @param privateKey The local private key.
+ * @param addresses The local addresses.
+ * @param dns The optional DNS settings.
+ * @param mtu The optional MTU.
  */
 @Serializable
 
 data class WireGuardLocalInterface (
 
-    @SerialName(value = "addresses")
-    val addresses: kotlin.collections.List<kotlin.String>,
-
+    /* The local private key. */
     @SerialName(value = "privateKey")
     val privateKey: kotlin.String,
 
+    /* The local addresses. */
+    @SerialName(value = "addresses")
+    val addresses: kotlin.collections.List<kotlin.String>,
+
+    /* The optional DNS settings. */
     @SerialName(value = "dns")
     val dns: DNSModule? = null,
 
+    /* The optional MTU. */
     @SerialName(value = "mtu")
     val mtu: kotlin.Int? = null
 

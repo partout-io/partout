@@ -21,7 +21,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * Common options to give to ``TunnelController``.
  *
  * @param dnsFallbackServers 
  * @param logsSnapshots 

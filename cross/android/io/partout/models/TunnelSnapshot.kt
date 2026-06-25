@@ -23,12 +23,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * Returns a tunnel-specific snapshot of a ``Profile``.
  *
  * @param id 
  * @param isEnabled 
- * @param onDemand 
  * @param status 
+ * @param onDemand 
  * @param environment 
  */
 @Serializable
@@ -41,11 +41,11 @@ data class TunnelSnapshot (
     @SerialName(value = "isEnabled")
     val isEnabled: kotlin.Boolean,
 
-    @SerialName(value = "onDemand")
-    val onDemand: kotlin.Boolean,
-
     @Contextual @SerialName(value = "status")
     val status: TunnelStatus,
+
+    @SerialName(value = "onDemand")
+    val onDemand: kotlin.Boolean,
 
     @SerialName(value = "environment")
     val environment: TunnelSnapshotEnvironment? = null

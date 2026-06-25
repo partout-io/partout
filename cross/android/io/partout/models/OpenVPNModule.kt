@@ -23,7 +23,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * A connection module providing an OpenVPN connection.
  *
  * @param id 
  * @param configuration 

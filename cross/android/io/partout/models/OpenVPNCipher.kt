@@ -21,7 +21,7 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * 
+ * Encryption algorithm.
  *
  * Values: aes128cbc,aes192cbc,aes256cbc,aes128gcm,aes192gcm,aes256gcm
  */

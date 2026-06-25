@@ -21,7 +21,7 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * 
+ * The status of a ``Connection``.
  *
  * Values: disconnected,connecting,connected,disconnecting
  */

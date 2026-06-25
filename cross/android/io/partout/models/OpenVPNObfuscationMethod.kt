@@ -23,7 +23,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonClassDiscriminator
 
 /**
- * 
+ * The obfuscation method.
  *
  */
 @Serializable

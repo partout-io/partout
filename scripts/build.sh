@@ -16,6 +16,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -gen)
+            do_build=1
             gen_build=1
             shift
             ;;
@@ -37,6 +38,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -a)
+            do_build=1
             cmake_opts+=("-DPP_BUILD_LIBRARY=ON")
             cmake_opts+=("-DPP_BUILD_USE_OPENSSL=ON")
             cmake_opts+=("-DPP_BUILD_USE_OPENVPN=ON")
@@ -69,6 +71,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -l)
+            do_build=1
             cmake_opts+=("-DPP_BUILD_LIBRARY=ON")
             shift
             ;;
@@ -79,7 +82,7 @@ while [[ $# -gt 0 ]]; do
             export SWIFT_ANDROID_API_LEVEL=28
             export SWIFT_ANDROID_VERSION=6.3.1
             build_dir=.cmake-android
-            cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=toolchains/android.toolchain.cmake")
+            cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=cmake/android.toolchain.cmake")
             shift
             ;;
         -*|--*)
@@ -94,6 +97,25 @@ while [[ $# -gt 0 ]]; do
 done
 set -- "${positional_args[@]}"
 
+# Generate models
+openapi=scripts/openapi.yaml
+if [[ $gen_models == 1 ]]; then
+    # Swift
+    scripts/gen-models.sh $openapi swift Sources/PartoutCore/OpenAPI/Codegen PartoutCore
+
+    # Kotlin
+    package=io.partout.models
+    models=cross
+    tmpmodels=cross-models
+    scripts/gen-models.sh $openapi kotlin $tmpmodels $package
+    rm -rf $models/android/io/partout/models
+    mv $tmpmodels/src/main/kotlin/io/partout/models $models/android/io/partout
+    rm -rf $tmpmodels
+
+    # C++ (TODO)
+    ######
+fi
+
 # Generate CMake files
 if [[ ! -d $build_dir ]]; then
     mkdir $build_dir
@@ -107,24 +129,11 @@ if [[ $gen_build == 1 ]]; then
 fi
 
 # Execute
-cmake --build $build_dir
-if [[ -n $install_dir ]]; then
-    cmake --install $build_dir
-fi
-
-# Generate foreign models
-if [[ $gen_models == 1 ]]; then
-    openapi=scripts/openapi.yaml
-    package=io.partout.models
-    models=cross
-    tmpmodels=cross-models
-    # Kotlin
-    scripts/gen-models.sh $openapi kotlin $tmpmodels $package
-    rm -rf $models/android/io/partout/models
-    mv $tmpmodels/src/main/kotlin/io/partout/models $models/android/io/partout
-    # C++ (TODO)
-    ######
-    rm -rf cross-models
+if [[ $do_build == 1 ]]; then
+    cmake --build $build_dir
+    if [[ -n $install_dir ]]; then
+        cmake --install $build_dir
+    fi
 fi
 
 popd

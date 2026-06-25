@@ -29,7 +29,7 @@ import kotlinx.serialization.encoding.Encoder
 
 
 /**
- * 
+ * Defines the type of compression algorithm.
  *
  * Values: disabled,LZO,other
  */

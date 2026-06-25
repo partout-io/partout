@@ -18,8 +18,7 @@ struct ProfileDiffTests {
             .changedName
         ])
 
-        var behavior = ProfileBehavior()
-        behavior.disconnectsOnSleep = true
+        let behavior = ProfileBehavior(disconnectsOnSleep: true, includesAllNetworks: false)
         sut.behavior = behavior
         #expect(try sut.build().differences(from: original) == [
             .changedName,

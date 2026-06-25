@@ -21,7 +21,7 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * 
+ * The wrapping strategy.
  *
  * Values: auth,crypt,cryptV2
  */

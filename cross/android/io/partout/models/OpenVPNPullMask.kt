@@ -21,7 +21,7 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * 
+ * Settings that can be pulled from server.
  *
  * Values: routes,dns,proxy
  */
