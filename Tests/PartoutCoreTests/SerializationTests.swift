@@ -62,6 +62,282 @@ struct SerializationTests {
         #expect(decodedOptions.minDataCountDelta == options.minDataCountDelta)
     }
 
+    // MARK: - Custom codable
+
+    @Test
+    func givenSingleValueCodableEntities_whenEncodeDecode_thenRawStringPayloadsAreStable() throws {
+        try assertSingleStringRoundTrip(Address.ip("203.0.113.5", .v4), "203.0.113.5")
+        try assertSingleStringRoundTrip(Address.ip("2001:db8::5", .v6), "2001:db8::5")
+        try assertSingleStringRoundTrip(Address.hostname("vpn.example.com"), "vpn.example.com")
+        try assertSingleStringRoundTrip(try Subnet("10.10.0.8", 24), "10.10.0.8/24")
+        try assertSingleStringRoundTrip(try Subnet("2001:db8:1::8", 64), "2001:db8:1::8/64")
+        try assertSingleStringRoundTrip(try Endpoint("198.51.100.10", 443), "198.51.100.10:443")
+        try assertSingleStringRoundTrip(try Endpoint("2001:db8::10", 443), "2001:db8::10:443")
+        try assertSingleStringRoundTrip(EndpointProtocol(.tcp6, 8443), "TCP6:8443")
+        try assertSingleStringRoundTrip(try ExtendedEndpoint("vpn.example.com", EndpointProtocol(.udp4, 1194)), "vpn.example.com:UDP4:1194")
+        try assertSingleStringRoundTrip(try ExtendedEndpoint("2001:db8::20", EndpointProtocol(.tcp6, 443)), "2001:db8::20:TCP6:443")
+        try assertSingleStringRoundTrip(try requireWireGuardKey(Keys.privateKey), Keys.privateKey)
+        try assertSingleStringRoundTrip(SecureData(Data([0xde, 0xad, 0xbe, 0xef])), "3q2+7w==")
+
+        let pem = pem(named: "CERTIFICATE", body: "certificate-body")
+        let crypto = OpenVPN.CryptoContainer(pem: "ignored preamble\n\(pem)")
+        try assertSingleStringRoundTrip(crypto, pem)
+        #expect(crypto.pem == pem)
+
+        let moduleId = UniqueID(uuidString: IDs.dns.uuidString)!
+        let moduleIdData = try encoder().encode(moduleId)
+        #expect(try JSONDecoder.shared().decode(String.self, from: moduleIdData) == IDs.dns.uuidString)
+        #expect(try JSONDecoder.shared().decode(UniqueID.self, from: moduleIdData) == IDs.dns)
+    }
+
+    @Test
+    func givenSingleValueCodableEntities_whenDecodeMalformedPayloads_thenFailOrNormalizeAsExpected() {
+        #expect(throws: Error.self) {
+            try decodeSingleString(Address.self, from: PartoutLogger.redactedValue)
+        }
+        #expect(throws: Error.self) {
+            try decodeSingleString(Subnet.self, from: "vpn.example.com/24")
+        }
+        #expect(throws: Error.self) {
+            try decodeSingleString(Endpoint.self, from: "198.51.100.10:not-a-port")
+        }
+        #expect(throws: Error.self) {
+            try decodeSingleString(EndpointProtocol.self, from: "SCTP:1194")
+        }
+        #expect(throws: Error.self) {
+            try decodeSingleString(ExtendedEndpoint.self, from: "vpn.example.com:ICMP:0")
+        }
+        #expect(throws: Error.self) {
+            try decodeSingleString(WireGuard.Key.self, from: "not base64")
+        }
+        #expect(throws: Error.self) {
+            try decodeSingleString(SecureData.self, from: PartoutLogger.redactedValue)
+        }
+
+        let malformedCrypto = try? decodeSingleString(OpenVPN.CryptoContainer.self, from: "not a pem")
+        #expect(malformedCrypto?.pem == "")
+    }
+
+    @Test
+    func givenSensitiveSingleValueCodableEntities_whenEncodeRedacting_thenRawValuesAreRedacted() throws {
+        try assertRedactedString(Address.ip("203.0.113.5", .v4), PartoutLogger.redactedValue)
+        try assertRedactedString(try Subnet("10.10.0.8", 24), "\(PartoutLogger.redactedValue)/24")
+        try assertRedactedString(try Endpoint("198.51.100.10", 443), "\(PartoutLogger.redactedValue):443")
+        try assertRedactedString(try ExtendedEndpoint("vpn.example.com", EndpointProtocol(.udp4, 1194)), "\(PartoutLogger.redactedValue):UDP4:1194")
+        try assertRedactedString(try requireWireGuardKey(Keys.privateKey), PartoutLogger.redactedValue)
+        try assertRedactedString(SecureData(Data([0xde, 0xad, 0xbe, 0xef])), PartoutLogger.redactedValue)
+        try assertRedactedString(OpenVPN.CryptoContainer(pem: pem(named: "PRIVATE KEY", body: "private-key-body")), PartoutLogger.redactedValue)
+    }
+
+    @Test
+    func givenDNSProtocolType_whenEncodeDecode_thenTaggedLegacySensitiveAndMalformedPathsAreCovered() throws {
+        let httpsURL = try #require(URL(string: "https://dns.example.com/query"))
+        let values: [DNSModule.ProtocolType] = [
+            .cleartext,
+            .https(url: httpsURL),
+            .tls(hostname: "dns.example.com")
+        ]
+
+        for value in values {
+            try assertRoundTrip(value)
+        }
+
+        let cleartextJSON = try jsonObject(from: encoder().encode(DNSModule.ProtocolType.cleartext))
+        #expect(cleartextJSON["type"] as? String == "cleartext")
+        #expect(cleartextJSON["url"] == nil)
+        #expect(cleartextJSON["hostname"] == nil)
+
+        let httpsJSON = try jsonObject(from: encoder().encode(DNSModule.ProtocolType.https(url: httpsURL)))
+        #expect(httpsJSON["type"] as? String == "https")
+        #expect(httpsJSON["url"] as? String == "https://dns.example.com/query")
+
+        let tlsJSON = try jsonObject(from: encoder().encode(DNSModule.ProtocolType.tls(hostname: "dns.example.com")))
+        #expect(tlsJSON["type"] as? String == "tls")
+        #expect(tlsJSON["hostname"] as? String == "dns.example.com")
+
+        let legacyHTTPSJSON = try jsonObject(from: encoder(legacySwiftEncoding: true).encode(DNSModule.ProtocolType.https(url: httpsURL)))
+        #expect(try requireObject(legacyHTTPSJSON["https"])["url"] as? String == "https://dns.example.com/query")
+        let legacyTLSJSON = try jsonObject(from: encoder(legacySwiftEncoding: true).encode(DNSModule.ProtocolType.tls(hostname: "dns.example.com")))
+        #expect(try requireObject(legacyTLSJSON["tls"])["hostname"] as? String == "dns.example.com")
+
+        let redactedHTTPSJSON = try jsonObject(from: encoder(redactingSensitiveData: true).encode(DNSModule.ProtocolType.https(url: httpsURL)))
+        #expect(redactedHTTPSJSON["url"] as? String == PartoutLogger.redactedValue)
+        let redactedTLSJSON = try jsonObject(from: encoder(redactingSensitiveData: true).encode(DNSModule.ProtocolType.tls(hostname: "dns.example.com")))
+        #expect(redactedTLSJSON["hostname"] as? String == PartoutLogger.redactedValue)
+
+        #expect(try decode(DNSModule.ProtocolType.self, from: #"{"cleartext":{}}"#) == .cleartext)
+        #expect(try decode(DNSModule.ProtocolType.self, from: #"{"https":{"url":"https://dns.example.com/query"}}"#) == .https(url: httpsURL))
+        #expect(try decode(DNSModule.ProtocolType.self, from: #"{"tls":{"hostname":"dns.example.com"}}"#) == .tls(hostname: "dns.example.com"))
+
+        #expect(throws: Error.self) {
+            try decode(DNSModule.ProtocolType.self, from: #"{"type":"https","hostname":"dns.example.com"}"#)
+        }
+        #expect(throws: Error.self) {
+            try decode(DNSModule.ProtocolType.self, from: #"{"https":{"hostname":"dns.example.com"}}"#)
+        }
+        #expect(throws: Error.self) {
+            try decode(DNSModule.ProtocolType.self, from: #"{"type":"bogus"}"#)
+        }
+    }
+
+    @Test
+    func givenOpenVPNObfuscationMethod_whenEncodeDecode_thenTaggedLegacySensitiveAndMalformedPathsAreCovered() throws {
+        let xormask = OpenVPN.ObfuscationMethod.xormask(mask: SecureData(Data([1, 2, 3])))
+        let xorptrpos = OpenVPN.ObfuscationMethod.xorptrpos
+        let reverse = OpenVPN.ObfuscationMethod.reverse
+        let obfuscate = OpenVPN.ObfuscationMethod.obfuscate(mask: SecureData(Data([4, 5, 6])))
+
+        try assertRoundTrip(xormask)
+        try assertRoundTrip(xorptrpos)
+        try assertRoundTrip(reverse)
+        try assertRoundTrip(obfuscate)
+
+        let taggedXORMaskJSON = try jsonObject(from: encoder().encode(xormask))
+        #expect(taggedXORMaskJSON["type"] as? String == "xormask")
+        #expect(taggedXORMaskJSON["mask"] as? String == "AQID")
+        let taggedXORPtrPosJSON = try jsonObject(from: encoder().encode(xorptrpos))
+        #expect(taggedXORPtrPosJSON["type"] as? String == "xorptrpos")
+        #expect(taggedXORPtrPosJSON["mask"] == nil)
+        let taggedReverseJSON = try jsonObject(from: encoder().encode(reverse))
+        #expect(taggedReverseJSON["type"] as? String == "reverse")
+        #expect(taggedReverseJSON["mask"] == nil)
+        let taggedObfuscateJSON = try jsonObject(from: encoder().encode(obfuscate))
+        #expect(taggedObfuscateJSON["type"] as? String == "obfuscate")
+        #expect(taggedObfuscateJSON["mask"] as? String == "BAUG")
+
+        let legacyXORMaskJSON = try jsonObject(from: encoder(legacySwiftEncoding: true).encode(xormask))
+        #expect(try requireObject(legacyXORMaskJSON["xormask"])["mask"] as? String == "AQID")
+        let legacyXORPtrPosJSON = try jsonObject(from: encoder(legacySwiftEncoding: true).encode(xorptrpos))
+        #expect((legacyXORPtrPosJSON["xorptrpos"] as? [String: Any])?.isEmpty == true)
+        let legacyReverseJSON = try jsonObject(from: encoder(legacySwiftEncoding: true).encode(reverse))
+        #expect((legacyReverseJSON["reverse"] as? [String: Any])?.isEmpty == true)
+        let legacyObfuscateJSON = try jsonObject(from: encoder(legacySwiftEncoding: true).encode(obfuscate))
+        #expect(try requireObject(legacyObfuscateJSON["obfuscate"])["mask"] as? String == "BAUG")
+
+        let redactedXORMaskJSON = try jsonObject(from: encoder(redactingSensitiveData: true).encode(xormask))
+        #expect(redactedXORMaskJSON["mask"] as? String == PartoutLogger.redactedValue)
+
+        #expect(try decode(OpenVPN.ObfuscationMethod.self, from: #"{"xormask":{"mask":"AQID"}}"#) == xormask)
+        #expect(try decode(OpenVPN.ObfuscationMethod.self, from: #"{"xorptrpos":{}}"#) == xorptrpos)
+        #expect(try decode(OpenVPN.ObfuscationMethod.self, from: #"{"reverse":{}}"#) == reverse)
+        #expect(try decode(OpenVPN.ObfuscationMethod.self, from: #"{"obfuscate":{"mask":"BAUG"}}"#) == obfuscate)
+
+        #expect(throws: Error.self) {
+            try decode(OpenVPN.ObfuscationMethod.self, from: #"{"type":"xormask"}"#)
+        }
+        #expect(throws: Error.self) {
+            try decode(OpenVPN.ObfuscationMethod.self, from: #"{"xormask":{}}"#)
+        }
+        #expect(throws: Error.self) {
+            try decode(OpenVPN.ObfuscationMethod.self, from: #"{"type":"obfuscate"}"#)
+        }
+        #expect(throws: Error.self) {
+            try decode(OpenVPN.ObfuscationMethod.self, from: #"{"obfuscate":{}}"#)
+        }
+        #expect(throws: Error.self) {
+            try decode(OpenVPN.ObfuscationMethod.self, from: #"{"type":"bogus"}"#)
+        }
+    }
+
+    @Test
+    func givenOpenVPNCredentials_whenEncodeDecode_thenSensitiveOptionalAndLegacyOTPPathsAreCovered() throws {
+        let credentials = OpenVPN.Credentials.Builder(
+            username: "user",
+            password: "password",
+            otpMethod: .append,
+            otp: "123456"
+        ).build()
+        try assertRoundTrip(credentials)
+
+        let encodedJSON = try jsonObject(from: encoder().encode(credentials))
+        #expect(encodedJSON["username"] as? String == "user")
+        #expect(encodedJSON["password"] as? String == "password")
+        #expect(encodedJSON["otpMethod"] as? String == "append")
+        #expect(encodedJSON["otp"] as? String == "123456")
+
+        let redactedJSON = try jsonObject(from: encoder(redactingSensitiveData: true).encode(credentials))
+        #expect(redactedJSON["username"] as? String == PartoutLogger.redactedValue)
+        #expect(redactedJSON["password"] as? String == PartoutLogger.redactedValue)
+        #expect(redactedJSON["otpMethod"] as? String == "append")
+        #expect(redactedJSON["otp"] as? String == PartoutLogger.redactedValue)
+
+        let missingOTP = try decode(OpenVPN.Credentials.self, from: #"{"username":"user","password":"password","otpMethod":"none"}"#)
+        #expect(missingOTP == OpenVPN.Credentials.Builder(username: "user", password: "password").build())
+
+        #expect(try decode(OpenVPN.Credentials.OTPMethod.self, from: #""none""#) == .none)
+        #expect(try decode(OpenVPN.Credentials.OTPMethod.self, from: #""append""#) == .append)
+        #expect(try decode(OpenVPN.Credentials.OTPMethod.self, from: #""encode""#) == .encode)
+        #expect(try decode(OpenVPN.Credentials.OTPMethod.self, from: #"{"none":{}}"#) == .none)
+        #expect(try decode(OpenVPN.Credentials.OTPMethod.self, from: #"{"append":{}}"#) == .append)
+        #expect(try decode(OpenVPN.Credentials.OTPMethod.self, from: #"{"encode":{}}"#) == .encode)
+
+        #expect(throws: Error.self) {
+            try decode(OpenVPN.Credentials.OTPMethod.self, from: #""bogus""#)
+        }
+        #expect(throws: Error.self) {
+            try decode(OpenVPN.Credentials.OTPMethod.self, from: #"{}"#)
+        }
+    }
+
+    @Test
+    func givenOpenVPNTLSWrap_whenEncodeDecode_thenAllStrategiesAndNestedSecureDataAreCovered() throws {
+        let auth = OpenVPN.TLSWrap(
+            strategy: .auth,
+            key: makeStaticKey(direction: .client)
+        )
+        let crypt = OpenVPN.TLSWrap(
+            strategy: .crypt,
+            key: makeStaticKey(direction: nil)
+        )
+        let cryptV2 = OpenVPN.TLSWrap(
+            strategy: .cryptV2,
+            key: makeStaticKey(direction: .client),
+            wrappedKey: SecureData(Data([0x10, 0x20, 0x30, 0x40]))
+        )
+
+        try assertRoundTrip(auth)
+        try assertRoundTrip(crypt)
+        try assertRoundTrip(cryptV2)
+
+        let authJSON = try jsonObject(from: encoder().encode(auth))
+        #expect(authJSON["strategy"] as? String == "auth")
+        #expect(try requireObject(authJSON["key"])["dir"] as? Int == 1)
+        #expect(authJSON["wrappedKey"] == nil)
+
+        let cryptJSON = try jsonObject(from: encoder().encode(crypt))
+        #expect(cryptJSON["strategy"] as? String == "crypt")
+        #expect(try requireObject(cryptJSON["key"])["dir"] == nil)
+        #expect(cryptJSON["wrappedKey"] == nil)
+
+        let cryptV2JSON = try jsonObject(from: encoder().encode(cryptV2))
+        #expect(cryptV2JSON["strategy"] as? String == "crypt-v2")
+        #expect(try requireObject(cryptV2JSON["key"])["data"] as? String == makeStaticKeyData().base64EncodedString())
+        #expect(cryptV2JSON["wrappedKey"] as? String == "ECAwQA==")
+
+        let redactedCryptV2JSON = try jsonObject(from: encoder(redactingSensitiveData: true).encode(cryptV2))
+        #expect(try requireObject(redactedCryptV2JSON["key"])["data"] as? String == PartoutLogger.redactedValue)
+        #expect(redactedCryptV2JSON["wrappedKey"] as? String == PartoutLogger.redactedValue)
+    }
+
+    @Test
+    func givenIPSettingsAndModuleType_whenDecodeCustomPayloads_thenFallbackPathsAreCovered() throws {
+        let emptyIPSettings = try decode(IPSettings.self, from: #"{}"#)
+        #expect(emptyIPSettings == IPSettings(subnets: [], includedRoutes: [], excludedRoutes: []))
+
+        let partialIPSettings = try decode(IPSettings.self, from: #"{"subnets":["10.10.0.2/24"]}"#)
+        #expect(partialIPSettings == IPSettings(
+            subnets: [try Subnet("10.10.0.2", 24)],
+            includedRoutes: [],
+            excludedRoutes: []
+        ))
+
+        let moduleTypeData = try encoder().encode(ModuleType.WireGuard)
+        #expect(try JSONDecoder.shared().decode(String.self, from: moduleTypeData) == "WireGuard")
+        #expect(try JSONDecoder.shared().decode(ModuleType.self, from: moduleTypeData) == .WireGuard)
+        #expect(try decode(ModuleType.self, from: #"{"name":"OpenVPN"}"#) == .OpenVPN)
+        #expect(try decode(ModuleType.self, from: #""DoesNotExist""#) == .Undefined)
+    }
+
     @Test
     func givenTaggedModules_whenRoundTrip_thenEveryCaseAndPayloadIsRestored() throws {
         let modules = try makeTaggedModules()
@@ -255,7 +531,7 @@ struct SerializationTests {
     @Test
     func givenTunnelRemoteInfo_whenEncodeAsJSON_thenWrapperPreservesProfileOptionsAndModules() throws {
         let profile = try makeProfile()
-        var options = TunnelControllerOptions(
+        let options = TunnelControllerOptions(
             dnsFallbackServers: ["8.8.8.8", "2001:4860:4860::8888"],
             logsSnapshots: true,
             minDataCountDelta: 512
@@ -572,22 +848,61 @@ private func assertRoundTrip<T>(_ value: T) throws where T: Codable & Equatable 
     #expect(decoded == value)
 }
 
+private func assertSingleStringRoundTrip<T>(_ value: T, _ rawValue: String) throws where T: Codable & Equatable {
+    let data = try encoder().encode(value)
+    #expect(try JSONDecoder.shared().decode(String.self, from: data) == rawValue)
+    #expect(try JSONDecoder.shared().decode(T.self, from: try encoder().encode(rawValue)) == value)
+}
+
+private func assertRedactedString<T>(_ value: T, _ redactedValue: String) throws where T: Encodable {
+    let data = try encoder(redactingSensitiveData: true).encode(value)
+    #expect(try JSONDecoder.shared().decode(String.self, from: data) == redactedValue)
+}
+
 private func decodeEncoded<T, U>(_ value: T, as type: U.Type) throws -> U where T: Encodable, U: Decodable {
     let data = try encoder().encode(value)
     return try JSONDecoder.shared().decode(type, from: data)
 }
 
-private func encoder(redactingSensitiveData: Bool = false) -> JSONEncoder {
+private func decode<T>(_ type: T.Type, from json: String) throws -> T where T: Decodable {
+    try JSONDecoder.shared().decode(T.self, from: Data(json.utf8))
+}
+
+private func decodeSingleString<T>(_ type: T.Type, from rawValue: String) throws -> T where T: Decodable {
+    try JSONDecoder.shared().decode(T.self, from: try encoder().encode(rawValue))
+}
+
+private func encoder(
+    legacySwiftEncoding: Bool = false,
+    redactingSensitiveData: Bool = false
+) -> JSONEncoder {
     let encoder = JSONEncoder.shared()
     encoder.outputFormatting = [.sortedKeys]
-    if redactingSensitiveData {
-        encoder.userInfo = [.redactingSensitiveData: true]
+    var userInfo: [CodingUserInfoKey: Any] = [:]
+    if legacySwiftEncoding {
+        userInfo[.legacySwiftEncoding] = true
     }
+    if redactingSensitiveData {
+        userInfo[.redactingSensitiveData] = true
+    }
+    encoder.userInfo = userInfo
     return encoder
 }
 
 private func requireAddress(_ rawValue: String) throws -> Address {
     try #require(Address(rawValue: rawValue))
+}
+
+private func requireWireGuardKey(_ rawValue: String) throws -> WireGuard.Key {
+    try #require(WireGuard.Key(rawValue: rawValue))
+}
+
+private func makeStaticKeyData() -> Data {
+    Data((0..<256).map { UInt8($0) })
+}
+
+private func makeStaticKey(direction: OpenVPN.StaticKey.Direction?) -> OpenVPN.StaticKey {
+    OpenVPN.StaticKey(data: makeStaticKeyData(), direction: direction)
 }
 
 private func jsonArray(from data: Data) throws -> [[String: Any]] {
