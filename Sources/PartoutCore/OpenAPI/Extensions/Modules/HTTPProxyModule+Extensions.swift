@@ -81,11 +81,11 @@ extension HTTPProxyModule {
                 return addr
             }
             return HTTPProxyModule(
-                bypassDomains: validBypassDomains,
                 id: id,
-                pacURL: pacURL,
                 proxy: proxy,
-                secureProxy: secureProxy
+                secureProxy: secureProxy,
+                pacURL: pacURL,
+                bypassDomains: validBypassDomains
             )
         }
     }

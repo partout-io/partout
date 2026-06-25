@@ -13,10 +13,10 @@ extension OpenVPN.Credentials {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
-            otp: try container.decodeIfPresent(String.self, forKey: .otp),
-            otpMethod: try container.decode(OTPMethod.self, forKey: .otpMethod),
+            username: try container.decode(String.self, forKey: .username),
             password: try container.decode(String.self, forKey: .password),
-            username: try container.decode(String.self, forKey: .username)
+            otpMethod: try container.decode(OTPMethod.self, forKey: .otpMethod),
+            otp: try container.decodeIfPresent(String.self, forKey: .otp)
         )
     }
 
@@ -63,15 +63,15 @@ extension OpenVPN.Credentials {
         }
 
         public func build() -> OpenVPN.Credentials {
-            OpenVPN.Credentials(otp: otp, otpMethod: otpMethod, password: password, username: username)
+            OpenVPN.Credentials(username: username, password: password, otpMethod: otpMethod, otp: otp)
         }
 
         public func buildForAuthentication() throws -> OpenVPN.Credentials {
             OpenVPN.Credentials(
-                otp: nil,
-                otpMethod: .none,
+                username: username,
                 password: try otpMethod.encoded(with: password, otp: otp),
-                username: username
+                otpMethod: .none,
+                otp: nil
             )
         }
     }

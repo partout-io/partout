@@ -24,25 +24,25 @@ import kotlinx.serialization.Contextual
 /**
  * IP settings and routes.
  *
- * @param excludedRoutes The excluded routes.
- * @param includedRoutes The included routes.
  * @param subnets The subnets.
+ * @param includedRoutes The included routes.
+ * @param excludedRoutes The excluded routes.
  */
 @Serializable
 
 data class IPSettings (
 
-    /* The excluded routes. */
-    @SerialName(value = "excludedRoutes")
-    val excludedRoutes: kotlin.collections.List<Route>,
+    /* The subnets. */
+    @SerialName(value = "subnets")
+    val subnets: kotlin.collections.List<kotlin.String>,
 
     /* The included routes. */
     @SerialName(value = "includedRoutes")
     val includedRoutes: kotlin.collections.List<Route>,
 
-    /* The subnets. */
-    @SerialName(value = "subnets")
-    val subnets: kotlin.collections.List<kotlin.String>
+    /* The excluded routes. */
+    @SerialName(value = "excludedRoutes")
+    val excludedRoutes: kotlin.collections.List<Route>
 
 ) {
 

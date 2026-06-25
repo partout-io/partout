@@ -7,22 +7,22 @@
 
 /** A codable wrapper for a profile with all known modules. */
 public struct TaggedProfile: Sendable, Codable, Hashable {
+    public let version: Int?
+    public let id: UniqueID
+    public let name: String
+    public let modules: [TaggedModule]
     public let activeModulesIds: Set<UniqueID>
     public let behavior: ProfileBehavior?
-    public let id: UniqueID
-    public let modules: [TaggedModule]
-    public let name: String
     public let userInfo: JSON?
-    public let version: Int?
 
-    public init(activeModulesIds: Set<UniqueID>, behavior: ProfileBehavior? = nil, id: UniqueID, modules: [TaggedModule], name: String, userInfo: JSON? = nil, version: Int? = nil) {
+    public init(version: Int? = nil, id: UniqueID, name: String, modules: [TaggedModule], activeModulesIds: Set<UniqueID>, behavior: ProfileBehavior? = nil, userInfo: JSON? = nil) {
+        self.version = version
+        self.id = id
+        self.name = name
+        self.modules = modules
         self.activeModulesIds = activeModulesIds
         self.behavior = behavior
-        self.id = id
-        self.modules = modules
-        self.name = name
         self.userInfo = userInfo
-        self.version = version
     }
 }
 

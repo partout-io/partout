@@ -36,10 +36,10 @@ extension WireGuard.LocalInterface {
                 return addr
             }
             return WireGuard.LocalInterface(
+                privateKey: validPrivateKey,
                 addresses: validAddresses,
                 dns: try dns?.build(),
-                mtu: mtu,
-                privateKey: validPrivateKey
+                mtu: mtu
             )
         }
     }

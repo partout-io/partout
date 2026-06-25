@@ -7,20 +7,20 @@
 
 public struct TunnelRemoteInfoWrapper: Sendable, Codable, Hashable {
 
-    public let address: Address?
-    public let modules: [TaggedModule]?
+    public let profile: TaggedProfile
     public let options: TunnelControllerOptions
     public let originalModuleId: UniqueID
-    public let profile: TaggedProfile
+    public let address: Address?
     public let requiresVirtualDevice: Bool
+    public let modules: [TaggedModule]?
 
-    public init(address: Address? = nil, modules: [TaggedModule]? = nil, options: TunnelControllerOptions, originalModuleId: UniqueID, profile: TaggedProfile, requiresVirtualDevice: Bool) {
-        self.address = address
-        self.modules = modules
+    public init(profile: TaggedProfile, options: TunnelControllerOptions, originalModuleId: UniqueID, address: Address? = nil, requiresVirtualDevice: Bool, modules: [TaggedModule]? = nil) {
+        self.profile = profile
         self.options = options
         self.originalModuleId = originalModuleId
-        self.profile = profile
+        self.address = address
         self.requiresVirtualDevice = requiresVirtualDevice
+        self.modules = modules
     }
 }
 

@@ -62,7 +62,7 @@ case $language in
             --schema-mappings WireGuard.Key=WireGuardKey \
             --type-mappings JSONValue=JSON,AnyCodable=JSON,URI=URL \
             --import-mappings JSONValue=JSON \
-            --additional-properties=enumPropertyNaming=original
+            --additional-properties=enumPropertyNaming=original,sortModelPropertiesByRequiredFlag=false,sortParamsByRequiredFlag=false
 
         generated_models_dir="$(find "$tmp_dir/Sources" -type d -name Models -print -quit)"
         if [[ -z "$generated_models_dir" ]]; then

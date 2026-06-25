@@ -9,14 +9,14 @@
 public struct OnDemandModule: Sendable, Codable, Hashable {
     public let id: UniqueID
     public let policy: OnDemandModulePolicy
-    public let withOtherNetworks: Set<OnDemandModuleOtherNetwork>
     public let withSSIDs: [String: Bool]
+    public let withOtherNetworks: Set<OnDemandModuleOtherNetwork>
 
-    public init(id: UniqueID, policy: OnDemandModulePolicy, withOtherNetworks: Set<OnDemandModuleOtherNetwork>, withSSIDs: [String: Bool]) {
+    public init(id: UniqueID, policy: OnDemandModulePolicy, withSSIDs: [String: Bool], withOtherNetworks: Set<OnDemandModuleOtherNetwork>) {
         self.id = id
         self.policy = policy
-        self.withOtherNetworks = withOtherNetworks
         self.withSSIDs = withSSIDs
+        self.withOtherNetworks = withOtherNetworks
     }
 }
 

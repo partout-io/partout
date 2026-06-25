@@ -8,16 +8,16 @@
 /** Holds parameters for TLS wrapping. */
 public struct OpenVPNTLSWrap: Sendable, Codable, Hashable {
 
-    /** The static encryption key. */
-    public let key: OpenVPNStaticKey
     /** The wrapping strategy. */
     public let strategy: OpenVPNTLSWrapStrategy
+    /** The static encryption key. */
+    public let key: OpenVPNStaticKey
     /** The wrapped client key appended to initial tls-crypt-v2 packets. */
     public let wrappedKey: SecureData?
 
-    public init(key: OpenVPNStaticKey, strategy: OpenVPNTLSWrapStrategy, wrappedKey: SecureData? = nil) {
-        self.key = key
+    public init(strategy: OpenVPNTLSWrapStrategy, key: OpenVPNStaticKey, wrappedKey: SecureData? = nil) {
         self.strategy = strategy
+        self.key = key
         self.wrappedKey = wrappedKey
     }
 }

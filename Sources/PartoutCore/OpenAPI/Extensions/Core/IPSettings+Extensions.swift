@@ -4,7 +4,7 @@
 
 extension IPSettings {
     public init(subnets: [Subnet]) {
-        self.init(excludedRoutes: [], includedRoutes: [], subnets: subnets)
+        self.init(subnets: subnets, includedRoutes: [], excludedRoutes: [])
     }
 
     public init(subnet: Subnet?) {
@@ -13,9 +13,9 @@ extension IPSettings {
 
     public func with(subnet: Subnet?) -> Self {
         Self(
-            excludedRoutes: excludedRoutes,
+            subnets: subnet.map { [$0] } ?? [],
             includedRoutes: includedRoutes,
-            subnets: subnet.map { [$0] } ?? []
+            excludedRoutes: excludedRoutes
         )
     }
 
@@ -41,7 +41,7 @@ extension IPSettings {
                 $0.destination == nil || $0.destination?.address.family == subnet.address.family
             })
         }
-        return Self(excludedRoutes: excludedRoutes, includedRoutes: routes, subnets: subnets)
+        return Self(subnets: subnets, includedRoutes: routes, excludedRoutes: excludedRoutes)
     }
 
     public func excluding(routes: [Route]) -> Self {
@@ -50,7 +50,7 @@ extension IPSettings {
                 $0.destination == nil || $0.destination?.address.family == subnet.address.family
             })
         }
-        return Self(excludedRoutes: routes, includedRoutes: includedRoutes, subnets: subnets)
+        return Self(subnets: subnets, includedRoutes: includedRoutes, excludedRoutes: routes)
     }
 
     public var includesDefaultRoute: Bool {
@@ -91,7 +91,7 @@ extension IPSettings {
         let subnets = try container.decodeIfPresent([Subnet].self, forKey: .subnets) ?? []
         let includedRoutes = try container.decodeIfPresent([Route].self, forKey: .includedRoutes) ?? []
         let excludedRoutes = try container.decodeIfPresent([Route].self, forKey: .excludedRoutes) ?? []
-        self.init(excludedRoutes: excludedRoutes, includedRoutes: includedRoutes, subnets: subnets)
+        self.init(subnets: subnets, includedRoutes: includedRoutes, excludedRoutes: excludedRoutes)
     }
 }
 

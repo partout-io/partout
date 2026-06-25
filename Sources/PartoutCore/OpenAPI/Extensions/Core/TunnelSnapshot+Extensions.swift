@@ -25,17 +25,13 @@ extension TunnelSnapshot.Environment {
 }
 
 extension TunnelSnapshot: CustomStringConvertible {
-    public init(id: Profile.ID, isEnabled: Bool, status: TunnelStatus, onDemand: Bool, environment: Environment? = nil) {
-        self.init(environment: environment, id: id, isEnabled: isEnabled, onDemand: onDemand, status: status)
-    }
-
     public func with(environment: Environment?) -> Self {
         Self(id: id, isEnabled: isEnabled, status: status, onDemand: onDemand, environment: environment)
     }
 
     public func isEquivalentExceptDataCount(to other: Self) -> Bool {
         let e1 = environment?.with(dataCount: .zero)
-        let e2 = other.environment?.with(dataCount:.zero)
+        let e2 = other.environment?.with(dataCount: .zero)
         return with(environment: e1) == other.with(environment: e2)
     }
 

@@ -36,8 +36,8 @@ extension OnDemandModule {
             OnDemandModule(
                 id: id,
                 policy: policy,
-                withOtherNetworks: withOtherNetworks,
-                withSSIDs: withSSIDs
+                withSSIDs: withSSIDs,
+                withOtherNetworks: withOtherNetworks
             )
         }
     }

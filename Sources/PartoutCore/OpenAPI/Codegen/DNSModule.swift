@@ -8,24 +8,24 @@
 /** DNS settings. */
 public struct DNSModule: Sendable, Codable, Hashable {
 
-    public let domainName: Address?
-    public let domainPolicy: DNSModuleDomainPolicy?
     public let id: UniqueID
-    public let inheritsVPN: Bool?
     public let protocolType: DNSModuleProtocolType
-    public let routesThroughVPN: Bool?
-    public let searchDomains: [Address]?
     public let servers: [Address]
+    public let domainName: Address?
+    public let searchDomains: [Address]?
+    public let inheritsVPN: Bool?
+    public let domainPolicy: DNSModuleDomainPolicy?
+    public let routesThroughVPN: Bool?
 
-    public init(domainName: Address? = nil, domainPolicy: DNSModuleDomainPolicy? = nil, id: UniqueID, inheritsVPN: Bool? = nil, protocolType: DNSModuleProtocolType, routesThroughVPN: Bool? = nil, searchDomains: [Address]? = nil, servers: [Address]) {
-        self.domainName = domainName
-        self.domainPolicy = domainPolicy
+    public init(id: UniqueID, protocolType: DNSModuleProtocolType, servers: [Address], domainName: Address? = nil, searchDomains: [Address]? = nil, inheritsVPN: Bool? = nil, domainPolicy: DNSModuleDomainPolicy? = nil, routesThroughVPN: Bool? = nil) {
         self.id = id
-        self.inheritsVPN = inheritsVPN
         self.protocolType = protocolType
-        self.routesThroughVPN = routesThroughVPN
-        self.searchDomains = searchDomains
         self.servers = servers
+        self.domainName = domainName
+        self.searchDomains = searchDomains
+        self.inheritsVPN = inheritsVPN
+        self.domainPolicy = domainPolicy
+        self.routesThroughVPN = routesThroughVPN
     }
 }
 

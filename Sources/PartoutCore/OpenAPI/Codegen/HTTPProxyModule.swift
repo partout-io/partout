@@ -8,18 +8,18 @@
 /** HTTP proxy settings. */
 public struct HTTPProxyModule: Sendable, Codable, Hashable {
 
-    public let bypassDomains: [Address]
     public let id: UniqueID
-    public let pacURL: URL?
     public let proxy: Endpoint?
     public let secureProxy: Endpoint?
+    public let pacURL: URL?
+    public let bypassDomains: [Address]
 
-    public init(bypassDomains: [Address], id: UniqueID, pacURL: URL? = nil, proxy: Endpoint? = nil, secureProxy: Endpoint? = nil) {
-        self.bypassDomains = bypassDomains
+    public init(id: UniqueID, proxy: Endpoint? = nil, secureProxy: Endpoint? = nil, pacURL: URL? = nil, bypassDomains: [Address]) {
         self.id = id
-        self.pacURL = pacURL
         self.proxy = proxy
         self.secureProxy = secureProxy
+        self.pacURL = pacURL
+        self.bypassDomains = bypassDomains
     }
 }
 

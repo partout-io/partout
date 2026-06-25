@@ -8,17 +8,17 @@
 /** IP settings and routes. */
 public struct IPSettings: Sendable, Codable, Hashable {
 
-    /** The excluded routes. */
-    public let excludedRoutes: [Route]
-    /** The included routes. */
-    public let includedRoutes: [Route]
     /** The subnets. */
     public let subnets: [Subnet]
+    /** The included routes. */
+    public let includedRoutes: [Route]
+    /** The excluded routes. */
+    public let excludedRoutes: [Route]
 
-    public init(excludedRoutes: [Route], includedRoutes: [Route], subnets: [Subnet]) {
-        self.excludedRoutes = excludedRoutes
-        self.includedRoutes = includedRoutes
+    public init(subnets: [Subnet], includedRoutes: [Route], excludedRoutes: [Route]) {
         self.subnets = subnets
+        self.includedRoutes = includedRoutes
+        self.excludedRoutes = excludedRoutes
     }
 }
 

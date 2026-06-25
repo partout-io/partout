@@ -35,13 +35,13 @@ extension Profile {
         let taggedModules = modules.compactMap(\.taggedModule)
         assert(taggedModules.count == modules.count)
         return TaggedProfile(
+            version: version,
+            id: id,
+            name: name,
+            modules: modules.compactMap(\.taggedModule),
             activeModulesIds: activeModulesIds,
             behavior: behavior,
-            id: id,
-            modules: modules.compactMap(\.taggedModule),
-            name: name,
-            userInfo: userInfo,
-            version: version
+            userInfo: userInfo
         )
     }
 }

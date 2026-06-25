@@ -62,9 +62,9 @@ extension OpenVPNModule {
             builder?.staticChallenge = isInteractive
             let configuration = try builder?.build(isClient: true)
             return OpenVPNModule(
+                id: id,
                 configuration: configuration,
                 credentials: credentials,
-                id: id,
                 requiresInteractiveCredentials: isInteractive
             )
         }

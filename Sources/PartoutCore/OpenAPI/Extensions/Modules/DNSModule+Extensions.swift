@@ -139,14 +139,14 @@ extension DNSModule {
                 validProtocolType = .cleartext
             }
             return DNSModule(
-                domainName: isFirstDomainPrimary ? validDomains?.first : nil,
-                domainPolicy: domainPolicy,
                 id: id,
-                inheritsVPN: inheritsVPN,
                 protocolType: validProtocolType,
-                routesThroughVPN: routesThroughVPN,
+                servers: validServers,
+                domainName: isFirstDomainPrimary ? validDomains?.first : nil,
                 searchDomains: validDomains,
-                servers: validServers
+                inheritsVPN: inheritsVPN,
+                domainPolicy: domainPolicy,
+                routesThroughVPN: routesThroughVPN
             )
         }
     }

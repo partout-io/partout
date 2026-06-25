@@ -23,23 +23,27 @@ import kotlinx.serialization.Contextual
 /**
  * The parameters of the remote interface.
  *
- * @param allowedIPs The list of allowed subnets.
  * @param publicKey The endpoint public key.
+ * @param allowedIPs The list of allowed subnets.
+ * @param preSharedKey The optional endpoint pre-shared key.
  * @param endpoint The optional endpoint.
  * @param keepAlive The keep-alive interval in seconds.
- * @param preSharedKey The optional endpoint pre-shared key.
  */
 @Serializable
 
 data class WireGuardRemoteInterface (
 
+    /* The endpoint public key. */
+    @SerialName(value = "publicKey")
+    val publicKey: kotlin.String,
+
     /* The list of allowed subnets. */
     @SerialName(value = "allowedIPs")
     val allowedIPs: kotlin.collections.List<kotlin.String>,
 
-    /* The endpoint public key. */
-    @SerialName(value = "publicKey")
-    val publicKey: kotlin.String,
+    /* The optional endpoint pre-shared key. */
+    @SerialName(value = "preSharedKey")
+    val preSharedKey: kotlin.String? = null,
 
     /* The optional endpoint. */
     @SerialName(value = "endpoint")
@@ -47,11 +51,7 @@ data class WireGuardRemoteInterface (
 
     /* The keep-alive interval in seconds. */
     @SerialName(value = "keepAlive")
-    val keepAlive: kotlin.Int? = null,
-
-    /* The optional endpoint pre-shared key. */
-    @SerialName(value = "preSharedKey")
-    val preSharedKey: kotlin.String? = null
+    val keepAlive: kotlin.Int? = null
 
 ) {
 

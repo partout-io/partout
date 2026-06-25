@@ -28,7 +28,7 @@ extension WireGuardModule {
             guard let configurationBuilder else {
                 throw PartoutError(.incompleteModule, self)
             }
-            return WireGuardModule(configuration: try configurationBuilder.build(), id: id)
+            return WireGuardModule(id: id, configuration: try configurationBuilder.build())
         }
     }
 }

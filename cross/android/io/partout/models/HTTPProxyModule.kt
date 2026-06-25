@@ -23,24 +23,21 @@ import kotlinx.serialization.Contextual
 /**
  * HTTP proxy settings.
  *
- * @param bypassDomains 
  * @param id 
- * @param pacURL 
+ * @param bypassDomains 
  * @param proxy Represents an endpoint.
  * @param secureProxy Represents an endpoint.
+ * @param pacURL 
  */
 @Serializable
 
 data class HTTPProxyModule (
 
-    @SerialName(value = "bypassDomains")
-    val bypassDomains: kotlin.collections.List<kotlin.String>,
-
     @SerialName(value = "id")
     val id: kotlin.String,
 
-    @SerialName(value = "pacURL")
-    val pacURL: kotlin.String? = null,
+    @SerialName(value = "bypassDomains")
+    val bypassDomains: kotlin.collections.List<kotlin.String>,
 
     /* Represents an endpoint. */
     @SerialName(value = "proxy")
@@ -48,7 +45,10 @@ data class HTTPProxyModule (
 
     /* Represents an endpoint. */
     @SerialName(value = "secureProxy")
-    val secureProxy: kotlin.String? = null
+    val secureProxy: kotlin.String? = null,
+
+    @SerialName(value = "pacURL")
+    val pacURL: kotlin.String? = null
 
 ) {
 

@@ -5,12 +5,12 @@
 extension TunnelRemoteInfoWrapper {
     init(_ profile: Profile, options: TunnelControllerOptions, info: TunnelRemoteInfo) {
         self.init(
-            address: info.address,
-            modules: info.modules?.compactMap(\.taggedModule),
+            profile: profile.asTaggedProfile,
             options: options,
             originalModuleId: info.originalModuleId,
-            profile: profile.asTaggedProfile,
-            requiresVirtualDevice: info.requiresVirtualDevice
+            address: info.address,
+            requiresVirtualDevice: info.requiresVirtualDevice,
+            modules: info.modules?.compactMap(\.taggedModule)
         )
     }
 }

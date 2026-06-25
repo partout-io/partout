@@ -8,20 +8,20 @@
 /** A set of credentials for authentication. */
 public struct OpenVPNCredentials: Sendable, Codable, Hashable {
 
-    /** The OTP. */
-    public let otp: String?
-    /** The OTP method (defaults to ``OTPMethod-swift.enum/none``). */
-    public let otpMethod: OpenVPNCredentialsOTPMethod
-    /** The password. */
-    public let password: String
     /** The username. */
     public let username: String
+    /** The password. */
+    public let password: String
+    /** The OTP method (defaults to ``OTPMethod-swift.enum/none``). */
+    public let otpMethod: OpenVPNCredentialsOTPMethod
+    /** The OTP. */
+    public let otp: String?
 
-    public init(otp: String? = nil, otpMethod: OpenVPNCredentialsOTPMethod, password: String, username: String) {
-        self.otp = otp
-        self.otpMethod = otpMethod
-        self.password = password
+    public init(username: String, password: String, otpMethod: OpenVPNCredentialsOTPMethod, otp: String? = nil) {
         self.username = username
+        self.password = password
+        self.otpMethod = otpMethod
+        self.otp = otp
     }
 }
 

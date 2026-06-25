@@ -50,11 +50,11 @@ extension WireGuard.RemoteInterface {
                 return addr
             }
             return WireGuard.RemoteInterface(
-                allowedIPs: validAllowedIPs,
-                endpoint: validEndpoint,
-                keepAlive: keepAlive,
+                publicKey: validPublicKey,
                 preSharedKey: validPreSharedKey,
-                publicKey: validPublicKey
+                endpoint: validEndpoint,
+                allowedIPs: validAllowedIPs,
+                keepAlive: keepAlive
             )
         }
     }

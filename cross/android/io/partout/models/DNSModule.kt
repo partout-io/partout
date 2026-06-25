@@ -29,10 +29,10 @@ import kotlinx.serialization.Contextual
  * @param protocolType 
  * @param servers 
  * @param domainName A hostname or IP address.
- * @param domainPolicy 
- * @param inheritsVPN 
- * @param routesThroughVPN 
  * @param searchDomains 
+ * @param inheritsVPN 
+ * @param domainPolicy 
+ * @param routesThroughVPN 
  */
 @Serializable
 
@@ -51,17 +51,17 @@ data class DNSModule (
     @SerialName(value = "domainName")
     val domainName: kotlin.String? = null,
 
-    @Contextual @SerialName(value = "domainPolicy")
-    val domainPolicy: DNSModuleDomainPolicy? = null,
+    @SerialName(value = "searchDomains")
+    val searchDomains: kotlin.collections.List<kotlin.String>? = null,
 
     @SerialName(value = "inheritsVPN")
     val inheritsVPN: kotlin.Boolean? = null,
 
-    @SerialName(value = "routesThroughVPN")
-    val routesThroughVPN: kotlin.Boolean? = null,
+    @Contextual @SerialName(value = "domainPolicy")
+    val domainPolicy: DNSModuleDomainPolicy? = null,
 
-    @SerialName(value = "searchDomains")
-    val searchDomains: kotlin.collections.List<kotlin.String>? = null
+    @SerialName(value = "routesThroughVPN")
+    val routesThroughVPN: kotlin.Boolean? = null
 
 ) {
 
