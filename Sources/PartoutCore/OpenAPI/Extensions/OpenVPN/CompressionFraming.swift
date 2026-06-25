@@ -1,0 +1,19 @@
+// SPDX-FileCopyrightText: 2026 Davide De Rosa
+//
+// SPDX-License-Identifier: GPL-3.0
+extension OpenVPN.CompressionFraming: CustomStringConvertible {
+    public var description: String {
+        switch self {
+        case .disabled:
+            return "disabled"
+        case .compress:
+            return "compress"
+        case .compressV2:
+            return "compress"
+        case .compLZO:
+            return "comp-lzo"
+        @unknown default:
+            return "unknown"
+        }
+    }
+}

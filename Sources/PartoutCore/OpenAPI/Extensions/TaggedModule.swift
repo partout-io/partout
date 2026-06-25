@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 //
 // SPDX-License-Identifier: GPL-3.0
-
 // WARNING: TaggedModule enum must match case of ModuleType.rawValue
 
 /// A codable wrapper for all known modules.
@@ -114,49 +113,5 @@ private extension TaggedModule {
         case .OpenVPN: .OpenVPN
         case .WireGuard: .WireGuard
         }
-    }
-}
-
-extension TaggedProfile: ProfileType {
-    public typealias CustomModuleHandler = @Sendable (CustomModule) throws -> Module
-
-    public func asProfile(customHandler: CustomModuleHandler? = nil) throws -> Profile {
-        let finalModules: [Module]
-        if let customHandler {
-            finalModules = try modules.map {
-                let inner = $0.containedModule
-                if let custom = inner as? CustomModule {
-                    return try customHandler(custom)
-                }
-                return inner
-            }
-        } else {
-            finalModules = modules.map(\.containedModule)
-        }
-        return try Profile.Builder(
-            version: version,
-            id: id,
-            name: name,
-            modules: finalModules,
-            activeModulesIds: activeModulesIds,
-            behavior: behavior,
-            userInfo: userInfo
-        ).build()
-    }
-}
-
-extension Profile {
-    public var asTaggedProfile: TaggedProfile {
-        let taggedModules = modules.compactMap(\.taggedModule)
-        assert(taggedModules.count == modules.count)
-        return TaggedProfile(
-            activeModulesIds: activeModulesIds,
-            behavior: behavior,
-            id: id,
-            modules: modules.compactMap(\.taggedModule),
-            name: name,
-            userInfo: userInfo,
-            version: version
-        )
     }
 }
