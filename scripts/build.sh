@@ -82,7 +82,7 @@ while [[ $# -gt 0 ]]; do
             export SWIFT_ANDROID_API_LEVEL=28
             export SWIFT_ANDROID_VERSION=6.3.1
             build_dir=.cmake-android
-            cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=swift-cmake-toolchains/android.toolchain.cmake")
+            cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=swift-cmake-toolchains/swift-android.toolchain.cmake")
             shift
             ;;
         -*|--*)
