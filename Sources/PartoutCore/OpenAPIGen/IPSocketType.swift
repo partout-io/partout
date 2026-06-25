@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** A socket type with optional info about the IP endpoint. */
 public enum IPSocketType: String, Codable, CaseIterable {
@@ -25,3 +21,4 @@ public enum IPSocketType: String, Codable, CaseIterable {
     /// TCP socket type (IPv6).
     case tcp6 = "TCP6"
 }
+

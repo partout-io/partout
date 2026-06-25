@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Represents a WireGuard configuration. */
 public struct WireGuardConfiguration: Codable, Hashable {
@@ -36,4 +32,5 @@ public struct WireGuardConfiguration: Codable, Hashable {
         try container.encode(peers, forKey: .peers)
     }
 }
+
 

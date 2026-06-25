@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Defines the type of compression framing. */
 public enum OpenVPNCompressionFraming: Int, Codable, CaseIterable {
@@ -17,3 +13,4 @@ public enum OpenVPNCompressionFraming: Int, Codable, CaseIterable {
     case compress = 2
     case compressV2 = 3
 }
+

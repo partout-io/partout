@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** The parameters of the remote interface. */
 public struct WireGuardRemoteInterface: Codable, Hashable {
@@ -51,4 +47,5 @@ public struct WireGuardRemoteInterface: Codable, Hashable {
         try container.encode(publicKey, forKey: .publicKey)
     }
 }
+
 

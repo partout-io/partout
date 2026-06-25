@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Defines the type of compression algorithm. */
 public enum OpenVPNCompressionAlgorithm: Int, Codable, CaseIterable {
@@ -16,3 +12,4 @@ public enum OpenVPNCompressionAlgorithm: Int, Codable, CaseIterable {
     case LZO = 1
     case other = 2
 }
+

@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** The key-direction field, usually 0 on servers and 1 on clients. */
 public enum OpenVPNStaticKeyDirection: Int, Codable, CaseIterable {
@@ -17,3 +13,4 @@ public enum OpenVPNStaticKeyDirection: Int, Codable, CaseIterable {
     /// Conventional client direction (implicit for tls-crypt).
     case client = 1
 }
+

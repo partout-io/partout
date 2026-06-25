@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Represents a cryptographic container in PEM format. */
 public struct OpenVPNCryptoContainer: Codable, Hashable {
@@ -31,4 +27,5 @@ public struct OpenVPNCryptoContainer: Codable, Hashable {
         try container.encode(pem, forKey: .pem)
     }
 }
+
 

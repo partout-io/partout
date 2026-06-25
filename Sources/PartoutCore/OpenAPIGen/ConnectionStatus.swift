@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** The status of a ``Connection``. */
 public enum ConnectionStatus: String, Codable, CaseIterable {
@@ -17,3 +13,4 @@ public enum ConnectionStatus: String, Codable, CaseIterable {
     case connected = "connected"
     case disconnecting = "disconnecting"
 }
+

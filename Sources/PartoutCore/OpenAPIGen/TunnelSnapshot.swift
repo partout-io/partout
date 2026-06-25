@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Returns a tunnel-specific snapshot of a ``Profile``. */
 public struct TunnelSnapshot: Codable, Hashable {
@@ -46,4 +42,5 @@ public struct TunnelSnapshot: Codable, Hashable {
         try container.encode(status, forKey: .status)
     }
 }
+
 

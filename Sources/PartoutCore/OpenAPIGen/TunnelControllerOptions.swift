@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Common options to give to ``TunnelController``. */
 public struct TunnelControllerOptions: Codable, Hashable {
@@ -38,4 +34,5 @@ public struct TunnelControllerOptions: Codable, Hashable {
         try container.encode(minDataCountDelta, forKey: .minDataCountDelta)
     }
 }
+
 

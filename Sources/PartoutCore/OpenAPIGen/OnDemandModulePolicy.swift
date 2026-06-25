@@ -5,13 +5,10 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 public enum OnDemandModulePolicy: String, Codable, CaseIterable {
     case any = "any"
     case including = "including"
     case excluding = "excluding"
 }
+

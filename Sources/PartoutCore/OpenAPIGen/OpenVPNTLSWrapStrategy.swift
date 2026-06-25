@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** The wrapping strategy. */
 public enum OpenVPNTLSWrapStrategy: String, Codable, CaseIterable {
@@ -19,3 +15,4 @@ public enum OpenVPNTLSWrapStrategy: String, Codable, CaseIterable {
     /// Encrypts payload with a client-specific key (--tls-crypt-v2).
     case cryptV2 = "crypt-v2"
 }
+

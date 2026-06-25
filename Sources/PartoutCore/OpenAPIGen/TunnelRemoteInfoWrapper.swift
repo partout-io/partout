@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 public struct TunnelRemoteInfoWrapper: Codable, Hashable {
 
@@ -50,4 +46,5 @@ public struct TunnelRemoteInfoWrapper: Codable, Hashable {
         try container.encode(requiresVirtualDevice, forKey: .requiresVirtualDevice)
     }
 }
+
 

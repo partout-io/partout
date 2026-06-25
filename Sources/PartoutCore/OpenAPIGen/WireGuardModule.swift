@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** A connection module providing a WireGuard connection. */
 public struct WireGuardModule: Codable, Hashable {
@@ -34,4 +30,5 @@ public struct WireGuardModule: Codable, Hashable {
         try container.encode(id, forKey: .id)
     }
 }
+
 

@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Encryption algorithm. */
 public enum OpenVPNCipher: String, Codable, CaseIterable {
@@ -25,3 +21,4 @@ public enum OpenVPNCipher: String, Codable, CaseIterable {
     /// AES encryption with 256-bit key size and GCM.
     case aes256gcm = "AES-256-GCM"
 }
+

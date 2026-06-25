@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Raw type univocally associated to each ``Module`` implementation. */
 public enum ModuleType: String, Codable, CaseIterable {
@@ -22,3 +18,4 @@ public enum ModuleType: String, Codable, CaseIterable {
     case WireGuard = "WireGuard"
     case Undefined = "Undefined"
 }
+

@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 public enum PartoutErrorCode: String, Codable, CaseIterable {
     /// Response is cached.
@@ -104,3 +100,4 @@ public enum PartoutErrorCode: String, Codable, CaseIterable {
     /// Configuration has no peers.
     case wireGuardEmptyPeers = "WireGuard.emptyPeers"
 }
+

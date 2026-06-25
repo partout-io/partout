@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Routing policy. */
 public enum OpenVPNRoutingPolicy: String, Codable, CaseIterable {
@@ -19,3 +15,4 @@ public enum OpenVPNRoutingPolicy: String, Codable, CaseIterable {
     /// Block LAN while connected.
     case blockLocal = "blockLocal"
 }
+

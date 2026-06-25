@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** A set of credentials for authentication. */
 public struct OpenVPNCredentials: Codable, Hashable {
@@ -46,4 +42,5 @@ public struct OpenVPNCredentials: Codable, Hashable {
         try container.encode(username, forKey: .username)
     }
 }
+
 

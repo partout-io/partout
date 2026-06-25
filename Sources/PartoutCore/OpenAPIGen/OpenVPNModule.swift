@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** A connection module providing an OpenVPN connection. */
 public struct OpenVPNModule: Codable, Hashable {
@@ -42,4 +38,5 @@ public struct OpenVPNModule: Codable, Hashable {
         try container.encodeIfPresent(requiresInteractiveCredentials, forKey: .requiresInteractiveCredentials)
     }
 }
+
 

@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Message digest algorithm. */
 public enum OpenVPNDigest: String, Codable, CaseIterable {
@@ -23,3 +19,4 @@ public enum OpenVPNDigest: String, Codable, CaseIterable {
     /// SHA256 message digest.
     case sha512 = "SHA512"
 }
+

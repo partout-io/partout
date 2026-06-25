@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 public struct OpenVPNObfuscationMethodXormask: Codable, Hashable {
 
@@ -37,4 +33,5 @@ public struct OpenVPNObfuscationMethodXormask: Codable, Hashable {
         try container.encode(mask, forKey: .mask)
     }
 }
+
 

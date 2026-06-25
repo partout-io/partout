@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Settings that can be pulled from server. */
 public enum OpenVPNPullMask: String, Codable, CaseIterable {
@@ -19,3 +15,4 @@ public enum OpenVPNPullMask: String, Codable, CaseIterable {
     /// Proxy settings.
     case proxy = "proxy"
 }
+

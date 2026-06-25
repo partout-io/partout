@@ -5,12 +5,9 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 public enum OnDemandModuleOtherNetwork: String, Codable, CaseIterable {
     case mobile = "mobile"
     case ethernet = "ethernet"
 }
+

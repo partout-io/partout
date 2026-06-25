@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 public struct TaggedModuleDNS: Codable, Hashable {
 
@@ -36,4 +32,5 @@ public struct TaggedModuleDNS: Codable, Hashable {
         try container.encode(value, forKey: .value)
     }
 }
+
 

@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 public struct DNSModuleProtocolType: Codable, Hashable {
 
@@ -29,4 +25,5 @@ public struct DNSModuleProtocolType: Codable, Hashable {
         try container.encode(type, forKey: .type)
     }
 }
+
 

@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Represents an OpenVPN static key file (as generated with --genkey) */
 public struct OpenVPNStaticKey: Codable, Hashable {
@@ -35,4 +31,5 @@ public struct OpenVPNStaticKey: Codable, Hashable {
         try container.encodeIfPresent(dir, forKey: .dir)
     }
 }
+
 

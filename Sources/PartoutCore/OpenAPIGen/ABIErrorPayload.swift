@@ -5,17 +5,13 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 public struct ABIErrorPayload: Codable, Hashable {
 
     public var code: PartoutErrorCode
-    public var userInfo: AnyCodable?
+    public var userInfo: JSON?
 
-    public init(code: PartoutErrorCode, userInfo: AnyCodable? = nil) {
+    public init(code: PartoutErrorCode, userInfo: JSON? = nil) {
         self.code = code
         self.userInfo = userInfo
     }
@@ -33,4 +29,5 @@ public struct ABIErrorPayload: Codable, Hashable {
         try container.encodeIfPresent(userInfo, forKey: .userInfo)
     }
 }
+
 

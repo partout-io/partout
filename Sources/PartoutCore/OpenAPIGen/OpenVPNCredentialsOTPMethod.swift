@@ -5,13 +5,10 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 public enum OpenVPNCredentialsOTPMethod: String, Codable, CaseIterable {
     case none = "none"
     case append = "append"
     case encode = "encode"
 }
+

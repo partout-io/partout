@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** The protocol used in DNS servers. */
 public enum DNSProtocol: String, Codable, CaseIterable {
@@ -19,3 +15,4 @@ public enum DNSProtocol: String, Codable, CaseIterable {
     /// DNS over TLS (port 853).
     case tls = "tls"
 }
+

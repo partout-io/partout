@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Advanced flags affecting the behavior of a ``Profile``. */
 public struct ProfileBehavior: Codable, Hashable {
@@ -36,4 +32,5 @@ public struct ProfileBehavior: Codable, Hashable {
         try container.encodeIfPresent(includesAllNetworks, forKey: .includesAllNetworks)
     }
 }
+
 

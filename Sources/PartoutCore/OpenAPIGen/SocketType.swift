@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** A socket type between UDP and TCP. */
 public enum SocketType: String, Codable, CaseIterable {
@@ -17,3 +13,4 @@ public enum SocketType: String, Codable, CaseIterable {
     /// TCP socket type.
     case tcp = "TCP"
 }
+

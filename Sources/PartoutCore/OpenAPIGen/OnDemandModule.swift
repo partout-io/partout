@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** On-demand settings. */
 public struct OnDemandModule: Codable, Hashable {
@@ -42,4 +38,5 @@ public struct OnDemandModule: Codable, Hashable {
         try container.encode(withSSIDs, forKey: .withSSIDs)
     }
 }
+
 

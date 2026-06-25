@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Holds parameters for TLS wrapping. */
 public struct OpenVPNTLSWrap: Codable, Hashable {
@@ -41,4 +37,5 @@ public struct OpenVPNTLSWrap: Codable, Hashable {
         try container.encodeIfPresent(wrappedKey, forKey: .wrappedKey)
     }
 }
+
 

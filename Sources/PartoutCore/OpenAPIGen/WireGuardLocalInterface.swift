@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** The parameters of the local interface. */
 public struct WireGuardLocalInterface: Codable, Hashable {
@@ -46,4 +42,5 @@ public struct WireGuardLocalInterface: Codable, Hashable {
         try container.encode(privateKey, forKey: .privateKey)
     }
 }
+
 

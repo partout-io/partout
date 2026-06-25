@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** Represents a route in the routing table. */
 public struct Route: Codable, Hashable {
@@ -36,4 +32,5 @@ public struct Route: Codable, Hashable {
         try container.encodeIfPresent(gateway, forKey: .gateway)
     }
 }
+
 

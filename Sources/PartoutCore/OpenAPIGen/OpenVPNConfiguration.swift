@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** The immutable configuration for `OpenVPNSession`. */
 public struct OpenVPNConfiguration: Codable, Hashable {
@@ -231,4 +227,5 @@ public struct OpenVPNConfiguration: Codable, Hashable {
         try container.encodeIfPresent(xorMethod, forKey: .xorMethod)
     }
 }
+
 

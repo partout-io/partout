@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** A codable wrapper for all known modules. */
 public struct TaggedModule: Codable, Hashable {
@@ -30,4 +26,5 @@ public struct TaggedModule: Codable, Hashable {
         try container.encode(type, forKey: .type)
     }
 }
+
 

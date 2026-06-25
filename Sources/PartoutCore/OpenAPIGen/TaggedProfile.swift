@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** A codable wrapper for a profile with all known modules. */
 public struct TaggedProfile: Codable, Hashable {
@@ -18,10 +14,10 @@ public struct TaggedProfile: Codable, Hashable {
     public var id: String
     public var modules: [TaggedModule]
     public var name: String
-    public var userInfo: AnyCodable?
+    public var userInfo: JSON?
     public var version: Int?
 
-    public init(activeModulesIds: Set<String>, behavior: ProfileBehavior? = nil, id: String, modules: [TaggedModule], name: String, userInfo: AnyCodable? = nil, version: Int? = nil) {
+    public init(activeModulesIds: Set<String>, behavior: ProfileBehavior? = nil, id: String, modules: [TaggedModule], name: String, userInfo: JSON? = nil, version: Int? = nil) {
         self.activeModulesIds = activeModulesIds
         self.behavior = behavior
         self.id = id
@@ -54,4 +50,5 @@ public struct TaggedProfile: Codable, Hashable {
         try container.encodeIfPresent(version, forKey: .version)
     }
 }
+
 

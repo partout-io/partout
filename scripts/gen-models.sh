@@ -10,6 +10,7 @@ if [ "$#" -lt 4 ]; then
     usage
 fi
 
+script_dir=$(cd "$(dirname "$0")" && pwd)
 infile=$1
 language=$2
 models_dir=$3
@@ -61,12 +62,15 @@ case $language in
         trap cleanup EXIT
 
         project_name=$package_name
+        swift_template_dir="$script_dir/openapi-generator/swift5"
         rm -rf "$models_dir"
         openapi-generator generate \
             -i "$infile" \
             -o "$tmp_dir" \
             -g swift5 \
+            -t "$swift_template_dir" \
             --global-property=models,modelDocs=false,modelTests=false \
+            --type-mappings AnyCodable=JSON \
             --additional-properties=projectName="$project_name" \
             --additional-properties=responseAs=AsyncAwait \
             --additional-properties=useSPMFileStructure=true \

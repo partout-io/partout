@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** IP settings and routes. */
 public struct IPSettings: Codable, Hashable {
@@ -41,4 +37,5 @@ public struct IPSettings: Codable, Hashable {
         try container.encode(subnets, forKey: .subnets)
     }
 }
+
 

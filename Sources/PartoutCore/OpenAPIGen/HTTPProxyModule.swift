@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** HTTP proxy settings. */
 public struct HTTPProxyModule: Codable, Hashable {
@@ -48,4 +44,5 @@ public struct HTTPProxyModule: Codable, Hashable {
         try container.encodeIfPresent(secureProxy, forKey: .secureProxy)
     }
 }
+
 

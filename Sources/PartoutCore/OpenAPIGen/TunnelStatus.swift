@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** The status of a ``Tunnel``. */
 public enum TunnelStatus: String, Codable, CaseIterable {
@@ -17,3 +13,4 @@ public enum TunnelStatus: String, Codable, CaseIterable {
     case active = "active"
     case deactivating = "deactivating"
 }
+

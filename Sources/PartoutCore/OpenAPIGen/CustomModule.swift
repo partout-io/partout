@@ -5,18 +5,14 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** A type-erased ``Module`` for encoding external implementations. */
 public struct CustomModule: Codable, Hashable {
 
     public var innerType: ModuleType
-    public var json: AnyCodable?
+    public var json: JSON?
 
-    public init(innerType: ModuleType, json: AnyCodable?) {
+    public init(innerType: ModuleType, json: JSON?) {
         self.innerType = innerType
         self.json = json
     }
@@ -34,4 +30,5 @@ public struct CustomModule: Codable, Hashable {
         try container.encode(json, forKey: .json)
     }
 }
+
 

@@ -5,12 +5,9 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 public enum DNSModuleDomainPolicy: String, Codable, CaseIterable {
     case match = "match"
     case matchAndSearch = "matchAndSearch"
 }
+

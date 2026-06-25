@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 public struct OpenVPNObfuscationMethodReverse: Codable, Hashable {
 
@@ -32,4 +28,5 @@ public struct OpenVPNObfuscationMethodReverse: Codable, Hashable {
         try container.encode(type, forKey: .type)
     }
 }
+
 

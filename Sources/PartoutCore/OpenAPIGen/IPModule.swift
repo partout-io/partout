@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** IP and routes. */
 public struct IPModule: Codable, Hashable {
@@ -42,4 +38,5 @@ public struct IPModule: Codable, Hashable {
         try container.encodeIfPresent(mtu, forKey: .mtu)
     }
 }
+
 

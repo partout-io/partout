@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** The obfuscation method. */
 public struct OpenVPNObfuscationMethod: Codable, Hashable {
@@ -30,4 +26,5 @@ public struct OpenVPNObfuscationMethod: Codable, Hashable {
         try container.encode(type, forKey: .type)
     }
 }
+
 

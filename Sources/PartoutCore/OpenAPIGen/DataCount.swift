@@ -5,10 +5,6 @@
 // https://openapi-generator.tech
 //
 
-import Foundation
-#if canImport(AnyCodable)
-import AnyCodable
-#endif
 
 /** A pair of received/sent bytes count. */
 public struct DataCount: Codable, Hashable {
@@ -36,4 +32,5 @@ public struct DataCount: Codable, Hashable {
         try container.encode(sent, forKey: .sent)
     }
 }
+
 
