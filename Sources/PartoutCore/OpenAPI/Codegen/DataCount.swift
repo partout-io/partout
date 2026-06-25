@@ -10,27 +10,15 @@
 public struct DataCount: Codable, Hashable {
 
     /** Received bytes count. */
-    public var received: Int64
+    public var received: ModelUInt64
     /** Sent bytes count. */
-    public var sent: Int64
+    public var sent: ModelUInt64
 
-    public init(received: Int64, sent: Int64) {
+    public init(received: ModelUInt64, sent: ModelUInt64) {
         self.received = received
         self.sent = sent
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case received
-        case sent
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(received, forKey: .received)
-        try container.encode(sent, forKey: .sent)
-    }
 }
 
 

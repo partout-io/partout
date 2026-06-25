@@ -2,6 +2,19 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+// WARNING: TaggedModule enum must match case of ModuleType.rawValue
+
+/// A codable wrapper for all known modules.
+public enum TaggedModule: Hashable, Sendable {
+    case Custom(CustomModule)
+    case DNS(DNSModule)
+    case HTTPProxy(HTTPProxyModule)
+    case IP(IPModule)
+    case OnDemand(OnDemandModule)
+    case OpenVPN(OpenVPNModule)
+    case WireGuard(WireGuardModule)
+}
+
 extension TaggedModule {
     var containedModule: Module & Codable {
         switch self {
@@ -137,13 +150,13 @@ extension Profile {
         let taggedModules = modules.compactMap(\.taggedModule)
         assert(taggedModules.count == modules.count)
         return TaggedProfile(
-            version: version,
-            id: id,
-            name: name,
-            modules: modules.compactMap(\.taggedModule),
             activeModulesIds: activeModulesIds,
             behavior: behavior,
-            userInfo: userInfo
+            id: id,
+            modules: modules.compactMap(\.taggedModule),
+            name: name,
+            userInfo: userInfo,
+            version: version
         )
     }
 }

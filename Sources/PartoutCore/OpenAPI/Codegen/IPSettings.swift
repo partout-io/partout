@@ -14,28 +14,14 @@ public struct IPSettings: Codable, Hashable {
     /** The included routes. */
     public var includedRoutes: [Route]
     /** The subnets. */
-    public var subnets: [String]
+    public var subnets: [Subnet]
 
-    public init(excludedRoutes: [Route], includedRoutes: [Route], subnets: [String]) {
+    public init(excludedRoutes: [Route], includedRoutes: [Route], subnets: [Subnet]) {
         self.excludedRoutes = excludedRoutes
         self.includedRoutes = includedRoutes
         self.subnets = subnets
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case excludedRoutes
-        case includedRoutes
-        case subnets
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(excludedRoutes, forKey: .excludedRoutes)
-        try container.encode(includedRoutes, forKey: .includedRoutes)
-        try container.encode(subnets, forKey: .subnets)
-    }
 }
 
 

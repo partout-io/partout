@@ -8,15 +8,14 @@
 
 public struct TunnelRemoteInfoWrapper: Codable, Hashable {
 
-    /** A hostname or IP address. */
-    public var address: String?
+    public var address: Address?
     public var modules: [TaggedModule]?
     public var options: TunnelControllerOptions
     public var originalModuleId: UniqueID
     public var profile: TaggedProfile
     public var requiresVirtualDevice: Bool
 
-    public init(address: String? = nil, modules: [TaggedModule]? = nil, options: TunnelControllerOptions, originalModuleId: UniqueID, profile: TaggedProfile, requiresVirtualDevice: Bool) {
+    public init(address: Address? = nil, modules: [TaggedModule]? = nil, options: TunnelControllerOptions, originalModuleId: UniqueID, profile: TaggedProfile, requiresVirtualDevice: Bool) {
         self.address = address
         self.modules = modules
         self.options = options
@@ -25,26 +24,6 @@ public struct TunnelRemoteInfoWrapper: Codable, Hashable {
         self.requiresVirtualDevice = requiresVirtualDevice
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case address
-        case modules
-        case options
-        case originalModuleId
-        case profile
-        case requiresVirtualDevice
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(address, forKey: .address)
-        try container.encodeIfPresent(modules, forKey: .modules)
-        try container.encode(options, forKey: .options)
-        try container.encode(originalModuleId, forKey: .originalModuleId)
-        try container.encode(profile, forKey: .profile)
-        try container.encode(requiresVirtualDevice, forKey: .requiresVirtualDevice)
-    }
 }
 
 

@@ -10,37 +10,21 @@
 public struct WireGuardLocalInterface: Codable, Hashable {
 
     /** The local addresses. */
-    public var addresses: [String]
+    public var addresses: [Subnet]
     /** The optional DNS settings. */
     public var dns: DNSModule?
     /** The optional MTU. */
-    public var mtu: Int?
+    public var mtu: ModelUInt16?
     /** The local private key. */
-    public var privateKey: String
+    public var privateKey: WireGuardKey
 
-    public init(addresses: [String], dns: DNSModule? = nil, mtu: Int? = nil, privateKey: String) {
+    public init(addresses: [Subnet], dns: DNSModule? = nil, mtu: ModelUInt16? = nil, privateKey: WireGuardKey) {
         self.addresses = addresses
         self.dns = dns
         self.mtu = mtu
         self.privateKey = privateKey
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case addresses
-        case dns
-        case mtu
-        case privateKey
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(addresses, forKey: .addresses)
-        try container.encodeIfPresent(dns, forKey: .dns)
-        try container.encodeIfPresent(mtu, forKey: .mtu)
-        try container.encode(privateKey, forKey: .privateKey)
-    }
 }
 
 

@@ -70,10 +70,22 @@ case $language in
             -g swift5 \
             -t "$swift_template_dir" \
             --global-property=models,modelDocs=false,modelTests=false \
+            --schema-mappings Address=Address \
+            --schema-mappings DNSModule.ProtocolType=DNSModuleProtocolType \
+            --schema-mappings Endpoint=Endpoint \
+            --schema-mappings EndpointProtocol=EndpointProtocol \
+            --schema-mappings ExtendedEndpoint=ExtendedEndpoint \
+            --schema-mappings Subnet=Subnet \
+            --schema-mappings TaggedModule=TaggedModule \
             --schema-mappings UniqueID=UniqueID \
+            --schema-mappings UInt16=UInt16 \
+            --schema-mappings UInt32=UInt32 \
+            --schema-mappings UInt64=UInt64 \
             --schema-mappings SecureData=SecureData \
             --schema-mappings OpenVPN.CryptoContainer=OpenVPNCryptoContainer \
-            --type-mappings AnyCodable=JSON \
+            --schema-mappings OpenVPN.ObfuscationMethod=OpenVPNObfuscationMethod \
+            --schema-mappings WireGuard.Key=WireGuardKey \
+            --type-mappings AnyCodable=JSON,URI=URL \
             --additional-properties=projectName="$project_name" \
             --additional-properties=responseAs=AsyncAwait \
             --additional-properties=useSPMFileStructure=true \

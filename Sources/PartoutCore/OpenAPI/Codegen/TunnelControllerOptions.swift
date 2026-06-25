@@ -11,28 +11,14 @@ public struct TunnelControllerOptions: Codable, Hashable {
 
     public var dnsFallbackServers: [String]
     public var logsSnapshots: Bool
-    public var minDataCountDelta: Int64
+    public var minDataCountDelta: ModelUInt64
 
-    public init(dnsFallbackServers: [String], logsSnapshots: Bool, minDataCountDelta: Int64) {
+    public init(dnsFallbackServers: [String], logsSnapshots: Bool, minDataCountDelta: ModelUInt64) {
         self.dnsFallbackServers = dnsFallbackServers
         self.logsSnapshots = logsSnapshots
         self.minDataCountDelta = minDataCountDelta
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case dnsFallbackServers
-        case logsSnapshots
-        case minDataCountDelta
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(dnsFallbackServers, forKey: .dnsFallbackServers)
-        try container.encode(logsSnapshots, forKey: .logsSnapshots)
-        try container.encode(minDataCountDelta, forKey: .minDataCountDelta)
-    }
 }
 
 

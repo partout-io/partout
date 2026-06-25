@@ -16,18 +16,6 @@ public struct ABIErrorPayload: Codable, Hashable {
         self.userInfo = userInfo
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case code
-        case userInfo
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(code, forKey: .code)
-        try container.encodeIfPresent(userInfo, forKey: .userInfo)
-    }
 }
 
 

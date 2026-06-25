@@ -17,18 +17,6 @@ public struct CustomModule: Codable, Hashable {
         self.json = json
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case innerType
-        case json
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(innerType, forKey: .innerType)
-        try container.encode(json, forKey: .json)
-    }
 }
 
 

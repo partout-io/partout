@@ -21,22 +21,6 @@ public struct OpenVPNModule: Codable, Hashable {
         self.requiresInteractiveCredentials = requiresInteractiveCredentials
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case configuration
-        case credentials
-        case id
-        case requiresInteractiveCredentials
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(configuration, forKey: .configuration)
-        try container.encodeIfPresent(credentials, forKey: .credentials)
-        try container.encode(id, forKey: .id)
-        try container.encodeIfPresent(requiresInteractiveCredentials, forKey: .requiresInteractiveCredentials)
-    }
 }
 
 

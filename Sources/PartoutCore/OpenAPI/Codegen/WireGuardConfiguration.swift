@@ -19,18 +19,6 @@ public struct WireGuardConfiguration: Codable, Hashable {
         self.peers = peers
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case interface
-        case peers
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(interface, forKey: .interface)
-        try container.encode(peers, forKey: .peers)
-    }
 }
 
 

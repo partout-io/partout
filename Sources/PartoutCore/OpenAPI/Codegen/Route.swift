@@ -10,27 +10,15 @@
 public struct Route: Codable, Hashable {
 
     /** The destination subnet or `nil` if default. */
-    public var destination: String?
+    public var destination: Subnet?
     /** The address of the gateway (falls back to global gateway). */
-    public var gateway: String?
+    public var gateway: Address?
 
-    public init(destination: String? = nil, gateway: String? = nil) {
+    public init(destination: Subnet? = nil, gateway: Address? = nil) {
         self.destination = destination
         self.gateway = gateway
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case destination
-        case gateway
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(destination, forKey: .destination)
-        try container.encodeIfPresent(gateway, forKey: .gateway)
-    }
 }
 
 

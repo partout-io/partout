@@ -27,28 +27,6 @@ public struct TaggedProfile: Codable, Hashable {
         self.version = version
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case activeModulesIds
-        case behavior
-        case id
-        case modules
-        case name
-        case userInfo
-        case version
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(activeModulesIds, forKey: .activeModulesIds)
-        try container.encodeIfPresent(behavior, forKey: .behavior)
-        try container.encode(id, forKey: .id)
-        try container.encode(modules, forKey: .modules)
-        try container.encode(name, forKey: .name)
-        try container.encodeIfPresent(userInfo, forKey: .userInfo)
-        try container.encodeIfPresent(version, forKey: .version)
-    }
 }
 
 

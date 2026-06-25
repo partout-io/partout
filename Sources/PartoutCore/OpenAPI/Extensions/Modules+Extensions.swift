@@ -17,6 +17,14 @@ extension DNSProtocol {
     public static let fallback: DNSProtocol = .cleartext
 }
 
+extension DNSModule {
+    public enum ProtocolType: Hashable, Codable, Sendable {
+        case cleartext
+        case https(url: URL)
+        case tls(hostname: String)
+    }
+}
+
 extension DNSModule: Module, BuildableType {
     public static let moduleType: ModuleType = .DNS
 
@@ -146,14 +154,14 @@ extension DNSModule {
                 validProtocolType = .cleartext
             }
             return DNSModule(
-                id: id,
-                protocolType: validProtocolType,
-                servers: validServers,
                 domainName: isFirstDomainPrimary ? validDomains?.first : nil,
-                searchDomains: validDomains,
-                inheritsVPN: inheritsVPN,
                 domainPolicy: domainPolicy,
-                routesThroughVPN: routesThroughVPN
+                id: id,
+                inheritsVPN: inheritsVPN,
+                protocolType: validProtocolType,
+                routesThroughVPN: routesThroughVPN,
+                searchDomains: validDomains,
+                servers: validServers
             )
         }
     }
@@ -370,11 +378,11 @@ extension HTTPProxyModule {
                 return addr
             }
             return HTTPProxyModule(
+                bypassDomains: validBypassDomains,
                 id: id,
-                proxy: proxy,
-                secureProxy: secureProxy,
                 pacURL: pacURL,
-                bypassDomains: validBypassDomains
+                proxy: proxy,
+                secureProxy: secureProxy
             )
         }
     }
@@ -456,8 +464,8 @@ extension OnDemandModule {
             OnDemandModule(
                 id: id,
                 policy: policy,
-                withSSIDs: withSSIDs,
-                withOtherNetworks: withOtherNetworks
+                withOtherNetworks: withOtherNetworks,
+                withSSIDs: withSSIDs
             )
         }
     }

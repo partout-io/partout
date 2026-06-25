@@ -38,9 +38,9 @@ public struct OpenVPNConfiguration: Codable, Hashable {
     /** - Seealso: `Configuration.Builder.dnsServers` */
     public var dnsServers: [String]?
     /** - Seealso: `Configuration.Builder.httpProxy` */
-    public var httpProxy: String?
+    public var httpProxy: Endpoint?
     /** - Seealso: `Configuration.Builder.httpsProxy` */
-    public var httpsProxy: String?
+    public var httpsProxy: Endpoint?
     /** - Seealso: `Configuration.Builder.ipv4` */
     public var ipv4: IPSettings?
     /** - Seealso: `Configuration.Builder.ipv6` */
@@ -54,9 +54,9 @@ public struct OpenVPNConfiguration: Codable, Hashable {
     /** - Seealso: `Configuration.Builder.noPullMask` */
     public var noPullMask: [OpenVPNPullMask]?
     /** - Seealso: `Configuration.Builder.peerId` */
-    public var peerId: Int?
+    public var peerId: ModelUInt32?
     /** - Seealso: `Configuration.Builder.proxyAutoConfigurationURL` */
-    public var proxyAutoConfigurationURL: String?
+    public var proxyAutoConfigurationURL: URL?
     /** - Seealso: `Configuration.Builder.proxyBypassDomains` */
     public var proxyBypassDomains: [String]?
     /** - Seealso: `Configuration.Builder.randomizeEndpoint` */
@@ -64,13 +64,13 @@ public struct OpenVPNConfiguration: Codable, Hashable {
     /** - Seealso: `Configuration.Builder.randomizeHostnames` */
     public var randomizeHostnames: Bool?
     /** - Seealso: `Configuration.Builder.remotes` */
-    public var remotes: [String]?
+    public var remotes: [ExtendedEndpoint]?
     /** - Seealso: `Configuration.Builder.renegotiatesAfter` */
     public var renegotiatesAfter: Double?
     /** - Seealso: `Configuration.Builder.routeGateway4` */
-    public var routeGateway4: String?
+    public var routeGateway4: Address?
     /** - Seealso: `Configuration.Builder.routeGateway6` */
-    public var routeGateway6: String?
+    public var routeGateway6: Address?
     /** - Seealso: `Configuration.Builder.routes4` */
     public var routes4: [Route]?
     /** - Seealso: `Configuration.Builder.routes6` */
@@ -92,7 +92,7 @@ public struct OpenVPNConfiguration: Codable, Hashable {
     /** - Seealso: `Configuration.Builder.xorMethod` */
     public var xorMethod: OpenVPNObfuscationMethod?
 
-    public init(authToken: String? = nil, authUserPass: Bool? = nil, ca: OpenVPNCryptoContainer? = nil, checksEKU: Bool? = nil, checksSANHost: Bool? = nil, cipher: OpenVPNCipher? = nil, clientCertificate: OpenVPNCryptoContainer? = nil, clientKey: OpenVPNCryptoContainer? = nil, compressionAlgorithm: OpenVPNCompressionAlgorithm? = nil, compressionFraming: OpenVPNCompressionFraming? = nil, dataCiphers: [OpenVPNCipher]? = nil, digest: OpenVPNDigest? = nil, dnsDomain: String? = nil, dnsServers: [String]? = nil, httpProxy: String? = nil, httpsProxy: String? = nil, ipv4: IPSettings? = nil, ipv6: IPSettings? = nil, keepAliveInterval: Double? = nil, keepAliveTimeout: Double? = nil, mtu: Int? = nil, noPullMask: [OpenVPNPullMask]? = nil, peerId: Int? = nil, proxyAutoConfigurationURL: String? = nil, proxyBypassDomains: [String]? = nil, randomizeEndpoint: Bool? = nil, randomizeHostnames: Bool? = nil, remotes: [String]? = nil, renegotiatesAfter: Double? = nil, routeGateway4: String? = nil, routeGateway6: String? = nil, routes4: [Route]? = nil, routes6: [Route]? = nil, routingPolicies: [OpenVPNRoutingPolicy]? = nil, sanHost: String? = nil, searchDomains: [String]? = nil, staticChallenge: Bool? = nil, tlsSecurityLevel: Int? = nil, tlsWrap: OpenVPNTLSWrap? = nil, usesPIAPatches: Bool? = nil, xorMethod: OpenVPNObfuscationMethod? = nil) {
+    public init(authToken: String? = nil, authUserPass: Bool? = nil, ca: OpenVPNCryptoContainer? = nil, checksEKU: Bool? = nil, checksSANHost: Bool? = nil, cipher: OpenVPNCipher? = nil, clientCertificate: OpenVPNCryptoContainer? = nil, clientKey: OpenVPNCryptoContainer? = nil, compressionAlgorithm: OpenVPNCompressionAlgorithm? = nil, compressionFraming: OpenVPNCompressionFraming? = nil, dataCiphers: [OpenVPNCipher]? = nil, digest: OpenVPNDigest? = nil, dnsDomain: String? = nil, dnsServers: [String]? = nil, httpProxy: Endpoint? = nil, httpsProxy: Endpoint? = nil, ipv4: IPSettings? = nil, ipv6: IPSettings? = nil, keepAliveInterval: Double? = nil, keepAliveTimeout: Double? = nil, mtu: Int? = nil, noPullMask: [OpenVPNPullMask]? = nil, peerId: ModelUInt32? = nil, proxyAutoConfigurationURL: URL? = nil, proxyBypassDomains: [String]? = nil, randomizeEndpoint: Bool? = nil, randomizeHostnames: Bool? = nil, remotes: [ExtendedEndpoint]? = nil, renegotiatesAfter: Double? = nil, routeGateway4: Address? = nil, routeGateway6: Address? = nil, routes4: [Route]? = nil, routes6: [Route]? = nil, routingPolicies: [OpenVPNRoutingPolicy]? = nil, sanHost: String? = nil, searchDomains: [String]? = nil, staticChallenge: Bool? = nil, tlsSecurityLevel: Int? = nil, tlsWrap: OpenVPNTLSWrap? = nil, usesPIAPatches: Bool? = nil, xorMethod: OpenVPNObfuscationMethod? = nil) {
         self.authToken = authToken
         self.authUserPass = authUserPass
         self.ca = ca
@@ -136,96 +136,6 @@ public struct OpenVPNConfiguration: Codable, Hashable {
         self.xorMethod = xorMethod
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case authToken
-        case authUserPass
-        case ca
-        case checksEKU
-        case checksSANHost
-        case cipher
-        case clientCertificate
-        case clientKey
-        case compressionAlgorithm
-        case compressionFraming
-        case dataCiphers
-        case digest
-        case dnsDomain
-        case dnsServers
-        case httpProxy
-        case httpsProxy
-        case ipv4
-        case ipv6
-        case keepAliveInterval
-        case keepAliveTimeout
-        case mtu
-        case noPullMask
-        case peerId
-        case proxyAutoConfigurationURL
-        case proxyBypassDomains
-        case randomizeEndpoint
-        case randomizeHostnames
-        case remotes
-        case renegotiatesAfter
-        case routeGateway4
-        case routeGateway6
-        case routes4
-        case routes6
-        case routingPolicies
-        case sanHost
-        case searchDomains
-        case staticChallenge
-        case tlsSecurityLevel
-        case tlsWrap
-        case usesPIAPatches
-        case xorMethod
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(authToken, forKey: .authToken)
-        try container.encodeIfPresent(authUserPass, forKey: .authUserPass)
-        try container.encodeIfPresent(ca, forKey: .ca)
-        try container.encodeIfPresent(checksEKU, forKey: .checksEKU)
-        try container.encodeIfPresent(checksSANHost, forKey: .checksSANHost)
-        try container.encodeIfPresent(cipher, forKey: .cipher)
-        try container.encodeIfPresent(clientCertificate, forKey: .clientCertificate)
-        try container.encodeIfPresent(clientKey, forKey: .clientKey)
-        try container.encodeIfPresent(compressionAlgorithm, forKey: .compressionAlgorithm)
-        try container.encodeIfPresent(compressionFraming, forKey: .compressionFraming)
-        try container.encodeIfPresent(dataCiphers, forKey: .dataCiphers)
-        try container.encodeIfPresent(digest, forKey: .digest)
-        try container.encodeIfPresent(dnsDomain, forKey: .dnsDomain)
-        try container.encodeIfPresent(dnsServers, forKey: .dnsServers)
-        try container.encodeIfPresent(httpProxy, forKey: .httpProxy)
-        try container.encodeIfPresent(httpsProxy, forKey: .httpsProxy)
-        try container.encodeIfPresent(ipv4, forKey: .ipv4)
-        try container.encodeIfPresent(ipv6, forKey: .ipv6)
-        try container.encodeIfPresent(keepAliveInterval, forKey: .keepAliveInterval)
-        try container.encodeIfPresent(keepAliveTimeout, forKey: .keepAliveTimeout)
-        try container.encodeIfPresent(mtu, forKey: .mtu)
-        try container.encodeIfPresent(noPullMask, forKey: .noPullMask)
-        try container.encodeIfPresent(peerId, forKey: .peerId)
-        try container.encodeIfPresent(proxyAutoConfigurationURL, forKey: .proxyAutoConfigurationURL)
-        try container.encodeIfPresent(proxyBypassDomains, forKey: .proxyBypassDomains)
-        try container.encodeIfPresent(randomizeEndpoint, forKey: .randomizeEndpoint)
-        try container.encodeIfPresent(randomizeHostnames, forKey: .randomizeHostnames)
-        try container.encodeIfPresent(remotes, forKey: .remotes)
-        try container.encodeIfPresent(renegotiatesAfter, forKey: .renegotiatesAfter)
-        try container.encodeIfPresent(routeGateway4, forKey: .routeGateway4)
-        try container.encodeIfPresent(routeGateway6, forKey: .routeGateway6)
-        try container.encodeIfPresent(routes4, forKey: .routes4)
-        try container.encodeIfPresent(routes6, forKey: .routes6)
-        try container.encodeIfPresent(routingPolicies, forKey: .routingPolicies)
-        try container.encodeIfPresent(sanHost, forKey: .sanHost)
-        try container.encodeIfPresent(searchDomains, forKey: .searchDomains)
-        try container.encodeIfPresent(staticChallenge, forKey: .staticChallenge)
-        try container.encodeIfPresent(tlsSecurityLevel, forKey: .tlsSecurityLevel)
-        try container.encodeIfPresent(tlsWrap, forKey: .tlsWrap)
-        try container.encodeIfPresent(usesPIAPatches, forKey: .usesPIAPatches)
-        try container.encodeIfPresent(xorMethod, forKey: .xorMethod)
-    }
 }
 
 

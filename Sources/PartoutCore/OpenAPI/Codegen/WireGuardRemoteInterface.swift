@@ -10,17 +10,17 @@
 public struct WireGuardRemoteInterface: Codable, Hashable {
 
     /** The list of allowed subnets. */
-    public var allowedIPs: [String]
+    public var allowedIPs: [Subnet]
     /** The optional endpoint. */
-    public var endpoint: String?
+    public var endpoint: Endpoint?
     /** The keep-alive interval in seconds. */
-    public var keepAlive: Int?
+    public var keepAlive: ModelUInt16?
     /** The optional endpoint pre-shared key. */
-    public var preSharedKey: String?
+    public var preSharedKey: WireGuardKey?
     /** The endpoint public key. */
-    public var publicKey: String
+    public var publicKey: WireGuardKey
 
-    public init(allowedIPs: [String], endpoint: String? = nil, keepAlive: Int? = nil, preSharedKey: String? = nil, publicKey: String) {
+    public init(allowedIPs: [Subnet], endpoint: Endpoint? = nil, keepAlive: ModelUInt16? = nil, preSharedKey: WireGuardKey? = nil, publicKey: WireGuardKey) {
         self.allowedIPs = allowedIPs
         self.endpoint = endpoint
         self.keepAlive = keepAlive
@@ -28,24 +28,6 @@ public struct WireGuardRemoteInterface: Codable, Hashable {
         self.publicKey = publicKey
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case allowedIPs
-        case endpoint
-        case keepAlive
-        case preSharedKey
-        case publicKey
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(allowedIPs, forKey: .allowedIPs)
-        try container.encodeIfPresent(endpoint, forKey: .endpoint)
-        try container.encodeIfPresent(keepAlive, forKey: .keepAlive)
-        try container.encodeIfPresent(preSharedKey, forKey: .preSharedKey)
-        try container.encode(publicKey, forKey: .publicKey)
-    }
 }
 
 

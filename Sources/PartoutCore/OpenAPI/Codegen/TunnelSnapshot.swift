@@ -23,24 +23,6 @@ public struct TunnelSnapshot: Codable, Hashable {
         self.status = status
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case environment
-        case id
-        case isEnabled
-        case onDemand
-        case status
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(environment, forKey: .environment)
-        try container.encode(id, forKey: .id)
-        try container.encode(isEnabled, forKey: .isEnabled)
-        try container.encode(onDemand, forKey: .onDemand)
-        try container.encode(status, forKey: .status)
-    }
 }
 
 

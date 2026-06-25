@@ -12,25 +12,13 @@ public struct DNSModuleProtocolTypeHttps: Codable, Hashable {
         case https = "https"
     }
     public var type: ModelType
-    public var url: String
+    public var url: URL
 
-    public init(type: ModelType, url: String) {
+    public init(type: ModelType, url: URL) {
         self.type = type
         self.url = url
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case type
-        case url
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(type, forKey: .type)
-        try container.encode(url, forKey: .url)
-    }
 }
 
 

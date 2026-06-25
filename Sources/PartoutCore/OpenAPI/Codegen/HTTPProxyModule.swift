@@ -9,15 +9,13 @@
 /** HTTP proxy settings. */
 public struct HTTPProxyModule: Codable, Hashable {
 
-    public var bypassDomains: [String]
+    public var bypassDomains: [Address]
     public var id: UniqueID
-    public var pacURL: String?
-    /** Represents an endpoint. */
-    public var proxy: String?
-    /** Represents an endpoint. */
-    public var secureProxy: String?
+    public var pacURL: URL?
+    public var proxy: Endpoint?
+    public var secureProxy: Endpoint?
 
-    public init(bypassDomains: [String], id: UniqueID, pacURL: String? = nil, proxy: String? = nil, secureProxy: String? = nil) {
+    public init(bypassDomains: [Address], id: UniqueID, pacURL: URL? = nil, proxy: Endpoint? = nil, secureProxy: Endpoint? = nil) {
         self.bypassDomains = bypassDomains
         self.id = id
         self.pacURL = pacURL
@@ -25,24 +23,6 @@ public struct HTTPProxyModule: Codable, Hashable {
         self.secureProxy = secureProxy
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case bypassDomains
-        case id
-        case pacURL
-        case proxy
-        case secureProxy
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(bypassDomains, forKey: .bypassDomains)
-        try container.encode(id, forKey: .id)
-        try container.encodeIfPresent(pacURL, forKey: .pacURL)
-        try container.encodeIfPresent(proxy, forKey: .proxy)
-        try container.encodeIfPresent(secureProxy, forKey: .secureProxy)
-    }
 }
 
 

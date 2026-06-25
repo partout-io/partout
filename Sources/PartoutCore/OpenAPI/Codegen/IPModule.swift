@@ -21,22 +21,6 @@ public struct IPModule: Codable, Hashable {
         self.mtu = mtu
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case id
-        case ipv4
-        case ipv6
-        case mtu
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encodeIfPresent(ipv4, forKey: .ipv4)
-        try container.encodeIfPresent(ipv6, forKey: .ipv6)
-        try container.encodeIfPresent(mtu, forKey: .mtu)
-    }
 }
 
 

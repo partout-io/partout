@@ -21,22 +21,6 @@ public struct OnDemandModule: Codable, Hashable {
         self.withSSIDs = withSSIDs
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case id
-        case policy
-        case withOtherNetworks
-        case withSSIDs
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(policy, forKey: .policy)
-        try container.encode(withOtherNetworks, forKey: .withOtherNetworks)
-        try container.encode(withSSIDs, forKey: .withSSIDs)
-    }
 }
 
 

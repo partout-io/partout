@@ -19,18 +19,6 @@ public struct ProfileBehavior: Codable, Hashable {
         self.includesAllNetworks = includesAllNetworks
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case disconnectsOnSleep
-        case includesAllNetworks
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(disconnectsOnSleep, forKey: .disconnectsOnSleep)
-        try container.encodeIfPresent(includesAllNetworks, forKey: .includesAllNetworks)
-    }
 }
 
 

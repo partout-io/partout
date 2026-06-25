@@ -159,6 +159,10 @@ extension TunnelControllerOptions {
 }
 
 extension TunnelSnapshot.Environment {
+    public init() {
+        self.init(connectionStatus: .disconnected, dataCount: DataCount(), lastErrorCode: nil)
+    }
+
     public func with(connectionStatus: ConnectionStatus) -> Self {
         var copy = self
         copy.connectionStatus = connectionStatus
@@ -183,6 +187,10 @@ extension TunnelSnapshot.Environment {
 }
 
 extension TunnelSnapshot {
+    public init(id: Profile.ID, isEnabled: Bool, status: TunnelStatus, onDemand: Bool, environment: Environment? = nil) {
+        self.init(environment: environment, id: id, isEnabled: isEnabled, onDemand: onDemand, status: status)
+    }
+
     public func with(environment: Environment?) -> Self {
         var copy = self
         copy.environment = environment
@@ -238,12 +246,12 @@ extension TunnelEnvironmentReader {
 extension TunnelRemoteInfoWrapper {
     init(_ profile: Profile, options: TunnelControllerOptions, info: TunnelRemoteInfo) {
         self.init(
-            profile: profile.asTaggedProfile,
+            address: info.address,
+            modules: info.modules?.compactMap(\.taggedModule),
             options: options,
             originalModuleId: info.originalModuleId,
-            address: info.address,
-            requiresVirtualDevice: info.requiresVirtualDevice,
-            modules: info.modules?.compactMap(\.taggedModule)
+            profile: profile.asTaggedProfile,
+            requiresVirtualDevice: info.requiresVirtualDevice
         )
     }
 }

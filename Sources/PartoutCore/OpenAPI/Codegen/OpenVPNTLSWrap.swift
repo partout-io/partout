@@ -22,20 +22,6 @@ public struct OpenVPNTLSWrap: Codable, Hashable {
         self.wrappedKey = wrappedKey
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case key
-        case strategy
-        case wrappedKey
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(key, forKey: .key)
-        try container.encode(strategy, forKey: .strategy)
-        try container.encodeIfPresent(wrappedKey, forKey: .wrappedKey)
-    }
 }
 
 

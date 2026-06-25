@@ -1,0 +1,58 @@
+{{^objcCompatible}}{{#nonPublicApi}}internal{{/nonPublicApi}}{{^nonPublicApi}}public{{/nonPublicApi}} {{#useClasses}}final class{{/useClasses}}{{^useClasses}}struct{{/useClasses}} {{{classname}}}: {{#useVapor}}Content{{/useVapor}}{{^useVapor}}Codable{{#useJsonEncodable}}, JSONEncodable{{/useJsonEncodable}}{{/useVapor}}{{#vendorExtensions.x-swift-hashable}}, Hashable{{/vendorExtensions.x-swift-hashable}} {
+{{/objcCompatible}}{{#objcCompatible}}@objcMembers {{#nonPublicApi}}internal{{/nonPublicApi}}{{^nonPublicApi}}public{{/nonPublicApi}} class {{classname}}: NSObject, Codable{{#useJsonEncodable}}, JSONEncodable{{/useJsonEncodable}} {
+{{/objcCompatible}}
+
+{{#allVars}}
+{{#isEnum}}
+{{> modelInlineEnumDeclaration}}
+
+{{/isEnum}}
+{{/allVars}}
+{{#allVars}}
+{{#validatable}}
+{{#hasValidation}}
+{{#isString}}
+    {{#nonPublicApi}}internal{{/nonPublicApi}}{{^nonPublicApi}}public{{/nonPublicApi}} static let {{{name}}}Rule = StringRule(minLength: {{#minLength}}{{{.}}}{{/minLength}}{{^minLength}}nil{{/minLength}}, maxLength: {{#maxLength}}{{{.}}}{{/maxLength}}{{^maxLength}}nil{{/maxLength}}, pattern: {{#pattern}}"{{{.}}}"{{/pattern}}{{^pattern}}nil{{/pattern}})
+{{/isString}}
+{{#isNumeric}}
+    {{#nonPublicApi}}internal{{/nonPublicApi}}{{^nonPublicApi}}public{{/nonPublicApi}} static let {{{name}}}Rule = NumericRule<{{{dataType}}}>(minimum: {{#minimum}}{{{.}}}{{/minimum}}{{^minimum}}nil{{/minimum}}, exclusiveMinimum: {{#exclusiveMinimum}}true{{/exclusiveMinimum}}{{^exclusiveMinimum}}false{{/exclusiveMinimum}}, maximum: {{#maximum}}{{{.}}}{{/maximum}}{{^maximum}}nil{{/maximum}}, exclusiveMaximum: {{#exclusiveMaximum}}true{{/exclusiveMaximum}}{{^exclusiveMaximum}}false{{/exclusiveMaximum}}, multipleOf: {{#multipleOf}}{{{.}}}{{/multipleOf}}{{^multipleOf}}nil{{/multipleOf}})
+{{/isNumeric}}
+{{#isArray}}
+    {{#nonPublicApi}}internal{{/nonPublicApi}}{{^nonPublicApi}}public{{/nonPublicApi}} static let {{{name}}}Rule = ArrayRule(minItems: {{#minItems}}{{{.}}}{{/minItems}}{{^minItems}}nil{{/minItems}}, maxItems: {{#maxItems}}{{{.}}}{{/maxItems}}{{^maxItems}}nil{{/maxItems}}, uniqueItems: {{#uniqueItems}}true{{/uniqueItems}}{{^uniqueItems}}false{{/uniqueItems}})
+{{/isArray}}
+{{/hasValidation}}
+{{/validatable}}
+{{/allVars}}
+{{#allVars}}
+{{#isEnum}}
+    {{#description}}/** {{{.}}} */
+    {{/description}}{{#deprecated}}@available(*, deprecated, message: "This property is deprecated.")
+    {{/deprecated}}{{#nonPublicApi}}internal{{/nonPublicApi}}{{^nonPublicApi}}public{{/nonPublicApi}} {{#readonlyProperties}}private(set) {{/readonlyProperties}}var {{{name}}}: {{#vendorExtensions.x-null-encodable}}NullEncodable<{{{datatypeWithEnum}}}>{{/vendorExtensions.x-null-encodable}}{{^vendorExtensions.x-null-encodable}}{{{datatypeWithEnum}}}{{#required}}{{#isNullable}}?{{/isNullable}}{{/required}}{{^required}}?{{/required}}{{/vendorExtensions.x-null-encodable}}{{#defaultValue}} = {{#vendorExtensions.x-null-encodable}}{{{vendorExtensions.x-null-encodable-default-value}}}{{/vendorExtensions.x-null-encodable}}{{^vendorExtensions.x-null-encodable}}{{{.}}}{{/vendorExtensions.x-null-encodable}}{{/defaultValue}}
+{{/isEnum}}
+{{^isEnum}}
+    {{#description}}/** {{{.}}} */
+    {{/description}}{{#deprecated}}@available(*, deprecated, message: "This property is deprecated.")
+    {{/deprecated}}{{#nonPublicApi}}internal{{/nonPublicApi}}{{^nonPublicApi}}public{{/nonPublicApi}} {{#readonlyProperties}}private(set) {{/readonlyProperties}}var {{{name}}}: {{#vendorExtensions.x-null-encodable}}NullEncodable<{{{datatype}}}>{{/vendorExtensions.x-null-encodable}}{{^vendorExtensions.x-null-encodable}}{{{datatype}}}{{#required}}{{#isNullable}}?{{/isNullable}}{{/required}}{{^required}}?{{/required}}{{/vendorExtensions.x-null-encodable}}{{#defaultValue}} = {{#vendorExtensions.x-null-encodable}}{{{vendorExtensions.x-null-encodable-default-value}}}{{/vendorExtensions.x-null-encodable}}{{^vendorExtensions.x-null-encodable}}{{{.}}}{{/vendorExtensions.x-null-encodable}}{{/defaultValue}}
+{{/isEnum}}
+{{/allVars}}
+{{#hasVars}}
+
+    {{#nonPublicApi}}internal{{/nonPublicApi}}{{^nonPublicApi}}public{{/nonPublicApi}} init({{#allVars}}{{{name}}}: {{#vendorExtensions.x-null-encodable}}NullEncodable<{{{datatypeWithEnum}}}>{{/vendorExtensions.x-null-encodable}}{{^vendorExtensions.x-null-encodable}}{{{datatypeWithEnum}}}{{#required}}{{#isNullable}}?{{/isNullable}}{{/required}}{{^required}}?{{/required}}{{/vendorExtensions.x-null-encodable}}{{#defaultValue}} = {{#vendorExtensions.x-null-encodable}}{{{vendorExtensions.x-null-encodable-default-value}}}{{/vendorExtensions.x-null-encodable}}{{^vendorExtensions.x-null-encodable}}{{{.}}}{{/vendorExtensions.x-null-encodable}}{{/defaultValue}}{{^defaultValue}}{{^required}} = {{#vendorExtensions.x-null-encodable}}.encodeNull{{/vendorExtensions.x-null-encodable}}{{^vendorExtensions.x-null-encodable}}nil{{/vendorExtensions.x-null-encodable}}{{/required}}{{/defaultValue}}{{^-last}}, {{/-last}}{{/allVars}}) {
+        {{#allVars}}
+        self.{{{name}}} = {{{name}}}
+        {{/allVars}}
+    }
+{{/hasVars}}{{^objcCompatible}}{{#useClasses}}{{#vendorExtensions.x-swift-hashable}}
+
+    {{#nonPublicApi}}internal{{/nonPublicApi}}{{^nonPublicApi}}public{{/nonPublicApi}} static func == (lhs: {{classname}}, rhs: {{classname}}) -> Bool {
+        {{#allVars}}
+        lhs.{{{name}}} == rhs.{{{name}}}{{^-last}} &&{{/-last}}
+        {{/allVars}}
+    }
+
+    {{#nonPublicApi}}internal{{/nonPublicApi}}{{^nonPublicApi}}public{{/nonPublicApi}} func hash(into hasher: inout Hasher) {
+        {{#allVars}}
+        hasher.combine({{{name}}}{{^vendorExtensions.x-null-encodable}}{{^required}}?{{/required}}{{/vendorExtensions.x-null-encodable}}.hashValue)
+        {{/allVars}}
+    }{{/vendorExtensions.x-swift-hashable}}{{/useClasses}}{{/objcCompatible}}
+}

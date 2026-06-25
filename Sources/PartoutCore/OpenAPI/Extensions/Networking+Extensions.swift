@@ -4,6 +4,19 @@
 
 internal import _PartoutPortable_C
 
+/// A hostname or IP address.
+@frozen
+public enum Address: Hashable, Codable, Sendable {
+    case ip(String, _ family: Family)
+    case hostname(String)
+
+    @frozen
+    public enum Family: String, Sendable {
+        case v4
+        case v6
+    }
+}
+
 extension Address: RawRepresentable {
     public var rawValue: String {
         switch self {
@@ -162,9 +175,17 @@ extension IPSocketType {
     }
 }
 
-extension EndpointProtocol {
+/// Defines the communication protocol of an endpoint.
+public struct EndpointProtocol: Hashable, Sendable {
+    /// The socket type.
+    public let socketType: IPSocketType
+
+    /// The remote port.
+    public let port: UInt16
+
     public init(_ socketType: IPSocketType, _ port: UInt16) {
-        self.init(socketType: socketType, port: port)
+        self.socketType = socketType
+        self.port = port
     }
 }
 
@@ -210,7 +231,14 @@ extension EndpointProtocol: Codable {
     }
 }
 
-extension Endpoint {
+/// Represents an endpoint.
+public struct Endpoint: Hashable, Codable, Sendable {
+    /// The address.
+    public let address: Address
+
+    /// The port.
+    public let port: UInt16
+
     public init(_ rawAddress: String, _ port: UInt16) throws {
         guard let address = Address(rawValue: rawAddress) else {
             throw PartoutError(.invalidValue)
@@ -219,7 +247,8 @@ extension Endpoint {
     }
 
     public init(_ address: Address, _ port: UInt16) {
-        self.init(address: address, port: port)
+        self.address = address
+        self.port = port
     }
 }
 
@@ -261,7 +290,8 @@ extension Endpoint: SensitiveDebugStringConvertible {
     }
 }
 
-extension ExtendedEndpoint {
+/// Aggregates an address and an ``EndpointProtocol``.
+public struct ExtendedEndpoint: Hashable, Codable, Sendable {
     private static var rx: Regex<(Substring, Substring, Substring, Substring)> {
         let pattern = "^([^\\s]+):(UDP[46]?|TCP[46]?):(\\d+)$"
         do {
@@ -271,6 +301,10 @@ extension ExtendedEndpoint {
         }
     }
 
+    public let address: Address
+
+    public let proto: EndpointProtocol
+
     public init(_ rawAddress: String, _ proto: EndpointProtocol) throws {
         guard let address = Address(rawValue: rawAddress) else {
             throw PartoutError(.invalidValue)
@@ -279,7 +313,8 @@ extension ExtendedEndpoint {
     }
 
     public init(_ address: Address, _ proto: EndpointProtocol) {
-        self.init(address: address, proto: proto)
+        self.address = address
+        self.proto = proto
     }
 
     public var isIPv4: Bool {
@@ -345,7 +380,14 @@ extension ExtendedEndpoint: SensitiveDebugStringConvertible {
     }
 }
 
-extension Subnet {
+/// An IPv4/v6 subnet.
+public struct Subnet: Hashable, Codable, Sendable {
+    /// The subnet address.
+    public let address: Address
+
+    /// The prefix (0-8 for IPv4, 0-128 for IPv6).
+    public let prefixLength: Int
+
     public var ipv4Mask: String {
         guard case .ip(_, let family) = address else {
             preconditionFailure()
@@ -399,7 +441,8 @@ extension Subnet {
         guard prefixLength >= 0 && prefixLength <= maxPrefixLength else {
             return nil
         }
-        self.init(address: address, prefixLength: prefixLength)
+        self.address = address
+        self.prefixLength = prefixLength
     }
 }
 
@@ -489,7 +532,7 @@ extension Route: CustomDebugStringConvertible {
 
 extension IPSettings {
     public init(subnets: [Subnet]) {
-        self.init(subnets: subnets, includedRoutes: [], excludedRoutes: [])
+        self.init(excludedRoutes: [], includedRoutes: [], subnets: subnets)
     }
 
     public init(subnet: Subnet?) {
@@ -572,7 +615,7 @@ extension IPSettings {
         let subnets = try container.decodeIfPresent([Subnet].self, forKey: .subnets) ?? []
         let includedRoutes = try container.decodeIfPresent([Route].self, forKey: .includedRoutes) ?? []
         let excludedRoutes = try container.decodeIfPresent([Route].self, forKey: .excludedRoutes) ?? []
-        self.init(subnets: subnets, includedRoutes: includedRoutes, excludedRoutes: excludedRoutes)
+        self.init(excludedRoutes: excludedRoutes, includedRoutes: includedRoutes, subnets: subnets)
     }
 }
 

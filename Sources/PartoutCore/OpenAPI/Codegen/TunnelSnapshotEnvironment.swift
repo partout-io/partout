@@ -18,20 +18,6 @@ public struct TunnelSnapshotEnvironment: Codable, Hashable {
         self.lastErrorCode = lastErrorCode
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case connectionStatus
-        case dataCount
-        case lastErrorCode
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(connectionStatus, forKey: .connectionStatus)
-        try container.encode(dataCount, forKey: .dataCount)
-        try container.encodeIfPresent(lastErrorCode, forKey: .lastErrorCode)
-    }
 }
 
 

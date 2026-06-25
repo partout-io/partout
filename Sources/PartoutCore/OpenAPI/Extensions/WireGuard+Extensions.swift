@@ -6,12 +6,17 @@ extension LoggerCategory {
     public static let wireguard = Self(rawValue: "wireguard")
 }
 
-extension WireGuard.Key {
-    public init?(rawValue: String) {
-        guard Data(base64Encoded: rawValue) != nil else {
-            return nil
+extension WireGuard {
+    /// A Base64-encoded key.
+    public struct Key: Hashable, Codable, RawRepresentable, Sendable {
+        public let rawValue: String
+
+        public init?(rawValue: String) {
+            guard Data(base64Encoded: rawValue) != nil else {
+                return nil
+            }
+            self.rawValue = rawValue
         }
-        self.rawValue = rawValue
     }
 }
 
@@ -59,10 +64,10 @@ extension WireGuard.LocalInterface {
                 return addr
             }
             return WireGuard.LocalInterface(
-                privateKey: validPrivateKey,
                 addresses: validAddresses,
                 dns: try dns?.build(),
-                mtu: mtu
+                mtu: mtu,
+                privateKey: validPrivateKey
             )
         }
     }
@@ -124,11 +129,11 @@ extension WireGuard.RemoteInterface {
                 return addr
             }
             return WireGuard.RemoteInterface(
-                publicKey: validPublicKey,
-                preSharedKey: validPreSharedKey,
-                endpoint: validEndpoint,
                 allowedIPs: validAllowedIPs,
-                keepAlive: keepAlive
+                endpoint: validEndpoint,
+                keepAlive: keepAlive,
+                preSharedKey: validPreSharedKey,
+                publicKey: validPublicKey
             )
         }
     }
@@ -191,11 +196,10 @@ private extension Subnet {
 }
 
 extension PartoutError.ModuleField.WireGuard {
-    private static let root = "WireGuard"
-    public static let publicKey = PartoutError.ModuleField("\(root).publicKey")
-    public static let preSharedKey = PartoutError.ModuleField("\(root).preSharedKey")
-    public static let endpoint = PartoutError.ModuleField("\(root).endpoint")
-    public static let allowedIPs = PartoutError.ModuleField("\(root).allowedIPs")
+    public static let publicKey = PartoutError.ModuleField("WireGuard.publicKey")
+    public static let preSharedKey = PartoutError.ModuleField("WireGuard.preSharedKey")
+    public static let endpoint = PartoutError.ModuleField("WireGuard.endpoint")
+    public static let allowedIPs = PartoutError.ModuleField("WireGuard.allowedIPs")
 }
 
 extension WireGuard.Configuration: BuildableType {
@@ -307,7 +311,7 @@ extension WireGuardModule {
             guard let configurationBuilder else {
                 throw PartoutError(.incompleteModule, self)
             }
-            return WireGuardModule(id: id, configuration: try configurationBuilder.build())
+            return WireGuardModule(configuration: try configurationBuilder.build(), id: id)
         }
     }
 }

@@ -17,18 +17,6 @@ public struct OpenVPNStaticKey: Codable, Hashable {
         self.dir = dir
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case data
-        case dir
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(data, forKey: .data)
-        try container.encodeIfPresent(dir, forKey: .dir)
-    }
 }
 
 

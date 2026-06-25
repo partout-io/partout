@@ -19,18 +19,6 @@ public struct OpenVPNObfuscationMethodXormask: Codable, Hashable {
         self.mask = mask
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case type
-        case mask
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(type, forKey: .type)
-        try container.encode(mask, forKey: .mask)
-    }
 }
 
 

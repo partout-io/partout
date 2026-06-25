@@ -9,17 +9,16 @@
 /** DNS settings. */
 public struct DNSModule: Codable, Hashable {
 
-    /** A hostname or IP address. */
-    public var domainName: String?
+    public var domainName: Address?
     public var domainPolicy: DNSModuleDomainPolicy?
     public var id: UniqueID
     public var inheritsVPN: Bool?
     public var protocolType: DNSModuleProtocolType
     public var routesThroughVPN: Bool?
-    public var searchDomains: [String]?
-    public var servers: [String]
+    public var searchDomains: [Address]?
+    public var servers: [Address]
 
-    public init(domainName: String? = nil, domainPolicy: DNSModuleDomainPolicy? = nil, id: UniqueID, inheritsVPN: Bool? = nil, protocolType: DNSModuleProtocolType, routesThroughVPN: Bool? = nil, searchDomains: [String]? = nil, servers: [String]) {
+    public init(domainName: Address? = nil, domainPolicy: DNSModuleDomainPolicy? = nil, id: UniqueID, inheritsVPN: Bool? = nil, protocolType: DNSModuleProtocolType, routesThroughVPN: Bool? = nil, searchDomains: [Address]? = nil, servers: [Address]) {
         self.domainName = domainName
         self.domainPolicy = domainPolicy
         self.id = id
@@ -30,30 +29,6 @@ public struct DNSModule: Codable, Hashable {
         self.servers = servers
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case domainName
-        case domainPolicy
-        case id
-        case inheritsVPN
-        case protocolType
-        case routesThroughVPN
-        case searchDomains
-        case servers
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(domainName, forKey: .domainName)
-        try container.encodeIfPresent(domainPolicy, forKey: .domainPolicy)
-        try container.encode(id, forKey: .id)
-        try container.encodeIfPresent(inheritsVPN, forKey: .inheritsVPN)
-        try container.encode(protocolType, forKey: .protocolType)
-        try container.encodeIfPresent(routesThroughVPN, forKey: .routesThroughVPN)
-        try container.encodeIfPresent(searchDomains, forKey: .searchDomains)
-        try container.encode(servers, forKey: .servers)
-    }
 }
 
 

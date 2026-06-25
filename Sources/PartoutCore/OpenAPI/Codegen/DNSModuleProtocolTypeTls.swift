@@ -19,18 +19,6 @@ public struct DNSModuleProtocolTypeTls: Codable, Hashable {
         self.hostname = hostname
     }
 
-    public enum CodingKeys: String, CodingKey, CaseIterable {
-        case type
-        case hostname
-    }
-
-    // Encodable protocol methods
-
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(type, forKey: .type)
-        try container.encode(hostname, forKey: .hostname)
-    }
 }
 
 

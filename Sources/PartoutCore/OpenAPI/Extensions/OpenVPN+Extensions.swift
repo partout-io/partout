@@ -65,15 +65,30 @@ extension OpenVPN.CompressionFraming: CustomStringConvertible {
     }
 }
 
-extension OpenVPN.ObfuscationMethod {
-    public var mask: SecureData? {
-        switch self {
-        case .xormask(let mask):
-            return mask
-        case .obfuscate(let mask):
-            return mask
-        default:
-            return nil
+extension OpenVPN {
+    /// The obfuscation method.
+    public enum ObfuscationMethod: Hashable, Codable, Sendable {
+        /// XORs the bytes in each buffer with the given mask.
+        case xormask(mask: SecureData)
+
+        /// XORs each byte with its position in the packet.
+        case xorptrpos
+
+        /// Reverses the order of bytes in each buffer except for the first (abcde becomes aedcb).
+        case reverse
+
+        /// Performs several of the above steps (xormask -> xorptrpos -> reverse -> xorptrpos).
+        case obfuscate(mask: SecureData)
+
+        public var mask: SecureData? {
+            switch self {
+            case .xormask(let mask):
+                return mask
+            case .obfuscate(let mask):
+                return mask
+            default:
+                return nil
+            }
         }
     }
 }
@@ -255,6 +270,18 @@ extension OpenVPN.StaticKey {
     private static let fileFoot = "-----END OpenVPN Static key V1-----"
     private static let nonHexCharset = CharacterSet(charactersIn: "0123456789abcdefABCDEF").inverted
 
+    public var secureData: SecureData {
+        data
+    }
+
+    public var direction: Direction? {
+        dir
+    }
+
+    public init(secureData: SecureData, direction: Direction?) {
+        self.init(data: secureData, dir: direction)
+    }
+
     public var cipherEncryptKey: SecureData {
         guard let direction else {
             fatalError("Direction not set")
@@ -393,7 +420,7 @@ extension OpenVPN.TLSWrap {
     }
 }
 
-extension OpenVPN.Credentials: Codable {
+extension OpenVPN.Credentials {
     enum CodingKeys: CodingKey {
         case username
         case password
@@ -404,10 +431,10 @@ extension OpenVPN.Credentials: Codable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
-            username: try container.decode(String.self, forKey: .username),
-            password: try container.decode(String.self, forKey: .password),
+            otp: try container.decodeIfPresent(String.self, forKey: .otp),
             otpMethod: try container.decode(OTPMethod.self, forKey: .otpMethod),
-            otp: try container.decodeIfPresent(String.self, forKey: .otp)
+            password: try container.decode(String.self, forKey: .password),
+            username: try container.decode(String.self, forKey: .username)
         )
     }
 
@@ -454,15 +481,15 @@ extension OpenVPN.Credentials {
         }
 
         public func build() -> OpenVPN.Credentials {
-            OpenVPN.Credentials(username: username, password: password, otpMethod: otpMethod, otp: otp)
+            OpenVPN.Credentials(otp: otp, otpMethod: otpMethod, password: password, username: username)
         }
 
         public func buildForAuthentication() throws -> OpenVPN.Credentials {
             OpenVPN.Credentials(
-                username: username,
-                password: try otpMethod.encoded(with: password, otp: otp),
+                otp: nil,
                 otpMethod: .none,
-                otp: nil
+                password: try otpMethod.encoded(with: password, otp: otp),
+                username: username
             )
         }
     }
@@ -537,19 +564,19 @@ private enum OpenVPNConfigurationFallback {
 }
 
 extension OpenVPN.Configuration {
-    public var fallbackCipher: Cipher {
+    public var fallbackCipher: OpenVPN.Cipher {
         cipher ?? dataCiphers?.first ?? OpenVPNConfigurationFallback.cipher
     }
 
-    public var fallbackDigest: Digest {
+    public var fallbackDigest: OpenVPN.Digest {
         digest ?? OpenVPNConfigurationFallback.digest
     }
 
-    public var fallbackCompressionFraming: CompressionFraming {
+    public var fallbackCompressionFraming: OpenVPN.CompressionFraming {
         compressionFraming ?? OpenVPNConfigurationFallback.compressionFraming
     }
 
-    public var fallbackCompressionAlgorithm: CompressionAlgorithm {
+    public var fallbackCompressionAlgorithm: OpenVPN.CompressionAlgorithm {
         compressionAlgorithm ?? OpenVPNConfigurationFallback.compressionAlgorithm
     }
 }
@@ -628,46 +655,46 @@ extension OpenVPN.Configuration {
                 }
             }
             return OpenVPN.Configuration(
-                cipher: cipher,
-                dataCiphers: dataCiphers,
-                digest: digest,
-                compressionFraming: compressionFraming,
-                compressionAlgorithm: compressionAlgorithm,
+                authToken: authToken,
+                authUserPass: authUserPass,
                 ca: ca,
-                clientCertificate: clientCertificate,
-                clientKey: clientKey,
-                tlsWrap: tlsWrap,
-                tlsSecurityLevel: tlsSecurityLevel,
-                keepAliveInterval: keepAliveInterval,
-                keepAliveTimeout: keepAliveTimeout,
-                renegotiatesAfter: renegotiatesAfter,
-                remotes: remotes,
                 checksEKU: checksEKU,
                 checksSANHost: checksSANHost,
-                sanHost: sanHost,
-                randomizeEndpoint: randomizeEndpoint,
-                randomizeHostnames: randomizeHostnames,
-                usesPIAPatches: usesPIAPatches,
-                mtu: mtu,
-                authUserPass: authUserPass,
-                staticChallenge: staticChallenge,
-                authToken: authToken,
-                peerId: peerId,
-                ipv4: ipv4,
-                ipv6: ipv6,
-                routes4: routes4,
-                routes6: routes6,
-                routeGateway4: routeGateway4,
-                routeGateway6: routeGateway6,
-                dnsServers: dnsServers,
+                cipher: cipher,
+                clientCertificate: clientCertificate,
+                clientKey: clientKey,
+                compressionAlgorithm: compressionAlgorithm,
+                compressionFraming: compressionFraming,
+                dataCiphers: dataCiphers,
+                digest: digest,
                 dnsDomain: dnsDomain,
-                searchDomains: searchDomains,
+                dnsServers: dnsServers,
                 httpProxy: httpProxy,
                 httpsProxy: httpsProxy,
+                ipv4: ipv4,
+                ipv6: ipv6,
+                keepAliveInterval: keepAliveInterval,
+                keepAliveTimeout: keepAliveTimeout,
+                mtu: mtu,
+                noPullMask: noPullMask,
+                peerId: peerId,
                 proxyAutoConfigurationURL: proxyAutoConfigurationURL,
                 proxyBypassDomains: proxyBypassDomains,
+                randomizeEndpoint: randomizeEndpoint,
+                randomizeHostnames: randomizeHostnames,
+                remotes: remotes,
+                renegotiatesAfter: renegotiatesAfter,
+                routeGateway4: routeGateway4,
+                routeGateway6: routeGateway6,
+                routes4: routes4,
+                routes6: routes6,
                 routingPolicies: routingPolicies,
-                noPullMask: noPullMask,
+                sanHost: sanHost,
+                searchDomains: searchDomains,
+                staticChallenge: staticChallenge,
+                tlsSecurityLevel: tlsSecurityLevel,
+                tlsWrap: tlsWrap,
+                usesPIAPatches: usesPIAPatches,
                 xorMethod: xorMethod
             )
         }
@@ -780,9 +807,9 @@ extension OpenVPNModule {
             builder?.staticChallenge = isInteractive
             let configuration = try builder?.build(isClient: true)
             return OpenVPNModule(
-                id: id,
                 configuration: configuration,
                 credentials: credentials,
+                id: id,
                 requiresInteractiveCredentials: isInteractive
             )
         }
