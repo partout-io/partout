@@ -145,7 +145,6 @@ set(PARTOUT_SOURCES
 ./PartoutCore/OpenAPI/Codegen/ProfileBehavior.swift
 ./PartoutCore/OpenAPI/Codegen/Route.swift
 ./PartoutCore/OpenAPI/Codegen/SocketType.swift
-./PartoutCore/OpenAPI/Codegen/TaggedModule.swift
 ./PartoutCore/OpenAPI/Codegen/TaggedModuleCustom.swift
 ./PartoutCore/OpenAPI/Codegen/TaggedModuleDNS.swift
 ./PartoutCore/OpenAPI/Codegen/TaggedModuleHTTPProxy.swift
@@ -199,6 +198,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/OpenAPI/Extensions/OpenVPN/StaticKey.swift
 ./PartoutCore/OpenAPI/Extensions/OpenVPN/TLSWrap.swift
 ./PartoutCore/OpenAPI/Extensions/PartoutError+Code.swift
+./PartoutCore/OpenAPI/Extensions/TaggedModule.swift
 ./PartoutCore/OpenAPI/Extensions/TaggedModule+Extensions.swift
 ./PartoutCore/OpenAPI/Extensions/TaggedProfile+Extensions.swift
 ./PartoutCore/OpenAPI/Extensions/WireGuard/Key.swift
