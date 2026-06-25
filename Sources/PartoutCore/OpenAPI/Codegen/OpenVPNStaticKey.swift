@@ -9,11 +9,10 @@
 /** Represents an OpenVPN static key file (as generated with --genkey) */
 public struct OpenVPNStaticKey: Codable, Hashable {
 
-    /** Wrapper of a byte array with safe encoding capabilities. */
-    public var data: String
+    public var data: SecureData
     public var dir: OpenVPNStaticKeyDirection?
 
-    public init(data: String, dir: OpenVPNStaticKeyDirection? = nil) {
+    public init(data: SecureData, dir: OpenVPNStaticKeyDirection? = nil) {
         self.data = data
         self.dir = dir
     }

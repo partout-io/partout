@@ -12,10 +12,9 @@ public struct OpenVPNObfuscationMethodObfuscate: Codable, Hashable {
         case obfuscate = "obfuscate"
     }
     public var type: ModelType
-    /** Wrapper of a byte array with safe encoding capabilities. */
-    public var mask: String
+    public var mask: SecureData
 
-    public init(type: ModelType, mask: String) {
+    public init(type: ModelType, mask: SecureData) {
         self.type = type
         self.mask = mask
     }

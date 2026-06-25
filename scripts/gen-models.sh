@@ -71,6 +71,8 @@ case $language in
             -t "$swift_template_dir" \
             --global-property=models,modelDocs=false,modelTests=false \
             --schema-mappings UniqueID=UniqueID \
+            --schema-mappings SecureData=SecureData \
+            --schema-mappings OpenVPN.CryptoContainer=OpenVPNCryptoContainer \
             --type-mappings AnyCodable=JSON \
             --additional-properties=projectName="$project_name" \
             --additional-properties=responseAs=AsyncAwait \

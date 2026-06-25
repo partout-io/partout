@@ -548,14 +548,7 @@ components:
         - append
         - encode
     OpenVPN.CryptoContainer:
-      additionalProperties: false
-      properties:
-        pem:
-          type: string
-          description: The content in PEM format (ASCII).
-      required:
-        - pem
-      type: object
+      type: string
       description: Represents a cryptographic container in PEM format.
     OpenVPN.Digest:
       enum:

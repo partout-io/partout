@@ -202,24 +202,30 @@ extension OpenVPN.ObfuscationMethod {
     }
 }
 
-extension OpenVPN.CryptoContainer {
-    private static let begin = "-----BEGIN "
-    private static let end = "-----END "
+extension OpenVPN {
+    /// Represents a cryptographic container in PEM format.
+    public struct CryptoContainer: Hashable, Sendable {
+        private static let begin = "-----BEGIN "
+        private static let end = "-----END "
 
-    public var isEncrypted: Bool {
-        pem.contains("ENCRYPTED")
-    }
+        /// The content in PEM format (ASCII).
+        public let pem: String
 
-    public init(pem: String) {
-        guard let beginRange = pem.ranges(of: Self.begin).first else {
-            self.pem = ""
-            return
+        public var isEncrypted: Bool {
+            pem.contains("ENCRYPTED")
         }
-        self.pem = String(pem[beginRange.lowerBound...])
-    }
 
-    public func write(to url: URL) throws {
-        try pem.write(toFile: url.filePath(), encoding: .ascii)
+        public init(pem: String) {
+            guard let beginRange = pem.ranges(of: Self.begin).first else {
+                self.pem = ""
+                return
+            }
+            self.pem = String(pem[beginRange.lowerBound...])
+        }
+
+        public func write(to url: URL) throws {
+            try pem.write(toFile: url.filePath(), encoding: .ascii)
+        }
     }
 }
 

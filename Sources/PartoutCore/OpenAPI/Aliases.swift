@@ -12,8 +12,9 @@ public typealias Address = String
 public typealias Endpoint = String
 public typealias EndpointProtocol = String
 public typealias ExtendedEndpoint = String
-public typealias SecureData = String
 public typealias Subnet = String
+
+public typealias OpenVPNCryptoContainer = OpenVPN.CryptoContainer
 
 extension DNSModule {
     public typealias DomainPolicy = DNSModuleDomainPolicy
@@ -37,7 +38,6 @@ extension OpenVPN {
     public typealias CompressionFraming = OpenVPNCompressionFraming
     public typealias Configuration = OpenVPNConfiguration
     public typealias Credentials = OpenVPNCredentials
-    public typealias CryptoContainer = OpenVPNCryptoContainer
     public typealias Digest = OpenVPNDigest
     public typealias ObfuscationMethod = OpenVPNObfuscationMethod
     public typealias PullMask = OpenVPNPullMask

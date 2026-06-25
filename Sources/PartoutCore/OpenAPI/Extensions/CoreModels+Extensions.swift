@@ -97,7 +97,10 @@ extension ProfileBehavior {
     }
 }
 
-extension SecureData {
+/// Wrapper of a byte array with safe encoding capabilities.
+public struct SecureData: Hashable, Codable, @unchecked Sendable {
+    private let innerData: [UInt8]
+
     public init?(_ string: String) {
         guard let data = string.data(using: .utf8) else {
             return nil
@@ -106,13 +109,13 @@ extension SecureData {
     }
 
     public init(_ data: Data) {
-        self.init(innerData: [UInt8](data))
+        innerData = [UInt8](data)
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let data = try container.decode(Data.self)
-        self.init(data)
+        innerData = [UInt8](data)
     }
 
     public func encode(to encoder: Encoder) throws {

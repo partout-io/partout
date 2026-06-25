@@ -14,9 +14,9 @@ public struct OpenVPNTLSWrap: Codable, Hashable {
     /** The wrapping strategy. */
     public var strategy: OpenVPNTLSWrapStrategy
     /** The wrapped client key appended to initial tls-crypt-v2 packets. */
-    public var wrappedKey: String?
+    public var wrappedKey: SecureData?
 
-    public init(key: OpenVPNStaticKey, strategy: OpenVPNTLSWrapStrategy, wrappedKey: String? = nil) {
+    public init(key: OpenVPNStaticKey, strategy: OpenVPNTLSWrapStrategy, wrappedKey: SecureData? = nil) {
         self.key = key
         self.strategy = strategy
         self.wrappedKey = wrappedKey
