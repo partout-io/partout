@@ -526,10 +526,3 @@ enum FoundationCompatibility {
         }
     }
 }
-
-// MARK: - Codegen
-
-package.dependencies.append(
-    .package(url: "https://github.com/partout-io/codegen", branch: "master")
-    // .package(path: "../../../codegen")
-)
