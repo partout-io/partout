@@ -11,10 +11,10 @@ public struct OpenVPNModule: Codable, Hashable {
 
     public var configuration: OpenVPNConfiguration?
     public var credentials: OpenVPNCredentials?
-    public var id: String
+    public var id: UniqueID
     public var requiresInteractiveCredentials: Bool?
 
-    public init(configuration: OpenVPNConfiguration? = nil, credentials: OpenVPNCredentials? = nil, id: String, requiresInteractiveCredentials: Bool? = nil) {
+    public init(configuration: OpenVPNConfiguration? = nil, credentials: OpenVPNCredentials? = nil, id: UniqueID, requiresInteractiveCredentials: Bool? = nil) {
         self.configuration = configuration
         self.credentials = credentials
         self.id = id

@@ -12,11 +12,11 @@ public struct TunnelRemoteInfoWrapper: Codable, Hashable {
     public var address: String?
     public var modules: [TaggedModule]?
     public var options: TunnelControllerOptions
-    public var originalModuleId: String
+    public var originalModuleId: UniqueID
     public var profile: TaggedProfile
     public var requiresVirtualDevice: Bool
 
-    public init(address: String? = nil, modules: [TaggedModule]? = nil, options: TunnelControllerOptions, originalModuleId: String, profile: TaggedProfile, requiresVirtualDevice: Bool) {
+    public init(address: String? = nil, modules: [TaggedModule]? = nil, options: TunnelControllerOptions, originalModuleId: UniqueID, profile: TaggedProfile, requiresVirtualDevice: Bool) {
         self.address = address
         self.modules = modules
         self.options = options

@@ -9,15 +9,15 @@
 /** A codable wrapper for a profile with all known modules. */
 public struct TaggedProfile: Codable, Hashable {
 
-    public var activeModulesIds: Set<String>
+    public var activeModulesIds: Set<UniqueID>
     public var behavior: ProfileBehavior?
-    public var id: String
+    public var id: UniqueID
     public var modules: [TaggedModule]
     public var name: String
     public var userInfo: JSON?
     public var version: Int?
 
-    public init(activeModulesIds: Set<String>, behavior: ProfileBehavior? = nil, id: String, modules: [TaggedModule], name: String, userInfo: JSON? = nil, version: Int? = nil) {
+    public init(activeModulesIds: Set<UniqueID>, behavior: ProfileBehavior? = nil, id: UniqueID, modules: [TaggedModule], name: String, userInfo: JSON? = nil, version: Int? = nil) {
         self.activeModulesIds = activeModulesIds
         self.behavior = behavior
         self.id = id

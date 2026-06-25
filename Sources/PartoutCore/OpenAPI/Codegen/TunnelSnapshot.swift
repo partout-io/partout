@@ -10,12 +10,12 @@
 public struct TunnelSnapshot: Codable, Hashable {
 
     public var environment: TunnelSnapshotEnvironment?
-    public var id: String
+    public var id: UniqueID
     public var isEnabled: Bool
     public var onDemand: Bool
     public var status: TunnelStatus
 
-    public init(environment: TunnelSnapshotEnvironment? = nil, id: String, isEnabled: Bool, onDemand: Bool, status: TunnelStatus) {
+    public init(environment: TunnelSnapshotEnvironment? = nil, id: UniqueID, isEnabled: Bool, onDemand: Bool, status: TunnelStatus) {
         self.environment = environment
         self.id = id
         self.isEnabled = isEnabled

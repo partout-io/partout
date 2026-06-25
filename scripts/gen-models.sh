@@ -70,6 +70,7 @@ case $language in
             -g swift5 \
             -t "$swift_template_dir" \
             --global-property=models,modelDocs=false,modelTests=false \
+            --schema-mappings UniqueID=UniqueID \
             --type-mappings AnyCodable=JSON \
             --additional-properties=projectName="$project_name" \
             --additional-properties=responseAs=AsyncAwait \

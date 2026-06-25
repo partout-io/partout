@@ -10,9 +10,9 @@
 public struct WireGuardModule: Codable, Hashable {
 
     public var configuration: WireGuardConfiguration?
-    public var id: String
+    public var id: UniqueID
 
-    public init(configuration: WireGuardConfiguration? = nil, id: String) {
+    public init(configuration: WireGuardConfiguration? = nil, id: UniqueID) {
         self.configuration = configuration
         self.id = id
     }

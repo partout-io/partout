@@ -6,10 +6,6 @@ extension LoggerCategory {
     public static let openvpn = Self(rawValue: "openvpn")
 }
 
-// XXX: Workaround for name clash
-/// Alias for ``OpenVPN/Configuration``.
-public typealias OpenVPNConfiguration = OpenVPN.Configuration
-
 extension OpenVPN.Cipher {
     public var keySize: Int {
         switch self {

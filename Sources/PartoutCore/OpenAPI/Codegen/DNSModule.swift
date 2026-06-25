@@ -12,14 +12,14 @@ public struct DNSModule: Codable, Hashable {
     /** A hostname or IP address. */
     public var domainName: String?
     public var domainPolicy: DNSModuleDomainPolicy?
-    public var id: String
+    public var id: UniqueID
     public var inheritsVPN: Bool?
     public var protocolType: DNSModuleProtocolType
     public var routesThroughVPN: Bool?
     public var searchDomains: [String]?
     public var servers: [String]
 
-    public init(domainName: String? = nil, domainPolicy: DNSModuleDomainPolicy? = nil, id: String, inheritsVPN: Bool? = nil, protocolType: DNSModuleProtocolType, routesThroughVPN: Bool? = nil, searchDomains: [String]? = nil, servers: [String]) {
+    public init(domainName: String? = nil, domainPolicy: DNSModuleDomainPolicy? = nil, id: UniqueID, inheritsVPN: Bool? = nil, protocolType: DNSModuleProtocolType, routesThroughVPN: Bool? = nil, searchDomains: [String]? = nil, servers: [String]) {
         self.domainName = domainName
         self.domainPolicy = domainPolicy
         self.id = id

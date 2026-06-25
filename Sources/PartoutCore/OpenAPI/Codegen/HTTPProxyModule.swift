@@ -10,14 +10,14 @@
 public struct HTTPProxyModule: Codable, Hashable {
 
     public var bypassDomains: [String]
-    public var id: String
+    public var id: UniqueID
     public var pacURL: String?
     /** Represents an endpoint. */
     public var proxy: String?
     /** Represents an endpoint. */
     public var secureProxy: String?
 
-    public init(bypassDomains: [String], id: String, pacURL: String? = nil, proxy: String? = nil, secureProxy: String? = nil) {
+    public init(bypassDomains: [String], id: UniqueID, pacURL: String? = nil, proxy: String? = nil, secureProxy: String? = nil) {
         self.bypassDomains = bypassDomains
         self.id = id
         self.pacURL = pacURL

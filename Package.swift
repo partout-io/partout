@@ -146,8 +146,7 @@ package.targets.append(contentsOf: [
             "PartoutCore_C"
         ],
         exclude: [
-            "OpenAPIGen",
-            "OpenAPIGenExtensions"
+            "OpenAPILegacy"
         ],
         swiftSettings: useFoundationCompatibility.swiftSettings
     ),

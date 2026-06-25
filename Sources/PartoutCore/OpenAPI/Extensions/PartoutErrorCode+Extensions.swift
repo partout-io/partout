@@ -2,10 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-extension PartoutError {
-    public typealias Code = PartoutErrorCode
-}
-
 public func == (lhs: String, rhs: PartoutError.Code) -> Bool {
     PartoutError.Code(rawValue: lhs) == rhs
 }
