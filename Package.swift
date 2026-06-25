@@ -145,6 +145,10 @@ package.targets.append(contentsOf: [
             "MiniFoundation",
             "PartoutCore_C"
         ],
+        exclude: [
+            "OpenAPIGen",
+            "OpenAPIGenExtensions"
+        ],
         swiftSettings: useFoundationCompatibility.swiftSettings
     ),
     .target(
