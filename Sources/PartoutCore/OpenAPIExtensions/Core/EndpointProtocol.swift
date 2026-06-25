@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 //
 // SPDX-License-Identifier: GPL-3.0
+
 /// Defines the communication protocol of an endpoint.
 public struct EndpointProtocol: Hashable, Sendable {
     /// The socket type.

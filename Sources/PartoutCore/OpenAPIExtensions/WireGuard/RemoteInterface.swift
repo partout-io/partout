@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 //
 // SPDX-License-Identifier: GPL-3.0
+
 extension WireGuard.RemoteInterface: BuildableType {
     public func builder() -> Builder {
         var copy = Builder(publicKey: publicKey.rawValue)

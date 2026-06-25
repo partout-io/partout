@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 //
 // SPDX-License-Identifier: GPL-3.0
+
 /// Represents an endpoint.
 public struct Endpoint: Hashable, Codable, Sendable {
     /// The address.

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 //
 // SPDX-License-Identifier: GPL-3.0
+
 extension OpenVPN.StaticKey {
     private static let contentLength = 256
     private static let keyCount = 4

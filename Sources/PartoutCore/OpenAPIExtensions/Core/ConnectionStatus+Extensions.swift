@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 //
 // SPDX-License-Identifier: GPL-3.0
+
 extension ConnectionStatus {
     public func canChange(to nextStatus: ConnectionStatus) -> Bool {
         switch self {

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 //
 // SPDX-License-Identifier: GPL-3.0
+
 extension ModuleType {
     public init(_ name: String) {
         let value = ModuleType(rawValue: name)

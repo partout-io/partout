@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 //
 // SPDX-License-Identifier: GPL-3.0
+
 extension OpenVPN {
     /// The obfuscation method.
     public enum ObfuscationMethod: Hashable, Codable, Sendable {

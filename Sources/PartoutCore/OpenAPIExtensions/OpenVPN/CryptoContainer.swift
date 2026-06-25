@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 //
 // SPDX-License-Identifier: GPL-3.0
+
 extension OpenVPN {
     /// Represents a cryptographic container in PEM format.
     public struct CryptoContainer: Hashable, Sendable {

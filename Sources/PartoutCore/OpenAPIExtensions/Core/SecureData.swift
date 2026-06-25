@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 //
 // SPDX-License-Identifier: GPL-3.0
+
 /// Wrapper of a byte array with safe encoding capabilities.
 public struct SecureData: Hashable, Codable, @unchecked Sendable {
     private let innerData: [UInt8]
