@@ -12,7 +12,7 @@ public struct OpenVPNCredentials: Sendable, Codable, Hashable {
     public let username: String
     /** The password. */
     public let password: String
-    /** The OTP method (defaults to ``OTPMethod-swift.enum/none``). */
+    /** The OTP method (defaults to none). */
     public let otpMethod: OpenVPNCredentialsOTPMethod
     /** The OTP. */
     public let otp: String?
