@@ -1,9 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 //
 // SPDX-License-Identifier: GPL-3.0
-//
-// Swift-specific extensions distilled from Sources/PartoutCore/OpenAPI.
-
 
 extension LoggerCategory {
     public static let openvpn = Self(rawValue: "openvpn")
