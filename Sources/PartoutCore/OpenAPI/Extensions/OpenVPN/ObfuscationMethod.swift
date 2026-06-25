@@ -31,6 +31,8 @@ extension OpenVPN {
     }
 }
 
+// MARK: - Custom Codable
+
 extension OpenVPN.ObfuscationMethod {
     enum Discriminator: String, Codable {
         case xormask

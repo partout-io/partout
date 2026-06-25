@@ -152,6 +152,8 @@ extension DNSModule {
     }
 }
 
+// MARK: - Custom Codable
+
 extension DNSModule.ProtocolType {
     typealias Discriminator = DNSProtocol
 

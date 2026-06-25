@@ -98,6 +98,8 @@ private extension OpenVPN.Credentials.OTPMethod {
     }
 }
 
+// MARK: - Custom Codable
+
 extension OpenVPN.Credentials.OTPMethod {
     private enum LegacyCodingKeys: String, CodingKey {
         case none
