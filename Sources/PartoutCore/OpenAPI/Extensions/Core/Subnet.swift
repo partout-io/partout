@@ -12,6 +12,7 @@ public struct Subnet: Hashable, Codable, Sendable {
     /// The prefix (0-8 for IPv4, 0-128 for IPv6).
     public let prefixLength: Int
 
+    /// The classic IPv4 netmask.
     public var ipv4Mask: String {
         guard case .ip(_, let family) = address else {
             preconditionFailure()

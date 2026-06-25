@@ -17,6 +17,7 @@ extension OpenVPN {
         /// Performs several of the above steps (xormask -> xorptrpos -> reverse -> xorptrpos).
         case obfuscate(mask: SecureData)
 
+        /// The optionally associated mask.
         public var mask: SecureData? {
             switch self {
             case .xormask(let mask):

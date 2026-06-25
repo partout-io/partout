@@ -2,9 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+/// Container of all OpenVPN entities.
+///
 /// Compatibility namespace for OpenVPN model types generated from OpenAPI.
 public enum OpenVPN {}
 
+/// Container of all WireGuard entities.
+///
 /// Compatibility namespace for WireGuard model types generated from OpenAPI.
 public enum WireGuard {}
 

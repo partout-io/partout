@@ -22,6 +22,10 @@ extension OpenVPN.StaticKey {
         self.init(data: secureData, dir: direction)
     }
 
+    /// Returns the encryption key.
+    ///
+    /// - Precondition: `direction` must be non-nil.
+    /// - Seealso: `Configuration.Builder.tlsWrap`
     public var cipherEncryptKey: SecureData {
         guard let direction else {
             fatalError("Direction not set")
@@ -34,6 +38,10 @@ extension OpenVPN.StaticKey {
         }
     }
 
+    /// Returns the decryption key.
+    ///
+    /// - Precondition: `direction` must be non-nil.
+    /// - Seealso: `Configuration.Builder.tlsWrap`
     public var cipherDecryptKey: SecureData {
         guard let direction else {
             fatalError("Direction not set")
@@ -46,6 +54,9 @@ extension OpenVPN.StaticKey {
         }
     }
 
+    /// Returns the HMAC sending key.
+    ///
+    /// - Seealso: `Configuration.Builder.tlsWrap`
     public var hmacSendKey: SecureData {
         guard let direction else {
             return key(at: 1)
@@ -58,6 +69,9 @@ extension OpenVPN.StaticKey {
         }
     }
 
+    /// Returns the HMAC receiving key.
+    ///
+    /// - Seealso: `Configuration.Builder.tlsWrap`
     public var hmacReceiveKey: SecureData {
         guard let direction else {
             return key(at: 1)
@@ -70,11 +84,23 @@ extension OpenVPN.StaticKey {
         }
     }
 
+    /**
+     Initializes with data and direction.
+
+     - Parameter data: The key data.
+     - Parameter direction: The key direction, or bidirectional if nil. For tls-crypt behavior, must not be nil.
+     */
     public init(data: Data, direction: Direction?) {
         precondition(data.count == OpenVPN.StaticKey.contentLength)
         self.init(secureData: SecureData(data), direction: direction)
     }
 
+    /**
+     Initializes with file content and direction.
+
+     - Parameter file: The text file containing the key.
+     - Parameter direction: The key direction, or bidirectional if nil.
+     */
     public init?(file: String, direction: Direction?) {
         let lines = file.split(separator: "\n")
         self.init(lines: lines, direction: direction)
@@ -118,6 +144,11 @@ extension OpenVPN.StaticKey {
         self.init(data: data, direction: direction)
     }
 
+    /**
+     Initializes as bidirectional.
+
+     - Parameter data: The key data.
+     */
     public init(biData data: Data) {
         self.init(data: data, direction: nil)
     }
@@ -132,6 +163,7 @@ extension OpenVPN.StaticKey {
         secureData.toHex()
     }
 
+    /// Serializes the key as a `tls-auth`/`tls-crypt` static key file.
     public func asFileContents() -> String {
         let hex = hexString
         let keyLines = stride(from: 0, to: hex.count, by: 32).map { start -> String in
