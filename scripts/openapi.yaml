@@ -30,7 +30,8 @@ components:
       properties:
         innerType:
           "$ref": "#/components/schemas/ModuleType"
-        json: {}
+        json:
+          "$ref": "#/components/schemas/JSONValue"
       required:
         - innerType
         - json
@@ -257,6 +258,8 @@ components:
       type: integer
     Int8:
       type: integer
+    JSONValue:
+      type: object
     ModuleType:
       enum:
         - Custom

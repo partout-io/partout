@@ -146,4 +146,8 @@ extension OpenVPN.StaticKey {
             OpenVPN.StaticKey.fileFoot
         ]).joined(separator: "\n")
     }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.secureData == rhs.secureData
+    }
 }

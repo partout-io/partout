@@ -35,7 +35,7 @@ data class CustomModule (
     val innerType: ModuleType,
 
     @Contextual @SerialName(value = "json")
-    val json: kotlinx.serialization.json.JsonElement?
+    val json: kotlinx.serialization.json.JsonElement
 
 ) {
 

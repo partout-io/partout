@@ -24,7 +24,7 @@ extension TunnelSnapshot.Environment {
     }
 }
 
-extension TunnelSnapshot {
+extension TunnelSnapshot: CustomStringConvertible {
     public init(id: Profile.ID, isEnabled: Bool, status: TunnelStatus, onDemand: Bool, environment: Environment? = nil) {
         self.init(environment: environment, id: id, isEnabled: isEnabled, onDemand: onDemand, status: status)
     }

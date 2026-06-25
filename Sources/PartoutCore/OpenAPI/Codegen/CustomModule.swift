@@ -9,9 +9,9 @@
 public struct CustomModule: Sendable, Codable, Hashable {
 
     public let innerType: ModuleType
-    public let json: JSON?
+    public let json: JSON
 
-    public init(innerType: ModuleType, json: JSON?) {
+    public init(innerType: ModuleType, json: JSON) {
         self.innerType = innerType
         self.json = json
     }

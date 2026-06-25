@@ -29,6 +29,18 @@ extension OpenVPN.Digest {
     }
 }
 
+extension OpenVPN.Cipher: CustomStringConvertible {
+    public var description: String {
+        rawValue
+    }
+}
+
+extension OpenVPN.Digest: CustomStringConvertible {
+    public var description: String {
+        "\(genericName)-\(rawValue)"
+    }
+}
+
 private enum OpenVPNConfigurationFallback {
     static let cipher: OpenVPN.Cipher = .aes128cbc
     static let digest: OpenVPN.Digest = .sha1

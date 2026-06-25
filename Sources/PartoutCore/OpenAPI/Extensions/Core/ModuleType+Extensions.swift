@@ -36,6 +36,8 @@ extension ModuleType {
     }
 }
 
+extension ModuleType: Identifiable {}
+
 extension ModuleType: CustomDebugStringConvertible {
     public var debugDescription: String {
         rawValue
