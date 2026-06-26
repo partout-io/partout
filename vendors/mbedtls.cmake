@@ -24,6 +24,10 @@ if(PARTOUT_SYSTEM_VENDOR_SEARCH)
             return()
         endif()
     endif()
+
+    if(PARTOUT_SYSTEM_VENDOR_REQUIRED)
+        message(FATAL_ERROR "System MbedTLS not found")
+    endif()
 endif()
 
 set(MBEDTLS_DIR ${PP_BUILD_OUTPUT}/mbedtls)

@@ -21,6 +21,10 @@ if(PARTOUT_SYSTEM_VENDOR_SEARCH)
             return()
         endif()
     endif()
+
+    if(PARTOUT_SYSTEM_VENDOR_REQUIRED)
+        message(FATAL_ERROR "System OpenSSL 3 not found")
+    endif()
 endif()
 
 set(OPENSSL_DIR ${PP_BUILD_OUTPUT}/openssl)
