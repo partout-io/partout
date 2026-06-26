@@ -71,6 +71,27 @@ extension OpenVPNModule {
     }
 }
 
+extension OpenVPN.Configuration {
+    public var pullMask: [OpenVPN.PullMask]? {
+        toPullMask(from: noPullMask)
+    }
+}
+
+extension OpenVPN.Configuration.Builder {
+    public var pullMask: [OpenVPN.PullMask]? {
+        toPullMask(from: noPullMask)
+    }
+}
+
+private func toPullMask(from noPullMask: [OpenVPN.PullMask]?) -> [OpenVPN.PullMask]? {
+    let all = OpenVPN.PullMask.allCases
+    guard let notPulled = noPullMask else {
+        return all
+    }
+    let pulled = Array(Set(all).subtracting(notPulled))
+    return !pulled.isEmpty ? pulled : nil
+}
+
 extension PartoutError.ModuleField {
     public enum OpenVPN {
         private static let root = "OpenVPN"
