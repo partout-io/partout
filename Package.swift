@@ -16,10 +16,11 @@ let envDocs = env["PP_BUILD_DOCS"] == "1"
 // MARK: Configuration
 
 let areas = Area.allCases
-let cryptoMode: CryptoMode? = .openSSL
-let openSSLVersion: Version = "3.6.300" // 3.6.2
+let cryptoMode: CryptoMode? = .native
+// let cryptoMode: CryptoMode? = .openSSL
+// let openSSLVersion: Version = "3.6.300" // 3.6.2
 let wgGoVersion: Version = "0.0.20260530"
-let cmakeOutput = envCMakeOutput ?? "bin/windows-arm64"
+let cmakeOutput = envCMakeOutput ?? "bin/darwin-arm64"
 let useFoundationCompatibility: FoundationCompatibility = .off
 // let useFoundationCompatibility: FoundationCompatibility = OS.current != .apple ? .on : .off
 
@@ -307,62 +308,129 @@ if areas.contains(.wireGuard) {
 switch cryptoMode {
 case .openSSL:
     // OpenSSL-based crypto/TLS implementations
-    switch OS.current {
-    case .apple:
-        package.dependencies.append(
-            .package(url: "https://github.com/partout-io/openssl-apple", from: openSSLVersion)
-        )
-        package.targets.append(contentsOf: [
-            .target(
-                name: "_PartoutCryptoImpl_C",
-                dependencies: [
-                    "openssl-apple",
-                    "PartoutCore_C"
-                ],
-                path: "Sources/PartoutCrypto/OpenSSL_C"
-            )
-        ])
-    default:
+    if OS.current == .apple {
         package.targets.append(
-            .target(
-                name: "_PartoutCryptoImpl_C",
-                dependencies: ["PartoutCore_C"],
-                path: "Sources/PartoutCrypto/OpenSSL_C",
-                cSettings: globalCSettings + [
-                    .unsafeFlags(["-I\(cmakeOutput)/openssl/include"])
-                ],
-                linkerSettings: [
-                    .unsafeFlags(["-L\(cmakeOutput)/openssl/lib"]),
-                    // WARNING: order matters, ssl then crypto
-                    .linkedLibrary("\(staticLibPrefix)ssl"),
-                    .linkedLibrary("\(staticLibPrefix)crypto")
+            .systemLibrary(
+                name: "COpenSSL",
+                path: "Sources/SystemLibraries/COpenSSL",
+                pkgConfig: "openssl",
+                providers: [
+                    .brew(["openssl@3"])
                 ]
             )
         )
     }
-case .native:
-    // Crypto with OS routines, TLS with MbedTLS
     package.targets.append(
         .target(
             name: "_PartoutCryptoImpl_C",
-            dependencies: ["PartoutCore_C"],
+            dependencies: {
+                var list: [Target.Dependency] = ["PartoutCore_C"]
+                if OS.current == .apple {
+                    list.append("COpenSSL")
+                }
+                return list
+            }(),
+            path: "Sources/PartoutCrypto/OpenSSL_C",
+            cSettings: globalCSettings + {
+                switch OS.current {
+                case .apple:
+                    return []
+                default:
+                    return [
+                        .unsafeFlags(["-I\(cmakeOutput)/openssl/include"])
+                    ]
+                }
+            }(),
+            linkerSettings: {
+                switch OS.current {
+                case .apple:
+                    return []
+                default:
+                    return [
+                        .unsafeFlags(["-L\(cmakeOutput)/openssl/lib"]),
+                        // WARNING: order matters, ssl then crypto
+                        .linkedLibrary("\(staticLibPrefix)ssl"),
+                        .linkedLibrary("\(staticLibPrefix)crypto")
+                    ]
+                }
+            }()
+        )
+    )
+case .native:
+    // Crypto with OS routines, TLS with MbedTLS
+    if OS.current == .apple {
+        package.targets.append(contentsOf: [
+            .systemLibrary(
+                name: "CMbedTLS",
+                path: "Sources/SystemLibraries/CMbedTLS",
+                pkgConfig: "mbedtls",
+                providers: [
+                    .brew(["mbedtls"])
+                ]
+            ),
+            .systemLibrary(
+                name: "CMbedX509",
+                path: "Sources/SystemLibraries/CMbedX509",
+                pkgConfig: "mbedx509",
+                providers: [
+                    .brew(["mbedtls"])
+                ]
+            ),
+            .systemLibrary(
+                name: "CMbedCrypto",
+                path: "Sources/SystemLibraries/CMbedCrypto",
+                pkgConfig: "mbedcrypto",
+                providers: [
+                    .brew(["mbedtls"])
+                ]
+            )
+        ])
+    }
+    package.targets.append(
+        .target(
+            name: "_PartoutCryptoImpl_C",
+            dependencies: {
+                var list: [Target.Dependency] = ["PartoutCore_C"]
+                if OS.current == .apple {
+                    list.append(contentsOf: [
+                        "CMbedTLS",
+                        "CMbedX509",
+                        "CMbedCrypto"
+                    ])
+                }
+                return list
+            }(),
             path: "Sources/PartoutCrypto/Native_C",
             exclude: {
                 // Pick current OS by removing it from exclusions
                 var list = Set(OS.allCases)
                 list.remove(.current)
-                return list.map { "src/\($0.rawValue)" }
+                return list.map(\.nativeCryptoSourcePath)
             }(),
-            cSettings: globalCSettings + [
-                .unsafeFlags(["-I\(cmakeOutput)/mbedtls/include"])
-            ],
-            linkerSettings: [
-                .unsafeFlags(["-L\(cmakeOutput)/mbedtls/lib"]),
-                 // WARNING: order matters
-                .linkedLibrary("mbedtls"),
-                .linkedLibrary("mbedx509"),
-                .linkedLibrary("mbedcrypto")
-            ]
+            cSettings: globalCSettings + {
+                switch OS.current {
+                case .apple:
+                    return []
+                default:
+                    return [
+                        .unsafeFlags(["-I\(cmakeOutput)/mbedtls/include"])
+                    ]
+                }
+            }(),
+            linkerSettings: {
+                switch OS.current {
+                case .apple:
+                    return []
+                default:
+                    return [
+                        .unsafeFlags(["-L\(cmakeOutput)/mbedtls/lib"]),
+                         // WARNING: order matters
+                        .linkedLibrary("mbedtls"),
+                        .linkedLibrary("mbedx509"),
+                        .linkedLibrary("mbedcrypto")
+                    ]
+                }
+            }()
         )
     )
 default:
@@ -446,6 +514,9 @@ enum OS: String, CaseIterable {
         // Android is never compiled natively, therefore #if os(Android)
         // would be wrong here. Resort to an explicit env variable.
         if let envOS {
+            if envOS == "darwin" {
+                return .apple
+            }
             guard let os = OS(rawValue: envOS) else {
                 fatalError("Unrecognized OS '\(envOS)'")
             }
@@ -466,6 +537,13 @@ enum OS: String, CaseIterable {
         case .apple: [.iOS, .macOS, .tvOS]
         case .linux: [.linux]
         case .windows: [.windows]
+        }
+    }
+
+    var nativeCryptoSourcePath: String {
+        switch self {
+        case .apple: "src/darwin"
+        default: "src/\(rawValue)"
         }
     }
 }
