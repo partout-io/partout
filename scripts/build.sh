@@ -129,6 +129,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -android)
+            is_android=1
             build_dir=.cmake-android
             cmake_opts+=("-DCMAKE_ANDROID_NDK=$ANDROID_NDK_HOME")
             cmake_opts+=("-DANDROID_ABI=arm64-v8a")
@@ -147,6 +148,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 set -- "${positional_args[@]}"
+
+# On Linux, use custom toolchain
+if [[ $is_android != 1 && `uname -s` == "Linux" ]]; then
+    cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=cmake/swift/swift-linux.toolchain.cmake")
+fi
 
 # Generate models
 if [[ $gen_models == 1 ]]; then
