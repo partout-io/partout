@@ -16,9 +16,9 @@ let envDocs = env["PP_BUILD_DOCS"] == "1"
 // MARK: Configuration
 
 let areas = Area.allCases
-let cryptoMode: CryptoMode? = .native
-// let cryptoMode: CryptoMode? = .openSSL
-// let openSSLVersion: Version = "3.6.300" // 3.6.2
+let cryptoMode: CryptoMode? = .openSSL
+let openSSLVersion: Version = "3.6.300" // 3.6.2
+// let cryptoMode: CryptoMode? = .native
 let wgGoVersion: Version = "0.0.20260530"
 // Local CMake output is only required for generated wg-go and wintun artifacts.
 let cmakeOutput = envCMakeOutput ?? "bin/darwin-arm64"
