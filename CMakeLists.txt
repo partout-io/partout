@@ -24,6 +24,8 @@ option(PP_BUILD_USE_OPENSSL "Use OpenSSL" 0)
 option(PP_BUILD_USE_MBEDTLS "Use MbedTLS" 0)
 option(PP_BUILD_USE_OPENVPN "Use OpenVPN" 0)
 option(PP_BUILD_USE_WIREGUARD "Use WireGuard" 0)
+set(PP_BUILD_VENDOR_SOURCE "auto" CACHE STRING "Vendor source: bundled, system, auto")
+set_property(CACHE PP_BUILD_VENDOR_SOURCE PROPERTY STRINGS bundled system auto)
 
 # Output per platform/arch
 string(TOLOWER ${CMAKE_SYSTEM_NAME} PLATFORM_NAME)
@@ -35,6 +37,39 @@ else()
     set(PP_BUILD_OUTPUT "${PP_BUILD_OUTPUT_UNIVERSAL}/${PLATFORM_NAME}-${ARCH_NAME}")
 endif()
 
+set(PARTOUT_SYSTEM_VENDOR_SEARCH OFF)
+set(PARTOUT_SYSTEM_VENDOR_REQUIRED OFF)
+if(NOT PP_BUILD_VENDOR_SOURCE MATCHES "^(bundled|system|auto)$")
+    message(FATAL_ERROR "PP_BUILD_VENDOR_SOURCE must be bundled, system, or auto")
+endif()
+if(PP_BUILD_VENDOR_SOURCE STREQUAL "system")
+    set(PARTOUT_SYSTEM_VENDOR_SEARCH ON)
+    set(PARTOUT_SYSTEM_VENDOR_REQUIRED ON)
+elseif(PP_BUILD_VENDOR_SOURCE STREQUAL "auto" AND (APPLE OR LINUX))
+    set(PARTOUT_SYSTEM_VENDOR_SEARCH ON)
+endif()
+set(PKG_CONFIG_USE_CMAKE_PREFIX_PATH ON)
+if(APPLE AND PARTOUT_SYSTEM_VENDOR_SEARCH)
+    find_program(HOMEBREW_EXECUTABLE brew)
+endif()
+
+function(partout_use_homebrew_formula formula)
+    if(NOT HOMEBREW_EXECUTABLE)
+        return()
+    endif()
+    execute_process(
+        COMMAND "${HOMEBREW_EXECUTABLE}" --prefix "${formula}"
+        RESULT_VARIABLE result
+        OUTPUT_VARIABLE prefix
+        ERROR_QUIET
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if(result EQUAL 0 AND IS_DIRECTORY "${prefix}")
+        list(PREPEND CMAKE_PREFIX_PATH "${prefix}")
+        set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH}" PARENT_SCOPE)
+    endif()
+endfunction()
+
 # Options
 message(STATUS "Option CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 message(STATUS "Option PP_BUILD_LIBRARY = ${PP_BUILD_LIBRARY}")
@@ -43,7 +78,9 @@ message(STATUS "Option PP_BUILD_USE_OPENSSL = ${PP_BUILD_USE_OPENSSL}")
 message(STATUS "Option PP_BUILD_USE_MBEDTLS = ${PP_BUILD_USE_MBEDTLS}")
 message(STATUS "Option PP_BUILD_USE_OPENVPN = ${PP_BUILD_USE_OPENVPN}")
 message(STATUS "Option PP_BUILD_USE_WIREGUARD = ${PP_BUILD_USE_WIREGUARD}")
+message(STATUS "Option PP_BUILD_VENDOR_SOURCE = ${PP_BUILD_VENDOR_SOURCE}")
 message(STATUS "Option PP_BUILD_OUTPUT = ${PP_BUILD_OUTPUT}")
+message(STATUS "System vendor search = ${PARTOUT_SYSTEM_VENDOR_SEARCH}")
 
 # All vendor-inherited args
 if(WIN32)
@@ -107,7 +144,7 @@ if(PP_BUILD_LIBRARY)
 
     # Install
     set(PARTOUT_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/Partout")
-    if(PP_BUILD_USE_OPENSSL)
+    if(PP_BUILD_USE_OPENSSL AND NOT PARTOUT_OPENSSL_IS_SYSTEM)
         list(APPEND PARTOUT_VENDOR_BYPRODUCTS
             "${OPENSSL_DIR}/${LIBSSL}"
             "${OPENSSL_DIR}/${LIBCRYPTO}"
@@ -119,7 +156,7 @@ if(PP_BUILD_LIBRARY)
             )
         endif()
     endif()
-    if(PP_BUILD_USE_MBEDTLS)
+    if(PP_BUILD_USE_MBEDTLS AND NOT PARTOUT_MBEDTLS_IS_SYSTEM)
         list(APPEND PARTOUT_VENDOR_BYPRODUCTS
             "${MBEDTLS_DIR}/${LIBTLS}"
             "${MBEDTLS_DIR}/${LIBX509}"

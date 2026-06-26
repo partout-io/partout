@@ -1,3 +1,35 @@
+set(PARTOUT_MBEDTLS_IS_SYSTEM OFF)
+if(PARTOUT_SYSTEM_VENDOR_SEARCH)
+    find_package(MbedTLS CONFIG QUIET)
+    if(MbedTLS_FOUND AND TARGET MbedTLS::mbedtls AND TARGET MbedTLS::mbedx509 AND TARGET MbedTLS::mbedcrypto)
+        set(PARTOUT_MBEDTLS_IS_SYSTEM ON)
+        add_library(MbedTLSInterface INTERFACE)
+        target_link_libraries(MbedTLSInterface INTERFACE
+            MbedTLS::mbedtls
+            MbedTLS::mbedx509
+            MbedTLS::mbedcrypto
+        )
+        message(STATUS "Using system MbedTLS")
+        return()
+    endif()
+
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(MBEDTLS_PKG QUIET IMPORTED_TARGET mbedtls mbedx509 mbedcrypto)
+        if(MBEDTLS_PKG_FOUND AND TARGET PkgConfig::MBEDTLS_PKG)
+            set(PARTOUT_MBEDTLS_IS_SYSTEM ON)
+            add_library(MbedTLSInterface INTERFACE)
+            target_link_libraries(MbedTLSInterface INTERFACE PkgConfig::MBEDTLS_PKG)
+            message(STATUS "Using system MbedTLS")
+            return()
+        endif()
+    endif()
+
+    if(PARTOUT_SYSTEM_VENDOR_REQUIRED)
+        message(FATAL_ERROR "System MbedTLS not found")
+    endif()
+endif()
+
 set(MBEDTLS_DIR ${PP_BUILD_OUTPUT}/mbedtls)
 
 # Output

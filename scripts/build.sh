@@ -134,6 +134,7 @@ while [[ $# -gt 0 ]]; do
             build_dir=.cmake-android
             cmake_opts+=("-DCMAKE_ANDROID_NDK=$ANDROID_NDK_HOME")
             cmake_opts+=("-DANDROID_ABI=arm64-v8a")
+            cmake_opts+=("-DANDROID_STL=c++_shared")
             cmake_opts+=("-DSWIFT_VERSION=$swift_version")
             cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=cmake/swift/swift-android.toolchain.cmake")
             shift
