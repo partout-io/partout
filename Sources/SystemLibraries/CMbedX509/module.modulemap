@@ -1,4 +1,0 @@
-module CMbedX509 [system] {
-    header "shim.h"
-    export *
-}
