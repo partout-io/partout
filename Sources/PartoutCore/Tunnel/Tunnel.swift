@@ -173,11 +173,11 @@ private extension Tunnel {
         // Subscribe once
         guard subscriptions.isEmpty else { return }
 #endif
+        let ctx = self.ctx
+        let strategyStream = strategy.didUpdateActiveProfiles
         var subscriptions: [Task<Void, Never>] = []
-        subscriptions.append(Task { [weak self] in
-            guard let ctx = self?.ctx else { return }
-            guard let stream = self?.strategy.didUpdateActiveProfiles else { return }
-            for await snapshots in stream {
+        subscriptions.append(Task { [weak self, ctx] in
+            for await snapshots in strategyStream {
                 guard !Task.isCancelled else { break }
                 await self?.handleStrategySnapshots(snapshots)
             }
