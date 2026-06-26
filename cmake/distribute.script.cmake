@@ -1,4 +1,6 @@
 # Defaults
+include("${CMAKE_CURRENT_LIST_DIR}/swift/swift-macros.cmake")
+
 if(NOT DEFINED PARTOUT_OUTPUT_DIR AND DEFINED OUTPUT_DIR)
     set(PARTOUT_OUTPUT_DIR "${OUTPUT_DIR}")
 endif()
@@ -60,30 +62,12 @@ endforeach()
 
 # Windows steps
 set(PARTOUT_PREBUILT_LIBS "")
-set(PARTOUT_SWIFT_LIBS "")
 if(WIN32)
-    if(NOT DEFINED ENV{SWIFT_RUNTIME})
-        message(FATAL_ERROR "SWIFT_RUNTIME is required to locate the Swift runtime libraries")
-    endif()
     list(APPEND PARTOUT_PREBUILT_LIBS
         "${PARTOUT_OUTPUT_DIR}/wintun/wintun.dll"
-    )
-    list(APPEND PARTOUT_SWIFT_LIBS
-        BlocksRuntime.dll
-        dispatch.dll
-        FoundationEssentials.dll
-        swiftCore.dll
-        swiftCRT.dll
-        swiftDispatch.dll
-        swiftWinSDK.dll
-        swift_Concurrency.dll
-        swift_RegexParser.dll
-        swift_StringProcessing.dll
     )
 endif()
 foreach(lib IN LISTS PARTOUT_PREBUILT_LIBS)
     file(COPY "${lib}" DESTINATION "${PARTOUT_DIST_DIR}")
 endforeach()
-foreach(lib IN LISTS PARTOUT_SWIFT_LIBS)
-    file(COPY "$ENV{SWIFT_RUNTIME}/${lib}" DESTINATION "${PARTOUT_DIST_DIR}")
-endforeach()
+swift_copy_windows_runtime("${PARTOUT_DIST_DIR}")
