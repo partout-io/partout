@@ -2,7 +2,7 @@ include_guard(GLOBAL)
 
 function(partout_add_distribution_target target_name)
     set(options ALL)
-    set(one_value_args OUTPUT_DIR DIST_DIR)
+    set(one_value_args OUTPUT_DIR DIST_DIR SWIFT_SDKROOT SWIFT_VERSION)
     cmake_parse_arguments(PARTOUT_DIST "${options}" "${one_value_args}" "" ${ARGN})
 
     if(NOT PARTOUT_DIST_OUTPUT_DIR)
@@ -25,10 +25,24 @@ function(partout_add_distribution_target target_name)
         set(all_arg)
     endif()
 
+    set(partout_distribution_args
+        "-DPARTOUT_OUTPUT_DIR=${PARTOUT_DIST_OUTPUT_DIR}"
+        "-DPARTOUT_DIST_DIR=${PARTOUT_DIST_DIST_DIR}"
+    )
+    if(PARTOUT_DIST_SWIFT_SDKROOT)
+        list(APPEND partout_distribution_args "-DSWIFT_SDKROOT=${PARTOUT_DIST_SWIFT_SDKROOT}")
+    elseif(DEFINED SWIFT_SDKROOT)
+        list(APPEND partout_distribution_args "-DSWIFT_SDKROOT=${SWIFT_SDKROOT}")
+    endif()
+    if(PARTOUT_DIST_SWIFT_VERSION)
+        list(APPEND partout_distribution_args "-DSWIFT_VERSION=${PARTOUT_DIST_SWIFT_VERSION}")
+    elseif(DEFINED SWIFT_VERSION)
+        list(APPEND partout_distribution_args "-DSWIFT_VERSION=${SWIFT_VERSION}")
+    endif()
+
     add_custom_target(${target_name} ${all_arg}
         COMMAND ${CMAKE_COMMAND}
-            "-DPARTOUT_OUTPUT_DIR=${PARTOUT_DIST_OUTPUT_DIR}"
-            "-DPARTOUT_DIST_DIR=${PARTOUT_DIST_DIST_DIR}"
+            ${partout_distribution_args}
             -P "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/distribute.script.cmake"
         VERBATIM
     )
