@@ -10,8 +10,8 @@ public struct DNSModuleProtocolTypeTls: Sendable, Codable, Hashable {
     public enum ModelType: String, Sendable, Codable, CaseIterable {
         case tls = "tls"
     }
-    public let type: ModelType
-    public let hostname: String
+    public var type: ModelType
+    public var hostname: String
 
     public init(type: ModelType, hostname: String) {
         self.type = type

@@ -9,11 +9,11 @@
 public struct OpenVPNTLSWrap: Sendable, Codable, Hashable {
 
     /** The wrapping strategy. */
-    public let strategy: OpenVPNTLSWrapStrategy
+    public var strategy: OpenVPNTLSWrapStrategy
     /** The static encryption key. */
-    public let key: OpenVPNStaticKey
+    public var key: OpenVPNStaticKey
     /** The wrapped client key appended to initial tls-crypt-v2 packets. */
-    public let wrappedKey: SecureData?
+    public var wrappedKey: SecureData?
 
     public init(strategy: OpenVPNTLSWrapStrategy, key: OpenVPNStaticKey, wrappedKey: SecureData? = nil) {
         self.strategy = strategy

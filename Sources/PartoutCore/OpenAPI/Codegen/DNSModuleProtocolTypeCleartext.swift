@@ -10,7 +10,7 @@ public struct DNSModuleProtocolTypeCleartext: Sendable, Codable, Hashable {
     public enum ModelType: String, Sendable, Codable, CaseIterable {
         case cleartext = "cleartext"
     }
-    public let type: ModelType
+    public var type: ModelType
 
     public init(type: ModelType) {
         self.type = type

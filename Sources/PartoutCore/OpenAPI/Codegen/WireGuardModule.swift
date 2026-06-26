@@ -8,8 +8,8 @@
 /** A connection module providing a WireGuard connection. */
 public struct WireGuardModule: Sendable, Codable, Hashable {
 
-    public let id: UniqueID
-    public let configuration: WireGuardConfiguration?
+    public var id: UniqueID
+    public var configuration: WireGuardConfiguration?
 
     public init(id: UniqueID, configuration: WireGuardConfiguration? = nil) {
         self.id = id

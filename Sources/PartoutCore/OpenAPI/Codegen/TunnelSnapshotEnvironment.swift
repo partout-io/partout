@@ -7,9 +7,9 @@
 
 public struct TunnelSnapshotEnvironment: Sendable, Codable, Hashable {
 
-    public let connectionStatus: ConnectionStatus
-    public let dataCount: DataCount
-    public let lastErrorCode: String?
+    public var connectionStatus: ConnectionStatus
+    public var dataCount: DataCount
+    public var lastErrorCode: String?
 
     public init(connectionStatus: ConnectionStatus, dataCount: DataCount, lastErrorCode: String? = nil) {
         self.connectionStatus = connectionStatus

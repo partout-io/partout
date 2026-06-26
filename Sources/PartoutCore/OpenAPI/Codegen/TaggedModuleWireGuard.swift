@@ -10,8 +10,8 @@ public struct TaggedModuleWireGuard: Sendable, Codable, Hashable {
     public enum ModelType: String, Sendable, Codable, CaseIterable {
         case wireGuard = "WireGuard"
     }
-    public let type: ModelType
-    public let value: WireGuardModule
+    public var type: ModelType
+    public var value: WireGuardModule
 
     public init(type: ModelType, value: WireGuardModule) {
         self.type = type

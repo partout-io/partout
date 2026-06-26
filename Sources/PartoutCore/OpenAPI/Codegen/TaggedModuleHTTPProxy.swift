@@ -10,8 +10,8 @@ public struct TaggedModuleHTTPProxy: Sendable, Codable, Hashable {
     public enum ModelType: String, Sendable, Codable, CaseIterable {
         case httpproxy = "HTTPProxy"
     }
-    public let type: ModelType
-    public let value: HTTPProxyModule
+    public var type: ModelType
+    public var value: HTTPProxyModule
 
     public init(type: ModelType, value: HTTPProxyModule) {
         self.type = type

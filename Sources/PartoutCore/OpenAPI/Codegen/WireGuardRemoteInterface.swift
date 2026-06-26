@@ -9,15 +9,15 @@
 public struct WireGuardRemoteInterface: Sendable, Codable, Hashable {
 
     /** The endpoint public key. */
-    public let publicKey: WireGuardKey
+    public var publicKey: WireGuardKey
     /** The optional endpoint pre-shared key. */
-    public let preSharedKey: WireGuardKey?
+    public var preSharedKey: WireGuardKey?
     /** The optional endpoint. */
-    public let endpoint: Endpoint?
+    public var endpoint: Endpoint?
     /** The list of allowed subnets. */
-    public let allowedIPs: [Subnet]
+    public var allowedIPs: [Subnet]
     /** The keep-alive interval in seconds. */
-    public let keepAlive: ModelUInt16?
+    public var keepAlive: ModelUInt16?
 
     public init(publicKey: WireGuardKey, preSharedKey: WireGuardKey? = nil, endpoint: Endpoint? = nil, allowedIPs: [Subnet], keepAlive: ModelUInt16? = nil) {
         self.publicKey = publicKey

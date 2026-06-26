@@ -7,10 +7,10 @@
 
 /** On-demand settings. */
 public struct OnDemandModule: Sendable, Codable, Hashable {
-    public let id: UniqueID
-    public let policy: OnDemandModulePolicy
-    public let withSSIDs: [String: Bool]
-    public let withOtherNetworks: Set<OnDemandModuleOtherNetwork>
+    public var id: UniqueID
+    public var policy: OnDemandModulePolicy
+    public var withSSIDs: [String: Bool]
+    public var withOtherNetworks: Set<OnDemandModuleOtherNetwork>
 
     public init(id: UniqueID, policy: OnDemandModulePolicy, withSSIDs: [String: Bool], withOtherNetworks: Set<OnDemandModuleOtherNetwork>) {
         self.id = id

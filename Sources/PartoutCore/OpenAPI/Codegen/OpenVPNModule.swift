@@ -8,10 +8,10 @@
 /** A connection module providing an OpenVPN connection. */
 public struct OpenVPNModule: Sendable, Codable, Hashable {
 
-    public let id: UniqueID
-    public let configuration: OpenVPNConfiguration?
-    public let credentials: OpenVPNCredentials?
-    public let requiresInteractiveCredentials: Bool?
+    public var id: UniqueID
+    public var configuration: OpenVPNConfiguration?
+    public var credentials: OpenVPNCredentials?
+    public var requiresInteractiveCredentials: Bool?
 
     public init(id: UniqueID, configuration: OpenVPNConfiguration? = nil, credentials: OpenVPNCredentials? = nil, requiresInteractiveCredentials: Bool? = nil) {
         self.id = id

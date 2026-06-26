@@ -9,9 +9,9 @@
 public struct WireGuardConfiguration: Sendable, Codable, Hashable {
 
     /** The local interface. */
-    public let interface: WireGuardLocalInterface
+    public var interface: WireGuardLocalInterface
     /** The peers. */
-    public let peers: [WireGuardRemoteInterface]
+    public var peers: [WireGuardRemoteInterface]
 
     public init(interface: WireGuardLocalInterface, peers: [WireGuardRemoteInterface]) {
         self.interface = interface
