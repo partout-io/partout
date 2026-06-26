@@ -3,6 +3,7 @@ set -e
 opt_configuration=Debug
 build_dir=.cmake
 bin_dir=bin
+swift_version=6.3.1
 
 root_dir="$(dirname "$0")"/..
 pushd $root_dir
@@ -133,7 +134,7 @@ while [[ $# -gt 0 ]]; do
             build_dir=.cmake-android
             cmake_opts+=("-DCMAKE_ANDROID_NDK=$ANDROID_NDK_HOME")
             cmake_opts+=("-DANDROID_ABI=arm64-v8a")
-            cmake_opts+=("-DSWIFT_VERSION=6.3.1")
+            cmake_opts+=("-DSWIFT_VERSION=$swift_version")
             cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=cmake/swift/swift-android.toolchain.cmake")
             shift
             ;;
@@ -151,6 +152,7 @@ set -- "${positional_args[@]}"
 
 # On Linux, use custom toolchain
 if [[ $is_android != 1 && `uname -s` == "Linux" ]]; then
+    cmake_opts+=("-DSWIFT_VERSION=$swift_version")
     cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=cmake/swift/swift-linux.toolchain.cmake")
 fi
 
