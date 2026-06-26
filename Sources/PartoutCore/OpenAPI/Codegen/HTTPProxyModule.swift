@@ -8,11 +8,11 @@
 /** HTTP proxy settings. */
 public struct HTTPProxyModule: Sendable, Codable, Hashable {
 
-    public let id: UniqueID
-    public let proxy: Endpoint?
-    public let secureProxy: Endpoint?
-    public let pacURL: URL?
-    public let bypassDomains: [Address]
+    public var id: UniqueID
+    public var proxy: Endpoint?
+    public var secureProxy: Endpoint?
+    public var pacURL: URL?
+    public var bypassDomains: [Address]
 
     public init(id: UniqueID, proxy: Endpoint? = nil, secureProxy: Endpoint? = nil, pacURL: URL? = nil, bypassDomains: [Address]) {
         self.id = id

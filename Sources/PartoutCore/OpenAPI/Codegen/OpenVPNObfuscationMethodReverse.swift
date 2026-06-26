@@ -10,7 +10,7 @@ public struct OpenVPNObfuscationMethodReverse: Sendable, Codable, Hashable {
     public enum ModelType: String, Sendable, Codable, CaseIterable {
         case reverse = "reverse"
     }
-    public let type: ModelType
+    public var type: ModelType
 
     public init(type: ModelType) {
         self.type = type

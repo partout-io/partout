@@ -10,8 +10,8 @@ public struct TaggedModuleOpenVPN: Sendable, Codable, Hashable {
     public enum ModelType: String, Sendable, Codable, CaseIterable {
         case openVPN = "OpenVPN"
     }
-    public let type: ModelType
-    public let value: OpenVPNModule
+    public var type: ModelType
+    public var value: OpenVPNModule
 
     public init(type: ModelType, value: OpenVPNModule) {
         self.type = type

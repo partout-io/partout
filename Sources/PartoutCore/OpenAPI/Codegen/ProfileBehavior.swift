@@ -9,9 +9,9 @@
 public struct ProfileBehavior: Sendable, Codable, Hashable {
 
     /** Disconnects when the device goes to sleep. */
-    public let disconnectsOnSleep: Bool
+    public var disconnectsOnSleep: Bool
     /** Attempts to route as much traffic as possible through the tunnel. */
-    public let includesAllNetworks: Bool?
+    public var includesAllNetworks: Bool?
 
     public init(disconnectsOnSleep: Bool, includesAllNetworks: Bool? = nil) {
         self.disconnectsOnSleep = disconnectsOnSleep

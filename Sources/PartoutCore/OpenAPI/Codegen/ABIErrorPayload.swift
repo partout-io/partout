@@ -7,8 +7,8 @@
 
 public struct ABIErrorPayload: Sendable, Codable, Hashable {
 
-    public let code: PartoutErrorCode
-    public let userInfo: JSON?
+    public var code: PartoutErrorCode
+    public var userInfo: JSON?
 
     public init(code: PartoutErrorCode, userInfo: JSON? = nil) {
         self.code = code

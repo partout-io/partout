@@ -10,8 +10,8 @@ public struct DNSModuleProtocolTypeHttps: Sendable, Codable, Hashable {
     public enum ModelType: String, Sendable, Codable, CaseIterable {
         case https = "https"
     }
-    public let type: ModelType
-    public let url: URL
+    public var type: ModelType
+    public var url: URL
 
     public init(type: ModelType, url: URL) {
         self.type = type

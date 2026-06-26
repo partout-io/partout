@@ -9,9 +9,9 @@
 public struct Route: Sendable, Codable, Hashable {
 
     /** The destination subnet or `nil` if default. */
-    public let destination: Subnet?
+    public var destination: Subnet?
     /** The address of the gateway (falls back to global gateway). */
-    public let gateway: Address?
+    public var gateway: Address?
 
     public init(destination: Subnet? = nil, gateway: Address? = nil) {
         self.destination = destination

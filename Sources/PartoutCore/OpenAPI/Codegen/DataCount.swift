@@ -9,9 +9,9 @@
 public struct DataCount: Sendable, Codable, Hashable {
 
     /** Received bytes count. */
-    public let received: ModelUInt64
+    public var received: ModelUInt64
     /** Sent bytes count. */
-    public let sent: ModelUInt64
+    public var sent: ModelUInt64
 
     public init(received: ModelUInt64, sent: ModelUInt64) {
         self.received = received

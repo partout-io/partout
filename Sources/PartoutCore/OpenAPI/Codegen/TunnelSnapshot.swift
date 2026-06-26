@@ -8,11 +8,11 @@
 /** Returns a tunnel-specific snapshot of a ``Profile``. */
 public struct TunnelSnapshot: Sendable, Codable, Hashable {
 
-    public let id: UniqueID
-    public let isEnabled: Bool
-    public let status: TunnelStatus
-    public let onDemand: Bool
-    public let environment: TunnelSnapshotEnvironment?
+    public var id: UniqueID
+    public var isEnabled: Bool
+    public var status: TunnelStatus
+    public var onDemand: Bool
+    public var environment: TunnelSnapshotEnvironment?
 
     public init(id: UniqueID, isEnabled: Bool, status: TunnelStatus, onDemand: Bool, environment: TunnelSnapshotEnvironment? = nil) {
         self.id = id

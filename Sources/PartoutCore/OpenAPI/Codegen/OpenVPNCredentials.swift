@@ -9,13 +9,13 @@
 public struct OpenVPNCredentials: Sendable, Codable, Hashable {
 
     /** The username. */
-    public let username: String
+    public var username: String
     /** The password. */
-    public let password: String
+    public var password: String
     /** The OTP method (defaults to none). */
-    public let otpMethod: OpenVPNCredentialsOTPMethod
+    public var otpMethod: OpenVPNCredentialsOTPMethod
     /** The OTP. */
-    public let otp: String?
+    public var otp: String?
 
     public init(username: String, password: String, otpMethod: OpenVPNCredentialsOTPMethod, otp: String? = nil) {
         self.username = username

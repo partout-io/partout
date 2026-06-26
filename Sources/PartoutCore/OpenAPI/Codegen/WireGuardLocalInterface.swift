@@ -9,13 +9,13 @@
 public struct WireGuardLocalInterface: Sendable, Codable, Hashable {
 
     /** The local private key. */
-    public let privateKey: WireGuardKey
+    public var privateKey: WireGuardKey
     /** The local addresses. */
-    public let addresses: [Subnet]
+    public var addresses: [Subnet]
     /** The optional DNS settings. */
-    public let dns: DNSModule?
+    public var dns: DNSModule?
     /** The optional MTU. */
-    public let mtu: ModelUInt16?
+    public var mtu: ModelUInt16?
 
     public init(privateKey: WireGuardKey, addresses: [Subnet], dns: DNSModule? = nil, mtu: ModelUInt16? = nil) {
         self.privateKey = privateKey

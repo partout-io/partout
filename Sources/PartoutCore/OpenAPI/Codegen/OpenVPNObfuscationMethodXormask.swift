@@ -10,8 +10,8 @@ public struct OpenVPNObfuscationMethodXormask: Sendable, Codable, Hashable {
     public enum ModelType: String, Sendable, Codable, CaseIterable {
         case xormask = "xormask"
     }
-    public let type: ModelType
-    public let mask: SecureData
+    public var type: ModelType
+    public var mask: SecureData
 
     public init(type: ModelType, mask: SecureData) {
         self.type = type

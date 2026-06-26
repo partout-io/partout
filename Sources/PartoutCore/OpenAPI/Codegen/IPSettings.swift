@@ -9,11 +9,11 @@
 public struct IPSettings: Sendable, Codable, Hashable {
 
     /** The subnets. */
-    public let subnets: [Subnet]
+    public var subnets: [Subnet]
     /** The included routes. */
-    public let includedRoutes: [Route]
+    public var includedRoutes: [Route]
     /** The excluded routes. */
-    public let excludedRoutes: [Route]
+    public var excludedRoutes: [Route]
 
     public init(subnets: [Subnet], includedRoutes: [Route], excludedRoutes: [Route]) {
         self.subnets = subnets

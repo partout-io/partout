@@ -8,14 +8,14 @@
 /** DNS settings. */
 public struct DNSModule: Sendable, Codable, Hashable {
 
-    public let id: UniqueID
-    public let protocolType: DNSModuleProtocolType
-    public let servers: [Address]
-    public let domainName: Address?
-    public let searchDomains: [Address]?
-    public let inheritsVPN: Bool?
-    public let domainPolicy: DNSModuleDomainPolicy?
-    public let routesThroughVPN: Bool?
+    public var id: UniqueID
+    public var protocolType: DNSModuleProtocolType
+    public var servers: [Address]
+    public var domainName: Address?
+    public var searchDomains: [Address]?
+    public var inheritsVPN: Bool?
+    public var domainPolicy: DNSModuleDomainPolicy?
+    public var routesThroughVPN: Bool?
 
     public init(id: UniqueID, protocolType: DNSModuleProtocolType, servers: [Address], domainName: Address? = nil, searchDomains: [Address]? = nil, inheritsVPN: Bool? = nil, domainPolicy: DNSModuleDomainPolicy? = nil, routesThroughVPN: Bool? = nil) {
         self.id = id

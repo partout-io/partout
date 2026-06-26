@@ -10,7 +10,7 @@ public struct OpenVPNObfuscationMethodXorptrpos: Sendable, Codable, Hashable {
     public enum ModelType: String, Sendable, Codable, CaseIterable {
         case xorptrpos = "xorptrpos"
     }
-    public let type: ModelType
+    public var type: ModelType
 
     public init(type: ModelType) {
         self.type = type

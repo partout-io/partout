@@ -10,8 +10,8 @@ public struct TaggedModuleDNS: Sendable, Codable, Hashable {
     public enum ModelType: String, Sendable, Codable, CaseIterable {
         case dns = "DNS"
     }
-    public let type: ModelType
-    public let value: DNSModule
+    public var type: ModelType
+    public var value: DNSModule
 
     public init(type: ModelType, value: DNSModule) {
         self.type = type

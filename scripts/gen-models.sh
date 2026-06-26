@@ -24,7 +24,6 @@ postprocess_swift_models() {
     perl -0pi -e 's/(\/\/ https:\/\/openapi-generator\.tech\n\/\/\n)\n+/$1\n/g' "$models_dir"/*.swift
     perl -0pi -e 's/\n    public enum CodingKeys: String, CodingKey, CaseIterable(?:, Sendable)? \{\n(?:        case [^\n]+\n)*    \}\n//g; s/\n    \/\/ Encodable protocol methods\n\n    public func encode\(to encoder: Encoder\) throws \{\n(?:        .*\n)*?    \}\n//g' "$models_dir"/*.swift
     perl -0pi -e 's/\n    public static let \w+Rule = (?:StringRule|NumericRule<[^>]+>|ArrayRule)\([^\n]+\)\n//g' "$models_dir"/*.swift
-    perl -0pi -e 's/^    public var /    public let /mg' "$models_dir"/*.swift
 }
 
 case $language in
