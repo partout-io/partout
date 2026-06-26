@@ -129,13 +129,11 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -android)
-            # Requires ANDROID_NDK_HOME
-            export SWIFT_ANDROID_ABI=arm64-v8a
-            export SWIFT_ANDROID_ARCH=aarch64
-            export SWIFT_ANDROID_API_LEVEL=28
-            export SWIFT_ANDROID_VERSION=6.3.1
             build_dir=.cmake-android
-            cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=cmake/android.toolchain.cmake")
+            cmake_opts+=("-DCMAKE_ANDROID_NDK=$ANDROID_NDK_HOME")
+            cmake_opts+=("-DANDROID_ABI=arm64-v8a")
+            cmake_opts+=("-DSWIFT_VERSION=6.3.1")
+            cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=cmake/swift/swift-android.toolchain.cmake")
             shift
             ;;
         -*|--*)
