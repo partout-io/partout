@@ -42,9 +42,6 @@ public actor Tunnel {
         snapshotsSubject = CurrentValueStream([:])
         environments = [:]
         subscriptions = []
-#if swift(<6.0)
-        observeObjects()
-#endif
     }
 
     deinit {
@@ -59,14 +56,13 @@ public actor Tunnel {
 
 extension Tunnel: TunnelStrategy {
     public func prepare(purge: Bool) async throws {
-#if swift(>=6.0)
         observeObjects()
-#endif
         pp_log(ctx, .core, .info, "Prepare tunnel (purge: \(purge))...")
         try await strategy.prepare(purge: purge)
     }
 
     public func install(_ profile: Profile, connect: Bool, options: Sendable?) async throws {
+        observeObjects()
         guard !profile.activeModulesIds.isEmpty else {
             throw PartoutError(.noActiveModules)
         }
@@ -99,12 +95,14 @@ extension Tunnel: TunnelStrategy {
     }
 
     public func uninstall(profileId: Profile.ID) async throws {
+        observeObjects()
         pp_log(ctx, .core, .info, "Uninstall profile \(profileId)...")
         try await strategy.uninstall(profileId: profileId)
         environments.removeValue(forKey: profileId)
     }
 
     public func disconnect(from profileId: Profile.ID) async throws {
+        observeObjects()
         pp_log(ctx, .core, .info, "Disconnect profile \(profileId)...")
         try await strategy.disconnect(from: profileId)
     }
@@ -169,10 +167,8 @@ extension Tunnel {
 
 private extension Tunnel {
     func observeObjects() {
-#if swift(>=6.0)
         // Subscribe once
         guard subscriptions.isEmpty else { return }
-#endif
         let ctx = self.ctx
         let strategyStream = strategy.didUpdateActiveProfiles
         var subscriptions: [Task<Void, Never>] = []
