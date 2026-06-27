@@ -67,7 +67,7 @@ else()
 endif()
 
 if(PP_USE_PREBUILT_VENDORS)
-    partout_fetch_prebuilt_vendor(wg-go WGGO_DIR)
+    partout_use_prebuilt_vendor(wg-go WGGO_DIR)
 else()
     if(APPLE)
         set(WGGO_INSTALL_COMMAND

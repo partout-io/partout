@@ -104,7 +104,7 @@ function(partout_find_openssl_runtime output_var library_dir library_name)
 endfunction()
 
 if(PP_USE_PREBUILT_VENDORS)
-    partout_fetch_prebuilt_vendor(openssl OPENSSL_DIR)
+    partout_use_prebuilt_vendor(openssl OPENSSL_DIR)
     if(WIN32)
         file(GLOB OPENSSL_SSL_RUNTIME_CANDIDATES "${OPENSSL_DIR}/bin/libssl-3*.dll")
         file(GLOB OPENSSL_CRYPTO_RUNTIME_CANDIDATES "${OPENSSL_DIR}/bin/libcrypto-3*.dll")

@@ -36,7 +36,7 @@ set(MBEDTLS_X509_LIBRARY "lib/${CMAKE_STATIC_LIBRARY_PREFIX}mbedx509${CMAKE_STAT
 set(MBEDTLS_CRYPTO_LIBRARY "lib/${CMAKE_STATIC_LIBRARY_PREFIX}mbedcrypto${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
 if(PP_USE_PREBUILT_VENDORS)
-    partout_fetch_prebuilt_vendor(mbedtls MBEDTLS_DIR)
+    partout_use_prebuilt_vendor(mbedtls MBEDTLS_DIR)
     add_library(MbedTLS::TLS STATIC IMPORTED GLOBAL)
     add_library(MbedTLS::X509 STATIC IMPORTED GLOBAL)
     add_library(MbedTLS::Crypto STATIC IMPORTED GLOBAL)

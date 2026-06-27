@@ -138,6 +138,10 @@ if(ANDROID)
     set(VENDOR_ENV ${CMAKE_COMMAND} -E env PATH=${VENDOR_PATH})
 endif()
 
+if(PP_USE_PREBUILT_VENDORS)
+    partout_prepare_prebuilt_vendors()
+endif()
+
 if(PP_BUILD_USE_OPENSSL)
     include("vendors/openssl.cmake")
 endif()
