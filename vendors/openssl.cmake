@@ -35,7 +35,7 @@ set(OPENSSL_SSL_RUNTIME_LIBRARY "${OPENSSL_LIBDIR}/libssl${CMAKE_SHARED_LIBRARY_
 set(OPENSSL_CRYPTO_RUNTIME_LIBRARY "${OPENSSL_LIBDIR}/libcrypto${CMAKE_SHARED_LIBRARY_SUFFIX}")
 if(NOT PP_USE_PREBUILT_VENDORS)
     if(WIN32)
-        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+        if(ARCH_NAME MATCHES "^(arm64|aarch64)$")
             set(OPENSSL_ARCH arm64)
         else()
             set(OPENSSL_ARCH x64)
@@ -146,7 +146,7 @@ set(OPENSSL_CFG_FLAGS no-apps no-docs no-dsa no-engine no-gost no-legacy shared 
 
 # Add some flags if -DANDROID
 if(WIN32)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+    if(ARCH_NAME MATCHES "^(arm64|aarch64)$")
         set(OPENSSL_TARGET "VC-WIN64-ARM")
     else()
         set(OPENSSL_TARGET "VC-WIN64A")
