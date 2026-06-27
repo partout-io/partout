@@ -119,6 +119,21 @@ if(WIN32)
         -DUSE_SHARED_MBEDTLS_LIBRARY=OFF
         -DUSE_STATIC_MBEDTLS_LIBRARY=ON
     )
+    set(MBEDTLS_NORMALIZE_CRYPTO_LIBRARY_SCRIPT ${CMAKE_CURRENT_BINARY_DIR}/vendors/mbedtls-normalize-crypto.cmake)
+    file(WRITE "${MBEDTLS_NORMALIZE_CRYPTO_LIBRARY_SCRIPT}" [=[
+set(mbedcrypto_lib "${MBEDTLS_DIR}/lib/mbedcrypto.lib")
+set(mbedcrypto_archive "${MBEDTLS_DIR}/lib/libmbedcrypto.a")
+if(NOT EXISTS "${mbedcrypto_lib}" AND EXISTS "${mbedcrypto_archive}")
+    file(COPY_FILE "${mbedcrypto_archive}" "${mbedcrypto_lib}" ONLY_IF_DIFFERENT)
+endif()
+]=])
+    set(MBEDTLS_INSTALL_COMMAND
+        INSTALL_COMMAND
+            ${CMAKE_COMMAND} --build <BINARY_DIR> --target install
+            COMMAND ${CMAKE_COMMAND}
+                "-DMBEDTLS_DIR=<INSTALL_DIR>"
+                -P "${MBEDTLS_NORMALIZE_CRYPTO_LIBRARY_SCRIPT}"
+    )
 endif()
 if(ANDROID)
     list(APPEND MBEDTLS_CMAKE_ARGS
@@ -134,6 +149,7 @@ ExternalProject_Add(MbedTLSProject
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/mbedtls
     DEPENDS MbedTLSGeneratedFiles
     CMAKE_ARGS ${MBEDTLS_CMAKE_ARGS}
+    ${MBEDTLS_INSTALL_COMMAND}
     INSTALL_DIR ${MBEDTLS_DIR}
     BUILD_BYPRODUCTS
         <INSTALL_DIR>/${MBEDTLS_TLS_LIBRARY}
