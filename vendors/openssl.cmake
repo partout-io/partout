@@ -27,13 +27,15 @@ endif()
 
 set(OPENSSL_DIR ${PP_BUILD_OUTPUT}/openssl)
 set(OPENSSL_LIBDIR "lib")
+set(OPENSSL_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl)
+set(OPENSSL_BUILD_SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/vendors/openssl-src)
 
 # Output
 set(OPENSSL_SSL_RUNTIME_LIBRARY "${OPENSSL_LIBDIR}/libssl${CMAKE_SHARED_LIBRARY_SUFFIX}")
 set(OPENSSL_CRYPTO_RUNTIME_LIBRARY "${OPENSSL_LIBDIR}/libcrypto${CMAKE_SHARED_LIBRARY_SUFFIX}")
 if(NOT PP_USE_PREBUILT_VENDORS)
     if(WIN32)
-        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+        if(ARCH_NAME MATCHES "^(arm64|aarch64)$")
             set(OPENSSL_ARCH arm64)
         else()
             set(OPENSSL_ARCH x64)
@@ -102,7 +104,7 @@ function(partout_find_openssl_runtime output_var library_dir library_name)
 endfunction()
 
 if(PP_USE_PREBUILT_VENDORS)
-    partout_fetch_prebuilt_vendor(openssl OPENSSL_DIR)
+    partout_use_prebuilt_vendor(openssl OPENSSL_DIR)
     if(WIN32)
         file(GLOB OPENSSL_SSL_RUNTIME_CANDIDATES "${OPENSSL_DIR}/bin/libssl-3*.dll")
         file(GLOB OPENSSL_CRYPTO_RUNTIME_CANDIDATES "${OPENSSL_DIR}/bin/libcrypto-3*.dll")
@@ -143,8 +145,22 @@ endif()
 set(OPENSSL_CFG_FLAGS no-apps no-docs no-dsa no-engine no-gost no-legacy shared no-ssl no-tests no-zlib)
 
 # Add some flags if -DANDROID
-if(ANDROID)
+if(WIN32)
+    if(ARCH_NAME MATCHES "^(arm64|aarch64)$")
+        set(OPENSSL_TARGET "VC-WIN64-ARM")
+    else()
+        set(OPENSSL_TARGET "VC-WIN64A")
+    endif()
+elseif(ANDROID)
     set(OPENSSL_TARGET "android-arm64")
+    if(DEFINED ANDROID_NATIVE_API_LEVEL)
+        set(OPENSSL_ANDROID_API "${ANDROID_NATIVE_API_LEVEL}")
+    elseif(DEFINED CMAKE_SYSTEM_VERSION)
+        set(OPENSSL_ANDROID_API "${CMAKE_SYSTEM_VERSION}")
+    endif()
+    if(OPENSSL_ANDROID_API)
+        list(APPEND OPENSSL_CFG_FLAGS "-D__ANDROID_API__=${OPENSSL_ANDROID_API}")
+    endif()
     list(APPEND VENDOR_ENV ANDROID_NDK_ROOT=${CMAKE_ANDROID_NDK})
 else()
     set(OPENSSL_TARGET "")
@@ -158,7 +174,15 @@ set(CFG_ARGS
     ${OPENSSL_SYMBOLS}
     ${OPENSSL_CFG_FLAGS}
 )
-set(OPENSSL_INSTALL_COMMAND ${VENDOR_ENV} ${MAKE_CMD} install)
+set(OPENSSL_BUILD_COMMAND ${VENDOR_ENV} ${MAKE_CMD})
+if(NOT WIN32)
+    include(ProcessorCount)
+    ProcessorCount(OPENSSL_BUILD_JOBS)
+    if(NOT OPENSSL_BUILD_JOBS EQUAL 0)
+        list(APPEND OPENSSL_BUILD_COMMAND "-j${OPENSSL_BUILD_JOBS}")
+    endif()
+endif()
+set(OPENSSL_INSTALL_COMMAND ${VENDOR_ENV} ${MAKE_CMD} install_sw)
 if(APPLE)
     list(APPEND OPENSSL_INSTALL_COMMAND
         COMMAND install_name_tool -id "@rpath/libcrypto.3.dylib" "${OPENSSL_DIR}/${OPENSSL_LIBDIR}/libcrypto.3.dylib"
@@ -170,11 +194,15 @@ if(APPLE)
     )
 endif()
 ExternalProject_Add(OpenSSLProject
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl
-    CONFIGURE_COMMAND ${VENDOR_ENV} perl ${CMAKE_CURRENT_SOURCE_DIR}/vendors/openssl/Configure ${CFG_ARGS}
-    BUILD_COMMAND ${VENDOR_ENV} ${MAKE_CMD}
+    SOURCE_DIR ${OPENSSL_BUILD_SOURCE_DIR}
+    DOWNLOAD_COMMAND
+        ${CMAKE_COMMAND} -E rm -rf ${OPENSSL_BUILD_SOURCE_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${OPENSSL_SOURCE_DIR} ${OPENSSL_BUILD_SOURCE_DIR}
+    CONFIGURE_COMMAND ${VENDOR_ENV} perl ${OPENSSL_BUILD_SOURCE_DIR}/Configure ${CFG_ARGS}
+    BUILD_COMMAND ${OPENSSL_BUILD_COMMAND}
     INSTALL_COMMAND ${OPENSSL_INSTALL_COMMAND}
     INSTALL_DIR ${OPENSSL_DIR}
+    BUILD_IN_SOURCE 1
     BUILD_BYPRODUCTS ${OPENSSL_BYPRODUCTS}
 )
 
