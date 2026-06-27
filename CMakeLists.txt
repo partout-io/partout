@@ -154,100 +154,130 @@ if(PP_BUILD_LIBRARY)
     endif()
 endif()
 
-# Install vendored artifacts even when the Partout library is not built.
-set(PARTOUT_RUNTIME_DEPENDENCY_SET PartoutRuntimeDependencies)
-set(PARTOUT_IMPORTED_RUNTIME_TARGETS "")
-set(PARTOUT_RUNTIME_DEPENDENCY_DIRS "")
-set(PARTOUT_IMPORTED_STATIC_TARGET_FILES "")
-function(partout_install_runtime_target target)
-    if(NOT TARGET ${target})
-        message(FATAL_ERROR "Missing runtime dependency target: ${target}")
-    endif()
-    list(APPEND PARTOUT_IMPORTED_RUNTIME_TARGETS ${target})
-    get_target_property(runtime_location ${target} IMPORTED_LOCATION)
-    if(runtime_location)
-        get_filename_component(runtime_dir "${runtime_location}" DIRECTORY)
-        list(APPEND PARTOUT_RUNTIME_DEPENDENCY_DIRS "${runtime_dir}")
-    endif()
-    set(PARTOUT_IMPORTED_RUNTIME_TARGETS "${PARTOUT_IMPORTED_RUNTIME_TARGETS}" PARENT_SCOPE)
-    set(PARTOUT_RUNTIME_DEPENDENCY_DIRS "${PARTOUT_RUNTIME_DEPENDENCY_DIRS}" PARENT_SCOPE)
-endfunction()
+# Vendor-only installs keep each vendor's own install prefix layout.
+if(NOT PP_BUILD_LIBRARY)
+    function(partout_install_vendor_directory vendor source_dir)
+        get_filename_component(vendor_source_dir "${source_dir}" ABSOLUTE)
+        get_filename_component(vendor_install_dir "${CMAKE_INSTALL_PREFIX}/${vendor}" ABSOLUTE)
+        file(TO_CMAKE_PATH "${vendor_source_dir}" vendor_source_dir)
+        file(TO_CMAKE_PATH "${vendor_install_dir}" vendor_install_dir)
+        if(vendor_source_dir STREQUAL vendor_install_dir)
+            return()
+        endif()
 
-function(partout_install_static_target target)
-    if(NOT TARGET ${target})
-        message(FATAL_ERROR "Missing static dependency target: ${target}")
-    endif()
-    get_target_property(static_location ${target} IMPORTED_LOCATION)
-    if(NOT static_location)
-        message(FATAL_ERROR "Static dependency target has no IMPORTED_LOCATION: ${target}")
-    endif()
-    list(APPEND PARTOUT_IMPORTED_STATIC_TARGET_FILES "${static_location}")
-    set(PARTOUT_IMPORTED_STATIC_TARGET_FILES "${PARTOUT_IMPORTED_STATIC_TARGET_FILES}" PARENT_SCOPE)
-endfunction()
+        install(DIRECTORY "${source_dir}/"
+            DESTINATION "${vendor}"
+            USE_SOURCE_PERMISSIONS
+        )
+    endfunction()
 
-if(PP_BUNDLE_VENDOR_RUNTIME AND PP_BUILD_USE_OPENSSL)
-    partout_install_runtime_target(OpenSSL::SSL)
-    partout_install_runtime_target(OpenSSL::Crypto)
-endif()
-if(PP_BUNDLE_VENDOR_RUNTIME AND PP_BUILD_USE_MBEDTLS)
-    partout_install_static_target(MbedTLS::TLS)
-    partout_install_static_target(MbedTLS::X509)
-    partout_install_static_target(MbedTLS::Crypto)
-endif()
-if(PP_BUILD_USE_WIREGUARD)
-    partout_install_runtime_target(WireGuardGo::wg-go)
-endif()
-if(WIN32)
-    partout_install_runtime_target(Wintun::Wintun)
-endif()
-if(PARTOUT_IMPORTED_RUNTIME_TARGETS)
-    list(REMOVE_DUPLICATES PARTOUT_RUNTIME_DEPENDENCY_DIRS)
-    install(IMPORTED_RUNTIME_ARTIFACTS ${PARTOUT_IMPORTED_RUNTIME_TARGETS}
-        RUNTIME_DEPENDENCY_SET ${PARTOUT_RUNTIME_DEPENDENCY_SET}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    )
-
-    set(PARTOUT_RUNTIME_ROOT "${PP_BUILD_OUTPUT}")
-    set(PARTOUT_RUNTIME_DEPENDENCY_ARGS
-        POST_INCLUDE_REGEXES "^${PARTOUT_RUNTIME_ROOT}/"
-        POST_EXCLUDE_REGEXES ".*"
-    )
+    if(PP_BUNDLE_VENDOR_RUNTIME AND PP_BUILD_USE_OPENSSL)
+        partout_install_vendor_directory(openssl "${OPENSSL_DIR}")
+    endif()
+    if(PP_BUNDLE_VENDOR_RUNTIME AND PP_BUILD_USE_MBEDTLS)
+        partout_install_vendor_directory(mbedtls "${MBEDTLS_DIR}")
+    endif()
+    if(PP_BUILD_USE_WIREGUARD)
+        partout_install_vendor_directory(wg-go "${WGGO_DIR}")
+    endif()
     if(WIN32)
-        list(APPEND PARTOUT_RUNTIME_DEPENDENCY_ARGS
-            PRE_EXCLUDE_REGEXES
-                "api-ms-"
-                "ext-ms-"
-        )
-    elseif(ANDROID)
-        list(APPEND PARTOUT_RUNTIME_DEPENDENCY_ARGS
-            PRE_EXCLUDE_REGEXES
-                "^libandroid\\.so$"
-                "^libc\\.so$"
-                "^libdl\\.so$"
-                "^liblog\\.so$"
-                "^libm\\.so$"
-        )
+        partout_install_vendor_directory(wintun "${WINTUN_DIR}")
     endif()
-    if(ANDROID AND CMAKE_OBJDUMP)
-        string(REPLACE "\\" "/" PARTOUT_CMAKE_OBJDUMP "${CMAKE_OBJDUMP}")
-        install(CODE
-            "set(CMAKE_GET_RUNTIME_DEPENDENCIES_PLATFORM \"linux+elf\")
+else()
+    set(PARTOUT_RUNTIME_DEPENDENCY_SET PartoutRuntimeDependencies)
+    set(PARTOUT_IMPORTED_RUNTIME_TARGETS "")
+    set(PARTOUT_RUNTIME_DEPENDENCY_DIRS "")
+    set(PARTOUT_IMPORTED_STATIC_TARGET_FILES "")
+    function(partout_install_runtime_target target)
+        if(NOT TARGET ${target})
+            message(FATAL_ERROR "Missing runtime dependency target: ${target}")
+        endif()
+        list(APPEND PARTOUT_IMPORTED_RUNTIME_TARGETS ${target})
+        get_target_property(runtime_location ${target} IMPORTED_LOCATION)
+        if(runtime_location)
+            get_filename_component(runtime_dir "${runtime_location}" DIRECTORY)
+            list(APPEND PARTOUT_RUNTIME_DEPENDENCY_DIRS "${runtime_dir}")
+        endif()
+        set(PARTOUT_IMPORTED_RUNTIME_TARGETS "${PARTOUT_IMPORTED_RUNTIME_TARGETS}" PARENT_SCOPE)
+        set(PARTOUT_RUNTIME_DEPENDENCY_DIRS "${PARTOUT_RUNTIME_DEPENDENCY_DIRS}" PARENT_SCOPE)
+    endfunction()
+
+    function(partout_install_static_target target)
+        if(NOT TARGET ${target})
+            message(FATAL_ERROR "Missing static dependency target: ${target}")
+        endif()
+        get_target_property(static_location ${target} IMPORTED_LOCATION)
+        if(NOT static_location)
+            message(FATAL_ERROR "Static dependency target has no IMPORTED_LOCATION: ${target}")
+        endif()
+        list(APPEND PARTOUT_IMPORTED_STATIC_TARGET_FILES "${static_location}")
+        set(PARTOUT_IMPORTED_STATIC_TARGET_FILES "${PARTOUT_IMPORTED_STATIC_TARGET_FILES}" PARENT_SCOPE)
+    endfunction()
+
+    if(PP_BUNDLE_VENDOR_RUNTIME AND PP_BUILD_USE_OPENSSL)
+        partout_install_runtime_target(OpenSSL::SSL)
+        partout_install_runtime_target(OpenSSL::Crypto)
+    endif()
+    if(PP_BUNDLE_VENDOR_RUNTIME AND PP_BUILD_USE_MBEDTLS)
+        partout_install_static_target(MbedTLS::TLS)
+        partout_install_static_target(MbedTLS::X509)
+        partout_install_static_target(MbedTLS::Crypto)
+    endif()
+    if(PP_BUILD_USE_WIREGUARD)
+        partout_install_runtime_target(WireGuardGo::wg-go)
+    endif()
+    if(WIN32)
+        partout_install_runtime_target(Wintun::Wintun)
+    endif()
+    if(PARTOUT_IMPORTED_RUNTIME_TARGETS)
+        list(REMOVE_DUPLICATES PARTOUT_RUNTIME_DEPENDENCY_DIRS)
+        install(IMPORTED_RUNTIME_ARTIFACTS ${PARTOUT_IMPORTED_RUNTIME_TARGETS}
+            RUNTIME_DEPENDENCY_SET ${PARTOUT_RUNTIME_DEPENDENCY_SET}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        )
+
+        set(PARTOUT_RUNTIME_ROOT "${PP_BUILD_OUTPUT}")
+        set(PARTOUT_RUNTIME_DEPENDENCY_ARGS
+            POST_INCLUDE_REGEXES "^${PARTOUT_RUNTIME_ROOT}/"
+            POST_EXCLUDE_REGEXES ".*"
+        )
+        if(WIN32)
+            list(APPEND PARTOUT_RUNTIME_DEPENDENCY_ARGS
+                PRE_EXCLUDE_REGEXES
+                    "api-ms-"
+                    "ext-ms-"
+            )
+        elseif(ANDROID)
+            list(APPEND PARTOUT_RUNTIME_DEPENDENCY_ARGS
+                PRE_EXCLUDE_REGEXES
+                    "^libandroid\\.so$"
+                    "^libc\\.so$"
+                    "^libdl\\.so$"
+                    "^liblog\\.so$"
+                    "^libm\\.so$"
+            )
+        endif()
+        if(ANDROID AND CMAKE_OBJDUMP)
+            string(REPLACE "\\" "/" PARTOUT_CMAKE_OBJDUMP "${CMAKE_OBJDUMP}")
+            install(CODE
+                "set(CMAKE_GET_RUNTIME_DEPENDENCIES_PLATFORM \"linux+elf\")
 set(CMAKE_GET_RUNTIME_DEPENDENCIES_TOOL \"objdump\")
 set(CMAKE_GET_RUNTIME_DEPENDENCIES_COMMAND \"${PARTOUT_CMAKE_OBJDUMP}\")"
+            )
+        endif()
+        install(RUNTIME_DEPENDENCY_SET ${PARTOUT_RUNTIME_DEPENDENCY_SET}
+            ${PARTOUT_RUNTIME_DEPENDENCY_ARGS}
+            DIRECTORIES ${PARTOUT_RUNTIME_DEPENDENCY_DIRS}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         )
     endif()
-    install(RUNTIME_DEPENDENCY_SET ${PARTOUT_RUNTIME_DEPENDENCY_SET}
-        ${PARTOUT_RUNTIME_DEPENDENCY_ARGS}
-        DIRECTORIES ${PARTOUT_RUNTIME_DEPENDENCY_DIRS}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    )
-endif()
-if(PARTOUT_IMPORTED_STATIC_TARGET_FILES)
-    install(FILES ${PARTOUT_IMPORTED_STATIC_TARGET_FILES}
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    )
+    if(PARTOUT_IMPORTED_STATIC_TARGET_FILES)
+        install(FILES ${PARTOUT_IMPORTED_STATIC_TARGET_FILES}
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        )
+    endif()
 endif()
 
 if(PP_BUILD_LIBRARY)
