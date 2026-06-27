@@ -121,6 +121,10 @@ if(WIN32)
 else()
     set(MAKE_CMD make)
 endif()
+set(PP_BUILD_CONFIG_ARGS "")
+if(CMAKE_CONFIGURATION_TYPES)
+    list(APPEND PP_BUILD_CONFIG_ARGS --config $<CONFIG>)
+endif()
 
 # Define VENDOR_ENV to prepend NDK toolchain on Android
 if(ANDROID)
