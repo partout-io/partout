@@ -356,7 +356,7 @@ case .native:
                 // Pick current OS by removing it from exclusions
                 var list = Set(OS.allCases)
                 list.remove(.current)
-                return list.map(\.nativeCryptoSourcePath)
+                return list.map { "src/\($0.rawValue)" }
             }(),
             cSettings: globalCSettings
         )
@@ -431,7 +431,7 @@ enum Area: CaseIterable {
 
 enum OS: String, CaseIterable {
     case android
-    case apple
+    case apple = "darwin"
     case linux
     case windows
 
@@ -442,9 +442,6 @@ enum OS: String, CaseIterable {
         // Android is never compiled natively, therefore #if os(Android)
         // would be wrong here. Resort to an explicit env variable.
         if let envOS {
-            if envOS == "darwin" {
-                return .apple
-            }
             guard let os = OS(rawValue: envOS) else {
                 fatalError("Unrecognized OS '\(envOS)'")
             }
@@ -465,13 +462,6 @@ enum OS: String, CaseIterable {
         case .apple: [.iOS, .macOS, .tvOS]
         case .linux: [.linux]
         case .windows: [.windows]
-        }
-    }
-
-    var nativeCryptoSourcePath: String {
-        switch self {
-        case .apple: "src/darwin"
-        default: "src/\(rawValue)"
         }
     }
 }
