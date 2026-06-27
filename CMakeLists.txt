@@ -219,6 +219,15 @@ if(PARTOUT_IMPORTED_RUNTIME_TARGETS)
                 "api-ms-"
                 "ext-ms-"
         )
+    elseif(ANDROID)
+        list(APPEND PARTOUT_RUNTIME_DEPENDENCY_ARGS
+            PRE_EXCLUDE_REGEXES
+                "^libandroid\\.so$"
+                "^libc\\.so$"
+                "^libdl\\.so$"
+                "^liblog\\.so$"
+                "^libm\\.so$"
+        )
     endif()
     if(ANDROID AND CMAKE_OBJDUMP)
         string(REPLACE "\\" "/" PARTOUT_CMAKE_OBJDUMP "${CMAKE_OBJDUMP}")
