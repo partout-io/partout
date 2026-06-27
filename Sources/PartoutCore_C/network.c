@@ -9,9 +9,7 @@
 #include <string.h>
 #include "portable/network.h"
 
-#if PARTOUT_WINDOWS
-#include <ws2tcpip.h>
-#else
+#if !PARTOUT_WINDOWS
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <netdb.h>

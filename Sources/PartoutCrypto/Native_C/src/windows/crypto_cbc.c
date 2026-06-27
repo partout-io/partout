@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include <windows.h>
+#include "portable/common.h"
 #include <bcrypt.h>
 #include <string.h>
-#include "portable/common.h"
 #include "crypto/crypto_cbc.h"
 #include "crypto_windows.h"
 
@@ -80,7 +79,6 @@ size_t local_encrypt(void *vctx,
     uint8_t *out_iv = out + digest_len;
     uint8_t *out_encrypted = out_iv + cipher_iv_len;
     ULONG enc_len = 0;
-    size_t hmac_len = 0;
 
     if (ctx->hAlgCipher) {
         if (!flags || !flags->for_testing) {
@@ -167,8 +165,6 @@ size_t local_decrypt(void *vctx,
     const size_t hmac_key_len = ctx->crypto.meta.hmac_key_len;
     const uint8_t *iv = in + digest_len;
     const uint8_t *encrypted = in + digest_len + cipher_iv_len;
-    ULONG dec_len = 0;
-    size_t hmac_len = 0;
 
     BCRYPT_HASH_HANDLE hHmac = NULL;
     PP_CRYPTO_CHECK(BCryptCreateHash(
@@ -209,7 +205,6 @@ static
 bool local_verify(void *vctx, const uint8_t *in, size_t in_len, pp_crypto_error_code *error) {
     pp_crypto_cbc *ctx = vctx;
     pp_assert(ctx);
-    size_t hmac_len = 0;
 
     const size_t digest_len = ctx->crypto.meta.digest_len;
     const size_t hmac_key_len = ctx->crypto.meta.hmac_key_len;
