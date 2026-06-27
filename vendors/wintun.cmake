@@ -15,3 +15,8 @@ file(COPY_FILE
     ${WINTUN_DIR}/wintun.dll
     ONLY_IF_DIFFERENT
 )
+
+add_library(Wintun::Wintun SHARED IMPORTED GLOBAL)
+set_target_properties(Wintun::Wintun PROPERTIES
+    IMPORTED_LOCATION "${WINTUN_DIR}/wintun.dll"
+)

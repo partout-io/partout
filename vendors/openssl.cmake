@@ -1,9 +1,9 @@
-set(PARTOUT_OPENSSL_IS_SYSTEM OFF)
-if(PARTOUT_SYSTEM_VENDOR_SEARCH)
+set(PP_OPENSSL_IS_SYSTEM OFF)
+if(PP_USE_SYSTEM_VENDORS)
     partout_use_homebrew_formula(openssl@3.5)
     find_package(OpenSSL 3 QUIET COMPONENTS SSL Crypto)
     if(OpenSSL_FOUND AND TARGET OpenSSL::SSL AND TARGET OpenSSL::Crypto)
-        set(PARTOUT_OPENSSL_IS_SYSTEM ON)
+        set(PP_OPENSSL_IS_SYSTEM ON)
         add_library(OpenSSLInterface INTERFACE)
         target_link_libraries(OpenSSLInterface INTERFACE OpenSSL::SSL OpenSSL::Crypto)
         message(STATUS "Using system OpenSSL")
@@ -14,7 +14,7 @@ if(PARTOUT_SYSTEM_VENDOR_SEARCH)
     if(PkgConfig_FOUND)
         pkg_check_modules(OPENSSL_PKG QUIET IMPORTED_TARGET "openssl>=3")
         if(OPENSSL_PKG_FOUND AND TARGET PkgConfig::OPENSSL_PKG)
-            set(PARTOUT_OPENSSL_IS_SYSTEM ON)
+            set(PP_OPENSSL_IS_SYSTEM ON)
             add_library(OpenSSLInterface INTERFACE)
             target_link_libraries(OpenSSLInterface INTERFACE PkgConfig::OPENSSL_PKG)
             message(STATUS "Using system OpenSSL")
@@ -22,38 +22,118 @@ if(PARTOUT_SYSTEM_VENDOR_SEARCH)
         endif()
     endif()
 
-    if(PARTOUT_SYSTEM_VENDOR_REQUIRED)
-        message(FATAL_ERROR "System OpenSSL 3 not found")
-    endif()
+    message(FATAL_ERROR "System OpenSSL 3 not found")
 endif()
 
 set(OPENSSL_DIR ${PP_BUILD_OUTPUT}/openssl)
 set(OPENSSL_LIBDIR "lib")
 
 # Output
-if(WIN32)
-    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
-        set(OPENSSL_ARCH arm64)
+set(OPENSSL_SSL_RUNTIME_LIBRARY "${OPENSSL_LIBDIR}/libssl${CMAKE_SHARED_LIBRARY_SUFFIX}")
+set(OPENSSL_CRYPTO_RUNTIME_LIBRARY "${OPENSSL_LIBDIR}/libcrypto${CMAKE_SHARED_LIBRARY_SUFFIX}")
+if(NOT PP_USE_PREBUILT_VENDORS)
+    if(WIN32)
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+            set(OPENSSL_ARCH arm64)
+        else()
+            set(OPENSSL_ARCH x64)
+        endif()
+        set(OPENSSL_SSL_RUNTIME_LIBRARY "bin/libssl-3-${OPENSSL_ARCH}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+        set(OPENSSL_CRYPTO_RUNTIME_LIBRARY "bin/libcrypto-3-${OPENSSL_ARCH}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    elseif(APPLE)
+        set(OPENSSL_SSL_RUNTIME_LIBRARY "${OPENSSL_LIBDIR}/libssl.3${CMAKE_SHARED_LIBRARY_SUFFIX}")
+        set(OPENSSL_CRYPTO_RUNTIME_LIBRARY "${OPENSSL_LIBDIR}/libcrypto.3${CMAKE_SHARED_LIBRARY_SUFFIX}")
     else()
-        set(OPENSSL_ARCH x64)
+        set(OPENSSL_SSL_RUNTIME_LIBRARY "${OPENSSL_LIBDIR}/libssl${CMAKE_SHARED_LIBRARY_SUFFIX}.3")
+        set(OPENSSL_CRYPTO_RUNTIME_LIBRARY "${OPENSSL_LIBDIR}/libcrypto${CMAKE_SHARED_LIBRARY_SUFFIX}.3")
     endif()
-    set(LIBSSL bin/libssl-3-${OPENSSL_ARCH}${LIBEXT})
-    set(LIBCRYPTO bin/libcrypto-3-${OPENSSL_ARCH}${LIBEXT})
-    set(LIBSSL_IMP ${OPENSSL_LIBDIR}/libssl${LIBEXT_IMP})
-    set(LIBCRYPTO_IMP ${OPENSSL_LIBDIR}/libcrypto${LIBEXT_IMP})
-    set(OPENSSL_BYPRODUCTS
-        <INSTALL_DIR>/${LIBSSL}
-        <INSTALL_DIR>/${LIBSSL_IMP}
-        <INSTALL_DIR>/${LIBCRYPTO}
-        <INSTALL_DIR>/${LIBCRYPTO_IMP}
+endif()
+set(OPENSSL_BYPRODUCTS
+    <INSTALL_DIR>/${OPENSSL_SSL_RUNTIME_LIBRARY}
+    <INSTALL_DIR>/${OPENSSL_CRYPTO_RUNTIME_LIBRARY}
+)
+if(WIN32)
+    set(OPENSSL_SSL_IMPORT_LIBRARY "${OPENSSL_LIBDIR}/libssl${CMAKE_IMPORT_LIBRARY_SUFFIX}")
+    set(OPENSSL_CRYPTO_IMPORT_LIBRARY "${OPENSSL_LIBDIR}/libcrypto${CMAKE_IMPORT_LIBRARY_SUFFIX}")
+    list(APPEND OPENSSL_BYPRODUCTS
+        <INSTALL_DIR>/${OPENSSL_SSL_IMPORT_LIBRARY}
+        <INSTALL_DIR>/${OPENSSL_CRYPTO_IMPORT_LIBRARY}
     )
-else()
-    set(LIBSSL ${OPENSSL_LIBDIR}/libssl${LIBEXT})
-    set(LIBCRYPTO ${OPENSSL_LIBDIR}/libcrypto${LIBEXT})
-    set(OPENSSL_BYPRODUCTS
-        <INSTALL_DIR>/${LIBSSL}
-        <INSTALL_DIR>/${LIBCRYPTO}
+endif()
+
+function(partout_import_openssl_targets ssl_runtime crypto_runtime ssl_import crypto_import)
+    add_library(OpenSSL::SSL SHARED IMPORTED GLOBAL)
+    add_library(OpenSSL::Crypto SHARED IMPORTED GLOBAL)
+    set_target_properties(OpenSSL::SSL PROPERTIES
+        IMPORTED_LOCATION "${ssl_runtime}"
     )
+    set_target_properties(OpenSSL::Crypto PROPERTIES
+        IMPORTED_LOCATION "${crypto_runtime}"
+    )
+    if(ssl_import AND crypto_import)
+        set_target_properties(OpenSSL::SSL PROPERTIES
+            IMPORTED_IMPLIB "${ssl_import}"
+        )
+        set_target_properties(OpenSSL::Crypto PROPERTIES
+            IMPORTED_IMPLIB "${crypto_import}"
+        )
+    endif()
+endfunction()
+
+function(partout_find_openssl_runtime output_var library_dir library_name)
+    file(GLOB runtime_candidates "${library_dir}/${library_name}*${CMAKE_SHARED_LIBRARY_SUFFIX}*")
+    set(runtime_library "")
+    foreach(candidate IN LISTS runtime_candidates)
+        if(NOT IS_SYMLINK "${candidate}")
+            set(runtime_library "${candidate}")
+            break()
+        endif()
+    endforeach()
+    if(NOT runtime_library AND runtime_candidates)
+        list(GET runtime_candidates 0 runtime_library)
+    endif()
+    if(NOT runtime_library)
+        message(FATAL_ERROR "Unable to locate prebuilt OpenSSL runtime library '${library_name}' in ${library_dir}")
+    endif()
+    set(${output_var} "${runtime_library}" PARENT_SCOPE)
+endfunction()
+
+if(PP_USE_PREBUILT_VENDORS)
+    partout_fetch_prebuilt_vendor(openssl OPENSSL_DIR)
+    if(WIN32)
+        file(GLOB OPENSSL_SSL_RUNTIME_CANDIDATES "${OPENSSL_DIR}/bin/libssl-3*.dll")
+        file(GLOB OPENSSL_CRYPTO_RUNTIME_CANDIDATES "${OPENSSL_DIR}/bin/libcrypto-3*.dll")
+        list(LENGTH OPENSSL_SSL_RUNTIME_CANDIDATES OPENSSL_SSL_RUNTIME_CANDIDATE_COUNT)
+        list(LENGTH OPENSSL_CRYPTO_RUNTIME_CANDIDATES OPENSSL_CRYPTO_RUNTIME_CANDIDATE_COUNT)
+        if(NOT OPENSSL_SSL_RUNTIME_CANDIDATE_COUNT EQUAL 1 OR NOT OPENSSL_CRYPTO_RUNTIME_CANDIDATE_COUNT EQUAL 1)
+            message(FATAL_ERROR "Unable to locate prebuilt OpenSSL runtime libraries in ${OPENSSL_DIR}/bin")
+        endif()
+        list(GET OPENSSL_SSL_RUNTIME_CANDIDATES 0 OPENSSL_SSL_RUNTIME_LOCATION)
+        list(GET OPENSSL_CRYPTO_RUNTIME_CANDIDATES 0 OPENSSL_CRYPTO_RUNTIME_LOCATION)
+        partout_import_openssl_targets(
+            "${OPENSSL_SSL_RUNTIME_LOCATION}"
+            "${OPENSSL_CRYPTO_RUNTIME_LOCATION}"
+            "${OPENSSL_DIR}/${OPENSSL_SSL_IMPORT_LIBRARY}"
+            "${OPENSSL_DIR}/${OPENSSL_CRYPTO_IMPORT_LIBRARY}"
+        )
+    else()
+        partout_find_openssl_runtime(OPENSSL_SSL_RUNTIME_LOCATION "${OPENSSL_DIR}/${OPENSSL_LIBDIR}" libssl)
+        partout_find_openssl_runtime(OPENSSL_CRYPTO_RUNTIME_LOCATION "${OPENSSL_DIR}/${OPENSSL_LIBDIR}" libcrypto)
+        partout_import_openssl_targets(
+            "${OPENSSL_SSL_RUNTIME_LOCATION}"
+            "${OPENSSL_CRYPTO_RUNTIME_LOCATION}"
+            ""
+            ""
+        )
+    endif()
+
+    add_library(OpenSSLInterface INTERFACE)
+    target_include_directories(OpenSSLInterface INTERFACE ${OPENSSL_DIR}/include)
+    target_link_libraries(OpenSSLInterface INTERFACE
+        OpenSSL::SSL
+        OpenSSL::Crypto
+    )
+    return()
 endif()
 
 # Configure flags
@@ -97,23 +177,19 @@ ExternalProject_Add(OpenSSLProject
 
 # XXX: Use absolute paths to fix linking clash with system OpenSSL/BoringSSL
 ExternalProject_Get_Property(OpenSSLProject install_dir)
-add_library(OpenSSL::SSL SHARED IMPORTED GLOBAL)
-add_library(OpenSSL::Crypto SHARED IMPORTED GLOBAL)
 if(WIN32)
-    set_target_properties(OpenSSL::SSL PROPERTIES
-        IMPORTED_LOCATION ${install_dir}/${LIBSSL}
-        IMPORTED_IMPLIB ${install_dir}/${LIBSSL_IMP}
-    )
-    set_target_properties(OpenSSL::Crypto PROPERTIES
-        IMPORTED_LOCATION ${install_dir}/${LIBCRYPTO}
-        IMPORTED_IMPLIB ${install_dir}/${LIBCRYPTO_IMP}
+    partout_import_openssl_targets(
+        "${install_dir}/${OPENSSL_SSL_RUNTIME_LIBRARY}"
+        "${install_dir}/${OPENSSL_CRYPTO_RUNTIME_LIBRARY}"
+        "${install_dir}/${OPENSSL_SSL_IMPORT_LIBRARY}"
+        "${install_dir}/${OPENSSL_CRYPTO_IMPORT_LIBRARY}"
     )
 else()
-    set_target_properties(OpenSSL::SSL PROPERTIES
-        IMPORTED_LOCATION ${install_dir}/${LIBSSL}
-    )
-    set_target_properties(OpenSSL::Crypto PROPERTIES
-        IMPORTED_LOCATION ${install_dir}/${LIBCRYPTO}
+    partout_import_openssl_targets(
+        "${install_dir}/${OPENSSL_SSL_RUNTIME_LIBRARY}"
+        "${install_dir}/${OPENSSL_CRYPTO_RUNTIME_LIBRARY}"
+        ""
+        ""
     )
 endif()
 add_dependencies(OpenSSL::SSL OpenSSLProject)
