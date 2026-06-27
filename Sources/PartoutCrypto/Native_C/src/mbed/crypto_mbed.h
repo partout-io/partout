@@ -8,23 +8,12 @@
 
 #include <psa/crypto.h>
 #include <stddef.h>
-#include <strings.h>
 #include "portable/common.h"
 #include "crypto/crypto.h"
+#include "hmac_mbed.h"
 
-#define PP_MBED_HMAC_MAX_LENGTH (size_t)128
 #define PP_MBED_AES_BLOCK_SIZE (size_t)16
 #define PP_MBED_GCM_IV_LENGTH (size_t)12
-
-typedef struct {
-    psa_algorithm_t algorithm;
-    size_t length;
-} pp_mbed_digest;
-
-static
-bool pp_mbed_init(void) {
-    return psa_crypto_init() == PSA_SUCCESS;
-}
 
 static
 void pp_mbed_set_error(pp_crypto_error_code *error, pp_crypto_error_code code) {
@@ -39,41 +28,31 @@ void *pp_mbed_alloc(size_t size) {
 }
 
 static
-bool pp_mbed_digest_by_name(const char *name, pp_mbed_digest *digest) {
-    pp_assert(name);
-    pp_assert(digest);
+bool pp_mbed_ascii_has_prefix(const char *str, const char *prefix) {
+    pp_assert(str);
+    pp_assert(prefix);
 
-    if (!strcasecmp(name, "MD5")) {
-        digest->algorithm = PSA_ALG_MD5;
-        digest->length = PSA_HASH_LENGTH(PSA_ALG_MD5);
-        return true;
+    while (*prefix) {
+        if (!*str || pp_mbed_ascii_upper(*str) != pp_mbed_ascii_upper(*prefix)) {
+            return false;
+        }
+        ++str;
+        ++prefix;
     }
-    if (!strcasecmp(name, "SHA1")) {
-        digest->algorithm = PSA_ALG_SHA_1;
-        digest->length = PSA_HASH_LENGTH(PSA_ALG_SHA_1);
-        return true;
+    return true;
+}
+
+static
+bool pp_mbed_ascii_has_suffix(const char *str, const char *suffix) {
+    pp_assert(str);
+    pp_assert(suffix);
+
+    const size_t str_len = strlen(str);
+    const size_t suffix_len = strlen(suffix);
+    if (str_len < suffix_len) {
+        return false;
     }
-    if (!strcasecmp(name, "SHA224")) {
-        digest->algorithm = PSA_ALG_SHA_224;
-        digest->length = PSA_HASH_LENGTH(PSA_ALG_SHA_224);
-        return true;
-    }
-    if (!strcasecmp(name, "SHA256")) {
-        digest->algorithm = PSA_ALG_SHA_256;
-        digest->length = PSA_HASH_LENGTH(PSA_ALG_SHA_256);
-        return true;
-    }
-    if (!strcasecmp(name, "SHA384")) {
-        digest->algorithm = PSA_ALG_SHA_384;
-        digest->length = PSA_HASH_LENGTH(PSA_ALG_SHA_384);
-        return true;
-    }
-    if (!strcasecmp(name, "SHA512")) {
-        digest->algorithm = PSA_ALG_SHA_512;
-        digest->length = PSA_HASH_LENGTH(PSA_ALG_SHA_512);
-        return true;
-    }
-    return false;
+    return pp_mbed_ascii_equal(str + str_len - suffix_len, suffix);
 }
 
 static
@@ -82,20 +61,18 @@ bool pp_mbed_aes_key_len_by_name(const char *name, const char *suffix, size_t *k
     pp_assert(suffix);
     pp_assert(key_len);
 
-    const size_t suffix_len = strlen(suffix);
-    const size_t name_len = strlen(name);
-    if (name_len < suffix_len || strcasecmp(name + name_len - suffix_len, suffix)) {
+    if (!pp_mbed_ascii_has_suffix(name, suffix)) {
         return false;
     }
-    if (!strncasecmp(name, "AES-128-", 8)) {
+    if (pp_mbed_ascii_has_prefix(name, "AES-128-")) {
         *key_len = 16;
         return true;
     }
-    if (!strncasecmp(name, "AES-192-", 8)) {
+    if (pp_mbed_ascii_has_prefix(name, "AES-192-")) {
         *key_len = 24;
         return true;
     }
-    if (!strncasecmp(name, "AES-256-", 8)) {
+    if (pp_mbed_ascii_has_prefix(name, "AES-256-")) {
         *key_len = 32;
         return true;
     }
@@ -109,78 +86,6 @@ bool pp_mbed_secure_equal(const uint8_t *lhs, const uint8_t *rhs, size_t len) {
         diff |= lhs[i] ^ rhs[i];
     }
     return diff == 0;
-}
-
-static
-bool pp_mbed_import_key(psa_key_type_t type,
-                        psa_key_usage_t usage,
-                        psa_algorithm_t algorithm,
-                        const uint8_t *key_bytes,
-                        size_t key_len,
-                        mbedtls_svc_key_id_t *key) {
-    pp_assert(key_bytes);
-    pp_assert(key);
-
-    if (!pp_mbed_init()) {
-        return false;
-    }
-
-    psa_key_attributes_t attributes = PSA_KEY_ATTRIBUTES_INIT;
-    psa_set_key_type(&attributes, type);
-    psa_set_key_bits(&attributes, 8 * key_len);
-    psa_set_key_usage_flags(&attributes, usage);
-    psa_set_key_algorithm(&attributes, algorithm);
-    const psa_status_t status = psa_import_key(&attributes, key_bytes, key_len, key);
-    psa_reset_key_attributes(&attributes);
-    return status == PSA_SUCCESS;
-}
-
-static
-bool pp_mbed_hmac(const pp_mbed_digest *digest,
-                  const uint8_t *key_bytes,
-                  size_t key_len,
-                  const void *data1,
-                  size_t data1_len,
-                  const void *data2,
-                  size_t data2_len,
-                  uint8_t *out,
-                  size_t out_len) {
-    pp_assert(digest);
-    pp_assert(key_bytes);
-    pp_assert(out);
-    pp_assert(out_len >= digest->length);
-
-    const psa_algorithm_t algorithm = PSA_ALG_HMAC(digest->algorithm);
-    mbedtls_svc_key_id_t key = MBEDTLS_SVC_KEY_ID_INIT;
-    if (!pp_mbed_import_key(PSA_KEY_TYPE_HMAC,
-                            PSA_KEY_USAGE_SIGN_MESSAGE,
-                            algorithm,
-                            key_bytes,
-                            key_len,
-                            &key)) {
-        return false;
-    }
-
-    psa_mac_operation_t operation = PSA_MAC_OPERATION_INIT;
-    psa_status_t status = psa_mac_sign_setup(&operation, key, algorithm);
-    if (status == PSA_SUCCESS && data1_len > 0) {
-        pp_assert(data1);
-        status = psa_mac_update(&operation, data1, data1_len);
-    }
-    if (status == PSA_SUCCESS && data2_len > 0) {
-        pp_assert(data2);
-        status = psa_mac_update(&operation, data2, data2_len);
-    }
-    size_t mac_len = 0;
-    if (status == PSA_SUCCESS) {
-        status = psa_mac_sign_finish(&operation, out, out_len, &mac_len);
-    }
-    if (status != PSA_SUCCESS) {
-        (void)psa_mac_abort(&operation);
-    }
-    (void)psa_destroy_key(key);
-
-    return status == PSA_SUCCESS && mac_len == digest->length;
 }
 
 static
@@ -313,33 +218,6 @@ bool pp_crypto_init_seed(const uint8_t *src, const size_t len) {
     uint8_t probe = 0;
     return pp_mbed_init() &&
            psa_generate_random(&probe, sizeof(probe)) == PSA_SUCCESS;
-}
-
-pp_zd *pp_hmac_create(void) {
-    return pp_zd_create(PP_MBED_HMAC_MAX_LENGTH);
-}
-
-size_t pp_hmac_do(pp_hmac_ctx *ctx) {
-    pp_assert(ctx);
-    pp_assert(ctx->dst_len >= PP_MBED_HMAC_MAX_LENGTH);
-
-    pp_mbed_digest digest;
-    if (!pp_mbed_digest_by_name(ctx->digest_name, &digest)) {
-        return 0;
-    }
-
-    if (!pp_mbed_hmac(&digest,
-                      ctx->secret,
-                      ctx->secret_len,
-                      ctx->data,
-                      ctx->data_len,
-                      NULL,
-                      0,
-                      ctx->dst,
-                      ctx->dst_len)) {
-        return 0;
-    }
-    return digest.length;
 }
 
 // MARK: - CBC
