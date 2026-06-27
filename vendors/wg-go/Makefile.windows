@@ -19,7 +19,7 @@ version-header: $(DESTDIR)\wireguard-go-version.h
 
 $(PREFIXDIR)\$(BUILDDIR)\wg-go.$(BUILDEXT): go.mod
 	@if not exist "$(PREFIXDIR)\$(BUILDDIR)" mkdir "$(PREFIXDIR)\$(BUILDDIR)"
-	set CGO_ENABLED=1&& set CGO_CFLAGS=--target=$(TARGET)&& set CGO_CXXFLAGS=--target=$(TARGET)&& go build -C $(PREFIXDIR) -x -ldflags=-w -trimpath -v -o "$(BUILDDIR)\wg-go.$(BUILDEXT)" -buildmode=$(BUILDMODE)
+	set "CGO_ENABLED=1"&& set "CC=$(CC)"&& set "CXX=$(CXX)"&& set "CGO_CFLAGS=--target=$(TARGET)"&& set "CGO_CXXFLAGS=--target=$(TARGET)"&& go build -C $(PREFIXDIR) -x -ldflags=-w -trimpath -v -o "$(BUILDDIR)\wg-go.$(BUILDEXT)" -buildmode=$(BUILDMODE)
 	@if exist "$(PREFIXDIR)\$(BUILDDIR)\libwg-go.h" del "$(PREFIXDIR)\$(BUILDDIR)\libwg-go.h"
 	@if exist "$(PREFIXDIR)\$(BUILDDIR)\wg-go.h" del "$(PREFIXDIR)\$(BUILDDIR)\wg-go.h"
 

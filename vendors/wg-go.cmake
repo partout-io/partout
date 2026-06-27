@@ -8,15 +8,26 @@ if(WIN32)
     set(WGGO_DEF_FILE ${CMAKE_CURRENT_BINARY_DIR}/vendors/wg-go.def)
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
         set(WGGO_GOARCH arm64)
-        set(WGGO_TARGET aarch64-windows-gnu)
+        set(WGGO_MINGW_TRIPLE aarch64-w64-mingw32)
         set(WGGO_MSVC_MACHINE ARM64)
         set(WGGO_DLLTOOL_MACHINE arm64)
     else()
         set(WGGO_GOARCH amd64)
-        set(WGGO_TARGET x86_64-windows-gnu)
+        set(WGGO_MINGW_TRIPLE x86_64-w64-mingw32)
         set(WGGO_MSVC_MACHINE X64)
         set(WGGO_DLLTOOL_MACHINE i386:x86-64)
     endif()
+    set(WGGO_LLVM_MINGW_ROOT "$ENV{LLVM_MINGW_ROOT}")
+    find_program(WGGO_CC_EXECUTABLE
+        NAMES ${WGGO_MINGW_TRIPLE}-clang
+        HINTS "${WGGO_LLVM_MINGW_ROOT}/bin"
+        REQUIRED
+    )
+    find_program(WGGO_CXX_EXECUTABLE
+        NAMES ${WGGO_MINGW_TRIPLE}-clang++
+        HINTS "${WGGO_LLVM_MINGW_ROOT}/bin"
+        REQUIRED
+    )
     file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/vendors)
     configure_file(${WGGO_SOURCE_DIR}/exports.def ${WGGO_DEF_FILE} COPYONLY)
     set(WGGO_CMD
@@ -26,8 +37,10 @@ if(WIN32)
             CGO_ENABLED=1
             GOOS=windows
             GOARCH=${WGGO_GOARCH}
-            CGO_CFLAGS=--target=${WGGO_TARGET}
-            CGO_CXXFLAGS=--target=${WGGO_TARGET}
+            CC=${WGGO_CC_EXECUTABLE}
+            CXX=${WGGO_CXX_EXECUTABLE}
+            CGO_CFLAGS=--target=${WGGO_MINGW_TRIPLE}
+            CGO_CXXFLAGS=--target=${WGGO_MINGW_TRIPLE}
             go build -C ${WGGO_SOURCE_DIR}/src -ldflags=-w -trimpath -v -o ${WGGO_RUNTIME_LIBRARY} -buildmode=c-shared
     )
     if(MSVC)
