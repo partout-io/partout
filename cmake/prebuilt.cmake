@@ -1,0 +1,67 @@
+include_guard(GLOBAL)
+include(FetchContent)
+
+function(partout_prebuilt_vendor_target output_target)
+    if(ANDROID)
+        if(DEFINED ANDROID_ABI)
+            set(android_abi "${ANDROID_ABI}")
+        elseif(DEFINED CMAKE_ANDROID_ARCH_ABI)
+            set(android_abi "${CMAKE_ANDROID_ARCH_ABI}")
+        else()
+            set(android_abi "")
+        endif()
+        if(NOT android_abi STREQUAL "arm64-v8a")
+            message(FATAL_ERROR "Prebuilt vendors only support Android arm64-v8a")
+        endif()
+        set(target "android-arm64-v8a")
+    elseif(WIN32)
+        string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" system_processor)
+        if(system_processor MATCHES "^(arm64|aarch64)$")
+            set(target "windows-arm64")
+        elseif(system_processor MATCHES "^(amd64|x86_64|x64)$")
+            set(target "windows-x64")
+        else()
+            message(FATAL_ERROR "Prebuilt vendors do not support Windows architecture '${CMAKE_SYSTEM_PROCESSOR}'")
+        endif()
+    else()
+        message(FATAL_ERROR "Prebuilt vendors only support Android and Windows")
+    endif()
+
+    set(${output_target} "${target}" PARENT_SCOPE)
+endfunction()
+
+function(partout_fetch_prebuilt_vendor vendor output_dir)
+    if(NOT vendor MATCHES "^(mbedtls|openssl|wg-go)$")
+        message(FATAL_ERROR "No prebuilt archive configured for vendor '${vendor}'")
+    endif()
+
+    partout_prebuilt_vendor_target(target)
+    if(NOT PP_BUILD_VENDOR_PREBUILT_URL)
+        message(FATAL_ERROR "PP_BUILD_VENDOR_PREBUILT_URL must be set when PP_BUILD_VENDOR_SOURCE=auto selects prebuilt vendors")
+    endif()
+
+    set(archive "partout-vendors-${vendor}-${target}.tar.gz")
+    string(REGEX REPLACE "/+$" "" vendor_url "${PP_BUILD_VENDOR_PREBUILT_URL}")
+    string(REPLACE "-" "_" content_name "partout_prebuilt_${vendor}_${target}")
+    string(REPLACE "-" "_" verification_name "${vendor}_${target}")
+    string(TOUPPER "${verification_name}" verification_name)
+    set(verification_var "PP_BUILD_VENDOR_PREBUILT_VERIFICATION_${verification_name}")
+
+    set(fetch_content_args
+        URL "${vendor_url}/${archive}"
+        SOURCE_SUBDIR "__partout_no_cmake_subdir"
+        DOWNLOAD_EXTRACT_TIMESTAMP FALSE
+    )
+    if(DEFINED ${verification_var} AND NOT "${${verification_var}}" STREQUAL "")
+        list(APPEND fetch_content_args URL_HASH "${${verification_var}}")
+    endif()
+
+    FetchContent_Declare(${content_name} ${fetch_content_args})
+    FetchContent_MakeAvailable(${content_name})
+    FetchContent_GetProperties(${content_name} SOURCE_DIR source_dir)
+
+    file(MAKE_DIRECTORY "${PP_BUILD_OUTPUT}")
+    file(COPY "${source_dir}/${vendor}" DESTINATION "${PP_BUILD_OUTPUT}")
+    set(${output_dir} "${PP_BUILD_OUTPUT}/${vendor}" PARENT_SCOPE)
+    message(STATUS "Using prebuilt ${vendor} (${target})")
+endfunction()
