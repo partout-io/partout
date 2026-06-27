@@ -401,7 +401,13 @@ set(PARTOUT_C_SOURCES
 ./PartoutCore_C/tun_linux.c
 ./PartoutCore_C/tun_windows.c
 ./PartoutCore_C/zd.c
-./PartoutCrypto/Native_C/src/crypto_stubs.c
+./PartoutCrypto/Native_C/src/darwin/crypto.c
+./PartoutCrypto/Native_C/src/darwin/crypto_aead.c
+./PartoutCrypto/Native_C/src/darwin/crypto_cbc.c
+./PartoutCrypto/Native_C/src/darwin/crypto_ctr.c
+./PartoutCrypto/Native_C/src/darwin/hmac.c
+./PartoutCrypto/Native_C/src/linux/crypto.c
+./PartoutCrypto/Native_C/src/linux/hmac.c
 ./PartoutCrypto/Native_C/src/mbed/keys.c
 ./PartoutCrypto/Native_C/src/mbed/tls.c
 ./PartoutCrypto/Native_C/src/windows/crypto.c
