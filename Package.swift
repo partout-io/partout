@@ -354,8 +354,8 @@ case .native:
             path: "Sources/PartoutCrypto/Native_C",
             exclude: {
                 // Pick current OS by removing it from exclusions
-                var list = Set(OS.allCases)
-                list.remove(.current)
+                var list = Set(OS.nativeCryptoSources)
+                list.remove(OS.current.nativeCryptoSource)
                 return list.map { "src/\($0.rawValue)" }
             }(),
             cSettings: globalCSettings
@@ -435,6 +435,8 @@ enum OS: String, CaseIterable {
     case linux
     case windows
 
+    static let nativeCryptoSources: Set<OS> = [.apple, .linux, .windows]
+
     // Unfortunately, SwiftPM has no "when" conditionals on package
     // dependencies. We resort on some raw #if, which are reliable
     // as long as we don't cross-compile.
@@ -462,6 +464,13 @@ enum OS: String, CaseIterable {
         case .apple: [.iOS, .macOS, .tvOS]
         case .linux: [.linux]
         case .windows: [.windows]
+        }
+    }
+
+    var nativeCryptoSource: OS {
+        switch self {
+        case .android: .linux
+        default: self
         }
     }
 }

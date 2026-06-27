@@ -401,8 +401,6 @@ set(PARTOUT_C_SOURCES
 ./PartoutCore_C/tun_linux.c
 ./PartoutCore_C/tun_windows.c
 ./PartoutCore_C/zd.c
-./PartoutCrypto/Native_C/src/android/crypto.c
-./PartoutCrypto/Native_C/src/android/hmac.c
 ./PartoutCrypto/Native_C/src/darwin/crypto.c
 ./PartoutCrypto/Native_C/src/darwin/crypto_aead.c
 ./PartoutCrypto/Native_C/src/darwin/crypto_cbc.c
