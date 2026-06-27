@@ -61,9 +61,12 @@ if(PP_USE_PREBUILT_VENDORS)
 endif()
 
 set(MBEDTLS_PYTHON_VENV ${PP_BUILD_OUTPUT}/mbedtls-python)
-set(MBEDTLS_PYTHON_REQUIREMENTS ${CMAKE_CURRENT_SOURCE_DIR}/vendors/mbedtls/tf-psa-crypto/scripts/basic.requirements.txt)
-set(MBEDTLS_PYTHON_DRIVER_REQUIREMENTS ${CMAKE_CURRENT_SOURCE_DIR}/vendors/mbedtls/tf-psa-crypto/scripts/driver.requirements.txt)
+set(MBEDTLS_PYTHON_REQUIREMENTS ${CMAKE_CURRENT_SOURCE_DIR}/vendors/mbedtls/scripts/basic.requirements.txt)
+set(MBEDTLS_TFPSA_PYTHON_REQUIREMENTS ${CMAKE_CURRENT_SOURCE_DIR}/vendors/mbedtls/tf-psa-crypto/scripts/basic.requirements.txt)
+set(MBEDTLS_PYTHON_DRIVER_REQUIREMENTS ${CMAKE_CURRENT_SOURCE_DIR}/vendors/mbedtls/scripts/driver.requirements.txt)
+set(MBEDTLS_TFPSA_PYTHON_DRIVER_REQUIREMENTS ${CMAKE_CURRENT_SOURCE_DIR}/vendors/mbedtls/tf-psa-crypto/scripts/driver.requirements.txt)
 set(MBEDTLS_PYTHON_STAMP ${MBEDTLS_PYTHON_VENV}/.requirements.stamp)
+set(MBEDTLS_GENERATED_STAMP ${CMAKE_CURRENT_BINARY_DIR}/vendors/mbedtls-generated/.stamp)
 if(WIN32)
     set(MBEDTLS_PYTHON_EXECUTABLE ${MBEDTLS_PYTHON_VENV}/Scripts/python.exe)
 else()
@@ -76,13 +79,27 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory ${PP_BUILD_OUTPUT}
     COMMAND ${Python3_EXECUTABLE} -m venv ${MBEDTLS_PYTHON_VENV}
     COMMAND ${MBEDTLS_PYTHON_EXECUTABLE} -m pip install --disable-pip-version-check -r ${MBEDTLS_PYTHON_REQUIREMENTS}
+    COMMAND ${MBEDTLS_PYTHON_EXECUTABLE} -m pip install --disable-pip-version-check -r ${MBEDTLS_TFPSA_PYTHON_REQUIREMENTS}
     COMMAND ${CMAKE_COMMAND} -E touch ${MBEDTLS_PYTHON_STAMP}
     DEPENDS
         ${MBEDTLS_PYTHON_REQUIREMENTS}
+        ${MBEDTLS_TFPSA_PYTHON_REQUIREMENTS}
         ${MBEDTLS_PYTHON_DRIVER_REQUIREMENTS}
+        ${MBEDTLS_TFPSA_PYTHON_DRIVER_REQUIREMENTS}
     VERBATIM
 )
 add_custom_target(MbedTLSPythonEnv DEPENDS ${MBEDTLS_PYTHON_STAMP})
+add_custom_command(
+    OUTPUT ${MBEDTLS_GENERATED_STAMP}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/vendors/mbedtls-generated
+    COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_SOURCE_DIR}/vendors/mbedtls/tf-psa-crypto ${MBEDTLS_PYTHON_EXECUTABLE} framework/scripts/make_generated_files.py
+    COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_SOURCE_DIR}/vendors/mbedtls ${MBEDTLS_PYTHON_EXECUTABLE} scripts/make_generated_files.py
+    COMMAND ${CMAKE_COMMAND} -E touch ${MBEDTLS_GENERATED_STAMP}
+    DEPENDS
+        ${MBEDTLS_PYTHON_STAMP}
+    VERBATIM
+)
+add_custom_target(MbedTLSGeneratedFiles DEPENDS ${MBEDTLS_GENERATED_STAMP})
 
 set(MBEDTLS_CMAKE_ARGS
     -DCMAKE_INSTALL_PREFIX=${MBEDTLS_DIR}
@@ -90,6 +107,19 @@ set(MBEDTLS_CMAKE_ARGS
     -DENABLE_PROGRAMS=OFF
     -DENABLE_TESTING=OFF
 )
+if(CMAKE_BUILD_TYPE)
+    list(APPEND MBEDTLS_CMAKE_ARGS
+        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    )
+endif()
+if(WIN32)
+    list(APPEND MBEDTLS_CMAKE_ARGS
+        -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
+        -DCMAKE_MSVC_RUNTIME_LIBRARY=${CMAKE_MSVC_RUNTIME_LIBRARY}
+        -DUSE_SHARED_MBEDTLS_LIBRARY=OFF
+        -DUSE_STATIC_MBEDTLS_LIBRARY=ON
+    )
+endif()
 if(ANDROID)
     list(APPEND MBEDTLS_CMAKE_ARGS
         -DCMAKE_TOOLCHAIN_FILE=${CMAKE_ANDROID_NDK}/build/cmake/android.toolchain.cmake
@@ -102,7 +132,7 @@ endif()
 
 ExternalProject_Add(MbedTLSProject
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/mbedtls
-    DEPENDS MbedTLSPythonEnv
+    DEPENDS MbedTLSGeneratedFiles
     CMAKE_ARGS ${MBEDTLS_CMAKE_ARGS}
     INSTALL_DIR ${MBEDTLS_DIR}
     BUILD_BYPRODUCTS

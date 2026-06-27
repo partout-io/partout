@@ -13,17 +13,15 @@ BUILDDIR=build
 DESTDIR=bin\$(HOST_GOOS)-$(HOST_GOARCH)
 
 # Targets
-build: $(BUILDDIR)\wg-go.$(BUILDEXT)
+build: $(PREFIXDIR)\$(BUILDDIR)\wg-go.$(BUILDEXT)
 
 version-header: $(DESTDIR)\wireguard-go-version.h
 
-$(BUILDDIR)\wg-go.$(BUILDEXT): go.mod
-	@set CGO_ENABLED=1
-	@set CGO_CFLAGS=--target=$(TARGET)
-	@set CGO_CXXFLAGS=--target=$(TARGET)
-	go build -C $(PREFIXDIR) -x -ldflags=-w -trimpath -v -o "$(BUILDDIR)\wg-go.$(BUILDEXT)" -buildmode=$(BUILDMODE)
-	@if exist "$(BUILDDIR)\libwg-go.h" del "$(BUILDDIR)\libwg-go.h"
-	@if exist "$(BUILDDIR)\wg-go.h" del "$(BUILDDIR)\wg-go.h"
+$(PREFIXDIR)\$(BUILDDIR)\wg-go.$(BUILDEXT): go.mod
+	@if not exist "$(PREFIXDIR)\$(BUILDDIR)" mkdir "$(PREFIXDIR)\$(BUILDDIR)"
+	set CGO_ENABLED=1&& set CGO_CFLAGS=--target=$(TARGET)&& set CGO_CXXFLAGS=--target=$(TARGET)&& go build -C $(PREFIXDIR) -x -ldflags=-w -trimpath -v -o "$(BUILDDIR)\wg-go.$(BUILDEXT)" -buildmode=$(BUILDMODE)
+	@if exist "$(PREFIXDIR)\$(BUILDDIR)\libwg-go.h" del "$(PREFIXDIR)\$(BUILDDIR)\libwg-go.h"
+	@if exist "$(PREFIXDIR)\$(BUILDDIR)\wg-go.h" del "$(PREFIXDIR)\$(BUILDDIR)\wg-go.h"
 
 $(DESTDIR)\wireguard-go-version.h: go.mod
 	# Windows PowerShell equivalent for sed:
