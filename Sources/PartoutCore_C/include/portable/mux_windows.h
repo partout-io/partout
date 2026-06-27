@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include <windows.h>
 #include "portable/mux.h"
 
 struct pp_mux_entry {

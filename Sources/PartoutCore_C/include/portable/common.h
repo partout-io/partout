@@ -116,7 +116,6 @@ extern const int PPIOErrorNoSpace;
 
 #if PARTOUT_WINDOWS
 
-#include <ws2tcpip.h>
 #pragma clang assume_nonnull begin
 
 typedef _Nonnull HANDLE pp_fd;

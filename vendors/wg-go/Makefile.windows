@@ -23,6 +23,7 @@ $(BUILDDIR)\wg-go.$(BUILDEXT): go.mod
 	@set CGO_CXXFLAGS=--target=$(TARGET)
 	go build -C $(PREFIXDIR) -x -ldflags=-w -trimpath -v -o "$(BUILDDIR)\wg-go.$(BUILDEXT)" -buildmode=$(BUILDMODE)
 	@if exist "$(BUILDDIR)\libwg-go.h" del "$(BUILDDIR)\libwg-go.h"
+	@if exist "$(BUILDDIR)\wg-go.h" del "$(BUILDDIR)\wg-go.h"
 
 $(DESTDIR)\wireguard-go-version.h: go.mod
 	# Windows PowerShell equivalent for sed:

@@ -65,17 +65,18 @@ Then, you will use one of the `scripts/build.*` variants based on the host platf
 
 The script builds the vendors as static libraries and accepts a few options: 
 
-- `-a`: Build everything
+- `-gen`: Generate CMake metadata
 - `-config (Debug|Release)`: The CMake build type
-- `-android`: Build for Android
 - `-l`: Build the Partout library (opt-in)
 - `-crypto (openssl|native)`: Pick a crypto subsystem between OpenSSL and Native/MbedTLS (WIP)
 - `-wireguard`: Enable support for WireGuard (requires Go)
+- `-android`: Build for Android
+- `-vendors [bundled|<url>]`: Build bundled vendors, or provide the prebuilt vendor URL for Android/Windows
 
 For example, this will build Partout for release with a dependency on OpenSSL:
 
 ```shell
-$ scripts/build.sh -config Release -l -crypto openssl
+$ scripts/build.sh -gen -config Release -l -crypto openssl
 ```
 
 Sample output:

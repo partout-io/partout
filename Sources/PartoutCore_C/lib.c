@@ -10,7 +10,6 @@
 #include "portable/lib.h"
 
 #if PARTOUT_WINDOWS
-#include <windows.h>
 struct __pp_lib_struct {
     HMODULE handle;
 };
