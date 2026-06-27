@@ -4,6 +4,8 @@ opt_configuration=Debug
 build_dir=.cmake
 bin_dir=bin
 swift_version=6.3.1
+vendor_source=
+vendor_prebuilt_url=
 
 root_dir="$(dirname "$0")"/..
 pushd $root_dir
@@ -94,7 +96,6 @@ while [[ $# -gt 0 ]]; do
         -a)
             do_build=1
             cmake_opts+=("-DPP_BUILD_LIBRARY=ON")
-            cmake_opts+=("-DPP_BUILD_USE_OPENSSL=ON")
             cmake_opts+=("-DPP_BUILD_USE_OPENVPN=ON")
             cmake_opts+=("-DPP_BUILD_USE_WIREGUARD=ON")
             shift
@@ -104,8 +105,10 @@ while [[ $# -gt 0 ]]; do
             case $2 in
                 openssl)
                     cmake_opts+=("-DPP_BUILD_USE_OPENSSL=ON")
+                    cmake_opts+=("-DPP_BUILD_USE_MBEDTLS=OFF")
                     ;;
                 native)
+                    cmake_opts+=("-DPP_BUILD_USE_OPENSSL=OFF")
                     cmake_opts+=("-DPP_BUILD_USE_MBEDTLS=ON")
                     ;;
                 *)
@@ -139,6 +142,25 @@ while [[ $# -gt 0 ]]; do
             cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=cmake/swift/swift-android.toolchain.cmake")
             shift
             ;;
+        -vendors)
+            if [[ -z ${2:-} || $2 == -* ]]; then
+                shift
+            else
+                case $2 in
+                    auto)
+                        vendor_source=
+                        ;;
+                    bundled)
+                        vendor_source=bundled
+                        ;;
+                    *)
+                        vendor_prebuilt_url=$2
+                        ;;
+                esac
+                shift
+                shift
+            fi
+            ;;
         -*|--*)
             echo "Unknown option $1"
             exit 1
@@ -150,6 +172,16 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 set -- "${positional_args[@]}"
+
+# Vendor overrides
+if [[ -n $vendor_source ]]; then
+    cmake_opts+=("-DPP_BUILD_VENDOR_SOURCE=$vendor_source")
+fi
+if [[ -n $vendor_prebuilt_url ]]; then
+    cmake_opts+=("-DPP_BUILD_VENDOR_PREBUILT_URL=$vendor_prebuilt_url")
+elif [[ -n ${PP_BUILD_VENDOR_PREBUILT_URL:-} ]]; then
+    cmake_opts+=("-DPP_BUILD_VENDOR_PREBUILT_URL=$PP_BUILD_VENDOR_PREBUILT_URL")
+fi
 
 # On Linux, use custom toolchain
 if [[ $is_android != 1 && `uname -s` == "Linux" ]]; then

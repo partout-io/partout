@@ -70,7 +70,10 @@ The script builds the vendors as static libraries and accepts a few options:
 - `-android`: Build for Android
 - `-l`: Build the Partout library (opt-in)
 - `-crypto (openssl|native)`: Pick a crypto subsystem between OpenSSL and Native/MbedTLS (WIP)
+- `-vendors [bundled|<url>]`: Build bundled vendors, provide the prebuilt vendor URL for Android/Windows, or default to `auto`
 - `-wireguard`: Enable support for WireGuard (requires Go)
+
+When omitted, CMake defaults vendors to `auto`. `PP_BUILD_VENDOR_PREBUILT_URL` in the environment is also supported.
 
 For example, this will build Partout for release with a dependency on OpenSSL:
 
