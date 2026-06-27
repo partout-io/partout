@@ -14,37 +14,58 @@
 pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
                                     size_t tag_len, size_t id_len,
                                     const pp_crypto_keys *keys) {
+    (void)cipher_name;
+    (void)tag_len;
+    (void)id_len;
+    (void)keys;
     return NULL;
 }
 
-void pp_crypto_aead_free(pp_crypto_ctx vctx) {}
+void pp_crypto_aead_free(pp_crypto_ctx vctx) {
+    (void)vctx;
+}
 
 pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name,
                                    const char *digest_name,
                                    const pp_crypto_keys *keys) {
+    (void)cipher_name;
+    (void)digest_name;
+    (void)keys;
     return NULL;
 }
 
-void pp_crypto_cbc_free(pp_crypto_ctx vctx) {}
+void pp_crypto_cbc_free(pp_crypto_ctx vctx) {
+    (void)vctx;
+}
 
 pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name,
                                    const char *digest_name,
                                    size_t tag_len, size_t payload_len,
                                    const pp_crypto_keys *keys) {
+    (void)cipher_name;
+    (void)digest_name;
+    (void)tag_len;
+    (void)payload_len;
+    (void)keys;
     return NULL;
 }
 
-void pp_crypto_ctr_free(pp_crypto_ctx vctx) {}
+void pp_crypto_ctr_free(pp_crypto_ctx vctx) {
+    (void)vctx;
+}
 
 bool pp_crypto_init_seed(const uint8_t *src, const size_t len) {
+    (void)src;
+    (void)len;
     return false;
 }
 
 pp_zd *pp_hmac_create(void) {
-    return NULL;
+    return 0xffffffff;
 }
 
 size_t pp_hmac_do(pp_hmac_ctx *ctx) {
+    (void)ctx;
     return 0;
 }
 

@@ -1,4 +1,4 @@
-module mbedtls [system] {
+module CMbedTLS [system] {
     header "shim.h"
     link "mbedtls"
     link "mbedx509"
