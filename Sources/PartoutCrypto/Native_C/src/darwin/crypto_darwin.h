@@ -18,29 +18,6 @@
 
 #define PP_CC_HMAC_MAX_LENGTH (size_t)128
 #define PP_CC_AES_BLOCK_SIZE (size_t)kCCBlockSizeAES128
-#define PP_CC_GCM_IV_LENGTH (size_t)12
-
-/*
- * The GCM entry points are exported by CommonCrypto but are not declared in
- * the public SDK headers shipped with current Apple SDKs.
- */
-extern CCCryptorStatus CCCryptorGCMOneshotEncrypt(
-    CCAlgorithm alg,
-    const void *key, size_t keyLength,
-    const void *iv, size_t ivLen,
-    const void *_Nullable aData, size_t aDataLen,
-    const void *_Nullable dataIn, size_t dataInLength,
-    void *dataOut,
-    void *tagOut, size_t tagLength);
-
-extern CCCryptorStatus CCCryptorGCMOneshotDecrypt(
-    CCAlgorithm alg,
-    const void *key, size_t keyLength,
-    const void *iv, size_t ivLen,
-    const void *_Nullable aData, size_t aDataLen,
-    const void *_Nullable dataIn, size_t dataInLength,
-    void *dataOut,
-    const void *tagIn, size_t tagLength);
 
 typedef struct {
     CCHmacAlgorithm algorithm;
