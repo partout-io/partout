@@ -9,7 +9,7 @@
 #include <string.h>
 #include "portable/common.h"
 #include "crypto/crypto_ctr.h"
-#include "crypto/windows/macros.h"
+#include "crypto_windows.h"
 
 #pragma comment(lib, "bcrypt.lib")
 
