@@ -1,74 +1,80 @@
 set(WGGO_DIR ${PP_BUILD_OUTPUT}/wg-go)
 set(WGGO_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/vendors/wg-go)
 
+if(PP_USE_PREBUILT_VENDORS)
+    partout_use_prebuilt_vendor(wg-go WGGO_DIR)
+endif()
+
 if(WIN32)
     set(WGGO_RUNTIME_LIBRARY ${WGGO_DIR}/lib/wg-go.dll)
     set(WGGO_IMPORT_LIBRARY ${WGGO_DIR}/lib/wg-go${CMAKE_IMPORT_LIBRARY_SUFFIX})
     set(WGGO_BUILD_BYPRODUCTS ${WGGO_RUNTIME_LIBRARY} ${WGGO_IMPORT_LIBRARY})
     set(WGGO_DEF_FILE ${CMAKE_CURRENT_BINARY_DIR}/vendors/wg-go.def)
-    if(ARCH_NAME MATCHES "^(arm64|aarch64)$")
-        set(WGGO_GOARCH arm64)
-        set(WGGO_MINGW_TRIPLE aarch64-w64-mingw32)
-        set(WGGO_MSVC_MACHINE ARM64)
-        set(WGGO_DLLTOOL_MACHINE arm64)
-    else()
-        set(WGGO_GOARCH amd64)
-        set(WGGO_MINGW_TRIPLE x86_64-w64-mingw32)
-        set(WGGO_MSVC_MACHINE X64)
-        set(WGGO_DLLTOOL_MACHINE i386:x86-64)
-    endif()
-    set(WGGO_LLVM_MINGW_ROOT "$ENV{LLVM_MINGW_ROOT}")
-    find_program(WGGO_CC_EXECUTABLE
-        NAMES ${WGGO_MINGW_TRIPLE}-clang
-        HINTS "${WGGO_LLVM_MINGW_ROOT}/bin"
-        REQUIRED
-    )
-    find_program(WGGO_CXX_EXECUTABLE
-        NAMES ${WGGO_MINGW_TRIPLE}-clang++
-        HINTS "${WGGO_LLVM_MINGW_ROOT}/bin"
-        REQUIRED
-    )
-    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/vendors)
-    configure_file(${WGGO_SOURCE_DIR}/exports.def ${WGGO_DEF_FILE} COPYONLY)
-    set(WGGO_CMD
-        ${CMAKE_COMMAND} -E make_directory ${WGGO_DIR}/include ${WGGO_DIR}/lib
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${WGGO_SOURCE_DIR}/include ${WGGO_DIR}/include
-        COMMAND ${CMAKE_COMMAND} -E env
-            CGO_ENABLED=1
-            GOOS=windows
-            GOARCH=${WGGO_GOARCH}
-            CC=${WGGO_CC_EXECUTABLE}
-            CXX=${WGGO_CXX_EXECUTABLE}
-            CGO_CFLAGS=--target=${WGGO_MINGW_TRIPLE}
-            CGO_CXXFLAGS=--target=${WGGO_MINGW_TRIPLE}
-            go build -C ${WGGO_SOURCE_DIR}/src -ldflags=-w -trimpath -v -o ${WGGO_RUNTIME_LIBRARY} -buildmode=c-shared
-    )
-    if(MSVC)
-        list(APPEND WGGO_CMD
-            COMMAND ${CMAKE_AR} /nologo /def:${WGGO_DEF_FILE} /machine:${WGGO_MSVC_MACHINE} /out:${WGGO_IMPORT_LIBRARY}
-        )
-    else()
-        find_program(WGGO_DLLTOOL_EXECUTABLE NAMES llvm-dlltool dlltool REQUIRED)
-        list(APPEND WGGO_CMD
-            COMMAND ${WGGO_DLLTOOL_EXECUTABLE} -m ${WGGO_DLLTOOL_MACHINE} -d ${WGGO_DEF_FILE} -l ${WGGO_IMPORT_LIBRARY}
-        )
-    endif()
 else()
     set(WGGO_RUNTIME_LIBRARY ${WGGO_DIR}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}wg-go${CMAKE_SHARED_LIBRARY_SUFFIX})
     set(WGGO_BUILD_BYPRODUCTS ${WGGO_RUNTIME_LIBRARY})
-    set(WGGO_CMD
-        ${VENDOR_ENV} make -C ${WGGO_SOURCE_DIR}
-        DESTDIR=${WGGO_DIR}
-    )
-    if(ANDROID)
-        set(CLANG ${SWIFT_ANDROID_ARCH}-linux-android${ANDROID_NATIVE_API_LEVEL}-clang)
-        set(WGGO_CMD ${WGGO_CMD} ANDROID=1 CC=${CLANG})
-    endif()
 endif()
 
-if(PP_USE_PREBUILT_VENDORS)
-    partout_use_prebuilt_vendor(wg-go WGGO_DIR)
-else()
+if(NOT PP_USE_PREBUILT_VENDORS)
+    if(WIN32)
+        if(ARCH_NAME MATCHES "^(arm64|aarch64)$")
+            set(WGGO_GOARCH arm64)
+            set(WGGO_MINGW_TRIPLE aarch64-w64-mingw32)
+            set(WGGO_MSVC_MACHINE ARM64)
+            set(WGGO_DLLTOOL_MACHINE arm64)
+        else()
+            set(WGGO_GOARCH amd64)
+            set(WGGO_MINGW_TRIPLE x86_64-w64-mingw32)
+            set(WGGO_MSVC_MACHINE X64)
+            set(WGGO_DLLTOOL_MACHINE i386:x86-64)
+        endif()
+        set(WGGO_LLVM_MINGW_ROOT "$ENV{LLVM_MINGW_ROOT}")
+        find_program(WGGO_CC_EXECUTABLE
+            NAMES ${WGGO_MINGW_TRIPLE}-clang
+            HINTS "${WGGO_LLVM_MINGW_ROOT}/bin"
+            REQUIRED
+        )
+        find_program(WGGO_CXX_EXECUTABLE
+            NAMES ${WGGO_MINGW_TRIPLE}-clang++
+            HINTS "${WGGO_LLVM_MINGW_ROOT}/bin"
+            REQUIRED
+        )
+        file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/vendors)
+        configure_file(${WGGO_SOURCE_DIR}/exports.def ${WGGO_DEF_FILE} COPYONLY)
+        set(WGGO_CMD
+            ${CMAKE_COMMAND} -E make_directory ${WGGO_DIR}/include ${WGGO_DIR}/lib
+            COMMAND ${CMAKE_COMMAND} -E copy_directory ${WGGO_SOURCE_DIR}/include ${WGGO_DIR}/include
+            COMMAND ${CMAKE_COMMAND} -E env
+                CGO_ENABLED=1
+                GOOS=windows
+                GOARCH=${WGGO_GOARCH}
+                CC=${WGGO_CC_EXECUTABLE}
+                CXX=${WGGO_CXX_EXECUTABLE}
+                CGO_CFLAGS=--target=${WGGO_MINGW_TRIPLE}
+                CGO_CXXFLAGS=--target=${WGGO_MINGW_TRIPLE}
+                go build -C ${WGGO_SOURCE_DIR}/src -ldflags=-w -trimpath -v -o ${WGGO_RUNTIME_LIBRARY} -buildmode=c-shared
+        )
+        if(MSVC)
+            list(APPEND WGGO_CMD
+                COMMAND ${CMAKE_AR} /nologo /def:${WGGO_DEF_FILE} /machine:${WGGO_MSVC_MACHINE} /out:${WGGO_IMPORT_LIBRARY}
+            )
+        else()
+            find_program(WGGO_DLLTOOL_EXECUTABLE NAMES llvm-dlltool dlltool REQUIRED)
+            list(APPEND WGGO_CMD
+                COMMAND ${WGGO_DLLTOOL_EXECUTABLE} -m ${WGGO_DLLTOOL_MACHINE} -d ${WGGO_DEF_FILE} -l ${WGGO_IMPORT_LIBRARY}
+            )
+        endif()
+    else()
+        set(WGGO_CMD
+            ${VENDOR_ENV} make -C ${WGGO_SOURCE_DIR}
+            DESTDIR=${WGGO_DIR}
+        )
+        if(ANDROID)
+            set(CLANG ${SWIFT_ANDROID_ARCH}-linux-android${ANDROID_NATIVE_API_LEVEL}-clang)
+            set(WGGO_CMD ${WGGO_CMD} ANDROID=1 CC=${CLANG})
+        endif()
+    endif()
+
     if(APPLE)
         set(WGGO_INSTALL_COMMAND
             INSTALL_COMMAND
