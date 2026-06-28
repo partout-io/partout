@@ -229,8 +229,9 @@ bool local_verify(void *vctx, const uint8_t *in, size_t in_len, pp_crypto_error_
 
 // MARK: -
 
-pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name, const char *digest_name,
-                             const pp_crypto_keys *keys) {
+pp_crypto_ctx pp_windows_crypto_cbc_create(const char *cipher_name,
+                                           const char *digest_name,
+                                           const pp_crypto_keys *keys) {
     pp_assert(digest_name);
 
     size_t cipher_key_len;
@@ -319,7 +320,7 @@ failure:
     return NULL;
 }
 
-void pp_crypto_cbc_free(pp_crypto_ctx vctx) {
+void pp_windows_crypto_cbc_free(pp_crypto_ctx vctx) {
     if (!vctx) return;
     pp_crypto_cbc *ctx = (pp_crypto_cbc *)vctx;
 

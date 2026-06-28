@@ -162,9 +162,9 @@ size_t local_decrypt(void *vctx,
 
 // MARK: -
 
-pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
-                                    size_t tag_len, size_t id_len,
-                                    const pp_crypto_keys *keys) {
+pp_crypto_ctx pp_windows_crypto_aead_create(const char *cipher_name,
+                                            size_t tag_len, size_t id_len,
+                                            const pp_crypto_keys *keys) {
     pp_assert(cipher_name);
 
     size_t cipher_key_len;
@@ -223,7 +223,7 @@ failure:
     return NULL;
 }
 
-void pp_crypto_aead_free(pp_crypto_ctx vctx) {
+void pp_windows_crypto_aead_free(pp_crypto_ctx vctx) {
     if (!vctx) return;
     pp_crypto_aead *ctx = (pp_crypto_aead *)vctx;
 
