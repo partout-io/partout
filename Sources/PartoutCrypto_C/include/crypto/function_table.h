@@ -103,10 +103,10 @@ typedef struct {
     pp_tls_function_table tls;
 } pp_crypto_function_table;
 
-extern const pp_crypto_function_table pp_crypto_function_table_openssl;
-extern const pp_crypto_function_table pp_crypto_function_table_mbed;
-extern const pp_crypto_function_table pp_crypto_function_table_native_darwin;
-extern const pp_crypto_function_table pp_crypto_function_table_native_linux;
-extern const pp_crypto_function_table pp_crypto_function_table_native_windows;
+pp_crypto_function_table pp_crypto_function_table_openssl(void);
+pp_crypto_function_table pp_crypto_function_table_mbed(void);
+pp_crypto_function_table pp_crypto_function_table_native_darwin(void);
+pp_crypto_function_table pp_crypto_function_table_native_linux(void);
+pp_crypto_function_table pp_crypto_function_table_native_windows(void);
 
 #pragma clang assume_nonnull end
