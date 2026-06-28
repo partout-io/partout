@@ -22,7 +22,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * A type-erased ``Module`` for encoding external implementations.
  *
  * @param innerType 
  * @param json 
@@ -35,7 +35,7 @@ data class CustomModule (
     val innerType: ModuleType,
 
     @Contextual @SerialName(value = "json")
-    val json: kotlinx.serialization.json.JsonElement?
+    val json: kotlinx.serialization.json.JsonElement
 
 ) {
 

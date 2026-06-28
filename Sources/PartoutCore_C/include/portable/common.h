@@ -116,7 +116,6 @@ extern const int PPIOErrorNoSpace;
 
 #if PARTOUT_WINDOWS
 
-#include <ws2tcpip.h>
 #pragma clang assume_nonnull begin
 
 typedef _Nonnull HANDLE pp_fd;
@@ -134,7 +133,7 @@ static inline bool pp_fd_is_valid(pp_fd fd) {
     } while (0)
 
 static inline int pp_io_last_error(void) {
-    return GetLastError();
+    return (int)GetLastError();
 }
 #pragma clang assume_nonnull end
 

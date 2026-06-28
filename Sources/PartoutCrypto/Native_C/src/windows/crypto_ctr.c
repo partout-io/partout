@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include <windows.h>
+#include "portable/common.h"
 #include <bcrypt.h>
 #include <string.h>
-#include "portable/common.h"
 #include "crypto/crypto_ctr.h"
-#include "crypto/windows/macros.h"
+#include "crypto_windows.h"
 
 #pragma comment(lib, "bcrypt.lib")
 
@@ -74,6 +73,7 @@ size_t local_encrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
                      const pp_crypto_flags *flags, pp_crypto_error_code *error) {
+    (void)out_buf_len;
     pp_crypto_ctr *ctx = vctx;
     pp_assert(ctx);
     pp_assert(ctx->hKeyEnc);
@@ -163,6 +163,7 @@ size_t local_decrypt(void *vctx,
                      uint8_t *out, size_t out_buf_len,
                      const uint8_t *in, size_t in_len,
                      const pp_crypto_flags *flags, pp_crypto_error_code *error) {
+    (void)out_buf_len;
     pp_crypto_ctr *ctx = vctx;
     pp_assert(ctx);
     pp_assert(ctx->hKeyDec);

@@ -25,7 +25,6 @@ bool pp_prng_do(uint8_t *dst, size_t len) {
 
 #elif PARTOUT_WINDOWS
 
-#include <windows.h>
 #include <bcrypt.h>
 
 bool pp_prng_do(uint8_t *dst, size_t len) {

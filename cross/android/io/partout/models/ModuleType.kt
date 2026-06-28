@@ -21,7 +21,7 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * 
+ * Raw type univocally associated to each ``Module`` implementation.
  *
  * Values: Custom,DNS,HTTPProxy,IP,OnDemand,OpenVPN,Provider,WireGuard,Undefined
  */

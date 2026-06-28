@@ -21,7 +21,7 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * 
+ * Message digest algorithm.
  *
  * Values: sha1,sha224,sha256,sha384,sha512
  */

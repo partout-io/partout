@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include <windows.h>
+#include "portable/common.h"
 #include <bcrypt.h>
 #include <string.h>
-#include "portable/common.h"
 #include "crypto/crypto_aead.h"
-#include "crypto/windows/macros.h"
+#include "crypto_windows.h"
 
 #pragma comment(lib, "bcrypt.lib")
 

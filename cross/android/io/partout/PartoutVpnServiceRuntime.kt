@@ -306,8 +306,8 @@ class PartoutVpnServiceRuntime(
         private fun TunnelSnapshot.disabled() = TunnelSnapshot(
             id,
             false,
-            false,
             TunnelStatus.inactive,
+            false,
             environment
         )
     }

@@ -3,7 +3,7 @@ set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(OUTPUT_DIR ${PP_BUILD_OUTPUT}/partout)
 
 # Include file lists
-include("partout.cmake")
+include("files.cmake")
 
 # Header search paths from all C targets
 set(PARTOUT_C_INCLUDE_DIRS
@@ -20,27 +20,31 @@ endif()
 set(EXCLUDED_PATTERNS "")
 
 # Filter by crypto vendor
-set(HAS_CRYPTO ON)
+set(HAS_CRYPTO OFF)
 if(PP_BUILD_USE_OPENSSL)
+    set(HAS_CRYPTO ON)
     list(APPEND PARTOUT_C_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCrypto/OpenSSL_C/include)
-    list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/)
-elseif(PP_BUILD_USE_MBEDTLS)
-    list(APPEND PARTOUT_C_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCrypto/Native_C/include)
-    list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/OpenSSL_C\/)
-    if(NOT APPLE)
-        list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/src/apple)
+    if(NOT PP_BUILD_USE_MBEDTLS)
+        list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/)
     endif()
-    if(NOT LINUX)
+endif()
+if(PP_BUILD_USE_MBEDTLS)
+    set(HAS_CRYPTO ON)
+    list(APPEND PARTOUT_C_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/PartoutCrypto/Native_C/include)
+    if(NOT PP_BUILD_USE_OPENSSL)
+        list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/OpenSSL_C\/)
+    endif()
+    if(NOT APPLE)
+        list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/src/darwin)
+    endif()
+    if(NOT LINUX AND NOT ANDROID)
         list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/src/linux)
     endif()
     if(NOT WIN32)
         list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/src/windows)
     endif()
-    if(NOT ANDROID)
-        list(APPEND EXCLUDED_PATTERNS PartoutCrypto\/Native_C\/src/android)
-    endif()
-else()
-    set(HAS_CRYPTO OFF)
+endif()
+if(NOT HAS_CRYPTO)
     list(APPEND EXCLUDED_PATTERNS PartoutCrypto)
 endif()
 
@@ -223,19 +227,10 @@ else()
     else()
         set(RPATH_ORIGIN "\$ORIGIN")
     endif()
-    set(PARTOUT_RPATH "${RPATH_ORIGIN}")
-    if(PP_BUILD_USE_OPENSSL)
-        list(APPEND PARTOUT_RPATH "${RPATH_ORIGIN}/../openssl/lib")
-    endif()
-    if(PP_BUILD_USE_WIREGUARD)
-        list(APPEND PARTOUT_RPATH "${RPATH_ORIGIN}/../wg-go/lib")
-    endif()
     set_target_properties(partout PROPERTIES
-        BUILD_WITH_INSTALL_RPATH ON
-        INSTALL_RPATH "${PARTOUT_RPATH}"
-        SKIP_BUILD_RPATH OFF
+        BUILD_WITH_INSTALL_RPATH TRUE
+        INSTALL_RPATH "${RPATH_ORIGIN}"
     )
-    unset(PARTOUT_RPATH)
     unset(RPATH_ORIGIN)
 endif()
 

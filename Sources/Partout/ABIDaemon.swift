@@ -97,13 +97,13 @@ public final class ABIDaemon {
 
 private extension partout_daemon_options {
     func forTunnelController() -> TunnelControllerOptions {
-        var options = TunnelControllerOptions()
-        options.dnsFallbackServers = stringsFromCStrings(
-            dns_fallback,
-            count: dns_fallback_len
+        TunnelControllerOptions(
+            dnsFallbackServers: stringsFromCStrings(
+                dns_fallback,
+                count: dns_fallback_len
+            ),
+            logsSnapshots: logs_snapshots,
+            minDataCountDelta: min_data_count_delta
         )
-        options.logsSnapshots = logs_snapshots
-        options.minDataCountDelta = min_data_count_delta
-        return options
     }
 }

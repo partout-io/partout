@@ -10,7 +10,6 @@
 #include "portable/lib.h"
 
 #if PARTOUT_WINDOWS
-#include <windows.h>
 struct __pp_lib_struct {
     HMODULE handle;
 };
@@ -67,7 +66,7 @@ void pp_lib_free(pp_lib lib) {
 
 void *pp_lib_load(const pp_lib lib, const char *symbol) {
 #if PARTOUT_WINDOWS
-    void *ptr = GetProcAddress(lib->handle, symbol);
+    void *ptr = (void *)GetProcAddress(lib->handle, symbol);
 #else
     void *ptr = dlsym(lib->handle, symbol);
 #endif

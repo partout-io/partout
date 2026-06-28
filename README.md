@@ -51,63 +51,43 @@ These are the requirements for Partout, but additional build tools may be requir
 
 #### Build
 
-First, fetch all the vendored submodules:
-
-```shell
-git submodule init
-git submodule update --recursive
-```
-
-Then, you will use one of the `scripts/build.*` variants based on the host platform:
+Use one of the `scripts/build.*` variants based on the host platform:
 
 - `scripts/build.sh` (bash)
 - `scripts/build.ps1` (Windows PowerShell)
 
 The script builds the vendors as static libraries and accepts a few options: 
 
-- `-a`: Build everything
+- `-gen`: Generate CMake metadata
 - `-config (Debug|Release)`: The CMake build type
-- `-android`: Build for Android
 - `-l`: Build the Partout library (opt-in)
 - `-crypto (openssl|native)`: Pick a crypto subsystem between OpenSSL and Native/MbedTLS (WIP)
 - `-wireguard`: Enable support for WireGuard (requires Go)
+- `-android`: Build for Android
+- `-vendors [bundled|<url>]`: Build bundled vendors (requires submodules), or provide the prebuilt vendor URL for Android/Windows
 
 For example, this will build Partout for release with a dependency on OpenSSL:
 
 ```shell
-$ scripts/build.sh -config Release -l -crypto openssl
+$ scripts/build.sh -gen -config Release -l -crypto openssl
 ```
 
 Sample output:
 
 ```
-bin/darwin-arm64/libpartout.a       # macOS
-bin/linux-aarch64/libpartout.a      # Linux
-bin/windows-arm64/libpartout.lib    # Windows
-bin/android-aarch64/libpartout.a    # Android
+# macOS
+bin/darwin-arm64/libpartout.dylib	
+# Linux
+bin/linux-aarch64/libpartout.so
+# Android
+bin/android-aarch64/libpartout.so
+# Windows
+bin/windows-arm64/libpartout.dll
 ```
 
-Additionally, `libpartout_c` must be linked. Partout must be bundled with the shared vendored libraries and the Swift runtime to work.
+Partout must be bundled with the shared vendored libraries to work. On Windows, it must also include the Swift runtime DLLs. Building for Android requires access to the Android NDK and the Swift Android SDK.
 
-Building for Android requires access to the Android NDK and the Swift Android SDK, where the CMake toolchain expects from the environment:
-
-- `ANDROID_NDK_HOME` points to your Android NDK installation.
-- `SWIFT_ANDROID_ABI` feeds the ANDROID_ABI parameter (e.g. `arm64-v8a`).
-- `SWIFT_ANDROID_ARCH` defines your host arch for the Swift Android SDK (e.g. `aarch64`).
-- `SWIFT_ANDROID_API_LEVEL` sets the API level (e.g. 28).
-- `SWIFT_ANDROID_VERSION` defines the Swift version of the Swift Android SDK.
-
-Check out `scripts/build.sh` and the `cmake/android.toolchain.cmake` toolchain file for more details. The build script runs on macOS and Linux.
-
-#### Codegen
-
-Partout comes with a [code generator][partout-codegen] that translates Swift data entities to a formal OpenAPI specification for non-Swift consumers.
-
-```
-swift run codegen --manifest scripts/manifest.yaml
-```
-
-`codegen` uses [swift-syntax][credits-swift-syntax] to build an intermediate representation (IR) of the Swift data entities, then proceeds to map it to the OpenAPI format. [openapi-generator][openapi-generator] can eventually be used to generate the Partout data models for other languages.
+Check out `scripts/build.sh` and `scripts/build.ps1` for more details.
 
 ## Demo
 
@@ -179,7 +159,6 @@ Website: [partout.io][about-website]
 [license-website]: https://partout.io/license
 [contrib-cla]: CLA.rst
 [contrib-readme]: CONTRIBUTING.md
-[partout-codegen]: https://github.com/partout-io/codegen
 [openapi-generator]: https://openapi-generator.tech/
 
 [github-releases]: https://github.com/partout-io/partout/releases
