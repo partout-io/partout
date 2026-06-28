@@ -13,7 +13,7 @@
 #include <mbedtls/x509_crt.h>
 #include <psa/crypto.h>
 #include "portable/common.h"
-#include "tls/tls_base.h"
+#include "crypto/tls_base.h"
 
 typedef struct {
     uint8_t *_Nullable bytes;

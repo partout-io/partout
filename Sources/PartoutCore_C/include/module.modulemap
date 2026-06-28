@@ -11,8 +11,3 @@ module _PartoutPortable_C {
     exclude header "portable/socket_windows.h"
     export *
 }
-
-module _PartoutTLS_C {
-    umbrella header "tls/tls.h"
-    export *
-}

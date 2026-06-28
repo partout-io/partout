@@ -12,3 +12,4 @@
 #include "crypto_ctr.h"
 #include "hmac.h"
 #include "keys.h"
+#include "tls.h"

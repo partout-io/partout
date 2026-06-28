@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+internal import _PartoutCrypto_C
 internal import _PartoutOpenVPN_C
-internal import _PartoutTLS_C
 
 extension TLSWrapper {
     static func native(with parameters: Parameters) throws -> TLSWrapper {

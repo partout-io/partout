@@ -7,7 +7,7 @@
 #include "partout.h"
 #include "crypto/crypto.h"
 #include "portable/portable.h"
-#include "tls/tls.h"
+#include "crypto/tls.h"
 
 #if PARTOUT_OPENVPN
 #include "openvpn/openvpn.h"
