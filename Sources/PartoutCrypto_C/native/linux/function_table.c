@@ -6,10 +6,6 @@
 
 #include "crypto/function_table.h"
 
-pp_crypto_function_table pp_crypto_function_table_native_android(void) {
-    return pp_crypto_function_table_mbed();
-}
-
-pp_crypto_function_table pp_crypto_function_table_native_linux(void) {
+pp_crypto_function_table pp_crypto_function_table_native(void) {
     return pp_crypto_function_table_mbed();
 }

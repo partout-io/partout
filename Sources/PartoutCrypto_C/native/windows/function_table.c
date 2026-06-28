@@ -31,7 +31,7 @@ void pp_windows_crypto_ctr_free(pp_crypto_ctx ctx);
 
 #pragma clang assume_nonnull end
 
-pp_crypto_function_table pp_crypto_function_table_native_windows(void) {
+pp_crypto_function_table pp_crypto_function_table_native(void) {
     const pp_enc_function_table enc = {
         .init_seed = pp_windows_crypto_init_seed,
         .aead_create = pp_windows_crypto_aead_create,

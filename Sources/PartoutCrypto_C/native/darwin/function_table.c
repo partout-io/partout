@@ -31,7 +31,7 @@ void pp_darwin_crypto_ctr_free(pp_crypto_ctx ctx);
 
 #pragma clang assume_nonnull end
 
-pp_crypto_function_table pp_crypto_function_table_native_darwin(void) {
+pp_crypto_function_table pp_crypto_function_table_native(void) {
     const pp_enc_function_table enc = {
         .init_seed = pp_darwin_crypto_init_seed,
         .aead_create = pp_darwin_crypto_aead_create,
