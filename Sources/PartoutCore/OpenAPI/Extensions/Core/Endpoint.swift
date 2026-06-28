@@ -40,7 +40,8 @@ extension Endpoint: RawRepresentable {
         guard let port = UInt16(rawPort) else {
             return nil
         }
-        try? self.init(String(rawAddress), port)
+        let address = String(rawAddress).unbracketedIPv6Address ?? String(rawAddress)
+        try? self.init(address, port)
     }
 }
 
@@ -58,5 +59,18 @@ extension Endpoint: SensitiveDebugStringConvertible {
     public func debugDescription(withSensitiveData: Bool) -> String {
         let addressDescription = address.debugDescription(withSensitiveData: withSensitiveData)
         return "\(addressDescription):\(port)"
+    }
+}
+
+private extension String {
+    var unbracketedIPv6Address: String? {
+        guard first == "[", last == "]" else {
+            return nil
+        }
+        let candidate = String(dropFirst().dropLast())
+        guard Address(rawValue: candidate)?.family == .v6 else {
+            return nil
+        }
+        return candidate
     }
 }

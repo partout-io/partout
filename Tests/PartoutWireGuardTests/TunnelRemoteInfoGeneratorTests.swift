@@ -68,6 +68,29 @@ struct TunnelRemoteInfoGeneratorTests {
     }
 
     @Test
+    func givenBracketedIPv6Endpoint_whenGeneratingUAPIConfiguration_thenBypassesDNS64Cache() async throws {
+        let sourceEndpoint = try #require(Endpoint(rawValue: "[2001:db8::1]:51830"))
+        #expect(sourceEndpoint.address.family == .v6)
+        let configuration = try makeConfiguration(endpoint: "[2001:db8::1]:51830")
+        let dns = RecordingDNSResolver()
+        await dns.setResolvedRecords([
+            DNSRecord(address: "64:ff9b::c000:201", isIPv6: true)
+        ], for: sourceEndpoint.address.rawValue)
+        let sut = TunnelRemoteInfoGenerator(
+            .global,
+            tunnelConfiguration: configuration,
+            dns: dns,
+            dnsTimeout: 1000
+        )
+
+        let uapiConfiguration = try await sut.uapiConfiguration(logHandler: { _, _ in })
+
+        #expect(uapiConfiguration.contains("endpoint=[2001:db8::1]:51830"))
+        let requestedHostnames = await dns.requestedHostnames
+        #expect(requestedHostnames.isEmpty)
+    }
+
+    @Test
     func givenHostnameEndpointWithDNS64AndIPv4_whenResolved_thenCachesIPv4BaseAddress() async throws {
         let sourceEndpoint = try Endpoint("foobar.com", 51830)
         let ipv4Endpoint = try Endpoint("77.160.28.16", sourceEndpoint.port)
