@@ -38,16 +38,15 @@ pp_crypto_function_table pp_crypto_function_table_mbed(void) {
     pp_crypto_function_table table = {
         .name = "mbed",
 
-        .init_seed = pp_mbed_crypto_init_seed,
-
-        .aead_create = pp_mbed_crypto_aead_create,
-        .aead_free = pp_mbed_crypto_aead_free,
-
-        .cbc_create = pp_mbed_crypto_cbc_create,
-        .cbc_free = pp_mbed_crypto_cbc_free,
-
-        .ctr_create = pp_mbed_crypto_ctr_create,
-        .ctr_free = pp_mbed_crypto_ctr_free,
+        .enc = {
+            .init_seed = pp_mbed_crypto_init_seed,
+            .aead_create = pp_mbed_crypto_aead_create,
+            .aead_free = pp_mbed_crypto_aead_free,
+            .cbc_create = pp_mbed_crypto_cbc_create,
+            .cbc_free = pp_mbed_crypto_cbc_free,
+            .ctr_create = pp_mbed_crypto_ctr_create,
+            .ctr_free = pp_mbed_crypto_ctr_free
+        },
 
         .hmac_do = pp_mbed_hmac_do,
 
