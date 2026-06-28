@@ -33,13 +33,16 @@ void pp_darwin_crypto_ctr_free(pp_crypto_ctx ctx);
 
 pp_crypto_function_table pp_crypto_function_table_native(void) {
     const pp_enc_function_table enc = {
-        .init_seed = pp_darwin_crypto_init_seed,
-        .aead_create = pp_darwin_crypto_aead_create,
-        .aead_free = pp_darwin_crypto_aead_free,
-        .cbc_create = pp_darwin_crypto_cbc_create,
-        .cbc_free = pp_darwin_crypto_cbc_free,
-        .ctr_create = pp_darwin_crypto_ctr_create,
-        .ctr_free = pp_darwin_crypto_ctr_free
+        pp_darwin_crypto_init_seed,
+
+        pp_darwin_crypto_aead_create,
+        pp_darwin_crypto_aead_free,
+
+        pp_darwin_crypto_cbc_create,
+        pp_darwin_crypto_cbc_free,
+
+        pp_darwin_crypto_ctr_create,
+        pp_darwin_crypto_ctr_free
     };
     pp_crypto_function_table table = pp_crypto_function_table_mbed();
     table.name = "native-darwin";
