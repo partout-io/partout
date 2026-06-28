@@ -1,8 +1,3 @@
-module _PartoutCrypto_C {
-    umbrella header "crypto/crypto.h"
-    export *
-}
-
 module _PartoutPortable_C {
     umbrella header "portable/portable.h"
     exclude header "portable/mux_posix.h"
