@@ -9,7 +9,7 @@
 #include <string.h>
 #include "portable/common.h"
 #include "crypto/crypto_cbc.h"
-#include "crypto/macros.h"
+#include "crypto_macros_openssl.h"
 
 #define HMACMaxLength (size_t)128
 

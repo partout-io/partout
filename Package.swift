@@ -16,9 +16,8 @@ let envDocs = env["PP_BUILD_DOCS"] == "1"
 // MARK: Configuration
 
 let areas = Area.allCases
-let cryptoMode: CryptoMode? = .openSSL
+let cryptoModes: [CryptoMode] = [.openSSL, .native]
 let openSSLVersion: Version = "3.6.300" // 3.6.2
-// let cryptoMode: CryptoMode? = .native
 let wgGoVersion: Version = "0.0.20260530"
 // Local CMake output is only required for generated wg-go and wintun artifacts.
 let cmakeOutput = envCMakeOutput ?? "bin/darwin-arm64"
@@ -75,8 +74,8 @@ let package = Package(
                     "PartoutCore",
                     "PartoutOS"
                 ]
-                if cryptoMode != nil {
-                    list.append("_PartoutCryptoImpl_C")
+                if !cryptoModes.isEmpty {
+                    list.append("PartoutCrypto_C")
                     if areas.contains(.openVPN) {
                         list.append("PartoutOpenVPN")
                     }
@@ -96,8 +95,8 @@ let package = Package(
                 var list: [Target.Dependency] = [
                     "PartoutCore_C"
                 ]
-                if cryptoMode != nil {
-                    list.append("_PartoutCryptoImpl_C")
+                if !cryptoModes.isEmpty {
+                    list.append("PartoutCrypto_C")
                     if areas.contains(.openVPN) {
                         list.append("PartoutOpenVPN_C")
                     }
@@ -110,7 +109,7 @@ let package = Package(
             }(),
             cSettings: globalCSettings + {
                 var list: [CSetting] = []
-                if areas.contains(.openVPN), cryptoMode != nil {
+                if areas.contains(.openVPN), !cryptoModes.isEmpty {
                     list.append(.define("PARTOUT_OPENVPN"))
                 }
                 if areas.contains(.wireGuard) {
@@ -211,7 +210,7 @@ package.targets.append(contentsOf: [
 // MARK: OpenVPN
 
 // OpenVPN requires Crypto/TLS wrappers
-if areas.contains(.openVPN), cryptoMode != nil {
+if areas.contains(.openVPN), !cryptoModes.isEmpty {
     package.products.append(
         .library(
             name: "PartoutOpenVPN",
@@ -221,7 +220,7 @@ if areas.contains(.openVPN), cryptoMode != nil {
     package.targets.append(contentsOf: [
         .target(
             name: "PartoutOpenVPN_C",
-            dependencies: ["_PartoutCryptoImpl_C"],
+            dependencies: ["PartoutCrypto_C"],
             cSettings: globalCSettings
         ),
         .target(
@@ -306,96 +305,79 @@ if areas.contains(.wireGuard) {
 
 // MARK: - Crypto
 
-switch cryptoMode {
-case .openSSL:
-    // OpenSSL-based crypto/TLS implementations
-    switch OS.current {
-    case .apple:
-        package.dependencies.append(
-            .package(url: "https://github.com/partout-io/openssl-apple", from: openSSLVersion)
-        )
-        package.targets.append(
-            .target(
-                name: "_PartoutCryptoImpl_C",
-                dependencies: [
-                    "PartoutCore_C",
-                    "openssl-apple"
-                ],
-                path: "Sources/PartoutCrypto/OpenSSL_C",
-                cSettings: globalCSettings
+var cryptoDependencies: [Target.Dependency] = ["PartoutCore_C"]
+
+for mode in cryptoModes {
+    switch mode {
+    case .openSSL:
+        // OpenSSL-based crypto/TLS implementations
+        switch OS.current {
+        case .apple:
+            package.dependencies.append(
+                .package(url: "https://github.com/partout-io/openssl-apple", from: openSSLVersion)
             )
-        )
-    default:
+            cryptoDependencies.append("openssl-apple")
+        default:
+            package.targets.append(
+                .systemLibrary(
+                    name: "COpenSSL",
+                    path: "Sources/SystemLibraries/COpenSSL",
+                    pkgConfig: "openssl",
+                    providers: [
+                        .brew(["openssl@3"]),
+                        .apt(["libssl-dev"])
+                    ]
+                )
+            )
+            cryptoDependencies.append("COpenSSL")
+        }
+    case .native:
+        // Crypto with OS routines, TLS with MbedTLS
         package.targets.append(
             .systemLibrary(
-                name: "COpenSSL",
-                path: "Sources/SystemLibraries/COpenSSL",
-                pkgConfig: "openssl",
+                name: "CMbedTLS",
+                path: "Sources/SystemLibraries/CMbedTLS",
+                pkgConfig: "mbedtls",
                 providers: [
-                    .brew(["openssl@3"]),
-                    .apt(["libssl-dev"])
+                    .brew(["mbedtls"]),
+                    .apt(["libmbedtls-dev"])
                 ]
             )
         )
-        package.targets.append(
-            .target(
-                name: "_PartoutCryptoImpl_C",
-                dependencies: [
-                    "PartoutCore_C",
-                    "COpenSSL"
-                ],
-                path: "Sources/PartoutCrypto/OpenSSL_C",
-                cSettings: globalCSettings
-            )
-        )
+        cryptoDependencies.append("CMbedTLS")
     }
-case .native:
-    // Crypto with OS routines, TLS with MbedTLS
-    package.targets.append(
-        .systemLibrary(
-            name: "CMbedTLS",
-            path: "Sources/SystemLibraries/CMbedTLS",
-            pkgConfig: "mbedtls",
-            providers: [
-                .brew(["mbedtls"]),
-                .apt(["libmbedtls-dev"])
-            ]
-        )
-    )
-    package.targets.append(
-        .target(
-            name: "_PartoutCryptoImpl_C",
-            dependencies: [
-                "PartoutCore_C",
-                "CMbedTLS"
-            ],
-            path: "Sources/PartoutCrypto/Native_C",
-            exclude: {
-                // Pick current OS by removing it from exclusions
-                var list = Set(OS.nativeCryptoSources)
-                list.remove(OS.current.nativeCryptoSource)
-                return list.map { "src/\($0.rawValue)" }
-            }(),
-            cSettings: globalCSettings
-        )
-    )
-default:
-    break
 }
 
 // Include concrete crypto targets if supported
-if cryptoMode != nil {
+if !cryptoModes.isEmpty {
+    package.targets.append(
+        .target(
+            name: "PartoutCrypto_C",
+            dependencies: cryptoDependencies,
+            exclude: [
+                "mbed",
+                "native"
+            ],
+//            exclude: {
+//                // Pick current OS by removing it from exclusions
+//                var list = Set(OS.nativeCryptoSources)
+//                list.remove(OS.current.nativeCryptoSource)
+//                return list.map { "native/\($0.rawValue)" }
+//            }(),
+            cSettings: globalCSettings
+        )
+    )
     package.products.append(
         .library(
             name: "PartoutCrypto",
-            targets: ["_PartoutCryptoImpl_C"]
+            targets: ["PartoutCrypto_C"]
         )
     )
     package.targets.append(contentsOf: [
         .testTarget(
             name: "PartoutCryptoTests",
             dependencies: [
-                "_PartoutCryptoImpl_C",
+                "PartoutCrypto_C",
                 "PartoutOS"
             ],
             exclude: [

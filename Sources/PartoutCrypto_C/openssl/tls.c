@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include "portable/common.h"
 #include "tls/tls_base.h"
-#include "tls/macros.h"
+#include "tls_macros_openssl.h"
 
 //static const char *const TLSBoxClientEKU = "TLS Web Client Authentication";
 static const char *const TLSBoxServerEKU = "TLS Web Server Authentication";
