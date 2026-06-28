@@ -106,6 +106,7 @@ typedef struct {
 pp_crypto_function_table pp_crypto_function_table_openssl(void);
 pp_crypto_function_table pp_crypto_function_table_mbed(void);
 pp_crypto_function_table pp_crypto_function_table_native_darwin(void);
+pp_crypto_function_table pp_crypto_function_table_native_android(void);
 pp_crypto_function_table pp_crypto_function_table_native_linux(void);
 pp_crypto_function_table pp_crypto_function_table_native_windows(void);
 
