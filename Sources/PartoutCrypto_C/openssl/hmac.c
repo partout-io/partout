@@ -10,7 +10,7 @@
 
 #define HMACMaxLength    (size_t)128
 
-size_t pp_hmac_do(pp_hmac_ctx *ctx) {
+size_t pp_openssl_hmac_do(pp_hmac_ctx *ctx) {
     pp_assert(ctx->dst_len >= HMACMaxLength);
 
     const EVP_MD *md = EVP_get_digestbyname(ctx->digest_name);

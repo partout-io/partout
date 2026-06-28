@@ -13,3 +13,4 @@
 #include "hmac.h"
 #include "keys.h"
 #include "tls.h"
+#include "function_table.h"

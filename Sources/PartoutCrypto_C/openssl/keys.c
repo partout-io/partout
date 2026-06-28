@@ -42,7 +42,7 @@ char *pp_key_decrypted_from_bio(BIO *_Nonnull bio, const char *_Nonnull passphra
     return ret;
 }
 
-char *pp_key_decrypted_from_path(const char *path, const char *passphrase) {
+char *pp_openssl_key_decrypted_from_path(const char *path, const char *passphrase) {
     BIO *bio;
     if (!(bio = BIO_new_file(path, "r"))) {
         return NULL;
@@ -52,7 +52,7 @@ char *pp_key_decrypted_from_path(const char *path, const char *passphrase) {
     return ret;
 }
 
-char *pp_key_decrypted_from_pem(const char *pem, const char *passphrase) {
+char *pp_openssl_key_decrypted_from_pem(const char *pem, const char *passphrase) {
     BIO *bio;
     if (!(bio = BIO_new_mem_buf(pem, (int)strlen(pem)))) {
         return NULL;

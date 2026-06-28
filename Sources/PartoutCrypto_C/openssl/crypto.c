@@ -7,7 +7,7 @@
 #include <openssl/rand.h>
 #include "crypto/crypto.h"
 
-bool pp_crypto_init_seed(const uint8_t *src, const size_t len) {
+bool pp_openssl_crypto_init_seed(const uint8_t *src, const size_t len) {
     unsigned char x[1];
     if (RAND_bytes(x, 1) != 1) {
         return false;

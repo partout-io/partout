@@ -59,7 +59,7 @@ int pp_tls_verify_peer(int ok, X509_STORE_CTX *_Nonnull ctx) {
 
 // MARK: -
 
-pp_tls pp_tls_create(const pp_tls_options *opt, pp_tls_error_code *error) {
+pp_tls pp_openssl_tls_create(const pp_tls_options *opt, pp_tls_error_code *error) {
     SSL_CTX *ssl_ctx = SSL_CTX_new(TLS_client_method());
     X509 *cert = NULL;
     BIO *cert_bio = NULL;
@@ -136,7 +136,7 @@ failure:
     return NULL;
 }
 
-void pp_tls_free(pp_tls tls) {
+void pp_openssl_tls_free(pp_tls tls) {
     if (!tls) return;
 
     // DO NOT FREE these due to use in BIO_set_ssl() macro
@@ -161,7 +161,7 @@ void pp_tls_free(pp_tls tls) {
     SSL_CTX_free(tls->ssl_ctx);
 }
 
-bool pp_tls_start(pp_tls tls) {
+bool pp_openssl_tls_start(pp_tls tls) {
     if (tls->bio_plain) {
         BIO_free_all(tls->bio_plain);
         tls->bio_plain = NULL;
@@ -194,7 +194,7 @@ bool pp_tls_start(pp_tls tls) {
     return SSL_do_handshake(tls->ssl);
 }
 
-bool pp_tls_is_connected(pp_tls tls) {
+bool pp_openssl_tls_is_connected(pp_tls tls) {
     return tls->is_connected;
 }
 
@@ -203,7 +203,7 @@ bool pp_tls_is_connected(pp_tls tls) {
 bool pp_tls_verify_ssl_eku(SSL *ssl);
 bool pp_tls_verify_ssl_san_host(SSL *ssl, const char *hostname);
 
-pp_zd *_Nullable pp_tls_pull_cipher(pp_tls tls, pp_tls_error_code *_Nullable error) {
+pp_zd *_Nullable pp_openssl_tls_pull_cipher(pp_tls tls, pp_tls_error_code *_Nullable error) {
     if (error) {
         *error = PPTLSErrorNone;
     }
@@ -241,7 +241,7 @@ pp_zd *_Nullable pp_tls_pull_cipher(pp_tls tls, pp_tls_error_code *_Nullable err
     return pp_zd_create_from_data(tls->buf_cipher, ret);
 }
 
-pp_zd *_Nullable pp_tls_pull_plain(pp_tls tls, pp_tls_error_code *_Nullable error) {
+pp_zd *_Nullable pp_openssl_tls_pull_plain(pp_tls tls, pp_tls_error_code *_Nullable error) {
     const int ret = BIO_read(tls->bio_plain, tls->buf_plain, (int)tls->opt->buf_len);
     if (error) {
         *error = PPTLSErrorNone;
@@ -258,9 +258,9 @@ pp_zd *_Nullable pp_tls_pull_plain(pp_tls tls, pp_tls_error_code *_Nullable erro
     return pp_zd_create_from_data(tls->buf_plain, ret);
 }
 
-bool pp_tls_put_cipher(pp_tls tls,
-                       const uint8_t *src, size_t src_len,
-                       pp_tls_error_code *_Nullable error) {
+bool pp_openssl_tls_put_cipher(pp_tls tls,
+                               const uint8_t *src, size_t src_len,
+                               pp_tls_error_code *_Nullable error) {
     if (error) {
         *error = PPTLSErrorNone;
     }
@@ -274,9 +274,9 @@ bool pp_tls_put_cipher(pp_tls tls,
     return true;
 }
 
-bool pp_tls_put_plain(pp_tls tls,
-                      const uint8_t *src, size_t src_len,
-                      pp_tls_error_code *_Nullable error) {
+bool pp_openssl_tls_put_plain(pp_tls tls,
+                              const uint8_t *src, size_t src_len,
+                              pp_tls_error_code *_Nullable error) {
     if (error) {
         *error = PPTLSErrorNone;
     }
@@ -292,7 +292,7 @@ bool pp_tls_put_plain(pp_tls tls,
 
 // MARK: - MD5
 
-char *pp_tls_ca_md5(const pp_tls tls) {
+char *pp_openssl_tls_ca_md5(const pp_tls tls) {
     const EVP_MD *alg = EVP_get_digestbyname("MD5");
     uint8_t md[16];
     unsigned int len;
