@@ -4,4 +4,25 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include "../mbed/crypto_aead_mbed.h"
+#include "crypto/crypto_aead.h"
+
+#pragma clang assume_nonnull begin
+
+pp_crypto_ctx _Nullable pp_mbed_crypto_aead_create(const char *cipher_name,
+                                                   size_t tag_len,
+                                                   size_t id_len,
+                                                   const pp_crypto_keys *_Nullable keys);
+void pp_mbed_crypto_aead_free(pp_crypto_ctx ctx);
+
+#pragma clang assume_nonnull end
+
+pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
+                                    size_t tag_len,
+                                    size_t id_len,
+                                    const pp_crypto_keys *keys) {
+    return pp_mbed_crypto_aead_create(cipher_name, tag_len, id_len, keys);
+}
+
+void pp_crypto_aead_free(pp_crypto_ctx ctx) {
+    pp_mbed_crypto_aead_free(ctx);
+}

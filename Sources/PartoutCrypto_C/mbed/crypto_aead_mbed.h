@@ -306,10 +306,10 @@ size_t pp_mbed_aead_decrypt(void *vctx,
     return out_len;
 }
 
-pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
-                                    size_t tag_len,
-                                    size_t id_len,
-                                    const pp_crypto_keys *keys) {
+pp_crypto_ctx pp_mbed_crypto_aead_create(const char *cipher_name,
+                                         size_t tag_len,
+                                         size_t id_len,
+                                         const pp_crypto_keys *keys) {
     pp_assert(cipher_name);
 
     size_t cipher_key_len = 0;
@@ -347,7 +347,7 @@ pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
     return (pp_crypto_ctx)ctx;
 }
 
-void pp_crypto_aead_free(pp_crypto_ctx vctx) {
+void pp_mbed_crypto_aead_free(pp_crypto_ctx vctx) {
     if (!vctx) return;
     pp_crypto_aead *ctx = (pp_crypto_aead *)vctx;
 

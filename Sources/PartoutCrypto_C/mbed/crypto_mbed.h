@@ -145,7 +145,7 @@ bool pp_mbed_cipher_crypt(const uint8_t *key_bytes,
     return true;
 }
 
-bool pp_crypto_init_seed(const uint8_t *src, const size_t len) {
+bool pp_mbed_crypto_init_seed(const uint8_t *src, const size_t len) {
     (void)src;
     (void)len;
 
@@ -361,9 +361,9 @@ size_t pp_mbed_cbc_decrypt(void *vctx,
     return out_len;
 }
 
-pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name,
-                                   const char *digest_name,
-                                   const pp_crypto_keys *keys) {
+pp_crypto_ctx pp_mbed_crypto_cbc_create(const char *cipher_name,
+                                        const char *digest_name,
+                                        const pp_crypto_keys *keys) {
     pp_assert(digest_name);
 
     size_t cipher_key_len = 0;
@@ -405,7 +405,7 @@ pp_crypto_ctx pp_crypto_cbc_create(const char *cipher_name,
     return (pp_crypto_ctx)ctx;
 }
 
-void pp_crypto_cbc_free(pp_crypto_ctx vctx) {
+void pp_mbed_crypto_cbc_free(pp_crypto_ctx vctx) {
     if (!vctx) return;
     pp_crypto_cbc *ctx = (pp_crypto_cbc *)vctx;
 
@@ -598,11 +598,11 @@ size_t pp_mbed_ctr_decrypt(void *vctx,
     return encrypted_len;
 }
 
-pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name,
-                                   const char *digest_name,
-                                   size_t tag_len,
-                                   size_t payload_len,
-                                   const pp_crypto_keys *keys) {
+pp_crypto_ctx pp_mbed_crypto_ctr_create(const char *cipher_name,
+                                        const char *digest_name,
+                                        size_t tag_len,
+                                        size_t payload_len,
+                                        const pp_crypto_keys *keys) {
     pp_assert(cipher_name && digest_name);
 
     size_t cipher_key_len = 0;
@@ -645,7 +645,7 @@ pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name,
     return (pp_crypto_ctx)ctx;
 }
 
-void pp_crypto_ctr_free(pp_crypto_ctx vctx) {
+void pp_mbed_crypto_ctr_free(pp_crypto_ctx vctx) {
     if (!vctx) return;
     pp_crypto_ctr *ctx = (pp_crypto_ctr *)vctx;
 

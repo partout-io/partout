@@ -229,7 +229,7 @@ char *pp_key_decrypted_from_buffer(const char *pem, const char *passphrase) {
     return decrypted;
 }
 
-char *pp_key_decrypted_from_path(const char *path, const char *passphrase) {
+char *pp_mbed_key_decrypted_from_path(const char *path, const char *passphrase) {
     char *pem = pp_file_read(path, NULL);
     if (!pem) {
         return NULL;
@@ -241,6 +241,6 @@ char *pp_key_decrypted_from_path(const char *path, const char *passphrase) {
     return ret;
 }
 
-char *pp_key_decrypted_from_pem(const char *pem, const char *passphrase) {
+char *pp_mbed_key_decrypted_from_pem(const char *pem, const char *passphrase) {
     return pp_key_decrypted_from_buffer(pem, passphrase);
 }

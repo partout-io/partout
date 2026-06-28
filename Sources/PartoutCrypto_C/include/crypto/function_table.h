@@ -100,6 +100,7 @@ typedef struct {
 } pp_crypto_function_table;
 
 extern const pp_crypto_function_table pp_crypto_function_table_openssl;
+extern const pp_crypto_function_table pp_crypto_function_table_mbed;
 extern const pp_crypto_function_table pp_crypto_function_table_native_darwin;
 extern const pp_crypto_function_table pp_crypto_function_table_native_linux;
 extern const pp_crypto_function_table pp_crypto_function_table_native_windows;
