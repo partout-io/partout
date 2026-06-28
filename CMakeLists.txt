@@ -14,10 +14,13 @@ include("cmake/prebuilt.cmake")
 
 # Be quite strict
 set(CMAKE_C_FLAGS "
-    -W -Wall -Wextra -pedantic -Werror \
+    -W -Wall -Wextra -Werror \
     -Wno-nullability-extension \
     -Wno-language-extension-token"
 )
+if(NOT WIN32)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pedantic")
+endif()
 set(CMAKE_CXX_FLAGS ${CMAKE_C_FLAGS})
 
 # Command line options
