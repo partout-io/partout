@@ -397,7 +397,10 @@ if !cryptoModes.isEmpty {
             ],
             exclude: [
                 "CryptoPerformanceTests.swift"
-            ]
+            ],
+            swiftSettings: cryptoModes.map {
+                .define($0.define)
+            }
         )
     ])
 }
@@ -493,6 +496,13 @@ enum OS: String, CaseIterable {
 enum CryptoMode {
     case openSSL
     case native
+
+    var define: String {
+        switch self {
+        case .openSSL: "PARTOUT_CRYPTO_OPENSSL"
+        case .native: "PARTOUT_CRYPTO_NATIVE"
+        }
+    }
 }
 
 enum FoundationCompatibility {

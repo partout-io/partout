@@ -16,10 +16,13 @@ private let flags = CryptoFlags(
 
 struct CryptoAEADTests {
     @Test(arguments: [
-        ("aes-256-gcm", 16, 4)
+        (CryptoWrapper.Backend.openSSL, "aes-256-gcm", 16, 4),
+        (.mbedTLS, "aes-256-gcm", 16, 4),
+        (.native, "aes-256-gcm", 16, 4)
     ])
-    func givenData_whenEncrypt_thenDecrypts(cipherName: String, tagLength: Int, idLength: Int) throws {
+    func givenData_whenEncrypt_thenDecrypts(backend: CryptoWrapper.Backend, cipherName: String, tagLength: Int, idLength: Int) throws {
         let sut = try CryptoWrapper(
+            backend,
             withAEADCipherName: cipherName,
             tagLength: tagLength,
             idLength: idLength

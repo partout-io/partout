@@ -6,47 +6,82 @@ internal import _PartoutCrypto_C
 @testable import PartoutCore
 
 final class CryptoWrapper {
-    private let ptr: pp_crypto_ctx
+    enum Backend {
+        case openSSL
+        case mbedTLS
+        case native
 
+        var functionTable: pp_crypto_function_table {
+            switch self {
+            case .openSSL:
+#if PARTOUT_CRYPTO_OPENSSL
+                pp_crypto_function_table_openssl()
+#else
+                pp_crypto_function_table_mbed()
+#endif
+            case .mbedTLS:
+#if PARTOUT_CRYPTO_NATIVE
+                pp_crypto_function_table_mbed()
+#else
+                pp_crypto_function_table_openssl()
+#endif
+            case .native:
+#if PARTOUT_CRYPTO_NATIVE
+                pp_crypto_function_table_native()
+#else
+                pp_crypto_function_table_openssl()
+#endif
+            }
+        }
+    }
+
+    private let tbl: pp_enc_function_table
+    private let ptr: pp_crypto_ctx
     private let free_fn: pp_crypto_free_fn
 
     init(
+        _ backend: Backend,
         withAEADCipherName cipherName: String,
         tagLength: Int,
         idLength: Int
     ) throws {
-        guard let ptr = pp_crypto_aead_create(cipherName, tagLength, idLength, nil) else {
+        tbl = backend.functionTable.enc
+        guard let ptr = tbl.aead_create(cipherName, tagLength, idLength, nil) else {
             throw PPCryptoError()
         }
         print("PartoutOpenVPN: Using CryptoAEAD (native Swift/C)")
         self.ptr = ptr
-        free_fn = pp_crypto_aead_free
+        free_fn = tbl.aead_free
     }
 
     init(
+        _ backend: Backend,
         withCBCCipherName cipherName: String?,
         digestName: String
     ) throws {
-        guard let ptr = pp_crypto_cbc_create(cipherName, digestName, nil) else {
+        tbl = backend.functionTable.enc
+        guard let ptr = tbl.cbc_create(cipherName, digestName, nil) else {
             throw PPCryptoError()
         }
         print("PartoutOpenVPN: Using CryptoCBC (native Swift/C)")
         self.ptr = ptr
-        free_fn = pp_crypto_cbc_free
+        free_fn = tbl.cbc_free
     }
 
     init(
+        _ backend: Backend,
         withCTRCipherName cipherName: String,
         digestName: String,
         tagLength: Int,
         payloadLength: Int
     ) throws {
-        guard let ptr = pp_crypto_ctr_create(cipherName, digestName, tagLength, payloadLength, nil) else {
+        tbl = backend.functionTable.enc
+        guard let ptr = tbl.ctr_create(cipherName, digestName, tagLength, payloadLength, nil) else {
             throw PPCryptoError()
         }
         print("PartoutOpenVPN: Using CryptoCTR (native Swift/C)")
         self.ptr = ptr
-        free_fn = pp_crypto_ctr_free
+        free_fn = tbl.ctr_free
     }
 
     deinit {

@@ -15,10 +15,13 @@ private let flags = CryptoFlags(
 
 struct CryptoCTRTests {
     @Test(arguments: [
-        ("aes-128-ctr", "sha256", 32, 128)
+        (CryptoWrapper.Backend.openSSL, "aes-128-ctr", "sha256", 32, 128),
+        (.mbedTLS, "aes-128-ctr", "sha256", 32, 128),
+        (.native, "aes-128-ctr", "sha256", 32, 128),
     ])
-    func givenData_whenEncrypt_thenDecrypts(cipherName: String, digestName: String, tagLength: Int, payloadLength: Int) throws {
+    func givenData_whenEncrypt_thenDecrypts(backend: CryptoWrapper.Backend, cipherName: String, digestName: String, tagLength: Int, payloadLength: Int) throws {
         let sut = try CryptoWrapper(
+            backend,
             withCTRCipherName: cipherName,
             digestName: digestName,
             tagLength: tagLength,
