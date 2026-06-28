@@ -1,9 +1,9 @@
 #!/bin/bash
 LC_ALL=C
-partout=partout.cmake
+filelist=files.cmake
 set -e
 cd Sources
-cat >${partout} <<EOF
+cat >${filelist} <<EOF
 set(PARTOUT_SOURCES
 $(find . -name "*.swift" | sort)
 )
