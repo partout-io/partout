@@ -16,13 +16,13 @@ void pp_mbed_crypto_aead_free(pp_crypto_ctx ctx);
 
 #pragma clang assume_nonnull end
 
-pp_crypto_ctx pp_crypto_aead_create(const char *cipher_name,
-                                    size_t tag_len,
-                                    size_t id_len,
-                                    const pp_crypto_keys *keys) {
+pp_crypto_ctx pp_darwin_crypto_aead_create(const char *cipher_name,
+                                           size_t tag_len,
+                                           size_t id_len,
+                                           const pp_crypto_keys *keys) {
     return pp_mbed_crypto_aead_create(cipher_name, tag_len, id_len, keys);
 }
 
-void pp_crypto_aead_free(pp_crypto_ctx ctx) {
+void pp_darwin_crypto_aead_free(pp_crypto_ctx ctx) {
     pp_mbed_crypto_aead_free(ctx);
 }

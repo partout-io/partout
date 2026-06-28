@@ -183,9 +183,10 @@ size_t local_decrypt(void *vctx,
 
 // MARK: -
 
-pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name, const char *digest_name,
-                                   size_t tag_len, size_t payload_len,
-                                   const pp_crypto_keys *keys) {
+pp_crypto_ctx pp_darwin_crypto_ctr_create(const char *cipher_name,
+                                          const char *digest_name,
+                                          size_t tag_len, size_t payload_len,
+                                          const pp_crypto_keys *keys) {
     pp_assert(cipher_name && digest_name);
 
     size_t cipher_key_len = 0;
@@ -228,7 +229,7 @@ pp_crypto_ctx pp_crypto_ctr_create(const char *cipher_name, const char *digest_n
     return (pp_crypto_ctx)ctx;
 }
 
-void pp_crypto_ctr_free(pp_crypto_ctx vctx) {
+void pp_darwin_crypto_ctr_free(pp_crypto_ctx vctx) {
     if (!vctx) return;
     pp_crypto_ctr *ctx = (pp_crypto_ctr *)vctx;
 
