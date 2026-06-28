@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include "crypto/crypto_aead.h"
+#include "crypto/crypto_base.h"
 
 #pragma clang assume_nonnull begin
 

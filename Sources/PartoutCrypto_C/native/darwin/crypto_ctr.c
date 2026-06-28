@@ -6,7 +6,7 @@
 
 #include <string.h>
 #include "portable/common.h"
-#include "crypto/crypto_ctr.h"
+#include "crypto/crypto_base.h"
 #include "crypto_darwin.h"
 
 typedef struct {

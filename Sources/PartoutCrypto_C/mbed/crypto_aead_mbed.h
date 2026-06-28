@@ -9,7 +9,7 @@
 #include <psa/crypto.h>
 #include <stddef.h>
 #include "portable/common.h"
-#include "crypto/crypto_aead.h"
+#include "crypto/crypto_base.h"
 #include "hmac_mbed.h"
 
 #define PP_MBED_AEAD_AES_BLOCK_SIZE (size_t)16

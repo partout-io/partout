@@ -8,7 +8,7 @@
 #include <openssl/rand.h>
 #include <string.h>
 #include "portable/common.h"
-#include "crypto/crypto_cbc.h"
+#include "crypto/crypto_base.h"
 #include "crypto_openssl.h"
 
 #define HMACMaxLength (size_t)128

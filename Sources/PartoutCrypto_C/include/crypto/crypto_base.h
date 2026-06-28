@@ -182,4 +182,24 @@ void pp_assert_decryption_length(size_t out_len, size_t in_len) {
     pp_assert(out_len >= in_len);
 }
 
+/* Function table. */
+
+typedef bool (*pp_crypto_init_seed_fn)(const uint8_t *src,
+                                       const size_t len);
+
+typedef pp_crypto_ctx _Nullable (*pp_crypto_aead_create_fn)(const char *cipher_name,
+                                                            size_t tag_len,
+                                                            size_t id_len,
+                                                            const pp_crypto_keys *_Nullable keys);
+
+typedef pp_crypto_ctx _Nullable (*pp_crypto_cbc_create_fn)(const char *_Nullable cipher_name,
+                                                           const char *digest_name,
+                                                           const pp_crypto_keys *_Nullable keys);
+
+typedef pp_crypto_ctx _Nullable (*pp_crypto_ctr_create_fn)(const char *cipher_name,
+                                                           const char *digest_name,
+                                                           size_t tag_len,
+                                                           size_t payload_len,
+                                                           const pp_crypto_keys *_Nullable keys);
+
 #pragma clang assume_nonnull end

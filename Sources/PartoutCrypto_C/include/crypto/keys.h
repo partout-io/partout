@@ -7,10 +7,12 @@
 #pragma once
 #pragma clang assume_nonnull begin
 
-char *_Nullable pp_key_decrypted_from_path(const char *path,
-                                           const char *passphrase);
+/* Function table. */
 
-char *_Nullable pp_key_decrypted_from_pem(const char *pem,
-                                          const char *passphrase);
+typedef char *_Nullable (*pp_key_decrypted_from_path_fn)(const char *path,
+                                                         const char *passphrase);
+
+typedef char *_Nullable (*pp_key_decrypted_from_pem_fn)(const char *pem,
+                                                        const char *passphrase);
 
 #pragma clang assume_nonnull end

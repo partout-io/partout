@@ -21,6 +21,8 @@ typedef struct {
     size_t data_len;
 } pp_hmac_ctx;
 
-size_t pp_hmac_do(pp_hmac_ctx *ctx);
+/* Function table. */
+
+typedef size_t (*pp_hmac_do_fn)(pp_hmac_ctx *ctx);
 
 #pragma clang assume_nonnull end

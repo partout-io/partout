@@ -39,8 +39,6 @@ typedef struct {
     void (*on_verify_failure)(void *_Nullable ctx);
 } pp_tls_options;
 
-typedef struct __pp_tls_struct *pp_tls;
-
 pp_tls_options *pp_tls_options_create(int sec_level,
                                       size_t buf_len,
                                       bool eku,
@@ -54,28 +52,31 @@ pp_tls_options *pp_tls_options_create(int sec_level,
 
 void pp_tls_options_free(pp_tls_options *opt);
 
-// "opt" ownership is transferred and released on free
-pp_tls _Nullable pp_tls_create(const pp_tls_options *opt,
-                               pp_tls_error_code *error);
-void pp_tls_free(pp_tls tls);
+/* Function table. */
 
-bool pp_tls_start(pp_tls tls);
-bool pp_tls_is_connected(pp_tls tls);
+typedef struct __pp_tls_struct *pp_tls;
 
-pp_zd *_Nullable pp_tls_pull_cipher(pp_tls tls,
+typedef pp_tls _Nullable (*pp_tls_create_fn)(const pp_tls_options *opt,
+                                             pp_tls_error_code *error);
+typedef void (*pp_tls_free_fn)(pp_tls tls);
+typedef bool (*pp_tls_start_fn)(pp_tls tls);
+typedef bool (*pp_tls_is_connected_fn)(pp_tls tls);
+
+typedef pp_zd *_Nullable (*pp_tls_pull_cipher_fn)(pp_tls tls,
+                                                  pp_tls_error_code *_Nullable error);
+typedef pp_zd *_Nullable (*pp_tls_pull_plain_fn)(pp_tls tls,
+                                                 pp_tls_error_code *_Nullable error);
+
+typedef bool (*pp_tls_put_cipher_fn)(pp_tls tls,
+                                     const uint8_t *src,
+                                     size_t src_len,
+                                     pp_tls_error_code *_Nullable error);
+
+typedef bool (*pp_tls_put_plain_fn)(pp_tls tls,
+                                    const uint8_t *src,
+                                    size_t src_len,
                                     pp_tls_error_code *_Nullable error);
 
-pp_zd *_Nullable pp_tls_pull_plain(pp_tls tls,
-                                   pp_tls_error_code *_Nullable error);
-
-bool pp_tls_put_cipher(pp_tls tls,
-                       const uint8_t *src, size_t src_len,
-                       pp_tls_error_code *_Nullable error);
-
-bool pp_tls_put_plain(pp_tls tls,
-                      const uint8_t *src, size_t src_len,
-                      pp_tls_error_code *_Nullable error);
-
-char *_Nullable pp_tls_ca_md5(const pp_tls tls);
+typedef char *_Nullable (*pp_tls_ca_md5_fn)(const pp_tls tls);
 
 #pragma clang assume_nonnull end

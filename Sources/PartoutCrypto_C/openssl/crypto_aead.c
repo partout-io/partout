@@ -7,7 +7,7 @@
 #include <openssl/evp.h>
 #include <string.h>
 #include "portable/common.h"
-#include "crypto/crypto_aead.h"
+#include "crypto/crypto_base.h"
 #include "crypto_openssl.h"
 
 typedef struct {
