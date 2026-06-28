@@ -70,6 +70,18 @@ typedef bool (*pp_tls_put_plain_fn)(pp_tls tls,
 typedef char *_Nullable (*pp_tls_ca_md5_fn)(const pp_tls tls);
 
 typedef struct {
+    pp_tls_create_fn create;
+    pp_tls_free_fn free;
+    pp_tls_start_fn start;
+    pp_tls_is_connected_fn is_connected;
+    pp_tls_pull_cipher_fn pull_cipher;
+    pp_tls_pull_plain_fn pull_plain;
+    pp_tls_put_cipher_fn put_cipher;
+    pp_tls_put_plain_fn put_plain;
+    pp_tls_ca_md5_fn ca_md5;
+} pp_tls_function_table;
+
+typedef struct {
     const char *name;
 
     pp_crypto_init_seed_fn init_seed;
@@ -88,15 +100,7 @@ typedef struct {
     pp_key_decrypted_from_path_fn key_decrypted_from_path;
     pp_key_decrypted_from_pem_fn key_decrypted_from_pem;
 
-    pp_tls_create_fn tls_create;
-    pp_tls_free_fn tls_free;
-    pp_tls_start_fn tls_start;
-    pp_tls_is_connected_fn tls_is_connected;
-    pp_tls_pull_cipher_fn tls_pull_cipher;
-    pp_tls_pull_plain_fn tls_pull_plain;
-    pp_tls_put_cipher_fn tls_put_cipher;
-    pp_tls_put_plain_fn tls_put_plain;
-    pp_tls_ca_md5_fn tls_ca_md5;
+    pp_tls_function_table tls;
 } pp_crypto_function_table;
 
 extern const pp_crypto_function_table pp_crypto_function_table_openssl;

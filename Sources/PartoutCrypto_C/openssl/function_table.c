@@ -76,13 +76,15 @@ const pp_crypto_function_table pp_crypto_function_table_openssl = {
     .key_decrypted_from_path = pp_openssl_key_decrypted_from_path,
     .key_decrypted_from_pem = pp_openssl_key_decrypted_from_pem,
 
-    .tls_create = pp_openssl_tls_create,
-    .tls_free = pp_openssl_tls_free,
-    .tls_start = pp_openssl_tls_start,
-    .tls_is_connected = pp_openssl_tls_is_connected,
-    .tls_pull_cipher = pp_openssl_tls_pull_cipher,
-    .tls_pull_plain = pp_openssl_tls_pull_plain,
-    .tls_put_cipher = pp_openssl_tls_put_cipher,
-    .tls_put_plain = pp_openssl_tls_put_plain,
-    .tls_ca_md5 = pp_openssl_tls_ca_md5
+    .tls = {
+        .create = pp_openssl_tls_create,
+        .free = pp_openssl_tls_free,
+        .start = pp_openssl_tls_start,
+        .is_connected = pp_openssl_tls_is_connected,
+        .pull_cipher = pp_openssl_tls_pull_cipher,
+        .pull_plain = pp_openssl_tls_pull_plain,
+        .put_cipher = pp_openssl_tls_put_cipher,
+        .put_plain = pp_openssl_tls_put_plain,
+        .ca_md5 = pp_openssl_tls_ca_md5
+    }
 };
