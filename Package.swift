@@ -354,16 +354,12 @@ if !cryptoModes.isEmpty {
         .target(
             name: "PartoutCrypto_C",
             dependencies: cryptoDependencies,
-            exclude: [
-                "mbed",
-                "native"
-            ],
-//            exclude: {
-//                // Pick current OS by removing it from exclusions
-//                var list = Set(OS.nativeCryptoSources)
-//                list.remove(OS.current.nativeCryptoSource)
-//                return list.map { "native/\($0.rawValue)" }
-//            }(),
+            exclude: {
+                // Pick current OS by removing it from exclusions
+                var list = Set(OS.nativeCryptoSources)
+                list.remove(OS.current.nativeCryptoSource)
+                return list.map { "native/\($0.rawValue)" }
+            }(),
             cSettings: globalCSettings
         )
     )
