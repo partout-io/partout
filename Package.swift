@@ -16,7 +16,7 @@ let envDocs = env["PP_BUILD_DOCS"] == "1"
 // MARK: Configuration
 
 let areas = Area.allCases
-let cryptoModes: [CryptoMode] = [.openSSL, .native]
+let cryptoModes: [CryptoMode] = [.openSSL]
 let openSSLVersion: Version = "3.6.300" // 3.6.2
 let wgGoVersion: Version = "0.0.20260530"
 // Local CMake output is only required for generated wg-go and wintun artifacts.
