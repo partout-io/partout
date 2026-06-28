@@ -33,6 +33,7 @@ option(PP_BUILD_USE_WIREGUARD "Use WireGuard" 0)
 set(PP_BUILD_VENDOR_SOURCE "auto" CACHE STRING "Vendor source: auto or bundled")
 set_property(CACHE PP_BUILD_VENDOR_SOURCE PROPERTY STRINGS auto bundled)
 set(PP_BUILD_VENDOR_PREBUILT_URL "" CACHE STRING "Base URL for prebuilt vendor archives")
+string(STRIP "${PP_BUILD_VENDOR_PREBUILT_URL}" PP_BUILD_VENDOR_PREBUILT_URL)
 
 # Output per platform/arch
 string(TOLOWER ${CMAKE_SYSTEM_NAME} PLATFORM_NAME)
