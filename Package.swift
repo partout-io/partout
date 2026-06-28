@@ -309,28 +309,46 @@ if areas.contains(.wireGuard) {
 switch cryptoMode {
 case .openSSL:
     // OpenSSL-based crypto/TLS implementations
-    package.targets.append(
-        .systemLibrary(
-            name: "COpenSSL",
-            path: "Sources/SystemLibraries/COpenSSL",
-            pkgConfig: "openssl",
-            providers: [
-                .brew(["openssl@3"]),
-                .apt(["libssl-dev"])
-            ]
+    switch OS.current {
+    case .apple:
+        package.dependencies.append(
+            .package(url: "https://github.com/partout-io/openssl-apple", from: openSSLVersion)
         )
-    )
-    package.targets.append(
-        .target(
-            name: "_PartoutCryptoImpl_C",
-            dependencies: [
-                "PartoutCore_C",
-                "COpenSSL"
-            ],
-            path: "Sources/PartoutCrypto/OpenSSL_C",
-            cSettings: globalCSettings
+        package.targets.append(
+            .target(
+                name: "_PartoutCryptoImpl_C",
+                dependencies: [
+                    "PartoutCore_C",
+                    "openssl-apple"
+                ],
+                path: "Sources/PartoutCrypto/OpenSSL_C",
+                cSettings: globalCSettings
+            )
         )
-    )
+    default:
+        package.targets.append(
+            .systemLibrary(
+                name: "COpenSSL",
+                path: "Sources/SystemLibraries/COpenSSL",
+                pkgConfig: "openssl",
+                providers: [
+                    .brew(["openssl@3"]),
+                    .apt(["libssl-dev"])
+                ]
+            )
+        )
+        package.targets.append(
+            .target(
+                name: "_PartoutCryptoImpl_C",
+                dependencies: [
+                    "PartoutCore_C",
+                    "COpenSSL"
+                ],
+                path: "Sources/PartoutCrypto/OpenSSL_C",
+                cSettings: globalCSettings
+            )
+        )
+    }
 case .native:
     // Crypto with OS routines, TLS with MbedTLS
     package.targets.append(
