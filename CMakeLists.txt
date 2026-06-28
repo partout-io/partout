@@ -14,14 +14,18 @@ include("cmake/prebuilt.cmake")
 
 # Be quite strict
 set(CMAKE_C_FLAGS "
-    -W -Wall -Wextra -Werror \
+    -Wall -Wextra \
     -Wno-nullability-extension \
     -Wno-language-extension-token"
 )
 if(NOT WIN32)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pedantic")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror -pedantic")
 endif()
 set(CMAKE_CXX_FLAGS ${CMAKE_C_FLAGS})
+set(CMAKE_CXX_STANDARD 11)
+if(MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
+endif()
 
 # Command line options
 option(PP_BUILD_LIBRARY "Include main library" 0)

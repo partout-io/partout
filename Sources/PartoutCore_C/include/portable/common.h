@@ -133,7 +133,7 @@ static inline bool pp_fd_is_valid(pp_fd fd) {
     } while (0)
 
 static inline int pp_io_last_error(void) {
-    return GetLastError();
+    return (int)GetLastError();
 }
 #pragma clang assume_nonnull end
 
