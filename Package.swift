@@ -356,9 +356,20 @@ if !cryptoModes.isEmpty {
             dependencies: cryptoDependencies,
             exclude: {
                 // Pick current OS by removing it from exclusions
-                var list = Set(OS.nativeCryptoSources)
-                list.remove(OS.current.nativeCryptoSource)
-                return list.map { "native/\($0.rawValue)" }
+                var list: [String] = []
+                if !cryptoModes.contains(.openSSL) {
+                    list.append("openssl")
+                }
+                if !cryptoModes.contains(.native) {
+                    list.append("mbed")
+                    list.append("native")
+                } else {
+                    var native = Set(OS.nativeCryptoSources)
+                    native.remove(OS.current.nativeCryptoSource)
+                    let nativeSrc = native.map { "native/\($0.rawValue)" }
+                    list.append(contentsOf: nativeSrc)
+                }
+                return list
             }(),
             cSettings: globalCSettings,
             linkerSettings: {

@@ -15,13 +15,10 @@
 
 typedef struct {
     pp_crypto_init_seed_fn init_seed;
-
     pp_crypto_aead_create_fn aead_create;
     pp_crypto_free_fn aead_free;
-
     pp_crypto_cbc_create_fn cbc_create;
     pp_crypto_free_fn cbc_free;
-
     pp_crypto_ctr_create_fn ctr_create;
     pp_crypto_free_fn ctr_free;
 } pp_enc_function_table;
