@@ -360,7 +360,15 @@ if !cryptoModes.isEmpty {
                 list.remove(OS.current.nativeCryptoSource)
                 return list.map { "native/\($0.rawValue)" }
             }(),
-            cSettings: globalCSettings
+            cSettings: globalCSettings,
+            linkerSettings: {
+                var list: [LinkerSetting] = []
+                if cryptoModes.contains(.native) {
+                    list.append(.linkedLibrary("mbedx509"))
+                    list.append(.linkedLibrary("mbedcrypto"))
+                }
+                return list
+            }()
         )
     )
     package.products.append(
