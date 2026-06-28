@@ -129,7 +129,7 @@ endif()
 ]=])
     set(MBEDTLS_INSTALL_COMMAND
         INSTALL_COMMAND
-            ${CMAKE_COMMAND} --build <BINARY_DIR> --target install
+            ${CMAKE_COMMAND} --build <BINARY_DIR> --target install ${PP_BUILD_CONFIG_ARGS}
             COMMAND ${CMAKE_COMMAND}
                 "-DMBEDTLS_DIR=<INSTALL_DIR>"
                 -P "${MBEDTLS_NORMALIZE_CRYPTO_LIBRARY_SCRIPT}"

@@ -51,14 +51,7 @@ These are the requirements for Partout, but additional build tools may be requir
 
 #### Build
 
-First, fetch all the vendored submodules:
-
-```shell
-git submodule init
-git submodule update --recursive
-```
-
-Then, you will use one of the `scripts/build.*` variants based on the host platform:
+Use one of the `scripts/build.*` variants based on the host platform:
 
 - `scripts/build.sh` (bash)
 - `scripts/build.ps1` (Windows PowerShell)
@@ -71,7 +64,7 @@ The script builds the vendors as static libraries and accepts a few options:
 - `-crypto (openssl|native)`: Pick a crypto subsystem between OpenSSL and Native/MbedTLS (WIP)
 - `-wireguard`: Enable support for WireGuard (requires Go)
 - `-android`: Build for Android
-- `-vendors [bundled|<url>]`: Build bundled vendors, or provide the prebuilt vendor URL for Android/Windows
+- `-vendors [bundled|<url>]`: Build bundled vendors (requires submodules), or provide the prebuilt vendor URL for Android/Windows
 
 For example, this will build Partout for release with a dependency on OpenSSL:
 

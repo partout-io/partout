@@ -3,7 +3,7 @@ set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(OUTPUT_DIR ${PP_BUILD_OUTPUT}/partout)
 
 # Include file lists
-include("partout.cmake")
+include("files.cmake")
 
 # Header search paths from all C targets
 set(PARTOUT_C_INCLUDE_DIRS
