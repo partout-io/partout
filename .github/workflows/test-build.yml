@@ -8,7 +8,8 @@ on:
 
 env:
   INSTALL_DIR: dist
-  SWIFT_VERSION: 6.3.2
+  SWIFT_VERSION: swift-6.3.2-release
+  SWIFT_BUILD: 6.3.2-RELEASE
   ARCH_WINDOWS: x64
 
 jobs:
@@ -23,9 +24,10 @@ jobs:
         with:
           arch: ${{ env.ARCH_WINDOWS }}
       - name: Set up Swift
-        uses: swift-actions/setup-swift@v3
+        uses: compnerd/gha-setup-swift@main
         with:
           swift-version: ${{ env.SWIFT_VERSION }}
+          swift-build: ${{ env.SWIFT_BUILD }}
       - name: Build with CMake (no vendors)
         shell: pwsh
         run: |
