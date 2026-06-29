@@ -7,29 +7,28 @@ internal import _PartoutCrypto_C
 
 final class CryptoWrapper {
     enum Backend {
+        case mock
+#if PARTOUT_CRYPTO_OPENSSL
         case openSSL
+#endif
+#if PARTOUT_CRYPTO_MBEDTLS
         case mbedTLS
         case native
+#endif
 
         var functionTable: pp_crypto_function_table {
             switch self {
-            case .openSSL:
+            case .mock:
+                pp_crypto_function_table_mock()
 #if PARTOUT_CRYPTO_OPENSSL
+            case .openSSL:
                 pp_crypto_function_table_openssl()
-#else
-                pp_crypto_function_table_mbed()
 #endif
+#if PARTOUT_CRYPTO_MBEDTLS
             case .mbedTLS:
-#if PARTOUT_CRYPTO_NATIVE
                 pp_crypto_function_table_mbed()
-#else
-                pp_crypto_function_table_openssl()
-#endif
             case .native:
-#if PARTOUT_CRYPTO_NATIVE
                 pp_crypto_function_table_native()
-#else
-                pp_crypto_function_table_openssl()
 #endif
             }
         }

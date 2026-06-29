@@ -16,7 +16,7 @@ let envDocs = env["PP_BUILD_DOCS"] == "1"
 // MARK: Configuration
 
 let areas = Area.allCases
-let cryptoModes: [CryptoMode] = [.openSSL]
+let cryptoLibraries: [CryptoLibrary] = [.openSSL]
 let openSSLVersion: Version = "3.6.300" // 3.6.2
 let wgGoVersion: Version = "0.0.20260530"
 // Local CMake output is only required for generated wg-go and wintun artifacts.
@@ -74,7 +74,7 @@ let package = Package(
                     "PartoutCore",
                     "PartoutOS"
                 ]
-                if !cryptoModes.isEmpty {
+                if !cryptoLibraries.isEmpty {
                     list.append("PartoutCrypto_C")
                     if areas.contains(.openVPN) {
                         list.append("PartoutOpenVPN")
@@ -95,7 +95,7 @@ let package = Package(
                 var list: [Target.Dependency] = [
                     "PartoutCore_C"
                 ]
-                if !cryptoModes.isEmpty {
+                if !cryptoLibraries.isEmpty {
                     list.append("PartoutCrypto_C")
                     if areas.contains(.openVPN) {
                         list.append("PartoutOpenVPN_C")
@@ -109,7 +109,7 @@ let package = Package(
             }(),
             cSettings: globalCSettings + {
                 var list: [CSetting] = []
-                if areas.contains(.openVPN), !cryptoModes.isEmpty {
+                if areas.contains(.openVPN), !cryptoLibraries.isEmpty {
                     list.append(.define("PARTOUT_OPENVPN"))
                 }
                 if areas.contains(.wireGuard) {
@@ -210,7 +210,7 @@ package.targets.append(contentsOf: [
 // MARK: OpenVPN
 
 // OpenVPN requires Crypto/TLS wrappers
-if areas.contains(.openVPN), !cryptoModes.isEmpty {
+if areas.contains(.openVPN), !cryptoLibraries.isEmpty {
     package.products.append(
         .library(
             name: "PartoutOpenVPN",
@@ -307,7 +307,7 @@ if areas.contains(.wireGuard) {
 
 var cryptoDependencies: [Target.Dependency] = ["PartoutCore_C"]
 
-for mode in cryptoModes {
+for mode in cryptoLibraries {
     switch mode {
     case .openSSL:
         // OpenSSL-based crypto/TLS implementations
@@ -331,7 +331,7 @@ for mode in cryptoModes {
             )
             cryptoDependencies.append("COpenSSL")
         }
-    case .native:
+    case .mbedTLS:
         // Crypto with OS routines, TLS with MbedTLS
         package.targets.append(
             .systemLibrary(
@@ -349,7 +349,7 @@ for mode in cryptoModes {
 }
 
 // Include concrete crypto targets if supported
-if !cryptoModes.isEmpty {
+if !cryptoLibraries.isEmpty {
     package.targets.append(
         .target(
             name: "PartoutCrypto_C",
@@ -357,10 +357,10 @@ if !cryptoModes.isEmpty {
             exclude: {
                 // Pick current OS by removing it from exclusions
                 var list: [String] = []
-                if !cryptoModes.contains(.openSSL) {
+                if !cryptoLibraries.contains(.openSSL) {
                     list.append("openssl")
                 }
-                if !cryptoModes.contains(.native) {
+                if !cryptoLibraries.contains(.mbedTLS) {
                     list.append("mbed")
                     list.append("native")
                 } else {
@@ -374,7 +374,7 @@ if !cryptoModes.isEmpty {
             cSettings: globalCSettings,
             linkerSettings: {
                 var list: [LinkerSetting] = []
-                if cryptoModes.contains(.native) {
+                if cryptoLibraries.contains(.mbedTLS) {
                     list.append(.linkedLibrary("mbedx509"))
                     list.append(.linkedLibrary("mbedcrypto"))
                 }
@@ -398,7 +398,7 @@ if !cryptoModes.isEmpty {
             exclude: [
                 "CryptoPerformanceTests.swift"
             ],
-            swiftSettings: cryptoModes.map {
+            swiftSettings: cryptoLibraries.map {
                 .define($0.define)
             }
         )
@@ -493,14 +493,14 @@ enum OS: String, CaseIterable {
     }
 }
 
-enum CryptoMode {
+enum CryptoLibrary {
     case openSSL
-    case native
+    case mbedTLS
 
     var define: String {
         switch self {
         case .openSSL: "PARTOUT_CRYPTO_OPENSSL"
-        case .native: "PARTOUT_CRYPTO_NATIVE"
+        case .mbedTLS: "PARTOUT_CRYPTO_MBEDTLS"
         }
     }
 }
