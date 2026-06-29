@@ -10,6 +10,7 @@ env:
   INSTALL_DIR: dist
   SWIFT_VERSION: swift-6.3.2-release
   SWIFT_BUILD: 6.3.2-RELEASE
+  ARCH_WINDOWS: x64
 
 jobs:
   build_windows:
@@ -18,6 +19,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ env.ARCH_WINDOWS }}
       - uses: compnerd/gha-setup-swift@main
         with:
           swift-version: ${{ env.SWIFT_VERSION }}
