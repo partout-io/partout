@@ -1,0 +1,25 @@
+name: Test CMake Build
+
+on:
+  workflow_dispatch:
+
+env:
+  INSTALL_DIR: dist
+
+jobs:
+  build_windows:
+    name: Build for Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: compnerd/gha-setup-swift@main
+        with:
+          swift-version: swift-6.3.2-release
+          swift-build: 6.3.2-RELEASE
+      - name: Build with CMake (no vendors)
+        shell: pwsh
+        run: ./scripts/build.ps1 -gen -l -install $INSTALL_DIR
+      # - name: Verify output
+      #   shell: pwsh
+      #   run: ./ci/verify-windows.ps1 $INSTALL_DIR
