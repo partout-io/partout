@@ -12,13 +12,20 @@ private nonisolated(unsafe) let hmacKey = CZeroingData(count: 32)
 private let flags = CryptoFlags(
     ad: [0x00, 0x12, 0x34, 0x56]
 )
+private let cryptoCTRCases: [(CryptoWrapper.Backend, String, String, Int, Int)] = {
+    var cases: [(CryptoWrapper.Backend, String, String, Int, Int)] = []
+#if PARTOUT_CRYPTO_OPENSSL
+    cases.append((.openSSL, "aes-128-ctr", "sha256", 32, 128))
+#endif
+#if PARTOUT_CRYPTO_MBEDTLS
+    cases.append((.mbedTLS, "aes-128-ctr", "sha256", 32, 128))
+    cases.append((.native, "aes-128-ctr", "sha256", 32, 128))
+#endif
+    return cases
+}()
 
 struct CryptoCTRTests {
-    @Test(arguments: [
-        (CryptoWrapper.Backend.openSSL, "aes-128-ctr", "sha256", 32, 128),
-        (.mbedTLS, "aes-128-ctr", "sha256", 32, 128),
-        (.native, "aes-128-ctr", "sha256", 32, 128),
-    ])
+    @Test(arguments: cryptoCTRCases)
     func givenData_whenEncrypt_thenDecrypts(backend: CryptoWrapper.Backend, cipherName: String, digestName: String, tagLength: Int, payloadLength: Int) throws {
         let sut = try CryptoWrapper(
             backend,
