@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include <winsock2.h>
-#include <ws2tcpip.h>
 #include "portable/socket.h"
 
 /* Windows uses SOCKET for I/O and HANDLE for watching.  */

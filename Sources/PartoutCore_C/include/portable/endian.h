@@ -35,9 +35,7 @@ uint32_t pp_endian_htonl(uint32_t num) {
 
 #else
 
-#if PARTOUT_WINDOWS
-#include <WinSock2.h>
-#else
+#if !PARTOUT_WINDOWS
 #include <arpa/inet.h>
 #endif
 

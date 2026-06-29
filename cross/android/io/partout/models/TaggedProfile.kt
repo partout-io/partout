@@ -23,40 +23,40 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * A codable wrapper for a profile with all known modules.
  *
- * @param activeModulesIds 
  * @param id 
- * @param modules 
  * @param name 
+ * @param modules 
+ * @param activeModulesIds 
+ * @param version 
  * @param behavior 
  * @param userInfo 
- * @param version 
  */
 @Serializable
 
 data class TaggedProfile (
 
-    @SerialName(value = "activeModulesIds")
-    val activeModulesIds: kotlin.collections.Set<kotlin.String>,
-
     @SerialName(value = "id")
     val id: kotlin.String,
+
+    @SerialName(value = "name")
+    val name: kotlin.String,
 
     @SerialName(value = "modules")
     val modules: kotlin.collections.List<TaggedModule>,
 
-    @SerialName(value = "name")
-    val name: kotlin.String,
+    @SerialName(value = "activeModulesIds")
+    val activeModulesIds: kotlin.collections.Set<kotlin.String>,
+
+    @SerialName(value = "version")
+    val version: kotlin.Int? = null,
 
     @SerialName(value = "behavior")
     val behavior: ProfileBehavior? = null,
 
     @Contextual @SerialName(value = "userInfo")
-    val userInfo: kotlinx.serialization.json.JsonElement? = null,
-
-    @SerialName(value = "version")
-    val version: kotlin.Int? = null
+    val userInfo: kotlinx.serialization.json.JsonElement? = null
 
 ) {
 

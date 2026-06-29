@@ -21,18 +21,20 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * A pair of received/sent bytes count.
  *
- * @param received 
- * @param sent 
+ * @param received Received bytes count.
+ * @param sent Sent bytes count.
  */
 @Serializable
 
 data class DataCount (
 
+    /* Received bytes count. */
     @SerialName(value = "received")
     val received: kotlin.Long,
 
+    /* Sent bytes count. */
     @SerialName(value = "sent")
     val sent: kotlin.Long
 

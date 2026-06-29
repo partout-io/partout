@@ -45,6 +45,7 @@ void pp_log_simple_append(const char *_Nullable tag,
 static inline
 void pp_assert(bool condition) {
     assert(condition);
+    (void)condition;
 }
 
 static inline
@@ -111,10 +112,10 @@ char *_Nullable pp_file_read(const char *rel_path, const char *_Nullable parent)
 
 extern const int PPIOErrorWouldBlock;
 extern const int PPIOErrorNoBufs;
+extern const int PPIOErrorNoSpace;
 
 #if PARTOUT_WINDOWS
 
-#include <ws2tcpip.h>
 #pragma clang assume_nonnull begin
 
 typedef _Nonnull HANDLE pp_fd;
@@ -132,7 +133,7 @@ static inline bool pp_fd_is_valid(pp_fd fd) {
     } while (0)
 
 static inline int pp_io_last_error(void) {
-    return GetLastError();
+    return (int)GetLastError();
 }
 #pragma clang assume_nonnull end
 
@@ -168,6 +169,10 @@ static inline bool pp_io_wouldblock(void) {
 
 static inline bool pp_io_nobufs(void) {
     return errno == ENOBUFS;
+}
+
+static inline bool pp_io_nospace(void) {
+    return errno == ENOSPC;
 }
 #pragma clang assume_nonnull end
 

@@ -22,7 +22,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * IP and routes.
  *
  * @param id 
  * @param ipv4 

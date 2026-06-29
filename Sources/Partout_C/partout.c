@@ -5,9 +5,11 @@
  */
 
 #include "partout.h"
-#include "crypto/crypto.h"
 #include "portable/portable.h"
-#include "tls/tls.h"
+
+#if PARTOUT_HAS_CRYPTO
+#include "crypto/crypto.h"
+#endif
 
 #if PARTOUT_OPENVPN
 #include "openvpn/openvpn.h"

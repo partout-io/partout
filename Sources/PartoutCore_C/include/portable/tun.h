@@ -54,6 +54,9 @@ static inline int pp_tun_handle_result(int ret) {
         if (pp_io_nobufs()) {
             return PPIOErrorNoBufs;
         }
+        if (pp_io_nospace()) {
+            return PPIOErrorNoSpace;
+        }
     }
     return ret;
 }

@@ -64,4 +64,5 @@ Given the main app and the daemon:
 
 - ``NativeTunnelController``
 - ``TunnelController``
+- ``TunnelControllerOptions``
 - ``TunnelRemoteInfo``

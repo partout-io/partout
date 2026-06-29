@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+internal import _PartoutCrypto_C
+
 extension _OpenVPNConnectionV3 {
     public init(
         _ ctx: PartoutLoggerContext,
@@ -23,6 +25,7 @@ extension _OpenVPNConnectionV3 {
         let sessionFactory = {
             try OpenVPNSessionV3(
                 ctx,
+                fnt: options.backend.functionTable,
                 configuration: configuration,
                 credentials: module.credentials,
                 prng: prng,

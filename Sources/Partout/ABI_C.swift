@@ -101,7 +101,7 @@ public func __partout_import_profile(
             let profile = try coding.profileOrModule(fromString: text, name: name)
             callback.succeed(profile.asTaggedProfile)
         } catch {
-            callback.fail(error.localizedDescription)
+            callback.fail(error)
         }
     }
 }

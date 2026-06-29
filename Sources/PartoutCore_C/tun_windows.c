@@ -147,6 +147,7 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
         SetLastError(ERROR_INVALID_HANDLE);
         return -1;
     }
+    if (!dst || dst_len == 0) return -1;
     DWORD packet_len;
     BYTE *packet = WintunReceivePacket(tun->session, &packet_len);
     if (!packet) {
@@ -157,7 +158,6 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
         pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: read(), %lu", err);
         return -1;
     }
-
     if (dst_len < packet_len) {
         WintunReleaseReceivePacket(tun->session, packet);
         SetLastError(ERROR_INSUFFICIENT_BUFFER);
@@ -173,7 +173,7 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
         SetLastError(ERROR_INVALID_HANDLE);
         return -1;
     }
-
+    if (!src || src_len == 0) return -1;
     BYTE *packet = WintunAllocateSendPacket(tun->session, src_len);
     if (!packet) {
         const DWORD err = GetLastError();
@@ -183,7 +183,6 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
         pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: write(), %lu", err);
         return -1;
     }
-
     memcpy(packet, src, src_len);
     WintunSendPacket(tun->session, packet);
     return (int)src_len;

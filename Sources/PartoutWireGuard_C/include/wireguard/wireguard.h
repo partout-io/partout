@@ -6,5 +6,4 @@
 
 #include "wireguard/key.h"
 #include "wireguard/logging.h"
-#include "wireguard/sys.h"
 #include "wireguard/x25519.h"

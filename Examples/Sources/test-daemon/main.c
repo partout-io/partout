@@ -25,11 +25,12 @@ int main(int argc, const char *argv[]) {
         fprintf(stderr, "Unable to read profile\n");
         return -1;
     }
-    partout_daemon_start_args args;
+    partout_daemon_start_args args = { 0 };
     args.profile = profile;
     args.is_daemon = true;
     args.cache_dir = ".";
     args.bindings = NULL;
+    args.options.logs_snapshots = true;
     const partout_completion_code result = partout_daemon_start(&args);
     free(profile);
     if (result != PartoutCompletionCodeOK) {

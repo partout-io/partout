@@ -4,25 +4,26 @@
 
 package io.partout.abi
 
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 
 data class PartoutResult(
     val code: Int,
-    val payload: String?
+    val json: String?
 ) {
     companion object {
         suspend fun await(
             block: (PartoutCompletionCallback) -> Unit
         ): PartoutResult = withContext(Dispatchers.IO) {
-            val future = CompletableDeferred<PartoutResult>()
-            block { code, json ->
-                future.complete(PartoutResult(code, json))
+            val result = suspendCancellableCoroutine { continuation ->
+                block { code, json ->
+                    continuation.resume(PartoutResult(code, json))
+                }
             }
-            val result = future.await()
             if (result.code != 0) {
-                throw PartoutException(result.code, result.payload)
+                throw PartoutException(result.code, result.json)
             }
             result
         }

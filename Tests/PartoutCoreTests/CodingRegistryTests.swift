@@ -37,6 +37,40 @@ struct CodingRegistryTests {
         #expect(profile == decoded)
     }
 
+    @Test
+    func givenCoder_whenDecodeV3ProfileWithLegacyOTPMethod_thenIsDecoded() throws {
+        let registry = Registry(withKnown: true)
+        let sut = registry.withLegacyEncoding(false)
+
+        var ovpnBuilder = OpenVPN.Configuration.Builder()
+        ovpnBuilder.ca = OpenVPN.CryptoContainer(pem: "ca is required")
+        ovpnBuilder.cipher = .aes128cbc
+        ovpnBuilder.remotes = [
+            try ExtendedEndpoint("host.name", EndpointProtocol(.tcp, 80))
+        ]
+        let credentials = OpenVPN.Credentials.Builder(
+            username: "user",
+            password: "password",
+            otpMethod: .append,
+            otp: "123456"
+        ).build()
+        let module = try OpenVPNModule.Builder(
+            configurationBuilder: ovpnBuilder,
+            credentials: credentials
+        ).build()
+        let profile = try Profile.Builder(modules: [module]).build()
+
+        let encoded = try sut.string(fromProfile: profile)
+        let legacyEncoded = encoded.replacingOccurrences(
+            of: "\"otpMethod\":\"append\"",
+            with: "\"otpMethod\":{\"append\":{}}"
+        )
+        #expect(legacyEncoded != encoded)
+
+        let decoded = try sut.profile(fromString: legacyEncoded)
+        #expect(decoded == profile)
+    }
+
     @Test(arguments: [true, false])
     func givenCoder_whenEncodeProfileWithRegisteredModule_thenIsDecoded(legacy: Bool) throws {
         let registry = Registry(allHandlers: [

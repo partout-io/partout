@@ -4,9 +4,11 @@
 
 internal import _PartoutOpenVPN_C
 
-extension ControlChannel {
+extension OpenVPNTLS {
     final class AuthSerializer: ControlChannelSerializer {
         private let ctx: PartoutLoggerContext
+
+        private let fnt: pp_crypto_enc_fnt
 
         private let cbc: pp_crypto_ctx
 
@@ -26,10 +28,12 @@ extension ControlChannel {
 
         init(
             _ ctx: PartoutLoggerContext,
+            fnt: pp_crypto_enc_fnt,
             digest: OpenVPN.Digest,
             key: OpenVPN.StaticKey
         ) throws {
             self.ctx = ctx
+            self.fnt = fnt
 
             let cbc = digest.rawValue.withCString { _ in
                 let keys = CryptoKeys(
@@ -41,7 +45,7 @@ extension ControlChannel {
                 )
                 let keysBridge = CryptoKeysBridge(keys: keys)
                 return keysBridge.withUnsafeKeys {
-                    pp_crypto_cbc_create(nil, digest.rawValue, $0)
+                    fnt.cbc_create(nil, digest.rawValue, $0)
                 }
             }
             guard let cbc else {
@@ -60,7 +64,7 @@ extension ControlChannel {
         }
 
         deinit {
-            pp_crypto_cbc_free(cbc)
+            fnt.cbc_free(cbc)
         }
 
         func reset() {

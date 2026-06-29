@@ -41,8 +41,7 @@ internal class JNITunnelController(
     private val logTag: String,
     private val service: VpnService,
     private val scope: CoroutineScope,
-    private val logsSnapshots: Boolean,
-    private val delegate: TunnelControllerDelegate,
+    private val delegate: TunnelControllerDelegate
 ) : TunnelController {
     //region State
     // All accesses must be synchronized against the lock
@@ -51,6 +50,7 @@ internal class JNITunnelController(
     // JNI interactions with Native (Swift)
     private var nativeDelegate: Long = 0
     private var isNativeCancelled = false
+    private var logsSnapshots = false
 
     // Network observers
     private val reachabilityObserver = ReachabilityObserver(service)
@@ -108,6 +108,10 @@ internal class JNITunnelController(
             return@synchronized INVALID_TUN_FD
         }
 
+        // Pick options
+        logsSnapshots = info.options.logsSnapshots
+        Log.d(logTag, "Controller options: ${info.options}")
+
         // Apply modules to VPN builder
         var appliedAddressSettings = false
         var appliedDnsSettings = false
@@ -137,6 +141,10 @@ internal class JNITunnelController(
 
                 else -> {}
             }
+        }
+        if (!appliedDnsSettings && info.options.dnsFallbackServers.isNotEmpty()) {
+            Log.i(logTag, "DNS: Apply fallback servers: ${info.options.dnsFallbackServers}")
+            info.options.dnsFallbackServers.addDNSServers(logTag, builder)
         }
         if (!appliedAddressSettings) {
             Log.e(logTag, "Unable to set interface address")

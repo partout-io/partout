@@ -2,16 +2,15 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+internal import _PartoutCrypto_C
+
 final class DataPathWrapper {
     struct Parameters {
+        let fnt: pp_crypto_enc_fnt
         let cipher: OpenVPN.Cipher?
-
         let digest: OpenVPN.Digest?
-
         let compressionFraming: OpenVPN.CompressionFraming
-
         let compressionAlgorithm: OpenVPN.CompressionAlgorithm
-
         let peerId: UInt32?
     }
 

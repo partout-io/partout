@@ -13,13 +13,14 @@ struct TLSTests {
 extension TLSTests {
     func newConfiguration() throws -> OpenVPN.Configuration {
         let url = try #require(Bundle.module.url(forResource: "tunnelbear", withExtension: "ovpn"))
-        return try StandardOpenVPNParser(decrypter: SimpleKeyDecrypter())
+        return try StandardOpenVPNParser(decrypter: SimpleKeyDecrypter(backend: .forTesting))
             .parsed(fromURL: url, passphrase: "foobar")
             .configuration
     }
 
     func emptyParameters() throws -> TLSWrapper.Parameters {
         TLSWrapper.Parameters(
+            fnt: .forTesting,
             cachesURL: cachesURL,
             cfg: try newConfiguration(),
             onVerificationFailure: {}

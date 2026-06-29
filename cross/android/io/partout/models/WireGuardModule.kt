@@ -22,7 +22,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * A connection module providing a WireGuard connection.
  *
  * @param id 
  * @param configuration 

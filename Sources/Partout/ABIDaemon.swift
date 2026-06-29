@@ -10,8 +10,7 @@ public final class ABIDaemon {
         let profile: Profile
         let cachesURL: URL
         let isDaemon: Bool
-        let logsSnapshots: Bool
-        let minDataCountDelta: UInt64
+        let controllerOptions: TunnelControllerOptions
 
         init(_ args: partout_daemon_start_args) throws {
             guard let cProfileJSON = args.profile,
@@ -23,8 +22,7 @@ public final class ABIDaemon {
             profile = try decoder.decode(TaggedProfile.self, from: profileData).asProfile()
             cachesURL = URL(filePath: String(cString: cCacheDir))
             isDaemon = args.is_daemon
-            logsSnapshots = args.logs_snapshots
-            minDataCountDelta = args.min_data_count_delta
+            controllerOptions = args.options.forTunnelController()
         }
     }
 
@@ -53,9 +51,10 @@ public final class ABIDaemon {
         let controller = try NativeTunnelController(
             ctx,
             ref: bindings?.controller,
+            profile: profile,
             environment: environment,
             betterPathFactory: betterPathFactory,
-            logsSnapshots: options.logsSnapshots
+            options: options.controllerOptions
         )
         let factory = controller.newSocketFactory()
 
@@ -74,7 +73,7 @@ public final class ABIDaemon {
             messageHandler: DefaultMessageHandler(ctx, environment: environment),
             startsImmediately: false,
             cancelsUnrecoverable: true,
-            minDataCountDelta: options.minDataCountDelta
+            minDataCountDelta: options.controllerOptions.minDataCountDelta
         )
 
         daemon = try SimpleConnectionDaemon(params: daemonParameters)
@@ -93,5 +92,18 @@ public final class ABIDaemon {
 
     func stop() async {
         await daemon.stop()
+    }
+}
+
+private extension partout_daemon_options {
+    func forTunnelController() -> TunnelControllerOptions {
+        TunnelControllerOptions(
+            dnsFallbackServers: stringsFromCStrings(
+                dns_fallback,
+                count: dns_fallback_len
+            ),
+            logsSnapshots: logs_snapshots,
+            minDataCountDelta: min_data_count_delta
+        )
     }
 }

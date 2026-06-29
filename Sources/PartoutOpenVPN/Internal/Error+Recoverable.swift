@@ -19,7 +19,7 @@ private let ppRecoverableCodes: [PartoutError.Code] = [
     .timeout,
     .ioFailure,
     .networkChanged,
-    .OpenVPN.connectionFailure,
-    .OpenVPN.recoverableAuthentication,
-    .OpenVPN.serverShutdown
+    .openVPNConnectionFailure,
+    .openVPNRecoverableAuthentication,
+    .openVPNServerShutdown
 ]

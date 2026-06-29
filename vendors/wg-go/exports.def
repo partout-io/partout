@@ -1,0 +1,13 @@
+LIBRARY wg-go.dll
+EXPORTS
+wgSetLogger
+wgTurnOn
+wgGetSocketV4
+wgGetSocketV6
+wgTurnOff
+wgSetConfig
+wgGetConfig
+wgBumpSockets
+wgBumpSocketsAndWait
+wgDisableSomeRoamingForBrokenMobileSemantics
+wgVersion

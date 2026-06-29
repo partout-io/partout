@@ -1,0 +1,9 @@
+  -clean                         Remove build output directories
+  -gen                           Generate CMake metadata and configure
+  -install <dir>                 Install after building
+  -crypto <openssl|native>[,...] Enable one or more crypto backends
+  -openvpn                       Enable OpenVPN support
+  -wireguard                     Enable WireGuard support
+  -l                             Build the Partout library
+  -android                       Configure an Android build
+  -vendors [auto|bundled|<url>]  Select vendor source or prebuilt vendor URL

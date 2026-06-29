@@ -21,7 +21,7 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * 
+ * The protocol used in DNS servers.
  *
  * Values: cleartext,https,tls
  */

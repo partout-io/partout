@@ -95,8 +95,8 @@ extension partout_completion {
         complete(PartoutCompletionCodeFailure)
     }
 
-    func fail(_ payload: String?) {
-        complete(PartoutCompletionCodeFailure, payload)
+    func fail(_ error: Error) {
+        complete(PartoutCompletionCodeFailure, ABIErrorPayload(error))
     }
 }
 
@@ -115,4 +115,16 @@ private extension partout_completion {
         }
         callback?(ctx, code, payloadJSON)
     }
+}
+
+func stringsFromCStrings(
+    _ ptrs: UnsafePointer<UnsafePointer<CChar>?>?,
+    count: Int
+) -> [String] {
+    (0..<count)
+        .compactMap { i in
+            ptrs?[i].map {
+                String(cString: $0)
+            }
+        }
 }

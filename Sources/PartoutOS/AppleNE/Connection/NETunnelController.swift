@@ -22,11 +22,9 @@ extension Profile {
 /// A controller based on `NEPacketTunnelProvider`.
 public final class NETunnelController: TunnelController {
     public struct Options: Sendable {
-        public var dnsFallbackServers: [String]
+        public var dnsFallbackServers: [String] = []
 
-        public init() {
-            dnsFallbackServers = []
-        }
+        public init() {}
     }
 
     nonisolated(unsafe)

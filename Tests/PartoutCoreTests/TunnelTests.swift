@@ -77,7 +77,8 @@ struct TunnelTests {
         let module = IPModule.Builder().build()
         let profile = try Profile.Builder(modules: [module]).build()
         try await sut.connect(with: profile)
-        env.setEnvironmentValue(.crypto, forKey: TunnelEnvironmentKeys.lastErrorCode)
+        let errorCode: PartoutError.Code = .crypto
+        env.setEnvironmentValue(errorCode.rawValue, forKey: TunnelEnvironmentKeys.lastErrorCode)
 
         let exp = Expectation()
         let stream = sut.snapshotsStream

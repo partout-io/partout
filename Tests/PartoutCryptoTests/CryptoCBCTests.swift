@@ -11,14 +11,47 @@ private let encryptedHMACHex = "fea3fe87ee68eb21c697e62d3c29f7bea2f5b457d9a7fa66
 private nonisolated(unsafe) let cipherKey = CZeroingData(count: 32)
 private nonisolated(unsafe) let hmacKey = CZeroingData(count: 32)
 private let flags = CryptoFlags()
+private let cryptoCBCEncryptCases: [(CryptoWrapper.Backend, String?, String, String)] = {
+    var cases: [(CryptoWrapper.Backend, String?, String, String)] = []
+#if PARTOUT_CRYPTO_OPENSSL
+    cases.append((.openSSL, nil, "sha256", plainHMACHex))
+    cases.append((.openSSL, "aes-128-cbc", "sha256", encryptedHMACHex))
+#endif
+#if PARTOUT_CRYPTO_MBEDTLS
+    cases.append((.mbedTLS, "aes-128-cbc", "sha256", encryptedHMACHex))
+    cases.append((.native, "aes-128-cbc", "sha256", encryptedHMACHex))
+#endif
+    return cases
+}()
+private let cryptoCBCDecryptCases: [(CryptoWrapper.Backend, String?, String, String, String)] = {
+    var cases: [(CryptoWrapper.Backend, String?, String, String, String)] = []
+#if PARTOUT_CRYPTO_OPENSSL
+    cases.append((.openSSL, nil, "sha256", plainHMACHex, plainHex))
+    cases.append((.openSSL, "aes-128-cbc", "sha256", encryptedHMACHex, plainHex))
+#endif
+#if PARTOUT_CRYPTO_MBEDTLS
+    cases.append((.mbedTLS, "aes-128-cbc", "sha256", encryptedHMACHex, plainHex))
+    cases.append((.native, "aes-128-cbc", "sha256", encryptedHMACHex, plainHex))
+#endif
+    return cases
+}()
+private let cryptoCBCVerifyCases: [(CryptoWrapper.Backend, String, String)] = {
+    var cases: [(CryptoWrapper.Backend, String, String)] = []
+#if PARTOUT_CRYPTO_OPENSSL
+    cases.append((.openSSL, "sha256", plainHMACHex))
+    cases.append((.openSSL, "sha256", encryptedHMACHex))
+#endif
+#if PARTOUT_CRYPTO_MBEDTLS
+    cases.append((.mbedTLS, "sha256", encryptedHMACHex))
+    cases.append((.native, "sha256", encryptedHMACHex))
+#endif
+    return cases
+}()
 
 struct CryptoCBCTests {
-    @Test(arguments: [
-        (nil as String?, "sha256", plainHMACHex),
-        ("aes-128-cbc", "sha256", encryptedHMACHex)
-    ])
-    func givenDecrypted_whenEncrypt_thenIsExpected(cipherName: String?, digestName: String, expected: String) throws {
-        let sut = try CryptoWrapper(withCBCCipherName: cipherName, digestName: digestName)
+    @Test(arguments: cryptoCBCEncryptCases)
+    func givenDecrypted_whenEncrypt_thenIsExpected(backend: CryptoWrapper.Backend, cipherName: String?, digestName: String, expected: String) throws {
+        let sut = try CryptoWrapper(backend, withCBCCipherName: cipherName, digestName: digestName)
         sut.configureEncryption(withCipherKey: cipherName != nil ? cipherKey : nil, hmacKey: hmacKey)
 
         let id = "\(cipherName ?? "nil"):\(digestName)"
@@ -30,12 +63,9 @@ struct CryptoCBCTests {
         }
     }
 
-    @Test(arguments: [
-        (nil as String?, "sha256", plainHMACHex, plainHex),
-        ("aes-128-cbc", "sha256", encryptedHMACHex, plainHex)
-    ])
-    func givenEncryptedWithHMAC_whenDecrypt_thenIsExpected(cipherName: String?, digestName: String, encrypted: String, expected: String) throws {
-        let sut = try CryptoWrapper(withCBCCipherName: cipherName, digestName: digestName)
+    @Test(arguments: cryptoCBCDecryptCases)
+    func givenEncryptedWithHMAC_whenDecrypt_thenIsExpected(backend: CryptoWrapper.Backend, cipherName: String?, digestName: String, encrypted: String, expected: String) throws {
+        let sut = try CryptoWrapper(backend, withCBCCipherName: cipherName, digestName: digestName)
         sut.configureDecryption(withCipherKey: cipherName != nil ? cipherKey : nil, hmacKey: hmacKey)
 
         let id = "\(cipherName ?? "nil"):\(digestName)"
@@ -47,12 +77,9 @@ struct CryptoCBCTests {
         }
     }
 
-    @Test(arguments: [
-        ("sha256", plainHMACHex),
-        ("sha256", encryptedHMACHex)
-    ])
-    func givenHMAC_whenVerify_thenSucceeds(digestName: String, encrypted: String) throws {
-        let sut = try CryptoWrapper(withCBCCipherName: nil, digestName: digestName)
+    @Test(arguments: cryptoCBCVerifyCases)
+    func givenHMAC_whenVerify_thenSucceeds(backend: CryptoWrapper.Backend, digestName: String, encrypted: String) throws {
+        let sut = try CryptoWrapper(backend, withCBCCipherName: nil, digestName: digestName)
         sut.configureDecryption(withCipherKey: nil, hmacKey: hmacKey)
 
         try flags.withUnsafeFlags { flags in

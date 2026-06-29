@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+internal import _PartoutCrypto_C
+
 // Use looper.schedule() for synchronization
 final class NegotiatorV3: @unchecked Sendable {
     struct Options {
@@ -19,6 +21,8 @@ final class NegotiatorV3: @unchecked Sendable {
     }
 
     private let ctx: PartoutLoggerContext
+
+    let fnt: pp_crypto_fnt
 
     private let parser = StandardOpenVPNParser(decrypter: nil)
 
@@ -72,6 +76,7 @@ final class NegotiatorV3: @unchecked Sendable {
 
     convenience init(
         _ ctx: PartoutLoggerContext,
+        fnt: pp_crypto_fnt,
         looper: FdLooper,
         remoteEndpoint: ExtendedEndpoint,
         channel: ControlChannelV3,
@@ -82,6 +87,7 @@ final class NegotiatorV3: @unchecked Sendable {
     ) {
         self.init(
             ctx,
+            fnt: fnt,
             key: 0,
             history: nil,
             renegotiation: nil,
@@ -97,6 +103,7 @@ final class NegotiatorV3: @unchecked Sendable {
 
     private init(
         _ ctx: PartoutLoggerContext,
+        fnt: pp_crypto_fnt,
         key: UInt8,
         history: NegotiationHistory?,
         renegotiation: RenegotiationType?,
@@ -109,6 +116,7 @@ final class NegotiatorV3: @unchecked Sendable {
         options: Options
     ) {
         self.ctx = ctx
+        self.fnt = fnt
         self.key = key
         self.history = history
         self.renegotiation = renegotiation
@@ -140,6 +148,7 @@ final class NegotiatorV3: @unchecked Sendable {
         let newKey = Constants.ControlChannel.nextKey(after: key)
         return NegotiatorV3(
             ctx,
+            fnt: fnt,
             key: newKey,
             history: history,
             renegotiation: newRenegotiation,
@@ -678,6 +687,7 @@ private extension NegotiatorV3 {
 //        pp_log(ctx, .openvpn, .info, "\tremoteSessionId: \(remoteSessionId.toHex())")
 
         let parameters = DataPathWrapper.Parameters(
+            fnt: fnt.enc,
             cipher: options.configuration.negotiatedDataChannelCipher(
                 with: history.pushReply.options,
                 serverOptions: authenticator?.serverOptions
@@ -688,6 +698,7 @@ private extension NegotiatorV3 {
             peerId: history.pushReply.options.peerId,
         )
         let prf = CryptoKeys.PRF(
+            fnt: fnt,
             handshake: handshake,
             sessionId: sessionId,
             remoteSessionId: remoteSessionId

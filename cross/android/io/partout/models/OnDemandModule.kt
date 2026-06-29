@@ -23,12 +23,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * On-demand settings.
  *
  * @param id 
  * @param policy 
- * @param withOtherNetworks 
  * @param withSSIDs 
+ * @param withOtherNetworks 
  */
 @Serializable
 
@@ -40,11 +40,11 @@ data class OnDemandModule (
     @Contextual @SerialName(value = "policy")
     val policy: OnDemandModulePolicy,
 
-    @SerialName(value = "withOtherNetworks")
-    val withOtherNetworks: kotlin.collections.Set<@Contextual OnDemandModuleOtherNetwork>,
-
     @SerialName(value = "withSSIDs")
-    val withSSIDs: kotlin.collections.Map<kotlin.String, kotlin.Boolean>
+    val withSSIDs: kotlin.collections.Map<kotlin.String, kotlin.Boolean>,
+
+    @SerialName(value = "withOtherNetworks")
+    val withOtherNetworks: kotlin.collections.Set<@Contextual OnDemandModuleOtherNetwork>
 
 ) {
 

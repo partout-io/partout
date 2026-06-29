@@ -270,8 +270,13 @@ actor WireGuardAdapter {
     private func configureSockets(for handle: Int32) throws -> [SocketDescriptor] {
         let descriptors = backend.socketDescriptors(handle)
             .filter { $0 >= 0 }
+        guard !descriptors.isEmpty else {
+#if os(Android)
+            pp_log(ctx, .wireguard, .fault, "Socket descriptors are empty")
+#endif
+            return []
+        }
         pp_log(ctx, .wireguard, .info, "Socket descriptors: \(descriptors)")
-        guard !descriptors.isEmpty else { return [] }
         try delegate?.adapterShouldConfigureSockets(self, descriptors: descriptors)
         return descriptors
     }

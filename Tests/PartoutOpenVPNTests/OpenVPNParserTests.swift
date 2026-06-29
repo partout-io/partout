@@ -319,6 +319,6 @@ private extension OpenVPNParserTests {
     }
 
     static func allParsers() -> [StandardOpenVPNParser] {
-        [StandardOpenVPNParser(decrypter: SimpleKeyDecrypter())]
+        [StandardOpenVPNParser(decrypter: SimpleKeyDecrypter(backend: .forTesting))]
     }
 }

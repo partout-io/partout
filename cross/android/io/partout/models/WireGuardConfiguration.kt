@@ -23,18 +23,20 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * Represents a WireGuard configuration.
  *
- * @param `interface` 
- * @param peers 
+ * @param `interface` The local interface.
+ * @param peers The peers.
  */
 @Serializable
 
 data class WireGuardConfiguration (
 
+    /* The local interface. */
     @SerialName(value = "interface")
     val `interface`: WireGuardLocalInterface,
 
+    /* The peers. */
     @SerialName(value = "peers")
     val peers: kotlin.collections.List<WireGuardRemoteInterface>
 
