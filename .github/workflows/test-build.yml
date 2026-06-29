@@ -1,9 +1,6 @@
 name: Test CMake Build
 
 on:
-  push:
-    branches:
-      - cojbdev/windows-port-m2
   workflow_dispatch:
 
 env:
