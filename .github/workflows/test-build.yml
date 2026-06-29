@@ -24,7 +24,8 @@ jobs:
           swift-build: ${{ env.SWIFT_BUILD }}
       - name: Build with CMake (no vendors)
         shell: pwsh
-        run: ./scripts/build.ps1 -gen -l -install $INSTALL_DIR
+        run: |
+          ./scripts/build.ps1 -gen -l -install $env:INSTALL_DIR
       # - name: Verify output
       #   shell: pwsh
       #   run: ./ci/verify-windows.ps1 $INSTALL_DIR
