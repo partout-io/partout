@@ -26,7 +26,7 @@ final class CryptoWrapper {
 #endif
 #if PARTOUT_CRYPTO_MBEDTLS
             case .mbedTLS:
-                pp_crypto_fnt_mbed()
+                pp_crypto_fnt_mbedtls()
             case .native:
                 pp_crypto_fnt_native()
 #endif

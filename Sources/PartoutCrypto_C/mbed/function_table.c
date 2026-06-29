@@ -34,7 +34,7 @@ char *_Nullable pp_mbed_tls_ca_md5(const pp_tls tls);
 
 #pragma clang assume_nonnull end
 
-pp_crypto_fnt pp_crypto_fnt_mbed(void) {
+pp_crypto_fnt pp_crypto_fnt_mbedtls(void) {
     pp_crypto_fnt table = {
         .name = "mbed",
 

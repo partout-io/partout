@@ -44,7 +44,7 @@ pp_crypto_fnt pp_crypto_fnt_native(void) {
         pp_windows_crypto_ctr_create,
         pp_windows_crypto_ctr_free
     };
-    pp_crypto_fnt table = pp_crypto_fnt_mbed();
+    pp_crypto_fnt table = pp_crypto_fnt_mbedtls();
     table.name = "native-windows";
     table.enc = enc;
     return table;

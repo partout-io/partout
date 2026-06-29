@@ -45,7 +45,7 @@ typedef struct {
 } pp_crypto_fnt;
 
 pp_crypto_fnt pp_crypto_fnt_openssl(void);
-pp_crypto_fnt pp_crypto_fnt_mbed(void);
+pp_crypto_fnt pp_crypto_fnt_mbedtls(void);
 pp_crypto_fnt pp_crypto_fnt_native(void);
 pp_crypto_fnt pp_crypto_fnt_mock(void);
 
