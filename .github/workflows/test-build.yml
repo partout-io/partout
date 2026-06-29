@@ -8,6 +8,8 @@ on:
 
 env:
   INSTALL_DIR: dist
+  SWIFT_VERSION: swift-6.3.2-release
+  SWIFT_BUILD: 6.3.2-RELEASE
 
 jobs:
   build_windows:
@@ -15,11 +17,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: compnerd/gha-setup-swift@main
         with:
-          swift-version: swift-6.3.2-release
-          swift-build: 6.3.2-RELEASE
+          swift-version: ${{ env.SWIFT_VERSION }}
+          swift-build: ${{ env.SWIFT_BUILD }}
       - name: Build with CMake (no vendors)
         shell: pwsh
         run: ./scripts/build.ps1 -gen -l -install $INSTALL_DIR
