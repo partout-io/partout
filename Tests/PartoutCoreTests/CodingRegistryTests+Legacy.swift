@@ -60,66 +60,6 @@ private extension CodingRegistryLegacyTests {
         ])
         return try builder.build()
     }
-
-    func expectedBuild4094Profile(
-        profileId: String,
-        dnsId: String,
-        ipId: String,
-        onDemandId: String,
-        httpProxyId: String,
-        openVPNId: String,
-        wireGuardId: String
-    ) throws -> Profile {
-        var openVPNBuilder = OpenVPN.Configuration.Builder()
-        openVPNBuilder.ca = OpenVPN.CryptoContainer(pem: "")
-        openVPNBuilder.cipher = .aes128cbc
-        openVPNBuilder.remotes = [
-            try ExtendedEndpoint("host.name", EndpointProtocol(.tcp, 80))
-        ]
-
-        var wireGuardBuilder = WireGuard.Configuration.Builder(privateKey: "")
-        wireGuardBuilder.peers = [WireGuard.RemoteInterface.Builder(publicKey: "")]
-
-        let modules: [Module] = [
-            try DNSModule.Builder(
-                id: requireUniqueID(dnsId),
-                servers: ["1.1.1.1"]
-            ).build(),
-            IPModule.Builder(
-                id: requireUniqueID(ipId),
-                ipv4: IPSettings(subnet: try Subnet("1.2.3.4", 16))
-            ).build(),
-            OnDemandModule.Builder(
-                id: requireUniqueID(onDemandId)
-            ).build(),
-            try HTTPProxyModule.Builder(
-                id: requireUniqueID(httpProxyId),
-                address: "1.1.1.1",
-                port: 1080
-            ).build(),
-            try OpenVPNModule.Builder(
-                id: requireUniqueID(openVPNId),
-                configurationBuilder: openVPNBuilder
-            ).build(),
-            try WireGuardModule.Builder(
-                id: requireUniqueID(wireGuardId),
-                configurationBuilder: wireGuardBuilder
-            ).build()
-        ]
-
-        return try Profile.Builder(
-            id: requireUniqueID(profileId),
-            modules: modules,
-            activatingModules: false
-        ).build()
-    }
-
-    func requireUniqueID(_ string: String) -> UniqueID {
-        guard let id = UniqueID(uuidString: string) else {
-            fatalError("Invalid fixture UUID: \(string)")
-        }
-        return id
-    }
 }
 
 private struct LegacyProfileFixture {
