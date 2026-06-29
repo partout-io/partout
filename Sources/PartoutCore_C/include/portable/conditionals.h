@@ -46,3 +46,9 @@
 #include <WS2tcpip.h>
 #include <Windows.h>
 #endif
+
+#if defined(PARTOUT_CRYPTO_OPENSSL) || defined(PARTOUT_CRYPTO_MBEDTLS)
+#define PARTOUT_HAS_CRYPTO 1
+#else
+#define PARTOUT_HAS_CRYPTO 0
+#endif

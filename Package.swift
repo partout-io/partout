@@ -15,7 +15,6 @@ let envDocs = env["PP_BUILD_DOCS"] == "1"
 
 // MARK: Configuration
 
-let areas = Area.allCases
 let cryptoLibraries: [CryptoLibrary] = [.openSSL]
 let openSSLVersion: Version = "3.6.300" // 3.6.2
 let wgGoVersion: Version = "0.0.20260530"
@@ -23,6 +22,10 @@ let wgGoVersion: Version = "0.0.20260530"
 let cmakeOutput = envCMakeOutput ?? "bin/darwin-arm64"
 let useFoundationCompatibility: FoundationCompatibility = .off
 // let useFoundationCompatibility: FoundationCompatibility = OS.current != .apple ? .on : .off
+
+let areas = Area.allCases.filter {
+    $0 != .openVPN || !cryptoLibraries.isEmpty
+}
 
 // MARK: - Package
 
@@ -71,14 +74,12 @@ let package = Package(
                 // These are always included
                 var list: [Target.Dependency] = [
                     "Partout_C",
+                    "PartoutCrypto_C",
                     "PartoutCore",
                     "PartoutOS"
                 ]
-                if !cryptoLibraries.isEmpty {
-                    list.append("PartoutCrypto_C")
-                    if areas.contains(.openVPN) {
-                        list.append("PartoutOpenVPN")
-                    }
+                if areas.contains(.openVPN) {
+                    list.append("PartoutOpenVPN")
                 }
                 if areas.contains(.wireGuard) {
                     list.append("PartoutWireGuard")
@@ -91,13 +92,11 @@ let package = Package(
             name: "Partout_C",
             dependencies: {
                 var list: [Target.Dependency] = [
+                    "PartoutCrypto_C",
                     "PartoutCore_C"
                 ]
-                if !cryptoLibraries.isEmpty {
-                    list.append("PartoutCrypto_C")
-                    if areas.contains(.openVPN) {
-                        list.append("PartoutOpenVPN_C")
-                    }
+                if areas.contains(.openVPN) {
+                    list.append("PartoutOpenVPN_C")
                 }
                 if areas.contains(.wireGuard) {
                     list.append("PartoutWireGuard_C")
@@ -105,9 +104,9 @@ let package = Package(
                 }
                 return list
             }(),
-            cSettings: globalCSettings + {
+            cSettings: globalCSettings + cryptoLibraries.cSettings + {
                 var list: [CSetting] = []
-                if areas.contains(.openVPN), !cryptoLibraries.isEmpty {
+                if areas.contains(.openVPN) {
                     list.append(.define("PARTOUT_OPENVPN"))
                 }
                 if areas.contains(.wireGuard) {
@@ -208,7 +207,7 @@ package.targets.append(contentsOf: [
 // MARK: OpenVPN
 
 // OpenVPN requires Crypto/TLS wrappers
-if areas.contains(.openVPN), !cryptoLibraries.isEmpty {
+if areas.contains(.openVPN) {
     package.products.append(
         .library(
             name: "PartoutOpenVPN",
@@ -348,45 +347,45 @@ for mode in cryptoLibraries {
 }
 
 // Include concrete crypto targets if supported
+package.targets.append(
+    .target(
+        name: "PartoutCrypto_C",
+        dependencies: cryptoDependencies,
+        exclude: {
+            // Pick current OS by removing it from exclusions
+            var list: [String] = []
+            if !cryptoLibraries.contains(.openSSL) {
+                list.append("openssl")
+            }
+            if !cryptoLibraries.contains(.mbedTLS) {
+                list.append("mbed")
+                list.append("native")
+            } else {
+                var native = Set(OS.nativeCryptoSources)
+                native.remove(OS.current.nativeCryptoSource)
+                let nativeSrc = native.map { "native/\($0.rawValue)" }
+                list.append(contentsOf: nativeSrc)
+            }
+            return list
+        }(),
+        cSettings: globalCSettings,
+        linkerSettings: {
+            var list: [LinkerSetting] = []
+            if cryptoLibraries.contains(.mbedTLS) {
+                list.append(.linkedLibrary("mbedx509"))
+                list.append(.linkedLibrary("mbedcrypto"))
+            }
+            return list
+        }()
+    )
+)
+package.products.append(
+    .library(
+        name: "PartoutCrypto",
+        targets: ["PartoutCrypto_C"]
+    )
+)
 if !cryptoLibraries.isEmpty {
-    package.targets.append(
-        .target(
-            name: "PartoutCrypto_C",
-            dependencies: cryptoDependencies,
-            exclude: {
-                // Pick current OS by removing it from exclusions
-                var list: [String] = []
-                if !cryptoLibraries.contains(.openSSL) {
-                    list.append("openssl")
-                }
-                if !cryptoLibraries.contains(.mbedTLS) {
-                    list.append("mbed")
-                    list.append("native")
-                } else {
-                    var native = Set(OS.nativeCryptoSources)
-                    native.remove(OS.current.nativeCryptoSource)
-                    let nativeSrc = native.map { "native/\($0.rawValue)" }
-                    list.append(contentsOf: nativeSrc)
-                }
-                return list
-            }(),
-            cSettings: globalCSettings,
-            linkerSettings: {
-                var list: [LinkerSetting] = []
-                if cryptoLibraries.contains(.mbedTLS) {
-                    list.append(.linkedLibrary("mbedx509"))
-                    list.append(.linkedLibrary("mbedcrypto"))
-                }
-                return list
-            }()
-        )
-    )
-    package.products.append(
-        .library(
-            name: "PartoutCrypto",
-            targets: ["PartoutCrypto_C"]
-        )
-    )
     package.targets.append(contentsOf: [
         .testTarget(
             name: "PartoutCryptoTests",
@@ -507,6 +506,12 @@ enum CryptoLibrary: Definable {
 }
 
 extension Collection where Element: Definable {
+    var cSettings: [CSetting] {
+        map {
+            .define($0.define)
+        }
+    }
+
     var swiftSettings: [SwiftSetting] {
         map {
             .define($0.define)

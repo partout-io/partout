@@ -59,9 +59,9 @@ Use one of the `scripts/build.*` variants based on the host platform:
 The script builds the vendors as static libraries and accepts a few options: 
 
 - `-gen`: Generate CMake metadata
-- `-config (Debug|Release)`: The CMake build type
+- `-config (Debug|Release)`: The CMake build type (`build.sh` only)
 - `-l`: Build the Partout library (opt-in)
-- `-crypto (openssl|native)`: Pick a crypto subsystem between OpenSSL and Native/MbedTLS (WIP)
+- `-crypto (openssl|native[,openssl|native...])`: Pick one or more crypto subsystems between OpenSSL and Native/MbedTLS
 - `-wireguard`: Enable support for WireGuard (requires Go)
 - `-android`: Build for Android
 - `-vendors [bundled|<url>]`: Build bundled vendors (requires submodules), or provide the prebuilt vendor URL for Android/Windows
