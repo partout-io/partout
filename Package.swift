@@ -85,9 +85,7 @@ let package = Package(
                 }
                 return list
             }(),
-            swiftSettings: areas.compactMap(\.define).map {
-                .define($0)
-            } + useFoundationCompatibility.swiftSettings
+            swiftSettings: areas.swiftSettings + useFoundationCompatibility.swiftSettings
         ),
         .target(
             name: "Partout_C",
@@ -228,7 +226,8 @@ if areas.contains(.openVPN), !cryptoLibraries.isEmpty {
             dependencies: [
                 "PartoutCore",
                 "PartoutOpenVPN_C"
-            ]
+            ],
+            swiftSettings: cryptoLibraries.swiftSettings
         ),
         .testTarget(
             name: "PartoutOpenVPNTests",
@@ -398,9 +397,7 @@ if !cryptoLibraries.isEmpty {
             exclude: [
                 "CryptoPerformanceTests.swift"
             ],
-            swiftSettings: cryptoLibraries.map {
-                .define($0.define)
-            }
+            swiftSettings: cryptoLibraries.swiftSettings
         )
     ])
 }
@@ -435,11 +432,15 @@ package.targets.append(contentsOf: [
 
 // MARK: - Configuration structures
 
-enum Area: CaseIterable {
+protocol Definable {
+    var define: String { get }
+}
+
+enum Area: Definable, CaseIterable {
     case openVPN
     case wireGuard
 
-    var define: String? {
+    var define: String {
         switch self {
         case .openVPN: "PARTOUT_OPENVPN"
         case .wireGuard: "PARTOUT_WIREGUARD"
@@ -493,7 +494,7 @@ enum OS: String, CaseIterable {
     }
 }
 
-enum CryptoLibrary {
+enum CryptoLibrary: Definable {
     case openSSL
     case mbedTLS
 
@@ -501,6 +502,14 @@ enum CryptoLibrary {
         switch self {
         case .openSSL: "PARTOUT_CRYPTO_OPENSSL"
         case .mbedTLS: "PARTOUT_CRYPTO_MBEDTLS"
+        }
+    }
+}
+
+extension Collection where Element: Definable {
+    var swiftSettings: [SwiftSetting] {
+        map {
+            .define($0.define)
         }
     }
 }

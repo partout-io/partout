@@ -201,6 +201,22 @@ if(PP_BUILD_USE_WIREGUARD)
         -DPARTOUT_WIREGUARD
     )
 endif()
+if(PP_BUILD_USE_OPENSSL)
+    target_compile_options(partout_c PRIVATE
+        -DPARTOUT_CRYPTO_OPENSSL
+    )
+    target_compile_options(partout PRIVATE
+        -DPARTOUT_CRYPTO_OPENSSL
+    )
+endif()
+if(PP_BUILD_USE_MBEDTLS)
+    target_compile_options(partout_c PRIVATE
+        -DPARTOUT_CRYPTO_MBEDTLS
+    )
+    target_compile_options(partout PRIVATE
+        -DPARTOUT_CRYPTO_MBEDTLS
+    )
+endif()
 
 # Set overall output properties
 set_target_properties(partout PROPERTIES
