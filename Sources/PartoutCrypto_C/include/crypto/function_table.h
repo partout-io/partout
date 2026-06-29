@@ -47,5 +47,6 @@ typedef struct {
 pp_crypto_function_table pp_crypto_function_table_openssl(void);
 pp_crypto_function_table pp_crypto_function_table_mbed(void);
 pp_crypto_function_table pp_crypto_function_table_native(void);
+pp_crypto_function_table pp_crypto_function_table_mock(void);
 
 #pragma clang assume_nonnull end
