@@ -7,28 +7,54 @@ env:
   INSTALL_DIR: dist
   SWIFT_VERSION: swift-6.3.2-release
   SWIFT_BUILD: 6.3.2-RELEASE
-  ARCH_WINDOWS: x64
 
 jobs:
-  build_windows:
-    name: Build for Windows x64
-    runs-on: windows-latest
+  build:
+    name: Build for ${{ matrix.name }}
+    runs-on: ${{ matrix.runs_on }}
     timeout-minutes: 10
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: Windows x64
+            runs_on: windows-latest
+            arch: x64
+          - name: Linux x64
+            runs_on: ubuntu-latest
+            arch: x64
     steps:
       - uses: actions/checkout@v7
       - name: Set up Visual Studio
+        if: runner.os == 'Windows'
         uses: egor-tensin/vs-shell@v2
         with:
-          arch: ${{ env.ARCH_WINDOWS }}
+          arch: ${{ matrix.arch }}
       - name: Set up Swift
         uses: compnerd/gha-setup-swift@main
         with:
           swift-version: ${{ env.SWIFT_VERSION }}
           swift-build: ${{ env.SWIFT_BUILD }}
+          cache: true
       - name: Build with CMake (no vendors)
+        if: runner.os == 'Windows'
         shell: pwsh
+        run: ./scripts/build.ps1 -gen -l -install $env:INSTALL_DIR
+      - name: Build with CMake (no vendors)
+        if: runner.os == 'Linux'
+        shell: bash
         run: |
-          ./scripts/build.ps1 -gen -l -install $env:INSTALL_DIR
+          # Swift action sets a wrong path, maybe the toolchain
+          # has changed its layout since the action was last updated
+          SWIFT_PATHS=("$HOME"/swift-*/usr/bin)
+          PATH="${SWIFT_PATHS[0]}:$PATH"
+          git submodule update --init cmake/swift
+          ./scripts/build.sh -gen -l -install "$INSTALL_DIR"
       - name: Verify output
+        if: runner.os == 'Windows'
         shell: pwsh
         run: ./ci/verify-windows.ps1 $env:INSTALL_DIR
+      - name: Verify output
+        if: runner.os == 'Linux'
+        shell: bash
+        run: ./ci/verify-linux.sh "$INSTALL_DIR"

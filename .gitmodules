@@ -6,4 +6,4 @@
 	url = https://github.com/openssl/openssl
 [submodule "swift-cmake-toolchains"]
 	path = cmake/swift
-	url = git@github.com:keeshux/swift-cmake-toolchains.git
+	url = https://github.com/keeshux/swift-cmake-toolchains
