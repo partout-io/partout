@@ -14,6 +14,7 @@
 #include <psa/crypto.h>
 #include "portable/common.h"
 #include "crypto/tls.h"
+#include "crypto_mbed_api.h"
 
 typedef struct {
     uint8_t *_Nullable bytes;
@@ -448,7 +449,7 @@ bool pp_mbed_tls_is_connected(pp_tls tls) {
 
 // MARK: - I/O
 
-pp_zd *_Nullable pp_mbed_tls_pull_cipher(pp_tls tls, pp_tls_error_code *_Nullable error) {
+pp_zd *pp_mbed_tls_pull_cipher(pp_tls tls, pp_tls_error_code *error) {
     pp_tls_set_error(error, PPTLSErrorNone);
 
     int ret = 0;
@@ -505,7 +506,7 @@ pp_zd *_Nullable pp_mbed_tls_pull_cipher(pp_tls tls, pp_tls_error_code *_Nullabl
     return cipher;
 }
 
-pp_zd *_Nullable pp_mbed_tls_pull_plain(pp_tls tls, pp_tls_error_code *_Nullable error) {
+pp_zd *pp_mbed_tls_pull_plain(pp_tls tls, pp_tls_error_code *error) {
     pp_tls_set_error(error, PPTLSErrorNone);
 
     pp_zd *plain = pp_tls_buffer_drain_zd(&tls->plain_out);
@@ -533,7 +534,7 @@ pp_zd *_Nullable pp_mbed_tls_pull_plain(pp_tls tls, pp_tls_error_code *_Nullable
 
 bool pp_mbed_tls_put_cipher(pp_tls tls,
                             const uint8_t *src, size_t src_len,
-                            pp_tls_error_code *_Nullable error) {
+                            pp_tls_error_code *error) {
     pp_tls_set_error(error, PPTLSErrorNone);
     pp_tls_buffer_append(&tls->cipher_in, src, src_len);
     return true;
@@ -541,7 +542,7 @@ bool pp_mbed_tls_put_cipher(pp_tls tls,
 
 bool pp_mbed_tls_put_plain(pp_tls tls,
                            const uint8_t *src, size_t src_len,
-                           pp_tls_error_code *_Nullable error) {
+                           pp_tls_error_code *error) {
     pp_tls_set_error(error, PPTLSErrorNone);
 
     size_t offset = 0;

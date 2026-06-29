@@ -7,6 +7,7 @@
 #include <openssl/hmac.h>
 #include "crypto/hmac.h"
 #include "portable/common.h"
+#include "crypto_openssl.h"
 
 #define HMACMaxLength    (size_t)128
 

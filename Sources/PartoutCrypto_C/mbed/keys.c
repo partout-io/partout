@@ -12,6 +12,7 @@
 #include <psa/crypto.h>
 #include "portable/common.h"
 #include "crypto/keys.h"
+#include "crypto_mbed_api.h"
 
 #define PP_MBED_DER_BUFFER_INITIAL 4096
 #define PP_MBED_DER_BUFFER_MAX (256 * 1024)

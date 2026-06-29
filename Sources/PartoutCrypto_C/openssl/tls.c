@@ -203,7 +203,7 @@ bool pp_openssl_tls_is_connected(pp_tls tls) {
 bool pp_tls_verify_ssl_eku(SSL *ssl);
 bool pp_tls_verify_ssl_san_host(SSL *ssl, const char *hostname);
 
-pp_zd *_Nullable pp_openssl_tls_pull_cipher(pp_tls tls, pp_tls_error_code *_Nullable error) {
+pp_zd *pp_openssl_tls_pull_cipher(pp_tls tls, pp_tls_error_code *error) {
     if (error) {
         *error = PPTLSErrorNone;
     }
@@ -241,7 +241,7 @@ pp_zd *_Nullable pp_openssl_tls_pull_cipher(pp_tls tls, pp_tls_error_code *_Null
     return pp_zd_create_from_data(tls->buf_cipher, ret);
 }
 
-pp_zd *_Nullable pp_openssl_tls_pull_plain(pp_tls tls, pp_tls_error_code *_Nullable error) {
+pp_zd *pp_openssl_tls_pull_plain(pp_tls tls, pp_tls_error_code *error) {
     const int ret = BIO_read(tls->bio_plain, tls->buf_plain, (int)tls->opt->buf_len);
     if (error) {
         *error = PPTLSErrorNone;
@@ -260,7 +260,7 @@ pp_zd *_Nullable pp_openssl_tls_pull_plain(pp_tls tls, pp_tls_error_code *_Nulla
 
 bool pp_openssl_tls_put_cipher(pp_tls tls,
                                const uint8_t *src, size_t src_len,
-                               pp_tls_error_code *_Nullable error) {
+                               pp_tls_error_code *error) {
     if (error) {
         *error = PPTLSErrorNone;
     }
@@ -276,7 +276,7 @@ bool pp_openssl_tls_put_cipher(pp_tls tls,
 
 bool pp_openssl_tls_put_plain(pp_tls tls,
                               const uint8_t *src, size_t src_len,
-                              pp_tls_error_code *_Nullable error) {
+                              pp_tls_error_code *error) {
     if (error) {
         *error = PPTLSErrorNone;
     }

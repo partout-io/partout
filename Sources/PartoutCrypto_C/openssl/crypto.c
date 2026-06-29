@@ -6,6 +6,7 @@
 
 #include <openssl/rand.h>
 #include "crypto/crypto.h"
+#include "crypto_openssl.h"
 
 bool pp_openssl_crypto_init_seed(const uint8_t *src, const size_t len) {
     unsigned char x[1];

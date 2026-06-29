@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include "portable/common.h"
 #include "crypto/crypto.h"
+#include "crypto_mbed_api.h"
 #include "crypto_aead_mbed.h"
 #include "hmac_mbed.h"
 

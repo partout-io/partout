@@ -186,7 +186,7 @@ size_t local_decrypt(void *vctx,
 pp_crypto_ctx pp_darwin_crypto_ctr_create(const char *cipher_name,
                                           const char *digest_name,
                                           size_t tag_len, size_t payload_len,
-                                          const pp_crypto_keys *_Nullable keys) {
+                                          const pp_crypto_keys *keys) {
     pp_assert(cipher_name && digest_name);
 
     size_t cipher_key_len = 0;

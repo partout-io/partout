@@ -10,6 +10,7 @@
 #include "portable/common.h"
 #include "crypto/hmac.h"
 #include "crypto/keys.h"
+#include "crypto_openssl.h"
 
 static
 char *pp_key_decrypted_from_pkey(const EVP_PKEY *_Nonnull key) {
