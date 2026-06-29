@@ -181,8 +181,6 @@ try {
     }
     if ($vendor_prebuilt_url) {
         $cmake_opts += "-DPP_BUILD_VENDOR_PREBUILT_URL=$vendor_prebuilt_url"
-    } elseif ($env:PP_BUILD_VENDOR_PREBUILT_URL) {
-        $cmake_opts += "-DPP_BUILD_VENDOR_PREBUILT_URL=$env:PP_BUILD_VENDOR_PREBUILT_URL"
     }
 
     if (-not (Test-Path -Path $build_dir)) {

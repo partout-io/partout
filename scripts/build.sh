@@ -211,8 +211,6 @@ if [[ -n $vendor_source ]]; then
 fi
 if [[ -n $vendor_prebuilt_url ]]; then
     cmake_opts+=("-DPP_BUILD_VENDOR_PREBUILT_URL=$vendor_prebuilt_url")
-elif [[ -n ${PP_BUILD_VENDOR_PREBUILT_URL:-} ]]; then
-    cmake_opts+=("-DPP_BUILD_VENDOR_PREBUILT_URL=$PP_BUILD_VENDOR_PREBUILT_URL")
 fi
 
 # On Linux, use custom toolchain
