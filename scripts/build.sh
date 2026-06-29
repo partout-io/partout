@@ -1,11 +1,13 @@
 #!/bin/bash
 set -e
-opt_configuration=Debug
 build_dir=.cmake
 bin_dir=bin
 swift_version=6.3.1
 vendor_source=
 vendor_prebuilt_url=
+crypto_selected=
+crypto_openssl=
+crypto_mbedtls=
 
 root_dir="$(dirname "$0")"/..
 pushd $root_dir
@@ -87,36 +89,59 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -install)
+            if [[ -z ${2:-} || $2 == -* ]]; then
+                echo "-install requires a value"
+                exit 1
+            fi
             install_dir=$2
-            mkdir $install_dir || true
+            mkdir -p "$install_dir"
             cmake_opts+=("-DCMAKE_INSTALL_PREFIX=$install_dir")
+            do_build=1
             shift
             shift
             ;;
         -crypto)
-            # openssl|native
-            case $2 in
-                openssl)
-                    cmake_opts+=("-DPP_BUILD_USE_OPENSSL=ON")
-                    cmake_opts+=("-DPP_BUILD_USE_MBEDTLS=OFF")
-                    ;;
-                native)
-                    cmake_opts+=("-DPP_BUILD_USE_OPENSSL=OFF")
-                    cmake_opts+=("-DPP_BUILD_USE_MBEDTLS=ON")
-                    ;;
-                *)
-                    echo "Unknown crypto '$2'"
-                    exit 1
-                    ;;
-            esac
+            # openssl|native, comma-separated
+            if [[ -z ${2:-} || $2 == -* ]]; then
+                echo "-crypto requires a value"
+                exit 1
+            fi
+            if [[ $2 == ,* || $2 == *, || $2 == *,,* ]]; then
+                echo "Empty crypto in '$2'"
+                exit 1
+            fi
+            crypto_selected=1
+            do_build=1
+            IFS=',' read -ra crypto_args <<< "$2"
+            for crypto in "${crypto_args[@]}"; do
+                crypto="${crypto//[[:space:]]/}"
+                case $crypto in
+                    openssl)
+                        crypto_openssl=1
+                        ;;
+                    native)
+                        crypto_mbedtls=1
+                        ;;
+                    "")
+                        echo "Empty crypto in '$2'"
+                        exit 1
+                        ;;
+                    *)
+                        echo "Unknown crypto '$crypto'"
+                        exit 1
+                        ;;
+                esac
+            done
             shift
             shift
             ;;
         -openvpn)
+            do_build=1
             cmake_opts+=("-DPP_BUILD_USE_OPENVPN=ON")
             shift
             ;;
         -wireguard)
+            do_build=1
             cmake_opts+=("-DPP_BUILD_USE_WIREGUARD=ON")
             shift
             ;;
@@ -165,6 +190,20 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 set -- "${positional_args[@]}"
+
+# Crypto
+if [[ $crypto_selected == 1 ]]; then
+    if [[ $crypto_openssl == 1 ]]; then
+        cmake_opts+=("-DPP_BUILD_USE_OPENSSL=ON")
+    else
+        cmake_opts+=("-DPP_BUILD_USE_OPENSSL=OFF")
+    fi
+    if [[ $crypto_mbedtls == 1 ]]; then
+        cmake_opts+=("-DPP_BUILD_USE_MBEDTLS=ON")
+    else
+        cmake_opts+=("-DPP_BUILD_USE_MBEDTLS=OFF")
+    fi
+fi
 
 # Vendor overrides
 if [[ -n $vendor_source ]]; then
