@@ -13,7 +13,8 @@ extension CrossZD {
     }
 
     func hmac(
-        with digestName: String,
+        _ fnt: pp_crypto_fnt,
+        digestName: String,
         secret: CrossZD,
         data: CrossZD
     ) throws -> CrossZD {
@@ -27,7 +28,7 @@ extension CrossZD {
                 data: data.mutableBytes,
                 data_len: data.count
             )
-            return pp_hmac_do(&ctx)
+            return fnt.hmac_do(&ctx)
         }
         guard hmacLength > 0 else {
             throw PPCryptoError.hmac

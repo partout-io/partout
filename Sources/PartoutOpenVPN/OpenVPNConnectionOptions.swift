@@ -4,6 +4,8 @@
 
 /// Intervals are expressed in seconds.
 public struct OpenVPNConnectionOptions: Sendable {
+    public var backend: CryptoBackend = .default
+
     public var maxPackets: Int = 100
 
     public var writeTimeout: TimeInterval = 5.0
@@ -29,3 +31,4 @@ public struct OpenVPNConnectionOptions: Sendable {
     public init() {
     }
 }
+

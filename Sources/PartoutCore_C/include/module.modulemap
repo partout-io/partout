@@ -1,18 +1,8 @@
-module _PartoutCrypto_C {
-    umbrella header "crypto/crypto.h"
-    export *
-}
-
 module _PartoutPortable_C {
     umbrella header "portable/portable.h"
     exclude header "portable/mux_posix.h"
     exclude header "portable/mux_windows.h"
     exclude header "portable/socket_posix.h"
     exclude header "portable/socket_windows.h"
-    export *
-}
-
-module _PartoutTLS_C {
-    umbrella header "tls/tls.h"
     export *
 }

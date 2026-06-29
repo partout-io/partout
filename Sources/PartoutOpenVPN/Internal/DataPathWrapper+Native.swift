@@ -11,7 +11,7 @@ extension DataPathWrapper {
     }
 
     static func native(with parameters: Parameters, prf: CryptoKeys.PRF, seed: CrossZD) throws -> DataPathWrapper {
-        pp_crypto_init_seed(seed.bytes, seed.count)
+        _ = parameters.fnt.init_seed(seed.bytes, seed.count)
         let keys = try CryptoKeys(withPRF: prf)
         return try .native(with: parameters, keys: keys)
     }
@@ -24,27 +24,33 @@ extension DataPathWrapper {
         let digestAlgorithm = parameters.digest?.rawValue.uppercased()
         let keysBridge = CryptoKeysBridge(keys: keys)
 
-        if let cipherAlgorithm, cipherAlgorithm.hasSuffix("-GCM") {
-            mode = keysBridge.withUnsafeKeys { keys in
-                cipherAlgorithm.withCString { cCipher in
-                    openvpn_dp_mode_ad_create_aead(
-                        cCipher,
-                        Constants.DataChannel.aeadTagLength,
-                        Constants.DataChannel.aeadIdLength,
-                        keys,
-                        parameters.compressionFraming.cNative
-                    )
+        mode = try withUnsafePointer(to: parameters.fnt) { cFnt in
+            // AEAD
+            if let cipherAlgorithm, cipherAlgorithm.hasSuffix("-GCM") {
+                return keysBridge.withUnsafeKeys { keys in
+                    cipherAlgorithm.withCString { cCipher in
+                        openvpn_dp_mode_ad_create_aead(
+                            cFnt,
+                            cCipher,
+                            Constants.DataChannel.aeadTagLength,
+                            Constants.DataChannel.aeadIdLength,
+                            keys,
+                            parameters.compressionFraming.cNative
+                        )
+                    }
                 }
             }
-        } else {
+            // CBC
             guard let digestAlgorithm else {
                 throw OpenVPNDataPathError.algorithm
             }
-            mode = try digestAlgorithm.withCString { cDigest in
+            return try digestAlgorithm.withCString { cDigest in
                 try keysBridge.withUnsafeKeys { keys in
+                    // CBC with cipher + digest
                     if let cipherAlgorithm {
                         return try cipherAlgorithm.withCString { cCipher in
                             let mode = openvpn_dp_mode_hmac_create_cbc(
+                                cFnt,
                                 cCipher,
                                 cDigest,
                                 keys,
@@ -55,23 +61,23 @@ extension DataPathWrapper {
                             }
                             return mode
                         }
-                    } else {
-                        return openvpn_dp_mode_hmac_create_cbc(
-                            nil,
-                            cDigest,
-                            keys,
-                            parameters.compressionFraming.cNative
-                        )
                     }
+                    // CBC with digest only
+                    return openvpn_dp_mode_hmac_create_cbc(
+                        cFnt,
+                        nil,
+                        cDigest,
+                        keys,
+                        parameters.compressionFraming.cNative
+                    )
                 }
             }
         }
-
         guard let mode else {
             throw OpenVPNDataPathError.creation
         }
 
-        // the encryption keys must match the cipher/digest
+        // The encryption keys must match the cipher/digest
         let crypto = mode.pointee.crypto.assumingMemoryBound(to: pp_crypto.self)
         let cipherKeyLength = crypto.pointee.meta.cipher_key_len
         let hmacKeyLength = crypto.pointee.meta.hmac_key_len

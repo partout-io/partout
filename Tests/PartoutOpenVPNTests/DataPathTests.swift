@@ -16,6 +16,8 @@ private let packetId: UInt32 = 0x1020
 private let payload = Data(hex: "11223344")
 
 struct DataPathTests {
+    private let fnt: pp_crypto_enc_fnt = .forTesting
+
     @Test(arguments: [
         // mock AD
         (nil as OpenVPN.Cipher?, nil as OpenVPN.Digest?, OpenVPN.CompressionFraming.disabled),
@@ -53,7 +55,7 @@ struct DataPathTests {
             precondition(cipher != nil)
             let keys = CryptoKeys(emptyWithCipherLength: 1024, hmacKeyLength: 1024)
             let cryptoAEAD = CryptoKeysBridge(keys: keys).withUnsafeKeys { keys in
-                pp_crypto_aead_create(cipher!.rawValue, 16, 4, keys)
+                fnt.aead_create(cipher!.rawValue, 16, 4, keys)
             }
             guard let cryptoAEAD else {
                 throw PPCryptoError.creation
@@ -63,7 +65,7 @@ struct DataPathTests {
             precondition(digest != nil)
             let keys = CryptoKeys(emptyWithCipherLength: 1024, hmacKeyLength: 1024)
             let cryptoCBC = CryptoKeysBridge(keys: keys).withUnsafeKeys { keys in
-                pp_crypto_cbc_create(cipher?.rawValue, digest!.rawValue, keys)
+                fnt.cbc_create(cipher?.rawValue, digest!.rawValue, keys)
             }
             guard let cryptoCBC else {
                 throw PPCryptoError.creation

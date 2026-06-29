@@ -4,7 +4,7 @@
 
 internal import _PartoutOpenVPN_C
 
-extension ControlChannel {
+extension OpenVPNTLS {
     final class CryptSerializer: ControlChannelSerializer {
         private let ctx: PartoutLoggerContext
 
@@ -22,7 +22,11 @@ extension ControlChannel {
 
         private let plain: PlainSerializer
 
-        init(_ ctx: PartoutLoggerContext, key: OpenVPN.StaticKey) throws {
+        init(
+            _ ctx: PartoutLoggerContext,
+            fnt: pp_crypto_enc_fnt,
+            key: OpenVPN.StaticKey,
+        ) throws {
             self.ctx = ctx
 
             let ctr = {
@@ -38,7 +42,7 @@ extension ControlChannel {
                 )
                 let keysBridge = CryptoKeysBridge(keys: keys)
                 return keysBridge.withUnsafeKeys {
-                    pp_crypto_ctr_create(
+                    fnt.ctr_create(
                         "AES-256-CTR",
                         "SHA256",
                         Constants.ControlChannel.ctrTagLength,

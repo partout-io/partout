@@ -2,15 +2,17 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-extension ControlChannel {
+internal import _PartoutCrypto_C
+
+extension OpenVPNTLS {
     final class CryptV2Serializer: ControlChannelSerializer {
         private let wrappedKey: Data
 
         private let serializer: CryptSerializer
 
-        init(_ ctx: PartoutLoggerContext, key: OpenVPN.StaticKey, wrappedKey: SecureData) throws {
+        init(_ ctx: PartoutLoggerContext, fnt: pp_crypto_enc_fnt, key: OpenVPN.StaticKey, wrappedKey: SecureData) throws {
             self.wrappedKey = wrappedKey.toData()
-            serializer = try CryptSerializer(ctx, key: key)
+            serializer = try CryptSerializer(ctx, fnt: fnt, key: key)
         }
 
         func reset() {
