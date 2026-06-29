@@ -93,13 +93,6 @@ while [[ $# -gt 0 ]]; do
             shift
             shift
             ;;
-        -a)
-            do_build=1
-            cmake_opts+=("-DPP_BUILD_LIBRARY=ON")
-            cmake_opts+=("-DPP_BUILD_USE_OPENVPN=ON")
-            cmake_opts+=("-DPP_BUILD_USE_WIREGUARD=ON")
-            shift
-            ;;
         -crypto)
             # openssl|native
             case $2 in
