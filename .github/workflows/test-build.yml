@@ -30,6 +30,6 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/build.ps1 -gen -l -install $env:INSTALL_DIR
-      # - name: Verify output
-      #   shell: pwsh
-      #   run: ./ci/verify-windows.ps1 $env:INSTALL_DIR
+      - name: Verify output
+        shell: pwsh
+        run: ./ci/verify-windows.ps1 $env:INSTALL_DIR
