@@ -4,7 +4,7 @@
 
 /// Intervals are expressed in seconds.
 public struct OpenVPNConnectionOptions: Sendable {
-    public var backend: CryptoBackend = .openSSL
+    public var backend: CryptoBackend = .default
 
     public var maxPackets: Int = 100
 

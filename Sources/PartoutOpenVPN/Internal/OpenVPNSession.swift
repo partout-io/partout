@@ -5,7 +5,7 @@
 internal import _PartoutCrypto_C
 
 // Hardcoded legacy
-private let legacyFNT = pp_crypto_fnt_openssl()
+private let legacyFNT = CryptoBackend.openSSL.functionTable
 
 /// Default implementation of `OpenVPNSessionProtocol`.
 @OpenVPNActor
