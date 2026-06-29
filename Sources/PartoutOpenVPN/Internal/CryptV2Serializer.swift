@@ -4,7 +4,7 @@
 
 internal import _PartoutCrypto_C
 
-extension ControlChannel {
+extension OpenVPNTLS {
     final class CryptV2Serializer: ControlChannelSerializer {
         private let wrappedKey: Data
 

@@ -30,7 +30,7 @@ final class ControlChannelV3 {
     private var sentDates: [UInt32: Date]
 
     convenience init(_ ctx: PartoutLoggerContext, prng: PRNGProtocol) {
-        self.init(ctx, prng: prng, serializer: ControlChannel.PlainSerializer(ctx))
+        self.init(ctx, prng: prng, serializer: OpenVPNTLS.PlainSerializer(ctx))
     }
 
     init(

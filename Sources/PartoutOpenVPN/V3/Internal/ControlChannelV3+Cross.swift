@@ -15,7 +15,7 @@ extension ControlChannelV3 {
         self.init(
             ctx,
             prng: prng,
-            serializer: try ControlChannel.AuthSerializer(ctx, fnt: fnt, digest: digest, key: key)
+            serializer: try OpenVPNTLS.AuthSerializer(ctx, fnt: fnt, digest: digest, key: key)
         )
     }
 
@@ -28,7 +28,7 @@ extension ControlChannelV3 {
         self.init(
             ctx,
             prng: prng,
-            serializer: try ControlChannel.CryptSerializer(ctx, fnt: fnt, key: key)
+            serializer: try OpenVPNTLS.CryptSerializer(ctx, fnt: fnt, key: key)
         )
     }
 
@@ -42,7 +42,7 @@ extension ControlChannelV3 {
         self.init(
             ctx,
             prng: prng,
-            serializer: try ControlChannel.CryptV2Serializer(ctx, fnt: fnt, key: key, wrappedKey: wrappedKey)
+            serializer: try OpenVPNTLS.CryptV2Serializer(ctx, fnt: fnt, key: key, wrappedKey: wrappedKey)
         )
     }
 }

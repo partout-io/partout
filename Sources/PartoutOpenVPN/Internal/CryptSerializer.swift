@@ -4,7 +4,7 @@
 
 internal import _PartoutOpenVPN_C
 
-extension ControlChannel {
+extension OpenVPNTLS {
     final class CryptSerializer: ControlChannelSerializer {
         private let ctx: PartoutLoggerContext
 
