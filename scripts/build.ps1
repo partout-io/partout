@@ -27,6 +27,8 @@ Push-Location $root_dir
 try {
     $build_dir = ".cmake"
     $bin_dir = "bin"
+    $configuration = "Debug"
+    $generator = "Ninja Multi-Config"
     $swift_version = "6.3.1"
     $vendor_source = $null
     $vendor_prebuilt_url = $null
@@ -212,16 +214,16 @@ try {
 
     if ($gen_build) {
         Update-CMakeFileList
-        $configure_args = @("-G", "Ninja", "-S", ".", "-B", $build_dir) + $cmake_opts
+        $configure_args = @("-G", $generator, "-S", ".", "-B", $build_dir) + $cmake_opts
         & cmake @configure_args
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
 
     if ($do_build) {
-        & cmake --build $build_dir
+        & cmake --build $build_dir --config $configuration
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         if ($install_dir) {
-            & cmake --install $build_dir
+            & cmake --install $build_dir --config $configuration
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         }
     }
