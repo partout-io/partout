@@ -1,0 +1,34 @@
+name: Test CMake Build
+
+on:
+  workflow_dispatch:
+
+env:
+  INSTALL_DIR: dist
+  SWIFT_VERSION: swift-6.3.2-release
+  SWIFT_BUILD: 6.3.2-RELEASE
+  ARCH_WINDOWS: x64
+
+jobs:
+  build_windows:
+    name: Build for Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Visual Studio
+        uses: egor-tensin/vs-shell@v2
+        with:
+          arch: ${{ env.ARCH_WINDOWS }}
+      - name: Set up Swift
+        uses: compnerd/gha-setup-swift@main
+        with:
+          swift-version: ${{ env.SWIFT_VERSION }}
+          swift-build: ${{ env.SWIFT_BUILD }}
+      - name: Build with CMake (no vendors)
+        shell: pwsh
+        run: |
+          ./scripts/build.ps1 -gen -l -install $env:INSTALL_DIR
+      - name: Verify output
+        shell: pwsh
+        run: ./ci/verify-windows.ps1 $env:INSTALL_DIR
