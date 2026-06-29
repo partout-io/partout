@@ -7,8 +7,6 @@ import PartoutCore
 @testable import PartoutOpenVPN
 import Testing
 
-private let fnt = CryptoBackend.default.functionTable.enc
-
 private func cryptoFree(_: pp_crypto_ctx) {
 }
 
@@ -18,6 +16,8 @@ private let packetId: UInt32 = 0x1020
 private let payload = Data(hex: "11223344")
 
 struct DataPathTests {
+    private let fnt: pp_crypto_enc_fnt = .forTesting
+
     @Test(arguments: [
         // mock AD
         (nil as OpenVPN.Cipher?, nil as OpenVPN.Digest?, OpenVPN.CompressionFraming.disabled),

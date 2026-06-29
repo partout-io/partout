@@ -2,14 +2,15 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+import _PartoutCrypto_C
 import PartoutCore
 @testable import PartoutOpenVPN
 import Testing
 
-private let fnt = CryptoBackend.default.functionTable.enc
-
 @OpenVPNActor
 struct ControlChannelTests {
+    private let fnt: pp_crypto_enc_fnt = .forTesting
+
     @Test
     func givenChannel_whenHandleSequence_thenIsReordered() {
         let seq1: [UInt32] = [0, 5, 2, 1, 4, 3]
