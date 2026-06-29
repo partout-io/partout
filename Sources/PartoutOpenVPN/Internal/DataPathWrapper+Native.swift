@@ -11,7 +11,7 @@ extension DataPathWrapper {
     }
 
     static func native(with parameters: Parameters, prf: CryptoKeys.PRF, seed: CrossZD) throws -> DataPathWrapper {
-        pp_crypto_init_seed(seed.bytes, seed.count)
+        _ = parameters.fnt.init_seed(seed.bytes, seed.count)
         let keys = try CryptoKeys(withPRF: prf)
         return try .native(with: parameters, keys: keys)
     }
@@ -27,13 +27,16 @@ extension DataPathWrapper {
         if let cipherAlgorithm, cipherAlgorithm.hasSuffix("-GCM") {
             mode = keysBridge.withUnsafeKeys { keys in
                 cipherAlgorithm.withCString { cCipher in
-                    openvpn_dp_mode_ad_create_aead(
-                        cCipher,
-                        Constants.DataChannel.aeadTagLength,
-                        Constants.DataChannel.aeadIdLength,
-                        keys,
-                        parameters.compressionFraming.cNative
-                    )
+                    withUnsafePointer(to: parameters.fnt) { cFnt in
+                        openvpn_dp_mode_ad_create_aead(
+                            cFnt,
+                            cCipher,
+                            Constants.DataChannel.aeadTagLength,
+                            Constants.DataChannel.aeadIdLength,
+                            keys,
+                            parameters.compressionFraming.cNative
+                        )
+                    }
                 }
             }
         } else {
@@ -44,24 +47,30 @@ extension DataPathWrapper {
                 try keysBridge.withUnsafeKeys { keys in
                     if let cipherAlgorithm {
                         return try cipherAlgorithm.withCString { cCipher in
-                            let mode = openvpn_dp_mode_hmac_create_cbc(
-                                cCipher,
+                            try withUnsafePointer(to: parameters.fnt) { cFnt in
+                                let mode = openvpn_dp_mode_hmac_create_cbc(
+                                    cFnt,
+                                    cCipher,
+                                    cDigest,
+                                    keys,
+                                    parameters.compressionFraming.cNative
+                                )
+                                guard let mode else {
+                                    throw OpenVPNDataPathError.algorithm
+                                }
+                                return mode
+                            }
+                        }
+                    } else {
+                        return withUnsafePointer(to: parameters.fnt) { cFnt in
+                            openvpn_dp_mode_hmac_create_cbc(
+                                cFnt,
+                                nil,
                                 cDigest,
                                 keys,
                                 parameters.compressionFraming.cNative
                             )
-                            guard let mode else {
-                                throw OpenVPNDataPathError.algorithm
-                            }
-                            return mode
                         }
-                    } else {
-                        return openvpn_dp_mode_hmac_create_cbc(
-                            nil,
-                            cDigest,
-                            keys,
-                            parameters.compressionFraming.cNative
-                        )
                     }
                 }
             }

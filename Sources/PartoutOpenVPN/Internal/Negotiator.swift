@@ -2,6 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+internal import _PartoutCrypto_C
+
+// Hardcoded legacy
+private let legacyFNT = pp_crypto_fnt_openssl()
+
 @OpenVPNActor
 final class Negotiator {
     struct Options {
@@ -684,6 +689,7 @@ private extension Negotiator {
 //        pp_log(ctx, .openvpn, .info, "\tremoteSessionId: \(remoteSessionId.toHex())")
 
         let parameters = DataPathWrapper.Parameters(
+            fnt: legacyFNT.enc,
             cipher: options.configuration.negotiatedDataChannelCipher(
                 with: history.pushReply.options,
                 serverOptions: authenticator?.serverOptions
@@ -694,6 +700,7 @@ private extension Negotiator {
             peerId: history.pushReply.options.peerId,
         )
         let prf = CryptoKeys.PRF(
+            fnt: legacyFNT,
             handshake: handshake,
             sessionId: sessionId,
             remoteSessionId: remoteSessionId

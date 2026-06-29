@@ -6,6 +6,8 @@ import PartoutCore
 @testable import PartoutOpenVPN
 import Testing
 
+private let fnt = CryptoBackend.default.functionTable.enc
+
 @OpenVPNActor
 struct ControlChannelTests {
     @Test
@@ -47,12 +49,14 @@ struct ControlChannelTests {
         let keyData = Data((0..<256).map(UInt8.init))
         let clientChannel = try ControlChannel(
             .global,
+            fnt: fnt,
             prng: MockPRNG(),
             authKey: .init(data: keyData, direction: .client),
             digest: .sha256
         )
         let serverChannel = try ControlChannel(
             .global,
+            fnt: fnt,
             prng: MockPRNG(),
             authKey: .init(data: keyData, direction: .server),
             digest: .sha256
@@ -82,11 +86,13 @@ struct ControlChannelTests {
         let keyData = Data((0..<256).map(UInt8.init))
         let clientChannel = try ControlChannel(
             .global,
+            fnt: fnt,
             prng: MockPRNG(),
             cryptKey: .init(data: keyData, direction: .client)
         )
         let serverChannel = try ControlChannel(
             .global,
+            fnt: fnt,
             prng: MockPRNG(),
             cryptKey: .init(data: keyData, direction: .server)
         )
@@ -115,6 +121,7 @@ struct ControlChannelTests {
         let wrappedKey = SecureData(Data([0xde, 0xad, 0xbe, 0xef]))
         let channel = try ControlChannel(
             .global,
+            fnt: fnt,
             prng: MockPRNG(),
             cryptV2Key: .init(data: Data((0..<256).map(UInt8.init)), direction: .client),
             wrappedKey: wrappedKey
@@ -138,6 +145,7 @@ struct ControlChannelTests {
         let wrappedKey = SecureData(Data([0xca, 0xfe, 0xba, 0xbe]))
         let channel = try ControlChannel(
             .global,
+            fnt: fnt,
             prng: MockPRNG(),
             cryptV2Key: .init(data: Data((0..<256).map(UInt8.init)), direction: .client),
             wrappedKey: wrappedKey

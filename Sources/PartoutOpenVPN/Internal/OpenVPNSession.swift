@@ -2,6 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+internal import _PartoutCrypto_C
+
+// Hardcoded legacy
+private let legacyFNT = pp_crypto_fnt_openssl()
+
 /// Default implementation of `OpenVPNSessionProtocol`.
 @OpenVPNActor
 final class OpenVPNSession {
@@ -115,7 +120,8 @@ final class OpenVPNSession {
 
         controlChannel = try Self.newControlChannel(
             ctx,
-            with: prng,
+            fnt: legacyFNT.enc,
+            prng: prng,
             configuration: configuration
         )
         negotiators = [:]
@@ -297,6 +303,7 @@ extension OpenVPNSession {
             }
         )
         let tlsParameters = TLSWrapper.Parameters(
+            fnt: legacyFNT.tls,
             cachesURL: cachesURL,
             cfg: configuration,
             onVerificationFailure: { [weak self] in
@@ -497,7 +504,8 @@ private extension OpenVPNSession {
 private extension OpenVPNSession {
     static func newControlChannel(
         _ ctx: PartoutLoggerContext,
-        with prng: PRNGProtocol,
+        fnt: pp_crypto_enc_fnt,
+        prng: PRNGProtocol,
         configuration: OpenVPN.Configuration
     ) throws -> ControlChannel {
         let channel: ControlChannel
@@ -506,6 +514,7 @@ private extension OpenVPNSession {
             case .auth:
                 channel = try ControlChannel(
                     ctx,
+                    fnt: fnt,
                     prng: prng,
                     authKey: tlsWrap.key,
                     digest: configuration.fallbackDigest
@@ -514,6 +523,7 @@ private extension OpenVPNSession {
             case .crypt:
                 channel = try ControlChannel(
                     ctx,
+                    fnt: fnt,
                     prng: prng,
                     cryptKey: tlsWrap.key
                 )
@@ -524,6 +534,7 @@ private extension OpenVPNSession {
                 }
                 channel = try ControlChannel(
                     ctx,
+                    fnt: fnt,
                     prng: prng,
                     cryptV2Key: tlsWrap.key,
                     wrappedKey: wrappedKey

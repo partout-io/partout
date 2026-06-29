@@ -7,6 +7,8 @@ import PartoutCore
 @testable import PartoutOpenVPN
 import Testing
 
+private let fnt = CryptoBackend.default.functionTable.enc
+
 private func cryptoFree(_: pp_crypto_ctx) {
 }
 
@@ -53,7 +55,7 @@ struct DataPathTests {
             precondition(cipher != nil)
             let keys = CryptoKeys(emptyWithCipherLength: 1024, hmacKeyLength: 1024)
             let cryptoAEAD = CryptoKeysBridge(keys: keys).withUnsafeKeys { keys in
-                pp_crypto_aead_create(cipher!.rawValue, 16, 4, keys)
+                fnt.aead_create(cipher!.rawValue, 16, 4, keys)
             }
             guard let cryptoAEAD else {
                 throw PPCryptoError.creation
@@ -63,7 +65,7 @@ struct DataPathTests {
             precondition(digest != nil)
             let keys = CryptoKeys(emptyWithCipherLength: 1024, hmacKeyLength: 1024)
             let cryptoCBC = CryptoKeysBridge(keys: keys).withUnsafeKeys { keys in
-                pp_crypto_cbc_create(cipher?.rawValue, digest!.rawValue, keys)
+                fnt.cbc_create(cipher?.rawValue, digest!.rawValue, keys)
             }
             guard let cryptoCBC else {
                 throw PPCryptoError.creation

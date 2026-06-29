@@ -2,9 +2,12 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+internal import _PartoutCrypto_C
+
 /// Default implementation of `OpenVPNSessionProtocol`.
 final class OpenVPNSessionV3: @unchecked Sendable {
     let ctx: PartoutLoggerContext
+    private let fnt: pp_crypto_fnt
     private let configuration: OpenVPN.Configuration
     private let credentials: OpenVPN.Credentials?
     private let prng: PRNGProtocol
@@ -42,6 +45,7 @@ final class OpenVPNSessionV3: @unchecked Sendable {
 
      - Parameters:
        - ctx: The context.
+       - fnt: The crypto function table.
        - configuration: The `Configuration` to use for this session.
        - credentials: The optional credentials.
        - prng: The pseudo-random number generator.
@@ -54,6 +58,7 @@ final class OpenVPNSessionV3: @unchecked Sendable {
      */
     init(
         _ ctx: PartoutLoggerContext,
+        fnt: pp_crypto_fnt,
         configuration: OpenVPN.Configuration,
         credentials: OpenVPN.Credentials?,
         prng: PRNGProtocol,
@@ -63,6 +68,7 @@ final class OpenVPNSessionV3: @unchecked Sendable {
         dpFactory: @escaping DataPathFactory
     ) throws {
         self.ctx = ctx
+        self.fnt = fnt
         self.configuration = configuration
         self.credentials = try credentials?.forAuthentication()
         self.prng = prng
@@ -76,7 +82,8 @@ final class OpenVPNSessionV3: @unchecked Sendable {
         queue.setSpecific(key: queueKey, value: ())
         controlChannel = try Self.newControlChannel(
             ctx,
-            with: prng,
+            fnt: fnt.enc,
+            prng: prng,
             configuration: configuration
         )
         sessionState = .stopped(IdleContext(withLocalOptions: true))
@@ -344,6 +351,7 @@ extension OpenVPNSessionV3 {
             }
         )
         let tlsParameters = TLSWrapper.Parameters(
+            fnt: fnt.tls,
             cachesURL: cachesURL,
             cfg: configuration,
             onVerificationFailure: { [weak self] in
@@ -355,6 +363,7 @@ extension OpenVPNSessionV3 {
         let tls = try tlsFactory(tlsParameters)
         return NegotiatorV3(
             ctx,
+            fnt: fnt,
             looper: looper,
             remoteEndpoint: remoteEndpoint,
             channel: controlChannel,
@@ -528,7 +537,8 @@ private extension OpenVPNSessionV3 {
 private extension OpenVPNSessionV3 {
     static func newControlChannel(
         _ ctx: PartoutLoggerContext,
-        with prng: PRNGProtocol,
+        fnt: pp_crypto_enc_fnt,
+        prng: PRNGProtocol,
         configuration: OpenVPN.Configuration
     ) throws -> ControlChannelV3 {
         let channel: ControlChannelV3
@@ -537,6 +547,7 @@ private extension OpenVPNSessionV3 {
             case .auth:
                 channel = try ControlChannelV3(
                     ctx,
+                    fnt: fnt,
                     prng: prng,
                     authKey: tlsWrap.key,
                     digest: configuration.fallbackDigest
@@ -544,6 +555,7 @@ private extension OpenVPNSessionV3 {
             case .crypt:
                 channel = try ControlChannelV3(
                     ctx,
+                    fnt: fnt,
                     prng: prng,
                     cryptKey: tlsWrap.key
                 )
@@ -553,6 +565,7 @@ private extension OpenVPNSessionV3 {
                 }
                 channel = try ControlChannelV3(
                     ctx,
+                    fnt: fnt,
                     prng: prng,
                     cryptV2Key: tlsWrap.key,
                     wrappedKey: wrappedKey

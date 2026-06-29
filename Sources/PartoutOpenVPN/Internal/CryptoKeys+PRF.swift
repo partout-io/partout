@@ -6,15 +6,15 @@ internal import _PartoutOpenVPN_C
 
 extension CryptoKeys {
     struct PRF {
+        let fnt: pp_crypto_fnt
         let handshake: Handshake
-
         let sessionId: Data
-
         let remoteSessionId: Data
     }
 
     init(withPRF prf: PRF) throws {
         let masterData = try Self.prfData(with: PRFInput(
+            fnt: prf.fnt,
             label: Constants.Keys.label1,
             secret: prf.handshake.preMaster,
             clientSeed: prf.handshake.random1,
@@ -24,6 +24,7 @@ extension CryptoKeys {
             size: Constants.Keys.preMasterLength
         ))
         let keysData = try Self.prfData(with: PRFInput(
+            fnt: prf.fnt,
             label: Constants.Keys.label2,
             secret: masterData,
             clientSeed: prf.handshake.random2,
@@ -54,18 +55,13 @@ extension CryptoKeys {
 // MARK: - Helpers
 
 private struct PRFInput {
+    let fnt: pp_crypto_fnt
     let label: String
-
     let secret: CrossZD
-
     let clientSeed: CrossZD
-
     let serverSeed: CrossZD
-
     let clientSessionId: Data?
-
     let serverSessionId: Data?
-
     let size: Int
 }
 
@@ -85,8 +81,8 @@ private extension CryptoKeys {
         let secret1 = input.secret.withOffset(0, count: lenx)
         let secret2 = input.secret.withOffset(len, count: lenx)
 
-        let hash1 = try keysHash("MD5", secret1, seed, input.size)
-        let hash2 = try keysHash("SHA1", secret2, seed, input.size)
+        let hash1 = try keysHash(input.fnt, "MD5", secret1, seed, input.size)
+        let hash2 = try keysHash(input.fnt, "SHA1", secret2, seed, input.size)
 
         let prf = CZ()
         for i in 0..<hash1.count {
@@ -97,13 +93,19 @@ private extension CryptoKeys {
         return prf
     }
 
-    static func keysHash(_ digestName: String, _ secret: CrossZD, _ seed: CrossZD, _ size: Int) throws -> CrossZD {
+    static func keysHash(
+        _ fnt: pp_crypto_fnt,
+        _ digestName: String,
+        _ secret: CrossZD,
+        _ seed: CrossZD,
+        _ size: Int
+    ) throws -> CrossZD {
         let out = CZ()
         let buffer = CrossZD.forHMAC()
-        var chain = try buffer.hmac(with: digestName, secret: secret, data: seed)
+        var chain = try buffer.hmac(fnt, digestName: digestName, secret: secret, data: seed)
         while out.count < size {
-            out.append(try buffer.hmac(with: digestName, secret: secret, data: chain.appending(seed)))
-            chain = try buffer.hmac(with: digestName, secret: secret, data: chain)
+            out.append(try buffer.hmac(fnt, digestName: digestName, secret: secret, data: chain.appending(seed)))
+            chain = try buffer.hmac(fnt, digestName: digestName, secret: secret, data: chain)
         }
         return out.withOffset(0, count: size)
     }

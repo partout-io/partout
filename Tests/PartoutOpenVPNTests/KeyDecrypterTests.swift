@@ -46,7 +46,7 @@ struct KeyDecrypterTests {
 
 private extension KeyDecrypterTests {
     func newDecrypter() -> SimpleKeyDecrypter {
-        SimpleKeyDecrypter()
+        SimpleKeyDecrypter(backend: .default)
     }
 
     func path(withName name: String) throws -> String {
