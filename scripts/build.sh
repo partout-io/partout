@@ -8,8 +8,34 @@ vendor_prebuilt_url=
 crypto_selected=
 crypto_openssl=
 crypto_mbedtls=
+script_dir="$(dirname "$0")"
 
-root_dir="$(dirname "$0")"/..
+print_common_help() {
+    cat "$script_dir/build-help.txt"
+}
+
+print_help() {
+    cat <<EOF
+Usage: scripts/build.sh [options]
+
+Options:
+EOF
+    print_common_help
+    cat <<EOF
+
+build.sh only:
+  -gen-models [all|swift|kotlin|cpp]
+                                  Generate OpenAPI models
+  -config Debug|Release          Set the CMake build type
+EOF
+}
+
+if [[ $# -eq 0 ]]; then
+    print_help
+    exit 0
+fi
+
+root_dir="$script_dir"/..
 pushd $root_dir
 
 generate_swift_models() {

@@ -3,6 +3,26 @@ $ErrorActionPreference = "Stop"
 $script_dir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
 $root_dir = Resolve-Path (Join-Path $script_dir "..")
 
+function Show-CommonHelp {
+    foreach ($line in Get-Content -Path (Join-Path $script_dir "build-help.txt")) {
+        Write-Host $line
+    }
+}
+
+function Show-Help {
+    @"
+Usage: scripts/build.ps1 [options]
+
+Options:
+"@ | Write-Host
+    Show-CommonHelp
+}
+
+if ($args.Count -eq 0) {
+    Show-Help
+    exit 0
+}
+
 Push-Location $root_dir
 try {
     $build_dir = ".cmake"
