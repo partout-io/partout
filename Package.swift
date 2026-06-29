@@ -105,7 +105,7 @@ let package = Package(
                 }
                 return list
             }(),
-            cSettings: globalCSettings + {
+            cSettings: globalCSettings + cryptoLibraries.cSettings + {
                 var list: [CSetting] = []
                 if areas.contains(.openVPN), !cryptoLibraries.isEmpty {
                     list.append(.define("PARTOUT_OPENVPN"))
@@ -507,6 +507,12 @@ enum CryptoLibrary: Definable {
 }
 
 extension Collection where Element: Definable {
+    var cSettings: [CSetting] {
+        map {
+            .define($0.define)
+        }
+    }
+
     var swiftSettings: [SwiftSetting] {
         map {
             .define($0.define)
