@@ -5,6 +5,7 @@
  */
 
 #include "crypto/crypto.h"
+#include "crypto_darwin.h"
 
 bool pp_darwin_crypto_init_seed(const uint8_t *src, const size_t len) {
     (void)src;

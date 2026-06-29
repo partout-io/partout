@@ -12,6 +12,7 @@
 #include <CommonCrypto/CommonRandom.h>
 #include <stdbool.h>
 #include <strings.h>
+#include "crypto/crypto_base.h"
 #include "portable/common.h"
 
 #pragma clang assume_nonnull begin
@@ -23,6 +24,20 @@ typedef struct {
     CCHmacAlgorithm algorithm;
     size_t length;
 } pp_cc_digest;
+
+bool pp_darwin_crypto_init_seed(const uint8_t *src, const size_t len);
+
+pp_crypto_ctx _Nullable pp_darwin_crypto_cbc_create(const char *_Nullable cipher_name,
+                                                    const char *digest_name,
+                                                    const pp_crypto_keys *_Nullable keys);
+void pp_darwin_crypto_cbc_free(pp_crypto_ctx ctx);
+
+pp_crypto_ctx _Nullable pp_darwin_crypto_ctr_create(const char *cipher_name,
+                                                    const char *digest_name,
+                                                    size_t tag_len,
+                                                    size_t payload_len,
+                                                    const pp_crypto_keys *_Nullable keys);
+void pp_darwin_crypto_ctr_free(pp_crypto_ctx ctx);
 
 static inline
 bool pp_cc_digest_by_name(const char *name, pp_cc_digest *digest) {

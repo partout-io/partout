@@ -406,14 +406,11 @@ set(PARTOUT_C_SOURCES
 ./PartoutCrypto_C/mbed/tls.c
 ./PartoutCrypto_C/mock/function_table.c
 ./PartoutCrypto_C/native/darwin/crypto.c
-./PartoutCrypto_C/native/darwin/crypto_aead.c
 ./PartoutCrypto_C/native/darwin/crypto_cbc.c
 ./PartoutCrypto_C/native/darwin/crypto_ctr.c
 ./PartoutCrypto_C/native/darwin/function_table.c
 ./PartoutCrypto_C/native/darwin/hmac.c
-./PartoutCrypto_C/native/linux/crypto.c
 ./PartoutCrypto_C/native/linux/function_table.c
-./PartoutCrypto_C/native/linux/hmac.c
 ./PartoutCrypto_C/native/windows/crypto.c
 ./PartoutCrypto_C/native/windows/crypto_aead.c
 ./PartoutCrypto_C/native/windows/crypto_cbc.c

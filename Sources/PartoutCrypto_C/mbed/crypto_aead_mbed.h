@@ -11,6 +11,7 @@
 #include "portable/common.h"
 #include "crypto/crypto_base.h"
 #include "hmac_mbed.h"
+#include "crypto_aead_mbed_api.h"
 
 #define PP_MBED_AEAD_AES_BLOCK_SIZE (size_t)16
 #define PP_MBED_AEAD_GCM_IV_LENGTH (size_t)12

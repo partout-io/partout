@@ -204,9 +204,9 @@ size_t local_decrypt(void *vctx,
 
 // MARK: -
 
-pp_crypto_ctx pp_darwin_crypto_cbc_create(const char *cipher_name,
+pp_crypto_ctx pp_darwin_crypto_cbc_create(const char *_Nullable cipher_name,
                                           const char *digest_name,
-                                          const pp_crypto_keys *keys) {
+                                          const pp_crypto_keys *_Nullable keys) {
     pp_assert(digest_name);
 
     size_t cipher_key_len = 0;
