@@ -43,6 +43,10 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
+          # Swift action sets a wrong path, maybe the toolchain
+          # has changed its layout since the action was last updated
+          SWIFT_PATHS=("$HOME"/swift-*/usr/bin)
+          PATH="${SWIFT_PATHS[0]}:$PATH"
           git submodule update --init cmake/swift
           ./scripts/build.sh -gen -l -install "$INSTALL_DIR"
       - name: Verify output
