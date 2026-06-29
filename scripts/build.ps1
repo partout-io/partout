@@ -27,7 +27,7 @@ Push-Location $root_dir
 try {
     $build_dir = ".cmake"
     $bin_dir = "bin"
-    $configuration = "Debug"
+    $configuration = "Release"
     $generator = "Ninja Multi-Config"
     $swift_version = "6.3.1"
     $vendor_source = $null
@@ -82,26 +82,6 @@ try {
         "./" + ($relative -replace "\\", "/")
     }
 
-    function Update-CMakeFileList {
-        $sources_dir = (Resolve-Path "Sources").Path
-        $swift_files = Get-ChildItem -Path $sources_dir -Recurse -File |
-            Where-Object { $_.Extension -eq ".swift" } |
-            ForEach-Object { Get-SourceRelativePath $sources_dir $_ } |
-            Sort-Object
-        $c_files = Get-ChildItem -Path $sources_dir -Recurse -File |
-            Where-Object { $_.Extension -eq ".c" -or $_.Extension -eq ".cc" } |
-            ForEach-Object { Get-SourceRelativePath $sources_dir $_ } |
-            Sort-Object
-
-        $lines = @("set(PARTOUT_SOURCES")
-        $lines += $swift_files
-        $lines += ")"
-        $lines += "set(PARTOUT_C_SOURCES"
-        $lines += $c_files
-        $lines += ")"
-        Set-Content -Path (Join-Path $sources_dir "files.cmake") -Value $lines -Encoding ASCII
-    }
-
     $index = 0
     while ($index -lt $args.Count) {
         switch ($args[$index]) {
@@ -137,6 +117,8 @@ try {
             }
             "-l" {
                 $cmake_opts += "-DPP_BUILD_LIBRARY=ON"
+                $cmake_opts += "-DCMAKE_C_COMPILER=clang"
+                $cmake_opts += "-DCMAKE_CXX_COMPILER=clang"
                 $do_build = $true
                 $index += 1
             }
@@ -213,7 +195,6 @@ try {
     }
 
     if ($gen_build) {
-        Update-CMakeFileList
         $configure_args = @("-G", $generator, "-S", ".", "-B", $build_dir) + $cmake_opts
         & cmake @configure_args
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

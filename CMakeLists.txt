@@ -111,7 +111,6 @@ function(partout_use_homebrew_formula formula)
 endfunction()
 
 # Options
-message(STATUS "Option CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 message(STATUS "Option PP_BUILD_LIBRARY = ${PP_BUILD_LIBRARY}")
 message(STATUS "Option PP_BUILD_STATIC = ${PP_BUILD_STATIC}")
 message(STATUS "Option PP_BUILD_USE_OPENSSL = ${PP_BUILD_USE_OPENSSL}")
