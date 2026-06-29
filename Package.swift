@@ -15,7 +15,6 @@ let envDocs = env["PP_BUILD_DOCS"] == "1"
 
 // MARK: Configuration
 
-let areas = Area.allCases
 let cryptoLibraries: [CryptoLibrary] = [.openSSL]
 let openSSLVersion: Version = "3.6.300" // 3.6.2
 let wgGoVersion: Version = "0.0.20260530"
@@ -23,6 +22,10 @@ let wgGoVersion: Version = "0.0.20260530"
 let cmakeOutput = envCMakeOutput ?? "bin/darwin-arm64"
 let useFoundationCompatibility: FoundationCompatibility = .off
 // let useFoundationCompatibility: FoundationCompatibility = OS.current != .apple ? .on : .off
+
+let areas = Area.allCases.filter {
+    $0 != .openVPN || !cryptoLibraries.isEmpty
+}
 
 // MARK: - Package
 
@@ -75,19 +78,15 @@ let package = Package(
                     "PartoutCore",
                     "PartoutOS"
                 ]
-                if !cryptoLibraries.isEmpty {
-                    if areas.contains(.openVPN) {
-                        list.append("PartoutOpenVPN")
-                    }
+                if areas.contains(.openVPN) {
+                    list.append("PartoutOpenVPN")
                 }
                 if areas.contains(.wireGuard) {
                     list.append("PartoutWireGuard")
                 }
                 return list
             }(),
-            swiftSettings: areas.compactMap {
-                $0.define(cryptoLibraries)
-            } + useFoundationCompatibility.swiftSettings
+            swiftSettings: areas.swiftSettings + useFoundationCompatibility.swiftSettings
         ),
         .target(
             name: "Partout_C",
@@ -96,10 +95,8 @@ let package = Package(
                     "PartoutCrypto_C",
                     "PartoutCore_C"
                 ]
-                if !cryptoLibraries.isEmpty {
-                    if areas.contains(.openVPN) {
-                        list.append("PartoutOpenVPN_C")
-                    }
+                if areas.contains(.openVPN) {
+                    list.append("PartoutOpenVPN_C")
                 }
                 if areas.contains(.wireGuard) {
                     list.append("PartoutWireGuard_C")
@@ -109,7 +106,7 @@ let package = Package(
             }(),
             cSettings: globalCSettings + cryptoLibraries.cSettings + {
                 var list: [CSetting] = []
-                if areas.contains(.openVPN), !cryptoLibraries.isEmpty {
+                if areas.contains(.openVPN) {
                     list.append(.define("PARTOUT_OPENVPN"))
                 }
                 if areas.contains(.wireGuard) {
@@ -210,7 +207,7 @@ package.targets.append(contentsOf: [
 // MARK: OpenVPN
 
 // OpenVPN requires Crypto/TLS wrappers
-if areas.contains(.openVPN), !cryptoLibraries.isEmpty {
+if areas.contains(.openVPN) {
     package.products.append(
         .library(
             name: "PartoutOpenVPN",
@@ -438,14 +435,14 @@ protocol Definable {
     var define: String { get }
 }
 
-enum Area: CaseIterable {
+enum Area: Definable, CaseIterable {
     case openVPN
     case wireGuard
 
-    func define(_ cryptoLibraries: [CryptoLibrary]) -> SwiftSetting? {
+    var define: String {
         switch self {
-        case .openVPN: !cryptoLibraries.isEmpty ? .define("PARTOUT_OPENVPN") : nil
-        case .wireGuard: .define("PARTOUT_WIREGUARD")
+        case .openVPN: "PARTOUT_OPENVPN"
+        case .wireGuard: "PARTOUT_WIREGUARD"
         }
     }
 }
