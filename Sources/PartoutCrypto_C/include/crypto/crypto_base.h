@@ -23,8 +23,6 @@ size_t pp_crypto_encryption_base_capacity(size_t size, size_t overhead) {
     return 2 * size + PP_CRYPTO_MAX_BLOCK_SIZE + overhead;
 }
 
-bool pp_crypto_init_seed(const uint8_t *src, const size_t len);
-
 typedef enum {
     PPCryptoErrorNone,
     PPCryptoErrorEncryption,
@@ -184,8 +182,7 @@ void pp_assert_decryption_length(size_t out_len, size_t in_len) {
 
 /* Function table. */
 
-typedef bool (*pp_crypto_init_seed_fn)(const uint8_t *src,
-                                       const size_t len);
+typedef bool (*pp_crypto_init_seed_fn)(const uint8_t *src, const size_t len);
 
 typedef pp_crypto_ctx _Nullable (*pp_crypto_aead_create_fn)(const char *cipher_name,
                                                             size_t tag_len,
