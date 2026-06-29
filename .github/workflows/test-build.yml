@@ -35,6 +35,7 @@ jobs:
         with:
           swift-version: ${{ env.SWIFT_VERSION }}
           swift-build: ${{ env.SWIFT_BUILD }}
+          cache: true
       - name: Build with CMake (no vendors)
         if: runner.os == 'Windows'
         shell: pwsh
