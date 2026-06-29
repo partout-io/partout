@@ -6,6 +6,6 @@
 
 #include "crypto/function_table.h"
 
-pp_crypto_function_table pp_crypto_function_table_native(void) {
-    return pp_crypto_function_table_mbed();
+pp_crypto_fnt pp_crypto_fnt_native(void) {
+    return pp_crypto_fnt_mbed();
 }

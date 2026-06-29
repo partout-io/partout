@@ -57,8 +57,8 @@ char *_Nullable pp_openssl_tls_ca_md5(const pp_tls tls);
 
 #pragma clang assume_nonnull end
 
-pp_crypto_function_table pp_crypto_function_table_openssl(void) {
-    pp_crypto_function_table table = {
+pp_crypto_fnt pp_crypto_fnt_openssl(void) {
+    pp_crypto_fnt table = {
         .name = "openssl",
 
         .enc = {

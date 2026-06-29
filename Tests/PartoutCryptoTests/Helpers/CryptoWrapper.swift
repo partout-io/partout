@@ -16,25 +16,25 @@ final class CryptoWrapper {
         case native
 #endif
 
-        var functionTable: pp_crypto_function_table {
+        var functionTable: pp_crypto_fnt {
             switch self {
             case .mock:
-                pp_crypto_function_table_mock()
+                pp_crypto_fnt_mock()
 #if PARTOUT_CRYPTO_OPENSSL
             case .openSSL:
-                pp_crypto_function_table_openssl()
+                pp_crypto_fnt_openssl()
 #endif
 #if PARTOUT_CRYPTO_MBEDTLS
             case .mbedTLS:
-                pp_crypto_function_table_mbed()
+                pp_crypto_fnt_mbed()
             case .native:
-                pp_crypto_function_table_native()
+                pp_crypto_fnt_native()
 #endif
             }
         }
     }
 
-    private let tbl: pp_enc_function_table
+    private let tbl: pp_crypto_enc_fnt
     private let ptr: pp_crypto_ctx
     private let free_fn: pp_crypto_free_fn
 

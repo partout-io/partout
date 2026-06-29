@@ -192,8 +192,8 @@ static char *_Nullable pp_mock_tls_ca_md5(const pp_tls tls) {
 
 #pragma clang assume_nonnull end
 
-pp_crypto_function_table pp_crypto_function_table_mock(void) {
-    pp_crypto_function_table table = {
+pp_crypto_fnt pp_crypto_fnt_mock(void) {
+    pp_crypto_fnt table = {
         .name = "mock",
         .enc = {
             .init_seed = pp_mock_crypto_init_seed,
