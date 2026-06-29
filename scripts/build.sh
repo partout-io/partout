@@ -23,7 +23,7 @@ EOF
     print_common_help
     cat <<EOF
   -gen-models [all|swift|kotlin|cpp]
-                                  Generate OpenAPI models
+                                 Generate OpenAPI models (requires java)
   -config Debug|Release          Set the CMake build type
 EOF
 }
