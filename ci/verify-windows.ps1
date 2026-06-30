@@ -63,7 +63,7 @@ Write-Host "Using dumpbin: $dumpbin"
 Write-Host "Verifying install directory: $installRoot"
 
 $requiredArtifacts = @(
-    "bin\libpartout.dll",
+    "bin\partout.dll",
     "bin\wintun.dll",
     "lib\partout.lib"
 )

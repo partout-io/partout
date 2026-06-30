@@ -82,7 +82,7 @@ bin/linux-aarch64/libpartout.so
 # Android
 bin/android-aarch64/libpartout.so
 # Windows
-bin/windows-arm64/libpartout.dll
+bin/windows-arm64/partout.dll
 ```
 
 Partout must be bundled with the shared vendored libraries to work. On Windows, it must also include the Swift runtime DLLs. Building for Android requires access to the Android NDK and the Swift Android SDK.

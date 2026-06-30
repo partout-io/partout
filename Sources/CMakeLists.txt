@@ -237,10 +237,7 @@ set_target_properties(partout_c PROPERTIES
 )
 
 # Platform specifics
-if(WIN32)
-    set_target_properties(partout_c PROPERTIES PREFIX "lib")
-    set_target_properties(partout PROPERTIES PREFIX "lib")
-else()
+if(NOT WIN32)
     if(APPLE)
         set(RPATH_ORIGIN "@loader_path")
     else()
