@@ -10,7 +10,7 @@
 
 _The easiest way to build cross-platform tunnel apps_.
 
-Partout is a _multilanguage_ library using [Swift][swift] and C at its core. It provides VPN functionality through the [Network Extension][network-extension] framework on Apple platforms, but it partially works on Android, Linux, and Windows (with [Wintun][wintun]). I'm documenting the long journey of making Partout fully cross-platform [in a blog series][blog], where I write about the challenges of Swift on non-Apple targets, and how I'm overcoming them.
+Partout (French: /paʁtu/) is a _multilanguage_ library using [Swift][swift] and C at its core. It provides VPN functionality through the [Network Extension][network-extension] framework on Apple platforms, but it partially works on Android, Linux, and Windows (with [Wintun][wintun]). I'm documenting the long journey of making Partout fully cross-platform [in a blog series][blog], where I write about the challenges of Swift on non-Apple targets, and how I'm overcoming them.
 
 Partout is the backbone of [Passepartout][passepartout]. The footprint is kept in check on non-Apple platforms by reimplementing a small subset of Swift Foundation in the `MiniFoundation` targets.
 
