@@ -17,7 +17,7 @@ let envDocs = env["PP_BUILD_DOCS"] == "1"
 
 let cryptoLibraries: [CryptoLibrary] = [.openSSL]
 let openSSLVersion: Version = "3.6.300" // 3.6.2
-let wgGoVersion: Version = "0.0.20260530"
+let wgGoVersion: Version = "0.0.20260703"
 // Local CMake output is only required for generated wg-go and wintun artifacts.
 let cmakeOutput = envCMakeOutput ?? "bin/darwin-arm64"
 let useFoundationCompatibility: FoundationCompatibility = .off

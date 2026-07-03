@@ -13,7 +13,7 @@
  * when built as monolith in CMake. The library is dynamic everywhere
  * else.
  */
-#include "wg_go.h"
+#include <wg_go/wg_go.h>
 
 int pp_wg_init(void) {
     pp_clog_v(PPLogCategoryWireGuard, PPLogLevelInfo, "wg-go version: %s", pp_wg_version());
