@@ -25,7 +25,7 @@ public protocol NEProtocolEncoder: Sendable {
     /// Purges stale data from existing profiles.
     /// - Parameters:
     ///   - managers: The list of `NETunnelProviderManager` to review for potentially stale data.
-    func purge(managers: [NETunnelProviderManager]) async
+    func purge(managers: [NETunnelProviderManager]) async -> [Profile]
 }
 
 /// Decodes a `Profile` for use in Network Extension.
