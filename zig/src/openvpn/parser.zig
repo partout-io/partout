@@ -597,7 +597,7 @@ const Builder = struct {
         self.configuration.xor_method = null;
         if (std.ascii.eqlIgnoreCase(components[1], "xormask")) {
             if (components.len > 2) self.configuration.xor_method = .{ .xormask = .{
-                .mask = (try api.SecureData.parseRawAlloc(allocator, components[2])) orelse return error.MalformedOption,
+                .mask = try api.SecureData.initBytesAlloc(allocator, components[2]),
             } };
         } else if (std.ascii.eqlIgnoreCase(components[1], "xorptrpos")) {
             self.configuration.xor_method = .{ .xorptrpos = .{} };
@@ -605,7 +605,7 @@ const Builder = struct {
             self.configuration.xor_method = .{ .reverse = .{} };
         } else if (std.ascii.eqlIgnoreCase(components[1], "obfuscate")) {
             if (components.len > 2) self.configuration.xor_method = .{ .obfuscate = .{
-                .mask = (try api.SecureData.parseRawAlloc(allocator, components[2])) orelse return error.MalformedOption,
+                .mask = try api.SecureData.initBytesAlloc(allocator, components[2]),
             } };
         }
     }
@@ -777,10 +777,9 @@ fn ipv4MaskPrefix(mask: []const u8) ?u8 {
 }
 
 fn parseStaticKeyData(allocator: std.mem.Allocator, lines: []const []u8) ParseError!api.SecureData {
-    return .{
-        .base64 = try parseStaticKeyHex(allocator, lines),
-        .owned = true,
-    };
+    const hex = try parseStaticKeyHex(allocator, lines);
+    defer allocator.free(hex);
+    return (try api.SecureData.parseHexAlloc(allocator, hex)) orelse error.MalformedOption;
 }
 
 fn parseStaticKeyHex(allocator: std.mem.Allocator, lines: []const []u8) ParseError![]u8 {
@@ -821,33 +820,27 @@ fn parseCryptV2Key(allocator: std.mem.Allocator, lines: []const []u8) ParseError
         if (in_key) try base64.appendSlice(allocator, line);
     }
 
-    const decoded_size = std.base64.standard.Decoder.calcSizeForSlice(base64.items) catch return error.MalformedOption;
-    if (decoded_size < 256) return error.MalformedOption;
-    const decoded = try allocator.alloc(u8, decoded_size);
+    var encoded = (try api.SecureData.parseRawAlloc(allocator, base64.items)) orelse return error.MalformedOption;
+    defer encoded.deinit(allocator);
+    const decoded = encoded.bytesAlloc(allocator) catch |err| return switch (err) {
+        error.OutOfMemory => error.OutOfMemory,
+        else => error.MalformedOption,
+    };
     defer allocator.free(decoded);
-    std.base64.standard.Decoder.decode(decoded, base64.items) catch return error.MalformedOption;
+    if (decoded.len <= 256) return error.MalformedOption;
 
-    const static_hex = try std.fmt.allocPrint(allocator, "{x}", .{decoded[0..256]});
-    errdefer allocator.free(static_hex);
-    const wrapped_hex = if (decoded.len > 256)
-        try std.fmt.allocPrint(allocator, "{x}", .{decoded[256..]})
-    else
-        null;
-    errdefer if (wrapped_hex) |value| allocator.free(value);
+    var static_key = try api.SecureData.initBytesAlloc(allocator, decoded[0..256]);
+    errdefer static_key.deinit(allocator);
+    var wrapped_key = try api.SecureData.initBytesAlloc(allocator, decoded[256..]);
+    errdefer wrapped_key.deinit(allocator);
 
     return .{
         .strategy = .cryptV2,
         .key = .{
-            .data = .{
-                .base64 = static_hex,
-                .owned = true,
-            },
+            .data = static_key,
             .dir = .client,
         },
-        .wrapped_key = if (wrapped_hex) |value| .{
-            .base64 = value,
-            .owned = true,
-        } else null,
+        .wrapped_key = wrapped_key,
     };
 }
 

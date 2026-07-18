@@ -182,11 +182,41 @@ test "parses IPv6 subnets" {
 test "formats subnet network addresses" {
     try expectNetworkRaw("192.168.12.34/24", "192.168.12.0/24");
     try expectNetworkRaw("2001:db8:abcd:1234::1/64", "2001:db8:abcd:1234::/64");
+
+    const allocator = std.testing.allocator;
+    const ipv4 = api.Subnet.parseRaw("192.168.12.34/24").?;
+    const mask = try ipv4.ipv4MaskAlloc(allocator);
+    defer allocator.free(mask);
+    try std.testing.expectEqualStrings("255.255.255.0", mask);
+
+    const ipv6 = api.Subnet.parseRaw("2001:db8::/64").?;
+    try std.testing.expectError(error.InvalidModel, ipv6.ipv4MaskAlloc(allocator));
 }
 
 test "round-trips secure data" {
     try expectRoundTrip(api.SecureData, "\"MTIzNDU2\"");
     try std.testing.expect(api.SecureData.parseRaw("not base64") == null);
+
+    const allocator = std.testing.allocator;
+    var data = try api.SecureData.initBytesAlloc(allocator, "123456");
+    defer data.deinit(allocator);
+    try std.testing.expectEqualStrings("MTIzNDU2", data.base64);
+
+    const bytes = try data.bytesAlloc(allocator);
+    defer allocator.free(bytes);
+    try std.testing.expectEqualStrings("123456", bytes);
+
+    const hex = try data.hexAlloc(allocator);
+    defer allocator.free(hex);
+    try std.testing.expectEqualStrings("313233343536", hex);
+
+    var from_hex = (try api.SecureData.parseHexAlloc(allocator, hex)).?;
+    defer from_hex.deinit(allocator);
+    try std.testing.expectEqualStrings(data.base64, from_hex.base64);
+    try std.testing.expect((try api.SecureData.parseHexAlloc(allocator, "zz")) == null);
+
+    const malformed = api.SecureData{ .base64 = "%%%%" };
+    try std.testing.expectError(error.InvalidModel, malformed.bytesAlloc(allocator));
 }
 
 test "round-trips single-string API values" {
