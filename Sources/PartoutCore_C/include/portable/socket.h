@@ -39,11 +39,7 @@ static inline pp_reachability pp_reachability_none(void) {
 }
 
 #if PARTOUT_ANDROID
-int android_getaddrinfofornetwork(uint64_t network_handle,
-                                  const char *hostname,
-                                  const char *_Nullable service,
-                                  const struct addrinfo *_Nullable hints,
-                                  struct addrinfo *_Nullable *_Nonnull infoptr);
+#include <android/multinetwork.h>
 #endif
 
 static inline int pp_dns_resolve(const char *hostname,
