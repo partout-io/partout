@@ -28,7 +28,7 @@ typedef enum {
 typedef const char *pp_log_category;
 extern pp_log_category PPLogCategoryCore;
 
-extern bool partout_log_enabled(void);
+// extern bool partout_log_enabled(void);
 extern void partout_log(pp_log_category category,
                         pp_log_level level,
                         const char *message);
