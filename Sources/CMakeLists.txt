@@ -65,14 +65,10 @@ else()
         PartoutOpenVPN_C\/
     )
 endif()
-if(PP_BUILD_USE_WIREGUARD)
-    list(APPEND PARTOUT_C_INCLUDE_DIRS
-        ${CMAKE_CURRENT_SOURCE_DIR}/PartoutWireGuardBackend_C/include
-    )
-else()
+if(NOT PP_BUILD_USE_WIREGUARD)
     list(APPEND EXCLUDED_PATTERNS
         PartoutWireGuard\/
-        PartoutWireGuardBackend_C\/
+        PartoutWireGuard_C\/backend[.]c
     )
 endif()
 

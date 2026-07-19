@@ -71,8 +71,8 @@ static pp_socket pp_socket_create(pp_socket_fd fd) {
 }
 
 /* Open a socket to an IP address, an UDP/TCP protocol, and a port. Set
- * the non-blocking flag as an option. Beware with Swift Concurrency that
- * this function is blocking regardless of the blocking argument. */
+ * the non-blocking flag as an option, though the DNS resolution may
+ * block regardless. */
 pp_socket pp_socket_open(const char *ip_addr,
                          pp_socket_proto proto,
                          uint16_t port,

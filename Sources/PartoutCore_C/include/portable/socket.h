@@ -5,11 +5,14 @@
  */
 
 #pragma once
-#include "portable/conditionals.h"
+#include "conditionals.h"
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#if !PARTOUT_WINDOWS
+#include <netdb.h>
+#endif
 #include "portable/common.h"
 
 #pragma clang assume_nonnull begin
@@ -33,6 +36,33 @@ static inline pp_reachability pp_reachability_none(void) {
     };
 #endif
     return none;
+}
+
+#if PARTOUT_ANDROID
+int android_getaddrinfofornetwork(uint64_t network_handle,
+                                  const char *hostname,
+                                  const char *_Nullable service,
+                                  const struct addrinfo *_Nullable hints,
+                                  struct addrinfo *_Nullable *_Nonnull infoptr);
+#endif
+
+static inline int pp_dns_resolve(const char *hostname,
+                                 const struct addrinfo *_Nullable hints,
+                                 const pp_reachability *_Nullable reachability,
+                                 struct addrinfo *_Nullable *_Nonnull infoptr) {
+#if PARTOUT_ANDROID
+    if (!reachability || reachability->network_handle == 0) {
+        return EAI_FAIL;
+    }
+    return android_getaddrinfofornetwork(reachability->network_handle,
+                                         hostname,
+                                         NULL,
+                                         hints,
+                                         infoptr);
+#else
+    (void)reachability;
+    return getaddrinfo(hostname, NULL, hints, infoptr);
+#endif
 }
 
 /* The available protocols. */

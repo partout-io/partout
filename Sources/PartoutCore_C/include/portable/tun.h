@@ -5,7 +5,7 @@
  */
 
 #pragma once
-#include "portable/conditionals.h"
+#include "conditionals.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -65,9 +65,9 @@ static inline int pp_tun_handle_result(int ret) {
 /* Tunnel controller. */
 typedef struct {
     void *_Nullable ctx;
-    void (*on_reachability)(void *ctx, const pp_reachability *reachability);
-    void (*on_better_path)(void *ctx);
-    char *_Nullable (*_Nonnull environment_value)(void *ctx, const char *key);
+    void (*on_reachability)(void *_Nullable ctx, const pp_reachability *reachability);
+    void (*on_better_path)(void *_Nullable ctx);
+    char *_Nullable (*_Nonnull environment_value)(void *_Nullable ctx, const char *key);
 } pp_tun_ctrl_delegate;
 void pp_tun_ctrl_set_delegate(void *_Nullable ref,
                               const pp_tun_ctrl_delegate *_Nullable delegate);

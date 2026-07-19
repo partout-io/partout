@@ -10,7 +10,7 @@
 #include "endian.h"
 #include "lib.h"
 #include "mux.h"
-#include "network.h"
+#include "network.h" // FIXME: ###, Deprecated
 #include "prng.h"
 #include "socket.h"
 #include "tun.h"

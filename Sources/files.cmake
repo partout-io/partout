@@ -435,7 +435,7 @@ set(PARTOUT_C_SOURCES
 ./PartoutOpenVPN_C/mss_fix.c
 ./PartoutOpenVPN_C/pkt_proc.c
 ./PartoutOpenVPN_C/test/crypto_mock.c
-./PartoutWireGuardBackend_C/backend.c
+./PartoutWireGuard_C/backend.c
 ./PartoutWireGuard_C/key.c
 ./PartoutWireGuard_C/logging.c
 ./PartoutWireGuard_C/x25519.c
