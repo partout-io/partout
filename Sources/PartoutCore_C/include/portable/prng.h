@@ -5,7 +5,7 @@
  */
 
 #pragma once
-#include "portable/conditionals.h"
+#include "conditionals.h"
 
 #include <stdbool.h>
 #include <stddef.h>

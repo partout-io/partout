@@ -8,6 +8,7 @@
 //  SPDX-License-Identifier: MIT
 //  Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
+internal import _PartoutPortable_C
 internal import _PartoutWireGuard_C
 
 final class TunnelRemoteInfoGenerator: Sendable {
@@ -322,7 +323,7 @@ private extension Endpoint {
             }
         }
 
-        let errorCode = getaddrinfo(hostname, "\(port)", &hints, &resultPointer)
+        let errorCode = pp_dns_resolve(hostname, "\(port)", &hints, nil, &resultPointer)
         if errorCode != 0 {
             throw PartoutError(.dnsFailure)
         }

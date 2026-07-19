@@ -63,16 +63,13 @@ public final class NativeTunnelController: TunnelController, Sendable {
         var delegate = pp_tun_ctrl_delegate(
             ctx: .fromSelf(self),
             on_reachability: { ctx, reachability in
-                let this = ctx.toSelf
-                this.onReachability(reachability)
+                ctx?.toSelf.onReachability(reachability)
             },
             on_better_path: { ctx in
-                let this = ctx.toSelf
-                this.onBetterPath()
+                ctx?.toSelf.onBetterPath()
             },
             environment_value: { ctx, key in
-                let this = ctx.toSelf
-                guard let data = this.environmentData(forKey: String(cString: key)),
+                guard let data = ctx?.toSelf.environmentData(forKey: String(cString: key)),
                       let json = String(data: data, encoding: .utf8) else {
                     return nil
                 }

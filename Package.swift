@@ -100,7 +100,6 @@ let package = Package(
                 }
                 if areas.contains(.wireGuard) {
                     list.append("PartoutWireGuard_C")
-                    list.append("PartoutWireGuardBackend_C")
                 }
                 return list
             }(),
@@ -257,9 +256,9 @@ if areas.contains(.wireGuard) {
         )
         package.targets.append(
             .target(
-                name: "PartoutWireGuardBackend_C",
+                name: "PartoutWireGuard_C",
                 dependencies: [
-                    "PartoutWireGuard_C",
+                    "PartoutCore_C",
                     "wg-go-apple"
                 ]
             )
@@ -268,8 +267,8 @@ if areas.contains(.wireGuard) {
         // Load wg-go backend dynamically
         package.targets.append(
             .target(
-                name: "PartoutWireGuardBackend_C",
-                dependencies: ["PartoutWireGuard_C"],
+                name: "PartoutWireGuard_C",
+                dependencies: ["PartoutCore_C"],
                 cSettings: globalCSettings + [
                     .unsafeFlags(["-I\(cmakeOutput)/wg-go/include"])
                 ],
@@ -285,13 +284,8 @@ if areas.contains(.wireGuard) {
             name: "PartoutWireGuard",
             dependencies: [
                 "PartoutCore",
-                "PartoutWireGuard_C",
-                "PartoutWireGuardBackend_C"
+                "PartoutWireGuard_C"
             ]
-        ),
-        .target(
-            name: "PartoutWireGuard_C",
-            dependencies: ["PartoutCore_C"]
         ),
         .testTarget(
             name: "PartoutWireGuardTests",
@@ -355,17 +349,16 @@ package.targets.append(
             // Pick current OS by removing it from exclusions
             var list: [String] = []
             if !cryptoLibraries.contains(.openSSL) {
-                list.append("openssl")
+                list.append("crypto_openssl.c")
             }
+            var native = Set(OS.nativeCryptoSources)
             if !cryptoLibraries.contains(.mbedTLS) {
-                list.append("mbed")
-                list.append("native")
+                list.append("crypto_mbedtls.c")
             } else {
-                var native = Set(OS.nativeCryptoSources)
                 native.remove(OS.current.nativeCryptoSource)
-                let nativeSrc = native.map { "native/\($0.rawValue)" }
-                list.append(contentsOf: nativeSrc)
             }
+            let nativeSrc = native.map { "crypto_\($0.rawValue).c" }
+            list.append(contentsOf: nativeSrc)
             return list
         }(),
         cSettings: globalCSettings,

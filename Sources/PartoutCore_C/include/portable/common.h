@@ -5,7 +5,7 @@
  */
 
 #pragma once
-#include "portable/conditionals.h"
+#include "conditionals.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -28,17 +28,21 @@ typedef enum {
 typedef const char *pp_log_category;
 extern pp_log_category PPLogCategoryCore;
 
-extern void pp_clog(pp_log_category category,
-                    pp_log_level level,
-                    const char *message);
+// extern bool partout_log_enabled(void);
+extern void partout_log(pp_log_category category,
+                        pp_log_level level,
+                        const char *message);
+
+static inline
+void pp_clog(pp_log_category category,
+             pp_log_level level,
+             const char *message) {
+    partout_log(category, level, message);
+}
 
 void pp_clog_v(pp_log_category category,
                pp_log_level level,
                const char *fmt, ...);
-
-void pp_log_simple_append(const char *_Nullable tag,
-                          pp_log_level level,
-                          const char *message);
 
 /* Use inline rather than #define to make available to Swift. */
 

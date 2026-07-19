@@ -59,3 +59,12 @@ public func pp_clog(
     errno = savedErrno
 #endif
 }
+
+@c(partout_log)
+public func partout_log(
+    _ cCategory: UnsafePointer<CChar>,
+    _ cLevel: Int,
+    _ cMessage: UnsafePointer<CChar>
+) {
+    pp_clog(cCategory, cLevel, cMessage)
+}

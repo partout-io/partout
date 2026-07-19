@@ -65,19 +65,16 @@ private extension POSIXDNSStrategy {
         // XXX: Choosing either would dedup results
 //        hints.ai_socktype = SOCK_STREAM SOCK_DGRAM
         var infoPointer: UnsafeMutablePointer<addrinfo>?
+        var cReachability = reachability?.toCReachability ?? pp_reachability_none()
         let result = hostname.withCString {
-#if os(Android)
-            android_getaddrinfofornetwork(networkHandle, $0, nil, &hints, &infoPointer)
-#else
-            getaddrinfo($0, nil, &hints, &infoPointer)
-#endif
+            pp_dns_resolve($0, nil, &hints, &cReachability, &infoPointer)
         }
         guard result == 0 else {
             switch result {
             case EAI_BADFLAGS:
-                pp_log_g(.core, .fault, "getaddrinfo() failed with EAI_BADFLAGS")
+                pp_log_g(.core, .fault, "pp_dns_resolve() failed with EAI_BADFLAGS")
             default:
-                pp_log_g(.core, .fault, "getaddrinfo() failed with result \(result)")
+                pp_log_g(.core, .fault, "pp_dns_resolve() failed with result \(result)")
             }
             throw PartoutError(.dnsFailure)
         }

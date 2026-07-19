@@ -7,7 +7,7 @@
 #pragma once
 
 #include "crypto/crypto.h"
-#include "crypto_aead_mbed_api.h"
+#include "crypto_aead_mbedtls_api.h"
 
 #pragma clang assume_nonnull begin
 
