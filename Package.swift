@@ -351,11 +351,12 @@ package.targets.append(
             if !cryptoLibraries.contains(.openSSL) {
                 list.append("crypto_openssl.c")
             }
+            var native = Set(OS.nativeCryptoSources)
             if !cryptoLibraries.contains(.mbedTLS) {
                 list.append("crypto_mbedtls.c")
+            } else {
+                native.remove(OS.current.nativeCryptoSource)
             }
-            var native = Set(OS.nativeCryptoSources)
-            native.remove(OS.current.nativeCryptoSource)
             let nativeSrc = native.map { "crypto_\($0.rawValue).c" }
             list.append(contentsOf: nativeSrc)
             return list
