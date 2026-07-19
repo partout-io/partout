@@ -9,7 +9,7 @@ struct BackendTests {
     @Test
     func givenBackend_whenGetVersion_thenIsExpected() throws {
         let sut = WireGuardBackend()
-        let expectedVersion = "f333402"
+        let expectedVersion = "ecfc5a8"
         let vendorVersion = try #require(sut.version())
         #expect(vendorVersion == expectedVersion)
         print("WireGuard version: \(vendorVersion)")
