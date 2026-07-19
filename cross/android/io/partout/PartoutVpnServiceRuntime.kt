@@ -34,7 +34,8 @@ class PartoutVpnServiceRuntime(
     private val jniLogTag: String,
     val service: VpnService,
     private val engine: Engine,
-    private val logsSnapshots: Boolean
+    private val logsSnapshots: Boolean,
+    private val dnsFallbackServers: List<String> = emptyList()
 ): TunnelControllerDelegate {
     // Execute actions in serial queue
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -126,7 +127,9 @@ class PartoutVpnServiceRuntime(
                 jniLogTag,
                 service,
                 serviceScope,
-                this
+                this,
+                dnsFallbackServers,
+                logsSnapshots
             )
             engine.start(intent, newController, profileJSON)
             // Does not throw from now

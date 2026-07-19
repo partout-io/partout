@@ -25,24 +25,16 @@ typedef enum {
     PPLogLevelDebug
 } pp_log_level;
 
-typedef const char *pp_log_category;
-extern pp_log_category PPLogCategoryCore;
-
+/* This callback forwards to the logger from partout_init(). */
 // extern bool partout_log_enabled(void);
-extern void partout_log(pp_log_category category,
-                        pp_log_level level,
-                        const char *message);
+extern void partout_log(pp_log_level level, const char *message);
 
 static inline
-void pp_clog(pp_log_category category,
-             pp_log_level level,
-             const char *message) {
-    partout_log(category, level, message);
+void pp_clog(pp_log_level level, const char *message) {
+    partout_log(level, message);
 }
 
-void pp_clog_v(pp_log_category category,
-               pp_log_level level,
-               const char *fmt, ...);
+void pp_clog_v(pp_log_level level, const char *fmt, ...);
 
 /* Use inline rather than #define to make available to Swift. */
 
@@ -56,7 +48,7 @@ static inline
 void *pp_alloc(size_t size) {
     void *memory = calloc(1, size);
     if (!memory) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_alloc: malloc() call failed");
+        pp_clog(PPLogLevelFault, "pp_alloc: malloc() call failed");
         abort();
     }
     return memory;
@@ -85,7 +77,7 @@ char *pp_dup(const char *str) {
     char *ptr = strdup(str);
 #endif
     if (!ptr) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_dup: strdup() call failed");
+        pp_clog(PPLogLevelFault, "pp_dup: strdup() call failed");
         abort();
     }
     return ptr;

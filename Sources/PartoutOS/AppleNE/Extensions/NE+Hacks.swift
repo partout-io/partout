@@ -5,7 +5,8 @@
 import NetworkExtension
 
 extension NEPacketTunnelProvider {
-    func clearTunnelSettings(withKillSwitch: Bool) async throws {
+    // FIXME: ###, Make internal after consolidating
+    public func clearTunnelSettings(withKillSwitch: Bool) async throws {
         // XXX: We want to remove the VPN status icon on iOS/tvOS
         // and calling .setTunnelNetworkSettings(nil) doesn't seem
         // to do it. Feeding fake IPv4 settings does the trick.

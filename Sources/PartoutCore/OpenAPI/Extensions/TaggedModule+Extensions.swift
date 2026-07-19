@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 extension TaggedModule {
-    var containedModule: Module & Codable {
+    public var containedModule: Module & Codable {
         switch self {
         case .Custom(let module): module
         case .DNS(let module): module

@@ -6,7 +6,6 @@
 
 #include <stdio.h>
 #include "portable/lib.h"
-#include "wireguard/logging.h"
 #include "wireguard/backend.h"
 
 /* The Apple library is statically linked as a Swift package, except
@@ -16,7 +15,7 @@
 #include <wg_go/wg_go.h>
 
 int pp_wg_init(void) {
-    pp_clog_v(PPLogCategoryWireGuard, PPLogLevelInfo, "wg-go version: %s", pp_wg_version());
+    pp_clog_v(PPLogLevelInfo, "wg-go version: %s", pp_wg_version());
     return 0;
 }
 

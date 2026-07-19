@@ -36,7 +36,7 @@ pp_tun pp_tun_open(const char *uuid) {
      * consistent across distros for coming from the kernel. */
     PP_IO_RETRY(fd, open(dev_path, O_RDWR));
     if (fd < 0) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_linux: create(), open(tun)");
+        pp_clog(PPLogLevelFault, "tun_linux: create(), open(tun)");
         goto failure;
     }
 
@@ -46,11 +46,11 @@ pp_tun pp_tun_open(const char *uuid) {
     int ret;
     PP_IO_RETRY(ret, ioctl(fd, TUNSETIFF, (void *)&ifr));
     if (ret < 0) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_linux: create(), ioctl(TUNSETIFF)");
+        pp_clog(PPLogLevelFault, "tun_linux: create(), ioctl(TUNSETIFF)");
         goto failure;
     }
 
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_linux: Created tun device %s", ifr.ifr_name);
+    pp_clog_v(PPLogLevelInfo, "tun_linux: Created tun device %s", ifr.ifr_name);
     pp_tun tun = pp_alloc(sizeof(*tun));
     tun->fd = fd;
     tun->dev_name = pp_dup(ifr.ifr_name);
@@ -103,48 +103,57 @@ const char *pp_tun_name(const pp_tun tun) {
     return tun->dev_name;
 }
 
-void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
+static void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
     (void)ref;
     (void)delegate;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_linux: ctrl_set_delegate(%p, %p)", ref, delegate);
+    pp_clog_v(PPLogLevelDebug, "tun_linux: ctrl_set_delegate(%p, %p)", ref, delegate);
 }
 
-pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
+static pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
     (void)ref;
     (void)uuid;
     (void)info_json;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_linux: ctrl_set_tunnel(%p)", ref);
+    pp_clog_v(PPLogLevelInfo, "tun_linux: ctrl_set_tunnel(%p)", ref);
     return pp_tun_open(uuid);
 }
 
-bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
-                                   const pp_socket_fd *fds, const size_t fds_len) {
+static bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
+                                          const pp_socket_fd *fds, const size_t fds_len) {
     (void)ref;
     (void)info;
     (void)fds;
     (void)fds_len;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_linux: ctrl_configure_sockets(%p)", ref);
+    pp_clog_v(PPLogLevelInfo, "tun_linux: ctrl_configure_sockets(%p)", ref);
     return true;
 }
 
-void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json, bool log) {
+static void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
     (void)ref;
     (void)snapshot_json;
-    if (log) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_linux: ctrl_report_snapshot(%p)", ref);
-    }
 }
 
-void pp_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
+static void pp_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
     (void)ref;
     (void)kill_switch;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_linux: ctrl_clear_tunnel(%p)", ref);
+    pp_clog_v(PPLogLevelInfo, "tun_linux: ctrl_clear_tunnel(%p)", ref);
 }
 
-void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_code) {
+static void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_code) {
     (void)ref;
     (void)error_code;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_linux: ctrl_cancel_tunnel(%p)", ref);
+    pp_clog_v(PPLogLevelInfo, "tun_linux: ctrl_cancel_tunnel(%p)", ref);
+}
+
+pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
+    pp_tun_ctrl_fnt fnt = {
+        .set_delegate = pp_tun_ctrl_set_delegate,
+        .set_tunnel = pp_tun_ctrl_set_tunnel,
+        .configure_sockets = pp_tun_ctrl_configure_sockets,
+        .report_snapshot = pp_tun_ctrl_report_snapshot,
+        .clear_tunnel = pp_tun_ctrl_clear_tunnel,
+        .cancel_tunnel = pp_tun_ctrl_cancel_tunnel
+    };
+    return fnt;
 }
 
 #endif

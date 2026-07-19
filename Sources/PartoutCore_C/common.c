@@ -12,11 +12,7 @@ const int PPIOErrorWouldBlock   = -11;
 const int PPIOErrorNoBufs       = -12;
 const int PPIOErrorNoSpace      = -13;
 
-pp_log_category PPLogCategoryCore = "core";
-
-void pp_clog_v(pp_log_category category,
-               pp_log_level level,
-               const char *fmt, ...) {
+void pp_clog_v(pp_log_level level, const char *fmt, ...) {
 #if !PARTOUT_WINDOWS
     const int saved_errno = errno;
 #endif
@@ -35,7 +31,7 @@ void pp_clog_v(pp_log_category category,
     va_start(args, fmt);
     vsnprintf(msg, msg_len, fmt, args);
     va_end(args);
-    partout_log(category, level, msg);
+    partout_log(level, msg);
     pp_free(msg);
 #if !PARTOUT_WINDOWS
     errno = saved_errno;
@@ -111,13 +107,13 @@ JNIEnv *pp_jni_attach_thread(bool *did_attach) {
         case JNI_EDETACHED:
             status = (*jvm)->AttachCurrentThread(jvm, &env, NULL);
             if (status != JNI_OK) {
-                pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "AttachCurrentThread failed (%d)", status);
+                pp_clog_v(PPLogLevelFault, "AttachCurrentThread failed (%d)", status);
                 return NULL;
             }
             *did_attach = true;
             return env;
         default:
-            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "GetEnv failed (%d)", status);
+            pp_clog_v(PPLogLevelFault, "GetEnv failed (%d)", status);
             return NULL;
     }
 }
@@ -156,14 +152,14 @@ void pp_jni_delete_global_ref(void *ref) {
 int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {
     const int flags = fcntl(fd, F_GETFL, 0);
     if (flags < 0) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "fcntl(): set, F_GETFL");
+        pp_clog(PPLogLevelFault, "fcntl(): set, F_GETFL");
         return -1;
     }
     if (original_flags) {
         *original_flags = flags;
     }
     if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "fcntl(): set, F_SETFL");
+        pp_clog(PPLogLevelFault, "fcntl(): set, F_SETFL");
         return -1;
     }
     return 0;
@@ -171,7 +167,7 @@ int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {
 
 int pp_fd_restore_blocking(pp_fd fd, int original_flags) {
     if (fcntl(fd, F_SETFL, original_flags) < 0) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "fcntl(): restore");
+        pp_clog(PPLogLevelFault, "fcntl(): restore");
         return -1;
     }
     return 0;

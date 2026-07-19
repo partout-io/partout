@@ -61,6 +61,7 @@ case $language in
             --schema-mappings WireGuard.Key=WireGuardKey \
             --type-mappings JSONValue=JSON,AnyCodable=JSON,URI=URL \
             --import-mappings JSONValue=JSON \
+            --model-name-mappings Profile=TaggedProfile \
             --additional-properties=enumPropertyNaming=original,sortModelPropertiesByRequiredFlag=false,sortParamsByRequiredFlag=false
 
         generated_models_dir="$(find "$tmp_dir/Sources" -type d -name Models -print -quit)"
@@ -102,6 +103,7 @@ case $language in
             --additional-properties=packageName=$package_name \
             --additional-properties=modelPackage=$package_name \
             --schema-mappings OpenVPN.CryptoContainer=kotlin.String \
+            --model-name-mappings Profile=TaggedProfile \
             "${kotlin_extra_imports_opts[@]}"
         ;;
     cpp)

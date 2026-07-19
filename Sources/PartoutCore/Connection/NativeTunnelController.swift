@@ -11,6 +11,8 @@ public final class NativeTunnelController: TunnelController, Sendable {
     nonisolated(unsafe)
     private let ref: UnsafeMutableRawPointer?
 
+    private let fnt: pp_tun_ctrl_fnt
+
     private let profile: Profile
 
     private let environment: TunnelEnvironmentReader
@@ -27,7 +29,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     private let dns: DNSResolver
 
-    public init(
+    public convenience init(
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
         profile: Profile,
@@ -36,7 +38,30 @@ public final class NativeTunnelController: TunnelController, Sendable {
         options: TunnelControllerOptions,
         bufSize: Int = 1 * 1024 * 1024 // 1MB
     ) throws {
+        try self.init(
+            ctx,
+            ref: ref,
+            fnt: pp_tun_ctrl_fnt_current(),
+            profile: profile,
+            environment: environment,
+            betterPathFactory: betterPathFactory,
+            options: options,
+            bufSize: bufSize
+        )
+    }
+
+    init(
+        _ ctx: PartoutLoggerContext,
+        ref: UnsafeMutableRawPointer?,
+        fnt customFnt: pp_tun_ctrl_fnt? = nil,
+        profile: Profile,
+        environment: TunnelEnvironmentReader,
+        betterPathFactory: BetterPathStreamFactory? = nil,
+        options: TunnelControllerOptions,
+        bufSize: Int
+    ) throws {
         self.ctx = ctx
+        fnt = customFnt ?? pp_tun_ctrl_fnt_current()
 #if os(Android)
         pp_log(ctx, .core, .debug, "NativeTunnelController: Retain JNI ref")
         guard let retainedRef = pp_jni_new_global_ref(ref) else {
@@ -76,11 +101,11 @@ public final class NativeTunnelController: TunnelController, Sendable {
                 return pp_dup(json)
             }
         )
-        pp_tun_ctrl_set_delegate(self.ref, &delegate)
+        fnt.set_delegate(ref, &delegate)
     }
 
     deinit {
-        pp_tun_ctrl_set_delegate(ref, nil)
+        fnt.set_delegate(ref, nil)
         pp_log(ctx, .core, .debug, "Deinit NativeTunnelController")
 #if os(Android)
         pp_log(ctx, .core, .debug, "NativeTunnelController: Release JNI ref")
@@ -97,12 +122,12 @@ public final class NativeTunnelController: TunnelController, Sendable {
         }
 
         // Encode to JSON for native receivers
-        let infoJSON = try info.encodedAsJSON(profile, options: options)
+        let infoJSON = try info.encodedAsJSON(profile)
 
         // Create tun with optional implementation from controller
         guard let tun = info.originalModuleId.uuidString.withCString({ uuid in
             infoJSON.withCString { info in
-                pp_tun_ctrl_set_tunnel(ref, uuid, info)
+                fnt.set_tunnel(ref, uuid, info)
             }
         }) else {
             throw PartoutError(.tunNotAvailable)
@@ -128,10 +153,10 @@ public final class NativeTunnelController: TunnelController, Sendable {
                 }
                 if let reachability {
                     return withUnsafePointer(to: reachability) { infoPtr in
-                        pp_tun_ctrl_configure_sockets(ref, infoPtr, fdsBase, fds.count)
+                        fnt.configure_sockets(ref, infoPtr, fdsBase, fds.count)
                     }
                 } else {
-                    return pp_tun_ctrl_configure_sockets(ref, nil, fdsBase, fds.count)
+                    return fnt.configure_sockets(ref, nil, fdsBase, fds.count)
                 }
             }
         guard result else {
@@ -146,7 +171,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
         do {
             let json = try JSONEncoder.shared().encodeJSON(snapshot)
             json.withCString {
-                pp_tun_ctrl_report_snapshot(ref, $0, options.logsSnapshots)
+                fnt.report_snapshot(ref, $0)
             }
         } catch {
             pp_log(ctx, .core, .error, "Unable to encode snapshots: \(error)")
@@ -160,7 +185,7 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     public func clearTunnelSettings(withKillSwitch: Bool) async {
         pp_log(ctx, .core, .debug, "Clear tunnel settings: withKillSwitch=\(withKillSwitch)")
-        pp_tun_ctrl_clear_tunnel(ref, withKillSwitch)
+        fnt.clear_tunnel(ref, withKillSwitch)
     }
 
     public func setReasserting(_ reasserting: Bool) {
@@ -169,11 +194,11 @@ public final class NativeTunnelController: TunnelController, Sendable {
 
     public func cancelTunnelConnection(with error: Error?) {
         guard let error else {
-            pp_tun_ctrl_cancel_tunnel(ref, nil)
+            fnt.cancel_tunnel(ref, nil)
             return
         }
         error.partoutErrorCode.rawValue.withCString {
-            pp_tun_ctrl_cancel_tunnel(ref, $0)
+            fnt.cancel_tunnel(ref, $0)
         }
     }
 }

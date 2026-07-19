@@ -21,25 +21,19 @@ extension Profile {
 
 /// A controller based on `NEPacketTunnelProvider`.
 public final class NETunnelController: TunnelController {
-    public struct Options: Sendable {
-        public var dnsFallbackServers: [String] = []
-
-        public init() {}
-    }
-
     nonisolated(unsafe)
     public private(set) weak var provider: NEPacketTunnelProvider?
 
     private let profile: Profile
 
-    private let options: Options
+    private let options: TunnelControllerOptions
 
     private let tun: NETunnelInterface
 
     public init(
         provider: NEPacketTunnelProvider,
         profile: Profile,
-        options: Options
+        options: TunnelControllerOptions
     ) {
         self.provider = provider
         self.profile = profile

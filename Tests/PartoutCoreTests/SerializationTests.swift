@@ -529,13 +529,8 @@ struct SerializationTests {
     }
 
     @Test
-    func givenTunnelRemoteInfo_whenEncodeAsJSON_thenWrapperPreservesProfileOptionsAndModules() throws {
+    func givenTunnelRemoteInfo_whenEncodeAsJSON_thenWrapperPreservesProfileAndModules() throws {
         let profile = try makeProfile()
-        let options = TunnelControllerOptions(
-            dnsFallbackServers: ["8.8.8.8", "2001:4860:4860::8888"],
-            logsSnapshots: true,
-            minDataCountDelta: 512
-        )
         let info = TunnelRemoteInfo(
             originalModuleId: IDs.openVPN,
             address: try requireAddress("198.51.100.44"),
@@ -556,15 +551,12 @@ struct SerializationTests {
             requiresVirtualDevice: true
         )
 
-        let json = try jsonObject(from: Data(try info.encodedAsJSON(profile, options: options).utf8))
+        let json = try jsonObject(from: Data(try info.encodedAsJSON(profile).utf8))
         #expect(json["originalModuleId"] as? String == IDs.openVPN.uuidString)
         #expect(json["address"] as? String == "198.51.100.44")
         #expect(json["requiresVirtualDevice"] as? Bool == true)
 
-        let optionsJSON = try requireObject(json["options"])
-        #expect(optionsJSON["dnsFallbackServers"] as? [String] == options.dnsFallbackServers)
-        #expect(optionsJSON["logsSnapshots"] as? Bool == true)
-        #expect(optionsJSON["minDataCountDelta"] as? Int == 512)
+        #expect(json["options"] == nil)
 
         let profileJSON = try requireObject(json["profile"])
         #expect(profileJSON["id"] as? String == IDs.profile.uuidString)

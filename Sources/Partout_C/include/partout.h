@@ -4,77 +4,84 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#ifndef __PARTOUT_H
-#define __PARTOUT_H
+#ifndef PARTOUT_H
+#define PARTOUT_H
 
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Current library version. */
+const char *partout_version(void);
+
 /* Library initializiation, call it ASAP. */
+typedef void (*partout_logger_cb)(int level, const char *message);
 typedef struct {
-    const char *log_tag;
     bool logs_private_data;
+    partout_logger_cb logger;
 } partout_init_args;
 void partout_init(const partout_init_args *args);
 
 /* Common functions. */
-const char *partout_version(void);
 char *partout_readfile(const char *rel_path, const char *parent);
 
-/* Event callback. */
-typedef void (*partout_event_cb)(void *event_ctx, const char *event);
-
-/* Completion callback.
- * - Success: code == 0, string = result
- * - Error:   code != 0, string = error
- * Both 'result' and 'error' are optional JSON payloads.
- */
+/* ABI result codes. */
 typedef enum {
     PartoutCompletionCodeOK         = 0,
+    PartoutCompletionCodeMemory     = -3,
     PartoutCompletionCodeArgs       = -2,
     PartoutCompletionCodeFailure    = -1
 } partout_completion_code;
-typedef void (*partout_completion_cb)(void *ctx, partout_completion_code code, const char *json);
-typedef struct {
-    partout_completion_cb callback;
-    void *ctx;
-} partout_completion;
-
-/* Macros for completion blocks. */
-static inline
-partout_completion PARTOUT_CB(partout_completion_cb callback, void *ctx) {
-    partout_completion completion = { callback, ctx };
-    return completion;
-}
 
 /* Import profiles. */
-void partout_import_profile(const char *text, const char *name, partout_completion completion);
+char *partout_import_profile(const char *text, const char *name);
+char *partout_import_module(const char *text);
 
+/* Callbacks invoked on daemon events. */
+typedef struct {
+    void *ctx;
+    void (*set_connection_status)(void *ctx, const char *status);
+    void (*set_data_count)(void *ctx, uint64_t received, uint64_t sent);
+    void (*set_last_error_code)(void *ctx, const char *code);
+    void (*remove)(void *ctx, const char *key);
+} partout_daemon_events;
+
+/* Bindings to externally executed code. */
 typedef struct __partout_daemon_bindings {
     void *controller;
-    void (*free)(struct __partout_daemon_bindings *);
+    partout_daemon_events events;
+    /* Releases the resources referenced by the struct (not
+     * the struct itself). */
+    void (*release)(struct __partout_daemon_bindings *);
 } partout_daemon_bindings;
 
 /* Daemon options. */
 typedef struct {
-    bool logs_snapshots;
+    bool is_daemon;
+    bool starts_immediately;
+    /* Defaults to the system temporary directory if NULL. */
+    const char *cache_dir;
     uint64_t min_data_count_delta;
-    const char **dns_fallback;
-    size_t dns_fallback_len;
 } partout_daemon_options;
 
 /* Daemon initialization. */
 typedef struct {
     const char *profile;
-    const char *cache_dir;
-    bool is_daemon;
     partout_daemon_options options;
     const partout_daemon_bindings *bindings;
 } partout_daemon_start_args;
 
 /* Daemon functions. */
 int partout_daemon_start(const partout_daemon_start_args *args);
-void partout_daemon_stop(partout_completion completion);
+void partout_daemon_hold();
+void partout_daemon_stop(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

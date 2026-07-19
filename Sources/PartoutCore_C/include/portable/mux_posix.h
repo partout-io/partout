@@ -43,7 +43,7 @@ static struct pp_mux_entry *pp_mux_track_fd(pp_mux mux, pp_fd fd) {
     if (tracked) return tracked;
     /* Do not track more than fds_len. */
     if (mux->num_tracked >= mux->entries_len) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "Too many tracked fds");
+        pp_clog_v(PPLogLevelFault, "Too many tracked fds");
         return NULL;
     }
     tracked = mux->entries + mux->num_tracked;
@@ -102,7 +102,7 @@ static int pp_mux_drain_wake(pp_mux mux) {
         PP_IO_RETRY(ret, read(mux->wake_pipe[0], buffer, sizeof(buffer)));
         if (ret < 0) {
             if (pp_io_wouldblock()) return 0;
-            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait wake read() failed: errno=%d", errno);
+            pp_clog_v(PPLogLevelFault, "pp_mux_wait wake read() failed: errno=%d", errno);
             return (int)ret;
         }
         if (ret == 0) return 0;
@@ -196,7 +196,7 @@ int pp_mux_wait(pp_mux mux, int *error_code) {
     int num;
     PP_IO_RETRY(num, poll(mux->pollfds, (nfds_t)pollfds_count, -1));
     if (num < 0) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait poll() failed: errno=%d", errno);
+        pp_clog_v(PPLogLevelFault, "pp_mux_wait poll() failed: errno=%d", errno);
         if (error_code) *error_code = errno;
         return num;
     }

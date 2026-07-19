@@ -30,7 +30,6 @@ int main(int argc, const char *argv[]) {
     args.is_daemon = true;
     args.cache_dir = ".";
     args.bindings = NULL;
-    args.options.logs_snapshots = true;
     const partout_completion_code result = partout_daemon_start(&args);
     free(profile);
     if (result != PartoutCompletionCodeOK) {

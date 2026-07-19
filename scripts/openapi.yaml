@@ -4,10 +4,22 @@ components:
       additionalProperties: false
       properties:
         code:
-          "$ref": "#/components/schemas/PartoutErrorCode"
-        userInfo: {}
+          $ref: "#/components/schemas/PartoutErrorCode"
+        userInfo:
+          type: object
       required:
         - code
+      type: object
+    ParseErrorInfo:
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        details:
+          type: string
+      required:
+        - name
+        - details
       type: object
     Address:
       type: string
@@ -29,9 +41,9 @@ components:
       additionalProperties: false
       properties:
         innerType:
-          "$ref": "#/components/schemas/ModuleType"
+          $ref: "#/components/schemas/ModuleType"
         json:
-          "$ref": "#/components/schemas/JSONValue"
+          $ref: "#/components/schemas/JSONValue"
       required:
         - innerType
         - json
@@ -41,23 +53,23 @@ components:
       additionalProperties: false
       properties:
         id:
-          "$ref": "#/components/schemas/UniqueID"
+          $ref: "#/components/schemas/UniqueID"
         protocolType:
-          "$ref": "#/components/schemas/DNSModule.ProtocolType"
+          $ref: "#/components/schemas/DNSModule.ProtocolType"
         servers:
           items:
-            "$ref": "#/components/schemas/Address"
+            $ref: "#/components/schemas/Address"
           type: array
         domainName:
-          "$ref": "#/components/schemas/Address"
+          $ref: "#/components/schemas/Address"
         searchDomains:
           items:
-            "$ref": "#/components/schemas/Address"
+            $ref: "#/components/schemas/Address"
           type: array
         inheritsVPN:
           type: boolean
         domainPolicy:
-          "$ref": "#/components/schemas/DNSModule.DomainPolicy"
+          $ref: "#/components/schemas/DNSModule.DomainPolicy"
         routesThroughVPN:
           type: boolean
       required:
@@ -90,7 +102,7 @@ components:
     DNSModule.ProtocolType.cleartext:
       additionalProperties: false
       allOf:
-        - "$ref": "#/components/schemas/DNSModule.ProtocolType"
+        - $ref: "#/components/schemas/DNSModule.ProtocolType"
       properties:
         type:
           const: cleartext
@@ -101,7 +113,7 @@ components:
     DNSModule.ProtocolType.https:
       additionalProperties: false
       allOf:
-        - "$ref": "#/components/schemas/DNSModule.ProtocolType"
+        - $ref: "#/components/schemas/DNSModule.ProtocolType"
       properties:
         type:
           const: https
@@ -116,7 +128,7 @@ components:
     DNSModule.ProtocolType.tls:
       additionalProperties: false
       allOf:
-        - "$ref": "#/components/schemas/DNSModule.ProtocolType"
+        - $ref: "#/components/schemas/DNSModule.ProtocolType"
       properties:
         type:
           const: tls
@@ -146,10 +158,10 @@ components:
       additionalProperties: false
       properties:
         received:
-          "$ref": "#/components/schemas/UInt64"
+          $ref: "#/components/schemas/UInt64"
           description: Received bytes count.
         sent:
-          "$ref": "#/components/schemas/UInt64"
+          $ref: "#/components/schemas/UInt64"
           description: Sent bytes count.
       required:
         - received
@@ -169,17 +181,17 @@ components:
       additionalProperties: false
       properties:
         id:
-          "$ref": "#/components/schemas/UniqueID"
+          $ref: "#/components/schemas/UniqueID"
         proxy:
-          "$ref": "#/components/schemas/Endpoint"
+          $ref: "#/components/schemas/Endpoint"
         secureProxy:
-          "$ref": "#/components/schemas/Endpoint"
+          $ref: "#/components/schemas/Endpoint"
         pacURL:
           format: uri
           type: string
         bypassDomains:
           items:
-            "$ref": "#/components/schemas/Address"
+            $ref: "#/components/schemas/Address"
           type: array
       required:
         - id
@@ -190,11 +202,11 @@ components:
       additionalProperties: false
       properties:
         id:
-          "$ref": "#/components/schemas/UniqueID"
+          $ref: "#/components/schemas/UniqueID"
         ipv4:
-          "$ref": "#/components/schemas/IPSettings"
+          $ref: "#/components/schemas/IPSettings"
         ipv6:
-          "$ref": "#/components/schemas/IPSettings"
+          $ref: "#/components/schemas/IPSettings"
         mtu:
           type: integer
       required:
@@ -206,17 +218,17 @@ components:
       properties:
         subnets:
           items:
-            "$ref": "#/components/schemas/Subnet"
+            $ref: "#/components/schemas/Subnet"
           type: array
           description: The subnets.
         includedRoutes:
           items:
-            "$ref": "#/components/schemas/Route"
+            $ref: "#/components/schemas/Route"
           type: array
           description: The included routes.
         excludedRoutes:
           items:
-            "$ref": "#/components/schemas/Route"
+            $ref: "#/components/schemas/Route"
           type: array
           description: The excluded routes.
       required:
@@ -287,16 +299,16 @@ components:
       additionalProperties: false
       properties:
         id:
-          "$ref": "#/components/schemas/UniqueID"
+          $ref: "#/components/schemas/UniqueID"
         policy:
-          "$ref": "#/components/schemas/OnDemandModule.Policy"
+          $ref: "#/components/schemas/OnDemandModule.Policy"
         withSSIDs:
           additionalProperties:
             type: boolean
           type: object
         withOtherNetworks:
           items:
-            "$ref": "#/components/schemas/OnDemandModule.OtherNetwork"
+            $ref: "#/components/schemas/OnDemandModule.OtherNetwork"
           type: array
           uniqueItems: true
       required:
@@ -376,33 +388,33 @@ components:
       additionalProperties: false
       properties:
         cipher:
-          "$ref": "#/components/schemas/OpenVPN.Cipher"
+          $ref: "#/components/schemas/OpenVPN.Cipher"
           description: "- Seealso: `Configuration.Builder.cipher`"
         dataCiphers:
           items:
-            "$ref": "#/components/schemas/OpenVPN.Cipher"
+            $ref: "#/components/schemas/OpenVPN.Cipher"
           type: array
           description: "- Seealso: `Configuration.Builder.dataCiphers`"
         digest:
-          "$ref": "#/components/schemas/OpenVPN.Digest"
+          $ref: "#/components/schemas/OpenVPN.Digest"
           description: "- Seealso: `Configuration.Builder.digest`"
         compressionFraming:
-          "$ref": "#/components/schemas/OpenVPN.CompressionFraming"
+          $ref: "#/components/schemas/OpenVPN.CompressionFraming"
           description: "- Seealso: `Configuration.Builder.compressionFraming`"
         compressionAlgorithm:
-          "$ref": "#/components/schemas/OpenVPN.CompressionAlgorithm"
+          $ref: "#/components/schemas/OpenVPN.CompressionAlgorithm"
           description: "- Seealso: `Configuration.Builder.compressionAlgorithm`"
         ca:
-          "$ref": "#/components/schemas/OpenVPN.CryptoContainer"
+          $ref: "#/components/schemas/OpenVPN.CryptoContainer"
           description: "- Seealso: `Configuration.Builder.ca`"
         clientCertificate:
-          "$ref": "#/components/schemas/OpenVPN.CryptoContainer"
+          $ref: "#/components/schemas/OpenVPN.CryptoContainer"
           description: "- Seealso: `Configuration.Builder.clientCertificate`"
         clientKey:
-          "$ref": "#/components/schemas/OpenVPN.CryptoContainer"
+          $ref: "#/components/schemas/OpenVPN.CryptoContainer"
           description: "- Seealso: `Configuration.Builder.clientKey`"
         tlsWrap:
-          "$ref": "#/components/schemas/OpenVPN.TLSWrap"
+          $ref: "#/components/schemas/OpenVPN.TLSWrap"
           description: "- Seealso: `Configuration.Builder.tlsWrap`"
         tlsSecurityLevel:
           type: integer
@@ -418,7 +430,7 @@ components:
           description: "- Seealso: `Configuration.Builder.renegotiatesAfter`"
         remotes:
           items:
-            "$ref": "#/components/schemas/ExtendedEndpoint"
+            $ref: "#/components/schemas/ExtendedEndpoint"
           type: array
           description: "- Seealso: `Configuration.Builder.remotes`"
         checksEKU:
@@ -452,29 +464,29 @@ components:
           type: string
           description: "- Seealso: `Configuration.Builder.authToken`"
         peerId:
-          "$ref": "#/components/schemas/UInt32"
+          $ref: "#/components/schemas/UInt32"
           description: "- Seealso: `Configuration.Builder.peerId`"
         ipv4:
-          "$ref": "#/components/schemas/IPSettings"
+          $ref: "#/components/schemas/IPSettings"
           description: "- Seealso: `Configuration.Builder.ipv4`"
         ipv6:
-          "$ref": "#/components/schemas/IPSettings"
+          $ref: "#/components/schemas/IPSettings"
           description: "- Seealso: `Configuration.Builder.ipv6`"
         routes4:
           items:
-            "$ref": "#/components/schemas/Route"
+            $ref: "#/components/schemas/Route"
           type: array
           description: "- Seealso: `Configuration.Builder.routes4`"
         routes6:
           items:
-            "$ref": "#/components/schemas/Route"
+            $ref: "#/components/schemas/Route"
           type: array
           description: "- Seealso: `Configuration.Builder.routes6`"
         routeGateway4:
-          "$ref": "#/components/schemas/Address"
+          $ref: "#/components/schemas/Address"
           description: "- Seealso: `Configuration.Builder.routeGateway4`"
         routeGateway6:
-          "$ref": "#/components/schemas/Address"
+          $ref: "#/components/schemas/Address"
           description: "- Seealso: `Configuration.Builder.routeGateway6`"
         dnsServers:
           items:
@@ -490,10 +502,10 @@ components:
           type: array
           description: "- Seealso: `Configuration.Builder.searchDomains`"
         httpProxy:
-          "$ref": "#/components/schemas/Endpoint"
+          $ref: "#/components/schemas/Endpoint"
           description: "- Seealso: `Configuration.Builder.httpProxy`"
         httpsProxy:
-          "$ref": "#/components/schemas/Endpoint"
+          $ref: "#/components/schemas/Endpoint"
           description: "- Seealso: `Configuration.Builder.httpsProxy`"
         proxyAutoConfigurationURL:
           format: uri
@@ -506,16 +518,16 @@ components:
           description: "- Seealso: `Configuration.Builder.proxyBypassDomains`"
         routingPolicies:
           items:
-            "$ref": "#/components/schemas/OpenVPN.RoutingPolicy"
+            $ref: "#/components/schemas/OpenVPN.RoutingPolicy"
           type: array
           description: "- Seealso: `Configuration.Builder.routingPolicies`"
         noPullMask:
           items:
-            "$ref": "#/components/schemas/OpenVPN.PullMask"
+            $ref: "#/components/schemas/OpenVPN.PullMask"
           type: array
           description: "- Seealso: `Configuration.Builder.noPullMask`"
         xorMethod:
-          "$ref": "#/components/schemas/OpenVPN.ObfuscationMethod"
+          $ref: "#/components/schemas/OpenVPN.ObfuscationMethod"
           description: "- Seealso: `Configuration.Builder.xorMethod`"
       type: object
       description: The immutable configuration for `OpenVPNSession`.
@@ -529,7 +541,7 @@ components:
           type: string
           description: The password.
         otpMethod:
-          "$ref": "#/components/schemas/OpenVPN.Credentials.OTPMethod"
+          $ref: "#/components/schemas/OpenVPN.Credentials.OTPMethod"
           description: The OTP method (defaults to none).
         otp:
           type: string
@@ -592,13 +604,13 @@ components:
     OpenVPN.ObfuscationMethod.obfuscate:
       additionalProperties: false
       allOf:
-        - "$ref": "#/components/schemas/OpenVPN.ObfuscationMethod"
+        - $ref: "#/components/schemas/OpenVPN.ObfuscationMethod"
       properties:
         type:
           const: obfuscate
           type: string
         mask:
-          "$ref": "#/components/schemas/SecureData"
+          $ref: "#/components/schemas/SecureData"
       required:
         - type
         - mask
@@ -607,7 +619,7 @@ components:
     OpenVPN.ObfuscationMethod.reverse:
       additionalProperties: false
       allOf:
-        - "$ref": "#/components/schemas/OpenVPN.ObfuscationMethod"
+        - $ref: "#/components/schemas/OpenVPN.ObfuscationMethod"
       properties:
         type:
           const: reverse
@@ -619,13 +631,13 @@ components:
     OpenVPN.ObfuscationMethod.xormask:
       additionalProperties: false
       allOf:
-        - "$ref": "#/components/schemas/OpenVPN.ObfuscationMethod"
+        - $ref: "#/components/schemas/OpenVPN.ObfuscationMethod"
       properties:
         type:
           const: xormask
           type: string
         mask:
-          "$ref": "#/components/schemas/SecureData"
+          $ref: "#/components/schemas/SecureData"
       required:
         - type
         - mask
@@ -634,7 +646,7 @@ components:
     OpenVPN.ObfuscationMethod.xorptrpos:
       additionalProperties: false
       allOf:
-        - "$ref": "#/components/schemas/OpenVPN.ObfuscationMethod"
+        - $ref: "#/components/schemas/OpenVPN.ObfuscationMethod"
       properties:
         type:
           const: xorptrpos
@@ -677,9 +689,9 @@ components:
       additionalProperties: false
       properties:
         data:
-          "$ref": "#/components/schemas/SecureData"
+          $ref: "#/components/schemas/SecureData"
         dir:
-          "$ref": "#/components/schemas/OpenVPN.StaticKey.Direction"
+          $ref: "#/components/schemas/OpenVPN.StaticKey.Direction"
       required:
         - data
       type: object
@@ -700,13 +712,13 @@ components:
       additionalProperties: false
       properties:
         strategy:
-          "$ref": "#/components/schemas/OpenVPN.TLSWrap.Strategy"
+          $ref: "#/components/schemas/OpenVPN.TLSWrap.Strategy"
           description: The wrapping strategy.
         key:
-          "$ref": "#/components/schemas/OpenVPN.StaticKey"
+          $ref: "#/components/schemas/OpenVPN.StaticKey"
           description: The static encryption key.
         wrappedKey:
-          "$ref": "#/components/schemas/SecureData"
+          $ref: "#/components/schemas/SecureData"
           description: "The wrapped client key appended to initial tls-crypt-v2 packets."
       required:
         - strategy
@@ -732,11 +744,11 @@ components:
       additionalProperties: false
       properties:
         id:
-          "$ref": "#/components/schemas/UniqueID"
+          $ref: "#/components/schemas/UniqueID"
         configuration:
-          "$ref": "#/components/schemas/OpenVPN.Configuration"
+          $ref: "#/components/schemas/OpenVPN.Configuration"
         credentials:
-          "$ref": "#/components/schemas/OpenVPN.Credentials"
+          $ref: "#/components/schemas/OpenVPN.Credentials"
         requiresInteractiveCredentials:
           type: boolean
       required:
@@ -886,6 +898,35 @@ components:
         - Compression setting is unsupported.
         - Option is unsupported.
         - Configuration has no peers.
+    Profile:
+      additionalProperties: false
+      properties:
+        version:
+          type: integer
+        id:
+          $ref: "#/components/schemas/UniqueID"
+        name:
+          type: string
+        modules:
+          items:
+            $ref: "#/components/schemas/TaggedModule"
+          type: array
+        activeModulesIds:
+          items:
+            $ref: "#/components/schemas/UniqueID"
+          type: array
+          uniqueItems: true
+        behavior:
+          $ref: "#/components/schemas/ProfileBehavior"
+        userInfo:
+          type: object
+      required:
+        - id
+        - name
+        - modules
+        - activeModulesIds
+      type: object
+      description: A codable wrapper for a profile with all known modules.
     ProfileBehavior:
       additionalProperties: false
       properties:
@@ -903,10 +944,10 @@ components:
       additionalProperties: false
       properties:
         destination:
-          "$ref": "#/components/schemas/Subnet"
+          $ref: "#/components/schemas/Subnet"
           description: The destination subnet or `nil` if default.
         gateway:
-          "$ref": "#/components/schemas/Address"
+          $ref: "#/components/schemas/Address"
           description: The address of the gateway (falls back to global gateway).
       type: object
       description: Represents a route in the routing table.
@@ -949,13 +990,13 @@ components:
     TaggedModule.Custom:
       additionalProperties: false
       allOf:
-        - "$ref": "#/components/schemas/TaggedModule"
+        - $ref: "#/components/schemas/TaggedModule"
       properties:
         type:
           const: Custom
           type: string
         value:
-          "$ref": "#/components/schemas/CustomModule"
+          $ref: "#/components/schemas/CustomModule"
       required:
         - type
         - value
@@ -963,13 +1004,13 @@ components:
     TaggedModule.DNS:
       additionalProperties: false
       allOf:
-        - "$ref": "#/components/schemas/TaggedModule"
+        - $ref: "#/components/schemas/TaggedModule"
       properties:
         type:
           const: DNS
           type: string
         value:
-          "$ref": "#/components/schemas/DNSModule"
+          $ref: "#/components/schemas/DNSModule"
       required:
         - type
         - value
@@ -977,13 +1018,13 @@ components:
     TaggedModule.HTTPProxy:
       additionalProperties: false
       allOf:
-        - "$ref": "#/components/schemas/TaggedModule"
+        - $ref: "#/components/schemas/TaggedModule"
       properties:
         type:
           const: HTTPProxy
           type: string
         value:
-          "$ref": "#/components/schemas/HTTPProxyModule"
+          $ref: "#/components/schemas/HTTPProxyModule"
       required:
         - type
         - value
@@ -991,13 +1032,13 @@ components:
     TaggedModule.IP:
       additionalProperties: false
       allOf:
-        - "$ref": "#/components/schemas/TaggedModule"
+        - $ref: "#/components/schemas/TaggedModule"
       properties:
         type:
           const: IP
           type: string
         value:
-          "$ref": "#/components/schemas/IPModule"
+          $ref: "#/components/schemas/IPModule"
       required:
         - type
         - value
@@ -1005,13 +1046,13 @@ components:
     TaggedModule.OnDemand:
       additionalProperties: false
       allOf:
-        - "$ref": "#/components/schemas/TaggedModule"
+        - $ref: "#/components/schemas/TaggedModule"
       properties:
         type:
           const: OnDemand
           type: string
         value:
-          "$ref": "#/components/schemas/OnDemandModule"
+          $ref: "#/components/schemas/OnDemandModule"
       required:
         - type
         - value
@@ -1019,13 +1060,13 @@ components:
     TaggedModule.OpenVPN:
       additionalProperties: false
       allOf:
-        - "$ref": "#/components/schemas/TaggedModule"
+        - $ref: "#/components/schemas/TaggedModule"
       properties:
         type:
           const: OpenVPN
           type: string
         value:
-          "$ref": "#/components/schemas/OpenVPNModule"
+          $ref: "#/components/schemas/OpenVPNModule"
       required:
         - type
         - value
@@ -1033,45 +1074,17 @@ components:
     TaggedModule.WireGuard:
       additionalProperties: false
       allOf:
-        - "$ref": "#/components/schemas/TaggedModule"
+        - $ref: "#/components/schemas/TaggedModule"
       properties:
         type:
           const: WireGuard
           type: string
         value:
-          "$ref": "#/components/schemas/WireGuardModule"
+          $ref: "#/components/schemas/WireGuardModule"
       required:
         - type
         - value
       type: object
-    TaggedProfile:
-      additionalProperties: false
-      properties:
-        version:
-          type: integer
-        id:
-          "$ref": "#/components/schemas/UniqueID"
-        name:
-          type: string
-        modules:
-          items:
-            "$ref": "#/components/schemas/TaggedModule"
-          type: array
-        activeModulesIds:
-          items:
-            "$ref": "#/components/schemas/UniqueID"
-          type: array
-          uniqueItems: true
-        behavior:
-          "$ref": "#/components/schemas/ProfileBehavior"
-        userInfo: {}
-      required:
-        - id
-        - name
-        - modules
-        - activeModulesIds
-      type: object
-      description: A codable wrapper for a profile with all known modules.
     TunnelControllerOptions:
       additionalProperties: false
       properties:
@@ -1082,7 +1095,7 @@ components:
         logsSnapshots:
           type: boolean
         minDataCountDelta:
-          "$ref": "#/components/schemas/UInt64"
+          $ref: "#/components/schemas/UInt64"
       required:
         - dnsFallbackServers
         - logsSnapshots
@@ -1093,22 +1106,19 @@ components:
       additionalProperties: false
       properties:
         profile:
-          "$ref": "#/components/schemas/TaggedProfile"
-        options:
-          "$ref": "#/components/schemas/TunnelControllerOptions"
+          $ref: "#/components/schemas/Profile"
         originalModuleId:
-          "$ref": "#/components/schemas/UniqueID"
+          $ref: "#/components/schemas/UniqueID"
         address:
-          "$ref": "#/components/schemas/Address"
+          $ref: "#/components/schemas/Address"
         requiresVirtualDevice:
           type: boolean
         modules:
           items:
-            "$ref": "#/components/schemas/TaggedModule"
+            $ref: "#/components/schemas/TaggedModule"
           type: array
       required:
         - profile
-        - options
         - originalModuleId
         - requiresVirtualDevice
       type: object
@@ -1116,15 +1126,15 @@ components:
       additionalProperties: false
       properties:
         id:
-          "$ref": "#/components/schemas/UniqueID"
+          $ref: "#/components/schemas/UniqueID"
         isEnabled:
           type: boolean
         status:
-          "$ref": "#/components/schemas/TunnelStatus"
+          $ref: "#/components/schemas/TunnelStatus"
         onDemand:
           type: boolean
         environment:
-          "$ref": "#/components/schemas/TunnelSnapshot.Environment"
+          $ref: "#/components/schemas/TunnelSnapshot.Environment"
       required:
         - id
         - isEnabled
@@ -1136,9 +1146,9 @@ components:
       additionalProperties: false
       properties:
         connectionStatus:
-          "$ref": "#/components/schemas/ConnectionStatus"
+          $ref: "#/components/schemas/ConnectionStatus"
         dataCount:
-          "$ref": "#/components/schemas/DataCount"
+          $ref: "#/components/schemas/DataCount"
         lastErrorCode:
           type: string
       required:
@@ -1175,11 +1185,11 @@ components:
       additionalProperties: false
       properties:
         interface:
-          "$ref": "#/components/schemas/WireGuard.LocalInterface"
+          $ref: "#/components/schemas/WireGuard.LocalInterface"
           description: The local interface.
         peers:
           items:
-            "$ref": "#/components/schemas/WireGuard.RemoteInterface"
+            $ref: "#/components/schemas/WireGuard.RemoteInterface"
           type: array
           description: The peers.
       required:
@@ -1194,18 +1204,21 @@ components:
       additionalProperties: false
       properties:
         privateKey:
-          "$ref": "#/components/schemas/WireGuard.Key"
+          $ref: "#/components/schemas/WireGuard.Key"
           description: The local private key.
         addresses:
           items:
-            "$ref": "#/components/schemas/Subnet"
+            $ref: "#/components/schemas/Subnet"
           type: array
           description: The local addresses.
+        listenPort:
+          $ref: "#/components/schemas/UInt16"
+          description: The optional UDP port to listen on.
         dns:
-          "$ref": "#/components/schemas/DNSModule"
+          $ref: "#/components/schemas/DNSModule"
           description: The optional DNS settings.
         mtu:
-          "$ref": "#/components/schemas/UInt16"
+          $ref: "#/components/schemas/UInt16"
           description: The optional MTU.
       required:
         - privateKey
@@ -1216,21 +1229,21 @@ components:
       additionalProperties: false
       properties:
         publicKey:
-          "$ref": "#/components/schemas/WireGuard.Key"
+          $ref: "#/components/schemas/WireGuard.Key"
           description: The endpoint public key.
         preSharedKey:
-          "$ref": "#/components/schemas/WireGuard.Key"
+          $ref: "#/components/schemas/WireGuard.Key"
           description: The optional endpoint pre-shared key.
         endpoint:
-          "$ref": "#/components/schemas/Endpoint"
+          $ref: "#/components/schemas/Endpoint"
           description: The optional endpoint.
         allowedIPs:
           items:
-            "$ref": "#/components/schemas/Subnet"
+            $ref: "#/components/schemas/Subnet"
           type: array
           description: The list of allowed subnets.
         keepAlive:
-          "$ref": "#/components/schemas/UInt16"
+          $ref: "#/components/schemas/UInt16"
           description: The keep-alive interval in seconds.
       required:
         - publicKey
@@ -1241,9 +1254,9 @@ components:
       additionalProperties: false
       properties:
         id:
-          "$ref": "#/components/schemas/UniqueID"
+          $ref: "#/components/schemas/UniqueID"
         configuration:
-          "$ref": "#/components/schemas/WireGuard.Configuration"
+          $ref: "#/components/schemas/WireGuard.Configuration"
       required:
         - id
       type: object
@@ -1252,4 +1265,6 @@ info:
   title: codegen
   version: 1.0.0
 openapi: 3.1.0
-paths: {}
+paths:
+  /:
+    summary: ""

@@ -31,11 +31,7 @@ set(PARTOUT_SOURCES
 ./MiniFoundation/Streams/CurrentValueStream.swift
 ./MiniFoundation/Streams/PassthroughStream.swift
 ./MiniFoundation/Streams/SubjectStream.swift
-./Partout/ABIDaemon.swift
-./Partout/ABIHelpers.swift
-./Partout/ABI_C.swift
 ./Partout/PartoutExports.swift
-./Partout/Registry+ABI.swift
 ./PartoutCore/Connection/BetterPathStreamFactory.swift
 ./PartoutCore/Connection/Connection.swift
 ./PartoutCore/Connection/ConnectionDaemon.swift
@@ -140,6 +136,7 @@ set(PARTOUT_SOURCES
 ./PartoutCore/OpenAPI/Codegen/OpenVPNStaticKeyDirection.swift
 ./PartoutCore/OpenAPI/Codegen/OpenVPNTLSWrap.swift
 ./PartoutCore/OpenAPI/Codegen/OpenVPNTLSWrapStrategy.swift
+./PartoutCore/OpenAPI/Codegen/ParseErrorInfo.swift
 ./PartoutCore/OpenAPI/Codegen/PartoutErrorCode.swift
 ./PartoutCore/OpenAPI/Codegen/ProfileBehavior.swift
 ./PartoutCore/OpenAPI/Codegen/Route.swift
@@ -283,6 +280,8 @@ set(PARTOUT_SOURCES
 ./PartoutOS/AppleNE/Modules/IPModule+NE.swift
 ./PartoutOS/AppleNE/Modules/OnDemandModule+NE.swift
 ./PartoutOS/AppleNE/Modules/Profile+NE.swift
+./PartoutOS/AppleNE/Runtime/PartoutProviderRuntime.swift
+./PartoutOS/AppleNE/Runtime/PartoutTunnelController.swift
 ./PartoutOS/AppleNE/Serialization/KeychainNEProtocolCoder.swift
 ./PartoutOS/AppleNE/Serialization/NEProtocolCoder.swift
 ./PartoutOS/AppleNE/Serialization/ProviderNEProtocolCoder.swift

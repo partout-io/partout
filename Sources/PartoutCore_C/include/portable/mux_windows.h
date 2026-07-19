@@ -40,7 +40,7 @@ static struct pp_mux_entry *pp_mux_track_fd(pp_mux mux, pp_fd fd) {
     if (tracked) return tracked;
     /* Do not track more than fds_len. */
     if (mux->num_tracked >= mux->entries_len) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "Too many tracked fds");
+        pp_clog_v(PPLogLevelFault, "Too many tracked fds");
         return NULL;
     }
     tracked = mux->entries + mux->num_tracked;
@@ -156,7 +156,7 @@ int pp_mux_wait(pp_mux mux, int *error_code) {
     const DWORD ret = WaitForMultipleObjects((DWORD)handles_count, mux->handles, FALSE, INFINITE);
     if (ret == WAIT_FAILED) {
         const DWORD error = GetLastError();
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait WaitForMultipleObjects() failed: error=%lu", error);
+        pp_clog_v(PPLogLevelFault, "pp_mux_wait WaitForMultipleObjects() failed: error=%lu", error);
         if (error_code) *error_code = (int)error;
         return -1;
     }
@@ -164,7 +164,7 @@ int pp_mux_wait(pp_mux mux, int *error_code) {
     const DWORD first = WAIT_OBJECT_0;
     const DWORD last = WAIT_OBJECT_0 + (DWORD)handles_count;
     if (ret < first || ret >= last) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "pp_mux_wait WaitForMultipleObjects() unexpected status: %lu", ret);
+        pp_clog_v(PPLogLevelFault, "pp_mux_wait WaitForMultipleObjects() unexpected status: %lu", ret);
         if (error_code) *error_code = (int)ret;
         return -1;
     }

@@ -1,4 +1,0 @@
-module Partout_C {
-    header "partout.h"
-    export *
-}

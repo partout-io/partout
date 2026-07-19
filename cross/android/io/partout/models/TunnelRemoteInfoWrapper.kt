@@ -25,7 +25,6 @@ package io.partout.models
 
 import io.partout.models.TaggedModule
 import io.partout.models.TaggedProfile
-import io.partout.models.TunnelControllerOptions
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -35,7 +34,6 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param profile 
- * @param options 
  * @param originalModuleId 
  * @param requiresVirtualDevice 
  * @param address A hostname or IP address.
@@ -47,9 +45,6 @@ data class TunnelRemoteInfoWrapper (
 
     @SerialName(value = "profile")
     val profile: TaggedProfile,
-
-    @SerialName(value = "options")
-    val options: TunnelControllerOptions,
 
     @SerialName(value = "originalModuleId")
     val originalModuleId: kotlin.String,
@@ -68,4 +63,3 @@ data class TunnelRemoteInfoWrapper (
 
 
 }
-

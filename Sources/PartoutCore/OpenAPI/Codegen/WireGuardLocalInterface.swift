@@ -12,14 +12,17 @@ public struct WireGuardLocalInterface: Sendable, Codable, Hashable {
     public var privateKey: WireGuardKey
     /** The local addresses. */
     public var addresses: [Subnet]
+    /** The optional UDP port to listen on. */
+    public var listenPort: ModelUInt16?
     /** The optional DNS settings. */
     public var dns: DNSModule?
     /** The optional MTU. */
     public var mtu: ModelUInt16?
 
-    public init(privateKey: WireGuardKey, addresses: [Subnet], dns: DNSModule? = nil, mtu: ModelUInt16? = nil) {
+    public init(privateKey: WireGuardKey, addresses: [Subnet], listenPort: ModelUInt16? = nil, dns: DNSModule? = nil, mtu: ModelUInt16? = nil) {
         self.privateKey = privateKey
         self.addresses = addresses
+        self.listenPort = listenPort
         self.dns = dns
         self.mtu = mtu
     }

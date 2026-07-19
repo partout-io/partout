@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include "partout.h"
 #include "portable/portable.h"
 
 #if PARTOUT_HAS_CRYPTO

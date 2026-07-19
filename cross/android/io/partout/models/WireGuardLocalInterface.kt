@@ -34,6 +34,7 @@ import kotlinx.serialization.Contextual
  *
  * @param privateKey The local private key.
  * @param addresses The local addresses.
+ * @param listenPort The optional UDP port to listen on.
  * @param dns The optional DNS settings.
  * @param mtu The optional MTU.
  */
@@ -48,6 +49,10 @@ data class WireGuardLocalInterface (
     /* The local addresses. */
     @SerialName(value = "addresses")
     val addresses: kotlin.collections.List<kotlin.String>,
+
+    /* The optional UDP port to listen on. */
+    @SerialName(value = "listenPort")
+    val listenPort: kotlin.Int? = null,
 
     /* The optional DNS settings. */
     @SerialName(value = "dns")
