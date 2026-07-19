@@ -43,6 +43,7 @@ static inline pp_reachability pp_reachability_none(void) {
 #endif
 
 static inline int pp_dns_resolve(const char *hostname,
+                                 const char *_Nullable service,
                                  const struct addrinfo *_Nullable hints,
                                  const pp_reachability *_Nullable reachability,
                                  struct addrinfo *_Nullable *_Nonnull infoptr) {
@@ -52,12 +53,12 @@ static inline int pp_dns_resolve(const char *hostname,
     }
     return android_getaddrinfofornetwork(reachability->network_handle,
                                          hostname,
-                                         NULL,
+                                         service,
                                          hints,
                                          infoptr);
 #else
     (void)reachability;
-    return getaddrinfo(hostname, NULL, hints, infoptr);
+    return getaddrinfo(hostname, service, hints, infoptr);
 #endif
 }
 

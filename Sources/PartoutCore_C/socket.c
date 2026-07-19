@@ -144,19 +144,9 @@ pp_socket pp_socket_open(const char *ip_addr,
 #endif
 
     snprintf(port_str, sizeof(port_str), "%u", port);
-    int ret;
-#if PARTOUT_ANDROID
-    if (!reachability || reachability->network_handle <= 0) {
-        local_print_error("android_getaddrinfofornetwork(): missing network handle");
-        goto failure;
-    }
-    ret = android_getaddrinfofornetwork(reachability->network_handle, ip_addr, port_str, &hints, &resolved);
-#else
-    (void)reachability;
-    ret = getaddrinfo(ip_addr, port_str, &hints, &resolved);
-#endif
+    const int ret = pp_dns_resolve(ip_addr, port_str, &hints, reachability, &resolved);
     if (ret != 0) {
-        local_print_error("getaddrinfo()");
+        local_print_error("pp_dns_resolve()");
         goto failure;
     }
 
