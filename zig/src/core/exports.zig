@@ -35,3 +35,4 @@ pub const SerializeError = registry.SerializeError;
 
 pub const isGeneratedId = uuid.isV4;
 pub const newId = uuid.newId;
+pub const sleepMs = concurrency.sleepMs;

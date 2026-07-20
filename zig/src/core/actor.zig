@@ -28,6 +28,7 @@ pub fn Actor(
         const Result = union(enum) {
             ok,
             err: Error,
+            closed,
         };
 
         const Outcome = struct {
@@ -47,6 +48,15 @@ pub fn Actor(
         pub const PostError = std.mem.Allocator.Error || error{Closed};
         pub const CallError = Error || error{Closed};
 
+        /// Replaces the condition-backed mailbox wait. `wait` must block until
+        /// work may be available, and returns `false` when the actor must exit.
+        /// `wake_up` must make an in-flight `wait` return. Both callbacks
+        /// execute without the actor mutex held.
+        pub const WaitCallbacks = struct {
+            wait: *const fn (*Context) bool,
+            wake_up: *const fn (*Context) void,
+        };
+
         allocator: std.mem.Allocator,
         context: *Context,
         mutex: concurrency.Mutex = .{},
@@ -56,13 +66,24 @@ pub fn Actor(
         accepting: bool = false,
         head: ?*Job = null,
         tail: ?*Job = null,
+        wait_callbacks: ?WaitCallbacks = null,
+        worker_exited: bool = false,
 
         pub fn create(allocator: std.mem.Allocator, context: *Context) CreateError!*Self {
+            return createWithWaitCallbacks(allocator, context, null);
+        }
+
+        pub fn createWithWaitCallbacks(
+            allocator: std.mem.Allocator,
+            context: *Context,
+            wait_callbacks: ?WaitCallbacks,
+        ) CreateError!*Self {
             const self = try allocator.create(Self);
             self.* = .{
                 .allocator = allocator,
                 .context = context,
                 .accepting = true,
+                .wait_callbacks = wait_callbacks,
             };
             errdefer {
                 self.cond.deinit();
@@ -81,9 +102,15 @@ pub fn Actor(
             self.allocator.destroy(self);
         }
 
-        fn isCurrentThread(self: *const Self) bool {
+        fn isCurrentThreadLocked(self: *const Self) bool {
             const thread_id = self.thread_id orelse return false;
             return thread_id == std.Thread.getCurrentId();
+        }
+
+        pub fn isCurrentThread(self: *Self) bool {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            return self.isCurrentThreadLocked();
         }
 
         /// Dispatches a message asynchronously with the actor.
@@ -111,7 +138,7 @@ pub fn Actor(
             // call(), we must execute the job immediately. Waiting on
             // the condition would lead to a deadlock.
             self.mutex.lock();
-            if (self.isCurrentThread()) {
+            if (self.isCurrentThreadLocked()) {
                 self.mutex.unlock();
                 return perform(self.context, message);
             }
@@ -125,6 +152,7 @@ pub fn Actor(
             return switch (job.result) {
                 .ok => {},
                 .err => |err| err,
+                .closed => error.Closed,
             };
         }
 
@@ -137,6 +165,13 @@ pub fn Actor(
                 self.mutex.unlock();
                 return;
             };
+            if (self.worker_exited) {
+                self.thread = null;
+                self.thread_id = null;
+                self.mutex.unlock();
+                thread.join();
+                return;
+            }
             // Stop accepting new jobs
             self.accepting = false;
             self.pushLocked(&job);
@@ -162,14 +197,28 @@ pub fn Actor(
             }
             self.tail = job;
             self.cond.broadcast();
+            if (self.wait_callbacks) |callbacks| {
+                // The callback is required to be non-blocking. Calling it
+                // outside this mutex also permits it to re-enter the context.
+                self.mutex.unlock();
+                callbacks.wake_up(self.context);
+                self.mutex.lock();
+            }
         }
 
-        fn popBlocking(self: *Self) *Job {
+        fn popBlocking(self: *Self) ?*Job {
             self.mutex.lock();
             defer self.mutex.unlock();
 
             while (self.head == null) {
-                self.cond.wait(&self.mutex);
+                if (self.wait_callbacks) |callbacks| {
+                    self.mutex.unlock();
+                    const should_continue = callbacks.wait(self.context);
+                    self.mutex.lock();
+                    if (!should_continue) return null;
+                } else {
+                    self.cond.wait(&self.mutex);
+                }
             }
             const job = self.head.?;
             self.head = job.next;
@@ -187,12 +236,8 @@ pub fn Actor(
             self.mutex.unlock();
 
             while (true) {
-                const job = self.popBlocking();
+                const job = self.popBlocking() orelse break;
                 const outcome = self.performCommand(job.command);
-                // Snapshot ownership before publishing completion. A synchronous
-                // caller may return and invalidate its stack-backed job as soon
-                // as done is signalled.
-                const owned = job.owned;
 
                 self.mutex.lock();
                 job.result = outcome.result;
@@ -201,10 +246,31 @@ pub fn Actor(
                 self.mutex.unlock();
 
                 const should_exit = outcome.exit;
-                if (owned) {
+                if (job.owned) {
                     self.allocator.destroy(job);
                 }
-                if (should_exit) return;
+                if (should_exit) break;
+            }
+
+            self.mutex.lock();
+            self.accepting = false;
+            self.worker_exited = true;
+            self.closePendingLocked();
+            self.cond.broadcast();
+            self.mutex.unlock();
+        }
+
+        fn closePendingLocked(self: *Self) void {
+            var current = self.head;
+            self.head = null;
+            self.tail = null;
+            while (current) |job| {
+                const next = job.next;
+                job.next = null;
+                job.result = .closed;
+                job.done = true;
+                if (job.owned) self.allocator.destroy(job);
+                current = next;
             }
         }
 

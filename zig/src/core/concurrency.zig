@@ -298,7 +298,14 @@ const WindowsCondition = struct {
     pub fn deinit(_: *WindowsCondition) void {}
 };
 
-fn sleepMs(value: u64) void {
+pub fn sleepMs(value: u64) void {
+    if (builtin.os.tag == .windows) {
+        const windows = std.os.windows;
+        const bounded = @min(value, @as(u64, @intCast(std.math.maxInt(i64) / 10_000)));
+        var interval: windows.LARGE_INTEGER = -@as(i64, @intCast(bounded * 10_000));
+        _ = windows.ntdll.NtDelayExecution(.FALSE, &interval);
+        return;
+    }
     var request = std.c.timespec{
         .sec = @intCast(value / std.time.ms_per_s),
         .nsec = @intCast((value % std.time.ms_per_s) * std.time.ns_per_ms),
