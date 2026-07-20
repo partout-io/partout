@@ -18,7 +18,7 @@ const util = core.util;
 
 // ZIGME: Hardcode until only Zig ABI
 pub export fn partout_log(_: i32, message: [*:0]const u8) void {
-    std.debug.print("{s}", .{message});
+    std.debug.print("{s}\n", .{message});
 }
 
 pub const MockRuntime = struct {

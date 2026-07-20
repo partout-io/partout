@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 comptime {
-    _ = @import("partout.zig");
     _ = @import("abi/helpers.zig");
     _ = @import("abi/importer.zig");
     _ = @import("abi/runtime.zig");
