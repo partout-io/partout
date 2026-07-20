@@ -437,12 +437,12 @@ fn cOnReachability(ctx: ?*anyopaque, reachability: [*c]const ReachabilityInfo) c
     if (reachability == null) return;
     self.notifyReachability(reachability.*);
     if (builtin.abi.isAndroid() and @hasField(ReachabilityInfo, "network_handle")) {
-        log.writef(.info, "Network reachability changed: reachable={}, network_handle={}", .{
+        log.writef(.debug, "Network reachability changed: reachable={}, network_handle={}", .{
             reachability[0].reachable,
             reachability[0].network_handle,
         });
     } else {
-        log.writef(.info, "Network reachability changed: reachable={}", .{reachability[0].reachable});
+        log.writef(.debug, "Network reachability changed: reachable={}", .{reachability[0].reachable});
     }
 }
 
