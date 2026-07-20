@@ -53,10 +53,10 @@ public final class NativeTunnelController: TunnelController, Sendable {
     init(
         _ ctx: PartoutLoggerContext,
         ref: UnsafeMutableRawPointer?,
-        fnt customFnt: pp_tun_ctrl_fnt? = nil,
+        fnt customFnt: pp_tun_ctrl_fnt?,
         profile: Profile,
         environment: TunnelEnvironmentReader,
-        betterPathFactory: BetterPathStreamFactory? = nil,
+        betterPathFactory: BetterPathStreamFactory?,
         options: TunnelControllerOptions,
         bufSize: Int
     ) throws {
