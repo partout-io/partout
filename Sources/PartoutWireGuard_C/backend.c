@@ -5,6 +5,7 @@
  */
 
 #include <stdio.h>
+#include "portable/common.h"
 #include "portable/lib.h"
 #include "wireguard/backend.h"
 
