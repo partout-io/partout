@@ -5,7 +5,7 @@
 import NetworkExtension
 
 extension NEPacketTunnelProvider {
-    // FIXME: ###, Make internal after consolidating
+    // TODO: #518, Make internal after migrating to Zig
     public func clearTunnelSettings(withKillSwitch: Bool) async throws {
         // XXX: We want to remove the VPN status icon on iOS/tvOS
         // and calling .setTunnelNetworkSettings(nil) doesn't seem

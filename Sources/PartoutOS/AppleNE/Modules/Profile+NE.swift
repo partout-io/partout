@@ -5,7 +5,7 @@
 import NetworkExtension
 
 extension Profile {
-    // FIXME: ###, Make internal after consolidating
+    // TODO: #518, Make internal after migrating to Zig
     public func networkSettings(
         with info: TunnelRemoteInfo?,
         options: TunnelControllerOptions = .init()
