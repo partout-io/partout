@@ -10,7 +10,6 @@
         "scripts",
         "src",
         "tools",
-        "vendors/wg-go/include",
         "LICENSE",
     },
 }
