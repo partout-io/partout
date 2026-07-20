@@ -19,6 +19,13 @@ extern "C" {
 const char *partout_version(void);
 
 /* Library initializiation, call it ASAP. */
+typedef enum {
+    PartoutLogLevelFault = 0,
+    PartoutLogLevelError,
+    PartoutLogLevelNotice,
+    PartoutLogLevelInfo,
+    PartoutLogLevelDebug
+} partout_log_level;
 typedef void (*partout_logger_cb)(int level, const char *message);
 typedef struct {
     bool logs_private_data;

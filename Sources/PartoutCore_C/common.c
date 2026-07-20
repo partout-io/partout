@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include <stdarg.h>
-#include <errno.h>
 #include "portable/common.h"
+
+#include <stdarg.h>
+#include <stdio.h>
+#include <errno.h>
 
 const int PPIOErrorWouldBlock   = -11;
 const int PPIOErrorNoBufs       = -12;
@@ -39,7 +41,7 @@ void pp_clog_v(pp_log_level level, const char *fmt, ...) {
 }
 
 static FILE *pp_file_open_read(const char *path) {
-#ifdef _WIN32
+#if PARTOUT_WINDOWS
     FILE *file = NULL;
     return (fopen_s(&file, path, "rb") == 0) ? file : NULL;
 #else
