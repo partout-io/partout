@@ -60,7 +60,7 @@ const char *pp_tun_name(const pp_tun tun) {
     return NULL;
 }
 
-/* JNITunnelcontroller */
+/* PartoutTunnelController */
 
 typedef struct {
     const char *name;
@@ -361,10 +361,10 @@ pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
 }
 
 JNIEXPORT void JNICALL
-Java_io_partout_vpn_JNITunnelController_onNativeReachabilityUpdate(JNIEnv *env,
-                                                                   jobject thiz,
-                                                                   jlong delegate,
-                                                                   jlong net_handle) {
+Java_io_partout_vpn_PartoutTunnelController_onNativeReachabilityUpdate(JNIEnv *env,
+                                                                       jobject thiz,
+                                                                       jlong delegate,
+                                                                       jlong net_handle) {
     (void)env;
     (void)thiz;
     pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
@@ -377,9 +377,9 @@ Java_io_partout_vpn_JNITunnelController_onNativeReachabilityUpdate(JNIEnv *env,
 }
 
 JNIEXPORT void JNICALL
-Java_io_partout_vpn_JNITunnelController_onNativeBetterPathUpdate(JNIEnv *env,
-                                                                 jobject thiz,
-                                                                 jlong delegate) {
+Java_io_partout_vpn_PartoutTunnelController_onNativeBetterPathUpdate(JNIEnv *env,
+                                                                     jobject thiz,
+                                                                     jlong delegate) {
     (void)env;
     (void)thiz;
     pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
@@ -388,10 +388,10 @@ Java_io_partout_vpn_JNITunnelController_onNativeBetterPathUpdate(JNIEnv *env,
 }
 
 JNIEXPORT jstring JNICALL
-Java_io_partout_vpn_JNITunnelController_getNativeEnvironmentValue(JNIEnv *env,
-                                                                  jobject thiz,
-                                                                  jlong delegate,
-                                                                  jstring key) {
+Java_io_partout_vpn_PartoutTunnelController_getNativeEnvironmentValue(JNIEnv *env,
+                                                                      jobject thiz,
+                                                                      jlong delegate,
+                                                                      jstring key) {
     (void)thiz;
     pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
     if (!ctrl_delegate || !ctrl_delegate->ctx) return NULL;

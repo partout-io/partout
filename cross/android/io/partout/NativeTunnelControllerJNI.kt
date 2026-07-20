@@ -7,15 +7,15 @@ package io.partout
 /*
 Three layers are involved in this:
 - PartoutVpnServiceRuntime.kt
-- JNITunnelController.kt
+- PartoutTunnelController.kt
 - NativeTunnelController.swift (+ tun_android.c)
 
 Where:
-- PartoutVpnServiceRuntime owns JNITunnelController and forwards its JNI ref to Engine.start()
+- PartoutVpnServiceRuntime owns PartoutTunnelController and forwards its JNI ref to Engine.start()
 - The engine sets up the Swift/C NativeTunnelController with the JNI ref
-- On setup, NativeTunnelController sets itself (via C) as the JNITunnelController delegate
-- When needed, NativeTunnelController calls JNITunnelController methods via JNI
-- When needed, JNITunnelController calls NativeTunnelController methods via the JNI delegate
+- On setup, NativeTunnelController sets itself (via C) as the PartoutTunnelController delegate
+- When needed, NativeTunnelController calls PartoutTunnelController methods via JNI
+- When needed, PartoutTunnelController calls NativeTunnelController methods via the JNI delegate
  */
 
 // Swift/C -> Kotlin: ProGuard rules MUST MATCH!

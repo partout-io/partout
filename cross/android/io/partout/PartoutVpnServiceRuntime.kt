@@ -15,9 +15,10 @@ import android.os.Message
 import android.os.Messenger
 import android.util.Log
 import io.partout.models.TaggedProfile
+import io.partout.models.TunnelControllerOptions
 import io.partout.models.TunnelSnapshot
 import io.partout.models.TunnelStatus
-import io.partout.vpn.JNITunnelController
+import io.partout.vpn.PartoutTunnelController
 import io.partout.vpn.TunnelControllerDelegate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -34,8 +35,7 @@ class PartoutVpnServiceRuntime(
     private val jniLogTag: String,
     val service: VpnService,
     private val engine: Engine,
-    private val logsSnapshots: Boolean,
-    private val dnsFallbackServers: List<String> = emptyList()
+    private val options: TunnelControllerOptions
 ): TunnelControllerDelegate {
     // Execute actions in serial queue
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -44,11 +44,11 @@ class PartoutVpnServiceRuntime(
     private var activeProfileId: String? = null
 
     // C/JNI controller
-    private var controller: JNITunnelController? = null
+    private var controller: PartoutTunnelController? = null
 
     // Deliver snapshots with mutex
     private val snapshotEmitter = SnapshotEmitter(
-        if (logsSnapshots) logTag else null,
+        if (options.logsSnapshots) logTag else null,
         service
     )
 
@@ -123,13 +123,12 @@ class PartoutVpnServiceRuntime(
         activeProfileId = profileId
         Log.i(logTag, "Starting VPN daemon")
         runCatching {
-            val newController = JNITunnelController(
+            val newController = PartoutTunnelController(
                 jniLogTag,
                 service,
                 serviceScope,
                 this,
-                dnsFallbackServers,
-                logsSnapshots
+                options
             )
             engine.start(intent, newController, profileJSON)
             // Does not throw from now
