@@ -69,20 +69,25 @@ typedef struct {
     void (*on_better_path)(void *_Nullable ctx);
     char *_Nullable (*_Nonnull environment_value)(void *_Nullable ctx, const char *key);
 } pp_tun_ctrl_delegate;
-void pp_tun_ctrl_set_delegate(void *_Nullable ref,
-                              const pp_tun_ctrl_delegate *_Nullable delegate);
-pp_tun _Nullable pp_tun_ctrl_set_tunnel(void *_Nullable ref,
-                                        const char *uuid,
-                                        const char *_Nullable info_json);
-bool pp_tun_ctrl_configure_sockets(void *_Nullable ref,
-                                   const pp_reachability *_Nullable info,
-                                   const pp_socket_fd *_Nonnull fds,
-                                   const size_t fds_len);
-void pp_tun_ctrl_report_snapshot(void *_Nullable ref,
-                                 const char *snapshot_json,
-                                 bool log);
-void pp_tun_ctrl_clear_tunnel(void *_Nullable ref, bool kill_switch);
-void pp_tun_ctrl_cancel_tunnel(void *_Nullable ref,
-                               const char *_Nullable error_message);
+
+typedef struct {
+    void (*set_delegate)(void *_Nullable ref,
+                         const pp_tun_ctrl_delegate *_Nullable delegate);
+    pp_tun _Nullable (*_Nonnull set_tunnel)(void *_Nullable ref,
+                                            const char *uuid,
+                                            const char *_Nullable info_json);
+    bool (*configure_sockets)(void *_Nullable ref,
+                              const pp_reachability *_Nullable info,
+                              const pp_socket_fd *_Nonnull fds,
+                              size_t fds_len);
+    void (*report_snapshot)(void *_Nullable ref,
+                            const char *snapshot_json);
+    void (*clear_tunnel)(void *_Nullable ref, bool kill_switch);
+    void (*cancel_tunnel)(void *_Nullable ref,
+                          const char *_Nullable error_message);
+} pp_tun_ctrl_fnt;
+
+/* Return the function table for the current platform. */
+pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void);
 
 #pragma clang assume_nonnull end

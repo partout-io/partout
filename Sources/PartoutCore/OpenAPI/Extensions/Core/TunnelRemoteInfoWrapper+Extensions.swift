@@ -3,10 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 extension TunnelRemoteInfoWrapper {
-    init(_ profile: Profile, options: TunnelControllerOptions, info: TunnelRemoteInfo) {
+    init(_ profile: Profile, info: TunnelRemoteInfo) {
         self.init(
             profile: profile.asTaggedProfile,
-            options: options,
             originalModuleId: info.originalModuleId,
             address: info.address,
             requiresVirtualDevice: info.requiresVirtualDevice,
@@ -16,8 +15,8 @@ extension TunnelRemoteInfoWrapper {
 }
 
 extension TunnelRemoteInfo {
-    func encodedAsJSON(_ profile: Profile, options: TunnelControllerOptions) throws -> String {
-        let wrapped = TunnelRemoteInfoWrapper(profile, options: options, info: self)
+    func encodedAsJSON(_ profile: Profile) throws -> String {
+        let wrapped = TunnelRemoteInfoWrapper(profile, info: self)
         do {
             return try JSONEncoder.shared().encodeJSON(wrapped)
         } catch {

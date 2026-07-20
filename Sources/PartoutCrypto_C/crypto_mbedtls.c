@@ -303,7 +303,7 @@ static
 void pp_tls_log_mbed_error(const char *op, int ret) {
     char msg[128];
     mbedtls_strerror(ret, msg, sizeof(msg));
-    pp_clog_v(PPLogCategoryCore, PPLogLevelError,
+    pp_clog_v(PPLogLevelError,
               "%s: mbedTLS error -0x%04x (%s)", op, ret < 0 ? -ret : ret, msg);
 }
 
@@ -338,7 +338,7 @@ void pp_tls_buffer_reserve(pp_tls_buffer *buf, size_t capacity) {
     size_t new_capacity = buf->capacity ? buf->capacity : 1024;
     while (new_capacity < capacity) {
         if (new_capacity > (SIZE_MAX / 2)) {
-            pp_clog(PPLogCategoryCore, PPLogLevelFault,
+            pp_clog(PPLogLevelFault,
                     "pp_tls_buffer_reserve: capacity overflow");
             abort();
         }
@@ -360,7 +360,7 @@ void pp_tls_buffer_append(pp_tls_buffer *buf,
                           const uint8_t *src, size_t src_len) {
     if (!src_len) return;
     if (buf->length > SIZE_MAX - src_len) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault,
+        pp_clog(PPLogLevelFault,
                 "pp_tls_buffer_append: length overflow");
         abort();
     }
@@ -490,7 +490,7 @@ int pp_tls_verify_peer(void *ctx, mbedtls_x509_crt *crt, int depth, uint32_t *fl
     if (flags && *flags) {
         pp_tls tls = ctx;
         tls->did_fail_verify = true;
-        pp_clog_v(PPLogCategoryCore, PPLogLevelError,
+        pp_clog_v(PPLogLevelError,
                   "pp_tls_verify_peer: flags 0x%08x", (unsigned int)*flags);
         tls->opt->on_verify_failure(tls->opt->ctx);
     }

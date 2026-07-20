@@ -15,7 +15,7 @@ struct __pp_socket_struct {
 typedef int os_socklen_t;
 
 static inline void local_print_error(const char *msg) {
-    pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s failed with error %d", msg, WSAGetLastError());
+    pp_clog_v(PPLogLevelFault, "%s failed with error %d", msg, WSAGetLastError());
 }
 
 static inline bool local_platform_init(void) {

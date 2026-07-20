@@ -29,7 +29,7 @@ pp_lib pp_lib_create(const char *path) {
     snprintf(path_ext, path_len, "%s.dll", path);
     HMODULE handle = LoadLibraryExA(path_ext, NULL, LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (!handle) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "LoadLibraryExA(): %lu", GetLastError());
+        pp_clog_v(PPLogLevelFault, "LoadLibraryExA(): %lu", GetLastError());
         goto failure;
     }
 #else
@@ -40,7 +40,7 @@ pp_lib pp_lib_create(const char *path) {
 #endif
     void *handle = dlopen(path_ext, RTLD_NOW);
     if (!handle) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "dlopen(): %s", dlerror());
+        pp_clog_v(PPLogLevelFault, "dlopen(): %s", dlerror());
         goto failure;
     }
 #endif
@@ -71,7 +71,7 @@ void *pp_lib_load(const pp_lib lib, const char *symbol) {
     void *ptr = dlsym(lib->handle, symbol);
 #endif
     if (!ptr) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s not found in library", symbol);
+        pp_clog_v(PPLogLevelFault, "%s not found in library", symbol);
         return NULL;
     }
     return ptr;

@@ -15,8 +15,10 @@
 #include <sys/ioctl.h>
 #include <sys/uio.h>
 #include <net/if.h>
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <dlfcn.h>
 #include "portable/endian.h"
 
 #if defined(UTUN_CONTROL_NAME)
@@ -53,7 +55,7 @@ pp_tun pp_tun_open(const char *uuid) {
 
     fd = socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL);
     if (fd < 0) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: socket(PF_SYSTEM)");
+        pp_clog(PPLogLevelFault, "tun_darwin: socket(PF_SYSTEM)");
         goto failure;
     }
 
@@ -61,7 +63,7 @@ pp_tun pp_tun_open(const char *uuid) {
     int ret;
     PP_IO_RETRY(ret, ioctl(fd, CTLIOCGINFO, &ctl_info));
     if (ret < 0) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: ioctl(CTLIOCGINFO)");
+        pp_clog(PPLogLevelFault, "tun_darwin: ioctl(CTLIOCGINFO)");
         goto failure;
     }
 
@@ -72,18 +74,18 @@ pp_tun pp_tun_open(const char *uuid) {
     sc.sc_unit = 0;  // First free utunX
     PP_IO_RETRY(ret, connect(fd, (struct sockaddr *)&sc, sizeof(sc)));
     if (ret < 0) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: connect(AF_SYSTEM, AF_SYS_CONTROL)");
+        pp_clog_v(PPLogLevelFault, "tun_darwin: connect(AF_SYSTEM, AF_SYS_CONTROL): %s", strerror(errno));
         goto failure;
     }
 
     // Get actual name
     if (getsockopt(fd, SYSPROTO_CONTROL, UTUN_OPT_IFNAME,
                    ifname, &ifname_len) == -1) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "tun_darwin: getsockopt(UTUN_OPT_IFNAME)");
+        pp_clog(PPLogLevelFault, "tun_darwin: getsockopt(UTUN_OPT_IFNAME)");
         goto failure;
     }
 
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_darwin: Created utun device %s", ifname);
+    pp_clog_v(PPLogLevelInfo, "tun_darwin: Created utun device %s", ifname);
     pp_tun tun = pp_alloc(sizeof(*tun));
     tun->fd = fd;
     tun->dev_name = pp_dup(ifname);
@@ -167,7 +169,7 @@ uint32_t pp_tun_proto_for(uint8_t byte) {
         case 6:
             return AF_INET6;
         default:
-            pp_clog_v(PPLogCategoryCore, PPLogLevelError, "tun_darwin: Unexpected utun packet header (%u)", header);
+            pp_clog_v(PPLogLevelError, "tun_darwin: Unexpected utun packet header (%u)", header);
             return 0;
     }
 }
@@ -189,7 +191,7 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
         return pp_tun_handle_result(read_len);
     }
     if (read_len < (int)sizeof(pi)) {
-        pp_clog(PPLogCategoryCore, PPLogLevelError, "tun_darwin: Missing 4-byte utun packet header");
+        pp_clog(PPLogLevelError, "tun_darwin: Missing 4-byte utun packet header");
         return -1;
     }
     return read_len - (int)sizeof(pi);
@@ -233,52 +235,97 @@ const char *pp_tun_name(const pp_tun tun) {
     return tun->dev_name;
 }
 
-void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
-    (void)ref;
-    (void)delegate;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_darwin: ctrl_set_delegate(%p, %p)", ref, delegate);
-}
+typedef void (*pp_swift_tun_ctrl_set_delegate_fn)(void *_Nullable ref,
+                                                  const pp_tun_ctrl_delegate *_Nullable delegate);
+typedef bool (*pp_swift_tun_ctrl_set_tunnel_fn)(void *_Nullable ref,
+                                                const char *_Nullable uuid,
+                                                const char *_Nullable info_json);
+typedef bool (*pp_swift_tun_ctrl_configure_sockets_fn)(void *_Nullable ref,
+                                                       const pp_reachability *_Nullable info,
+                                                       const pp_socket_fd *_Nullable fds,
+                                                       size_t fds_len);
+typedef void (*pp_swift_tun_ctrl_report_snapshot_fn)(void *_Nullable ref,
+                                                     const char *_Nullable snapshot_json);
+typedef void (*pp_swift_tun_ctrl_clear_tunnel_fn)(void *_Nullable ref,
+                                                  bool kill_switch);
+typedef void (*pp_swift_tun_ctrl_cancel_tunnel_fn)(void *_Nullable ref,
+                                                   const char *_Nullable error_code);
 
-pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
-    (void)ref;
-    (void)uuid;
-    (void)info_json;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_darwin: ctrl_set_tunnel(%p)", ref);
-#if PARTOUT_MACOS
-    return pp_tun_open(uuid);
-#else
-    return NULL;
-#endif
-}
-
-bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
-                                   const pp_socket_fd *fds, const size_t fds_len) {
-    (void)ref;
-    (void)info;
-    (void)fds;
-    (void)fds_len;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_darwin: ctrl_configure_sockets(%p)", ref);
-    return true;
-}
-
-void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json, bool log) {
-    (void)ref;
-    (void)snapshot_json;
-    if (log) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_darwin: ctrl_report_snapshot(%p)", ref);
+#define PP_SWIFT_TUN_CTRL_SYMBOL(function_name, symbol_name, type) \
+    static type function_name(void) { \
+        union { \
+            void *symbol; \
+            type function; \
+        } lookup = { .symbol = dlsym(RTLD_DEFAULT, symbol_name) }; \
+        return lookup.function; \
     }
+
+PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_set_delegate, "pp_swift_tun_ctrl_set_delegate", pp_swift_tun_ctrl_set_delegate_fn)
+PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_set_tunnel, "pp_swift_tun_ctrl_set_tunnel", pp_swift_tun_ctrl_set_tunnel_fn)
+PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_configure_sockets, "pp_swift_tun_ctrl_configure_sockets", pp_swift_tun_ctrl_configure_sockets_fn)
+PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_report_snapshot, "pp_swift_tun_ctrl_report_snapshot", pp_swift_tun_ctrl_report_snapshot_fn)
+PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_clear_tunnel, "pp_swift_tun_ctrl_clear_tunnel", pp_swift_tun_ctrl_clear_tunnel_fn)
+PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_cancel_tunnel, "pp_swift_tun_ctrl_cancel_tunnel", pp_swift_tun_ctrl_cancel_tunnel_fn)
+
+static void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
+    pp_clog_v(PPLogLevelDebug, "tun_darwin: ctrl_set_delegate(%p, %p)", ref, delegate);
+    const pp_swift_tun_ctrl_set_delegate_fn swift = pp_swift_tun_ctrl_set_delegate();
+    if (!swift) return;
+    swift(ref, delegate);
 }
 
-void pp_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
-    (void)ref;
-    (void)kill_switch;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_darwin: ctrl_clear_tunnel(%p)", ref);
+static pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
+    pp_clog_v(PPLogLevelInfo, "tun_darwin: ctrl_set_tunnel(%p)", ref);
+    const pp_swift_tun_ctrl_set_tunnel_fn swift = pp_swift_tun_ctrl_set_tunnel();
+    if (!swift) {
+#if PARTOUT_MACOS
+        return pp_tun_open(uuid);
+#else
+        return NULL;
+#endif
+    }
+    if (!swift(ref, uuid, info_json)) return NULL;
+    return pp_tun_lookup();
 }
 
-void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_code) {
-    (void)ref;
-    (void)error_code;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_darwin: ctrl_cancel_tunnel(%p)", ref);
+static bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
+                                          const pp_socket_fd *fds, const size_t fds_len) {
+    pp_clog_v(PPLogLevelInfo, "tun_darwin: ctrl_configure_sockets(%p)", ref);
+    const pp_swift_tun_ctrl_configure_sockets_fn swift = pp_swift_tun_ctrl_configure_sockets();
+    if (!swift) return true;
+    return swift(ref, info, fds, fds_len);
+}
+
+static void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
+    const pp_swift_tun_ctrl_report_snapshot_fn swift = pp_swift_tun_ctrl_report_snapshot();
+    if (!swift) return;
+    swift(ref, snapshot_json);
+}
+
+static void pp_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
+    pp_clog_v(PPLogLevelInfo, "tun_darwin: ctrl_clear_tunnel(%p)", ref);
+    const pp_swift_tun_ctrl_clear_tunnel_fn swift = pp_swift_tun_ctrl_clear_tunnel();
+    if (!swift) return;
+    swift(ref, kill_switch);
+}
+
+static void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_code) {
+    pp_clog_v(PPLogLevelInfo, "tun_darwin: ctrl_cancel_tunnel(%p)", ref);
+    const pp_swift_tun_ctrl_cancel_tunnel_fn swift = pp_swift_tun_ctrl_cancel_tunnel();
+    if (!swift) return;
+    swift(ref, error_code);
+}
+
+pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
+    pp_tun_ctrl_fnt fnt = {
+        .set_delegate = pp_tun_ctrl_set_delegate,
+        .set_tunnel = pp_tun_ctrl_set_tunnel,
+        .configure_sockets = pp_tun_ctrl_configure_sockets,
+        .report_snapshot = pp_tun_ctrl_report_snapshot,
+        .clear_tunnel = pp_tun_ctrl_clear_tunnel,
+        .cancel_tunnel = pp_tun_ctrl_cancel_tunnel
+    };
+    return fnt;
 }
 
 #endif

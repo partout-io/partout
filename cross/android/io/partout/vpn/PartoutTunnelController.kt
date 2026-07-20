@@ -9,6 +9,7 @@ import io.partout.models.TaggedModuleDNS
 import io.partout.models.TaggedModuleHTTPProxy
 import io.partout.models.TaggedModuleIP
 import io.partout.models.TaggedModuleOnDemand
+import io.partout.models.TunnelControllerOptions
 import io.partout.models.TunnelRemoteInfoWrapper
 import io.partout.models.TunnelSnapshot
 import kotlinx.coroutines.CoroutineScope
@@ -37,11 +38,12 @@ internal interface TunnelControllerDelegate {
     fun shouldDisconnect(controller: NativeTunnelControllerJNI)
 }
 
-internal class JNITunnelController(
+internal class PartoutTunnelController(
     private val logTag: String,
     private val service: VpnService,
     private val scope: CoroutineScope,
-    private val delegate: TunnelControllerDelegate
+    private val delegate: TunnelControllerDelegate,
+    private val options: TunnelControllerOptions
 ) : TunnelController {
     //region State
     // All accesses must be synchronized against the lock
@@ -50,7 +52,6 @@ internal class JNITunnelController(
     // JNI interactions with Native (Swift)
     private var nativeDelegate: Long = 0
     private var isNativeCancelled = false
-    private var logsSnapshots = false
 
     // Network observers
     private val reachabilityObserver = ReachabilityObserver(service)
@@ -108,10 +109,6 @@ internal class JNITunnelController(
             return@synchronized INVALID_TUN_FD
         }
 
-        // Pick options
-        logsSnapshots = info.options.logsSnapshots
-        Log.d(logTag, "Controller options: ${info.options}")
-
         // Apply modules to VPN builder
         var appliedAddressSettings = false
         var appliedDnsSettings = false
@@ -142,9 +139,9 @@ internal class JNITunnelController(
                 else -> {}
             }
         }
-        if (!appliedDnsSettings && info.options.dnsFallbackServers.isNotEmpty()) {
-            Log.i(logTag, "DNS: Apply fallback servers: ${info.options.dnsFallbackServers}")
-            info.options.dnsFallbackServers.addDNSServers(logTag, builder)
+        if (!appliedDnsSettings && options.dnsFallbackServers.isNotEmpty()) {
+            Log.i(logTag, "DNS: Apply fallback servers: ${options.dnsFallbackServers}")
+            options.dnsFallbackServers.addDNSServers(logTag, builder)
         }
         if (!appliedAddressSettings) {
             Log.e(logTag, "Unable to set interface address")
@@ -196,7 +193,7 @@ internal class JNITunnelController(
 
     override fun onSnapshot(snapshotJSON: String) = synchronized(lock) {
         if (isNativeCancelled) { return }
-        if (logsSnapshots) {
+        if (options.logsSnapshots) {
             Log.d(logTag, "onSnapshot(${snapshotJSON})")
         }
         val snapshot = json.decodeFromString<TunnelSnapshot>(snapshotJSON)
