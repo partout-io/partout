@@ -77,7 +77,7 @@ typedef struct {
 
 /* Daemon functions. */
 int partout_daemon_start(const partout_daemon_start_args *args);
-void partout_daemon_hold();
+void partout_daemon_hold(void);
 void partout_daemon_stop(void);
 
 #ifdef __cplusplus
