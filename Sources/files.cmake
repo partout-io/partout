@@ -280,8 +280,6 @@ set(PARTOUT_SOURCES
 ./PartoutOS/AppleNE/Modules/IPModule+NE.swift
 ./PartoutOS/AppleNE/Modules/OnDemandModule+NE.swift
 ./PartoutOS/AppleNE/Modules/Profile+NE.swift
-./PartoutOS/AppleNE/Runtime/PartoutProviderRuntime.swift
-./PartoutOS/AppleNE/Runtime/PartoutTunnelController.swift
 ./PartoutOS/AppleNE/Serialization/KeychainNEProtocolCoder.swift
 ./PartoutOS/AppleNE/Serialization/NEProtocolCoder.swift
 ./PartoutOS/AppleNE/Serialization/ProviderNEProtocolCoder.swift
@@ -365,6 +363,8 @@ set(PARTOUT_SOURCES
 ./PartoutOpenVPN/V3/Internal/OpenVPNSessionV3.swift
 ./PartoutOpenVPN/V3/_OpenVPNConnectionV3+Default.swift
 ./PartoutOpenVPN/V3/_OpenVPNConnectionV3.swift
+./PartoutRuntime/PartoutProviderRuntime.swift
+./PartoutRuntime/PartoutTunnelController.swift
 ./PartoutWireGuard/Internal/Configuration+WgQuickConfig.swift
 ./PartoutWireGuard/Internal/Endpoint+WireGuardKit.swift
 ./PartoutWireGuard/Internal/PrivateKey.swift
@@ -411,13 +411,11 @@ set(PARTOUT_C_SOURCES
 ./PartoutOpenVPN_C/dp_mode.c
 ./PartoutOpenVPN_C/dp_mode_ad.c
 ./PartoutOpenVPN_C/dp_mode_hmac.c
-./PartoutOpenVPN_C/logging.c
 ./PartoutOpenVPN_C/mss_fix.c
 ./PartoutOpenVPN_C/pkt_proc.c
 ./PartoutOpenVPN_C/test/openvpn_crypto_mock.c
 ./PartoutWireGuard_C/backend.c
 ./PartoutWireGuard_C/key.c
-./PartoutWireGuard_C/logging.c
 ./PartoutWireGuard_C/x25519.c
 ./Partout_C/partout.c
 )
