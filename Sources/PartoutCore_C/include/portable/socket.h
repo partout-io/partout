@@ -13,6 +13,9 @@
 #if !PARTOUT_WINDOWS
 #include <netdb.h>
 #endif
+#if PARTOUT_ANDROID
+#include <android/multinetwork.h>
+#endif
 #include "portable/common.h"
 
 #pragma clang assume_nonnull begin
@@ -37,10 +40,6 @@ static inline pp_reachability pp_reachability_none(void) {
 #endif
     return none;
 }
-
-#if PARTOUT_ANDROID
-#include <android/multinetwork.h>
-#endif
 
 static inline int pp_dns_resolve(const char *hostname,
                                  const char *_Nullable service,
