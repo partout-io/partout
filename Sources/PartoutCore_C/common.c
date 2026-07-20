@@ -8,6 +8,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <errno.h>
 
 const int PPIOErrorWouldBlock   = -11;

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include <stdint.h>
 #include <mbedtls/asn1write.h>
 #include <mbedtls/oid.h>
 #include <mbedtls/pem.h>
