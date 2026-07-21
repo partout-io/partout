@@ -16,6 +16,7 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
+const queue_mod = @import("looper_queue.zig");
 const c = io.c;
 const log = core.logging;
 
@@ -24,36 +25,19 @@ pub const Looper = struct {
     /// normally `.keep` reading (default behavior), but may also
     /// return `.pause` to temporarily suspend the observation
     /// of read events.
-    pub const ReadAction = enum {
-        keep,
-        pause,
-    };
+    pub const ReadAction = queue_mod.ReadAction;
 
     /// Single binary data packet.
-    pub const Packet = []const u8;
+    pub const Packet = queue_mod.Packet;
     /// Slice of packets.
-    pub const Packets = []const Packet;
+    pub const Packets = queue_mod.Packets;
 
     /// Transformation callback to apply before submitting packets
     /// to the write queue.
-    pub const TransformWrite = struct {
-        context: ?*anyopaque = null,
-        callback: *const fn (?*anyopaque, Packets) anyerror!Packets,
-
-        fn call(self: TransformWrite, packets: Packets) anyerror!Packets {
-            return self.callback(self.context, packets);
-        }
-    };
+    pub const TransformWrite = queue_mod.TransformWrite;
 
     /// Invoked on read events from either looper side.
-    pub const OnRead = struct {
-        context: ?*anyopaque = null,
-        callback: *const fn (?*anyopaque, Packets) anyerror!ReadAction,
-
-        fn call(self: OnRead, packets: Packets) anyerror!ReadAction {
-            return self.callback(self.context, packets);
-        }
-    };
+    pub const OnRead = queue_mod.OnRead;
 
     /// Returns elaborated details about the underlying reason
     /// of a failure. It represents the former Swift errors:
@@ -68,27 +52,10 @@ pub const Looper = struct {
     /// - .mux, .wait, and .io are typically triggered by syscalls
     /// - .system covers an internal I/O or allocation failure
     /// - .user comes from `OnRead` and `Task` callback invocations
-    pub const Failure = union(enum) {
-        mux: ?io.Side,
-        wait: c_int,
-        io: struct {
-            side: io.Side,
-            cause: io.Error,
-            code: ?c_int,
-        },
-        user: anyerror,
-        system: io.Error,
-    };
+    pub const Failure = queue_mod.Failure;
 
     /// Invoked on any failure event.
-    pub const OnFailure = struct {
-        context: ?*anyopaque = null,
-        callback: *const fn (?*anyopaque, Failure) void,
-
-        fn call(self: OnFailure, failure: Failure) void {
-            self.callback(self.context, failure);
-        }
-    };
+    pub const OnFailure = queue_mod.OnFailure;
 
     /// Invoked when the looper finishes, with the optional failure.
     pub const OnFinish = struct {
@@ -101,36 +68,18 @@ pub const Looper = struct {
     };
 
     /// Runs a generic task in the worker thread.
-    pub const Task = struct {
-        context: ?*anyopaque = null,
-        callback: *const fn (?*anyopaque) anyerror!void,
-
-        fn call(self: Task) anyerror!void {
-            return self.callback(self.context);
-        }
-    };
+    pub const Task = queue_mod.Task;
 
     /// A descriptor includes:
     /// - The `fd` to watch for I/O events.
     /// - The `io` interface to perform reads and writes.
-    pub const Descriptor = struct {
-        fd: io.FileDescriptor,
-        io: io.IOInterface,
-    };
+    pub const Descriptor = queue_mod.Descriptor;
 
     /// The looper manages exactly one link and one tun (at most).
-    pub const DescriptorPair = union(io.Side) {
-        link: Descriptor,
-        tun: Descriptor,
-    };
+    pub const DescriptorPair = queue_mod.DescriptorPair;
 
     /// The arguments to attach a side of the looper.
-    pub const AttachArguments = struct {
-        pair: DescriptorPair,
-        transform_write: ?TransformWrite = null,
-        on_read: ?OnRead = null,
-        on_failure: ?OnFailure = null,
-    };
+    pub const AttachArguments = queue_mod.AttachArguments;
 
     /// Fine-tuning.
     pub const Options = struct {
@@ -170,43 +119,40 @@ pub const Looper = struct {
         WriteIncomplete,
     };
 
-    const CompletionError = error{
-        Cancelled,
-        MuxFailure,
-        OperationCancelled,
-        OutOfMemory,
-        TerminalFailure,
-    };
+    const CompletionError = queue_mod.CompletionError;
 
+    // Configuration.
     allocator: std.mem.Allocator,
-    mux: c.pp_mux,
-    link_buf_size: usize,
-    tun_buf_size: usize,
-    max_read_size: usize,
-    max_read_count: usize,
-    on_finish: OnFinish,
+    options: Options,
 
+    // Lifecycle synchronization.
     lock: core.Mutex = .{},
     condition: core.Condition = .{},
     state: State = .idle,
-    command_head: ?*CommandNode = null,
-    command_tail: ?*CommandNode = null,
-    completion_head: ?*Completion = null,
-    completion_tail: ?*Completion = null,
+    deinitializing: bool = false,
+    terminal_failure: ?Failure = null,
+
+    // Command submission and synchronous completion.
+    commands: CommandQueue = .{},
+    completions: CompletionQueue = .{},
+    stop_completion: ?*Completion = null,
     waiter_count: usize = 0,
-    scheduled_head: ?*CommandNode = null,
-    read_retries: [2]bool = .{ false, false },
-    write_retries: [2]bool = .{ false, false },
+
+    // Mux-owned resources.
+    mux: c.pp_mux,
+    mux_freed: bool = false,
+    fd_set: ?DescriptorSet = null,
+
+    // Attached sides and their scheduled retries.
     link: ?*SideIO = null,
     tun: ?*SideIO = null,
-    stop_completion: ?*Completion = null,
-    terminal_failure: ?Failure = null,
     next_side_id: u64 = 1,
+    read_retries: [2]bool = .{ false, false },
+    write_retries: [2]bool = .{ false, false },
+
+    // Worker ownership and identity.
     worker_thread: ?std.Thread = null,
     loop_thread_id: ?std.Thread.Id = null,
-    fd_set: ?DescriptorSet = null,
-    deinitializing: bool = false,
-    mux_freed: bool = false,
 
     threadlocal var borrowed_callback_depth: usize = 0;
 
@@ -215,17 +161,15 @@ pub const Looper = struct {
             log.writef(.err, "Unable to create mux", .{});
             return error.MuxFailure;
         };
+        var resolved_options = options;
+        resolved_options.max_read_size = @max(
+            options.max_read_size,
+            @max(options.link_buf_size, options.tun_buf_size),
+        );
         return .{
             .allocator = allocator,
+            .options = resolved_options,
             .mux = mux,
-            .link_buf_size = options.link_buf_size,
-            .tun_buf_size = options.tun_buf_size,
-            .max_read_size = @max(
-                options.max_read_size,
-                @max(options.link_buf_size, options.tun_buf_size),
-            ),
-            .max_read_count = options.max_read_count,
-            .on_finish = options.on_finish,
         };
     }
 
@@ -245,12 +189,8 @@ pub const Looper = struct {
             self.state = .stopping;
         }
 
-        const pending = self.command_head;
-        self.command_head = null;
-        self.command_tail = null;
-        self.cancelPendingLocked(pending);
-        self.destroyCommandList(self.scheduled_head);
-        self.scheduled_head = null;
+        self.cancelPendingLocked(self.commands.takeReady());
+        self.destroyCommandList(self.commands.takeScheduled());
         self.read_retries = .{ false, false };
         self.write_retries = .{ false, false };
         if (self.stop_completion) |completion| {
@@ -341,7 +281,7 @@ pub const Looper = struct {
         }
         const now_ns = core.concurrency.monotonicNs();
         self.promoteDueScheduledLocked(now_ns);
-        const timeout_ms = self.waitTimeoutMsLocked(now_ns);
+        const timeout_ms = self.commands.waitTimeoutMs(now_ns);
         const fd_set = if (self.fd_set) |*value| value else {
             self.lock.unlock();
             return false;
@@ -436,7 +376,7 @@ pub const Looper = struct {
         };
         self.state = .stopping;
         self.stop_completion = &completion;
-        self.appendCommandNode(node);
+        self.commands.append(node);
         self.waiter_count += 1;
         self.wakeLocked();
         while (!completion.done) {
@@ -510,7 +450,7 @@ pub const Looper = struct {
             self.lock.unlock();
             return err;
         };
-        self.appendCommandNode(node);
+        self.commands.append(node);
         self.waiter_count += 1;
         self.wakeLocked();
         while (!completion.done) {
@@ -551,11 +491,11 @@ pub const Looper = struct {
         if (delay_ms) |delay| {
             const node = try self.createCommandNode(.{ .custom = task });
             node.deadline_ns = deadlineAfter(delay);
-            if (self.insertScheduledNode(node)) self.wakeLocked();
+            if (self.commands.insertScheduled(node)) self.wakeLocked();
             return;
         }
         const node = try self.createCommandNode(.{ .custom = task });
-        self.appendCommandNode(node);
+        self.commands.append(node);
         self.wakeLocked();
     }
 
@@ -578,7 +518,7 @@ pub const Looper = struct {
             self.lock.unlock();
             return err;
         };
-        self.appendCommandNode(node);
+        self.commands.append(node);
         self.waiter_count += 1;
         self.wakeLocked();
         while (!completion.done) {
@@ -615,7 +555,7 @@ pub const Looper = struct {
             self.lock.unlock();
             return err;
         };
-        self.appendCommandNode(node);
+        self.commands.append(node);
         self.waiter_count += 1;
         self.wakeLocked();
         while (!completion.done) {
@@ -658,7 +598,7 @@ pub const Looper = struct {
             .side = side,
             .id = null,
         } });
-        self.appendCommandNode(node);
+        self.commands.append(node);
         self.wakeLocked();
     }
 
@@ -716,30 +656,8 @@ pub const Looper = struct {
         } });
         errdefer self.allocator.destroy(command);
 
-        var new_head: ?*WriteNode = null;
-        var new_tail: ?*WriteNode = null;
-        errdefer self.destroyWriteList(new_head);
-        for (processed) |packet| {
-            const copy = try self.allocator.dupe(u8, packet);
-            errdefer self.allocator.free(copy);
-            const node = try self.allocator.create(WriteNode);
-            node.* = .{ .data = copy };
-            if (new_tail) |tail| {
-                tail.next = node;
-            } else {
-                new_head = node;
-            }
-            new_tail = node;
-        }
-        if (new_head) |head| {
-            if (attached.write_tail) |tail| {
-                tail.next = head;
-            } else {
-                attached.write_head = head;
-            }
-            attached.write_tail = new_tail;
-        }
-        self.appendCommandNode(command);
+        try attached.write_queue.append(processed);
+        self.commands.append(command);
         self.wakeLocked();
     }
 
@@ -758,41 +676,13 @@ pub const Looper = struct {
         stopped,
     };
 
-    const SideIdentity = struct {
-        side: io.Side,
-        id: ?u64,
-    };
-
-    const Completion = struct {
-        done: bool = false,
-        result: ?CompletionError = null,
-        next: ?*Completion = null,
-    };
-
-    const Command = union(enum) {
-        attach: struct {
-            arguments: AttachArguments,
-            completion: *Completion,
-        },
-        detach: struct {
-            side: io.Side,
-            completion: *Completion,
-        },
-        enable_read: SideIdentity,
-        enable_write: SideIdentity,
-        perform: struct {
-            task: Task,
-            completion: *Completion,
-        },
-        custom: Task,
-        stop,
-    };
-
-    const CommandNode = struct {
-        command: Command,
-        next: ?*CommandNode = null,
-        deadline_ns: u64 = 0,
-    };
+    const SideIdentity = queue_mod.SideIdentity;
+    const Completion = queue_mod.Completion;
+    const CompletionQueue = queue_mod.CompletionQueue;
+    const Command = queue_mod.Command;
+    const CommandNode = queue_mod.CommandNode;
+    const CommandQueue = queue_mod.CommandQueue;
+    const WriteQueue = queue_mod.WriteQueue;
 
     const CommandOutcome = struct {
         should_continue: bool = true,
@@ -808,26 +698,28 @@ pub const Looper = struct {
         fatal: Failure,
     };
 
-    const WriteNode = struct {
-        data: []u8,
-        next: ?*WriteNode = null,
-    };
-
     const SideIO = struct {
+        // Identity and native I/O.
         id: u64,
         side: io.Side,
         fd: io.FileDescriptor,
         native_io: io.IOInterface,
+
+        // User callbacks.
         transform_write: ?TransformWrite,
         on_read: ?OnRead,
         on_failure: ?OnFailure,
+
+        // Buffered packet state.
         read_buf: []u8,
-        write_head: ?*WriteNode = null,
-        write_tail: ?*WriteNode = null,
-        write_offset: usize = 0,
+        write_queue: WriteQueue,
+
+        // Mux event and cleanup state.
         is_reading: bool = true,
         is_writing: bool = false,
         did_cleanup: bool = false,
+
+        // In-flight transform synchronization.
         transform_drainer: core.Drainer = .{},
 
         fn create(
@@ -850,18 +742,13 @@ pub const Looper = struct {
                 .on_read = arguments.on_read,
                 .on_failure = arguments.on_failure,
                 .read_buf = read_buf,
+                .write_queue = WriteQueue.init(allocator),
             };
             return self;
         }
 
         fn destroyStorage(self: *SideIO, allocator: std.mem.Allocator) void {
-            var current = self.write_head;
-            while (current) |node| {
-                const next = node.next;
-                allocator.free(node.data);
-                allocator.destroy(node);
-                current = next;
-            }
+            self.write_queue.deinit();
             allocator.free(self.read_buf);
             self.transform_drainer.deinit();
             allocator.destroy(self);
@@ -901,8 +788,10 @@ pub const Looper = struct {
 
     const DescriptorSet = struct {
         allocator: std.mem.Allocator,
+
         readable: std.ArrayList(io.FileDescriptor) = .empty,
         writable: std.ArrayList(io.FileDescriptor) = .empty,
+
         allocation_failed: bool = false,
 
         fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!DescriptorSet {
@@ -1033,9 +922,7 @@ pub const Looper = struct {
 
     fn handleCommands(self: *Looper, fd_set: *DescriptorSet) CommandOutcome {
         self.lock.lock();
-        var pending = self.command_head;
-        self.command_head = null;
-        self.command_tail = null;
+        var pending = self.commands.takeReady();
 
         var outcome = CommandOutcome{};
         while (pending) |node| {
@@ -1253,18 +1140,8 @@ pub const Looper = struct {
                     } },
                 }
             };
-            const did_complete = written == pending.data.len - pending.offset;
             self.lock.lock();
-            if (did_complete) {
-                const first = side_io.write_head.?;
-                side_io.write_head = first.next;
-                if (side_io.write_head == null) side_io.write_tail = null;
-                side_io.write_offset = 0;
-                self.allocator.free(first.data);
-                self.allocator.destroy(first);
-            } else {
-                side_io.write_offset += written;
-            }
+            const did_complete = side_io.write_queue.advance(written);
             self.lock.unlock();
             watch_writes = !did_complete;
         }
@@ -1285,7 +1162,7 @@ pub const Looper = struct {
 
         var read_count: usize = 0;
         var read_size: usize = 0;
-        while (read_count < self.max_read_count and read_size < self.max_read_size) {
+        while (read_count < self.options.max_read_count and read_size < self.options.max_read_size) {
             const maybe_count = side_io.native_io.read(side_io.read_buf) catch |err| {
                 if (err == error.WouldBlock) break;
                 return .{ .side_failure = .{
@@ -1343,7 +1220,7 @@ pub const Looper = struct {
         } }) catch |err| return .{ .system = err };
         node.deadline_ns = deadlineAfter(no_buf_retry_delay_ms);
         self.read_retries[index] = true;
-        _ = self.insertScheduledNode(node);
+        _ = self.commands.insertScheduled(node);
         return null;
     }
 
@@ -1358,7 +1235,7 @@ pub const Looper = struct {
         } }) catch |err| return .{ .system = err };
         node.deadline_ns = deadlineAfter(no_buf_retry_delay_ms);
         self.write_retries[index] = true;
-        _ = self.insertScheduledNode(node);
+        _ = self.commands.insertScheduled(node);
         return null;
     }
 
@@ -1395,12 +1272,8 @@ pub const Looper = struct {
         }
         self.state = .stopped;
         self.terminal_failure = failure;
-        const pending = self.command_head;
-        self.command_head = null;
-        self.command_tail = null;
-        self.cancelPendingLocked(pending);
-        self.destroyCommandList(self.scheduled_head);
-        self.scheduled_head = null;
+        self.cancelPendingLocked(self.commands.takeReady());
+        self.destroyCommandList(self.commands.takeScheduled());
         self.read_retries = .{ false, false };
         self.write_retries = .{ false, false };
         if (self.stop_completion) |completion| {
@@ -1411,7 +1284,7 @@ pub const Looper = struct {
         self.condition.broadcast();
         self.lock.unlock();
 
-        self.on_finish.call(failure);
+        self.options.on_finish.call(failure);
     }
 
     fn cleanupAfterLoop(self: *Looper) void {
@@ -1532,8 +1405,8 @@ pub const Looper = struct {
 
     fn readBufferSize(self: Looper, side: io.Side) usize {
         return switch (side) {
-            .link => self.link_buf_size,
-            .tun => self.tun_buf_size,
+            .link => self.options.link_buf_size,
+            .tun => self.options.tun_buf_size,
         };
     }
 
@@ -1555,19 +1428,10 @@ pub const Looper = struct {
         } };
     }
 
-    const PendingWrite = struct {
-        data: []const u8,
-        offset: usize,
-    };
-
-    fn pendingWrite(self: *Looper, side_io: *SideIO) ?PendingWrite {
+    fn pendingWrite(self: *Looper, side_io: *SideIO) ?queue_mod.PendingWrite {
         self.lock.lock();
         defer self.lock.unlock();
-        const first = side_io.write_head orelse return null;
-        return .{
-            .data = first.data,
-            .offset = side_io.write_offset,
-        };
+        return side_io.write_queue.pending();
     }
 
     fn createCommandNode(self: *Looper, command: Command) std.mem.Allocator.Error!*CommandNode {
@@ -1576,69 +1440,17 @@ pub const Looper = struct {
         return node;
     }
 
-    fn appendCommandNode(self: *Looper, node: *CommandNode) void {
-        node.next = null;
-        if (self.command_tail) |tail| {
-            tail.next = node;
-        } else {
-            self.command_head = node;
-        }
-        self.command_tail = node;
-    }
-
-    /// Inserts by absolute deadline, preserving FIFO order for equal deadlines.
-    /// Returns whether `node` became the earliest scheduled command.
-    fn insertScheduledNode(self: *Looper, node: *CommandNode) bool {
-        node.next = null;
-        const head = self.scheduled_head orelse {
-            self.scheduled_head = node;
-            return true;
-        };
-        if (node.deadline_ns < head.deadline_ns) {
-            node.next = head;
-            self.scheduled_head = node;
-            return true;
-        }
-
-        var previous = head;
-        while (previous.next) |next| {
-            if (node.deadline_ns < next.deadline_ns) break;
-            previous = next;
-        }
-        node.next = previous.next;
-        previous.next = node;
-        return false;
-    }
-
     /// Moves every expired timer onto the serial command queue. Caller holds
     /// `lock`; callbacks still run later from `handleCommands`.
     fn promoteDueScheduledLocked(self: *Looper, now_ns: u64) void {
-        while (self.scheduled_head) |node| {
-            if (node.deadline_ns > now_ns) return;
-            self.scheduled_head = node.next;
-            node.next = null;
+        while (self.commands.popDue(now_ns)) |node| {
             self.clearRetryForCommand(node.command);
             if (self.state == .started) {
-                self.appendCommandNode(node);
+                self.commands.append(node);
             } else {
                 self.allocator.destroy(node);
             }
         }
-    }
-
-    fn waitTimeoutMsLocked(self: *Looper, now_ns: u64) c_int {
-        if (self.command_head != null) return 0;
-        const deadline_ns = if (self.scheduled_head) |node|
-            node.deadline_ns
-        else
-            return -1;
-        if (deadline_ns <= now_ns) return 0;
-
-        const remaining_ns = deadline_ns - now_ns;
-        var timeout_ms = remaining_ns / std.time.ns_per_ms;
-        if (remaining_ns % std.time.ns_per_ms != 0) timeout_ms += 1;
-        const max_timeout_ms: u64 = @intCast(std.math.maxInt(c_int));
-        return @intCast(@min(timeout_ms, max_timeout_ms));
     }
 
     fn deadlineAfter(delay_ms: u64) u64 {
@@ -1683,41 +1495,16 @@ pub const Looper = struct {
         }
     }
 
-    fn destroyWriteList(self: *Looper, head: ?*WriteNode) void {
-        var current = head;
-        while (current) |node| {
-            const next = node.next;
-            self.allocator.free(node.data);
-            self.allocator.destroy(node);
-            current = next;
-        }
-    }
-
     fn queueCompletionLocked(
         self: *Looper,
         completion: *Completion,
         result: ?CompletionError,
     ) void {
-        completion.result = result;
-        completion.next = null;
-        if (self.completion_tail) |tail| {
-            tail.next = completion;
-        } else {
-            self.completion_head = completion;
-        }
-        self.completion_tail = completion;
+        self.completions.append(completion, result);
     }
 
     fn releaseCompletionsLocked(self: *Looper) void {
-        var current = self.completion_head;
-        while (current) |completion| {
-            const next = completion.next;
-            completion.next = null;
-            completion.done = true;
-            current = next;
-        }
-        self.completion_head = null;
-        self.completion_tail = null;
+        self.completions.releaseAll();
     }
 
     fn completeNow(completion: *Completion, result: ?CompletionError) void {
