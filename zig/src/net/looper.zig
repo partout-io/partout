@@ -139,7 +139,6 @@ pub const Looper = struct {
 
     // Mux-owned resources.
     mux: c.pp_mux,
-    mux_freed: bool = false,
     fd_set: ?DescriptorSet = null,
 
     // Attached sides and their scheduled retries.
@@ -183,6 +182,8 @@ pub const Looper = struct {
         while (self.state == .starting) {
             self.condition.wait(&self.lock);
         }
+        const cleanup_in_deinit = self.state == .idle;
+        const should_wake_worker = self.state == .started or self.state == .stopping;
         self.state = .deinitializing;
 
         self.cancelPendingLocked(self.commands.takeReady());
@@ -194,7 +195,7 @@ pub const Looper = struct {
             self.stop_completion = null;
         }
         self.releaseCompletionsLocked();
-        self.wakeLocked();
+        if (should_wake_worker) self.wakeLocked();
         self.condition.broadcast();
         while (self.waiter_count > 0) {
             self.condition.wait(&self.lock);
@@ -205,9 +206,11 @@ pub const Looper = struct {
         // descriptor callbacks or storage are released.
         self.joinWorker();
 
-        self.lock.lock();
-        self.cleanupResourcesLocked();
-        self.lock.unlock();
+        if (cleanup_in_deinit) {
+            self.lock.lock();
+            self.cleanupResourcesLocked();
+            self.lock.unlock();
+        }
 
         self.condition.deinit();
         self.lock.deinit();
@@ -271,7 +274,7 @@ pub const Looper = struct {
 
     fn loopOnce(self: *Looper) bool {
         self.lock.lock();
-        if (self.state == .deinitializing or self.state == .stopped or self.mux_freed) {
+        if (self.state == .deinitializing or self.state == .stopped) {
             self.lock.unlock();
             return false;
         }
@@ -476,7 +479,7 @@ pub const Looper = struct {
     pub fn schedule(self: *Looper, delay_ms: ?u64, task: Task) ScheduleError!void {
         if (delay_ms == null and self.isOnQueue()) {
             task.call() catch |err| {
-                log.writef(.err, "Scheduled task failed: {s}", .{@errorName(err)});
+                log.writef(.err, "Scheduled task failed: {}", .{err});
                 return error.TaskFailure;
             };
             return;
@@ -484,7 +487,7 @@ pub const Looper = struct {
 
         self.lock.lock();
         defer self.lock.unlock();
-        if (self.state != .started or self.mux_freed) {
+        if (self.state != .started) {
             log.writef(.debug, "Ignoring schedule before start() or after finish", .{});
             return error.Cancelled;
         }
@@ -593,7 +596,7 @@ pub const Looper = struct {
     pub fn resumeReading(self: *Looper, side: io.Side) ResumeReadingError!void {
         self.lock.lock();
         defer self.lock.unlock();
-        if (self.state != .started or self.mux_freed) return error.Cancelled;
+        if (self.state != .started) return error.Cancelled;
         const node = try self.createCommandNode(.{ .enable_read = .{
             .side = side,
             .id = null,
@@ -611,13 +614,13 @@ pub const Looper = struct {
         if (out_of_band) return self.writeOutOfBand(packets, side);
 
         self.lock.lock();
-        if (self.state != .started or self.mux_freed) {
+        if (self.state != .started) {
             self.lock.unlock();
             return error.Cancelled;
         }
         const current = self.sideIO(side) orelse {
             self.lock.unlock();
-            log.writef(.err, "Ignoring {s} packets, not attached", .{@tagName(side)});
+            log.writef(.err, "Ignoring {} packets, not attached", .{side});
             return;
         };
         current.transform_drainer.enter();
@@ -634,19 +637,19 @@ pub const Looper = struct {
         defer self.lock.unlock();
         defer current.transform_drainer.leaveLocked();
         const processed = processed_result catch |err| {
-            log.writef(.err, "{s} write transform failed: {s}", .{
-                @tagName(side),
-                @errorName(err),
+            log.writef(.err, "{} write transform failed: {}", .{
+                side,
+                err,
             });
             return error.TransformFailure;
         };
-        if (self.state != .started or self.mux_freed) return error.Cancelled;
+        if (self.state != .started) return error.Cancelled;
         const attached = self.sideIO(side) orelse {
-            log.writef(.debug, "Ignoring detached {s} during processing", .{@tagName(side)});
+            log.writef(.debug, "Ignoring detached {} during processing", .{side});
             return;
         };
         if (attached.id != id) {
-            log.writef(.debug, "Ignoring detached {s} during processing", .{@tagName(side)});
+            log.writef(.debug, "Ignoring detached {} during processing", .{side});
             return;
         }
 
@@ -873,13 +876,13 @@ pub const Looper = struct {
         }
 
         self.lock.lock();
-        if (self.state != .started or self.mux_freed) {
+        if (self.state != .started) {
             self.lock.unlock();
             return error.Cancelled;
         }
         const side_io = self.sideIO(side) orelse {
             self.lock.unlock();
-            log.writef(.err, "Ignoring {s} packets, not attached", .{@tagName(side)});
+            log.writef(.err, "Ignoring {} packets, not attached", .{side});
             return;
         };
         const transform = side_io.transform_write;
@@ -887,9 +890,9 @@ pub const Looper = struct {
 
         const processed = if (transform) |callback|
             self.callTransform(callback, packets) catch |err| {
-                log.writef(.err, "{s} write transform failed: {s}", .{
-                    @tagName(side),
-                    @errorName(err),
+                log.writef(.err, "{} write transform failed: {}", .{
+                    side,
+                    err,
                 });
                 return error.TransformFailure;
             }
@@ -897,12 +900,12 @@ pub const Looper = struct {
             packets;
         for (processed) |packet| {
             const written = side_io.native_io.write(packet, 0) catch |err| {
-                log.writef(.err, "{s} write failed: {s}", .{ @tagName(side), @errorName(err) });
+                log.writef(.err, "{} write failed: {}", .{ side, err });
                 return err;
             };
             if (written != packet.len) {
-                log.writef(.err, "Incomplete {s} write ({}/{})", .{
-                    @tagName(side),
+                log.writef(.err, "Incomplete {} write ({}/{})", .{
+                    side,
                     written,
                     packet.len,
                 });
@@ -1009,11 +1012,11 @@ pub const Looper = struct {
             .tun => |value| value,
         };
         if (!c.pp_mux_add(self.mux, descriptor.fd)) {
-            log.writef(.err, "Unable to attach {s} (fd={any})", .{ @tagName(side), descriptor.fd });
+            log.writef(.err, "Unable to attach {} (fd={any})", .{ side, descriptor.fd });
             self.queueCompletionLocked(completion, error.MuxFailure);
             return;
         }
-        log.writef(.info, "Attach {s} (fd={any})", .{ @tagName(side), descriptor.fd });
+        log.writef(.info, "Attach {} (fd={any})", .{ side, descriptor.fd });
 
         const id = self.next_side_id;
         self.next_side_id +%= 1;
@@ -1030,7 +1033,7 @@ pub const Looper = struct {
             return;
         };
         side_io.syncEventMask() catch {
-            log.writef(.err, "Unable to retain {s}", .{@tagName(side)});
+            log.writef(.err, "Unable to retain {}", .{side});
             _ = c.pp_mux_delete(self.mux, descriptor.fd);
             side_io.destroyStorage(self.allocator);
             self.queueCompletionLocked(completion, error.MuxFailure);
@@ -1056,7 +1059,7 @@ pub const Looper = struct {
         if (self.sideIO(side)) |side_io| {
             try side_io.setRead(self.mux, true);
         } else {
-            log.writef(.err, "Ignoring enableRead(.{s}), not attached", .{@tagName(side)});
+            log.writef(.err, "Ignoring enableRead({}), not attached", .{side});
         }
     }
 
@@ -1069,7 +1072,7 @@ pub const Looper = struct {
             try side_io.setWrite(self.mux, true);
             fd_set.insertWritable(side_io.fd);
         } else {
-            log.writef(.err, "Ignoring enableWrite(.{s}), not attached", .{@tagName(side)});
+            log.writef(.err, "Ignoring enableWrite({}), not attached", .{side});
         }
     }
 
@@ -1287,7 +1290,7 @@ pub const Looper = struct {
         self.lock.unlock();
 
         if (failure) |reason| {
-            log.writef(.err, "Finish looper with error: {s}", .{@tagName(reason)});
+            log.writef(.err, "Finish looper with error: {}", .{reason});
         } else {
             log.writef(.info, "Finish looper", .{});
         }
@@ -1296,10 +1299,6 @@ pub const Looper = struct {
 
     fn cleanupAfterLoop(self: *Looper) void {
         self.lock.lock();
-        if (self.mux_freed) {
-            self.lock.unlock();
-            return;
-        }
         self.cleanupResourcesLocked();
         self.condition.broadcast();
         self.lock.unlock();
@@ -1321,7 +1320,7 @@ pub const Looper = struct {
     }
 
     fn wakeLocked(self: *Looper) void {
-        if (!self.mux_freed) _ = c.pp_mux_wake(self.mux);
+        _ = c.pp_mux_wake(self.mux);
     }
 
     fn isReentrantLifecycleCall(self: *Looper) bool {
@@ -1390,10 +1389,7 @@ pub const Looper = struct {
             fd_set.deinit();
             self.fd_set = null;
         }
-        if (!self.mux_freed) {
-            self.mux_freed = true;
-            c.pp_mux_free(self.mux);
-        }
+        c.pp_mux_free(self.mux);
     }
 
     fn sideIO(self: *Looper, side: io.Side) ?*SideIO {

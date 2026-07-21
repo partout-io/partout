@@ -282,6 +282,11 @@ test "deinit does not invoke the finish callback" {
     try std.testing.expect(!probe.called.load(.acquire));
 }
 
+test "deinit owns mux cleanup before start" {
+    var looper = try initLooper(.{ .callback = noopFinish });
+    looper.deinit();
+}
+
 test "perform completion is released before later commands finish" {
     var first_task = BlockingTask{};
     var second_task = BlockingTask{};
