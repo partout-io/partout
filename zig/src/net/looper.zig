@@ -134,235 +134,6 @@ pub const Looper = struct {
     };
     pub const ResumeReadingError = std.mem.Allocator.Error || error{Cancelled};
 
-    const number_of_descriptors = 2;
-    const no_buf_retry_delay_ms = 10;
-
-    const State = enum {
-        idle,
-        starting,
-        started,
-        stopping,
-        stopped,
-    };
-
-    const SideIdentity = struct {
-        side: io.Side,
-        id: ?u64,
-    };
-
-    const Completion = struct {
-        done: bool = false,
-        result: ?anyerror = null,
-        next: ?*Completion = null,
-    };
-
-    const Command = union(enum) {
-        attach: struct {
-            arguments: AttachArguments,
-            completion: *Completion,
-        },
-        detach: struct {
-            side: io.Side,
-            completion: *Completion,
-        },
-        enable_read: SideIdentity,
-        enable_write: SideIdentity,
-        perform: struct {
-            task: Task,
-            completion: *Completion,
-        },
-        custom: Task,
-        stop,
-    };
-
-    const CommandNode = struct {
-        command: Command,
-        next: ?*CommandNode = null,
-        deadline_ns: u64 = 0,
-    };
-
-    const CommandOutcome = struct {
-        should_continue: bool = true,
-        failure: ?Failure = null,
-    };
-
-    const ProcessOutcome = union(enum) {
-        ok,
-        side_failure: struct {
-            side: io.Side,
-            failure: Failure,
-        },
-        fatal: Failure,
-    };
-
-    const WriteNode = struct {
-        data: []u8,
-        next: ?*WriteNode = null,
-    };
-
-    const SideIO = struct {
-        id: u64,
-        side: io.Side,
-        fd: io.FileDescriptor,
-        native_io: io.IOInterface,
-        transform_write: ?TransformWrite,
-        on_read: ?OnRead,
-        on_failure: ?OnFailure,
-        read_buf: []u8,
-        write_head: ?*WriteNode = null,
-        write_tail: ?*WriteNode = null,
-        write_offset: usize = 0,
-        is_reading: bool = true,
-        is_writing: bool = false,
-        did_cleanup: bool = false,
-        transform_drainer: core.Drainer = .{},
-
-        fn create(
-            allocator: std.mem.Allocator,
-            id: u64,
-            side: io.Side,
-            descriptor: Descriptor,
-            read_buf_size: usize,
-            arguments: AttachArguments,
-        ) std.mem.Allocator.Error!*SideIO {
-            const self = try allocator.create(SideIO);
-            errdefer allocator.destroy(self);
-            const read_buf = try allocator.alloc(u8, read_buf_size);
-            self.* = .{
-                .id = id,
-                .side = side,
-                .fd = descriptor.fd,
-                .native_io = descriptor.io,
-                .transform_write = arguments.transform_write,
-                .on_read = arguments.on_read,
-                .on_failure = arguments.on_failure,
-                .read_buf = read_buf,
-            };
-            return self;
-        }
-
-        fn destroyStorage(self: *SideIO, allocator: std.mem.Allocator) void {
-            var current = self.write_head;
-            while (current) |node| {
-                const next = node.next;
-                allocator.free(node.data);
-                allocator.destroy(node);
-                current = next;
-            }
-            allocator.free(self.read_buf);
-            self.transform_drainer.deinit();
-            allocator.destroy(self);
-        }
-
-        fn resetEvents(self: *SideIO) io.Error!void {
-            return self.native_io.resetEvents();
-        }
-
-        fn setRead(self: *SideIO, mux: c.pp_mux, enabled: bool) io.Error!void {
-            _ = c.pp_mux_set_read(mux, self.fd, enabled);
-            self.is_reading = enabled;
-            try self.syncEventMask();
-        }
-
-        fn setWrite(self: *SideIO, mux: c.pp_mux, enabled: bool) io.Error!void {
-            _ = c.pp_mux_set_write(mux, self.fd, enabled);
-            self.is_writing = enabled;
-            try self.syncEventMask();
-        }
-
-        fn syncEventMask(self: *SideIO) io.Error!void {
-            return self.native_io.setEventMask(self.is_reading, self.is_writing);
-        }
-
-        fn detachFromMux(self: *SideIO, mux: c.pp_mux) bool {
-            if (self.did_cleanup) return false;
-            self.did_cleanup = true;
-            _ = c.pp_mux_delete(mux, self.fd);
-            return true;
-        }
-
-        fn cleanupNative(self: *SideIO) void {
-            self.native_io.cleanup();
-        }
-    };
-
-    const DescriptorSet = struct {
-        allocator: std.mem.Allocator,
-        readable: std.ArrayList(io.FileDescriptor) = .empty,
-        writable: std.ArrayList(io.FileDescriptor) = .empty,
-        allocation_failed: bool = false,
-
-        fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!DescriptorSet {
-            var self = DescriptorSet{ .allocator = allocator };
-            errdefer self.deinit();
-            try self.readable.ensureTotalCapacity(allocator, number_of_descriptors);
-            try self.writable.ensureTotalCapacity(allocator, number_of_descriptors);
-            return self;
-        }
-
-        fn deinit(self: *DescriptorSet) void {
-            self.readable.deinit(self.allocator);
-            self.writable.deinit(self.allocator);
-        }
-
-        fn resetReadable(self: *DescriptorSet) void {
-            self.readable.clearRetainingCapacity();
-        }
-
-        fn insertReadable(self: *DescriptorSet, fd: io.FileDescriptor) void {
-            self.insert(&self.readable, fd) catch {
-                self.allocation_failed = true;
-            };
-        }
-
-        fn insertWritable(self: *DescriptorSet, fd: io.FileDescriptor) void {
-            self.insert(&self.writable, fd) catch {
-                self.allocation_failed = true;
-            };
-        }
-
-        fn insert(
-            self: *DescriptorSet,
-            list: *std.ArrayList(io.FileDescriptor),
-            fd: io.FileDescriptor,
-        ) std.mem.Allocator.Error!void {
-            if (contains(list.items, fd)) return;
-            try list.append(self.allocator, fd);
-        }
-
-        fn removeReadable(self: *DescriptorSet, fd: io.FileDescriptor) void {
-            remove(&self.readable, fd);
-        }
-
-        fn removeWritable(self: *DescriptorSet, fd: io.FileDescriptor) void {
-            remove(&self.writable, fd);
-        }
-
-        fn isReadable(self: DescriptorSet, fd: io.FileDescriptor) bool {
-            return contains(self.readable.items, fd);
-        }
-
-        fn isWritable(self: DescriptorSet, fd: io.FileDescriptor) bool {
-            return contains(self.writable.items, fd);
-        }
-
-        fn contains(list: []const io.FileDescriptor, fd: io.FileDescriptor) bool {
-            for (list) |item| {
-                if (item == fd) return true;
-            }
-            return false;
-        }
-
-        fn remove(list: *std.ArrayList(io.FileDescriptor), fd: io.FileDescriptor) void {
-            for (list.items, 0..) |item, index| {
-                if (item == fd) {
-                    _ = list.orderedRemove(index);
-                    return;
-                }
-            }
-        }
-    };
-
     allocator: std.mem.Allocator,
     mux: c.pp_mux,
     link_buf_size: usize,
@@ -502,6 +273,95 @@ pub const Looper = struct {
         self.state = .started;
         self.condition.broadcast();
         self.lock.unlock();
+    }
+
+    fn loopMain(self: *Looper) void {
+        self.lock.lock();
+        while (self.state == .starting) {
+            self.condition.wait(&self.lock);
+        }
+        const loop_thread_id = std.Thread.getCurrentId();
+        self.loop_thread_id = loop_thread_id;
+        self.lock.unlock();
+
+        defer self.clearLoopThread(loop_thread_id);
+        while (self.loopOnce()) {}
+        self.cleanupAfterLoop();
+    }
+
+    fn loopOnce(self: *Looper) bool {
+        self.lock.lock();
+        if (self.deinitializing or self.state == .stopped or self.mux_freed) {
+            self.lock.unlock();
+            return false;
+        }
+        const now_ns = core.concurrency.monotonicNs();
+        self.promoteDueScheduledLocked(now_ns);
+        const timeout_ms = self.waitTimeoutMsLocked(now_ns);
+        const fd_set = if (self.fd_set) |*value| value else {
+            self.lock.unlock();
+            return false;
+        };
+        self.lock.unlock();
+
+        fd_set.resetReadable();
+        var code: c_int = 0;
+        if (c.pp_mux_wait_timeout(self.mux, &code, timeout_ms) < 0) {
+            log.writef(.err, "Looper: pp_mux_wait_timeout() failed (code={})", .{code});
+            self.finish(.{ .wait = code });
+            return false;
+        }
+        if (fd_set.allocation_failed) {
+            self.finish(.{ .system = error.OutOfMemory });
+            return false;
+        }
+
+        self.lock.lock();
+        self.promoteDueScheduledLocked(core.concurrency.monotonicNs());
+        const released = self.deinitializing;
+        self.lock.unlock();
+        if (released) {
+            log.writef(.info, "Looper: released self", .{});
+            return false;
+        }
+
+        const command_outcome = self.handleCommands(fd_set);
+        self.lock.lock();
+        const deinitializing_after_commands = self.deinitializing;
+        self.lock.unlock();
+        if (deinitializing_after_commands) {
+            return false;
+        }
+        if (command_outcome.failure) |failure| {
+            if (sideFailure(failure)) |item| {
+                self.detachImmediately(item.side, item.failure);
+                return true;
+            }
+            self.finish(failure);
+            return false;
+        }
+        if (!command_outcome.should_continue) {
+            log.writef(.info, "Looper: stop requested", .{});
+            self.finish(null);
+            return false;
+        }
+
+        const process_outcome = self.process(fd_set);
+        self.lock.lock();
+        const deinitializing_after_process = self.deinitializing;
+        self.lock.unlock();
+        if (deinitializing_after_process) {
+            return false;
+        }
+        switch (process_outcome) {
+            .ok => {},
+            .side_failure => |item| self.detachImmediately(item.side, item.failure),
+            .fatal => |failure| {
+                self.finish(failure);
+                return false;
+            },
+        }
+        return true;
     }
 
     pub fn stop(self: *Looper) anyerror!void {
@@ -826,6 +686,235 @@ pub const Looper = struct {
         return self.write(packets, side, false);
     }
 
+    const number_of_descriptors = 2;
+    const no_buf_retry_delay_ms = 10;
+
+    const State = enum {
+        idle,
+        starting,
+        started,
+        stopping,
+        stopped,
+    };
+
+    const SideIdentity = struct {
+        side: io.Side,
+        id: ?u64,
+    };
+
+    const Completion = struct {
+        done: bool = false,
+        result: ?anyerror = null,
+        next: ?*Completion = null,
+    };
+
+    const Command = union(enum) {
+        attach: struct {
+            arguments: AttachArguments,
+            completion: *Completion,
+        },
+        detach: struct {
+            side: io.Side,
+            completion: *Completion,
+        },
+        enable_read: SideIdentity,
+        enable_write: SideIdentity,
+        perform: struct {
+            task: Task,
+            completion: *Completion,
+        },
+        custom: Task,
+        stop,
+    };
+
+    const CommandNode = struct {
+        command: Command,
+        next: ?*CommandNode = null,
+        deadline_ns: u64 = 0,
+    };
+
+    const CommandOutcome = struct {
+        should_continue: bool = true,
+        failure: ?Failure = null,
+    };
+
+    const ProcessOutcome = union(enum) {
+        ok,
+        side_failure: struct {
+            side: io.Side,
+            failure: Failure,
+        },
+        fatal: Failure,
+    };
+
+    const WriteNode = struct {
+        data: []u8,
+        next: ?*WriteNode = null,
+    };
+
+    const SideIO = struct {
+        id: u64,
+        side: io.Side,
+        fd: io.FileDescriptor,
+        native_io: io.IOInterface,
+        transform_write: ?TransformWrite,
+        on_read: ?OnRead,
+        on_failure: ?OnFailure,
+        read_buf: []u8,
+        write_head: ?*WriteNode = null,
+        write_tail: ?*WriteNode = null,
+        write_offset: usize = 0,
+        is_reading: bool = true,
+        is_writing: bool = false,
+        did_cleanup: bool = false,
+        transform_drainer: core.Drainer = .{},
+
+        fn create(
+            allocator: std.mem.Allocator,
+            id: u64,
+            side: io.Side,
+            descriptor: Descriptor,
+            read_buf_size: usize,
+            arguments: AttachArguments,
+        ) std.mem.Allocator.Error!*SideIO {
+            const self = try allocator.create(SideIO);
+            errdefer allocator.destroy(self);
+            const read_buf = try allocator.alloc(u8, read_buf_size);
+            self.* = .{
+                .id = id,
+                .side = side,
+                .fd = descriptor.fd,
+                .native_io = descriptor.io,
+                .transform_write = arguments.transform_write,
+                .on_read = arguments.on_read,
+                .on_failure = arguments.on_failure,
+                .read_buf = read_buf,
+            };
+            return self;
+        }
+
+        fn destroyStorage(self: *SideIO, allocator: std.mem.Allocator) void {
+            var current = self.write_head;
+            while (current) |node| {
+                const next = node.next;
+                allocator.free(node.data);
+                allocator.destroy(node);
+                current = next;
+            }
+            allocator.free(self.read_buf);
+            self.transform_drainer.deinit();
+            allocator.destroy(self);
+        }
+
+        fn resetEvents(self: *SideIO) io.Error!void {
+            return self.native_io.resetEvents();
+        }
+
+        fn setRead(self: *SideIO, mux: c.pp_mux, enabled: bool) io.Error!void {
+            _ = c.pp_mux_set_read(mux, self.fd, enabled);
+            self.is_reading = enabled;
+            try self.syncEventMask();
+        }
+
+        fn setWrite(self: *SideIO, mux: c.pp_mux, enabled: bool) io.Error!void {
+            _ = c.pp_mux_set_write(mux, self.fd, enabled);
+            self.is_writing = enabled;
+            try self.syncEventMask();
+        }
+
+        fn syncEventMask(self: *SideIO) io.Error!void {
+            return self.native_io.setEventMask(self.is_reading, self.is_writing);
+        }
+
+        fn detachFromMux(self: *SideIO, mux: c.pp_mux) bool {
+            if (self.did_cleanup) return false;
+            self.did_cleanup = true;
+            _ = c.pp_mux_delete(mux, self.fd);
+            return true;
+        }
+
+        fn cleanupNative(self: *SideIO) void {
+            self.native_io.cleanup();
+        }
+    };
+
+    const DescriptorSet = struct {
+        allocator: std.mem.Allocator,
+        readable: std.ArrayList(io.FileDescriptor) = .empty,
+        writable: std.ArrayList(io.FileDescriptor) = .empty,
+        allocation_failed: bool = false,
+
+        fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!DescriptorSet {
+            var self = DescriptorSet{ .allocator = allocator };
+            errdefer self.deinit();
+            try self.readable.ensureTotalCapacity(allocator, number_of_descriptors);
+            try self.writable.ensureTotalCapacity(allocator, number_of_descriptors);
+            return self;
+        }
+
+        fn deinit(self: *DescriptorSet) void {
+            self.readable.deinit(self.allocator);
+            self.writable.deinit(self.allocator);
+        }
+
+        fn resetReadable(self: *DescriptorSet) void {
+            self.readable.clearRetainingCapacity();
+        }
+
+        fn insertReadable(self: *DescriptorSet, fd: io.FileDescriptor) void {
+            self.insert(&self.readable, fd) catch {
+                self.allocation_failed = true;
+            };
+        }
+
+        fn insertWritable(self: *DescriptorSet, fd: io.FileDescriptor) void {
+            self.insert(&self.writable, fd) catch {
+                self.allocation_failed = true;
+            };
+        }
+
+        fn insert(
+            self: *DescriptorSet,
+            list: *std.ArrayList(io.FileDescriptor),
+            fd: io.FileDescriptor,
+        ) std.mem.Allocator.Error!void {
+            if (contains(list.items, fd)) return;
+            try list.append(self.allocator, fd);
+        }
+
+        fn removeReadable(self: *DescriptorSet, fd: io.FileDescriptor) void {
+            remove(&self.readable, fd);
+        }
+
+        fn removeWritable(self: *DescriptorSet, fd: io.FileDescriptor) void {
+            remove(&self.writable, fd);
+        }
+
+        fn isReadable(self: DescriptorSet, fd: io.FileDescriptor) bool {
+            return contains(self.readable.items, fd);
+        }
+
+        fn isWritable(self: DescriptorSet, fd: io.FileDescriptor) bool {
+            return contains(self.writable.items, fd);
+        }
+
+        fn contains(list: []const io.FileDescriptor, fd: io.FileDescriptor) bool {
+            for (list) |item| {
+                if (item == fd) return true;
+            }
+            return false;
+        }
+
+        fn remove(list: *std.ArrayList(io.FileDescriptor), fd: io.FileDescriptor) void {
+            for (list.items, 0..) |item, index| {
+                if (item == fd) {
+                    _ = list.orderedRemove(index);
+                    return;
+                }
+            }
+        }
+    };
+
     fn writeOutOfBand(self: *Looper, packets: Packets, side: io.Side) anyerror!void {
         if (!self.isOnQueue()) {
             log.writef(.err, "OOB writes must run on the looper queue", .{});
@@ -855,95 +944,6 @@ pub const Looper = struct {
             };
             if (written != packet.len) return error.WriteIncomplete;
         }
-    }
-
-    fn loopMain(self: *Looper) void {
-        self.lock.lock();
-        while (self.state == .starting) {
-            self.condition.wait(&self.lock);
-        }
-        const loop_thread_id = std.Thread.getCurrentId();
-        self.loop_thread_id = loop_thread_id;
-        self.lock.unlock();
-
-        defer self.clearLoopThread(loop_thread_id);
-        while (self.loopOnce()) {}
-        self.cleanupAfterLoop();
-    }
-
-    fn loopOnce(self: *Looper) bool {
-        self.lock.lock();
-        if (self.deinitializing or self.state == .stopped or self.mux_freed) {
-            self.lock.unlock();
-            return false;
-        }
-        const now_ns = core.concurrency.monotonicNs();
-        self.promoteDueScheduledLocked(now_ns);
-        const timeout_ms = self.waitTimeoutMsLocked(now_ns);
-        const fd_set = if (self.fd_set) |*value| value else {
-            self.lock.unlock();
-            return false;
-        };
-        self.lock.unlock();
-
-        fd_set.resetReadable();
-        var code: c_int = 0;
-        if (c.pp_mux_wait_timeout(self.mux, &code, timeout_ms) < 0) {
-            log.writef(.err, "Looper: pp_mux_wait_timeout() failed (code={})", .{code});
-            self.finish(.{ .wait = code });
-            return false;
-        }
-        if (fd_set.allocation_failed) {
-            self.finish(.{ .system = error.OutOfMemory });
-            return false;
-        }
-
-        self.lock.lock();
-        self.promoteDueScheduledLocked(core.concurrency.monotonicNs());
-        const released = self.deinitializing;
-        self.lock.unlock();
-        if (released) {
-            log.writef(.info, "Looper: released self", .{});
-            return false;
-        }
-
-        const command_outcome = self.handleCommands(fd_set);
-        self.lock.lock();
-        const deinitializing_after_commands = self.deinitializing;
-        self.lock.unlock();
-        if (deinitializing_after_commands) {
-            return false;
-        }
-        if (command_outcome.failure) |failure| {
-            if (sideFailure(failure)) |item| {
-                self.detachImmediately(item.side, item.failure);
-                return true;
-            }
-            self.finish(failure);
-            return false;
-        }
-        if (!command_outcome.should_continue) {
-            log.writef(.info, "Looper: stop requested", .{});
-            self.finish(null);
-            return false;
-        }
-
-        const process_outcome = self.process(fd_set);
-        self.lock.lock();
-        const deinitializing_after_process = self.deinitializing;
-        self.lock.unlock();
-        if (deinitializing_after_process) {
-            return false;
-        }
-        switch (process_outcome) {
-            .ok => {},
-            .side_failure => |item| self.detachImmediately(item.side, item.failure),
-            .fatal => |failure| {
-                self.finish(failure);
-                return false;
-            },
-        }
-        return true;
     }
 
     fn onMuxReadable(context: ?*anyopaque, fd: io.FileDescriptor) callconv(.c) void {
