@@ -4,9 +4,9 @@
 
 //! A small serial actor executor.
 //!
-//! The actor owns a worker thread and a FIFO mailbox. Synchronous calls enqueue
-//! stack-backed jobs and wait for completion; asynchronous posts enqueue
-//! heap-backed jobs and return immediately.
+//! The actor owns a worker thread and a FIFO mailbox. `perform` enqueues
+//! stack-backed jobs and waits for completion; `schedule` enqueues heap-backed
+//! jobs and returns immediately.
 
 const std = @import("std");
 
@@ -16,7 +16,7 @@ pub fn Actor(
     comptime Context: type,
     comptime Message: type,
     comptime Error: type,
-    comptime perform: fn (*Context, Message) Error!void,
+    comptime handler: fn (*Context, Message) Error!void,
 ) type {
     return struct {
         const Self = @This();
@@ -45,8 +45,8 @@ pub fn Actor(
         };
 
         pub const CreateError = std.mem.Allocator.Error || std.Thread.SpawnError;
-        pub const PostError = std.mem.Allocator.Error || error{Closed};
-        pub const CallError = Error || error{Closed};
+        pub const ScheduleError = std.mem.Allocator.Error || error{Closed};
+        pub const PerformError = Error || error{Closed};
 
         /// Replaces the condition-backed mailbox wait. `wait` must block until
         /// work may be available, and returns `false` when the actor must exit.
@@ -113,8 +113,8 @@ pub fn Actor(
             return self.isCurrentThreadLocked();
         }
 
-        /// Dispatches a message asynchronously with the actor.
-        pub fn post(self: *Self, message: Message) PostError!void {
+        /// Schedules a message asynchronously on the actor.
+        pub fn schedule(self: *Self, message: Message) ScheduleError!void {
             const job = try self.allocator.create(Job);
             errdefer self.allocator.destroy(job);
             job.* = .{
@@ -128,19 +128,19 @@ pub fn Actor(
             self.pushLocked(job);
         }
 
-        /// Dispatches a message synchronously with the actor. Returns
+        /// Performs a message synchronously on the actor. Returns
         /// a domain-specific error related to the job execution.
-        pub fn call(self: *Self, message: Message) CallError!void {
+        pub fn perform(self: *Self, message: Message) PerformError!void {
             var job = Job{ .command = .{ .message = message } };
 
-            // Watch out for recursive locks. If we are invoking call()
+            // Watch out for recursive locks. If we are invoking perform()
             // on the actor thread, e.g., as the effect of a nested
-            // call(), we must execute the job immediately. Waiting on
+            // perform(), we must execute the job immediately. Waiting on
             // the condition would lead to a deadlock.
             self.mutex.lock();
             if (self.isCurrentThreadLocked()) {
                 self.mutex.unlock();
-                return perform(self.context, message);
+                return handler(self.context, message);
             }
             defer self.mutex.unlock();
 
@@ -277,7 +277,7 @@ pub fn Actor(
         fn performCommand(self: *Self, command: Command) Outcome {
             switch (command) {
                 .message => |message| {
-                    perform(self.context, message) catch |err| {
+                    handler(self.context, message) catch |err| {
                         return .{ .result = .{ .err = err } };
                     };
                 },

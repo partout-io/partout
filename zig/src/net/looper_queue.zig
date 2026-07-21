@@ -147,11 +147,11 @@ pub const Command = union(enum) {
     },
     enable_read: SideIdentity,
     enable_write: SideIdentity,
-    perform: struct {
+    schedule: struct {
         task: Task,
         completion: *Completion,
     },
-    custom: Task,
+    perform: Task,
     stop,
 };
 

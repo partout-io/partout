@@ -446,7 +446,7 @@ pub const Looper = struct {
             log.writef(.debug, "Ignoring perform before start() or after finish", .{});
             return error.Cancelled;
         }
-        const node = self.createCommandNode(.{ .perform = .{
+        const node = self.createCommandNode(.{ .schedule = .{
             .task = .{ .context = &holder, .callback = Holder.run },
             .completion = &completion,
         } }) catch |err| {
@@ -492,12 +492,12 @@ pub const Looper = struct {
             return error.Cancelled;
         }
         if (delay_ms) |delay| {
-            const node = try self.createCommandNode(.{ .custom = task });
+            const node = try self.createCommandNode(.{ .perform = task });
             node.deadline_ns = deadlineAfter(delay);
             if (self.commands.insertScheduled(node)) self.wakeLocked();
             return;
         }
-        const node = try self.createCommandNode(.{ .custom = task });
+        const node = try self.createCommandNode(.{ .perform = task });
         self.commands.append(node);
         self.wakeLocked();
     }
@@ -954,7 +954,7 @@ pub const Looper = struct {
                         };
                     }
                 },
-                .perform => |command| {
+                .schedule => |command| {
                     self.lock.unlock();
                     command.task.call() catch unreachable;
                     self.lock.lock();
@@ -965,7 +965,7 @@ pub const Looper = struct {
                     self.lock.unlock();
                     self.lock.lock();
                 },
-                .custom => |task| {
+                .perform => |task| {
                     self.lock.unlock();
                     task.call() catch |err| {
                         self.lock.lock();
@@ -1481,7 +1481,7 @@ pub const Looper = struct {
             switch (node.command) {
                 .attach => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
                 .detach => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
-                .perform => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
+                .schedule => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
                 else => {},
             }
             self.allocator.destroy(node);
