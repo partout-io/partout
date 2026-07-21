@@ -23,6 +23,7 @@ pub const net_sandbox = @import("net/sandbox.zig");
 pub const net_platform = @import("net/platform.zig");
 pub const openvpn_exports = @import("openvpn/exports.zig");
 pub const openvpn_parser = @import("openvpn/parser.zig");
+pub const openvpn_serializer = @import("openvpn/serializer.zig");
 pub const partout = @import("partout.zig");
 pub const wireguard_adapter = @import("wireguard/adapter.zig");
 pub const wireguard_backend = @import("wireguard/backend.zig");
