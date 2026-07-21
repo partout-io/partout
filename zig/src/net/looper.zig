@@ -1622,7 +1622,7 @@ pub const Looper = struct {
             self.clearRetryForCommand(node.command);
             switch (node.command) {
                 .attach => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
-                .detach => |command| self.queueCompletionLocked(command.completion, null),
+                .detach => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
                 .perform => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
                 else => {},
             }
