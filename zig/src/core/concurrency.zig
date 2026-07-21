@@ -39,6 +39,11 @@ pub const Drainer = struct {
         mutex.lock();
         defer mutex.unlock();
 
+        self.leaveLocked();
+    }
+
+    /// Caller must hold the mutex that protects this drainer.
+    pub fn leaveLocked(self: *Drainer) void {
         std.debug.assert(self.in_flight > 0);
         self.in_flight -= 1;
         if (self.in_flight == 0) {

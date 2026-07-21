@@ -17,6 +17,7 @@ pub const net_connection = @import("net/connection.zig");
 pub const net_daemon = @import("net/daemon.zig");
 pub const net_daemon_helpers = @import("net/daemon_helpers.zig");
 pub const net_io = @import("net/io.zig");
+pub const net_looper = @import("net/looper.zig");
 pub const net_sandbox = @import("net/sandbox.zig");
 pub const net_platform = @import("net/platform.zig");
 pub const openvpn_exports = @import("openvpn/exports.zig");

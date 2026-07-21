@@ -17,6 +17,7 @@ comptime {
     _ = @import("net/connection.zig");
     _ = @import("net/daemon.zig");
     _ = @import("net/io.zig");
+    _ = @import("net/looper.zig");
     _ = @import("net/platform.zig");
     _ = @import("openvpn/exports.zig");
     _ = @import("openvpn/parser.zig");

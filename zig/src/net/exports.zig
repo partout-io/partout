@@ -17,6 +17,7 @@
 const conn = @import("connection.zig");
 const daemon = @import("daemon.zig");
 const io = @import("io.zig");
+const looper = @import("looper.zig");
 const platform = @import("platform.zig");
 const sandbox = @import("sandbox.zig");
 
@@ -32,6 +33,7 @@ pub const DaemonError = daemon.Error;
 pub const DNSRecord = sandbox.DNSRecord;
 pub const DNSResolver = sandbox.DNSResolver;
 pub const FileDescriptor = io.FileDescriptor;
+pub const Looper = looper.Looper;
 pub const NetworkMonitor = sandbox.NetworkMonitor;
 pub const Platform = platform.Platform;
 pub const ReachabilityInfo = io.ReachabilityInfo;

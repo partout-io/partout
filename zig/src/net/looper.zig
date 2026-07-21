@@ -128,13 +128,20 @@ pub const Looper = struct {
         Cancelled,
         MuxFailure,
         OperationCancelled,
+        ReentrantCall,
     };
+    pub const DetachError = std.mem.Allocator.Error || error{
+        Cancelled,
+        ReentrantCall,
+    };
+    pub const ResumeReadingError = std.mem.Allocator.Error || error{Cancelled};
 
     const number_of_descriptors = 2;
     const no_buf_retry_delay_ms = 10;
 
     const State = enum {
         idle,
+        starting,
         started,
         stopping,
         stopped,
@@ -210,6 +217,7 @@ pub const Looper = struct {
         is_reading: bool = true,
         is_writing: bool = false,
         did_cleanup: bool = false,
+        transform_drainer: core.Drainer = .{},
 
         fn create(
             allocator: std.mem.Allocator,
@@ -244,6 +252,7 @@ pub const Looper = struct {
                 current = next;
             }
             allocator.free(self.read_buf);
+            self.transform_drainer.deinit();
             allocator.destroy(self);
         }
 
@@ -267,13 +276,14 @@ pub const Looper = struct {
             return self.native_io.setEventMask(self.is_reading, self.is_writing);
         }
 
-        fn detach(self: *SideIO, mux: c.pp_mux, failure: ?Failure) void {
-            if (failure) |reason| {
-                if (self.on_failure) |callback| callback.call(reason);
-            }
-            if (self.did_cleanup) return;
+        fn detachFromMux(self: *SideIO, mux: c.pp_mux) bool {
+            if (self.did_cleanup) return false;
             self.did_cleanup = true;
             _ = c.pp_mux_delete(mux, self.fd);
+            return true;
+        }
+
+        fn cleanupNative(self: *SideIO) void {
             self.native_io.cleanup();
         }
     };
@@ -379,6 +389,7 @@ pub const Looper = struct {
     command_tail: ?*CommandNode = null,
     completion_head: ?*Completion = null,
     completion_tail: ?*Completion = null,
+    waiter_count: usize = 0,
     scheduled_head: ?*CommandNode = null,
     scheduled_tail: ?*CommandNode = null,
     read_retries: [2]bool = .{ false, false },
@@ -389,11 +400,14 @@ pub const Looper = struct {
     terminal_failure: ?Failure = null,
     next_side_id: u64 = 1,
     actor: ?*LoopActor = null,
+    loop_thread_id: ?std.Thread.Id = null,
     fd_set: ?DescriptorSet = null,
     scheduler_thread: ?std.Thread = null,
     scheduler_stopping: bool = false,
     deinitializing: bool = false,
     mux_freed: bool = false,
+
+    threadlocal var borrowed_callback_depth: usize = 0;
 
     pub fn init(allocator: std.mem.Allocator, options: Options) InitError!Looper {
         const mux = c.pp_mux_create(number_of_descriptors) orelse {
@@ -417,58 +431,50 @@ pub const Looper = struct {
     pub fn deinit(self: *Looper) void {
         log.debug("Deinit Looper", .{});
 
-        self.lock.lock();
-        var link_to_detach: ?*SideIO = null;
-        var tun_to_detach: ?*SideIO = null;
-        var should_wake = false;
-        if (self.state == .started) {
-            // Match FdLooper.deinit: detach first, then wake the weakly-held
-            // event loop without reporting a normal finish.
-            link_to_detach = self.link;
-            tun_to_detach = self.tun;
-            self.state = .stopping;
-            self.deinitializing = true;
-            should_wake = true;
+        if (self.isReentrantLifecycleCall()) {
+            @panic("Looper.deinit() must run outside looper callbacks");
         }
-        self.lock.unlock();
-        if (link_to_detach) |side_io| side_io.detach(self.mux, null);
-        if (tun_to_detach) |side_io| side_io.detach(self.mux, null);
-        if (should_wake) _ = c.pp_mux_wake(self.mux);
-        self.shutdownActor();
 
         self.lock.lock();
+        while (self.state == .starting) {
+            self.condition.wait(&self.lock);
+        }
+        self.deinitializing = true;
         self.scheduler_stopping = true;
-        self.condition.broadcast();
-        const scheduler_thread = self.scheduler_thread;
-        self.scheduler_thread = null;
-        self.lock.unlock();
-        if (scheduler_thread) |thread| thread.join();
+        if (self.state == .idle or self.state == .started) {
+            self.state = .stopping;
+        }
 
-        self.lock.lock();
-        if (self.link) |side_io| {
-            side_io.detach(self.mux, null);
-            side_io.destroyStorage(self.allocator);
-            self.link = null;
-        }
-        if (self.tun) |side_io| {
-            side_io.detach(self.mux, null);
-            side_io.destroyStorage(self.allocator);
-            self.tun = null;
-        }
-        self.destroyCommandList(self.command_head);
+        const pending = self.command_head;
         self.command_head = null;
         self.command_tail = null;
+        self.cancelPendingLocked(pending);
         self.destroyCommandList(self.scheduled_head);
         self.scheduled_head = null;
         self.scheduled_tail = null;
-        if (self.fd_set) |*fd_set| {
-            fd_set.deinit();
-            self.fd_set = null;
+        self.read_retries = .{ false, false };
+        self.write_retries = .{ false, false };
+        if (self.stop_completion) |completion| {
+            completeNow(completion, error.Cancelled);
+            self.stop_completion = null;
         }
-        if (!self.mux_freed) {
-            c.pp_mux_free(self.mux);
-            self.mux_freed = true;
+        self.releaseCompletionsLocked();
+        self.wakeLocked();
+        self.condition.broadcast();
+        while (self.waiter_count > 0) {
+            self.condition.wait(&self.lock);
         }
+        const scheduler_thread = self.scheduler_thread;
+        self.scheduler_thread = null;
+        self.lock.unlock();
+
+        // The actor owns every live SideIO. It must be fully joined before
+        // descriptor callbacks or storage are released.
+        self.shutdownActor();
+        if (scheduler_thread) |thread| thread.join();
+
+        self.lock.lock();
+        self.cleanupResourcesLocked();
         self.lock.unlock();
 
         self.condition.deinit();
@@ -482,65 +488,78 @@ pub const Looper = struct {
             std.debug.assert(false);
             return error.AlreadyStarted;
         }
-        self.state = .started;
+        self.state = .starting;
         self.scheduler_stopping = false;
-        self.lock.unlock();
-
-        const scheduler = std.Thread.spawn(.{}, schedulerMain, .{self}) catch |err| {
-            self.lock.lock();
-            self.state = .idle;
-            self.lock.unlock();
-            return err;
-        };
-        self.lock.lock();
-        self.scheduler_thread = scheduler;
         self.lock.unlock();
 
         const fd_set = DescriptorSet.init(self.allocator) catch |err| {
             self.lock.lock();
             self.state = .idle;
-            self.scheduler_stopping = true;
             self.condition.broadcast();
-            self.scheduler_thread = null;
             self.lock.unlock();
-            scheduler.join();
             return err;
         };
+
+        self.lock.lock();
         self.fd_set = fd_set;
         c.pp_mux_set_on_readable(self.mux, onMuxReadable, &self.fd_set.?);
         c.pp_mux_set_on_writable(self.mux, onMuxWritable, &self.fd_set.?);
+        self.lock.unlock();
+
+        const scheduler = std.Thread.spawn(.{}, schedulerMain, .{self}) catch |err| {
+            self.lock.lock();
+            self.fd_set.?.deinit();
+            self.fd_set = null;
+            self.state = .idle;
+            self.condition.broadcast();
+            self.lock.unlock();
+            return err;
+        };
 
         log.info("Start looper", .{});
         const actor = LoopActor.createWithWaitCallbacks(self.allocator, self, .{
             .wait = actorWait,
             .wake_up = actorWakeUp,
         }) catch |err| {
-            self.fd_set.?.deinit();
-            self.fd_set = null;
             self.lock.lock();
-            self.state = .idle;
             self.scheduler_stopping = true;
             self.condition.broadcast();
-            self.scheduler_thread = null;
             self.lock.unlock();
             scheduler.join();
+
+            self.lock.lock();
+            self.fd_set.?.deinit();
+            self.fd_set = null;
+            self.scheduler_stopping = false;
+            self.state = .idle;
+            self.condition.broadcast();
+            self.lock.unlock();
             return err;
         };
         self.lock.lock();
+        self.scheduler_thread = scheduler;
         self.actor = actor;
+        self.state = .started;
+        self.condition.broadcast();
         self.lock.unlock();
     }
 
     pub fn stop(self: *Looper) anyerror!void {
+        if (self.isReentrantLifecycleCall()) return error.ReentrantCall;
+
         var completion = Completion{};
 
         self.lock.lock();
+        while (self.state == .starting) {
+            self.condition.wait(&self.lock);
+        }
         switch (self.state) {
             .idle => {
                 self.lock.unlock();
                 return;
             },
             .started => {},
+            .starting => unreachable,
             .stopping, .stopped => {
                 self.lock.unlock();
                 std.debug.assert(false);
@@ -554,7 +573,8 @@ pub const Looper = struct {
         self.state = .stopping;
         self.stop_completion = &completion;
         self.appendCommandNode(node);
-        _ = c.pp_mux_wake(self.mux);
+        self.waiter_count += 1;
+        self.wakeLocked();
         while (!completion.done) {
             self.condition.wait(&self.lock);
         }
@@ -562,14 +582,20 @@ pub const Looper = struct {
         self.lock.unlock();
 
         self.shutdownActor();
+
+        self.lock.lock();
+        std.debug.assert(self.waiter_count > 0);
+        self.waiter_count -= 1;
+        self.condition.broadcast();
+        self.lock.unlock();
         if (result) |err| return err;
     }
 
     pub fn isOnQueue(self: *Looper) bool {
         self.lock.lock();
-        const actor = self.actor;
-        self.lock.unlock();
-        return if (actor) |item| item.isCurrentThread() else false;
+        defer self.lock.unlock();
+        const thread_id = self.loop_thread_id orelse return false;
+        return thread_id == std.Thread.getCurrentId();
     }
 
     pub fn perform(
@@ -578,6 +604,7 @@ pub const Looper = struct {
         context: ?*anyopaque,
         callback: *const fn (?*anyopaque) anyerror!Result,
     ) anyerror!Result {
+        if (hasBorrowedCallback()) return error.ReentrantCall;
         if (self.isOnQueue()) return callback(context);
 
         const Holder = struct {
@@ -604,7 +631,7 @@ pub const Looper = struct {
         self.lock.lock();
         if (self.state != .started) {
             self.lock.unlock();
-            log.err("Ignoring perform before start()", .{});
+            log.debug("Ignoring perform before start() or after finish", .{});
             return error.Cancelled;
         }
         const node = self.createCommandNode(.{ .perform = .{
@@ -615,11 +642,15 @@ pub const Looper = struct {
             return err;
         };
         self.appendCommandNode(node);
-        _ = c.pp_mux_wake(self.mux);
+        self.waiter_count += 1;
+        self.wakeLocked();
         while (!completion.done) {
             self.condition.wait(&self.lock);
         }
         const command_result = completion.result;
+        std.debug.assert(self.waiter_count > 0);
+        self.waiter_count -= 1;
+        self.condition.broadcast();
         self.lock.unlock();
 
         if (command_result) |err| return err;
@@ -638,6 +669,10 @@ pub const Looper = struct {
 
         self.lock.lock();
         defer self.lock.unlock();
+        if (self.state != .started or self.mux_freed) {
+            log.debug("Ignoring schedule before start() or after finish", .{});
+            return error.Cancelled;
+        }
         if (delay_ms) |delay| {
             const node = try self.createCommandNode(.{ .custom = task });
             node.remaining_ms = delay;
@@ -645,25 +680,22 @@ pub const Looper = struct {
             self.condition.broadcast();
             return;
         }
-        if (self.state != .started) {
-            log.err("Ignoring schedule before start()", .{});
-            return;
-        }
         const node = try self.createCommandNode(.{ .custom = task });
         self.appendCommandNode(node);
-        _ = c.pp_mux_wake(self.mux);
+        self.wakeLocked();
     }
 
     /// Ownership of `arguments.pair.io` transfers only after successful attach.
     pub fn attach(self: *Looper, arguments: AttachArguments) AttachError!void {
+        if (self.isReentrantLifecycleCall()) return error.ReentrantCall;
+
         var completion = Completion{};
 
         self.lock.lock();
         if (self.state != .started) {
             self.lock.unlock();
-            log.err("Ignoring attach before start()", .{});
-            std.debug.assert(false);
-            return;
+            log.debug("Ignoring attach before start() or after finish", .{});
+            return error.Cancelled;
         }
         const node = self.createCommandNode(.{ .attach = .{
             .arguments = arguments,
@@ -673,11 +705,15 @@ pub const Looper = struct {
             return err;
         };
         self.appendCommandNode(node);
-        _ = c.pp_mux_wake(self.mux);
+        self.waiter_count += 1;
+        self.wakeLocked();
         while (!completion.done) {
             self.condition.wait(&self.lock);
         }
         const result = completion.result;
+        std.debug.assert(self.waiter_count > 0);
+        self.waiter_count -= 1;
+        self.condition.broadcast();
         self.lock.unlock();
         if (result) |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
@@ -687,15 +723,16 @@ pub const Looper = struct {
         };
     }
 
-    pub fn detach(self: *Looper, side: io.Side) std.mem.Allocator.Error!void {
+    pub fn detach(self: *Looper, side: io.Side) DetachError!void {
+        if (self.isReentrantLifecycleCall()) return error.ReentrantCall;
+
         var completion = Completion{};
 
         self.lock.lock();
         if (self.state != .started) {
             self.lock.unlock();
-            log.err("Ignoring detach before start()", .{});
-            std.debug.assert(false);
-            return;
+            log.debug("Ignoring detach before start() or after finish", .{});
+            return error.Cancelled;
         }
         const node = self.createCommandNode(.{ .detach = .{
             .side = side,
@@ -705,11 +742,20 @@ pub const Looper = struct {
             return err;
         };
         self.appendCommandNode(node);
-        _ = c.pp_mux_wake(self.mux);
+        self.waiter_count += 1;
+        self.wakeLocked();
         while (!completion.done) {
             self.condition.wait(&self.lock);
         }
+        const result = completion.result;
+        std.debug.assert(self.waiter_count > 0);
+        self.waiter_count -= 1;
+        self.condition.broadcast();
         self.lock.unlock();
+        if (result) |err| return switch (err) {
+            error.OutOfMemory => error.OutOfMemory,
+            else => error.Cancelled,
+        };
     }
 
     pub fn isLinkAttached(self: *Looper) bool {
@@ -730,15 +776,16 @@ pub const Looper = struct {
         return self.terminal_failure;
     }
 
-    pub fn resumeReading(self: *Looper, side: io.Side) std.mem.Allocator.Error!void {
+    pub fn resumeReading(self: *Looper, side: io.Side) ResumeReadingError!void {
         self.lock.lock();
         defer self.lock.unlock();
+        if (self.state != .started or self.mux_freed) return error.Cancelled;
         const node = try self.createCommandNode(.{ .enable_read = .{
             .side = side,
             .id = null,
         } });
         self.appendCommandNode(node);
-        _ = c.pp_mux_wake(self.mux);
+        self.wakeLocked();
     }
 
     pub fn write(
@@ -750,34 +797,42 @@ pub const Looper = struct {
         if (out_of_band) return self.writeOutOfBand(packets, side);
 
         self.lock.lock();
+        if (self.state != .started or self.mux_freed) {
+            self.lock.unlock();
+            return error.Cancelled;
+        }
         const current = self.sideIO(side) orelse {
             self.lock.unlock();
             log.err("Ignoring {s} packets, not attached", .{@tagName(side)});
             return;
         };
+        current.transform_drainer.enter();
         const id = current.id;
         const transform = current.transform_write;
         self.lock.unlock();
 
-        const processed = if (transform) |callback|
-            try callback.call(packets)
+        const processed_result: anyerror!Packets = if (transform) |callback|
+            self.callTransform(callback, packets)
         else
             packets;
 
         self.lock.lock();
         defer self.lock.unlock();
+        defer current.transform_drainer.leaveLocked();
+        const processed = try processed_result;
+        if (self.state != .started or self.mux_freed) return error.Cancelled;
         const attached = self.sideIO(side) orelse {
-            log.err("Ignoring detached {s} during processing", .{@tagName(side)});
+            log.debug("Ignoring detached {s} during processing", .{@tagName(side)});
             return;
         };
         if (attached.id != id) {
-            log.err("Ignoring detached {s} during processing", .{@tagName(side)});
+            log.debug("Ignoring detached {s} during processing", .{@tagName(side)});
             return;
         }
 
         const command = try self.createCommandNode(.{ .enable_write = .{
             .side = side,
-            .id = null,
+            .id = id,
         } });
         errdefer self.allocator.destroy(command);
 
@@ -805,7 +860,7 @@ pub const Looper = struct {
             attached.write_tail = new_tail;
         }
         self.appendCommandNode(command);
-        _ = c.pp_mux_wake(self.mux);
+        self.wakeLocked();
     }
 
     pub fn writeQueued(self: *Looper, packets: Packets, side: io.Side) anyerror!void {
@@ -817,12 +872,22 @@ pub const Looper = struct {
             log.err("OOB writes must run on the looper queue", .{});
             return;
         }
+
+        self.lock.lock();
+        if (self.state != .started or self.mux_freed) {
+            self.lock.unlock();
+            return error.Cancelled;
+        }
         const side_io = self.sideIO(side) orelse {
+            self.lock.unlock();
             log.err("Ignoring {s} packets, not attached", .{@tagName(side)});
             return;
         };
-        const processed = if (side_io.transform_write) |callback|
-            try callback.call(packets)
+        const transform = side_io.transform_write;
+        self.lock.unlock();
+
+        const processed = if (transform) |callback|
+            try self.callTransform(callback, packets)
         else
             packets;
         for (processed) |packet| {
@@ -835,6 +900,12 @@ pub const Looper = struct {
 
     fn actorWait(self: *Looper) bool {
         self.lock.lock();
+        while (self.state == .starting) {
+            self.condition.wait(&self.lock);
+        }
+        const loop_thread_id = std.Thread.getCurrentId();
+        self.loop_thread_id = loop_thread_id;
+        defer self.clearLoopThread(loop_thread_id);
         if (self.state == .stopped or self.mux_freed) {
             self.lock.unlock();
             return false;
@@ -869,6 +940,13 @@ pub const Looper = struct {
         }
 
         const command_outcome = self.handleCommands(fd_set);
+        self.lock.lock();
+        const deinitializing_after_commands = self.deinitializing;
+        self.lock.unlock();
+        if (deinitializing_after_commands) {
+            self.cleanupAfterLoop();
+            return false;
+        }
         if (command_outcome.failure) |failure| {
             if (sideFailure(failure)) |item| {
                 self.detachImmediately(item.side, item.failure);
@@ -885,7 +963,15 @@ pub const Looper = struct {
             return false;
         }
 
-        switch (self.process(fd_set)) {
+        const process_outcome = self.process(fd_set);
+        self.lock.lock();
+        const deinitializing_after_process = self.deinitializing;
+        self.lock.unlock();
+        if (deinitializing_after_process) {
+            self.cleanupAfterLoop();
+            return false;
+        }
+        switch (process_outcome) {
             .ok => {},
             .side_failure => |item| self.detachImmediately(item.side, item.failure),
             .fatal => |failure| {
@@ -899,9 +985,8 @@ pub const Looper = struct {
 
     fn actorWakeUp(self: *Looper) void {
         self.lock.lock();
-        const can_wake = !self.mux_freed;
+        self.wakeLocked();
         self.lock.unlock();
-        if (can_wake) _ = c.pp_mux_wake(self.mux);
     }
 
     fn schedulerMain(self: *Looper) void {
@@ -950,7 +1035,7 @@ pub const Looper = struct {
                 }
                 current = next;
             }
-            if (did_wake) _ = c.pp_mux_wake(self.mux);
+            if (did_wake) self.wakeLocked();
             self.lock.unlock();
         }
     }
@@ -1001,7 +1086,12 @@ pub const Looper = struct {
                     self.lock.unlock();
                     command.task.call() catch unreachable;
                     self.lock.lock();
-                    self.queueCompletionLocked(command.completion, null);
+                    completeNow(command.completion, null);
+                    self.condition.broadcast();
+                    // Give the synchronous caller a chance to return before
+                    // processing the rest of this detached command batch.
+                    self.lock.unlock();
+                    self.lock.lock();
                 },
                 .custom => |task| {
                     self.lock.unlock();
@@ -1019,7 +1109,7 @@ pub const Looper = struct {
             }
             self.allocator.destroy(node);
             pending = next;
-            if (outcome.failure != null) {
+            if (outcome.failure != null or !outcome.should_continue) {
                 self.cancelPendingLocked(pending);
                 pending = null;
             }
@@ -1087,13 +1177,9 @@ pub const Looper = struct {
         side: io.Side,
         completion: *Completion,
     ) void {
-        if (self.sideIO(side)) |side_io| {
-            side_io.detach(self.mux, null);
-            side_io.destroyStorage(self.allocator);
-            self.setSideIO(side, null);
+        if (self.takeSideIOLocked(side)) |side_io| {
+            self.destroyDetachedSideIOLocked(side_io);
         }
-        self.read_retries[sideIndex(side)] = false;
-        self.write_retries[sideIndex(side)] = false;
         self.queueCompletionLocked(completion, null);
     }
 
@@ -1299,12 +1385,20 @@ pub const Looper = struct {
 
     fn detachImmediately(self: *Looper, side: io.Side, failure: Failure) void {
         self.lock.lock();
-        defer self.lock.unlock();
-        if (self.sideIO(side)) |side_io| {
-            side_io.detach(self.mux, failure);
-            side_io.destroyStorage(self.allocator);
-            self.setSideIO(side, null);
-        }
+        const side_io = self.takeSideIOLocked(side) orelse {
+            self.lock.unlock();
+            return;
+        };
+        side_io.transform_drainer.drain(&self.lock);
+        const on_failure = side_io.on_failure;
+        self.lock.unlock();
+
+        // User code must never execute while holding the looper mutex.
+        if (on_failure) |callback| callback.call(failure);
+
+        self.lock.lock();
+        self.destroyDetachedSideIOLocked(side_io);
+        self.lock.unlock();
     }
 
     fn finish(self: *Looper, failure: ?Failure) void {
@@ -1322,10 +1416,20 @@ pub const Looper = struct {
         }
         self.state = .stopped;
         self.terminal_failure = failure;
+        const pending = self.command_head;
+        self.command_head = null;
+        self.command_tail = null;
+        self.cancelPendingLocked(pending);
+        self.destroyCommandList(self.scheduled_head);
+        self.scheduled_head = null;
+        self.scheduled_tail = null;
+        self.read_retries = .{ false, false };
+        self.write_retries = .{ false, false };
         if (self.stop_completion) |completion| {
             completeNow(completion, if (failure) |reason| reason.err() else null);
             self.stop_completion = null;
         }
+        self.releaseCompletionsLocked();
         self.condition.broadcast();
         self.lock.unlock();
 
@@ -1338,20 +1442,7 @@ pub const Looper = struct {
             self.lock.unlock();
             return;
         }
-        // Publish mux unavailability before releasing the lock so an actor
-        // shutdown racing `finish()` cannot wake a freed mux.
-        self.mux_freed = true;
-        self.lock.unlock();
-
-        if (self.link) |side_io| side_io.detach(self.mux, null);
-        if (self.tun) |side_io| side_io.detach(self.mux, null);
-
-        c.pp_mux_free(self.mux);
-        self.lock.lock();
-        if (self.fd_set) |*fd_set| {
-            fd_set.deinit();
-            self.fd_set = null;
-        }
+        self.cleanupResourcesLocked();
         self.condition.broadcast();
         self.lock.unlock();
     }
@@ -1361,7 +1452,96 @@ pub const Looper = struct {
         const actor = self.actor;
         self.actor = null;
         self.lock.unlock();
-        if (actor) |item| item.deinit();
+        if (actor) |item| {
+            item.deinit();
+            self.lock.lock();
+            self.loop_thread_id = null;
+            self.condition.broadcast();
+            self.lock.unlock();
+        }
+    }
+
+    fn clearLoopThread(self: *Looper, thread_id: std.Thread.Id) void {
+        self.lock.lock();
+        if (self.loop_thread_id == thread_id) self.loop_thread_id = null;
+        self.condition.broadcast();
+        self.lock.unlock();
+    }
+
+    fn wakeLocked(self: *Looper) void {
+        if (!self.mux_freed) _ = c.pp_mux_wake(self.mux);
+    }
+
+    fn isReentrantLifecycleCall(self: *Looper) bool {
+        return hasBorrowedCallback() or self.isOnQueue();
+    }
+
+    fn hasBorrowedCallback() bool {
+        return borrowed_callback_depth > 0;
+    }
+
+    fn callTransform(
+        self: *Looper,
+        transform: TransformWrite,
+        packets: Packets,
+    ) anyerror!Packets {
+        _ = self;
+        borrowed_callback_depth += 1;
+        defer borrowed_callback_depth -= 1;
+        return transform.call(packets);
+    }
+
+    fn callNativeCleanup(self: *Looper, side_io: *SideIO) void {
+        _ = self;
+        borrowed_callback_depth += 1;
+        defer borrowed_callback_depth -= 1;
+        side_io.cleanupNative();
+    }
+
+    /// Removes a side from publication before waiting for borrowed transform
+    /// callbacks. Caller must hold `lock`.
+    fn takeSideIOLocked(self: *Looper, side: io.Side) ?*SideIO {
+        const side_io = self.sideIO(side) orelse return null;
+        self.setSideIO(side, null);
+        self.read_retries[sideIndex(side)] = false;
+        self.write_retries[sideIndex(side)] = false;
+        if (self.fd_set) |*fd_set| {
+            fd_set.removeReadable(side_io.fd);
+            fd_set.removeWritable(side_io.fd);
+        }
+        return side_io;
+    }
+
+    /// Caller must hold `lock`, and `side_io` must already be unpublished.
+    /// Returns with `lock` held, but invokes native cleanup without it.
+    fn destroyDetachedSideIOLocked(self: *Looper, side_io: *SideIO) void {
+        side_io.transform_drainer.drain(&self.lock);
+        const should_cleanup = side_io.detachFromMux(self.mux);
+        self.lock.unlock();
+        if (should_cleanup) self.callNativeCleanup(side_io);
+        side_io.destroyStorage(self.allocator);
+        self.lock.lock();
+    }
+
+    /// Destroys every mux-owned resource. Caller must hold `lock` and the actor
+    /// must either be the caller or have been joined.
+    fn cleanupResourcesLocked(self: *Looper) void {
+        if (self.link != null) {
+            const side_io = self.takeSideIOLocked(.link).?;
+            self.destroyDetachedSideIOLocked(side_io);
+        }
+        if (self.tun != null) {
+            const side_io = self.takeSideIOLocked(.tun).?;
+            self.destroyDetachedSideIOLocked(side_io);
+        }
+        if (self.fd_set) |*fd_set| {
+            fd_set.deinit();
+            self.fd_set = null;
+        }
+        if (!self.mux_freed) {
+            self.mux_freed = true;
+            c.pp_mux_free(self.mux);
+        }
     }
 
     fn sideIO(self: *Looper, side: io.Side) ?*SideIO {
@@ -1460,6 +1640,7 @@ pub const Looper = struct {
         var pending = pending_head;
         while (pending) |node| {
             const next = node.next;
+            self.clearRetryForCommand(node.command);
             switch (node.command) {
                 .attach => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
                 .detach => |command| self.queueCompletionLocked(command.completion, null),
