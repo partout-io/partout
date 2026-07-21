@@ -61,7 +61,6 @@ const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");
 const parser = @import("parser.zig");
 const proto = @import("../proto/exports.zig");
-const serializer = @import("serializer.zig");
 
 const ModuleType = core.api.ModuleType;
 
@@ -81,7 +80,7 @@ pub const impl: proto.ModuleExports = .{
 const module_vtable: core.ModuleImplementation.VTable = .{
     .module_type = moduleType,
     .import_module = parser.importModule,
-    .serialize_module = serializer.serializeModule,
+    .serialize_module = null, // ZIGME: Implement serialization
 };
 
 // const connection_vtable: net.ConnectionImplementation.VTable = .{

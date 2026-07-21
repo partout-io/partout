@@ -23,7 +23,6 @@ comptime {
     _ = @import("net/platform.zig");
     _ = @import("openvpn/exports.zig");
     _ = @import("openvpn/parser.zig");
-    _ = @import("openvpn/serializer.zig");
     _ = @import("wireguard/connection.zig");
     _ = @import("wireguard/exports.zig");
     _ = @import("wireguard/parser.zig");

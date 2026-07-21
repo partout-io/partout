@@ -353,16 +353,6 @@ pub const SecureData = struct {
     base64: []const u8 = "",
     owned: bool = false,
 
-    /// Encodes raw bytes in the representation used by the API schema.
-    pub fn initBytesAlloc(allocator: std.mem.Allocator, bytes: []const u8) AllocError!SecureData {
-        const encoded = try allocator.alloc(u8, std.base64.standard.Encoder.calcSize(bytes.len));
-        _ = std.base64.standard.Encoder.encode(encoded, bytes);
-        return .{
-            .base64 = encoded,
-            .owned = true,
-        };
-    }
-
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!SecureData {
         var parsed = try util.parseJsonValue(allocator, text);
         defer parsed.deinit();
@@ -389,37 +379,6 @@ pub const SecureData = struct {
 
     pub fn deinit(self: *SecureData, allocator: std.mem.Allocator) void {
         if (self.owned and self.base64.len > 0) allocator.free(self.base64);
-    }
-
-    /// Decodes the schema's base64 representation into raw bytes.
-    pub fn bytesAlloc(self: SecureData, allocator: std.mem.Allocator) EncodeError![]u8 {
-        const decoded_size = std.base64.standard.Decoder.calcSizeForSlice(self.base64) catch return error.InvalidModel;
-        const decoded = try allocator.alloc(u8, decoded_size);
-        errdefer allocator.free(decoded);
-        std.base64.standard.Decoder.decode(decoded, self.base64) catch return error.InvalidModel;
-        return decoded;
-    }
-
-    /// Encodes a hexadecimal byte string in the representation used by the API schema.
-    pub fn parseHexAlloc(allocator: std.mem.Allocator, hex: []const u8) AllocError!?SecureData {
-        if (hex.len % 2 != 0) return null;
-        const bytes = try allocator.alloc(u8, hex.len / 2);
-        defer allocator.free(bytes);
-        _ = std.fmt.hexToBytes(bytes, hex) catch return null;
-        return try initBytesAlloc(allocator, bytes);
-    }
-
-    /// Returns the raw bytes as lowercase hexadecimal text.
-    pub fn hexAlloc(self: SecureData, allocator: std.mem.Allocator) EncodeError![]u8 {
-        const bytes = try self.bytesAlloc(allocator);
-        defer allocator.free(bytes);
-        const hex = try allocator.alloc(u8, bytes.len * 2);
-        const alphabet = "0123456789abcdef";
-        for (bytes, 0..) |byte, index| {
-            hex[index * 2] = alphabet[byte >> 4];
-            hex[index * 2 + 1] = alphabet[byte & 0x0f];
-        }
-        return hex;
     }
 
     pub fn jsonStringify(self: SecureData, jw: anytype) JsonStringifyError!void {
@@ -479,18 +438,6 @@ pub const Subnet = struct {
 
     pub fn rawAlloc(self: Subnet, allocator: std.mem.Allocator) error{OutOfMemory}![]u8 {
         return std.fmt.allocPrint(allocator, "{s}/{}", .{ self.address.raw, self.prefix_length });
-    }
-
-    /// Returns the classic dotted-decimal netmask for an IPv4 subnet.
-    pub fn ipv4MaskAlloc(self: Subnet, allocator: std.mem.Allocator) EncodeError![]u8 {
-        if (self.address.family != .v4 or self.prefix_length > 32) return error.InvalidModel;
-        const mask = ipv4Netmask(self.prefix_length);
-        return std.fmt.allocPrint(allocator, "{}.{}.{}.{}", .{
-            (mask >> 24) & 0xff,
-            (mask >> 16) & 0xff,
-            (mask >> 8) & 0xff,
-            mask & 0xff,
-        });
     }
 
     pub fn networkRawAlloc(self: Subnet, allocator: std.mem.Allocator) EncodeError![]u8 {

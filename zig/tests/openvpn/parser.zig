@@ -57,21 +57,6 @@ test "OpenVPNParser rejects enabled LZO compression" {
     try std.testing.expectError(error.UnsupportedCompression, OpenVPNParser.parse(allocator, "compress lzo"));
 }
 
-test "OpenVPNParser stores scramble masks as UTF-8 SecureData" {
-    const allocator = std.testing.allocator;
-    var configuration = try OpenVPNParser.parse(allocator, "scramble obfuscate FFFF");
-    defer configuration.deinit(allocator);
-
-    const mask = switch (configuration.xor_method.?) {
-        .obfuscate => |value| value.mask,
-        else => return error.TestUnexpectedResult,
-    };
-    const bytes = try mask.bytesAlloc(allocator);
-    defer allocator.free(bytes);
-    try std.testing.expectEqualStrings("FFFF", bytes);
-    try std.testing.expectEqualStrings("RkZGRg==", mask.base64);
-}
-
 test "OpenVPNParser reports parse error info" {
     try expectParseErrorInfo(error.MalformedOption, "cipher", "cipher", "cipher");
     try expectParseErrorInfo(error.UnsupportedCompression, "compress lzo", "compress", "compress lzo");
