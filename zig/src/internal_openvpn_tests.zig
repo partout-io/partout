@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-//! Primary test root for file-local tests in `openvpn/tmp`.
+//! Primary test root for file-local tests in `openvpn/internal`.
 
-const c = @import("openvpn/tmp/c.zig").api;
+const c = @import("openvpn/internal/c.zig").api;
 
 pub export fn partout_log(_: c_int, _: [*:0]const u8) void {}
 
@@ -24,5 +24,5 @@ pub export fn pp_crypto_fnt_native() c.pp_crypto_fnt {
 }
 
 test {
-    _ = @import("openvpn/tmp/exports.zig");
+    _ = @import("openvpn/internal/exports.zig");
 }

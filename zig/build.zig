@@ -153,25 +153,25 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run Zig tests");
     test_step.dependOn(&run_unit_tests.step);
 
-    // File-local tests in the temporary OpenVPN package need a primary test
+    // File-local tests in the internal OpenVPN package need a primary test
     // root. Xcode 26 ARM Mach headers currently trip Zig translate-c, and the
     // fallback backend symbols below are only appropriate for the mock-only
     // crypto build.
-    const can_run_tmp_openvpn_tests = embed_c and
+    const can_run_internal_openvpn_tests = embed_c and
         use_openvpn and
         !crypto_libraries.openssl and
         !crypto_libraries.mbedtls and
         !(target.result.os.tag.isDarwin() and target.result.cpu.arch == .aarch64);
-    if (can_run_tmp_openvpn_tests) {
-        const tmp_openvpn_test_module = b.createModule(.{
-            .root_source_file = b.path("src/tmp_openvpn_tests.zig"),
+    if (can_run_internal_openvpn_tests) {
+        const internal_openvpn_test_module = b.createModule(.{
+            .root_source_file = b.path("src/internal_openvpn_tests.zig"),
             .target = target,
             .optimize = optimize,
             .link_libc = true,
             .sanitize_c = .off,
         });
         configurePartoutModule(
-            tmp_openvpn_test_module,
+            internal_openvpn_test_module,
             b,
             target,
             apple_sdk_path,
@@ -182,14 +182,14 @@ pub fn build(b: *std.Build) void {
             use_wireguard,
             build_options,
         );
-        const tmp_openvpn_tests = b.addTest(.{
-            .root_module = tmp_openvpn_test_module,
+        const internal_openvpn_tests = b.addTest(.{
+            .root_module = internal_openvpn_test_module,
         });
-        tmp_openvpn_tests.step.dependOn(api_codegen_step);
-        const run_tmp_openvpn_tests = b.addRunArtifact(tmp_openvpn_tests);
-        const tmp_openvpn_test_step = b.step("test-openvpn-tmp", "Run temporary OpenVPN port tests");
-        tmp_openvpn_test_step.dependOn(&run_tmp_openvpn_tests.step);
-        test_step.dependOn(&run_tmp_openvpn_tests.step);
+        internal_openvpn_tests.step.dependOn(api_codegen_step);
+        const run_internal_openvpn_tests = b.addRunArtifact(internal_openvpn_tests);
+        const internal_openvpn_test_step = b.step("test-openvpn-internal", "Run internal OpenVPN port tests");
+        internal_openvpn_test_step.dependOn(&run_internal_openvpn_tests.step);
+        test_step.dependOn(&run_internal_openvpn_tests.step);
     }
 
     const coverage_step = b.step("coverage", "Run Zig tests under kcov");
@@ -340,7 +340,7 @@ fn configurePartoutModuleSettings(
     module.addIncludePath(b.path("src/c/portable/include"));
     module.addIncludePath(b.path("src/c/crypto/include"));
     if (use_openvpn) {
-        module.addIncludePath(b.path("src/openvpn/internal/include"));
+        module.addIncludePath(b.path("src/openvpn/c/include"));
     }
     if (use_wireguard) {
         module.addIncludePath(b.path("src/wireguard/internal/include"));
@@ -449,15 +449,15 @@ fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool
     if (use_openvpn) {
         module.addCSourceFiles(.{
             .files = &.{
-                "src/openvpn/internal/control.c",
-                "src/openvpn/internal/dp_framing.c",
-                "src/openvpn/internal/dp_mode.c",
-                "src/openvpn/internal/dp_mode_ad.c",
-                "src/openvpn/internal/dp_mode_hmac.c",
-                "src/openvpn/internal/mss_fix.c",
-                "src/openvpn/internal/pkt_proc.c",
-                "src/openvpn/internal/test/openvpn_crypto_mock.c",
-                "src/openvpn/tmp/c_shims.c",
+                "src/openvpn/c/control.c",
+                "src/openvpn/c/dp_framing.c",
+                "src/openvpn/c/dp_mode.c",
+                "src/openvpn/c/dp_mode_ad.c",
+                "src/openvpn/c/dp_mode_hmac.c",
+                "src/openvpn/c/mss_fix.c",
+                "src/openvpn/c/pkt_proc.c",
+                "src/openvpn/c/test/openvpn_crypto_mock.c",
+                "src/openvpn/internal/c_shims.c",
             },
             .flags = c_flags,
         });

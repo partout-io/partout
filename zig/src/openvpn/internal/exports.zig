@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-//! Compile surface for the temporary one-entity-per-file OpenVPN port.
+//! Compile surface for the internal one-entity-per-file OpenVPN port.
 
 const std = @import("std");
 

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-//! Single C-import identity shared by the temporary OpenVPN port.
+//! Single C-import identity shared by the internal OpenVPN port.
 //!
 //! Keeping the crypto and OpenVPN declarations in one `@cImport` matters:
 //! independently imported C declarations are distinct Zig types even when

@@ -27,7 +27,7 @@ comptime {
         _ = @import("openvpn/exports.zig");
         _ = @import("openvpn/parser.zig");
         _ = @import("openvpn/serializer.zig");
-        _ = source.openvpn_tmp;
+        _ = source.openvpn_internal;
     }
     if (source.wireguard_enabled) {
         _ = @import("wireguard/connection.zig");

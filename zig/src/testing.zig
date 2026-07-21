@@ -4,10 +4,6 @@
 
 const build_options = @import("build_options");
 
-fn featureModule(comptime enabled: bool, comptime path: []const u8) type {
-    return if (enabled) @import(path) else struct {};
-}
-
 pub const abi = @import("abi/exports.zig");
 pub const abi_helpers = @import("abi/helpers.zig");
 pub const abi_runtime = @import("abi/runtime.zig");
@@ -28,17 +24,17 @@ pub const net_looper_queue = @import("net/looper_queue.zig");
 pub const net_sandbox = @import("net/sandbox.zig");
 pub const net_platform = @import("net/platform.zig");
 pub const openvpn_enabled = build_options.openvpn;
-pub const openvpn_exports = featureModule(openvpn_enabled, "openvpn/exports.zig");
-pub const openvpn_parser = featureModule(openvpn_enabled, "openvpn/parser.zig");
-pub const openvpn_serializer = featureModule(openvpn_enabled, "openvpn/serializer.zig");
-pub const openvpn_tmp = featureModule(openvpn_enabled, "openvpn/tmp/exports.zig");
+pub const openvpn_exports = if (openvpn_enabled) @import("openvpn/exports.zig") else struct {};
+pub const openvpn_parser = if (openvpn_enabled) @import("openvpn/parser.zig") else struct {};
+pub const openvpn_serializer = if (openvpn_enabled) @import("openvpn/serializer.zig") else struct {};
+pub const openvpn_internal = if (openvpn_enabled) @import("openvpn/internal/exports.zig") else struct {};
 pub const partout = @import("partout.zig");
 pub const wireguard_enabled = build_options.wireguard;
-pub const wireguard_adapter = featureModule(wireguard_enabled, "wireguard/adapter.zig");
-pub const wireguard_backend = featureModule(wireguard_enabled, "wireguard/backend.zig");
-pub const wireguard_connection = featureModule(wireguard_enabled, "wireguard/connection.zig");
-pub const wireguard_exports = featureModule(wireguard_enabled, "wireguard/exports.zig");
-pub const wireguard_parser = featureModule(wireguard_enabled, "wireguard/parser.zig");
-pub const wireguard_serializer = featureModule(wireguard_enabled, "wireguard/serializer.zig");
-pub const wireguard_tunnel_info = featureModule(wireguard_enabled, "wireguard/tunnel_info.zig");
-pub const wireguard_uapi = featureModule(wireguard_enabled, "wireguard/uapi.zig");
+pub const wireguard_adapter = if (wireguard_enabled) @import("wireguard/adapter.zig") else struct {};
+pub const wireguard_backend = if (wireguard_enabled) @import("wireguard/backend.zig") else struct {};
+pub const wireguard_connection = if (wireguard_enabled) @import("wireguard/connection.zig") else struct {};
+pub const wireguard_exports = if (wireguard_enabled) @import("wireguard/exports.zig") else struct {};
+pub const wireguard_parser = if (wireguard_enabled) @import("wireguard/parser.zig") else struct {};
+pub const wireguard_serializer = if (wireguard_enabled) @import("wireguard/serializer.zig") else struct {};
+pub const wireguard_tunnel_info = if (wireguard_enabled) @import("wireguard/tunnel_info.zig") else struct {};
+pub const wireguard_uapi = if (wireguard_enabled) @import("wireguard/uapi.zig") else struct {};
