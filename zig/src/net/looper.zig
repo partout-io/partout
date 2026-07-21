@@ -129,7 +129,6 @@ pub const Looper = struct {
     lock: core.Mutex = .{},
     condition: core.Condition = .{},
     state: State = .idle,
-    deinitializing: bool = false,
     terminal_failure: ?Failure = null,
 
     // Command submission and synchronous completion.
@@ -184,10 +183,7 @@ pub const Looper = struct {
         while (self.state == .starting) {
             self.condition.wait(&self.lock);
         }
-        self.deinitializing = true;
-        if (self.state == .idle or self.state == .started) {
-            self.state = .stopping;
-        }
+        self.state = .deinitializing;
 
         self.cancelPendingLocked(self.commands.takeReady());
         self.destroyCommandList(self.commands.takeScheduled());
@@ -275,7 +271,7 @@ pub const Looper = struct {
 
     fn loopOnce(self: *Looper) bool {
         self.lock.lock();
-        if (self.deinitializing or self.state == .stopped or self.mux_freed) {
+        if (self.state == .deinitializing or self.state == .stopped or self.mux_freed) {
             self.lock.unlock();
             return false;
         }
@@ -302,7 +298,7 @@ pub const Looper = struct {
 
         self.lock.lock();
         self.promoteDueScheduledLocked(core.concurrency.monotonicNs());
-        const released = self.deinitializing;
+        const released = self.state == .deinitializing;
         self.lock.unlock();
         if (released) {
             log.writef(.info, "Looper: released self", .{});
@@ -311,7 +307,7 @@ pub const Looper = struct {
 
         const command_outcome = self.handleCommands(fd_set);
         self.lock.lock();
-        const deinitializing_after_commands = self.deinitializing;
+        const deinitializing_after_commands = self.state == .deinitializing;
         self.lock.unlock();
         if (deinitializing_after_commands) {
             return false;
@@ -332,7 +328,7 @@ pub const Looper = struct {
 
         const process_outcome = self.process(fd_set);
         self.lock.lock();
-        const deinitializing_after_process = self.deinitializing;
+        const deinitializing_after_process = self.state == .deinitializing;
         self.lock.unlock();
         if (deinitializing_after_process) {
             return false;
@@ -364,6 +360,10 @@ pub const Looper = struct {
             },
             .started => {},
             .starting => unreachable,
+            .deinitializing => {
+                self.lock.unlock();
+                return error.Cancelled;
+            },
             .stopping, .stopped => {
                 self.lock.unlock();
                 std.debug.assert(false);
@@ -674,6 +674,7 @@ pub const Looper = struct {
         started,
         stopping,
         stopped,
+        deinitializing,
     };
 
     const SideIdentity = queue_mod.SideIdentity;
@@ -993,7 +994,7 @@ pub const Looper = struct {
         arguments: AttachArguments,
         completion: *Completion,
     ) void {
-        if (self.state == .stopping) {
+        if (self.state != .started) {
             self.queueCompletionLocked(completion, error.Cancelled);
             return;
         }
@@ -1258,17 +1259,18 @@ pub const Looper = struct {
     }
 
     fn finish(self: *Looper, failure: ?Failure) void {
-        if (failure) |reason| {
-            log.writef(.err, "Finish looper with error: {s}", .{@tagName(reason)});
-        } else {
-            log.writef(.info, "Finish looper", .{});
-        }
-
         self.lock.lock();
-        if (self.state == .stopped) {
-            self.lock.unlock();
-            std.debug.assert(false);
-            return;
+        switch (self.state) {
+            .deinitializing => {
+                self.lock.unlock();
+                return;
+            },
+            .stopped => {
+                self.lock.unlock();
+                std.debug.assert(false);
+                return;
+            },
+            else => {},
         }
         self.state = .stopped;
         self.terminal_failure = failure;
@@ -1284,6 +1286,11 @@ pub const Looper = struct {
         self.condition.broadcast();
         self.lock.unlock();
 
+        if (failure) |reason| {
+            log.writef(.err, "Finish looper with error: {s}", .{@tagName(reason)});
+        } else {
+            log.writef(.info, "Finish looper", .{});
+        }
         self.options.on_finish.call(failure);
     }
 

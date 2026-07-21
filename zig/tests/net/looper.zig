@@ -160,6 +160,15 @@ const CancellationProbe = struct {
     }
 };
 
+const FinishCallProbe = struct {
+    called: AtomicBool = AtomicBool.init(false),
+
+    fn onFinish(raw: ?*anyopaque, _: ?Looper.Failure) void {
+        const self: *FinishCallProbe = @ptrCast(@alignCast(raw.?));
+        self.called.store(true, .release);
+    }
+};
+
 test "perform completes synchronously with its result" {
     var looper = try initLooper(.{ .callback = noopFinish });
     defer looper.deinit();
@@ -258,6 +267,19 @@ test "stop and deinit cancel delayed tasks" {
     source.core.sleepMs(delay_ms + 50);
     try std.testing.expect(!stopped_probe.fired.load(.acquire));
     try std.testing.expect(!deinitialized_probe.fired.load(.acquire));
+}
+
+test "deinit does not invoke the finish callback" {
+    var probe = FinishCallProbe{};
+    var looper = try initLooper(.{
+        .context = &probe,
+        .callback = FinishCallProbe.onFinish,
+    });
+    try looper.start();
+
+    looper.deinit();
+
+    try std.testing.expect(!probe.called.load(.acquire));
 }
 
 test "perform completion is released before later commands finish" {
