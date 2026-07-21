@@ -320,3 +320,25 @@ pub fn sleepMs(value: u64) void {
         request = remaining;
     }
 }
+
+/// Returns time from a process-independent monotonic clock. The epoch is
+/// intentionally unspecified; only differences between readings are useful.
+pub fn monotonicNs() u64 {
+    if (builtin.os.tag == .windows) {
+        const windows = std.os.windows;
+        var frequency: windows.LARGE_INTEGER = undefined;
+        var counter: windows.LARGE_INTEGER = undefined;
+        std.debug.assert(windows.ntdll.RtlQueryPerformanceFrequency(&frequency).toBool());
+        std.debug.assert(windows.ntdll.RtlQueryPerformanceCounter(&counter).toBool());
+        const frequency_u64: u64 = @bitCast(frequency);
+        const counter_u64: u64 = @bitCast(counter);
+        return @intCast(
+            (@as(u128, counter_u64) * std.time.ns_per_s) / frequency_u64,
+        );
+    }
+
+    var timestamp: std.c.timespec = undefined;
+    std.debug.assert(std.c.clock_gettime(.MONOTONIC, &timestamp) == 0);
+    return @as(u64, @intCast(timestamp.sec)) * std.time.ns_per_s +
+        @as(u64, @intCast(timestamp.nsec));
+}
