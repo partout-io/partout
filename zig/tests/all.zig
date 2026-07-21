@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+const source = @import("source");
+
 comptime {
     _ = @import("abi/helpers.zig");
     _ = @import("abi/importer.zig");
@@ -21,11 +23,16 @@ comptime {
     _ = @import("net/looper_queue.zig");
     _ = @import("net/mux.zig");
     _ = @import("net/platform.zig");
-    _ = @import("openvpn/exports.zig");
-    _ = @import("openvpn/parser.zig");
-    _ = @import("openvpn/serializer.zig");
-    _ = @import("wireguard/connection.zig");
-    _ = @import("wireguard/exports.zig");
-    _ = @import("wireguard/parser.zig");
-    _ = @import("wireguard/serializer.zig");
+    if (source.openvpn_enabled) {
+        _ = @import("openvpn/exports.zig");
+        _ = @import("openvpn/parser.zig");
+        _ = @import("openvpn/serializer.zig");
+        _ = source.openvpn_tmp;
+    }
+    if (source.wireguard_enabled) {
+        _ = @import("wireguard/connection.zig");
+        _ = @import("wireguard/exports.zig");
+        _ = @import("wireguard/parser.zig");
+        _ = @import("wireguard/serializer.zig");
+    }
 }
