@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c = @import("c.zig").api;
+const c_common = @import("../../c/exports.zig").common;
 const errors = @import("errors.zig");
 
 /// Owning Zig facade over the existing C `pp_zd` implementation.
@@ -12,18 +12,18 @@ const errors = @import("errors.zig");
 /// resizing, slicing, prefix removal, wiping, and release are delegated to the
 /// existing portable C code, matching Swift's `CZeroingData` wrapper.
 pub const ZeroingData = struct {
-    ptr: ?*c.pp_zd = null,
+    ptr: ?*c_common.pp_zd = null,
     bytes: []u8 = @constCast(&[_]u8{}),
 
     pub fn init(_: std.mem.Allocator, count: usize) std.mem.Allocator.Error!ZeroingData {
-        return fromC(c.pp_zd_create(count));
+        return fromC(c_common.pp_zd_create(count));
     }
 
     pub fn initCopy(
         _: std.mem.Allocator,
         source: []const u8,
     ) std.mem.Allocator.Error!ZeroingData {
-        return fromC(c.pp_zd_create_from_data(source.ptr, source.len));
+        return fromC(c_common.pp_zd_create_from_data(source.ptr, source.len));
     }
 
     pub fn initString(
@@ -32,13 +32,13 @@ pub const ZeroingData = struct {
         null_terminated: bool,
     ) std.mem.Allocator.Error!ZeroingData {
         const length = source.len + @intFromBool(null_terminated);
-        var result = fromC(c.pp_zd_create(length));
+        var result = fromC(c_common.pp_zd_create(length));
         @memcpy(result.bytes[0..source.len], source);
         if (null_terminated) result.bytes[source.len] = 0;
         return result;
     }
 
-    pub fn fromC(ptr: *c.pp_zd) ZeroingData {
+    pub fn fromC(ptr: *c_common.pp_zd) ZeroingData {
         return .{
             .ptr = ptr,
             .bytes = ptr.*.bytes[0..ptr.*.length],
@@ -46,11 +46,11 @@ pub const ZeroingData = struct {
     }
 
     pub fn clone(self: ZeroingData, _: std.mem.Allocator) std.mem.Allocator.Error!ZeroingData {
-        return fromC(c.pp_zd_make_copy(self.cPtr()));
+        return fromC(c_common.pp_zd_make_copy(self.cPtr()));
     }
 
     pub fn deinit(self: *ZeroingData, _: std.mem.Allocator) void {
-        if (self.ptr) |ptr| c.pp_zd_free(ptr);
+        if (self.ptr) |ptr| c_common.pp_zd_free(ptr);
         self.* = .{};
     }
 
@@ -60,21 +60,21 @@ pub const ZeroingData = struct {
         return result;
     }
 
-    pub fn cPtr(self: ZeroingData) *c.pp_zd {
+    pub fn cPtr(self: ZeroingData) *c_common.pp_zd {
         return self.ptr orelse @panic("use of deinitialized ZeroingData");
     }
 
-    pub fn cCopy(self: ZeroingData) std.mem.Allocator.Error!*c.pp_zd {
-        return c.pp_zd_make_copy(self.cPtr());
+    pub fn cCopy(self: ZeroingData) std.mem.Allocator.Error!*c_common.pp_zd {
+        return c_common.pp_zd_make_copy(self.cPtr());
     }
 
     pub fn zero(self: *ZeroingData) void {
-        c.pp_zd_zero(self.cPtr());
+        c_common.pp_zd_zero(self.cPtr());
         self.refresh();
     }
 
     pub fn resize(self: *ZeroingData, count: usize) void {
-        c.pp_zd_resize(self.cPtr(), count);
+        c_common.pp_zd_resize(self.cPtr(), count);
         self.refresh();
     }
 
@@ -83,14 +83,14 @@ pub const ZeroingData = struct {
         _: std.mem.Allocator,
         suffix: []const u8,
     ) std.mem.Allocator.Error!void {
-        const other = c.pp_zd_create_from_data(suffix.ptr, suffix.len);
-        defer c.pp_zd_free(other);
-        c.pp_zd_append(self.cPtr(), other);
+        const other = c_common.pp_zd_create_from_data(suffix.ptr, suffix.len);
+        defer c_common.pp_zd_free(other);
+        c_common.pp_zd_append(self.cPtr(), other);
         self.refresh();
     }
 
     pub fn appendData(self: *ZeroingData, other: ZeroingData) void {
-        c.pp_zd_append(self.cPtr(), other.cPtr());
+        c_common.pp_zd_append(self.cPtr(), other.cPtr());
         self.refresh();
     }
 
@@ -109,12 +109,12 @@ pub const ZeroingData = struct {
         offset: usize,
         count: usize,
     ) (std.mem.Allocator.Error || errors.ZeroingDataError)!ZeroingData {
-        const slice = c.pp_zd_make_slice(self.cPtr(), offset, count) orelse return error.OutOfBounds;
+        const slice = c_common.pp_zd_make_slice(self.cPtr(), offset, count) orelse return error.OutOfBounds;
         return fromC(slice);
     }
 
     pub fn eql(self: ZeroingData, other: []const u8) bool {
-        return c.pp_zd_equals_to_data(self.cPtr(), other.ptr, other.len);
+        return c_common.pp_zd_equals_to_data(self.cPtr(), other.ptr, other.len);
     }
 
     pub fn networkU16(self: ZeroingData, offset: usize) errors.ZeroingDataError!u16 {
@@ -135,7 +135,7 @@ pub const ZeroingData = struct {
         count: usize,
     ) (std.mem.Allocator.Error || errors.ZeroingDataError)!void {
         if (count > self.bytes.len) return error.OutOfBounds;
-        c.pp_zd_remove_until(self.cPtr(), count);
+        c_common.pp_zd_remove_until(self.cPtr(), count);
         self.refresh();
     }
 

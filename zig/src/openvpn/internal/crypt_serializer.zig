@@ -6,6 +6,7 @@ const std = @import("std");
 
 const core = @import("../../core/exports.zig");
 const api = core.api;
+const c_crypto = @import("../../c/exports.zig").crypto;
 const c = @import("c.zig").api;
 const BidirectionalState = @import("bidirectional_state.zig").BidirectionalState;
 const CControlPacket = @import("c_control_packet.zig").CControlPacket;
@@ -18,8 +19,8 @@ const static_key = @import("static_key_helpers.zig");
 const time = @import("time_helpers.zig");
 
 pub const CryptSerializer = struct {
-    fnt: c.pp_crypto_enc_fnt,
-    ctr: c.pp_crypto_ctx,
+    fnt: c_crypto.pp_crypto_enc_fnt,
+    ctr: c_crypto.pp_crypto_ctx,
     header_length: usize,
     ad_length: usize,
     tag_length: usize,
@@ -29,7 +30,7 @@ pub const CryptSerializer = struct {
 
     pub fn init(
         allocator: std.mem.Allocator,
-        fnt: c.pp_crypto_enc_fnt,
+        fnt: c_crypto.pp_crypto_enc_fnt,
         key: api.OpenVPNStaticKey,
     ) anyerror!CryptSerializer {
         var keys = try static_key.cryptKeys(allocator, key);
@@ -55,7 +56,7 @@ pub const CryptSerializer = struct {
             .ctr = ctr,
             .header_length = header_length,
             .ad_length = header_length + c.OpenVPNPacketReplayIdLength + c.OpenVPNPacketReplayTimestampLength,
-            .tag_length = c.pp_crypto_meta_of(ctr).tag_len,
+            .tag_length = c_crypto.pp_crypto_meta_of(ctr).tag_len,
             .current_replay_id = BidirectionalState(u32).init(1),
             .timestamp = time.unixSeconds(),
         };
@@ -63,7 +64,7 @@ pub const CryptSerializer = struct {
 
     pub fn create(
         allocator: std.mem.Allocator,
-        fnt: c.pp_crypto_enc_fnt,
+        fnt: c_crypto.pp_crypto_enc_fnt,
         key: api.OpenVPNStaticKey,
     ) anyerror!ControlChannelSerializer {
         const self = try allocator.create(CryptSerializer);
@@ -120,20 +121,20 @@ pub const CryptSerializer = struct {
         // Swift allocation relies on cipher/tag headroom being at least the
         // header length; making that requirement explicit is safe for exact-
         // capacity backends too.
-        const crypto_capacity = c.pp_crypto_encryption_capacity(self.ctr, encrypted_count);
+        const crypto_capacity = c_crypto.pp_crypto_encryption_capacity(self.ctr, encrypted_count);
         const decrypted_capacity = std.math.add(usize, self.header_length, crypto_capacity) catch
             return error.OutOfMemory;
         var decrypted = try allocator.alloc(u8, decrypted_capacity);
         errdefer allocator.free(decrypted);
-        var flags = c.pp_crypto_flags{
+        var flags = c_crypto.pp_crypto_flags{
             .iv = null,
             .iv_len = 0,
             .ad = source.ptr,
             .ad_len = self.ad_length,
             .for_testing = 0,
         };
-        var native_error: c.pp_crypto_error_code = c.PPCryptoErrorNone;
-        const decrypted_count = c.pp_crypto_decrypt(
+        var native_error: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone;
+        const decrypted_count = c_crypto.pp_crypto_decrypt(
             self.ctr,
             decrypted.ptr + self.header_length,
             decrypted.len - self.header_length,
@@ -179,7 +180,7 @@ test "tls-crypt round trips the whole datagram and ignores bounds" {
     var secure_key = try api.SecureData.initBytesAlloc(std.testing.allocator, &key_bytes);
     defer secure_key.deinit(std.testing.allocator);
     const key = api.OpenVPNStaticKey{ .data = secure_key, .dir = .client };
-    const functions = c.pp_crypto_fnt_mock();
+    const functions = c_crypto.pp_crypto_fnt_mock();
     var serializer = try CryptSerializer.init(std.testing.allocator, functions.enc, key);
     defer serializer.deinit();
 

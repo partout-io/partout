@@ -104,20 +104,20 @@ pub const DataPathWrapper = struct {
         const mode: *c.openvpn_dp_mode = if (isAEAD(parameters.cipher)) blk: {
             const name = cipher_name orelse return error.DataPathAlgorithm;
             break :blk c.openvpn_dp_mode_ad_create_aead(
-                &parameters.fnt,
+                @ptrCast(&parameters.fnt),
                 name.ptr,
                 DataChannelConstants.aead_tag_length,
                 DataChannelConstants.aead_id_length,
-                bridge.native(),
+                @ptrCast(bridge.native()),
                 framing,
             ) orelse return error.DataPathCreation;
         } else blk: {
             const digest = digest_name orelse return error.DataPathAlgorithm;
             break :blk c.openvpn_dp_mode_hmac_create_cbc(
-                &parameters.fnt,
+                @ptrCast(&parameters.fnt),
                 if (cipher_name) |value| value.ptr else null,
                 digest.ptr,
-                bridge.native(),
+                @ptrCast(bridge.native()),
                 framing,
             ) orelse return if (cipher_name != null)
                 error.DataPathAlgorithm

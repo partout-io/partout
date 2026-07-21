@@ -6,6 +6,7 @@
 
 const std = @import("std");
 
+const c_crypto = @import("../../c/exports.zig").crypto;
 const c = @import("c.zig").api;
 const errors = @import("errors.zig");
 const CPacketCode = @import("c_packet_code.zig").CPacketCode;
@@ -193,27 +194,27 @@ pub const CControlPacket = struct {
     pub fn serializedWithCryptoAlloc(
         self: *const CControlPacket,
         allocator: std.mem.Allocator,
-        crypto: c.pp_crypto_ctx,
+        crypto: c_crypto.pp_crypto_ctx,
         replay_id: u32,
         timestamp: u32,
         function: anytype,
     ) anyerror![]u8 {
         const packet = self.native();
         var algorithm = c.openvpn_ctrl_alg{
-            .crypto = crypto,
+            .crypto = @ptrCast(crypto),
             .replay_id = replay_id,
             .timestamp = timestamp,
         };
         const capacity = c.openvpn_ctrl_capacity_alg(packet, &algorithm);
         var destination = try allocator.alloc(u8, capacity);
         errdefer allocator.free(destination);
-        var native_error: c.pp_crypto_error_code = c.PPCryptoErrorNone;
+        var native_error: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone;
         const written = function(
             destination.ptr,
             destination.len,
             packet,
             &algorithm,
-            &native_error,
+            @ptrCast(&native_error),
         );
         if (written == 0) return errors.CCryptoError.init(native_error).toError();
         if (written < destination.len) destination = try allocator.realloc(destination, written);

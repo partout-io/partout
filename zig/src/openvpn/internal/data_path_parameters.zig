@@ -3,12 +3,12 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const core = @import("../../core/exports.zig");
-const c = @import("c.zig").api;
+const c_crypto = @import("../../c/exports.zig").crypto;
 
 const api = core.api;
 
 pub const DataPathParameters = struct {
-    fnt: c.pp_crypto_enc_fnt,
+    fnt: c_crypto.pp_crypto_enc_fnt,
     cipher: ?api.OpenVPNCipher,
     digest: ?api.OpenVPNDigest,
     compression_framing: api.OpenVPNCompressionFraming,

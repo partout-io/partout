@@ -11,6 +11,7 @@
 const std = @import("std");
 
 const api = @import("../../core/exports.zig").api;
+const c_crypto = @import("../../c/exports.zig").crypto;
 const c = @import("c.zig").api;
 
 pub const PPCryptoError = error{
@@ -135,25 +136,25 @@ pub const OpenVPNErrorCode = enum(i32) {
 };
 
 pub const CCryptoError = struct {
-    code: c.pp_crypto_error_code,
+    code: c_crypto.pp_crypto_error_code,
 
-    pub fn init(code: c.pp_crypto_error_code) CCryptoError {
-        std.debug.assert(code != c.PPCryptoErrorNone);
+    pub fn init(code: c_crypto.pp_crypto_error_code) CCryptoError {
+        std.debug.assert(code != c_crypto.PPCryptoErrorNone);
         return .{ .code = code };
     }
 
     pub fn toError(self: CCryptoError) anyerror {
         return switch (self.code) {
-            c.PPCryptoErrorHMAC => error.CryptoHMAC,
-            c.PPCryptoErrorEncryption => error.CryptoEncryption,
+            c_crypto.PPCryptoErrorHMAC => error.CryptoHMAC,
+            c_crypto.PPCryptoErrorEncryption => error.CryptoEncryption,
             else => error.CryptoFailure,
         };
     }
 
     pub fn openVPNCode(self: CCryptoError) OpenVPNErrorCode {
         return switch (self.code) {
-            c.PPCryptoErrorHMAC => .cryptoHMAC,
-            c.PPCryptoErrorEncryption => .cryptoEncryption,
+            c_crypto.PPCryptoErrorHMAC => .cryptoHMAC,
+            c_crypto.PPCryptoErrorEncryption => .cryptoEncryption,
             else => .unknown,
         };
     }
@@ -161,7 +162,7 @@ pub const CCryptoError = struct {
 
 pub const CDataPathError = struct {
     code: c.openvpn_dp_error_code,
-    crypto_code: c.pp_crypto_error_code = c.PPCryptoErrorNone,
+    crypto_code: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone,
 
     pub fn init(code: c.openvpn_dp_error_code) CDataPathError {
         std.debug.assert(code != c.OpenVPNDataPathErrorNone);
@@ -196,40 +197,40 @@ pub const CDataPathError = struct {
 };
 
 pub const CTLSError = struct {
-    code: c.pp_tls_error_code,
+    code: c_crypto.pp_tls_error_code,
 
-    pub fn init(code: c.pp_tls_error_code) CTLSError {
-        std.debug.assert(code != c.PPTLSErrorNone);
+    pub fn init(code: c_crypto.pp_tls_error_code) CTLSError {
+        std.debug.assert(code != c_crypto.PPTLSErrorNone);
         return .{ .code = code };
     }
 
     pub fn toError(self: CTLSError) anyerror {
         return switch (self.code) {
-            c.PPTLSErrorCARead => error.TLSCARead,
-            c.PPTLSErrorCAUse => error.TLSCAUse,
-            c.PPTLSErrorCAPeerVerification => error.TLSCAPeerVerification,
-            c.PPTLSErrorClientCertificateRead => error.TLSClientCertificateRead,
-            c.PPTLSErrorClientCertificateUse => error.TLSClientCertificateUse,
-            c.PPTLSErrorClientKeyRead => error.TLSClientKeyRead,
-            c.PPTLSErrorClientKeyUse => error.TLSClientKeyUse,
-            c.PPTLSErrorHandshake => error.TLSHandshake,
-            c.PPTLSErrorServerEKU => error.TLSServerEKU,
-            c.PPTLSErrorServerHost => error.TLSServerHost,
+            c_crypto.PPTLSErrorCARead => error.TLSCARead,
+            c_crypto.PPTLSErrorCAUse => error.TLSCAUse,
+            c_crypto.PPTLSErrorCAPeerVerification => error.TLSCAPeerVerification,
+            c_crypto.PPTLSErrorClientCertificateRead => error.TLSClientCertificateRead,
+            c_crypto.PPTLSErrorClientCertificateUse => error.TLSClientCertificateUse,
+            c_crypto.PPTLSErrorClientKeyRead => error.TLSClientKeyRead,
+            c_crypto.PPTLSErrorClientKeyUse => error.TLSClientKeyUse,
+            c_crypto.PPTLSErrorHandshake => error.TLSHandshake,
+            c_crypto.PPTLSErrorServerEKU => error.TLSServerEKU,
+            c_crypto.PPTLSErrorServerHost => error.TLSServerHost,
             else => error.TLSFailure,
         };
     }
 
     pub fn openVPNCode(self: CTLSError) OpenVPNErrorCode {
         return switch (self.code) {
-            c.PPTLSErrorCAUse => .tlscaUse,
-            c.PPTLSErrorCAPeerVerification => .tlscaPeerVerification,
-            c.PPTLSErrorClientCertificateRead => .tlsClientCertificateRead,
-            c.PPTLSErrorClientCertificateUse => .tlsClientCertificateUse,
-            c.PPTLSErrorClientKeyRead => .tlsClientKeyRead,
-            c.PPTLSErrorClientKeyUse => .tlsClientKeyUse,
-            c.PPTLSErrorHandshake => .tlsHandshake,
-            c.PPTLSErrorServerEKU => .tlsServerEKU,
-            c.PPTLSErrorServerHost => .tlsServerHost,
+            c_crypto.PPTLSErrorCAUse => .tlscaUse,
+            c_crypto.PPTLSErrorCAPeerVerification => .tlscaPeerVerification,
+            c_crypto.PPTLSErrorClientCertificateRead => .tlsClientCertificateRead,
+            c_crypto.PPTLSErrorClientCertificateUse => .tlsClientCertificateUse,
+            c_crypto.PPTLSErrorClientKeyRead => .tlsClientKeyRead,
+            c_crypto.PPTLSErrorClientKeyUse => .tlsClientKeyUse,
+            c_crypto.PPTLSErrorHandshake => .tlsHandshake,
+            c_crypto.PPTLSErrorServerEKU => .tlsServerEKU,
+            c_crypto.PPTLSErrorServerHost => .tlsServerHost,
             else => .unknown,
         };
     }

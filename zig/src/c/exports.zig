@@ -6,6 +6,7 @@ pub const common = @cImport({
     @cInclude("portable/common.h");
     @cInclude("portable/lib.h");
     @cInclude("portable/prng.h");
+    @cInclude("portable/zd.h");
 });
 
 pub const crypto = @cImport({

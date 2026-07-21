@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c = @import("c.zig").api;
+const c_crypto = @import("../../c/exports.zig").crypto;
 const errors = @import("errors.zig");
 const Keys = @import("key_constants.zig").Keys;
 const CryptoKeyPair = @import("crypto_key_pair.zig").CryptoKeyPair;
@@ -14,7 +14,7 @@ const ZeroingData = @import("zeroing_data.zig").ZeroingData;
 
 /// Parameters for deriving the four OpenVPN key-method 2 keys.
 pub const CryptoKeysPRF = struct {
-    fnt: c.pp_crypto_fnt,
+    fnt: c_crypto.pp_crypto_fnt,
     handshake: ?Handshake,
     session_id: ?[]u8,
     remote_session_id: ?[]u8,
@@ -25,7 +25,7 @@ pub const CryptoKeysPRF = struct {
     /// produced it.
     pub fn init(
         allocator: std.mem.Allocator,
-        fnt: c.pp_crypto_fnt,
+        fnt: c_crypto.pp_crypto_fnt,
         handshake: *const Handshake,
         session_id: []const u8,
         remote_session_id: []const u8,
@@ -143,7 +143,7 @@ pub const CryptoKeysPRF = struct {
 
     fn keysHash(
         allocator: std.mem.Allocator,
-        fnt: c.pp_crypto_fnt,
+        fnt: c_crypto.pp_crypto_fnt,
         digest_name: [*:0]const u8,
         secret: []const u8,
         seed: []const u8,
@@ -175,7 +175,7 @@ pub const CryptoKeysPRF = struct {
 
     fn hmac(
         allocator: std.mem.Allocator,
-        fnt: c.pp_crypto_fnt,
+        fnt: c_crypto.pp_crypto_fnt,
         digest_name: [*:0]const u8,
         secret: []const u8,
         data: []const u8,
@@ -183,7 +183,7 @@ pub const CryptoKeysPRF = struct {
         const hmac_max_length = 128;
         var buffer = try ZeroingData.init(allocator, hmac_max_length);
         errdefer buffer.deinit(allocator);
-        var context = c.pp_hmac_ctx{
+        var context = c_crypto.pp_hmac_ctx{
             .dst = buffer.bytes.ptr,
             .dst_len = buffer.bytes.len,
             .digest_name = digest_name,
@@ -203,7 +203,7 @@ pub const CryptoKeysPRF = struct {
 
 test "CryptoKeysPRF owns retained inputs and derives four key-method-2 buffers" {
     const Fake = struct {
-        fn hmac(context_pointer: [*c]c.pp_hmac_ctx) callconv(.c) usize {
+        fn hmac(context_pointer: [*c]c_crypto.pp_hmac_ctx) callconv(.c) usize {
             const context = &context_pointer[0];
             const length: usize = 16;
             const destination = context.*.dst[0..length];
@@ -236,7 +236,7 @@ test "CryptoKeysPRF owns retained inputs and derives four key-method-2 buffers" 
         .server_random1 = server_random1.move(),
         .server_random2 = server_random2.move(),
     };
-    var fnt = c.pp_crypto_fnt_mock();
+    var fnt = c_crypto.pp_crypto_fnt_mock();
     fnt.hmac_do = Fake.hmac;
     const session_id = try allocator.dupe(u8, "12345678");
     const remote_session_id = try allocator.dupe(u8, "ABCDEFGH");

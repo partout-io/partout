@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-const c = @import("c.zig").api;
+const c_crypto = @import("../../c/exports.zig").crypto;
 
 /// Runtime crypto backend selection used by the Swift API.
 pub const CryptoBackend = enum {
@@ -11,12 +11,12 @@ pub const CryptoBackend = enum {
     native,
     mock,
 
-    pub fn functionTable(self: CryptoBackend) c.pp_crypto_fnt {
+    pub fn functionTable(self: CryptoBackend) c_crypto.pp_crypto_fnt {
         return switch (self) {
-            .open_ssl => c.pp_crypto_fnt_openssl(),
-            .mbed_tls => c.pp_crypto_fnt_mbedtls(),
-            .native => c.pp_crypto_fnt_native(),
-            .mock => c.pp_crypto_fnt_mock(),
+            .open_ssl => c_crypto.pp_crypto_fnt_openssl(),
+            .mbed_tls => c_crypto.pp_crypto_fnt_mbedtls(),
+            .native => c_crypto.pp_crypto_fnt_native(),
+            .mock => c_crypto.pp_crypto_fnt_mock(),
         };
     }
 };

@@ -8,6 +8,7 @@ const core = @import("../../core/exports.zig");
 const net = @import("../../net/exports.zig");
 const ActiveContext = @import("active_context.zig").ActiveContext;
 const ActivePhase = @import("active_phase.zig").ActivePhase;
+const c_crypto = @import("../../c/exports.zig").crypto;
 const c = @import("c.zig").api;
 const CPacketCode = @import("c_packet_code.zig").CPacketCode;
 const ConnectionOptions = @import("connection_options.zig").ConnectionOptions;
@@ -47,7 +48,7 @@ const api = core.api;
 /// owner must not retain a direct Session callback after `destroy` returns.
 pub const Session = struct {
     allocator: std.mem.Allocator,
-    fnt: c.pp_crypto_fnt,
+    fnt: c_crypto.pp_crypto_fnt,
     configuration: api.OpenVPNConfiguration,
     credentials: ?api.OpenVPNCredentials,
     prng: PRNG,
@@ -82,7 +83,7 @@ pub const Session = struct {
     pub fn create(
         allocator: std.mem.Allocator,
         looper: *net.Looper,
-        fnt: c.pp_crypto_fnt,
+        fnt: c_crypto.pp_crypto_fnt,
         configuration: api.OpenVPNConfiguration,
         credentials: ?api.OpenVPNCredentials,
         prng: PRNG,
@@ -815,7 +816,7 @@ test "Session borrows an externally managed Looper" {
     const session = try Session.create(
         allocator,
         &looper,
-        c.pp_crypto_fnt_mock(),
+        c_crypto.pp_crypto_fnt_mock(),
         .{},
         null,
         PRNG.system(),

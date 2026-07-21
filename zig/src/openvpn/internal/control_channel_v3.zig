@@ -7,6 +7,7 @@ const std = @import("std");
 const core = @import("../../core/exports.zig");
 const api = @import("../../core/exports.zig").api;
 const AuthSerializer = @import("auth_serializer.zig").AuthSerializer;
+const c_crypto = @import("../../c/exports.zig").crypto;
 const c = @import("c.zig").api;
 const CControlPacket = @import("c_control_packet.zig").CControlPacket;
 const CPacketCode = @import("c_packet_code.zig").CPacketCode;
@@ -53,7 +54,7 @@ pub const ControlChannelV3 = struct {
 
     pub fn createForConfiguration(
         allocator: std.mem.Allocator,
-        fnt: c.pp_crypto_enc_fnt,
+        fnt: c_crypto.pp_crypto_enc_fnt,
         prng: PRNG,
         configuration: *const api.OpenVPNConfiguration,
     ) anyerror!*ControlChannelV3 {

@@ -6,6 +6,7 @@ const std = @import("std");
 
 const core = @import("../../core/exports.zig");
 const api = core.api;
+const c_crypto = @import("../../c/exports.zig").crypto;
 const c = @import("c.zig").api;
 const BidirectionalState = @import("bidirectional_state.zig").BidirectionalState;
 const CControlPacket = @import("c_control_packet.zig").CControlPacket;
@@ -17,8 +18,8 @@ const static_key = @import("static_key_helpers.zig");
 const time = @import("time_helpers.zig");
 
 pub const AuthSerializer = struct {
-    fnt: c.pp_crypto_enc_fnt,
-    cbc: c.pp_crypto_ctx,
+    fnt: c_crypto.pp_crypto_enc_fnt,
+    cbc: c_crypto.pp_crypto_ctx,
     prefix_length: usize,
     hmac_length: usize,
     auth_length: usize,
@@ -29,7 +30,7 @@ pub const AuthSerializer = struct {
 
     pub fn init(
         allocator: std.mem.Allocator,
-        fnt: c.pp_crypto_enc_fnt,
+        fnt: c_crypto.pp_crypto_enc_fnt,
         digest: api.OpenVPNDigest,
         key: api.OpenVPNStaticKey,
     ) anyerror!AuthSerializer {
@@ -42,7 +43,7 @@ pub const AuthSerializer = struct {
         defer digest_name.deinit();
         const cbc = fnt.cbc_create.?(null, digest_name.ptr(), bridge.native()) orelse return error.CryptoCreation;
         const prefix_length = c.OpenVPNPacketOpcodeLength + c.OpenVPNPacketSessionIdLength;
-        const hmac_length = c.pp_crypto_meta_of(cbc).digest_len;
+        const hmac_length = c_crypto.pp_crypto_meta_of(cbc).digest_len;
         const auth_length = hmac_length + c.OpenVPNPacketReplayIdLength + c.OpenVPNPacketReplayTimestampLength;
         return .{
             .fnt = fnt,
@@ -58,7 +59,7 @@ pub const AuthSerializer = struct {
 
     pub fn create(
         allocator: std.mem.Allocator,
-        fnt: c.pp_crypto_enc_fnt,
+        fnt: c_crypto.pp_crypto_enc_fnt,
         digest: api.OpenVPNDigest,
         key: api.OpenVPNStaticKey,
     ) anyerror!ControlChannelSerializer {
@@ -117,8 +118,8 @@ pub const AuthSerializer = struct {
             self.prefix_length,
             self.auth_length,
         );
-        var native_error: c.pp_crypto_error_code = c.PPCryptoErrorNone;
-        if (!c.pp_crypto_verify(self.cbc, swapped.ptr, swapped.len, &native_error)) {
+        var native_error: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone;
+        if (!c_crypto.pp_crypto_verify(self.cbc, swapped.ptr, swapped.len, &native_error)) {
             return errors.CCryptoError.init(native_error).toError();
         }
         return self.plain.deserialize(allocator, swapped, self.auth_length, null);
@@ -152,7 +153,7 @@ test "tls-auth round trips the whole datagram and ignores bounds" {
     var secure_key = try api.SecureData.initBytesAlloc(std.testing.allocator, &key_bytes);
     defer secure_key.deinit(std.testing.allocator);
     const key = api.OpenVPNStaticKey{ .data = secure_key, .dir = null };
-    const functions = c.pp_crypto_fnt_mock();
+    const functions = c_crypto.pp_crypto_fnt_mock();
     var serializer = try AuthSerializer.init(std.testing.allocator, functions.enc, .sha256, key);
     defer serializer.deinit();
 

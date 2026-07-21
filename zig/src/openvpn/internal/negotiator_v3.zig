@@ -25,14 +25,14 @@ const PRNG = @import("prng.zig").PRNG;
 const PushReply = @import("push_reply.zig").PushReply;
 const RenegotiationType = @import("renegotiation_type.zig").RenegotiationType;
 const TLSProtocol = @import("tls_protocol.zig").TLSProtocol;
-const c = @import("c.zig").api;
+const c_crypto = @import("../../c/exports.zig").crypto;
 
 const api = core.api;
 
 /// V3 control-channel state machine. All mutable methods run on `looper`.
 pub const NegotiatorV3 = struct {
     allocator: std.mem.Allocator,
-    fnt: c.pp_crypto_fnt,
+    fnt: c_crypto.pp_crypto_fnt,
     key: u8,
     history: ?NegotiationHistory,
     renegotiation: ?RenegotiationType,
@@ -56,7 +56,7 @@ pub const NegotiatorV3 = struct {
     should_resend_wrapped_key: bool = false,
 
     pub const Init = struct {
-        fnt: c.pp_crypto_fnt,
+        fnt: c_crypto.pp_crypto_fnt,
         key: u8 = 0,
         history: ?NegotiationHistory = null,
         renegotiation: ?RenegotiationType = null,

@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const c_common = @import("../../c/exports.zig").common;
+const c_crypto = @import("../../c/exports.zig").crypto;
 const c = @import("c.zig").api;
 const errors = @import("errors.zig");
 const DataPathDecryptedTuple = @import("data_path_decrypted_tuple.zig").DataPathDecryptedTuple;
@@ -14,14 +16,14 @@ const DataPathTestingProtocol = @import("data_path_testing_protocol.zig").DataPa
 
 extern fn partout_openvpn_dp_mode_decrypt_and_parse(
     mode: *c.openvpn_dp_mode,
-    buffer: *c.pp_zd,
+    buffer: *c_common.pp_zd,
     packet_id: *u32,
     header: *u8,
     keep_alive: *bool,
     source: [*c]const u8,
     source_length: usize,
     native_error: *c.openvpn_dp_error,
-) ?*c.pp_zd;
+) ?*c_common.pp_zd;
 
 /// C-backed OpenVPN data path.
 ///
@@ -32,8 +34,8 @@ extern fn partout_openvpn_dp_mode_decrypt_and_parse(
 pub const CDataPath = struct {
     allocator: std.mem.Allocator,
     mode: *c.openvpn_dp_mode,
-    enc_buffer: *c.pp_zd,
-    dec_buffer: *c.pp_zd,
+    enc_buffer: *c_common.pp_zd,
+    dec_buffer: *c_common.pp_zd,
     replay: *c.openvpn_replay,
     out_packet_id: u32 = 0,
 
@@ -51,8 +53,8 @@ pub const CDataPath = struct {
         self.* = .{
             .allocator = allocator,
             .mode = mode,
-            .enc_buffer = c.pp_zd_create(initial_buffer_size),
-            .dec_buffer = c.pp_zd_create(initial_buffer_size),
+            .enc_buffer = c_common.pp_zd_create(initial_buffer_size),
+            .dec_buffer = c_common.pp_zd_create(initial_buffer_size),
             .replay = c.openvpn_replay_create(),
         };
         return self;
@@ -62,8 +64,8 @@ pub const CDataPath = struct {
         const allocator = self.allocator;
         c.openvpn_replay_free(self.replay);
         c.openvpn_dp_mode_free(self.mode);
-        c.pp_zd_free(self.enc_buffer);
-        c.pp_zd_free(self.dec_buffer);
+        c_common.pp_zd_free(self.enc_buffer);
+        c_common.pp_zd_free(self.dec_buffer);
         allocator.destroy(self);
     }
 
@@ -151,7 +153,7 @@ pub const CDataPath = struct {
         const length = c.openvpn_dp_mode_assemble(
             self.mode,
             packet_id,
-            self.enc_buffer,
+            @ptrCast(self.enc_buffer),
             payload.ptr,
             payload.len,
         );
@@ -172,7 +174,7 @@ pub const CDataPath = struct {
             self.mode,
             key,
             packet_id,
-            self.enc_buffer,
+            @ptrCast(self.enc_buffer),
             assembled.ptr,
             assembled.len,
             &native_error,
@@ -191,16 +193,16 @@ pub const CDataPath = struct {
         const capacity = c.openvpn_dp_mode_assemble_and_encrypt_capacity(self.mode, packet.len);
         self.resize(self.enc_buffer, capacity);
         var native_error = emptyNativeError();
-        const data = c.openvpn_dp_mode_assemble_and_encrypt(
+        const data: *c_common.pp_zd = @ptrCast(c.openvpn_dp_mode_assemble_and_encrypt(
             self.mode,
             key,
             packet_id,
-            self.enc_buffer,
+            @ptrCast(self.enc_buffer),
             packet.ptr,
             packet.len,
             &native_error,
-        ) orelse return nativeError(native_error);
-        defer c.pp_zd_free(data);
+        ) orelse return nativeError(native_error));
+        defer c_common.pp_zd_free(data);
         return allocator.dupe(u8, data.*.bytes[0..data.*.length]);
     }
 
@@ -214,7 +216,7 @@ pub const CDataPath = struct {
         var native_error = emptyNativeError();
         const length = c.openvpn_dp_mode_decrypt(
             self.mode,
-            self.dec_buffer,
+            @ptrCast(self.dec_buffer),
             &packet_id,
             packet.ptr,
             packet.len,
@@ -239,7 +241,7 @@ pub const CDataPath = struct {
         var native_error = emptyNativeError();
         const length = c.openvpn_dp_mode_parse(
             self.mode,
-            self.dec_buffer,
+            @ptrCast(self.dec_buffer),
             header,
             input.ptr,
             input.len,
@@ -269,7 +271,7 @@ pub const CDataPath = struct {
             packet.len,
             &native_error,
         ) orelse return nativeError(native_error);
-        defer c.pp_zd_free(data);
+        defer c_common.pp_zd_free(data);
         return .init(
             packet_id,
             header,
@@ -278,16 +280,16 @@ pub const CDataPath = struct {
         );
     }
 
-    fn resize(_: *CDataPath, buffer: *c.pp_zd, count: usize) void {
+    fn resize(_: *CDataPath, buffer: *c_common.pp_zd, count: usize) void {
         if (buffer.*.length >= count) return;
         const new_count = std.mem.alignForward(usize, count, resize_step);
-        c.pp_zd_resize(buffer, new_count);
+        c_common.pp_zd_resize(buffer, new_count);
     }
 
     fn emptyNativeError() c.openvpn_dp_error {
         return .{
             .dp_code = c.OpenVPNDataPathErrorNone,
-            .crypto_code = c.PPCryptoErrorNone,
+            .crypto_code = c_crypto.PPCryptoErrorNone,
         };
     }
 

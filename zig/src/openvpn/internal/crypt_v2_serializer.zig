@@ -5,7 +5,7 @@
 const std = @import("std");
 
 const api = @import("../../core/exports.zig").api;
-const c = @import("c.zig").api;
+const c_crypto = @import("../../c/exports.zig").crypto;
 const CControlPacket = @import("c_control_packet.zig").CControlPacket;
 const ControlChannelSerializer = @import("control_channel_serializer.zig").ControlChannelSerializer;
 const CryptSerializer = @import("crypt_serializer.zig").CryptSerializer;
@@ -16,7 +16,7 @@ pub const CryptV2Serializer = struct {
 
     pub fn init(
         allocator: std.mem.Allocator,
-        fnt: c.pp_crypto_enc_fnt,
+        fnt: c_crypto.pp_crypto_enc_fnt,
         key: api.OpenVPNStaticKey,
         wrapped_key: api.SecureData,
     ) anyerror!CryptV2Serializer {
@@ -33,7 +33,7 @@ pub const CryptV2Serializer = struct {
 
     pub fn create(
         allocator: std.mem.Allocator,
-        fnt: c.pp_crypto_enc_fnt,
+        fnt: c_crypto.pp_crypto_enc_fnt,
         key: api.OpenVPNStaticKey,
         wrapped_key: api.SecureData,
     ) anyerror!ControlChannelSerializer {
@@ -113,7 +113,7 @@ test "tls-crypt-v2 appends the wrapped key only to WKC opcodes" {
     var secure_wrapped = try api.SecureData.initBytesAlloc(std.testing.allocator, &wrapped_bytes);
     defer secure_wrapped.deinit(std.testing.allocator);
     const key = api.OpenVPNStaticKey{ .data = secure_key, .dir = .client };
-    const functions = c.pp_crypto_fnt_mock();
+    const functions = c_crypto.pp_crypto_fnt_mock();
     var serializer = try CryptV2Serializer.init(
         std.testing.allocator,
         functions.enc,

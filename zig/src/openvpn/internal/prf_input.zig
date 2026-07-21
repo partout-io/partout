@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-const c = @import("c.zig").api;
+const c_crypto = @import("../../c/exports.zig").crypto;
 
 /// Borrowed input to the OpenVPN TLS 1.0 PRF.
 pub const PRFInput = struct {
-    fnt: c.pp_crypto_fnt,
+    fnt: c_crypto.pp_crypto_fnt,
     label: []const u8,
     secret: []const u8,
     client_seed: []const u8,

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c = @import("c.zig").api;
+const c_common = @import("../../c/exports.zig").common;
 const errors = @import("errors.zig");
 const ZeroingData = @import("zeroing_data.zig").ZeroingData;
 
@@ -44,6 +44,6 @@ pub const PRNG = struct {
 
     fn systemFill(_: ?*anyopaque, destination: []u8) bool {
         if (destination.len == 0) return true;
-        return c.pp_prng_do(destination.ptr, destination.len);
+        return c_common.pp_prng_do(destination.ptr, destination.len);
     }
 };

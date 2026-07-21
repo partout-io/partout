@@ -3,11 +3,12 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c = @import("c.zig").api;
+const c_common = @import("../../c/exports.zig").common;
+const c_crypto = @import("../../c/exports.zig").crypto;
 const CryptoBackend = @import("crypto_backend.zig").CryptoBackend;
 
 pub const SimpleKeyDecrypter = struct {
-    fnt: c.pp_crypto_fnt,
+    fnt: c_crypto.pp_crypto_fnt,
 
     pub fn init(backend: CryptoBackend) SimpleKeyDecrypter {
         return .{ .fnt = backend.functionTable() };
@@ -57,8 +58,8 @@ pub const SimpleKeyDecrypter = struct {
     ) std.mem.Allocator.Error![]u8 {
         const source = std.mem.span(@as([*:0]u8, @ptrCast(value)));
         defer {
-            c.pp_zero(value, source.len);
-            c.pp_free(value);
+            c_common.pp_zero(value, source.len);
+            c_common.pp_free(value);
         }
         return allocator.dupe(u8, source);
     }

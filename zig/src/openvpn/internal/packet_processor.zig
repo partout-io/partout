@@ -7,6 +7,7 @@
 const std = @import("std");
 
 const api = @import("../../core/exports.zig").api;
+const c_common = @import("../../c/exports.zig").common;
 const c = @import("c.zig").api;
 const errors = @import("errors.zig");
 
@@ -15,11 +16,11 @@ extern fn partout_openvpn_pkt_proc_stream_recv(
     source: [*c]const u8,
     source_length: usize,
     source_received: *usize,
-) ?*c.pp_zd;
+) ?*c_common.pp_zd;
 
 extern fn partout_openvpn_pkt_proc_stream_send(
     processor: *const c.openvpn_pkt_proc,
-    destination: *c.pp_zd,
+    destination: *c_common.pp_zd,
     destination_offset: usize,
     source: [*c]const u8,
     source_length: usize,
@@ -113,7 +114,7 @@ pub const PacketProcessor = struct {
                 stream.len - until.*,
                 &received,
             ) orelse break;
-            defer c.pp_zd_free(zeroing);
+            defer c_common.pp_zd_free(zeroing);
             const copy = try allocator.dupe(u8, zeroing.*.bytes[0..zeroing.*.length]);
             errdefer allocator.free(copy);
             try packets.append(allocator, copy);
@@ -141,8 +142,8 @@ pub const PacketProcessor = struct {
             payload_length = std.math.add(usize, payload_length, packet.len) catch return error.PacketTooLarge;
         }
         const capacity = c.openvpn_pkt_proc_stream_send_bufsize(@intCast(packets.len), payload_length);
-        const zeroing = c.pp_zd_create(capacity);
-        defer c.pp_zd_free(zeroing);
+        const zeroing = c_common.pp_zd_create(capacity);
+        defer c_common.pp_zd_free(zeroing);
         var offset: usize = 0;
         for (packets) |packet| {
             offset = partout_openvpn_pkt_proc_stream_send(
