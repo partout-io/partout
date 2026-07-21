@@ -61,13 +61,13 @@ pub const Looper = struct {
     /// - SideError(Side, Error?) -> .user
     /// - MuxError(Side?) -> .mux
     /// - WaitError(errno) -> .wait
-    /// - NativeIOError -> .io (split in sideTaggedError(), plus OOM)
+    /// - NativeIOError -> .io
     ///
     /// Precisely:
     ///
     /// - .mux, .wait, and .io are typically triggered by syscalls
-    /// - .system covers any other unspecified internal failure
-    /// - .user comes from `OnRead` callback invocations
+    /// - .system covers an internal I/O or allocation failure
+    /// - .user comes from `OnRead` and `Task` callback invocations
     pub const Failure = union(enum) {
         mux: ?io.Side,
         wait: c_int,
@@ -77,18 +77,7 @@ pub const Looper = struct {
             code: ?c_int,
         },
         user: anyerror,
-        system: anyerror,
-
-        /// Synthesizes an error from this `Failure` object.
-        pub fn err(self: Failure) anyerror {
-            return switch (self) {
-                .mux => error.MuxFailure,
-                .wait => error.WaitFailure,
-                .io => |failure| failure.cause,
-                .user => |reason| reason,
-                .system => |reason| reason,
-            };
-        }
+        system: io.Error,
     };
 
     /// Invoked on any failure event.
@@ -165,6 +154,29 @@ pub const Looper = struct {
         ReentrantCall,
     };
     pub const ResumeReadingError = std.mem.Allocator.Error || error{Cancelled};
+    pub const ScheduleError = std.mem.Allocator.Error || error{
+        Cancelled,
+        TaskFailure,
+    };
+    pub const StopError = std.mem.Allocator.Error || error{
+        Cancelled,
+        InvalidState,
+        ReentrantCall,
+        TerminalFailure,
+    };
+    pub const WriteError = std.mem.Allocator.Error || io.Error || error{
+        Cancelled,
+        TransformFailure,
+        WriteIncomplete,
+    };
+
+    const CompletionError = error{
+        Cancelled,
+        MuxFailure,
+        OperationCancelled,
+        OutOfMemory,
+        TerminalFailure,
+    };
 
     allocator: std.mem.Allocator,
     mux: c.pp_mux,
@@ -396,7 +408,7 @@ pub const Looper = struct {
         return true;
     }
 
-    pub fn stop(self: *Looper) anyerror!void {
+    pub fn stop(self: *Looper) StopError!void {
         if (self.isReentrantLifecycleCall()) return error.ReentrantCall;
 
         var completion = Completion{};
@@ -440,7 +452,12 @@ pub const Looper = struct {
         self.waiter_count -= 1;
         self.condition.broadcast();
         self.lock.unlock();
-        if (result) |err| return err;
+        if (result) |err| return switch (err) {
+            error.OutOfMemory => error.OutOfMemory,
+            error.Cancelled => error.Cancelled,
+            error.TerminalFailure => error.TerminalFailure,
+            else => unreachable,
+        };
     }
 
     pub fn isOnQueue(self: *Looper) bool {
@@ -516,8 +533,14 @@ pub const Looper = struct {
 
     /// With no delay, runs inline on the looper thread or enqueues on it.
     /// Delayed work is always enqueued asynchronously after `delay_ms`.
-    pub fn schedule(self: *Looper, delay_ms: ?u64, task: Task) anyerror!void {
-        if (delay_ms == null and self.isOnQueue()) return task.call();
+    pub fn schedule(self: *Looper, delay_ms: ?u64, task: Task) ScheduleError!void {
+        if (delay_ms == null and self.isOnQueue()) {
+            task.call() catch |err| {
+                log.writef(.err, "Scheduled task failed: {s}", .{@errorName(err)});
+                return error.TaskFailure;
+            };
+            return;
+        }
 
         self.lock.lock();
         defer self.lock.unlock();
@@ -644,7 +667,7 @@ pub const Looper = struct {
         packets: Packets,
         side: io.Side,
         out_of_band: bool,
-    ) anyerror!void {
+    ) WriteError!void {
         if (out_of_band) return self.writeOutOfBand(packets, side);
 
         self.lock.lock();
@@ -662,7 +685,7 @@ pub const Looper = struct {
         const transform = current.transform_write;
         self.lock.unlock();
 
-        const processed_result: anyerror!Packets = if (transform) |callback|
+        const processed_result = if (transform) |callback|
             self.callTransform(callback, packets)
         else
             packets;
@@ -670,7 +693,13 @@ pub const Looper = struct {
         self.lock.lock();
         defer self.lock.unlock();
         defer current.transform_drainer.leaveLocked();
-        const processed = try processed_result;
+        const processed = processed_result catch |err| {
+            log.writef(.err, "{s} write transform failed: {s}", .{
+                @tagName(side),
+                @errorName(err),
+            });
+            return error.TransformFailure;
+        };
         if (self.state != .started or self.mux_freed) return error.Cancelled;
         const attached = self.sideIO(side) orelse {
             log.writef(.debug, "Ignoring detached {s} during processing", .{@tagName(side)});
@@ -714,7 +743,7 @@ pub const Looper = struct {
         self.wakeLocked();
     }
 
-    pub fn writeQueued(self: *Looper, packets: Packets, side: io.Side) anyerror!void {
+    pub fn writeQueued(self: *Looper, packets: Packets, side: io.Side) WriteError!void {
         return self.write(packets, side, false);
     }
 
@@ -736,7 +765,7 @@ pub const Looper = struct {
 
     const Completion = struct {
         done: bool = false,
-        result: ?anyerror = null,
+        result: ?CompletionError = null,
         next: ?*Completion = null,
     };
 
@@ -947,7 +976,7 @@ pub const Looper = struct {
         }
     };
 
-    fn writeOutOfBand(self: *Looper, packets: Packets, side: io.Side) anyerror!void {
+    fn writeOutOfBand(self: *Looper, packets: Packets, side: io.Side) WriteError!void {
         if (!self.isOnQueue()) {
             log.writef(.err, "OOB writes must run on the looper queue", .{});
             return;
@@ -967,14 +996,28 @@ pub const Looper = struct {
         self.lock.unlock();
 
         const processed = if (transform) |callback|
-            try self.callTransform(callback, packets)
+            self.callTransform(callback, packets) catch |err| {
+                log.writef(.err, "{s} write transform failed: {s}", .{
+                    @tagName(side),
+                    @errorName(err),
+                });
+                return error.TransformFailure;
+            }
         else
             packets;
         for (processed) |packet| {
             const written = side_io.native_io.write(packet, 0) catch |err| {
-                return sideTaggedError(side, err);
+                log.writef(.err, "{s} write failed: {s}", .{ @tagName(side), @errorName(err) });
+                return err;
             };
-            if (written != packet.len) return error.WriteIncomplete;
+            if (written != packet.len) {
+                log.writef(.err, "Incomplete {s} write ({}/{})", .{
+                    @tagName(side),
+                    written,
+                    packet.len,
+                });
+                return error.WriteIncomplete;
+            }
         }
     }
 
@@ -1035,7 +1078,7 @@ pub const Looper = struct {
                     self.lock.unlock();
                     task.call() catch |err| {
                         self.lock.lock();
-                        outcome.failure = self.failureFromTaggedError(err) orelse .{ .system = err };
+                        outcome.failure = .{ .user = err };
                         self.lock.unlock();
                     };
                     self.lock.lock();
@@ -1361,7 +1404,7 @@ pub const Looper = struct {
         self.read_retries = .{ false, false };
         self.write_retries = .{ false, false };
         if (self.stop_completion) |completion| {
-            completeNow(completion, if (failure) |reason| reason.err() else null);
+            completeNow(completion, if (failure != null) error.TerminalFailure else null);
             self.stop_completion = null;
         }
         self.releaseCompletionsLocked();
@@ -1653,7 +1696,7 @@ pub const Looper = struct {
     fn queueCompletionLocked(
         self: *Looper,
         completion: *Completion,
-        result: ?anyerror,
+        result: ?CompletionError,
     ) void {
         completion.result = result;
         completion.next = null;
@@ -1677,7 +1720,7 @@ pub const Looper = struct {
         self.completion_tail = null;
     }
 
-    fn completeNow(completion: *Completion, result: ?anyerror) void {
+    fn completeNow(completion: *Completion, result: ?CompletionError) void {
         completion.result = result;
         completion.done = true;
     }
@@ -1699,51 +1742,5 @@ pub const Looper = struct {
             .io => |item| .{ .side = item.side, .failure = failure },
             else => null,
         };
-    }
-
-    fn sideTaggedError(side: io.Side, cause: io.Error) anyerror {
-        return switch (side) {
-            .link => switch (cause) {
-                error.WouldBlock => error.LinkWouldBlock,
-                error.Backpressure => error.LinkBackpressure,
-                error.EndOfStream => error.LinkEndOfStream,
-                error.LibcFailure => error.LinkLibcFailure,
-                error.OutOfMemory => error.LinkOutOfMemory,
-            },
-            .tun => switch (cause) {
-                error.WouldBlock => error.TunWouldBlock,
-                error.Backpressure => error.TunBackpressure,
-                error.EndOfStream => error.TunEndOfStream,
-                error.LibcFailure => error.TunLibcFailure,
-                error.OutOfMemory => error.TunOutOfMemory,
-            },
-        };
-    }
-
-    fn failureFromTaggedError(self: *Looper, err: anyerror) ?Failure {
-        const item: struct { side: io.Side, cause: io.Error } = switch (err) {
-            error.LinkWouldBlock => .{ .side = .link, .cause = error.WouldBlock },
-            error.LinkBackpressure => .{ .side = .link, .cause = error.Backpressure },
-            error.LinkEndOfStream => .{ .side = .link, .cause = error.EndOfStream },
-            error.LinkLibcFailure => .{ .side = .link, .cause = error.LibcFailure },
-            error.LinkOutOfMemory => .{ .side = .link, .cause = error.OutOfMemory },
-            error.TunWouldBlock => .{ .side = .tun, .cause = error.WouldBlock },
-            error.TunBackpressure => .{ .side = .tun, .cause = error.Backpressure },
-            error.TunEndOfStream => .{ .side = .tun, .cause = error.EndOfStream },
-            error.TunLibcFailure => .{ .side = .tun, .cause = error.LibcFailure },
-            error.TunOutOfMemory => .{ .side = .tun, .cause = error.OutOfMemory },
-            else => return null,
-        };
-        return .{ .io = .{
-            .side = item.side,
-            .cause = item.cause,
-            .code = if (item.cause == error.LibcFailure)
-                if (self.sideIO(item.side)) |side_io|
-                    side_io.native_io.lastErrorCode()
-                else
-                    null
-            else
-                null,
-        } };
     }
 };

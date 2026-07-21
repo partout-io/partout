@@ -78,6 +78,7 @@ const Pipe = struct {
 
 const MockIO = struct {
     fail_reads: AtomicBool = AtomicBool.init(false),
+    fail_writes: AtomicBool = AtomicBool.init(false),
     cleaned: AtomicBool = AtomicBool.init(false),
 
     fn interface(self: *MockIO) io.IOInterface {
@@ -94,7 +95,9 @@ const MockIO = struct {
         return null;
     }
 
-    fn write(_: *anyopaque, data: []const u8, offset: usize) io.Error!usize {
+    fn write(raw: *anyopaque, data: []const u8, offset: usize) io.Error!usize {
+        const self: *MockIO = @ptrCast(@alignCast(raw));
+        if (self.fail_writes.load(.acquire)) return error.EndOfStream;
         return data.len - offset;
     }
 
@@ -375,6 +378,35 @@ test "side failure callback runs after the looper mutex is released" {
     try looper.stop();
 }
 
+test "out-of-band write returns the underlying I/O error" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+
+    var pipe = try Pipe.init();
+    defer pipe.deinit();
+    var mock = MockIO{};
+    var looper = try initLooper(.{ .callback = noopFinish });
+    defer looper.deinit();
+    try looper.start();
+    try looper.attach(.{
+        .pair = .{ .link = descriptor(pipe, &mock) },
+    });
+    mock.fail_writes.store(true, .release);
+
+    const WriteTask = struct {
+        fn run(raw: ?*anyopaque) anyerror!void {
+            const current: *Looper = @ptrCast(@alignCast(raw.?));
+            return current.write(&.{"packet"}, .link, true);
+        }
+    };
+    try std.testing.expectError(
+        error.EndOfStream,
+        looper.performTask(.{ .context = &looper, .callback = WriteTask.run }),
+    );
+
+    try looper.detach(.link);
+    try looper.stop();
+}
+
 const FailureProbe = struct {
     looper: *Looper = undefined,
     did_run: AtomicBool = AtomicBool.init(false),
@@ -516,7 +548,7 @@ const DetachWorker = struct {
     looper: *Looper,
     started: AtomicBool = AtomicBool.init(false),
     done: AtomicBool = AtomicBool.init(false),
-    failure: ?anyerror = null,
+    failure: ?Looper.DetachError = null,
 
     fn run(self: *DetachWorker) void {
         self.started.store(true, .release);
@@ -526,6 +558,59 @@ const DetachWorker = struct {
         self.done.store(true, .release);
     }
 };
+
+test "deinit cancels a detach queued during a running command" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+
+    var pipe = try Pipe.init();
+    defer pipe.deinit();
+    var mock = MockIO{};
+    var blocking_task = BlockingTask{};
+    var looper = try initLooper(.{ .callback = noopFinish });
+    var needs_deinit = true;
+    defer if (needs_deinit) looper.deinit();
+    try looper.start();
+    try looper.attach(.{
+        .pair = .{ .link = descriptor(pipe, &mock) },
+    });
+
+    try looper.schedule(null, .{
+        .context = &blocking_task,
+        .callback = BlockingTask.run,
+    });
+    waitUntil(&blocking_task.entered);
+
+    var detacher = DetachWorker{ .looper = &looper };
+    var detach_thread = try std.Thread.spawn(.{}, DetachWorker.run, .{&detacher});
+    var detacher_joined = false;
+    defer if (!detacher_joined) {
+        blocking_task.release.store(true, .release);
+        detach_thread.join();
+    };
+    waitUntil(&detacher.started);
+    yieldRepeatedly();
+
+    var deinit_worker = DeinitWorker{ .looper = &looper };
+    var deinit_thread = try std.Thread.spawn(.{}, DeinitWorker.run, .{&deinit_worker});
+    needs_deinit = false;
+    var deinit_joined = false;
+    defer if (!deinit_joined) {
+        blocking_task.release.store(true, .release);
+        deinit_thread.join();
+    };
+
+    waitUntil(&detacher.done);
+    detach_thread.join();
+    detacher_joined = true;
+    try std.testing.expect(detacher.failure.? == error.Cancelled);
+
+    blocking_task.release.store(true, .release);
+    deinit_thread.join();
+    deinit_joined = true;
+
+    try std.testing.expect(deinit_worker.done.load(.acquire));
+    try std.testing.expect(mock.cleaned.load(.acquire));
+}
 
 test "deinit cancels a perform queued during a running command" {
     var blocking_task = BlockingTask{};
