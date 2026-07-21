@@ -53,7 +53,6 @@ public final class FdLooper: @unchecked Sendable {
 
     private let loopQueue: DispatchQueue
     private let loopQueueKey: DispatchSpecificKey<Void>
-    private let loopGroup: DispatchGroup
     private let scheduleQueue: DispatchQueue
     private let lock: SemaphoreMutex
 
@@ -91,7 +90,6 @@ public final class FdLooper: @unchecked Sendable {
         loopQueue = queue
         loopQueueKey = DispatchSpecificKey()
         loopQueue.setSpecific(key: loopQueueKey, value: ())
-        loopGroup = DispatchGroup()
         scheduleQueue = DispatchQueue(label: "\(queue.label).schedule")
         lock = SemaphoreMutex()
 
@@ -103,14 +101,9 @@ public final class FdLooper: @unchecked Sendable {
 
     deinit {
         pp_log(ctx, .core, .debug, "Deinit FdLooper")
+        link?.detach()
+        tun?.detach()
         stopWithoutWaiting()
-        if !isOnQueue {
-            loopGroup.wait()
-        }
-        // The loop owns the mux after start(). Off the loop queue, wait for it
-        // to release the mux. On the loop queue, cleanup runs between waits and
-        // the wake above makes the next wait terminate. Never mutate the mux here.
-        detachAll(deleteFromMux: false)
     }
 
     public func start() {
@@ -123,18 +116,16 @@ public final class FdLooper: @unchecked Sendable {
 
         // Hold mux for cleanup
         nonisolated(unsafe) let mux = self.mux
-        let loopGroup = self.loopGroup
 
         // Event loop
         state = .started
-        loopGroup.enter()
         loopQueue.async { [weak self] in
             var lastError: Error?
             defer {
                 self?.finish(throwing: lastError)
-                self?.detachAll()
+                self?.link?.detach()
+                self?.tun?.detach()
                 pp_mux_free(mux)
-                loopGroup.leave()
             }
 
             // Bind I/O callbacks to fd set. Fd set is never mutated
@@ -222,27 +213,18 @@ public final class FdLooper: @unchecked Sendable {
     }
 
     private func stopWithoutWaiting() {
-        var pendingCommands: [Command] = []
-        var continuation: CheckedContinuation<Void, Error>?
         lock.with {
-            pendingCommands = commands
-            commands.removeAll(keepingCapacity: false)
-            continuation = stopContinuation
-            stopContinuation = nil
             switch state {
             case .idle:
                 pp_mux_free(mux)
             case .started:
                 state = .stopping
-                pp_mux_wake(mux)
-            case .stopping:
+                commands.append(.stop)
                 pp_mux_wake(mux)
             default:
                 break
             }
         }
-        cancel(pendingCommands)
-        continuation?.resume(throwing: CancellationError())
     }
 
     public var isOnQueue: Bool {
@@ -260,15 +242,13 @@ public final class FdLooper: @unchecked Sendable {
                     continuation.resume(throwing: CancellationError())
                     return
                 }
-                commands.append(.perform({
+                commands.append(.custom {
                     do {
                         continuation.resume(returning: try body())
                     } catch {
                         continuation.resume(throwing: error)
                     }
-                }, onCancel: {
-                    continuation.resume(throwing: CancellationError())
-                }))
+                })
                 pp_mux_wake(mux)
             }
         }
@@ -351,10 +331,6 @@ public final class FdLooper: @unchecked Sendable {
     public func resumeReading(from side: Side) {
         lock.lock()
         defer { lock.unlock() }
-        guard state == .started else {
-            pp_log(ctx, .core, .error, "Ignoring resumeReading while looper is not running")
-            return
-        }
         commands.append(.enableRead(side, nil))
         pp_mux_wake(mux)
     }
@@ -365,53 +341,65 @@ public final class FdLooper: @unchecked Sendable {
                 pp_log(ctx, .core, .fault, "OOB writes must run on the looper queue")
                 return
             }
-            lock.lock()
-            guard state == .started else {
-                lock.unlock()
-                pp_log(ctx, .core, .error, "Ignoring packets while looper is not running")
-                return
+            switch side {
+            case .link:
+                guard let link else {
+                    pp_log(ctx, .core, .error, "Ignoring link packets, not attached")
+                    return
+                }
+                let processedPackets = try link.transformWrite?(packets) ?? packets
+                try processedPackets.forEach(link.writeOutOfBand)
+            case .tun:
+                guard let tun else {
+                    pp_log(ctx, .core, .error, "Ignoring tun packets, not attached")
+                    return
+                }
+                let processedPackets = try tun.transformWrite?(packets) ?? packets
+                try processedPackets.forEach(tun.writeOutOfBand)
             }
-            let io = side == .link ? link : tun
-            lock.unlock()
-            guard let io else {
-                pp_log(ctx, .core, .error, "Ignoring \(side) packets, not attached")
-                return
-            }
-            let processedPackets = try io.transformWrite?(packets) ?? packets
-            try processedPackets.forEach(io.writeOutOfBand)
             return
         }
-
-        lock.lock()
-        guard state == .started else {
-            lock.unlock()
-            pp_log(ctx, .core, .error, "Ignoring packets while looper is not running")
-            return
-        }
-        let io = side == .link ? link : tun
-        lock.unlock()
-        guard let io else {
-            pp_log(ctx, .core, .error, "Ignoring \(side) packets, not attached")
-            return
-        }
-
-        let processedPackets = try io.transformWrite?(packets) ?? packets
 
         lock.lock()
         defer { lock.unlock() }
-        guard state == .started else {
-            pp_log(ctx, .core, .error, "Ignoring processed packets while looper is not running")
-            return
+        switch side {
+        case .link:
+            guard let link else {
+                pp_log(ctx, .core, .error, "Ignoring link packets, not attached")
+                return
+            }
+            lock.unlock()
+
+            let processedPackets = try link.transformWrite?(packets) ?? packets
+
+            lock.lock()
+            guard link === self.link else {
+                pp_log(ctx, .core, .error, "Ignoring detached link during processing")
+                return
+            }
+            processedPackets.forEach {
+                link.unsafeEnqueueWrite($0)
+            }
+            commands.append(.enableWrite(.link, nil))
+        case .tun:
+            guard let tun else {
+                pp_log(ctx, .core, .error, "Ignoring tun packets, not attached")
+                return
+            }
+            lock.unlock()
+
+            let processedPackets = try tun.transformWrite?(packets) ?? packets
+
+            lock.lock()
+            guard tun === self.tun else {
+                pp_log(ctx, .core, .error, "Ignoring detached tun during processing")
+                return
+            }
+            processedPackets.forEach {
+                tun.unsafeEnqueueWrite($0)
+            }
+            commands.append(.enableWrite(.tun, nil))
         }
-        let currentIO = side == .link ? link : tun
-        guard io === currentIO else {
-            pp_log(ctx, .core, .error, "Ignoring detached \(side) during processing")
-            return
-        }
-        processedPackets.forEach {
-            io.unsafeEnqueueWrite($0)
-        }
-        commands.append(.enableWrite(side, nil))
         pp_mux_wake(mux)
     }
 }
@@ -430,7 +418,6 @@ private extension FdLooper {
         case enableRead(Side, UUID?)
         case enableWrite(Side, UUID?)
         case custom(@Sendable () throws -> Void)
-        case perform(@Sendable () -> Void, onCancel: @Sendable () -> Void)
         case stop
     }
 
@@ -450,57 +437,32 @@ private extension FdLooper {
     }
 
     func handleCommands(fdSet: FdSet) throws -> Bool {
-        let pendingCommands = lock.with {
-            let result = commands
-            commands.removeAll(keepingCapacity: true)
-            return result
-        }
+        lock.lock()
+        let pendingCommands = commands
+        commands.removeAll(keepingCapacity: true)
         var results: [CommandResult] = []
         var shouldStop = false
-        var nextCommandIndex = pendingCommands.startIndex
-        do {
-            while nextCommandIndex < pendingCommands.endIndex {
-                let commandIndex = nextCommandIndex
-                nextCommandIndex = pendingCommands.index(after: commandIndex)
-                switch pendingCommands[commandIndex] {
-                case .attach(let arguments, let continuation):
-                    lock.with {
-                        handleAttach(arguments, continuation: continuation, results: &results)
-                    }
-                case .detach(let side, let continuation):
-                    lock.with {
-                        handleDetach(side, continuation: continuation, results: &results)
-                    }
-                case .enableRead(let side, let id):
-                    try lock.with {
-                        try handleEnableRead(side, id: id)
-                    }
-                case .enableWrite(let side, let id):
-                    try lock.with {
-                        try handleEnableWrite(side, id: id, fdSet: fdSet)
-                    }
-                case .custom(let body):
-                    try body()
-                case .perform(let body, _):
-                    body()
-                case .stop:
-                    pp_log(ctx, .core, .info, "Stop looper")
-                    shouldStop = true
-                    cancel(Array(pendingCommands[nextCommandIndex...]))
-                    nextCommandIndex = pendingCommands.endIndex
-                }
+        for cmd in pendingCommands {
+            switch cmd {
+            case .attach(let arguments, let continuation):
+                handleAttach(arguments, continuation: continuation, results: &results)
+            case .detach(let side, let continuation):
+                handleDetach(side, continuation: continuation, results: &results)
+            case .enableRead(let side, let id):
+                try handleEnableRead(side, id: id)
+            case .enableWrite(let side, let id):
+                try handleEnableWrite(side, id: id, fdSet: fdSet)
+            case .custom(let body):
+                lock.unlock()
+                try body()
+                lock.lock()
+            case .stop:
+                pp_log(ctx, .core, .info, "Stop looper")
+                shouldStop = true
             }
-        } catch {
-            resume(results)
-            cancel(Array(pendingCommands[nextCommandIndex...]))
-            throw error
         }
+        lock.unlock()
 
-        resume(results)
-        return !shouldStop
-    }
-
-    func resume(_ results: [CommandResult]) {
         results.forEach {
             switch $0 {
             case .attach(let continuation, let result):
@@ -509,21 +471,7 @@ private extension FdLooper {
                 continuation.resume()
             }
         }
-    }
-
-    func cancel(_ pendingCommands: [Command]) {
-        pendingCommands.forEach {
-            switch $0 {
-            case .attach(_, let continuation):
-                continuation.resume(throwing: CancellationError())
-            case .detach(_, let continuation):
-                continuation.resume()
-            case .perform(_, let onCancel):
-                onCancel()
-            case .enableRead, .enableWrite, .custom, .stop:
-                break
-            }
-        }
+        return !shouldStop
     }
 
     func process(mux: pp_mux, fdSet: FdSet) throws {
@@ -705,35 +653,16 @@ private extension FdLooper {
     }
 
     func detachImmediately(_ side: Side, withReason reason: Error?) {
-        let io: SideIO? = lock.with {
+        lock.with {
             switch side {
             case .link:
-                let detached = link
+                link?.detach(reason: reason)
                 link = nil
-                readRetries.remove(.link)
-                writeRetries.remove(.link)
-                return detached
             case .tun:
-                let detached = tun
+                tun?.detach(reason: reason)
                 tun = nil
-                readRetries.remove(.tun)
-                writeRetries.remove(.tun)
-                return detached
             }
         }
-        io?.detach(reason: reason)
-    }
-
-    func detachAll(deleteFromMux: Bool = true) {
-        let detached: [SideIO] = lock.with {
-            let result = [link, tun].compactMap { $0 }
-            link = nil
-            tun = nil
-            readRetries.removeAll(keepingCapacity: false)
-            writeRetries.removeAll(keepingCapacity: false)
-            return result
-        }
-        detached.forEach { $0.detach(deleteFromMux: deleteFromMux) }
     }
 
     func finish(throwing error: Error? = nil) {
@@ -751,18 +680,14 @@ private extension FdLooper {
         }
         state = .stopped
         terminalError = error
-        let pendingCommands = commands
-        commands.removeAll(keepingCapacity: false)
-        let continuation = stopContinuation
-        stopContinuation = nil
         lock.unlock()
 
-        cancel(pendingCommands)
         if let error {
-            continuation?.resume(throwing: error)
+            stopContinuation?.resume(throwing: error)
         } else {
-            continuation?.resume()
+            stopContinuation?.resume()
         }
+        stopContinuation = nil
         onFinish(error)
     }
 }
@@ -1069,15 +994,13 @@ private extension FdLooper {
             }
         }
 
-        func detach(reason: Error? = nil, deleteFromMux: Bool = true) {
+        func detach(reason: Error? = nil) {
             if let reason {
                 onFailure?(reason)
             }
             guard !didCleanup else { return }
             didCleanup = true
-            if deleteFromMux {
-                pp_mux_delete(mux, fd)
-            }
+            pp_mux_delete(mux, fd)
             io.cleanup()
         }
     }
