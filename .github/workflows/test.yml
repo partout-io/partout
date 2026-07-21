@@ -21,10 +21,10 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - job_name: run_swift_tests
+          - job_name: Run Swift tests
             runner: macos-26
             suite: swift
-          - job_name: run_zig_tests
+          - job_name: Run Zig tests
             runner: ubuntu-latest
             suite: zig
     runs-on: ${{ matrix.runner }}
