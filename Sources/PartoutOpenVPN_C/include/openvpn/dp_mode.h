@@ -239,7 +239,6 @@ size_t openvpn_dp_mode_parse(openvpn_dp_mode *mode,
                      size_t src_len,
                      openvpn_dp_error *_Nullable error);
 
-static inline
 pp_zd *_Nullable openvpn_dp_mode_decrypt_and_parse(openvpn_dp_mode *mode,
                                                    pp_zd *buf,
                                                    uint32_t *dst_packet_id,
@@ -247,30 +246,6 @@ pp_zd *_Nullable openvpn_dp_mode_decrypt_and_parse(openvpn_dp_mode *mode,
                                                    bool *dst_keep_alive,
                                                    const uint8_t *src,
                                                    size_t src_len,
-                                                   openvpn_dp_error *_Nullable error) {
-
-    pp_assert(buf->length >= src_len);
-    pp_zd *dst = NULL;
-    const size_t dec_len = openvpn_dp_mode_decrypt(mode, buf, dst_packet_id,
-                                                   src, src_len, error);
-    if (dec_len == 0) {
-        goto failure;
-    }
-    dst = pp_zd_create(dec_len);
-    const size_t dst_len = openvpn_dp_mode_parse(mode, dst, dst_header,
-                                                 buf->bytes, dec_len, error);
-    if (dst_len == 0) {
-        goto failure;
-    }
-    pp_zd_resize(dst, dst_len);
-    if (openvpn_packet_is_ping(dst->bytes, dst->length)) {
-        *dst_keep_alive = true;
-    }
-    return dst;
-
-failure:
-    if (dst) pp_zd_free(dst);
-    return NULL;
-}
+                                                   openvpn_dp_error *_Nullable error);
 
 #pragma clang assume_nonnull end

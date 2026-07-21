@@ -11,20 +11,6 @@ const c_common = @import("../../c/exports.zig").common;
 const c = @import("c.zig").api;
 const errors = @import("errors.zig");
 
-extern fn partout_openvpn_pkt_proc_stream_recv(
-    processor: *const c.openvpn_pkt_proc,
-    source: [*c]const u8,
-    source_length: usize,
-    source_received: *usize,
-) ?*c_common.pp_zd;
-
-extern fn partout_openvpn_pkt_proc_stream_send(
-    processor: *const c.openvpn_pkt_proc,
-    destination: *c_common.pp_zd,
-    destination_offset: usize,
-    source: [*c]const u8,
-    source_length: usize,
-) usize;
 const Direction = @import("packet_direction.zig").Direction;
 
 pub const PacketProcessor = struct {
@@ -108,12 +94,12 @@ pub const PacketProcessor = struct {
         until.* = 0;
         while (until.* < stream.len) {
             var received: usize = 0;
-            const zeroing = partout_openvpn_pkt_proc_stream_recv(
+            const zeroing: *c_common.pp_zd = @ptrCast(c.openvpn_pkt_proc_stream_recv(
                 self.ptr,
                 stream[until.*..].ptr,
                 stream.len - until.*,
                 &received,
-            ) orelse break;
+            ) orelse break);
             defer c_common.pp_zd_free(zeroing);
             const copy = try allocator.dupe(u8, zeroing.*.bytes[0..zeroing.*.length]);
             errdefer allocator.free(copy);
@@ -146,9 +132,9 @@ pub const PacketProcessor = struct {
         defer c_common.pp_zd_free(zeroing);
         var offset: usize = 0;
         for (packets) |packet| {
-            offset = partout_openvpn_pkt_proc_stream_send(
+            offset = c.openvpn_pkt_proc_stream_send(
                 self.ptr,
-                zeroing,
+                @ptrCast(zeroing),
                 offset,
                 packet.ptr,
                 packet.len,

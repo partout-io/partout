@@ -14,17 +14,6 @@ const DataPathProtocol = data_path_protocol.DataPathProtocol;
 const DataPathDecryptResult = @import("data_path_decrypt_result.zig").DataPathDecryptResult;
 const DataPathTestingProtocol = @import("data_path_testing_protocol.zig").DataPathTestingProtocol;
 
-extern fn partout_openvpn_dp_mode_decrypt_and_parse(
-    mode: *c.openvpn_dp_mode,
-    buffer: *c_common.pp_zd,
-    packet_id: *u32,
-    header: *u8,
-    keep_alive: *bool,
-    source: [*c]const u8,
-    source_length: usize,
-    native_error: *c.openvpn_dp_error,
-) ?*c_common.pp_zd;
-
 /// C-backed OpenVPN data path.
 ///
 /// `mode` ownership transfers to `create` on success and is ultimately
@@ -261,16 +250,16 @@ pub const CDataPath = struct {
         var header: u8 = 0;
         var keep_alive = false;
         var native_error = emptyNativeError();
-        const data = partout_openvpn_dp_mode_decrypt_and_parse(
+        const data: *c_common.pp_zd = @ptrCast(c.openvpn_dp_mode_decrypt_and_parse(
             self.mode,
-            self.dec_buffer,
+            @ptrCast(self.dec_buffer),
             &packet_id,
             &header,
             &keep_alive,
             packet.ptr,
             packet.len,
             &native_error,
-        ) orelse return nativeError(native_error);
+        ) orelse return nativeError(native_error));
         defer c_common.pp_zd_free(data);
         return .init(
             packet_id,

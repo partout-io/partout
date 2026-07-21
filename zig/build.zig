@@ -457,7 +457,6 @@ fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool
                 "src/openvpn/c/mss_fix.c",
                 "src/openvpn/c/pkt_proc.c",
                 "src/openvpn/c/test/openvpn_crypto_mock.c",
-                "src/openvpn/internal/c_shims.c",
             },
             .flags = c_flags,
         });

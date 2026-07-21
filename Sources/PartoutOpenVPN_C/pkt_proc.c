@@ -95,3 +95,46 @@ void openvpn_pkt_proc_free(openvpn_pkt_proc *proc) {
     }
     pp_free(proc);
 }
+
+// MARK: - Streams (TCP)
+
+pp_zd *_Nullable openvpn_pkt_proc_stream_recv(const void *vproc,
+                                              const uint8_t *src,
+                                              size_t src_len,
+                                              size_t *_Nullable src_rcvd) {
+    if (src_len < OpenVPNPktProcStreamHeaderLength) {
+        return NULL;
+    }
+
+    // [length(2 bytes)][packet(length)]
+    const size_t buf_len = pp_endian_ntohs(*(uint16_t *)src);
+    const uint8_t *buf_payload = src + OpenVPNPktProcStreamHeaderLength;
+    if (src_len < OpenVPNPktProcStreamHeaderLength + buf_len) {
+        return NULL;
+    }
+
+    const openvpn_pkt_proc *proc = vproc;
+    pp_zd *dst = pp_zd_create(buf_len);
+    openvpn_pkt_proc_recv(proc, dst->bytes, buf_payload, buf_len);
+    if (src_rcvd) {
+        *src_rcvd = OpenVPNPktProcStreamHeaderLength + buf_len;
+    }
+    return dst;
+}
+
+size_t openvpn_pkt_proc_stream_send(const void *vproc,
+                                    pp_zd *dst,
+                                    size_t dst_offset,
+                                    const uint8_t *src,
+                                    size_t src_len) {
+    const size_t buf_len = OpenVPNPktProcStreamHeaderLength + src_len;
+    pp_assert(dst->length >= dst_offset + buf_len);
+
+    uint8_t *ptr = dst->bytes + dst_offset;
+    *(uint16_t *)ptr = pp_endian_htons(src_len);
+    ptr += OpenVPNPktProcStreamHeaderLength;
+
+    const openvpn_pkt_proc *proc = vproc;
+    openvpn_pkt_proc_send(proc, ptr, src, src_len);
+    return dst_offset + buf_len;
+}
