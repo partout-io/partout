@@ -343,7 +343,7 @@ fn configurePartoutModuleSettings(
         module.addIncludePath(b.path("src/openvpn/c/include"));
     }
     if (use_wireguard) {
-        module.addIncludePath(b.path("src/wireguard/internal/include"));
+        module.addIncludePath(b.path("src/wireguard/c/include"));
     }
     addVendorIncludePaths(module, b, target, vendor_includes);
     addAppleSDKPaths(module, b, apple_sdk_path);
@@ -466,9 +466,9 @@ fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool
     if (use_wireguard) {
         module.addCSourceFiles(.{
             .files = &.{
-                "src/wireguard/internal/backend.c",
-                "src/wireguard/internal/key.c",
-                "src/wireguard/internal/x25519.c",
+                "src/wireguard/c/backend.c",
+                "src/wireguard/c/key.c",
+                "src/wireguard/c/x25519.c",
             },
             .flags = c_flags,
         });
