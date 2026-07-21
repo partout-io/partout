@@ -20,14 +20,22 @@ const c = io.c;
 const log = core.logging;
 
 pub const Looper = struct {
+    /// The `OnRead` callback returns an action. Consumers will
+    /// normally `.keep` reading (default behavior), but may also
+    /// return `.pause` to temporarily suspend the observation
+    /// of read events.
     pub const ReadAction = enum {
         keep,
         pause,
     };
 
+    /// Single binary data packet.
     pub const Packet = []const u8;
+    /// Slice of packets.
     pub const Packets = []const Packet;
 
+    /// Transformation callback to apply before submitting packets
+    /// to the write queue.
     pub const TransformWrite = struct {
         context: ?*anyopaque = null,
         callback: *const fn (?*anyopaque, Packets) anyerror!Packets,
@@ -37,6 +45,7 @@ pub const Looper = struct {
         }
     };
 
+    /// Invoked on read events from either looper side.
     pub const OnRead = struct {
         context: ?*anyopaque = null,
         callback: *const fn (?*anyopaque, Packets) anyerror!ReadAction,
@@ -46,6 +55,19 @@ pub const Looper = struct {
         }
     };
 
+    /// Returns elaborated details about the underlying reason
+    /// of a failure. It represents the former Swift errors:
+    ///
+    /// - SideError(Side, Error?) -> .user
+    /// - MuxError(Side?) -> .mux
+    /// - WaitError(errno) -> .wait
+    /// - NativeIOError -> .io (split in sideTaggedError(), plus OOM)
+    ///
+    /// Precisely:
+    ///
+    /// - .mux, .wait, and .io are typically triggered by syscalls
+    /// - .system covers any other unspecified internal failure
+    /// - .user comes from `OnRead` callback invocations
     pub const Failure = union(enum) {
         mux: ?io.Side,
         wait: c_int,
@@ -57,6 +79,7 @@ pub const Looper = struct {
         user: anyerror,
         system: anyerror,
 
+        /// Synthesizes an error from this `Failure` object.
         pub fn err(self: Failure) anyerror {
             return switch (self) {
                 .mux => error.MuxFailure,
@@ -68,6 +91,7 @@ pub const Looper = struct {
         }
     };
 
+    /// Invoked on any failure event.
     pub const OnFailure = struct {
         context: ?*anyopaque = null,
         callback: *const fn (?*anyopaque, Failure) void,
@@ -77,6 +101,7 @@ pub const Looper = struct {
         }
     };
 
+    /// Invoked when the looper finishes, with the optional failure.
     pub const OnFinish = struct {
         context: ?*anyopaque = null,
         callback: *const fn (?*anyopaque, ?Failure) void,
@@ -86,6 +111,7 @@ pub const Looper = struct {
         }
     };
 
+    /// Runs a generic task in the worker thread.
     pub const Task = struct {
         context: ?*anyopaque = null,
         callback: *const fn (?*anyopaque) anyerror!void,
@@ -95,16 +121,21 @@ pub const Looper = struct {
         }
     };
 
+    /// A descriptor includes:
+    /// - The `fd` to watch for I/O events.
+    /// - The `io` interface to perform reads and writes.
     pub const Descriptor = struct {
         fd: io.FileDescriptor,
         io: io.IOInterface,
     };
 
+    /// The looper manages exactly one link and one tun (at most).
     pub const DescriptorPair = union(io.Side) {
         link: Descriptor,
         tun: Descriptor,
     };
 
+    /// The arguments to attach a side of the looper.
     pub const AttachArguments = struct {
         pair: DescriptorPair,
         transform_write: ?TransformWrite = null,
@@ -112,6 +143,7 @@ pub const Looper = struct {
         on_failure: ?OnFailure = null,
     };
 
+    /// Fine-tuning.
     pub const Options = struct {
         link_buf_size: usize = 64 * 1024,
         tun_buf_size: usize = 16 * 1024,
