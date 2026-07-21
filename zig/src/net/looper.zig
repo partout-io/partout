@@ -16,9 +16,8 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
-
 const c = io.c;
-const log = std.log.scoped(.looper);
+const log = core.logging;
 
 pub const Looper = struct {
     pub const ReadAction = enum {
@@ -398,7 +397,7 @@ pub const Looper = struct {
 
     pub fn init(allocator: std.mem.Allocator, options: Options) InitError!Looper {
         const mux = c.pp_mux_create(number_of_descriptors) orelse {
-            log.err("Unable to create mux", .{});
+            log.writef(.err, "Unable to create mux", .{});
             return error.MuxFailure;
         };
         return .{
@@ -416,7 +415,7 @@ pub const Looper = struct {
     }
 
     pub fn deinit(self: *Looper) void {
-        log.debug("Deinit Looper", .{});
+        log.writef(.debug, "Deinit Looper", .{});
 
         if (self.isReentrantLifecycleCall()) {
             @panic("Looper.deinit() must run outside looper callbacks");
@@ -497,7 +496,7 @@ pub const Looper = struct {
             return err;
         };
 
-        log.info("Start looper", .{});
+        log.writef(.info, "Start looper", .{});
         self.lock.lock();
         self.worker_thread = worker;
         self.state = .started;
@@ -592,7 +591,7 @@ pub const Looper = struct {
         self.lock.lock();
         if (self.state != .started) {
             self.lock.unlock();
-            log.debug("Ignoring perform before start() or after finish", .{});
+            log.writef(.debug, "Ignoring perform before start() or after finish", .{});
             return error.Cancelled;
         }
         const node = self.createCommandNode(.{ .perform = .{
@@ -631,7 +630,7 @@ pub const Looper = struct {
         self.lock.lock();
         defer self.lock.unlock();
         if (self.state != .started or self.mux_freed) {
-            log.debug("Ignoring schedule before start() or after finish", .{});
+            log.writef(.debug, "Ignoring schedule before start() or after finish", .{});
             return error.Cancelled;
         }
         if (delay_ms) |delay| {
@@ -654,7 +653,7 @@ pub const Looper = struct {
         self.lock.lock();
         if (self.state != .started) {
             self.lock.unlock();
-            log.debug("Ignoring attach before start() or after finish", .{});
+            log.writef(.debug, "Ignoring attach before start() or after finish", .{});
             return error.Cancelled;
         }
         const node = self.createCommandNode(.{ .attach = .{
@@ -691,7 +690,7 @@ pub const Looper = struct {
         self.lock.lock();
         if (self.state != .started) {
             self.lock.unlock();
-            log.debug("Ignoring detach before start() or after finish", .{});
+            log.writef(.debug, "Ignoring detach before start() or after finish", .{});
             return error.Cancelled;
         }
         const node = self.createCommandNode(.{ .detach = .{
@@ -763,7 +762,7 @@ pub const Looper = struct {
         }
         const current = self.sideIO(side) orelse {
             self.lock.unlock();
-            log.err("Ignoring {s} packets, not attached", .{@tagName(side)});
+            log.writef(.err, "Ignoring {s} packets, not attached", .{@tagName(side)});
             return;
         };
         current.transform_drainer.enter();
@@ -782,11 +781,11 @@ pub const Looper = struct {
         const processed = try processed_result;
         if (self.state != .started or self.mux_freed) return error.Cancelled;
         const attached = self.sideIO(side) orelse {
-            log.debug("Ignoring detached {s} during processing", .{@tagName(side)});
+            log.writef(.debug, "Ignoring detached {s} during processing", .{@tagName(side)});
             return;
         };
         if (attached.id != id) {
-            log.debug("Ignoring detached {s} during processing", .{@tagName(side)});
+            log.writef(.debug, "Ignoring detached {s} during processing", .{@tagName(side)});
             return;
         }
 
@@ -829,7 +828,7 @@ pub const Looper = struct {
 
     fn writeOutOfBand(self: *Looper, packets: Packets, side: io.Side) anyerror!void {
         if (!self.isOnQueue()) {
-            log.err("OOB writes must run on the looper queue", .{});
+            log.writef(.err, "OOB writes must run on the looper queue", .{});
             return;
         }
 
@@ -840,7 +839,7 @@ pub const Looper = struct {
         }
         const side_io = self.sideIO(side) orelse {
             self.lock.unlock();
-            log.err("Ignoring {s} packets, not attached", .{@tagName(side)});
+            log.writef(.err, "Ignoring {s} packets, not attached", .{@tagName(side)});
             return;
         };
         const transform = side_io.transform_write;
@@ -890,7 +889,7 @@ pub const Looper = struct {
         fd_set.resetReadable();
         var code: c_int = 0;
         if (c.pp_mux_wait_timeout(self.mux, &code, timeout_ms) < 0) {
-            log.err("Looper: pp_mux_wait_timeout() failed (code={})", .{code});
+            log.writef(.err, "Looper: pp_mux_wait_timeout() failed (code={})", .{code});
             self.finish(.{ .wait = code });
             return false;
         }
@@ -904,7 +903,7 @@ pub const Looper = struct {
         const released = self.deinitializing;
         self.lock.unlock();
         if (released) {
-            log.info("Looper: released self", .{});
+            log.writef(.info, "Looper: released self", .{});
             return false;
         }
 
@@ -924,7 +923,7 @@ pub const Looper = struct {
             return false;
         }
         if (!command_outcome.should_continue) {
-            log.info("Looper: stop requested", .{});
+            log.writef(.info, "Looper: stop requested", .{});
             self.finish(null);
             return false;
         }
@@ -1010,7 +1009,7 @@ pub const Looper = struct {
                     self.lock.lock();
                 },
                 .stop => {
-                    log.info("Stop looper", .{});
+                    log.writef(.info, "Stop looper", .{});
                     outcome.should_continue = false;
                 },
             }
@@ -1047,11 +1046,11 @@ pub const Looper = struct {
             .tun => |value| value,
         };
         if (!c.pp_mux_add(self.mux, descriptor.fd)) {
-            log.err("Unable to attach {s} (fd={any})", .{ @tagName(side), descriptor.fd });
+            log.writef(.err, "Unable to attach {s} (fd={any})", .{ @tagName(side), descriptor.fd });
             self.queueCompletionLocked(completion, error.MuxFailure);
             return;
         }
-        log.info("Attach {s} (fd={any})", .{ @tagName(side), descriptor.fd });
+        log.writef(.info, "Attach {s} (fd={any})", .{ @tagName(side), descriptor.fd });
 
         const id = self.next_side_id;
         self.next_side_id +%= 1;
@@ -1068,7 +1067,7 @@ pub const Looper = struct {
             return;
         };
         side_io.syncEventMask() catch {
-            log.err("Unable to retain {s}", .{@tagName(side)});
+            log.writef(.err, "Unable to retain {s}", .{@tagName(side)});
             _ = c.pp_mux_delete(self.mux, descriptor.fd);
             side_io.destroyStorage(self.allocator);
             self.queueCompletionLocked(completion, error.MuxFailure);
@@ -1094,7 +1093,7 @@ pub const Looper = struct {
         if (self.sideIO(side)) |side_io| {
             try side_io.setRead(self.mux, true);
         } else {
-            log.err("Ignoring enableRead(.{s}), not attached", .{@tagName(side)});
+            log.writef(.err, "Ignoring enableRead(.{s}), not attached", .{@tagName(side)});
         }
     }
 
@@ -1107,7 +1106,7 @@ pub const Looper = struct {
             try side_io.setWrite(self.mux, true);
             fd_set.insertWritable(side_io.fd);
         } else {
-            log.err("Ignoring enableWrite(.{s}), not attached", .{@tagName(side)});
+            log.writef(.err, "Ignoring enableWrite(.{s}), not attached", .{@tagName(side)});
         }
     }
 
@@ -1308,9 +1307,9 @@ pub const Looper = struct {
 
     fn finish(self: *Looper, failure: ?Failure) void {
         if (failure) |reason| {
-            log.err("Finish looper with error: {s}", .{@tagName(reason)});
+            log.writef(.err, "Finish looper with error: {s}", .{@tagName(reason)});
         } else {
-            log.info("Finish looper", .{});
+            log.writef(.info, "Finish looper", .{});
         }
 
         self.lock.lock();
