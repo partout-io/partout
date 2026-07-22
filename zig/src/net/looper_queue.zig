@@ -7,14 +7,22 @@ const std = @import("std");
 const concurrency = @import("../core/concurrency.zig");
 const io = @import("io.zig");
 
+/// The `OnRead` callback returns an action. Consumers will
+/// normally `.keep` reading (default behavior), but may also
+/// return `.pause` to temporarily suspend the observation
+/// of read events.
 pub const ReadAction = enum {
     keep,
     pause,
 };
 
+/// Single binary data packet.
 pub const Packet = []const u8;
+/// Slice of packets.
 pub const Packets = []const Packet;
 
+/// Transformation callback to apply before submitting packets
+/// to the write queue.
 pub const TransformWrite = struct {
     context: ?*anyopaque = null,
     callback: *const fn (?*anyopaque, Packets) anyerror!Packets,
@@ -24,6 +32,7 @@ pub const TransformWrite = struct {
     }
 };
 
+/// Invoked on read events from either looper side.
 pub const OnRead = struct {
     context: ?*anyopaque = null,
     callback: *const fn (?*anyopaque, Packets) anyerror!ReadAction,
@@ -33,6 +42,19 @@ pub const OnRead = struct {
     }
 };
 
+/// Returns elaborated details about the underlying reason
+/// of a failure. It represents the former Swift errors:
+///
+/// - SideError(Side, Error?) -> .user
+/// - MuxError(Side?) -> .mux
+/// - WaitError(errno) -> .wait
+/// - NativeIOError -> .io
+///
+/// Precisely:
+///
+/// - .mux, .wait, and .io are typically triggered by syscalls
+/// - .system covers an internal I/O or allocation failure
+/// - .user comes from `OnRead` and `Task` callback invocations
 pub const Failure = union(enum) {
     mux: ?io.Side,
     wait: c_int,
@@ -45,6 +67,7 @@ pub const Failure = union(enum) {
     system: io.Error,
 };
 
+/// Invoked on any failure event.
 pub const OnFailure = struct {
     context: ?*anyopaque = null,
     callback: *const fn (?*anyopaque, Failure) void,
@@ -54,6 +77,7 @@ pub const OnFailure = struct {
     }
 };
 
+/// Runs a generic task in the worker thread.
 pub const Task = struct {
     context: ?*anyopaque = null,
     callback: *const fn (?*anyopaque) anyerror!void,
@@ -63,16 +87,21 @@ pub const Task = struct {
     }
 };
 
+/// A descriptor includes:
+/// - The `fd` to watch for I/O events.
+/// - The `io` interface to perform reads and writes.
 pub const Descriptor = struct {
     fd: io.FileDescriptor,
     io: io.IOInterface,
 };
 
+/// The looper manages exactly one link and one tun (at most).
 pub const DescriptorPair = union(io.Side) {
     link: Descriptor,
     tun: Descriptor,
 };
 
+/// The arguments to attach a side of the looper.
 pub const AttachArguments = struct {
     pair: DescriptorPair,
 

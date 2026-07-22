@@ -21,40 +21,17 @@ const c = io.c;
 const log = core.logging;
 
 pub const Looper = struct {
-    /// The `OnRead` callback returns an action. Consumers will
-    /// normally `.keep` reading (default behavior), but may also
-    /// return `.pause` to temporarily suspend the observation
-    /// of read events.
     pub const ReadAction = queue_mod.ReadAction;
 
-    /// Single binary data packet.
     pub const Packet = queue_mod.Packet;
-    /// Slice of packets.
     pub const Packets = queue_mod.Packets;
 
-    /// Transformation callback to apply before submitting packets
-    /// to the write queue.
     pub const TransformWrite = queue_mod.TransformWrite;
 
-    /// Invoked on read events from either looper side.
     pub const OnRead = queue_mod.OnRead;
 
-    /// Returns elaborated details about the underlying reason
-    /// of a failure. It represents the former Swift errors:
-    ///
-    /// - SideError(Side, Error?) -> .user
-    /// - MuxError(Side?) -> .mux
-    /// - WaitError(errno) -> .wait
-    /// - NativeIOError -> .io
-    ///
-    /// Precisely:
-    ///
-    /// - .mux, .wait, and .io are typically triggered by syscalls
-    /// - .system covers an internal I/O or allocation failure
-    /// - .user comes from `OnRead` and `Task` callback invocations
     pub const Failure = queue_mod.Failure;
 
-    /// Invoked on any failure event.
     pub const OnFailure = queue_mod.OnFailure;
 
     /// Invoked when the looper finishes, with the optional failure.
@@ -67,18 +44,12 @@ pub const Looper = struct {
         }
     };
 
-    /// Runs a generic task in the worker thread.
     pub const Task = queue_mod.Task;
 
-    /// A descriptor includes:
-    /// - The `fd` to watch for I/O events.
-    /// - The `io` interface to perform reads and writes.
     pub const Descriptor = queue_mod.Descriptor;
 
-    /// The looper manages exactly one link and one tun (at most).
     pub const DescriptorPair = queue_mod.DescriptorPair;
 
-    /// The arguments to attach a side of the looper.
     pub const AttachArguments = queue_mod.AttachArguments;
 
     /// Fine-tuning.
