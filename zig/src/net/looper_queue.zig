@@ -199,8 +199,9 @@ pub const Command = union(enum) {
     stop,
 };
 
+/// A node in the `CommandQueue`, with the payload and
+/// an optional one-shot timer for deferred scheduling.
 pub const CommandNode = struct {
-    // Command payload and optional one-shot timer.
     command: Command,
     timer: concurrency.RunAfter.Scheduled = .{},
 
@@ -208,8 +209,8 @@ pub const CommandNode = struct {
     next: ?*CommandNode = null,
 };
 
+/// A plain FIFO for the pending worker commands.
 pub const CommandQueue = struct {
-    // Ready FIFO.
     ready_head: ?*CommandNode = null,
     ready_tail: ?*CommandNode = null,
 
