@@ -120,13 +120,26 @@ pub const AttachArguments = struct {
     on_failure: ?OnFailure = null,
 };
 
-pub const CancellationError = error{Cancelled};
-pub const CompletionError = CancellationError || error{
-    MuxFailure,
-    OperationCancelled,
-    OutOfMemory,
-    TerminalFailure,
+/// Exact error sets used to compose the looper API. Keeping every custom
+/// error name here makes misspellings in set compositions a compile error.
+pub const Errors = struct {
+    pub const AlreadyStarted = error{AlreadyStarted};
+    pub const Cancelled = error{Cancelled};
+    pub const InvalidState = error{InvalidState};
+    pub const MuxFailure = error{MuxFailure};
+    pub const OperationCancelled = error{OperationCancelled};
+    pub const ReentrantCall = error{ReentrantCall};
+    pub const TaskFailure = error{TaskFailure};
+    pub const TerminalFailure = error{TerminalFailure};
+    pub const TransformFailure = error{TransformFailure};
+    pub const WriteIncomplete = error{WriteIncomplete};
 };
+
+pub const CompletionError = std.mem.Allocator.Error ||
+    Errors.Cancelled ||
+    Errors.MuxFailure ||
+    Errors.OperationCancelled ||
+    Errors.TerminalFailure;
 
 pub const Completion = struct {
     // Completion state.

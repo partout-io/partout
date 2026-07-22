@@ -86,27 +86,28 @@ pub const Looper = struct {
         on_finish: OnFinish,
     };
 
-    const CancellationError = queue_mod.CancellationError;
+    const Errors = queue_mod.Errors;
+    const SubmissionError = std.mem.Allocator.Error || Errors.Cancelled;
     const CompletionError = queue_mod.CompletionError;
-    pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
-    pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{AlreadyStarted};
-    pub const AttachError = std.mem.Allocator.Error || CancellationError || error{
-        MuxFailure,
-        OperationCancelled,
-        ReentrantCall,
-    };
-    pub const DetachError = std.mem.Allocator.Error || CancellationError || error{ReentrantCall};
-    pub const ResumeReadingError = std.mem.Allocator.Error || CancellationError;
-    pub const ScheduleError = std.mem.Allocator.Error || CancellationError || error{TaskFailure};
-    pub const StopError = std.mem.Allocator.Error || CancellationError || error{
-        InvalidState,
-        ReentrantCall,
-        TerminalFailure,
-    };
-    pub const WriteError = std.mem.Allocator.Error || io.Error || CancellationError || error{
-        TransformFailure,
-        WriteIncomplete,
-    };
+    pub const InitError = std.mem.Allocator.Error || Errors.MuxFailure;
+    pub const StartError = std.mem.Allocator.Error ||
+        std.Thread.SpawnError ||
+        Errors.AlreadyStarted;
+    pub const AttachError = SubmissionError ||
+        Errors.MuxFailure ||
+        Errors.OperationCancelled ||
+        Errors.ReentrantCall;
+    pub const DetachError = SubmissionError || Errors.ReentrantCall;
+    pub const ResumeReadingError = SubmissionError;
+    pub const ScheduleError = SubmissionError || Errors.TaskFailure;
+    pub const StopError = SubmissionError ||
+        Errors.InvalidState ||
+        Errors.ReentrantCall ||
+        Errors.TerminalFailure;
+    pub const WriteError = SubmissionError ||
+        io.Error ||
+        Errors.TransformFailure ||
+        Errors.WriteIncomplete;
 
     // Configuration.
     allocator: std.mem.Allocator,
