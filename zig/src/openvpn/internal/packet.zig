@@ -4,10 +4,10 @@
 
 const std = @import("std");
 const c_exports_mod = @import("../../c/exports.zig");
-const c_mod = @import("c.zig");
 const errors_mod = @import("errors.zig");
+const helpers_mod = @import("helpers.zig");
 
-const c = c_mod.api;
+const c = helpers_mod.c;
 const c_crypto = c_exports_mod.crypto;
 
 const SerializeWithCrypto = @TypeOf(&c.openvpn_ctrl_serialize_auth);

@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c_mod = @import("c.zig");
+const helpers_mod = @import("helpers.zig");
 
-const c = c_mod.api;
+const c = helpers_mod.c;
 
 pub const Control = struct {
     pub const max_payload_bytes_per_packet: usize = 1000;

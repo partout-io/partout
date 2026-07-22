@@ -5,7 +5,6 @@
 const std = @import("std");
 const c_exports_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
-const c_mod = @import("c.zig");
 const configuration_mod = @import("configuration.zig");
 const constants_mod = @import("constants.zig");
 const crypto_mod = @import("crypto.zig");
@@ -14,7 +13,7 @@ const helpers_mod = @import("helpers.zig");
 const packet_mod = @import("packet.zig");
 
 const api = core_mod.api;
-const c = c_mod.api;
+const c = helpers_mod.c;
 const c_crypto = c_exports_mod.crypto;
 
 const BidirectionalState = helpers_mod.BidirectionalState;
@@ -186,7 +185,7 @@ const AuthSerializer = struct {
         digest: api.OpenVPNDigest,
         key: api.OpenVPNStaticKey,
     ) !AuthSerializer {
-        var keys = try helpers_mod.authKeys(allocator, key);
+        var keys = try crypto_mod.authKeys(allocator, key);
         defer keys.deinit(allocator);
         var bridge = try CryptoKeysBridge.init(allocator, &keys);
         defer bridge.deinit();
@@ -281,7 +280,7 @@ const CryptSerializer = struct {
         fnt: c_crypto.pp_crypto_enc_fnt,
         key: api.OpenVPNStaticKey,
     ) !CryptSerializer {
-        var keys = try helpers_mod.cryptKeys(allocator, key);
+        var keys = try crypto_mod.cryptKeys(allocator, key);
         defer keys.deinit(allocator);
         var bridge = try CryptoKeysBridge.init(allocator, &keys);
         defer bridge.deinit();

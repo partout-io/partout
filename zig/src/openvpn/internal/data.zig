@@ -7,14 +7,14 @@ const c_exports_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const net_mod = @import("../../net/exports.zig");
 const auth_mod = @import("auth.zig");
-const c_mod = @import("c.zig");
 const constants_mod = @import("constants.zig");
 const crypto_mod = @import("crypto.zig");
 const errors_mod = @import("errors.zig");
+const helpers_mod = @import("helpers.zig");
 const processing_mod = @import("processing.zig");
 
 const api = core_mod.api;
-const c = c_mod.api;
+const c = helpers_mod.c;
 const c_common = c_exports_mod.common;
 const c_crypto = c_exports_mod.crypto;
 const log = core_mod.logging;

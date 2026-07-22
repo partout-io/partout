@@ -6,7 +6,6 @@ const std = @import("std");
 const c_exports_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const net_mod = @import("../../net/exports.zig");
-const c_mod = @import("c.zig");
 const configuration_mod = @import("configuration.zig");
 const constants_mod = @import("constants.zig");
 const control_mod = @import("control.zig");
@@ -23,7 +22,7 @@ const session_negotiator_mod = @import("session_negotiator.zig");
 const tls_mod = @import("tls.zig");
 
 const api = core_mod.api;
-const c = c_mod.api;
+const c = helpers_mod.c;
 const c_crypto = c_exports_mod.crypto;
 const log = core_mod.logging;
 

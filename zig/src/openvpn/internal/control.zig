@@ -4,12 +4,12 @@
 
 const std = @import("std");
 const core_mod = @import("../../core/exports.zig");
-const c_mod = @import("c.zig");
 const crypto_mod = @import("crypto.zig");
 const errors_mod = @import("errors.zig");
+const helpers_mod = @import("helpers.zig");
 const packet_mod = @import("packet.zig");
 
-const c = c_mod.api;
+const c = helpers_mod.c;
 
 const ControlPacket = packet_mod.ControlPacket;
 const PacketCode = packet_mod.PacketCode;

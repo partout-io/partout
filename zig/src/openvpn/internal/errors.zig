@@ -7,10 +7,10 @@
 const std = @import("std");
 const c_exports_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
-const c_mod = @import("c.zig");
+const helpers_mod = @import("helpers.zig");
 
 const api = core_mod.api;
-const c = c_mod.api;
+const c = helpers_mod.c;
 const c_crypto = c_exports_mod.crypto;
 const log = core_mod.logging;
 
@@ -68,10 +68,6 @@ pub const NetworkSettingsError = error{
 
 pub const ZeroingDataError = error{
     OutOfBounds,
-};
-
-pub const CredentialsError = error{
-    OTPRequired,
 };
 
 pub const StaticKeyError = api.EncodeError || error{
