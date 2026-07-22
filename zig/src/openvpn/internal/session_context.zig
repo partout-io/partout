@@ -176,12 +176,3 @@ pub const SessionState = union(enum) {
         return active.context;
     }
 };
-
-test "ActiveContext declarations are semantically analyzed" {
-    std.testing.refAllDecls(ActiveContext);
-}
-
-test "stopped session has no active context" {
-    var state = SessionState{ .stopped = .{ .with_local_options = false } };
-    try std.testing.expect(state.activeContext() == null);
-}

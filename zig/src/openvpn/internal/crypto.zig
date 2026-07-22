@@ -292,15 +292,3 @@ pub const ZeroingData = struct {
         self.bytes = ptr.*.bytes[0..ptr.*.length];
     }
 };
-
-test "ZeroingData delegates append and slice to pp_zd" {
-    const allocator = std.testing.allocator;
-    var data = try ZeroingData.initCopy(allocator, "abc");
-    defer data.deinit(allocator);
-    try data.append(allocator, "def");
-    try std.testing.expectEqualStrings("abcdef", data.bytes);
-
-    var part = try data.sliceCopy(allocator, 2, 3);
-    defer part.deinit(allocator);
-    try std.testing.expectEqualStrings("cde", part.bytes);
-}

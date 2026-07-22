@@ -717,56 +717,17 @@ pub const Negotiator = struct {
     }
 };
 
-test "renegotiation initiator is explicit" {
-    try std.testing.expect(RenegotiationType.client != .server);
-}
+pub const testing = struct {
+    pub fn forwardPulledCipherText(
+        allocator: std.mem.Allocator,
+        tls: anytype,
+        context: ?*anyopaque,
+        enqueue: *const fn (?*anyopaque, []const u8) anyerror!void,
+    ) anyerror!void {
+        return Negotiator.forwardPulledCipherText(allocator, tls, context, enqueue);
+    }
 
-test "NegotiatorState preserves Swift ordering" {
-    try std.testing.expect(NegotiatorState.tls.before(.auth));
-    try std.testing.expect(!NegotiatorState.connected.before(.push));
-}
-
-test "negotiation history deep-clones push options" {
-    var reply = (try PushReply.parse(std.testing.allocator, "PUSH_REPLY,ping 10")).?;
-    var history = NegotiationHistory.init(&reply);
-    defer history.deinit(std.testing.allocator);
-    var copy = try history.clone(std.testing.allocator);
-    defer copy.deinit(std.testing.allocator);
-    try std.testing.expectEqual(@as(?f64, 10), copy.push_reply.options.keep_alive_interval);
-}
-
-test "Negotiator declarations are semantically analyzed" {
-    std.testing.refAllDecls(Negotiator);
-}
-
-test "early-negotiation TLV requests wrapped-key resend" {
-    const payload = [_]u8{
-        0x00, 0x01, // early-negotiation flags
-        0x00, 0x02, // two-byte flags payload
-        0x00, 0x01, // resend wrapped key
-    };
-    try std.testing.expect(Negotiator.requestsWrappedKeyResend(&payload));
-    try std.testing.expect(!Negotiator.requestsWrappedKeyResend(payload[0..5]));
-}
-
-test "successful TLS pull propagates control enqueue failure" {
-    const Fake = struct {
-        fn pullCipherText(_: *@This(), allocator: std.mem.Allocator) anyerror![]u8 {
-            return allocator.dupe(u8, "ciphertext");
-        }
-        fn failEnqueue(_: ?*anyopaque, _: []const u8) anyerror!void {
-            return error.ControlChannelFailure;
-        }
-    };
-
-    var fake: Fake = .{};
-    try std.testing.expectError(
-        error.ControlChannelFailure,
-        Negotiator.forwardPulledCipherText(
-            std.testing.allocator,
-            &fake,
-            null,
-            Fake.failEnqueue,
-        ),
-    );
-}
+    pub fn requestsWrappedKeyResend(payload: ?[]const u8) bool {
+        return Negotiator.requestsWrappedKeyResend(payload);
+    }
+};

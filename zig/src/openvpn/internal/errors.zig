@@ -107,18 +107,3 @@ pub fn partoutCode(err: anyerror) api.PartoutErrorCode {
         else => .openVPNConnectionFailure,
     };
 }
-
-test "coarse failures map to ConnectionReporter categories" {
-    try std.testing.expectEqual(api.PartoutErrorCode.timeout, partoutCode(error.Timeout));
-    try std.testing.expectEqual(api.PartoutErrorCode.authentication, partoutCode(error.BadCredentials));
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.openVPNUnsupportedAlgorithm,
-        partoutCode(error.UnsupportedAlgorithm),
-    );
-    try std.testing.expectEqual(api.PartoutErrorCode.crypto, partoutCode(error.CryptoFailure));
-    try std.testing.expectEqual(api.PartoutErrorCode.openVPNTLSFailure, partoutCode(error.TLSFailure));
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.openVPNCompressionMismatch,
-        partoutCode(error.CompressionMismatch),
-    );
-}

@@ -153,45 +153,6 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run Zig tests");
     test_step.dependOn(&run_unit_tests.step);
 
-    // File-local tests in the internal OpenVPN package need a primary test
-    // root. Xcode 26 ARM Mach headers currently trip Zig translate-c, and the
-    // fallback backend symbols below are only appropriate for the mock-only
-    // crypto build.
-    const can_run_internal_openvpn_tests = embed_c and
-        use_openvpn and
-        !crypto_libraries.openssl and
-        !crypto_libraries.mbedtls and
-        !(target.result.os.tag.isDarwin() and target.result.cpu.arch == .aarch64);
-    if (can_run_internal_openvpn_tests) {
-        const internal_openvpn_test_module = b.createModule(.{
-            .root_source_file = b.path("src/internal_openvpn_tests.zig"),
-            .target = target,
-            .optimize = optimize,
-            .link_libc = true,
-            .sanitize_c = .off,
-        });
-        configurePartoutModule(
-            internal_openvpn_test_module,
-            b,
-            target,
-            apple_sdk_path,
-            crypto_libraries,
-            vendor_includes,
-            embed_c,
-            use_openvpn,
-            use_wireguard,
-            build_options,
-        );
-        const internal_openvpn_tests = b.addTest(.{
-            .root_module = internal_openvpn_test_module,
-        });
-        internal_openvpn_tests.step.dependOn(api_codegen_step);
-        const run_internal_openvpn_tests = b.addRunArtifact(internal_openvpn_tests);
-        const internal_openvpn_test_step = b.step("test-openvpn-internal", "Run internal OpenVPN port tests");
-        internal_openvpn_test_step.dependOn(&run_internal_openvpn_tests.step);
-        test_step.dependOn(&run_internal_openvpn_tests.step);
-    }
-
     const coverage_step = b.step("coverage", "Run Zig tests under kcov");
     coverage_step.dependOn(&addCoverageRunStep(b, unit_tests).step);
 

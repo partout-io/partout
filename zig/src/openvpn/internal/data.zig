@@ -577,45 +577,16 @@ pub const DataLinkPair = struct {
     }
 };
 
-test "DataPath mock round-trips compound and bulk packets" {
-    const allocator = std.testing.allocator;
-    const peer_id: u32 = 0x01;
-    const key: u8 = 0x02;
-    const packet_id: u32 = 0x1020;
-    const payload = [_]u8{ 0x11, 0x22, 0x33, 0x44 };
+pub const testing = struct {
+    pub fn createMockDataPath(
+        allocator: std.mem.Allocator,
+        peer_id: u32,
+    ) !*DataPath {
+        const mode = c.openvpn_dp_mode_ad_create_mock(c.OpenVPNCompressionFramingDisabled);
+        return DataPath.create(allocator, mode, peer_id);
+    }
 
-    const mode = c.openvpn_dp_mode_ad_create_mock(c.OpenVPNCompressionFramingDisabled);
-    const data_path = try DataPath.create(allocator, mode, peer_id);
-    defer data_path.destroy();
-
-    const compound = try data_path.assembleAndEncrypt(
-        allocator,
-        &payload,
-        key,
-        packet_id,
-    );
-    defer allocator.free(compound);
-    var compound_result = try data_path.decryptAndParse(allocator, compound);
-    defer compound_result.deinit(allocator);
-    try std.testing.expectEqual(packet_id, compound_result.packet_id);
-    try std.testing.expectEqualSlices(u8, &payload, compound_result.data);
-
-    const packets = [_][]const u8{&payload};
-    const encrypted_packets = try data_path.encryptPackets(allocator, &packets, key);
-    defer core_mod.util.freeSliceOfStrings(allocator, encrypted_packets);
-    var decrypted_packets = try data_path.decryptPackets(allocator, encrypted_packets);
-    defer decrypted_packets.deinit(allocator);
-    try std.testing.expect(!decrypted_packets.keep_alive);
-    try std.testing.expectEqual(@as(usize, 1), decrypted_packets.packets.len);
-    try std.testing.expectEqualSlices(u8, &payload, decrypted_packets.packets[0]);
-}
-
-test "DataLink declarations are semantically analyzed" {
-    std.testing.refAllDecls(DataLink);
-}
-
-test "DataLink preserves only reportable inbound failure categories" {
-    try std.testing.expectEqual(error.CryptoFailure, DataLink.mapInboundError(error.CryptoFailure));
-    try std.testing.expectEqual(error.CompressionMismatch, DataLink.mapInboundError(error.CompressionMismatch));
-    try std.testing.expectEqual(error.Recoverable, DataLink.mapInboundError(error.OutOfMemory));
-}
+    pub fn mapInboundError(err: anyerror) anyerror {
+        return DataLink.mapInboundError(err);
+    }
+};

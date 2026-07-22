@@ -75,6 +75,11 @@ pub fn peerInfoAlloc(
     );
 }
 
+pub const testing = struct {
+    pub const formatPeerInfo = formatPeerInfoAlloc;
+    pub const platformVersion = platformVersionAlloc;
+};
+
 fn platformName() []const u8 {
     if (builtin.target.abi.isAndroid()) return "android";
     return switch (builtin.os.tag) {
@@ -177,57 +182,4 @@ fn formatPeerInfoAlloc(
     writer.print("IV_PLAT={s}\nIV_PLAT_VER={s}\n", .{ platform, platform_version }) catch return error.OutOfMemory;
     for (extra_lines) |line| writer.print("{s}\n", .{line}) catch return error.OutOfMemory;
     return output.toOwnedSlice() catch error.OutOfMemory;
-}
-
-test "PUSH_REPLY parses through the standard OpenVPN parser" {
-    var reply = (try PushReply.parse(
-        std.testing.allocator,
-        "PUSH_REPLY,ping 10,ping-restart 60,cipher AES-256-GCM,auth SHA256,peer-id 7",
-    )).?;
-    defer reply.deinit(std.testing.allocator);
-    try std.testing.expectEqual(@as(?f64, 10), reply.options.keep_alive_interval);
-    try std.testing.expectEqual(api.OpenVPNCipher.aes256gcm, reply.options.cipher.?);
-    try std.testing.expectEqual(@as(?u32, 7), reply.options.peer_id);
-}
-
-test "PUSH_REPLY clone owns independent storage" {
-    var reply = (try PushReply.parse(std.testing.allocator, "PUSH_REPLY,ping 10")).?;
-    defer reply.deinit(std.testing.allocator);
-    var copy = try reply.clone(std.testing.allocator);
-    defer copy.deinit(std.testing.allocator);
-    try std.testing.expectEqualStrings(reply.original, copy.original);
-    try std.testing.expect(reply.original.ptr != copy.original.ptr);
-}
-
-test "PUSH_REPLY signals a continuation fragment" {
-    try std.testing.expectError(
-        error.ContinuationPushReply,
-        PushReply.parse(
-            std.testing.allocator,
-            "PUSH_REPLY,route 10.0.0.0 255.0.0.0,push-continuation 2",
-        ),
-    );
-}
-
-test "runtime platform version has major and minor components" {
-    const version = try platformVersionAlloc(std.testing.allocator);
-    defer std.testing.allocator.free(version);
-    const separator = std.mem.indexOfScalar(u8, version, '.') orelse
-        return error.TestUnexpectedResult;
-    try std.testing.expect(separator > 0);
-    try std.testing.expect(separator + 1 < version.len);
-}
-
-test "peer info has one trailing newline" {
-    const info = try formatPeerInfoAlloc(
-        std.testing.allocator,
-        "test",
-        "TLSv1.3",
-        "linux",
-        "6.1",
-        &.{"IV_CIPHERS=AES-256-GCM"},
-    );
-    defer std.testing.allocator.free(info);
-    try std.testing.expect(std.mem.endsWith(u8, info, "IV_CIPHERS=AES-256-GCM\n"));
-    try std.testing.expect(!std.mem.endsWith(u8, info, "\n\n"));
 }

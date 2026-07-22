@@ -9,6 +9,7 @@ const c = c_mod.api;
 
 pub const Control = struct {
     pub const max_payload_bytes_per_packet: usize = 1000;
+    pub const session_id_length: usize = c.OpenVPNPacketSessionIdLength;
     pub const early_negotiation_flags_type: u16 = 0x0001;
     pub const early_negotiation_resend_wrapped_key: u16 = 0x0001;
     pub const tls_prefix = [_]u8{ 0, 0, 0, 0, 2 };
@@ -50,10 +51,3 @@ pub const TLS = struct {
     pub const default_security_level: i32 = 0;
     pub const buffer_length: usize = 16 * 1024;
 };
-
-test "constant groups preserve protocol values" {
-    try std.testing.expectEqual(@as(usize, 1000), Control.max_payload_bytes_per_packet);
-    try std.testing.expectEqual(@as(u8, 1), Control.nextKey(7));
-    try std.testing.expectEqual(@as(usize, 16), Data.ping_string.len);
-    try std.testing.expectEqual(@as(usize, 256), Keys.keys_count * Keys.key_length);
-}

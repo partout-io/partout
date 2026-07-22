@@ -210,21 +210,3 @@ pub fn processedRemotes(
     }
     return result;
 }
-
-test "fallbacks mirror Swift configuration defaults" {
-    const configuration = api.OpenVPNConfiguration{};
-    try std.testing.expectEqual(api.OpenVPNCipher.aes128cbc, fallbackCipher(configuration));
-    try std.testing.expectEqual(api.OpenVPNDigest.sha1, fallbackDigest(configuration));
-    try std.testing.expectEqual(api.OpenVPNCompressionFraming.disabled, fallbackCompressionFraming(configuration));
-    try std.testing.expectEqual(api.OpenVPNCompressionAlgorithm.disabled, fallbackCompressionAlgorithm(configuration));
-}
-
-test "local options include explicit legacy cipher" {
-    const allocator = std.testing.allocator;
-    const options = try localOptionsStringAlloc(allocator, .{ .cipher = .aes256gcm }, true);
-    defer allocator.free(options);
-    try std.testing.expectEqualStrings(
-        "V4,dev-type tun,cipher AES-256-GCM,keysize 256,auth SHA1,key-method 2,tls-client",
-        options,
-    );
-}
