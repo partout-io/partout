@@ -33,7 +33,6 @@ pub const openvpn_parser = if (openvpn_enabled) @import("openvpn/parser.zig") el
 pub const openvpn_serializer = if (openvpn_enabled) @import("openvpn/serializer.zig") else struct {};
 pub const openvpn_internal = if (openvpn_enabled) struct {
     pub const auth = @import("openvpn/internal/auth.zig");
-    pub const c = @import("openvpn/internal/c.zig");
     pub const configuration = @import("openvpn/internal/configuration.zig");
     pub const constants = @import("openvpn/internal/constants.zig");
     pub const control = @import("openvpn/internal/control.zig");
