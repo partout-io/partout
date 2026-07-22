@@ -3,49 +3,107 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-
+const c_crypto = @import("../../c/exports.zig").crypto;
 const core = @import("../../core/exports.zig");
 const net = @import("../../net/exports.zig");
-const ActiveContext = @import("session_context.zig").ActiveContext;
-const ActivePhase = @import("active_phase.zig").ActivePhase;
-const c_crypto = @import("../../c/exports.zig").crypto;
 const c = @import("c.zig").api;
+const configuration_types = @import("configuration.zig");
+const constants = @import("constants.zig");
 const control = @import("control.zig");
-const PacketCode = control.PacketCode;
-const ConnectionOptions = @import("connection_options.zig").ConnectionOptions;
-const ControlChannelConstants = @import("control_channel_constants.zig").ControlChannel;
-const serialization = @import("serialization.zig");
-const ControlChannel = control.ControlChannel(serialization.Serializer);
-const credentials_helpers = @import("credentials_helpers.zig");
-const DataChannel = @import("data.zig").DataChannel;
-const DataLink = @import("data.zig").DataLink;
+const crypto = @import("crypto.zig");
+const data_types = @import("data.zig");
 const errors = @import("errors.zig");
-const IdleContext = @import("session_context.zig").IdleContext;
-const LinkProcessor = @import("processing.zig").LinkProcessor;
-const NegotiatorOptions = @import("session_negotiator.zig").NegotiatorOptions;
-const Negotiator = @import("session_negotiator.zig").Negotiator;
-const OCCPacket = @import("occ_packet.zig").OCCPacket;
-const PRNG = @import("prng.zig").PRNG;
-const PushReply = @import("push_reply.zig").PushReply;
-const RenegotiationType = @import("renegotiation_type.zig").RenegotiationType;
-const SessionDelegate = @import("session_delegate.zig").SessionDelegate;
-const SessionState = @import("session_state.zig").SessionState;
-const TLSParameters = @import("tls.zig").TLSParameters;
-const TLSWrapper = @import("tls.zig").TLSWrapper;
+const helpers = @import("helpers.zig");
+const packet_types = @import("packet.zig");
+const processing = @import("processing.zig");
+const push = @import("push.zig");
+const serialization = @import("serialization.zig");
+const session_context = @import("session_context.zig");
+const session_negotiator = @import("session_negotiator.zig");
+const tls_types = @import("tls.zig");
+
+const ActiveContext = session_context.ActiveContext;
+const ActivePhase = session_context.ActivePhase;
+const ConnectionOptions = configuration_types.ConnectionOptions;
+const ControlChannel = control.ControlChannel(serialization.Serializer);
+const ControlChannelConstants = constants.Control;
+const credentials_helpers = helpers;
+const DataChannel = data_types.DataChannel;
+const DataLink = data_types.DataLink;
+const IdleContext = session_context.IdleContext;
+const LinkProcessor = processing.LinkProcessor;
+const Negotiator = session_negotiator.Negotiator;
+const NegotiatorOptions = session_negotiator.NegotiatorOptions;
+const OCCPacket = packet_types.OCCPacket;
+const PacketCode = packet_types.PacketCode;
+const PRNG = crypto.PRNG;
+const PushReply = push.PushReply;
+const RenegotiationType = session_negotiator.RenegotiationType;
+const SessionState = session_context.SessionState;
+const TLSParameters = tls_types.TLSParameters;
+const TLSWrapper = tls_types.TLSWrapper;
 
 const api = core.api;
 
+/// Type-erased observer for major session events.
+///
+/// Values passed to callbacks are borrowed for the duration of the callback.
+/// Callbacks execute on the session looper.
+pub const SessionDelegate = struct {
+    context: ?*anyopaque = null,
+    vtable: *const VTable,
+
+    pub const VTable = struct {
+        did_start: *const fn (
+            ?*anyopaque,
+            *anyopaque,
+            api.ExtendedEndpoint,
+            api.OpenVPNConfiguration,
+        ) void,
+        did_stop: *const fn (?*anyopaque, *anyopaque, ?anyerror) void,
+        did_update_data_count: *const fn (
+            ?*anyopaque,
+            *anyopaque,
+            api.DataCount,
+        ) void,
+    };
+
+    pub fn didStart(
+        self: SessionDelegate,
+        session: *anyopaque,
+        remote_endpoint: api.ExtendedEndpoint,
+        remote_options: api.OpenVPNConfiguration,
+    ) void {
+        self.vtable.did_start(
+            self.context,
+            session,
+            remote_endpoint,
+            remote_options,
+        );
+    }
+
+    pub fn didStop(
+        self: SessionDelegate,
+        session: *anyopaque,
+        cause: ?anyerror,
+    ) void {
+        self.vtable.did_stop(self.context, session, cause);
+    }
+
+    pub fn didUpdateDataCount(
+        self: SessionDelegate,
+        session: *anyopaque,
+        count: api.DataCount,
+    ) void {
+        self.vtable.did_update_data_count(self.context, session, count);
+    }
+};
+
 /// Default V3 OpenVPN session implementation.
 ///
-/// `Session` is heap-only: looper callbacks, the shutdown actor, and timer
-/// contexts all borrow this stable address until `destroy` joins them. The
-/// `Looper` itself is borrowed; its owner initializes and starts it, keeps it
-/// alive and running through `destroy`, then stops and deinitializes it.
-/// It is dedicated to this Session while borrowed because Session manages its
-/// single link/tunnel pair.
-/// Public lifecycle methods are synchronous because `Looper` already
-/// serializes and waits for attach/perform/detach completion. The external
-/// owner must not retain a direct Session callback after `destroy` returns.
+/// `Session` is heap-only: callbacks, the shutdown actor, and timer contexts
+/// borrow this stable address until `destroy` joins them. Its `Looper` is
+/// borrowed and dedicated to this session for the same lifetime.
 pub const Session = struct {
     allocator: std.mem.Allocator,
     fnt: c_crypto.pp_crypto_fnt,
@@ -614,7 +672,7 @@ pub const Session = struct {
         const pair = context.current_data_pair orelse return;
         try self.checkPingTimeoutOnQueue(context);
         if (self.keepAliveIntervalMs(context) != null) {
-            const ping: []const u8 = &@import("data.zig").DataConstants.ping_string;
+            const ping: []const u8 = &constants.Data.ping_string;
             try pair.send(&.{ping}, null, null);
         }
         try self.scheduleNextPing(context);

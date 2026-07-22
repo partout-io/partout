@@ -4,18 +4,24 @@
 
 const std = @import("std");
 const core = @import("../../core/exports.zig");
-const BidirectionalState = @import("bidirectional_state.zig").BidirectionalState;
-const ControlChannelConstants = @import("control_channel_constants.zig").ControlChannel;
+const BidirectionalState = @import("helpers.zig").BidirectionalState;
+const ControlChannelConstants = @import("constants.zig").Control;
 const data = @import("data.zig");
 const DataChannel = data.DataChannel;
 const DataLink = data.DataLink;
 const DataLinkPair = data.DataLinkPair;
 const Negotiator = @import("session_negotiator.zig").Negotiator;
-const PushReply = @import("push_reply.zig").PushReply;
+const PushReply = @import("push.zig").PushReply;
 
 const api = core.api;
 
 /// State retained between session attempts.
+pub const ActivePhase = enum {
+    starting,
+    started,
+    stopping,
+};
+
 pub const IdleContext = struct {
     /// Cleared after AUTH_FAILED so the next attempt sends `V0 UNDEF`.
     with_local_options: bool = true,
@@ -144,6 +150,49 @@ pub const ActiveContext = struct {
     }
 };
 
+pub const SessionState = union(enum) {
+    stopped: IdleContext,
+    active: Active,
+
+    pub const Active = struct {
+        phase: ActivePhase,
+        context: *ActiveContext,
+    };
+
+    pub fn activePhase(self: SessionState) ?ActivePhase {
+        return switch (self) {
+            .stopped => null,
+            .active => |active| active.phase,
+        };
+    }
+
+    pub fn idleContext(self: *SessionState) ?*IdleContext {
+        return switch (self.*) {
+            .stopped => |*context| context,
+            .active => null,
+        };
+    }
+
+    pub fn activeState(self: *SessionState) ?*Active {
+        return switch (self.*) {
+            .stopped => null,
+            .active => |*active| active,
+        };
+    }
+
+    pub fn activeContext(self: *SessionState) ?*ActiveContext {
+        const active = self.activeState() orelse return null;
+        return active.context;
+    }
+};
+
 test "ActiveContext declarations are semantically analyzed" {
     std.testing.refAllDecls(ActiveContext);
+}
+
+test "stopped session exposes only its idle context" {
+    var state = SessionState{ .stopped = .{ .with_local_options = false } };
+    try std.testing.expect(state.activePhase() == null);
+    try std.testing.expect(state.activeContext() == null);
+    try std.testing.expect(!state.idleContext().?.with_local_options);
 }

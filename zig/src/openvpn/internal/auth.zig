@@ -5,17 +5,17 @@
 const std = @import("std");
 const core = @import("../../core/exports.zig");
 const c_crypto = @import("../../c/exports.zig").crypto;
-const configuration_helpers = @import("configuration_helpers.zig");
-const ControlChannel = @import("control_channel_constants.zig").ControlChannel;
-const CryptoKeyPair = @import("crypto_key_pair.zig").CryptoKeyPair;
-const CryptoKeys = @import("crypto_keys.zig").CryptoKeys;
+const configuration_helpers = @import("configuration.zig");
+const constants = @import("constants.zig");
+const ControlChannel = constants.Control;
+const crypto = @import("crypto.zig");
+const CryptoKeyPair = crypto.CryptoKeyPair;
+const CryptoKeys = crypto.CryptoKeys;
 const errors = @import("errors.zig");
-const Keys = @import("key_constants.zig").Keys;
-const platform = @import("platform_helpers.zig");
-const PRFInput = @import("prf_input.zig").PRFInput;
-const PRNG = @import("prng.zig").PRNG;
-const ServerOCC = @import("server_occ.zig").ServerOCC;
-const ZeroingData = @import("zeroing_data.zig").ZeroingData;
+const Keys = constants.Keys;
+const push = @import("push.zig");
+const PRNG = crypto.PRNG;
+const ZeroingData = crypto.ZeroingData;
 
 const api = core.api;
 
@@ -245,70 +245,6 @@ pub const PRF = struct {
     }
 };
 
-test "PRF owns retained inputs and derives four key-method-2 buffers" {
-    const Fake = struct {
-        fn hmac(context_pointer: [*c]c_crypto.pp_hmac_ctx) callconv(.c) usize {
-            const context = &context_pointer[0];
-            const length: usize = 16;
-            const destination = context.*.dst[0..length];
-            const secret = context.*.secret[0..context.*.secret_len];
-            const data = context.*.data[0..context.*.data_len];
-            for (destination, 0..) |*byte, index| {
-                byte.* = secret[index % secret.len] ^
-                    data[index % data.len] ^
-                    @as(u8, @truncate(index));
-            }
-            return length;
-        }
-    };
-
-    const allocator = std.testing.allocator;
-    var pre_master = try ZeroingData.init(allocator, Keys.pre_master_length);
-    @memset(pre_master.bytes, 0x10);
-    var random1 = try ZeroingData.init(allocator, Keys.random_length);
-    @memset(random1.bytes, 0x21);
-    var random2 = try ZeroingData.init(allocator, Keys.random_length);
-    @memset(random2.bytes, 0x32);
-    var server_random1 = try ZeroingData.init(allocator, Keys.random_length);
-    @memset(server_random1.bytes, 0x43);
-    var server_random2 = try ZeroingData.init(allocator, Keys.random_length);
-    @memset(server_random2.bytes, 0x54);
-    var handshake = Handshake{
-        .pre_master = pre_master.move(),
-        .random1 = random1.move(),
-        .random2 = random2.move(),
-        .server_random1 = server_random1.move(),
-        .server_random2 = server_random2.move(),
-    };
-    var fnt = c_crypto.pp_crypto_fnt_mock();
-    fnt.hmac_do = Fake.hmac;
-    const session_id = try allocator.dupe(u8, "12345678");
-    const remote_session_id = try allocator.dupe(u8, "ABCDEFGH");
-    var prf = try PRF.init(
-        allocator,
-        fnt,
-        &handshake,
-        session_id,
-        remote_session_id,
-    );
-    defer prf.deinit(allocator);
-
-    // The PRF must remain usable after negotiation-owned inputs disappear and
-    // after ownership moves into a retaining factory.
-    handshake.deinit(allocator);
-    allocator.free(session_id);
-    allocator.free(remote_session_id);
-    var retained_prf = prf.move();
-    defer retained_prf.deinit(allocator);
-
-    var keys = try retained_prf.derive(allocator);
-    defer keys.deinit(allocator);
-    try std.testing.expectEqual(Keys.key_length, keys.cipher.?.encryption_key.bytes.len);
-    try std.testing.expectEqual(Keys.key_length, keys.cipher.?.decryption_key.bytes.len);
-    try std.testing.expectEqual(Keys.key_length, keys.digest.?.encryption_key.bytes.len);
-    try std.testing.expectEqual(Keys.key_length, keys.digest.?.decryption_key.bytes.len);
-}
-
 pub const Authenticator = struct {
     allocator: std.mem.Allocator,
     control_buffer: ZeroingData,
@@ -432,14 +368,10 @@ pub const Authenticator = struct {
             &.{value}
         else
             &.{};
-        const platform_version = try platform.versionAlloc(allocator);
-        defer allocator.free(platform_version);
-        const peer_info = try ControlChannel.peerInfoAlloc(
+        const peer_info = try push.peerInfoAlloc(
             allocator,
             "io.partout 0.151.0",
             self.ssl_version,
-            platform.name(),
-            platform_version,
             extra_lines,
         );
         defer allocator.free(peer_info);
@@ -589,6 +521,120 @@ pub const Authenticator = struct {
     }
 };
 
+const PRFInput = struct {
+    fnt: c_crypto.pp_crypto_fnt,
+    label: []const u8,
+    secret: []const u8,
+    client_seed: []const u8,
+    server_seed: []const u8,
+    client_session_id: ?[]const u8 = null,
+    server_session_id: ?[]const u8 = null,
+    size: usize,
+};
+
+const ServerOCC = struct {
+    cipher: ?api.OpenVPNCipher = null,
+    digest: ?api.OpenVPNDigest = null,
+
+    pub fn parse(string: []const u8) ServerOCC {
+        var result: ServerOCC = .{};
+        var lines = std.mem.splitScalar(u8, string, ',');
+        while (lines.next()) |raw_line| {
+            const line = std.mem.trim(u8, raw_line, " \t\r\n");
+            var components = std.mem.tokenizeAny(u8, line, " \t\r\n");
+            const option = components.next() orelse continue;
+            const value = components.next() orelse continue;
+
+            if (std.ascii.eqlIgnoreCase(option, "cipher")) {
+                result.cipher = parseCipher(value);
+            } else if (std.ascii.eqlIgnoreCase(option, "data-ciphers-fallback")) {
+                if (result.cipher == null) result.cipher = parseCipher(value);
+            } else if (std.ascii.eqlIgnoreCase(option, "auth")) {
+                result.digest = parseDigest(value);
+            }
+        }
+        return result;
+    }
+
+    fn parseCipher(value: []const u8) ?api.OpenVPNCipher {
+        inline for (std.meta.tags(api.OpenVPNCipher)) |candidate| {
+            if (std.ascii.eqlIgnoreCase(value, candidate.raw())) return candidate;
+        }
+        return null;
+    }
+
+    fn parseDigest(value: []const u8) ?api.OpenVPNDigest {
+        inline for (std.meta.tags(api.OpenVPNDigest)) |candidate| {
+            if (std.ascii.eqlIgnoreCase(value, candidate.raw())) return candidate;
+        }
+        return null;
+    }
+};
+
+test "PRF owns retained inputs and derives four key-method-2 buffers" {
+    const Fake = struct {
+        fn hmac(context_pointer: [*c]c_crypto.pp_hmac_ctx) callconv(.c) usize {
+            const context = &context_pointer[0];
+            const length: usize = 16;
+            const destination = context.*.dst[0..length];
+            const secret = context.*.secret[0..context.*.secret_len];
+            const data = context.*.data[0..context.*.data_len];
+            for (destination, 0..) |*byte, index| {
+                byte.* = secret[index % secret.len] ^
+                    data[index % data.len] ^
+                    @as(u8, @truncate(index));
+            }
+            return length;
+        }
+    };
+
+    const allocator = std.testing.allocator;
+    var pre_master = try ZeroingData.init(allocator, Keys.pre_master_length);
+    @memset(pre_master.bytes, 0x10);
+    var random1 = try ZeroingData.init(allocator, Keys.random_length);
+    @memset(random1.bytes, 0x21);
+    var random2 = try ZeroingData.init(allocator, Keys.random_length);
+    @memset(random2.bytes, 0x32);
+    var server_random1 = try ZeroingData.init(allocator, Keys.random_length);
+    @memset(server_random1.bytes, 0x43);
+    var server_random2 = try ZeroingData.init(allocator, Keys.random_length);
+    @memset(server_random2.bytes, 0x54);
+    var handshake = Handshake{
+        .pre_master = pre_master.move(),
+        .random1 = random1.move(),
+        .random2 = random2.move(),
+        .server_random1 = server_random1.move(),
+        .server_random2 = server_random2.move(),
+    };
+    var fnt = c_crypto.pp_crypto_fnt_mock();
+    fnt.hmac_do = Fake.hmac;
+    const session_id = try allocator.dupe(u8, "12345678");
+    const remote_session_id = try allocator.dupe(u8, "ABCDEFGH");
+    var prf = try PRF.init(
+        allocator,
+        fnt,
+        &handshake,
+        session_id,
+        remote_session_id,
+    );
+    defer prf.deinit(allocator);
+
+    // The PRF must remain usable after negotiation-owned inputs disappear and
+    // after ownership moves into a retaining factory.
+    handshake.deinit(allocator);
+    allocator.free(session_id);
+    allocator.free(remote_session_id);
+    var retained_prf = prf.move();
+    defer retained_prf.deinit(allocator);
+
+    var keys = try retained_prf.derive(allocator);
+    defer keys.deinit(allocator);
+    try std.testing.expectEqual(Keys.key_length, keys.cipher.?.encryption_key.bytes.len);
+    try std.testing.expectEqual(Keys.key_length, keys.cipher.?.decryption_key.bytes.len);
+    try std.testing.expectEqual(Keys.key_length, keys.digest.?.encryption_key.bytes.len);
+    try std.testing.expectEqual(Keys.key_length, keys.digest.?.decryption_key.bytes.len);
+}
+
 test "Authenticator frames auth and buffers replies and messages" {
     const allocator = std.testing.allocator;
     const FixedPRNG = struct {
@@ -663,4 +709,15 @@ test "Authenticator frames auth and buffers replies and messages" {
     try std.testing.expectEqualStrings("AUTH_FAILED", messages[0]);
     try std.testing.expectEqualStrings("PUSH_REPLY,route", messages[1]);
     try std.testing.expectEqualStrings("partial", authenticator.control_buffer.bytes);
+}
+
+test "server OCC extracts only runtime-relevant values" {
+    const occ = ServerOCC.parse("V4,dev-type tun,cipher aes-256-cbc,auth sha256,key-method 2");
+    try std.testing.expectEqual(api.OpenVPNCipher.aes256cbc, occ.cipher.?);
+    try std.testing.expectEqual(api.OpenVPNDigest.sha256, occ.digest.?);
+}
+
+test "explicit cipher wins over fallback alias" {
+    const occ = ServerOCC.parse("cipher AES-256-GCM,data-ciphers-fallback AES-128-CBC");
+    try std.testing.expectEqual(api.OpenVPNCipher.aes256gcm, occ.cipher.?);
 }

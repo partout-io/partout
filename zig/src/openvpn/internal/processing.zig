@@ -10,16 +10,10 @@ const errors = @import("errors.zig");
 
 const api = core.api;
 
-pub const Direction = enum {
+pub const PacketDirection = enum {
     outbound,
     inbound,
 };
-
-pub const PacketDirection = Direction;
-
-test "packet directions remain distinct" {
-    try std.testing.expect(Direction.outbound != Direction.inbound);
-}
 
 pub const PacketProcessor = struct {
     ptr: *c.openvpn_pkt_proc,
@@ -62,7 +56,7 @@ pub const PacketProcessor = struct {
         self: *const PacketProcessor,
         allocator: std.mem.Allocator,
         packet: []const u8,
-        direction: Direction,
+        direction: PacketDirection,
     ) std.mem.Allocator.Error![]u8 {
         const destination = try allocator.alloc(u8, packet.len);
         switch (direction) {
@@ -76,7 +70,7 @@ pub const PacketProcessor = struct {
         self: *const PacketProcessor,
         allocator: std.mem.Allocator,
         packets: []const []const u8,
-        direction: Direction,
+        direction: PacketDirection,
     ) std.mem.Allocator.Error![][]u8 {
         const result = try allocator.alloc([]u8, packets.len);
         var initialized: usize = 0;
@@ -163,38 +157,10 @@ pub const PacketProcessor = struct {
     }
 };
 
-test "packet processor frames and parses a TCP stream" {
-    var processor = try PacketProcessor.init(std.testing.allocator, null);
-    defer processor.deinit();
-    const packet = [_]u8{ 0x11, 0x22, 0x33, 0x44, 0x55 };
-    const stream = try processor.streamFromPacket(std.testing.allocator, &packet);
-    defer std.testing.allocator.free(stream);
-    try std.testing.expectEqualSlices(u8, &.{ 0, 5, 0x11, 0x22, 0x33, 0x44, 0x55 }, stream);
-
-    var consumed: usize = 0;
-    const parsed = try processor.packetsFromStream(std.testing.allocator, stream, &consumed);
-    defer PacketProcessor.freePackets(std.testing.allocator, parsed);
-    try std.testing.expectEqual(stream.len, consumed);
-    try std.testing.expectEqual(@as(usize, 1), parsed.len);
-    try std.testing.expectEqualSlices(u8, &packet, parsed[0]);
-}
-
-test "packet processor retains incomplete TCP frames" {
-    var processor = try PacketProcessor.init(std.testing.allocator, null);
-    defer processor.deinit();
-    var consumed: usize = 99;
-    const parsed = try processor.packetsFromStream(std.testing.allocator, &.{ 0, 4, 1, 2 }, &consumed);
-    defer PacketProcessor.freePackets(std.testing.allocator, parsed);
-    try std.testing.expectEqual(@as(usize, 0), consumed);
-    try std.testing.expectEqual(@as(usize, 0), parsed.len);
-}
-
 /// Applies OpenVPN XOR processing and TCP packet framing around LINK traffic.
 ///
-/// Unlike the Swift closure pair, the Zig API returns explicit ownership. This
-/// is important because `Looper.TransformWrite` returns borrowed slices: a
-/// caller can keep this output alive through `Looper.write()` and release it as
-/// soon as that synchronous method has copied the packets.
+/// Unlike the Swift closure pair, the Zig API returns explicit ownership so
+/// callers can retain output through a synchronous `Looper.write()` call.
 pub const LinkProcessor = struct {
     allocator: std.mem.Allocator,
     processor: PacketProcessor,
@@ -306,6 +272,36 @@ pub const LinkProcessor = struct {
         return result;
     }
 };
+
+test "packet directions remain distinct" {
+    try std.testing.expect(PacketDirection.outbound != PacketDirection.inbound);
+}
+
+test "packet processor frames and parses a TCP stream" {
+    var processor = try PacketProcessor.init(std.testing.allocator, null);
+    defer processor.deinit();
+    const packet = [_]u8{ 0x11, 0x22, 0x33, 0x44, 0x55 };
+    const stream = try processor.streamFromPacket(std.testing.allocator, &packet);
+    defer std.testing.allocator.free(stream);
+    try std.testing.expectEqualSlices(u8, &.{ 0, 5, 0x11, 0x22, 0x33, 0x44, 0x55 }, stream);
+
+    var consumed: usize = 0;
+    const parsed = try processor.packetsFromStream(std.testing.allocator, stream, &consumed);
+    defer PacketProcessor.freePackets(std.testing.allocator, parsed);
+    try std.testing.expectEqual(stream.len, consumed);
+    try std.testing.expectEqual(@as(usize, 1), parsed.len);
+    try std.testing.expectEqualSlices(u8, &packet, parsed[0]);
+}
+
+test "packet processor retains incomplete TCP frames" {
+    var processor = try PacketProcessor.init(std.testing.allocator, null);
+    defer processor.deinit();
+    var consumed: usize = 99;
+    const parsed = try processor.packetsFromStream(std.testing.allocator, &.{ 0, 4, 1, 2 }, &consumed);
+    defer PacketProcessor.freePackets(std.testing.allocator, parsed);
+    try std.testing.expectEqual(@as(usize, 0), consumed);
+    try std.testing.expectEqual(@as(usize, 0), parsed.len);
+}
 
 test "LinkProcessor declarations are semantically analyzed" {
     std.testing.refAllDecls(LinkProcessor);

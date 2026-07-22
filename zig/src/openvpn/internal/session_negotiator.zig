@@ -9,28 +9,33 @@ const c_crypto = @import("../../c/exports.zig").crypto;
 const auth = @import("auth.zig");
 const Authenticator = auth.Authenticator;
 const PRF = auth.PRF;
-const configuration_helpers = @import("configuration_helpers.zig");
+const configuration_helpers = @import("configuration.zig");
 const control = @import("control.zig");
 const serialization = @import("serialization.zig");
 const ControlChannel = control.ControlChannel(serialization.Serializer);
-const ControlPacket = control.ControlPacket;
-const PacketCode = control.PacketCode;
-const ControlChannelConstants = @import("control_channel_constants.zig").ControlChannel;
+const packet_types = @import("packet.zig");
+const ControlPacket = packet_types.ControlPacket;
+const PacketCode = packet_types.PacketCode;
+const ControlChannelConstants = @import("constants.zig").Control;
 const data_types = @import("data.zig");
 const DataChannel = data_types.DataChannel;
 const DataPathParameters = data_types.DataPathParameters;
 const DataPathWrapper = data_types.DataPathWrapper;
-const ConnectionOptions = @import("connection_options.zig").ConnectionOptions;
+const ConnectionOptions = configuration_helpers.ConnectionOptions;
 const LinkProcessor = @import("processing.zig").LinkProcessor;
-const PIAHardReset = @import("pia_hard_reset.zig").PIAHardReset;
-const PRNG = @import("prng.zig").PRNG;
-const PushReply = @import("push_reply.zig").PushReply;
-const RenegotiationType = @import("renegotiation_type.zig").RenegotiationType;
+const PIAHardReset = @import("helpers.zig").PIAHardReset;
+const PRNG = @import("crypto.zig").PRNG;
+const PushReply = @import("push.zig").PushReply;
 const TLSWrapper = @import("tls.zig").TLSWrapper;
 
 const api = core.api;
 
 /// Ordered phases of an OpenVPN key negotiation.
+pub const RenegotiationType = enum {
+    client,
+    server,
+};
+
 pub const NegotiatorState = enum(u8) {
     idle,
     tls,
@@ -42,11 +47,6 @@ pub const NegotiatorState = enum(u8) {
         return @intFromEnum(self) < @intFromEnum(other);
     }
 };
-
-test "NegotiatorState preserves Swift ordering" {
-    try std.testing.expect(NegotiatorState.tls.before(.auth));
-    try std.testing.expect(!NegotiatorState.connected.before(.push));
-}
 
 pub const NegotiationHistory = struct {
     push_reply: PushReply,
@@ -66,15 +66,6 @@ pub const NegotiationHistory = struct {
         self.* = undefined;
     }
 };
-
-test "negotiation history deep-clones push options" {
-    var reply = (try PushReply.parse(std.testing.allocator, "PUSH_REPLY,ping 10")).?;
-    var history = NegotiationHistory.init(&reply);
-    defer history.deinit(std.testing.allocator);
-    var copy = try history.clone(std.testing.allocator);
-    defer copy.deinit(std.testing.allocator);
-    try std.testing.expectEqual(@as(?f64, 10), copy.push_reply.options.keep_alive_interval);
-}
 
 /// Borrowed session settings and callbacks used by a negotiator.
 ///
@@ -719,6 +710,24 @@ pub const Negotiator = struct {
         return output.toOwnedSlice();
     }
 };
+
+test "renegotiation initiator is explicit" {
+    try std.testing.expect(RenegotiationType.client != .server);
+}
+
+test "NegotiatorState preserves Swift ordering" {
+    try std.testing.expect(NegotiatorState.tls.before(.auth));
+    try std.testing.expect(!NegotiatorState.connected.before(.push));
+}
+
+test "negotiation history deep-clones push options" {
+    var reply = (try PushReply.parse(std.testing.allocator, "PUSH_REPLY,ping 10")).?;
+    var history = NegotiationHistory.init(&reply);
+    defer history.deinit(std.testing.allocator);
+    var copy = try history.clone(std.testing.allocator);
+    defer copy.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(?f64, 10), copy.push_reply.options.keep_alive_interval);
+}
 
 test "Negotiator declarations are semantically analyzed" {
     std.testing.refAllDecls(Negotiator);

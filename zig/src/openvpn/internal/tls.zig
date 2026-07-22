@@ -4,17 +4,13 @@
 
 const std = @import("std");
 const core = @import("../../core/exports.zig");
-const c_common = @import("../../c/exports.zig").common;
-const c_crypto = @import("../../c/exports.zig").crypto;
+const c_exports = @import("../../c/exports.zig");
+const c_common = c_exports.common;
+const c_crypto = c_exports.crypto;
+const TLSConstants = @import("constants.zig").TLS;
 const errors = @import("errors.zig");
 
 const api = core.api;
-
-pub const TLSConstants = struct {
-    pub const ca_filename = "ca.pem";
-    pub const default_security_level: i32 = 0;
-    pub const buffer_length: usize = 16 * 1024;
-};
 
 /// Borrowed arguments used to create a TLS engine.
 pub const TLSParameters = struct {
@@ -292,7 +288,7 @@ test "TLSWrapper delegates its complete TLS surface to the C table" {
     defer allocator.free(caches_directory);
 
     var verification_failures: usize = 0;
-    const configuration = @import("../../core/exports.zig").api.OpenVPNConfiguration{
+    const configuration = api.OpenVPNConfiguration{
         .ca = .{ .pem = "-----BEGIN CERTIFICATE-----\nmock\n-----END CERTIFICATE-----\n" },
     };
     var fnt = c_crypto.pp_crypto_fnt_mock().tls;

@@ -6,17 +6,20 @@ const std = @import("std");
 const core = @import("../../core/exports.zig");
 const c_crypto = @import("../../c/exports.zig").crypto;
 const c = @import("c.zig").api;
-const BidirectionalState = @import("bidirectional_state.zig").BidirectionalState;
+const helpers = @import("helpers.zig");
+const BidirectionalState = helpers.BidirectionalState;
 const control = @import("control.zig");
-const ControlPacket = control.ControlPacket;
-const PacketCode = control.PacketCode;
-const Constants = @import("constants.zig").Constants;
-const CryptoKeysBridge = @import("crypto_keys_bridge.zig").CryptoKeysBridge;
+const packet_types = @import("packet.zig");
+const ControlPacket = packet_types.ControlPacket;
+const PacketCode = packet_types.PacketCode;
+const ControlConstants = @import("constants.zig").Control;
+const crypto = @import("crypto.zig");
+const CryptoKeysBridge = crypto.CryptoKeysBridge;
 const errors = @import("errors.zig");
-const configuration_helpers = @import("configuration_helpers.zig");
-const PRNG = @import("prng.zig").PRNG;
-const static_key = @import("static_key_helpers.zig");
-const time = @import("time_helpers.zig");
+const configuration_helpers = @import("configuration.zig");
+const PRNG = crypto.PRNG;
+const static_key = helpers;
+const time = helpers;
 
 const api = core.api;
 
@@ -159,27 +162,6 @@ pub const PlainSerializer = struct {
     }
 };
 
-test "plain serializer round trips control and ACK packets" {
-    var interface = Serializer{ .plain = .{} };
-    defer interface.deinit(std.testing.allocator);
-    const sid = [_]u8{ 1, 2, 3, 4, 5, 6, 7, 8 };
-    const payload = [_]u8{ 9, 10, 11 };
-    var original = try ControlPacket.init(.controlV1, 3, &sid, 42, &payload, null, null);
-    defer original.deinit();
-    const raw = try interface.serialize(std.testing.allocator, &original);
-    defer std.testing.allocator.free(raw);
-    var decoded = try interface.deserialize(std.testing.allocator, raw, 0, null);
-    defer decoded.deinit();
-    try std.testing.expectEqual(PacketCode.controlV1, decoded.code);
-    try std.testing.expectEqual(@as(u32, 42), decoded.packetId());
-    try std.testing.expectEqualSlices(u8, &payload, decoded.payload().?);
-}
-
-test "plain serializer rejects truncated frames" {
-    var serializer: PlainSerializer = .{};
-    try std.testing.expectError(error.MissingSessionId, serializer.deserialize(std.testing.allocator, &.{0x20}, 0, null));
-}
-
 pub const AuthSerializer = struct {
     fnt: c_crypto.pp_crypto_enc_fnt,
     cbc: c_crypto.pp_crypto_ctx,
@@ -277,27 +259,6 @@ pub const AuthSerializer = struct {
     }
 };
 
-test "tls-auth round trips the whole datagram and ignores bounds" {
-    var key_bytes: [256]u8 = undefined;
-    for (&key_bytes, 0..) |*byte, index| byte.* = @truncate(index);
-    var secure_key = try api.SecureData.initBytesAlloc(std.testing.allocator, &key_bytes);
-    defer secure_key.deinit(std.testing.allocator);
-    const key = api.OpenVPNStaticKey{ .data = secure_key, .dir = null };
-    const functions = c_crypto.pp_crypto_fnt_mock();
-    var serializer = try AuthSerializer.init(std.testing.allocator, functions.enc, .sha256, key);
-    defer serializer.deinit();
-
-    const session_id = [_]u8{ 1, 2, 3, 4, 5, 6, 7, 8 };
-    var packet = try ControlPacket.init(.controlV1, 3, &session_id, 42, "payload", null, null);
-    defer packet.deinit();
-    const raw = try serializer.serializeAt(std.testing.allocator, &packet, 1234);
-    defer std.testing.allocator.free(raw);
-    var decoded = try serializer.deserialize(std.testing.allocator, raw, raw.len, 0);
-    defer decoded.deinit();
-    try std.testing.expectEqual(@as(u32, 42), decoded.packetId());
-    try std.testing.expectEqualStrings("payload", decoded.payload().?);
-}
-
 pub const CryptSerializer = struct {
     fnt: c_crypto.pp_crypto_enc_fnt,
     ctr: c_crypto.pp_crypto_ctx,
@@ -326,8 +287,8 @@ pub const CryptSerializer = struct {
         const ctr = fnt.ctr_create.?(
             cipher_name.ptr(),
             digest_name.ptr(),
-            Constants.ControlChannel.ctr_tag_length,
-            Constants.ControlChannel.ctr_payload_length,
+            ControlConstants.ctr_tag_length,
+            ControlConstants.ctr_payload_length,
             bridge.native(),
         ) orelse return error.UnsupportedAlgorithm;
         const header_length = c.OpenVPNPacketOpcodeLength + c.OpenVPNPacketSessionIdLength;
@@ -422,31 +383,6 @@ pub const CryptSerializer = struct {
     }
 };
 
-test "tls-crypt round trips the whole datagram and ignores bounds" {
-    var key_bytes: [256]u8 = undefined;
-    for (&key_bytes, 0..) |*byte, index| byte.* = @truncate(index);
-    var secure_key = try api.SecureData.initBytesAlloc(std.testing.allocator, &key_bytes);
-    defer secure_key.deinit(std.testing.allocator);
-    const key = api.OpenVPNStaticKey{ .data = secure_key, .dir = .client };
-    const functions = c_crypto.pp_crypto_fnt_mock();
-    var serializer = try CryptSerializer.init(std.testing.allocator, functions.enc, key);
-    defer serializer.deinit();
-
-    const session_id = [_]u8{ 1, 2, 3, 4, 5, 6, 7, 8 };
-    const payload = [_]u8{0xa5} ** 40;
-    var packet = try ControlPacket.init(.controlV1, 3, &session_id, 42, &payload, null, null);
-    defer packet.deinit();
-    const raw = try serializer.serializeAt(std.testing.allocator, &packet, 1234);
-    defer std.testing.allocator.free(raw);
-
-    // The Swift serializer deliberately ignores both values and authenticates
-    // the complete datagram.
-    var decoded = try serializer.deserialize(std.testing.allocator, raw, raw.len, 0);
-    defer decoded.deinit();
-    try std.testing.expectEqual(@as(u32, 42), decoded.packetId());
-    try std.testing.expectEqualSlices(u8, &payload, decoded.payload().?);
-}
-
 pub const CryptV2Serializer = struct {
     wrapped_key: []u8,
     serializer: CryptSerializer,
@@ -507,6 +443,79 @@ pub const CryptV2Serializer = struct {
         return self.serializer.deserialize(allocator, data, start, end);
     }
 };
+
+fn fillOnes(context: ?*anyopaque, destination: []u8) bool {
+    const value: *u8 = @ptrCast(@alignCast(context.?));
+    @memset(destination, value.*);
+    return true;
+}
+
+test "plain serializer round trips control and ACK packets" {
+    var interface = Serializer{ .plain = .{} };
+    defer interface.deinit(std.testing.allocator);
+    const sid = [_]u8{ 1, 2, 3, 4, 5, 6, 7, 8 };
+    const payload = [_]u8{ 9, 10, 11 };
+    var original = try ControlPacket.init(.controlV1, 3, &sid, 42, &payload, null, null);
+    defer original.deinit();
+    const raw = try interface.serialize(std.testing.allocator, &original);
+    defer std.testing.allocator.free(raw);
+    var decoded = try interface.deserialize(std.testing.allocator, raw, 0, null);
+    defer decoded.deinit();
+    try std.testing.expectEqual(PacketCode.controlV1, decoded.code);
+    try std.testing.expectEqual(@as(u32, 42), decoded.packetId());
+    try std.testing.expectEqualSlices(u8, &payload, decoded.payload().?);
+}
+
+test "plain serializer rejects truncated frames" {
+    var serializer: PlainSerializer = .{};
+    try std.testing.expectError(error.MissingSessionId, serializer.deserialize(std.testing.allocator, &.{0x20}, 0, null));
+}
+
+test "tls-auth round trips the whole datagram and ignores bounds" {
+    var key_bytes: [256]u8 = undefined;
+    for (&key_bytes, 0..) |*byte, index| byte.* = @truncate(index);
+    var secure_key = try api.SecureData.initBytesAlloc(std.testing.allocator, &key_bytes);
+    defer secure_key.deinit(std.testing.allocator);
+    const key = api.OpenVPNStaticKey{ .data = secure_key, .dir = null };
+    const functions = c_crypto.pp_crypto_fnt_mock();
+    var serializer = try AuthSerializer.init(std.testing.allocator, functions.enc, .sha256, key);
+    defer serializer.deinit();
+
+    const session_id = [_]u8{ 1, 2, 3, 4, 5, 6, 7, 8 };
+    var packet = try ControlPacket.init(.controlV1, 3, &session_id, 42, "payload", null, null);
+    defer packet.deinit();
+    const raw = try serializer.serializeAt(std.testing.allocator, &packet, 1234);
+    defer std.testing.allocator.free(raw);
+    var decoded = try serializer.deserialize(std.testing.allocator, raw, raw.len, 0);
+    defer decoded.deinit();
+    try std.testing.expectEqual(@as(u32, 42), decoded.packetId());
+    try std.testing.expectEqualStrings("payload", decoded.payload().?);
+}
+
+test "tls-crypt round trips the whole datagram and ignores bounds" {
+    var key_bytes: [256]u8 = undefined;
+    for (&key_bytes, 0..) |*byte, index| byte.* = @truncate(index);
+    var secure_key = try api.SecureData.initBytesAlloc(std.testing.allocator, &key_bytes);
+    defer secure_key.deinit(std.testing.allocator);
+    const key = api.OpenVPNStaticKey{ .data = secure_key, .dir = .client };
+    const functions = c_crypto.pp_crypto_fnt_mock();
+    var serializer = try CryptSerializer.init(std.testing.allocator, functions.enc, key);
+    defer serializer.deinit();
+
+    const session_id = [_]u8{ 1, 2, 3, 4, 5, 6, 7, 8 };
+    const payload = [_]u8{0xa5} ** 40;
+    var packet = try ControlPacket.init(.controlV1, 3, &session_id, 42, &payload, null, null);
+    defer packet.deinit();
+    const raw = try serializer.serializeAt(std.testing.allocator, &packet, 1234);
+    defer std.testing.allocator.free(raw);
+
+    // The Swift serializer deliberately ignores both values and authenticates
+    // the complete datagram.
+    var decoded = try serializer.deserialize(std.testing.allocator, raw, raw.len, 0);
+    defer decoded.deinit();
+    try std.testing.expectEqual(@as(u32, 42), decoded.packetId());
+    try std.testing.expectEqualSlices(u8, &payload, decoded.payload().?);
+}
 
 test "tls-crypt-v2 appends the wrapped key only to WKC opcodes" {
     var key_bytes: [256]u8 = undefined;
@@ -616,10 +625,4 @@ test "control channel suppresses retransmission until ACK" {
     try std.testing.expectEqual(@as(usize, 0), channel.outbound_queue.items.len);
     // Swift retains send dates until reset, even after the corresponding ACK.
     try std.testing.expectEqual(@as(usize, 1), channel.sent_dates_ms.count());
-}
-
-fn fillOnes(context: ?*anyopaque, destination: []u8) bool {
-    const value: *u8 = @ptrCast(@alignCast(context.?));
-    @memset(destination, value.*);
-    return true;
 }

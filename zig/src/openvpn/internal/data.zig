@@ -5,33 +5,21 @@
 const std = @import("std");
 const core = @import("../../core/exports.zig");
 const net = @import("../../net/exports.zig");
-const c_common = @import("../../c/exports.zig").common;
-const c_crypto = @import("../../c/exports.zig").crypto;
+const c_exports = @import("../../c/exports.zig");
+const c_common = c_exports.common;
+const c_crypto = c_exports.crypto;
 const c = @import("c.zig").api;
 const PRF = @import("auth.zig").PRF;
-const CryptoKeys = @import("crypto_keys.zig").CryptoKeys;
-const CryptoKeysBridge = @import("crypto_keys_bridge.zig").CryptoKeysBridge;
+const crypto = @import("crypto.zig");
+const CryptoKeys = crypto.CryptoKeys;
+const CryptoKeysBridge = crypto.CryptoKeysBridge;
 const errors = @import("errors.zig");
 const LinkProcessor = @import("processing.zig").LinkProcessor;
-const PRNG = @import("prng.zig").PRNG;
-const ZeroingData = @import("zeroing_data.zig").ZeroingData;
+const PRNG = crypto.PRNG;
+const ZeroingData = crypto.ZeroingData;
 
 const api = core.api;
-
-pub const DataConstants = struct {
-    pub const prng_seed_length: usize = 64;
-    pub const aead_tag_length: usize = 16;
-    pub const aead_id_length: usize = c.OpenVPNPacketIdLength;
-    pub const ping_string = [_]u8{
-        0x2a, 0x18, 0x7b, 0xf3, 0x64, 0x1e, 0xb4, 0xcb,
-        0x07, 0xed, 0x2d, 0x0a, 0x98, 0x1f, 0xc7, 0x48,
-    };
-    pub const uses_replay_protection = true;
-};
-
-test "OpenVPN ping payload is 16 bytes" {
-    try std.testing.expectEqual(@as(usize, 16), DataConstants.ping_string.len);
-}
+const DataConstants = @import("constants.zig").Data;
 
 pub const DataPathParameters = struct {
     fnt: c_crypto.pp_crypto_enc_fnt,
@@ -359,57 +347,6 @@ pub const DataPath = struct {
         return errors.dataPathError(native);
     }
 };
-
-test "DataPath mock round-trips individual, compound, and bulk packets" {
-    const allocator = std.testing.allocator;
-    const peer_id: u32 = 0x01;
-    const key: u8 = 0x02;
-    const packet_id: u32 = 0x1020;
-    const payload = [_]u8{ 0x11, 0x22, 0x33, 0x44 };
-
-    const mode = c.openvpn_dp_mode_ad_create_mock(c.OpenVPNCompressionFramingDisabled);
-    const data_path = try DataPath.create(allocator, mode, peer_id);
-    defer data_path.destroy();
-
-    const assembled = try data_path.assemble(allocator, packet_id, &payload);
-    defer allocator.free(assembled);
-    const encrypted = try data_path.encrypt(allocator, key, packet_id, assembled);
-    defer allocator.free(encrypted);
-    var decrypted = try data_path.decrypt(allocator, encrypted);
-    defer decrypted.deinit(allocator);
-    try std.testing.expectEqual(packet_id, decrypted.packet_id);
-    try std.testing.expectEqualSlices(u8, assembled, decrypted.data);
-    var header: u8 = 0;
-    const parsed = try data_path.parse(allocator, decrypted.data, &header);
-    defer allocator.free(parsed);
-    try std.testing.expectEqualSlices(u8, &payload, parsed);
-
-    const compound = try data_path.assembleAndEncrypt(
-        allocator,
-        &payload,
-        key,
-        packet_id,
-    );
-    defer allocator.free(compound);
-    var compound_result = try data_path.decryptAndParse(allocator, compound);
-    defer compound_result.deinit(allocator);
-    try std.testing.expectEqual(packet_id, compound_result.packet_id);
-    try std.testing.expectEqualSlices(u8, &payload, compound_result.data);
-
-    const packets = [_][]const u8{&payload};
-    const encrypted_packets = try data_path.encryptPackets(allocator, &packets, key);
-    defer freePackets(allocator, encrypted_packets);
-    var decrypted_packets = try data_path.decryptPackets(allocator, encrypted_packets);
-    defer decrypted_packets.deinit(allocator);
-    try std.testing.expect(!decrypted_packets.keep_alive);
-    try std.testing.expectEqual(@as(usize, 1), decrypted_packets.packets.len);
-    try std.testing.expectEqualSlices(u8, &payload, decrypted_packets.packets[0]);
-}
-
-fn freePackets(allocator: std.mem.Allocator, packets: [][]u8) void {
-    for (packets) |packet| allocator.free(packet);
-    allocator.free(packets);
-}
 
 /// Owning facade over the concrete C-backed data path.
 pub const DataPathWrapper = struct {
@@ -742,16 +679,6 @@ pub const DataLink = struct {
     }
 };
 
-test "DataLink declarations are semantically analyzed" {
-    std.testing.refAllDecls(DataLink);
-}
-
-test "DataLink preserves only reportable inbound failure categories" {
-    try std.testing.expectEqual(error.CryptoFailure, DataLink.mapInboundError(error.CryptoFailure));
-    try std.testing.expectEqual(error.CompressionMismatch, DataLink.mapInboundError(error.CompressionMismatch));
-    try std.testing.expectEqual(error.Recoverable, DataLink.mapInboundError(error.OutOfMemory));
-}
-
 /// A data-link view bound to the currently selected three-bit key.
 pub const DataLinkPair = struct {
     link: *DataLink,
@@ -774,3 +701,64 @@ pub const DataLinkPair = struct {
         try self.link.receive(packets, key);
     }
 };
+
+fn freePackets(allocator: std.mem.Allocator, packets: [][]u8) void {
+    for (packets) |packet| allocator.free(packet);
+    allocator.free(packets);
+}
+
+test "DataPath mock round-trips individual, compound, and bulk packets" {
+    const allocator = std.testing.allocator;
+    const peer_id: u32 = 0x01;
+    const key: u8 = 0x02;
+    const packet_id: u32 = 0x1020;
+    const payload = [_]u8{ 0x11, 0x22, 0x33, 0x44 };
+
+    const mode = c.openvpn_dp_mode_ad_create_mock(c.OpenVPNCompressionFramingDisabled);
+    const data_path = try DataPath.create(allocator, mode, peer_id);
+    defer data_path.destroy();
+
+    const assembled = try data_path.assemble(allocator, packet_id, &payload);
+    defer allocator.free(assembled);
+    const encrypted = try data_path.encrypt(allocator, key, packet_id, assembled);
+    defer allocator.free(encrypted);
+    var decrypted = try data_path.decrypt(allocator, encrypted);
+    defer decrypted.deinit(allocator);
+    try std.testing.expectEqual(packet_id, decrypted.packet_id);
+    try std.testing.expectEqualSlices(u8, assembled, decrypted.data);
+    var header: u8 = 0;
+    const parsed = try data_path.parse(allocator, decrypted.data, &header);
+    defer allocator.free(parsed);
+    try std.testing.expectEqualSlices(u8, &payload, parsed);
+
+    const compound = try data_path.assembleAndEncrypt(
+        allocator,
+        &payload,
+        key,
+        packet_id,
+    );
+    defer allocator.free(compound);
+    var compound_result = try data_path.decryptAndParse(allocator, compound);
+    defer compound_result.deinit(allocator);
+    try std.testing.expectEqual(packet_id, compound_result.packet_id);
+    try std.testing.expectEqualSlices(u8, &payload, compound_result.data);
+
+    const packets = [_][]const u8{&payload};
+    const encrypted_packets = try data_path.encryptPackets(allocator, &packets, key);
+    defer freePackets(allocator, encrypted_packets);
+    var decrypted_packets = try data_path.decryptPackets(allocator, encrypted_packets);
+    defer decrypted_packets.deinit(allocator);
+    try std.testing.expect(!decrypted_packets.keep_alive);
+    try std.testing.expectEqual(@as(usize, 1), decrypted_packets.packets.len);
+    try std.testing.expectEqualSlices(u8, &payload, decrypted_packets.packets[0]);
+}
+
+test "DataLink declarations are semantically analyzed" {
+    std.testing.refAllDecls(DataLink);
+}
+
+test "DataLink preserves only reportable inbound failure categories" {
+    try std.testing.expectEqual(error.CryptoFailure, DataLink.mapInboundError(error.CryptoFailure));
+    try std.testing.expectEqual(error.CompressionMismatch, DataLink.mapInboundError(error.CompressionMismatch));
+    try std.testing.expectEqual(error.Recoverable, DataLink.mapInboundError(error.OutOfMemory));
+}
