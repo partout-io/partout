@@ -54,27 +54,6 @@ test "command queue detaches ready commands in FIFO order" {
     try std.testing.expect(queue.takeReady() == null);
 }
 
-test "command queue orders deadlines and preserves equal-deadline FIFO" {
-    var queue = CommandQueue{};
-    var later = CommandNode{ .command = .stop, .deadline_ns = 20 };
-    var first_equal = CommandNode{ .command = .stop, .deadline_ns = 10 };
-    var second_equal = CommandNode{ .command = .stop, .deadline_ns = 10 };
-    var earlier = CommandNode{ .command = .stop, .deadline_ns = 5 };
-
-    try std.testing.expect(queue.insertScheduled(&later));
-    try std.testing.expect(queue.insertScheduled(&first_equal));
-    try std.testing.expect(!queue.insertScheduled(&second_equal));
-    try std.testing.expect(queue.insertScheduled(&earlier));
-
-    try std.testing.expect(queue.popDue(4) == null);
-    try std.testing.expect(queue.popDue(5).? == &earlier);
-    try std.testing.expect(queue.popDue(10).? == &first_equal);
-    try std.testing.expect(queue.popDue(10).? == &second_equal);
-    try std.testing.expect(queue.popDue(19) == null);
-    try std.testing.expect(queue.popDue(20).? == &later);
-    try std.testing.expect(queue.popDue(20) == null);
-}
-
 test "write queue preserves FIFO order and partial progress" {
     var queue = WriteQueue.init(std.testing.allocator);
     defer queue.deinit();

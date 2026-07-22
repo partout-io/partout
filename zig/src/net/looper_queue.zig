@@ -4,6 +4,7 @@
 
 const std = @import("std");
 
+const concurrency = @import("../core/concurrency.zig");
 const io = @import("io.zig");
 
 pub const ReadAction = enum {
@@ -156,9 +157,9 @@ pub const Command = union(enum) {
 };
 
 pub const CommandNode = struct {
-    // Command payload and scheduling metadata.
+    // Command payload and optional one-shot timer.
     command: Command,
-    deadline_ns: u64 = 0,
+    timer: concurrency.RunAfter.Scheduled = .{},
 
     // Intrusive command queue linkage.
     next: ?*CommandNode = null,
@@ -168,9 +169,6 @@ pub const CommandQueue = struct {
     // Ready FIFO.
     ready_head: ?*CommandNode = null,
     ready_tail: ?*CommandNode = null,
-
-    // Deadline-ordered scheduled list.
-    scheduled_head: ?*CommandNode = null,
 
     pub fn append(self: *CommandQueue, node: *CommandNode) void {
         node.next = null;
@@ -187,59 +185,6 @@ pub const CommandQueue = struct {
         self.ready_head = null;
         self.ready_tail = null;
         return pending;
-    }
-
-    /// Inserts by absolute deadline, preserving FIFO order for equal deadlines.
-    /// Returns whether `node` became the earliest scheduled command.
-    pub fn insertScheduled(self: *CommandQueue, node: *CommandNode) bool {
-        node.next = null;
-        const head = self.scheduled_head orelse {
-            self.scheduled_head = node;
-            return true;
-        };
-        if (node.deadline_ns < head.deadline_ns) {
-            node.next = head;
-            self.scheduled_head = node;
-            return true;
-        }
-
-        var previous = head;
-        while (previous.next) |next| {
-            if (node.deadline_ns < next.deadline_ns) break;
-            previous = next;
-        }
-        node.next = previous.next;
-        previous.next = node;
-        return false;
-    }
-
-    pub fn popDue(self: *CommandQueue, now_ns: u64) ?*CommandNode {
-        const node = self.scheduled_head orelse return null;
-        if (node.deadline_ns > now_ns) return null;
-        self.scheduled_head = node.next;
-        node.next = null;
-        return node;
-    }
-
-    pub fn takeScheduled(self: *CommandQueue) ?*CommandNode {
-        const scheduled = self.scheduled_head;
-        self.scheduled_head = null;
-        return scheduled;
-    }
-
-    pub fn waitTimeoutMs(self: *const CommandQueue, now_ns: u64) c_int {
-        if (self.ready_head != null) return 0;
-        const deadline_ns = if (self.scheduled_head) |node|
-            node.deadline_ns
-        else
-            return -1;
-        if (deadline_ns <= now_ns) return 0;
-
-        const remaining_ns = deadline_ns - now_ns;
-        var timeout_ms = remaining_ns / std.time.ns_per_ms;
-        if (remaining_ns % std.time.ns_per_ms != 0) timeout_ms += 1;
-        const max_timeout_ms: u64 = @intCast(std.math.maxInt(c_int));
-        return @intCast(@min(timeout_ms, max_timeout_ms));
     }
 };
 

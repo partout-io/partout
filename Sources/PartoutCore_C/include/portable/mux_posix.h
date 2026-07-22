@@ -5,10 +5,8 @@
  */
 
 #include <fcntl.h>
-#include <limits.h>
 #include <poll.h>
 #include <stdint.h>
-#include <time.h>
 #include <unistd.h>
 #include <errno.h>
 #include "portable/mux.h"
@@ -88,40 +86,6 @@ static int pp_mux_build_pollfds(pp_mux mux) {
         ++count;
     }
     return count;
-}
-
-static int pp_mux_poll(struct pollfd *pollfds, nfds_t count, int timeout_ms) {
-    int num;
-    if (timeout_ms < 0) {
-        PP_IO_RETRY(num, poll(pollfds, count, -1));
-        return num;
-    }
-
-    /* Retrying the original finite timeout after EINTR would extend deadlines. */
-    struct timespec timestamp;
-    if (clock_gettime(CLOCK_MONOTONIC, &timestamp) != 0) return -1;
-    const uint64_t now_ns = (uint64_t)timestamp.tv_sec * 1000000000ULL +
-        (uint64_t)timestamp.tv_nsec;
-    const uint64_t duration_ns = (uint64_t)timeout_ms * 1000000ULL;
-    const uint64_t deadline_ns = UINT64_MAX - now_ns < duration_ns
-        ? UINT64_MAX
-        : now_ns + duration_ns;
-
-    int remaining_ms = timeout_ms;
-    while (true) {
-        num = poll(pollfds, count, remaining_ms);
-        if (num >= 0 || errno != EINTR) return num;
-
-        if (clock_gettime(CLOCK_MONOTONIC, &timestamp) != 0) return -1;
-        const uint64_t updated_ns = (uint64_t)timestamp.tv_sec * 1000000000ULL +
-            (uint64_t)timestamp.tv_nsec;
-        if (updated_ns >= deadline_ns) return 0;
-
-        const uint64_t remaining_ns = deadline_ns - updated_ns;
-        uint64_t rounded_ms = remaining_ns / 1000000ULL;
-        if (remaining_ns % 1000000ULL != 0) ++rounded_ms;
-        remaining_ms = rounded_ms > INT_MAX ? INT_MAX : (int)rounded_ms;
-    }
 }
 
 static bool pp_mux_set_cloexec(pp_fd fd) {
@@ -225,13 +189,14 @@ void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), v
     mux->write_ctx = ctx;
 }
 
-int pp_mux_wait_timeout(pp_mux mux, int *error_code, int timeout_ms) {
+int pp_mux_wait(pp_mux mux, int *error_code) {
     if (!mux) return PPMuxErrorNull;
 
     const int pollfds_count = pp_mux_build_pollfds(mux);
-    const int num = pp_mux_poll(mux->pollfds, (nfds_t)pollfds_count, timeout_ms);
+    int num;
+    PP_IO_RETRY(num, poll(mux->pollfds, (nfds_t)pollfds_count, -1));
     if (num < 0) {
-        pp_clog_v(PPLogLevelFault, "pp_mux_wait_timeout poll() failed: errno=%d", errno);
+        pp_clog_v(PPLogLevelFault, "pp_mux_wait poll() failed: errno=%d", errno);
         if (error_code) *error_code = errno;
         return num;
     }
@@ -262,10 +227,6 @@ int pp_mux_wait_timeout(pp_mux mux, int *error_code, int timeout_ms) {
         }
     }
     return num;
-}
-
-int pp_mux_wait(pp_mux mux, int *error_code) {
-    return pp_mux_wait_timeout(mux, error_code, -1);
 }
 
 bool pp_mux_wake(pp_mux mux) {

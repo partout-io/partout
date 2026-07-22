@@ -55,6 +55,22 @@ pub const Drainer = struct {
 pub const RunAfter = struct {
     pub const Callback = *const fn (?*anyopaque) void;
 
+    /// Caller-owned handle for an independent one-shot callback. It must remain
+    /// alive until its callback reports either `.elapsed` or `.cancelled`.
+    pub const Scheduled = struct {
+        pub const Outcome = enum {
+            elapsed,
+            cancelled,
+        };
+
+        pub const Callback = *const fn (*Scheduled, Outcome) void;
+
+        context: ?*anyopaque = null,
+        callback: ?Scheduled.Callback = null,
+        remaining_ms: u64 = 0,
+        next: ?*Scheduled = null,
+    };
+
     const State = enum {
         idle,
         scheduled,
@@ -71,6 +87,18 @@ pub const RunAfter = struct {
     callback_ctx: ?*anyopaque = null,
     state: State = .idle,
     generation: u64 = 0,
+    scheduled_head: ?*Scheduled = null,
+    scheduled_tail: ?*Scheduled = null,
+    scheduling: bool = false,
+
+    /// Starts the reusable worker without scheduling a callback.
+    pub fn start(self: *RunAfter) std.Thread.SpawnError!void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+
+        std.debug.assert(self.state != .stopping);
+        try self.startLocked();
+    }
 
     pub fn init(
         self: *RunAfter,
@@ -82,40 +110,60 @@ pub const RunAfter = struct {
         defer self.mutex.unlock();
 
         std.debug.assert(self.state != .stopping);
-        if (self.thread == null) {
-            self.thread = try std.Thread.spawn(.{}, RunAfter.run, .{self});
-        }
+        std.debug.assert(!self.scheduling);
+        try self.startLocked();
 
-        self.generation +%= 1;
-        self.delay_ms = delay_ms;
-        self.callback = callback;
-        self.callback_ctx = callback_ctx;
-        self.state = switch (self.state) {
-            .idle, .scheduled => .scheduled,
-            .running, .running_scheduled => .running_scheduled,
-            .stopping => unreachable,
+        self.initLocked(delay_ms, callback, callback_ctx);
+    }
+
+    /// Adds an independent one-shot callback without replacing callbacks that
+    /// were previously added with `schedule`.
+    pub fn schedule(
+        self: *RunAfter,
+        scheduled: *Scheduled,
+        delay_ms: u64,
+        callback: Scheduled.Callback,
+        context: ?*anyopaque,
+    ) std.Thread.SpawnError!void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+
+        std.debug.assert(self.state != .stopping);
+        std.debug.assert(self.scheduling or self.state != .scheduled);
+        try self.startLocked();
+
+        scheduled.* = .{
+            .context = context,
+            .callback = callback,
+            // A full extra tick prevents a newly appended job from expiring
+            // early when it lands immediately before the current tick.
+            .remaining_ms = delay_ms +| scheduler_resolution_ms,
         };
-        self.cond.broadcast();
+        if (self.scheduled_tail) |tail| {
+            tail.next = scheduled;
+        } else {
+            self.scheduled_head = scheduled;
+        }
+        self.scheduled_tail = scheduled;
+
+        if (!self.scheduling) {
+            self.scheduling = true;
+            self.initLocked(scheduler_resolution_ms, runScheduled, self);
+        }
     }
 
     pub fn cancel(self: *RunAfter) void {
         self.mutex.lock();
-        defer self.mutex.unlock();
+        const cancelled = self.cancelLocked();
+        self.mutex.unlock();
 
-        self.generation +%= 1;
-        self.callback = null;
-        self.callback_ctx = null;
-        self.state = switch (self.state) {
-            .idle => .idle,
-            .scheduled => .idle,
-            .running, .running_scheduled => .running,
-            .stopping => .stopping,
-        };
-        self.cond.broadcast();
+        notifyScheduled(cancelled, .cancelled);
     }
 
     pub fn deinit(self: *RunAfter) void {
         self.mutex.lock();
+        const cancelled = self.takeScheduledLocked();
+        self.scheduling = false;
         self.generation +%= 1;
         self.callback = null;
         self.callback_ctx = null;
@@ -125,6 +173,7 @@ pub const RunAfter = struct {
         self.cond.broadcast();
         self.mutex.unlock();
 
+        notifyScheduled(cancelled, .cancelled);
         if (thread) |item| item.join();
         self.cond.deinit();
         self.mutex.deinit();
@@ -192,6 +241,110 @@ pub const RunAfter = struct {
         }
     }
 
+    fn runScheduled(context: ?*anyopaque) void {
+        const self: *RunAfter = @ptrCast(@alignCast(context.?));
+
+        self.mutex.lock();
+        if (!self.scheduling) {
+            self.mutex.unlock();
+            return;
+        }
+
+        var due_head: ?*Scheduled = null;
+        var due_tail: ?*Scheduled = null;
+        var previous: ?*Scheduled = null;
+        var current = self.scheduled_head;
+        while (current) |scheduled| {
+            const next = scheduled.next;
+            scheduled.remaining_ms -|= scheduler_resolution_ms;
+            if (scheduled.remaining_ms == 0) {
+                if (previous) |before| {
+                    before.next = next;
+                } else {
+                    self.scheduled_head = next;
+                }
+                if (self.scheduled_tail == scheduled) self.scheduled_tail = previous;
+
+                scheduled.next = null;
+                if (due_tail) |tail| {
+                    tail.next = scheduled;
+                } else {
+                    due_head = scheduled;
+                }
+                due_tail = scheduled;
+            } else {
+                previous = scheduled;
+            }
+            current = next;
+        }
+
+        if (self.scheduled_head != null) {
+            self.initLocked(scheduler_resolution_ms, runScheduled, self);
+        } else {
+            self.scheduling = false;
+        }
+        self.mutex.unlock();
+
+        notifyScheduled(due_head, .elapsed);
+    }
+
+    fn initLocked(
+        self: *RunAfter,
+        delay_ms: u64,
+        callback: Callback,
+        callback_ctx: ?*anyopaque,
+    ) void {
+        self.generation +%= 1;
+        self.delay_ms = delay_ms;
+        self.callback = callback;
+        self.callback_ctx = callback_ctx;
+        self.state = switch (self.state) {
+            .idle, .scheduled => .scheduled,
+            .running, .running_scheduled => .running_scheduled,
+            .stopping => unreachable,
+        };
+        self.cond.broadcast();
+    }
+
+    fn startLocked(self: *RunAfter) std.Thread.SpawnError!void {
+        if (self.thread == null) {
+            self.thread = try std.Thread.spawn(.{}, RunAfter.run, .{self});
+        }
+    }
+
+    fn cancelLocked(self: *RunAfter) ?*Scheduled {
+        const cancelled = self.takeScheduledLocked();
+        self.scheduling = false;
+        self.generation +%= 1;
+        self.callback = null;
+        self.callback_ctx = null;
+        self.state = switch (self.state) {
+            .idle => .idle,
+            .scheduled => .idle,
+            .running, .running_scheduled => .running,
+            .stopping => .stopping,
+        };
+        self.cond.broadcast();
+        return cancelled;
+    }
+
+    fn takeScheduledLocked(self: *RunAfter) ?*Scheduled {
+        const scheduled = self.scheduled_head;
+        self.scheduled_head = null;
+        self.scheduled_tail = null;
+        return scheduled;
+    }
+
+    fn notifyScheduled(head: ?*Scheduled, outcome: Scheduled.Outcome) void {
+        var current = head;
+        while (current) |scheduled| {
+            const next = scheduled.next;
+            scheduled.next = null;
+            if (scheduled.callback) |callback| callback(scheduled, outcome);
+            current = next;
+        }
+    }
+
     fn sleepUntilChangedOrElapsed(self: *RunAfter, generation: u64, delay_ms: u64) bool {
         const sleep_step_ms = 10;
         var remaining_ms = delay_ms;
@@ -211,6 +364,8 @@ pub const RunAfter = struct {
 
         return self.state != .scheduled or self.generation != generation;
     }
+
+    const scheduler_resolution_ms = 10;
 };
 
 const PosixMutex = struct {
@@ -319,26 +474,4 @@ pub fn sleepMs(value: u64) void {
     while (std.c.nanosleep(&request, &remaining) != 0) {
         request = remaining;
     }
-}
-
-/// Returns time from a process-independent monotonic clock. The epoch is
-/// intentionally unspecified; only differences between readings are useful.
-pub fn monotonicNs() u64 {
-    if (builtin.os.tag == .windows) {
-        const windows = std.os.windows;
-        var frequency: windows.LARGE_INTEGER = undefined;
-        var counter: windows.LARGE_INTEGER = undefined;
-        std.debug.assert(windows.ntdll.RtlQueryPerformanceFrequency(&frequency).toBool());
-        std.debug.assert(windows.ntdll.RtlQueryPerformanceCounter(&counter).toBool());
-        const frequency_u64: u64 = @bitCast(frequency);
-        const counter_u64: u64 = @bitCast(counter);
-        return @intCast(
-            (@as(u128, counter_u64) * std.time.ns_per_s) / frequency_u64,
-        );
-    }
-
-    var timestamp: std.c.timespec = undefined;
-    std.debug.assert(std.c.clock_gettime(.MONOTONIC, &timestamp) == 0);
-    return @as(u64, @intCast(timestamp.sec)) * std.time.ns_per_s +
-        @as(u64, @intCast(timestamp.nsec));
 }

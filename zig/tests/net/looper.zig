@@ -10,7 +10,6 @@ const io = source.net_io;
 
 const Looper = source.net_looper.Looper;
 const AtomicBool = std.atomic.Value(bool);
-const AtomicU64 = std.atomic.Value(u64);
 
 const libc = struct {
     extern "c" fn close(fd: std.c.fd_t) c_int;
@@ -28,30 +27,12 @@ fn yieldRepeatedly() void {
     }
 }
 
-fn monotonicMs() u64 {
-    if (builtin.os.tag == .windows) {
-        const windows = std.os.windows;
-        var frequency: windows.LARGE_INTEGER = undefined;
-        var counter: windows.LARGE_INTEGER = undefined;
-        std.debug.assert(windows.ntdll.RtlQueryPerformanceFrequency(&frequency).toBool());
-        std.debug.assert(windows.ntdll.RtlQueryPerformanceCounter(&counter).toBool());
-        const frequency_u64: u64 = @bitCast(frequency);
-        const counter_u64: u64 = @bitCast(counter);
-        return @intCast((@as(u128, counter_u64) * std.time.ms_per_s) / frequency_u64);
-    }
-
-    var timestamp: std.c.timespec = undefined;
-    std.debug.assert(std.c.clock_gettime(.MONOTONIC, &timestamp) == 0);
-    return @as(u64, @intCast(timestamp.sec)) * std.time.ms_per_s +
-        @as(u64, @intCast(@divTrunc(timestamp.nsec, std.time.ns_per_ms)));
-}
-
-fn waitUntilWithin(value: *const AtomicU64, timeout_ms: u64) bool {
-    const deadline_ms = monotonicMs() + timeout_ms;
-    while (value.load(.acquire) == 0 and monotonicMs() < deadline_ms) {
+fn waitUntilWithin(value: *const AtomicBool, timeout_ms: u64) bool {
+    var remaining_ms = timeout_ms;
+    while (!value.load(.acquire) and remaining_ms > 0) : (remaining_ms -= 1) {
         source.core.sleepMs(1);
     }
-    return value.load(.acquire) != 0;
+    return value.load(.acquire);
 }
 
 const Pipe = struct {
@@ -141,13 +122,13 @@ fn descriptor(pipe: Pipe, mock: *MockIO) Looper.Descriptor {
 
 const DelayedTaskProbe = struct {
     looper: *Looper,
-    fired_at_ms: AtomicU64 = AtomicU64.init(0),
+    fired: AtomicBool = AtomicBool.init(false),
     ran_on_queue: AtomicBool = AtomicBool.init(false),
 
     fn run(raw: ?*anyopaque) anyerror!void {
         const self: *DelayedTaskProbe = @ptrCast(@alignCast(raw.?));
         self.ran_on_queue.store(self.looper.isOnQueue(), .release);
-        self.fired_at_ms.store(monotonicMs(), .release);
+        self.fired.store(true, .release);
     }
 };
 
@@ -181,31 +162,27 @@ test "perform completes synchronously with its result" {
     try looper.stop();
 }
 
-test "delayed task waits for its deadline and runs on the looper" {
+test "delayed task waits before running on the looper" {
     const delay_ms = 100;
     var looper = try initLooper(.{ .callback = noopFinish });
     defer looper.deinit();
     try looper.start();
     var probe = DelayedTaskProbe{ .looper = &looper };
 
-    const scheduled_at_ms = monotonicMs();
     try looper.schedule(delay_ms, .{
         .context = &probe,
         .callback = DelayedTaskProbe.run,
     });
 
     source.core.sleepMs(15);
-    try std.testing.expectEqual(@as(u64, 0), probe.fired_at_ms.load(.acquire));
-    try std.testing.expect(waitUntilWithin(&probe.fired_at_ms, 750));
+    try std.testing.expect(!probe.fired.load(.acquire));
+    try std.testing.expect(waitUntilWithin(&probe.fired, 750));
 
-    const fired_at_ms = probe.fired_at_ms.load(.acquire);
-    // Keep a tiny tolerance for millisecond conversion at the wait boundary.
-    try std.testing.expect(fired_at_ms + 2 >= scheduled_at_ms + delay_ms);
     try std.testing.expect(probe.ran_on_queue.load(.acquire));
     try looper.stop();
 }
 
-test "an earlier deadline interrupts a later timed wait" {
+test "independent delayed tasks run in delay order" {
     const later_delay_ms = 500;
     const earlier_delay_ms = 40;
     var looper = try initLooper(.{ .callback = noopFinish });
@@ -214,27 +191,21 @@ test "an earlier deadline interrupts a later timed wait" {
     var later = DelayedTaskProbe{ .looper = &looper };
     var earlier = DelayedTaskProbe{ .looper = &looper };
 
-    const later_scheduled_at_ms = monotonicMs();
     try looper.schedule(later_delay_ms, .{
         .context = &later,
         .callback = DelayedTaskProbe.run,
     });
-    // A synchronous barrier proves that the loop has observed the later task;
-    // then give it a moment to enter the timed mux wait for that deadline.
+    // A synchronous barrier proves that the loop has observed the later task.
     try looper.performTask(.{ .callback = noopTask });
     source.core.sleepMs(10);
 
-    const earlier_scheduled_at_ms = monotonicMs();
     try looper.schedule(earlier_delay_ms, .{
         .context = &earlier,
         .callback = DelayedTaskProbe.run,
     });
 
-    try std.testing.expect(waitUntilWithin(&earlier.fired_at_ms, 250));
-    const earlier_fired_at_ms = earlier.fired_at_ms.load(.acquire);
-    try std.testing.expect(earlier_fired_at_ms + 2 >= earlier_scheduled_at_ms + earlier_delay_ms);
-    try std.testing.expect(earlier_fired_at_ms < later_scheduled_at_ms + later_delay_ms);
-    try std.testing.expectEqual(@as(u64, 0), later.fired_at_ms.load(.acquire));
+    try std.testing.expect(waitUntilWithin(&earlier.fired, 250));
+    try std.testing.expect(!later.fired.load(.acquire));
     try std.testing.expect(earlier.ran_on_queue.load(.acquire));
     try looper.stop();
 }

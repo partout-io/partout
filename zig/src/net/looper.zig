@@ -137,6 +137,9 @@ pub const Looper = struct {
     stop_completion: ?*Completion = null,
     waiter_count: usize = 0,
 
+    // Delayed command scheduler.
+    scheduler: core.RunAfter = .{},
+
     // Mux-owned resources.
     mux: c.pp_mux,
     fd_set: ?DescriptorSet = null,
@@ -187,7 +190,6 @@ pub const Looper = struct {
         self.state = .deinitializing;
 
         self.cancelPendingLocked(self.commands.takeReady());
-        self.destroyCommandList(self.commands.takeScheduled());
         self.read_retries = .{ false, false };
         self.write_retries = .{ false, false };
         if (self.stop_completion) |completion| {
@@ -201,6 +203,8 @@ pub const Looper = struct {
             self.condition.wait(&self.lock);
         }
         self.lock.unlock();
+
+        self.scheduler.deinit();
 
         // The loop owns every live SideIO. It must be fully joined before
         // descriptor callbacks or storage are released.
@@ -240,6 +244,16 @@ pub const Looper = struct {
         c.pp_mux_set_on_writable(self.mux, onMuxWritable, &self.fd_set.?);
         self.lock.unlock();
 
+        self.scheduler.start() catch |err| {
+            self.lock.lock();
+            self.fd_set.?.deinit();
+            self.fd_set = null;
+            self.state = .idle;
+            self.condition.broadcast();
+            self.lock.unlock();
+            return err;
+        };
+
         const worker = std.Thread.spawn(.{}, loopMain, .{self}) catch |err| {
             self.lock.lock();
             self.fd_set.?.deinit();
@@ -278,9 +292,6 @@ pub const Looper = struct {
             self.lock.unlock();
             return false;
         }
-        const now_ns = core.concurrency.monotonicNs();
-        self.promoteDueScheduledLocked(now_ns);
-        const timeout_ms = self.commands.waitTimeoutMs(now_ns);
         const fd_set = if (self.fd_set) |*value| value else {
             self.lock.unlock();
             return false;
@@ -289,8 +300,8 @@ pub const Looper = struct {
 
         fd_set.resetReadable();
         var code: c_int = 0;
-        if (c.pp_mux_wait_timeout(self.mux, &code, timeout_ms) < 0) {
-            log.writef(.err, "Looper: pp_mux_wait_timeout() failed (code={})", .{code});
+        if (c.pp_mux_wait(self.mux, &code) < 0) {
+            log.writef(.err, "Looper: pp_mux_wait() failed (code={})", .{code});
             self.finish(.{ .wait = code });
             return false;
         }
@@ -300,7 +311,6 @@ pub const Looper = struct {
         }
 
         self.lock.lock();
-        self.promoteDueScheduledLocked(core.concurrency.monotonicNs());
         const released = self.state == .deinitializing;
         self.lock.unlock();
         if (released) {
@@ -493,8 +503,7 @@ pub const Looper = struct {
         }
         if (delay_ms) |delay| {
             const node = try self.createCommandNode(.{ .perform = task });
-            node.deadline_ns = deadlineAfter(delay);
-            if (self.commands.insertScheduled(node)) self.wakeLocked();
+            self.scheduler.schedule(&node.timer, delay, onScheduledCommand, self) catch unreachable;
             return;
         }
         const node = try self.createCommandNode(.{ .perform = task });
@@ -1222,9 +1231,13 @@ pub const Looper = struct {
             .side = side_io.side,
             .id = side_io.id,
         } }) catch |err| return .{ .system = err };
-        node.deadline_ns = deadlineAfter(no_buf_retry_delay_ms);
         self.read_retries[index] = true;
-        _ = self.commands.insertScheduled(node);
+        self.scheduler.schedule(
+            &node.timer,
+            no_buf_retry_delay_ms,
+            onScheduledCommand,
+            self,
+        ) catch unreachable;
         return null;
     }
 
@@ -1237,9 +1250,13 @@ pub const Looper = struct {
             .side = side_io.side,
             .id = side_io.id,
         } }) catch |err| return .{ .system = err };
-        node.deadline_ns = deadlineAfter(no_buf_retry_delay_ms);
         self.write_retries[index] = true;
-        _ = self.commands.insertScheduled(node);
+        self.scheduler.schedule(
+            &node.timer,
+            no_buf_retry_delay_ms,
+            onScheduledCommand,
+            self,
+        ) catch unreachable;
         return null;
     }
 
@@ -1278,7 +1295,6 @@ pub const Looper = struct {
         self.state = .stopped;
         self.terminal_failure = failure;
         self.cancelPendingLocked(self.commands.takeReady());
-        self.destroyCommandList(self.commands.takeScheduled());
         self.read_retries = .{ false, false };
         self.write_retries = .{ false, false };
         if (self.stop_completion) |completion| {
@@ -1288,6 +1304,8 @@ pub const Looper = struct {
         self.releaseCompletionsLocked();
         self.condition.broadcast();
         self.lock.unlock();
+
+        self.scheduler.cancel();
 
         if (failure) |reason| {
             log.writef(.err, "Finish looper with error: {}", .{reason});
@@ -1443,22 +1461,22 @@ pub const Looper = struct {
         return node;
     }
 
-    /// Moves every expired timer onto the serial command queue. Caller holds
-    /// `lock`; callbacks still run later from `handleCommands`.
-    fn promoteDueScheduledLocked(self: *Looper, now_ns: u64) void {
-        while (self.commands.popDue(now_ns)) |node| {
-            self.clearRetryForCommand(node.command);
-            if (self.state == .started) {
-                self.commands.append(node);
-            } else {
-                self.allocator.destroy(node);
-            }
-        }
-    }
+    fn onScheduledCommand(
+        scheduled: *core.RunAfter.Scheduled,
+        outcome: core.RunAfter.Scheduled.Outcome,
+    ) void {
+        const node: *CommandNode = @fieldParentPtr("timer", scheduled);
+        const self: *Looper = @ptrCast(@alignCast(scheduled.context.?));
+        self.lock.lock();
+        defer self.lock.unlock();
 
-    fn deadlineAfter(delay_ms: u64) u64 {
-        const delay_ns = delay_ms *| @as(u64, std.time.ns_per_ms);
-        return core.concurrency.monotonicNs() +| delay_ns;
+        self.clearRetryForCommand(node.command);
+        if (outcome == .elapsed and self.state == .started) {
+            self.commands.append(node);
+            self.wakeLocked();
+        } else {
+            self.allocator.destroy(node);
+        }
     }
 
     fn clearRetryForCommand(self: *Looper, command: Command) void {
@@ -1486,15 +1504,6 @@ pub const Looper = struct {
             }
             self.allocator.destroy(node);
             pending = next;
-        }
-    }
-
-    fn destroyCommandList(self: *Looper, head: ?*CommandNode) void {
-        var current = head;
-        while (current) |node| {
-            const next = node.next;
-            self.allocator.destroy(node);
-            current = next;
         }
     }
 

@@ -149,18 +149,14 @@ void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), v
     mux->write_ctx = ctx;
 }
 
-int pp_mux_wait_timeout(pp_mux mux, int *error_code, int timeout_ms) {
+int pp_mux_wait(pp_mux mux, int *error_code) {
     if (!mux) return PPMuxErrorNull;
 
     const int handles_count = pp_mux_build_handles(mux);
-    const DWORD timeout = timeout_ms < 0 ? INFINITE : (DWORD)timeout_ms;
-    const DWORD ret = WaitForMultipleObjects((DWORD)handles_count, mux->handles, FALSE, timeout);
-    if (ret == WAIT_TIMEOUT) {
-        return 0;
-    }
+    const DWORD ret = WaitForMultipleObjects((DWORD)handles_count, mux->handles, FALSE, INFINITE);
     if (ret == WAIT_FAILED) {
         const DWORD error = GetLastError();
-        pp_clog_v(PPLogLevelFault, "pp_mux_wait_timeout WaitForMultipleObjects() failed: error=%lu", error);
+        pp_clog_v(PPLogLevelFault, "pp_mux_wait WaitForMultipleObjects() failed: error=%lu", error);
         if (error_code) *error_code = (int)error;
         return -1;
     }
@@ -168,7 +164,7 @@ int pp_mux_wait_timeout(pp_mux mux, int *error_code, int timeout_ms) {
     const DWORD first = WAIT_OBJECT_0;
     const DWORD last = WAIT_OBJECT_0 + (DWORD)handles_count;
     if (ret < first || ret >= last) {
-        pp_clog_v(PPLogLevelFault, "pp_mux_wait_timeout WaitForMultipleObjects() unexpected status: %lu", ret);
+        pp_clog_v(PPLogLevelFault, "pp_mux_wait WaitForMultipleObjects() unexpected status: %lu", ret);
         if (error_code) *error_code = (int)ret;
         return -1;
     }
@@ -188,10 +184,6 @@ int pp_mux_wait_timeout(pp_mux mux, int *error_code, int timeout_ms) {
         mux->on_writable(mux->write_ctx, fd);
     }
     return 1;
-}
-
-int pp_mux_wait(pp_mux mux, int *error_code) {
-    return pp_mux_wait_timeout(mux, error_code, -1);
 }
 
 bool pp_mux_wake(pp_mux mux) {

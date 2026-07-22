@@ -87,6 +87,22 @@ const BlockingRecorder = struct {
     }
 };
 
+const ScheduledProbe = struct {
+    elapsed: AtomicBool = AtomicBool.init(false),
+    cancelled: AtomicBool = AtomicBool.init(false),
+
+    fn record(
+        scheduled: *core.RunAfter.Scheduled,
+        outcome: core.RunAfter.Scheduled.Outcome,
+    ) void {
+        const self: *ScheduledProbe = @ptrCast(@alignCast(scheduled.context.?));
+        switch (outcome) {
+            .elapsed => self.elapsed.store(true, .release),
+            .cancelled => self.cancelled.store(true, .release),
+        }
+    }
+};
+
 test "drainer waits until in-flight work completes" {
     const Worker = struct {
         mutex: *core.Mutex,
@@ -230,4 +246,36 @@ test "RunAfter can reschedule while callback is running" {
 
     recorder.first_can_finish.store(true, .release);
     waitUntil(&recorder.second_did_run);
+}
+
+test "RunAfter schedules independent one-shot callbacks" {
+    var later_probe = ScheduledProbe{};
+    var earlier_probe = ScheduledProbe{};
+    var later = core.RunAfter.Scheduled{};
+    var earlier = core.RunAfter.Scheduled{};
+    var run_after = core.RunAfter{};
+    defer run_after.deinit();
+
+    try run_after.schedule(&later, 100, ScheduledProbe.record, &later_probe);
+    try run_after.schedule(&earlier, 1, ScheduledProbe.record, &earlier_probe);
+
+    waitUntil(&earlier_probe.elapsed);
+    try std.testing.expect(!later_probe.elapsed.load(.acquire));
+    try std.testing.expect(!earlier_probe.cancelled.load(.acquire));
+
+    waitUntil(&later_probe.elapsed);
+    try std.testing.expect(!later_probe.cancelled.load(.acquire));
+}
+
+test "RunAfter cancel releases scheduled callbacks" {
+    var probe = ScheduledProbe{};
+    var scheduled = core.RunAfter.Scheduled{};
+    var run_after = core.RunAfter{};
+    defer run_after.deinit();
+
+    try run_after.schedule(&scheduled, 100, ScheduledProbe.record, &probe);
+    run_after.cancel();
+
+    try std.testing.expect(probe.cancelled.load(.acquire));
+    try std.testing.expect(!probe.elapsed.load(.acquire));
 }
