@@ -3,23 +3,26 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const core = @import("../../core/exports.zig");
-const net = @import("../../net/exports.zig");
-const c_exports = @import("../../c/exports.zig");
-const c_common = c_exports.common;
-const c_crypto = c_exports.crypto;
-const c = @import("c.zig").api;
-const PRF = @import("auth.zig").PRF;
-const crypto = @import("crypto.zig");
-const CryptoKeys = crypto.CryptoKeys;
-const CryptoKeysBridge = crypto.CryptoKeysBridge;
-const errors = @import("errors.zig");
-const LinkProcessor = @import("processing.zig").LinkProcessor;
-const PRNG = crypto.PRNG;
-const ZeroingData = crypto.ZeroingData;
+const c_exports_mod = @import("../../c/exports.zig");
+const core_mod = @import("../../core/exports.zig");
+const net_mod = @import("../../net/exports.zig");
+const c_mod = @import("c.zig");
+const constants_mod = @import("constants.zig");
+const crypto_mod = @import("crypto.zig");
+const errors_mod = @import("errors.zig");
+const processing_mod = @import("processing.zig");
 
-const api = core.api;
-const DataConstants = @import("constants.zig").Data;
+const api = core_mod.api;
+const c = c_mod.api;
+const c_common = c_exports_mod.common;
+const c_crypto = c_exports_mod.crypto;
+
+const CryptoKeys = crypto_mod.CryptoKeys;
+const CryptoKeysBridge = crypto_mod.CryptoKeysBridge;
+const DataConstants = constants_mod.Data;
+const LinkProcessor = processing_mod.LinkProcessor;
+const PRNG = crypto_mod.PRNG;
+const ZeroingData = crypto_mod.ZeroingData;
 
 pub const DataPathParameters = struct {
     fnt: c_crypto.pp_crypto_enc_fnt,
@@ -28,20 +31,6 @@ pub const DataPathParameters = struct {
     compression_framing: api.OpenVPNCompressionFraming,
     compression_algorithm: api.OpenVPNCompressionAlgorithm,
     peer_id: ?u32,
-};
-
-pub const DataPathDecryptedTuple = struct {
-    packet_id: u32,
-    data: []u8,
-
-    pub fn init(packet_id: u32, data: []u8) DataPathDecryptedTuple {
-        return .{ .packet_id = packet_id, .data = data };
-    }
-
-    pub fn deinit(self: *DataPathDecryptedTuple, allocator: std.mem.Allocator) void {
-        allocator.free(self.data);
-        self.* = undefined;
-    }
 };
 
 pub const DataPathDecryptedAndParsedTuple = struct {
@@ -191,47 +180,6 @@ pub const DataPath = struct {
         };
     }
 
-    pub fn assemble(
-        self: *DataPath,
-        allocator: std.mem.Allocator,
-        packet_id: u32,
-        payload: []const u8,
-    ) anyerror![]u8 {
-        const capacity = c.openvpn_dp_mode_assemble_capacity(self.mode, payload.len);
-        self.resize(self.enc_buffer, capacity);
-        const length = c.openvpn_dp_mode_assemble(
-            self.mode,
-            packet_id,
-            @ptrCast(self.enc_buffer),
-            payload.ptr,
-            payload.len,
-        );
-        return allocator.dupe(u8, self.enc_buffer.*.bytes[0..length]);
-    }
-
-    pub fn encrypt(
-        self: *DataPath,
-        allocator: std.mem.Allocator,
-        key: u8,
-        packet_id: u32,
-        assembled: []const u8,
-    ) anyerror![]u8 {
-        const capacity = c.openvpn_dp_mode_encrypt_capacity(self.mode, assembled.len);
-        self.resize(self.enc_buffer, capacity);
-        var native_error = emptyNativeError();
-        const length = c.openvpn_dp_mode_encrypt(
-            self.mode,
-            key,
-            packet_id,
-            @ptrCast(self.enc_buffer),
-            assembled.ptr,
-            assembled.len,
-            &native_error,
-        );
-        if (length == 0) return nativeError(native_error);
-        return allocator.dupe(u8, self.enc_buffer.*.bytes[0..length]);
-    }
-
     pub fn assembleAndEncrypt(
         self: *DataPath,
         allocator: std.mem.Allocator,
@@ -253,51 +201,6 @@ pub const DataPath = struct {
         ) orelse return nativeError(native_error));
         defer c_common.pp_zd_free(data);
         return allocator.dupe(u8, data.*.bytes[0..data.*.length]);
-    }
-
-    pub fn decrypt(
-        self: *DataPath,
-        allocator: std.mem.Allocator,
-        packet: []const u8,
-    ) anyerror!DataPathDecryptedTuple {
-        self.resize(self.dec_buffer, packet.len);
-        var packet_id: u32 = 0;
-        var native_error = emptyNativeError();
-        const length = c.openvpn_dp_mode_decrypt(
-            self.mode,
-            @ptrCast(self.dec_buffer),
-            &packet_id,
-            packet.ptr,
-            packet.len,
-            &native_error,
-        );
-        if (length == 0) return nativeError(native_error);
-        return .init(
-            packet_id,
-            try allocator.dupe(u8, self.dec_buffer.*.bytes[0..length]),
-        );
-    }
-
-    pub fn parse(
-        self: *DataPath,
-        allocator: std.mem.Allocator,
-        decrypted: []const u8,
-        header: *u8,
-    ) anyerror![]u8 {
-        const input = try allocator.dupe(u8, decrypted);
-        defer allocator.free(input);
-        self.resize(self.dec_buffer, input.len);
-        var native_error = emptyNativeError();
-        const length = c.openvpn_dp_mode_parse(
-            self.mode,
-            @ptrCast(self.dec_buffer),
-            header,
-            input.ptr,
-            input.len,
-            &native_error,
-        );
-        if (length == 0) return nativeError(native_error);
-        return allocator.dupe(u8, self.dec_buffer.*.bytes[0..length]);
     }
 
     pub fn decryptAndParse(
@@ -344,7 +247,7 @@ pub const DataPath = struct {
 
     fn nativeError(native: c.openvpn_dp_error) anyerror {
         if (native.dp_code == c.OpenVPNDataPathErrorNone) return error.DataPathFailure;
-        return errors.dataPathError(native);
+        return errors_mod.dataPathError(native);
     }
 };
 
@@ -383,7 +286,7 @@ pub const DataPathWrapper = struct {
     pub fn nativeWithPRF(
         allocator: std.mem.Allocator,
         parameters: DataPathParameters,
-        prf: *const PRF,
+        prf: anytype,
         prng: PRNG,
     ) anyerror!DataPathWrapper {
         var seed = try prng.safeData(allocator, DataConstants.prng_seed_length);
@@ -391,10 +294,10 @@ pub const DataPathWrapper = struct {
         return nativeWithSeed(allocator, parameters, prf, seed);
     }
 
-    pub fn nativeWithSeed(
+    fn nativeWithSeed(
         allocator: std.mem.Allocator,
         parameters: DataPathParameters,
-        prf: *const PRF,
+        prf: anytype,
         seed: ZeroingData,
     ) anyerror!DataPathWrapper {
         const init_seed = parameters.fnt.init_seed orelse return error.UnsupportedAlgorithm;
@@ -404,7 +307,7 @@ pub const DataPathWrapper = struct {
         return nativeWithKeys(allocator, parameters, &keys);
     }
 
-    pub fn nativeWithKeys(
+    fn nativeWithKeys(
         allocator: std.mem.Allocator,
         parameters: DataPathParameters,
         keys: *const CryptoKeys,
@@ -453,34 +356,6 @@ pub const DataPathWrapper = struct {
             allocator,
             mode,
             parameters.peer_id orelse c.OpenVPNPacketPeerIdDisabled,
-        );
-        return init(implementation);
-    }
-
-    pub fn nativeADMock(
-        allocator: std.mem.Allocator,
-        framing: api.OpenVPNCompressionFraming,
-    ) std.mem.Allocator.Error!DataPathWrapper {
-        const mode = c.openvpn_dp_mode_ad_create_mock(nativeFraming(framing));
-        errdefer c.openvpn_dp_mode_free(mode);
-        const implementation = try DataPath.create(
-            allocator,
-            mode,
-            c.OpenVPNPacketPeerIdDisabled,
-        );
-        return init(implementation);
-    }
-
-    pub fn nativeHMACMock(
-        allocator: std.mem.Allocator,
-        framing: api.OpenVPNCompressionFraming,
-    ) std.mem.Allocator.Error!DataPathWrapper {
-        const mode = c.openvpn_dp_mode_hmac_create_mock(nativeFraming(framing));
-        errdefer c.openvpn_dp_mode_free(mode);
-        const implementation = try DataPath.create(
-            allocator,
-            mode,
-            c.OpenVPNPacketPeerIdDisabled,
         );
         return init(implementation);
     }
@@ -557,7 +432,7 @@ pub const DataChannel = struct {
 /// deliberately rejects calls from any other thread.
 pub const DataLink = struct {
     allocator: std.mem.Allocator,
-    looper: *net.Looper,
+    looper: *net_mod.Looper,
     link_processor: *LinkProcessor,
     context: ?*anyopaque,
     callbacks: Callbacks,
@@ -570,7 +445,7 @@ pub const DataLink = struct {
 
     pub fn init(
         allocator: std.mem.Allocator,
-        looper: *net.Looper,
+        looper: *net_mod.Looper,
         link_processor: *LinkProcessor,
         context: ?*anyopaque,
         callbacks: Callbacks,
@@ -635,13 +510,13 @@ pub const DataLink = struct {
         };
         if (!self.looper.isOnQueue()) return error.ReentrantCall;
 
-        const start = core.concurrency.monotonicNs();
+        const start = core_mod.concurrency.monotonicNs();
         const deadline = start +| timeout *| @as(u64, std.time.ns_per_ms);
         var last_error: ?anyerror = null;
         while (true) {
             self.looper.write(processed.packets(), .link, true) catch |err| {
                 last_error = err;
-                if (core.concurrency.monotonicNs() < deadline) continue;
+                if (core_mod.concurrency.monotonicNs() < deadline) continue;
                 return last_error orelse error.Timeout;
             };
             return;
@@ -702,12 +577,7 @@ pub const DataLinkPair = struct {
     }
 };
 
-fn freePackets(allocator: std.mem.Allocator, packets: [][]u8) void {
-    for (packets) |packet| allocator.free(packet);
-    allocator.free(packets);
-}
-
-test "DataPath mock round-trips individual, compound, and bulk packets" {
+test "DataPath mock round-trips compound and bulk packets" {
     const allocator = std.testing.allocator;
     const peer_id: u32 = 0x01;
     const key: u8 = 0x02;
@@ -717,19 +587,6 @@ test "DataPath mock round-trips individual, compound, and bulk packets" {
     const mode = c.openvpn_dp_mode_ad_create_mock(c.OpenVPNCompressionFramingDisabled);
     const data_path = try DataPath.create(allocator, mode, peer_id);
     defer data_path.destroy();
-
-    const assembled = try data_path.assemble(allocator, packet_id, &payload);
-    defer allocator.free(assembled);
-    const encrypted = try data_path.encrypt(allocator, key, packet_id, assembled);
-    defer allocator.free(encrypted);
-    var decrypted = try data_path.decrypt(allocator, encrypted);
-    defer decrypted.deinit(allocator);
-    try std.testing.expectEqual(packet_id, decrypted.packet_id);
-    try std.testing.expectEqualSlices(u8, assembled, decrypted.data);
-    var header: u8 = 0;
-    const parsed = try data_path.parse(allocator, decrypted.data, &header);
-    defer allocator.free(parsed);
-    try std.testing.expectEqualSlices(u8, &payload, parsed);
 
     const compound = try data_path.assembleAndEncrypt(
         allocator,
@@ -745,7 +602,7 @@ test "DataPath mock round-trips individual, compound, and bulk packets" {
 
     const packets = [_][]const u8{&payload};
     const encrypted_packets = try data_path.encryptPackets(allocator, &packets, key);
-    defer freePackets(allocator, encrypted_packets);
+    defer core_mod.util.freeSliceOfStrings(allocator, encrypted_packets);
     var decrypted_packets = try data_path.decryptPackets(allocator, encrypted_packets);
     defer decrypted_packets.deinit(allocator);
     try std.testing.expect(!decrypted_packets.keep_alive);

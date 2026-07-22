@@ -3,19 +3,43 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const core = @import("../../core/exports.zig");
-const crypto = @import("crypto.zig");
-const errors = @import("errors.zig");
+const core_mod = @import("../../core/exports.zig");
+const crypto_mod = @import("crypto.zig");
+const errors_mod = @import("errors.zig");
 const time_c = @cImport(@cInclude("time.h"));
 
-const api = core.api;
-const CryptoKeyPair = crypto.CryptoKeyPair;
-const CryptoKeys = crypto.CryptoKeys;
-const PRNG = crypto.PRNG;
-const ZeroingData = crypto.ZeroingData;
-const StaticKeyError = errors.StaticKeyError;
+const api = core_mod.api;
+
+const CryptoKeyPair = crypto_mod.CryptoKeyPair;
+const CryptoKeys = crypto_mod.CryptoKeys;
+const PRNG = crypto_mod.PRNG;
+const StaticKeyError = errors_mod.StaticKeyError;
+const ZeroingData = crypto_mod.ZeroingData;
 const static_key_content_length = 256;
 const static_key_length = 64;
+
+pub fn authKeys(
+    allocator: std.mem.Allocator,
+    key: api.OpenVPNStaticKey,
+) StaticKeyError!CryptoKeys {
+    const bytes = try decode(allocator, key);
+    defer {
+        @memset(bytes, 0);
+        allocator.free(bytes);
+    }
+    const send_index: usize = switch (key.dir orelse .server) {
+        .server => 1,
+        .client => 3,
+    };
+    const receive_index: usize = switch (key.dir orelse .client) {
+        .server => 3,
+        .client => 1,
+    };
+    var send = try ZeroingData.initCopy(allocator, quadrant(bytes, send_index));
+    errdefer send.deinit(allocator);
+    const receive = try ZeroingData.initCopy(allocator, quadrant(bytes, receive_index));
+    return CryptoKeys.init(null, CryptoKeyPair.init(send, receive));
+}
 
 pub fn BidirectionalState(comptime T: type) type {
     return struct {
@@ -37,17 +61,41 @@ pub fn BidirectionalState(comptime T: type) type {
             self.inbound = self.reset_value;
             self.outbound = self.reset_value;
         }
-
-        pub fn pair(self: Self) [2]T {
-            return .{ self.inbound, self.outbound };
-        }
     };
+}
+
+pub fn cryptKeys(
+    allocator: std.mem.Allocator,
+    key: api.OpenVPNStaticKey,
+) StaticKeyError!CryptoKeys {
+    const direction = key.dir orelse return error.MissingStaticKeyDirection;
+    const bytes = try decode(allocator, key);
+    defer {
+        @memset(bytes, 0);
+        allocator.free(bytes);
+    }
+    const cipher_send_index: usize = if (direction == .server) 0 else 2;
+    const cipher_receive_index: usize = if (direction == .server) 2 else 0;
+    const hmac_send_index: usize = if (direction == .server) 1 else 3;
+    const hmac_receive_index: usize = if (direction == .server) 3 else 1;
+
+    var cipher_send = try ZeroingData.initCopy(allocator, quadrant(bytes, cipher_send_index));
+    errdefer cipher_send.deinit(allocator);
+    var cipher_receive = try ZeroingData.initCopy(allocator, quadrant(bytes, cipher_receive_index));
+    errdefer cipher_receive.deinit(allocator);
+    var hmac_send = try ZeroingData.initCopy(allocator, quadrant(bytes, hmac_send_index));
+    errdefer hmac_send.deinit(allocator);
+    const hmac_receive = try ZeroingData.initCopy(allocator, quadrant(bytes, hmac_receive_index));
+    return CryptoKeys.init(
+        CryptoKeyPair.init(cipher_send, cipher_receive),
+        CryptoKeyPair.init(hmac_send, hmac_receive),
+    );
 }
 
 pub fn forAuthentication(
     allocator: std.mem.Allocator,
     credentials: api.OpenVPNCredentials,
-) (std.mem.Allocator.Error || errors.CredentialsError)!api.OpenVPNCredentials {
+) (std.mem.Allocator.Error || errors_mod.CredentialsError)!api.OpenVPNCredentials {
     const username = try allocator.dupe(u8, credentials.username);
     errdefer allocator.free(username);
 
@@ -104,7 +152,7 @@ pub const PIAHardReset = struct {
         self: PIAHardReset,
         allocator: std.mem.Allocator,
         prng: PRNG,
-    ) (std.mem.Allocator.Error || errors.PIAHardResetError)![]u8 {
+    ) (std.mem.Allocator.Error || errors_mod.PIAHardResetError)![]u8 {
         if (!isASCII(self.ca_md5_digest)) return error.Assertion;
 
         const cipher_name = try lowerAlloc(allocator, self.cipher.raw());
@@ -144,57 +192,6 @@ pub const PIAHardReset = struct {
     }
 };
 
-pub fn authKeys(
-    allocator: std.mem.Allocator,
-    key: api.OpenVPNStaticKey,
-) StaticKeyError!CryptoKeys {
-    const bytes = try decode(allocator, key);
-    defer {
-        @memset(bytes, 0);
-        allocator.free(bytes);
-    }
-    const send_index: usize = switch (key.dir orelse .server) {
-        .server => 1,
-        .client => 3,
-    };
-    const receive_index: usize = switch (key.dir orelse .client) {
-        .server => 3,
-        .client => 1,
-    };
-    var send = try ZeroingData.initCopy(allocator, quadrant(bytes, send_index));
-    errdefer send.deinit(allocator);
-    const receive = try ZeroingData.initCopy(allocator, quadrant(bytes, receive_index));
-    return CryptoKeys.init(null, CryptoKeyPair.init(send, receive));
-}
-
-pub fn cryptKeys(
-    allocator: std.mem.Allocator,
-    key: api.OpenVPNStaticKey,
-) StaticKeyError!CryptoKeys {
-    const direction = key.dir orelse return error.MissingStaticKeyDirection;
-    const bytes = try decode(allocator, key);
-    defer {
-        @memset(bytes, 0);
-        allocator.free(bytes);
-    }
-    const cipher_send_index: usize = if (direction == .server) 0 else 2;
-    const cipher_receive_index: usize = if (direction == .server) 2 else 0;
-    const hmac_send_index: usize = if (direction == .server) 1 else 3;
-    const hmac_receive_index: usize = if (direction == .server) 3 else 1;
-
-    var cipher_send = try ZeroingData.initCopy(allocator, quadrant(bytes, cipher_send_index));
-    errdefer cipher_send.deinit(allocator);
-    var cipher_receive = try ZeroingData.initCopy(allocator, quadrant(bytes, cipher_receive_index));
-    errdefer cipher_receive.deinit(allocator);
-    var hmac_send = try ZeroingData.initCopy(allocator, quadrant(bytes, hmac_send_index));
-    errdefer hmac_send.deinit(allocator);
-    const hmac_receive = try ZeroingData.initCopy(allocator, quadrant(bytes, hmac_receive_index));
-    return CryptoKeys.init(
-        CryptoKeyPair.init(cipher_send, cipher_receive),
-        CryptoKeyPair.init(hmac_send, hmac_receive),
-    );
-}
-
 pub fn unixSeconds() u32 {
     const raw = time_c.time(null);
     if (raw <= 0) return 0;
@@ -226,7 +223,29 @@ test "BidirectionalState resets both directions" {
     state.inbound = 1;
     state.outbound = 2;
     state.reset();
-    try std.testing.expectEqual([2]u32{ 7, 7 }, state.pair());
+    try std.testing.expectEqual(@as(u32, 7), state.inbound);
+    try std.testing.expectEqual(@as(u32, 7), state.outbound);
+}
+
+test "client and server tls-crypt keys are complementary" {
+    var bytes: [static_key_content_length]u8 = undefined;
+    for (&bytes, 0..) |*byte, index| byte.* = @intCast(index);
+    var secure = try api.SecureData.initBytesAlloc(std.testing.allocator, &bytes);
+    defer secure.deinit(std.testing.allocator);
+    var client = try cryptKeys(std.testing.allocator, .{ .data = secure, .dir = .client });
+    defer client.deinit(std.testing.allocator);
+    var server = try cryptKeys(std.testing.allocator, .{ .data = secure, .dir = .server });
+    defer server.deinit(std.testing.allocator);
+    try std.testing.expectEqualSlices(
+        u8,
+        client.cipher.?.encryption_key.bytes,
+        server.cipher.?.decryption_key.bytes,
+    );
+    try std.testing.expectEqualSlices(
+        u8,
+        client.digest.?.encryption_key.bytes,
+        server.digest.?.decryption_key.bytes,
+    );
 }
 
 test "forAuthentication appends and encodes OTP" {
@@ -266,27 +285,6 @@ test "PIA payload prepends the repeating XOR key" {
     defer std.testing.allocator.free(encoded);
     try std.testing.expectEqualSlices(u8, &.{ 1, 2, 3 }, encoded[0..3]);
     try std.testing.expectEqual(@as(u8, PIAHardReset.magic[0] ^ 1), encoded[3]);
-}
-
-test "client and server tls-crypt keys are complementary" {
-    var bytes: [static_key_content_length]u8 = undefined;
-    for (&bytes, 0..) |*byte, index| byte.* = @intCast(index);
-    var secure = try api.SecureData.initBytesAlloc(std.testing.allocator, &bytes);
-    defer secure.deinit(std.testing.allocator);
-    var client = try cryptKeys(std.testing.allocator, .{ .data = secure, .dir = .client });
-    defer client.deinit(std.testing.allocator);
-    var server = try cryptKeys(std.testing.allocator, .{ .data = secure, .dir = .server });
-    defer server.deinit(std.testing.allocator);
-    try std.testing.expectEqualSlices(
-        u8,
-        client.cipher.?.encryption_key.bytes,
-        server.cipher.?.decryption_key.bytes,
-    );
-    try std.testing.expectEqualSlices(
-        u8,
-        client.digest.?.encryption_key.bytes,
-        server.digest.?.decryption_key.bytes,
-    );
 }
 
 test "tls-auth without key direction uses the shared HMAC quadrant" {

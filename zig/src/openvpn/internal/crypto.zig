@@ -3,25 +3,17 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c_exports = @import("../../c/exports.zig");
-const c_common = c_exports.common;
-const c_crypto = c_exports.crypto;
-const errors = @import("errors.zig");
+const c_exports_mod = @import("../../c/exports.zig");
+const errors_mod = @import("errors.zig");
+
+const c_common = c_exports_mod.common;
+const c_crypto = c_exports_mod.crypto;
 
 pub const CryptoBackend = enum {
-    open_ssl,
-    mbed_tls,
+    openssl,
+    mbedtls,
     native,
     mock,
-
-    pub fn functionTable(self: CryptoBackend) c_crypto.pp_crypto_fnt {
-        return switch (self) {
-            .open_ssl => c_crypto.pp_crypto_fnt_openssl(),
-            .mbed_tls => c_crypto.pp_crypto_fnt_mbedtls(),
-            .native => c_crypto.pp_crypto_fnt_native(),
-            .mock => c_crypto.pp_crypto_fnt_mock(),
-        };
-    }
 };
 
 pub const CryptoKeyPair = struct {
@@ -33,26 +25,6 @@ pub const CryptoKeyPair = struct {
             .encryption_key = encryption_key,
             .decryption_key = decryption_key,
         };
-    }
-
-    pub fn initEmpty(
-        allocator: std.mem.Allocator,
-        length: usize,
-    ) std.mem.Allocator.Error!CryptoKeyPair {
-        var encryption_key = try ZeroingData.init(allocator, length);
-        errdefer encryption_key.deinit(allocator);
-        const decryption_key = try ZeroingData.init(allocator, length);
-        return init(encryption_key, decryption_key);
-    }
-
-    pub fn clone(
-        self: CryptoKeyPair,
-        allocator: std.mem.Allocator,
-    ) std.mem.Allocator.Error!CryptoKeyPair {
-        var encryption_key = try self.encryption_key.clone(allocator);
-        errdefer encryption_key.deinit(allocator);
-        const decryption_key = try self.decryption_key.clone(allocator);
-        return init(encryption_key, decryption_key);
     }
 
     pub fn deinit(self: *CryptoKeyPair, allocator: std.mem.Allocator) void {
@@ -79,45 +51,10 @@ pub const CryptoKeys = struct {
         return .{ .cipher = cipher, .digest = digest };
     }
 
-    pub fn initEmpty(
-        allocator: std.mem.Allocator,
-        cipher_key_length: usize,
-        hmac_key_length: usize,
-    ) std.mem.Allocator.Error!CryptoKeys {
-        var cipher = try CryptoKeyPair.initEmpty(allocator, cipher_key_length);
-        errdefer cipher.deinit(allocator);
-        const digest = try CryptoKeyPair.initEmpty(allocator, hmac_key_length);
-        return init(cipher, digest);
-    }
-
-    pub fn clone(
-        self: CryptoKeys,
-        allocator: std.mem.Allocator,
-    ) std.mem.Allocator.Error!CryptoKeys {
-        var cipher: ?CryptoKeyPair = if (self.cipher) |value|
-            try value.clone(allocator)
-        else
-            null;
-        errdefer if (cipher) |*value| value.deinit(allocator);
-        const digest: ?CryptoKeyPair = if (self.digest) |value|
-            try value.clone(allocator)
-        else
-            null;
-        return init(cipher, digest);
-    }
-
     pub fn deinit(self: *CryptoKeys, allocator: std.mem.Allocator) void {
         if (self.cipher) |*value| value.deinit(allocator);
         if (self.digest) |*value| value.deinit(allocator);
         self.* = .{};
-    }
-
-    pub fn move(self: *CryptoKeys) CryptoKeys {
-        var result: CryptoKeys = .{};
-        if (self.cipher) |*value| result.cipher = value.move();
-        if (self.digest) |*value| result.digest = value.move();
-        self.* = .{};
-        return result;
     }
 };
 
@@ -203,7 +140,7 @@ pub const PRNG = struct {
         return .{};
     }
 
-    pub fn fill(self: PRNG, destination: []u8) errors.PRNGError!void {
+    pub fn fill(self: PRNG, destination: []u8) errors_mod.PRNGError!void {
         if (!self.fill_fn(self.context, destination)) return error.CryptoFailure;
     }
 
@@ -211,7 +148,7 @@ pub const PRNG = struct {
         self: PRNG,
         allocator: std.mem.Allocator,
         length: usize,
-    ) (std.mem.Allocator.Error || errors.PRNGError)![]u8 {
+    ) (std.mem.Allocator.Error || errors_mod.PRNGError)![]u8 {
         const bytes = try allocator.alloc(u8, length);
         errdefer allocator.free(bytes);
         try self.fill(bytes);
@@ -222,7 +159,7 @@ pub const PRNG = struct {
         self: PRNG,
         allocator: std.mem.Allocator,
         length: usize,
-    ) (std.mem.Allocator.Error || errors.PRNGError)!ZeroingData {
+    ) (std.mem.Allocator.Error || errors_mod.PRNGError)!ZeroingData {
         var result = try ZeroingData.init(allocator, length);
         errdefer result.deinit(allocator);
         try self.fill(result.bytes);
@@ -232,64 +169,6 @@ pub const PRNG = struct {
     fn systemFill(_: ?*anyopaque, destination: []u8) bool {
         if (destination.len == 0) return true;
         return c_common.pp_prng_do(destination.ptr, destination.len);
-    }
-};
-
-pub const SimpleKeyDecrypter = struct {
-    fnt: c_crypto.pp_crypto_fnt,
-
-    pub fn init(backend: CryptoBackend) SimpleKeyDecrypter {
-        return .{ .fnt = backend.functionTable() };
-    }
-
-    /// Caller owns the returned plaintext key.
-    pub fn decryptedKeyFromPEM(
-        self: SimpleKeyDecrypter,
-        allocator: std.mem.Allocator,
-        pem: []const u8,
-        passphrase: []const u8,
-    ) anyerror![]u8 {
-        const c_pem = try allocator.dupeZ(u8, pem);
-        defer allocator.free(c_pem);
-        const c_passphrase = try allocator.dupeZ(u8, passphrase);
-        defer allocator.free(c_passphrase);
-        const decrypt = self.fnt.key_decrypted_from_pem orelse return error.UnsupportedAlgorithm;
-        const value = decrypt(
-            c_pem.ptr,
-            c_passphrase.ptr,
-        ) orelse return error.UnsupportedAlgorithm;
-        return copyAndDestroy(allocator, value);
-    }
-
-    /// Caller owns the returned plaintext key.
-    pub fn decryptedKeyFromPath(
-        self: SimpleKeyDecrypter,
-        allocator: std.mem.Allocator,
-        path: []const u8,
-        passphrase: []const u8,
-    ) anyerror![]u8 {
-        const c_path = try allocator.dupeZ(u8, path);
-        defer allocator.free(c_path);
-        const c_passphrase = try allocator.dupeZ(u8, passphrase);
-        defer allocator.free(c_passphrase);
-        const decrypt = self.fnt.key_decrypted_from_path orelse return error.UnsupportedAlgorithm;
-        const value = decrypt(
-            c_path.ptr,
-            c_passphrase.ptr,
-        ) orelse return error.UnsupportedAlgorithm;
-        return copyAndDestroy(allocator, value);
-    }
-
-    fn copyAndDestroy(
-        allocator: std.mem.Allocator,
-        value: [*c]u8,
-    ) std.mem.Allocator.Error![]u8 {
-        const source = std.mem.span(@as([*:0]u8, @ptrCast(value)));
-        defer {
-            c_common.pp_zero(value, source.len);
-            c_common.pp_free(value);
-        }
-        return allocator.dupe(u8, source);
     }
 };
 
@@ -376,30 +255,17 @@ pub const ZeroingData = struct {
         self.refresh();
     }
 
-    pub fn appendByte(
-        self: *ZeroingData,
-        allocator: std.mem.Allocator,
-        byte: u8,
-    ) std.mem.Allocator.Error!void {
-        const one = [1]u8{byte};
-        try self.append(allocator, &one);
-    }
-
     pub fn sliceCopy(
         self: ZeroingData,
         _: std.mem.Allocator,
         offset: usize,
         count: usize,
-    ) (std.mem.Allocator.Error || errors.ZeroingDataError)!ZeroingData {
+    ) (std.mem.Allocator.Error || errors_mod.ZeroingDataError)!ZeroingData {
         const slice = c_common.pp_zd_make_slice(self.cPtr(), offset, count) orelse return error.OutOfBounds;
         return fromC(slice);
     }
 
-    pub fn eql(self: ZeroingData, other: []const u8) bool {
-        return c_common.pp_zd_equals_to_data(self.cPtr(), other.ptr, other.len);
-    }
-
-    pub fn networkU16(self: ZeroingData, offset: usize) errors.ZeroingDataError!u16 {
+    pub fn networkU16(self: ZeroingData, offset: usize) errors_mod.ZeroingDataError!u16 {
         if (offset > self.bytes.len or self.bytes.len - offset < 2) return error.OutOfBounds;
         return std.mem.readInt(u16, self.bytes[offset..][0..2], .big);
     }
@@ -415,7 +281,7 @@ pub const ZeroingData = struct {
         self: *ZeroingData,
         _: std.mem.Allocator,
         count: usize,
-    ) (std.mem.Allocator.Error || errors.ZeroingDataError)!void {
+    ) (std.mem.Allocator.Error || errors_mod.ZeroingDataError)!void {
         if (count > self.bytes.len) return error.OutOfBounds;
         c_common.pp_zd_remove_until(self.cPtr(), count);
         self.refresh();

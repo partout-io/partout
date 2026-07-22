@@ -3,17 +3,22 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const core = @import("../../core/exports.zig");
-const BidirectionalState = @import("helpers.zig").BidirectionalState;
-const ControlChannelConstants = @import("constants.zig").Control;
-const data = @import("data.zig");
-const DataChannel = data.DataChannel;
-const DataLink = data.DataLink;
-const DataLinkPair = data.DataLinkPair;
-const Negotiator = @import("session_negotiator.zig").Negotiator;
-const PushReply = @import("push.zig").PushReply;
+const core_mod = @import("../../core/exports.zig");
+const constants_mod = @import("constants.zig");
+const data_mod = @import("data.zig");
+const helpers_mod = @import("helpers.zig");
+const push_mod = @import("push.zig");
+const session_negotiator_mod = @import("session_negotiator.zig");
 
-const api = core.api;
+const api = core_mod.api;
+
+const BidirectionalState = helpers_mod.BidirectionalState;
+const ControlConstants = constants_mod.Control;
+const DataChannel = data_mod.DataChannel;
+const DataLink = data_mod.DataLink;
+const DataLinkPair = data_mod.DataLinkPair;
+const Negotiator = session_negotiator_mod.Negotiator;
+const PushReply = push_mod.PushReply;
 
 /// State retained between session attempts.
 pub const ActivePhase = enum {
@@ -34,8 +39,8 @@ pub const ActiveContext = struct {
     with_local_options: bool,
     remote_endpoint: api.ExtendedEndpoint,
 
-    negotiators: [ControlChannelConstants.number_of_keys]?*Negotiator,
-    data_channels: [ControlChannelConstants.number_of_keys]?*DataChannel,
+    negotiators: [ControlConstants.number_of_keys]?*Negotiator,
+    data_channels: [ControlConstants.number_of_keys]?*DataChannel,
     old_keys: std.ArrayList(u8) = .empty,
     current_negotiator_key: ?u8 = null,
     current_data_pair: ?DataLinkPair = null,
@@ -62,8 +67,8 @@ pub const ActiveContext = struct {
                 .proto = remote_endpoint.proto,
                 .owned = true,
             },
-            .negotiators = [_]?*Negotiator{null} ** ControlChannelConstants.number_of_keys,
-            .data_channels = [_]?*DataChannel{null} ** ControlChannelConstants.number_of_keys,
+            .negotiators = [_]?*Negotiator{null} ** ControlConstants.number_of_keys,
+            .data_channels = [_]?*DataChannel{null} ** ControlConstants.number_of_keys,
         };
         return self;
     }
@@ -159,20 +164,6 @@ pub const SessionState = union(enum) {
         context: *ActiveContext,
     };
 
-    pub fn activePhase(self: SessionState) ?ActivePhase {
-        return switch (self) {
-            .stopped => null,
-            .active => |active| active.phase,
-        };
-    }
-
-    pub fn idleContext(self: *SessionState) ?*IdleContext {
-        return switch (self.*) {
-            .stopped => |*context| context,
-            .active => null,
-        };
-    }
-
     pub fn activeState(self: *SessionState) ?*Active {
         return switch (self.*) {
             .stopped => null,
@@ -190,9 +181,7 @@ test "ActiveContext declarations are semantically analyzed" {
     std.testing.refAllDecls(ActiveContext);
 }
 
-test "stopped session exposes only its idle context" {
+test "stopped session has no active context" {
     var state = SessionState{ .stopped = .{ .with_local_options = false } };
-    try std.testing.expect(state.activePhase() == null);
     try std.testing.expect(state.activeContext() == null);
-    try std.testing.expect(!state.idleContext().?.with_local_options);
 }

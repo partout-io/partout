@@ -3,14 +3,16 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const core = @import("../../core/exports.zig");
-const c_exports = @import("../../c/exports.zig");
-const c_common = c_exports.common;
-const c_crypto = c_exports.crypto;
-const TLSConstants = @import("constants.zig").TLS;
-const errors = @import("errors.zig");
+const c_exports_mod = @import("../../c/exports.zig");
+const core_mod = @import("../../core/exports.zig");
+const constants_mod = @import("constants.zig");
+const errors_mod = @import("errors.zig");
 
-const api = core.api;
+const api = core_mod.api;
+const c_common = c_exports_mod.common;
+const c_crypto = c_exports_mod.crypto;
+
+const TLSConstants = constants_mod.TLS;
 
 /// Borrowed arguments used to create a TLS engine.
 pub const TLSParameters = struct {
@@ -107,7 +109,7 @@ pub const TLSWrapper = struct {
         const tls = create_tls(options, &code) orelse {
             c_crypto.pp_tls_options_free(options);
             if (code == c_crypto.PPTLSErrorNone) return error.TLSFailure;
-            return errors.tlsError(code);
+            return errors_mod.tlsError(code);
         };
         errdefer free_tls(tls);
 
@@ -215,7 +217,7 @@ pub const TLSWrapper = struct {
 
     fn tlsOperationError(code: c_crypto.pp_tls_error_code) anyerror {
         if (code == c_crypto.PPTLSErrorNone) return error.TLSFailure;
-        return errors.tlsError(code);
+        return errors_mod.tlsError(code);
     }
 };
 

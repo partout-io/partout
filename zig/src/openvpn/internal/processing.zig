@@ -3,12 +3,14 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const core = @import("../../core/exports.zig");
-const c_common = @import("../../c/exports.zig").common;
-const c = @import("c.zig").api;
-const errors = @import("errors.zig");
+const c_exports_mod = @import("../../c/exports.zig");
+const core_mod = @import("../../core/exports.zig");
+const c_mod = @import("c.zig");
+const errors_mod = @import("errors.zig");
 
-const api = core.api;
+const api = core_mod.api;
+const c = c_mod.api;
+const c_common = c_exports_mod.common;
 
 pub const PacketDirection = enum {
     outbound,
@@ -111,19 +113,11 @@ pub const PacketProcessor = struct {
         return packets.toOwnedSlice(allocator);
     }
 
-    pub fn streamFromPacket(
-        self: *const PacketProcessor,
-        allocator: std.mem.Allocator,
-        packet: []const u8,
-    ) (std.mem.Allocator.Error || errors.PacketProcessorError)![]u8 {
-        return self.streamFromPackets(allocator, &.{packet});
-    }
-
     pub fn streamFromPackets(
         self: *const PacketProcessor,
         allocator: std.mem.Allocator,
         packets: []const []const u8,
-    ) (std.mem.Allocator.Error || errors.PacketProcessorError)![]u8 {
+    ) (std.mem.Allocator.Error || errors_mod.PacketProcessorError)![]u8 {
         var payload_length: usize = 0;
         for (packets) |packet| {
             if (packet.len > std.math.maxInt(u16)) return error.PacketTooLarge;
@@ -144,11 +138,6 @@ pub const PacketProcessor = struct {
         }
         std.debug.assert(offset == capacity);
         return allocator.dupe(u8, zeroing.*.bytes[0..offset]);
-    }
-
-    pub fn freePackets(allocator: std.mem.Allocator, packets: [][]u8) void {
-        for (packets) |packet| allocator.free(packet);
-        allocator.free(packets);
     }
 
     fn freePacketList(allocator: std.mem.Allocator, packets: *std.ArrayList([]u8)) void {
@@ -176,7 +165,7 @@ pub const LinkProcessor = struct {
         }
 
         pub fn deinit(self: *Output) void {
-            core.util.freeSliceOfStrings(self.allocator, self.owned_packets);
+            core_mod.util.freeSliceOfStrings(self.allocator, self.owned_packets);
             self.* = undefined;
         }
     };
@@ -281,13 +270,13 @@ test "packet processor frames and parses a TCP stream" {
     var processor = try PacketProcessor.init(std.testing.allocator, null);
     defer processor.deinit();
     const packet = [_]u8{ 0x11, 0x22, 0x33, 0x44, 0x55 };
-    const stream = try processor.streamFromPacket(std.testing.allocator, &packet);
+    const stream = try processor.streamFromPackets(std.testing.allocator, &.{&packet});
     defer std.testing.allocator.free(stream);
     try std.testing.expectEqualSlices(u8, &.{ 0, 5, 0x11, 0x22, 0x33, 0x44, 0x55 }, stream);
 
     var consumed: usize = 0;
     const parsed = try processor.packetsFromStream(std.testing.allocator, stream, &consumed);
-    defer PacketProcessor.freePackets(std.testing.allocator, parsed);
+    defer core_mod.util.freeSliceOfStrings(std.testing.allocator, parsed);
     try std.testing.expectEqual(stream.len, consumed);
     try std.testing.expectEqual(@as(usize, 1), parsed.len);
     try std.testing.expectEqualSlices(u8, &packet, parsed[0]);
@@ -298,7 +287,7 @@ test "packet processor retains incomplete TCP frames" {
     defer processor.deinit();
     var consumed: usize = 99;
     const parsed = try processor.packetsFromStream(std.testing.allocator, &.{ 0, 4, 1, 2 }, &consumed);
-    defer PacketProcessor.freePackets(std.testing.allocator, parsed);
+    defer core_mod.util.freeSliceOfStrings(std.testing.allocator, parsed);
     try std.testing.expectEqual(@as(usize, 0), consumed);
     try std.testing.expectEqual(@as(usize, 0), parsed.len);
 }

@@ -3,12 +3,11 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const core = @import("../../core/exports.zig");
-const configuration_helpers = @import("configuration.zig");
-const errors = @import("errors.zig");
+const core_mod = @import("../../core/exports.zig");
+const configuration_mod = @import("configuration.zig");
+const errors_mod = @import("errors.zig");
 
-const api = core.api;
-const log = core.logging;
+const api = core_mod.api;
 
 /// Merges local and pushed OpenVPN settings into owned core modules.
 pub const NetworkSettingsBuilder = struct {
@@ -49,34 +48,13 @@ pub const NetworkSettingsBuilder = struct {
         return result.toOwnedSlice(allocator);
     }
 
-    /// Logs the negotiated subset exactly where the Swift builder exposes its
-    /// `print()` diagnostic hook. Logging remains a no-op without a core logger.
-    pub fn print(self: NetworkSettingsBuilder) void {
-        log.write(.notice, "Negotiated options (remote overrides local)");
-        if (self.remote_options.cipher) |cipher| {
-            log.writef(.notice, "\tCipher: {s}", .{cipher.raw()});
-        }
-        if (self.remote_options.compression_framing) |framing| {
-            log.writef(.notice, "\tCompression framing: {s}", .{@tagName(framing)});
-        }
-        if (self.remote_options.compression_algorithm) |algorithm| {
-            log.writef(.notice, "\tCompression algorithm: {s}", .{@tagName(algorithm)});
-        }
-        if (self.remote_options.keep_alive_interval) |interval| {
-            log.writef(.notice, "\tKeep-alive interval: {d}s", .{interval});
-        }
-        if (self.remote_options.keep_alive_timeout) |timeout| {
-            log.writef(.notice, "\tKeep-alive timeout: {d}s", .{timeout});
-        }
-    }
-
     pub fn deinitModules(allocator: std.mem.Allocator, modules_value: []api.TaggedModule) void {
         for (modules_value) |*module| module.deinit(allocator);
         allocator.free(modules_value);
     }
 
     fn pulls(self: NetworkSettingsBuilder, mask: api.OpenVPNPullMask) bool {
-        return !configuration_helpers.hasPullMask(self.local_options.*, mask);
+        return !configuration_mod.hasPullMask(self.local_options.*, mask);
     }
 
     fn routingPolicies(self: NetworkSettingsBuilder) ?[]const api.OpenVPNRoutingPolicy {
@@ -126,7 +104,7 @@ pub const NetworkSettingsBuilder = struct {
         if (ipv4 == null and ipv6 == null and mtu == null) return null;
 
         return .{
-            .id = try core.newId(),
+            .id = try core_mod.newId(),
             .ipv4 = ipv4,
             .ipv6 = ipv6,
             .mtu = mtu,
@@ -206,7 +184,7 @@ pub const NetworkSettingsBuilder = struct {
         errdefer if (search_domains) |domains| freeAddresses(allocator, domains);
 
         return .{
-            .id = try core.newId(),
+            .id = try core_mod.newId(),
             .servers = servers,
             .domain_name = domain_name,
             .search_domains = search_domains,
@@ -249,7 +227,7 @@ pub const NetworkSettingsBuilder = struct {
         errdefer freeAddresses(allocator, bypass);
 
         return .{
-            .id = try core.newId(),
+            .id = try core_mod.newId(),
             .proxy = proxy,
             .secure_proxy = secure_proxy,
             .pac_url = pac_url,
@@ -261,7 +239,7 @@ pub const NetworkSettingsBuilder = struct {
 fn addressesAlloc(
     allocator: std.mem.Allocator,
     values: []const []const u8,
-) (std.mem.Allocator.Error || errors.NetworkSettingsError)![]api.Address {
+) (std.mem.Allocator.Error || errors_mod.NetworkSettingsError)![]api.Address {
     const addresses = try allocator.alloc(api.Address, values.len);
     var initialized: usize = 0;
     errdefer {

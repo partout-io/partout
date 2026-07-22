@@ -3,15 +3,17 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const core = @import("../../core/exports.zig");
-const c = @import("c.zig").api;
-const crypto = @import("crypto.zig");
-const errors = @import("errors.zig");
-const packet_types = @import("packet.zig");
+const core_mod = @import("../../core/exports.zig");
+const c_mod = @import("c.zig");
+const crypto_mod = @import("crypto.zig");
+const errors_mod = @import("errors.zig");
+const packet_mod = @import("packet.zig");
 
-const ControlPacket = packet_types.ControlPacket;
-const PacketCode = packet_types.PacketCode;
-const PRNG = crypto.PRNG;
+const c = c_mod.api;
+
+const ControlPacket = packet_mod.ControlPacket;
+const PacketCode = packet_mod.PacketCode;
+const PRNG = crypto_mod.PRNG;
 
 pub fn ControlChannel(comptime Serializer: type) type {
     return struct {
@@ -84,7 +86,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             return if (self.remote_session_id) |*value| value else null;
         }
 
-        pub fn setRemoteSessionId(self: *Self, value: []const u8) errors.InvalidSessionIdError!void {
+        pub fn setRemoteSessionId(self: *Self, value: []const u8) errors_mod.InvalidSessionIdError!void {
             if (value.len != c.OpenVPNPacketSessionIdLength) return error.InvalidSessionId;
             var copy: [c.OpenVPNPacketSessionIdLength]u8 = undefined;
             @memcpy(&copy, value);
@@ -142,23 +144,6 @@ pub fn ControlChannel(comptime Serializer: type) type {
             return ready.toOwnedSlice(self.allocator);
         }
 
-        pub fn enqueueOutboundPacketsWithCode(
-            self: *Self,
-            code: PacketCode,
-            key: u8,
-            payload: []const u8,
-            max_payload_bytes_per_packet: usize,
-        ) anyerror!void {
-            return self.enqueueOutboundPackets(
-                code,
-                code,
-                key,
-                payload,
-                max_payload_bytes_per_packet,
-                max_payload_bytes_per_packet,
-            );
-        }
-
         pub fn enqueueOutboundPackets(
             self: *Self,
             leading_code: PacketCode,
@@ -203,7 +188,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
         ) anyerror![][]u8 {
             var raw_packets: std.ArrayList([]u8) = .empty;
             errdefer freePacketList(self.allocator, &raw_packets);
-            const now = core.concurrency.monotonicNs() / std.time.ns_per_ms;
+            const now = core_mod.concurrency.monotonicNs() / std.time.ns_per_ms;
             for (self.outbound_queue.items) |*packet| {
                 if (self.sent_dates_ms.get(packet.packetId())) |sent| {
                     if (resend_after_ms > 0 and now -| sent < @as(u64, @intCast(resend_after_ms))) continue;
@@ -217,10 +202,6 @@ pub fn ControlChannel(comptime Serializer: type) type {
                 try self.pending_acks.put(packet.packetId(), {});
             }
             return raw_packets.toOwnedSlice(self.allocator);
-        }
-
-        pub fn hasPendingAcks(self: *const Self) bool {
-            return self.pending_acks.count() > 0;
         }
 
         pub fn writeAcks(
@@ -238,11 +219,6 @@ pub fn ControlChannel(comptime Serializer: type) type {
             );
             defer packet.deinit();
             return self.serializer.serialize(self.allocator, &packet);
-        }
-
-        pub fn freePackets(allocator: std.mem.Allocator, packets: [][]u8) void {
-            for (packets) |packet| allocator.free(packet);
-            allocator.free(packets);
         }
 
         fn readAcks(
@@ -283,4 +259,96 @@ pub fn ControlChannel(comptime Serializer: type) type {
             packets.deinit(allocator);
         }
     };
+}
+
+const TestSerializer = struct {
+    fn deinit(_: *TestSerializer, _: std.mem.Allocator) void {}
+
+    fn reset(_: *TestSerializer) void {}
+
+    fn serialize(
+        _: *TestSerializer,
+        allocator: std.mem.Allocator,
+        packet: *const ControlPacket,
+    ) std.mem.Allocator.Error![]u8 {
+        return packet.serializedAlloc(allocator);
+    }
+};
+
+const TestControlChannel = ControlChannel(TestSerializer);
+
+fn fillOnes(context: ?*anyopaque, destination: []u8) bool {
+    const value: *u8 = @ptrCast(@alignCast(context.?));
+    @memset(destination, value.*);
+    return true;
+}
+
+test "control channel fragments payload and retains opcode" {
+    var one: u8 = 1;
+    const channel = try TestControlChannel.create(
+        std.testing.allocator,
+        .{ .context = &one, .fill_fn = fillOnes },
+        .{},
+    );
+    defer channel.destroy();
+    try channel.reset(true);
+    try channel.enqueueOutboundPackets(.controlV1, .controlV1, 0, &.{ 1, 2, 3, 4, 5, 6 }, 4, 4);
+    const packets = try channel.writeOutboundPackets(0);
+    defer core_mod.util.freeSliceOfStrings(std.testing.allocator, packets);
+    try std.testing.expectEqual(@as(usize, 2), packets.len);
+    try std.testing.expectEqual(@as(u8, @intFromEnum(PacketCode.controlV1)), packets[0][0] >> 3);
+    try std.testing.expectEqual(@as(u8, @intFromEnum(PacketCode.controlV1)), packets[1][0] >> 3);
+}
+
+test "control channel reorders and deduplicates inbound packets" {
+    var one: u8 = 1;
+    const channel = try TestControlChannel.create(
+        std.testing.allocator,
+        .{ .context = &one, .fill_fn = fillOnes },
+        .{},
+    );
+    defer channel.destroy();
+    try channel.reset(true);
+    const sid = channel.sessionId().?;
+    const sequence = [_]u32{ 2, 0, 1, 1 };
+    var handled: std.ArrayList(u32) = .empty;
+    defer handled.deinit(std.testing.allocator);
+    for (sequence) |packet_id| {
+        const packet = try ControlPacket.init(.controlV1, 0, sid, packet_id, null, null, null);
+        const ready = try channel.enqueueInboundPacket(packet);
+        defer std.testing.allocator.free(ready);
+        for (ready) |*item| {
+            try handled.append(std.testing.allocator, item.packetId());
+            item.deinit();
+        }
+    }
+    try std.testing.expectEqualSlices(u32, &.{ 0, 1, 2 }, handled.items);
+}
+
+test "control channel suppresses retransmission until ACK" {
+    var one: u8 = 1;
+    const channel = try TestControlChannel.create(
+        std.testing.allocator,
+        .{ .context = &one, .fill_fn = fillOnes },
+        .{},
+    );
+    defer channel.destroy();
+    try channel.reset(true);
+    try channel.enqueueOutboundPackets(.controlV1, .controlV1, 0, "hello", 64, 64);
+
+    const first_write = try channel.writeOutboundPackets(60_000);
+    defer core_mod.util.freeSliceOfStrings(std.testing.allocator, first_write);
+    try std.testing.expectEqual(@as(usize, 1), first_write.len);
+    try std.testing.expect(channel.pending_acks.count() > 0);
+
+    const suppressed = try channel.writeOutboundPackets(60_000);
+    defer core_mod.util.freeSliceOfStrings(std.testing.allocator, suppressed);
+    try std.testing.expectEqual(@as(usize, 0), suppressed.len);
+
+    const packet_ids = [_]u32{0};
+    try channel.readAcks(&packet_ids, channel.sessionId().?);
+    try std.testing.expectEqual(@as(usize, 0), channel.pending_acks.count());
+    try std.testing.expectEqual(@as(usize, 0), channel.outbound_queue.items.len);
+    // Swift retains send dates until reset, even after the corresponding ACK.
+    try std.testing.expectEqual(@as(usize, 1), channel.sent_dates_ms.count());
 }

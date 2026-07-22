@@ -3,9 +3,12 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c_crypto = @import("../../c/exports.zig").crypto;
-const c = @import("c.zig").api;
-const errors = @import("errors.zig");
+const c_exports_mod = @import("../../c/exports.zig");
+const c_mod = @import("c.zig");
+const errors_mod = @import("errors.zig");
+
+const c = c_mod.api;
+const c_crypto = c_exports_mod.crypto;
 
 pub const PacketCode = enum(u8) {
     softResetV1 = 0x03,
@@ -38,28 +41,13 @@ pub const PacketCode = enum(u8) {
     pub fn native(self: PacketCode) c.openvpn_packet_code {
         return @intFromEnum(self);
     }
-
-    pub fn debugName(self: PacketCode) []const u8 {
-        return switch (self) {
-            .softResetV1 => "SOFT_RESET_V1",
-            .controlV1 => "CONTROL_V1",
-            .ackV1 => "ACK_V1",
-            .dataV1 => "DATA_V1",
-            .hardResetClientV2 => "HARD_RESET_CLIENT_V2",
-            .hardResetServerV2 => "HARD_RESET_SERVER_V2",
-            .dataV2 => "DATA_V2",
-            .hardResetClientV3 => "HARD_RESET_CLIENT_V3",
-            .controlWkcV1 => "CONTROL_WKC_V1",
-            .unknown => "UNKNOWN(255)",
-        };
-    }
 };
 
 pub const ControlPacket = struct {
     ptr: ?*c.openvpn_ctrl,
     code: PacketCode,
 
-    pub const InitError = errors.ControlPacketError;
+    pub const InitError = errors_mod.ControlPacketError;
 
     pub fn init(
         code: PacketCode,
@@ -171,50 +159,6 @@ pub const ControlPacket = struct {
         return bytes[0..c.OpenVPNPacketSessionIdLength];
     }
 
-    pub fn isAck(self: *const ControlPacket) bool {
-        return self.packetId() == std.math.maxInt(u32);
-    }
-
-    /// Caller-owned equivalent of Swift's sensitive debug description.
-    pub fn debugDescriptionAlloc(
-        self: *const ControlPacket,
-        allocator: std.mem.Allocator,
-        with_sensitive_data: bool,
-    ) std.mem.Allocator.Error![]u8 {
-        var output: std.Io.Writer.Allocating = .init(allocator);
-        errdefer output.deinit();
-        const writer = &output.writer;
-
-        writer.writeByte('{') catch return error.OutOfMemory;
-        writer.print("{s} | {}, sid: ", .{ self.code.debugName(), self.key() }) catch
-            return error.OutOfMemory;
-        writeHex(writer, self.sessionId()) catch return error.OutOfMemory;
-        if (self.ackIds()) |ack_ids| {
-            const remote_session_id = self.ackRemoteSessionId().?;
-            writer.writeAll(", acks: {[") catch return error.OutOfMemory;
-            for (ack_ids, 0..) |ack_id, index| {
-                if (index > 0) writer.writeAll(", ") catch return error.OutOfMemory;
-                writer.print("{}", .{ack_id}) catch return error.OutOfMemory;
-            }
-            writer.writeAll("], ") catch return error.OutOfMemory;
-            writeHex(writer, remote_session_id) catch return error.OutOfMemory;
-            writer.writeByte('}') catch return error.OutOfMemory;
-        }
-        if (!self.isAck()) {
-            writer.print(", pid: {}", .{self.packetId()}) catch return error.OutOfMemory;
-        }
-        if (self.payload()) |payload_bytes| {
-            writer.print(", [{} bytes", .{payload_bytes.len}) catch return error.OutOfMemory;
-            if (with_sensitive_data) {
-                writer.writeAll(", ") catch return error.OutOfMemory;
-                writeHex(writer, payload_bytes) catch return error.OutOfMemory;
-            }
-            writer.writeByte(']') catch return error.OutOfMemory;
-        }
-        writer.writeByte('}') catch return error.OutOfMemory;
-        return output.toOwnedSlice() catch error.OutOfMemory;
-    }
-
     pub fn serializedAlloc(
         self: *const ControlPacket,
         allocator: std.mem.Allocator,
@@ -260,7 +204,7 @@ pub const ControlPacket = struct {
             &algorithm,
             @ptrCast(&native_error),
         );
-        if (written == 0) return errors.cryptoError(native_error);
+        if (written == 0) return errors_mod.cryptoError(native_error);
         if (written < destination.len) destination = try allocator.realloc(destination, written);
         return destination;
     }
@@ -281,14 +225,6 @@ pub const OCCPacket = enum(u8) {
         return result;
     }
 };
-
-fn writeHex(writer: *std.Io.Writer, bytes: []const u8) std.Io.Writer.Error!void {
-    const alphabet = "0123456789abcdef";
-    for (bytes) |byte| {
-        try writer.writeByte(alphabet[byte >> 4]);
-        try writer.writeByte(alphabet[byte & 0x0f]);
-    }
-}
 
 test "control packet serializes to the Swift wire vector" {
     const session_id = [_]u8{ 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88 };
@@ -335,32 +271,10 @@ test "control packet rejects the native ACK sentinel on data opcodes" {
     );
 }
 
-test "control packet diagnostic redacts only payload bytes" {
-    const id = [_]u8{ 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef };
-    const payload = [_]u8{ 0xde, 0xad };
-    var packet = try ControlPacket.init(.controlV1, 2, &id, 7, &payload, null, null);
-    defer packet.deinit();
-
-    const redacted = try packet.debugDescriptionAlloc(std.testing.allocator, false);
-    defer std.testing.allocator.free(redacted);
-    try std.testing.expectEqualStrings(
-        "{CONTROL_V1 | 2, sid: 0123456789abcdef, pid: 7, [2 bytes]}",
-        redacted,
-    );
-
-    const sensitive = try packet.debugDescriptionAlloc(std.testing.allocator, true);
-    defer std.testing.allocator.free(sensitive);
-    try std.testing.expectEqualStrings(
-        "{CONTROL_V1 | 2, sid: 0123456789abcdef, pid: 7, [2 bytes, dead]}",
-        sensitive,
-    );
-}
-
 test "packet code wire values match OpenVPN" {
     try std.testing.expectEqual(@as(u8, 0x04), @intFromEnum(PacketCode.controlV1));
     try std.testing.expectEqual(PacketCode.hardResetClientV3, PacketCode.fromRaw(0x0a).?);
     try std.testing.expect(PacketCode.fromRaw(0x7f) == null);
-    try std.testing.expectEqualStrings("UNKNOWN(255)", PacketCode.unknown.debugName());
 }
 
 test "exit OCC packet matches OpenVPN magic" {

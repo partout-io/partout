@@ -3,32 +3,40 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const core = @import("../../core/exports.zig");
-const net = @import("../../net/exports.zig");
-const c_crypto = @import("../../c/exports.zig").crypto;
-const auth = @import("auth.zig");
-const Authenticator = auth.Authenticator;
-const PRF = auth.PRF;
-const configuration_helpers = @import("configuration.zig");
-const control = @import("control.zig");
-const serialization = @import("serialization.zig");
-const ControlChannel = control.ControlChannel(serialization.Serializer);
-const packet_types = @import("packet.zig");
-const ControlPacket = packet_types.ControlPacket;
-const PacketCode = packet_types.PacketCode;
-const ControlChannelConstants = @import("constants.zig").Control;
-const data_types = @import("data.zig");
-const DataChannel = data_types.DataChannel;
-const DataPathParameters = data_types.DataPathParameters;
-const DataPathWrapper = data_types.DataPathWrapper;
-const ConnectionOptions = configuration_helpers.ConnectionOptions;
-const LinkProcessor = @import("processing.zig").LinkProcessor;
-const PIAHardReset = @import("helpers.zig").PIAHardReset;
-const PRNG = @import("crypto.zig").PRNG;
-const PushReply = @import("push.zig").PushReply;
-const TLSWrapper = @import("tls.zig").TLSWrapper;
+const c_exports_mod = @import("../../c/exports.zig");
+const core_mod = @import("../../core/exports.zig");
+const net_mod = @import("../../net/exports.zig");
+const auth_mod = @import("auth.zig");
+const configuration_mod = @import("configuration.zig");
+const constants_mod = @import("constants.zig");
+const control_mod = @import("control.zig");
+const crypto_mod = @import("crypto.zig");
+const data_mod = @import("data.zig");
+const helpers_mod = @import("helpers.zig");
+const packet_mod = @import("packet.zig");
+const processing_mod = @import("processing.zig");
+const push_mod = @import("push.zig");
+const serialization_mod = @import("serialization.zig");
+const tls_mod = @import("tls.zig");
 
-const api = core.api;
+const api = core_mod.api;
+const c_crypto = c_exports_mod.crypto;
+
+const Authenticator = auth_mod.Authenticator;
+const ConnectionOptions = configuration_mod.ConnectionOptions;
+const ControlChannel = control_mod.ControlChannel(serialization_mod.Serializer);
+const ControlConstants = constants_mod.Control;
+const ControlPacket = packet_mod.ControlPacket;
+const DataChannel = data_mod.DataChannel;
+const DataPathParameters = data_mod.DataPathParameters;
+const DataPathWrapper = data_mod.DataPathWrapper;
+const LinkProcessor = processing_mod.LinkProcessor;
+const PacketCode = packet_mod.PacketCode;
+const PIAHardReset = helpers_mod.PIAHardReset;
+const PRF = auth_mod.PRF;
+const PRNG = crypto_mod.PRNG;
+const PushReply = push_mod.PushReply;
+const TLSWrapper = tls_mod.TLSWrapper;
 
 /// Ordered phases of an OpenVPN key negotiation.
 pub const RenegotiationType = enum {
@@ -94,7 +102,7 @@ pub const Negotiator = struct {
     key: u8,
     history: ?NegotiationHistory,
     renegotiation: ?RenegotiationType,
-    looper: *net.Looper,
+    looper: *net_mod.Looper,
     link_processor: *LinkProcessor,
     remote_endpoint: *const api.ExtendedEndpoint,
     channel: *ControlChannel,
@@ -117,7 +125,7 @@ pub const Negotiator = struct {
         key: u8 = 0,
         history: ?NegotiationHistory = null,
         renegotiation: ?RenegotiationType = null,
-        looper: *net.Looper,
+        looper: *net_mod.Looper,
         link_processor: *LinkProcessor,
         remote_endpoint: *const api.ExtendedEndpoint,
         channel: *ControlChannel,
@@ -142,7 +150,7 @@ pub const Negotiator = struct {
             .prng = init.prng,
             .tls = init.tls,
             .options = init.options,
-            .start_time_ns = core.concurrency.monotonicNs(),
+            .start_time_ns = core_mod.concurrency.monotonicNs(),
             .negotiation_timeout_ms = if (init.renegotiation != null)
                 init.options.session_options.soft_negotiation_timeout_ms
             else
@@ -184,7 +192,7 @@ pub const Negotiator = struct {
         errdefer self.tls = tls;
         return create(self.allocator, .{
             .fnt = self.fnt,
-            .key = ControlChannelConstants.nextKey(self.key),
+            .key = ControlConstants.nextKey(self.key),
             .history = history,
             .renegotiation = initiated_by,
             .looper = self.looper,
@@ -300,8 +308,6 @@ pub const Negotiator = struct {
         }
     }
 
-    pub fn handleAcks(_: *Negotiator) void {}
-
     pub fn sendAck(self: *Negotiator, packet: *const ControlPacket) void {
         const raw = self.channel.writeAcks(
             packet.key(),
@@ -331,15 +337,15 @@ pub const Negotiator = struct {
         defer self.allocator.free(ca_md5);
         return PIAHardReset.init(
             ca_md5,
-            configuration_helpers.fallbackCipher(self.options.configuration.*),
-            configuration_helpers.fallbackDigest(self.options.configuration.*),
+            configuration_mod.fallbackCipher(self.options.configuration.*),
+            configuration_mod.fallbackDigest(self.options.configuration.*),
         ).encodedData(self.allocator, self.prng) catch null;
     }
 
     fn pushRequest(self: *Negotiator) anyerror!void {
         if (self.state != .push) return;
         const next = self.next_push_request_ns orelse return;
-        if (core.concurrency.monotonicNs() <= next) return;
+        if (core_mod.concurrency.monotonicNs() <= next) return;
         const tls = self.tls orelse return error.Assertion;
         tls.putPlainText("PUSH_REQUEST\x00") catch {};
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
@@ -360,7 +366,7 @@ pub const Negotiator = struct {
         payload: []const u8,
     ) anyerror!void {
         var leading_code = code;
-        var leading_limit = ControlChannelConstants.max_payload_bytes_per_packet;
+        var leading_limit = ControlConstants.max_payload_bytes_per_packet;
         if (code == .controlV1 and self.should_resend_wrapped_key) {
             self.should_resend_wrapped_key = false;
             leading_code = .controlWkcV1;
@@ -374,7 +380,7 @@ pub const Negotiator = struct {
             key,
             payload,
             leading_limit,
-            ControlChannelConstants.max_payload_bytes_per_packet,
+            ControlConstants.max_payload_bytes_per_packet,
         );
         try self.flushControlQueue();
     }
@@ -403,9 +409,9 @@ pub const Negotiator = struct {
             const length = std.mem.readInt(u16, bytes[offset..][0..2], .big);
             offset += 2;
             if (offset + length > bytes.len) return false;
-            if (value_type == ControlChannelConstants.early_negotiation_flags_type and length >= 2) {
+            if (value_type == ControlConstants.early_negotiation_flags_type and length >= 2) {
                 const flags = std.mem.readInt(u16, bytes[offset..][0..2], .big);
-                return flags & ControlChannelConstants.early_negotiation_resend_wrapped_key != 0;
+                return flags & ControlConstants.early_negotiation_resend_wrapped_key != 0;
             }
             offset += length;
         }
@@ -608,16 +614,16 @@ pub const Negotiator = struct {
             null;
         const parameters = DataPathParameters{
             .fnt = self.fnt.enc,
-            .cipher = configuration_helpers.negotiatedDataChannelCipher(
+            .cipher = configuration_mod.negotiatedDataChannelCipher(
                 self.options.configuration.*,
                 push_reply.options,
                 server_cipher,
             ),
-            .digest = configuration_helpers.fallbackDigest(self.options.configuration.*),
+            .digest = configuration_mod.fallbackDigest(self.options.configuration.*),
             .compression_framing = push_reply.options.compression_framing orelse
-                configuration_helpers.fallbackCompressionFraming(self.options.configuration.*),
+                configuration_mod.fallbackCompressionFraming(self.options.configuration.*),
             .compression_algorithm = push_reply.options.compression_algorithm orelse
-                configuration_helpers.fallbackCompressionAlgorithm(self.options.configuration.*),
+                configuration_mod.fallbackCompressionAlgorithm(self.options.configuration.*),
             .peer_id = push_reply.options.peer_id,
         };
         var prf = try PRF.init(
@@ -645,12 +651,12 @@ pub const Negotiator = struct {
     }
 
     fn elapsedMs(self: *const Negotiator) u64 {
-        return (core.concurrency.monotonicNs() -| self.start_time_ns) /
+        return (core_mod.concurrency.monotonicNs() -| self.start_time_ns) /
             std.time.ns_per_ms;
     }
 
     fn deadlineAfter(delay_ms: u64) u64 {
-        return core.concurrency.monotonicNs() +|
+        return core_mod.concurrency.monotonicNs() +|
             delay_ms *| @as(u64, std.time.ns_per_ms);
     }
 

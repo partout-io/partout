@@ -3,13 +3,13 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const core = @import("../../core/exports.zig");
-const crypto = @import("crypto.zig");
-const errors = @import("errors.zig");
+const core_mod = @import("../../core/exports.zig");
+const crypto_mod = @import("crypto.zig");
+const errors_mod = @import("errors.zig");
 
-const api = core.api;
-const CryptoBackend = crypto.CryptoBackend;
-const PRNG = crypto.PRNG;
+const api = core_mod.api;
+const CryptoBackend = crypto_mod.CryptoBackend;
+const PRNG = crypto_mod.PRNG;
 
 pub const ConnectionOptions = struct {
     backend: CryptoBackend = .native,
@@ -142,7 +142,7 @@ pub fn endpointWithRandomPrefix(
     endpoint: api.ExtendedEndpoint,
     length: usize,
     prng: PRNG,
-) (std.mem.Allocator.Error || errors.PRNGError)!api.ExtendedEndpoint {
+) (std.mem.Allocator.Error || errors_mod.PRNGError)!api.ExtendedEndpoint {
     const address = api.Address.parseRaw(endpoint.address) orelse {
         return .{
             .address = try allocator.dupe(u8, endpoint.address),
@@ -180,7 +180,7 @@ pub fn processedRemotes(
     allocator: std.mem.Allocator,
     configuration: api.OpenVPNConfiguration,
     prng: PRNG,
-) (std.mem.Allocator.Error || errors.PRNGError)!?[]api.ExtendedEndpoint {
+) (std.mem.Allocator.Error || errors_mod.PRNGError)!?[]api.ExtendedEndpoint {
     const source = configuration.remotes orelse return null;
     const shuffled = try allocator.dupe(api.ExtendedEndpoint, source);
     defer allocator.free(shuffled);

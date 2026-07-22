@@ -3,21 +3,23 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const core = @import("../../core/exports.zig");
-const c_crypto = @import("../../c/exports.zig").crypto;
-const configuration_helpers = @import("configuration.zig");
-const constants = @import("constants.zig");
-const ControlChannel = constants.Control;
-const crypto = @import("crypto.zig");
-const CryptoKeyPair = crypto.CryptoKeyPair;
-const CryptoKeys = crypto.CryptoKeys;
-const errors = @import("errors.zig");
-const Keys = constants.Keys;
-const push = @import("push.zig");
-const PRNG = crypto.PRNG;
-const ZeroingData = crypto.ZeroingData;
+const c_exports_mod = @import("../../c/exports.zig");
+const core_mod = @import("../../core/exports.zig");
+const configuration_mod = @import("configuration.zig");
+const constants_mod = @import("constants.zig");
+const crypto_mod = @import("crypto.zig");
+const errors_mod = @import("errors.zig");
+const push_mod = @import("push.zig");
 
-const api = core.api;
+const api = core_mod.api;
+const c_crypto = c_exports_mod.crypto;
+
+const ControlConstants = constants_mod.Control;
+const CryptoKeyPair = crypto_mod.CryptoKeyPair;
+const CryptoKeys = crypto_mod.CryptoKeys;
+const Keys = constants_mod.Keys;
+const PRNG = crypto_mod.PRNG;
+const ZeroingData = crypto_mod.ZeroingData;
 
 /// Key-method 2 client/server random material.
 pub const Handshake = struct {
@@ -63,7 +65,7 @@ pub const PRF = struct {
     session_id: ?[]u8,
     remote_session_id: ?[]u8,
 
-    pub const Error = std.mem.Allocator.Error || errors.PRFError;
+    pub const Error = std.mem.Allocator.Error || errors_mod.PRFError;
 
     /// Clones all input data so this value may outlive the negotiation that
     /// produced it.
@@ -94,14 +96,6 @@ pub const PRF = struct {
         self.handshake = null;
         self.session_id = null;
         self.remote_session_id = null;
-    }
-
-    pub fn move(self: *PRF) PRF {
-        const result = self.*;
-        self.handshake = null;
-        self.session_id = null;
-        self.remote_session_id = null;
-        return result;
     }
 
     pub fn derive(self: *const PRF, allocator: std.mem.Allocator) Error!CryptoKeys {
@@ -330,14 +324,14 @@ pub const Authenticator = struct {
         configuration: api.OpenVPNConfiguration,
     ) anyerror!void {
         const allocator = self.allocator;
-        var raw = try ZeroingData.initCopy(allocator, &ControlChannel.tls_prefix);
+        var raw = try ZeroingData.initCopy(allocator, &ControlConstants.tls_prefix);
         defer raw.deinit(allocator);
 
         raw.appendData(self.pre_master);
         raw.appendData(self.random1);
         raw.appendData(self.random2);
 
-        const local_options = try configuration_helpers.localOptionsStringAlloc(
+        const local_options = try configuration_mod.localOptionsStringAlloc(
             allocator,
             configuration,
             self.with_local_options,
@@ -354,7 +348,7 @@ pub const Authenticator = struct {
             try raw.append(allocator, &.{ 0, 0, 0, 0 });
         }
 
-        const negotiated = try configuration_helpers.negotiableDataCiphers(
+        const negotiated = try configuration_mod.negotiableDataCiphers(
             allocator,
             configuration,
         );
@@ -368,7 +362,7 @@ pub const Authenticator = struct {
             &.{value}
         else
             &.{};
-        const peer_info = try push.peerInfoAlloc(
+        const peer_info = try push_mod.peerInfoAlloc(
             allocator,
             "io.partout 0.151.0",
             self.ssl_version,
@@ -387,13 +381,13 @@ pub const Authenticator = struct {
     }
 
     pub fn parseAuthReply(self: *Authenticator) anyerror!bool {
-        const prefix_length = ControlChannel.tls_prefix.len;
+        const prefix_length = ControlConstants.tls_prefix.len;
         const minimum_length = prefix_length + 2 * Keys.random_length + 2;
         if (self.control_buffer.bytes.len < minimum_length) return false;
         if (!std.mem.eql(
             u8,
             self.control_buffer.bytes[0..prefix_length],
-            &ControlChannel.tls_prefix,
+            &ControlConstants.tls_prefix,
         )) return error.WrongControlDataPrefix;
 
         var offset = prefix_length;
@@ -440,7 +434,7 @@ pub const Authenticator = struct {
     }
 
     /// Returns all complete NUL-terminated messages. Caller owns the rows and
-    /// outer slice and must call `freeMessages`.
+    /// outer slice.
     pub fn parseMessages(
         self: *Authenticator,
         allocator: std.mem.Allocator,
@@ -461,11 +455,6 @@ pub const Authenticator = struct {
         }
         self.control_buffer.removePrefix(self.allocator, offset) catch unreachable;
         return messages.toOwnedSlice(allocator);
-    }
-
-    pub fn freeMessages(allocator: std.mem.Allocator, messages: [][]u8) void {
-        for (messages) |message| allocator.free(message);
-        allocator.free(messages);
     }
 
     /// Returns an owned handshake once both server randoms are available.
@@ -619,15 +608,12 @@ test "PRF owns retained inputs and derives four key-method-2 buffers" {
     );
     defer prf.deinit(allocator);
 
-    // The PRF must remain usable after negotiation-owned inputs disappear and
-    // after ownership moves into a retaining factory.
+    // The PRF must remain usable after negotiation-owned inputs disappear.
     handshake.deinit(allocator);
     allocator.free(session_id);
     allocator.free(remote_session_id);
-    var retained_prf = prf.move();
-    defer retained_prf.deinit(allocator);
 
-    var keys = try retained_prf.derive(allocator);
+    var keys = try prf.derive(allocator);
     defer keys.deinit(allocator);
     try std.testing.expectEqual(Keys.key_length, keys.cipher.?.encryption_key.bytes.len);
     try std.testing.expectEqual(Keys.key_length, keys.cipher.?.decryption_key.bytes.len);
@@ -673,17 +659,17 @@ test "Authenticator frames auth and buffers replies and messages" {
     const framed = recorder.plaintext.?;
     try std.testing.expectEqualSlices(
         u8,
-        &ControlChannel.tls_prefix,
-        framed[0..ControlChannel.tls_prefix.len],
+        &ControlConstants.tls_prefix,
+        framed[0..ControlConstants.tls_prefix.len],
     );
     try std.testing.expect(framed.len >
-        ControlChannel.tls_prefix.len + Keys.pre_master_length + 2 * Keys.random_length);
+        ControlConstants.tls_prefix.len + Keys.pre_master_length + 2 * Keys.random_length);
     try std.testing.expect(std.mem.indexOf(u8, framed, "IV_PLAT_VER=") != null);
 
     const server_options = "V4,cipher AES-256-GCM,auth SHA256\x00";
     var reply: std.ArrayList(u8) = .empty;
     defer reply.deinit(allocator);
-    try reply.appendSlice(allocator, &ControlChannel.tls_prefix);
+    try reply.appendSlice(allocator, &ControlConstants.tls_prefix);
     try reply.appendNTimes(allocator, 0x11, Keys.random_length);
     try reply.appendNTimes(allocator, 0x22, Keys.random_length);
     var options_length: [2]u8 = undefined;
@@ -704,7 +690,10 @@ test "Authenticator frames auth and buffers replies and messages" {
 
     try authenticator.appendControlData("AUTH_FAILED\x00PUSH_REPLY,route\x00partial");
     const messages = try authenticator.parseMessages(allocator);
-    defer Authenticator.freeMessages(allocator, messages);
+    defer {
+        for (messages) |message| allocator.free(message);
+        allocator.free(messages);
+    }
     try std.testing.expectEqual(@as(usize, 2), messages.len);
     try std.testing.expectEqualStrings("AUTH_FAILED", messages[0]);
     try std.testing.expectEqualStrings("PUSH_REPLY,route", messages[1]);

@@ -5,10 +5,13 @@
 //! Coarse OpenVPN failures and their eventual ConnectionReporter mapping.
 
 const std = @import("std");
+const c_exports_mod = @import("../../c/exports.zig");
+const core_mod = @import("../../core/exports.zig");
+const c_mod = @import("c.zig");
 
-const api = @import("../../core/exports.zig").api;
-const c_crypto = @import("../../c/exports.zig").crypto;
-const c = @import("c.zig").api;
+const api = core_mod.api;
+const c = c_mod.api;
+const c_crypto = c_exports_mod.crypto;
 
 /// Failures that must retain a distinct public last-error category.
 pub const PRFError = error{
@@ -105,19 +108,6 @@ pub fn partoutCode(err: anyerror) api.PartoutErrorCode {
     };
 }
 
-pub fn isRecoverable(err: anyerror) bool {
-    return switch (partoutCode(err)) {
-        .timeout,
-        .ioFailure,
-        .networkChanged,
-        .openVPNConnectionFailure,
-        .openVPNRecoverableAuthentication,
-        .openVPNServerShutdown,
-        => true,
-        else => err == error.Recoverable,
-    };
-}
-
 test "coarse failures map to ConnectionReporter categories" {
     try std.testing.expectEqual(api.PartoutErrorCode.timeout, partoutCode(error.Timeout));
     try std.testing.expectEqual(api.PartoutErrorCode.authentication, partoutCode(error.BadCredentials));
@@ -131,5 +121,4 @@ test "coarse failures map to ConnectionReporter categories" {
         api.PartoutErrorCode.openVPNCompressionMismatch,
         partoutCode(error.CompressionMismatch),
     );
-    try std.testing.expect(isRecoverable(error.ServerShutdown));
 }

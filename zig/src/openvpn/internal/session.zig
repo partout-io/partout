@@ -3,47 +3,48 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c_crypto = @import("../../c/exports.zig").crypto;
-const core = @import("../../core/exports.zig");
-const net = @import("../../net/exports.zig");
-const c = @import("c.zig").api;
-const configuration_types = @import("configuration.zig");
-const constants = @import("constants.zig");
-const control = @import("control.zig");
-const crypto = @import("crypto.zig");
-const data_types = @import("data.zig");
-const errors = @import("errors.zig");
-const helpers = @import("helpers.zig");
-const packet_types = @import("packet.zig");
-const processing = @import("processing.zig");
-const push = @import("push.zig");
-const serialization = @import("serialization.zig");
-const session_context = @import("session_context.zig");
-const session_negotiator = @import("session_negotiator.zig");
-const tls_types = @import("tls.zig");
+const c_exports_mod = @import("../../c/exports.zig");
+const core_mod = @import("../../core/exports.zig");
+const net_mod = @import("../../net/exports.zig");
+const c_mod = @import("c.zig");
+const configuration_mod = @import("configuration.zig");
+const constants_mod = @import("constants.zig");
+const control_mod = @import("control.zig");
+const crypto_mod = @import("crypto.zig");
+const data_mod = @import("data.zig");
+const errors_mod = @import("errors.zig");
+const helpers_mod = @import("helpers.zig");
+const packet_mod = @import("packet.zig");
+const processing_mod = @import("processing.zig");
+const push_mod = @import("push.zig");
+const serialization_mod = @import("serialization.zig");
+const session_context_mod = @import("session_context.zig");
+const session_negotiator_mod = @import("session_negotiator.zig");
+const tls_mod = @import("tls.zig");
 
-const ActiveContext = session_context.ActiveContext;
-const ActivePhase = session_context.ActivePhase;
-const ConnectionOptions = configuration_types.ConnectionOptions;
-const ControlChannel = control.ControlChannel(serialization.Serializer);
-const ControlChannelConstants = constants.Control;
-const credentials_helpers = helpers;
-const DataChannel = data_types.DataChannel;
-const DataLink = data_types.DataLink;
-const IdleContext = session_context.IdleContext;
-const LinkProcessor = processing.LinkProcessor;
-const Negotiator = session_negotiator.Negotiator;
-const NegotiatorOptions = session_negotiator.NegotiatorOptions;
-const OCCPacket = packet_types.OCCPacket;
-const PacketCode = packet_types.PacketCode;
-const PRNG = crypto.PRNG;
-const PushReply = push.PushReply;
-const RenegotiationType = session_negotiator.RenegotiationType;
-const SessionState = session_context.SessionState;
-const TLSParameters = tls_types.TLSParameters;
-const TLSWrapper = tls_types.TLSWrapper;
+const api = core_mod.api;
+const c = c_mod.api;
+const c_crypto = c_exports_mod.crypto;
 
-const api = core.api;
+const ActiveContext = session_context_mod.ActiveContext;
+const ActivePhase = session_context_mod.ActivePhase;
+const ConnectionOptions = configuration_mod.ConnectionOptions;
+const ControlChannel = control_mod.ControlChannel(serialization_mod.Serializer);
+const ControlConstants = constants_mod.Control;
+const DataChannel = data_mod.DataChannel;
+const DataLink = data_mod.DataLink;
+const IdleContext = session_context_mod.IdleContext;
+const LinkProcessor = processing_mod.LinkProcessor;
+const Negotiator = session_negotiator_mod.Negotiator;
+const NegotiatorOptions = session_negotiator_mod.NegotiatorOptions;
+const OCCPacket = packet_mod.OCCPacket;
+const PacketCode = packet_mod.PacketCode;
+const PRNG = crypto_mod.PRNG;
+const PushReply = push_mod.PushReply;
+const RenegotiationType = session_negotiator_mod.RenegotiationType;
+const SessionState = session_context_mod.SessionState;
+const TLSParameters = tls_mod.TLSParameters;
+const TLSWrapper = tls_mod.TLSWrapper;
 
 /// Type-erased observer for major session events.
 ///
@@ -113,12 +114,12 @@ pub const Session = struct {
     caches_directory: []u8,
     options: ConnectionOptions,
 
-    looper: *net.Looper,
+    looper: *net_mod.Looper,
     control_channel: *ControlChannel,
     shutdown_actor: ?*ShutdownActor,
-    lifecycle_lock: core.Mutex = .{},
-    negotiation_timer: core.RunAfter = .{},
-    ping_timer: core.RunAfter = .{},
+    lifecycle_lock: core_mod.Mutex = .{},
+    negotiation_timer: core_mod.RunAfter = .{},
+    ping_timer: core_mod.RunAfter = .{},
 
     delegate: ?SessionDelegate = null,
     state: SessionState = .{ .stopped = .{ .with_local_options = true } },
@@ -129,7 +130,7 @@ pub const Session = struct {
         timeout_ms: ?u64 = null,
     };
 
-    const ShutdownActor = core.Actor(
+    const ShutdownActor = core_mod.Actor(
         Session,
         ShutdownRequest,
         anyerror,
@@ -138,7 +139,7 @@ pub const Session = struct {
 
     pub fn create(
         allocator: std.mem.Allocator,
-        looper: *net.Looper,
+        looper: *net_mod.Looper,
         fnt: c_crypto.pp_crypto_fnt,
         configuration: api.OpenVPNConfiguration,
         credentials: ?api.OpenVPNCredentials,
@@ -149,13 +150,13 @@ pub const Session = struct {
         var owned_configuration = try configuration.clone(allocator);
         errdefer owned_configuration.deinit(allocator);
         var owned_credentials = if (credentials) |value|
-            try credentials_helpers.forAuthentication(allocator, value)
+            try helpers_mod.forAuthentication(allocator, value)
         else
             null;
         errdefer if (owned_credentials) |*value| value.deinit(allocator);
         const owned_caches_directory = try allocator.dupe(u8, caches_directory);
         errdefer allocator.free(owned_caches_directory);
-        const serializer = try serialization.Serializer.forConfiguration(
+        const serializer = try serialization_mod.Serializer.forConfiguration(
             allocator,
             fnt.enc,
             &owned_configuration,
@@ -234,7 +235,7 @@ pub const Session = struct {
 
     pub fn setLink(
         self: *Session,
-        descriptor: net.Looper.Descriptor,
+        descriptor: net_mod.Looper.Descriptor,
         remote_endpoint: api.ExtendedEndpoint,
     ) anyerror!void {
         if (self.looper.isOnQueue()) return error.ReentrantCall;
@@ -270,11 +271,7 @@ pub const Session = struct {
         try self.looper.perform(void, &request, setLinkOnQueue);
     }
 
-    pub fn hasLink(self: *Session) bool {
-        return self.looper.isLinkAttached();
-    }
-
-    pub fn setTunnel(self: *Session, descriptor: net.Looper.Descriptor) anyerror!void {
+    pub fn setTunnel(self: *Session, descriptor: net_mod.Looper.Descriptor) anyerror!void {
         if (self.looper.isOnQueue()) return error.ReentrantCall;
         self.lifecycle_lock.lock();
         defer self.lifecycle_lock.unlock();
@@ -382,7 +379,7 @@ pub const Session = struct {
 
         const should_notify = request.cause == null or
             request.cause.? == error.NetworkChanged or
-            errors.partoutCode(request.cause.?) == .networkChanged;
+            errors_mod.partoutCode(request.cause.?) == .networkChanged;
         if (should_notify) self.sendExitPacketOnQueue(
             request.timeout_ms orelse self.options.write_timeout_ms,
         ) catch {};
@@ -425,20 +422,20 @@ pub const Session = struct {
     /// Routes the externally owned looper's terminal callback into the
     /// session. The owner must call this synchronously from `Looper.OnFinish`
     /// while the Session is alive, and must stop forwarding before `destroy`.
-    pub fn looperDidFinish(self: *Session, failure: ?net.Looper.Failure) void {
+    pub fn looperDidFinish(self: *Session, failure: ?net_mod.Looper.Failure) void {
         std.debug.assert(self.looper.isOnQueue());
         self.finishShutdown(if (failure) |value| failureError(value) else null);
     }
 
-    fn onSideFailure(raw: ?*anyopaque, failure: net.Looper.Failure) void {
+    fn onSideFailure(raw: ?*anyopaque, failure: net_mod.Looper.Failure) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         self.requestShutdown(failureError(failure));
     }
 
     fn onLinkRead(
         raw: ?*anyopaque,
-        packets: net.Looper.Packets,
-    ) anyerror!net.Looper.ReadAction {
+        packets: net_mod.Looper.Packets,
+    ) anyerror!net_mod.Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const processor = self.link_processor orelse return .keep;
         var processed = try processor.processInbound(packets);
@@ -449,8 +446,8 @@ pub const Session = struct {
 
     fn onTunnelRead(
         raw: ?*anyopaque,
-        packets: net.Looper.Packets,
-    ) anyerror!net.Looper.ReadAction {
+        packets: net_mod.Looper.Packets,
+    ) anyerror!net_mod.Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         try self.receiveTunnel(packets);
         return .keep;
@@ -459,13 +456,13 @@ pub const Session = struct {
     fn receiveLink(self: *Session, packets: []const []const u8) anyerror!void {
         std.debug.assert(self.looper.isOnQueue());
         const context = self.state.activeContext() orelse return;
-        context.last_received_ns = core.concurrency.monotonicNs();
+        context.last_received_ns = core_mod.concurrency.monotonicNs();
         var negotiator = context.currentNegotiator() orelse return error.Assertion;
         if (negotiator.shouldRenegotiate())
             negotiator = try self.startRenegotiationOnQueue(negotiator, .client);
 
         var grouped = [_]std.ArrayList([]const u8){.empty} **
-            ControlChannelConstants.number_of_keys;
+            ControlConstants.number_of_keys;
         defer for (&grouped) |*list| list.deinit(self.allocator);
         for (packets) |packet| {
             if (packet.len == 0) continue;
@@ -484,7 +481,6 @@ pub const Session = struct {
             try processDataPackets(context, &grouped);
             var parsed = negotiator.readInboundPacket(packet, 0) catch continue;
             defer parsed.deinit();
-            negotiator.handleAcks();
             if (parsed.code == .ackV1) continue;
             switch (code) {
                 .hardResetServerV2 => {
@@ -510,7 +506,7 @@ pub const Session = struct {
 
     fn processDataPackets(
         context: *ActiveContext,
-        grouped: *[ControlChannelConstants.number_of_keys]std.ArrayList([]const u8),
+        grouped: *[ControlConstants.number_of_keys]std.ArrayList([]const u8),
     ) anyerror!void {
         const pair = context.current_data_pair orelse {
             for (grouped) |*list| list.clearRetainingCapacity();
@@ -672,7 +668,7 @@ pub const Session = struct {
         const pair = context.current_data_pair orelse return;
         try self.checkPingTimeoutOnQueue(context);
         if (self.keepAliveIntervalMs(context) != null) {
-            const ping: []const u8 = &constants.Data.ping_string;
+            const ping: []const u8 = &constants_mod.Data.ping_string;
             try pair.send(&.{ping}, null, null);
         }
         try self.scheduleNextPing(context);
@@ -685,7 +681,7 @@ pub const Session = struct {
         const last_received = context.last_received_ns orelse return;
         const timeout_ns = self.keepAliveTimeoutMs(context) *|
             @as(u64, std.time.ns_per_ms);
-        if (core.concurrency.monotonicNs() -| last_received > timeout_ns)
+        if (core_mod.concurrency.monotonicNs() -| last_received > timeout_ns)
             return error.Timeout;
     }
 
@@ -742,7 +738,7 @@ pub const Session = struct {
     }
 
     fn delegateCurrentDataCount(self: *Session, context: *ActiveContext) void {
-        const now = core.concurrency.monotonicNs();
+        const now = core_mod.concurrency.monotonicNs();
         if (context.last_data_count_ns) |last| {
             const minimum = self.options.min_data_count_interval_ms *|
                 @as(u64, std.time.ns_per_ms);
@@ -755,7 +751,7 @@ pub const Session = struct {
         });
     }
 
-    fn failureError(failure: net.Looper.Failure) anyerror {
+    fn failureError(failure: net_mod.Looper.Failure) anyerror {
         return switch (failure) {
             .user => |cause| cause,
             .io => |details| details.cause,
@@ -805,13 +801,13 @@ test "Session declarations are semantically analyzed" {
 
 test "Session borrows an externally managed Looper" {
     const Callbacks = struct {
-        fn onFinish(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
+        fn onFinish(_: ?*anyopaque, _: ?net_mod.Looper.Failure) void {}
 
         fn barrier(_: ?*anyopaque) anyerror!void {}
     };
 
     const allocator = std.testing.allocator;
-    var looper = try net.Looper.init(allocator, .{
+    var looper = try net_mod.Looper.init(allocator, .{
         .on_finish = .{ .callback = Callbacks.onFinish },
     });
     defer looper.deinit();

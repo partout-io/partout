@@ -4,8 +4,12 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
-const api = @import("../../core/exports.zig").api;
-const Parser = @import("../parser.zig").Parser;
+const core_mod = @import("../../core/exports.zig");
+const parser_mod = @import("../parser.zig");
+
+const api = core_mod.api;
+
+const Parser = parser_mod.Parser;
 
 pub const PushReply = struct {
     original: []u8,
@@ -50,25 +54,6 @@ pub const PushReply = struct {
         self.options.deinit(allocator);
         allocator.free(self.original);
         self.* = undefined;
-    }
-
-    /// Returns a diagnostic copy with the auth-token value removed.
-    pub fn redactedAlloc(self: PushReply, allocator: std.mem.Allocator) std.mem.Allocator.Error![]u8 {
-        var output: std.Io.Writer.Allocating = .init(allocator);
-        errdefer output.deinit();
-        var fields = std.mem.splitScalar(u8, self.original, ',');
-        var first = true;
-        while (fields.next()) |field| {
-            if (!first) output.writer.writeByte(',') catch return error.OutOfMemory;
-            first = false;
-            const trimmed = std.mem.trimStart(u8, field, " \t");
-            if (std.ascii.startsWithIgnoreCase(trimmed, "auth-token")) {
-                output.writer.writeAll("auth-token") catch return error.OutOfMemory;
-            } else {
-                output.writer.writeAll(field) catch return error.OutOfMemory;
-            }
-        }
-        return output.toOwnedSlice() catch error.OutOfMemory;
     }
 };
 
@@ -222,14 +207,6 @@ test "PUSH_REPLY signals a continuation fragment" {
             "PUSH_REPLY,route 10.0.0.0 255.0.0.0,push-continuation 2",
         ),
     );
-}
-
-test "PUSH_REPLY diagnostics redact auth tokens" {
-    var reply = (try PushReply.parse(std.testing.allocator, "PUSH_REPLY,ping 10,auth-token secret")).?;
-    defer reply.deinit(std.testing.allocator);
-    const redacted = try reply.redactedAlloc(std.testing.allocator);
-    defer std.testing.allocator.free(redacted);
-    try std.testing.expectEqualStrings("PUSH_REPLY,ping 10,auth-token", redacted);
 }
 
 test "runtime platform version has major and minor components" {

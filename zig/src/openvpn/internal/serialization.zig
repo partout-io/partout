@@ -3,25 +3,25 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const core = @import("../../core/exports.zig");
-const c_crypto = @import("../../c/exports.zig").crypto;
-const c = @import("c.zig").api;
-const helpers = @import("helpers.zig");
-const BidirectionalState = helpers.BidirectionalState;
-const control = @import("control.zig");
-const packet_types = @import("packet.zig");
-const ControlPacket = packet_types.ControlPacket;
-const PacketCode = packet_types.PacketCode;
-const ControlConstants = @import("constants.zig").Control;
-const crypto = @import("crypto.zig");
-const CryptoKeysBridge = crypto.CryptoKeysBridge;
-const errors = @import("errors.zig");
-const configuration_helpers = @import("configuration.zig");
-const PRNG = crypto.PRNG;
-const static_key = helpers;
-const time = helpers;
+const c_exports_mod = @import("../../c/exports.zig");
+const core_mod = @import("../../core/exports.zig");
+const c_mod = @import("c.zig");
+const configuration_mod = @import("configuration.zig");
+const constants_mod = @import("constants.zig");
+const crypto_mod = @import("crypto.zig");
+const errors_mod = @import("errors.zig");
+const helpers_mod = @import("helpers.zig");
+const packet_mod = @import("packet.zig");
 
-const api = core.api;
+const api = core_mod.api;
+const c = c_mod.api;
+const c_crypto = c_exports_mod.crypto;
+
+const BidirectionalState = helpers_mod.BidirectionalState;
+const ControlConstants = constants_mod.Control;
+const ControlPacket = packet_mod.ControlPacket;
+const CryptoKeysBridge = crypto_mod.CryptoKeysBridge;
+const PacketCode = packet_mod.PacketCode;
 
 /// Concrete serializer variants selected once when a control channel is built.
 pub const Serializer = union(enum) {
@@ -40,7 +40,7 @@ pub const Serializer = union(enum) {
                 .auth => .{ .auth = try AuthSerializer.init(
                     allocator,
                     fnt,
-                    configuration_helpers.fallbackDigest(configuration.*),
+                    configuration_mod.fallbackDigest(configuration.*),
                     wrap.key,
                 ) },
                 .crypt => .{ .crypt = try CryptSerializer.init(allocator, fnt, wrap.key) },
@@ -94,8 +94,8 @@ pub const Serializer = union(enum) {
     }
 };
 
-pub const PlainSerializer = struct {
-    pub const ParseError = errors.PlainSerializerError;
+const PlainSerializer = struct {
+    pub const ParseError = errors_mod.PlainSerializerError;
 
     pub fn reset(_: *PlainSerializer) void {}
 
@@ -162,7 +162,7 @@ pub const PlainSerializer = struct {
     }
 };
 
-pub const AuthSerializer = struct {
+const AuthSerializer = struct {
     fnt: c_crypto.pp_crypto_enc_fnt,
     cbc: c_crypto.pp_crypto_ctx,
     prefix_length: usize,
@@ -179,11 +179,11 @@ pub const AuthSerializer = struct {
         digest: api.OpenVPNDigest,
         key: api.OpenVPNStaticKey,
     ) anyerror!AuthSerializer {
-        var keys = try static_key.authKeys(allocator, key);
+        var keys = try helpers_mod.authKeys(allocator, key);
         defer keys.deinit(allocator);
         var bridge = try CryptoKeysBridge.init(allocator, &keys);
         defer bridge.deinit();
-        var digest_name: core.util.TemporaryCString = .{};
+        var digest_name: core_mod.util.TemporaryCString = .{};
         try digest_name.init(allocator, digest.raw());
         defer digest_name.deinit();
         const cbc = fnt.cbc_create.?(null, digest_name.ptr(), bridge.native()) orelse return error.UnsupportedAlgorithm;
@@ -198,7 +198,7 @@ pub const AuthSerializer = struct {
             .auth_length = auth_length,
             .preamble_length = prefix_length + auth_length,
             .current_replay_id = BidirectionalState(u32).init(1),
-            .timestamp = time.unixSeconds(),
+            .timestamp = helpers_mod.unixSeconds(),
         };
     }
 
@@ -253,13 +253,13 @@ pub const AuthSerializer = struct {
         );
         var native_error: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone;
         if (!c_crypto.pp_crypto_verify(self.cbc, swapped.ptr, swapped.len, &native_error)) {
-            return errors.cryptoError(native_error);
+            return errors_mod.cryptoError(native_error);
         }
         return self.plain.deserialize(allocator, swapped, self.auth_length, null);
     }
 };
 
-pub const CryptSerializer = struct {
+const CryptSerializer = struct {
     fnt: c_crypto.pp_crypto_enc_fnt,
     ctr: c_crypto.pp_crypto_ctx,
     header_length: usize,
@@ -274,14 +274,14 @@ pub const CryptSerializer = struct {
         fnt: c_crypto.pp_crypto_enc_fnt,
         key: api.OpenVPNStaticKey,
     ) anyerror!CryptSerializer {
-        var keys = try static_key.cryptKeys(allocator, key);
+        var keys = try helpers_mod.cryptKeys(allocator, key);
         defer keys.deinit(allocator);
         var bridge = try CryptoKeysBridge.init(allocator, &keys);
         defer bridge.deinit();
-        var cipher_name: core.util.TemporaryCString = .{};
+        var cipher_name: core_mod.util.TemporaryCString = .{};
         try cipher_name.init(allocator, "AES-256-CTR");
         defer cipher_name.deinit();
-        var digest_name: core.util.TemporaryCString = .{};
+        var digest_name: core_mod.util.TemporaryCString = .{};
         try digest_name.init(allocator, "SHA256");
         defer digest_name.deinit();
         const ctr = fnt.ctr_create.?(
@@ -299,7 +299,7 @@ pub const CryptSerializer = struct {
             .ad_length = header_length + c.OpenVPNPacketReplayIdLength + c.OpenVPNPacketReplayTimestampLength,
             .tag_length = c_crypto.pp_crypto_meta_of(ctr).tag_len,
             .current_replay_id = BidirectionalState(u32).init(1),
-            .timestamp = time.unixSeconds(),
+            .timestamp = helpers_mod.unixSeconds(),
         };
     }
 
@@ -373,7 +373,7 @@ pub const CryptSerializer = struct {
             &flags,
             &native_error,
         );
-        if (decrypted_count == 0) return errors.cryptoError(native_error);
+        if (decrypted_count == 0) return errors_mod.cryptoError(native_error);
         @memcpy(decrypted[0..self.header_length], source[0..self.header_length]);
         const total = self.header_length + decrypted_count;
         std.debug.assert(total <= decrypted.len);
@@ -383,7 +383,7 @@ pub const CryptSerializer = struct {
     }
 };
 
-pub const CryptV2Serializer = struct {
+const CryptV2Serializer = struct {
     wrapped_key: []u8,
     serializer: CryptSerializer,
 
@@ -443,12 +443,6 @@ pub const CryptV2Serializer = struct {
         return self.serializer.deserialize(allocator, data, start, end);
     }
 };
-
-fn fillOnes(context: ?*anyopaque, destination: []u8) bool {
-    const value: *u8 = @ptrCast(@alignCast(context.?));
-    @memset(destination, value.*);
-    return true;
-}
 
 test "plain serializer round trips control and ACK packets" {
     var interface = Serializer{ .plain = .{} };
@@ -547,82 +541,4 @@ test "tls-crypt-v2 appends the wrapped key only to WKC opcodes" {
     const unwrapped = try serializer.serialize(std.testing.allocator, &ordinary);
     defer std.testing.allocator.free(unwrapped);
     try std.testing.expect(!std.mem.endsWith(u8, unwrapped, &wrapped_bytes));
-}
-
-const TestControlChannel = control.ControlChannel(Serializer);
-
-test "plain control channel fragments payload and retains opcode" {
-    var one: u8 = 1;
-    const mock_prng = PRNG{ .context = &one, .fill_fn = fillOnes };
-    const channel = try TestControlChannel.create(
-        std.testing.allocator,
-        mock_prng,
-        .{ .plain = .{} },
-    );
-    defer channel.destroy();
-    try channel.reset(true);
-    try channel.enqueueOutboundPacketsWithCode(.controlV1, 0, &.{ 1, 2, 3, 4, 5, 6 }, 4);
-    const packets = try channel.writeOutboundPackets(0);
-    defer TestControlChannel.freePackets(std.testing.allocator, packets);
-    try std.testing.expectEqual(@as(usize, 2), packets.len);
-    try std.testing.expectEqual(@as(u8, @intFromEnum(PacketCode.controlV1)), packets[0][0] >> 3);
-    try std.testing.expectEqual(@as(u8, @intFromEnum(PacketCode.controlV1)), packets[1][0] >> 3);
-}
-
-test "control channel reorders and deduplicates inbound packets" {
-    var one: u8 = 1;
-    const mock_prng = PRNG{ .context = &one, .fill_fn = fillOnes };
-    const channel = try TestControlChannel.create(
-        std.testing.allocator,
-        mock_prng,
-        .{ .plain = .{} },
-    );
-    defer channel.destroy();
-    try channel.reset(true);
-    const sid = channel.sessionId().?;
-    const sequence = [_]u32{ 2, 0, 1, 1 };
-    var handled: std.ArrayList(u32) = .empty;
-    defer handled.deinit(std.testing.allocator);
-    for (sequence) |packet_id| {
-        const packet = try ControlPacket.init(.controlV1, 0, sid, packet_id, null, null, null);
-        const ready = try channel.enqueueInboundPacket(packet);
-        defer std.testing.allocator.free(ready);
-        for (ready) |*item| {
-            try handled.append(std.testing.allocator, item.packetId());
-            item.deinit();
-        }
-    }
-    try std.testing.expectEqualSlices(u32, &.{ 0, 1, 2 }, handled.items);
-}
-
-test "control channel suppresses retransmission until ACK" {
-    var one: u8 = 1;
-    const mock_prng = PRNG{ .context = &one, .fill_fn = fillOnes };
-    const channel = try TestControlChannel.create(
-        std.testing.allocator,
-        mock_prng,
-        .{ .plain = .{} },
-    );
-    defer channel.destroy();
-    try channel.reset(true);
-    try channel.enqueueOutboundPacketsWithCode(.controlV1, 0, "hello", 64);
-
-    const first_write = try channel.writeOutboundPackets(60_000);
-    defer TestControlChannel.freePackets(std.testing.allocator, first_write);
-    try std.testing.expectEqual(@as(usize, 1), first_write.len);
-    try std.testing.expect(channel.hasPendingAcks());
-
-    const suppressed = try channel.writeOutboundPackets(60_000);
-    defer TestControlChannel.freePackets(std.testing.allocator, suppressed);
-    try std.testing.expectEqual(@as(usize, 0), suppressed.len);
-
-    const packet_ids = [_]u32{0};
-    const raw_ack = try channel.writeAcks(0, &packet_ids, channel.sessionId().?);
-    defer std.testing.allocator.free(raw_ack);
-    var ack = try channel.readInboundPacket(raw_ack, 0);
-    defer ack.deinit();
-    try std.testing.expect(!channel.hasPendingAcks());
-    try std.testing.expectEqual(@as(usize, 0), channel.outbound_queue.items.len);
-    // Swift retains send dates until reset, even after the corresponding ACK.
-    try std.testing.expectEqual(@as(usize, 1), channel.sent_dates_ms.count());
 }
