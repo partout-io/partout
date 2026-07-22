@@ -212,7 +212,7 @@ pub const Command = union(enum) {
     stop,
 };
 
-/// A node in the `CommandQueue`, with the payload and
+/// A node in `CommandQueue`, with the payload and
 /// an optional one-shot timer for deferred scheduling.
 pub const CommandNode = struct {
     command: Command,
@@ -222,7 +222,7 @@ pub const CommandNode = struct {
     next: ?*CommandNode = null,
 };
 
-/// A plain FIFO for the pending worker commands.
+/// A plain FIFO for the pending worker commands. Not thread-safe.
 pub const CommandQueue = struct {
     ready_head: ?*CommandNode = null,
     ready_tail: ?*CommandNode = null,
@@ -245,11 +245,14 @@ pub const CommandQueue = struct {
     }
 };
 
+/// Helps storing a pending write without copying the
+/// original buffer to a partial buffer.
 pub const PendingWrite = struct {
     data: []const u8,
     offset: usize,
 };
 
+/// A node in `WriteQueue`.
 const WriteNode = struct {
     data: []u8,
     next: ?*WriteNode = null,
