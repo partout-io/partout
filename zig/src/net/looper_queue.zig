@@ -224,23 +224,23 @@ pub const CommandNode = struct {
 
 /// A plain FIFO for the pending worker commands. Not thread-safe.
 pub const CommandQueue = struct {
-    ready_head: ?*CommandNode = null,
-    ready_tail: ?*CommandNode = null,
+    head: ?*CommandNode = null,
+    tail: ?*CommandNode = null,
 
     pub fn append(self: *CommandQueue, node: *CommandNode) void {
         node.next = null;
-        if (self.ready_tail) |tail| {
+        if (self.tail) |tail| {
             tail.next = node;
         } else {
-            self.ready_head = node;
+            self.head = node;
         }
-        self.ready_tail = node;
+        self.tail = node;
     }
 
     pub fn takeReady(self: *CommandQueue) ?*CommandNode {
-        const pending = self.ready_head;
-        self.ready_head = null;
-        self.ready_tail = null;
+        const pending = self.head;
+        self.head = null;
+        self.tail = null;
         return pending;
     }
 };
