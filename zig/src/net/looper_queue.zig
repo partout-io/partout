@@ -7,6 +7,11 @@ const std = @import("std");
 const concurrency = @import("../core/concurrency.zig");
 const io = @import("io.zig");
 
+/// Single binary data packet.
+pub const Packet = []const u8;
+/// Slice of packets.
+pub const Packets = []const Packet;
+
 /// The `OnRead` callback returns an action. Consumers will
 /// normally `.keep` reading (default behavior), but may also
 /// return `.pause` to temporarily suspend the observation
@@ -15,11 +20,6 @@ pub const ReadAction = enum {
     keep,
     pause,
 };
-
-/// Single binary data packet.
-pub const Packet = []const u8;
-/// Slice of packets.
-pub const Packets = []const Packet;
 
 /// Transformation callback to apply before submitting packets
 /// to the write queue.
@@ -42,29 +42,30 @@ pub const OnRead = struct {
     }
 };
 
-/// Returns elaborated details about the underlying reason
-/// of a failure. It represents the former Swift errors:
+/// Returns details about the underlying reason of a deferred
+/// failure. It represents the former Swift errors:
 ///
 /// - SideError(Side, Error?) -> .user
-/// - MuxError(Side?) -> .mux
 /// - WaitError(errno) -> .wait
 /// - NativeIOError -> .io
 ///
 /// Precisely:
 ///
-/// - .mux, .wait, and .io are typically triggered by syscalls
-/// - .system covers an internal I/O or allocation failure
+/// - .wait and .system are fatal syscall failures
+/// - .io causes a side to be detached, but lets the loop continue
 /// - .user comes from `OnRead` and `Task` callback invocations
+///
+/// Swift MuxError is resolved to error.MuxFailure and is not
+/// mapped here because it's always returned synchronously.
 pub const Failure = union(enum) {
-    mux: ?io.Side,
     wait: c_int,
+    system: io.Error,
     io: struct {
         side: io.Side,
         cause: io.Error,
         code: ?c_int,
     },
     user: anyerror,
-    system: io.Error,
 };
 
 /// Invoked on any failure event.
@@ -73,6 +74,16 @@ pub const OnFailure = struct {
     callback: *const fn (?*anyopaque, Failure) void,
 
     pub fn call(self: OnFailure, failure: Failure) void {
+        self.callback(self.context, failure);
+    }
+};
+
+/// Invoked when the looper finishes, with the optional failure.
+pub const OnFinish = struct {
+    context: ?*anyopaque = null,
+    callback: *const fn (?*anyopaque, ?Failure) void,
+
+    pub fn call(self: OnFinish, failure: ?Failure) void {
         self.callback(self.context, failure);
     }
 };
@@ -104,7 +115,6 @@ pub const DescriptorPair = union(io.Side) {
 /// The arguments to attach a side of the looper.
 pub const AttachArguments = struct {
     pair: DescriptorPair,
-
     transform_write: ?TransformWrite = null,
     on_read: ?OnRead = null,
     on_failure: ?OnFailure = null,
@@ -121,8 +131,8 @@ pub const CompletionError = error{
 pub const Completion = struct {
     // Completion state.
     done: bool = false,
+    // Completion error or null on success.
     result: ?CompletionError = null,
-
     // Intrusive completion queue linkage.
     next: ?*Completion = null,
 };
@@ -161,11 +171,15 @@ pub const CompletionQueue = struct {
     }
 };
 
+/// Uniquely identifies a side. Acts as a discriminator
+/// if a task is submitted to a side but the side is
+/// detached before the task is actually executed.
 pub const SideIdentity = struct {
     side: io.Side,
     id: ?u64,
 };
 
+/// These are the supported commands by the looper worker.
 pub const Command = union(enum) {
     attach: struct {
         arguments: AttachArguments,

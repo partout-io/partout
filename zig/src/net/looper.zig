@@ -21,36 +21,61 @@ const c = io.c;
 const log = core.logging;
 
 pub const Looper = struct {
-    pub const ReadAction = queue_mod.ReadAction;
+    /// Max number of attached sides.
+    const number_of_descriptors = 2;
+    /// Hardcoded delay on backpressure (ENOBUFS).
+    const no_buf_retry_delay_ms = 10;
 
+    // Scheduling.
     pub const Packet = queue_mod.Packet;
     pub const Packets = queue_mod.Packets;
-
+    pub const ReadAction = queue_mod.ReadAction;
     pub const TransformWrite = queue_mod.TransformWrite;
-
     pub const OnRead = queue_mod.OnRead;
-
     pub const Failure = queue_mod.Failure;
-
     pub const OnFailure = queue_mod.OnFailure;
-
-    /// Invoked when the looper finishes, with the optional failure.
-    pub const OnFinish = struct {
-        context: ?*anyopaque = null,
-        callback: *const fn (?*anyopaque, ?Failure) void,
-
-        fn call(self: OnFinish, failure: ?Failure) void {
-            self.callback(self.context, failure);
-        }
-    };
-
+    pub const OnFinish = queue_mod.OnFinish;
     pub const Task = queue_mod.Task;
 
+    // Side attachment.
     pub const Descriptor = queue_mod.Descriptor;
-
     pub const DescriptorPair = queue_mod.DescriptorPair;
-
     pub const AttachArguments = queue_mod.AttachArguments;
+
+    // Queues.
+    const SideIdentity = queue_mod.SideIdentity;
+    const Completion = queue_mod.Completion;
+    const CompletionQueue = queue_mod.CompletionQueue;
+    const Command = queue_mod.Command;
+    const CommandNode = queue_mod.CommandNode;
+    const CommandQueue = queue_mod.CommandQueue;
+    const WriteQueue = queue_mod.WriteQueue;
+
+    /// Looper state.
+    const State = enum {
+        idle,
+        starting,
+        started,
+        stopping,
+        stopped,
+        deinitializing,
+    };
+
+    /// Outcome of a command submission (caller-side).
+    const CommandOutcome = struct {
+        should_continue: bool = true,
+        failure: ?Failure = null,
+    };
+
+    /// Outcome of a command execution (worker-side).
+    const ProcessOutcome = union(enum) {
+        ok,
+        side_failure: struct {
+            side: io.Side,
+            failure: Failure,
+        },
+        fatal: Failure,
+    };
 
     /// Fine-tuning.
     pub const Options = struct {
@@ -61,35 +86,27 @@ pub const Looper = struct {
         on_finish: OnFinish,
     };
 
+    const CancellationError = error{Cancelled};
+
     pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
     pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{AlreadyStarted};
-    pub const AttachError = std.mem.Allocator.Error || error{
-        Cancelled,
+    pub const AttachError = std.mem.Allocator.Error || CancellationError || error{
         MuxFailure,
         OperationCancelled,
         ReentrantCall,
     };
-    pub const DetachError = std.mem.Allocator.Error || error{
-        Cancelled,
-        ReentrantCall,
-    };
-    pub const ResumeReadingError = std.mem.Allocator.Error || error{Cancelled};
-    pub const ScheduleError = std.mem.Allocator.Error || error{
-        Cancelled,
-        TaskFailure,
-    };
-    pub const StopError = std.mem.Allocator.Error || error{
-        Cancelled,
+    pub const DetachError = std.mem.Allocator.Error || CancellationError || error{ReentrantCall};
+    pub const ResumeReadingError = std.mem.Allocator.Error || CancellationError;
+    pub const ScheduleError = std.mem.Allocator.Error || CancellationError || error{TaskFailure};
+    pub const StopError = std.mem.Allocator.Error || CancellationError || error{
         InvalidState,
         ReentrantCall,
         TerminalFailure,
     };
-    pub const WriteError = std.mem.Allocator.Error || io.Error || error{
-        Cancelled,
+    pub const WriteError = std.mem.Allocator.Error || io.Error || CancellationError || error{
         TransformFailure,
         WriteIncomplete,
     };
-
     const CompletionError = queue_mod.CompletionError;
 
     // Configuration.
@@ -119,6 +136,7 @@ pub const Looper = struct {
     link: ?*SideIO = null,
     tun: ?*SideIO = null,
     next_side_id: u64 = 1,
+    // The size of these follows `number_of_descriptors`.
     read_retries: [2]bool = .{ false, false },
     write_retries: [2]bool = .{ false, false },
 
@@ -126,6 +144,7 @@ pub const Looper = struct {
     worker_thread: ?std.Thread = null,
     loop_thread_id: ?std.Thread.Id = null,
 
+    /// Prevents deadlock on callback reentrancy.
     threadlocal var borrowed_callback_depth: usize = 0;
 
     pub fn init(allocator: std.mem.Allocator, options: Options) InitError!Looper {
@@ -391,6 +410,35 @@ pub const Looper = struct {
         return thread_id == std.Thread.getCurrentId();
     }
 
+    /// With no delay, runs inline on the looper thread or enqueues on it.
+    /// Delayed work is always enqueued asynchronously after `delay_ms`.
+    pub fn schedule(self: *Looper, delay_ms: ?u64, task: Task) ScheduleError!void {
+        if (delay_ms == null and self.isOnQueue()) {
+            task.call() catch |err| {
+                log.writef(.err, "Scheduled task failed: {}", .{err});
+                return error.TaskFailure;
+            };
+            return;
+        }
+
+        self.lock.lock();
+        defer self.lock.unlock();
+        if (self.state != .started) {
+            log.writef(.debug, "Ignoring schedule before start() or after finish", .{});
+            return error.Cancelled;
+        }
+        if (delay_ms) |delay| {
+            const node = try self.createCommandNode(.{ .perform = task });
+            self.scheduler.schedule(&node.timer, delay, onScheduledCommand, self) catch unreachable;
+            return;
+        }
+        const node = try self.createCommandNode(.{ .perform = task });
+        self.commands.append(node);
+        self.wakeLocked();
+    }
+
+    /// Performs a task synchronously with the worker. Runs inline
+    /// if on the same queue to prevent deadlock.
     pub fn perform(
         self: *Looper,
         comptime Result: type,
@@ -453,33 +501,6 @@ pub const Looper = struct {
 
     pub fn performTask(self: *Looper, task: Task) anyerror!void {
         return self.perform(void, task.context, task.callback);
-    }
-
-    /// With no delay, runs inline on the looper thread or enqueues on it.
-    /// Delayed work is always enqueued asynchronously after `delay_ms`.
-    pub fn schedule(self: *Looper, delay_ms: ?u64, task: Task) ScheduleError!void {
-        if (delay_ms == null and self.isOnQueue()) {
-            task.call() catch |err| {
-                log.writef(.err, "Scheduled task failed: {}", .{err});
-                return error.TaskFailure;
-            };
-            return;
-        }
-
-        self.lock.lock();
-        defer self.lock.unlock();
-        if (self.state != .started) {
-            log.writef(.debug, "Ignoring schedule before start() or after finish", .{});
-            return error.Cancelled;
-        }
-        if (delay_ms) |delay| {
-            const node = try self.createCommandNode(.{ .perform = task });
-            self.scheduler.schedule(&node.timer, delay, onScheduledCommand, self) catch unreachable;
-            return;
-        }
-        const node = try self.createCommandNode(.{ .perform = task });
-        self.commands.append(node);
-        self.wakeLocked();
     }
 
     /// Ownership of `arguments.pair.io` transfers only after successful attach.
@@ -647,40 +668,6 @@ pub const Looper = struct {
     pub fn writeQueued(self: *Looper, packets: Packets, side: io.Side) WriteError!void {
         return self.write(packets, side, false);
     }
-
-    const number_of_descriptors = 2;
-    const no_buf_retry_delay_ms = 10;
-
-    const State = enum {
-        idle,
-        starting,
-        started,
-        stopping,
-        stopped,
-        deinitializing,
-    };
-
-    const SideIdentity = queue_mod.SideIdentity;
-    const Completion = queue_mod.Completion;
-    const CompletionQueue = queue_mod.CompletionQueue;
-    const Command = queue_mod.Command;
-    const CommandNode = queue_mod.CommandNode;
-    const CommandQueue = queue_mod.CommandQueue;
-    const WriteQueue = queue_mod.WriteQueue;
-
-    const CommandOutcome = struct {
-        should_continue: bool = true,
-        failure: ?Failure = null,
-    };
-
-    const ProcessOutcome = union(enum) {
-        ok,
-        side_failure: struct {
-            side: io.Side,
-            failure: Failure,
-        },
-        fatal: Failure,
-    };
 
     const SideIO = struct {
         // Identity and native I/O.
