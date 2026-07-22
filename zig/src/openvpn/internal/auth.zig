@@ -8,7 +8,6 @@ const core_mod = @import("../../core/exports.zig");
 const configuration_mod = @import("configuration.zig");
 const constants_mod = @import("constants.zig");
 const crypto_mod = @import("crypto.zig");
-const errors_mod = @import("errors.zig");
 const push_mod = @import("push.zig");
 const tls_mod = @import("tls.zig");
 
@@ -31,7 +30,7 @@ pub const Handshake = struct {
     server_random1: ZeroingData,
     server_random2: ZeroingData,
 
-    pub fn clone(self: Handshake, allocator: std.mem.Allocator) std.mem.Allocator.Error!Handshake {
+    pub fn clone(self: Handshake, allocator: std.mem.Allocator) !Handshake {
         var pre_master = try self.pre_master.clone(allocator);
         errdefer pre_master.deinit(allocator);
         var random1 = try self.random1.clone(allocator);
@@ -67,8 +66,6 @@ pub const PRF = struct {
     session_id: ?[]u8,
     remote_session_id: ?[]u8,
 
-    pub const Error = std.mem.Allocator.Error || errors_mod.PRFError;
-
     /// Clones all input data so this value may outlive the negotiation that
     /// produced it.
     pub fn init(
@@ -77,7 +74,7 @@ pub const PRF = struct {
         handshake: *const Handshake,
         session_id: []const u8,
         remote_session_id: []const u8,
-    ) std.mem.Allocator.Error!PRF {
+    ) !PRF {
         var owned_handshake = try handshake.clone(allocator);
         errdefer owned_handshake.deinit(allocator);
         const owned_session_id = try allocator.dupe(u8, session_id);
@@ -100,7 +97,7 @@ pub const PRF = struct {
         self.remote_session_id = null;
     }
 
-    pub fn derive(self: *const PRF, allocator: std.mem.Allocator) Error!CryptoKeys {
+    pub fn derive(self: *const PRF, allocator: std.mem.Allocator) !CryptoKeys {
         std.debug.assert(self.handshake != null);
         std.debug.assert(self.session_id != null);
         std.debug.assert(self.remote_session_id != null);
@@ -147,7 +144,7 @@ pub const PRF = struct {
         );
     }
 
-    fn prfData(allocator: std.mem.Allocator, input: PRFInput) Error!ZeroingData {
+    fn prfData(allocator: std.mem.Allocator, input: PRFInput) !ZeroingData {
         var seed = try ZeroingData.initCopy(allocator, input.label);
         defer seed.deinit(allocator);
         try seed.append(allocator, input.client_seed);
@@ -188,7 +185,7 @@ pub const PRF = struct {
         secret: []const u8,
         seed: []const u8,
         size: usize,
-    ) Error!ZeroingData {
+    ) !ZeroingData {
         var output = try ZeroingData.init(allocator, 0);
         errdefer output.deinit(allocator);
         var chain = try hmac(allocator, fnt, digest_name, secret, seed);
@@ -219,7 +216,7 @@ pub const PRF = struct {
         digest_name: [*:0]const u8,
         secret: []const u8,
         data: []const u8,
-    ) Error!ZeroingData {
+    ) !ZeroingData {
         const hmac_max_length = 128;
         var buffer = try ZeroingData.init(allocator, hmac_max_length);
         errdefer buffer.deinit(allocator);
@@ -386,7 +383,10 @@ pub const Authenticator = struct {
         return raw;
     }
 
-    pub fn appendControlData(self: *Authenticator, data: []const u8) !void {
+    pub fn appendControlData(
+        self: *Authenticator,
+        data: []const u8,
+    ) !void {
         return self.control_buffer.append(self.allocator, data);
     }
 
@@ -448,7 +448,7 @@ pub const Authenticator = struct {
     pub fn parseMessages(
         self: *Authenticator,
         allocator: std.mem.Allocator,
-    ) std.mem.Allocator.Error![][]u8 {
+    ) ![][]u8 {
         var messages: std.ArrayList([]u8) = .empty;
         errdefer {
             for (messages.items) |message| allocator.free(message);
@@ -471,7 +471,7 @@ pub const Authenticator = struct {
     pub fn response(
         self: *const Authenticator,
         allocator: std.mem.Allocator,
-    ) std.mem.Allocator.Error!?Handshake {
+    ) !?Handshake {
         const remote1 = self.server_random1 orelse return null;
         const remote2 = self.server_random2 orelse return null;
         var pre_master = try self.pre_master.clone(allocator);
@@ -507,7 +507,7 @@ pub const Authenticator = struct {
     fn cipherLineAlloc(
         allocator: std.mem.Allocator,
         ciphers: []const api.OpenVPNCipher,
-    ) std.mem.Allocator.Error![]u8 {
+    ) ![]u8 {
         var output: std.Io.Writer.Allocating = .init(allocator);
         errdefer output.deinit();
         const writer = &output.writer;

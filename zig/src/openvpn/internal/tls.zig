@@ -6,7 +6,6 @@ const std = @import("std");
 const c_exports_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const constants_mod = @import("constants.zig");
-const errors_mod = @import("errors.zig");
 
 const api = core_mod.api;
 const c_common = c_exports_mod.common;
@@ -109,7 +108,7 @@ pub const TLSWrapper = struct {
         const tls = create_tls(options, &code) orelse {
             c_crypto.pp_tls_options_free(options);
             if (code == c_crypto.PPTLSErrorNone) return error.TLSFailure;
-            return errors_mod.tlsError(code);
+            return error.TLSFailure;
         };
         errdefer free_tls(tls);
 
@@ -215,8 +214,7 @@ pub const TLSWrapper = struct {
         if (c_common.fwrite(pem.ptr, 1, pem.len, file) != pem.len) return error.TLSFailure;
     }
 
-    fn tlsOperationError(code: c_crypto.pp_tls_error_code) errors_mod.TLSError {
-        if (code == c_crypto.PPTLSErrorNone) return error.TLSFailure;
-        return errors_mod.tlsError(code);
+    fn tlsOperationError(_: c_crypto.pp_tls_error_code) error{TLSFailure} {
+        return error.TLSFailure;
     }
 };

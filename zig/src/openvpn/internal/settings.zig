@@ -5,7 +5,6 @@
 const std = @import("std");
 const core_mod = @import("../../core/exports.zig");
 const configuration_mod = @import("configuration.zig");
-const errors_mod = @import("errors.zig");
 
 const api = core_mod.api;
 
@@ -239,7 +238,7 @@ pub const NetworkSettingsBuilder = struct {
 fn addressesAlloc(
     allocator: std.mem.Allocator,
     values: []const []const u8,
-) (std.mem.Allocator.Error || errors_mod.NetworkSettingsError)![]api.Address {
+) ![]api.Address {
     const addresses = try allocator.alloc(api.Address, values.len);
     var initialized: usize = 0;
     errdefer {

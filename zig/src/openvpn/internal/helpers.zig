@@ -38,7 +38,7 @@ pub const c = @cImport({
 pub fn forAuthentication(
     allocator: std.mem.Allocator,
     credentials: api.OpenVPNCredentials,
-) (std.mem.Allocator.Error || CredentialsError)!api.OpenVPNCredentials {
+) !api.OpenVPNCredentials {
     const username = try allocator.dupe(u8, credentials.username);
     errdefer allocator.free(username);
 
@@ -76,12 +76,8 @@ pub fn unixSeconds() u32 {
     return @truncate(@as(u64, @intCast(raw)));
 }
 
-fn base64Alloc(allocator: std.mem.Allocator, value: []const u8) std.mem.Allocator.Error![]u8 {
+fn base64Alloc(allocator: std.mem.Allocator, value: []const u8) ![]u8 {
     const encoded = try allocator.alloc(u8, std.base64.standard.Encoder.calcSize(value.len));
     _ = std.base64.standard.Encoder.encode(encoded, value);
     return encoded;
 }
-
-const CredentialsError = error{
-    OTPRequired,
-};

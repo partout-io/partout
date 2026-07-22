@@ -4,7 +4,7 @@
 
 const std = @import("std");
 const c_exports_mod = @import("../../c/exports.zig");
-const errors_mod = @import("errors.zig");
+const crypto_mod = @import("crypto.zig");
 const helpers_mod = @import("helpers.zig");
 
 const c = helpers_mod.c;
@@ -49,8 +49,6 @@ pub const ControlPacket = struct {
     ptr: ?*c.openvpn_ctrl,
     code: PacketCode,
 
-    pub const InitError = errors_mod.ControlPacketError;
-
     pub fn init(
         code: PacketCode,
         key_value: u8,
@@ -59,7 +57,7 @@ pub const ControlPacket = struct {
         payload_value: ?[]const u8,
         ack_ids_value: ?[]const u32,
         ack_remote_session_id_value: ?[]const u8,
-    ) InitError!ControlPacket {
+    ) !ControlPacket {
         if (key_value > 0b111) return error.InvalidKey;
         if (session_id.len != c.OpenVPNPacketSessionIdLength) return error.InvalidSessionId;
         if (ack_ids_value) |ids| {
@@ -104,7 +102,7 @@ pub const ControlPacket = struct {
         session_id: []const u8,
         ack_ids_value: []const u32,
         ack_remote_session_id_value: []const u8,
-    ) InitError!ControlPacket {
+    ) !ControlPacket {
         return init(
             .ackV1,
             key_value,
@@ -164,7 +162,7 @@ pub const ControlPacket = struct {
     pub fn serializedAlloc(
         self: *const ControlPacket,
         allocator: std.mem.Allocator,
-    ) std.mem.Allocator.Error![]u8 {
+    ) ![]u8 {
         const packet = self.native();
         const capacity = c.openvpn_ctrl_capacity(packet);
         const destination = try allocator.alloc(u8, capacity);
@@ -206,7 +204,7 @@ pub const ControlPacket = struct {
             &algorithm,
             @ptrCast(&native_error),
         );
-        if (written == 0) return errors_mod.cryptoError(native_error);
+        if (written == 0) return crypto_mod.cryptoError(native_error);
         if (written < destination.len) destination = try allocator.realloc(destination, written);
         return destination;
     }

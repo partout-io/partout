@@ -54,7 +54,7 @@ pub const ActiveContext = struct {
         data_link: DataLink,
         with_local_options: bool,
         remote_endpoint: api.ExtendedEndpoint,
-    ) std.mem.Allocator.Error!*ActiveContext {
+    ) !*ActiveContext {
         const owned_address = try allocator.dupe(u8, remote_endpoint.address);
         errdefer allocator.free(owned_address);
         const self = try allocator.create(ActiveContext);
@@ -107,7 +107,7 @@ pub const ActiveContext = struct {
         self: *ActiveContext,
         channel: *DataChannel,
         key: u8,
-    ) std.mem.Allocator.Error!void {
+    ) !void {
         std.debug.assert(key < self.data_channels.len);
         std.debug.assert(channel.key == key);
         if (self.current_data_pair) |pair| try self.old_keys.append(self.allocator, pair.key);

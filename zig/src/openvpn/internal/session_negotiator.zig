@@ -67,7 +67,10 @@ pub const NegotiationHistory = struct {
         return .{ .push_reply = moved };
     }
 
-    pub fn clone(self: NegotiationHistory, allocator: std.mem.Allocator) !NegotiationHistory {
+    pub fn clone(
+        self: NegotiationHistory,
+        allocator: std.mem.Allocator,
+    ) !NegotiationHistory {
         return .{ .push_reply = try self.push_reply.clone(allocator) };
     }
 
@@ -83,8 +86,6 @@ pub const NegotiationHistory = struct {
 /// push reply remains borrowed from the negotiator and must be cloned by a
 /// recipient that needs to retain it.
 pub const NegotiatorOptions = struct {
-    pub const ConnectedError = errors_mod.SessionError;
-
     configuration: *const api.OpenVPNConfiguration,
     credentials: ?*const api.OpenVPNCredentials,
     with_local_options: bool,
@@ -95,7 +96,7 @@ pub const NegotiatorOptions = struct {
         u8,
         *DataChannel,
         *const PushReply,
-    ) ConnectedError!void,
+    ) errors_mod.SessionError!void,
     on_error: *const fn (?*anyopaque, u8, errors_mod.SessionError) void,
 };
 
@@ -139,7 +140,7 @@ pub const Negotiator = struct {
     };
 
     /// `tls` and `history` transfer only when creation succeeds.
-    pub fn create(allocator: std.mem.Allocator, init: Init) std.mem.Allocator.Error!*Negotiator {
+    pub fn create(allocator: std.mem.Allocator, init: Init) !*Negotiator {
         const self = try allocator.create(Negotiator);
         self.* = .{
             .allocator = allocator,
@@ -652,7 +653,7 @@ pub const Negotiator = struct {
             remote_session_id,
         );
         defer prf.deinit(self.allocator);
-        var data_path = try DataPathWrapper.nativeWithPRF(
+        var data_path = try DataPathWrapper.createWithPRF(
             self.allocator,
             parameters,
             &prf,
@@ -710,7 +711,7 @@ pub const Negotiator = struct {
         ciphertext: []u8,
         context: ?*anyopaque,
         enqueue: EnqueueCipherText,
-    ) errors_mod.SessionError!void {
+    ) !void {
         defer allocator.free(ciphertext);
         try enqueue(context, ciphertext);
     }
@@ -718,7 +719,7 @@ pub const Negotiator = struct {
     fn enqueuePulledCipherText(
         raw: ?*anyopaque,
         ciphertext: []const u8,
-    ) errors_mod.SessionError!void {
+    ) !void {
         const self: *Negotiator = @ptrCast(@alignCast(raw.?));
         self.enqueueControlPackets(.controlV1, self.key, ciphertext) catch |err| {
             return errors_mod.sessionError(err);
@@ -734,7 +735,7 @@ pub const Negotiator = struct {
         allocator: std.mem.Allocator,
         input: []const u8,
         needle: []const u8,
-    ) std.mem.Allocator.Error![]u8 {
+    ) ![]u8 {
         if (needle.len == 0) return allocator.dupe(u8, input);
         var output: std.Io.Writer.Allocating = .init(allocator);
         errdefer output.deinit();
@@ -754,7 +755,7 @@ pub const testing = struct {
         ciphertext: []u8,
         context: ?*anyopaque,
         enqueue: Negotiator.EnqueueCipherText,
-    ) errors_mod.SessionError!void {
+    ) !void {
         return Negotiator.forwardCipherText(allocator, ciphertext, context, enqueue);
     }
 

@@ -5,7 +5,6 @@
 const std = @import("std");
 const c_exports_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
-const errors_mod = @import("errors.zig");
 const helpers_mod = @import("helpers.zig");
 
 const api = core_mod.api;
@@ -23,7 +22,7 @@ pub const PacketProcessor = struct {
     pub fn init(
         allocator: std.mem.Allocator,
         method: ?api.OpenVPNObfuscationMethod,
-    ) (std.mem.Allocator.Error || api.EncodeError)!PacketProcessor {
+    ) !PacketProcessor {
         var native_method: c.openvpn_pkt_proc_method = c.OpenVPNPktProcMethodNone;
         var mask: ?[]u8 = null;
         defer if (mask) |bytes| allocator.free(bytes);
@@ -59,7 +58,7 @@ pub const PacketProcessor = struct {
         allocator: std.mem.Allocator,
         packet: []const u8,
         direction: PacketDirection,
-    ) std.mem.Allocator.Error![]u8 {
+    ) ![]u8 {
         const destination = try allocator.alloc(u8, packet.len);
         switch (direction) {
             .inbound => c.openvpn_pkt_proc_recv(self.ptr, destination.ptr, packet.ptr, packet.len),
@@ -73,7 +72,7 @@ pub const PacketProcessor = struct {
         allocator: std.mem.Allocator,
         packets: []const []const u8,
         direction: PacketDirection,
-    ) std.mem.Allocator.Error![][]u8 {
+    ) ![][]u8 {
         const result = try allocator.alloc([]u8, packets.len);
         var initialized: usize = 0;
         errdefer {
@@ -92,7 +91,7 @@ pub const PacketProcessor = struct {
         allocator: std.mem.Allocator,
         stream: []const u8,
         until: *usize,
-    ) std.mem.Allocator.Error![][]u8 {
+    ) ![][]u8 {
         var packets: std.ArrayList([]u8) = .empty;
         errdefer freePacketList(allocator, &packets);
         until.* = 0;
@@ -117,7 +116,7 @@ pub const PacketProcessor = struct {
         self: *const PacketProcessor,
         allocator: std.mem.Allocator,
         packets: []const []const u8,
-    ) (std.mem.Allocator.Error || errors_mod.PacketProcessorError)![]u8 {
+    ) ![]u8 {
         var payload_length: usize = 0;
         for (packets) |packet| {
             if (packet.len > std.math.maxInt(u16)) return error.PacketTooLarge;

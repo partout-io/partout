@@ -8,7 +8,6 @@ const core_mod = @import("../../core/exports.zig");
 const configuration_mod = @import("configuration.zig");
 const constants_mod = @import("constants.zig");
 const crypto_mod = @import("crypto.zig");
-const errors_mod = @import("errors.zig");
 const helpers_mod = @import("helpers.zig");
 const packet_mod = @import("packet.zig");
 
@@ -101,15 +100,13 @@ pub const testing = struct {
 };
 
 const PlainSerializer = struct {
-    pub const ParseError = errors_mod.PlainSerializerError;
-
     pub fn reset(_: *PlainSerializer) void {}
 
     pub fn serialize(
         _: *PlainSerializer,
         allocator: std.mem.Allocator,
         packet: *const ControlPacket,
-    ) std.mem.Allocator.Error![]u8 {
+    ) ![]u8 {
         return packet.serializedAlloc(allocator);
     }
 
@@ -119,7 +116,7 @@ const PlainSerializer = struct {
         data: []const u8,
         start: usize,
         optional_end: ?usize,
-    ) (ParseError || ControlPacket.InitError)!ControlPacket {
+    ) !ControlPacket {
         const end = optional_end orelse data.len;
         if (start > end or end > data.len) return error.InvalidRange;
         var offset = start;
@@ -259,7 +256,7 @@ const AuthSerializer = struct {
         );
         var native_error: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone;
         if (!c_crypto.pp_crypto_verify(self.cbc, swapped.ptr, swapped.len, &native_error)) {
-            return errors_mod.cryptoError(native_error);
+            return crypto_mod.cryptoError(native_error);
         }
         return self.plain.deserialize(allocator, swapped, self.auth_length, null);
     }
@@ -379,7 +376,7 @@ const CryptSerializer = struct {
             &flags,
             &native_error,
         );
-        if (decrypted_count == 0) return errors_mod.cryptoError(native_error);
+        if (decrypted_count == 0) return crypto_mod.cryptoError(native_error);
         @memcpy(decrypted[0..self.header_length], source[0..self.header_length]);
         const total = self.header_length + decrypted_count;
         std.debug.assert(total <= decrypted.len);

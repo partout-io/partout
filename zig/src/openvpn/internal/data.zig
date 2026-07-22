@@ -9,7 +9,6 @@ const net_mod = @import("../../net/exports.zig");
 const auth_mod = @import("auth.zig");
 const constants_mod = @import("constants.zig");
 const crypto_mod = @import("crypto.zig");
-const errors_mod = @import("errors.zig");
 const helpers_mod = @import("helpers.zig");
 const processing_mod = @import("processing.zig");
 
@@ -99,7 +98,7 @@ pub const DataPath = struct {
         allocator: std.mem.Allocator,
         mode: *c.openvpn_dp_mode,
         peer_id: u32,
-    ) std.mem.Allocator.Error!*DataPath {
+    ) !*DataPath {
         const self = try allocator.create(DataPath);
         c.openvpn_dp_mode_set_peer_id(mode, peer_id);
         self.* = .{
@@ -251,15 +250,30 @@ pub const DataPath = struct {
         };
     }
 
-    fn nativeError(native: c.openvpn_dp_error) errors_mod.DataPathError {
+    fn nativeError(native: c.openvpn_dp_error) error{
+        CompressionMismatch,
+        CryptoFailure,
+        DataPathFailure,
+    } {
         if (native.dp_code == c.OpenVPNDataPathErrorNone) return error.DataPathFailure;
-        return errors_mod.dataPathError(native);
+        return switch (native.dp_code) {
+            c.OpenVPNDataPathErrorCompression => error.CompressionMismatch,
+            c.OpenVPNDataPathErrorCrypto => crypto_mod.cryptoError(native.crypto_code),
+            else => error.DataPathFailure,
+        };
     }
 };
 
 /// Owning facade over the concrete C-backed data path.
 pub const DataPathWrapper = struct {
     pub const Parameters = DataPathParameters;
+    pub const Error = std.mem.Allocator.Error || error{
+        CompressionMismatch,
+        CryptoFailure,
+        DataPathFailure,
+        Reconnect,
+        UnsupportedAlgorithm,
+    };
 
     data_path: *DataPath,
 
@@ -277,7 +291,7 @@ pub const DataPathWrapper = struct {
         allocator: std.mem.Allocator,
         packets: []const []const u8,
         key: u8,
-    ) ![][]u8 {
+    ) Error![][]u8 {
         return self.data_path.encryptPackets(allocator, packets, key);
     }
 
@@ -285,22 +299,22 @@ pub const DataPathWrapper = struct {
         self: DataPathWrapper,
         allocator: std.mem.Allocator,
         packets: []const []const u8,
-    ) !DataPathDecryptResult {
+    ) Error!DataPathDecryptResult {
         return self.data_path.decryptPackets(allocator, packets);
     }
 
-    pub fn nativeWithPRF(
+    pub fn createWithPRF(
         allocator: std.mem.Allocator,
         parameters: DataPathParameters,
         prf: *const PRF,
         prng: PRNG,
-    ) !DataPathWrapper {
+    ) Error!DataPathWrapper {
         var seed = try prng.safeData(allocator, DataConstants.prng_seed_length);
         defer seed.deinit(allocator);
-        return nativeWithSeed(allocator, parameters, prf, seed);
+        return createWithSeed(allocator, parameters, prf, seed);
     }
 
-    fn nativeWithSeed(
+    fn createWithSeed(
         allocator: std.mem.Allocator,
         parameters: DataPathParameters,
         prf: *const PRF,
@@ -310,10 +324,10 @@ pub const DataPathWrapper = struct {
         _ = init_seed(seed.bytes.ptr, seed.bytes.len);
         var keys = try prf.derive(allocator);
         defer keys.deinit(allocator);
-        return nativeWithKeys(allocator, parameters, &keys);
+        return createWithKeys(allocator, parameters, &keys);
     }
 
-    fn nativeWithKeys(
+    fn createWithKeys(
         allocator: std.mem.Allocator,
         parameters: DataPathParameters,
         keys: *const CryptoKeys,
@@ -395,7 +409,7 @@ pub const DataChannel = struct {
         allocator: std.mem.Allocator,
         key: u8,
         data_path: DataPathWrapper,
-    ) std.mem.Allocator.Error!*DataChannel {
+    ) !*DataChannel {
         const self = try allocator.create(DataChannel);
         self.* = .{
             .allocator = allocator,
@@ -466,15 +480,6 @@ pub const DataLink = struct {
     }
 
     pub fn receive(
-        self: *DataLink,
-        packets: []const []const u8,
-        key: u8,
-    ) !void {
-        self.receiveUnwrapped(packets, key) catch |err|
-            return errors_mod.sessionError(err);
-    }
-
-    fn receiveUnwrapped(
         self: *DataLink,
         packets: []const []const u8,
         key: u8,

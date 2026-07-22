@@ -5,7 +5,6 @@
 const std = @import("std");
 const core_mod = @import("../../core/exports.zig");
 const crypto_mod = @import("crypto.zig");
-const errors_mod = @import("errors.zig");
 
 const api = core_mod.api;
 const CryptoBackend = crypto_mod.CryptoBackend;
@@ -74,7 +73,7 @@ pub fn containsCipher(ciphers: []const api.OpenVPNCipher, wanted: api.OpenVPNCip
 pub fn negotiableDataCiphers(
     allocator: std.mem.Allocator,
     configuration: api.OpenVPNConfiguration,
-) std.mem.Allocator.Error!?[]api.OpenVPNCipher {
+) !?[]api.OpenVPNCipher {
     const advertised = configuration.data_ciphers orelse return null;
     if (advertised.len == 0) return null;
     const fallback = configuration.cipher;
@@ -104,7 +103,7 @@ pub fn localOptionsStringAlloc(
     allocator: std.mem.Allocator,
     configuration: api.OpenVPNConfiguration,
     with_local_options: bool,
-) std.mem.Allocator.Error![]u8 {
+) ![]u8 {
     if (!with_local_options) return allocator.dupe(u8, "V0 UNDEF");
 
     var output: std.Io.Writer.Allocating = .init(allocator);
@@ -142,7 +141,7 @@ pub fn endpointWithRandomPrefix(
     endpoint: api.ExtendedEndpoint,
     length: usize,
     prng: PRNG,
-) (std.mem.Allocator.Error || errors_mod.PRNGError)!api.ExtendedEndpoint {
+) !api.ExtendedEndpoint {
     const address = api.Address.parseRaw(endpoint.address) orelse {
         return .{
             .address = try allocator.dupe(u8, endpoint.address),
@@ -180,7 +179,7 @@ pub fn processedRemotes(
     allocator: std.mem.Allocator,
     configuration: api.OpenVPNConfiguration,
     prng: PRNG,
-) (std.mem.Allocator.Error || errors_mod.PRNGError)!?[]api.ExtendedEndpoint {
+) !?[]api.ExtendedEndpoint {
     const source = configuration.remotes orelse return null;
     const shuffled = try allocator.dupe(api.ExtendedEndpoint, source);
     defer allocator.free(shuffled);

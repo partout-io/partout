@@ -107,6 +107,8 @@ pub const SessionDelegate = struct {
 /// borrow this stable address until `destroy` joins them. Its `Looper` is
 /// borrowed and dedicated to this session for the same lifetime.
 pub const Session = struct {
+    pub const Error = errors_mod.SessionError;
+
     allocator: std.mem.Allocator,
     fnt: c_crypto.pp_crypto_fnt,
     configuration: api.OpenVPNConfiguration,
@@ -143,6 +145,28 @@ pub const Session = struct {
     );
 
     pub fn create(
+        allocator: std.mem.Allocator,
+        looper: *net_mod.Looper,
+        fnt: c_crypto.pp_crypto_fnt,
+        configuration: api.OpenVPNConfiguration,
+        credentials: ?api.OpenVPNCredentials,
+        prng: PRNG,
+        caches_directory: []const u8,
+        options: ConnectionOptions,
+    ) Error!*Session {
+        return createUnwrapped(
+            allocator,
+            looper,
+            fnt,
+            configuration,
+            credentials,
+            prng,
+            caches_directory,
+            options,
+        ) catch |err| errors_mod.sessionError(err);
+    }
+
+    fn createUnwrapped(
         allocator: std.mem.Allocator,
         looper: *net_mod.Looper,
         fnt: c_crypto.pp_crypto_fnt,
@@ -242,6 +266,15 @@ pub const Session = struct {
         self: *Session,
         descriptor: net_mod.Looper.Descriptor,
         remote_endpoint: api.ExtendedEndpoint,
+    ) Error!void {
+        return self.setLinkUnwrapped(descriptor, remote_endpoint) catch |err|
+            errors_mod.sessionError(err);
+    }
+
+    fn setLinkUnwrapped(
+        self: *Session,
+        descriptor: net_mod.Looper.Descriptor,
+        remote_endpoint: api.ExtendedEndpoint,
     ) !void {
         if (self.looper.isOnQueue()) return error.ReentrantCall;
         self.lifecycle_lock.lock();
@@ -276,7 +309,12 @@ pub const Session = struct {
         try self.looper.perform(void, &request, setLinkOnQueue);
     }
 
-    pub fn setTunnel(self: *Session, descriptor: net_mod.Looper.Descriptor) !void {
+    pub fn setTunnel(self: *Session, descriptor: net_mod.Looper.Descriptor) Error!void {
+        return self.setTunnelUnwrapped(descriptor) catch |err|
+            errors_mod.sessionError(err);
+    }
+
+    fn setTunnelUnwrapped(self: *Session, descriptor: net_mod.Looper.Descriptor) !void {
         if (self.looper.isOnQueue()) return error.ReentrantCall;
         self.lifecycle_lock.lock();
         defer self.lifecycle_lock.unlock();
@@ -292,6 +330,15 @@ pub const Session = struct {
     /// finishes state on the looper. Calling it from a callback is rejected;
     /// callback failures go through `ShutdownActor` instead.
     pub fn shutdown(
+        self: *Session,
+        cause: ?SessionError,
+        timeout_ms: ?u64,
+    ) Error!void {
+        return self.shutdownUnwrapped(cause, timeout_ms) catch |err|
+            errors_mod.sessionError(err);
+    }
+
+    fn shutdownUnwrapped(
         self: *Session,
         cause: ?SessionError,
         timeout_ms: ?u64,
@@ -596,7 +643,7 @@ pub const Session = struct {
         key: u8,
         data_channel: *DataChannel,
         push_reply: *const PushReply,
-    ) NegotiatorOptions.ConnectedError!void {
+    ) !void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const active = self.state.activeState() orelse return error.Reconnect;
         const context = active.context;
@@ -630,7 +677,7 @@ pub const Session = struct {
         self.requestShutdown(error.TLSFailure);
     }
 
-    fn scheduleNegotiationTick(self: *Session) std.Thread.SpawnError!void {
+    fn scheduleNegotiationTick(self: *Session) !void {
         try self.negotiation_timer.init(
             self.options.tick_interval_ms,
             onNegotiationTimer,
@@ -658,7 +705,7 @@ pub const Session = struct {
     fn scheduleNextPing(
         self: *Session,
         context: *ActiveContext,
-    ) std.Thread.SpawnError!void {
+    ) !void {
         const delay = self.keepAliveIntervalMs(context) orelse
             self.options.ping_timeout_check_interval_ms;
         try self.ping_timer.init(delay, onPingTimer, self);
@@ -689,7 +736,7 @@ pub const Session = struct {
     fn checkPingTimeoutOnQueue(
         self: *Session,
         context: *ActiveContext,
-    ) error{Timeout}!void {
+    ) !void {
         const last_received = context.last_received_ns orelse return;
         const timeout_ns = self.keepAliveTimeoutMs(context) *|
             @as(u64, std.time.ns_per_ms);

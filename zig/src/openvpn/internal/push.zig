@@ -62,7 +62,7 @@ pub fn peerInfoAlloc(
     ui_version: []const u8,
     ssl_version: ?[]const u8,
     extra_lines: []const []const u8,
-) std.mem.Allocator.Error![]u8 {
+) ![]u8 {
     const platform_version = try platformVersionAlloc(allocator);
     defer allocator.free(platform_version);
     return formatPeerInfoAlloc(
@@ -94,7 +94,7 @@ fn platformName() []const u8 {
 
 /// Returns the runtime operating-system major/minor version used in peer-info.
 /// The caller owns the returned string.
-fn platformVersionAlloc(allocator: std.mem.Allocator) std.mem.Allocator.Error![]u8 {
+fn platformVersionAlloc(allocator: std.mem.Allocator) ![]u8 {
     const detected = if (builtin.os.tag.isDarwin())
         try darwinVersionAlloc(allocator)
     else switch (builtin.os.tag) {
@@ -114,7 +114,7 @@ fn platformVersionAlloc(allocator: std.mem.Allocator) std.mem.Allocator.Error![]
     return detected orelse allocator.dupe(u8, "0.0");
 }
 
-fn darwinVersionAlloc(allocator: std.mem.Allocator) std.mem.Allocator.Error!?[]u8 {
+fn darwinVersionAlloc(allocator: std.mem.Allocator) !?[]u8 {
     var buffer: [64]u8 = @splat(0);
     var length = buffer.len;
     if (std.c.sysctlbyname(
@@ -131,12 +131,12 @@ fn darwinVersionAlloc(allocator: std.mem.Allocator) std.mem.Allocator.Error!?[]u
     return posixVersionAlloc(allocator);
 }
 
-fn posixVersionAlloc(allocator: std.mem.Allocator) std.mem.Allocator.Error!?[]u8 {
+fn posixVersionAlloc(allocator: std.mem.Allocator) !?[]u8 {
     const information = std.posix.uname();
     return majorMinorAlloc(allocator, std.mem.sliceTo(&information.release, 0));
 }
 
-fn windowsVersionAlloc(allocator: std.mem.Allocator) std.mem.Allocator.Error!?[]u8 {
+fn windowsVersionAlloc(allocator: std.mem.Allocator) !?[]u8 {
     var information: std.os.windows.RTL_OSVERSIONINFOW = std.mem.zeroes(
         std.os.windows.RTL_OSVERSIONINFOW,
     );
@@ -152,7 +152,7 @@ fn windowsVersionAlloc(allocator: std.mem.Allocator) std.mem.Allocator.Error!?[]
 fn majorMinorAlloc(
     allocator: std.mem.Allocator,
     raw: []const u8,
-) std.mem.Allocator.Error!?[]u8 {
+) !?[]u8 {
     var components = std.mem.splitScalar(u8, raw, '.');
     const major = numericPrefix(components.next() orelse return null);
     const minor = numericPrefix(components.next() orelse return null);
@@ -173,7 +173,7 @@ fn formatPeerInfoAlloc(
     platform: []const u8,
     platform_version: []const u8,
     extra_lines: []const []const u8,
-) std.mem.Allocator.Error![]u8 {
+) ![]u8 {
     var output: std.Io.Writer.Allocating = .init(allocator);
     errdefer output.deinit();
     const writer = &output.writer;

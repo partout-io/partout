@@ -5,7 +5,6 @@
 const std = @import("std");
 const core_mod = @import("../../core/exports.zig");
 const crypto_mod = @import("crypto.zig");
-const errors_mod = @import("errors.zig");
 const helpers_mod = @import("helpers.zig");
 const packet_mod = @import("packet.zig");
 
@@ -35,7 +34,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             allocator: std.mem.Allocator,
             prng: PRNG,
             serializer: Serializer,
-        ) std.mem.Allocator.Error!*Self {
+        ) !*Self {
             var owned_serializer = serializer;
             errdefer owned_serializer.deinit(allocator);
             const self = try allocator.create(Self);
@@ -86,7 +85,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             return if (self.remote_session_id) |*value| value else null;
         }
 
-        pub fn setRemoteSessionId(self: *Self, value: []const u8) errors_mod.InvalidSessionIdError!void {
+        pub fn setRemoteSessionId(self: *Self, value: []const u8) !void {
             if (value.len != c.OpenVPNPacketSessionIdLength) return error.InvalidSessionId;
             var copy: [c.OpenVPNPacketSessionIdLength]u8 = undefined;
             @memcpy(&copy, value);
@@ -113,7 +112,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
         pub fn enqueueInboundPacket(
             self: *Self,
             packet: ControlPacket,
-        ) std.mem.Allocator.Error![]ControlPacket {
+        ) ![]ControlPacket {
             var owned = packet;
             self.inbound_queue.append(self.allocator, owned) catch |err| {
                 owned.deinit();
