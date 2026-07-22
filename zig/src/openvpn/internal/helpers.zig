@@ -201,13 +201,6 @@ pub fn unixSeconds() u32 {
     return @truncate(@as(u64, @intCast(raw)));
 }
 
-pub fn wallMilliseconds() i64 {
-    var value: time_c.timespec = undefined;
-    if (time_c.timespec_get(&value, time_c.TIME_UTC) != time_c.TIME_UTC) return 0;
-    const seconds = std.math.mul(i64, @intCast(value.tv_sec), 1000) catch return std.math.maxInt(i64);
-    return std.math.add(i64, seconds, @divTrunc(@as(i64, @intCast(value.tv_nsec)), 1_000_000)) catch std.math.maxInt(i64);
-}
-
 fn base64Alloc(allocator: std.mem.Allocator, value: []const u8) std.mem.Allocator.Error![]u8 {
     const encoded = try allocator.alloc(u8, std.base64.standard.Encoder.calcSize(value.len));
     _ = std.base64.standard.Encoder.encode(encoded, value);
@@ -310,9 +303,4 @@ test "tls-auth without key direction uses the shared HMAC quadrant" {
     defer keys.deinit(std.testing.allocator);
     try std.testing.expect(std.mem.allEqual(u8, keys.digest.?.encryption_key.bytes, 1));
     try std.testing.expect(std.mem.allEqual(u8, keys.digest.?.decryption_key.bytes, 1));
-}
-
-test "wall clock helpers return plausible values" {
-    try std.testing.expect(unixSeconds() > 1_000_000_000);
-    try std.testing.expect(wallMilliseconds() > 1_000_000_000_000);
 }
