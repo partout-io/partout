@@ -573,7 +573,7 @@ void pp_tls_free_internal(pp_tls tls, bool free_options) {
     pp_free(tls);
 }
 
-pp_tls pp_mbed_tls_create(const pp_tls_options *opt, pp_tls_error_code *error) {
+pp_tls pp_mbedtls_create(const pp_tls_options *opt, pp_tls_error_code *error) {
     pp_tls_set_error(error, PPTLSErrorNone);
     if (!pp_tls_init_psa()) {
         pp_tls_set_error(error, PPTLSErrorHandshake);
@@ -655,11 +655,11 @@ failure:
     return NULL;
 }
 
-void pp_mbed_tls_free(pp_tls tls) {
+void pp_mbedtls_free(pp_tls tls) {
     pp_tls_free_internal(tls, true);
 }
 
-bool pp_mbed_tls_start(pp_tls tls) {
+bool pp_mbedtls_start(pp_tls tls) {
     if (tls->did_setup) {
         mbedtls_ssl_free(&tls->ssl);
         mbedtls_ssl_init(&tls->ssl);
@@ -691,13 +691,13 @@ bool pp_mbed_tls_start(pp_tls tls) {
     return true;
 }
 
-bool pp_mbed_tls_is_connected(pp_tls tls) {
+bool pp_mbedtls_is_connected(pp_tls tls) {
     return tls->is_connected;
 }
 
 // MARK: - I/O
 
-pp_zd *pp_mbed_tls_pull_cipher(pp_tls tls, pp_tls_error_code *error) {
+pp_zd *pp_mbedtls_pull_cipher(pp_tls tls, pp_tls_error_code *error) {
     pp_tls_set_error(error, PPTLSErrorNone);
 
     int ret = 0;
@@ -754,7 +754,7 @@ pp_zd *pp_mbed_tls_pull_cipher(pp_tls tls, pp_tls_error_code *error) {
     return cipher;
 }
 
-pp_zd *pp_mbed_tls_pull_plain(pp_tls tls, pp_tls_error_code *error) {
+pp_zd *pp_mbedtls_pull_plain(pp_tls tls, pp_tls_error_code *error) {
     pp_tls_set_error(error, PPTLSErrorNone);
 
     pp_zd *plain = pp_tls_buffer_drain_zd(&tls->plain_out);
@@ -780,7 +780,7 @@ pp_zd *pp_mbed_tls_pull_plain(pp_tls tls, pp_tls_error_code *error) {
     }
 }
 
-bool pp_mbed_tls_put_cipher(pp_tls tls,
+bool pp_mbedtls_put_cipher(pp_tls tls,
                             const uint8_t *src, size_t src_len,
                             pp_tls_error_code *error) {
     pp_tls_set_error(error, PPTLSErrorNone);
@@ -788,7 +788,7 @@ bool pp_mbed_tls_put_cipher(pp_tls tls,
     return true;
 }
 
-bool pp_mbed_tls_put_plain(pp_tls tls,
+bool pp_mbedtls_put_plain(pp_tls tls,
                            const uint8_t *src, size_t src_len,
                            pp_tls_error_code *error) {
     pp_tls_set_error(error, PPTLSErrorNone);
@@ -813,7 +813,7 @@ bool pp_mbed_tls_put_plain(pp_tls tls,
 
 // MARK: - MD5
 
-char *pp_mbed_tls_ca_md5(const pp_tls tls) {
+char *pp_mbedtls_ca_md5(const pp_tls tls) {
     if (!pp_tls_init_psa()) {
         return NULL;
     }
@@ -879,15 +879,15 @@ pp_crypto_fnt pp_crypto_fnt_mbedtls(void) {
         .key_decrypted_from_pem = pp_mbed_key_decrypted_from_pem,
 
         .tls = {
-            .create = pp_mbed_tls_create,
-            .free = pp_mbed_tls_free,
-            .start = pp_mbed_tls_start,
-            .is_connected = pp_mbed_tls_is_connected,
-            .pull_cipher = pp_mbed_tls_pull_cipher,
-            .pull_plain = pp_mbed_tls_pull_plain,
-            .put_cipher = pp_mbed_tls_put_cipher,
-            .put_plain = pp_mbed_tls_put_plain,
-            .ca_md5 = pp_mbed_tls_ca_md5
+            .create = pp_mbedtls_create,
+            .free = pp_mbedtls_free,
+            .start = pp_mbedtls_start,
+            .is_connected = pp_mbedtls_is_connected,
+            .pull_cipher = pp_mbedtls_pull_cipher,
+            .pull_plain = pp_mbedtls_pull_plain,
+            .put_cipher = pp_mbedtls_put_cipher,
+            .put_plain = pp_mbedtls_put_plain,
+            .ca_md5 = pp_mbedtls_ca_md5
         }
     };
     return table;
