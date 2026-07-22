@@ -595,7 +595,7 @@ const Builder = struct {
     fn build(self: *Builder, allocator: std.mem.Allocator) ParseError!api.OpenVPNConfiguration {
         if (!self.found_option) return error.InvalidFormat;
 
-        self.configuration.data_ciphers = try takeOwnedSlice(allocator, &self.data_ciphers);
+        self.configuration.data_ciphers = try takeOwnedSliceOrNull(allocator, &self.data_ciphers);
 
         if (self.remotes.items.len > 0) {
             const remotes = try allocator.alloc(api.ExtendedEndpoint, self.remotes.items.len);
@@ -618,13 +618,13 @@ const Builder = struct {
             self.configuration.remotes = remotes;
         }
 
-        self.configuration.routes4 = try takeOwnedSlice(allocator, &self.routes4);
-        self.configuration.routes6 = try takeOwnedSlice(allocator, &self.routes6);
-        self.configuration.dns_servers = try takeOwnedSlice(allocator, &self.dns_servers);
-        self.configuration.search_domains = try takeOwnedSlice(allocator, &self.search_domains);
-        self.configuration.proxy_bypass_domains = try takeOwnedSlice(allocator, &self.proxy_bypass_domains);
-        self.configuration.routing_policies = try takeOwnedSlice(allocator, &self.routing_policies);
-        self.configuration.no_pull_mask = try takeOwnedSlice(allocator, &self.no_pull_mask);
+        self.configuration.routes4 = try takeOwnedSliceOrNull(allocator, &self.routes4);
+        self.configuration.routes6 = try takeOwnedSliceOrNull(allocator, &self.routes6);
+        self.configuration.dns_servers = try takeOwnedSliceOrNull(allocator, &self.dns_servers);
+        self.configuration.search_domains = try takeOwnedSliceOrNull(allocator, &self.search_domains);
+        self.configuration.proxy_bypass_domains = try takeOwnedSliceOrNull(allocator, &self.proxy_bypass_domains);
+        self.configuration.routing_policies = try takeOwnedSliceOrNull(allocator, &self.routing_policies);
+        self.configuration.no_pull_mask = try takeOwnedSliceOrNull(allocator, &self.no_pull_mask);
 
         if (self.tls_strategy) |strategy| {
             const lines = self.tls_key_lines orelse {
@@ -677,7 +677,7 @@ const RemoteBuilder = struct {
     protocol: ?api.IPSocketType = null,
 };
 
-fn takeOwnedSlice(
+fn takeOwnedSliceOrNull(
     allocator: std.mem.Allocator,
     list: anytype,
 ) error{OutOfMemory}!?@TypeOf(list.items) {

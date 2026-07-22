@@ -6,6 +6,7 @@ const std = @import("std");
 const c_exports_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const net_mod = @import("../../net/exports.zig");
+const auth_mod = @import("auth.zig");
 const c_mod = @import("c.zig");
 const constants_mod = @import("constants.zig");
 const crypto_mod = @import("crypto.zig");
@@ -22,6 +23,7 @@ const CryptoKeys = crypto_mod.CryptoKeys;
 const CryptoKeysBridge = crypto_mod.CryptoKeysBridge;
 const DataConstants = constants_mod.Data;
 const LinkProcessor = processing_mod.LinkProcessor;
+const PRF = auth_mod.PRF;
 const PRNG = crypto_mod.PRNG;
 const ZeroingData = crypto_mod.ZeroingData;
 
@@ -290,7 +292,7 @@ pub const DataPathWrapper = struct {
     pub fn nativeWithPRF(
         allocator: std.mem.Allocator,
         parameters: DataPathParameters,
-        prf: anytype,
+        prf: *const PRF,
         prng: PRNG,
     ) !DataPathWrapper {
         var seed = try prng.safeData(allocator, DataConstants.prng_seed_length);
@@ -301,7 +303,7 @@ pub const DataPathWrapper = struct {
     fn nativeWithSeed(
         allocator: std.mem.Allocator,
         parameters: DataPathParameters,
-        prf: anytype,
+        prf: *const PRF,
         seed: ZeroingData,
     ) !DataPathWrapper {
         const init_seed = parameters.fnt.init_seed orelse return error.UnsupportedAlgorithm;
@@ -469,7 +471,7 @@ pub const DataLink = struct {
         key: u8,
     ) !void {
         self.receiveUnwrapped(packets, key) catch |err|
-            return mapInboundError(err);
+            return errors_mod.sessionError(err);
     }
 
     fn receiveUnwrapped(
@@ -543,10 +545,6 @@ pub const DataLink = struct {
         // processing/copying by PacketProcessor and Looper.
         return @ptrCast(packets);
     }
-
-    fn mapInboundError(err: anytype) errors_mod.SessionError {
-        return errors_mod.sessionError(err);
-    }
 };
 
 /// A data-link view bound to the currently selected three-bit key.
@@ -579,9 +577,5 @@ pub const testing = struct {
     ) !*DataPath {
         const mode = c.openvpn_dp_mode_ad_create_mock(c.OpenVPNCompressionFramingDisabled);
         return DataPath.create(allocator, mode, peer_id);
-    }
-
-    pub fn mapInboundError(err: anytype) errors_mod.SessionError {
-        return DataLink.mapInboundError(err);
     }
 };

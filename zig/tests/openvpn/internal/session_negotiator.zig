@@ -5,6 +5,7 @@
 const std = @import("std");
 const source = @import("source");
 
+const errors = source.openvpn_internal.errors;
 const push = source.openvpn_internal.push;
 const session_negotiator = source.openvpn_internal.session_negotiator;
 
@@ -46,25 +47,21 @@ test "early-negotiation TLV requests wrapped-key resend" {
     try std.testing.expect(!session_negotiator.testing.requestsWrappedKeyResend(payload[0..5]));
 }
 
-test "successful TLS pull propagates control enqueue failure" {
-    const Fake = struct {
-        pub fn pullCipherText(_: *@This(), allocator: std.mem.Allocator) ![]u8 {
-            return allocator.dupe(u8, "ciphertext");
-        }
-
-        fn failEnqueue(_: ?*anyopaque, _: []const u8) !void {
-            return error.ControlChannelFailure;
+test "forwarding TLS ciphertext propagates control enqueue failure" {
+    const Callbacks = struct {
+        fn failEnqueue(_: ?*anyopaque, _: []const u8) errors.SessionError!void {
+            return error.ConnectionFailure;
         }
     };
 
-    var fake: Fake = .{};
+    const ciphertext = try std.testing.allocator.dupe(u8, "ciphertext");
     try std.testing.expectError(
-        error.ControlChannelFailure,
-        session_negotiator.testing.forwardPulledCipherText(
+        error.ConnectionFailure,
+        session_negotiator.testing.forwardCipherText(
             std.testing.allocator,
-            &fake,
+            ciphertext,
             null,
-            Fake.failEnqueue,
+            Callbacks.failEnqueue,
         ),
     );
 }

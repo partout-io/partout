@@ -320,12 +320,20 @@ pub const Negotiator = struct {
             &.{packet.packetId()},
             packet.sessionId(),
         ) catch |err| {
-            self.reportError(err);
+            self.options.on_error(
+                self.options.callback_context,
+                self.key,
+                errors_mod.sessionError(err),
+            );
             return;
         };
         defer self.allocator.free(raw);
         self.writeLink(&.{raw}) catch |err| {
-            self.reportError(err);
+            self.options.on_error(
+                self.options.callback_context,
+                self.key,
+                errors_mod.sessionError(err),
+            );
         };
     }
 
@@ -335,6 +343,11 @@ pub const Negotiator = struct {
         if (seconds <= 0) return false;
         return self.elapsedMs() >= secondsToMilliseconds(seconds);
     }
+
+    const EnqueueCipherText = *const fn (
+        ?*anyopaque,
+        []const u8,
+    ) errors_mod.SessionError!void;
 
     fn hardResetPayload(self: *Negotiator) !?[]u8 {
         if (!(self.options.configuration.uses_pia_patches orelse false)) return null;
@@ -355,7 +368,7 @@ pub const Negotiator = struct {
         const tls = self.tls orelse return error.Assertion;
         tls.putPlainText("PUSH_REQUEST\x00") catch {};
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
-            if (isTLSError(err)) return err;
+            if (err == error.TLSFailure) return err;
             return;
         };
         defer self.allocator.free(ciphertext);
@@ -458,12 +471,7 @@ pub const Negotiator = struct {
                 const payload = packet.payload() orelse return;
                 const tls = self.tls orelse return error.Assertion;
                 tls.putCipherText(payload) catch {};
-                try forwardPulledCipherText(
-                    self.allocator,
-                    tls,
-                    self,
-                    enqueuePulledCipherText,
-                );
+                try self.forwardPulledCipherText(tls);
 
                 if (self.state.before(.auth) and tls.isConnected()) {
                     self.state = .auth;
@@ -503,7 +511,7 @@ pub const Negotiator = struct {
         const tls = self.tls orelse return error.Assertion;
         try self.authenticator.?.putAuth(tls, self.options.configuration.*);
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
-            if (isTLSError(err)) return err;
+            if (err == error.TLSFailure) return err;
             return;
         };
         defer self.allocator.free(ciphertext);
@@ -531,7 +539,11 @@ pub const Negotiator = struct {
         defer freePackets(self.allocator, messages);
         for (messages) |message| {
             self.handleControlMessage(message) catch |err| {
-                self.reportError(err);
+                self.options.on_error(
+                    self.options.callback_context,
+                    self.key,
+                    errors_mod.sessionError(err),
+                );
                 return err;
             };
         }
@@ -674,38 +686,43 @@ pub const Negotiator = struct {
         return @intFromFloat(milliseconds);
     }
 
-    fn isTLSError(err: anytype) bool {
-        return err == error.TLSFailure;
-    }
-
-    fn reportError(self: *Negotiator, err: anytype) void {
-        self.options.on_error(
-            self.options.callback_context,
-            self.key,
-            errors_mod.sessionError(err),
-        );
-    }
-
     /// Pull absence/non-native pull failures are non-fatal during TLS drain,
     /// but a successful pull transfers control to the normal outbound path;
     /// failures from that path must propagate to the Session.
     fn forwardPulledCipherText(
-        allocator: std.mem.Allocator,
-        tls: anytype,
-        context: ?*anyopaque,
-        enqueue: anytype,
+        self: *Negotiator,
+        tls: *TLSWrapper,
     ) !void {
-        const ciphertext = tls.pullCipherText(allocator) catch |err| {
-            if (isTLSError(err)) return err;
+        const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
+            if (err == error.TLSFailure) return err;
             return;
         };
+        try forwardCipherText(
+            self.allocator,
+            ciphertext,
+            self,
+            enqueuePulledCipherText,
+        );
+    }
+
+    fn forwardCipherText(
+        allocator: std.mem.Allocator,
+        ciphertext: []u8,
+        context: ?*anyopaque,
+        enqueue: EnqueueCipherText,
+    ) errors_mod.SessionError!void {
         defer allocator.free(ciphertext);
         try enqueue(context, ciphertext);
     }
 
-    fn enqueuePulledCipherText(raw: ?*anyopaque, ciphertext: []const u8) !void {
+    fn enqueuePulledCipherText(
+        raw: ?*anyopaque,
+        ciphertext: []const u8,
+    ) errors_mod.SessionError!void {
         const self: *Negotiator = @ptrCast(@alignCast(raw.?));
-        try self.enqueueControlPackets(.controlV1, self.key, ciphertext);
+        self.enqueueControlPackets(.controlV1, self.key, ciphertext) catch |err| {
+            return errors_mod.sessionError(err);
+        };
     }
 
     fn freePackets(allocator: std.mem.Allocator, packets: [][]u8) void {
@@ -732,13 +749,13 @@ pub const Negotiator = struct {
 };
 
 pub const testing = struct {
-    pub fn forwardPulledCipherText(
+    pub fn forwardCipherText(
         allocator: std.mem.Allocator,
-        tls: anytype,
+        ciphertext: []u8,
         context: ?*anyopaque,
-        enqueue: anytype,
-    ) !void {
-        return Negotiator.forwardPulledCipherText(allocator, tls, context, enqueue);
+        enqueue: Negotiator.EnqueueCipherText,
+    ) errors_mod.SessionError!void {
+        return Negotiator.forwardCipherText(allocator, ciphertext, context, enqueue);
     }
 
     pub fn requestsWrappedKeyResend(payload: ?[]const u8) bool {

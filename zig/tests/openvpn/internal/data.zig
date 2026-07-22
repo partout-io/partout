@@ -7,6 +7,7 @@ const source = @import("source");
 
 const core = source.core;
 const data = source.openvpn_internal.data;
+const errors = source.openvpn_internal.errors;
 
 test "DataPath mock round-trips compound and bulk packets" {
     const allocator = std.testing.allocator;
@@ -45,7 +46,7 @@ test "DataLink declarations are semantically analyzed" {
 }
 
 test "DataLink preserves only reportable inbound failure categories" {
-    try std.testing.expectEqual(error.CryptoFailure, data.testing.mapInboundError(error.CryptoFailure));
-    try std.testing.expectEqual(error.CompressionMismatch, data.testing.mapInboundError(error.CompressionMismatch));
-    try std.testing.expectEqual(error.Reconnect, data.testing.mapInboundError(error.OutOfMemory));
+    try std.testing.expectEqual(error.CryptoFailure, errors.sessionError(error.CryptoFailure));
+    try std.testing.expectEqual(error.CompressionMismatch, errors.sessionError(error.CompressionMismatch));
+    try std.testing.expectEqual(error.Reconnect, errors.sessionError(error.OutOfMemory));
 }

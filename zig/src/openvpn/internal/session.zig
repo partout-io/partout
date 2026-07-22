@@ -329,10 +329,6 @@ pub const Session = struct {
         actor.schedule(.{ .cause = cause }) catch {};
     }
 
-    fn requestShutdownForError(self: *Session, err: anytype) void {
-        self.requestShutdown(errors_mod.sessionError(err));
-    }
-
     fn handleShutdownRequest(
         self: *Session,
         request: ShutdownRequest,
@@ -616,7 +612,8 @@ pub const Session = struct {
         context.removeOldNegotiators();
         if (active.phase == .started) return;
         active.phase = .started;
-        self.scheduleNextPing(context) catch |err| self.requestShutdownForError(err);
+        self.scheduleNextPing(context) catch |err|
+            self.requestShutdown(errors_mod.sessionError(err));
         if (self.delegate) |delegate| delegate.didStart(
             self,
             context.remote_endpoint,
@@ -648,7 +645,7 @@ pub const Session = struct {
             .context = self,
             .callback = negotiationTickOnQueue,
         }) catch |err| {
-            if (err != error.Cancelled) self.requestShutdownForError(err);
+            if (err != error.Cancelled) self.requestShutdown(errors_mod.sessionError(err));
         };
     }
 
@@ -674,7 +671,7 @@ pub const Session = struct {
             .context = self,
             .callback = pingOnQueue,
         }) catch |err| {
-            if (err != error.Cancelled) self.requestShutdownForError(err);
+            if (err != error.Cancelled) self.requestShutdown(errors_mod.sessionError(err));
         };
     }
 

@@ -10,6 +10,8 @@ const errors_mod = @import("errors.zig");
 const c = c_mod.api;
 const c_crypto = c_exports_mod.crypto;
 
+const SerializeWithCrypto = @TypeOf(&c.openvpn_ctrl_serialize_auth);
+
 pub const PacketCode = enum(u8) {
     softResetV1 = 0x03,
     controlV1 = 0x04,
@@ -185,7 +187,7 @@ pub const ControlPacket = struct {
         crypto: c_crypto.pp_crypto_ctx,
         replay_id: u32,
         timestamp: u32,
-        function: anytype,
+        function: SerializeWithCrypto,
     ) ![]u8 {
         const packet = self.native();
         var algorithm = c.openvpn_ctrl_alg{

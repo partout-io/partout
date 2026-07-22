@@ -10,6 +10,7 @@ const constants_mod = @import("constants.zig");
 const crypto_mod = @import("crypto.zig");
 const errors_mod = @import("errors.zig");
 const push_mod = @import("push.zig");
+const tls_mod = @import("tls.zig");
 
 const api = core_mod.api;
 const c_crypto = c_exports_mod.crypto;
@@ -19,6 +20,7 @@ const CryptoKeyPair = crypto_mod.CryptoKeyPair;
 const CryptoKeys = crypto_mod.CryptoKeys;
 const Keys = constants_mod.Keys;
 const PRNG = crypto_mod.PRNG;
+const TLSWrapper = tls_mod.TLSWrapper;
 const ZeroingData = crypto_mod.ZeroingData;
 
 /// Key-method 2 client/server random material.
@@ -320,12 +322,21 @@ pub const Authenticator = struct {
 
     pub fn putAuth(
         self: *Authenticator,
-        tls: anytype,
+        tls: *TLSWrapper,
         configuration: api.OpenVPNConfiguration,
     ) !void {
+        var raw = try self.authData(configuration);
+        defer raw.deinit(self.allocator);
+        try tls.putRawPlainText(raw.bytes);
+    }
+
+    fn authData(
+        self: *Authenticator,
+        configuration: api.OpenVPNConfiguration,
+    ) !ZeroingData {
         const allocator = self.allocator;
         var raw = try ZeroingData.initCopy(allocator, &ControlConstants.tls_prefix);
-        defer raw.deinit(allocator);
+        errdefer raw.deinit(allocator);
 
         raw.appendData(self.pre_master);
         raw.appendData(self.random1);
@@ -372,8 +383,7 @@ pub const Authenticator = struct {
         var peer_info_data = try ZeroingData.initString(allocator, peer_info, true);
         defer peer_info_data.deinit(allocator);
         try appendSized(&raw, allocator, peer_info_data);
-
-        try tls.putRawPlainText(raw.bytes);
+        return raw;
     }
 
     pub fn appendControlData(self: *Authenticator, data: []const u8) !void {
@@ -512,6 +522,13 @@ pub const Authenticator = struct {
 
 pub const testing = struct {
     pub const ServerOptions = ServerOCC;
+
+    pub fn authData(
+        authenticator: *Authenticator,
+        configuration: api.OpenVPNConfiguration,
+    ) !ZeroingData {
+        return authenticator.authData(configuration);
+    }
 };
 
 const PRFInput = struct {

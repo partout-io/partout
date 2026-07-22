@@ -81,27 +81,17 @@ test "Authenticator frames auth and buffers replies and messages" {
             return true;
         }
     };
-    const TLSRecorder = struct {
-        allocator: std.mem.Allocator,
-        plaintext: ?[]u8 = null,
-
-        pub fn putRawPlainText(self: *@This(), data: []const u8) !void {
-            if (self.plaintext) |value| self.allocator.free(value);
-            self.plaintext = try self.allocator.dupe(u8, data);
-        }
-    };
 
     var authenticator = try Authenticator.init(allocator, .{ .fill_fn = FixedPRNG.fill }, "user", "password");
     defer authenticator.deinit();
-    var recorder = TLSRecorder{ .allocator = allocator };
-    defer if (recorder.plaintext) |value| allocator.free(value);
     const ciphers = [_]api.OpenVPNCipher{.aes256gcm};
-    try authenticator.putAuth(&recorder, .{
+    var auth_data = try auth.testing.authData(&authenticator, .{
         .cipher = .aes256gcm,
         .data_ciphers = &ciphers,
         .digest = .sha256,
     });
-    const framed = recorder.plaintext.?;
+    defer auth_data.deinit(allocator);
+    const framed = auth_data.bytes;
     try std.testing.expectEqualSlices(u8, &ControlConstants.tls_prefix, framed[0..ControlConstants.tls_prefix.len]);
     try std.testing.expect(framed.len > ControlConstants.tls_prefix.len + Keys.pre_master_length + 2 * Keys.random_length);
     try std.testing.expect(std.mem.indexOf(u8, framed, "IV_PLAT_VER=") != null);
