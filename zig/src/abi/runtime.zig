@@ -47,8 +47,9 @@ pub const DaemonOptions = struct {
         };
         errdefer profile.deinit(allocator);
 
-        // Leave early if the profile contains modules whose
-        // implementations are not built with the library
+        // Leave early if the active connection module has no runtime
+        // implementation. A protocol may be built for parsing and
+        // serialization while its connection implementation is unavailable.
         try validateSupportedImplementations(profile);
 
         // Make deep copies of the other input
@@ -75,8 +76,8 @@ pub const DaemonOptions = struct {
     fn validateSupportedImplementations(profile: api.Profile) RuntimeError!void {
         const module = api.findActiveConnectionModule(profile) orelse return;
         switch (api.moduleType(module)) {
-            .OpenVPN => if (!build_options.openvpn) return error.MissingConnectionImplementation,
-            .WireGuard => if (!build_options.wireguard) return error.MissingConnectionImplementation,
+            .OpenVPN => if (openvpn.impl.connection == null) return error.MissingConnectionImplementation,
+            .WireGuard => if (wireguard.impl.connection == null) return error.MissingConnectionImplementation,
             else => {},
         }
     }

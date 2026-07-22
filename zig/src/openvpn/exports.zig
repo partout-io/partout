@@ -72,10 +72,10 @@ pub const impl: proto.ModuleExports = .{
     },
     .connection = null,
     // ZIGME: Implement OpenVPN connection
-    // .connection_impl = .{
-    //     .ptr = default_connection_context,
+    // .connection = if (build_options.openvpn) .{
+    //     .ptr = &Default.connection_context,
     //     .vtable = &connection_vtable,
-    // },
+    // } else null,
 };
 
 const module_vtable: core.ModuleImplementation.VTable = .{
