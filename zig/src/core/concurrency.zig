@@ -698,3 +698,23 @@ pub fn sleepMs(value: u64) void {
         request = remaining;
     }
 }
+
+/// Returns nanoseconds from a process-independent monotonic clock.
+pub fn monotonicNs() u64 {
+    if (builtin.os.tag == .windows) {
+        const windows = std.os.windows;
+        var frequency: windows.LARGE_INTEGER = undefined;
+        var counter: windows.LARGE_INTEGER = undefined;
+        std.debug.assert(windows.ntdll.RtlQueryPerformanceFrequency(&frequency).toBool());
+        std.debug.assert(windows.ntdll.RtlQueryPerformanceCounter(&counter).toBool());
+        const ticks: u64 = @bitCast(counter);
+        const ticks_per_second: u64 = @bitCast(frequency);
+        return @intCast((@as(u128, ticks) * std.time.ns_per_s) / ticks_per_second);
+    }
+
+    var timestamp: std.c.timespec = undefined;
+    if (std.c.clock_gettime(.MONOTONIC, &timestamp) != 0) return 0;
+    const seconds: u64 = @intCast(timestamp.sec);
+    const nanoseconds: u64 = @intCast(timestamp.nsec);
+    return seconds *| @as(u64, std.time.ns_per_s) +| nanoseconds;
+}

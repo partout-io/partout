@@ -3,19 +3,44 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const core = @import("../../core/exports.zig");
 const c_common = @import("../../c/exports.zig").common;
 const c_crypto = @import("../../c/exports.zig").crypto;
 const errors = @import("errors.zig");
-const NativeTLSConstants = @import("native_tls_constants.zig").NativeTLSConstants;
-const TLSParameters = @import("tls_parameters.zig").TLSParameters;
-const TLSProtocol = @import("tls_protocol.zig").TLSProtocol;
 
-/// C-backed implementation of `TLSProtocol`.
+const api = core.api;
+
+pub const TLSConstants = struct {
+    pub const ca_filename = "ca.pem";
+    pub const default_security_level: i32 = 0;
+    pub const buffer_length: usize = 16 * 1024;
+};
+
+/// Borrowed arguments used to create a TLS engine.
+pub const TLSParameters = struct {
+    fnt: c_crypto.pp_crypto_tls_fnt,
+    caches_directory: []const u8,
+    configuration: *const api.OpenVPNConfiguration,
+    verification: Verification = .{},
+
+    pub const Verification = struct {
+        context: ?*anyopaque = null,
+        callback: *const fn (?*anyopaque) void = ignore,
+
+        fn ignore(_: ?*anyopaque) void {}
+
+        pub fn failed(self: Verification) void {
+            self.callback(self.context);
+        }
+    };
+};
+
+/// C-backed TLS implementation.
 ///
 /// The C TLS object takes ownership of `pp_tls_options` after a successful
 /// `create`. The Zig wrapper owns its verification context, CA file path, and
 /// the TLS object itself.
-pub const NativeTLSWrapper = struct {
+pub const TLSWrapper = struct {
     allocator: std.mem.Allocator,
     fnt: c_crypto.pp_crypto_tls_fnt,
     tls: c_crypto.pp_tls,
@@ -26,20 +51,12 @@ pub const NativeTLSWrapper = struct {
         verification: TLSParameters.Verification,
     };
 
-    pub fn createProtocol(
-        allocator: std.mem.Allocator,
-        parameters: TLSParameters,
-    ) anyerror!TLSProtocol {
-        const self = try create(allocator, parameters);
-        return .{ .ptr = self, .vtable = &vtable };
-    }
-
     pub fn create(
         allocator: std.mem.Allocator,
         parameters: TLSParameters,
-    ) anyerror!*NativeTLSWrapper {
+    ) anyerror!*TLSWrapper {
         const configuration = parameters.configuration.*;
-        const ca = configuration.ca orelse return error.MissingCA;
+        const ca = configuration.ca orelse return error.TLSFailure;
         const create_tls = parameters.fnt.create orelse return error.TLSFailure;
         const free_tls = parameters.fnt.free orelse return error.TLSFailure;
 
@@ -49,7 +66,7 @@ pub const NativeTLSWrapper = struct {
             .{
                 parameters.caches_directory,
                 if (std.mem.endsWith(u8, parameters.caches_directory, "/")) "" else "/",
-                NativeTLSConstants.ca_filename,
+                TLSConstants.ca_filename,
             },
         );
         defer allocator.free(ca_path_plain);
@@ -79,8 +96,8 @@ pub const NativeTLSWrapper = struct {
         verification_context.* = .{ .verification = parameters.verification };
 
         const options = c_crypto.pp_tls_options_create(
-            configuration.tls_security_level orelse NativeTLSConstants.default_security_level,
-            NativeTLSConstants.buffer_length,
+            configuration.tls_security_level orelse TLSConstants.default_security_level,
+            TLSConstants.buffer_length,
             configuration.checks_eku orelse false,
             configuration.checks_san_host orelse false,
             ca_path.ptr,
@@ -94,11 +111,11 @@ pub const NativeTLSWrapper = struct {
         const tls = create_tls(options, &code) orelse {
             c_crypto.pp_tls_options_free(options);
             if (code == c_crypto.PPTLSErrorNone) return error.TLSFailure;
-            return errors.CTLSError.init(code).toError();
+            return errors.tlsError(code);
         };
         errdefer free_tls(tls);
 
-        const self = try allocator.create(NativeTLSWrapper);
+        const self = try allocator.create(TLSWrapper);
         self.* = .{
             .allocator = allocator,
             .fnt = parameters.fnt,
@@ -109,7 +126,7 @@ pub const NativeTLSWrapper = struct {
         return self;
     }
 
-    pub fn destroy(self: *NativeTLSWrapper) void {
+    pub fn destroy(self: *TLSWrapper) void {
         const allocator = self.allocator;
         self.fnt.free.?(self.tls);
         allocator.destroy(self.verification_context);
@@ -118,25 +135,25 @@ pub const NativeTLSWrapper = struct {
         allocator.destroy(self);
     }
 
-    pub fn start(self: *NativeTLSWrapper) anyerror!void {
-        const start_tls = self.fnt.start orelse return error.TLSStart;
-        if (!start_tls(self.tls)) return error.TLSStart;
+    pub fn start(self: *TLSWrapper) anyerror!void {
+        const start_tls = self.fnt.start orelse return error.TLSFailure;
+        if (!start_tls(self.tls)) return error.TLSFailure;
     }
 
-    pub fn isConnected(self: *const NativeTLSWrapper) bool {
+    pub fn isConnected(self: *const TLSWrapper) bool {
         const is_connected = self.fnt.is_connected orelse return false;
         return is_connected(self.tls);
     }
 
-    pub fn putPlainText(self: *NativeTLSWrapper, text: []const u8) anyerror!void {
+    pub fn putPlainText(self: *TLSWrapper, text: []const u8) anyerror!void {
         return self.putPlain(text);
     }
 
-    pub fn putRawPlainText(self: *NativeTLSWrapper, text: []const u8) anyerror!void {
+    pub fn putRawPlainText(self: *TLSWrapper, text: []const u8) anyerror!void {
         return self.putPlain(text);
     }
 
-    pub fn putCipherText(self: *NativeTLSWrapper, data: []const u8) anyerror!void {
+    pub fn putCipherText(self: *TLSWrapper, data: []const u8) anyerror!void {
         var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
         const put_cipher = self.fnt.put_cipher orelse return error.TLSFailure;
         if (!put_cipher(self.tls, data.ptr, data.len, &code))
@@ -144,7 +161,7 @@ pub const NativeTLSWrapper = struct {
     }
 
     pub fn pullPlainText(
-        self: *NativeTLSWrapper,
+        self: *TLSWrapper,
         allocator: std.mem.Allocator,
     ) anyerror![]u8 {
         var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
@@ -158,7 +175,7 @@ pub const NativeTLSWrapper = struct {
     }
 
     pub fn pullCipherText(
-        self: *NativeTLSWrapper,
+        self: *TLSWrapper,
         allocator: std.mem.Allocator,
     ) anyerror![]u8 {
         var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
@@ -172,16 +189,16 @@ pub const NativeTLSWrapper = struct {
     }
 
     pub fn caMD5(
-        self: *NativeTLSWrapper,
+        self: *TLSWrapper,
         allocator: std.mem.Allocator,
     ) anyerror![]u8 {
-        const ca_md5 = self.fnt.ca_md5 orelse return error.TLSEncryption;
-        const value = ca_md5(self.tls) orelse return error.TLSEncryption;
+        const ca_md5 = self.fnt.ca_md5 orelse return error.TLSFailure;
+        const value = ca_md5(self.tls) orelse return error.TLSFailure;
         defer c_common.pp_free(value);
         return allocator.dupe(u8, std.mem.span(@as([*:0]u8, @ptrCast(value))));
     }
 
-    fn putPlain(self: *NativeTLSWrapper, data: []const u8) anyerror!void {
+    fn putPlain(self: *TLSWrapper, data: []const u8) anyerror!void {
         var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
         const put_plain = self.fnt.put_plain orelse return error.TLSFailure;
         if (!put_plain(self.tls, data.ptr, data.len, &code))
@@ -194,71 +211,19 @@ pub const NativeTLSWrapper = struct {
     }
 
     fn writeCA(path: [:0]const u8, pem: []const u8) anyerror!void {
-        const file = c_common.fopen(path.ptr, "wb") orelse return error.TLSCAWrite;
+        const file = c_common.fopen(path.ptr, "wb") orelse return error.TLSFailure;
         defer _ = c_common.fclose(file);
         if (pem.len == 0) return;
-        if (c_common.fwrite(pem.ptr, 1, pem.len, file) != pem.len) return error.TLSCAWrite;
+        if (c_common.fwrite(pem.ptr, 1, pem.len, file) != pem.len) return error.TLSFailure;
     }
 
     fn tlsOperationError(code: c_crypto.pp_tls_error_code) anyerror {
         if (code == c_crypto.PPTLSErrorNone) return error.TLSFailure;
-        return errors.CTLSError.init(code).toError();
-    }
-
-    const vtable = TLSProtocol.VTable{
-        .start = protocolStart,
-        .is_connected = protocolIsConnected,
-        .put_plain_text = protocolPutPlainText,
-        .put_raw_plain_text = protocolPutRawPlainText,
-        .put_cipher_text = protocolPutCipherText,
-        .pull_plain_text = protocolPullPlainText,
-        .pull_cipher_text = protocolPullCipherText,
-        .ca_md5 = protocolCaMD5,
-        .deinit = protocolDeinit,
-    };
-
-    fn cast(pointer: *anyopaque) *NativeTLSWrapper {
-        return @ptrCast(@alignCast(pointer));
-    }
-
-    fn protocolStart(pointer: *anyopaque) anyerror!void {
-        return cast(pointer).start();
-    }
-
-    fn protocolIsConnected(pointer: *anyopaque) bool {
-        return cast(pointer).isConnected();
-    }
-
-    fn protocolPutPlainText(pointer: *anyopaque, text: []const u8) anyerror!void {
-        return cast(pointer).putPlainText(text);
-    }
-
-    fn protocolPutRawPlainText(pointer: *anyopaque, text: []const u8) anyerror!void {
-        return cast(pointer).putRawPlainText(text);
-    }
-
-    fn protocolPutCipherText(pointer: *anyopaque, data: []const u8) anyerror!void {
-        return cast(pointer).putCipherText(data);
-    }
-
-    fn protocolPullPlainText(pointer: *anyopaque, allocator: std.mem.Allocator) anyerror![]u8 {
-        return cast(pointer).pullPlainText(allocator);
-    }
-
-    fn protocolPullCipherText(pointer: *anyopaque, allocator: std.mem.Allocator) anyerror![]u8 {
-        return cast(pointer).pullCipherText(allocator);
-    }
-
-    fn protocolCaMD5(pointer: *anyopaque, allocator: std.mem.Allocator) anyerror![]u8 {
-        return cast(pointer).caMD5(allocator);
-    }
-
-    fn protocolDeinit(pointer: *anyopaque) void {
-        cast(pointer).destroy();
+        return errors.tlsError(code);
     }
 };
 
-test "NativeTLSWrapper delegates its complete TLS surface to the C table" {
+test "TLSWrapper delegates its complete TLS surface to the C table" {
     const Fake = struct {
         fn options(tls: c_crypto.pp_tls) [*c]c_crypto.pp_tls_options {
             return @ptrCast(@alignCast(tls.?));
@@ -340,7 +305,7 @@ test "NativeTLSWrapper delegates its complete TLS surface to the C table" {
     fnt.put_plain = Fake.put;
     fnt.put_cipher = Fake.put;
     fnt.ca_md5 = Fake.caMD5;
-    var tls = try NativeTLSWrapper.createProtocol(allocator, .{
+    const tls = try TLSWrapper.create(allocator, .{
         .fnt = fnt,
         .caches_directory = caches_directory,
         .configuration = &configuration,
@@ -349,7 +314,7 @@ test "NativeTLSWrapper delegates its complete TLS surface to the C table" {
             .callback = Fake.verificationFailed,
         },
     });
-    defer tls.deinit();
+    defer tls.destroy();
 
     try tls.start();
     try std.testing.expect(tls.isConnected());

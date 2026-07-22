@@ -5,7 +5,7 @@
 pub const Constants = struct {
     pub const Keys = @import("key_constants.zig").Keys;
     pub const ControlChannel = @import("control_channel_constants.zig").ControlChannel;
-    pub const DataChannel = @import("data_channel_constants.zig").DataChannel;
+    pub const DataChannel = @import("data.zig").DataConstants;
 };
 
 test "constants namespace re-exports entity files" {

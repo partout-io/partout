@@ -6,32 +6,32 @@ const std = @import("std");
 
 const core = @import("../../core/exports.zig");
 const net = @import("../../net/exports.zig");
-const ActiveContext = @import("active_context.zig").ActiveContext;
+const ActiveContext = @import("session_context.zig").ActiveContext;
 const ActivePhase = @import("active_phase.zig").ActivePhase;
 const c_crypto = @import("../../c/exports.zig").crypto;
 const c = @import("c.zig").api;
-const CPacketCode = @import("c_packet_code.zig").CPacketCode;
+const control = @import("control.zig");
+const PacketCode = control.PacketCode;
 const ConnectionOptions = @import("connection_options.zig").ConnectionOptions;
 const ControlChannelConstants = @import("control_channel_constants.zig").ControlChannel;
-const ControlChannelV3 = @import("control_channel_v3.zig").ControlChannelV3;
+const serialization = @import("serialization.zig");
+const ControlChannel = control.ControlChannel(serialization.Serializer);
 const credentials_helpers = @import("credentials_helpers.zig");
-const DataChannel = @import("data_channel.zig").DataChannel;
-const DataLink = @import("data_link.zig").DataLink;
-const DataPathFactory = @import("factories.zig").DataPathFactory;
+const DataChannel = @import("data.zig").DataChannel;
+const DataLink = @import("data.zig").DataLink;
 const errors = @import("errors.zig");
-const IdleContext = @import("idle_context.zig").IdleContext;
-const LinkProcessor = @import("link_processor.zig").LinkProcessor;
-const NegotiatorOptions = @import("negotiator_options.zig").NegotiatorOptions;
-const NegotiatorV3 = @import("negotiator_v3.zig").NegotiatorV3;
+const IdleContext = @import("session_context.zig").IdleContext;
+const LinkProcessor = @import("processing.zig").LinkProcessor;
+const NegotiatorOptions = @import("session_negotiator.zig").NegotiatorOptions;
+const Negotiator = @import("session_negotiator.zig").Negotiator;
 const OCCPacket = @import("occ_packet.zig").OCCPacket;
 const PRNG = @import("prng.zig").PRNG;
 const PushReply = @import("push_reply.zig").PushReply;
 const RenegotiationType = @import("renegotiation_type.zig").RenegotiationType;
 const SessionDelegate = @import("session_delegate.zig").SessionDelegate;
-const SessionProtocol = @import("session_protocol.zig").SessionProtocol;
 const SessionState = @import("session_state.zig").SessionState;
-const TLSFactory = @import("factories.zig").TLSFactory;
-const TLSParameters = @import("tls_parameters.zig").TLSParameters;
+const TLSParameters = @import("tls.zig").TLSParameters;
+const TLSWrapper = @import("tls.zig").TLSWrapper;
 
 const api = core.api;
 
@@ -54,11 +54,9 @@ pub const Session = struct {
     prng: PRNG,
     caches_directory: []u8,
     options: ConnectionOptions,
-    tls_factory: TLSFactory,
-    data_path_factory: DataPathFactory,
 
     looper: *net.Looper,
-    control_channel: *ControlChannelV3,
+    control_channel: *ControlChannel,
     shutdown_actor: ?*ShutdownActor,
     lifecycle_lock: core.Mutex = .{},
     negotiation_timer: core.RunAfter = .{},
@@ -89,8 +87,6 @@ pub const Session = struct {
         prng: PRNG,
         caches_directory: []const u8,
         options: ConnectionOptions,
-        tls_factory: TLSFactory,
-        data_path_factory: DataPathFactory,
     ) anyerror!*Session {
         var owned_configuration = try configuration.clone(allocator);
         errdefer owned_configuration.deinit(allocator);
@@ -101,12 +97,12 @@ pub const Session = struct {
         errdefer if (owned_credentials) |*value| value.deinit(allocator);
         const owned_caches_directory = try allocator.dupe(u8, caches_directory);
         errdefer allocator.free(owned_caches_directory);
-        const control_channel = try ControlChannelV3.createForConfiguration(
+        const serializer = try serialization.Serializer.forConfiguration(
             allocator,
             fnt.enc,
-            prng,
             &owned_configuration,
         );
+        const control_channel = try ControlChannel.create(allocator, prng, serializer);
         errdefer control_channel.destroy();
 
         const self = try allocator.create(Session);
@@ -119,8 +115,6 @@ pub const Session = struct {
             .prng = prng,
             .caches_directory = owned_caches_directory,
             .options = options,
-            .tls_factory = tls_factory,
-            .data_path_factory = data_path_factory,
             .looper = looper,
             .control_channel = control_channel,
             .shutdown_actor = null,
@@ -169,10 +163,6 @@ pub const Session = struct {
         const allocator = self.allocator;
         self.* = undefined;
         allocator.destroy(self);
-    }
-
-    pub fn protocol(self: *Session) SessionProtocol {
-        return .{ .ptr = self, .vtable = &protocol_vtable };
     }
 
     pub fn setDelegate(self: *Session, delegate: ?SessionDelegate) void {
@@ -421,7 +411,7 @@ pub const Session = struct {
         defer for (&grouped) |*list| list.deinit(self.allocator);
         for (packets) |packet| {
             if (packet.len == 0) continue;
-            const code = CPacketCode.fromRaw(packet[0] >> 3) orelse continue;
+            const code = PacketCode.fromRaw(packet[0] >> 3) orelse continue;
             if (code == .dataV2) {
                 if (packet.len -| 1 < c.OpenVPNPacketPeerIdLength) continue;
             }
@@ -482,17 +472,17 @@ pub const Session = struct {
         try pair.send(packets, null, null);
     }
 
-    fn startNegotiationOnQueue(self: *Session) anyerror!*NegotiatorV3 {
+    fn startNegotiationOnQueue(self: *Session) anyerror!*Negotiator {
         const context = self.state.activeContext() orelse return error.Assertion;
-        var tls = try self.tls_factory(self.allocator, TLSParameters{
+        const tls = try TLSWrapper.create(self.allocator, TLSParameters{
             .fnt = self.fnt.tls,
             .caches_directory = self.caches_directory,
             .configuration = &self.configuration,
             .verification = .{ .context = self, .callback = onTLSVerificationFailure },
         });
         var tls_transferred = false;
-        errdefer if (!tls_transferred) tls.deinit();
-        const negotiator = try NegotiatorV3.create(self.allocator, .{
+        errdefer if (!tls_transferred) tls.destroy();
+        const negotiator = try Negotiator.create(self.allocator, .{
             .fnt = self.fnt,
             .looper = self.looper,
             .link_processor = self.link_processor orelse return error.Assertion,
@@ -500,7 +490,6 @@ pub const Session = struct {
             .channel = self.control_channel,
             .prng = self.prng,
             .tls = tls,
-            .data_path_factory = self.data_path_factory,
             .options = self.negotiatorOptions(context.with_local_options),
         });
         tls_transferred = true;
@@ -512,9 +501,9 @@ pub const Session = struct {
 
     fn startRenegotiationOnQueue(
         self: *Session,
-        previous: *NegotiatorV3,
+        previous: *Negotiator,
         initiated_by: RenegotiationType,
-    ) anyerror!*NegotiatorV3 {
+    ) anyerror!*Negotiator {
         if (previous.isRenegotiating()) return previous;
         const context = self.state.activeContext() orelse return error.Assertion;
         const negotiator = try previous.forRenegotiation(initiated_by);
@@ -572,7 +561,7 @@ pub const Session = struct {
 
     fn onTLSVerificationFailure(raw: ?*anyopaque) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        self.requestShutdown(error.TLSPeerVerification);
+        self.requestShutdown(error.TLSFailure);
     }
 
     fn scheduleNegotiationTick(self: *Session) std.Thread.SpawnError!void {
@@ -625,7 +614,7 @@ pub const Session = struct {
         const pair = context.current_data_pair orelse return;
         try self.checkPingTimeoutOnQueue(context);
         if (self.keepAliveIntervalMs(context) != null) {
-            const ping: []const u8 = &@import("data_channel_constants.zig").DataChannel.ping_string;
+            const ping: []const u8 = &@import("data.zig").DataConstants.ping_string;
             try pair.send(&.{ping}, null, null);
         }
         try self.scheduleNextPing(context);
@@ -634,12 +623,12 @@ pub const Session = struct {
     fn checkPingTimeoutOnQueue(
         self: *Session,
         context: *ActiveContext,
-    ) errors.PingTimeoutError!void {
+    ) error{Timeout}!void {
         const last_received = context.last_received_ns orelse return;
         const timeout_ns = self.keepAliveTimeoutMs(context) *|
             @as(u64, std.time.ns_per_ms);
         if (core.concurrency.monotonicNs() -| last_received > timeout_ns)
-            return error.PingTimeout;
+            return error.Timeout;
     }
 
     fn keepAliveIntervalMs(
@@ -750,47 +739,6 @@ pub const Session = struct {
         session: *Session,
         cause: ?anyerror,
     };
-
-    const protocol_vtable = SessionProtocol.VTable{
-        .set_delegate = protocolSetDelegate,
-        .set_link = protocolSetLink,
-        .has_link = protocolHasLink,
-        .set_tunnel = protocolSetTunnel,
-        .shutdown = protocolShutdown,
-    };
-
-    fn protocolSetDelegate(raw: *anyopaque, delegate: ?SessionDelegate) void {
-        const self: *Session = @ptrCast(@alignCast(raw));
-        self.setDelegate(delegate);
-    }
-
-    fn protocolSetLink(
-        raw: *anyopaque,
-        descriptor: net.Looper.Descriptor,
-        remote_endpoint: api.ExtendedEndpoint,
-    ) anyerror!void {
-        const self: *Session = @ptrCast(@alignCast(raw));
-        try self.setLink(descriptor, remote_endpoint);
-    }
-
-    fn protocolHasLink(raw: *anyopaque) bool {
-        const self: *Session = @ptrCast(@alignCast(raw));
-        return self.hasLink();
-    }
-
-    fn protocolSetTunnel(raw: *anyopaque, descriptor: net.Looper.Descriptor) anyerror!void {
-        const self: *Session = @ptrCast(@alignCast(raw));
-        try self.setTunnel(descriptor);
-    }
-
-    fn protocolShutdown(
-        raw: *anyopaque,
-        cause: ?anyerror,
-        timeout_ms: ?u64,
-    ) anyerror!void {
-        const self: *Session = @ptrCast(@alignCast(raw));
-        try self.shutdown(cause, timeout_ms);
-    }
 };
 
 test "Session declarations are semantically analyzed" {
@@ -822,8 +770,6 @@ test "Session borrows an externally managed Looper" {
         PRNG.system(),
         "",
         .{},
-        @import("factories.zig").nativeTLSFactory,
-        @import("factories.zig").nativeDataPathFactory,
     );
     var session_destroyed = false;
     defer if (!session_destroyed) session.destroy();

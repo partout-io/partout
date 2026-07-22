@@ -25,11 +25,11 @@ pub const SimpleKeyDecrypter = struct {
         defer allocator.free(c_pem);
         const c_passphrase = try allocator.dupeZ(u8, passphrase);
         defer allocator.free(c_passphrase);
-        const decrypt = self.fnt.key_decrypted_from_pem orelse return error.CryptoCreation;
+        const decrypt = self.fnt.key_decrypted_from_pem orelse return error.UnsupportedAlgorithm;
         const value = decrypt(
             c_pem.ptr,
             c_passphrase.ptr,
-        ) orelse return error.CryptoCreation;
+        ) orelse return error.UnsupportedAlgorithm;
         return copyAndDestroy(allocator, value);
     }
 
@@ -44,11 +44,11 @@ pub const SimpleKeyDecrypter = struct {
         defer allocator.free(c_path);
         const c_passphrase = try allocator.dupeZ(u8, passphrase);
         defer allocator.free(c_passphrase);
-        const decrypt = self.fnt.key_decrypted_from_path orelse return error.CryptoCreation;
+        const decrypt = self.fnt.key_decrypted_from_path orelse return error.UnsupportedAlgorithm;
         const value = decrypt(
             c_path.ptr,
             c_passphrase.ptr,
-        ) orelse return error.CryptoCreation;
+        ) orelse return error.UnsupportedAlgorithm;
         return copyAndDestroy(allocator, value);
     }
 

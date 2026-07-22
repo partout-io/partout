@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-const ActiveContext = @import("active_context.zig").ActiveContext;
+const ActiveContext = @import("session_context.zig").ActiveContext;
 const ActivePhase = @import("active_phase.zig").ActivePhase;
-const IdleContext = @import("idle_context.zig").IdleContext;
+const IdleContext = @import("session_context.zig").IdleContext;
 
 /// Serialized lifecycle state for a V3 OpenVPN session.
 ///

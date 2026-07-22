@@ -11,7 +11,7 @@ const CryptoKeyPair = @import("crypto_key_pair.zig").CryptoKeyPair;
 /// owning value.
 pub const CryptoKeys = struct {
     pub const KeyPair = CryptoKeyPair;
-    pub const PRF = @import("crypto_keys_prf.zig").CryptoKeysPRF;
+    pub const PRF = @import("auth.zig").PRF;
 
     cipher: ?CryptoKeyPair = null,
     digest: ?CryptoKeyPair = null,

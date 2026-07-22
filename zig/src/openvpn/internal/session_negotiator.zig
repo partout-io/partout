@@ -3,34 +3,101 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-
 const core = @import("../../core/exports.zig");
 const net = @import("../../net/exports.zig");
-const Authenticator = @import("authenticator.zig").Authenticator;
-const CControlPacket = @import("c_control_packet.zig").CControlPacket;
-const CPacketCode = @import("c_packet_code.zig").CPacketCode;
+const c_crypto = @import("../../c/exports.zig").crypto;
+const auth = @import("auth.zig");
+const Authenticator = auth.Authenticator;
+const PRF = auth.PRF;
 const configuration_helpers = @import("configuration_helpers.zig");
-const ControlChannelV3 = @import("control_channel_v3.zig").ControlChannelV3;
+const control = @import("control.zig");
+const serialization = @import("serialization.zig");
+const ControlChannel = control.ControlChannel(serialization.Serializer);
+const ControlPacket = control.ControlPacket;
+const PacketCode = control.PacketCode;
 const ControlChannelConstants = @import("control_channel_constants.zig").ControlChannel;
-const CryptoKeysPRF = @import("crypto_keys_prf.zig").CryptoKeysPRF;
-const DataChannel = @import("data_channel.zig").DataChannel;
-const DataPathFactory = @import("factories.zig").DataPathFactory;
-const DataPathParameters = @import("data_path_parameters.zig").DataPathParameters;
-const LinkProcessor = @import("link_processor.zig").LinkProcessor;
-const NegotiationHistory = @import("negotiation_history.zig").NegotiationHistory;
-const NegotiatorOptions = @import("negotiator_options.zig").NegotiatorOptions;
-const NegotiatorState = @import("negotiator_state.zig").NegotiatorState;
+const data_types = @import("data.zig");
+const DataChannel = data_types.DataChannel;
+const DataPathParameters = data_types.DataPathParameters;
+const DataPathWrapper = data_types.DataPathWrapper;
+const ConnectionOptions = @import("connection_options.zig").ConnectionOptions;
+const LinkProcessor = @import("processing.zig").LinkProcessor;
 const PIAHardReset = @import("pia_hard_reset.zig").PIAHardReset;
 const PRNG = @import("prng.zig").PRNG;
 const PushReply = @import("push_reply.zig").PushReply;
 const RenegotiationType = @import("renegotiation_type.zig").RenegotiationType;
-const TLSProtocol = @import("tls_protocol.zig").TLSProtocol;
-const c_crypto = @import("../../c/exports.zig").crypto;
+const TLSWrapper = @import("tls.zig").TLSWrapper;
 
 const api = core.api;
 
+/// Ordered phases of an OpenVPN key negotiation.
+pub const NegotiatorState = enum(u8) {
+    idle,
+    tls,
+    auth,
+    push,
+    connected,
+
+    pub fn before(self: NegotiatorState, other: NegotiatorState) bool {
+        return @intFromEnum(self) < @intFromEnum(other);
+    }
+};
+
+test "NegotiatorState preserves Swift ordering" {
+    try std.testing.expect(NegotiatorState.tls.before(.auth));
+    try std.testing.expect(!NegotiatorState.connected.before(.push));
+}
+
+pub const NegotiationHistory = struct {
+    push_reply: PushReply,
+
+    pub fn init(push_reply: *PushReply) NegotiationHistory {
+        const moved = push_reply.*;
+        push_reply.* = undefined;
+        return .{ .push_reply = moved };
+    }
+
+    pub fn clone(self: NegotiationHistory, allocator: std.mem.Allocator) anyerror!NegotiationHistory {
+        return .{ .push_reply = try self.push_reply.clone(allocator) };
+    }
+
+    pub fn deinit(self: *NegotiationHistory, allocator: std.mem.Allocator) void {
+        self.push_reply.deinit(allocator);
+        self.* = undefined;
+    }
+};
+
+test "negotiation history deep-clones push options" {
+    var reply = (try PushReply.parse(std.testing.allocator, "PUSH_REPLY,ping 10")).?;
+    var history = NegotiationHistory.init(&reply);
+    defer history.deinit(std.testing.allocator);
+    var copy = try history.clone(std.testing.allocator);
+    defer copy.deinit(std.testing.allocator);
+    try std.testing.expectEqual(@as(?f64, 10), copy.push_reply.options.keep_alive_interval);
+}
+
+/// Borrowed session settings and callbacks used by a negotiator.
+///
+/// `on_connected` transfers the `DataChannel` to the callback on success. The
+/// push reply remains borrowed from the negotiator and must be cloned by a
+/// recipient that needs to retain it.
+pub const NegotiatorOptions = struct {
+    configuration: *const api.OpenVPNConfiguration,
+    credentials: ?*const api.OpenVPNCredentials,
+    with_local_options: bool,
+    session_options: ConnectionOptions,
+    callback_context: ?*anyopaque,
+    on_connected: *const fn (
+        ?*anyopaque,
+        u8,
+        *DataChannel,
+        *const PushReply,
+    ) anyerror!void,
+    on_error: *const fn (?*anyopaque, u8, anyerror) void,
+};
+
 /// V3 control-channel state machine. All mutable methods run on `looper`.
-pub const NegotiatorV3 = struct {
+pub const Negotiator = struct {
     allocator: std.mem.Allocator,
     fnt: c_crypto.pp_crypto_fnt,
     key: u8,
@@ -39,17 +106,16 @@ pub const NegotiatorV3 = struct {
     looper: *net.Looper,
     link_processor: *LinkProcessor,
     remote_endpoint: *const api.ExtendedEndpoint,
-    channel: *ControlChannelV3,
+    channel: *ControlChannel,
     prng: PRNG,
-    tls: ?TLSProtocol,
-    data_path_factory: DataPathFactory,
+    tls: ?*TLSWrapper,
     options: NegotiatorOptions,
 
     start_time_ns: u64,
     negotiation_timeout_ms: u64,
     state: NegotiatorState = .idle,
     expected_packet_id: u32 = 0,
-    pending_packets: std.AutoHashMap(u32, CControlPacket),
+    pending_packets: std.AutoHashMap(u32, ControlPacket),
     authenticator: ?Authenticator = null,
     next_push_request_ns: ?u64 = null,
     continued_push_reply_message: ?[]u8 = null,
@@ -63,16 +129,15 @@ pub const NegotiatorV3 = struct {
         looper: *net.Looper,
         link_processor: *LinkProcessor,
         remote_endpoint: *const api.ExtendedEndpoint,
-        channel: *ControlChannelV3,
+        channel: *ControlChannel,
         prng: PRNG,
-        tls: TLSProtocol,
-        data_path_factory: DataPathFactory,
+        tls: *TLSWrapper,
         options: NegotiatorOptions,
     };
 
     /// `tls` and `history` transfer only when creation succeeds.
-    pub fn create(allocator: std.mem.Allocator, init: Init) std.mem.Allocator.Error!*NegotiatorV3 {
-        const self = try allocator.create(NegotiatorV3);
+    pub fn create(allocator: std.mem.Allocator, init: Init) std.mem.Allocator.Error!*Negotiator {
+        const self = try allocator.create(Negotiator);
         self.* = .{
             .allocator = allocator,
             .fnt = init.fnt,
@@ -85,23 +150,22 @@ pub const NegotiatorV3 = struct {
             .channel = init.channel,
             .prng = init.prng,
             .tls = init.tls,
-            .data_path_factory = init.data_path_factory,
             .options = init.options,
             .start_time_ns = core.concurrency.monotonicNs(),
             .negotiation_timeout_ms = if (init.renegotiation != null)
                 init.options.session_options.soft_negotiation_timeout_ms
             else
                 init.options.session_options.negotiation_timeout_ms,
-            .pending_packets = std.AutoHashMap(u32, CControlPacket).init(allocator),
+            .pending_packets = std.AutoHashMap(u32, ControlPacket).init(allocator),
         };
         return self;
     }
 
-    pub fn destroy(self: *NegotiatorV3) void {
+    pub fn destroy(self: *Negotiator) void {
         self.cancel();
         if (self.history) |*history| history.deinit(self.allocator);
         if (self.continued_push_reply_message) |message| self.allocator.free(message);
-        if (self.tls) |*tls| tls.deinit();
+        if (self.tls) |tls| tls.destroy();
         self.pending_packets.deinit();
         const allocator = self.allocator;
         self.* = undefined;
@@ -109,9 +173,9 @@ pub const NegotiatorV3 = struct {
     }
 
     pub fn forRenegotiation(
-        self: *NegotiatorV3,
+        self: *Negotiator,
         initiated_by: RenegotiationType,
-    ) anyerror!*NegotiatorV3 {
+    ) anyerror!*Negotiator {
         const history = if (self.history) |value|
             try value.clone(self.allocator)
         else
@@ -138,25 +202,24 @@ pub const NegotiatorV3 = struct {
             .channel = self.channel,
             .prng = self.prng,
             .tls = tls,
-            .data_path_factory = self.data_path_factory,
             .options = self.options,
         });
     }
 
-    pub fn isConnected(self: *const NegotiatorV3) bool {
+    pub fn isConnected(self: *const Negotiator) bool {
         return self.state == .connected;
     }
 
-    pub fn isRenegotiating(self: *const NegotiatorV3) bool {
+    pub fn isRenegotiating(self: *const Negotiator) bool {
         return self.renegotiation != null and self.state != .connected;
     }
 
-    pub fn usesTLSCryptV2(self: *const NegotiatorV3) bool {
+    pub fn usesTLSCryptV2(self: *const Negotiator) bool {
         const wrap = self.options.configuration.tls_wrap orelse return false;
         return wrap.strategy == .cryptV2;
     }
 
-    pub fn start(self: *NegotiatorV3) anyerror!void {
+    pub fn start(self: *Negotiator) anyerror!void {
         std.debug.assert(self.looper.isOnQueue());
         try self.channel.reset(self.renegotiation == null);
         _ = try self.tick();
@@ -175,7 +238,7 @@ pub const NegotiatorV3 = struct {
         }
     }
 
-    pub fn cancel(self: *NegotiatorV3) void {
+    pub fn cancel(self: *Negotiator) void {
         var iterator = self.pending_packets.valueIterator();
         while (iterator.next()) |packet| packet.deinit();
         self.pending_packets.clearRetainingCapacity();
@@ -185,13 +248,13 @@ pub const NegotiatorV3 = struct {
 
     /// Performs the former recursive `Task.sleep` check once. The Session owns
     /// the stable timer and calls this method again when it returns `true`.
-    pub fn tick(self: *NegotiatorV3) anyerror!bool {
+    pub fn tick(self: *Negotiator) anyerror!bool {
         std.debug.assert(self.looper.isOnQueue());
         const elapsed = self.elapsedMs();
         if (self.state == .idle and elapsed > self.options.session_options.hard_reset_timeout_ms)
             return error.Recoverable;
         if (self.state != .connected and elapsed > self.negotiation_timeout_ms)
-            return error.NegotiationTimeout;
+            return error.Timeout;
 
         if (!self.isRenegotiating()) try self.pushRequest();
         if (self.remote_endpoint.plainSocketType() == .udp) try self.flushControlQueue();
@@ -199,27 +262,27 @@ pub const NegotiatorV3 = struct {
     }
 
     pub fn readInboundPacket(
-        self: *NegotiatorV3,
+        self: *Negotiator,
         packet: []const u8,
         _: usize,
-    ) anyerror!CControlPacket {
+    ) anyerror!ControlPacket {
         // Preserve the V3 implementation's deliberate quirk: the public
         // offset parameter exists for parity, but channel parsing starts at 0.
         return self.channel.readInboundPacket(packet, 0);
     }
 
     /// Takes ownership of `packet`; the returned slice and packets are owned by
-    /// the caller, as documented by ControlChannelV3.
+    /// the caller, as documented by ControlChannel.
     pub fn enqueueInboundPacket(
-        self: *NegotiatorV3,
-        packet: CControlPacket,
-    ) anyerror![]CControlPacket {
+        self: *Negotiator,
+        packet: ControlPacket,
+    ) anyerror![]ControlPacket {
         return self.channel.enqueueInboundPacket(packet);
     }
 
     pub fn handleControlPacket(
-        self: *NegotiatorV3,
-        packet: *CControlPacket,
+        self: *Negotiator,
+        packet: *ControlPacket,
     ) anyerror!void {
         const packet_id = packet.packetId();
         if (packet_id < self.expected_packet_id) return;
@@ -246,9 +309,9 @@ pub const NegotiatorV3 = struct {
         }
     }
 
-    pub fn handleAcks(_: *NegotiatorV3) void {}
+    pub fn handleAcks(_: *Negotiator) void {}
 
-    pub fn sendAck(self: *NegotiatorV3, packet: *const CControlPacket) void {
+    pub fn sendAck(self: *Negotiator, packet: *const ControlPacket) void {
         const raw = self.channel.writeAcks(
             packet.key(),
             &.{packet.packetId()},
@@ -263,14 +326,14 @@ pub const NegotiatorV3 = struct {
         };
     }
 
-    pub fn shouldRenegotiate(self: *const NegotiatorV3) bool {
+    pub fn shouldRenegotiate(self: *const Negotiator) bool {
         if (self.state != .connected) return false;
         const seconds = self.options.configuration.renegotiates_after orelse return false;
         if (seconds <= 0) return false;
         return self.elapsedMs() >= secondsToMilliseconds(seconds);
     }
 
-    fn hardResetPayload(self: *NegotiatorV3) anyerror!?[]u8 {
+    fn hardResetPayload(self: *Negotiator) anyerror!?[]u8 {
         if (!(self.options.configuration.uses_pia_patches orelse false)) return null;
         const tls = self.tls orelse return error.Assertion;
         const ca_md5 = tls.caMD5(self.allocator) catch return null;
@@ -282,14 +345,14 @@ pub const NegotiatorV3 = struct {
         ).encodedData(self.allocator, self.prng) catch null;
     }
 
-    fn pushRequest(self: *NegotiatorV3) anyerror!void {
+    fn pushRequest(self: *Negotiator) anyerror!void {
         if (self.state != .push) return;
         const next = self.next_push_request_ns orelse return;
         if (core.concurrency.monotonicNs() <= next) return;
         const tls = self.tls orelse return error.Assertion;
         tls.putPlainText("PUSH_REQUEST\x00") catch {};
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
-            if (isNativeTLSError(err)) return err;
+            if (isTLSError(err)) return err;
             return;
         };
         defer self.allocator.free(ciphertext);
@@ -300,8 +363,8 @@ pub const NegotiatorV3 = struct {
     }
 
     fn enqueueControlPackets(
-        self: *NegotiatorV3,
-        code: CPacketCode,
+        self: *Negotiator,
+        code: PacketCode,
         key: u8,
         payload: []const u8,
     ) anyerror!void {
@@ -325,7 +388,7 @@ pub const NegotiatorV3 = struct {
         try self.flushControlQueue();
     }
 
-    fn flushControlQueue(self: *NegotiatorV3) anyerror!void {
+    fn flushControlQueue(self: *Negotiator) anyerror!void {
         const raw_packets = try self.channel.writeOutboundPackets(
             @intCast(self.options.session_options.retransmission_interval_ms),
         );
@@ -334,7 +397,7 @@ pub const NegotiatorV3 = struct {
         try self.writeLink(@ptrCast(raw_packets));
     }
 
-    fn writeLink(self: *NegotiatorV3, packets: []const []const u8) anyerror!void {
+    fn writeLink(self: *Negotiator, packets: []const []const u8) anyerror!void {
         var processed = try self.link_processor.processOutbound(packets);
         defer processed.deinit();
         try self.looper.writeQueued(processed.packets(), .link);
@@ -359,8 +422,8 @@ pub const NegotiatorV3 = struct {
     }
 
     fn privateHandleControlPacket(
-        self: *NegotiatorV3,
-        packet: *CControlPacket,
+        self: *Negotiator,
+        packet: *ControlPacket,
     ) anyerror!void {
         if (packet.key() != self.key) return;
         switch (self.state) {
@@ -377,7 +440,7 @@ pub const NegotiatorV3 = struct {
                     return error.SessionMismatch;
 
                 self.state = .tls;
-                const tls = if (self.tls) |*value| value else return error.Assertion;
+                const tls = self.tls orelse return error.Assertion;
                 try tls.start();
                 const ciphertext = try tls.pullCipherText(self.allocator);
                 defer self.allocator.free(ciphertext);
@@ -390,11 +453,11 @@ pub const NegotiatorV3 = struct {
                 if (!std.mem.eql(u8, packet.sessionId(), remote_session_id))
                     return error.SessionMismatch;
                 const payload = packet.payload() orelse return;
-                const tls = if (self.tls) |*value| value else return error.Assertion;
+                const tls = self.tls orelse return error.Assertion;
                 tls.putCipherText(payload) catch {};
                 try forwardPulledCipherText(
                     self.allocator,
-                    tls.*,
+                    tls,
                     self,
                     enqueuePulledCipherText,
                 );
@@ -416,7 +479,7 @@ pub const NegotiatorV3 = struct {
         }
     }
 
-    fn onTLSConnect(self: *NegotiatorV3) anyerror!void {
+    fn onTLSConnect(self: *Negotiator) anyerror!void {
         const credentials = self.options.credentials;
         const username = if (credentials) |value| value.username else null;
         const password = if (self.history) |*history|
@@ -434,17 +497,17 @@ pub const NegotiatorV3 = struct {
             password,
         );
         self.authenticator.?.with_local_options = self.options.with_local_options;
-        const tls = if (self.tls) |*value| value else return error.Assertion;
-        try self.authenticator.?.putAuth(tls.*, self.options.configuration.*);
+        const tls = self.tls orelse return error.Assertion;
+        try self.authenticator.?.putAuth(tls, self.options.configuration.*);
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
-            if (isNativeTLSError(err)) return err;
+            if (isTLSError(err)) return err;
             return;
         };
         defer self.allocator.free(ciphertext);
         try self.enqueueControlPackets(.controlV1, self.key, ciphertext);
     }
 
-    fn handleControlData(self: *NegotiatorV3, data: []const u8) anyerror!void {
+    fn handleControlData(self: *Negotiator, data: []const u8) anyerror!void {
         const authenticator = if (self.authenticator) |*value| value else return;
         try authenticator.appendControlData(data);
         if (self.state == .auth) {
@@ -471,7 +534,7 @@ pub const NegotiatorV3 = struct {
         }
     }
 
-    fn handleControlMessage(self: *NegotiatorV3, message: []const u8) anyerror!void {
+    fn handleControlMessage(self: *Negotiator, message: []const u8) anyerror!void {
         if (std.mem.startsWith(u8, message, "AUTH_FAILED")) {
             if (self.authenticator.?.with_local_options)
                 return error.BadCredentialsWithLocalOptions;
@@ -503,7 +566,7 @@ pub const NegotiatorV3 = struct {
 
         if (reply.options.compression_framing != null) {
             if (reply.options.compression_algorithm) |algorithm| {
-                if (algorithm != .disabled) return error.ServerCompression;
+                if (algorithm != .disabled) return error.CompressionMismatch;
             }
         }
         if (reply.options.ipv4 == null and reply.options.ipv6 == null)
@@ -514,7 +577,7 @@ pub const NegotiatorV3 = struct {
     }
 
     fn completeConnection(
-        self: *NegotiatorV3,
+        self: *Negotiator,
         push_reply: *const PushReply,
     ) anyerror!void {
         const data_channel = try self.newDataChannel(push_reply);
@@ -539,7 +602,7 @@ pub const NegotiatorV3 = struct {
     }
 
     fn newDataChannel(
-        self: *NegotiatorV3,
+        self: *Negotiator,
         push_reply: *const PushReply,
     ) anyerror!*DataChannel {
         const session_id = self.channel.sessionId() orelse return error.Assertion;
@@ -566,7 +629,7 @@ pub const NegotiatorV3 = struct {
                 configuration_helpers.fallbackCompressionAlgorithm(self.options.configuration.*),
             .peer_id = push_reply.options.peer_id,
         };
-        var prf = try CryptoKeysPRF.init(
+        var prf = try PRF.init(
             self.allocator,
             self.fnt,
             &handshake,
@@ -574,23 +637,23 @@ pub const NegotiatorV3 = struct {
             remote_session_id,
         );
         defer prf.deinit(self.allocator);
-        var data_path = try self.data_path_factory(
+        var data_path = try DataPathWrapper.nativeWithPRF(
             self.allocator,
             parameters,
-            prf.move(),
+            &prf,
             self.prng,
         );
         errdefer data_path.deinit();
         return DataChannel.create(self.allocator, self.key, data_path);
     }
 
-    fn wrappedKeyLength(self: *const NegotiatorV3) usize {
+    fn wrappedKeyLength(self: *const Negotiator) usize {
         const wrapped = (self.options.configuration.tls_wrap orelse return 0)
             .wrapped_key orelse return 0;
         return std.base64.standard.Decoder.calcSizeForSlice(wrapped.base64) catch 0;
     }
 
-    fn elapsedMs(self: *const NegotiatorV3) u64 {
+    fn elapsedMs(self: *const Negotiator) u64 {
         return (core.concurrency.monotonicNs() -| self.start_time_ns) /
             std.time.ns_per_ms;
     }
@@ -608,22 +671,8 @@ pub const NegotiatorV3 = struct {
         return @intFromFloat(milliseconds);
     }
 
-    fn isNativeTLSError(err: anyerror) bool {
-        return switch (err) {
-            error.TLSCARead,
-            error.TLSCAUse,
-            error.TLSCAPeerVerification,
-            error.TLSClientCertificateRead,
-            error.TLSClientCertificateUse,
-            error.TLSClientKeyRead,
-            error.TLSClientKeyUse,
-            error.TLSHandshake,
-            error.TLSServerEKU,
-            error.TLSServerHost,
-            error.TLSFailure,
-            => true,
-            else => false,
-        };
+    fn isTLSError(err: anyerror) bool {
+        return err == error.TLSFailure;
     }
 
     /// Pull absence/non-native pull failures are non-fatal during TLS drain,
@@ -631,12 +680,12 @@ pub const NegotiatorV3 = struct {
     /// failures from that path must propagate to the Session.
     fn forwardPulledCipherText(
         allocator: std.mem.Allocator,
-        tls: TLSProtocol,
+        tls: anytype,
         context: ?*anyopaque,
         enqueue: *const fn (?*anyopaque, []const u8) anyerror!void,
     ) anyerror!void {
         const ciphertext = tls.pullCipherText(allocator) catch |err| {
-            if (isNativeTLSError(err)) return err;
+            if (isTLSError(err)) return err;
             return;
         };
         defer allocator.free(ciphertext);
@@ -644,7 +693,7 @@ pub const NegotiatorV3 = struct {
     }
 
     fn enqueuePulledCipherText(raw: ?*anyopaque, ciphertext: []const u8) anyerror!void {
-        const self: *NegotiatorV3 = @ptrCast(@alignCast(raw.?));
+        const self: *Negotiator = @ptrCast(@alignCast(raw.?));
         try self.enqueueControlPackets(.controlV1, self.key, ciphertext);
     }
 
@@ -671,8 +720,8 @@ pub const NegotiatorV3 = struct {
     }
 };
 
-test "NegotiatorV3 declarations are semantically analyzed" {
-    std.testing.refAllDecls(NegotiatorV3);
+test "Negotiator declarations are semantically analyzed" {
+    std.testing.refAllDecls(Negotiator);
 }
 
 test "early-negotiation TLV requests wrapped-key resend" {
@@ -681,51 +730,26 @@ test "early-negotiation TLV requests wrapped-key resend" {
         0x00, 0x02, // two-byte flags payload
         0x00, 0x01, // resend wrapped key
     };
-    try std.testing.expect(NegotiatorV3.requestsWrappedKeyResend(&payload));
-    try std.testing.expect(!NegotiatorV3.requestsWrappedKeyResend(payload[0..5]));
+    try std.testing.expect(Negotiator.requestsWrappedKeyResend(&payload));
+    try std.testing.expect(!Negotiator.requestsWrappedKeyResend(payload[0..5]));
 }
 
 test "successful TLS pull propagates control enqueue failure" {
     const Fake = struct {
-        fn start(_: *anyopaque) anyerror!void {}
-        fn isConnected(_: *anyopaque) bool {
-            return true;
-        }
-        fn put(_: *anyopaque, _: []const u8) anyerror!void {}
-        fn pullPlain(_: *anyopaque, _: std.mem.Allocator) anyerror![]u8 {
-            return error.TLSNoData;
-        }
-        fn pullCipher(_: *anyopaque, allocator: std.mem.Allocator) anyerror![]u8 {
+        fn pullCipherText(_: *@This(), allocator: std.mem.Allocator) anyerror![]u8 {
             return allocator.dupe(u8, "ciphertext");
         }
-        fn caMD5(_: *anyopaque, allocator: std.mem.Allocator) anyerror![]u8 {
-            return allocator.alloc(u8, 0);
-        }
-        fn deinit(_: *anyopaque) void {}
         fn failEnqueue(_: ?*anyopaque, _: []const u8) anyerror!void {
             return error.ControlChannelFailure;
         }
-
-        const vtable = TLSProtocol.VTable{
-            .start = start,
-            .is_connected = isConnected,
-            .put_plain_text = put,
-            .put_raw_plain_text = put,
-            .put_cipher_text = put,
-            .pull_plain_text = pullPlain,
-            .pull_cipher_text = pullCipher,
-            .ca_md5 = caMD5,
-            .deinit = deinit,
-        };
     };
 
-    var fake_context: u8 = 0;
-    const tls = TLSProtocol{ .ptr = &fake_context, .vtable = &Fake.vtable };
+    var fake: Fake = .{};
     try std.testing.expectError(
         error.ControlChannelFailure,
-        NegotiatorV3.forwardPulledCipherText(
+        Negotiator.forwardPulledCipherText(
             std.testing.allocator,
-            tls,
+            &fake,
             null,
             Fake.failEnqueue,
         ),

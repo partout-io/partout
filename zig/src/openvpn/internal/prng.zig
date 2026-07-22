@@ -7,7 +7,7 @@ const c_common = @import("../../c/exports.zig").common;
 const errors = @import("errors.zig");
 const ZeroingData = @import("zeroing_data.zig").ZeroingData;
 
-/// Pseudo-random byte source, ported from `PRNGProtocol`.
+/// Injectable pseudo-random byte source.
 pub const PRNG = struct {
     context: ?*anyopaque = null,
     fill_fn: *const fn (?*anyopaque, []u8) bool = systemFill,
@@ -17,7 +17,7 @@ pub const PRNG = struct {
     }
 
     pub fn fill(self: PRNG, destination: []u8) errors.PRNGError!void {
-        if (!self.fill_fn(self.context, destination)) return error.RandomGeneration;
+        if (!self.fill_fn(self.context, destination)) return error.CryptoFailure;
     }
 
     pub fn data(

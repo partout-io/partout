@@ -3,17 +3,23 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-
 const core = @import("../../core/exports.zig");
 const BidirectionalState = @import("bidirectional_state.zig").BidirectionalState;
 const ControlChannelConstants = @import("control_channel_constants.zig").ControlChannel;
-const DataChannel = @import("data_channel.zig").DataChannel;
-const DataLink = @import("data_link.zig").DataLink;
-const DataLinkPair = @import("data_link_pair.zig").DataLinkPair;
-const NegotiatorV3 = @import("negotiator_v3.zig").NegotiatorV3;
+const data = @import("data.zig");
+const DataChannel = data.DataChannel;
+const DataLink = data.DataLink;
+const DataLinkPair = data.DataLinkPair;
+const Negotiator = @import("session_negotiator.zig").Negotiator;
 const PushReply = @import("push_reply.zig").PushReply;
 
 const api = core.api;
+
+/// State retained between session attempts.
+pub const IdleContext = struct {
+    /// Cleared after AUTH_FAILED so the next attempt sends `V0 UNDEF`.
+    with_local_options: bool = true,
+};
 
 /// Mutable state owned by an active session and touched only on its looper.
 pub const ActiveContext = struct {
@@ -22,7 +28,7 @@ pub const ActiveContext = struct {
     with_local_options: bool,
     remote_endpoint: api.ExtendedEndpoint,
 
-    negotiators: [ControlChannelConstants.number_of_keys]?*NegotiatorV3,
+    negotiators: [ControlChannelConstants.number_of_keys]?*Negotiator,
     data_channels: [ControlChannelConstants.number_of_keys]?*DataChannel,
     old_keys: std.ArrayList(u8) = .empty,
     current_negotiator_key: ?u8 = null,
@@ -50,7 +56,7 @@ pub const ActiveContext = struct {
                 .proto = remote_endpoint.proto,
                 .owned = true,
             },
-            .negotiators = [_]?*NegotiatorV3{null} ** ControlChannelConstants.number_of_keys,
+            .negotiators = [_]?*Negotiator{null} ** ControlChannelConstants.number_of_keys,
             .data_channels = [_]?*DataChannel{null} ** ControlChannelConstants.number_of_keys,
         };
         return self;
@@ -65,7 +71,7 @@ pub const ActiveContext = struct {
         allocator.destroy(self);
     }
 
-    pub fn currentNegotiator(self: *ActiveContext) ?*NegotiatorV3 {
+    pub fn currentNegotiator(self: *ActiveContext) ?*Negotiator {
         const key = self.current_negotiator_key orelse return null;
         return self.negotiators[key];
     }
@@ -76,7 +82,7 @@ pub const ActiveContext = struct {
     }
 
     /// Transfers ownership of `negotiator` to this context.
-    pub fn addNegotiator(self: *ActiveContext, negotiator: *NegotiatorV3) void {
+    pub fn addNegotiator(self: *ActiveContext, negotiator: *Negotiator) void {
         std.debug.assert(negotiator.key < self.negotiators.len);
         if (self.negotiators[negotiator.key]) |old| {
             if (old != negotiator) old.destroy();
