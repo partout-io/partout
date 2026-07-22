@@ -16,6 +16,7 @@ const api = core_mod.api;
 const c = c_mod.api;
 const c_common = c_exports_mod.common;
 const c_crypto = c_exports_mod.crypto;
+const log = core_mod.logging;
 
 const CryptoKeys = crypto_mod.CryptoKeys;
 const CryptoKeysBridge = crypto_mod.CryptoKeysBridge;
@@ -123,7 +124,7 @@ pub const DataPath = struct {
         allocator: std.mem.Allocator,
         packets: []const []const u8,
         key: u8,
-    ) anyerror![][]u8 {
+    ) ![][]u8 {
         var result: std.ArrayList([]u8) = .empty;
         errdefer {
             for (result.items) |packet| allocator.free(packet);
@@ -131,8 +132,10 @@ pub const DataPath = struct {
         }
         try result.ensureTotalCapacity(allocator, packets.len);
         for (packets) |packet| {
-            self.out_packet_id = std.math.add(u32, self.out_packet_id, 1) catch
-                return error.Recoverable;
+            self.out_packet_id = std.math.add(u32, self.out_packet_id, 1) catch {
+                log.write(.notice, "OpenVPN data packet counter exhausted; reconnecting");
+                return error.Reconnect;
+            };
             const encrypted = try self.assembleAndEncrypt(
                 allocator,
                 packet,
@@ -148,7 +151,7 @@ pub const DataPath = struct {
         self: *DataPath,
         allocator: std.mem.Allocator,
         packets: []const []const u8,
-    ) anyerror!DataPathDecryptResult {
+    ) !DataPathDecryptResult {
         var result: std.ArrayList([]u8) = .empty;
         errdefer {
             for (result.items) |packet| allocator.free(packet);
@@ -160,7 +163,8 @@ pub const DataPath = struct {
             var tuple = try self.decryptAndParse(allocator, packet);
             if (tuple.packet_id > max_packet_id) {
                 tuple.deinit(allocator);
-                return error.Recoverable;
+                log.write(.notice, "OpenVPN peer data packet counter exhausted; reconnecting");
+                return error.Reconnect;
             }
             if (c.openvpn_replay_is_replayed(self.replay, tuple.packet_id)) {
                 tuple.deinit(allocator);
@@ -186,7 +190,7 @@ pub const DataPath = struct {
         packet: []const u8,
         key: u8,
         packet_id: u32,
-    ) anyerror![]u8 {
+    ) ![]u8 {
         const capacity = c.openvpn_dp_mode_assemble_and_encrypt_capacity(self.mode, packet.len);
         self.resize(self.enc_buffer, capacity);
         var native_error = emptyNativeError();
@@ -207,7 +211,7 @@ pub const DataPath = struct {
         self: *DataPath,
         allocator: std.mem.Allocator,
         packet: []const u8,
-    ) anyerror!DataPathDecryptedAndParsedTuple {
+    ) !DataPathDecryptedAndParsedTuple {
         self.resize(self.dec_buffer, packet.len);
         var packet_id: u32 = 0;
         var header: u8 = 0;
@@ -245,7 +249,7 @@ pub const DataPath = struct {
         };
     }
 
-    fn nativeError(native: c.openvpn_dp_error) anyerror {
+    fn nativeError(native: c.openvpn_dp_error) errors_mod.DataPathError {
         if (native.dp_code == c.OpenVPNDataPathErrorNone) return error.DataPathFailure;
         return errors_mod.dataPathError(native);
     }
@@ -271,7 +275,7 @@ pub const DataPathWrapper = struct {
         allocator: std.mem.Allocator,
         packets: []const []const u8,
         key: u8,
-    ) anyerror![][]u8 {
+    ) ![][]u8 {
         return self.data_path.encryptPackets(allocator, packets, key);
     }
 
@@ -279,7 +283,7 @@ pub const DataPathWrapper = struct {
         self: DataPathWrapper,
         allocator: std.mem.Allocator,
         packets: []const []const u8,
-    ) anyerror!DataPathDecryptResult {
+    ) !DataPathDecryptResult {
         return self.data_path.decryptPackets(allocator, packets);
     }
 
@@ -288,7 +292,7 @@ pub const DataPathWrapper = struct {
         parameters: DataPathParameters,
         prf: anytype,
         prng: PRNG,
-    ) anyerror!DataPathWrapper {
+    ) !DataPathWrapper {
         var seed = try prng.safeData(allocator, DataConstants.prng_seed_length);
         defer seed.deinit(allocator);
         return nativeWithSeed(allocator, parameters, prf, seed);
@@ -299,7 +303,7 @@ pub const DataPathWrapper = struct {
         parameters: DataPathParameters,
         prf: anytype,
         seed: ZeroingData,
-    ) anyerror!DataPathWrapper {
+    ) !DataPathWrapper {
         const init_seed = parameters.fnt.init_seed orelse return error.UnsupportedAlgorithm;
         _ = init_seed(seed.bytes.ptr, seed.bytes.len);
         var keys = try prf.derive(allocator);
@@ -311,7 +315,7 @@ pub const DataPathWrapper = struct {
         allocator: std.mem.Allocator,
         parameters: DataPathParameters,
         keys: *const CryptoKeys,
-    ) anyerror!DataPathWrapper {
+    ) !DataPathWrapper {
         var bridge = try CryptoKeysBridge.init(allocator, keys);
         defer bridge.deinit();
 
@@ -410,7 +414,7 @@ pub const DataChannel = struct {
         self: *DataChannel,
         allocator: std.mem.Allocator,
         packets: []const []const u8,
-    ) anyerror![][]u8 {
+    ) ![][]u8 {
         return self.data_path.encrypt(allocator, packets, self.key);
     }
 
@@ -419,7 +423,7 @@ pub const DataChannel = struct {
         self: *DataChannel,
         allocator: std.mem.Allocator,
         packets: []const []const u8,
-    ) anyerror![][]u8 {
+    ) ![][]u8 {
         const result = try self.data_path.decrypt(allocator, packets);
         return result.packets;
     }
@@ -463,7 +467,7 @@ pub const DataLink = struct {
         self: *DataLink,
         packets: []const []const u8,
         key: u8,
-    ) anyerror!void {
+    ) !void {
         self.receiveUnwrapped(packets, key) catch |err|
             return mapInboundError(err);
     }
@@ -472,7 +476,7 @@ pub const DataLink = struct {
         self: *DataLink,
         packets: []const []const u8,
         key: u8,
-    ) anyerror!void {
+    ) !void {
         const channel = self.callbacks.data_channel(self.context, key) orelse return;
         const decrypted = try channel.decrypt(self.allocator, packets);
         defer DataLink.freePackets(self.allocator, decrypted);
@@ -490,7 +494,7 @@ pub const DataLink = struct {
         packets: []const []const u8,
         key: u8,
         timeout_ms: ?u64,
-    ) anyerror!void {
+    ) !void {
         const channel = self.callbacks.data_channel(self.context, key) orelse return;
         const encrypted = try channel.encrypt(self.allocator, packets);
         defer DataLink.freePackets(self.allocator, encrypted);
@@ -512,12 +516,11 @@ pub const DataLink = struct {
 
         const start = core_mod.concurrency.monotonicNs();
         const deadline = start +| timeout *| @as(u64, std.time.ns_per_ms);
-        var last_error: ?anyerror = null;
         while (true) {
             self.looper.write(processed.packets(), .link, true) catch |err| {
-                last_error = err;
                 if (core_mod.concurrency.monotonicNs() < deadline) continue;
-                return last_error orelse error.Timeout;
+                log.writef(.err, "OpenVPN write timed out after: {s}", .{@errorName(err)});
+                return error.Timeout;
             };
             return;
         }
@@ -541,16 +544,8 @@ pub const DataLink = struct {
         return @ptrCast(packets);
     }
 
-    fn mapInboundError(err: anyerror) anyerror {
-        // Native failures retain only the category reported to the daemon.
-        // Allocation, looper, and other inbound failures are recoverable.
-        return switch (err) {
-            error.CryptoFailure,
-            error.CompressionMismatch,
-            error.DataPathFailure,
-            => err,
-            else => error.Recoverable,
-        };
+    fn mapInboundError(err: anytype) errors_mod.SessionError {
+        return errors_mod.sessionError(err);
     }
 };
 
@@ -564,7 +559,7 @@ pub const DataLinkPair = struct {
         packets: []const []const u8,
         key: ?u8,
         timeout_ms: ?u64,
-    ) anyerror!void {
+    ) !void {
         try self.link.send(packets, key orelse self.key, timeout_ms);
     }
 
@@ -572,7 +567,7 @@ pub const DataLinkPair = struct {
         self: DataLinkPair,
         packets: []const []const u8,
         key: u8,
-    ) anyerror!void {
+    ) !void {
         try self.link.receive(packets, key);
     }
 };
@@ -586,7 +581,7 @@ pub const testing = struct {
         return DataPath.create(allocator, mode, peer_id);
     }
 
-    pub fn mapInboundError(err: anyerror) anyerror {
+    pub fn mapInboundError(err: anytype) errors_mod.SessionError {
         return DataLink.mapInboundError(err);
     }
 };

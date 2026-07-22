@@ -85,7 +85,7 @@ test "Authenticator frames auth and buffers replies and messages" {
         allocator: std.mem.Allocator,
         plaintext: ?[]u8 = null,
 
-        pub fn putRawPlainText(self: *@This(), data: []const u8) anyerror!void {
+        pub fn putRawPlainText(self: *@This(), data: []const u8) !void {
             if (self.plaintext) |value| self.allocator.free(value);
             self.plaintext = try self.allocator.dupe(u8, data);
         }

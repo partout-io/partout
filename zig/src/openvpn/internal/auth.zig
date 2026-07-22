@@ -258,7 +258,7 @@ pub const Authenticator = struct {
         prng: PRNG,
         username: ?[]const u8,
         password: ?[]const u8,
-    ) anyerror!Authenticator {
+    ) !Authenticator {
         var pre_master = try prng.safeData(allocator, Keys.pre_master_length);
         errdefer pre_master.deinit(allocator);
         var random1 = try prng.safeData(allocator, Keys.random_length);
@@ -322,7 +322,7 @@ pub const Authenticator = struct {
         self: *Authenticator,
         tls: anytype,
         configuration: api.OpenVPNConfiguration,
-    ) anyerror!void {
+    ) !void {
         const allocator = self.allocator;
         var raw = try ZeroingData.initCopy(allocator, &ControlConstants.tls_prefix);
         defer raw.deinit(allocator);
@@ -376,11 +376,11 @@ pub const Authenticator = struct {
         try tls.putRawPlainText(raw.bytes);
     }
 
-    pub fn appendControlData(self: *Authenticator, data: []const u8) anyerror!void {
+    pub fn appendControlData(self: *Authenticator, data: []const u8) !void {
         return self.control_buffer.append(self.allocator, data);
     }
 
-    pub fn parseAuthReply(self: *Authenticator) anyerror!bool {
+    pub fn parseAuthReply(self: *Authenticator) !bool {
         const prefix_length = ControlConstants.tls_prefix.len;
         const minimum_length = prefix_length + 2 * Keys.random_length + 2;
         if (self.control_buffer.bytes.len < minimum_length) return false;
@@ -486,7 +486,7 @@ pub const Authenticator = struct {
         destination: *ZeroingData,
         allocator: std.mem.Allocator,
         source: ZeroingData,
-    ) anyerror!void {
+    ) !void {
         if (source.bytes.len > std.math.maxInt(u16)) return error.Assertion;
         var encoded: [2]u8 = undefined;
         std.mem.writeInt(u16, &encoded, @intCast(source.bytes.len), .big);

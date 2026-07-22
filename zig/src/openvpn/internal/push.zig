@@ -20,7 +20,7 @@ pub const PushReply = struct {
     pub fn parse(
         allocator: std.mem.Allocator,
         message: []const u8,
-    ) anyerror!?PushReply {
+    ) !?PushReply {
         if (!std.mem.startsWith(u8, message, prefix)) return null;
         if (std.mem.indexOf(u8, message, "push-continuation 2") != null)
             return error.ContinuationPushReply;
@@ -41,7 +41,7 @@ pub const PushReply = struct {
         };
     }
 
-    pub fn clone(self: PushReply, allocator: std.mem.Allocator) anyerror!PushReply {
+    pub fn clone(self: PushReply, allocator: std.mem.Allocator) !PushReply {
         const original = try allocator.dupe(u8, self.original);
         errdefer allocator.free(original);
         return .{

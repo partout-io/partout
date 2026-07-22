@@ -48,11 +48,11 @@ test "early-negotiation TLV requests wrapped-key resend" {
 
 test "successful TLS pull propagates control enqueue failure" {
     const Fake = struct {
-        pub fn pullCipherText(_: *@This(), allocator: std.mem.Allocator) anyerror![]u8 {
+        pub fn pullCipherText(_: *@This(), allocator: std.mem.Allocator) ![]u8 {
             return allocator.dupe(u8, "ciphertext");
         }
 
-        fn failEnqueue(_: ?*anyopaque, _: []const u8) anyerror!void {
+        fn failEnqueue(_: ?*anyopaque, _: []const u8) !void {
             return error.ControlChannelFailure;
         }
     };

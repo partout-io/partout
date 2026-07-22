@@ -174,7 +174,7 @@ pub const LinkProcessor = struct {
         allocator: std.mem.Allocator,
         method: ?api.OpenVPNObfuscationMethod,
         is_tcp: bool,
-    ) anyerror!*LinkProcessor {
+    ) !*LinkProcessor {
         const self = try allocator.create(LinkProcessor);
         errdefer allocator.destroy(self);
         self.* = .{
@@ -196,7 +196,7 @@ pub const LinkProcessor = struct {
     pub fn processInbound(
         self: *LinkProcessor,
         packets: []const []const u8,
-    ) anyerror!Output {
+    ) !Output {
         const owned = if (self.is_tcp)
             try self.processTCPInbound(packets)
         else
@@ -211,7 +211,7 @@ pub const LinkProcessor = struct {
     pub fn processOutbound(
         self: *LinkProcessor,
         packets: []const []const u8,
-    ) anyerror!Output {
+    ) !Output {
         if (!self.is_tcp) {
             return .{
                 .allocator = self.allocator,
@@ -240,7 +240,7 @@ pub const LinkProcessor = struct {
     fn processTCPInbound(
         self: *LinkProcessor,
         packets: []const []const u8,
-    ) anyerror![][]u8 {
+    ) ![][]u8 {
         var additional: usize = 0;
         for (packets) |packet| additional = std.math.add(usize, additional, packet.len) catch return error.OutOfMemory;
         try self.tcp_read_buffer.ensureUnusedCapacity(self.allocator, additional);

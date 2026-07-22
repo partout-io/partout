@@ -47,5 +47,5 @@ test "DataLink declarations are semantically analyzed" {
 test "DataLink preserves only reportable inbound failure categories" {
     try std.testing.expectEqual(error.CryptoFailure, data.testing.mapInboundError(error.CryptoFailure));
     try std.testing.expectEqual(error.CompressionMismatch, data.testing.mapInboundError(error.CompressionMismatch));
-    try std.testing.expectEqual(error.Recoverable, data.testing.mapInboundError(error.OutOfMemory));
+    try std.testing.expectEqual(error.Reconnect, data.testing.mapInboundError(error.OutOfMemory));
 }

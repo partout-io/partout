@@ -186,7 +186,7 @@ pub const ControlPacket = struct {
         replay_id: u32,
         timestamp: u32,
         function: anytype,
-    ) anyerror![]u8 {
+    ) ![]u8 {
         const packet = self.native();
         var algorithm = c.openvpn_ctrl_alg{
             .crypto = @ptrCast(crypto),

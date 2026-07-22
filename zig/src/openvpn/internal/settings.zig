@@ -27,7 +27,7 @@ pub const NetworkSettingsBuilder = struct {
     pub fn modules(
         self: NetworkSettingsBuilder,
         allocator: std.mem.Allocator,
-    ) anyerror![]api.TaggedModule {
+    ) ![]api.TaggedModule {
         var result: std.ArrayList(api.TaggedModule) = .empty;
         errdefer {
             for (result.items) |*module| module.deinit(allocator);
@@ -70,7 +70,7 @@ pub const NetworkSettingsBuilder = struct {
     fn ipModule(
         self: NetworkSettingsBuilder,
         allocator: std.mem.Allocator,
-    ) anyerror!?api.IPModule {
+    ) !?api.IPModule {
         var ipv4 = if (self.remote_options.ipv4) |settings|
             try self.ipSettings(
                 allocator,
@@ -119,7 +119,7 @@ pub const NetworkSettingsBuilder = struct {
         remote_routes: ?[]const api.Route,
         default_gateway: ?api.Address,
         add_default: bool,
-    ) anyerror!api.IPSettings {
+    ) !api.IPSettings {
         var collected: std.ArrayList(api.Route) = .empty;
         defer collected.deinit(allocator);
         try collected.appendSlice(allocator, server.included_routes);
@@ -147,7 +147,7 @@ pub const NetworkSettingsBuilder = struct {
     fn dnsModule(
         self: NetworkSettingsBuilder,
         allocator: std.mem.Allocator,
-    ) anyerror!?api.DNSModule {
+    ) !?api.DNSModule {
         var raw_servers: std.ArrayList([]const u8) = .empty;
         defer raw_servers.deinit(allocator);
         if (self.local_options.dns_servers) |servers| try raw_servers.appendSlice(allocator, servers);
@@ -195,7 +195,7 @@ pub const NetworkSettingsBuilder = struct {
     fn httpProxyModule(
         self: NetworkSettingsBuilder,
         allocator: std.mem.Allocator,
-    ) anyerror!?api.HTTPProxyModule {
+    ) !?api.HTTPProxyModule {
         const proxy_source = if (self.pulls(.proxy))
             self.remote_options.http_proxy orelse self.local_options.http_proxy
         else

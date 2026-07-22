@@ -18,7 +18,7 @@ test "Session borrows an externally managed Looper" {
     const Callbacks = struct {
         fn onFinish(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
 
-        fn barrier(_: ?*anyopaque) anyerror!void {}
+        fn barrier(_: ?*anyopaque) !void {}
     };
 
     const allocator = std.testing.allocator;

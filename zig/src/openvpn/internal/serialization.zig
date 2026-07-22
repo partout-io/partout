@@ -34,7 +34,7 @@ pub const Serializer = union(enum) {
         allocator: std.mem.Allocator,
         fnt: c_crypto.pp_crypto_enc_fnt,
         configuration: *const api.OpenVPNConfiguration,
-    ) anyerror!Serializer {
+    ) !Serializer {
         if (configuration.tls_wrap) |wrap| {
             return switch (wrap.strategy) {
                 .auth => .{ .auth = try AuthSerializer.init(
@@ -75,7 +75,7 @@ pub const Serializer = union(enum) {
         self: *Serializer,
         allocator: std.mem.Allocator,
         packet: *const ControlPacket,
-    ) anyerror![]u8 {
+    ) ![]u8 {
         return switch (self.*) {
             inline else => |*value| value.serialize(allocator, packet),
         };
@@ -87,7 +87,7 @@ pub const Serializer = union(enum) {
         data: []const u8,
         start: usize,
         end: ?usize,
-    ) anyerror!ControlPacket {
+    ) !ControlPacket {
         return switch (self.*) {
             inline else => |*value| value.deserialize(allocator, data, start, end),
         };
@@ -185,7 +185,7 @@ const AuthSerializer = struct {
         fnt: c_crypto.pp_crypto_enc_fnt,
         digest: api.OpenVPNDigest,
         key: api.OpenVPNStaticKey,
-    ) anyerror!AuthSerializer {
+    ) !AuthSerializer {
         var keys = try helpers_mod.authKeys(allocator, key);
         defer keys.deinit(allocator);
         var bridge = try CryptoKeysBridge.init(allocator, &keys);
@@ -220,7 +220,7 @@ const AuthSerializer = struct {
         self: *AuthSerializer,
         allocator: std.mem.Allocator,
         packet: *const ControlPacket,
-    ) anyerror![]u8 {
+    ) ![]u8 {
         return self.serializeAt(allocator, packet, self.timestamp);
     }
 
@@ -229,7 +229,7 @@ const AuthSerializer = struct {
         allocator: std.mem.Allocator,
         packet: *const ControlPacket,
         timestamp: u32,
-    ) anyerror![]u8 {
+    ) ![]u8 {
         const data = try packet.serializedWithCryptoAlloc(
             allocator,
             self.cbc,
@@ -247,7 +247,7 @@ const AuthSerializer = struct {
         packet: []const u8,
         _: usize,
         _: ?usize,
-    ) anyerror!ControlPacket {
+    ) !ControlPacket {
         if (packet.len < self.preamble_length) return error.ControlChannelFailure;
         const swapped = try allocator.alloc(u8, packet.len);
         defer allocator.free(swapped);
@@ -280,7 +280,7 @@ const CryptSerializer = struct {
         allocator: std.mem.Allocator,
         fnt: c_crypto.pp_crypto_enc_fnt,
         key: api.OpenVPNStaticKey,
-    ) anyerror!CryptSerializer {
+    ) !CryptSerializer {
         var keys = try helpers_mod.cryptKeys(allocator, key);
         defer keys.deinit(allocator);
         var bridge = try CryptoKeysBridge.init(allocator, &keys);
@@ -321,7 +321,7 @@ const CryptSerializer = struct {
         self: *CryptSerializer,
         allocator: std.mem.Allocator,
         packet: *const ControlPacket,
-    ) anyerror![]u8 {
+    ) ![]u8 {
         return self.serializeAt(allocator, packet, self.timestamp);
     }
 
@@ -330,7 +330,7 @@ const CryptSerializer = struct {
         allocator: std.mem.Allocator,
         packet: *const ControlPacket,
         timestamp: u32,
-    ) anyerror![]u8 {
+    ) ![]u8 {
         const data = try packet.serializedWithCryptoAlloc(
             allocator,
             self.ctr,
@@ -348,7 +348,7 @@ const CryptSerializer = struct {
         packet: []const u8,
         _: usize,
         _: ?usize,
-    ) anyerror!ControlPacket {
+    ) !ControlPacket {
         // Swift intentionally ignores start/end for tls-crypt framing and
         // authenticates/decrypts the complete datagram.
         if (packet.len < self.ad_length + self.tag_length) return error.ControlChannelFailure;
@@ -399,7 +399,7 @@ const CryptV2Serializer = struct {
         fnt: c_crypto.pp_crypto_enc_fnt,
         key: api.OpenVPNStaticKey,
         wrapped_key: api.SecureData,
-    ) anyerror!CryptV2Serializer {
+    ) !CryptV2Serializer {
         const decoded = try wrapped_key.bytesAlloc(allocator);
         errdefer {
             @memset(decoded, 0);
@@ -426,7 +426,7 @@ const CryptV2Serializer = struct {
         self: *CryptV2Serializer,
         allocator: std.mem.Allocator,
         packet: *const ControlPacket,
-    ) anyerror![]u8 {
+    ) ![]u8 {
         var data = try self.serializer.serialize(allocator, packet);
         errdefer allocator.free(data);
         switch (packet.code) {
@@ -446,7 +446,7 @@ const CryptV2Serializer = struct {
         data: []const u8,
         start: usize,
         end: ?usize,
-    ) anyerror!ControlPacket {
+    ) !ControlPacket {
         return self.serializer.deserialize(allocator, data, start, end);
     }
 };

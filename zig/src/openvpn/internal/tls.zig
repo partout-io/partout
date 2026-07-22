@@ -52,7 +52,7 @@ pub const TLSWrapper = struct {
     pub fn create(
         allocator: std.mem.Allocator,
         parameters: TLSParameters,
-    ) anyerror!*TLSWrapper {
+    ) !*TLSWrapper {
         const configuration = parameters.configuration.*;
         const ca = configuration.ca orelse return error.TLSFailure;
         const create_tls = parameters.fnt.create orelse return error.TLSFailure;
@@ -133,7 +133,7 @@ pub const TLSWrapper = struct {
         allocator.destroy(self);
     }
 
-    pub fn start(self: *TLSWrapper) anyerror!void {
+    pub fn start(self: *TLSWrapper) !void {
         const start_tls = self.fnt.start orelse return error.TLSFailure;
         if (!start_tls(self.tls)) return error.TLSFailure;
     }
@@ -143,15 +143,15 @@ pub const TLSWrapper = struct {
         return is_connected(self.tls);
     }
 
-    pub fn putPlainText(self: *TLSWrapper, text: []const u8) anyerror!void {
+    pub fn putPlainText(self: *TLSWrapper, text: []const u8) !void {
         return self.putPlain(text);
     }
 
-    pub fn putRawPlainText(self: *TLSWrapper, text: []const u8) anyerror!void {
+    pub fn putRawPlainText(self: *TLSWrapper, text: []const u8) !void {
         return self.putPlain(text);
     }
 
-    pub fn putCipherText(self: *TLSWrapper, data: []const u8) anyerror!void {
+    pub fn putCipherText(self: *TLSWrapper, data: []const u8) !void {
         var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
         const put_cipher = self.fnt.put_cipher orelse return error.TLSFailure;
         if (!put_cipher(self.tls, data.ptr, data.len, &code))
@@ -161,7 +161,7 @@ pub const TLSWrapper = struct {
     pub fn pullPlainText(
         self: *TLSWrapper,
         allocator: std.mem.Allocator,
-    ) anyerror![]u8 {
+    ) ![]u8 {
         var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
         const pull_plain = self.fnt.pull_plain orelse return error.TLSFailure;
         const data = pull_plain(self.tls, &code) orelse {
@@ -175,7 +175,7 @@ pub const TLSWrapper = struct {
     pub fn pullCipherText(
         self: *TLSWrapper,
         allocator: std.mem.Allocator,
-    ) anyerror![]u8 {
+    ) ![]u8 {
         var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
         const pull_cipher = self.fnt.pull_cipher orelse return error.TLSFailure;
         const data = pull_cipher(self.tls, &code) orelse {
@@ -189,14 +189,14 @@ pub const TLSWrapper = struct {
     pub fn caMD5(
         self: *TLSWrapper,
         allocator: std.mem.Allocator,
-    ) anyerror![]u8 {
+    ) ![]u8 {
         const ca_md5 = self.fnt.ca_md5 orelse return error.TLSFailure;
         const value = ca_md5(self.tls) orelse return error.TLSFailure;
         defer c_common.pp_free(value);
         return allocator.dupe(u8, std.mem.span(@as([*:0]u8, @ptrCast(value))));
     }
 
-    fn putPlain(self: *TLSWrapper, data: []const u8) anyerror!void {
+    fn putPlain(self: *TLSWrapper, data: []const u8) !void {
         var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
         const put_plain = self.fnt.put_plain orelse return error.TLSFailure;
         if (!put_plain(self.tls, data.ptr, data.len, &code))
@@ -208,14 +208,14 @@ pub const TLSWrapper = struct {
         typed.verification.failed();
     }
 
-    fn writeCA(path: [:0]const u8, pem: []const u8) anyerror!void {
+    fn writeCA(path: [:0]const u8, pem: []const u8) !void {
         const file = c_common.fopen(path.ptr, "wb") orelse return error.TLSFailure;
         defer _ = c_common.fclose(file);
         if (pem.len == 0) return;
         if (c_common.fwrite(pem.ptr, 1, pem.len, file) != pem.len) return error.TLSFailure;
     }
 
-    fn tlsOperationError(code: c_crypto.pp_tls_error_code) anyerror {
+    fn tlsOperationError(code: c_crypto.pp_tls_error_code) errors_mod.TLSError {
         if (code == c_crypto.PPTLSErrorNone) return error.TLSFailure;
         return errors_mod.tlsError(code);
     }

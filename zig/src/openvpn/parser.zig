@@ -43,12 +43,16 @@ pub fn importModule(
 }
 
 pub const Parser = struct {
+    pub const DecryptError = std.mem.Allocator.Error || error{
+        DecryptionFailed,
+    };
+
     pub const DecryptKey = *const fn (
         ?*anyopaque,
         std.mem.Allocator,
         []const u8,
         []const u8,
-    ) anyerror![]u8;
+    ) DecryptError![]u8;
 
     pub const Context = struct {
         passphrase: ?[]const u8 = null,

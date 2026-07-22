@@ -22,3 +22,10 @@ test "coarse failures map to ConnectionReporter categories" {
         errors.partoutCode(error.CompressionMismatch),
     );
 }
+
+test "unexpected session failures become reconnect requests" {
+    try std.testing.expectEqual(error.Reconnect, errors.sessionError(error.OutOfMemory));
+    try std.testing.expectEqual(error.ConnectionFailure, errors.sessionError(error.DataPathFailure));
+    try std.testing.expectEqual(error.ConnectionFailure, errors.sessionError(error.ConnectionFailure));
+    try std.testing.expectEqual(null, errors.partoutCode(error.Reconnect));
+}

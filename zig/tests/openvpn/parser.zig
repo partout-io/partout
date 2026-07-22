@@ -155,14 +155,14 @@ fn decryptKey(
     allocator: std.mem.Allocator,
     pem: []const u8,
     passphrase: []const u8,
-) anyerror![]u8 {
-    try std.testing.expectEqualStrings("secret", passphrase);
-    try std.testing.expect(std.mem.indexOf(u8, pem, "Proc-Type: 4,ENCRYPTED\nDEK-Info: AES-256-CBC,0123456789ABCDEF\n\nciphertext") != null);
+) ![]u8 {
+    std.debug.assert(std.mem.eql(u8, "secret", passphrase));
+    std.debug.assert(std.mem.indexOf(u8, pem, "Proc-Type: 4,ENCRYPTED\nDEK-Info: AES-256-CBC,0123456789ABCDEF\n\nciphertext") != null);
     return try allocator.dupe(u8, decrypted_private_key);
 }
 
 fn expectParseErrorInfo(
-    expected_err: anyerror,
+    expected_err: anytype,
     contents: []const u8,
     expected_name: []const u8,
     expected_details: []const u8,
@@ -186,6 +186,6 @@ fn failDecryptKey(
     _: std.mem.Allocator,
     _: []const u8,
     _: []const u8,
-) anyerror![]u8 {
-    return error.BadPassphrase;
+) ![]u8 {
+    return error.DecryptionFailed;
 }
