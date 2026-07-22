@@ -316,12 +316,16 @@ pub const Looper = struct {
             return false;
         }
         if (command_outcome.failure) |failure| {
-            if (sideFailure(failure)) |item| {
-                self.detachImmediately(item.side, item.failure);
-                return true;
+            switch (failure) {
+                .io => |item| {
+                    self.detachImmediately(item.side, failure);
+                    return true;
+                },
+                else => {
+                    self.finish(failure);
+                    return false;
+                },
             }
-            self.finish(failure);
-            return false;
         }
         if (!command_outcome.should_continue) {
             log.writef(.info, "Looper: stop requested", .{});
@@ -1319,18 +1323,6 @@ pub const Looper = struct {
         return switch (side) {
             .link => 0,
             .tun => 1,
-        };
-    }
-
-    const TaggedSideFailure = struct {
-        side: io.Side,
-        failure: Failure,
-    };
-
-    fn sideFailure(failure: Failure) ?TaggedSideFailure {
-        return switch (failure) {
-            .io => |item| .{ .side = item.side, .failure = failure },
-            else => null,
         };
     }
 
