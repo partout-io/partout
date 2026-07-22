@@ -86,8 +86,8 @@ pub const Looper = struct {
         on_finish: OnFinish,
     };
 
-    const CancellationError = error{Cancelled};
-
+    const CancellationError = queue_mod.CancellationError;
+    const CompletionError = queue_mod.CompletionError;
     pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
     pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{AlreadyStarted};
     pub const AttachError = std.mem.Allocator.Error || CancellationError || error{
@@ -107,7 +107,6 @@ pub const Looper = struct {
         TransformFailure,
         WriteIncomplete,
     };
-    const CompletionError = queue_mod.CompletionError;
 
     // Configuration.
     allocator: std.mem.Allocator,

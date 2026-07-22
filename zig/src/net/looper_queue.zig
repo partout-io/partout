@@ -120,8 +120,8 @@ pub const AttachArguments = struct {
     on_failure: ?OnFailure = null,
 };
 
-pub const CompletionError = error{
-    Cancelled,
+pub const CancellationError = error{Cancelled};
+pub const CompletionError = CancellationError || error{
     MuxFailure,
     OperationCancelled,
     OutOfMemory,
