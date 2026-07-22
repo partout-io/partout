@@ -255,17 +255,17 @@ pub const Daemon = struct {
         self: *Daemon,
         allocator: std.mem.Allocator,
     ) Error!void {
-        return self.actor.call(.{ .start = .{
+        return self.actor.perform(.{ .start = .{
             .allocator = allocator,
         } });
     }
 
     pub fn hold(self: *Daemon) void {
-        self.actor.call(.hold) catch return;
+        self.actor.perform(.hold) catch return;
     }
 
     pub fn stop(self: *Daemon) void {
-        self.actor.call(.stop) catch return;
+        self.actor.perform(.stop) catch return;
     }
 
     // The ready event gates the signals from:
@@ -275,7 +275,7 @@ pub const Daemon = struct {
     fn onNetworkReady(ctx: ?*anyopaque) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
         log.write(.notice, "Network is ready, start connection");
-        self.actor.call(.evaluateConnection) catch |err| {
+        self.actor.perform(.evaluateConnection) catch |err| {
             log.writef(.err, "Unable to evaluate connection: {}", .{err});
         };
     }
@@ -283,7 +283,7 @@ pub const Daemon = struct {
     // This is scheduled with a delay
     fn onResumeGate(ctx: ?*anyopaque) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
-        self.actor.call(.resumeGate) catch |err| {
+        self.actor.perform(.resumeGate) catch |err| {
             log.writef(.err, "Unable to resume connection gate: {}", .{err});
         };
     }
@@ -294,7 +294,7 @@ pub const Daemon = struct {
         if (self.gate) |*gate| {
             _ = gate.updateReachability(reachability.reachable);
         }
-        self.actor.call(.{ .onReachability = reachability }) catch |err| {
+        self.actor.perform(.{ .onReachability = reachability }) catch |err| {
             log.writef(.err, "Unable to handle reachability: {}", .{err});
         };
     }
@@ -302,7 +302,7 @@ pub const Daemon = struct {
     // This is external and is invoked by ConnectionGate
     fn onBetterPath(ctx: ?*anyopaque) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
-        self.actor.call(.onBetterPath) catch |err| {
+        self.actor.perform(.onBetterPath) catch |err| {
             log.writef(.err, "Unable to handle better path: {}", .{err});
         };
     }
@@ -328,21 +328,21 @@ pub const Daemon = struct {
 
     fn onConnectionStatus(ctx: *anyopaque, status: api.ConnectionStatus) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
-        self.actor.call(.{ .onConnectionStatus = status }) catch |err| {
+        self.actor.perform(.{ .onConnectionStatus = status }) catch |err| {
             log.writef(.err, "Unable to report connection status: {}", .{err});
         };
     }
 
     fn onConnectionLastError(ctx: *anyopaque, code: api.PartoutErrorCode) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
-        self.actor.call(.{ .onConnectionLastError = code }) catch |err| {
+        self.actor.perform(.{ .onConnectionLastError = code }) catch |err| {
             log.writef(.err, "Unable to report connection last error: {}", .{err});
         };
     }
 
     fn onConnectionDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
-        self.actor.call(.{ .onConnectionDataCount = data_count }) catch |err| {
+        self.actor.perform(.{ .onConnectionDataCount = data_count }) catch |err| {
             log.writef(.err, "Unable to report connection data count: {}", .{err});
         };
     }
@@ -358,7 +358,7 @@ pub const Daemon = struct {
         // RunAfter callbacks must return without waiting for the actor. This
         // lets cancellation drain a callback even when stop currently owns the
         // actor, and preserves FIFO ordering with a later restart.
-        self.actor.post(.{ .onConnectionBlock = .{
+        self.actor.schedule(.{ .onConnectionBlock = .{
             .ptr = ptr,
             .block = block,
         } }) catch |err| {

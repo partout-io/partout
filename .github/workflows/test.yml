@@ -16,12 +16,23 @@ concurrency:
 
 jobs:
   run_tests:
-    name: Run SwiftPM tests
-    runs-on: macos-26
+    name: ${{ matrix.job_name }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - job_name: Run Swift tests
+            runner: macos-26
+            suite: swift
+          - job_name: Run Zig tests
+            runner: ubuntu-latest
+            suite: zig
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
       - name: Verify CMake file lists
+        if: matrix.suite == 'swift'
         run: |
           scripts/gen-cmake-files.sh
           if [[ -n "$(git status --porcelain)" ]]; then
@@ -29,12 +40,22 @@ jobs:
             exit 1
           fi
       - uses: partout-io/action-prepare-xcode-build@master
+        if: matrix.suite == 'swift'
         with:
           access-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Ensure Foundation compatibility is off
+        if: matrix.suite == 'swift'
         run: |
           expected="let useFoundationCompatibility: FoundationCompatibility = .off"
           grep "^$expected" Package.swift
-      - name: Run tests
+      - name: Run Swift tests
+        if: matrix.suite == 'swift'
         run: |
           swift test
+      - uses: mlugg/setup-zig@v2
+        if: matrix.suite == 'zig'
+      - name: Run Zig tests
+        if: matrix.suite == 'zig'
+        working-directory: zig
+        run: |
+          zig build test -Dembed-c=true

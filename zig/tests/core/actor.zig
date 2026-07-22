@@ -43,8 +43,8 @@ test "actor serializes sync and async messages" {
     const actor = try CounterActor.create(allocator, &state);
     defer actor.deinit();
 
-    try actor.post(.{ .add = 2 });
-    try actor.call(.{ .add = 4 });
+    try actor.schedule(.{ .add = 2 });
+    try actor.perform(.{ .add = 4 });
 
     try std.testing.expectEqual(@as(usize, 6), state.value);
     try std.testing.expect(state.actor_thread_id != null);
@@ -58,9 +58,9 @@ test "actor propagates errors and rejects messages after shutdown" {
     const actor = try CounterActor.create(allocator, &state);
     defer actor.deinit();
 
-    try std.testing.expectError(error.Rejected, actor.call(.fail));
+    try std.testing.expectError(error.Rejected, actor.perform(.fail));
 
     actor.shutdown();
-    try std.testing.expectError(error.Closed, actor.call(.{ .add = 1 }));
-    try std.testing.expectError(error.Closed, actor.call(.{ .add = 1 }));
+    try std.testing.expectError(error.Closed, actor.perform(.{ .add = 1 }));
+    try std.testing.expectError(error.Closed, actor.schedule(.{ .add = 1 }));
 }
