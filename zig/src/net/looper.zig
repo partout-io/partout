@@ -669,173 +669,6 @@ pub const Looper = struct {
         return self.write(packets, side, false);
     }
 
-    const SideIO = struct {
-        // Identity and native I/O.
-        id: u64,
-        side: io.Side,
-        fd: io.FileDescriptor,
-        native_io: io.IOInterface,
-
-        // User callbacks.
-        transform_write: ?TransformWrite,
-        on_read: ?OnRead,
-        on_failure: ?OnFailure,
-
-        // Buffered packet state.
-        read_buf: []u8,
-        write_queue: WriteQueue,
-
-        // Mux event and cleanup state.
-        is_reading: bool = true,
-        is_writing: bool = false,
-        did_cleanup: bool = false,
-
-        // In-flight transform synchronization.
-        transform_drainer: core.Drainer = .{},
-
-        fn create(
-            allocator: std.mem.Allocator,
-            id: u64,
-            side: io.Side,
-            descriptor: Descriptor,
-            read_buf_size: usize,
-            arguments: AttachArguments,
-        ) std.mem.Allocator.Error!*SideIO {
-            const self = try allocator.create(SideIO);
-            errdefer allocator.destroy(self);
-            const read_buf = try allocator.alloc(u8, read_buf_size);
-            self.* = .{
-                .id = id,
-                .side = side,
-                .fd = descriptor.fd,
-                .native_io = descriptor.io,
-                .transform_write = arguments.transform_write,
-                .on_read = arguments.on_read,
-                .on_failure = arguments.on_failure,
-                .read_buf = read_buf,
-                .write_queue = WriteQueue.init(allocator),
-            };
-            return self;
-        }
-
-        fn destroyStorage(self: *SideIO, allocator: std.mem.Allocator) void {
-            self.write_queue.deinit();
-            allocator.free(self.read_buf);
-            self.transform_drainer.deinit();
-            allocator.destroy(self);
-        }
-
-        fn resetEvents(self: *SideIO) io.Error!void {
-            return self.native_io.resetEvents();
-        }
-
-        fn setRead(self: *SideIO, mux: c.pp_mux, enabled: bool) io.Error!void {
-            _ = c.pp_mux_set_read(mux, self.fd, enabled);
-            self.is_reading = enabled;
-            try self.syncEventMask();
-        }
-
-        fn setWrite(self: *SideIO, mux: c.pp_mux, enabled: bool) io.Error!void {
-            _ = c.pp_mux_set_write(mux, self.fd, enabled);
-            self.is_writing = enabled;
-            try self.syncEventMask();
-        }
-
-        fn syncEventMask(self: *SideIO) io.Error!void {
-            return self.native_io.setEventMask(self.is_reading, self.is_writing);
-        }
-
-        fn detachFromMux(self: *SideIO, mux: c.pp_mux) bool {
-            if (self.did_cleanup) return false;
-            self.did_cleanup = true;
-            _ = c.pp_mux_delete(mux, self.fd);
-            return true;
-        }
-
-        fn cleanupNative(self: *SideIO) void {
-            self.native_io.cleanup();
-        }
-    };
-
-    const DescriptorSet = struct {
-        allocator: std.mem.Allocator,
-
-        readable: std.ArrayList(io.FileDescriptor) = .empty,
-        writable: std.ArrayList(io.FileDescriptor) = .empty,
-
-        allocation_failed: bool = false,
-
-        fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!DescriptorSet {
-            var self = DescriptorSet{ .allocator = allocator };
-            errdefer self.deinit();
-            try self.readable.ensureTotalCapacity(allocator, number_of_descriptors);
-            try self.writable.ensureTotalCapacity(allocator, number_of_descriptors);
-            return self;
-        }
-
-        fn deinit(self: *DescriptorSet) void {
-            self.readable.deinit(self.allocator);
-            self.writable.deinit(self.allocator);
-        }
-
-        fn resetReadable(self: *DescriptorSet) void {
-            self.readable.clearRetainingCapacity();
-        }
-
-        fn insertReadable(self: *DescriptorSet, fd: io.FileDescriptor) void {
-            self.insert(&self.readable, fd) catch {
-                self.allocation_failed = true;
-            };
-        }
-
-        fn insertWritable(self: *DescriptorSet, fd: io.FileDescriptor) void {
-            self.insert(&self.writable, fd) catch {
-                self.allocation_failed = true;
-            };
-        }
-
-        fn insert(
-            self: *DescriptorSet,
-            list: *std.ArrayList(io.FileDescriptor),
-            fd: io.FileDescriptor,
-        ) std.mem.Allocator.Error!void {
-            if (contains(list.items, fd)) return;
-            try list.append(self.allocator, fd);
-        }
-
-        fn removeReadable(self: *DescriptorSet, fd: io.FileDescriptor) void {
-            remove(&self.readable, fd);
-        }
-
-        fn removeWritable(self: *DescriptorSet, fd: io.FileDescriptor) void {
-            remove(&self.writable, fd);
-        }
-
-        fn isReadable(self: DescriptorSet, fd: io.FileDescriptor) bool {
-            return contains(self.readable.items, fd);
-        }
-
-        fn isWritable(self: DescriptorSet, fd: io.FileDescriptor) bool {
-            return contains(self.writable.items, fd);
-        }
-
-        fn contains(list: []const io.FileDescriptor, fd: io.FileDescriptor) bool {
-            for (list) |item| {
-                if (item == fd) return true;
-            }
-            return false;
-        }
-
-        fn remove(list: *std.ArrayList(io.FileDescriptor), fd: io.FileDescriptor) void {
-            for (list.items, 0..) |item, index| {
-                if (item == fd) {
-                    _ = list.orderedRemove(index);
-                    return;
-                }
-            }
-        }
-    };
-
     fn writeOutOfBand(self: *Looper, packets: Packets, side: io.Side) WriteError!void {
         if (!self.isOnQueue()) {
             log.writef(.err, "OOB writes must run on the looper queue", .{});
@@ -1500,4 +1333,171 @@ pub const Looper = struct {
             else => null,
         };
     }
+
+    const SideIO = struct {
+        // Identity and native I/O.
+        id: u64,
+        side: io.Side,
+        fd: io.FileDescriptor,
+        native_io: io.IOInterface,
+
+        // User callbacks.
+        transform_write: ?TransformWrite,
+        on_read: ?OnRead,
+        on_failure: ?OnFailure,
+
+        // Buffered packet state.
+        read_buf: []u8,
+        write_queue: WriteQueue,
+
+        // Mux event and cleanup state.
+        is_reading: bool = true,
+        is_writing: bool = false,
+        did_cleanup: bool = false,
+
+        // In-flight transform synchronization.
+        transform_drainer: core.Drainer = .{},
+
+        fn create(
+            allocator: std.mem.Allocator,
+            id: u64,
+            side: io.Side,
+            descriptor: Descriptor,
+            read_buf_size: usize,
+            arguments: AttachArguments,
+        ) std.mem.Allocator.Error!*SideIO {
+            const self = try allocator.create(SideIO);
+            errdefer allocator.destroy(self);
+            const read_buf = try allocator.alloc(u8, read_buf_size);
+            self.* = .{
+                .id = id,
+                .side = side,
+                .fd = descriptor.fd,
+                .native_io = descriptor.io,
+                .transform_write = arguments.transform_write,
+                .on_read = arguments.on_read,
+                .on_failure = arguments.on_failure,
+                .read_buf = read_buf,
+                .write_queue = WriteQueue.init(allocator),
+            };
+            return self;
+        }
+
+        fn destroyStorage(self: *SideIO, allocator: std.mem.Allocator) void {
+            self.write_queue.deinit();
+            allocator.free(self.read_buf);
+            self.transform_drainer.deinit();
+            allocator.destroy(self);
+        }
+
+        fn resetEvents(self: *SideIO) io.Error!void {
+            return self.native_io.resetEvents();
+        }
+
+        fn setRead(self: *SideIO, mux: c.pp_mux, enabled: bool) io.Error!void {
+            _ = c.pp_mux_set_read(mux, self.fd, enabled);
+            self.is_reading = enabled;
+            try self.syncEventMask();
+        }
+
+        fn setWrite(self: *SideIO, mux: c.pp_mux, enabled: bool) io.Error!void {
+            _ = c.pp_mux_set_write(mux, self.fd, enabled);
+            self.is_writing = enabled;
+            try self.syncEventMask();
+        }
+
+        fn syncEventMask(self: *SideIO) io.Error!void {
+            return self.native_io.setEventMask(self.is_reading, self.is_writing);
+        }
+
+        fn detachFromMux(self: *SideIO, mux: c.pp_mux) bool {
+            if (self.did_cleanup) return false;
+            self.did_cleanup = true;
+            _ = c.pp_mux_delete(mux, self.fd);
+            return true;
+        }
+
+        fn cleanupNative(self: *SideIO) void {
+            self.native_io.cleanup();
+        }
+    };
+
+    const DescriptorSet = struct {
+        allocator: std.mem.Allocator,
+
+        readable: std.ArrayList(io.FileDescriptor) = .empty,
+        writable: std.ArrayList(io.FileDescriptor) = .empty,
+
+        allocation_failed: bool = false,
+
+        fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!DescriptorSet {
+            var self = DescriptorSet{ .allocator = allocator };
+            errdefer self.deinit();
+            try self.readable.ensureTotalCapacity(allocator, number_of_descriptors);
+            try self.writable.ensureTotalCapacity(allocator, number_of_descriptors);
+            return self;
+        }
+
+        fn deinit(self: *DescriptorSet) void {
+            self.readable.deinit(self.allocator);
+            self.writable.deinit(self.allocator);
+        }
+
+        fn resetReadable(self: *DescriptorSet) void {
+            self.readable.clearRetainingCapacity();
+        }
+
+        fn insertReadable(self: *DescriptorSet, fd: io.FileDescriptor) void {
+            self.insert(&self.readable, fd) catch {
+                self.allocation_failed = true;
+            };
+        }
+
+        fn insertWritable(self: *DescriptorSet, fd: io.FileDescriptor) void {
+            self.insert(&self.writable, fd) catch {
+                self.allocation_failed = true;
+            };
+        }
+
+        fn insert(
+            self: *DescriptorSet,
+            list: *std.ArrayList(io.FileDescriptor),
+            fd: io.FileDescriptor,
+        ) std.mem.Allocator.Error!void {
+            if (contains(list.items, fd)) return;
+            try list.append(self.allocator, fd);
+        }
+
+        fn removeReadable(self: *DescriptorSet, fd: io.FileDescriptor) void {
+            remove(&self.readable, fd);
+        }
+
+        fn removeWritable(self: *DescriptorSet, fd: io.FileDescriptor) void {
+            remove(&self.writable, fd);
+        }
+
+        fn isReadable(self: DescriptorSet, fd: io.FileDescriptor) bool {
+            return contains(self.readable.items, fd);
+        }
+
+        fn isWritable(self: DescriptorSet, fd: io.FileDescriptor) bool {
+            return contains(self.writable.items, fd);
+        }
+
+        fn contains(list: []const io.FileDescriptor, fd: io.FileDescriptor) bool {
+            for (list) |item| {
+                if (item == fd) return true;
+            }
+            return false;
+        }
+
+        fn remove(list: *std.ArrayList(io.FileDescriptor), fd: io.FileDescriptor) void {
+            for (list.items, 0..) |item, index| {
+                if (item == fd) {
+                    _ = list.orderedRemove(index);
+                    return;
+                }
+            }
+        }
+    };
 };
