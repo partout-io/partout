@@ -177,9 +177,28 @@ fn formatPeerInfoAlloc(
     var output: std.Io.Writer.Allocating = .init(allocator);
     errdefer output.deinit();
     const writer = &output.writer;
-    writer.print("IV_VER=2.4\nIV_UI_VER={s}\nIV_PROTO=2\nIV_NCP=2\nIV_LZO_STUB=1\nIV_LZO=0\n", .{ui_version}) catch return error.OutOfMemory;
-    if (ssl_version) |value| writer.print("IV_SSL={s}\n", .{value}) catch return error.OutOfMemory;
-    writer.print("IV_PLAT={s}\nIV_PLAT_VER={s}\n", .{ platform, platform_version }) catch return error.OutOfMemory;
-    for (extra_lines) |line| writer.print("{s}\n", .{line}) catch return error.OutOfMemory;
+
+    const fields = [_]struct {
+        name: []const u8,
+        value: ?[]const u8,
+    }{
+        .{ .name = "IV_VER", .value = "2.4" },
+        .{ .name = "IV_UI_VER", .value = ui_version },
+        .{ .name = "IV_PROTO", .value = "2" },
+        .{ .name = "IV_NCP", .value = "2" },
+        .{ .name = "IV_LZO_STUB", .value = "1" },
+        .{ .name = "IV_LZO", .value = "0" },
+        .{ .name = "IV_SSL", .value = ssl_version },
+        .{ .name = "IV_PLAT", .value = platform },
+        .{ .name = "IV_PLAT_VER", .value = platform_version },
+    };
+    for (fields) |field| {
+        const value = field.value orelse continue;
+        writer.print("{s}={s}\n", .{ field.name, value }) catch
+            return error.OutOfMemory;
+    }
+    for (extra_lines) |line| {
+        writer.print("{s}\n", .{line}) catch return error.OutOfMemory;
+    }
     return output.toOwnedSlice() catch error.OutOfMemory;
 }
