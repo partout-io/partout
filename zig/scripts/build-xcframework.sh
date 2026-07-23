@@ -202,7 +202,7 @@ build_slice() {
     echo "Building $name ($target)"
     (
         cd "$zig_dir"
-        zig build \
+        zig build install \
             -j1 \
             --prefix "$install_root" \
             --cache-dir "$cache_dir" \
