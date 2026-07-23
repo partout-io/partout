@@ -15,25 +15,3 @@ test "BidirectionalState resets both directions" {
     try std.testing.expectEqual(@as(u32, 7), state.inbound);
     try std.testing.expectEqual(@as(u32, 7), state.outbound);
 }
-
-test "forAuthentication appends and encodes OTP" {
-    const allocator = std.testing.allocator;
-
-    var appended = try helpers.forAuthentication(allocator, .{
-        .username = "user",
-        .password = "pass",
-        .otp_method = .append,
-        .otp = "123",
-    });
-    defer appended.deinit(allocator);
-    try std.testing.expectEqualStrings("pass123", appended.password);
-
-    var encoded = try helpers.forAuthentication(allocator, .{
-        .username = "user",
-        .password = "pass",
-        .otp_method = .encode,
-        .otp = "123",
-    });
-    defer encoded.deinit(allocator);
-    try std.testing.expectEqualStrings("SCRV1:cGFzcw==:MTIz", encoded.password);
-}

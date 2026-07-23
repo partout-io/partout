@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+
 const c_exports_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const net_mod = @import("../../net/exports.zig");
@@ -21,6 +22,7 @@ const session_context_mod = @import("session_context.zig");
 const session_negotiator_mod = @import("session_negotiator.zig");
 const tls_mod = @import("tls.zig");
 
+const session_mod = @This();
 const api = core_mod.api;
 const c = helpers_mod.c;
 const c_crypto = c_exports_mod.crypto;
@@ -42,6 +44,7 @@ const PacketCode = packet_mod.PacketCode;
 const PRNG = crypto_mod.PRNG;
 const PushReply = push_mod.PushReply;
 const RenegotiationType = session_negotiator_mod.RenegotiationType;
+const Serializer = serialization_mod.Serializer;
 const SessionState = session_context_mod.SessionState;
 const SessionError = errors_mod.SessionError;
 const TLSParameters = tls_mod.TLSParameters;
@@ -185,7 +188,7 @@ pub const Session = struct {
         errdefer if (owned_credentials) |*value| value.deinit(allocator);
         const owned_caches_directory = try allocator.dupe(u8, caches_directory);
         errdefer allocator.free(owned_caches_directory);
-        const serializer = try serialization_mod.Serializer.forConfiguration(
+        const serializer = try Serializer.forConfiguration(
             allocator,
             fnt.enc,
             &owned_configuration,
@@ -855,4 +858,49 @@ pub const Session = struct {
         session: *Session,
         cause: ?SessionError,
     };
+};
+
+fn forAuthentication(
+    allocator: std.mem.Allocator,
+    credentials: api.OpenVPNCredentials,
+) !api.OpenVPNCredentials {
+    const username = try allocator.dupe(u8, credentials.username);
+    errdefer allocator.free(username);
+
+    const password = switch (credentials.otp_method) {
+        .none => try allocator.dupe(u8, credentials.password),
+        .append => blk: {
+            const otp = credentials.otp orelse return error.OTPRequired;
+            break :blk try std.mem.concat(allocator, u8, &.{ credentials.password, otp });
+        },
+        .encode => blk: {
+            const otp = credentials.otp orelse return error.OTPRequired;
+            const encoded_password = try base64Alloc(allocator, credentials.password);
+            defer allocator.free(encoded_password);
+            const encoded_otp = try base64Alloc(allocator, otp);
+            defer allocator.free(encoded_otp);
+            break :blk try std.fmt.allocPrint(
+                allocator,
+                "SCRV1:{s}:{s}",
+                .{ encoded_password, encoded_otp },
+            );
+        },
+    };
+
+    return .{
+        .username = username,
+        .password = password,
+        .otp_method = .none,
+        .otp = null,
+    };
+}
+
+fn base64Alloc(allocator: std.mem.Allocator, value: []const u8) ![]u8 {
+    const encoded = try allocator.alloc(u8, std.base64.standard.Encoder.calcSize(value.len));
+    _ = std.base64.standard.Encoder.encode(encoded, value);
+    return encoded;
+}
+
+pub const testing = struct {
+    pub const forAuthentication = session_mod.forAuthentication;
 };
