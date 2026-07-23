@@ -105,10 +105,7 @@ public final class PartoutProviderRuntime: Sendable {
         partout_daemon_stop()
     }
 
-    public func cancelTunnelWithError(_ error: Error?) {
-        pp_log(ctx, .os, .info, "Cancel runtime, error: \(String(describing: error))")
-        controller.cancelTunnelConnection(with: error)
-    }
+    public func cancelTunnelWithError(_: Error?) {}
 
     public func handleAppMessage(_ messageData: Data) async -> Data? {
         do {
