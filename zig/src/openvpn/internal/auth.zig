@@ -15,8 +15,8 @@ const api = core_mod.api;
 const c_crypto = c_exports_mod.crypto;
 
 const ControlConstants = constants_mod.Control;
-const CryptoKeyPair = crypto_mod.CryptoKeyPair;
 const CryptoKeys = crypto_mod.CryptoKeys;
+const CryptoKeyPair = CryptoKeys.KeyPair;
 const Keys = constants_mod.Keys;
 const PRNG = crypto_mod.PRNG;
 const TLSWrapper = tls_mod.TLSWrapper;

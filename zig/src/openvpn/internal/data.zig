@@ -9,6 +9,7 @@ const net_mod = @import("../../net/exports.zig");
 const auth_mod = @import("auth.zig");
 const constants_mod = @import("constants.zig");
 const crypto_mod = @import("crypto.zig");
+const errors_mod = @import("errors.zig");
 const helpers_mod = @import("helpers.zig");
 const processing_mod = @import("processing.zig");
 
@@ -258,7 +259,7 @@ pub const DataPath = struct {
         if (native.dp_code == c.OpenVPNDataPathErrorNone) return error.DataPathFailure;
         return switch (native.dp_code) {
             c.OpenVPNDataPathErrorCompression => error.CompressionMismatch,
-            c.OpenVPNDataPathErrorCrypto => crypto_mod.cryptoError(native.crypto_code),
+            c.OpenVPNDataPathErrorCrypto => errors_mod.cryptoError(native.crypto_code),
             else => error.DataPathFailure,
         };
     }

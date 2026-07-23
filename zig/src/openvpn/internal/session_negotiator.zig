@@ -34,7 +34,6 @@ const DataPathParameters = data_mod.DataPathParameters;
 const DataPathWrapper = data_mod.DataPathWrapper;
 const LinkProcessor = processing_mod.LinkProcessor;
 const PacketCode = packet_mod.PacketCode;
-const PIAHardReset = crypto_mod.PIAHardReset;
 const PRF = auth_mod.PRF;
 const PRNG = crypto_mod.PRNG;
 const PushReply = push_mod.PushReply;
@@ -232,7 +231,20 @@ pub const Negotiator = struct {
             .client => try self.enqueueControlPackets(.softResetV1, self.key, ""),
             .server => {},
         } else {
-            const hard_reset_payload = try self.hardResetPayload();
+            const uses_pia_patches = self.options.configuration.uses_pia_patches orelse false;
+            const ca_md5_digest: ?[]u8 = if (uses_pia_patches) blk: {
+                const tls = self.tls orelse return error.Assertion;
+                break :blk tls.caMD5(self.allocator) catch null;
+            } else null;
+            defer if (ca_md5_digest) |digest| self.allocator.free(digest);
+            const hard_reset_payload = packet_mod.hardResetPayload(
+                self.allocator,
+                uses_pia_patches,
+                ca_md5_digest,
+                configuration_mod.fallbackCipher(self.options.configuration).raw(),
+                configuration_mod.fallbackDigest(self.options.configuration).raw(),
+                self.prng,
+            );
             defer if (hard_reset_payload) |payload| self.allocator.free(payload);
             try self.enqueueControlPackets(
                 if (self.usesTLSCryptV2()) .hardResetClientV3 else .hardResetClientV2,
@@ -349,18 +361,6 @@ pub const Negotiator = struct {
         ?*anyopaque,
         []const u8,
     ) errors_mod.SessionError!void;
-
-    fn hardResetPayload(self: *const Negotiator) !?[]u8 {
-        if (!(self.options.configuration.uses_pia_patches orelse false)) return null;
-        const tls = self.tls orelse return error.Assertion;
-        const ca_md5 = tls.caMD5(self.allocator) catch return null;
-        defer self.allocator.free(ca_md5);
-        return PIAHardReset.init(
-            ca_md5,
-            configuration_mod.fallbackCipher(self.options.configuration),
-            configuration_mod.fallbackDigest(self.options.configuration),
-        ).encodedData(self.allocator, self.prng) catch null;
-    }
 
     fn pushRequest(self: *Negotiator) !void {
         if (self.state != .push) return;

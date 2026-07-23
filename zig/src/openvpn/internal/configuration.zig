@@ -7,8 +7,14 @@ const core_mod = @import("../../core/exports.zig");
 const crypto_mod = @import("crypto.zig");
 
 const api = core_mod.api;
-const CryptoBackend = crypto_mod.CryptoBackend;
 const PRNG = crypto_mod.PRNG;
+
+const CryptoBackend = enum {
+    openssl,
+    mbedtls,
+    native,
+    mock,
+};
 
 pub const ConnectionOptions = struct {
     backend: CryptoBackend = .native,

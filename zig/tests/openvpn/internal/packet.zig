@@ -5,10 +5,46 @@
 const std = @import("std");
 const source = @import("source");
 
+const packet_mod = source.openvpn_internal.packet;
+
 const ControlConstants = source.openvpn_internal.constants.Control;
-const ControlPacket = source.openvpn_internal.packet.ControlPacket;
-const OCCPacket = source.openvpn_internal.packet.OCCPacket;
-const PacketCode = source.openvpn_internal.packet.PacketCode;
+const ControlPacket = packet_mod.ControlPacket;
+const OCCPacket = packet_mod.OCCPacket;
+const PacketCode = packet_mod.PacketCode;
+
+test "PIA payload prepends the repeating XOR key" {
+    const Fixed = struct {
+        fn fill(_: ?*anyopaque, destination: []u8) bool {
+            for (destination, 0..) |*byte, index| byte.* = @intCast(index + 1);
+            return true;
+        }
+    };
+    const encoded = packet_mod.hardResetPayload(
+        std.testing.allocator,
+        true,
+        "012345",
+        "AES-128-CBC",
+        "SHA1",
+        .{ .fill_fn = Fixed.fill },
+    );
+    defer std.testing.allocator.free(encoded.?);
+    try std.testing.expectEqualSlices(u8, &.{ 1, 2, 3 }, encoded.?[0..3]);
+    try std.testing.expectEqual(
+        @as(u8, '5' ^ 1),
+        encoded.?[3],
+    );
+}
+
+test "standard hard reset has no payload" {
+    try std.testing.expect(packet_mod.hardResetPayload(
+        std.testing.allocator,
+        false,
+        "unused",
+        "unused",
+        "unused",
+        .{},
+    ) == null);
+}
 
 test "control packet serializes to the Swift wire vector" {
     const session_id = [_]u8{ 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88 };

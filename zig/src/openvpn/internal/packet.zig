@@ -5,11 +5,13 @@
 const std = @import("std");
 const c_exports_mod = @import("../../c/exports.zig");
 const crypto_mod = @import("crypto.zig");
+const errors_mod = @import("errors.zig");
 const helpers_mod = @import("helpers.zig");
 
 const c = helpers_mod.c;
 const c_crypto = c_exports_mod.crypto;
 
+const PRNG = crypto_mod.PRNG;
 const SerializeWithCrypto = @TypeOf(&c.openvpn_ctrl_serialize_auth);
 
 pub const PacketCode = enum(u8) {
@@ -204,7 +206,7 @@ pub const ControlPacket = struct {
             &algorithm,
             @ptrCast(&native_error),
         );
-        if (written == 0) return crypto_mod.cryptoError(native_error);
+        if (written == 0) return errors_mod.cryptoError(native_error);
         if (written < destination.len) destination = try allocator.realloc(destination, written);
         return destination;
     }
@@ -222,6 +224,85 @@ pub const OCCPacket = enum(u8) {
         var result: [magic_string.len + 1]u8 = undefined;
         @memcpy(result[0..magic_string.len], &magic_string);
         result[magic_string.len] = @intFromEnum(self);
+        return result;
+    }
+};
+
+pub fn hardResetPayload(
+    allocator: std.mem.Allocator,
+    uses_pia_patches: bool,
+    ca_md5_digest: ?[]const u8,
+    cipher_name: []const u8,
+    digest_name: []const u8,
+    prng: PRNG,
+) ?[]u8 {
+    if (!uses_pia_patches) return null;
+    const ca_md5 = ca_md5_digest orelse return null;
+    return PIAHardReset.init(ca_md5, cipher_name, digest_name)
+        .encodedData(allocator, prng) catch null;
+}
+
+const PIAHardReset = struct {
+    const obfuscation_key_length: usize = 3;
+    const magic = "53eo0rk92gxic98p1asgl5auh59r1vp4lmry1e3chzi100qntd";
+
+    ca_md5_digest: []const u8,
+    cipher_name: []const u8,
+    digest_name: []const u8,
+
+    fn init(
+        ca_md5_digest: []const u8,
+        cipher_name: []const u8,
+        digest_name: []const u8,
+    ) PIAHardReset {
+        return .{
+            .ca_md5_digest = ca_md5_digest,
+            .cipher_name = cipher_name,
+            .digest_name = digest_name,
+        };
+    }
+
+    /// Returns the PIA-specific encoded hard-reset payload. Caller owns it.
+    fn encodedData(
+        self: PIAHardReset,
+        allocator: std.mem.Allocator,
+        prng: PRNG,
+    ) ![]u8 {
+        if (!isASCII(self.ca_md5_digest)) return error.Assertion;
+
+        const cipher_name = try lowerAlloc(allocator, self.cipher_name);
+        defer allocator.free(cipher_name);
+        const digest_name = try lowerAlloc(allocator, self.digest_name);
+        defer allocator.free(digest_name);
+        const plain = try std.fmt.allocPrint(
+            allocator,
+            "{s}crypto\t{s}|{s}\tca\t{s}",
+            .{ magic, cipher_name, digest_name, self.ca_md5_digest },
+        );
+        defer allocator.free(plain);
+
+        const result = try allocator.alloc(u8, obfuscation_key_length + plain.len);
+        errdefer allocator.free(result);
+        try prng.fill(result[0..obfuscation_key_length]);
+        for (plain, 0..) |byte, index| {
+            result[obfuscation_key_length + index] =
+                byte ^ result[index % obfuscation_key_length];
+        }
+        return result;
+    }
+
+    fn isASCII(value: []const u8) bool {
+        for (value) |byte| if (!std.ascii.isAscii(byte)) return false;
+        return true;
+    }
+
+    fn lowerAlloc(
+        allocator: std.mem.Allocator,
+        value: []const u8,
+    ) ![]u8 {
+        const result = try allocator.alloc(u8, value.len);
+        for (value, result) |source, *destination|
+            destination.* = std.ascii.toLower(source);
         return result;
     }
 };

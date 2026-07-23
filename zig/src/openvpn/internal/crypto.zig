@@ -4,56 +4,33 @@
 
 const std = @import("std");
 const c_exports_mod = @import("../../c/exports.zig");
-const core_mod = @import("../../core/exports.zig");
 
-const api = core_mod.api;
 const c_common = c_exports_mod.common;
 const c_crypto = c_exports_mod.crypto;
 
-pub fn cryptoError(code: c_crypto.pp_crypto_error_code) error{CryptoFailure} {
-    std.debug.assert(code != c_crypto.PPCryptoErrorNone);
-    return error.CryptoFailure;
-}
-
-pub const CryptoBackend = enum {
-    openssl,
-    mbedtls,
-    native,
-    mock,
-};
-
-pub const CryptoKeyPair = struct {
-    encryption_key: ZeroingData,
-    decryption_key: ZeroingData,
-
-    pub fn init(encryption_key: ZeroingData, decryption_key: ZeroingData) CryptoKeyPair {
-        return .{
-            .encryption_key = encryption_key,
-            .decryption_key = decryption_key,
-        };
-    }
-
-    pub fn deinit(self: *CryptoKeyPair, allocator: std.mem.Allocator) void {
-        self.encryption_key.deinit(allocator);
-        self.decryption_key.deinit(allocator);
-        self.* = undefined;
-    }
-
-    pub fn move(self: *const CryptoKeyPair) CryptoKeyPair {
-        return .{
-            .encryption_key = self.encryption_key.move(),
-            .decryption_key = self.decryption_key.move(),
-        };
-    }
-};
-
 pub const CryptoKeys = struct {
-    pub const KeyPair = CryptoKeyPair;
+    pub const KeyPair = struct {
+        encryption_key: ZeroingData,
+        decryption_key: ZeroingData,
 
-    cipher: ?CryptoKeyPair = null,
-    digest: ?CryptoKeyPair = null,
+        pub fn init(encryption_key: ZeroingData, decryption_key: ZeroingData) KeyPair {
+            return .{
+                .encryption_key = encryption_key,
+                .decryption_key = decryption_key,
+            };
+        }
 
-    pub fn init(cipher: ?CryptoKeyPair, digest: ?CryptoKeyPair) CryptoKeys {
+        pub fn deinit(self: *KeyPair, allocator: std.mem.Allocator) void {
+            self.encryption_key.deinit(allocator);
+            self.decryption_key.deinit(allocator);
+            self.* = undefined;
+        }
+    };
+
+    cipher: ?KeyPair = null,
+    digest: ?KeyPair = null,
+
+    pub fn init(cipher: ?KeyPair, digest: ?KeyPair) CryptoKeys {
         return .{ .cipher = cipher, .digest = digest };
     }
 
@@ -178,71 +155,6 @@ pub const PRNG = struct {
     }
 };
 
-pub const PIAHardReset = struct {
-    pub const obfuscation_key_length: usize = 3;
-    pub const magic = "53eo0rk92gxic98p1asgl5auh59r1vp4lmry1e3chzi100qntd";
-
-    ca_md5_digest: []const u8,
-    cipher: api.OpenVPNCipher,
-    digest: api.OpenVPNDigest,
-
-    pub fn init(
-        ca_md5_digest: []const u8,
-        cipher: api.OpenVPNCipher,
-        digest: api.OpenVPNDigest,
-    ) PIAHardReset {
-        return .{
-            .ca_md5_digest = ca_md5_digest,
-            .cipher = cipher,
-            .digest = digest,
-        };
-    }
-
-    /// Returns the PIA-specific encoded hard-reset payload. Caller owns it.
-    pub fn encodedData(
-        self: PIAHardReset,
-        allocator: std.mem.Allocator,
-        prng: PRNG,
-    ) ![]u8 {
-        if (!isASCII(self.ca_md5_digest)) return error.Assertion;
-
-        const cipher_name = try lowerAlloc(allocator, self.cipher.raw());
-        defer allocator.free(cipher_name);
-        const digest_name = try lowerAlloc(allocator, self.digest.raw());
-        defer allocator.free(digest_name);
-        const plain = try std.fmt.allocPrint(
-            allocator,
-            "{s}crypto\t{s}|{s}\tca\t{s}",
-            .{ magic, cipher_name, digest_name, self.ca_md5_digest },
-        );
-        defer allocator.free(plain);
-
-        const result = try allocator.alloc(u8, obfuscation_key_length + plain.len);
-        errdefer allocator.free(result);
-        try prng.fill(result[0..obfuscation_key_length]);
-        for (plain, 0..) |byte, index| {
-            result[obfuscation_key_length + index] =
-                byte ^ result[index % obfuscation_key_length];
-        }
-        return result;
-    }
-
-    fn lowerAlloc(
-        allocator: std.mem.Allocator,
-        value: []const u8,
-    ) ![]u8 {
-        const result = try allocator.alloc(u8, value.len);
-        for (value, result) |source, *destination|
-            destination.* = std.ascii.toLower(source);
-        return result;
-    }
-
-    fn isASCII(value: []const u8) bool {
-        for (value) |byte| if (!std.ascii.isAscii(byte)) return false;
-        return true;
-    }
-};
-
 pub const ZeroingData = struct {
     ptr: ?*c_common.pp_zd = null,
     bytes: []u8 = @constCast(&[_]u8{}),
@@ -270,7 +182,7 @@ pub const ZeroingData = struct {
         return result;
     }
 
-    pub fn fromC(ptr: *c_common.pp_zd) ZeroingData {
+    fn fromC(ptr: *c_common.pp_zd) ZeroingData {
         return .{
             .ptr = ptr,
             .bytes = ptr.*.bytes[0..ptr.*.length],
@@ -292,21 +204,16 @@ pub const ZeroingData = struct {
         return result;
     }
 
-    pub fn cPtr(self: ZeroingData) *c_common.pp_zd {
+    fn cPtr(self: ZeroingData) *c_common.pp_zd {
         return self.ptr orelse @panic("use of deinitialized ZeroingData");
     }
 
-    pub fn cCopy(self: ZeroingData) !*c_common.pp_zd {
+    fn cCopy(self: ZeroingData) !*c_common.pp_zd {
         return c_common.pp_zd_make_copy(self.cPtr());
     }
 
     pub fn zero(self: *ZeroingData) void {
         c_common.pp_zd_zero(self.cPtr());
-        self.refresh();
-    }
-
-    pub fn resize(self: *const ZeroingData, count: usize) void {
-        c_common.pp_zd_resize(self.cPtr(), count);
         self.refresh();
     }
 
@@ -363,74 +270,3 @@ pub const ZeroingData = struct {
         self.bytes = ptr.*.bytes[0..ptr.*.length];
     }
 };
-
-pub fn authKeys(
-    allocator: std.mem.Allocator,
-    key: api.OpenVPNStaticKey,
-) !CryptoKeys {
-    const bytes = try decodeStaticKey(allocator, key);
-    defer {
-        @memset(bytes, 0);
-        allocator.free(bytes);
-    }
-    const send_index: usize = switch (key.dir orelse .server) {
-        .server => 1,
-        .client => 3,
-    };
-    const receive_index: usize = switch (key.dir orelse .client) {
-        .server => 3,
-        .client => 1,
-    };
-    var send = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, send_index));
-    errdefer send.deinit(allocator);
-    const receive = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, receive_index));
-    return CryptoKeys.init(null, CryptoKeyPair.init(send, receive));
-}
-
-pub fn cryptKeys(
-    allocator: std.mem.Allocator,
-    key: api.OpenVPNStaticKey,
-) !CryptoKeys {
-    const direction = key.dir orelse return error.MissingStaticKeyDirection;
-    const bytes = try decodeStaticKey(allocator, key);
-    defer {
-        @memset(bytes, 0);
-        allocator.free(bytes);
-    }
-    const cipher_send_index: usize = if (direction == .server) 0 else 2;
-    const cipher_receive_index: usize = if (direction == .server) 2 else 0;
-    const hmac_send_index: usize = if (direction == .server) 1 else 3;
-    const hmac_receive_index: usize = if (direction == .server) 3 else 1;
-
-    var cipher_send = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, cipher_send_index));
-    errdefer cipher_send.deinit(allocator);
-    var cipher_receive = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, cipher_receive_index));
-    errdefer cipher_receive.deinit(allocator);
-    var hmac_send = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, hmac_send_index));
-    errdefer hmac_send.deinit(allocator);
-    const hmac_receive = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, hmac_receive_index));
-    return CryptoKeys.init(
-        CryptoKeyPair.init(cipher_send, cipher_receive),
-        CryptoKeyPair.init(hmac_send, hmac_receive),
-    );
-}
-
-const static_key_content_length = 256;
-const static_key_length = 64;
-
-fn decodeStaticKey(
-    allocator: std.mem.Allocator,
-    key: api.OpenVPNStaticKey,
-) ![]u8 {
-    const bytes = try key.data.bytesAlloc(allocator);
-    errdefer {
-        @memset(bytes, 0);
-        allocator.free(bytes);
-    }
-    if (bytes.len != static_key_content_length) return error.InvalidStaticKey;
-    return bytes;
-}
-
-fn staticKeyQuadrant(bytes: []const u8, index: usize) []const u8 {
-    return bytes[index * static_key_length .. (index + 1) * static_key_length];
-}

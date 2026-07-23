@@ -4,9 +4,12 @@
 
 //! Coarse OpenVPN failures and their eventual ConnectionReporter mapping.
 
+const std = @import("std");
+const c_exports_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 
 const api = core_mod.api;
+const c_crypto = c_exports_mod.crypto;
 const log = core_mod.logging;
 
 /// The only result retained after a session stops. Unknown failures are logged
@@ -25,6 +28,11 @@ pub const SessionError = error{
     UnsupportedAlgorithm,
     Reconnect,
 };
+
+pub fn cryptoError(code: c_crypto.pp_crypto_error_code) error{CryptoFailure} {
+    std.debug.assert(code != c_crypto.PPCryptoErrorNone);
+    return error.CryptoFailure;
+}
 
 /// Classifies a session failure. Unknown runtime failures are useful only for
 /// diagnostics: log them and return the reconnect signal without retaining
