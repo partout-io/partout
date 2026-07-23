@@ -19,6 +19,36 @@ test "PUSH_REPLY parses through the standard OpenVPN parser" {
     try std.testing.expectEqual(@as(?u32, 7), reply.options.peer_id);
 }
 
+test "PUSH_REPLY parses pushed tunnel addresses" {
+    const allocator = std.testing.allocator;
+    var reply = (try push.PushReply.parse(
+        allocator,
+        "PUSH_REPLY,topology subnet,ifconfig 10.9.0.7 255.255.255.0,route-gateway 10.9.0.1,ifconfig-ipv6 fd00:9::7/64 fd00:9::1",
+    )).?;
+    defer reply.deinit(allocator);
+
+    try std.testing.expectEqualStrings(
+        "10.9.0.7",
+        reply.options.ipv4.?.subnets[0].address.raw,
+    );
+    try std.testing.expectEqualStrings(
+        "fd00:9::7",
+        reply.options.ipv6.?.subnets[0].address.raw,
+    );
+}
+
+test "PUSH_REPLY ignores incomplete ifconfig like the Swift parser" {
+    const allocator = std.testing.allocator;
+    var reply = (try push.PushReply.parse(
+        allocator,
+        "PUSH_REPLY,ifconfig 10.8.0.2,auth-token somethingsecret,cipher AES-128-CBC",
+    )).?;
+    defer reply.deinit(allocator);
+
+    try std.testing.expect(reply.options.ipv4 == null);
+    try std.testing.expectEqual(api.OpenVPNCipher.aes128cbc, reply.options.cipher.?);
+}
+
 test "PUSH_REPLY clone owns independent storage" {
     var reply = (try push.PushReply.parse(std.testing.allocator, "PUSH_REPLY,ping 10")).?;
     defer reply.deinit(std.testing.allocator);

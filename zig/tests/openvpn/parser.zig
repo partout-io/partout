@@ -101,6 +101,79 @@ test "OpenVPNParser matches directives and inline blocks case-insensitively" {
     try std.testing.expect(configuration.ca != null);
 }
 
+test "OpenVPNParser builds subnet IPv4 and IPv6 settings from push directives" {
+    const allocator = std.testing.allocator;
+    var configuration = try OpenVPNParser.parse(allocator,
+        \\topology subnet
+        \\ifconfig 10.8.12.34 255.255.255.0
+        \\route-gateway 10.8.12.1
+        \\ifconfig-ipv6 fd42:abcd:1234::9/64 fd42:abcd:1234::1
+        \\route-ipv6-gateway fd42:abcd:1234::ffff
+    );
+    defer configuration.deinit(allocator);
+
+    const ipv4 = configuration.ipv4 orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(@as(usize, 1), ipv4.subnets.len);
+    try std.testing.expectEqualStrings("10.8.12.34", ipv4.subnets[0].address.raw);
+    try std.testing.expectEqual(@as(u8, 24), ipv4.subnets[0].prefix_length);
+    try std.testing.expectEqual(@as(usize, 1), ipv4.included_routes.len);
+    try std.testing.expectEqualStrings(
+        "10.8.12.0",
+        ipv4.included_routes[0].destination.?.address.raw,
+    );
+    try std.testing.expectEqual(@as(u8, 24), ipv4.included_routes[0].destination.?.prefix_length);
+    try std.testing.expectEqualStrings("10.8.12.1", configuration.route_gateway4.?.raw);
+
+    const ipv6 = configuration.ipv6 orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(@as(usize, 1), ipv6.subnets.len);
+    try std.testing.expectEqualStrings("fd42:abcd:1234::9", ipv6.subnets[0].address.raw);
+    try std.testing.expectEqual(@as(u8, 64), ipv6.subnets[0].prefix_length);
+    try std.testing.expectEqual(@as(usize, 1), ipv6.included_routes.len);
+    try std.testing.expectEqualStrings(
+        "fd42:abcd:1234::",
+        ipv6.included_routes[0].destination.?.address.raw,
+    );
+    try std.testing.expectEqual(@as(u8, 64), ipv6.included_routes[0].destination.?.prefix_length);
+    try std.testing.expectEqualStrings("fd42:abcd:1234::1", configuration.route_gateway6.?.raw);
+}
+
+test "OpenVPNParser applies legacy net30 ifconfig semantics" {
+    const allocator = std.testing.allocator;
+    var configuration = try OpenVPNParser.parse(allocator,
+        \\ifconfig 10.8.0.6 10.8.0.5
+        \\route-gateway 192.0.2.1
+    );
+    defer configuration.deinit(allocator);
+
+    const ipv4 = configuration.ipv4 orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqualStrings("10.8.0.6", ipv4.subnets[0].address.raw);
+    try std.testing.expectEqual(@as(u8, 30), ipv4.subnets[0].prefix_length);
+    try std.testing.expectEqualStrings(
+        "10.8.0.4",
+        ipv4.included_routes[0].destination.?.address.raw,
+    );
+    try std.testing.expectEqualStrings("10.8.0.5", configuration.route_gateway4.?.raw);
+}
+
+test "OpenVPNParser enforces Swift topology constraints" {
+    const allocator = std.testing.allocator;
+
+    try std.testing.expectError(
+        error.MalformedOption,
+        OpenVPNParser.parse(
+            allocator,
+            "topology subnet\nifconfig 10.8.0.2 255.255.255.0",
+        ),
+    );
+    try std.testing.expectError(
+        error.UnsupportedConfiguration,
+        OpenVPNParser.parse(
+            allocator,
+            "topology p2p\nifconfig 10.8.0.2 10.8.0.1",
+        ),
+    );
+}
+
 test "OpenVPNParser requires passphrase for encrypted client key" {
     const allocator = std.testing.allocator;
     const ovpn_parser = OpenVPNParser{ .decrypt_key = decryptKey };

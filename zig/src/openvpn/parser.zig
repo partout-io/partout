@@ -159,6 +159,10 @@ const Builder = struct {
     tls_key_direction: ?api.OpenVPNStaticKeyDirection = null,
     default_protocol: api.IPSocketType = .udp,
     default_port: u16 = 1194,
+    topology: Topology = .net30,
+    ifconfig4: ?IfconfigArguments = null,
+    ifconfig6: ?IfconfigArguments = null,
+    route_gateway4_argument_count: ?usize = null,
     found_option: bool = false,
     context: Parser.Context = .{},
     decrypt_key_ctx: ?*anyopaque = null,
@@ -380,6 +384,23 @@ const Builder = struct {
             if (components.items.len == 2) self.configuration.peer_id = std.fmt.parseInt(u32, components.items[1], 10) catch return error.MalformedOption;
             return;
         }
+        if (std.ascii.eqlIgnoreCase(option, "topology")) {
+            if (components.items.len != 2) return;
+            if (Topology.parse(components.items[1])) |topology| {
+                self.topology = topology;
+            }
+            return;
+        }
+        if (std.ascii.eqlIgnoreCase(option, "ifconfig")) {
+            if (components.items.len < 3) return;
+            self.ifconfig4 = IfconfigArguments.init(components.items[1..]);
+            return;
+        }
+        if (std.ascii.eqlIgnoreCase(option, "ifconfig-ipv6")) {
+            if (components.items.len < 3) return;
+            self.ifconfig6 = IfconfigArguments.init(components.items[1..]);
+            return;
+        }
         if (std.ascii.eqlIgnoreCase(option, "route")) {
             try self.putRoute4(allocator, components.items);
             return;
@@ -389,7 +410,10 @@ const Builder = struct {
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "route-gateway")) {
-            if (components.items.len > 1) try replaceAddress(allocator, &self.configuration.route_gateway4, components.items[1]);
+            if (components.items.len > 1) {
+                self.route_gateway4_argument_count = components.items.len - 1;
+                try replaceAddress(allocator, &self.configuration.route_gateway4, components.items[1]);
+            }
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "route-ipv6-gateway")) {
@@ -595,6 +619,7 @@ const Builder = struct {
     fn build(self: *Builder, allocator: std.mem.Allocator) ParseError!api.OpenVPNConfiguration {
         if (!self.found_option) return error.InvalidFormat;
 
+        try self.buildRoutingSettings(allocator);
         self.configuration.data_ciphers = try takeOwnedSliceOrNull(allocator, &self.data_ciphers);
 
         if (self.remotes.items.len > 0) {
@@ -658,6 +683,97 @@ const Builder = struct {
         return result;
     }
 
+    fn buildRoutingSettings(
+        self: *Builder,
+        allocator: std.mem.Allocator,
+    ) ParseError!void {
+        if (self.ifconfig4) |arguments| {
+            if (arguments.count != 2) {
+                self.context.setParseErrorInfo(
+                    allocator,
+                    "ifconfig",
+                    "ifconfig takes 2 arguments",
+                );
+                return error.MalformedOption;
+            }
+
+            const address = arguments.first.?;
+            const remote_or_mask = arguments.second.?;
+            switch (self.topology) {
+                .subnet => {
+                    if (self.route_gateway4_argument_count != 1) {
+                        self.context.setParseErrorInfo(
+                            allocator,
+                            "route-gateway",
+                            "route-gateway takes 1 argument",
+                        );
+                        return error.MalformedOption;
+                    }
+                    const prefix = ipv4MaskPrefix(remote_or_mask) orelse
+                        return error.MalformedOption;
+                    self.configuration.ipv4 = try ipSettings(
+                        allocator,
+                        address,
+                        prefix,
+                        .v4,
+                    );
+                    const gateway = self.configuration.route_gateway4 orelse
+                        return error.MalformedOption;
+                    if (gateway.family != .v4) return error.MalformedOption;
+                },
+                .net30 => {
+                    self.configuration.ipv4 = try ipSettings(
+                        allocator,
+                        address,
+                        30,
+                        .v4,
+                    );
+                    try replaceIPAddress(
+                        allocator,
+                        &self.configuration.route_gateway4,
+                        remote_or_mask,
+                        .v4,
+                    );
+                },
+                .p2p => {
+                    self.context.setParseErrorInfo(
+                        allocator,
+                        "topology",
+                        "topology p2p",
+                    );
+                    return error.UnsupportedConfiguration;
+                },
+            }
+        }
+
+        if (self.ifconfig6) |arguments| {
+            if (arguments.count != 2) {
+                self.context.setParseErrorInfo(
+                    allocator,
+                    "ifconfig-ipv6",
+                    "ifconfig-ipv6 takes 2 arguments",
+                );
+                return error.MalformedOption;
+            }
+            const raw_subnet = arguments.first.?;
+            const parsed = api.Subnet.parseRaw(raw_subnet) orelse
+                return error.MalformedOption;
+            if (parsed.address.family != .v6) return error.MalformedOption;
+            self.configuration.ipv6 = try ipSettings(
+                allocator,
+                parsed.address.raw,
+                parsed.prefix_length,
+                .v6,
+            );
+            try replaceIPAddress(
+                allocator,
+                &self.configuration.route_gateway6,
+                arguments.second.?,
+                .v6,
+            );
+        }
+    }
+
     fn decryptClientKeyIfNeeded(self: *Builder, allocator: std.mem.Allocator) ParseError!void {
         const client_key = self.configuration.client_key orelse return;
         if (!client_key.isEncrypted()) return;
@@ -675,6 +791,33 @@ const RemoteBuilder = struct {
     address: []const u8,
     port: ?u16 = null,
     protocol: ?api.IPSocketType = null,
+};
+
+const Topology = enum {
+    net30,
+    p2p,
+    subnet,
+
+    fn parse(raw: []const u8) ?Topology {
+        if (std.ascii.eqlIgnoreCase(raw, "net30")) return .net30;
+        if (std.ascii.eqlIgnoreCase(raw, "p2p")) return .p2p;
+        if (std.ascii.eqlIgnoreCase(raw, "subnet")) return .subnet;
+        return null;
+    }
+};
+
+const IfconfigArguments = struct {
+    first: ?[]const u8 = null,
+    second: ?[]const u8 = null,
+    count: usize,
+
+    fn init(arguments: []const []const u8) IfconfigArguments {
+        return .{
+            .first = if (arguments.len > 0) arguments[0] else null,
+            .second = if (arguments.len > 1) arguments[1] else null,
+            .count = arguments.len,
+        };
+    }
 };
 
 fn takeOwnedSliceOrNull(
@@ -855,6 +998,63 @@ fn replaceAddress(
     field.* = value;
 }
 
+fn replaceIPAddress(
+    allocator: std.mem.Allocator,
+    field: *?api.Address,
+    raw: []const u8,
+    family: api.Address.Family,
+) ParseError!void {
+    var value = (try api.Address.parseRawAlloc(allocator, raw)) orelse
+        return error.MalformedOption;
+    errdefer value.deinit(allocator);
+    if (value.family != family) return error.MalformedOption;
+    if (field.*) |*old| old.deinit(allocator);
+    field.* = value;
+}
+
+fn ipSettings(
+    allocator: std.mem.Allocator,
+    address: []const u8,
+    prefix: u8,
+    family: api.Address.Family,
+) ParseError!api.IPSettings {
+    const raw_subnet = try std.fmt.allocPrint(
+        allocator,
+        "{s}/{d}",
+        .{ address, prefix },
+    );
+    defer allocator.free(raw_subnet);
+
+    var subnet = (try api.Subnet.parseRawAlloc(allocator, raw_subnet)) orelse
+        return error.MalformedOption;
+    errdefer subnet.deinit(allocator);
+    if (subnet.address.family != family) return error.MalformedOption;
+
+    const raw_network = subnet.networkRawAlloc(allocator) catch |err| {
+        return switch (err) {
+            error.OutOfMemory => error.OutOfMemory,
+            error.InvalidModel, error.Stringify => error.MalformedOption,
+        };
+    };
+    defer allocator.free(raw_network);
+    var network = (try api.Subnet.parseRawAlloc(allocator, raw_network)) orelse
+        return error.MalformedOption;
+    errdefer network.deinit(allocator);
+
+    const subnets = try allocator.alloc(api.Subnet, 1);
+    errdefer allocator.free(subnets);
+    subnets[0] = subnet;
+
+    const routes = try allocator.alloc(api.Route, 1);
+    errdefer allocator.free(routes);
+    routes[0] = .{ .destination = network };
+
+    return .{
+        .subnets = subnets,
+        .included_routes = routes,
+    };
+}
+
 fn replaceOpenVPNCryptoContainer(
     allocator: std.mem.Allocator,
     field: *?api.OpenVPNCryptoContainer,
@@ -897,6 +1097,8 @@ const known_openvpn_options = [_][]const u8{
     "explicit-exit-notify",
     "fast-io",
     "float",
+    "ifconfig",
+    "ifconfig-ipv6",
     "keepalive",
     "key-direction",
     "mute-replay-warnings",
