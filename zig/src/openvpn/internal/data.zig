@@ -34,7 +34,6 @@ pub const DataPathParameters = struct {
     compression_framing: api.OpenVPNCompressionFraming,
     compression_algorithm: api.OpenVPNCompressionAlgorithm,
     peer_id: ?u32,
-    mss: ?u16 = null,
 };
 
 pub const DataPathDecryptedAndParsedTuple = struct {
@@ -111,10 +110,6 @@ pub const DataPath = struct {
             .replay = c.openvpn_replay_create(),
         };
         return self;
-    }
-
-    pub fn setMss(self: *DataPath, mss: ?u16) void {
-        c.openvpn_dp_mode_set_mss(self.mode, mss orelse 0);
     }
 
     pub fn destroy(self: *const DataPath) void {
@@ -383,7 +378,6 @@ pub const DataPathWrapper = struct {
             mode,
             parameters.peer_id orelse c.OpenVPNPacketPeerIdDisabled,
         );
-        implementation.setMss(parameters.mss);
         return init(implementation);
     }
 
@@ -604,15 +598,5 @@ pub const testing = struct {
     ) !*DataPath {
         const mode = c.openvpn_dp_mode_ad_create_mock(c.OpenVPNCompressionFramingDisabled);
         return DataPath.create(allocator, mode, peer_id);
-    }
-
-    pub fn createMockDataPathWithMss(
-        allocator: std.mem.Allocator,
-        peer_id: u32,
-        mss: u16,
-    ) !*DataPath {
-        const data_path = try createMockDataPath(allocator, peer_id);
-        data_path.setMss(mss);
-        return data_path;
     }
 };

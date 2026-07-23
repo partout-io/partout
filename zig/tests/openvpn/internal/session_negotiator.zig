@@ -37,17 +37,6 @@ test "Negotiator declarations are semantically analyzed" {
     std.testing.refAllDecls(Negotiator);
 }
 
-test "MSS clamping is enabled only for UDP data channels" {
-    try std.testing.expectEqual(
-        @as(?u16, 1250),
-        session_negotiator.testing.dataPathMss(.udp),
-    );
-    try std.testing.expectEqual(
-        @as(?u16, null),
-        session_negotiator.testing.dataPathMss(.tcp),
-    );
-}
-
 test "early-negotiation TLV requests wrapped-key resend" {
     const payload = [_]u8{
         0x00, 0x01,

@@ -33,9 +33,6 @@ pub const Data = struct {
     /// Maximum pushed TUN MTU supported by the client. This matches the
     /// OpenVPN 2.6 default advertised through IV_MTU.
     pub const tun_max_mtu: u16 = 1600;
-    /// Conservative legacy clamp for TCP carried over an OpenVPN UDP link.
-    /// It leaves enough room for IPv4/IPv6, UDP, and data-channel overhead.
-    pub const udp_mss: u16 = 1250;
     pub const ping_string = [_]u8{
         0x2a, 0x18, 0x7b, 0xf3, 0x64, 0x1e, 0xb4, 0xcb,
         0x07, 0xed, 0x2d, 0x0a, 0x98, 0x1f, 0xc7, 0x48,

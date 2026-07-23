@@ -30,7 +30,6 @@ const ControlChannel = control_mod.ControlChannel(serialization_mod.Serializer);
 const ControlConstants = constants_mod.Control;
 const ControlPacket = packet_mod.ControlPacket;
 const DataChannel = data_mod.DataChannel;
-const DataConstants = constants_mod.Data;
 const DataPathParameters = data_mod.DataPathParameters;
 const DataPathWrapper = data_mod.DataPathWrapper;
 const LinkProcessor = processing_mod.LinkProcessor;
@@ -765,7 +764,6 @@ pub const Negotiator = struct {
             .compression_algorithm = push_reply.options.compression_algorithm orelse
                 configuration_mod.fallbackCompressionAlgorithm(self.options.configuration),
             .peer_id = push_reply.options.peer_id,
-            .mss = dataPathMss(self.remote_endpoint.plainSocketType()),
         };
         var prf = try PRF.init(
             self.allocator,
@@ -789,10 +787,6 @@ pub const Negotiator = struct {
         const wrapped = (self.options.configuration.tls_wrap orelse return 0)
             .wrapped_key orelse return 0;
         return std.base64.standard.Decoder.calcSizeForSlice(wrapped.base64) catch 0;
-    }
-
-    fn dataPathMss(socket_type: api.SocketType) ?u16 {
-        return if (socket_type == .udp) DataConstants.udp_mss else null;
     }
 
     fn elapsedMs(self: *const Negotiator) u64 {
@@ -899,9 +893,5 @@ pub const testing = struct {
 
     pub fn requestsWrappedKeyResend(payload: ?[]const u8) bool {
         return Negotiator.requestsWrappedKeyResend(payload);
-    }
-
-    pub fn dataPathMss(socket_type: api.SocketType) ?u16 {
-        return Negotiator.dataPathMss(socket_type);
     }
 };
