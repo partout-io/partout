@@ -87,6 +87,7 @@ test "Authenticator frames auth and buffers replies and messages" {
     const framed = auth_data.bytes;
     try std.testing.expectEqualSlices(u8, &ControlConstants.tls_prefix, framed[0..ControlConstants.tls_prefix.len]);
     try std.testing.expect(framed.len > ControlConstants.tls_prefix.len + Keys.pre_master_length + 2 * Keys.random_length);
+    try std.testing.expect(std.mem.indexOf(u8, framed, "IV_MTU=1600\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, framed, "IV_PLAT_VER=") != null);
 
     const server_options = "V4,cipher AES-256-GCM,auth SHA256\x00";

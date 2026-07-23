@@ -104,6 +104,7 @@ test "peer info has one trailing newline" {
         &.{"IV_CIPHERS=AES-256-GCM"},
     );
     defer std.testing.allocator.free(info);
+    try std.testing.expect(std.mem.indexOf(u8, info, "IV_MTU=1600\n") != null);
     try std.testing.expect(std.mem.endsWith(u8, info, "IV_CIPHERS=AES-256-GCM\n"));
     try std.testing.expect(!std.mem.endsWith(u8, info, "\n\n"));
 }

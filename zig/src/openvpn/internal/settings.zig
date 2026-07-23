@@ -125,10 +125,8 @@ pub const NetworkSettingsBuilder = struct {
             null;
         errdefer if (ipv6) |*settings| settings.deinit(allocator);
 
-        const mtu = if (self.local_options.mtu) |value|
-            if (value > 0) value else null
-        else
-            null;
+        const mtu = validMtu(self.remote_options.mtu) orelse
+            validMtu(self.local_options.mtu);
         if (ipv4 == null and ipv6 == null and mtu == null) return null;
 
         return .{
@@ -137,6 +135,11 @@ pub const NetworkSettingsBuilder = struct {
             .ipv6 = ipv6,
             .mtu = mtu,
         };
+    }
+
+    fn validMtu(mtu: ?i32) ?i32 {
+        const value = mtu orelse return null;
+        return if (value > 0) value else null;
     }
 
     fn ipSettings(

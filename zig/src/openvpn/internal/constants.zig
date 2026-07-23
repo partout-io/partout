@@ -30,6 +30,9 @@ pub const Data = struct {
     pub const prng_seed_length: usize = 64;
     pub const aead_tag_length: usize = 16;
     pub const aead_id_length: usize = c.OpenVPNPacketIdLength;
+    /// Maximum pushed TUN MTU supported by the client. This matches the
+    /// OpenVPN 2.6 default advertised through IV_MTU.
+    pub const tun_max_mtu: u16 = 1600;
     pub const ping_string = [_]u8{
         0x2a, 0x18, 0x7b, 0xf3, 0x64, 0x1e, 0xb4, 0xcb,
         0x07, 0xed, 0x2d, 0x0a, 0x98, 0x1f, 0xc7, 0x48,

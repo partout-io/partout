@@ -54,3 +54,40 @@ test "NetworkSettingsBuilder omits malformed proxy without discarding DNS" {
     try std.testing.expectEqual(@as(usize, 1), result.len);
     try std.testing.expect(result[0] == .DNS);
 }
+
+test "NetworkSettingsBuilder applies pushed MTU with local fallback" {
+    const allocator = std.testing.allocator;
+
+    {
+        const local = api.OpenVPNConfiguration{ .mtu = 1400 };
+        const remote = api.OpenVPNConfiguration{ .mtu = 1300 };
+        const builder = NetworkSettingsBuilder.init(&local, &remote);
+        const result = try builder.modules(allocator);
+        defer NetworkSettingsBuilder.deinitModules(allocator, result);
+
+        try std.testing.expectEqual(@as(usize, 1), result.len);
+        try std.testing.expectEqual(@as(?i32, 1300), result[0].IP.mtu);
+    }
+
+    {
+        const local = api.OpenVPNConfiguration{ .mtu = 1400 };
+        const remote = api.OpenVPNConfiguration{};
+        const builder = NetworkSettingsBuilder.init(&local, &remote);
+        const result = try builder.modules(allocator);
+        defer NetworkSettingsBuilder.deinitModules(allocator, result);
+
+        try std.testing.expectEqual(@as(usize, 1), result.len);
+        try std.testing.expectEqual(@as(?i32, 1400), result[0].IP.mtu);
+    }
+
+    {
+        const local = api.OpenVPNConfiguration{ .mtu = 1400 };
+        const remote = api.OpenVPNConfiguration{ .mtu = 0 };
+        const builder = NetworkSettingsBuilder.init(&local, &remote);
+        const result = try builder.modules(allocator);
+        defer NetworkSettingsBuilder.deinitModules(allocator, result);
+
+        try std.testing.expectEqual(@as(usize, 1), result.len);
+        try std.testing.expectEqual(@as(?i32, 1400), result[0].IP.mtu);
+    }
+}

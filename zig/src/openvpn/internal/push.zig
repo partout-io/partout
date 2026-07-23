@@ -6,9 +6,11 @@ const std = @import("std");
 const builtin = @import("builtin");
 const core_mod = @import("../../core/exports.zig");
 const parser_mod = @import("../parser.zig");
+const constants_mod = @import("constants.zig");
 
 const api = core_mod.api;
 
+const DataConstants = constants_mod.Data;
 const Parser = parser_mod.Parser;
 
 pub const PushReply = struct {
@@ -209,6 +211,10 @@ fn formatPeerInfoAlloc(
         .{ .name = "IV_UI_VER", .value = ui_version },
         .{ .name = "IV_PROTO", .value = "2" },
         .{ .name = "IV_NCP", .value = "2" },
+        .{
+            .name = "IV_MTU",
+            .value = std.fmt.comptimePrint("{d}", .{DataConstants.tun_max_mtu}),
+        },
         .{ .name = "IV_LZO_STUB", .value = "1" },
         .{ .name = "IV_LZO", .value = "0" },
         .{ .name = "IV_SSL", .value = ssl_version },
