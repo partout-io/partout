@@ -28,6 +28,7 @@ pub const net_sandbox = @import("net/sandbox.zig");
 pub const net_platform = @import("net/platform.zig");
 pub const net_platform_dns = @import("net/platform_dns.zig");
 pub const openvpn_enabled = build_options.openvpn;
+pub const openvpn_connection = if (openvpn_enabled) @import("openvpn/connection.zig") else struct {};
 pub const openvpn_exports = if (openvpn_enabled) @import("openvpn/exports.zig") else struct {};
 pub const openvpn_parser = if (openvpn_enabled) @import("openvpn/parser.zig") else struct {};
 pub const openvpn_serializer = if (openvpn_enabled) @import("openvpn/serializer.zig") else struct {};

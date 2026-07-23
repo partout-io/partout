@@ -139,6 +139,7 @@ pub const DaemonRuntime = struct {
                     .cancels_unrecoverable = true,
                     .min_data_count_delta = options.min_data_count_delta,
                     .events = self.events.interface(),
+                    .cache_dir = options.cache_dir,
                 },
             },
         );

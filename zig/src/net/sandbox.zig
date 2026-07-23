@@ -11,6 +11,7 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
+const looper = @import("looper.zig");
 const api = core.api;
 const TunWrapper = io.TunWrapper;
 
@@ -22,6 +23,12 @@ pub const Sandbox = struct {
     resolver: DNSResolver,
     factory: SocketFactory,
     monitor: NetworkMonitor,
+    /// Daemon-owned I/O loop dedicated to this connection. Protocols that do
+    /// not multiplex link and tunnel descriptors may ignore it.
+    looper: ?*looper.Looper = null,
+    /// Borrowed runtime cache directory. Connections that retain it must copy
+    /// it during creation.
+    cache_dir: []const u8 = "",
     /// Executes connection-owned work in the same serialized context as the
     /// connection lifecycle. The daemon supplies its actor-backed executor;
     /// direct users and tests default to immediate execution. The sandbox
@@ -178,7 +185,7 @@ pub const SocketFactory = struct {
             endpoint: api.ExtendedEndpoint,
             reachability: ?io.ReachabilityInfo,
             timeout: c_int,
-        ) Error!io.IOInterface,
+        ) Error!looper.Looper.Descriptor,
     };
 
     pub fn currentReachability(self: SocketFactory) ?io.ReachabilityInfo {
@@ -191,8 +198,18 @@ pub const SocketFactory = struct {
         endpoint: api.ExtendedEndpoint,
         reachability: ?io.ReachabilityInfo,
         timeout: u32,
-    ) Error!io.IOInterface {
-        return self.vtable.create(self.ptr, allocator, endpoint, reachability, timeout);
+    ) Error!looper.Looper.Descriptor {
+        const native_timeout: c_int = @intCast(@min(
+            timeout,
+            @as(u32, @intCast(std.math.maxInt(c_int))),
+        ));
+        return self.vtable.create(
+            self.ptr,
+            allocator,
+            endpoint,
+            reachability,
+            native_timeout,
+        );
     }
 };
 

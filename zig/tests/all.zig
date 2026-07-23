@@ -25,6 +25,7 @@ comptime {
     _ = @import("net/platform.zig");
     _ = @import("net/platform_dns.zig");
     if (source.openvpn_enabled) {
+        _ = @import("openvpn/connection.zig");
         _ = @import("openvpn/exports.zig");
         _ = @import("openvpn/internal/auth.zig");
         _ = @import("openvpn/internal/configuration.zig");

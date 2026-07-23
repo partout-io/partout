@@ -16,6 +16,10 @@ test "coarse failures map to ConnectionReporter categories" {
         errors.partoutCode(error.UnsupportedAlgorithm),
     );
     try std.testing.expectEqual(api.PartoutErrorCode.crypto, errors.partoutCode(error.CryptoFailure));
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.networkChanged,
+        errors.partoutCode(error.NetworkChanged),
+    );
     try std.testing.expectEqual(api.PartoutErrorCode.openVPNTLSFailure, errors.partoutCode(error.TLSFailure));
     try std.testing.expectEqual(
         api.PartoutErrorCode.openVPNCompressionMismatch,

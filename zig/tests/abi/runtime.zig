@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const source = @import("source");
 
-const core = @import("source").core;
-const conn = @import("source").net_connection;
-const net_daemon = @import("source").net_daemon;
-const helpers = @import("source").abi_helpers;
-const abi_runtime = @import("source").abi_runtime;
-const mock = @import("source").mock;
+const core = source.core;
+const conn = source.net_connection;
+const net_daemon = source.net_daemon;
+const helpers = source.abi_helpers;
+const abi_runtime = source.abi_runtime;
+const mock = source.mock;
 
 const api = core.api;
 const c = helpers.c;
@@ -77,6 +78,15 @@ test "daemon options default cache directory" {
 
 test "daemon options reject missing connection implementation" {
     const allocator = std.testing.allocator;
+    if (source.openvpn_enabled) {
+        var options = try abi_runtime.DaemonOptions.init(
+            allocator,
+            daemonStartArgs(mock.connectionProfileJson().ptr),
+            null,
+        );
+        defer options.deinit(allocator);
+        return;
+    }
     try std.testing.expectError(
         error.MissingConnectionImplementation,
         abi_runtime.DaemonOptions.init(

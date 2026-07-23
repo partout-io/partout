@@ -55,6 +55,7 @@
 //! [dep-tunnelblick-xor]: https://tunnelblick.net/cOpenvpn_xorpatch.html
 
 const std = @import("std");
+const build_options = @import("build_options");
 
 const connection = @import("connection.zig");
 const core = @import("../core/exports.zig");
@@ -70,12 +71,14 @@ pub const impl: proto.ModuleExports = .{
         .ptr = null,
         .vtable = &module_vtable,
     },
-    .connection = null,
-    // ZIGME: Implement OpenVPN connection
-    // .connection = if (build_options.openvpn) .{
-    //     .ptr = &Default.connection_context,
-    //     .vtable = &connection_vtable,
-    // } else null,
+    .connection = if (build_options.openvpn and connection.has_default_crypto_backend) .{
+        .ptr = &Default.connection_context,
+        .vtable = &connection_vtable,
+    } else null,
+};
+
+const Default = struct {
+    var connection_context: connection.ConnectionContext = .{};
 };
 
 const module_vtable: core.ModuleImplementation.VTable = .{
@@ -84,10 +87,10 @@ const module_vtable: core.ModuleImplementation.VTable = .{
     .serialize_module = serializer.serializeModule,
 };
 
-// const connection_vtable: net.ConnectionImplementation.VTable = .{
-//     .module_type = moduleType,
-//     .create_connection = connection.createConnection,
-// };
+const connection_vtable: net.ConnectionImplementation.VTable = .{
+    .module_type = moduleType,
+    .create_connection = connection.createConnection,
+};
 
 fn moduleType(_: ?*anyopaque) ModuleType {
     return .OpenVPN;

@@ -18,6 +18,16 @@ pub fn Actor(
     comptime Error: type,
     comptime handler: fn (*Context, Message) Error!void,
 ) type {
+    return ActorWithFinish(Context, Message, Error, handler, null);
+}
+
+pub fn ActorWithFinish(
+    comptime Context: type,
+    comptime Message: type,
+    comptime Error: type,
+    comptime handler: fn (*Context, Message) Error!void,
+    comptime on_finish: ?*const fn (*Context) void,
+) type {
     return struct {
         const Self = @This();
         const Command = union(enum) {
@@ -143,13 +153,18 @@ pub fn Actor(
             while (!job.done) {
                 self.cond.wait(&self.mutex);
             }
-            // Only after shutdown dispatch do we clean up
+            // Stop exposing the join handle, but retain the worker identity
+            // until its terminal callback has completed. This lets that
+            // callback perform nested actor work inline while shutdown joins.
             self.thread = null;
-            self.thread_id = null;
             self.mutex.unlock();
 
             // Wait for pending jobs
             thread.join();
+
+            self.mutex.lock();
+            self.thread_id = null;
+            self.mutex.unlock();
         }
 
         /// Pushes to the queue while inside the mutex.
@@ -181,6 +196,8 @@ pub fn Actor(
         }
 
         fn run(self: *Self) void {
+            defer if (on_finish) |callback| callback(self.context);
+
             self.mutex.lock();
             self.thread_id = std.Thread.getCurrentId();
             self.cond.broadcast();

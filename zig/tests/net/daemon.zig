@@ -238,22 +238,124 @@ test "connection daemon passes connection options into sandbox" {
         &controller,
         &events,
         &monitor,
-        .{ .connection_options = .{
-            .dns_timeout = 1234,
-            .link_activity_timeout = 2345,
-            .link_write_timeout = 3456,
-            .min_data_count_interval = 4567,
-            .user_info = .{ .bytes = "{\"source\":\"test\"}" },
-        } },
+        .{
+            .connection_options = .{
+                .dns_timeout = 1234,
+                .link_activity_timeout = 2345,
+                .link_write_timeout = 3456,
+                .min_data_count_interval = 4567,
+                .user_info = .{ .bytes = "{\"source\":\"test\"}" },
+            },
+            .cache_dir = "/tmp/openvpn-cache",
+        },
     );
     defer sut.deinit(allocator);
 
     const options = capture.options orelse return error.TestUnexpectedResult;
+    try std.testing.expect(capture.looper != null);
+    try std.testing.expect(capture.looper_ready);
+    try std.testing.expectEqualStrings(
+        "/tmp/openvpn-cache",
+        capture.cache_dir,
+    );
     try std.testing.expectEqual(@as(u32, 1234), options.dns_timeout);
     try std.testing.expectEqual(@as(u32, 2345), options.link_activity_timeout);
     try std.testing.expectEqual(@as(u32, 3456), options.link_write_timeout);
     try std.testing.expectEqual(@as(u32, 4567), options.min_data_count_interval);
     try std.testing.expectEqualStrings("{\"source\":\"test\"}", options.user_info.?.bytes);
+}
+
+test "connection daemon creation fails if looper finishes before connection creation" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var capture = SandboxCapture{ .stop_looper_during_create = true };
+    var implementations = [_]net.ConnectionImplementation{capture.implementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var events = mock.ConnectionEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{};
+
+    try std.testing.expectError(error.LooperFailure, newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{},
+    ));
+    try std.testing.expect(capture.looper_ready);
+    try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
+}
+
+test "connection daemon terminates when its owned looper finishes" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var capture = SandboxCapture{};
+    var implementations = [_]net.ConnectionImplementation{capture.implementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var events = mock.ConnectionEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{};
+    var sut = try newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{ .cancels_unrecoverable = false },
+    );
+    defer sut.deinit(allocator);
+
+    const looper = capture.looper orelse return error.TestUnexpectedResult;
+    try looper.stop();
+
+    // onLooperFinish synchronously routes terminal state through the actor
+    // before stop() returns.
+    try std.testing.expectError(error.AlreadyStarted, sut.start(allocator));
+    try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
+    try std.testing.expectEqual(@as(?api.PartoutErrorCode, null), controller.last_cancel_code);
+}
+
+test "connection daemon terminates when its actor finishes" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var implementations = [_]net.ConnectionImplementation{mock.mockConnectionImplementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var events = mock.ConnectionEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{};
+    var sut = try newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{ .cancels_unrecoverable = false },
+    );
+    defer sut.deinit(allocator);
+
+    try sut.start(allocator);
+    sut.actor.shutdown();
+
+    try std.testing.expectError(error.Closed, sut.start(allocator));
+    try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
+    try std.testing.expectEqual(@as(?api.PartoutErrorCode, null), controller.last_cancel_code);
+    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
+        .disconnected,
+        .connecting,
+        .connected,
+        .disconnecting,
+        .disconnected,
+    }, sut.testStatuses());
 }
 
 test "connection daemon connects when previously unreachable network becomes reachable" {
@@ -506,6 +608,10 @@ const DelayedConnection = struct {
 
 const SandboxCapture = struct {
     options: ?net.ConnectionOptions = null,
+    looper: ?*net.Looper = null,
+    looper_ready: bool = false,
+    stop_looper_during_create: bool = false,
+    cache_dir: []const u8 = "",
 
     fn implementation(self: *SandboxCapture) net.ConnectionImplementation {
         return .{
@@ -525,11 +631,26 @@ const SandboxCapture = struct {
         sandbox: net.Sandbox,
     ) net.ConnectionCreateError!net.Connection {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr.?));
+        const looper = sandbox.looper orelse return error.MissingConnectionImplementation;
         self.options = sandbox.options;
+        self.looper = looper;
+        self.looper_ready = looper.perform(
+            bool,
+            null,
+            confirmLooperReady,
+        ) catch false;
+        if (self.stop_looper_during_create) {
+            looper.stop() catch {};
+        }
+        self.cache_dir = sandbox.cache_dir;
         return .{
             .ptr = self,
             .vtable = &vtable,
         };
+    }
+
+    fn confirmLooperReady(_: ?*anyopaque) !bool {
+        return true;
     }
 
     fn start(_: *anyopaque, _: net.Connection.Events) net.ConnectionStartError!bool {

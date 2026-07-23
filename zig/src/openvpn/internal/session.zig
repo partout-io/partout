@@ -283,6 +283,8 @@ pub const Session = struct {
         self.lifecycle_lock.lock();
         defer self.lifecycle_lock.unlock();
         if (self.looper.isLinkAttached()) return;
+        var descriptor_transferred = false;
+        errdefer if (!descriptor_transferred) descriptor.io.cleanup();
 
         const processor = try LinkProcessor.create(
             self.allocator,
@@ -305,6 +307,7 @@ pub const Session = struct {
             .on_failure = .{ .context = self, .callback = onLinkFailure },
         });
         attached = true;
+        descriptor_transferred = true;
         var request = SetLinkRequest{
             .session = self,
             .remote_endpoint = remote_endpoint,

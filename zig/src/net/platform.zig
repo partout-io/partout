@@ -9,6 +9,7 @@ const platform_mod = @This();
 const c_mod = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
+const looper = @import("looper.zig");
 const platform_dns = @import("platform_dns.zig");
 const sandbox = @import("sandbox.zig");
 
@@ -390,7 +391,7 @@ fn socketFactoryCreate(
     endpoint: api.ExtendedEndpoint,
     reachability: ?ReachabilityInfo,
     timeout: c_int,
-) SocketFactory.Error!io.IOInterface {
+) SocketFactory.Error!looper.Looper.Descriptor {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     const effective_reachability = reachability orelse self.currentReachability();
 
@@ -400,7 +401,14 @@ fn socketFactoryCreate(
         self.socketOptions(endpoint, effective_reachability, timeout),
     ) orelse return error.LinkNotActive;
     log.writef(.debug, "PlatformSocketFactory: Created socket for {s}", .{endpoint.address});
-    return wrapper.nativeIO();
+    const fd = wrapper.muxDescriptor() orelse {
+        wrapper.nativeIO().cleanup();
+        return error.LinkNotActive;
+    };
+    return .{
+        .fd = fd,
+        .io = wrapper.nativeIO(),
+    };
 }
 
 //#endregion

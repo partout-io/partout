@@ -1107,6 +1107,14 @@ pub const Looper = struct {
         } else {
             log.writef(.info, "Finish looper", .{});
         }
+
+        // Session owners may react to OnFinish on another serialized
+        // executor and release descriptor storage immediately. Unpublish and
+        // clean both sides before that callback so their borrowed IO pointers
+        // are no longer in use.
+        self.lock.lock();
+        self.cleanupSidesLocked();
+        self.lock.unlock();
         self.options.on_finish.call(failure);
     }
 
@@ -1187,6 +1195,17 @@ pub const Looper = struct {
     /// Destroys every mux-owned resource. Caller must hold `lock` and the loop
     /// must either be the caller or have been joined.
     fn cleanupResourcesLocked(self: *Looper) void {
+        self.cleanupSidesLocked();
+        if (self.fd_set) |*fd_set| {
+            fd_set.deinit();
+            self.fd_set = null;
+        }
+        c.pp_mux_free(self.mux);
+    }
+
+    /// Caller must hold `lock`, and the worker must be the only thread still
+    /// processing descriptor state.
+    fn cleanupSidesLocked(self: *Looper) void {
         if (self.link != null) {
             const side_io = self.takeSideIOLocked(.link).?;
             self.destroyDetachedSideIOLocked(side_io);
@@ -1195,11 +1214,6 @@ pub const Looper = struct {
             const side_io = self.takeSideIOLocked(.tun).?;
             self.destroyDetachedSideIOLocked(side_io);
         }
-        if (self.fd_set) |*fd_set| {
-            fd_set.deinit();
-            self.fd_set = null;
-        }
-        c.pp_mux_free(self.mux);
     }
 
     fn sideIO(self: *const Looper, side: io.Side) ?*SideIO {

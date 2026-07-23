@@ -9,6 +9,7 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
+const looper = @import("looper.zig");
 const platform = @import("sandbox.zig");
 const api = core.api;
 
@@ -173,6 +174,9 @@ pub const Connection = struct {
         network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) void,
         better_path: *const fn (*anyopaque, Events) void,
         deinit: *const fn (*anyopaque, std.mem.Allocator) void,
+        /// Called synchronously from the daemon-owned looper's terminal
+        /// callback. Most protocols can leave this unset.
+        looper_finish: ?*const fn (*anyopaque, ?looper.Looper.Failure) void = null,
     };
 
     pub fn start(self: Connection, events: Events) StartError!bool {
@@ -198,6 +202,14 @@ pub const Connection = struct {
 
     pub fn betterPath(self: Connection, events: Events) void {
         self.vtable.better_path(self.ptr, events);
+    }
+
+    pub fn looperDidFinish(
+        self: Connection,
+        failure: ?looper.Looper.Failure,
+    ) void {
+        const block = self.vtable.looper_finish orelse return;
+        block(self.ptr, failure);
     }
 
     pub fn deinit(self: Connection, allocator: std.mem.Allocator) void {

@@ -243,7 +243,7 @@ pub const TunWrapper = struct {
         return c.pp_tun_open(c_uuid.ptr());
     }
 
-    pub fn nativeIO(self: *const TunWrapper) IOInterface {
+    pub fn nativeIO(self: *TunWrapper) IOInterface {
         return .{
             .ptr = self,
             .vtable = &tun_vtable,

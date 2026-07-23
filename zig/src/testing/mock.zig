@@ -85,6 +85,7 @@ pub const MockRuntime = struct {
                 error.InvalidJson, error.InvalidModel, error.UnsupportedModel => error.InvalidProfile,
                 error.AlreadyStarted => error.AlreadyStarted,
                 error.Closed => error.Closed,
+                error.LooperFailure => error.Closed,
                 error.MissingConnectionImplementation => error.MissingConnectionImplementation,
                 error.OutOfMemory => error.OutOfMemory,
             };
@@ -328,7 +329,7 @@ fn noopSocketFactoryCreate(
     _: api.ExtendedEndpoint,
     _: ?net_io.ReachabilityInfo,
     _: c_int,
-) net.SocketFactory.Error!net_io.IOInterface {
+) net.SocketFactory.Error!net.Looper.Descriptor {
     return error.LinkNotActive;
 }
 
