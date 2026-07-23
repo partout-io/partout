@@ -103,6 +103,7 @@ pub fn build(b: *std.Build) void {
 
     const check = b.step("check", "Check if partout compiles");
     check.dependOn(&lib.step);
+    b.default_step = check;
 
     const test_source_module = b.createModule(.{
         .root_source_file = b.path("src/testing.zig"),

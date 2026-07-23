@@ -3,9 +3,6 @@
   "zig.zls.enabled": "on",
   "zig.formattingProvider": "zls",
   "zig.buildOnSaveProvider": "zls",
-  "zig.buildOnSaveArgs": [
-    "check"
-  ],
   "[zig]": {
     "editor.defaultFormatter": "ziglang.vscode-zig",
     "editor.formatOnSave": true

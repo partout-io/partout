@@ -23,25 +23,6 @@
       }
     },
     {
-      "label": "zig build check",
-      "type": "shell",
-      "command": "zig",
-      "args": [
-        "build",
-        "check"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "group": "build",
-      "problemMatcher": "$zig",
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
       "label": "zig build coverage",
       "type": "shell",
       "command": "zig",
@@ -64,24 +45,5 @@
         "clear": true
       }
     },
-    {
-      "label": "zig build gen-api",
-      "type": "shell",
-      "command": "zig",
-      "args": [
-        "build",
-        "gen-api"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "group": "build",
-      "problemMatcher": "$zig",
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    }
   ]
 }
