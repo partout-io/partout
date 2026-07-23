@@ -634,7 +634,7 @@ pub const Looper = struct {
         self.lock.unlock();
 
         const processed_result = if (transform) |callback|
-            self.callTransform(callback, packets)
+            callTransform(callback, packets)
         else
             packets;
 
@@ -693,7 +693,7 @@ pub const Looper = struct {
         self.lock.unlock();
 
         const processed = if (transform) |callback|
-            self.callTransform(callback, packets) catch |err| {
+            callTransform(callback, packets) catch |err| {
                 log.writef(.err, "{} write transform failed: {}", .{
                     side,
                     err,
@@ -944,7 +944,7 @@ pub const Looper = struct {
                     },
                     else => return .{ .side_failure = .{
                         .side = side_io.side,
-                        .failure = self.ioFailure(side_io, err),
+                        .failure = side_io.ioFailure(err),
                     } },
                 }
             };
@@ -975,7 +975,7 @@ pub const Looper = struct {
                 if (err == error.WouldBlock) break;
                 return .{ .side_failure = .{
                     .side = side_io.side,
-                    .failure = self.ioFailure(side_io, err),
+                    .failure = side_io.ioFailure(err),
                 } };
             };
             if (maybe_count) |count| {
@@ -1145,18 +1145,15 @@ pub const Looper = struct {
     }
 
     fn callTransform(
-        self: *const Looper,
         transform: TransformWrite,
         packets: Packets,
     ) anyerror!Packets {
-        _ = self;
         borrowed_callback_depth += 1;
         defer borrowed_callback_depth -= 1;
         return transform.call(packets);
     }
 
-    fn callNativeCleanup(self: *const Looper, side_io: *SideIO) void {
-        _ = self;
+    fn callNativeCleanup(side_io: *SideIO) void {
         borrowed_callback_depth += 1;
         defer borrowed_callback_depth -= 1;
         side_io.cleanupNative();
@@ -1182,7 +1179,7 @@ pub const Looper = struct {
         side_io.transform_drainer.drain(&self.lock);
         const should_cleanup = side_io.detachFromMux(self.mux);
         self.lock.unlock();
-        if (should_cleanup) self.callNativeCleanup(side_io);
+        if (should_cleanup) callNativeCleanup(side_io);
         side_io.destroyStorage(self.allocator);
         self.lock.lock();
     }
@@ -1230,18 +1227,6 @@ pub const Looper = struct {
         const id = identity.id orelse return false;
         const side_io = self.sideIO(identity.side) orelse return true;
         return id != side_io.id;
-    }
-
-    fn ioFailure(self: *const Looper, side_io: *SideIO, cause: io.Error) Failure {
-        _ = self;
-        return .{ .io = .{
-            .side = side_io.side,
-            .cause = cause,
-            .code = if (cause == error.LibcFailure)
-                side_io.native_io.lastErrorCode()
-            else
-                null,
-        } };
     }
 
     fn pendingWrite(self: *Looper, side_io: *SideIO) ?queue_mod.PendingWrite {
@@ -1411,6 +1396,17 @@ pub const Looper = struct {
 
         fn cleanupNative(self: *const SideIO) void {
             self.native_io.cleanup();
+        }
+
+        fn ioFailure(self: *const SideIO, cause: io.Error) Failure {
+            return .{ .io = .{
+                .side = self.side,
+                .cause = cause,
+                .code = if (cause == error.LibcFailure)
+                    self.native_io.lastErrorCode()
+                else
+                    null,
+            } };
         }
     };
 
