@@ -150,6 +150,11 @@ void openvpn_dp_mode_set_peer_id(openvpn_dp_mode *mode, uint32_t peer_id) {
 }
 
 static inline
+void openvpn_dp_mode_set_mss(openvpn_dp_mode *mode, uint16_t mss) {
+    mode->opt.mss_val = mss;
+}
+
+static inline
 openvpn_compression_framing openvpn_dp_mode_framing(const openvpn_dp_mode *mode) {
     return mode->opt.comp_f;
 }

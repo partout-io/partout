@@ -11,6 +11,6 @@
 
 #pragma clang assume_nonnull begin
 
-void openvpn_mss_fix(uint8_t *data, size_t data_len, uint16_t mtu);
+void openvpn_mss_fix(uint8_t *data, size_t data_len, uint16_t mss);
 
 #pragma clang assume_nonnull end
