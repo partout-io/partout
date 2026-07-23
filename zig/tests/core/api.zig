@@ -400,7 +400,7 @@ test "encodes tagged module discriminators" {
     var profile = try api.Profile.parse(allocator, tagged_profile_json);
     defer profile.deinit(allocator);
 
-    const encoded = try util.encodeJsonValue(allocator, profile);
+    const encoded = try util.encodeJsonValue(allocator, &profile);
     defer allocator.free(encoded);
 
     try expectJsonContains(encoded, "\"type\":\"DNS\"");
@@ -446,11 +446,11 @@ test "round-trips tagged profiles" {
     try std.testing.expect(profile.behavior.?.disconnects_on_sleep);
     try std.testing.expectEqual(true, profile.behavior.?.includes_all_networks.?);
 
-    const encoded = try util.encodeJsonValue(allocator, profile);
+    const encoded = try util.encodeJsonValue(allocator, &profile);
     defer allocator.free(encoded);
     var decoded = try api.Profile.parse(allocator, encoded);
     defer decoded.deinit(allocator);
-    const reencoded = try util.encodeJsonValue(allocator, decoded);
+    const reencoded = try util.encodeJsonValue(allocator, &decoded);
     defer allocator.free(reencoded);
     try std.testing.expectEqualStrings(encoded, reencoded);
 }
@@ -529,13 +529,13 @@ fn expectRoundTrip(comptime T: type, json: []const u8) !void {
     var value = try parseFromJson(T, allocator, json);
     defer deinitParsed(T, allocator, &value);
 
-    const encoded = try util.encodeJsonValue(allocator, value);
+    const encoded = try util.encodeJsonValue(allocator, &value);
     defer allocator.free(encoded);
 
     var decoded = try parseFromJson(T, allocator, encoded);
     defer deinitParsed(T, allocator, &decoded);
 
-    const reencoded = try util.encodeJsonValue(allocator, decoded);
+    const reencoded = try util.encodeJsonValue(allocator, &decoded);
     defer allocator.free(reencoded);
     try std.testing.expectEqualStrings(encoded, reencoded);
 }
@@ -544,7 +544,7 @@ fn encodedFromJson(comptime T: type, json: []const u8) ![]u8 {
     const allocator = std.testing.allocator;
     var value = try parseFromJson(T, allocator, json);
     defer deinitParsed(T, allocator, &value);
-    return util.encodeJsonValue(allocator, value);
+    return util.encodeJsonValue(allocator, &value);
 }
 
 fn parseFromJson(comptime T: type, allocator: std.mem.Allocator, json: []const u8) !T {

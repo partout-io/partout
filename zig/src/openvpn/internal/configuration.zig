@@ -40,7 +40,7 @@ pub fn cipherEmbedsDigest(cipher: api.OpenVPNCipher) bool {
     };
 }
 
-pub fn fallbackCipher(configuration: api.OpenVPNConfiguration) api.OpenVPNCipher {
+pub fn fallbackCipher(configuration: *const api.OpenVPNConfiguration) api.OpenVPNCipher {
     if (configuration.cipher) |cipher| return cipher;
     if (configuration.data_ciphers) |ciphers| {
         if (ciphers.len > 0) return ciphers[0];
@@ -48,18 +48,18 @@ pub fn fallbackCipher(configuration: api.OpenVPNConfiguration) api.OpenVPNCipher
     return .aes128cbc;
 }
 
-pub fn fallbackDigest(configuration: api.OpenVPNConfiguration) api.OpenVPNDigest {
+pub fn fallbackDigest(configuration: *const api.OpenVPNConfiguration) api.OpenVPNDigest {
     return configuration.digest orelse .sha1;
 }
 
 pub fn fallbackCompressionFraming(
-    configuration: api.OpenVPNConfiguration,
+    configuration: *const api.OpenVPNConfiguration,
 ) api.OpenVPNCompressionFraming {
     return configuration.compression_framing orelse .disabled;
 }
 
 pub fn fallbackCompressionAlgorithm(
-    configuration: api.OpenVPNConfiguration,
+    configuration: *const api.OpenVPNConfiguration,
 ) api.OpenVPNCompressionAlgorithm {
     return configuration.compression_algorithm orelse .disabled;
 }
@@ -72,7 +72,7 @@ pub fn containsCipher(ciphers: []const api.OpenVPNCipher, wanted: api.OpenVPNCip
 /// it was not explicitly advertised, matching the Swift extension.
 pub fn negotiableDataCiphers(
     allocator: std.mem.Allocator,
-    configuration: api.OpenVPNConfiguration,
+    configuration: *const api.OpenVPNConfiguration,
 ) !?[]api.OpenVPNCipher {
     const advertised = configuration.data_ciphers orelse return null;
     if (advertised.len == 0) return null;
@@ -85,8 +85,8 @@ pub fn negotiableDataCiphers(
 }
 
 pub fn negotiatedDataChannelCipher(
-    configuration: api.OpenVPNConfiguration,
-    pushed: api.OpenVPNConfiguration,
+    configuration: *const api.OpenVPNConfiguration,
+    pushed: *const api.OpenVPNConfiguration,
     server_cipher: ?api.OpenVPNCipher,
 ) api.OpenVPNCipher {
     if (pushed.cipher) |cipher| return cipher;
@@ -101,7 +101,7 @@ pub fn negotiatedDataChannelCipher(
 /// Builds the legacy OCC/auth-options string sent during key-method-2 auth.
 pub fn localOptionsStringAlloc(
     allocator: std.mem.Allocator,
-    configuration: api.OpenVPNConfiguration,
+    configuration: *const api.OpenVPNConfiguration,
     with_local_options: bool,
 ) ![]u8 {
     if (!with_local_options) return allocator.dupe(u8, "V0 UNDEF");
@@ -129,7 +129,7 @@ pub fn localOptionsStringAlloc(
     return output.toOwnedSlice();
 }
 
-pub fn hasPullMask(configuration: api.OpenVPNConfiguration, mask: api.OpenVPNPullMask) bool {
+pub fn hasPullMask(configuration: *const api.OpenVPNConfiguration, mask: api.OpenVPNPullMask) bool {
     const masks = configuration.no_pull_mask orelse return false;
     return std.mem.indexOfScalar(api.OpenVPNPullMask, masks, mask) != null;
 }
@@ -177,7 +177,7 @@ pub fn endpointWithRandomPrefix(
 /// randomization and random hostname prefixes.
 pub fn processedRemotes(
     allocator: std.mem.Allocator,
-    configuration: api.OpenVPNConfiguration,
+    configuration: *const api.OpenVPNConfiguration,
     prng: PRNG,
 ) !?[]api.ExtendedEndpoint {
     const source = configuration.remotes orelse return null;

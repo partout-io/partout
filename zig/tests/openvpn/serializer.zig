@@ -62,7 +62,7 @@ test "OpenVPN serializer generates client configuration" {
         .xor_method = .{ .obfuscate = .{ .mask = mask } },
     };
 
-    const serialized = try serializer.serializeConfiguration(allocator, configuration);
+    const serialized = try serializer.serializeConfiguration(allocator, &configuration);
     defer allocator.free(serialized);
 
     try std.testing.expectEqualStrings(
@@ -130,7 +130,7 @@ test "OpenVPN module export serializes module configuration" {
     defer configuration.deinit(allocator);
 
     const module = api.TaggedModule{ .OpenVPN = .{ .configuration = configuration } };
-    const serialized = try source.openvpn_exports.impl.module.serializeModule(allocator, module, null);
+    const serialized = try source.openvpn_exports.impl.module.serializeModule(allocator, &module, null);
     defer allocator.free(serialized);
 
     try std.testing.expect(std.mem.startsWith(u8, serialized, "client\ndev tun\nnobind\npersist-key\npersist-tun\n"));
@@ -140,7 +140,7 @@ test "OpenVPN module export serializes module configuration" {
 
 test "OpenVPN serializer preserves legacy directive variants" {
     const allocator = std.testing.allocator;
-    const serialized = try serializer.serializeConfiguration(allocator, .{
+    const serialized = try serializer.serializeConfiguration(allocator, &.{
         .cipher = .aes128cbc,
         .compression_framing = .compLZO,
         .compression_algorithm = .disabled,
@@ -169,7 +169,7 @@ test "OpenVPN serializer round-trips static TLS keys through core SecureData" {
             .key = .{ .data = key_data, .dir = .client },
         },
     };
-    const serialized = try serializer.serializeConfiguration(allocator, configuration);
+    const serialized = try serializer.serializeConfiguration(allocator, &configuration);
     defer allocator.free(serialized);
 
     try std.testing.expect(std.mem.indexOf(u8, serialized, "key-direction 1") != null);
@@ -200,7 +200,7 @@ test "OpenVPN serializer round-trips tls-crypt-v2 keys" {
             .wrapped_key = wrapped_key,
         },
     };
-    const serialized = try serializer.serializeConfiguration(allocator, configuration);
+    const serialized = try serializer.serializeConfiguration(allocator, &configuration);
     defer allocator.free(serialized);
     try std.testing.expect(std.mem.indexOf(u8, serialized, "<tls-crypt-v2>\n-----BEGIN OpenVPN tls-crypt-v2 client key-----") != null);
 
@@ -218,14 +218,14 @@ test "OpenVPN serializer rejects unsupported static challenge and invalid masks"
     const allocator = std.testing.allocator;
     try std.testing.expectError(
         error.SerializationFailed,
-        serializer.serializeConfiguration(allocator, .{ .static_challenge = true }),
+        serializer.serializeConfiguration(allocator, &.{ .static_challenge = true }),
     );
 
     var invalid_utf8 = try api.SecureData.initBytesAlloc(allocator, &.{0xff});
     defer invalid_utf8.deinit(allocator);
     try std.testing.expectError(
         error.SerializationFailed,
-        serializer.serializeConfiguration(allocator, .{
+        serializer.serializeConfiguration(allocator, &.{
             .xor_method = .{ .xormask = .{ .mask = invalid_utf8 } },
         }),
     );

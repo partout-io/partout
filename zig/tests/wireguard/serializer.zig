@@ -28,7 +28,7 @@ test "WireGuard serializer generates wg-quick configuration" {
     );
     defer configuration.deinit(allocator);
 
-    const serialized = try serializer.serializeConfiguration(allocator, configuration);
+    const serialized = try serializer.serializeConfiguration(allocator, &configuration);
     defer allocator.free(serialized);
 
     try std.testing.expectEqualStrings(
@@ -63,7 +63,7 @@ test "WireGuard module export serializes module configuration" {
     defer configuration.deinit(allocator);
 
     const module = api.TaggedModule{ .WireGuard = .{ .configuration = configuration } };
-    const serialized = try source.wireguard_exports.impl.module.serializeModule(allocator, module, null);
+    const serialized = try source.wireguard_exports.impl.module.serializeModule(allocator, &module, null);
     defer allocator.free(serialized);
 
     try std.testing.expectEqualStrings(
@@ -76,7 +76,7 @@ test "WireGuard serializer validates required keys and DNS roles" {
     const allocator = std.testing.allocator;
     try std.testing.expectError(
         error.IncompleteModule,
-        serializer.serializeConfiguration(allocator, .{}),
+        serializer.serializeConfiguration(allocator, &.{}),
     );
 
     const invalid_dns = api.WireGuardConfiguration{ .interface = .{
@@ -87,7 +87,7 @@ test "WireGuard serializer validates required keys and DNS roles" {
     } };
     try std.testing.expectError(
         error.SerializationFailed,
-        serializer.serializeConfiguration(allocator, invalid_dns),
+        serializer.serializeConfiguration(allocator, &invalid_dns),
     );
 }
 
@@ -102,7 +102,7 @@ test "WireGuard serializer retains ListenPort and discards legacy DNS keys" {
     );
     defer configuration.deinit(allocator);
 
-    const serialized = try serializer.serializeConfiguration(allocator, configuration);
+    const serialized = try serializer.serializeConfiguration(allocator, &configuration);
     defer allocator.free(serialized);
     try std.testing.expect(std.mem.indexOf(u8, serialized, "ListenPort = 51820") != null);
     try std.testing.expect(std.mem.indexOf(u8, serialized, "DNSOverHTTPSURL") == null);

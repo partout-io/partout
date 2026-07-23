@@ -357,8 +357,8 @@ pub const Negotiator = struct {
         defer self.allocator.free(ca_md5);
         return PIAHardReset.init(
             ca_md5,
-            configuration_mod.fallbackCipher(self.options.configuration.*),
-            configuration_mod.fallbackDigest(self.options.configuration.*),
+            configuration_mod.fallbackCipher(self.options.configuration),
+            configuration_mod.fallbackDigest(self.options.configuration),
         ).encodedData(self.allocator, self.prng) catch null;
     }
 
@@ -510,7 +510,7 @@ pub const Negotiator = struct {
         );
         self.authenticator.?.with_local_options = self.options.with_local_options;
         const tls = self.tls orelse return error.Assertion;
-        try self.authenticator.?.putAuth(tls, self.options.configuration.*);
+        try self.authenticator.?.putAuth(tls, self.options.configuration);
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
             if (err == error.TLSFailure) return err;
             return;
@@ -634,15 +634,15 @@ pub const Negotiator = struct {
         const parameters = DataPathParameters{
             .fnt = self.fnt.enc,
             .cipher = configuration_mod.negotiatedDataChannelCipher(
-                self.options.configuration.*,
-                push_reply.options,
+                self.options.configuration,
+                &push_reply.options,
                 server_cipher,
             ),
-            .digest = configuration_mod.fallbackDigest(self.options.configuration.*),
+            .digest = configuration_mod.fallbackDigest(self.options.configuration),
             .compression_framing = push_reply.options.compression_framing orelse
-                configuration_mod.fallbackCompressionFraming(self.options.configuration.*),
+                configuration_mod.fallbackCompressionFraming(self.options.configuration),
             .compression_algorithm = push_reply.options.compression_algorithm orelse
-                configuration_mod.fallbackCompressionAlgorithm(self.options.configuration.*),
+                configuration_mod.fallbackCompressionAlgorithm(self.options.configuration),
             .peer_id = push_reply.options.peer_id,
         };
         var prf = try PRF.init(

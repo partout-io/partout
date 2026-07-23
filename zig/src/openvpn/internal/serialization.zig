@@ -38,7 +38,7 @@ pub const Serializer = union(enum) {
                 .auth => .{ .auth = try AuthSerializer.init(
                     allocator,
                     fnt,
-                    configuration_mod.fallbackDigest(configuration.*),
+                    configuration_mod.fallbackDigest(configuration),
                     wrap.key,
                 ) },
                 .crypt => .{ .crypt = try CryptSerializer.init(allocator, fnt, wrap.key) },

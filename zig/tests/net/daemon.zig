@@ -569,7 +569,7 @@ fn newDaemon(
 ) !*Daemon {
     var profile = try api.Profile.parse(allocator, profile_json);
     defer profile.deinit(allocator);
-    return try Daemon.create(allocator, profile, .{
+    return try Daemon.create(allocator, &profile, .{
         .objects = .{
             .registry = registry,
             .controller = controller.interface(),

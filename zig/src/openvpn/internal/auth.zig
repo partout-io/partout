@@ -320,7 +320,7 @@ pub const Authenticator = struct {
     pub fn putAuth(
         self: *Authenticator,
         tls: *TLSWrapper,
-        configuration: api.OpenVPNConfiguration,
+        configuration: *const api.OpenVPNConfiguration,
     ) !void {
         var raw = try self.authData(configuration);
         defer raw.deinit(self.allocator);
@@ -329,7 +329,7 @@ pub const Authenticator = struct {
 
     fn authData(
         self: *Authenticator,
-        configuration: api.OpenVPNConfiguration,
+        configuration: *const api.OpenVPNConfiguration,
     ) !ZeroingData {
         const allocator = self.allocator;
         var raw = try ZeroingData.initCopy(allocator, &ControlConstants.tls_prefix);
@@ -525,7 +525,7 @@ pub const testing = struct {
 
     pub fn authData(
         authenticator: *Authenticator,
-        configuration: api.OpenVPNConfiguration,
+        configuration: *const api.OpenVPNConfiguration,
     ) !ZeroingData {
         return authenticator.authData(configuration);
     }

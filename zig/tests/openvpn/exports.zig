@@ -35,7 +35,7 @@ test "OpenVPN module exports import tagged module" {
     try std.testing.expect(core.isGeneratedId(module_id[0..]));
     try std.testing.expect(!std.mem.eql(u8, module_id[0..], "openvpn"));
 
-    const encoded = try api.encodeModule(allocator, module);
+    const encoded = try api.encodeModule(allocator, &module);
     defer allocator.free(encoded);
 
     try std.testing.expect(std.mem.indexOf(u8, encoded, "\"type\":\"OpenVPN\"") != null);

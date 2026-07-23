@@ -13,7 +13,7 @@ pub const BuildConfigurationError = std.Io.Writer.Error || api.EncodeError;
 
 pub fn buildConfiguration(
     allocator: std.mem.Allocator,
-    configuration: api.WireGuardConfiguration,
+    configuration: *const api.WireGuardConfiguration,
     resolved_endpoints: []const resolver.ResolvedEndpoint,
 ) BuildConfigurationError![]u8 {
     var aw: std.Io.Writer.Allocating = .init(allocator);
@@ -28,7 +28,7 @@ pub fn buildConfiguration(
     }
     if (configuration.peers.len > 0) try writer.writeAll("replace_peers=true\n");
 
-    for (configuration.peers) |peer| {
+    for (configuration.peers) |*peer| {
         const public_key = try peer.public_key.hexAlloc(allocator);
         defer allocator.free(public_key);
         try writer.print("public_key={s}\n", .{public_key});
@@ -67,14 +67,14 @@ pub fn buildConfiguration(
 
 pub fn buildEndpointConfiguration(
     allocator: std.mem.Allocator,
-    configuration: api.WireGuardConfiguration,
+    configuration: *const api.WireGuardConfiguration,
     resolved_endpoints: []const resolver.ResolvedEndpoint,
 ) BuildConfigurationError![]u8 {
     var aw: std.Io.Writer.Allocating = .init(allocator);
     errdefer aw.deinit();
     const writer = &aw.writer;
 
-    for (configuration.peers) |peer| {
+    for (configuration.peers) |*peer| {
         const public_key = try peer.public_key.hexAlloc(allocator);
         defer allocator.free(public_key);
         try writer.print("public_key={s}\n", .{public_key});

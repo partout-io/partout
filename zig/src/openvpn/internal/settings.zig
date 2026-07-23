@@ -53,7 +53,7 @@ pub const NetworkSettingsBuilder = struct {
     }
 
     fn pulls(self: NetworkSettingsBuilder, mask: api.OpenVPNPullMask) bool {
-        return !configuration_mod.hasPullMask(self.local_options.*, mask);
+        return !configuration_mod.hasPullMask(self.local_options, mask);
     }
 
     fn routingPolicies(self: NetworkSettingsBuilder) ?[]const api.OpenVPNRoutingPolicy {

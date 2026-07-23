@@ -116,7 +116,7 @@ pub const ModuleImplementation = struct {
         serialize_module: ?*const fn (
             ?*anyopaque,
             std.mem.Allocator,
-            api.TaggedModule,
+            *const api.TaggedModule,
             ?*anyopaque,
         ) SerializeError![]u8 = null,
     };
@@ -147,10 +147,10 @@ pub const ModuleImplementation = struct {
     pub fn serializeModule(
         self: ModuleImplementation,
         allocator: std.mem.Allocator,
-        module: api.TaggedModule,
+        module: *const api.TaggedModule,
         object: ?*anyopaque,
     ) SerializeError![]u8 {
-        if (api.moduleType(&module) != self.moduleType()) return error.UnexpectedModuleType;
+        if (api.moduleType(module) != self.moduleType()) return error.UnexpectedModuleType;
         const serializer = self.vtable.serialize_module orelse return error.MissingModuleSerializer;
         return serializer(self.ptr, allocator, module, object);
     }
@@ -281,7 +281,7 @@ pub const Registry = struct {
             errdefer module.deinit(allocator);
 
             // Return profile with parsed module
-            return profileWithActiveModule(allocator, module, name);
+            return profileWithActiveModule(allocator, &module, name);
         };
         errdefer profile.deinit(allocator);
         try migrateProfileVersion(&profile);
@@ -304,7 +304,7 @@ pub const Registry = struct {
         errdefer module.deinit(allocator);
 
         // Valid module, return a profile with it
-        return profileWithActiveModule(allocator, module, name);
+        return profileWithActiveModule(allocator, &module, name);
     }
 
     /// Serializes a tagged module through the implementation registered for
@@ -312,10 +312,10 @@ pub const Registry = struct {
     pub fn serializeModule(
         self: Registry,
         allocator: std.mem.Allocator,
-        module: api.TaggedModule,
+        module: *const api.TaggedModule,
         object: ?*anyopaque,
     ) SerializeError![]u8 {
-        const impl = self.implementation(api.moduleType(&module)) orelse return error.MissingModuleSerializer;
+        const impl = self.implementation(api.moduleType(module)) orelse return error.MissingModuleSerializer;
         return impl.serializeModule(allocator, module, object);
     }
 };
@@ -343,10 +343,10 @@ fn implementationIndex(
 /// Builds a profile containing a single active module.
 fn profileWithActiveModule(
     allocator: std.mem.Allocator,
-    module: api.TaggedModule,
+    module: *const api.TaggedModule,
     name: ?[]const u8,
 ) ImportError!api.Profile {
-    const active_id = api.moduleId(&module);
+    const active_id = api.moduleId(module);
     const profile_id = try uuid.newId();
     const profile_name = try allocator.dupe(u8, name orelse "");
     errdefer allocator.free(profile_name);
@@ -354,12 +354,15 @@ fn profileWithActiveModule(
     // Make a list of 1 module
     const modules = try allocator.alloc(api.TaggedModule, 1);
     errdefer allocator.free(modules);
-    modules[0] = module;
-
     // Let the module be the only active one
     const active_modules_ids = try allocator.alloc(uuid.UUID, 1);
     errdefer allocator.free(active_modules_ids);
     active_modules_ids[0] = active_id;
+
+    // Transfer module ownership only after every allocation has succeeded.
+    // Both callers return immediately, so their errdefer only runs when this
+    // function fails before the transfer.
+    modules[0] = module.*;
 
     return .{
         .version = api.profile_version,

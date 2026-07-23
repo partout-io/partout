@@ -50,7 +50,7 @@ pub const DaemonOptions = struct {
         // Leave early if the active connection module has no runtime
         // implementation. A protocol may be built for parsing and
         // serialization while its connection implementation is unavailable.
-        try validateSupportedImplementations(profile);
+        try validateSupportedImplementations(&profile);
 
         // Make deep copies of the other input
         const cache_dir = if (args.options.cache_dir) |value|
@@ -73,7 +73,7 @@ pub const DaemonOptions = struct {
         self.profile.deinit(allocator);
     }
 
-    fn validateSupportedImplementations(profile: api.Profile) RuntimeError!void {
+    fn validateSupportedImplementations(profile: *const api.Profile) RuntimeError!void {
         const module = api.findActiveConnectionModule(profile) orelse return;
         switch (api.moduleType(module)) {
             .OpenVPN => if (openvpn.impl.connection == null) return error.MissingConnectionImplementation,
@@ -125,7 +125,7 @@ pub const DaemonRuntime = struct {
         self.events = helpers.BoundDaemonEvents.init(bindings);
         self.daemon = try net.Daemon.create(
             allocator,
-            options.profile,
+            &options.profile,
             .{
                 .objects = .{
                     .registry = &self.registry,

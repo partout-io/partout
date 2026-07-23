@@ -85,7 +85,7 @@ test "Authenticator frames auth and buffers replies and messages" {
     var authenticator = try Authenticator.init(allocator, .{ .fill_fn = FixedPRNG.fill }, "user", "password");
     defer authenticator.deinit();
     const ciphers = [_]api.OpenVPNCipher{.aes256gcm};
-    var auth_data = try auth.testing.authData(&authenticator, .{
+    var auth_data = try auth.testing.authData(&authenticator, &.{
         .cipher = .aes256gcm,
         .data_ciphers = &ciphers,
         .digest = .sha256,

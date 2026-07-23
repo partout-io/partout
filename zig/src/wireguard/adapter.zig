@@ -44,8 +44,8 @@ pub const WireGuardAdapter = struct {
     module_id: api.UUID,
     backend: impl.Backend,
     controller: net.TunnelController,
-    profile: api.Profile,
-    configuration: api.WireGuardConfiguration,
+    profile: *const api.Profile,
+    configuration: *const api.WireGuardConfiguration,
     endpoint_resolver: PeerEndpointResolver,
     network_change_behavior: NetworkChangeBehavior,
     state: State = .stopped,
@@ -88,8 +88,8 @@ pub const WireGuardAdapter = struct {
         controller: net.TunnelController,
         dns_resolver: net.DNSResolver,
         factory: net.SocketFactory,
-        profile: api.Profile,
-        configuration: api.WireGuardConfiguration,
+        profile: *const api.Profile,
+        configuration: *const api.WireGuardConfiguration,
         dns_timeout_ms: u32,
     ) WireGuardAdapter {
         return .{
@@ -403,7 +403,7 @@ pub const WireGuardAdapter = struct {
 
 fn buildConfiguration(
     allocator: std.mem.Allocator,
-    configuration: api.WireGuardConfiguration,
+    configuration: *const api.WireGuardConfiguration,
     endpoint_resolver: *PeerEndpointResolver,
     scope: WireGuardAdapter.ConfigurationScope,
 ) WireGuardAdapter.BuildConfigurationError![]u8 {
@@ -427,7 +427,7 @@ pub const testing = struct {
 
     pub fn buildUapiConfiguration(
         allocator: std.mem.Allocator,
-        configuration: api.WireGuardConfiguration,
+        configuration: *const api.WireGuardConfiguration,
         dns_resolver: net.DNSResolver,
     ) WireGuardAdapter.BuildConfigurationError![]u8 {
         var endpoint_resolver = PeerEndpointResolver.init(

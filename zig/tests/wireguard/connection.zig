@@ -35,7 +35,7 @@ test "WireGuard connection builds UAPI configuration" {
     defer configuration.deinit(allocator);
     const configuration_text = try adapter.testing.buildUapiConfiguration(
         allocator,
-        configuration,
+        &configuration,
         mock.noopDNSResolver(),
     );
     defer allocator.free(configuration_text);
@@ -57,7 +57,7 @@ test "WireGuard connection builds tunnel info with IP and DNS modules" {
         \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
     );
     defer profile.deinit(allocator);
-    const conn_module = conn.activeConnectionModule(profile) orelse return error.TestUnexpectedResult;
+    const conn_module = conn.activeConnectionModule(&profile) orelse return error.TestUnexpectedResult;
     const configuration = switch (conn_module.module.*) {
         .WireGuard => |wg| wg.configuration,
         else => unreachable,
@@ -66,9 +66,9 @@ test "WireGuard connection builds tunnel info with IP and DNS modules" {
     // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
     var info = try tunnel_info.TunnelRemoteInfoBuilder.init(
         allocator,
-        profile,
+        &profile,
         conn_module.id(),
-        configuration.?,
+        &configuration.?,
     ).build();
     defer info.deinit(allocator);
 
@@ -133,8 +133,8 @@ test "WireGuard connection folds active IP and VPN DNS routes into every peer" {
     // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
     var merged = try connection.testing.configurationWithActiveModules(
         allocator,
-        source_configuration.?,
-        profile,
+        &source_configuration.?,
+        &profile,
     );
     defer merged.deinit(allocator);
 
@@ -188,7 +188,7 @@ test "WireGuard connection erases adapter activation errors at the generic bound
         \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
     );
     defer tagged.deinit(allocator);
-    const module = conn.activeConnectionModule(tagged) orelse return error.TestUnexpectedResult;
+    const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
         .controller = controller.controller(),
@@ -221,7 +221,7 @@ test "WireGuard connection starts and stops through backend and controller" {
         \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
     );
     defer tagged.deinit(allocator);
-    const module = conn.activeConnectionModule(tagged) orelse return error.TestUnexpectedResult;
+    const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
         .controller = controller.controller(),
@@ -273,7 +273,7 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
         \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
     );
     defer tagged.deinit(allocator);
-    const module = conn.activeConnectionModule(tagged) orelse return error.TestUnexpectedResult;
+    const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
         .controller = controller.controller(),
@@ -316,7 +316,7 @@ test "WireGuard DNS resolution bypasses the resolver for numeric endpoints" {
 
     const uapi_configuration = try adapter.testing.buildUapiConfiguration(
         allocator,
-        configuration,
+        &configuration,
         resolver.resolver(),
     );
     defer allocator.free(uapi_configuration);
@@ -338,7 +338,7 @@ test "WireGuard DNS resolution accepts peers without endpoints" {
 
     const uapi_configuration = try adapter.testing.buildUapiConfiguration(
         allocator,
-        configuration,
+        &configuration,
         resolver.resolver(),
     );
     defer allocator.free(uapi_configuration);
@@ -365,7 +365,7 @@ test "WireGuard resolves every peer hostname" {
 
     const uapi_configuration = try adapter.testing.buildUapiConfiguration(
         allocator,
-        configuration,
+        &configuration,
         resolver.resolver(),
     );
     defer allocator.free(uapi_configuration);
@@ -391,7 +391,7 @@ test "WireGuard delegates current-network address mapping to DNSResolver" {
 
     const configuration_text = try adapter.testing.buildUapiConfiguration(
         allocator,
-        configuration,
+        &configuration,
         resolver.resolver(),
     );
     defer allocator.free(configuration_text);
@@ -420,7 +420,7 @@ test "WireGuard connection handles network monitor events" {
         \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
     );
     defer tagged.deinit(allocator);
-    const module = conn.activeConnectionModule(tagged) orelse return error.TestUnexpectedResult;
+    const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
         .controller = controller.controller(),
@@ -493,7 +493,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
         \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
     );
     defer tagged.deinit(allocator);
-    const module = conn.activeConnectionModule(tagged) orelse return error.TestUnexpectedResult;
+    const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
         .controller = controller.controller(),

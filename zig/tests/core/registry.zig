@@ -235,7 +235,7 @@ test "registry reports missing module serializers" {
 
     try std.testing.expectError(
         error.MissingModuleSerializer,
-        registry.serializeModule(allocator, module, null),
+        registry.serializeModule(allocator, &module, null),
     );
 }
 
@@ -250,10 +250,10 @@ test "registry serializes modules through registered serializers" {
         fn serializeModule(
             _: ?*anyopaque,
             module_allocator: std.mem.Allocator,
-            module: api.TaggedModule,
+            module: *const api.TaggedModule,
             _: ?*anyopaque,
         ) SerializeError![]u8 {
-            if (api.moduleType(&module) != .DNS) return error.UnexpectedModuleType;
+            if (api.moduleType(module) != .DNS) return error.UnexpectedModuleType;
             return module_allocator.dupe(u8, "serialized dns");
         }
 
@@ -274,7 +274,7 @@ test "registry serializes modules through registered serializers" {
     );
     defer module.deinit(allocator);
 
-    const serialized = try registry.serializeModule(allocator, module, null);
+    const serialized = try registry.serializeModule(allocator, &module, null);
     defer allocator.free(serialized);
 
     try std.testing.expectEqualStrings("serialized dns", serialized);
@@ -497,7 +497,7 @@ test "registry wraps encoded tagged modules as profiles" {
     );
     defer module.deinit(allocator);
 
-    const module_json = try api.encodeModule(allocator, module);
+    const module_json = try api.encodeModule(allocator, &module);
     defer allocator.free(module_json);
     try std.testing.expect(std.mem.indexOf(u8, module_json, "\"type\":\"DNS\"") != null);
     const module_id = api.moduleId(&module);

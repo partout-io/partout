@@ -10,21 +10,26 @@ const api = core.api;
 pub fn serializeModule(
     _: ?*anyopaque,
     allocator: std.mem.Allocator,
-    module: api.TaggedModule,
+    module: *const api.TaggedModule,
     _: ?*anyopaque,
 ) core.SerializeError![]u8 {
-    const openvpn = switch (module) {
-        .OpenVPN => |value| value,
+    // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
+    const configuration = switch (module.*) {
+        .OpenVPN => |*openvpn| blk: {
+            const value = if (openvpn.configuration) |*configuration|
+                configuration
+            else
+                return error.IncompleteModule;
+            break :blk value;
+        },
         else => return error.UnexpectedModuleType,
     };
-    // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
-    const cfg = openvpn.configuration orelse return error.IncompleteModule;
-    return serializeConfiguration(allocator, cfg);
+    return serializeConfiguration(allocator, configuration);
 }
 
 pub fn serializeConfiguration(
     allocator: std.mem.Allocator,
-    configuration: api.OpenVPNConfiguration,
+    configuration: *const api.OpenVPNConfiguration,
 ) core.SerializeError![]u8 {
     if (configuration.static_challenge orelse false) return error.SerializationFailed;
 

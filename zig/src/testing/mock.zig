@@ -64,7 +64,7 @@ pub const MockRuntime = struct {
         };
         errdefer profile.deinit(allocator);
 
-        const new_daemon = net_daemon.Daemon.create(allocator, profile, .{
+        const new_daemon = net_daemon.Daemon.create(allocator, &profile, .{
             .objects = .{
                 .registry = runtime.connectionRegistry(),
                 .controller = runtime.tunnelController(),
@@ -452,7 +452,7 @@ const MockConnection = struct {
         const created = try allocator.create(MockConnection);
         errdefer allocator.destroy(created);
 
-        var tunnel_info = try buildTunnelInfo(allocator, parameters.profile.*, module);
+        var tunnel_info = try buildTunnelInfo(allocator, parameters.profile, module);
         errdefer tunnel_info.deinit(allocator);
 
         created.* = .{
@@ -520,12 +520,12 @@ fn deinit(ptr: *anyopaque, allocator: std.mem.Allocator) void {
 
 fn buildTunnelInfo(
     allocator: std.mem.Allocator,
-    profile: api.Profile,
+    profile: *const api.Profile,
     conn_module: net_conn.ConnectionModule,
 ) net_conn.CreateError!api.TunnelRemoteInfoWrapper {
     const modules = [_]api.TaggedModule{conn_module.module.*};
     const info = api.TunnelRemoteInfoWrapper{
-        .profile = profile,
+        .profile = profile.*,
         .original_module_id = conn_module.id(),
         .requires_virtual_device = true,
         .modules = &modules,
@@ -548,9 +548,9 @@ fn snapshotTunnelSettings(info: api.TunnelRemoteInfoWrapper) MockTunnelControlle
         .module_count = if (info.modules) |modules| modules.len else 0,
     };
     const modules = info.modules orelse return snapshot;
-    for (modules) |module| {
-        switch (module) {
-            .DNS => |dns| {
+    for (modules) |*module| {
+        switch (module.*) {
+            .DNS => |*dns| {
                 snapshot.has_dns_module = true;
                 snapshot.dns_server_count = dns.servers.len;
                 const count = @min(dns.servers.len, snapshot.dns_servers.len);
@@ -784,7 +784,7 @@ fn mockCreate(
     parameters: net_sandbox.Sandbox,
 ) net_conn.CreateError!net_conn.Connection {
     std.debug.assert(module.typeOf() == .OpenVPN);
-    std.debug.assert(api.hasConnection(parameters.profile.*));
+    std.debug.assert(api.hasConnection(parameters.profile));
     std.debug.assert(parameters.controller.ptr != null);
     std.debug.assert(parameters.monitor.ptr != null);
     var created = try allocator.create(DaemonMockConnection);
@@ -857,7 +857,7 @@ fn blockingCreate(
     parameters: net_sandbox.Sandbox,
 ) net_conn.CreateError!net_conn.Connection {
     std.debug.assert(module.typeOf() == .OpenVPN);
-    std.debug.assert(api.hasConnection(parameters.profile.*));
+    std.debug.assert(api.hasConnection(parameters.profile));
     const self: *BlockingStopConnection = @ptrCast(@alignCast(ptr.?));
     return self.asConnection();
 }
