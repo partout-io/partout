@@ -226,6 +226,7 @@ pub const Session = struct {
         if (self.looper.isOnQueue())
             @panic("Session.destroy() must run outside looper callbacks");
 
+        log.write(.debug, "Deinit OpenVPNSession");
         self.negotiation_timer.cancel();
         self.ping_timer.cancel();
 
@@ -282,7 +283,10 @@ pub const Session = struct {
         if (self.looper.isOnQueue()) return error.ReentrantCall;
         self.lifecycle_lock.lock();
         defer self.lifecycle_lock.unlock();
-        if (self.looper.isLinkAttached()) return;
+        if (self.looper.isLinkAttached()) {
+            log.write(.err, "Link interface already set");
+            return;
+        }
         var descriptor_transferred = false;
         errdefer if (!descriptor_transferred) descriptor.io.cleanup();
 
@@ -301,6 +305,7 @@ pub const Session = struct {
             }
         }
 
+        log.write(.info, "Attach LINK");
         try self.looper.attach(.{
             .pair = .{ .link = descriptor },
             .on_read = .{ .context = self, .callback = onLinkRead },
@@ -324,7 +329,15 @@ pub const Session = struct {
         if (self.looper.isOnQueue()) return error.ReentrantCall;
         self.lifecycle_lock.lock();
         defer self.lifecycle_lock.unlock();
-        if (!self.looper.isLinkAttached() or self.looper.isTunAttached()) return;
+        if (!self.looper.isLinkAttached()) {
+            log.write(.err, "Set link interface first");
+            return;
+        }
+        if (self.looper.isTunAttached()) {
+            log.write(.err, "Tunnel interface already set");
+            return;
+        }
+        log.write(.info, "Attach TUN");
         try self.looper.attach(.{
             .pair = .{ .tun = descriptor },
             .on_read = .{ .context = self, .callback = onTunnelRead },
@@ -365,6 +378,7 @@ pub const Session = struct {
             // A terminal looper has already serialized final state; its owner
             // routes `OnFinish` through `looperDidFinish` while Session lives.
             if (err == error.Cancelled or err == error.TerminalFailure) return;
+            log.writef(.err, "Unable to shut down session on looper queue: {}", .{err});
             return err;
         };
         if (!should_detach) return;
@@ -386,7 +400,7 @@ pub const Session = struct {
         request: ShutdownRequest,
     ) ShutdownActorError!void {
         self.shutdown(request.cause, request.timeout_ms) catch |err| {
-            log.writef(.err, "Unable to shut down OpenVPN session: {s}", .{@errorName(err)});
+            log.writef(.err, "Unable to shut down session on looper queue: {}", .{err});
             return error.ShutdownFailure;
         };
     }
@@ -397,8 +411,12 @@ pub const Session = struct {
         std.debug.assert(self.looper.isOnQueue());
         const idle = switch (self.state) {
             .stopped => |context| context,
-            .active => return error.OperationCancelled,
+            .active => {
+                log.write(.err, "Session is not stopped");
+                return error.OperationCancelled;
+            },
         };
+        log.write(.info, "Start VPN session");
         const processor = self.link_processor orelse return error.Assertion;
         const data_link = DataLink.init(
             self.allocator,
@@ -432,8 +450,19 @@ pub const Session = struct {
         const request: *ShutdownOnQueueRequest = @ptrCast(@alignCast(raw.?));
         const self = request.session;
         std.debug.assert(self.looper.isOnQueue());
-        const active = self.state.activeState() orelse return false;
-        if (active.phase == .stopping) return false;
+        const active = self.state.activeState() orelse {
+            log.write(.debug, "Ignore stop request, stopped or already stopping");
+            return false;
+        };
+        if (active.phase == .stopping) {
+            log.write(.debug, "Ignore stop request, stopped or already stopping");
+            return false;
+        }
+        if (request.cause) |cause| {
+            log.writef(.err, "Shut down with failure: {}", .{cause});
+        } else {
+            log.write(.info, "Shut down on request");
+        }
         active.phase = .stopping;
         self.negotiation_timer.cancel();
         self.ping_timer.cancel();
@@ -441,7 +470,9 @@ pub const Session = struct {
         const should_notify = request.cause == null;
         if (should_notify) self.sendExitPacketOnQueue(
             request.timeout_ms orelse self.options.write_timeout_ms,
-        ) catch {};
+        ) catch |err| {
+            log.writef(.err, "Unable to send exit packet: {}", .{err});
+        };
         return true;
     }
 
@@ -483,6 +514,20 @@ pub const Session = struct {
     /// while the Session is alive, and must stop forwarding before `destroy`.
     pub fn looperDidFinish(self: *Session, failure: ?net_mod.Looper.Failure) void {
         std.debug.assert(self.looper.isOnQueue());
+        if (failure) |value| switch (value) {
+            .user => |cause| log.writef(.err, "Session looper finished with error: {}", .{
+                cause,
+            }),
+            .io => |details| log.writef(.err, "Session looper finished with error: {}", .{
+                details.cause,
+            }),
+            .system => |cause| log.writef(.err, "Session looper finished with error: {}", .{
+                cause,
+            }),
+            .wait => |code| log.writef(.err, "Session looper finished with error: wait({d})", .{
+                code,
+            }),
+        };
         self.finishShutdown(if (failure) |value| failureError(value) else null);
     }
 
@@ -522,7 +567,10 @@ pub const Session = struct {
         std.debug.assert(self.looper.isOnQueue());
         const context = self.state.activeContext() orelse return;
         context.last_received_ns = core_mod.concurrency.monotonicNs();
-        var negotiator = context.currentNegotiator() orelse return error.Assertion;
+        var negotiator = context.currentNegotiator() orelse {
+            log.write(.fault, "No negotiator");
+            return error.Assertion;
+        };
         if (negotiator.shouldRenegotiate())
             negotiator = try self.startRenegotiationOnQueue(negotiator, .client);
 
@@ -530,21 +578,39 @@ pub const Session = struct {
             ControlConstants.number_of_keys;
         defer for (&grouped) |*list| list.deinit(self.allocator);
         for (packets) |packet| {
-            if (packet.len == 0) continue;
-            const code = PacketCode.fromRaw(packet[0] >> 3) orelse continue;
+            if (packet.len == 0) {
+                log.write(.err, "Dropped malformed packet (missing opcode)");
+                continue;
+            }
+            const code_value = packet[0] >> 3;
+            const code = PacketCode.fromRaw(code_value) orelse {
+                log.writef(.err, "Dropped malformed packet (unknown code: {d})", .{
+                    code_value,
+                });
+                continue;
+            };
             if (code == .dataV2) {
-                if (packet.len -| 1 < c.OpenVPNPacketPeerIdLength) continue;
+                if (packet.len -| 1 < c.OpenVPNPacketPeerIdLength) {
+                    log.write(.err, "Dropped malformed packet (missing peerId)");
+                    continue;
+                }
             }
 
             if (code == .dataV1 or code == .dataV2) {
                 const key = packet[0] & 0b111;
-                if (context.dataChannel(key) == null) continue;
+                if (context.dataChannel(key) == null) {
+                    log.writef(.err, "Data: Channel with key {d} not found", .{key});
+                    continue;
+                }
                 try grouped[key].append(self.allocator, packet);
                 continue;
             }
 
             try processDataPackets(context, &grouped);
-            var parsed = negotiator.readInboundPacket(packet, 0) catch continue;
+            var parsed = negotiator.readInboundPacket(packet, 0) catch |err| {
+                log.writef(.err, "Dropped malformed packet: {}", .{err});
+                continue;
+            };
             defer parsed.deinit();
             if (parsed.code == .ackV1) continue;
             switch (code) {
@@ -563,11 +629,21 @@ pub const Session = struct {
             }
             negotiator.sendAck(&parsed);
             const inbound = try negotiator.enqueueInboundPacket(parsed.move());
+            var inbound_ids: [ControlConstants.number_of_keys]u32 = undefined;
+            const inbound_count = @min(inbound.len, inbound_ids.len);
+            for (inbound[0..inbound_count], 0..) |owned, index|
+                inbound_ids[index] = owned.packetId();
+            log.writef(.debug, "Pending inbound queue: {any}", .{
+                inbound_ids[0..inbound_count],
+            });
             defer {
                 for (inbound) |*owned| owned.deinit();
                 self.allocator.free(inbound);
             }
-            for (inbound) |*owned| try negotiator.handleControlPacket(owned);
+            for (inbound) |*owned| {
+                log.writef(.debug, "Handle packet: {d}", .{owned.packetId()});
+                try negotiator.handleControlPacket(owned);
+            }
         }
         try processDataPackets(context, &grouped);
     }
@@ -595,6 +671,7 @@ pub const Session = struct {
     }
 
     fn startNegotiationOnQueue(self: *Session) !*Negotiator {
+        log.write(.info, "Start negotiation");
         const context = self.state.activeContext() orelse return error.Assertion;
         const tls = try TLSWrapper.create(self.allocator, TLSParameters{
             .fnt = self.fnt.tls,
@@ -626,7 +703,17 @@ pub const Session = struct {
         previous: *Negotiator,
         initiated_by: RenegotiationType,
     ) !*Negotiator {
-        if (previous.isRenegotiating()) return previous;
+        if (previous.isRenegotiating()) {
+            log.write(.err, "Renegotiation already in progress");
+            return previous;
+        }
+        log.write(
+            .notice,
+            if (initiated_by == .server)
+                "Renegotiation request from server"
+            else
+                "Renegotiation request from client",
+        );
         const context = self.state.activeContext() orelse return error.Assertion;
         const negotiator = try previous.forRenegotiation(initiated_by);
         context.addNegotiator(negotiator);
@@ -659,15 +746,21 @@ pub const Session = struct {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const active = self.state.activeState() orelse return error.Reconnect;
         const context = active.context;
+        log.writef(.info, "Negotiation succeeded, set key {d} as current", .{key});
         var reply = push_reply.clone(self.allocator) catch |err|
             return errors_mod.sessionError(err);
         var reply_transferred = false;
         errdefer if (!reply_transferred) reply.deinit(self.allocator);
+        log.writef(.info, "Replace key {d} with new data channel", .{
+            data_channel.key,
+        });
         context.setDataChannel(data_channel, key) catch |err|
             return errors_mod.sessionError(err);
         context.setPushReply(reply);
         reply_transferred = true;
         context.removeOldNegotiators();
+        context.logNegotiatorKeys();
+        context.logDataKeys();
         if (active.phase == .started) return;
         active.phase = .started;
         self.scheduleNextPing(context) catch |err|
@@ -720,6 +813,7 @@ pub const Session = struct {
     ) !void {
         const delay = self.keepAliveIntervalMs(context) orelse
             self.options.ping_timeout_check_interval_ms;
+        log.writef(.debug, "Schedule ping check after {d} milliseconds", .{delay});
         try self.ping_timer.init(delay, onPingTimer, self);
     }
 
@@ -735,10 +829,18 @@ pub const Session = struct {
 
     fn pingOnQueue(raw: ?*anyopaque) !void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        const context = self.state.activeContext() orelse return;
-        const pair = context.current_data_pair orelse return;
+        const context = self.state.activeContext() orelse {
+            log.write(.debug, "Ping cancelled, session stopped");
+            return;
+        };
+        const pair = context.current_data_pair orelse {
+            log.write(.debug, "Ping cancelled, no data link");
+            return;
+        };
+        log.write(.debug, "Run ping check");
         try self.checkPingTimeoutOnQueue(context);
         if (self.keepAliveIntervalMs(context) != null) {
+            log.write(.debug, "Send ping");
             const ping: []const u8 = &constants_mod.Data.ping_string;
             try pair.send(&.{ping}, null, null);
         }
@@ -783,9 +885,11 @@ pub const Session = struct {
         const context = self.state.activeContext() orelse return;
         if (context.remote_endpoint.plainSocketType() != .udp) return;
         const pair = context.current_data_pair orelse return;
+        log.write(.info, "Send OCCPacket exit");
         const exit = OCCPacket.exit.serialized();
         const packet: []const u8 = &exit;
         try pair.send(&.{packet}, null, timeout_ms);
+        log.write(.info, "Sent OCCPacket correctly");
     }
 
     fn dataChannelForKey(raw: ?*anyopaque, key: u8) ?*DataChannel {

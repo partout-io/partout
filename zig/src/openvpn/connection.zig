@@ -11,12 +11,14 @@ const net = @import("../net/exports.zig");
 const configuration_mod = @import("internal/configuration.zig");
 const crypto_mod = @import("internal/crypto.zig");
 const errors_mod = @import("internal/errors.zig");
+const logging_mod = @import("internal/logging.zig");
 const session_mod = @import("internal/session.zig");
 const settings_mod = @import("internal/settings.zig");
 
 const api = core.api;
 const c_crypto = c_exports.crypto;
 const log = core.logging;
+const openvpn_log = logging_mod;
 const ConnectionOptions = configuration_mod.ConnectionOptions;
 const NetworkSettingsBuilder = settings_mod.NetworkSettingsBuilder;
 const PRNG = crypto_mod.PRNG;
@@ -172,12 +174,12 @@ const OpenVPNConnection = struct {
             .endpoint_resolver = EndpointResolver.init(endpoints),
             .cache_dir = cache_dir,
         };
-        log.write(.notice, "OpenVPN: Using Zig connection");
+        log.write(.notice, "OpenVPN: Using v3 connection");
         return created.asConnection();
     }
 
     fn deinit(self: *OpenVPNConnection) void {
-        log.write(.debug, "OpenVPN: Deinit connection");
+        log.write(.debug, "Deinit _OpenVPNConnectionV3");
         if (self.current_session) |session| {
             session.setDelegate(null);
             session.destroy();
@@ -209,7 +211,7 @@ const OpenVPNConnection = struct {
         events: net.Connection.Events,
     ) net.ConnectionStartError!bool {
         if (self.status != .disconnected) {
-            log.writef(.err, "OpenVPN: Start ignored in status {s}", .{
+            log.writef(.err, "Ignore start, connection status {s} != .disconnected", .{
                 self.status.raw(),
             });
             return false;
@@ -233,9 +235,7 @@ const OpenVPNConnection = struct {
             self.cache_dir,
             self.session_options,
         ) catch |err| {
-            log.writef(.err, "OpenVPN: Unable to create session: {s}", .{
-                @errorName(err),
-            });
+            log.writef(.err, "OpenVPN: Unable to create session: {}", .{err});
             return error.UnableToStart;
         };
         session.setDelegate(self.sessionDelegate());
@@ -244,9 +244,7 @@ const OpenVPNConnection = struct {
 
         _ = self.sendStatus(.connecting, events);
         const descriptor = self.setupLink() catch |err| {
-            log.writef(.err, "OpenVPN: Unable to create link: {s}", .{
-                @errorName(err),
-            });
+            log.writef(.fault, "Unable to create link: {}", .{err});
             _ = self.sendStatus(.disconnected, events);
             session.setDelegate(null);
             session.shutdown(errors_mod.sessionError(err), null) catch {};
@@ -257,9 +255,7 @@ const OpenVPNConnection = struct {
             };
         };
         session.setLink(descriptor, self.current_endpoint.?) catch |err| {
-            log.writef(.err, "OpenVPN: Unable to attach link: {s}", .{
-                @errorName(err),
-            });
+            log.writef(.err, "OpenVPN: Unable to attach link: {}", .{err});
             _ = self.sendStatus(.disconnected, events);
             session.setDelegate(null);
             session.shutdown(err, null) catch {};
@@ -277,20 +273,23 @@ const OpenVPNConnection = struct {
     ) void {
         const session = self.current_session orelse return;
         if (self.status == .disconnected) {
-            log.write(.debug, "OpenVPN: Stop ignored, connection is disconnected");
+            log.write(.err, "Ignore stop, connection not started");
             return;
         }
 
         _ = self.sendStatus(.disconnecting, events);
+        log.write(.info, "User requested disconnection");
         // The generic Connection contract forbids callbacks after stop().
         // Removing the delegate also lets shutdown complete synchronously
         // without queueing a didStop event behind the daemon's stop message.
         session.setDelegate(null);
+        var graceful = true;
         session.shutdown(null, timeout_ms) catch |err| {
-            log.writef(.err, "OpenVPN: Unable to shut down session: {s}", .{
-                @errorName(err),
-            });
+            _ = err;
+            graceful = false;
+            log.write(.err, "Link shut down due to timeout");
         };
+        if (graceful) log.write(.notice, "Link shut down gracefully");
         self.discardQueuedEvents();
         self.clearTunnel();
         self.clearCurrentEndpoint();
@@ -314,11 +313,9 @@ const OpenVPNConnection = struct {
     ) void {
         const session = self.current_session orelse return;
         if (self.status == .disconnected or self.status == .disconnecting) return;
-        log.write(.notice, "OpenVPN: Better path available, reconnect session");
+        log.write(.notice, "Link has a better path, shut down session to reconnect");
         session.shutdown(error.NetworkChanged, null) catch |err| {
-            log.writef(.err, "OpenVPN: Better-path shutdown failed: {s}", .{
-                @errorName(err),
-            });
+            log.writef(.err, "OpenVPN: Better-path shutdown failed: {}", .{err});
         };
     }
 
@@ -333,7 +330,8 @@ const OpenVPNConnection = struct {
     fn setupLink(
         self: *OpenVPNConnection,
     ) (std.mem.Allocator.Error || error{ ExhaustedEndpoints, LinkNotActive })!net.Looper.Descriptor {
-        log.write(.notice, "OpenVPN: Cycle to next endpoint");
+        log.write(.notice, "Create new link");
+        log.write(.notice, "Cycle to next endpoint");
         const reachability = self.factory.currentReachability();
         const endpoint = try self.endpoint_resolver.next(
             self.allocator,
@@ -344,6 +342,7 @@ const OpenVPNConnection = struct {
 
         var owned_endpoint = try cloneEndpoint(self.allocator, endpoint);
         errdefer owned_endpoint.deinit(self.allocator);
+        logSensitiveEndpoint(.notice, "Connect to ", owned_endpoint);
         const descriptor = self.factory.create(
             self.allocator,
             owned_endpoint,
@@ -354,8 +353,9 @@ const OpenVPNConnection = struct {
             error.LinkNotActive => return error.LinkNotActive,
         };
         self.current_endpoint = owned_endpoint;
-        log.writef(.notice, "OpenVPN: Link is active ({s})", .{
-            self.current_endpoint.?.address,
+        log.write(.notice, "Link is active");
+        log.writef(.info, "Link type is {s}", .{
+            self.current_endpoint.?.proto.socket_type.raw(),
         });
         return descriptor;
     }
@@ -428,7 +428,7 @@ const OpenVPNConnection = struct {
             return;
         };
         if (event.session() != @as(*anyopaque, @ptrCast(current))) {
-            log.write(.debug, "OpenVPN: Ignore event from old session");
+            log.write(.info, "Ignoring delegate event from old session");
             return;
         }
         switch (event) {
@@ -440,6 +440,10 @@ const OpenVPNConnection = struct {
             .did_stop => |payload| self.handleDidStop(payload.cause),
             .did_update_data_count => |payload| {
                 if (self.status != .connected) return;
+                log.writef(.debug, "Updated data count: received={d}, sent={d}", .{
+                    payload.data_count.received,
+                    payload.data_count.sent,
+                });
                 const events = self.events orelse return;
                 events.data_count(events.ctx, payload.data_count);
             },
@@ -452,9 +456,16 @@ const OpenVPNConnection = struct {
         remote_endpoint: api.ExtendedEndpoint,
         remote_options: *const api.OpenVPNConfiguration,
     ) void {
-        log.writef(.notice, "OpenVPN: Session started with {s}", .{
-            remote_endpoint.address,
+        log.write(.notice, "Session did start");
+        openvpn_log.sensitiveString(.info, "\tEndpoint: ", remote_endpoint.address);
+        log.writef(.info, "\tProtocol: {s}:{d}", .{
+            remote_endpoint.proto.socket_type.raw(),
+            remote_endpoint.proto.port,
         });
+        log.write(.notice, "Local options:");
+        logConfiguration(&self.configuration, true);
+        log.write(.notice, "Remote options:");
+        logConfiguration(remote_options, false);
         const events = self.events orelse return;
 
         const builder = NetworkSettingsBuilder.init(
@@ -501,7 +512,7 @@ const OpenVPNConnection = struct {
             return;
         };
         if (self.sendStatus(.connected, events)) {
-            log.write(.notice, "OpenVPN: Tunnel interface is now UP");
+            log.write(.notice, "Tunnel interface is now UP");
         }
     }
 
@@ -510,7 +521,7 @@ const OpenVPNConnection = struct {
         session: *Session,
         code: api.PartoutErrorCode,
     ) void {
-        log.writef(.err, "OpenVPN: Unable to configure tunnel: {s}", .{
+        log.writef(.err, "Unable to start tunnel: {s}", .{
             code.raw(),
         });
         const events = self.events orelse return;
@@ -537,12 +548,12 @@ const OpenVPNConnection = struct {
 
         if (self.status == .disconnecting) return;
         if (cause) |err| {
-            log.writef(.err, "OpenVPN: Session stopped: {s}", .{
-                @errorName(err),
-            });
+            log.writef(.err, "Session did stop: {}", .{err});
             if (errors_mod.partoutCode(err)) |code| {
                 events.last_error(events.ctx, code);
                 if (!isRecoverable(err)) {
+                    log.write(.err, "Disconnection is not recoverable");
+                    log.writef(.info, "Report link failure: {}", .{err});
                     self.status = .disconnected;
                     self.events = null;
                     self.controller.setReasserting(false);
@@ -551,7 +562,7 @@ const OpenVPNConnection = struct {
                 }
             }
         } else {
-            log.write(.notice, "OpenVPN: Session stopped");
+            log.write(.notice, "Session did stop");
         }
         _ = self.sendStatus(.disconnected, events);
     }
@@ -562,12 +573,13 @@ const OpenVPNConnection = struct {
         events: net.Connection.Events,
     ) bool {
         if (!canChangeStatus(self.status, new_status)) {
-            log.writef(.err, "OpenVPN: Ignore status change {s} -> {s}", .{
+            log.writef(.err, "Ignore unexpected status change: {s} -> {s}", .{
                 self.status.raw(),
                 new_status.raw(),
             });
             return false;
         }
+        log.writef(.info, "Report link status: {s}", .{new_status.raw()});
         self.status = new_status;
         events.status(events.ctx, new_status);
         return true;
@@ -688,6 +700,231 @@ const session_delegate_vtable = SessionDelegate.VTable{
     .did_update_data_count = sessionDidUpdateDataCount,
 };
 
+fn logConfiguration(
+    configuration: *const api.OpenVPNConfiguration,
+    is_local: bool,
+) void {
+    if (is_local) {
+        if (configuration.remotes) |remotes| {
+            if (log.logsPrivateData()) {
+                log.writef(.notice, "\tRemotes: {any}", .{remotes});
+            } else {
+                log.writef(.notice, "\tRemotes: [<redacted> x {d}]", .{remotes.len});
+            }
+        }
+    } else {
+        logSensitiveValue("\tIPv4: ", configuration.ipv4);
+        logSensitiveValue("\tIPv6: ", configuration.ipv6);
+    }
+    if (configuration.routes4) |routes|
+        log.writef(.notice, "\tRoutes (IPv4): {any}", .{routes});
+    if (configuration.routes6) |routes|
+        log.writef(.notice, "\tRoutes (IPv6): {any}", .{routes});
+
+    if (configuration.cipher) |cipher| {
+        log.writef(.notice, "\tCipher: {s}", .{cipher.raw()});
+    } else if (is_local) {
+        log.writef(.notice, "\tCipher: {s}", .{
+            configuration_mod.fallbackCipher(configuration).raw(),
+        });
+    }
+    if (configuration.digest) |digest| {
+        log.writef(.notice, "\tDigest: {s}", .{digest.raw()});
+    } else if (is_local) {
+        log.writef(.notice, "\tDigest: {s}", .{
+            configuration_mod.fallbackDigest(configuration).raw(),
+        });
+    }
+    if (configuration.compression_framing) |framing| {
+        log.writef(.notice, "\tCompression framing: {s}", .{@tagName(framing)});
+    } else if (is_local) {
+        log.writef(.notice, "\tCompression framing: {s}", .{
+            @tagName(configuration_mod.fallbackCompressionFraming(configuration)),
+        });
+    }
+    if (configuration.compression_algorithm) |algorithm| {
+        log.writef(.notice, "\tCompression algorithm: {s}", .{@tagName(algorithm)});
+    } else if (is_local) {
+        log.writef(.notice, "\tCompression algorithm: {s}", .{
+            @tagName(configuration_mod.fallbackCompressionAlgorithm(configuration)),
+        });
+    }
+
+    if (is_local) {
+        log.writef(.notice, "\tUsername authentication: {}", .{
+            configuration.auth_user_pass orelse false,
+        });
+        log.writef(.notice, "\tStatic challenge: {}", .{
+            configuration.static_challenge orelse false,
+        });
+        log.write(
+            .notice,
+            if (configuration.client_certificate != null)
+                "\tClient verification: enabled"
+            else
+                "\tClient verification: disabled",
+        );
+        if (configuration.tls_wrap) |wrap| {
+            log.writef(.notice, "\tTLS wrapping: {s}", .{wrap.strategy.raw()});
+        } else {
+            log.write(.notice, "\tTLS wrapping: disabled");
+        }
+        if (configuration.tls_security_level) |level| {
+            log.writef(.notice, "\tTLS security level: {d}", .{level});
+        } else {
+            log.write(.notice, "\tTLS security level: default");
+        }
+    }
+
+    logPositiveSeconds(
+        "\tKeep-alive interval: ",
+        configuration.keep_alive_interval,
+        is_local,
+    );
+    logPositiveSeconds(
+        "\tKeep-alive timeout: ",
+        configuration.keep_alive_timeout,
+        is_local,
+    );
+    logPositiveSeconds(
+        "\tRenegotiation: ",
+        configuration.renegotiates_after,
+        is_local,
+    );
+    if (configuration.checks_eku orelse false) {
+        log.write(.notice, "\tServer EKU verification: enabled");
+    } else if (is_local) {
+        log.write(.notice, "\tServer EKU verification: disabled");
+    }
+    if (configuration.checks_san_host orelse false) {
+        if (configuration.san_host) |host| {
+            if (log.logsPrivateData()) {
+                log.writef(.notice, "\tHost SAN verification: enabled ({s})", .{host});
+            } else {
+                log.write(.notice, "\tHost SAN verification: enabled (<redacted>)");
+            }
+        } else {
+            log.write(.notice, "\tHost SAN verification: enabled (-)");
+        }
+    } else if (is_local) {
+        log.write(.notice, "\tHost SAN verification: disabled");
+    }
+
+    if (configuration.randomize_endpoint orelse false)
+        log.write(.notice, "\tRandomize endpoint: true");
+    if (configuration.randomize_hostnames orelse false)
+        log.write(.notice, "\tRandomize hostnames: true");
+
+    if (configuration.routing_policies) |policies| {
+        log.writef(.notice, "\tGateway: {any}", .{policies});
+    } else if (is_local) {
+        log.write(.notice, "\tGateway: not configured");
+    }
+
+    if (configuration.dns_servers) |servers| {
+        if (servers.len > 0) {
+            logSensitiveStrings(.notice, "\tDNS: ", servers);
+        } else if (is_local) {
+            log.write(.notice, "\tDNS: not configured");
+        }
+    } else if (is_local) {
+        log.write(.notice, "\tDNS: not configured");
+    }
+    if (configuration.dns_domain) |domain|
+        openvpn_log.sensitiveString(.notice, "\tDNS domain: ", domain);
+    if (configuration.search_domains) |domains| {
+        if (domains.len > 0)
+            logSensitiveStrings(.notice, "\tSearch domains: ", domains);
+    }
+
+    if (configuration.http_proxy) |proxy|
+        logSensitiveProxy(.notice, "\tHTTP proxy: ", proxy);
+    if (configuration.https_proxy) |proxy|
+        logSensitiveProxy(.notice, "\tHTTPS proxy: ", proxy);
+    if (configuration.proxy_auto_configuration_url) |url|
+        openvpn_log.sensitiveString(.notice, "\tPAC: ", url);
+    if (configuration.proxy_bypass_domains) |domains| {
+        if (domains.len > 0)
+            logSensitiveStrings(.notice, "\tProxy bypass domains: ", domains);
+    }
+
+    if (configuration.mtu) |mtu| {
+        log.writef(.notice, "\tMTU: {d}", .{mtu});
+    } else if (is_local) {
+        log.write(.notice, "\tMTU: default");
+    }
+    if (configuration.xor_method) |method|
+        log.writef(.notice, "\tXOR: {s}", .{@tagName(std.meta.activeTag(method))});
+    if (configuration.no_pull_mask) |mask|
+        log.writef(.notice, "\tNot pulled: {any}", .{mask});
+}
+
+fn logPositiveSeconds(
+    comptime prefix: []const u8,
+    value: ?f64,
+    print_never: bool,
+) void {
+    if (value) |seconds| {
+        if (seconds > 0) {
+            log.writef(.notice, prefix ++ "{d} seconds", .{seconds});
+            return;
+        }
+    }
+    if (print_never) log.write(.notice, prefix ++ "never");
+}
+
+fn logSensitiveValue(comptime prefix: []const u8, value: anytype) void {
+    if (value) |unwrapped| {
+        if (log.logsPrivateData()) {
+            log.writef(.notice, prefix ++ "{any}", .{unwrapped});
+        } else {
+            log.write(.notice, prefix ++ "<redacted>");
+        }
+    } else {
+        log.write(.notice, prefix ++ "not configured");
+    }
+}
+
+fn logSensitiveStrings(
+    level: core.logging.Level,
+    comptime prefix: []const u8,
+    values: []const []const u8,
+) void {
+    if (log.logsPrivateData()) {
+        log.writef(level, prefix ++ "{any}", .{values});
+    } else {
+        log.writef(level, prefix ++ "[<redacted> x {d}]", .{values.len});
+    }
+}
+
+fn logSensitiveProxy(
+    level: core.logging.Level,
+    comptime prefix: []const u8,
+    endpoint: api.Endpoint,
+) void {
+    if (log.logsPrivateData()) {
+        log.writef(level, prefix ++ "{s}:{d}", .{ endpoint.address, endpoint.port });
+    } else {
+        log.write(level, prefix ++ "<redacted>");
+    }
+}
+
+fn logSensitiveEndpoint(
+    level: core.logging.Level,
+    comptime prefix: []const u8,
+    endpoint: api.ExtendedEndpoint,
+) void {
+    if (log.logsPrivateData()) {
+        log.writef(level, prefix ++ "{s}:{s}:{d}", .{
+            endpoint.address,
+            endpoint.proto.socket_type.raw(),
+            endpoint.proto.port,
+        });
+    } else {
+        log.write(level, prefix ++ "<redacted>");
+    }
+}
+
 const EndpointResolver = struct {
     endpoints: []const api.ExtendedEndpoint,
     next_endpoint_index: usize = 0,
@@ -738,9 +975,9 @@ const EndpointResolver = struct {
                 error.ResolutionFailure,
                 error.Timeout,
                 => {
-                    log.writef(.err, "OpenVPN: Unable to resolve {s}: {s}", .{
+                    log.writef(.err, "OpenVPN: Unable to resolve {s}: {}", .{
                         source.address,
-                        @errorName(err),
+                        err,
                     });
                     continue;
                 },

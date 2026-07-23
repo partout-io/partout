@@ -13,6 +13,7 @@ const tls_mod = @import("tls.zig");
 
 const api = core_mod.api;
 const c_crypto = c_exports_mod.crypto;
+const log = core_mod.logging;
 
 const ControlConstants = constants_mod.Control;
 const CryptoKeys = crypto_mod.CryptoKeys;
@@ -324,6 +325,7 @@ pub const Authenticator = struct {
     ) !void {
         var raw = try self.authData(configuration);
         defer raw.deinit(self.allocator);
+        log.write(.info, "TLS.auth: Put plaintext");
         try tls.putRawPlainText(raw.bytes);
     }
 
@@ -345,6 +347,7 @@ pub const Authenticator = struct {
             self.with_local_options,
         );
         defer allocator.free(local_options);
+        log.writef(.info, "TLS.auth: Local options: {s}", .{local_options});
         var local_options_data = try ZeroingData.initString(allocator, local_options, true);
         defer local_options_data.deinit(allocator);
         try appendSized(&raw, allocator, local_options_data);
@@ -429,10 +432,17 @@ pub const Authenticator = struct {
         defer server_options_data.deinit(self.allocator);
         offset += options_length;
 
-        const parsed_options: ?ServerOCC = if (server_options_data.nullTerminatedString(0)) |value|
-            ServerOCC.parse(value)
-        else
-            null;
+        log.write(.info, "TLS.auth: Parsed server random");
+
+        const parsed_options: ?ServerOCC = if (server_options_data.nullTerminatedString(0)) |value| blk: {
+            log.writef(.info, "TLS.auth: Parsed server options (string): \"{s}\"", .{value});
+            const options = ServerOCC.parse(value);
+            log.writef(.info, "TLS.auth: Server options: cipher={s}, digest={s}", .{
+                if (options.cipher) |cipher| cipher.raw() else "nil",
+                if (options.digest) |digest| digest.raw() else "nil",
+            });
+            break :blk options;
+        } else null;
         try self.control_buffer.removePrefix(self.allocator, offset);
 
         if (self.server_random1) |*value| value.deinit(self.allocator);

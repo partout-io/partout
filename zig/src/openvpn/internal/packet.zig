@@ -4,12 +4,14 @@
 
 const std = @import("std");
 const c_exports_mod = @import("../../c/exports.zig");
+const core_mod = @import("../../core/exports.zig");
 const crypto_mod = @import("crypto.zig");
 const errors_mod = @import("errors.zig");
 const helpers_mod = @import("helpers.zig");
 
 const c = helpers_mod.c;
 const c_crypto = c_exports_mod.crypto;
+const log = core_mod.logging;
 
 const PRNG = crypto_mod.PRNG;
 const SerializeWithCrypto = @TypeOf(&c.openvpn_ctrl_serialize_auth);
@@ -268,7 +270,10 @@ const PIAHardReset = struct {
         allocator: std.mem.Allocator,
         prng: PRNG,
     ) ![]u8 {
-        if (!isASCII(self.ca_md5_digest)) return error.Assertion;
+        if (!isASCII(self.ca_md5_digest)) {
+            log.write(.fault, "Unable to encode string to ASCII");
+            return error.Assertion;
+        }
 
         const cipher_name = try lowerAlloc(allocator, self.cipher_name);
         defer allocator.free(cipher_name);

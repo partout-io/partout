@@ -58,6 +58,23 @@ test "PUSH_REPLY clone owns independent storage" {
     try std.testing.expect(reply.original.ptr != copy.original.ptr);
 }
 
+test "PUSH_REPLY log description strips auth-token values" {
+    const allocator = std.testing.allocator;
+    var reply = (try push.PushReply.parse(
+        allocator,
+        "PUSH_REPLY,ping 10,auth-token somethingsecret,cipher AES-256-GCM",
+    )).?;
+    defer reply.deinit(allocator);
+    const description = try reply.logDescriptionAlloc(allocator);
+    defer allocator.free(description);
+
+    try std.testing.expectEqualStrings(
+        "PUSH_REPLY,ping 10,auth-token,cipher AES-256-GCM",
+        description,
+    );
+    try std.testing.expect(std.mem.indexOf(u8, description, "somethingsecret") == null);
+}
+
 test "PUSH_REPLY signals a continuation fragment" {
     try std.testing.expectError(
         error.ContinuationPushReply,

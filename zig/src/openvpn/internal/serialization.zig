@@ -15,6 +15,7 @@ const packet_mod = @import("packet.zig");
 const api = core_mod.api;
 const c = helpers_mod.c;
 const c_crypto = c_exports_mod.crypto;
+const log = core_mod.logging;
 
 const BidirectionalState = helpers_mod.BidirectionalState;
 const ControlConstants = constants_mod.Control;
@@ -126,6 +127,10 @@ const PlainSerializer = struct {
         const code = PacketCode.fromRaw(data[offset] >> 3) orelse return error.UnknownCode;
         const key = data[offset] & 0b111;
         offset += c.OpenVPNPacketOpcodeLength;
+        log.writef(.info, "Control: Try read packet with code {s} and key {d}", .{
+            @tagName(code),
+            key,
+        });
 
         if (end - offset < c.OpenVPNPacketSessionIdLength) return error.MissingSessionId;
         const session_id = data[offset .. offset + c.OpenVPNPacketSessionIdLength];
@@ -282,7 +287,10 @@ const AuthSerializer = struct {
         if (!c_crypto.pp_crypto_verify(self.cbc, swapped.ptr, swapped.len, &native_error)) {
             return errors_mod.cryptoError(native_error);
         }
-        return self.plain.deserialize(allocator, swapped, self.auth_length, null);
+        return self.plain.deserialize(allocator, swapped, self.auth_length, null) catch |err| {
+            log.writef(.fault, "Control: Channel failure: {}", .{err});
+            return err;
+        };
     }
 };
 
@@ -434,7 +442,10 @@ const CryptSerializer = struct {
         std.debug.assert(total <= decrypted.len);
         if (total < decrypted.len) decrypted = try allocator.realloc(decrypted, total);
         defer allocator.free(decrypted);
-        return self.plain.deserialize(allocator, decrypted, 0, null);
+        return self.plain.deserialize(allocator, decrypted, 0, null) catch |err| {
+            log.writef(.fault, "Control: Channel failure: {}", .{err});
+            return err;
+        };
     }
 };
 

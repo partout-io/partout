@@ -56,7 +56,7 @@ pub fn sessionError(err: anyerror) SessionError {
         else => error.Reconnect,
     };
     if (result == error.Reconnect and err != error.Reconnect) {
-        log.writef(.err, "OpenVPN session will reconnect after: {s}", .{@errorName(err)});
+        log.writef(.err, "OpenVPN session will reconnect after: {}", .{err});
     }
     return result;
 }
