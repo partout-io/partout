@@ -12,7 +12,7 @@ const api = core_mod.api;
 const Parser = parser_mod.Parser;
 
 pub const PushReply = struct {
-    original: []u8,
+    original: []const u8,
     options: api.OpenVPNConfiguration,
 
     pub const prefix = "PUSH_REPLY,";
