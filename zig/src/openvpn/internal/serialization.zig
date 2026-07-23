@@ -41,7 +41,11 @@ pub const Serializer = union(enum) {
                     configuration_mod.fallbackDigest(configuration),
                     wrap.key,
                 ) },
-                .crypt => .{ .crypt = try CryptSerializer.init(allocator, fnt, wrap.key) },
+                .crypt => .{ .crypt = try CryptSerializer.init(
+                    allocator,
+                    fnt,
+                    wrap.key,
+                ) },
                 .cryptV2 => .{ .crypt_v2 = try CryptV2Serializer.init(
                     allocator,
                     fnt,
@@ -90,13 +94,6 @@ pub const Serializer = union(enum) {
             inline else => |*value| value.deserialize(allocator, data, start, end),
         };
     }
-};
-
-pub const testing = struct {
-    pub const Auth = AuthSerializer;
-    pub const Crypt = CryptSerializer;
-    pub const CryptV2 = CryptV2Serializer;
-    pub const Plain = PlainSerializer;
 };
 
 const PlainSerializer = struct {
@@ -453,3 +450,10 @@ fn unixSeconds() u32 {
     if (seconds <= 0) return 0;
     return @truncate(@as(u64, @intCast(seconds)));
 }
+
+pub const testing = struct {
+    pub const Auth = AuthSerializer;
+    pub const Crypt = CryptSerializer;
+    pub const CryptV2 = CryptV2Serializer;
+    pub const Plain = PlainSerializer;
+};
