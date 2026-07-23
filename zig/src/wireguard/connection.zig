@@ -103,13 +103,13 @@ const WireGuardConnection = struct {
             &created.configuration,
             sandbox.options.dns_timeout,
         );
-        log.writef(.notice, "WireGuard: Using v2-style connection for module {s}", .{module_id[0..]});
+        log.write(.notice, "WireGuard: Using v2 connection");
         return created.asConnection();
     }
 
     fn deinit(self: *WireGuardConnection) void {
         const allocator = self.allocator;
-        log.write(.debug, "WireGuard: Deinit connection");
+        log.write(.debug, "Deinit _WireGuardConnectionV2");
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
         self.data_count_timer.deinit();
@@ -136,18 +136,18 @@ const WireGuardConnection = struct {
             return false;
         }
 
-        log.write(.info, "WireGuard: Start tunnel");
+        log.write(.info, "Start tunnel");
         self.events = events;
         events.status(events.ctx, .connecting);
         errdefer events.status(events.ctx, .disconnected);
 
         self.adapter.start(allocator) catch |err| {
-            // Adapter activation errors are the local diagnostic signal. The
-            // generic connection contract deliberately exposes no WireGuard-
-            // specific categories, so log the concrete error before erasing it.
-            log.writef(.fault, "WireGuard: Unable to start adapter: {s}", .{@errorName(err)});
+            self.logStartError(err);
             return error.UnableToStart;
         };
+        log.writef(.info, "Tunnel interface is {s}", .{
+            self.adapter.interfaceName() orelse "unknown",
+        });
         events.status(events.ctx, .connected);
         self.reportDataCount(allocator, events);
         self.startDataCountTimer() catch |err| {
@@ -170,13 +170,14 @@ const WireGuardConnection = struct {
             return;
         }
 
-        log.write(.info, "WireGuard: Stop tunnel");
+        log.write(.info, "Stop tunnel");
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
         events.status(events.ctx, .disconnecting);
+        // The Zig adapter's stop path is intentionally infallible, so Swift's
+        // "Unable to stop WireGuard adapter" catch has no equivalent branch.
         self.adapter.stop(allocator);
         events.status(events.ctx, .disconnected);
-        log.write(.info, "WireGuard: Tunnel disconnected");
     }
 
     fn networkChange(
@@ -228,12 +229,16 @@ const WireGuardConnection = struct {
     }
 
     fn stopDataCountTimer(self: *WireGuardConnection) void {
+        const was_active = self.data_count_timer_active;
         self.data_count_timer_active = false;
         self.data_count_timer.cancel();
         // The raw callback only posts asynchronously, so waiting cannot
         // deadlock with the daemon actor. Once drained, a later start cannot
         // inherit a callback from the previous timer generation.
         self.data_count_timer.wait();
+        if (was_active) {
+            log.write(.debug, "Cancelled WireGuardConnection.dataCountTimer");
+        }
     }
 
     fn onDataCountTimer(ctx: ?*anyopaque) void {
@@ -257,7 +262,7 @@ const WireGuardConnection = struct {
     fn scheduleTemporaryShutdownRetry(self: *WireGuardConnection) void {
         // `.retry` is an authoritative adapter outcome. The connection owns
         // when to retry and does not inspect the adapter's internal state.
-        log.writef(.debug, "WireGuard: Retry backend restart in {} milliseconds", .{
+        log.writef(.debug, "Retry backend restart in {} milliseconds", .{
             self.temporary_shutdown_retry_delay_ms,
         });
         self.temporary_shutdown_retry_timer.init(
@@ -290,7 +295,49 @@ const WireGuardConnection = struct {
             .retry => self.scheduleTemporaryShutdownRetry(),
         }
     }
+
+    fn logStartError(self: *const WireGuardConnection, err: WireGuardAdapter.ActivationError) void {
+        switch (err) {
+            error.CannotLocateTunnelFileDescriptor => {
+                log.write(.err, "Starting tunnel failed: could not determine file descriptor");
+            },
+            error.DNSResolutionFailure, error.InvalidEndpoint => {
+                logDNSResolutionFailures(self.adapter.failedEndpoints());
+            },
+            error.TunNotAvailable => {
+                log.writef(
+                    .err,
+                    "Starting tunnel failed with setTunnelNetworkSettings returning {s}",
+                    .{@errorName(err)},
+                );
+            },
+            error.CouldNotStartBackend => {
+                log.writef(
+                    .err,
+                    "Starting tunnel failed with wgTurnOn returning {}",
+                    .{self.adapter.lastBackendErrorCode() orelse -1},
+                );
+            },
+            else => {},
+        }
+    }
 };
+
+fn logDNSResolutionFailures(endpoints: []const api.Endpoint) void {
+    const allocator = std.heap.c_allocator;
+    var output: std.Io.Writer.Allocating = .init(allocator);
+    defer output.deinit();
+    const writer = &output.writer;
+    writer.writeAll("DNS resolution failed for the following hostnames: [") catch return;
+    for (endpoints, 0..) |endpoint, index| {
+        if (index > 0) writer.writeAll(", ") catch return;
+        writer.writeAll(if (log.logsPrivateData()) endpoint.address else "<redacted>") catch return;
+    }
+    writer.writeByte(']') catch return;
+    const message = output.toOwnedSlice() catch return;
+    defer allocator.free(message);
+    log.write(.err, message);
+}
 
 /// Swift's `Configuration.withModules(from:)` folds settings-only modules into
 /// WireGuard before building the backend and tunnel configurations. Every peer

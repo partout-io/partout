@@ -52,10 +52,11 @@ pub const WireGuardAdapter = struct {
     /// Latest reachability event, used only to gate background restart retries.
     last_reachable: ?bool = null,
     tunnel: ?net.TunWrapper = null,
+    last_backend_error_code: ?i32 = null,
 
     /// Concrete failures produced while activating the WireGuard tunnel.
-    /// The connection logs these locally before exposing only the generic
-    /// `UnableToStart` error through `net.Connection`.
+    /// The adapter logs the full error and the connection adds Swift-compatible
+    /// category details before exposing generic `UnableToStart`.
     pub const ActivationError = BuildConfigurationError ||
         TunnelRemoteInfoBuilder.Error ||
         net.TunnelController.Error ||
@@ -109,7 +110,8 @@ pub const WireGuardAdapter = struct {
     }
 
     pub fn deinit(self: *WireGuardAdapter, allocator: std.mem.Allocator) void {
-        self.stop(allocator);
+        log.write(.debug, "Deinit WireGuardAdapter");
+        if (!self.isStopped()) self.shutdown(allocator);
         self.endpoint_resolver.deinit(allocator);
     }
 
@@ -118,15 +120,19 @@ pub const WireGuardAdapter = struct {
         allocator: std.mem.Allocator,
     ) ActivationError!void {
         std.debug.assert(self.isStopped());
-        errdefer self.shutdown(allocator);
+        errdefer self.shutdownAfterStartFailure(allocator);
 
-        log.write(.info, "WireGuard: Start adapter");
-        try self.activate(allocator);
-        log.write(.info, "WireGuard: Tunnel connected");
+        log.write(.info, "Start adapter");
+        self.last_backend_error_code = null;
+        self.activate(allocator) catch |err| {
+            log.writef(.fault, "Unable to start: {s}", .{@errorName(err)});
+            return err;
+        };
     }
 
     pub fn stop(self: *WireGuardAdapter, allocator: std.mem.Allocator) void {
         if (self.isStopped()) return;
+        log.write(.info, "Stop adapter");
         self.shutdown(allocator);
     }
 
@@ -168,9 +174,8 @@ pub const WireGuardAdapter = struct {
         self: *WireGuardAdapter,
         remote_info: api.TunnelRemoteInfoWrapper,
     ) net.TunnelController.Error!void {
-        log.write(.debug, "WireGuard: Configure tunnel settings");
         const new_tunnel = self.controller.setTunnelSettings(remote_info) catch |err| {
-            log.writef(.err, "WireGuard: Unable to configure tunnel settings: {s}", .{@errorName(err)});
+            log.writef(.err, "Unable to configure tunnel settings: {s}", .{@errorName(err)});
             return err;
         };
 
@@ -179,46 +184,53 @@ pub const WireGuardAdapter = struct {
             old_tunnel.deinit();
         }
         self.tunnel = new_tunnel;
+        log.write(.info, "Tunnel interface is now UP");
         if (self.tunnel == null) {
             // This is expected on Windows: wg-go opens the adapter itself by
             // the interface name passed to `turnOn`. Other controllers may
             // still omit a native descriptor when no socket setup is needed.
-            log.write(.debug, "WireGuard: Tunnel controller did not return a native TUN");
             return;
         }
 
-        // Not all platforms supply an interface name for tun
-        if (self.interfaceName()) |name| {
-            log.writef(.info, "WireGuard: Tunnel interface is now UP ({s})", .{name});
-        } else {
-            log.write(.info, "WireGuard: Tunnel interface is now UP");
+        if (builtin.os.tag != .windows) {
+            if (self.tunnel.?.muxDescriptor()) |descriptor| {
+                log.writef(.debug, "Tunnel file descriptor: Optional({any})", .{descriptor});
+            } else {
+                log.write(.debug, "Tunnel file descriptor: nil");
+            }
         }
     }
 
-    fn interfaceName(self: *const WireGuardAdapter) ?[]const u8 {
+    pub fn interfaceName(self: *const WireGuardAdapter) ?[]const u8 {
+        if (builtin.os.tag == .windows) {
+            return self.module_id[0..];
+        }
         const tunnel = self.tunnel orelse return null;
         if (tunnel.tun == null) return null;
         return tunnel.name();
     }
 
+    pub fn failedEndpoints(self: *const WireGuardAdapter) []const api.Endpoint {
+        return self.endpoint_resolver.failedEndpoints();
+    }
+
+    pub fn lastBackendErrorCode(self: *const WireGuardAdapter) ?i32 {
+        return self.last_backend_error_code;
+    }
+
     fn startBackend(
-        self: *const WireGuardAdapter,
+        self: *WireGuardAdapter,
         allocator: std.mem.Allocator,
         wg_config: []const u8,
     ) StartBackendError!i32 {
-        log.write(.debug, "WireGuard: Start wg-go backend");
-        const handle = self.backend.turnOn(allocator, wg_config, .{
+        const handle = try self.backend.turnOn(allocator, wg_config, .{
             .tun = self.tunnel,
             .ifname = self.module_id[0..],
-        }) catch |err| {
-            log.writef(.err, "WireGuard: Starting tunnel failed: {s}", .{@errorName(err)});
-            return err;
-        };
+        });
         if (handle < 0) {
-            log.writef(.err, "WireGuard: Starting tunnel failed with wgTurnOn returning {}", .{handle});
+            self.last_backend_error_code = handle;
             return error.CouldNotStartBackend;
         }
-        log.writef(.debug, "WireGuard: wg-go backend started with handle {}", .{handle});
         errdefer self.backend.turnOff(handle);
 
         if (builtin.os.tag == .ios) {
@@ -233,25 +245,17 @@ pub const WireGuardAdapter = struct {
         allocator: std.mem.Allocator,
         handle: i32,
     ) ConfigureSocketsError!void {
-        const descriptors = self.backend.socketDescriptors(allocator, handle) catch |err| {
-            log.writef(.err, "WireGuard: Unable to fetch backend socket descriptors: {s}", .{@errorName(err)});
-            return err;
-        };
+        const descriptors = try self.backend.socketDescriptors(allocator, handle);
         defer allocator.free(descriptors);
 
         if (descriptors.len == 0) {
             if (builtin.abi.isAndroid()) {
-                log.write(.fault, "WireGuard: Socket descriptors are empty");
-            } else {
-                log.write(.debug, "WireGuard: Backend returned no sockets to configure");
+                log.write(.fault, "Socket descriptors are empty");
             }
             return;
         }
-        log.writef(.info, "WireGuard: Configure {} backend sockets", .{descriptors.len});
-        self.controller.configureSockets(descriptors) catch |err| {
-            log.writef(.err, "WireGuard: Unable to configure backend sockets: {s}", .{@errorName(err)});
-            return err;
-        };
+        logSocketDescriptors(descriptors);
+        try self.controller.configureSockets(descriptors);
     }
 
     pub fn didUpdateReachable(
@@ -259,7 +263,7 @@ pub const WireGuardAdapter = struct {
         allocator: std.mem.Allocator,
         is_reachable: bool,
     ) NetworkChangeResult {
-        log.writef(.debug, "WireGuard: Network change detected, reachable: {}", .{is_reachable});
+        log.writef(.debug, "Network change detected, reachable: {}", .{is_reachable});
         self.last_reachable = is_reachable;
 
         switch (self.state) {
@@ -272,7 +276,7 @@ pub const WireGuardAdapter = struct {
                         self.refreshSockets(allocator, handle);
                     },
                     .suspend_backend_when_offline => if (!is_reachable) {
-                        log.write(.debug, "WireGuard: Connectivity offline, pausing backend");
+                        log.write(.debug, "Connectivity offline, pausing backend.");
                         self.state = .temporary_shutdown;
                         self.backend.turnOff(handle);
                     } else {
@@ -299,7 +303,7 @@ pub const WireGuardAdapter = struct {
             &self.endpoint_resolver,
             .endpoints,
         ) catch |err| {
-            log.writef(.err, "WireGuard: Unable to build peer endpoint update: {s}", .{@errorName(err)});
+            log.writef(.err, "Unable to resolve peer endpoints: {s}", .{@errorName(err)});
             return;
         };
         defer allocator.free(wg_config);
@@ -319,7 +323,7 @@ pub const WireGuardAdapter = struct {
     fn refreshSockets(self: *const WireGuardAdapter, allocator: std.mem.Allocator, handle: i32) void {
         self.backend.bumpSockets(handle, true);
         self.configureSockets(allocator, handle) catch |err| {
-            log.writef(.err, "WireGuard: Unable to configure sockets after network change: {s}", .{@errorName(err)});
+            log.writef(.err, "Unable to update reachability: {s}", .{@errorName(err)});
         };
     }
 
@@ -331,7 +335,7 @@ pub const WireGuardAdapter = struct {
             // Restart failure is transient state-machine work, not a new
             // connection error. Swift logs it and retries while the latest
             // reachability state remains up.
-            log.writef(.err, "WireGuard: Failed to restart backend: {s}", .{@errorName(err)});
+            log.writef(.err, "Failed to restart backend: {s}", .{@errorName(err)});
             return .retry;
         };
         return .resumed;
@@ -341,7 +345,7 @@ pub const WireGuardAdapter = struct {
         self: *WireGuardAdapter,
         allocator: std.mem.Allocator,
     ) ActivationError!void {
-        log.write(.debug, "WireGuard: Connectivity online, resuming backend");
+        log.write(.debug, "Connectivity online, resuming backend.");
         // Do not carry endpoint answers across an offline interval. Both the
         // hostname's A/AAAA set and the active network's DNS64 prefix may have
         // changed while the backend was down.
@@ -379,6 +383,17 @@ pub const WireGuardAdapter = struct {
         self.clearTunnel();
     }
 
+    fn shutdownAfterStartFailure(self: *WireGuardAdapter, allocator: std.mem.Allocator) void {
+        switch (self.state) {
+            .started => |handle| self.backend.turnOff(handle),
+            .stopped, .temporary_shutdown => {},
+        }
+        self.state = .stopped;
+        self.last_reachable = null;
+        self.endpoint_resolver.resetResolvedEndpoints(allocator);
+        self.clearTunnel();
+    }
+
     fn clearTunnel(self: *WireGuardAdapter) void {
         if (self.tunnel) |*tun| {
             tun.deinit();
@@ -400,6 +415,22 @@ pub const WireGuardAdapter = struct {
         return uapi.parseRuntimeDataCount(text);
     }
 };
+
+fn logSocketDescriptors(descriptors: []const net.SocketDescriptor) void {
+    const allocator = std.heap.c_allocator;
+    var output: std.Io.Writer.Allocating = .init(allocator);
+    defer output.deinit();
+    const writer = &output.writer;
+    writer.writeAll("Socket descriptors: [") catch return;
+    for (descriptors, 0..) |descriptor, index| {
+        if (index > 0) writer.writeAll(", ") catch return;
+        writer.print("{any}", .{descriptor}) catch return;
+    }
+    writer.writeByte(']') catch return;
+    const message = output.toOwnedSlice() catch return;
+    defer allocator.free(message);
+    log.write(.info, message);
+}
 
 fn buildConfiguration(
     allocator: std.mem.Allocator,

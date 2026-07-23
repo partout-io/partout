@@ -34,6 +34,7 @@ pub const PeerEndpointResolver = struct {
     factory: ?net.SocketFactory,
     timeout_ms: u32,
     cache: Cache = .{},
+    failed_endpoints: []const api.Endpoint = &.{},
 
     /// `null` means unresolved; a non-null empty slice is a valid result.
     const Cache = struct {
@@ -103,11 +104,21 @@ pub const PeerEndpointResolver = struct {
     }
 
     pub fn deinit(self: *PeerEndpointResolver, allocator: std.mem.Allocator) void {
+        self.clearFailedEndpoints(allocator);
         self.cache.deinit(allocator);
     }
 
     pub fn reset(self: *PeerEndpointResolver, allocator: std.mem.Allocator) void {
+        self.clearFailedEndpoints(allocator);
         self.cache.reset(allocator);
+    }
+
+    pub fn resetResolvedEndpoints(self: *PeerEndpointResolver, allocator: std.mem.Allocator) void {
+        self.cache.reset(allocator);
+    }
+
+    pub fn failedEndpoints(self: *const PeerEndpointResolver) []const api.Endpoint {
+        return self.failed_endpoints;
     }
 
     pub fn cacheAll(self: *PeerEndpointResolver, allocator: std.mem.Allocator) ResolutionError!void {
@@ -143,11 +154,13 @@ pub const PeerEndpointResolver = struct {
         flags: std.EnumSet(net.DNSResolver.Flag),
     ) ResolutionError!void {
         std.debug.assert(self.cache.value() == null);
+        self.clearFailedEndpoints(allocator);
 
         var entries = List.init(allocator);
         errdefer entries.deinit();
+        var failed: std.ArrayList(api.Endpoint) = .empty;
+        defer failed.deinit(allocator);
         const reachability = if (self.factory) |factory| factory.currentReachability() else null;
-        var failures: usize = 0;
 
         // ZIGME: Swift resolves peer hostnames concurrently with a task group.
         // This simpler loop makes DNS timeouts additive when several peers are
@@ -161,12 +174,12 @@ pub const PeerEndpointResolver = struct {
                 flags,
                 reachability,
             ) catch |err| {
-                log.writef(.err, "WireGuard: Failed to resolve endpoint {s}: {s}", .{
-                    endpoint.address,
+                log.writef(.err, "Failed to resolve endpoint {s}: {s}", .{
+                    if (log.logsPrivateData()) endpoint.address else "<redacted>",
                     @errorName(err),
                 });
                 if (err == error.OutOfMemory) return error.OutOfMemory;
-                failures += 1;
+                try failed.append(allocator, endpoint);
                 continue;
             };
             const target = base.clone(allocator) catch |err| {
@@ -179,7 +192,10 @@ pub const PeerEndpointResolver = struct {
                 .target = target,
             });
         }
-        if (failures > 0) return error.DNSResolutionFailure;
+        if (failed.items.len > 0) {
+            self.failed_endpoints = try failed.toOwnedSlice(allocator);
+            return error.DNSResolutionFailure;
+        }
 
         self.cache.setValue(try entries.toOwnedSlice());
     }
@@ -199,17 +215,16 @@ pub const PeerEndpointResolver = struct {
             ) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.NetworkUnreachable, error.ResolutionFailure, error.Timeout => fallback: {
-                    log.writef(.err, "WireGuard: Unable to remap endpoint {s}: {s}", .{
-                        entry.base.address,
-                        @errorName(err),
-                    });
+                    log.writef(.err, "Unable to re-resolve endpoint: {s}", .{@errorName(err)});
                     break :fallback try allocator.dupe(u8, entry.base.address);
                 },
             };
 
             const parsed = api.Address.parseRaw(mapped);
             if (parsed == null or !parsed.?.isIPAddress()) {
-                log.writef(.err, "WireGuard: Resolver returned invalid mapped address for {s}", .{entry.base.address});
+                log.writef(.err, "Unable to re-resolve endpoint: {s}", .{
+                    @errorName(error.InvalidEndpoint),
+                });
                 allocator.free(mapped);
                 mapped = try allocator.dupe(u8, entry.base.address);
             }
@@ -260,6 +275,14 @@ pub const PeerEndpointResolver = struct {
             .port = endpoint.port,
         }).clone(allocator);
     }
+
+    fn clearFailedEndpoints(
+        self: *PeerEndpointResolver,
+        allocator: std.mem.Allocator,
+    ) void {
+        if (self.failed_endpoints.len > 0) allocator.free(self.failed_endpoints);
+        self.failed_endpoints = &.{};
+    }
 };
 
 fn preferredAddress(records: []const net.DNSRecord) ?[]const u8 {
@@ -277,8 +300,8 @@ fn preferredAddress(records: []const net.DNSRecord) ?[]const u8 {
 
 fn logMapping(source: []const u8, target: []const u8) void {
     if (std.mem.eql(u8, source, target)) {
-        log.writef(.debug, "WireGuard: DNS64 mapped {s} to itself", .{source});
+        log.writef(.debug, "DNS64: mapped {s} to itself.", .{source});
     } else {
-        log.writef(.debug, "WireGuard: DNS64 mapped {s} to {s}", .{ source, target });
+        log.writef(.debug, "DNS64: mapped {s} to {s}", .{ source, target });
     }
 }

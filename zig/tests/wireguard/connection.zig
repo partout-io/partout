@@ -301,6 +301,41 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
     try std.testing.expectEqual(@as(usize, 1), fake_backend.disable_roaming_count);
 }
 
+test "WireGuard connection retains failed endpoints for start diagnostics" {
+    const mock = @import("source").mock;
+    const allocator = std.testing.allocator;
+
+    var fake_backend = FakeBackend{};
+    defer fake_backend.deinit(allocator);
+    var context = ConnectionContext.init(fake_backend.backend());
+    var controller = FakeController{};
+    var resolver = FakeResolver{
+        .records = &.{},
+        .fail_resolution = true,
+    };
+    var recorder = EventRecorder{};
+    var tagged = try api.Profile.parse(allocator,
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
+        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"]},"peers":[{"publicKey":"BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw=","endpoint":"unresolved.example:51820","allowedIPs":["0.0.0.0/0"]}]}}}
+        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
+    );
+    defer tagged.deinit(allocator);
+    const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
+    const created = try connection.createConnection(&context, allocator, module, .{
+        .profile = &tagged,
+        .controller = controller.controller(),
+        .resolver = resolver.resolver(),
+        .factory = mock.noopSocketFactory(),
+        .monitor = mock.alwaysReachableMonitor(),
+    });
+    defer created.deinit(allocator);
+
+    try std.testing.expectError(error.UnableToStart, created.start(recorder.events()));
+    const failed = connection.testing.adapter(created).failedEndpoints();
+    try std.testing.expectEqual(@as(usize, 1), failed.len);
+    try std.testing.expectEqualStrings("unresolved.example", failed[0].address);
+}
+
 test "WireGuard DNS resolution bypasses the resolver for numeric endpoints" {
     const allocator = std.testing.allocator;
     var resolver = FakeResolver{ .records = &.{
@@ -615,6 +650,7 @@ const FakeResolver = struct {
 
     records: []const Record,
     mapped_address: ?[]const u8 = null,
+    fail_resolution: bool = false,
     resolve_count: usize = 0,
     resolve_address_count: usize = 0,
     last_hostname: ?[]const u8 = null,
@@ -643,6 +679,7 @@ fn fakeResolve(
     self.last_hostname = hostname;
     self.last_flags = flags;
     self.last_timeout_ms = timeout_ms;
+    if (self.fail_resolution) return error.ResolutionFailure;
 
     const records = try allocator.alloc(sandbox.DNSRecord, self.records.len);
     errdefer allocator.free(records);
