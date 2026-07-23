@@ -49,7 +49,7 @@ pub const ConnectionRegistry = struct {
         };
     }
 
-    pub fn deinit(self: *ConnectionRegistry, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const ConnectionRegistry, allocator: std.mem.Allocator) void {
         allocator.free(self.all_implementations);
     }
 

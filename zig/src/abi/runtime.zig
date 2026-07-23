@@ -68,7 +68,7 @@ pub const DaemonOptions = struct {
         };
     }
 
-    pub fn deinit(self: *DaemonOptions, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const DaemonOptions, allocator: std.mem.Allocator) void {
         allocator.free(self.cache_dir);
         self.profile.deinit(allocator);
     }
@@ -166,15 +166,15 @@ pub const DaemonRuntime = struct {
         allocator.destroy(self);
     }
 
-    pub fn start(self: *DaemonRuntime, allocator: std.mem.Allocator) RuntimeError!void {
+    pub fn start(self: *const DaemonRuntime, allocator: std.mem.Allocator) RuntimeError!void {
         return try self.daemon.start(allocator);
     }
 
-    pub fn hold(self: *DaemonRuntime) void {
+    pub fn hold(self: *const DaemonRuntime) void {
         self.daemon.hold();
     }
 
-    pub fn stop(self: *DaemonRuntime) void {
+    pub fn stop(self: *const DaemonRuntime) void {
         self.daemon.stop();
     }
 };

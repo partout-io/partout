@@ -29,7 +29,7 @@ pub const Importer = struct {
         };
     }
 
-    pub fn deinit(self: *Importer, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const Importer, allocator: std.mem.Allocator) void {
         self.registry.deinit(allocator);
     }
 

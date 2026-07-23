@@ -252,7 +252,7 @@ pub const Daemon = struct {
     }
 
     pub fn start(
-        self: *Daemon,
+        self: *const Daemon,
         allocator: std.mem.Allocator,
     ) Error!void {
         return self.actor.perform(.{ .start = .{
@@ -260,11 +260,11 @@ pub const Daemon = struct {
         } });
     }
 
-    pub fn hold(self: *Daemon) void {
+    pub fn hold(self: *const Daemon) void {
         self.actor.perform(.hold) catch return;
     }
 
-    pub fn stop(self: *Daemon) void {
+    pub fn stop(self: *const Daemon) void {
         self.actor.perform(.stop) catch return;
     }
 
@@ -633,7 +633,7 @@ pub const Daemon = struct {
     }
 
     fn handleConnectionBlock(
-        self: *Daemon,
+        self: *const Daemon,
         ptr: *anyopaque,
         block: sandbox.SerializedExecutor.Block,
     ) void {
@@ -653,7 +653,7 @@ pub const Daemon = struct {
         if (self.options.events) |e| e.status(e.ctx, status);
     }
 
-    fn emitRemove(self: *Daemon, key: conn_mod.Connection.EventKey) void {
+    fn emitRemove(self: *const Daemon, key: conn_mod.Connection.EventKey) void {
         if (self.options.events) |e| e.remove_key(e.ctx, key);
     }
 

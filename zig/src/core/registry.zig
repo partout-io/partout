@@ -189,7 +189,7 @@ pub const Registry = struct {
     }
 
     /// Releases memory allocated by `init`.
-    pub fn deinit(self: *Registry, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const Registry, allocator: std.mem.Allocator) void {
         allocator.free(self.all_implementations);
     }
 

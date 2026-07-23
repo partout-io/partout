@@ -82,12 +82,12 @@ pub const ActiveContext = struct {
         allocator.destroy(self);
     }
 
-    pub fn currentNegotiator(self: *ActiveContext) ?*Negotiator {
+    pub fn currentNegotiator(self: *const ActiveContext) ?*Negotiator {
         const key = self.current_negotiator_key orelse return null;
         return self.negotiators[key];
     }
 
-    pub fn dataChannel(self: *ActiveContext, key: u8) ?*DataChannel {
+    pub fn dataChannel(self: *const ActiveContext, key: u8) ?*DataChannel {
         if (key >= self.data_channels.len) return null;
         return self.data_channels[key];
     }

@@ -208,7 +208,7 @@ pub const LinkProcessor = struct {
     }
 
     pub fn processOutbound(
-        self: *LinkProcessor,
+        self: *const LinkProcessor,
         packets: []const []const u8,
     ) !Output {
         if (!self.is_tcp) {

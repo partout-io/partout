@@ -243,7 +243,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             }
         }
 
-        fn clearPacketList(self: *Self, packets: *std.ArrayList(ControlPacket)) void {
+        fn clearPacketList(self: *const Self, packets: *std.ArrayList(ControlPacket)) void {
             _ = self;
             for (packets.items) |*packet| packet.deinit();
             packets.clearRetainingCapacity();

@@ -111,7 +111,7 @@ pub const DataPath = struct {
         return self;
     }
 
-    pub fn destroy(self: *DataPath) void {
+    pub fn destroy(self: *const DataPath) void {
         const allocator = self.allocator;
         c.openvpn_replay_free(self.replay);
         c.openvpn_dp_mode_free(self.mode);
@@ -427,7 +427,7 @@ pub const DataChannel = struct {
 
     /// The caller owns the returned packet rows and outer slice.
     pub fn encrypt(
-        self: *DataChannel,
+        self: *const DataChannel,
         allocator: std.mem.Allocator,
         packets: []const []const u8,
     ) ![][]u8 {
@@ -436,7 +436,7 @@ pub const DataChannel = struct {
 
     /// The caller owns the returned packet rows and outer slice.
     pub fn decrypt(
-        self: *DataChannel,
+        self: *const DataChannel,
         allocator: std.mem.Allocator,
         packets: []const []const u8,
     ) ![][]u8 {
@@ -480,7 +480,7 @@ pub const DataLink = struct {
     }
 
     pub fn receive(
-        self: *DataLink,
+        self: *const DataLink,
         packets: []const []const u8,
         key: u8,
     ) !void {
@@ -497,7 +497,7 @@ pub const DataLink = struct {
     }
 
     pub fn send(
-        self: *DataLink,
+        self: *const DataLink,
         packets: []const []const u8,
         key: u8,
         timeout_ms: ?u64,

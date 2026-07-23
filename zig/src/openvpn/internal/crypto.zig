@@ -39,7 +39,7 @@ pub const CryptoKeyPair = struct {
         self.* = undefined;
     }
 
-    pub fn move(self: *CryptoKeyPair) CryptoKeyPair {
+    pub fn move(self: *const CryptoKeyPair) CryptoKeyPair {
         return .{
             .encryption_key = self.encryption_key.move(),
             .decryption_key = self.decryption_key.move(),
@@ -305,7 +305,7 @@ pub const ZeroingData = struct {
         self.refresh();
     }
 
-    pub fn resize(self: *ZeroingData, count: usize) void {
+    pub fn resize(self: *const ZeroingData, count: usize) void {
         c_common.pp_zd_resize(self.cPtr(), count);
         self.refresh();
     }

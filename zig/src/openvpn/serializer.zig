@@ -142,12 +142,12 @@ const ConfigurationWriter = struct {
         self.has_lines = true;
     }
 
-    fn writeAll(self: *ConfigurationWriter, text: []const u8) core.SerializeError!void {
+    fn writeAll(self: *const ConfigurationWriter, text: []const u8) core.SerializeError!void {
         self.writer.writeAll(text) catch return error.OutOfMemory;
     }
 
     fn print(
-        self: *ConfigurationWriter,
+        self: *const ConfigurationWriter,
         comptime format: []const u8,
         args: anytype,
     ) core.SerializeError!void {

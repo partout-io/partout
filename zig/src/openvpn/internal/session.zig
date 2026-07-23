@@ -179,7 +179,7 @@ pub const Session = struct {
         var owned_configuration = try configuration.clone(allocator);
         errdefer owned_configuration.deinit(allocator);
         var owned_credentials = if (credentials) |value|
-            try helpers_mod.forAuthentication(allocator, value)
+            try forAuthentication(allocator, value)
         else
             null;
         errdefer if (owned_credentials) |*value| value.deinit(allocator);
@@ -370,7 +370,7 @@ pub const Session = struct {
         try self.looper.perform(void, &finish, finishShutdownOnQueue);
     }
 
-    fn requestShutdown(self: *Session, cause: ?SessionError) void {
+    fn requestShutdown(self: *const Session, cause: ?SessionError) void {
         const actor = self.shutdown_actor orelse return;
         actor.schedule(.{ .cause = cause }) catch {};
     }
@@ -734,7 +734,7 @@ pub const Session = struct {
     }
 
     fn checkPingTimeoutOnQueue(
-        self: *Session,
+        self: *const Session,
         context: *ActiveContext,
     ) !void {
         const last_received = context.last_received_ns orelse return;
@@ -745,7 +745,7 @@ pub const Session = struct {
     }
 
     fn keepAliveIntervalMs(
-        self: *Session,
+        self: *const Session,
         context: *ActiveContext,
     ) ?u64 {
         if (context.push_reply) |reply| {
@@ -757,7 +757,7 @@ pub const Session = struct {
         return null;
     }
 
-    fn keepAliveTimeoutMs(self: *Session, context: *ActiveContext) u64 {
+    fn keepAliveTimeoutMs(self: *const Session, context: *ActiveContext) u64 {
         if (context.push_reply) |reply| {
             if (reply.options.keep_alive_timeout) |seconds|
                 if (seconds > 0) return secondsToMilliseconds(seconds);

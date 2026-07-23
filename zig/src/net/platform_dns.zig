@@ -40,7 +40,7 @@ pub const PlatformDNS = struct {
     /// address using the NAT64 prefix of the network that is active now. Other
     /// platforms do not need this extra pass and preserve the address verbatim.
     pub fn resolveAddress(
-        self: *PlatformDNS,
+        self: *const PlatformDNS,
         allocator: std.mem.Allocator,
         address: []const u8,
         reachability: ?ReachabilityInfo,

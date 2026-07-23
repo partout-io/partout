@@ -268,7 +268,7 @@ pub const Negotiator = struct {
     }
 
     pub fn readInboundPacket(
-        self: *Negotiator,
+        self: *const Negotiator,
         packet: []const u8,
         _: usize,
     ) !ControlPacket {
@@ -280,7 +280,7 @@ pub const Negotiator = struct {
     /// Takes ownership of `packet`; the returned slice and packets are owned by
     /// the caller, as documented by ControlChannel.
     pub fn enqueueInboundPacket(
-        self: *Negotiator,
+        self: *const Negotiator,
         packet: ControlPacket,
     ) ![]ControlPacket {
         return self.channel.enqueueInboundPacket(packet);
@@ -315,7 +315,7 @@ pub const Negotiator = struct {
         }
     }
 
-    pub fn sendAck(self: *Negotiator, packet: *const ControlPacket) void {
+    pub fn sendAck(self: *const Negotiator, packet: *const ControlPacket) void {
         const raw = self.channel.writeAcks(
             packet.key(),
             &.{packet.packetId()},
@@ -350,7 +350,7 @@ pub const Negotiator = struct {
         []const u8,
     ) errors_mod.SessionError!void;
 
-    fn hardResetPayload(self: *Negotiator) !?[]u8 {
+    fn hardResetPayload(self: *const Negotiator) !?[]u8 {
         if (!(self.options.configuration.uses_pia_patches orelse false)) return null;
         const tls = self.tls orelse return error.Assertion;
         const ca_md5 = tls.caMD5(self.allocator) catch return null;
@@ -405,7 +405,7 @@ pub const Negotiator = struct {
         try self.flushControlQueue();
     }
 
-    fn flushControlQueue(self: *Negotiator) !void {
+    fn flushControlQueue(self: *const Negotiator) !void {
         const raw_packets = try self.channel.writeOutboundPackets(
             @intCast(self.options.session_options.retransmission_interval_ms),
         );
@@ -414,7 +414,7 @@ pub const Negotiator = struct {
         try self.writeLink(@ptrCast(raw_packets));
     }
 
-    fn writeLink(self: *Negotiator, packets: []const []const u8) !void {
+    fn writeLink(self: *const Negotiator, packets: []const []const u8) !void {
         var processed = try self.link_processor.processOutbound(packets);
         defer processed.deinit();
         try self.looper.writeQueued(processed.packets(), .link);
@@ -618,7 +618,7 @@ pub const Negotiator = struct {
     }
 
     fn newDataChannel(
-        self: *Negotiator,
+        self: *const Negotiator,
         push_reply: *const PushReply,
     ) !*DataChannel {
         const session_id = self.channel.sessionId() orelse return error.Assertion;

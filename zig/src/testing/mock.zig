@@ -34,7 +34,7 @@ pub const MockRuntime = struct {
         bindings: ?helpers.CDaemonBindings,
         runtime: *MockDaemonRuntime,
 
-        fn finishTeardown(self: *Instance, allocator: std.mem.Allocator) void {
+        fn finishTeardown(self: *const Instance, allocator: std.mem.Allocator) void {
             self.daemon.deinit(allocator);
             allocator.destroy(self.daemon);
             self.runtime.deinit(allocator);
@@ -114,16 +114,16 @@ pub const MockRuntime = struct {
         return true;
     }
 
-    pub fn isStarted(self: *MockRuntime) bool {
+    pub fn isStarted(self: *const MockRuntime) bool {
         return self.current != null;
     }
 
-    pub fn currentSetTunnelSettingsCount(self: *MockRuntime) ?usize {
+    pub fn currentSetTunnelSettingsCount(self: *const MockRuntime) ?usize {
         const instance = self.current orelse return null;
         return instance.runtime.controller.set_tunnel_settings_count;
     }
 
-    pub fn currentStatuses(self: *MockRuntime) ?[]const api.ConnectionStatus {
+    pub fn currentStatuses(self: *const MockRuntime) ?[]const api.ConnectionStatus {
         const instance = self.current orelse return null;
         return instance.daemon.testStatuses();
     }
@@ -166,7 +166,7 @@ pub const MockDaemonRuntime = struct {
         return self;
     }
 
-    pub fn deinit(self: *MockDaemonRuntime, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const MockDaemonRuntime, allocator: std.mem.Allocator) void {
         self.registry.deinit(allocator);
         allocator.destroy(self);
     }
@@ -175,7 +175,7 @@ pub const MockDaemonRuntime = struct {
         return &self.registry;
     }
 
-    pub fn tunnelController(self: *MockDaemonRuntime) net.TunnelController {
+    pub fn tunnelController(self: *const MockDaemonRuntime) net.TunnelController {
         return self.controller.interface();
     }
 
@@ -187,11 +187,11 @@ pub const MockDaemonRuntime = struct {
         return noopSocketFactory();
     }
 
-    pub fn networkMonitor(self: *MockDaemonRuntime) net.NetworkMonitor {
+    pub fn networkMonitor(self: *const MockDaemonRuntime) net.NetworkMonitor {
         return self.monitor.interface();
     }
 
-    pub fn daemonEvents(self: *MockDaemonRuntime) ?net_conn.Connection.Events {
+    pub fn daemonEvents(self: *const MockDaemonRuntime) ?net_conn.Connection.Events {
         return self.events.events();
     }
 
@@ -216,7 +216,7 @@ pub const NoopModuleImplementation = struct {
         return .{ .module_type = module_type };
     }
 
-    pub fn moduleImplementation(self: *NoopModuleImplementation) core.ModuleImplementation {
+    pub fn moduleImplementation(self: *const NoopModuleImplementation) core.ModuleImplementation {
         return .{
             .ptr = self,
             .vtable = &vtable,
@@ -254,7 +254,7 @@ pub const NoopConnectionImplementation = struct {
         };
     }
 
-    pub fn connectionImplementation(self: *NoopConnectionImplementation) net_conn.ConnectionImplementation {
+    pub fn connectionImplementation(self: *const NoopConnectionImplementation) net_conn.ConnectionImplementation {
         return .{
             .ptr = self,
             .vtable = &vtable,
@@ -464,7 +464,7 @@ const MockConnection = struct {
         return created.asConnection();
     }
 
-    fn asConnection(self: *MockConnection) net_conn.Connection {
+    fn asConnection(self: *const MockConnection) net_conn.Connection {
         return .{
             .ptr = self,
             .vtable = &mock_connection_vtable,
@@ -676,7 +676,7 @@ pub const MockNetworkMonitor = struct {
         }
     }
 
-    pub fn onBetterPath(self: *MockNetworkMonitor) void {
+    pub fn onBetterPath(self: *const MockNetworkMonitor) void {
         if (self.event_handler) |handler| {
             handler.onBetterPath();
         }

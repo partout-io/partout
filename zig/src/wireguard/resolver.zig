@@ -22,7 +22,7 @@ pub const ResolvedEndpoint = struct {
     base: api.Endpoint,
     target: api.Endpoint,
 
-    pub fn deinit(self: *ResolvedEndpoint, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const ResolvedEndpoint, allocator: std.mem.Allocator) void {
         self.base.deinit(allocator);
         self.target.deinit(allocator);
     }
@@ -43,7 +43,7 @@ pub const PeerEndpointResolver = struct {
             return self.entries;
         }
 
-        fn mutableValue(self: *Cache) ?[]ResolvedEndpoint {
+        fn mutableValue(self: *const Cache) ?[]ResolvedEndpoint {
             return self.entries;
         }
 
@@ -185,7 +185,7 @@ pub const PeerEndpointResolver = struct {
     }
 
     fn refreshTargets(
-        self: *PeerEndpointResolver,
+        self: *const PeerEndpointResolver,
         allocator: std.mem.Allocator,
     ) std.mem.Allocator.Error!void {
         const reachability = if (self.factory) |factory| factory.currentReachability() else null;
@@ -226,7 +226,7 @@ pub const PeerEndpointResolver = struct {
     }
 
     fn resolveEndpoint(
-        self: *PeerEndpointResolver,
+        self: *const PeerEndpointResolver,
         allocator: std.mem.Allocator,
         endpoint: api.Endpoint,
         flags: std.EnumSet(net.DNSResolver.Flag),

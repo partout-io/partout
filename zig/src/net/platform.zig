@@ -257,7 +257,7 @@ pub const Platform = struct {
     }
 
     fn configureSocket(
-        self: *Platform,
+        self: *const Platform,
         descriptor: SocketDescriptor,
         reachability: ?ReachabilityInfo,
     ) bool {
@@ -271,7 +271,7 @@ pub const Platform = struct {
     //#endregion
 
     fn configureSocketsWithError(
-        self: *Platform,
+        self: *const Platform,
         descriptors: []const SocketDescriptor,
         reachability: ?ReachabilityInfo,
     ) TunnelController.Error!void {
@@ -287,7 +287,7 @@ pub const Platform = struct {
 
     //#region Environment
 
-    fn environmentValue(self: *Platform, key: []const u8) ?[]const u8 {
+    fn environmentValue(self: *const Platform, key: []const u8) ?[]const u8 {
         log.writef(.debug, "Get tunnel environment: {s}", .{key});
         const block = self.environment_value orelse return null;
         return block.call(key);

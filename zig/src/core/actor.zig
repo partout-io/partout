@@ -208,7 +208,7 @@ pub fn Actor(
             }
         }
 
-        fn performCommand(self: *Self, command: Command) Outcome {
+        fn performCommand(self: *const Self, command: Command) Outcome {
             switch (command) {
                 .message => |message| {
                     handler(self.context, message) catch |err| {

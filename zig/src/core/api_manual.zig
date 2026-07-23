@@ -73,7 +73,7 @@ pub const Address = struct {
         };
     }
 
-    pub fn deinit(self: *Address, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const Address, allocator: std.mem.Allocator) void {
         if (self.owned and self.raw.len > 0) allocator.free(self.raw);
     }
 
@@ -151,7 +151,7 @@ pub const Endpoint = struct {
         };
     }
 
-    pub fn deinit(self: *Endpoint, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const Endpoint, allocator: std.mem.Allocator) void {
         if (self.owned and self.address.len > 0) allocator.free(self.address);
     }
 
@@ -281,7 +281,7 @@ pub const ExtendedEndpoint = struct {
         };
     }
 
-    pub fn deinit(self: *ExtendedEndpoint, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const ExtendedEndpoint, allocator: std.mem.Allocator) void {
         if (self.owned and self.address.len > 0) allocator.free(self.address);
     }
 
@@ -336,7 +336,7 @@ pub const OpenVPNCryptoContainer = struct {
         };
     }
 
-    pub fn deinit(self: *OpenVPNCryptoContainer, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const OpenVPNCryptoContainer, allocator: std.mem.Allocator) void {
         if (self.owned and self.pem.len > 0) allocator.free(self.pem);
     }
 
@@ -387,7 +387,7 @@ pub const SecureData = struct {
         };
     }
 
-    pub fn deinit(self: *SecureData, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const SecureData, allocator: std.mem.Allocator) void {
         if (self.owned and self.base64.len > 0) allocator.free(self.base64);
     }
 
@@ -473,7 +473,7 @@ pub const Subnet = struct {
         };
     }
 
-    pub fn deinit(self: *Subnet, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const Subnet, allocator: std.mem.Allocator) void {
         self.address.deinit(allocator);
     }
 
@@ -588,7 +588,7 @@ pub const WireGuardKey = struct {
         };
     }
 
-    pub fn deinit(self: *WireGuardKey, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const WireGuardKey, allocator: std.mem.Allocator) void {
         if (self.owned and self.raw.len > 0) allocator.free(self.raw);
     }
 

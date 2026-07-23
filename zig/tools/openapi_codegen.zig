@@ -414,7 +414,7 @@ fn renderDocument(allocator: std.mem.Allocator, doc: Document, exclusions: Schem
         \\        };
         \\    }
         \\
-        \\    pub fn deinit(self: *RawJsonValue, allocator: std.mem.Allocator) void {
+        \\    pub fn deinit(self: *const RawJsonValue, allocator: std.mem.Allocator) void {
         \\        if (self.owned) allocator.free(self.bytes);
         \\    }
         \\
@@ -544,7 +544,7 @@ fn renderRuntime(w: *std.Io.Writer) WriterError!void {
         \\    info.* = .{};
         \\}
         \\
-        \\fn deinitJson(comptime T: type, allocator: std.mem.Allocator, value: *T) void {
+        \\fn deinitJson(comptime T: type, allocator: std.mem.Allocator, value: *const T) void {
         \\    if (comptime std.meta.hasFn(T, "deinit")) {
         \\        value.deinit(allocator);
         \\        return;
@@ -856,7 +856,7 @@ fn renderStructMethods(w: *std.Io.Writer, doc: Document, schema_item: Schema, om
         \\        return parse(allocator, encoded);
         \\    }
         \\
-        \\    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+        \\    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         \\
     );
     if (property_count == 0) {
@@ -1047,7 +1047,7 @@ fn renderUnion(w: *std.Io.Writer, doc: Document, schema_item: Schema, exclusions
         \\        return parse(allocator, encoded);
         \\    }
         \\
-        \\    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+        \\    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         \\        switch (self.*) {
         \\
     );

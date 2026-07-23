@@ -318,7 +318,7 @@ pub const Authenticator = struct {
     }
 
     pub fn putAuth(
-        self: *Authenticator,
+        self: *const Authenticator,
         tls: *TLSWrapper,
         configuration: *const api.OpenVPNConfiguration,
     ) !void {
@@ -328,7 +328,7 @@ pub const Authenticator = struct {
     }
 
     fn authData(
-        self: *Authenticator,
+        self: *const Authenticator,
         configuration: *const api.OpenVPNConfiguration,
     ) !ZeroingData {
         const allocator = self.allocator;

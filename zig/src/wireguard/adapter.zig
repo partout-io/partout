@@ -202,7 +202,7 @@ pub const WireGuardAdapter = struct {
     }
 
     fn startBackend(
-        self: *WireGuardAdapter,
+        self: *const WireGuardAdapter,
         allocator: std.mem.Allocator,
         wg_config: []const u8,
     ) StartBackendError!i32 {
@@ -229,7 +229,7 @@ pub const WireGuardAdapter = struct {
     }
 
     fn configureSockets(
-        self: *WireGuardAdapter,
+        self: *const WireGuardAdapter,
         allocator: std.mem.Allocator,
         handle: i32,
     ) ConfigureSocketsError!void {
@@ -316,7 +316,7 @@ pub const WireGuardAdapter = struct {
         self.refreshSockets(allocator, handle);
     }
 
-    fn refreshSockets(self: *WireGuardAdapter, allocator: std.mem.Allocator, handle: i32) void {
+    fn refreshSockets(self: *const WireGuardAdapter, allocator: std.mem.Allocator, handle: i32) void {
         self.backend.bumpSockets(handle, true);
         self.configureSockets(allocator, handle) catch |err| {
             log.writef(.err, "WireGuard: Unable to configure sockets after network change: {}", .{err});
