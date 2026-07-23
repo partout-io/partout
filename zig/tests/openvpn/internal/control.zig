@@ -9,21 +9,13 @@ const core = source.core;
 const internal = source.openvpn_internal;
 const ControlPacket = internal.packet.ControlPacket;
 const PacketCode = internal.packet.PacketCode;
-const PRNG = internal.crypto.PRNG;
 const Serializer = internal.serialization.Serializer;
 const TestControlChannel = internal.control.ControlChannel(Serializer);
 
-fn fillOnes(context: ?*anyopaque, destination: []u8) bool {
-    const value: *u8 = @ptrCast(@alignCast(context.?));
-    @memset(destination, value.*);
-    return true;
-}
-
 test "control channel fragments payload and retains opcode" {
-    var one: u8 = 1;
     const channel = try TestControlChannel.create(
         std.testing.allocator,
-        PRNG{ .context = &one, .fill_fn = fillOnes },
+        .system(),
         .{ .plain = .{} },
     );
     defer channel.destroy();
@@ -37,10 +29,9 @@ test "control channel fragments payload and retains opcode" {
 }
 
 test "control channel reorders and deduplicates inbound packets" {
-    var one: u8 = 1;
     const channel = try TestControlChannel.create(
         std.testing.allocator,
-        PRNG{ .context = &one, .fill_fn = fillOnes },
+        .system(),
         .{ .plain = .{} },
     );
     defer channel.destroy();
@@ -62,10 +53,9 @@ test "control channel reorders and deduplicates inbound packets" {
 }
 
 test "control channel suppresses retransmission until ACK" {
-    var one: u8 = 1;
     const channel = try TestControlChannel.create(
         std.testing.allocator,
-        PRNG{ .context = &one, .fill_fn = fillOnes },
+        .system(),
         .{ .plain = .{} },
     );
     defer channel.destroy();

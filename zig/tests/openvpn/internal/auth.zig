@@ -75,14 +75,7 @@ test "PRF owns retained inputs and derives four key-method-2 buffers" {
 
 test "Authenticator frames auth and buffers replies and messages" {
     const allocator = std.testing.allocator;
-    const FixedPRNG = struct {
-        fn fill(_: ?*anyopaque, destination: []u8) bool {
-            @memset(destination, 0x5a);
-            return true;
-        }
-    };
-
-    var authenticator = try Authenticator.init(allocator, .{ .fill_fn = FixedPRNG.fill }, "user", "password");
+    var authenticator = try Authenticator.init(allocator, .system(), "user", "password");
     defer authenticator.deinit();
     const ciphers = [_]api.OpenVPNCipher{.aes256gcm};
     var auth_data = try auth.testing.authData(&authenticator, &.{

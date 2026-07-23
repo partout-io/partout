@@ -115,41 +115,52 @@ pub const CryptoKeysBridge = struct {
     }
 };
 
-pub const PRNG = struct {
-    context: ?*anyopaque = null,
-    fill_fn: *const fn (?*anyopaque, []u8) bool = systemFill,
+pub const PRNG = PRNGWith(SystemRandom);
 
-    pub fn system() PRNG {
-        return .{};
-    }
+pub fn PRNGWith(comptime Provider: type) type {
+    return struct {
+        const Self = @This();
 
-    pub fn fill(self: PRNG, destination: []u8) !void {
-        if (!self.fill_fn(self.context, destination)) return error.CryptoFailure;
-    }
+        provider: Provider,
 
-    pub fn data(
-        self: PRNG,
-        allocator: std.mem.Allocator,
-        length: usize,
-    ) ![]u8 {
-        const bytes = try allocator.alloc(u8, length);
-        errdefer allocator.free(bytes);
-        try self.fill(bytes);
-        return bytes;
-    }
+        pub fn init(provider: Provider) Self {
+            return .{ .provider = provider };
+        }
 
-    pub fn safeData(
-        self: PRNG,
-        allocator: std.mem.Allocator,
-        length: usize,
-    ) !ZeroingData {
-        var result = try ZeroingData.init(allocator, length);
-        errdefer result.deinit(allocator);
-        try self.fill(result.bytes);
-        return result;
-    }
+        pub fn system() Self {
+            return init(.{});
+        }
 
-    fn systemFill(_: ?*anyopaque, destination: []u8) bool {
+        pub fn fill(self: Self, destination: []u8) !void {
+            if (!self.provider.fill(destination)) return error.CryptoFailure;
+        }
+
+        pub fn data(
+            self: Self,
+            allocator: std.mem.Allocator,
+            length: usize,
+        ) ![]u8 {
+            const bytes = try allocator.alloc(u8, length);
+            errdefer allocator.free(bytes);
+            try self.fill(bytes);
+            return bytes;
+        }
+
+        pub fn safeData(
+            self: Self,
+            allocator: std.mem.Allocator,
+            length: usize,
+        ) !ZeroingData {
+            var result = try ZeroingData.init(allocator, length);
+            errdefer result.deinit(allocator);
+            try self.fill(result.bytes);
+            return result;
+        }
+    };
+}
+
+const SystemRandom = struct {
+    fn fill(_: SystemRandom, destination: []u8) bool {
         if (destination.len == 0) return true;
         return c_common.pp_prng_do(destination.ptr, destination.len);
     }

@@ -13,26 +13,20 @@ const OCCPacket = packet_mod.OCCPacket;
 const PacketCode = packet_mod.PacketCode;
 
 test "PIA payload prepends the repeating XOR key" {
-    const Fixed = struct {
-        fn fill(_: ?*anyopaque, destination: []u8) bool {
-            for (destination, 0..) |*byte, index| byte.* = @intCast(index + 1);
-            return true;
-        }
-    };
     const encoded = packet_mod.hardResetPayload(
         std.testing.allocator,
         true,
         "012345",
         "AES-128-CBC",
         "SHA1",
-        .{ .fill_fn = Fixed.fill },
+        .system(),
     );
     defer std.testing.allocator.free(encoded.?);
-    try std.testing.expectEqualSlices(u8, &.{ 1, 2, 3 }, encoded.?[0..3]);
-    try std.testing.expectEqual(
-        @as(u8, '5' ^ 1),
-        encoded.?[3],
-    );
+    const plain = "53eo0rk92gxic98p1asgl5auh59r1vp4lmry1e3chzi100qntd" ++
+        "crypto\taes-128-cbc|sha1\tca\t012345";
+    try std.testing.expectEqual(plain.len + 3, encoded.?.len);
+    for (plain, 0..) |byte, index|
+        try std.testing.expectEqual(byte, encoded.?[3 + index] ^ encoded.?[index % 3]);
 }
 
 test "standard hard reset has no payload" {
@@ -42,7 +36,7 @@ test "standard hard reset has no payload" {
         "unused",
         "unused",
         "unused",
-        .{},
+        .system(),
     ) == null);
 }
 
