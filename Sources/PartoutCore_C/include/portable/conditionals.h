@@ -52,3 +52,7 @@
 #else
 #define PARTOUT_HAS_CRYPTO 0
 #endif
+
+#ifndef PARTOUT_HAS_WIREGUARD_BACKEND
+#define PARTOUT_HAS_WIREGUARD_BACKEND 1
+#endif

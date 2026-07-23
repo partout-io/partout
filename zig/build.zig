@@ -59,7 +59,7 @@ pub fn build(b: *std.Build) void {
     const vendor_includes = VendorIncludePaths{
         .openssl = includePathOption(b, "openssl-include", "OpenSSL headers search path.", false),
         .mbedtls = includePathOption(b, "mbedtls-include", "mbedTLS headers search path.", false),
-        .wg_go = includePathOption(b, "wg-go-include", "wg-go headers search path.", embed_c and use_wireguard),
+        .wg_go = includePathOption(b, "wg-go-include", "wg-go headers search path.", false),
     };
     const crypto_libraries = CryptoLibraries{
         .openssl = vendor_includes.openssl != null,
@@ -309,9 +309,18 @@ fn configurePartoutModuleSettings(
     }
     addVendorIncludePaths(module, b, target, vendor_includes);
     addAppleSDKPaths(module, b, apple_sdk_path);
-    addCryptoDefines(module, crypto_libraries);
+    if (crypto_libraries.openssl) {
+        module.addCMacro("PARTOUT_CRYPTO_OPENSSL", "1");
+    }
+    if (crypto_libraries.mbedtls) {
+        module.addCMacro("PARTOUT_CRYPTO_MBEDTLS", "1");
+    }
     module.addCMacro("PARTOUT_OPENVPN", if (use_openvpn) "1" else "0");
     module.addCMacro("PARTOUT_WIREGUARD", if (use_wireguard) "1" else "0");
+    module.addCMacro(
+        "PARTOUT_HAS_WIREGUARD_BACKEND",
+        if (vendor_includes.wg_go != null) "1" else "0",
+    );
     if (target.result.os.tag.isDarwin()) {
         module.linkFramework("Security", .{});
     }
@@ -493,14 +502,5 @@ fn addNativeCryptoCSources(
             .flags = c_flags,
         }),
         else => {},
-    }
-}
-
-fn addCryptoDefines(module: *std.Build.Module, crypto_libraries: CryptoLibraries) void {
-    if (crypto_libraries.openssl) {
-        module.addCMacro("PARTOUT_CRYPTO_OPENSSL", "1");
-    }
-    if (crypto_libraries.mbedtls) {
-        module.addCMacro("PARTOUT_CRYPTO_MBEDTLS", "1");
     }
 }

@@ -10,9 +10,7 @@
         "coverage",
         "-Dembed-c=true",
         "-Dopenvpn=true",
-        "-Dwireguard=true",
-        "-Dopenssl-include=../.build/artifacts/openssl-apple/openssl/openssl.xcframework/macos-arm64_x86_64/openssl.framework/Headers",
-        "-Dwg-go-include=../.build/artifacts/wg-go-apple/wg-go/wg-go.xcframework/macos-arm64_x86_64/wg_go.framework/Headers"
+        "-Dwireguard=true"
       ],
       "options": {
         "cwd": "${workspaceFolder}"

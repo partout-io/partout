@@ -109,7 +109,7 @@ pub fn localOptionsStringAlloc(
     allocator: std.mem.Allocator,
     configuration: *const api.OpenVPNConfiguration,
     with_local_options: bool,
-) ![]u8 {
+) ![]const u8 {
     if (!with_local_options) return allocator.dupe(u8, "V0 UNDEF");
 
     var output: std.Io.Writer.Allocating = .init(allocator);
