@@ -66,7 +66,7 @@ pub const PlatformDNS = struct {
     }
 
     pub fn resolve(
-        self: *PlatformDNS,
+        self: *const PlatformDNS,
         allocator: std.mem.Allocator,
         hostname: []const u8,
         flags: std.EnumSet(DNSResolver.Flag),
@@ -77,7 +77,7 @@ pub const PlatformDNS = struct {
     }
 
     fn resolveWith(
-        _: *PlatformDNS,
+        _: *const PlatformDNS,
         allocator: std.mem.Allocator,
         hostname: []const u8,
         flags: std.EnumSet(DNSResolver.Flag),
