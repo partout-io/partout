@@ -201,7 +201,7 @@ const AuthSerializer = struct {
             .auth_length = auth_length,
             .preamble_length = prefix_length + auth_length,
             .current_replay_id = BidirectionalState(u32).init(1),
-            .timestamp = helpers_mod.unixSeconds(),
+            .timestamp = unixSeconds(),
         };
     }
 
@@ -302,7 +302,7 @@ const CryptSerializer = struct {
             .ad_length = header_length + c.OpenVPNPacketReplayIdLength + c.OpenVPNPacketReplayTimestampLength,
             .tag_length = c_crypto.pp_crypto_meta_of(ctr).tag_len,
             .current_replay_id = BidirectionalState(u32).init(1),
-            .timestamp = helpers_mod.unixSeconds(),
+            .timestamp = unixSeconds(),
         };
     }
 
@@ -446,3 +446,10 @@ const CryptV2Serializer = struct {
         return self.serializer.deserialize(allocator, data, start, end);
     }
 };
+
+fn unixSeconds() u32 {
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const seconds = std.Io.Clock.real.now(io).toSeconds();
+    if (seconds <= 0) return 0;
+    return @truncate(@as(u64, @intCast(seconds)));
+}

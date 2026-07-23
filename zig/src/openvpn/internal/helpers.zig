@@ -4,7 +4,6 @@
 
 const std = @import("std");
 const core_mod = @import("../../core/exports.zig");
-const time_c = @cImport(@cInclude("time.h"));
 
 const api = core_mod.api;
 
@@ -68,12 +67,6 @@ pub fn forAuthentication(
         .otp_method = .none,
         .otp = null,
     };
-}
-
-pub fn unixSeconds() u32 {
-    const raw = time_c.time(null);
-    if (raw <= 0) return 0;
-    return @truncate(@as(u64, @intCast(raw)));
 }
 
 fn base64Alloc(allocator: std.mem.Allocator, value: []const u8) ![]u8 {
