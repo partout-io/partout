@@ -35,9 +35,9 @@ test "finds the active connection module" {
     );
     defer profile.deinit(allocator);
 
-    try std.testing.expect(api.hasConnection(profile));
-    try std.testing.expect(api.isActiveProfileModule(profile, profile.active_modules_ids[0]));
-    const active = activeConnectionModule(profile) orelse return error.TestUnexpectedResult;
+    try std.testing.expect(api.hasConnection(&profile));
+    try std.testing.expect(api.isActiveProfileModule(&profile, profile.active_modules_ids[0]));
+    const active = activeConnectionModule(&profile) orelse return error.TestUnexpectedResult;
     try std.testing.expectEqual(api.ModuleType.WireGuard, active.typeOf());
     const active_id = active.id();
     try std.testing.expectEqualStrings("00000000-0000-0000-0000-000000000107", active_id[0..]);
@@ -54,8 +54,8 @@ test "ignores inactive connection modules" {
     );
     defer profile.deinit(allocator);
 
-    try std.testing.expect(!api.hasConnection(profile));
-    try std.testing.expect(api.findActiveConnectionModule(profile) == null);
+    try std.testing.expect(!api.hasConnection(&profile));
+    try std.testing.expect(api.findActiveConnectionModule(&profile) == null);
 }
 
 test "reports interactive OpenVPN connections" {
@@ -67,7 +67,7 @@ test "reports interactive OpenVPN connections" {
     );
     defer profile.deinit(allocator);
 
-    const active = activeConnectionModule(profile) orelse return error.TestUnexpectedResult;
+    const active = activeConnectionModule(&profile) orelse return error.TestUnexpectedResult;
     try std.testing.expectEqual(api.ModuleType.OpenVPN, active.typeOf());
     try std.testing.expect(active.isInteractive());
 }
@@ -80,7 +80,7 @@ test "empty connection registry reports absent implementation" {
     var profile = try api.Profile.parse(allocator, mock.connectionProfileJson());
     defer profile.deinit(allocator);
 
-    const module = activeConnectionModule(profile) orelse return error.TestUnexpectedResult;
+    const module = activeConnectionModule(&profile) orelse return error.TestUnexpectedResult;
     try std.testing.expectError(
         error.MissingConnectionImplementation,
         registry.createConnection(allocator, module, .{

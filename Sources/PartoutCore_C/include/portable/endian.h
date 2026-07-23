@@ -11,26 +11,24 @@
 
 #if PARTOUT_APPLE
 
-#include <CoreFoundation/CoreFoundation.h>
-
 static inline
 uint16_t pp_endian_ntohs(uint16_t num) {
-    return CFSwapInt16BigToHost(num);
+    return __builtin_bswap16(num);
 }
 
 static inline
 uint16_t pp_endian_htons(uint16_t num) {
-    return CFSwapInt16HostToBig(num);
+    return __builtin_bswap16(num);
 }
 
 static inline
 uint32_t pp_endian_ntohl(uint32_t num) {
-    return CFSwapInt32BigToHost(num);
+    return __builtin_bswap32(num);
 }
 
 static inline
 uint32_t pp_endian_htonl(uint32_t num) {
-    return CFSwapInt32HostToBig(num);
+    return __builtin_bswap32(num);
 }
 
 #else

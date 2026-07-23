@@ -30,7 +30,7 @@ test "ABI registry imports raw OpenVPN profile through parser implementation" {
     try std.testing.expect(std.mem.indexOf(u8, imported, "\"type\":\"OpenVPN\"") != null);
     var profile = try api.Profile.parse(allocator, imported);
     defer profile.deinit(allocator);
-    const module = conn.activeConnectionModule(profile) orelse return error.TestUnexpectedResult;
+    const module = conn.activeConnectionModule(&profile) orelse return error.TestUnexpectedResult;
     const module_id = module.id();
     try std.testing.expect(core.isGeneratedId(module_id[0..]));
     try std.testing.expect(!std.mem.eql(u8, module_id[0..], "openvpn"));
@@ -61,7 +61,7 @@ test "ABI registry imports raw WireGuard profile through parser implementation" 
     try std.testing.expect(std.mem.indexOf(u8, imported, "\"type\":\"WireGuard\"") != null);
     var profile = try api.Profile.parse(allocator, imported);
     defer profile.deinit(allocator);
-    const module = conn.activeConnectionModule(profile) orelse return error.TestUnexpectedResult;
+    const module = conn.activeConnectionModule(&profile) orelse return error.TestUnexpectedResult;
     const module_id = module.id();
     try std.testing.expect(core.isGeneratedId(module_id[0..]));
     try std.testing.expect(!std.mem.eql(u8, module_id[0..], "wireguard"));

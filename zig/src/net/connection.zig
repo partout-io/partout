@@ -49,7 +49,7 @@ pub const ConnectionRegistry = struct {
         };
     }
 
-    pub fn deinit(self: *ConnectionRegistry, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const ConnectionRegistry, allocator: std.mem.Allocator) void {
         allocator.free(self.all_implementations);
     }
 
@@ -133,7 +133,7 @@ pub const ConnectionModule = struct {
     /// interactive.
     pub fn isInteractive(self: ConnectionModule) bool {
         return switch (self.module.*) {
-            .OpenVPN => |module| module.requires_interactive_credentials orelse false,
+            .OpenVPN => |*module| module.requires_interactive_credentials orelse false,
             .WireGuard => false,
             else => false,
         };
@@ -141,7 +141,7 @@ pub const ConnectionModule = struct {
 };
 
 /// Returns the first active connection-building module in profile order.
-pub fn activeConnectionModule(profile: api.Profile) ?ConnectionModule {
+pub fn activeConnectionModule(profile: *const api.Profile) ?ConnectionModule {
     const module = api.findActiveConnectionModule(profile) orelse return null;
     return .{ .module = module };
 }

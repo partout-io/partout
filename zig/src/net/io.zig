@@ -127,7 +127,7 @@ pub const SocketWrapper = struct {
         return wrapper;
     }
 
-    pub fn deinit(self: *SocketWrapper) void {
+    pub fn deinit(self: *const SocketWrapper) void {
         log.write(.debug, "Deinit SocketWrapper");
         self.cleanup();
     }
@@ -163,20 +163,20 @@ pub const SocketWrapper = struct {
         };
     }
 
-    pub fn setEventMask(self: *SocketWrapper, readable: bool, writable: bool) Error!void {
+    pub fn setEventMask(self: *const SocketWrapper, readable: bool, writable: bool) Error!void {
         if (!c.pp_socket_set_event_mask(self.socket, readable, writable)) return error.LibcFailure;
     }
 
-    pub fn resetEvents(self: *SocketWrapper) Error!void {
+    pub fn resetEvents(self: *const SocketWrapper) Error!void {
         if (!c.pp_socket_reset_events(self.socket)) return error.LibcFailure;
     }
 
-    pub fn read(self: *SocketWrapper, buf: []u8) Error!?usize {
+    pub fn read(self: *const SocketWrapper, buf: []u8) Error!?usize {
         const read_count = c.pp_socket_read(self.socket, buf.ptr, buf.len);
         return mapReadResult(.link, read_count, self.closes_on_empty_read);
     }
 
-    pub fn write(self: *SocketWrapper, data: []const u8, offset: usize) Error!usize {
+    pub fn write(self: *const SocketWrapper, data: []const u8, offset: usize) Error!usize {
         if (offset > data.len) return error.LibcFailure;
         const written = c.pp_socket_write(self.socket, data.ptr + offset, data.len - offset);
         return mapWriteResult(.link, written, false);
@@ -188,7 +188,7 @@ pub const SocketWrapper = struct {
         c.pp_socket_free_and_close(self.socket, true);
     }
 
-    pub fn close(self: *SocketWrapper) void {
+    pub fn close(self: *const SocketWrapper) void {
         if (self.is_closed) return;
         c.pp_socket_close(self.socket);
     }
@@ -243,7 +243,7 @@ pub const TunWrapper = struct {
         return c.pp_tun_open(c_uuid.ptr());
     }
 
-    pub fn nativeIO(self: *TunWrapper) IOInterface {
+    pub fn nativeIO(self: *const TunWrapper) IOInterface {
         return .{
             .ptr = self,
             .vtable = &tun_vtable,
@@ -254,12 +254,12 @@ pub const TunWrapper = struct {
 
     pub fn resetEvents(_: *TunWrapper) Error!void {}
 
-    pub fn read(self: *TunWrapper, buf: []u8) Error!?usize {
+    pub fn read(self: *const TunWrapper, buf: []u8) Error!?usize {
         const read_count = c.pp_tun_read(self.tun, buf.ptr, buf.len);
         return mapReadResult(.tun, read_count, false);
     }
 
-    pub fn write(self: *TunWrapper, data: []const u8, offset: usize) Error!usize {
+    pub fn write(self: *const TunWrapper, data: []const u8, offset: usize) Error!usize {
         if (offset > data.len) return error.LibcFailure;
         const written = c.pp_tun_write(self.tun, data.ptr + offset, data.len - offset);
         return mapWriteResult(.tun, written, true);

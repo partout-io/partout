@@ -120,13 +120,13 @@ pub const Daemon = struct {
 
     pub fn create(
         allocator: std.mem.Allocator,
-        original_profile: api.Profile,
+        original_profile: *const api.Profile,
         context: Context,
     ) Error!*Daemon {
         // Clone profile for safety, then log it
         var profile = try original_profile.clone(allocator);
         errdefer profile.deinit(allocator);
-        api.logDecodedProfile(allocator, profile);
+        api.logDecodedProfile(allocator, &profile);
 
         const daemon = try allocator.create(Daemon);
         errdefer allocator.destroy(daemon);
@@ -150,7 +150,7 @@ pub const Daemon = struct {
         // The connection sandbox contains an actor-backed executor whose
         // context is this daemon. Allocate and initialize the stable daemon
         // address before constructing the connection that retains it.
-        if (activeConnectionModule(profile)) |module| {
+        if (activeConnectionModule(&profile)) |module| {
             const sb: sandbox.Sandbox = .{
                 .profile = &daemon.profile,
                 .controller = context.objects.controller,
@@ -252,7 +252,7 @@ pub const Daemon = struct {
     }
 
     pub fn start(
-        self: *Daemon,
+        self: *const Daemon,
         allocator: std.mem.Allocator,
     ) Error!void {
         return self.actor.perform(.{ .start = .{
@@ -260,11 +260,11 @@ pub const Daemon = struct {
         } });
     }
 
-    pub fn hold(self: *Daemon) void {
+    pub fn hold(self: *const Daemon) void {
         self.actor.perform(.hold) catch return;
     }
 
-    pub fn stop(self: *Daemon) void {
+    pub fn stop(self: *const Daemon) void {
         self.actor.perform(.stop) catch return;
     }
 
@@ -382,7 +382,7 @@ pub const Daemon = struct {
 
         // Establish settings-only tunnel if no connection
         if (self.connection == null) {
-            var maybe_info = buildSettingsOnlyTunnelInfo(allocator, self.profile) catch |err| {
+            var maybe_info = buildSettingsOnlyTunnelInfo(allocator, &self.profile) catch |err| {
                 self.handleStartError(err);
                 return;
             };
@@ -633,7 +633,7 @@ pub const Daemon = struct {
     }
 
     fn handleConnectionBlock(
-        self: *Daemon,
+        self: *const Daemon,
         ptr: *anyopaque,
         block: sandbox.SerializedExecutor.Block,
     ) void {
@@ -653,7 +653,7 @@ pub const Daemon = struct {
         if (self.options.events) |e| e.status(e.ctx, status);
     }
 
-    fn emitRemove(self: *Daemon, key: conn_mod.Connection.EventKey) void {
+    fn emitRemove(self: *const Daemon, key: conn_mod.Connection.EventKey) void {
         if (self.options.events) |e| e.remove_key(e.ctx, key);
     }
 
@@ -700,15 +700,15 @@ pub const Daemon = struct {
 
 fn buildSettingsOnlyTunnelInfo(
     allocator: std.mem.Allocator,
-    profile: api.Profile,
+    profile: *const api.Profile,
 ) !?api.TunnelRemoteInfoWrapper {
     var modules: std.ArrayList(api.TaggedModule) = .empty;
     defer modules.deinit(allocator);
 
-    for (profile.modules) |module| {
-        if (!api.isActiveProfileModule(profile, api.moduleId(&module))) continue;
-        if (api.typeBuildsConnection(api.moduleType(&module))) continue;
-        try modules.append(allocator, module);
+    for (profile.modules) |*module| {
+        if (!api.isActiveProfileModule(profile, api.moduleId(module))) continue;
+        if (api.typeBuildsConnection(api.moduleType(module))) continue;
+        try modules.append(allocator, module.*);
     }
 
     if (modules.items.len == 0) {
@@ -716,7 +716,7 @@ fn buildSettingsOnlyTunnelInfo(
     }
 
     const info = api.TunnelRemoteInfoWrapper{
-        .profile = profile,
+        .profile = profile.*,
         .original_module_id = api.moduleId(&modules.items[0]),
         .requires_virtual_device = false,
         .modules = modules.items,

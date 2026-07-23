@@ -182,11 +182,41 @@ test "parses IPv6 subnets" {
 test "formats subnet network addresses" {
     try expectNetworkRaw("192.168.12.34/24", "192.168.12.0/24");
     try expectNetworkRaw("2001:db8:abcd:1234::1/64", "2001:db8:abcd:1234::/64");
+
+    const allocator = std.testing.allocator;
+    const ipv4 = api.Subnet.parseRaw("192.168.12.34/24").?;
+    const mask = try ipv4.ipv4MaskAlloc(allocator);
+    defer allocator.free(mask);
+    try std.testing.expectEqualStrings("255.255.255.0", mask);
+
+    const ipv6 = api.Subnet.parseRaw("2001:db8::/64").?;
+    try std.testing.expectError(error.InvalidModel, ipv6.ipv4MaskAlloc(allocator));
 }
 
 test "round-trips secure data" {
     try expectRoundTrip(api.SecureData, "\"MTIzNDU2\"");
     try std.testing.expect(api.SecureData.parseRaw("not base64") == null);
+
+    const allocator = std.testing.allocator;
+    var data = try api.SecureData.initBytesAlloc(allocator, "123456");
+    defer data.deinit(allocator);
+    try std.testing.expectEqualStrings("MTIzNDU2", data.base64);
+
+    const bytes = try data.bytesAlloc(allocator);
+    defer allocator.free(bytes);
+    try std.testing.expectEqualStrings("123456", bytes);
+
+    const hex = try data.hexAlloc(allocator);
+    defer allocator.free(hex);
+    try std.testing.expectEqualStrings("313233343536", hex);
+
+    var from_hex = (try api.SecureData.parseHexAlloc(allocator, hex)).?;
+    defer from_hex.deinit(allocator);
+    try std.testing.expectEqualStrings(data.base64, from_hex.base64);
+    try std.testing.expect((try api.SecureData.parseHexAlloc(allocator, "zz")) == null);
+
+    const malformed = api.SecureData{ .base64 = "%%%%" };
+    try std.testing.expectError(error.InvalidModel, malformed.bytesAlloc(allocator));
 }
 
 test "round-trips single-string API values" {
@@ -370,7 +400,7 @@ test "encodes tagged module discriminators" {
     var profile = try api.Profile.parse(allocator, tagged_profile_json);
     defer profile.deinit(allocator);
 
-    const encoded = try util.encodeJsonValue(allocator, profile);
+    const encoded = try util.encodeJsonValue(allocator, &profile);
     defer allocator.free(encoded);
 
     try expectJsonContains(encoded, "\"type\":\"DNS\"");
@@ -416,11 +446,11 @@ test "round-trips tagged profiles" {
     try std.testing.expect(profile.behavior.?.disconnects_on_sleep);
     try std.testing.expectEqual(true, profile.behavior.?.includes_all_networks.?);
 
-    const encoded = try util.encodeJsonValue(allocator, profile);
+    const encoded = try util.encodeJsonValue(allocator, &profile);
     defer allocator.free(encoded);
     var decoded = try api.Profile.parse(allocator, encoded);
     defer decoded.deinit(allocator);
-    const reencoded = try util.encodeJsonValue(allocator, decoded);
+    const reencoded = try util.encodeJsonValue(allocator, &decoded);
     defer allocator.free(reencoded);
     try std.testing.expectEqualStrings(encoded, reencoded);
 }
@@ -499,13 +529,13 @@ fn expectRoundTrip(comptime T: type, json: []const u8) !void {
     var value = try parseFromJson(T, allocator, json);
     defer deinitParsed(T, allocator, &value);
 
-    const encoded = try util.encodeJsonValue(allocator, value);
+    const encoded = try util.encodeJsonValue(allocator, &value);
     defer allocator.free(encoded);
 
     var decoded = try parseFromJson(T, allocator, encoded);
     defer deinitParsed(T, allocator, &decoded);
 
-    const reencoded = try util.encodeJsonValue(allocator, decoded);
+    const reencoded = try util.encodeJsonValue(allocator, &decoded);
     defer allocator.free(reencoded);
     try std.testing.expectEqualStrings(encoded, reencoded);
 }
@@ -514,7 +544,7 @@ fn encodedFromJson(comptime T: type, json: []const u8) ![]u8 {
     const allocator = std.testing.allocator;
     var value = try parseFromJson(T, allocator, json);
     defer deinitParsed(T, allocator, &value);
-    return util.encodeJsonValue(allocator, value);
+    return util.encodeJsonValue(allocator, &value);
 }
 
 fn parseFromJson(comptime T: type, allocator: std.mem.Allocator, json: []const u8) !T {

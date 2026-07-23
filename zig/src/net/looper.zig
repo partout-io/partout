@@ -634,7 +634,7 @@ pub const Looper = struct {
         self.lock.unlock();
 
         const processed_result = if (transform) |callback|
-            self.callTransform(callback, packets)
+            callTransform(callback, packets)
         else
             packets;
 
@@ -693,7 +693,7 @@ pub const Looper = struct {
         self.lock.unlock();
 
         const processed = if (transform) |callback|
-            self.callTransform(callback, packets) catch |err| {
+            callTransform(callback, packets) catch |err| {
                 log.writef(.err, "{} write transform failed: {}", .{
                     side,
                     err,
@@ -859,7 +859,7 @@ pub const Looper = struct {
         self.queueCompletionLocked(completion, null);
     }
 
-    fn handleEnableReadLocked(self: *Looper, side: io.Side) io.Error!void {
+    fn handleEnableReadLocked(self: *const Looper, side: io.Side) io.Error!void {
         if (self.sideIO(side)) |side_io| {
             try side_io.setRead(self.mux, true);
         } else {
@@ -868,7 +868,7 @@ pub const Looper = struct {
     }
 
     fn handleEnableWriteLocked(
-        self: *Looper,
+        self: *const Looper,
         side: io.Side,
         fd_set: *DescriptorSet,
     ) io.Error!void {
@@ -944,7 +944,7 @@ pub const Looper = struct {
                     },
                     else => return .{ .side_failure = .{
                         .side = side_io.side,
-                        .failure = self.ioFailure(side_io, err),
+                        .failure = side_io.ioFailure(err),
                     } },
                 }
             };
@@ -961,7 +961,7 @@ pub const Looper = struct {
         return .ok;
     }
 
-    fn processRead(self: *Looper, side_io: *SideIO) ProcessOutcome {
+    fn processRead(self: *const Looper, side_io: *SideIO) ProcessOutcome {
         var inbox: std.ArrayList(Packet) = .empty;
         defer {
             for (inbox.items) |packet| self.allocator.free(@constCast(packet));
@@ -975,7 +975,7 @@ pub const Looper = struct {
                 if (err == error.WouldBlock) break;
                 return .{ .side_failure = .{
                     .side = side_io.side,
-                    .failure = self.ioFailure(side_io, err),
+                    .failure = side_io.ioFailure(err),
                 } };
             };
             if (maybe_count) |count| {
@@ -1132,7 +1132,7 @@ pub const Looper = struct {
         self.lock.unlock();
     }
 
-    fn wakeLocked(self: *Looper) void {
+    fn wakeLocked(self: *const Looper) void {
         _ = c.pp_mux_wake(self.mux);
     }
 
@@ -1145,18 +1145,15 @@ pub const Looper = struct {
     }
 
     fn callTransform(
-        self: *Looper,
         transform: TransformWrite,
         packets: Packets,
     ) anyerror!Packets {
-        _ = self;
         borrowed_callback_depth += 1;
         defer borrowed_callback_depth -= 1;
         return transform.call(packets);
     }
 
-    fn callNativeCleanup(self: *Looper, side_io: *SideIO) void {
-        _ = self;
+    fn callNativeCleanup(side_io: *SideIO) void {
         borrowed_callback_depth += 1;
         defer borrowed_callback_depth -= 1;
         side_io.cleanupNative();
@@ -1182,7 +1179,7 @@ pub const Looper = struct {
         side_io.transform_drainer.drain(&self.lock);
         const should_cleanup = side_io.detachFromMux(self.mux);
         self.lock.unlock();
-        if (should_cleanup) self.callNativeCleanup(side_io);
+        if (should_cleanup) callNativeCleanup(side_io);
         side_io.destroyStorage(self.allocator);
         self.lock.lock();
     }
@@ -1205,7 +1202,7 @@ pub const Looper = struct {
         c.pp_mux_free(self.mux);
     }
 
-    fn sideIO(self: *Looper, side: io.Side) ?*SideIO {
+    fn sideIO(self: *const Looper, side: io.Side) ?*SideIO {
         return switch (side) {
             .link => self.link,
             .tun => self.tun,
@@ -1226,22 +1223,10 @@ pub const Looper = struct {
         };
     }
 
-    fn isOutdatedLocked(self: *Looper, identity: SideIdentity) bool {
+    fn isOutdatedLocked(self: *const Looper, identity: SideIdentity) bool {
         const id = identity.id orelse return false;
         const side_io = self.sideIO(identity.side) orelse return true;
         return id != side_io.id;
-    }
-
-    fn ioFailure(self: *Looper, side_io: *SideIO, cause: io.Error) Failure {
-        _ = self;
-        return .{ .io = .{
-            .side = side_io.side,
-            .cause = cause,
-            .code = if (cause == error.LibcFailure)
-                side_io.native_io.lastErrorCode()
-            else
-                null,
-        } };
     }
 
     fn pendingWrite(self: *Looper, side_io: *SideIO) ?queue_mod.PendingWrite {
@@ -1250,7 +1235,7 @@ pub const Looper = struct {
         return side_io.write_queue.pending();
     }
 
-    fn createCommandNode(self: *Looper, command: Command) std.mem.Allocator.Error!*CommandNode {
+    fn createCommandNode(self: *const Looper, command: Command) std.mem.Allocator.Error!*CommandNode {
         const node = try self.allocator.create(CommandNode);
         node.* = .{ .command = command };
         return node;
@@ -1382,7 +1367,7 @@ pub const Looper = struct {
             allocator.destroy(self);
         }
 
-        fn resetEvents(self: *SideIO) io.Error!void {
+        fn resetEvents(self: *const SideIO) io.Error!void {
             return self.native_io.resetEvents();
         }
 
@@ -1398,7 +1383,7 @@ pub const Looper = struct {
             try self.syncEventMask();
         }
 
-        fn syncEventMask(self: *SideIO) io.Error!void {
+        fn syncEventMask(self: *const SideIO) io.Error!void {
             return self.native_io.setEventMask(self.is_reading, self.is_writing);
         }
 
@@ -1409,8 +1394,19 @@ pub const Looper = struct {
             return true;
         }
 
-        fn cleanupNative(self: *SideIO) void {
+        fn cleanupNative(self: *const SideIO) void {
             self.native_io.cleanup();
+        }
+
+        fn ioFailure(self: *const SideIO, cause: io.Error) Failure {
+            return .{ .io = .{
+                .side = self.side,
+                .cause = cause,
+                .code = if (cause == error.LibcFailure)
+                    self.native_io.lastErrorCode()
+                else
+                    null,
+            } };
         }
     };
 
@@ -1452,7 +1448,7 @@ pub const Looper = struct {
         }
 
         fn insert(
-            self: *DescriptorSet,
+            self: *const DescriptorSet,
             list: *std.ArrayList(io.FileDescriptor),
             fd: io.FileDescriptor,
         ) std.mem.Allocator.Error!void {

@@ -44,8 +44,8 @@ pub const WireGuardAdapter = struct {
     module_id: api.UUID,
     backend: impl.Backend,
     controller: net.TunnelController,
-    profile: api.Profile,
-    configuration: api.WireGuardConfiguration,
+    profile: *const api.Profile,
+    configuration: *const api.WireGuardConfiguration,
     endpoint_resolver: PeerEndpointResolver,
     network_change_behavior: NetworkChangeBehavior,
     state: State = .stopped,
@@ -88,8 +88,8 @@ pub const WireGuardAdapter = struct {
         controller: net.TunnelController,
         dns_resolver: net.DNSResolver,
         factory: net.SocketFactory,
-        profile: api.Profile,
-        configuration: api.WireGuardConfiguration,
+        profile: *const api.Profile,
+        configuration: *const api.WireGuardConfiguration,
         dns_timeout_ms: u32,
     ) WireGuardAdapter {
         return .{
@@ -202,7 +202,7 @@ pub const WireGuardAdapter = struct {
     }
 
     fn startBackend(
-        self: *WireGuardAdapter,
+        self: *const WireGuardAdapter,
         allocator: std.mem.Allocator,
         wg_config: []const u8,
     ) StartBackendError!i32 {
@@ -229,7 +229,7 @@ pub const WireGuardAdapter = struct {
     }
 
     fn configureSockets(
-        self: *WireGuardAdapter,
+        self: *const WireGuardAdapter,
         allocator: std.mem.Allocator,
         handle: i32,
     ) ConfigureSocketsError!void {
@@ -316,7 +316,7 @@ pub const WireGuardAdapter = struct {
         self.refreshSockets(allocator, handle);
     }
 
-    fn refreshSockets(self: *WireGuardAdapter, allocator: std.mem.Allocator, handle: i32) void {
+    fn refreshSockets(self: *const WireGuardAdapter, allocator: std.mem.Allocator, handle: i32) void {
         self.backend.bumpSockets(handle, true);
         self.configureSockets(allocator, handle) catch |err| {
             log.writef(.err, "WireGuard: Unable to configure sockets after network change: {}", .{err});
@@ -403,7 +403,7 @@ pub const WireGuardAdapter = struct {
 
 fn buildConfiguration(
     allocator: std.mem.Allocator,
-    configuration: api.WireGuardConfiguration,
+    configuration: *const api.WireGuardConfiguration,
     endpoint_resolver: *PeerEndpointResolver,
     scope: WireGuardAdapter.ConfigurationScope,
 ) WireGuardAdapter.BuildConfigurationError![]u8 {
@@ -427,7 +427,7 @@ pub const testing = struct {
 
     pub fn buildUapiConfiguration(
         allocator: std.mem.Allocator,
-        configuration: api.WireGuardConfiguration,
+        configuration: *const api.WireGuardConfiguration,
         dns_resolver: net.DNSResolver,
     ) WireGuardAdapter.BuildConfigurationError![]u8 {
         var endpoint_resolver = PeerEndpointResolver.init(

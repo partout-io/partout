@@ -10,21 +10,26 @@ const api = core.api;
 pub fn serializeModule(
     _: ?*anyopaque,
     allocator: std.mem.Allocator,
-    module: api.TaggedModule,
+    module: *const api.TaggedModule,
     _: ?*anyopaque,
 ) core.SerializeError![]u8 {
-    const wireguard = switch (module) {
-        .WireGuard => |value| value,
+    // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
+    const configuration = switch (module.*) {
+        .WireGuard => |*wireguard| blk: {
+            const value = if (wireguard.configuration) |*configuration|
+                configuration
+            else
+                return error.IncompleteModule;
+            break :blk value;
+        },
         else => return error.UnexpectedModuleType,
     };
-    // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
-    const cfg = wireguard.configuration orelse return error.IncompleteModule;
-    return serializeConfiguration(allocator, cfg);
+    return serializeConfiguration(allocator, configuration);
 }
 
 pub fn serializeConfiguration(
     allocator: std.mem.Allocator,
-    configuration: api.WireGuardConfiguration,
+    configuration: *const api.WireGuardConfiguration,
 ) core.SerializeError![]u8 {
     try validateRequiredKey(configuration.interface.private_key);
 
@@ -38,10 +43,10 @@ pub fn serializeConfiguration(
         try output.line("ListenPort = {}", .{listen_port});
     }
     try output.subnets(allocator, "Address", configuration.interface.addresses);
-    if (configuration.interface.dns) |dns| try output.dns(dns);
+    if (configuration.interface.dns) |*dns| try output.dns(dns);
     if (configuration.interface.mtu) |mtu| try output.line("MTU = {}", .{mtu});
 
-    for (configuration.peers) |peer| {
+    for (configuration.peers) |*peer| {
         try validateRequiredKey(peer.public_key);
         try output.line("[Peer]", .{});
         try output.line("PublicKey = {s}", .{peer.public_key.raw});
@@ -74,12 +79,12 @@ const ConfigurationWriter = struct {
         self.has_lines = true;
     }
 
-    fn writeAll(self: *ConfigurationWriter, text: []const u8) core.SerializeError!void {
+    fn writeAll(self: *const ConfigurationWriter, text: []const u8) core.SerializeError!void {
         self.writer.writeAll(text) catch return error.OutOfMemory;
     }
 
     fn print(
-        self: *ConfigurationWriter,
+        self: *const ConfigurationWriter,
         comptime format: []const u8,
         args: anytype,
     ) core.SerializeError!void {
@@ -116,7 +121,7 @@ const ConfigurationWriter = struct {
         }
     }
 
-    fn dns(self: *ConfigurationWriter, configuration: api.DNSModule) core.SerializeError!void {
+    fn dns(self: *ConfigurationWriter, configuration: *const api.DNSModule) core.SerializeError!void {
         const domains = configuration.search_domains orelse &.{};
         if (configuration.servers.len == 0 and domains.len == 0) return;
 

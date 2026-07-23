@@ -11,9 +11,9 @@ const util = core.util;
 
 pub const TunnelRemoteInfoBuilder = struct {
     allocator: std.mem.Allocator,
-    profile: api.Profile,
+    profile: *const api.Profile,
     module_id: api.UUID,
-    configuration: api.WireGuardConfiguration,
+    configuration: *const api.WireGuardConfiguration,
 
     pub const Error = std.mem.Allocator.Error || error{IdGeneration};
 
@@ -21,9 +21,9 @@ pub const TunnelRemoteInfoBuilder = struct {
 
     pub fn init(
         allocator: std.mem.Allocator,
-        profile: api.Profile,
+        profile: *const api.Profile,
         module_id: api.UUID,
-        configuration: api.WireGuardConfiguration,
+        configuration: *const api.WireGuardConfiguration,
     ) Self {
         return .{
             .allocator = allocator,
@@ -56,7 +56,7 @@ pub const TunnelRemoteInfoBuilder = struct {
         };
     }
 
-    fn buildDNSModule(self: Self, source: api.DNSModule) Error!api.DNSModule {
+    fn buildDNSModule(self: Self, source: *const api.DNSModule) Error!api.DNSModule {
         // Unlike the synthesized IP module below, this DNS module already
         // belongs to the WireGuard configuration. Preserve its identity just
         // as Swift does so controller/reporting code can correlate it.
@@ -100,7 +100,7 @@ pub const TunnelRemoteInfoBuilder = struct {
                 try routes.append(self.allocator, owned);
             }
         }
-        for (self.configuration.peers) |peer| {
+        for (self.configuration.peers) |*peer| {
             for (peer.allowed_ips) |subnet| {
                 if (subnet.address.family != family) continue;
                 var owned = try self.buildPeerRoute(subnet);
@@ -144,7 +144,7 @@ pub const TunnelRemoteInfoBuilder = struct {
             errdefer module.deinit(self.allocator);
             try modules.append(self.allocator, module);
         }
-        if (self.configuration.interface.dns) |dns| {
+        if (self.configuration.interface.dns) |*dns| {
             var module = api.TaggedModule{ .DNS = try self.buildDNSModule(dns) };
             errdefer module.deinit(self.allocator);
             try modules.append(self.allocator, module);

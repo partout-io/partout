@@ -1,0 +1,582 @@
+// SPDX-FileCopyrightText: 2026 Davide De Rosa
+//
+// SPDX-License-Identifier: GPL-3.0
+
+const std = @import("std");
+const c_exports_mod = @import("../../c/exports.zig");
+const core_mod = @import("../../core/exports.zig");
+const configuration_mod = @import("configuration.zig");
+const constants_mod = @import("constants.zig");
+const crypto_mod = @import("crypto.zig");
+const push_mod = @import("push.zig");
+const tls_mod = @import("tls.zig");
+
+const api = core_mod.api;
+const c_crypto = c_exports_mod.crypto;
+
+const ControlConstants = constants_mod.Control;
+const CryptoKeys = crypto_mod.CryptoKeys;
+const CryptoKeyPair = CryptoKeys.KeyPair;
+const Keys = constants_mod.Keys;
+const PRNG = crypto_mod.PRNG;
+const TLSWrapper = tls_mod.TLSWrapper;
+const ZeroingData = crypto_mod.ZeroingData;
+
+/// Key-method 2 client/server random material.
+pub const Handshake = struct {
+    pre_master: ZeroingData,
+    random1: ZeroingData,
+    random2: ZeroingData,
+    server_random1: ZeroingData,
+    server_random2: ZeroingData,
+
+    pub fn clone(self: Handshake, allocator: std.mem.Allocator) !Handshake {
+        var pre_master = try self.pre_master.clone(allocator);
+        errdefer pre_master.deinit(allocator);
+        var random1 = try self.random1.clone(allocator);
+        errdefer random1.deinit(allocator);
+        var random2 = try self.random2.clone(allocator);
+        errdefer random2.deinit(allocator);
+        var server_random1 = try self.server_random1.clone(allocator);
+        errdefer server_random1.deinit(allocator);
+        const server_random2 = try self.server_random2.clone(allocator);
+        return .{
+            .pre_master = pre_master,
+            .random1 = random1,
+            .random2 = random2,
+            .server_random1 = server_random1,
+            .server_random2 = server_random2,
+        };
+    }
+
+    pub fn deinit(self: *Handshake, allocator: std.mem.Allocator) void {
+        self.pre_master.deinit(allocator);
+        self.random1.deinit(allocator);
+        self.random2.deinit(allocator);
+        self.server_random1.deinit(allocator);
+        self.server_random2.deinit(allocator);
+        self.* = undefined;
+    }
+};
+
+/// Parameters for deriving the four OpenVPN key-method 2 keys.
+pub const PRF = struct {
+    fnt: c_crypto.pp_crypto_fnt,
+    handshake: ?Handshake,
+    session_id: ?[]u8,
+    remote_session_id: ?[]u8,
+
+    /// Clones all input data so this value may outlive the negotiation that
+    /// produced it.
+    pub fn init(
+        allocator: std.mem.Allocator,
+        fnt: c_crypto.pp_crypto_fnt,
+        handshake: *const Handshake,
+        session_id: []const u8,
+        remote_session_id: []const u8,
+    ) !PRF {
+        var owned_handshake = try handshake.clone(allocator);
+        errdefer owned_handshake.deinit(allocator);
+        const owned_session_id = try allocator.dupe(u8, session_id);
+        errdefer allocator.free(owned_session_id);
+        const owned_remote_session_id = try allocator.dupe(u8, remote_session_id);
+        return .{
+            .fnt = fnt,
+            .handshake = owned_handshake,
+            .session_id = owned_session_id,
+            .remote_session_id = owned_remote_session_id,
+        };
+    }
+
+    pub fn deinit(self: *PRF, allocator: std.mem.Allocator) void {
+        if (self.handshake) |*value| value.deinit(allocator);
+        if (self.session_id) |value| allocator.free(value);
+        if (self.remote_session_id) |value| allocator.free(value);
+        self.handshake = null;
+        self.session_id = null;
+        self.remote_session_id = null;
+    }
+
+    pub fn derive(self: *const PRF, allocator: std.mem.Allocator) !CryptoKeys {
+        std.debug.assert(self.handshake != null);
+        std.debug.assert(self.session_id != null);
+        std.debug.assert(self.remote_session_id != null);
+        const handshake = self.handshake.?;
+
+        var master_data = try prfData(allocator, .{
+            .fnt = self.fnt,
+            .label = Keys.label1,
+            .secret = handshake.pre_master.bytes,
+            .client_seed = handshake.random1.bytes,
+            .server_seed = handshake.server_random1.bytes,
+            .size = Keys.pre_master_length,
+        });
+        defer master_data.deinit(allocator);
+
+        var keys_data = try prfData(allocator, .{
+            .fnt = self.fnt,
+            .label = Keys.label2,
+            .secret = master_data.bytes,
+            .client_seed = handshake.random2.bytes,
+            .server_seed = handshake.server_random2.bytes,
+            .client_session_id = self.session_id.?,
+            .server_session_id = self.remote_session_id.?,
+            .size = Keys.keys_count * Keys.key_length,
+        });
+        defer keys_data.deinit(allocator);
+        std.debug.assert(keys_data.bytes.len == Keys.keys_count * Keys.key_length);
+
+        var parts: [Keys.keys_count]ZeroingData = undefined;
+        var initialized: usize = 0;
+        errdefer for (parts[0..initialized]) |*part| part.deinit(allocator);
+        for (&parts, 0..) |*part, index| {
+            part.* = keys_data.sliceCopy(
+                allocator,
+                index * Keys.key_length,
+                Keys.key_length,
+            ) catch unreachable;
+            initialized += 1;
+        }
+
+        return CryptoKeys.init(
+            CryptoKeyPair.init(parts[0].move(), parts[2].move()),
+            CryptoKeyPair.init(parts[1].move(), parts[3].move()),
+        );
+    }
+
+    fn prfData(allocator: std.mem.Allocator, input: PRFInput) !ZeroingData {
+        var seed = try ZeroingData.initCopy(allocator, input.label);
+        defer seed.deinit(allocator);
+        try seed.append(allocator, input.client_seed);
+        try seed.append(allocator, input.server_seed);
+        if (input.client_session_id) |value| try seed.append(allocator, value);
+        if (input.server_session_id) |value| try seed.append(allocator, value);
+
+        const half = input.secret.len / 2;
+        const half_rounded_up = half + (input.secret.len & 1);
+        var hash1 = try keysHash(
+            allocator,
+            input.fnt,
+            "MD5",
+            input.secret[0..half_rounded_up],
+            seed.bytes,
+            input.size,
+        );
+        defer hash1.deinit(allocator);
+        var hash2 = try keysHash(
+            allocator,
+            input.fnt,
+            "SHA1",
+            input.secret[half..][0..half_rounded_up],
+            seed.bytes,
+            input.size,
+        );
+        defer hash2.deinit(allocator);
+
+        const result = try ZeroingData.init(allocator, input.size);
+        for (result.bytes, hash1.bytes, hash2.bytes) |*dst, lhs, rhs| dst.* = lhs ^ rhs;
+        return result;
+    }
+
+    fn keysHash(
+        allocator: std.mem.Allocator,
+        fnt: c_crypto.pp_crypto_fnt,
+        digest_name: [*:0]const u8,
+        secret: []const u8,
+        seed: []const u8,
+        size: usize,
+    ) !ZeroingData {
+        var output = try ZeroingData.init(allocator, 0);
+        errdefer output.deinit(allocator);
+        var chain = try hmac(allocator, fnt, digest_name, secret, seed);
+        defer chain.deinit(allocator);
+
+        while (output.bytes.len < size) {
+            var chain_and_seed = try chain.clone(allocator);
+            defer chain_and_seed.deinit(allocator);
+            try chain_and_seed.append(allocator, seed);
+
+            var block = try hmac(allocator, fnt, digest_name, secret, chain_and_seed.bytes);
+            defer block.deinit(allocator);
+            try output.append(allocator, block.bytes);
+
+            var next_chain = try hmac(allocator, fnt, digest_name, secret, chain.bytes);
+            chain.deinit(allocator);
+            chain = next_chain.move();
+        }
+
+        const truncated = output.sliceCopy(allocator, 0, size) catch unreachable;
+        output.deinit(allocator);
+        return truncated;
+    }
+
+    fn hmac(
+        allocator: std.mem.Allocator,
+        fnt: c_crypto.pp_crypto_fnt,
+        digest_name: [*:0]const u8,
+        secret: []const u8,
+        data: []const u8,
+    ) !ZeroingData {
+        const hmac_max_length = 128;
+        var buffer = try ZeroingData.init(allocator, hmac_max_length);
+        errdefer buffer.deinit(allocator);
+        var context = c_crypto.pp_hmac_ctx{
+            .dst = buffer.bytes.ptr,
+            .dst_len = buffer.bytes.len,
+            .digest_name = digest_name,
+            .secret = secret.ptr,
+            .secret_len = secret.len,
+            .data = data.ptr,
+            .data_len = data.len,
+        };
+        const hmac_do = fnt.hmac_do orelse return error.UnsupportedAlgorithm;
+        const length = hmac_do(&context);
+        if (length == 0 or length > buffer.bytes.len) return error.UnsupportedAlgorithm;
+        const result = buffer.sliceCopy(allocator, 0, length) catch unreachable;
+        buffer.deinit(allocator);
+        return result;
+    }
+};
+
+pub const Authenticator = struct {
+    allocator: std.mem.Allocator,
+    control_buffer: ZeroingData,
+    pre_master: ZeroingData,
+    random1: ZeroingData,
+    random2: ZeroingData,
+    server_random1: ?ZeroingData = null,
+    server_random2: ?ZeroingData = null,
+    server_options: ?ServerOCC = null,
+    username: ?ZeroingData = null,
+    password: ?ZeroingData = null,
+    with_local_options: bool = true,
+    ssl_version: ?[]const u8 = null,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        prng: PRNG,
+        username: ?[]const u8,
+        password: ?[]const u8,
+    ) !Authenticator {
+        var pre_master = try prng.safeData(allocator, Keys.pre_master_length);
+        errdefer pre_master.deinit(allocator);
+        var random1 = try prng.safeData(allocator, Keys.random_length);
+        errdefer random1.deinit(allocator);
+        var random2 = try prng.safeData(allocator, Keys.random_length);
+        errdefer random2.deinit(allocator);
+        var control_buffer = try ZeroingData.init(allocator, 0);
+        errdefer control_buffer.deinit(allocator);
+
+        var username_data: ?ZeroingData = null;
+        errdefer if (username_data) |*value| value.deinit(allocator);
+        var password_data: ?ZeroingData = null;
+        errdefer if (password_data) |*value| value.deinit(allocator);
+        if (username != null and password != null) {
+            username_data = try ZeroingData.initString(allocator, username.?, true);
+            password_data = try ZeroingData.initString(allocator, password.?, true);
+        }
+
+        return .{
+            .allocator = allocator,
+            .control_buffer = control_buffer,
+            .pre_master = pre_master,
+            .random1 = random1,
+            .random2 = random2,
+            .username = username_data,
+            .password = password_data,
+        };
+    }
+
+    pub fn deinit(self: *Authenticator) void {
+        const allocator = self.allocator;
+        self.control_buffer.deinit(allocator);
+        self.pre_master.deinit(allocator);
+        self.random1.deinit(allocator);
+        self.random2.deinit(allocator);
+        if (self.server_random1) |*value| value.deinit(allocator);
+        if (self.server_random2) |*value| value.deinit(allocator);
+        if (self.username) |*value| value.deinit(allocator);
+        if (self.password) |*value| value.deinit(allocator);
+        self.* = undefined;
+    }
+
+    pub fn reset(self: *Authenticator) void {
+        const allocator = self.allocator;
+        self.control_buffer.zero();
+        self.pre_master.zero();
+        self.random1.zero();
+        self.random2.zero();
+        if (self.server_random1) |*value| value.deinit(allocator);
+        if (self.server_random2) |*value| value.deinit(allocator);
+        if (self.username) |*value| value.deinit(allocator);
+        if (self.password) |*value| value.deinit(allocator);
+        self.server_random1 = null;
+        self.server_random2 = null;
+        self.server_options = null;
+        self.username = null;
+        self.password = null;
+    }
+
+    pub fn putAuth(
+        self: *const Authenticator,
+        tls: *TLSWrapper,
+        configuration: *const api.OpenVPNConfiguration,
+    ) !void {
+        var raw = try self.authData(configuration);
+        defer raw.deinit(self.allocator);
+        try tls.putRawPlainText(raw.bytes);
+    }
+
+    fn authData(
+        self: *const Authenticator,
+        configuration: *const api.OpenVPNConfiguration,
+    ) !ZeroingData {
+        const allocator = self.allocator;
+        var raw = try ZeroingData.initCopy(allocator, &ControlConstants.tls_prefix);
+        errdefer raw.deinit(allocator);
+
+        raw.appendData(self.pre_master);
+        raw.appendData(self.random1);
+        raw.appendData(self.random2);
+
+        const local_options = try configuration_mod.localOptionsStringAlloc(
+            allocator,
+            configuration,
+            self.with_local_options,
+        );
+        defer allocator.free(local_options);
+        var local_options_data = try ZeroingData.initString(allocator, local_options, true);
+        defer local_options_data.deinit(allocator);
+        try appendSized(&raw, allocator, local_options_data);
+
+        if (self.username != null and self.password != null) {
+            try appendSized(&raw, allocator, self.username.?);
+            try appendSized(&raw, allocator, self.password.?);
+        } else {
+            try raw.append(allocator, &.{ 0, 0, 0, 0 });
+        }
+
+        const negotiated = try configuration_mod.negotiableDataCiphers(
+            allocator,
+            configuration,
+        );
+        defer if (negotiated) |value| allocator.free(value);
+        const cipher_line = if (negotiated) |ciphers|
+            try cipherLineAlloc(allocator, ciphers)
+        else
+            null;
+        defer if (cipher_line) |value| allocator.free(value);
+        const extra_lines: []const []const u8 = if (cipher_line) |value|
+            &.{value}
+        else
+            &.{};
+        const peer_info = try push_mod.peerInfoAlloc(
+            allocator,
+            "io.partout 0.151.0",
+            self.ssl_version,
+            extra_lines,
+        );
+        defer allocator.free(peer_info);
+        var peer_info_data = try ZeroingData.initString(allocator, peer_info, true);
+        defer peer_info_data.deinit(allocator);
+        try appendSized(&raw, allocator, peer_info_data);
+        return raw;
+    }
+
+    pub fn appendControlData(
+        self: *Authenticator,
+        data: []const u8,
+    ) !void {
+        return self.control_buffer.append(self.allocator, data);
+    }
+
+    pub fn parseAuthReply(self: *Authenticator) !bool {
+        const prefix_length = ControlConstants.tls_prefix.len;
+        const minimum_length = prefix_length + 2 * Keys.random_length + 2;
+        if (self.control_buffer.bytes.len < minimum_length) return false;
+        if (!std.mem.eql(
+            u8,
+            self.control_buffer.bytes[0..prefix_length],
+            &ControlConstants.tls_prefix,
+        )) return error.WrongControlDataPrefix;
+
+        var offset = prefix_length;
+        const random1_offset = offset;
+        offset += Keys.random_length;
+        const random2_offset = offset;
+        offset += Keys.random_length;
+        const options_length = self.control_buffer.networkU16(offset) catch unreachable;
+        offset += 2;
+        if (self.control_buffer.bytes.len - offset < options_length) return false;
+
+        var server_random1 = self.control_buffer.sliceCopy(
+            self.allocator,
+            random1_offset,
+            Keys.random_length,
+        ) catch unreachable;
+        errdefer server_random1.deinit(self.allocator);
+        var server_random2 = self.control_buffer.sliceCopy(
+            self.allocator,
+            random2_offset,
+            Keys.random_length,
+        ) catch unreachable;
+        errdefer server_random2.deinit(self.allocator);
+        var server_options_data = self.control_buffer.sliceCopy(
+            self.allocator,
+            offset,
+            options_length,
+        ) catch unreachable;
+        defer server_options_data.deinit(self.allocator);
+        offset += options_length;
+
+        const parsed_options: ?ServerOCC = if (server_options_data.nullTerminatedString(0)) |value|
+            ServerOCC.parse(value)
+        else
+            null;
+        try self.control_buffer.removePrefix(self.allocator, offset);
+
+        if (self.server_random1) |*value| value.deinit(self.allocator);
+        if (self.server_random2) |*value| value.deinit(self.allocator);
+        self.server_random1 = server_random1.move();
+        self.server_random2 = server_random2.move();
+        if (parsed_options) |value| self.server_options = value;
+        return true;
+    }
+
+    /// Returns all complete NUL-terminated messages. Caller owns the rows and
+    /// outer slice.
+    pub fn parseMessages(
+        self: *Authenticator,
+        allocator: std.mem.Allocator,
+    ) ![][]u8 {
+        var messages: std.ArrayList([]u8) = .empty;
+        errdefer {
+            for (messages.items) |message| allocator.free(message);
+            messages.deinit(allocator);
+        }
+        var offset: usize = 0;
+        while (offset < self.control_buffer.bytes.len) {
+            const tail = self.control_buffer.bytes[offset..];
+            const length = std.mem.indexOfScalar(u8, tail, 0) orelse break;
+            const message = tail[0..length];
+            if (!std.unicode.utf8ValidateSlice(message)) break;
+            try messages.append(allocator, try allocator.dupe(u8, message));
+            offset += length + 1;
+        }
+        self.control_buffer.removePrefix(self.allocator, offset) catch unreachable;
+        return messages.toOwnedSlice(allocator);
+    }
+
+    /// Returns an owned handshake once both server randoms are available.
+    pub fn response(
+        self: *const Authenticator,
+        allocator: std.mem.Allocator,
+    ) !?Handshake {
+        const remote1 = self.server_random1 orelse return null;
+        const remote2 = self.server_random2 orelse return null;
+        var pre_master = try self.pre_master.clone(allocator);
+        errdefer pre_master.deinit(allocator);
+        var random1 = try self.random1.clone(allocator);
+        errdefer random1.deinit(allocator);
+        var random2 = try self.random2.clone(allocator);
+        errdefer random2.deinit(allocator);
+        var server_random1 = try remote1.clone(allocator);
+        errdefer server_random1.deinit(allocator);
+        const server_random2 = try remote2.clone(allocator);
+        return .{
+            .pre_master = pre_master,
+            .random1 = random1,
+            .random2 = random2,
+            .server_random1 = server_random1,
+            .server_random2 = server_random2,
+        };
+    }
+
+    fn appendSized(
+        destination: *ZeroingData,
+        allocator: std.mem.Allocator,
+        source: ZeroingData,
+    ) !void {
+        if (source.bytes.len > std.math.maxInt(u16)) return error.Assertion;
+        var encoded: [2]u8 = undefined;
+        std.mem.writeInt(u16, &encoded, @intCast(source.bytes.len), .big);
+        try destination.append(allocator, &encoded);
+        destination.appendData(source);
+    }
+
+    fn cipherLineAlloc(
+        allocator: std.mem.Allocator,
+        ciphers: []const api.OpenVPNCipher,
+    ) ![]u8 {
+        var output: std.Io.Writer.Allocating = .init(allocator);
+        errdefer output.deinit();
+        const writer = &output.writer;
+        writer.writeAll("IV_CIPHERS=") catch return error.OutOfMemory;
+        for (ciphers, 0..) |cipher, index| {
+            if (index > 0) writer.writeByte(':') catch return error.OutOfMemory;
+            writer.writeAll(cipher.raw()) catch return error.OutOfMemory;
+        }
+        return output.toOwnedSlice();
+    }
+};
+
+pub const testing = struct {
+    pub const ServerOptions = ServerOCC;
+
+    pub fn authData(
+        authenticator: *Authenticator,
+        configuration: *const api.OpenVPNConfiguration,
+    ) !ZeroingData {
+        return authenticator.authData(configuration);
+    }
+};
+
+const PRFInput = struct {
+    fnt: c_crypto.pp_crypto_fnt,
+    label: []const u8,
+    secret: []const u8,
+    client_seed: []const u8,
+    server_seed: []const u8,
+    client_session_id: ?[]const u8 = null,
+    server_session_id: ?[]const u8 = null,
+    size: usize,
+};
+
+const ServerOCC = struct {
+    cipher: ?api.OpenVPNCipher = null,
+    digest: ?api.OpenVPNDigest = null,
+
+    pub fn parse(string: []const u8) ServerOCC {
+        var result: ServerOCC = .{};
+        var lines = std.mem.splitScalar(u8, string, ',');
+        while (lines.next()) |raw_line| {
+            const line = std.mem.trim(u8, raw_line, " \t\r\n");
+            var components = std.mem.tokenizeAny(u8, line, " \t\r\n");
+            const option = components.next() orelse continue;
+            const value = components.next() orelse continue;
+
+            if (std.ascii.eqlIgnoreCase(option, "cipher")) {
+                result.cipher = parseCipher(value);
+            } else if (std.ascii.eqlIgnoreCase(option, "data-ciphers-fallback")) {
+                if (result.cipher == null) result.cipher = parseCipher(value);
+            } else if (std.ascii.eqlIgnoreCase(option, "auth")) {
+                result.digest = parseDigest(value);
+            }
+        }
+        return result;
+    }
+
+    fn parseCipher(value: []const u8) ?api.OpenVPNCipher {
+        inline for (std.meta.tags(api.OpenVPNCipher)) |candidate| {
+            if (std.ascii.eqlIgnoreCase(value, candidate.raw())) return candidate;
+        }
+        return null;
+    }
+
+    fn parseDigest(value: []const u8) ?api.OpenVPNDigest {
+        inline for (std.meta.tags(api.OpenVPNDigest)) |candidate| {
+            if (std.ascii.eqlIgnoreCase(value, candidate.raw())) return candidate;
+        }
+        return null;
+    }
+};

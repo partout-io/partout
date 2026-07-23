@@ -63,12 +63,17 @@ const WireGuardConnection = struct {
         module: net.ConnectionModule,
         sandbox: net.Sandbox,
     ) net.ConnectionCreateError!net.Connection {
-        const wireguard_module = switch (module.module.*) {
-            .WireGuard => |wg| wg,
+        // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
+        const base_configuration = switch (module.module.*) {
+            .WireGuard => |*wireguard| blk: {
+                const configuration = if (wireguard.configuration) |*value|
+                    value
+                else
+                    return error.IncompleteModule;
+                break :blk configuration;
+            },
             else => unreachable,
         };
-        // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
-        const base_cfg = wireguard_module.configuration orelse return error.IncompleteModule;
 
         const created = try allocator.create(WireGuardConnection);
         errdefer allocator.destroy(created);
@@ -76,27 +81,28 @@ const WireGuardConnection = struct {
         const module_id = module.id();
         var configuration = try configurationApplyingActiveModules(
             allocator,
-            base_cfg,
-            sandbox.profile.*,
+            base_configuration,
+            sandbox.profile,
         );
         errdefer configuration.deinit(allocator);
 
         created.* = .{
             .allocator = allocator,
-            .adapter = WireGuardAdapter.init(
-                module_id,
-                backend,
-                sandbox.controller,
-                sandbox.resolver,
-                sandbox.factory,
-                sandbox.profile.*,
-                configuration,
-                sandbox.options.dns_timeout,
-            ),
+            .adapter = undefined,
             .configuration = configuration,
             .serialized_executor = sandbox.serialized_executor,
             .data_count_interval_ms = sandbox.options.min_data_count_interval,
         };
+        created.adapter = WireGuardAdapter.init(
+            module_id,
+            backend,
+            sandbox.controller,
+            sandbox.resolver,
+            sandbox.factory,
+            sandbox.profile,
+            &created.configuration,
+            sandbox.options.dns_timeout,
+        );
         log.writef(.notice, "WireGuard: Using v2-style connection for module {s}", .{module_id[0..]});
         return created.asConnection();
     }
@@ -292,8 +298,8 @@ const WireGuardConnection = struct {
 /// for DNS servers explicitly marked `routesThroughVPN`.
 fn configurationApplyingActiveModules(
     allocator: std.mem.Allocator,
-    source: api.WireGuardConfiguration,
-    profile: api.Profile,
+    source: *const api.WireGuardConfiguration,
+    profile: *const api.Profile,
 ) std.mem.Allocator.Error!api.WireGuardConfiguration {
     var configuration = source.clone(allocator) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
@@ -309,23 +315,23 @@ fn configurationApplyingActiveModules(
 fn appendActiveModuleAllowedIPs(
     allocator: std.mem.Allocator,
     peer: *api.WireGuardRemoteInterface,
-    profile: api.Profile,
+    profile: *const api.Profile,
 ) std.mem.Allocator.Error!void {
     var extra_count: usize = 0;
-    for (profile.modules) |module| {
-        if (!api.isActiveProfileModule(profile, api.moduleId(&module))) continue;
-        switch (module) {
-            .IP => |ip| {
-                if (ip.ipv4) |settings| extra_count += settings.included_routes.len;
-                if (ip.ipv6) |settings| extra_count += settings.included_routes.len;
+    for (profile.modules) |*module| {
+        if (!api.isActiveProfileModule(profile, api.moduleId(module))) continue;
+        switch (module.*) {
+            .IP => |*ip| {
+                if (ip.ipv4) |*settings| extra_count += settings.included_routes.len;
+                if (ip.ipv6) |*settings| extra_count += settings.included_routes.len;
             },
             else => {},
         }
     }
-    for (profile.modules) |module| {
-        if (!api.isActiveProfileModule(profile, api.moduleId(&module))) continue;
-        switch (module) {
-            .DNS => |dns| if (dns.routes_through_vpn orelse false) {
+    for (profile.modules) |*module| {
+        if (!api.isActiveProfileModule(profile, api.moduleId(module))) continue;
+        switch (module.*) {
+            .DNS => |*dns| if (dns.routes_through_vpn orelse false) {
                 for (dns.servers) |server| extra_count += @intFromBool(server.isIPAddress());
             },
             else => {},
@@ -344,15 +350,15 @@ fn appendActiveModuleAllowedIPs(
 
     // Keep the Swift ordering: all active IP routes first (v4 then v6 per
     // module), followed by VPN-routed DNS server host routes.
-    for (profile.modules) |module| {
-        if (!api.isActiveProfileModule(profile, api.moduleId(&module))) continue;
-        switch (module) {
-            .IP => |ip| {
-                if (ip.ipv4) |settings| for (settings.included_routes) |route| {
+    for (profile.modules) |*module| {
+        if (!api.isActiveProfileModule(profile, api.moduleId(module))) continue;
+        switch (module.*) {
+            .IP => |*ip| {
+                if (ip.ipv4) |*settings| for (settings.included_routes) |*route| {
                     combined[initialized] = try cloneRouteDestination(allocator, route, .v4);
                     initialized += 1;
                 };
-                if (ip.ipv6) |settings| for (settings.included_routes) |route| {
+                if (ip.ipv6) |*settings| for (settings.included_routes) |*route| {
                     combined[initialized] = try cloneRouteDestination(allocator, route, .v6);
                     initialized += 1;
                 };
@@ -360,11 +366,11 @@ fn appendActiveModuleAllowedIPs(
             else => {},
         }
     }
-    for (profile.modules) |module| {
-        if (!api.isActiveProfileModule(profile, api.moduleId(&module))) continue;
-        switch (module) {
-            .DNS => |dns| if (dns.routes_through_vpn orelse false) {
-                for (dns.servers) |server| {
+    for (profile.modules) |*module| {
+        if (!api.isActiveProfileModule(profile, api.moduleId(module))) continue;
+        switch (module.*) {
+            .DNS => |*dns| if (dns.routes_through_vpn orelse false) {
+                for (dns.servers) |*server| {
                     if (!server.isIPAddress()) continue;
                     combined[initialized] = try cloneAddressAsHostSubnet(allocator, server);
                     initialized += 1;
@@ -383,10 +389,10 @@ fn appendActiveModuleAllowedIPs(
 
 fn cloneRouteDestination(
     allocator: std.mem.Allocator,
-    route: api.Route,
+    route: *const api.Route,
     family: api.Address.Family,
 ) std.mem.Allocator.Error!api.Subnet {
-    if (route.destination) |destination| return cloneSubnet(allocator, destination);
+    if (route.destination) |*destination| return cloneSubnet(allocator, destination);
     return switch (family) {
         .v4 => (try api.Subnet.parseRawAlloc(allocator, "0.0.0.0/0")).?,
         .v6 => (try api.Subnet.parseRawAlloc(allocator, "::/0")).?,
@@ -396,7 +402,7 @@ fn cloneRouteDestination(
 
 fn cloneAddressAsHostSubnet(
     allocator: std.mem.Allocator,
-    address: api.Address,
+    address: *const api.Address,
 ) std.mem.Allocator.Error!api.Subnet {
     return .{
         .address = (try api.Address.parseRawAlloc(allocator, address.raw)).?,
@@ -410,7 +416,7 @@ fn cloneAddressAsHostSubnet(
 
 fn cloneSubnet(
     allocator: std.mem.Allocator,
-    subnet: api.Subnet,
+    subnet: *const api.Subnet,
 ) std.mem.Allocator.Error!api.Subnet {
     return .{
         .address = (try api.Address.parseRawAlloc(allocator, subnet.address.raw)).?,
@@ -467,8 +473,8 @@ pub const testing = struct {
 
     pub fn configurationWithActiveModules(
         allocator: std.mem.Allocator,
-        source: api.WireGuardConfiguration,
-        profile: api.Profile,
+        source: *const api.WireGuardConfiguration,
+        profile: *const api.Profile,
     ) std.mem.Allocator.Error!api.WireGuardConfiguration {
         return configurationApplyingActiveModules(allocator, source, profile);
     }

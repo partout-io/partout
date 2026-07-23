@@ -29,7 +29,7 @@ pub const Importer = struct {
         };
     }
 
-    pub fn deinit(self: *Importer, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const Importer, allocator: std.mem.Allocator) void {
         self.registry.deinit(allocator);
     }
 
@@ -40,7 +40,7 @@ pub const Importer = struct {
     ) ImportAndEncodeError![:0]u8 {
         var module = try self.registry.importModule(allocator, text, null);
         defer module.deinit(allocator);
-        return api.encodeModuleZ(allocator, module);
+        return api.encodeModuleZ(allocator, &module);
     }
 
     pub fn importProfile(
@@ -51,7 +51,7 @@ pub const Importer = struct {
     ) ImportAndEncodeError![:0]u8 {
         var profile = try self.registry.importProfile(allocator, text, name);
         defer profile.deinit(allocator);
-        return api.encodeProfileZ(allocator, profile);
+        return api.encodeProfileZ(allocator, &profile);
     }
 };
 

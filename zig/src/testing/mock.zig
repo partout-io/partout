@@ -34,7 +34,7 @@ pub const MockRuntime = struct {
         bindings: ?helpers.CDaemonBindings,
         runtime: *MockDaemonRuntime,
 
-        fn finishTeardown(self: *Instance, allocator: std.mem.Allocator) void {
+        fn finishTeardown(self: *const Instance, allocator: std.mem.Allocator) void {
             self.daemon.deinit(allocator);
             allocator.destroy(self.daemon);
             self.runtime.deinit(allocator);
@@ -64,7 +64,7 @@ pub const MockRuntime = struct {
         };
         errdefer profile.deinit(allocator);
 
-        const new_daemon = net_daemon.Daemon.create(allocator, profile, .{
+        const new_daemon = net_daemon.Daemon.create(allocator, &profile, .{
             .objects = .{
                 .registry = runtime.connectionRegistry(),
                 .controller = runtime.tunnelController(),
@@ -114,16 +114,16 @@ pub const MockRuntime = struct {
         return true;
     }
 
-    pub fn isStarted(self: *MockRuntime) bool {
+    pub fn isStarted(self: *const MockRuntime) bool {
         return self.current != null;
     }
 
-    pub fn currentSetTunnelSettingsCount(self: *MockRuntime) ?usize {
+    pub fn currentSetTunnelSettingsCount(self: *const MockRuntime) ?usize {
         const instance = self.current orelse return null;
         return instance.runtime.controller.set_tunnel_settings_count;
     }
 
-    pub fn currentStatuses(self: *MockRuntime) ?[]const api.ConnectionStatus {
+    pub fn currentStatuses(self: *const MockRuntime) ?[]const api.ConnectionStatus {
         const instance = self.current orelse return null;
         return instance.daemon.testStatuses();
     }
@@ -166,7 +166,7 @@ pub const MockDaemonRuntime = struct {
         return self;
     }
 
-    pub fn deinit(self: *MockDaemonRuntime, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const MockDaemonRuntime, allocator: std.mem.Allocator) void {
         self.registry.deinit(allocator);
         allocator.destroy(self);
     }
@@ -175,7 +175,7 @@ pub const MockDaemonRuntime = struct {
         return &self.registry;
     }
 
-    pub fn tunnelController(self: *MockDaemonRuntime) net.TunnelController {
+    pub fn tunnelController(self: *const MockDaemonRuntime) net.TunnelController {
         return self.controller.interface();
     }
 
@@ -187,11 +187,11 @@ pub const MockDaemonRuntime = struct {
         return noopSocketFactory();
     }
 
-    pub fn networkMonitor(self: *MockDaemonRuntime) net.NetworkMonitor {
+    pub fn networkMonitor(self: *const MockDaemonRuntime) net.NetworkMonitor {
         return self.monitor.interface();
     }
 
-    pub fn daemonEvents(self: *MockDaemonRuntime) ?net_conn.Connection.Events {
+    pub fn daemonEvents(self: *const MockDaemonRuntime) ?net_conn.Connection.Events {
         return self.events.events();
     }
 
@@ -216,7 +216,7 @@ pub const NoopModuleImplementation = struct {
         return .{ .module_type = module_type };
     }
 
-    pub fn moduleImplementation(self: *NoopModuleImplementation) core.ModuleImplementation {
+    pub fn moduleImplementation(self: *const NoopModuleImplementation) core.ModuleImplementation {
         return .{
             .ptr = self,
             .vtable = &vtable,
@@ -254,7 +254,7 @@ pub const NoopConnectionImplementation = struct {
         };
     }
 
-    pub fn connectionImplementation(self: *NoopConnectionImplementation) net_conn.ConnectionImplementation {
+    pub fn connectionImplementation(self: *const NoopConnectionImplementation) net_conn.ConnectionImplementation {
         return .{
             .ptr = self,
             .vtable = &vtable,
@@ -452,7 +452,7 @@ const MockConnection = struct {
         const created = try allocator.create(MockConnection);
         errdefer allocator.destroy(created);
 
-        var tunnel_info = try buildTunnelInfo(allocator, parameters.profile.*, module);
+        var tunnel_info = try buildTunnelInfo(allocator, parameters.profile, module);
         errdefer tunnel_info.deinit(allocator);
 
         created.* = .{
@@ -464,7 +464,7 @@ const MockConnection = struct {
         return created.asConnection();
     }
 
-    fn asConnection(self: *MockConnection) net_conn.Connection {
+    fn asConnection(self: *const MockConnection) net_conn.Connection {
         return .{
             .ptr = self,
             .vtable = &mock_connection_vtable,
@@ -520,12 +520,12 @@ fn deinit(ptr: *anyopaque, allocator: std.mem.Allocator) void {
 
 fn buildTunnelInfo(
     allocator: std.mem.Allocator,
-    profile: api.Profile,
+    profile: *const api.Profile,
     conn_module: net_conn.ConnectionModule,
 ) net_conn.CreateError!api.TunnelRemoteInfoWrapper {
     const modules = [_]api.TaggedModule{conn_module.module.*};
     const info = api.TunnelRemoteInfoWrapper{
-        .profile = profile,
+        .profile = profile.*,
         .original_module_id = conn_module.id(),
         .requires_virtual_device = true,
         .modules = &modules,
@@ -548,9 +548,9 @@ fn snapshotTunnelSettings(info: api.TunnelRemoteInfoWrapper) MockTunnelControlle
         .module_count = if (info.modules) |modules| modules.len else 0,
     };
     const modules = info.modules orelse return snapshot;
-    for (modules) |module| {
-        switch (module) {
-            .DNS => |dns| {
+    for (modules) |*module| {
+        switch (module.*) {
+            .DNS => |*dns| {
                 snapshot.has_dns_module = true;
                 snapshot.dns_server_count = dns.servers.len;
                 const count = @min(dns.servers.len, snapshot.dns_servers.len);
@@ -676,7 +676,7 @@ pub const MockNetworkMonitor = struct {
         }
     }
 
-    pub fn onBetterPath(self: *MockNetworkMonitor) void {
+    pub fn onBetterPath(self: *const MockNetworkMonitor) void {
         if (self.event_handler) |handler| {
             handler.onBetterPath();
         }
@@ -784,7 +784,7 @@ fn mockCreate(
     parameters: net_sandbox.Sandbox,
 ) net_conn.CreateError!net_conn.Connection {
     std.debug.assert(module.typeOf() == .OpenVPN);
-    std.debug.assert(api.hasConnection(parameters.profile.*));
+    std.debug.assert(api.hasConnection(parameters.profile));
     std.debug.assert(parameters.controller.ptr != null);
     std.debug.assert(parameters.monitor.ptr != null);
     var created = try allocator.create(DaemonMockConnection);
@@ -857,7 +857,7 @@ fn blockingCreate(
     parameters: net_sandbox.Sandbox,
 ) net_conn.CreateError!net_conn.Connection {
     std.debug.assert(module.typeOf() == .OpenVPN);
-    std.debug.assert(api.hasConnection(parameters.profile.*));
+    std.debug.assert(api.hasConnection(parameters.profile));
     const self: *BlockingStopConnection = @ptrCast(@alignCast(ptr.?));
     return self.asConnection();
 }

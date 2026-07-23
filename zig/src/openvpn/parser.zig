@@ -43,12 +43,16 @@ pub fn importModule(
 }
 
 pub const Parser = struct {
+    pub const DecryptError = std.mem.Allocator.Error || error{
+        DecryptionFailed,
+    };
+
     pub const DecryptKey = *const fn (
         ?*anyopaque,
         std.mem.Allocator,
         []const u8,
         []const u8,
-    ) anyerror![]u8;
+    ) DecryptError![]u8;
 
     pub const Context = struct {
         passphrase: ?[]const u8 = null,
@@ -148,10 +152,10 @@ const Builder = struct {
     proxy_bypass_domains: std.ArrayList([]u8) = .empty,
     routing_policies: std.ArrayList(api.OpenVPNRoutingPolicy) = .empty,
     no_pull_mask: std.ArrayList(api.OpenVPNPullMask) = .empty,
-    current_block_name: ?[]u8 = null,
-    current_block_lines: std.ArrayList([]u8) = .empty,
+    current_block_name: ?[]const u8 = null,
+    current_block_lines: std.ArrayList([]const u8) = .empty,
     tls_strategy: ?api.OpenVPNTLSWrapStrategy = null,
-    tls_key_lines: ?[][]u8 = null,
+    tls_key_lines: ?[][]const u8 = null,
     tls_key_direction: ?api.OpenVPNStaticKeyDirection = null,
     default_protocol: api.IPSocketType = .udp,
     default_port: u16 = 1194,
@@ -163,7 +167,6 @@ const Builder = struct {
     fn deinit(self: *Builder, allocator: std.mem.Allocator) void {
         self.configuration.deinit(allocator);
         self.data_ciphers.deinit(allocator);
-        for (self.remotes.items) |*remote| remote.deinit(allocator);
         self.remotes.deinit(allocator);
         for (self.routes4.items) |*route| route.deinit(allocator);
         self.routes4.deinit(allocator);
@@ -174,9 +177,8 @@ const Builder = struct {
         util.deinitListOfStrings(allocator, &self.proxy_bypass_domains);
         self.routing_policies.deinit(allocator);
         self.no_pull_mask.deinit(allocator);
-        if (self.current_block_name) |value| allocator.free(value);
-        util.deinitListOfStrings(allocator, &self.current_block_lines);
-        if (self.tls_key_lines) |lines| util.freeSliceOfStrings(allocator, lines);
+        self.current_block_lines.deinit(allocator);
+        if (self.tls_key_lines) |lines| allocator.free(lines);
     }
 
     fn putLine(
@@ -188,13 +190,11 @@ const Builder = struct {
             if (blockEndName(line)) |name| {
                 if (std.ascii.eqlIgnoreCase(block_name, name)) {
                     try self.finishBlock(allocator, block_name);
-                    allocator.free(block_name);
                     self.current_block_name = null;
-                    self.current_block_lines.clearRetainingCapacity();
                     return;
                 }
             }
-            try util.appendOwned(allocator, &self.current_block_lines, line);
+            try self.current_block_lines.append(allocator, line);
             return;
         }
 
@@ -203,7 +203,7 @@ const Builder = struct {
                 self.context.setParseErrorInfo(allocator, name, line);
                 return error.UnsupportedConfiguration;
             }
-            self.current_block_name = try allocator.dupe(u8, name);
+            self.current_block_name = name;
             return;
         }
 
@@ -242,23 +242,20 @@ const Builder = struct {
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "tls-auth")) {
-            try self.putTLSDirective(.auth, components.items, line);
+            try self.putTLSDirective(.auth, components.items);
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "tls-crypt")) {
-            try self.putTLSDirective(.crypt, components.items, line);
+            try self.putTLSDirective(.crypt, components.items);
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "tls-crypt-v2")) {
-            try self.putTLSDirective(.cryptV2, components.items, line);
+            try self.putTLSDirective(.cryptV2, components.items);
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "cipher")) {
             if (components.items.len < 2) return error.MalformedOption;
-            self.configuration.cipher = api.OpenVPNCipher.parseValue(allocator, .{ .string = components.items[1] }) catch |err| return switch (err) {
-                error.OutOfMemory => error.OutOfMemory,
-                else => error.UnsupportedConfiguration,
-            };
+            self.configuration.cipher = api.OpenVPNCipher.parseFromRaw(components.items[1]) orelse return error.UnsupportedConfiguration;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "data-ciphers") or std.ascii.eqlIgnoreCase(option, "ncp-ciphers")) {
@@ -266,28 +263,19 @@ const Builder = struct {
             self.data_ciphers.clearRetainingCapacity();
             var ciphers = std.mem.splitScalar(u8, components.items[1], ':');
             while (ciphers.next()) |cipher| {
-                const parsed_cipher = api.OpenVPNCipher.parseValue(allocator, .{ .string = cipher }) catch |err| return switch (err) {
-                    error.OutOfMemory => error.OutOfMemory,
-                    else => error.UnsupportedConfiguration,
-                };
+                const parsed_cipher = api.OpenVPNCipher.parseFromRaw(cipher) orelse return error.UnsupportedConfiguration;
                 try self.data_ciphers.append(allocator, parsed_cipher);
             }
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "data-ciphers-fallback")) {
             if (components.items.len < 2) return error.MalformedOption;
-            self.configuration.cipher = api.OpenVPNCipher.parseValue(allocator, .{ .string = components.items[1] }) catch |err| return switch (err) {
-                error.OutOfMemory => error.OutOfMemory,
-                else => error.UnsupportedConfiguration,
-            };
+            self.configuration.cipher = api.OpenVPNCipher.parseFromRaw(components.items[1]) orelse return error.UnsupportedConfiguration;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "auth")) {
             if (components.items.len < 2) return error.MalformedOption;
-            self.configuration.digest = api.OpenVPNDigest.parseValue(allocator, .{ .string = components.items[1] }) catch |err| return switch (err) {
-                error.OutOfMemory => error.OutOfMemory,
-                else => error.UnsupportedConfiguration,
-            };
+            self.configuration.digest = api.OpenVPNDigest.parseFromRaw(components.items[1]) orelse return error.UnsupportedConfiguration;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "comp-lzo")) {
@@ -352,17 +340,13 @@ const Builder = struct {
         if (std.ascii.eqlIgnoreCase(option, "remote")) {
             if (components.items.len < 2) return error.MalformedOption;
             const remote = RemoteBuilder{
-                .address = try allocator.dupe(u8, components.items[1]),
+                .address = components.items[1],
                 .port = if (components.items.len > 2)
                     std.fmt.parseInt(u16, components.items[2], 10) catch null
                 else
                     null,
                 .protocol = if (components.items.len > 3) parseIPSocketType(components.items[3]) else null,
             };
-            errdefer {
-                var mutable = remote;
-                mutable.deinit(allocator);
-            }
             try self.remotes.append(allocator, remote);
             return;
         }
@@ -437,11 +421,9 @@ const Builder = struct {
         self: *Builder,
         strategy: api.OpenVPNTLSWrapStrategy,
         components: []const []const u8,
-        line: []const u8,
     ) ParseError!void {
         if (components.len > 1) {
             if (!std.ascii.eqlIgnoreCase(components[1], "inline") and !std.ascii.eqlIgnoreCase(components[1], "[inline]")) {
-                _ = line;
                 return error.UnsupportedConfiguration;
             }
             if (strategy == .auth and components.len > 2) {
@@ -479,13 +461,13 @@ const Builder = struct {
             self.tls_strategy = .cryptV2;
         }
 
-        for (self.current_block_lines.items) |item| allocator.free(item);
         self.current_block_lines.clearRetainingCapacity();
     }
 
     fn replaceTLSKeyLines(self: *Builder, allocator: std.mem.Allocator) error{OutOfMemory}!void {
-        if (self.tls_key_lines) |lines| util.freeSliceOfStrings(allocator, lines);
-        self.tls_key_lines = try util.cloneSliceOfStrings(allocator, self.current_block_lines.items);
+        const new_lines = try allocator.dupe([]const u8, self.current_block_lines.items);
+        if (self.tls_key_lines) |lines| allocator.free(lines);
+        self.tls_key_lines = new_lines;
     }
 
     fn putRoute4(
@@ -597,7 +579,7 @@ const Builder = struct {
         self.configuration.xor_method = null;
         if (std.ascii.eqlIgnoreCase(components[1], "xormask")) {
             if (components.len > 2) self.configuration.xor_method = .{ .xormask = .{
-                .mask = (try api.SecureData.parseRawAlloc(allocator, components[2])) orelse return error.MalformedOption,
+                .mask = try api.SecureData.initBytesAlloc(allocator, components[2]),
             } };
         } else if (std.ascii.eqlIgnoreCase(components[1], "xorptrpos")) {
             self.configuration.xor_method = .{ .xorptrpos = .{} };
@@ -605,7 +587,7 @@ const Builder = struct {
             self.configuration.xor_method = .{ .reverse = .{} };
         } else if (std.ascii.eqlIgnoreCase(components[1], "obfuscate")) {
             if (components.len > 2) self.configuration.xor_method = .{ .obfuscate = .{
-                .mask = (try api.SecureData.parseRawAlloc(allocator, components[2])) orelse return error.MalformedOption,
+                .mask = try api.SecureData.initBytesAlloc(allocator, components[2]),
             } };
         }
     }
@@ -613,9 +595,7 @@ const Builder = struct {
     fn build(self: *Builder, allocator: std.mem.Allocator) ParseError!api.OpenVPNConfiguration {
         if (!self.found_option) return error.InvalidFormat;
 
-        if (self.data_ciphers.items.len > 0) {
-            self.configuration.data_ciphers = try self.data_ciphers.toOwnedSlice(allocator);
-        }
+        self.configuration.data_ciphers = try takeOwnedSliceOrNull(allocator, &self.data_ciphers);
 
         if (self.remotes.items.len > 0) {
             const remotes = try allocator.alloc(api.ExtendedEndpoint, self.remotes.items.len);
@@ -638,13 +618,13 @@ const Builder = struct {
             self.configuration.remotes = remotes;
         }
 
-        if (self.routes4.items.len > 0) self.configuration.routes4 = try self.routes4.toOwnedSlice(allocator);
-        if (self.routes6.items.len > 0) self.configuration.routes6 = try self.routes6.toOwnedSlice(allocator);
-        if (self.dns_servers.items.len > 0) self.configuration.dns_servers = try self.dns_servers.toOwnedSlice(allocator);
-        if (self.search_domains.items.len > 0) self.configuration.search_domains = try self.search_domains.toOwnedSlice(allocator);
-        if (self.proxy_bypass_domains.items.len > 0) self.configuration.proxy_bypass_domains = try self.proxy_bypass_domains.toOwnedSlice(allocator);
-        if (self.routing_policies.items.len > 0) self.configuration.routing_policies = try self.routing_policies.toOwnedSlice(allocator);
-        if (self.no_pull_mask.items.len > 0) self.configuration.no_pull_mask = try self.no_pull_mask.toOwnedSlice(allocator);
+        self.configuration.routes4 = try takeOwnedSliceOrNull(allocator, &self.routes4);
+        self.configuration.routes6 = try takeOwnedSliceOrNull(allocator, &self.routes6);
+        self.configuration.dns_servers = try takeOwnedSliceOrNull(allocator, &self.dns_servers);
+        self.configuration.search_domains = try takeOwnedSliceOrNull(allocator, &self.search_domains);
+        self.configuration.proxy_bypass_domains = try takeOwnedSliceOrNull(allocator, &self.proxy_bypass_domains);
+        self.configuration.routing_policies = try takeOwnedSliceOrNull(allocator, &self.routing_policies);
+        self.configuration.no_pull_mask = try takeOwnedSliceOrNull(allocator, &self.no_pull_mask);
 
         if (self.tls_strategy) |strategy| {
             const lines = self.tls_key_lines orelse {
@@ -675,14 +655,6 @@ const Builder = struct {
 
         const result = self.configuration;
         self.configuration = .{};
-        self.data_ciphers = .empty;
-        self.routes4 = .empty;
-        self.routes6 = .empty;
-        self.dns_servers = .empty;
-        self.search_domains = .empty;
-        self.proxy_bypass_domains = .empty;
-        self.routing_policies = .empty;
-        self.no_pull_mask = .empty;
         return result;
     }
 
@@ -700,14 +672,18 @@ const Builder = struct {
 };
 
 const RemoteBuilder = struct {
-    address: []u8,
+    address: []const u8,
     port: ?u16 = null,
     protocol: ?api.IPSocketType = null,
-
-    fn deinit(self: *RemoteBuilder, allocator: std.mem.Allocator) void {
-        allocator.free(self.address);
-    }
 };
+
+fn takeOwnedSliceOrNull(
+    allocator: std.mem.Allocator,
+    list: anytype,
+) error{OutOfMemory}!?@TypeOf(list.items) {
+    if (list.items.len == 0) return null;
+    return try list.toOwnedSlice(allocator);
+}
 
 fn blockBeginName(line: []const u8) ?[]const u8 {
     if (line.len < 3 or line[0] != '<' or line[1] == '/') return null;
@@ -722,21 +698,15 @@ fn blockEndName(line: []const u8) ?[]const u8 {
 }
 
 fn parseDirection(value: []const u8) ?api.OpenVPNStaticKeyDirection {
-    const raw = std.fmt.parseInt(u8, value, 10) catch return null;
-    return switch (raw) {
-        0 => .server,
-        1 => .client,
-        else => null,
-    };
+    const raw = std.fmt.parseInt(i32, value, 10) catch return null;
+    return api.OpenVPNStaticKeyDirection.parseFromRaw(raw);
 }
 
 fn parseIPSocketType(value: []const u8) ?api.IPSocketType {
-    if (std.ascii.eqlIgnoreCase(value, "udp")) return .udp;
-    if (std.ascii.eqlIgnoreCase(value, "udp4")) return .udp4;
-    if (std.ascii.eqlIgnoreCase(value, "udp6")) return .udp6;
-    if (std.ascii.eqlIgnoreCase(value, "tcp")) return .tcp;
-    if (std.ascii.eqlIgnoreCase(value, "tcp4")) return .tcp4;
-    if (std.ascii.eqlIgnoreCase(value, "tcp6")) return .tcp6;
+    inline for (std.meta.fields(api.IPSocketType)) |field| {
+        const socket_type: api.IPSocketType = @field(api.IPSocketType, field.name);
+        if (std.ascii.eqlIgnoreCase(value, socket_type.raw())) return socket_type;
+    }
     return null;
 }
 
@@ -776,14 +746,13 @@ fn ipv4MaskPrefix(mask: []const u8) ?u8 {
     return prefix;
 }
 
-fn parseStaticKeyData(allocator: std.mem.Allocator, lines: []const []u8) ParseError!api.SecureData {
-    return .{
-        .base64 = try parseStaticKeyHex(allocator, lines),
-        .owned = true,
-    };
+fn parseStaticKeyData(allocator: std.mem.Allocator, lines: []const []const u8) ParseError!api.SecureData {
+    const hex = try parseStaticKeyHex(allocator, lines);
+    defer allocator.free(hex);
+    return (try api.SecureData.parseHexAlloc(allocator, hex)) orelse error.MalformedOption;
 }
 
-fn parseStaticKeyHex(allocator: std.mem.Allocator, lines: []const []u8) ParseError![]u8 {
+fn parseStaticKeyHex(allocator: std.mem.Allocator, lines: []const []const u8) ParseError![]u8 {
     var hex: std.ArrayList(u8) = .empty;
     defer hex.deinit(allocator);
 
@@ -805,7 +774,7 @@ fn parseStaticKeyHex(allocator: std.mem.Allocator, lines: []const []u8) ParseErr
     return try hex.toOwnedSlice(allocator);
 }
 
-fn parseCryptV2Key(allocator: std.mem.Allocator, lines: []const []u8) ParseError!api.OpenVPNTLSWrap {
+fn parseCryptV2Key(allocator: std.mem.Allocator, lines: []const []const u8) ParseError!api.OpenVPNTLSWrap {
     var base64: std.ArrayList(u8) = .empty;
     defer base64.deinit(allocator);
     var in_key = false;
@@ -821,44 +790,36 @@ fn parseCryptV2Key(allocator: std.mem.Allocator, lines: []const []u8) ParseError
         if (in_key) try base64.appendSlice(allocator, line);
     }
 
-    const decoded_size = std.base64.standard.Decoder.calcSizeForSlice(base64.items) catch return error.MalformedOption;
-    if (decoded_size < 256) return error.MalformedOption;
-    const decoded = try allocator.alloc(u8, decoded_size);
+    var encoded = (try api.SecureData.parseRawAlloc(allocator, base64.items)) orelse return error.MalformedOption;
+    defer encoded.deinit(allocator);
+    const decoded = encoded.bytesAlloc(allocator) catch |err| return switch (err) {
+        error.OutOfMemory => error.OutOfMemory,
+        else => error.MalformedOption,
+    };
     defer allocator.free(decoded);
-    std.base64.standard.Decoder.decode(decoded, base64.items) catch return error.MalformedOption;
+    if (decoded.len <= 256) return error.MalformedOption;
 
-    const static_hex = try std.fmt.allocPrint(allocator, "{x}", .{decoded[0..256]});
-    errdefer allocator.free(static_hex);
-    const wrapped_hex = if (decoded.len > 256)
-        try std.fmt.allocPrint(allocator, "{x}", .{decoded[256..]})
-    else
-        null;
-    errdefer if (wrapped_hex) |value| allocator.free(value);
+    var static_key = try api.SecureData.initBytesAlloc(allocator, decoded[0..256]);
+    errdefer static_key.deinit(allocator);
+    var wrapped_key = try api.SecureData.initBytesAlloc(allocator, decoded[256..]);
+    errdefer wrapped_key.deinit(allocator);
 
     return .{
         .strategy = .cryptV2,
         .key = .{
-            .data = .{
-                .base64 = static_hex,
-                .owned = true,
-            },
+            .data = static_key,
             .dir = .client,
         },
-        .wrapped_key = if (wrapped_hex) |value| .{
-            .base64 = value,
-            .owned = true,
-        } else null,
+        .wrapped_key = wrapped_key,
     };
 }
 
 fn normalizeEncryptedPEMBlock(
     allocator: std.mem.Allocator,
-    block: *std.ArrayList([]u8),
+    block: *std.ArrayList([]const u8),
 ) error{OutOfMemory}!void {
     if (block.items.len >= 3 and std.mem.indexOf(u8, block.items[1], "Proc-Type") != null) {
-        const blank = try allocator.dupe(u8, "");
-        errdefer allocator.free(blank);
-        try block.insert(allocator, 3, blank);
+        try block.insert(allocator, 3, "");
     }
 }
 

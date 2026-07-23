@@ -40,7 +40,7 @@ pub const PlatformDNS = struct {
     /// address using the NAT64 prefix of the network that is active now. Other
     /// platforms do not need this extra pass and preserve the address verbatim.
     pub fn resolveAddress(
-        self: *PlatformDNS,
+        self: *const PlatformDNS,
         allocator: std.mem.Allocator,
         address: []const u8,
         reachability: ?ReachabilityInfo,
@@ -171,6 +171,34 @@ pub const PlatformDNS = struct {
         }
         log.writef(.debug, "DNS resolved {s}: {} record(s)", .{ hostname, records.items.len });
         return records.toOwnedSlice(allocator);
+    }
+};
+
+pub const testing = struct {
+    pub const C = c;
+    pub const maxPendingQueries = max_pending_queries;
+
+    pub fn pendingCount() usize {
+        return query_pool.pendingCount();
+    }
+
+    pub fn resolveWith(
+        resolver: *PlatformDNS,
+        allocator: std.mem.Allocator,
+        hostname: []const u8,
+        flags: std.EnumSet(DNSResolver.Flag),
+        reachability: ?ReachabilityInfo,
+        timeout_ms: u32,
+        resolve_fn: ResolveFn,
+    ) DNSResolver.Error![]DNSRecord {
+        return resolver.resolveWith(
+            allocator,
+            hostname,
+            flags,
+            reachability,
+            timeout_ms,
+            resolve_fn,
+        );
     }
 };
 
@@ -335,61 +363,4 @@ fn numericHostAlloc(
         else => return error.ResolutionFailure,
     }
     return try allocator.dupe(u8, std.mem.sliceTo(&buffer, 0));
-}
-
-test "DNS resolver times out and caps abandoned queries" {
-    const HangingResolver = struct {
-        var release = std.atomic.Value(bool).init(false);
-
-        fn resolve(
-            _: [*:0]const u8,
-            _: *const c.addrinfo,
-            _: ?*const ReachabilityInfo,
-            _: *[*c]c.addrinfo,
-        ) c_int {
-            while (!release.load(.acquire)) std.Thread.yield() catch {};
-            return -1;
-        }
-    };
-
-    const allocator = std.testing.allocator;
-    var dns = PlatformDNS.init();
-    HangingResolver.release.store(false, .release);
-    defer {
-        HangingResolver.release.store(true, .release);
-        while (query_pool.pendingCount() != 0) std.Thread.yield() catch {};
-    }
-
-    for (0..max_pending_queries) |_| {
-        try std.testing.expectError(error.Timeout, dns.resolveWith(
-            allocator,
-            "example.com",
-            .initEmpty(),
-            null,
-            1,
-            HangingResolver.resolve,
-        ));
-    }
-    try std.testing.expectEqual(max_pending_queries, query_pool.pendingCount());
-    try std.testing.expectError(error.Timeout, dns.resolveWith(
-        allocator,
-        "example.com",
-        .initEmpty(),
-        null,
-        1,
-        HangingResolver.resolve,
-    ));
-    try std.testing.expectEqual(max_pending_queries, query_pool.pendingCount());
-
-    HangingResolver.release.store(true, .release);
-    while (query_pool.pendingCount() != 0) std.Thread.yield() catch {};
-    try std.testing.expectError(error.ResolutionFailure, dns.resolveWith(
-        allocator,
-        "example.com",
-        .initEmpty(),
-        null,
-        100,
-        HangingResolver.resolve,
-    ));
-    try std.testing.expectEqual(@as(usize, 0), query_pool.pendingCount());
 }

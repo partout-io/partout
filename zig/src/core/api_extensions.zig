@@ -15,7 +15,7 @@ const uuid = @import("uuid.zig");
 /// caller.
 pub fn encodeModule(
     allocator: std.mem.Allocator,
-    module: gen.TaggedModule,
+    module: *const gen.TaggedModule,
 ) gen.EncodeError![]u8 {
     return gen.encodeJsonValue(allocator, module);
 }
@@ -26,7 +26,7 @@ pub fn encodeModule(
 /// caller.
 pub fn encodeModuleZ(
     allocator: std.mem.Allocator,
-    module: gen.TaggedModule,
+    module: *const gen.TaggedModule,
 ) gen.EncodeError![:0]u8 {
     return gen.encodeJsonValueZ(allocator, module);
 }
@@ -37,7 +37,7 @@ pub fn encodeModuleZ(
 /// caller.
 pub fn encodeProfile(
     allocator: std.mem.Allocator,
-    profile: gen.Profile,
+    profile: *const gen.Profile,
 ) gen.EncodeError![]u8 {
     return gen.encodeJsonValue(allocator, profile);
 }
@@ -48,13 +48,13 @@ pub fn encodeProfile(
 /// caller.
 pub fn encodeProfileZ(
     allocator: std.mem.Allocator,
-    profile: gen.Profile,
+    profile: *const gen.Profile,
 ) gen.EncodeError![:0]u8 {
     return gen.encodeJsonValueZ(allocator, profile);
 }
 
 /// Finds the first active module that can establish a tunnel connection.
-pub fn findActiveConnectionModule(profile: gen.Profile) ?*const gen.TaggedModule {
+pub fn findActiveConnectionModule(profile: *const gen.Profile) ?*const gen.TaggedModule {
     for (profile.modules) |*module| {
         if (isActiveConnectionModule(profile, module)) return module;
     }
@@ -62,12 +62,12 @@ pub fn findActiveConnectionModule(profile: gen.Profile) ?*const gen.TaggedModule
 }
 
 /// Reports whether the profile has an active connection-building module.
-pub fn hasConnection(profile: gen.Profile) bool {
+pub fn hasConnection(profile: *const gen.Profile) bool {
     return findActiveConnectionModule(profile) != null;
 }
 
 /// Reports whether `module_id` appears in the profile active module list.
-pub fn isActiveProfileModule(profile: gen.Profile, module_id: uuid.UUID) bool {
+pub fn isActiveProfileModule(profile: *const gen.Profile, module_id: uuid.UUID) bool {
     for (profile.active_modules_ids) |active_id| {
         if (std.mem.eql(u8, active_id[0..], module_id[0..])) return true;
     }
@@ -75,7 +75,7 @@ pub fn isActiveProfileModule(profile: gen.Profile, module_id: uuid.UUID) bool {
 }
 
 /// Logs a decoded profile using the core logging facility.
-pub fn logDecodedProfile(allocator: std.mem.Allocator, profile: gen.Profile) void {
+pub fn logDecodedProfile(allocator: std.mem.Allocator, profile: *const gen.Profile) void {
     if (!log.hasLogger()) return;
 
     log.write(.notice, "Decoded profile:");
@@ -87,7 +87,7 @@ pub fn logDecodedProfile(allocator: std.mem.Allocator, profile: gen.Profile) voi
         log.writef(.notice, "\tBehavior: {s}", .{encoded});
     }
     log.write(.notice, "\tModules:");
-    for (profile.modules) |module| {
+    for (profile.modules) |*module| {
         logProfileModule(allocator, profile, module);
     }
 }
@@ -98,12 +98,12 @@ pub fn logDecodedProfile(allocator: std.mem.Allocator, profile: gen.Profile) voi
 /// UUID as a sentinel.
 pub fn moduleId(module: *const gen.TaggedModule) uuid.UUID {
     return switch (module.*) {
-        .DNS => |m| m.id,
-        .HTTPProxy => |m| m.id,
-        .IP => |m| m.id,
-        .OnDemand => |m| m.id,
-        .OpenVPN => |m| m.id,
-        .WireGuard => |m| m.id,
+        .DNS => |*value| value.id,
+        .HTTPProxy => |*value| value.id,
+        .IP => |*value| value.id,
+        .OnDemand => |*value| value.id,
+        .OpenVPN => |*value| value.id,
+        .WireGuard => |*value| value.id,
     };
 }
 
@@ -139,21 +139,25 @@ pub fn typeBuildsConnection(value: gen.ModuleType) bool {
 }
 
 /// Reports whether `module` is both active in the profile and connection-capable.
-fn isActiveConnectionModule(profile: gen.Profile, module: *const gen.TaggedModule) bool {
+fn isActiveConnectionModule(profile: *const gen.Profile, module: *const gen.TaggedModule) bool {
     return isActiveProfileModule(profile, moduleId(module)) and typeBuildsConnection(moduleType(module));
 }
 
-fn logProfileModule(allocator: std.mem.Allocator, profile: gen.Profile, module: gen.TaggedModule) void {
-    const active_marker: u8 = if (isActiveProfileModule(profile, moduleId(&module))) '+' else '-';
-    const type_name = moduleType(&module).raw();
+fn logProfileModule(
+    allocator: std.mem.Allocator,
+    profile: *const gen.Profile,
+    module: *const gen.TaggedModule,
+) void {
+    const active_marker: u8 = if (isActiveProfileModule(profile, moduleId(module))) '+' else '-';
+    const type_name = moduleType(module).raw();
     if (log.logsPrivateData()) {
         const encoded = util.encodeJsonValue(allocator, module) catch {
-            log.writef(.notice, "\t\t{c} {s}: {s}", .{ active_marker, type_name, moduleType(&module).raw() });
+            log.writef(.notice, "\t\t{c} {s}: {s}", .{ active_marker, type_name, moduleType(module).raw() });
             return;
         };
         defer allocator.free(encoded);
         log.writef(.notice, "\t\t{c} {s}: {s}", .{ active_marker, type_name, encoded });
         return;
     }
-    log.writef(.notice, "\t\t{c} {s}: {s}", .{ active_marker, type_name, moduleType(&module).raw() });
+    log.writef(.notice, "\t\t{c} {s}: {s}", .{ active_marker, type_name, moduleType(module).raw() });
 }

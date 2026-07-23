@@ -22,7 +22,7 @@ fn createDaemonWithJson(
 ) (api.DecodeError || net_daemon.Error)!*net_daemon.Daemon {
     var profile = try api.Profile.parse(allocator, profile_json);
     defer profile.deinit(allocator);
-    return net_daemon.Daemon.create(allocator, profile, context);
+    return net_daemon.Daemon.create(allocator, &profile, context);
 }
 
 fn daemonStartArgs(profile: ?[*:0]const u8) c.partout_daemon_start_args {

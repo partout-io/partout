@@ -47,7 +47,7 @@ pub const RawJsonValue = struct {
         };
     }
 
-    pub fn deinit(self: *RawJsonValue, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const RawJsonValue, allocator: std.mem.Allocator) void {
         if (self.owned) allocator.free(self.bytes);
     }
 
@@ -160,7 +160,7 @@ fn resetJsonErrorInfo(error_info: ?*JsonErrorInfo) void {
     info.* = .{};
 }
 
-fn deinitJson(comptime T: type, allocator: std.mem.Allocator, value: *T) void {
+fn deinitJson(comptime T: type, allocator: std.mem.Allocator, value: *const T) void {
     if (comptime std.meta.hasFn(T, "deinit")) {
         value.deinit(allocator);
         return;
@@ -293,7 +293,7 @@ pub const ABIErrorPayload = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(PartoutErrorCode, allocator, &self.code);
         if (self.user_info) |*value| deinitJson(RawJsonValue, allocator, value);
     }
@@ -345,7 +345,7 @@ pub const ParseErrorInfo = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson([]const u8, allocator, &self.name);
         deinitJson([]const u8, allocator, &self.details);
     }
@@ -434,13 +434,13 @@ pub const DNSModule = struct {
         return result;
     }
 
-    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+    pub fn clone(self: *const @This(), allocator: std.mem.Allocator) DecodeError!@This() {
         const encoded = try util.encodeJsonValue(allocator, self);
         defer allocator.free(encoded);
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(uuid.UUID, allocator, &self.id);
         deinitJson(DNSModuleProtocolType, allocator, &self.protocol_type);
         deinitJson([]const manual.Address, allocator, &self.servers);
@@ -451,7 +451,7 @@ pub const DNSModule = struct {
         if (self.routes_through_vpn) |*value| deinitJson(bool, allocator, value);
     }
 
-    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+    pub fn jsonStringify(self: *const @This(), jw: anytype) JsonStringifyError!void {
         try jw.beginObject();
         try jw.objectField("id");
         try writeJson(jw, self.id);
@@ -459,23 +459,23 @@ pub const DNSModule = struct {
         try writeJson(jw, self.protocol_type);
         try jw.objectField("servers");
         try writeJson(jw, self.servers);
-        if (self.domain_name) |value| {
+        if (self.domain_name) |*value| {
             try jw.objectField("domainName");
             try writeJson(jw, value);
         }
-        if (self.search_domains) |value| {
+        if (self.search_domains) |*value| {
             try jw.objectField("searchDomains");
             try writeJson(jw, value);
         }
-        if (self.inherits_vpn) |value| {
+        if (self.inherits_vpn) |*value| {
             try jw.objectField("inheritsVPN");
             try writeJson(jw, value);
         }
-        if (self.domain_policy) |value| {
+        if (self.domain_policy) |*value| {
             try jw.objectField("domainPolicy");
             try writeJson(jw, value);
         }
-        if (self.routes_through_vpn) |value| {
+        if (self.routes_through_vpn) |*value| {
             try jw.objectField("routesThroughVPN");
             try writeJson(jw, value);
         }
@@ -540,7 +540,7 @@ pub const DNSModuleProtocolTypeCleartext = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         _ = self;
         _ = allocator;
     }
@@ -585,7 +585,7 @@ pub const DNSModuleProtocolTypeHttps = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson([]const u8, allocator, &self.url);
     }
 
@@ -630,7 +630,7 @@ pub const DNSModuleProtocolTypeTls = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson([]const u8, allocator, &self.hostname);
     }
 
@@ -686,7 +686,7 @@ pub const DNSModuleProtocolType = union(enum) {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         switch (self.*) {
             .cleartext => |*value| deinitJson(DNSModuleProtocolTypeCleartext, allocator, value),
             .https => |*value| deinitJson(DNSModuleProtocolTypeHttps, allocator, value),
@@ -784,7 +784,7 @@ pub const DataCount = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(u64, allocator, &self.received);
         deinitJson(u64, allocator, &self.sent);
     }
@@ -834,13 +834,13 @@ pub const HTTPProxyModule = struct {
         return result;
     }
 
-    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+    pub fn clone(self: *const @This(), allocator: std.mem.Allocator) DecodeError!@This() {
         const encoded = try util.encodeJsonValue(allocator, self);
         defer allocator.free(encoded);
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(uuid.UUID, allocator, &self.id);
         if (self.proxy) |*value| deinitJson(manual.Endpoint, allocator, value);
         if (self.secure_proxy) |*value| deinitJson(manual.Endpoint, allocator, value);
@@ -848,19 +848,19 @@ pub const HTTPProxyModule = struct {
         deinitJson([]const manual.Address, allocator, &self.bypass_domains);
     }
 
-    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+    pub fn jsonStringify(self: *const @This(), jw: anytype) JsonStringifyError!void {
         try jw.beginObject();
         try jw.objectField("id");
         try writeJson(jw, self.id);
-        if (self.proxy) |value| {
+        if (self.proxy) |*value| {
             try jw.objectField("proxy");
             try writeJson(jw, value);
         }
-        if (self.secure_proxy) |value| {
+        if (self.secure_proxy) |*value| {
             try jw.objectField("secureProxy");
             try writeJson(jw, value);
         }
-        if (self.pac_url) |value| {
+        if (self.pac_url) |*value| {
             try jw.objectField("pacURL");
             try writeJson(jw, value);
         }
@@ -903,32 +903,32 @@ pub const IPModule = struct {
         return result;
     }
 
-    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+    pub fn clone(self: *const @This(), allocator: std.mem.Allocator) DecodeError!@This() {
         const encoded = try util.encodeJsonValue(allocator, self);
         defer allocator.free(encoded);
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(uuid.UUID, allocator, &self.id);
         if (self.ipv4) |*value| deinitJson(IPSettings, allocator, value);
         if (self.ipv6) |*value| deinitJson(IPSettings, allocator, value);
         if (self.mtu) |*value| deinitJson(i32, allocator, value);
     }
 
-    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+    pub fn jsonStringify(self: *const @This(), jw: anytype) JsonStringifyError!void {
         try jw.beginObject();
         try jw.objectField("id");
         try writeJson(jw, self.id);
-        if (self.ipv4) |value| {
+        if (self.ipv4) |*value| {
             try jw.objectField("ipv4");
             try writeJson(jw, value);
         }
-        if (self.ipv6) |value| {
+        if (self.ipv6) |*value| {
             try jw.objectField("ipv6");
             try writeJson(jw, value);
         }
-        if (self.mtu) |value| {
+        if (self.mtu) |*value| {
             try jw.objectField("mtu");
             try writeJson(jw, value);
         }
@@ -973,7 +973,7 @@ pub const IPSettings = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson([]const manual.Subnet, allocator, &self.subnets);
         deinitJson([]const Route, allocator, &self.included_routes);
         deinitJson([]const Route, allocator, &self.excluded_routes);
@@ -1113,20 +1113,20 @@ pub const OnDemandModule = struct {
         return result;
     }
 
-    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+    pub fn clone(self: *const @This(), allocator: std.mem.Allocator) DecodeError!@This() {
         const encoded = try util.encodeJsonValue(allocator, self);
         defer allocator.free(encoded);
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(uuid.UUID, allocator, &self.id);
         deinitJson(OnDemandModulePolicy, allocator, &self.policy);
         deinitJson(RawJsonValue, allocator, &self.with_ssids);
         deinitJson([]const OnDemandModuleOtherNetwork, allocator, &self.with_other_networks);
     }
 
-    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+    pub fn jsonStringify(self: *const @This(), jw: anytype) JsonStringifyError!void {
         try jw.beginObject();
         try jw.objectField("id");
         try writeJson(jw, self.id);
@@ -1416,7 +1416,7 @@ pub const OpenVPNConfiguration = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         if (self.cipher) |*value| deinitJson(OpenVPNCipher, allocator, value);
         if (self.data_ciphers) |*value| deinitJson([]const OpenVPNCipher, allocator, value);
         if (self.digest) |*value| deinitJson(OpenVPNDigest, allocator, value);
@@ -1669,7 +1669,7 @@ pub const OpenVPNCredentials = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson([]const u8, allocator, &self.username);
         deinitJson([]const u8, allocator, &self.password);
         deinitJson(OpenVPNCredentialsOTPMethod, allocator, &self.otp_method);
@@ -1791,7 +1791,7 @@ pub const OpenVPNObfuscationMethodObfuscate = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(manual.SecureData, allocator, &self.mask);
     }
 
@@ -1833,7 +1833,7 @@ pub const OpenVPNObfuscationMethodReverse = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         _ = self;
         _ = allocator;
     }
@@ -1878,7 +1878,7 @@ pub const OpenVPNObfuscationMethodXormask = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(manual.SecureData, allocator, &self.mask);
     }
 
@@ -1920,7 +1920,7 @@ pub const OpenVPNObfuscationMethodXorptrpos = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         _ = self;
         _ = allocator;
     }
@@ -1978,7 +1978,7 @@ pub const OpenVPNObfuscationMethod = union(enum) {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         switch (self.*) {
             .obfuscate => |*value| deinitJson(OpenVPNObfuscationMethodObfuscate, allocator, value),
             .reverse => |*value| deinitJson(OpenVPNObfuscationMethodReverse, allocator, value),
@@ -2112,7 +2112,7 @@ pub const OpenVPNStaticKey = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(manual.SecureData, allocator, &self.data);
         if (self.dir) |*value| deinitJson(OpenVPNStaticKeyDirection, allocator, value);
     }
@@ -2195,7 +2195,7 @@ pub const OpenVPNTLSWrap = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(OpenVPNTLSWrapStrategy, allocator, &self.strategy);
         deinitJson(OpenVPNStaticKey, allocator, &self.key);
         if (self.wrapped_key) |*value| deinitJson(manual.SecureData, allocator, value);
@@ -2278,32 +2278,32 @@ pub const OpenVPNModule = struct {
         return result;
     }
 
-    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+    pub fn clone(self: *const @This(), allocator: std.mem.Allocator) DecodeError!@This() {
         const encoded = try util.encodeJsonValue(allocator, self);
         defer allocator.free(encoded);
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(uuid.UUID, allocator, &self.id);
         if (self.configuration) |*value| deinitJson(OpenVPNConfiguration, allocator, value);
         if (self.credentials) |*value| deinitJson(OpenVPNCredentials, allocator, value);
         if (self.requires_interactive_credentials) |*value| deinitJson(bool, allocator, value);
     }
 
-    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+    pub fn jsonStringify(self: *const @This(), jw: anytype) JsonStringifyError!void {
         try jw.beginObject();
         try jw.objectField("id");
         try writeJson(jw, self.id);
-        if (self.configuration) |value| {
+        if (self.configuration) |*value| {
             try jw.objectField("configuration");
             try writeJson(jw, value);
         }
-        if (self.credentials) |value| {
+        if (self.credentials) |*value| {
             try jw.objectField("credentials");
             try writeJson(jw, value);
         }
-        if (self.requires_interactive_credentials) |value| {
+        if (self.requires_interactive_credentials) |*value| {
             try jw.objectField("requiresInteractiveCredentials");
             try writeJson(jw, value);
         }
@@ -2509,13 +2509,13 @@ pub const Profile = struct {
         return result;
     }
 
-    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+    pub fn clone(self: *const @This(), allocator: std.mem.Allocator) DecodeError!@This() {
         const encoded = try util.encodeJsonValue(allocator, self);
         defer allocator.free(encoded);
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         if (self.version) |*value| deinitJson(i32, allocator, value);
         deinitJson(uuid.UUID, allocator, &self.id);
         deinitJson([]const u8, allocator, &self.name);
@@ -2525,9 +2525,9 @@ pub const Profile = struct {
         if (self.user_info) |*value| deinitJson(RawJsonValue, allocator, value);
     }
 
-    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+    pub fn jsonStringify(self: *const @This(), jw: anytype) JsonStringifyError!void {
         try jw.beginObject();
-        if (self.version) |value| {
+        if (self.version) |*value| {
             try jw.objectField("version");
             try writeJson(jw, value);
         }
@@ -2539,11 +2539,11 @@ pub const Profile = struct {
         try writeJson(jw, self.modules);
         try jw.objectField("activeModulesIds");
         try writeJson(jw, self.active_modules_ids);
-        if (self.behavior) |value| {
+        if (self.behavior) |*value| {
             try jw.objectField("behavior");
             try writeJson(jw, value);
         }
-        if (self.user_info) |value| {
+        if (self.user_info) |*value| {
             try jw.objectField("userInfo");
             try writeJson(jw, value);
         }
@@ -2586,7 +2586,7 @@ pub const ProfileBehavior = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(bool, allocator, &self.disconnects_on_sleep);
         if (self.includes_all_networks) |*value| deinitJson(bool, allocator, value);
     }
@@ -2638,7 +2638,7 @@ pub const Route = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         if (self.destination) |*value| deinitJson(manual.Subnet, allocator, value);
         if (self.gateway) |*value| deinitJson(manual.Address, allocator, value);
     }
@@ -2740,13 +2740,13 @@ pub const TaggedModule = union(enum) {
         return error.UnsupportedModel;
     }
 
-    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+    pub fn clone(self: *const @This(), allocator: std.mem.Allocator) DecodeError!@This() {
         const encoded = try util.encodeJsonValue(allocator, self);
         defer allocator.free(encoded);
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         switch (self.*) {
             .DNS => |*value| deinitJson(DNSModule, allocator, value),
             .HTTPProxy => |*value| deinitJson(HTTPProxyModule, allocator, value),
@@ -2757,40 +2757,40 @@ pub const TaggedModule = union(enum) {
         }
     }
 
-    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+    pub fn jsonStringify(self: *const @This(), jw: anytype) JsonStringifyError!void {
         try jw.beginObject();
-        switch (self) {
-            .DNS => |value| {
+        switch (self.*) {
+            .DNS => |*value| {
                 try jw.objectField("type");
                 try jw.write("DNS");
                 try jw.objectField("value");
                 try writeJson(jw, value);
             },
-            .HTTPProxy => |value| {
+            .HTTPProxy => |*value| {
                 try jw.objectField("type");
                 try jw.write("HTTPProxy");
                 try jw.objectField("value");
                 try writeJson(jw, value);
             },
-            .IP => |value| {
+            .IP => |*value| {
                 try jw.objectField("type");
                 try jw.write("IP");
                 try jw.objectField("value");
                 try writeJson(jw, value);
             },
-            .OnDemand => |value| {
+            .OnDemand => |*value| {
                 try jw.objectField("type");
                 try jw.write("OnDemand");
                 try jw.objectField("value");
                 try writeJson(jw, value);
             },
-            .OpenVPN => |value| {
+            .OpenVPN => |*value| {
                 try jw.objectField("type");
                 try jw.write("OpenVPN");
                 try jw.objectField("value");
                 try writeJson(jw, value);
             },
-            .WireGuard => |value| {
+            .WireGuard => |*value| {
                 try jw.objectField("type");
                 try jw.write("WireGuard");
                 try jw.objectField("value");
@@ -2838,7 +2838,7 @@ pub const TunnelControllerOptions = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson([]const []const u8, allocator, &self.dns_fallback_servers);
         deinitJson(bool, allocator, &self.logs_snapshots);
         deinitJson(u64, allocator, &self.min_data_count_delta);
@@ -2897,7 +2897,7 @@ pub const TunnelRemoteInfoWrapper = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(Profile, allocator, &self.profile);
         deinitJson(uuid.UUID, allocator, &self.original_module_id);
         if (self.address) |*value| deinitJson(manual.Address, allocator, value);
@@ -2966,7 +2966,7 @@ pub const TunnelSnapshot = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(uuid.UUID, allocator, &self.id);
         deinitJson(bool, allocator, &self.is_enabled);
         deinitJson(TunnelStatus, allocator, &self.status);
@@ -3029,7 +3029,7 @@ pub const TunnelSnapshotEnvironment = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(ConnectionStatus, allocator, &self.connection_status);
         deinitJson(DataCount, allocator, &self.data_count);
         if (self.last_error_code) |*value| deinitJson([]const u8, allocator, value);
@@ -3117,7 +3117,7 @@ pub const WireGuardConfiguration = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(WireGuardLocalInterface, allocator, &self.interface);
         deinitJson([]const WireGuardRemoteInterface, allocator, &self.peers);
     }
@@ -3173,7 +3173,7 @@ pub const WireGuardLocalInterface = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(manual.WireGuardKey, allocator, &self.private_key);
         deinitJson([]const manual.Subnet, allocator, &self.addresses);
         if (self.listen_port) |*value| deinitJson(u16, allocator, value);
@@ -3244,7 +3244,7 @@ pub const WireGuardRemoteInterface = struct {
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(manual.WireGuardKey, allocator, &self.public_key);
         if (self.pre_shared_key) |*value| deinitJson(manual.WireGuardKey, allocator, value);
         if (self.endpoint) |*value| deinitJson(manual.Endpoint, allocator, value);
@@ -3303,22 +3303,22 @@ pub const WireGuardModule = struct {
         return result;
     }
 
-    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+    pub fn clone(self: *const @This(), allocator: std.mem.Allocator) DecodeError!@This() {
         const encoded = try util.encodeJsonValue(allocator, self);
         defer allocator.free(encoded);
         return parse(allocator, encoded);
     }
 
-    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(uuid.UUID, allocator, &self.id);
         if (self.configuration) |*value| deinitJson(WireGuardConfiguration, allocator, value);
     }
 
-    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+    pub fn jsonStringify(self: *const @This(), jw: anytype) JsonStringifyError!void {
         try jw.beginObject();
         try jw.objectField("id");
         try writeJson(jw, self.id);
-        if (self.configuration) |value| {
+        if (self.configuration) |*value| {
             try jw.objectField("configuration");
             try writeJson(jw, value);
         }

@@ -47,9 +47,10 @@ pub const DaemonOptions = struct {
         };
         errdefer profile.deinit(allocator);
 
-        // Leave early if the profile contains modules whose
-        // implementations are not built with the library
-        try validateSupportedImplementations(profile);
+        // Leave early if the active connection module has no runtime
+        // implementation. A protocol may be built for parsing and
+        // serialization while its connection implementation is unavailable.
+        try validateSupportedImplementations(&profile);
 
         // Make deep copies of the other input
         const cache_dir = if (args.options.cache_dir) |value|
@@ -67,16 +68,16 @@ pub const DaemonOptions = struct {
         };
     }
 
-    pub fn deinit(self: *DaemonOptions, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const DaemonOptions, allocator: std.mem.Allocator) void {
         allocator.free(self.cache_dir);
         self.profile.deinit(allocator);
     }
 
-    fn validateSupportedImplementations(profile: api.Profile) RuntimeError!void {
+    fn validateSupportedImplementations(profile: *const api.Profile) RuntimeError!void {
         const module = api.findActiveConnectionModule(profile) orelse return;
         switch (api.moduleType(module)) {
-            .OpenVPN => if (!build_options.openvpn) return error.MissingConnectionImplementation,
-            .WireGuard => if (!build_options.wireguard) return error.MissingConnectionImplementation,
+            .OpenVPN => if (openvpn.impl.connection == null) return error.MissingConnectionImplementation,
+            .WireGuard => if (wireguard.impl.connection == null) return error.MissingConnectionImplementation,
             else => {},
         }
     }
@@ -124,7 +125,7 @@ pub const DaemonRuntime = struct {
         self.events = helpers.BoundDaemonEvents.init(bindings);
         self.daemon = try net.Daemon.create(
             allocator,
-            options.profile,
+            &options.profile,
             .{
                 .objects = .{
                     .registry = &self.registry,
@@ -165,15 +166,15 @@ pub const DaemonRuntime = struct {
         allocator.destroy(self);
     }
 
-    pub fn start(self: *DaemonRuntime, allocator: std.mem.Allocator) RuntimeError!void {
+    pub fn start(self: *const DaemonRuntime, allocator: std.mem.Allocator) RuntimeError!void {
         return try self.daemon.start(allocator);
     }
 
-    pub fn hold(self: *DaemonRuntime) void {
+    pub fn hold(self: *const DaemonRuntime) void {
         self.daemon.hold();
     }
 
-    pub fn stop(self: *DaemonRuntime) void {
+    pub fn stop(self: *const DaemonRuntime) void {
         self.daemon.stop();
     }
 };

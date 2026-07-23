@@ -30,23 +30,23 @@ char *_Nullable pp_mbed_key_decrypted_from_path(const char *path,
 char *_Nullable pp_mbed_key_decrypted_from_pem(const char *pem,
                                                const char *passphrase);
 
-pp_tls _Nullable pp_mbed_tls_create(const pp_tls_options *opt,
+pp_tls _Nullable pp_mbedtls_create(const pp_tls_options *opt,
                                     pp_tls_error_code *error);
-void pp_mbed_tls_free(pp_tls tls);
-bool pp_mbed_tls_start(pp_tls tls);
-bool pp_mbed_tls_is_connected(pp_tls tls);
-pp_zd *_Nullable pp_mbed_tls_pull_cipher(pp_tls tls,
+void pp_mbedtls_free(pp_tls tls);
+bool pp_mbedtls_start(pp_tls tls);
+bool pp_mbedtls_is_connected(pp_tls tls);
+pp_zd *_Nullable pp_mbedtls_pull_cipher(pp_tls tls,
                                          pp_tls_error_code *_Nullable error);
-pp_zd *_Nullable pp_mbed_tls_pull_plain(pp_tls tls,
+pp_zd *_Nullable pp_mbedtls_pull_plain(pp_tls tls,
                                         pp_tls_error_code *_Nullable error);
-bool pp_mbed_tls_put_cipher(pp_tls tls,
+bool pp_mbedtls_put_cipher(pp_tls tls,
                             const uint8_t *src,
                             size_t src_len,
                             pp_tls_error_code *_Nullable error);
-bool pp_mbed_tls_put_plain(pp_tls tls,
+bool pp_mbedtls_put_plain(pp_tls tls,
                            const uint8_t *src,
                            size_t src_len,
                            pp_tls_error_code *_Nullable error);
-char *_Nullable pp_mbed_tls_ca_md5(const pp_tls tls);
+char *_Nullable pp_mbedtls_ca_md5(const pp_tls tls);
 
 #pragma clang assume_nonnull end

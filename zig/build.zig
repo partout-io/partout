@@ -59,7 +59,7 @@ pub fn build(b: *std.Build) void {
     const vendor_includes = VendorIncludePaths{
         .openssl = includePathOption(b, "openssl-include", "OpenSSL headers search path.", false),
         .mbedtls = includePathOption(b, "mbedtls-include", "mbedTLS headers search path.", false),
-        .wg_go = includePathOption(b, "wg-go-include", "wg-go headers search path.", embed_c and use_wireguard),
+        .wg_go = includePathOption(b, "wg-go-include", "wg-go headers search path.", false),
     };
     const crypto_libraries = CryptoLibraries{
         .openssl = vendor_includes.openssl != null,
@@ -103,6 +103,7 @@ pub fn build(b: *std.Build) void {
 
     const check = b.step("check", "Check if partout compiles");
     check.dependOn(&lib.step);
+    b.default_step = check;
 
     const test_source_module = b.createModule(.{
         .root_source_file = b.path("src/testing.zig"),
@@ -301,16 +302,25 @@ fn configurePartoutModuleSettings(
     module.addIncludePath(b.path("src/c/portable/include"));
     module.addIncludePath(b.path("src/c/crypto/include"));
     if (use_openvpn) {
-        module.addIncludePath(b.path("src/openvpn/internal/include"));
+        module.addIncludePath(b.path("src/openvpn/c/include"));
     }
     if (use_wireguard) {
-        module.addIncludePath(b.path("src/wireguard/internal/include"));
+        module.addIncludePath(b.path("src/wireguard/c/include"));
     }
     addVendorIncludePaths(module, b, target, vendor_includes);
     addAppleSDKPaths(module, b, apple_sdk_path);
-    addCryptoDefines(module, crypto_libraries);
+    if (crypto_libraries.openssl) {
+        module.addCMacro("PARTOUT_CRYPTO_OPENSSL", "1");
+    }
+    if (crypto_libraries.mbedtls) {
+        module.addCMacro("PARTOUT_CRYPTO_MBEDTLS", "1");
+    }
     module.addCMacro("PARTOUT_OPENVPN", if (use_openvpn) "1" else "0");
     module.addCMacro("PARTOUT_WIREGUARD", if (use_wireguard) "1" else "0");
+    module.addCMacro(
+        "PARTOUT_HAS_WIREGUARD_BACKEND",
+        if (vendor_includes.wg_go != null) "1" else "0",
+    );
     if (target.result.os.tag.isDarwin()) {
         module.linkFramework("Security", .{});
     }
@@ -410,14 +420,14 @@ fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool
     if (use_openvpn) {
         module.addCSourceFiles(.{
             .files = &.{
-                "src/openvpn/internal/control.c",
-                "src/openvpn/internal/dp_framing.c",
-                "src/openvpn/internal/dp_mode.c",
-                "src/openvpn/internal/dp_mode_ad.c",
-                "src/openvpn/internal/dp_mode_hmac.c",
-                "src/openvpn/internal/mss_fix.c",
-                "src/openvpn/internal/pkt_proc.c",
-                "src/openvpn/internal/test/openvpn_crypto_mock.c",
+                "src/openvpn/c/control.c",
+                "src/openvpn/c/dp_framing.c",
+                "src/openvpn/c/dp_mode.c",
+                "src/openvpn/c/dp_mode_ad.c",
+                "src/openvpn/c/dp_mode_hmac.c",
+                "src/openvpn/c/mss_fix.c",
+                "src/openvpn/c/pkt_proc.c",
+                "src/openvpn/c/test/openvpn_crypto_mock.c",
             },
             .flags = c_flags,
         });
@@ -426,9 +436,9 @@ fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool
     if (use_wireguard) {
         module.addCSourceFiles(.{
             .files = &.{
-                "src/wireguard/internal/backend.c",
-                "src/wireguard/internal/key.c",
-                "src/wireguard/internal/x25519.c",
+                "src/wireguard/c/backend.c",
+                "src/wireguard/c/key.c",
+                "src/wireguard/c/x25519.c",
             },
             .flags = c_flags,
         });
@@ -492,14 +502,5 @@ fn addNativeCryptoCSources(
             .flags = c_flags,
         }),
         else => {},
-    }
-}
-
-fn addCryptoDefines(module: *std.Build.Module, crypto_libraries: CryptoLibraries) void {
-    if (crypto_libraries.openssl) {
-        module.addCMacro("PARTOUT_CRYPTO_OPENSSL", "1");
-    }
-    if (crypto_libraries.mbedtls) {
-        module.addCMacro("PARTOUT_CRYPTO_MBEDTLS", "1");
     }
 }

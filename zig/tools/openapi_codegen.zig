@@ -414,7 +414,7 @@ fn renderDocument(allocator: std.mem.Allocator, doc: Document, exclusions: Schem
         \\        };
         \\    }
         \\
-        \\    pub fn deinit(self: *RawJsonValue, allocator: std.mem.Allocator) void {
+        \\    pub fn deinit(self: *const RawJsonValue, allocator: std.mem.Allocator) void {
         \\        if (self.owned) allocator.free(self.bytes);
         \\    }
         \\
@@ -544,7 +544,7 @@ fn renderRuntime(w: *std.Io.Writer) WriterError!void {
         \\    info.* = .{};
         \\}
         \\
-        \\fn deinitJson(comptime T: type, allocator: std.mem.Allocator, value: *T) void {
+        \\fn deinitJson(comptime T: type, allocator: std.mem.Allocator, value: *const T) void {
         \\    if (comptime std.meta.hasFn(T, "deinit")) {
         \\        value.deinit(allocator);
         \\        return;
@@ -782,6 +782,7 @@ fn renderStruct(w: *std.Io.Writer, doc: Document, schema_item: Schema, omit_disc
 
 fn renderStructMethods(w: *std.Io.Writer, doc: Document, schema_item: Schema, omit_discriminator: bool, exclusions: SchemaExclusions) RenderError!void {
     const name = zigTypeName(schema_item.name);
+    const const_receiver = usesConstPointerReceiver(name);
     const property_count = effectivePropertyCount(schema_item, omit_discriminator);
     if (property_count > 0) try w.writeAll("\n");
     try w.print(
@@ -843,13 +844,19 @@ fn renderStructMethods(w: *std.Io.Writer, doc: Document, schema_item: Schema, om
         \\        return result;
         \\    }
         \\
-        \\    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+    );
+    try w.writeAll("\n");
+    try w.print(
+        \\    pub fn clone(self: {s}, allocator: std.mem.Allocator) DecodeError!@This() {{
+        \\
+    , .{if (const_receiver) "*const @This()" else "@This()"});
+    try w.writeAll(
         \\        const encoded = try util.encodeJsonValue(allocator, self);
         \\        defer allocator.free(encoded);
         \\        return parse(allocator, encoded);
         \\    }
         \\
-        \\    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+        \\    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         \\
     );
     if (property_count == 0) {
@@ -877,9 +884,12 @@ fn renderStructMethods(w: *std.Io.Writer, doc: Document, schema_item: Schema, om
     try w.writeAll(
         \\    }
         \\
-        \\    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
-        \\
     );
+    try w.writeAll("\n");
+    try w.print(
+        \\    pub fn jsonStringify(self: {s}, jw: anytype) JsonStringifyError!void {{
+        \\
+    , .{if (const_receiver) "*const @This()" else "@This()"});
     if (property_count == 0) {
         try w.writeAll(
             \\        _ = self;
@@ -899,6 +909,14 @@ fn renderStructMethods(w: *std.Io.Writer, doc: Document, schema_item: Schema, om
                 \\        try writeJson(jw, self.{s});
                 \\
             , .{ property.name, field });
+        } else if (const_receiver) {
+            try w.print(
+                \\        if (self.{s}) |*value| {{
+                \\            try jw.objectField("{s}");
+                \\            try writeJson(jw, value);
+                \\        }}
+                \\
+            , .{ field, property.name });
         } else {
             try w.print(
                 \\        if (self.{s}) |value| {{
@@ -925,9 +943,14 @@ fn effectivePropertyCount(schema_item: Schema, omit_discriminator: bool) usize {
     return count;
 }
 
+fn usesConstPointerReceiver(name: []const u8) bool {
+    return std.mem.eql(u8, name, "Profile") or std.mem.endsWith(u8, name, "Module");
+}
+
 fn renderUnion(w: *std.Io.Writer, doc: Document, schema_item: Schema, exclusions: SchemaExclusions) RenderError!void {
     const name = zigTypeName(schema_item.name);
     const discriminator = schema_item.discriminator_property orelse "type";
+    const const_receiver = usesConstPointerReceiver(name);
 
     for (schema_item.variants.items) |variant| {
         if (exclusions.contains(variant.schema)) continue;
@@ -1012,13 +1035,19 @@ fn renderUnion(w: *std.Io.Writer, doc: Document, schema_item: Schema, exclusions
         \\        return error.UnsupportedModel;
         \\    }
         \\
-        \\    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+    );
+    try w.writeAll("\n");
+    try w.print(
+        \\    pub fn clone(self: {s}, allocator: std.mem.Allocator) DecodeError!@This() {{
+        \\
+    , .{if (const_receiver) "*const @This()" else "@This()"});
+    try w.writeAll(
         \\        const encoded = try util.encodeJsonValue(allocator, self);
         \\        defer allocator.free(encoded);
         \\        return parse(allocator, encoded);
         \\    }
         \\
-        \\    pub fn deinit(self: *@This(), allocator: std.mem.Allocator) void {
+        \\    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         \\        switch (self.*) {
         \\
     );
@@ -1036,17 +1065,23 @@ fn renderUnion(w: *std.Io.Writer, doc: Document, schema_item: Schema, exclusions
         \\        }
         \\    }
         \\
-        \\    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
-        \\        try jw.beginObject();
-        \\        switch (self) {
-        \\
     );
+    try w.writeAll("\n");
+    try w.print(
+        \\    pub fn jsonStringify(self: {s}, jw: anytype) JsonStringifyError!void {{
+        \\        try jw.beginObject();
+        \\        switch ({s}) {{
+        \\
+    , .{
+        if (const_receiver) "*const @This()" else "@This()",
+        if (const_receiver) "self.*" else "self",
+    });
     for (schema_item.variants.items) |variant| {
         if (exclusions.contains(variant.schema)) continue;
         const variant_schema = doc.schema(variant.schema) orelse return ParseError.InvalidSchema;
         if (variantValueProperty(variant_schema)) |value_property| {
             try w.print(
-                \\            .{s} => |value| {{
+                \\            .{s} => |{s}value| {{
                 \\                try jw.objectField("{s}");
                 \\                try jw.write("{s}");
                 \\                try jw.objectField("{s}");
@@ -1055,6 +1090,7 @@ fn renderUnion(w: *std.Io.Writer, doc: Document, schema_item: Schema, exclusions
                 \\
             , .{
                 zigEnumField(variant.raw),
+                if (const_receiver) "*" else "",
                 discriminator,
                 variant.raw,
                 value_property.name,
@@ -1062,11 +1098,16 @@ fn renderUnion(w: *std.Io.Writer, doc: Document, schema_item: Schema, exclusions
         } else {
             const variant_property_count = effectivePropertyCount(variant_schema.*, true);
             try w.print(
-                \\            .{s} => |value| {{
+                \\            .{s} => |{s}value| {{
                 \\                try jw.objectField("{s}");
                 \\                try jw.write("{s}");
                 \\
-            , .{ zigEnumField(variant.raw), discriminator, variant.raw });
+            , .{
+                zigEnumField(variant.raw),
+                if (const_receiver) "*" else "",
+                discriminator,
+                variant.raw,
+            });
             if (variant_property_count == 0) {
                 try w.writeAll(
                     \\                _ = value;
