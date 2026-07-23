@@ -2,34 +2,17 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "zig build",
-      "type": "shell",
-      "command": "zig",
-      "args": [
-        "build"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": "$zig",
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      }
-    },
-    {
       "label": "zig build coverage",
       "type": "shell",
       "command": "zig",
       "args": [
         "build",
         "coverage",
-        "-Dembed-c=true"
+        "-Dembed-c=true",
+        "-Dopenvpn=true",
+        "-Dwireguard=true",
+        "-Dopenssl-include=../.build/artifacts/openssl-apple/openssl/openssl.xcframework/macos-arm64_x86_64/openssl.framework/Headers",
+        "-Dwg-go-include=../.build/artifacts/wg-go-apple/wg-go/wg-go.xcframework/macos-arm64_x86_64/wg_go.framework/Headers"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
@@ -44,6 +27,6 @@
         "panel": "dedicated",
         "clear": true
       }
-    },
+    }
   ]
 }
