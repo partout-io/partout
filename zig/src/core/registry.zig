@@ -253,7 +253,9 @@ pub const Registry = struct {
             switch (json_err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.InvalidJson => {
-                    log.writef(.debug, "Unable to parse JSON, parse profile from text: {}", .{json_err});
+                    log.writef(.debug, "Unable to parse JSON, parse profile from text: {s}", .{
+                        @errorName(json_err),
+                    });
                     return self.importModuleAsProfile(allocator, text, name);
                 },
             }
@@ -265,7 +267,9 @@ pub const Registry = struct {
             if (profile_err == error.OutOfMemory) return error.OutOfMemory;
 
             // The JSON is not a profile, parse it as module
-            log.writef(.debug, "Unable to parse profile JSON, parse as module: {}", .{profile_err});
+            log.writef(.debug, "Unable to parse profile JSON, parse as module: {s}", .{
+                @errorName(profile_err),
+            });
             var module = api.TaggedModule.parseValue(allocator, parsed.value) catch |module_err| {
                 return switch (module_err) {
                     error.OutOfMemory => error.OutOfMemory,
@@ -273,7 +277,9 @@ pub const Registry = struct {
                     error.InvalidModel,
                     error.UnsupportedModel,
                     => {
-                        log.writef(.err, "Unable to parse module JSON, fail: {}", .{module_err});
+                        log.writef(.err, "Unable to parse module JSON, fail: {s}", .{
+                            @errorName(module_err),
+                        });
                         return ImportError.InvalidProfile;
                     },
                 };

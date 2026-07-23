@@ -235,7 +235,7 @@ const OpenVPNConnection = struct {
             self.cache_dir,
             self.session_options,
         ) catch |err| {
-            log.writef(.err, "OpenVPN: Unable to create session: {}", .{err});
+            log.writef(.err, "OpenVPN: Unable to create session: {s}", .{@errorName(err)});
             return error.UnableToStart;
         };
         session.setDelegate(self.sessionDelegate());
@@ -244,7 +244,7 @@ const OpenVPNConnection = struct {
 
         _ = self.sendStatus(.connecting, events);
         const descriptor = self.setupLink() catch |err| {
-            log.writef(.fault, "Unable to create link: {}", .{err});
+            log.writef(.fault, "Unable to create link: {s}", .{@errorName(err)});
             _ = self.sendStatus(.disconnected, events);
             session.setDelegate(null);
             session.shutdown(errors_mod.sessionError(err), null) catch {};
@@ -255,7 +255,7 @@ const OpenVPNConnection = struct {
             };
         };
         session.setLink(descriptor, self.current_endpoint.?) catch |err| {
-            log.writef(.err, "OpenVPN: Unable to attach link: {}", .{err});
+            log.writef(.err, "OpenVPN: Unable to attach link: {s}", .{@errorName(err)});
             _ = self.sendStatus(.disconnected, events);
             session.setDelegate(null);
             session.shutdown(err, null) catch {};
@@ -284,8 +284,7 @@ const OpenVPNConnection = struct {
         // without queueing a didStop event behind the daemon's stop message.
         session.setDelegate(null);
         var graceful = true;
-        session.shutdown(null, timeout_ms) catch |err| {
-            _ = err;
+        session.shutdown(null, timeout_ms) catch {
             graceful = false;
             log.write(.err, "Link shut down due to timeout");
         };
@@ -315,7 +314,7 @@ const OpenVPNConnection = struct {
         if (self.status == .disconnected or self.status == .disconnecting) return;
         log.write(.notice, "Link has a better path, shut down session to reconnect");
         session.shutdown(error.NetworkChanged, null) catch |err| {
-            log.writef(.err, "OpenVPN: Better-path shutdown failed: {}", .{err});
+            log.writef(.err, "OpenVPN: Better-path shutdown failed: {s}", .{@errorName(err)});
         };
     }
 
@@ -548,12 +547,12 @@ const OpenVPNConnection = struct {
 
         if (self.status == .disconnecting) return;
         if (cause) |err| {
-            log.writef(.err, "Session did stop: {}", .{err});
+            log.writef(.err, "Session did stop: {s}", .{@errorName(err)});
             if (errors_mod.partoutCode(err)) |code| {
                 events.last_error(events.ctx, code);
                 if (!isRecoverable(err)) {
                     log.write(.err, "Disconnection is not recoverable");
-                    log.writef(.info, "Report link failure: {}", .{err});
+                    log.writef(.info, "Report link failure: {s}", .{@errorName(err)});
                     self.status = .disconnected;
                     self.events = null;
                     self.controller.setReasserting(false);
@@ -866,7 +865,7 @@ fn logPositiveSeconds(
 ) void {
     if (value) |seconds| {
         if (seconds > 0) {
-            log.writef(.notice, prefix ++ "{d} seconds", .{seconds});
+            openvpn_log.timeSeconds(.notice, prefix, seconds);
             return;
         }
     }
@@ -975,9 +974,9 @@ const EndpointResolver = struct {
                 error.ResolutionFailure,
                 error.Timeout,
                 => {
-                    log.writef(.err, "OpenVPN: Unable to resolve {s}: {}", .{
+                    log.writef(.err, "OpenVPN: Unable to resolve {s}: {s}", .{
                         source.address,
-                        err,
+                        @errorName(err),
                     });
                     continue;
                 },

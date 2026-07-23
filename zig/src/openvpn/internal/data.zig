@@ -526,7 +526,9 @@ pub const DataLink = struct {
 
         const timeout = timeout_ms orelse {
             self.looper.writeQueued(processed.packets(), .link) catch |err| {
-                log.writef(.err, "Data: Failed LINK write during send data: {}", .{err});
+                log.writef(.err, "Data: Failed LINK write during send data: {s}", .{
+                    @errorName(err),
+                });
                 return err;
             };
             return;
@@ -538,7 +540,9 @@ pub const DataLink = struct {
         while (true) {
             self.looper.write(processed.packets(), .link, true) catch |err| {
                 if (core_mod.concurrency.monotonicNs() < deadline) continue;
-                log.writef(.err, "Data: Failed synchronous LINK write during send data: {}", .{err});
+                log.writef(.err, "Data: Failed synchronous LINK write during send data: {s}", .{
+                    @errorName(err),
+                });
                 return error.Timeout;
             };
             return;

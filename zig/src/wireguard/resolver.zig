@@ -161,9 +161,9 @@ pub const PeerEndpointResolver = struct {
                 flags,
                 reachability,
             ) catch |err| {
-                log.writef(.err, "WireGuard: Failed to resolve endpoint {s}: {}", .{
+                log.writef(.err, "WireGuard: Failed to resolve endpoint {s}: {s}", .{
                     endpoint.address,
-                    err,
+                    @errorName(err),
                 });
                 if (err == error.OutOfMemory) return error.OutOfMemory;
                 failures += 1;
@@ -199,9 +199,9 @@ pub const PeerEndpointResolver = struct {
             ) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.NetworkUnreachable, error.ResolutionFailure, error.Timeout => fallback: {
-                    log.writef(.err, "WireGuard: Unable to remap endpoint {s}: {}", .{
+                    log.writef(.err, "WireGuard: Unable to remap endpoint {s}: {s}", .{
                         entry.base.address,
-                        err,
+                        @errorName(err),
                     });
                     break :fallback try allocator.dupe(u8, entry.base.address);
                 },

@@ -288,7 +288,7 @@ const AuthSerializer = struct {
             return errors_mod.cryptoError(native_error);
         }
         return self.plain.deserialize(allocator, swapped, self.auth_length, null) catch |err| {
-            log.writef(.fault, "Control: Channel failure: {}", .{err});
+            log.writef(.fault, "Control: Channel failure: {s}", .{@errorName(err)});
             return err;
         };
     }
@@ -443,7 +443,7 @@ const CryptSerializer = struct {
         if (total < decrypted.len) decrypted = try allocator.realloc(decrypted, total);
         defer allocator.free(decrypted);
         return self.plain.deserialize(allocator, decrypted, 0, null) catch |err| {
-            log.writef(.fault, "Control: Channel failure: {}", .{err});
+            log.writef(.fault, "Control: Channel failure: {s}", .{@errorName(err)});
             return err;
         };
     }

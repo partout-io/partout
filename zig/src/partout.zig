@@ -119,7 +119,7 @@ pub export fn partout_daemon_stop() callconv(.c) void {
 }
 
 fn mapErrorToCode(err: abi.RuntimeError) c_int {
-    log.writef(.err, "Unable to start daemon: {}", .{err});
+    log.writef(.err, "Unable to start daemon: {s}", .{@errorName(err)});
     return switch (err) {
         error.InvalidArgs => c.PartoutCompletionCodeArgs,
         else => c.PartoutCompletionCodeFailure,

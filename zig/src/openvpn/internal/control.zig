@@ -105,7 +105,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
                 offset,
                 null,
             ) catch |err| {
-                log.writef(.fault, "Control: Channel failure: {}", .{err});
+                log.writef(.fault, "Control: Channel failure: {s}", .{@errorName(err)});
                 return err;
             };
             errdefer packet.deinit();
@@ -116,7 +116,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
                     return error.InvalidAck;
                 };
                 self.readAcks(ids, remote) catch |err| {
-                    log.writef(.fault, "Control: Channel failure: {}", .{err});
+                    log.writef(.fault, "Control: Channel failure: {s}", .{@errorName(err)});
                     return err;
                 };
             }

@@ -145,13 +145,13 @@ const WireGuardConnection = struct {
             // Adapter activation errors are the local diagnostic signal. The
             // generic connection contract deliberately exposes no WireGuard-
             // specific categories, so log the concrete error before erasing it.
-            log.writef(.fault, "WireGuard: Unable to start adapter: {}", .{err});
+            log.writef(.fault, "WireGuard: Unable to start adapter: {s}", .{@errorName(err)});
             return error.UnableToStart;
         };
         events.status(events.ctx, .connected);
         self.reportDataCount(allocator, events);
         self.startDataCountTimer() catch |err| {
-            log.writef(.err, "WireGuard: Unable to start data count timer: {}", .{err});
+            log.writef(.err, "WireGuard: Unable to start data count timer: {s}", .{@errorName(err)});
         };
         return true;
     }
@@ -214,7 +214,7 @@ const WireGuardConnection = struct {
         allocator: std.mem.Allocator,
     ) ?api.DataCount {
         return self.adapter.dataCountFromRuntimeConfig(allocator) catch |err| {
-            log.writef(.debug, "WireGuard: Unable to fetch runtime configuration: {}", .{err});
+            log.writef(.debug, "WireGuard: Unable to fetch runtime configuration: {s}", .{@errorName(err)});
             return null;
         };
     }
@@ -249,7 +249,7 @@ const WireGuardConnection = struct {
         self.reportDataCount(self.allocator, events);
         if (!self.data_count_timer_active) return;
         self.data_count_timer.init(self.data_count_interval_ms, onDataCountTimer, self) catch |err| {
-            log.writef(.err, "WireGuard: Unable to reschedule data count timer: {}", .{err});
+            log.writef(.err, "WireGuard: Unable to reschedule data count timer: {s}", .{@errorName(err)});
             self.data_count_timer_active = false;
         };
     }
@@ -265,7 +265,7 @@ const WireGuardConnection = struct {
             onTemporaryShutdownRetry,
             self,
         ) catch |err| {
-            log.writef(.err, "WireGuard: Unable to schedule backend restart retry: {}", .{err});
+            log.writef(.err, "WireGuard: Unable to schedule backend restart retry: {s}", .{@errorName(err)});
         };
     }
 

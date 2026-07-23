@@ -342,9 +342,9 @@ pub const Negotiator = struct {
             &.{packet.packetId()},
             packet.sessionId(),
         ) catch |err| {
-            log.writef(.err, "Failed LINK write during send ack for packetId {d}: {}", .{
+            log.writef(.err, "Failed LINK write during send ack for packetId {d}: {s}", .{
                 packet.packetId(),
-                err,
+                @errorName(err),
             });
             self.options.on_error(
                 self.options.callback_context,
@@ -355,9 +355,9 @@ pub const Negotiator = struct {
         };
         defer self.allocator.free(raw);
         self.writeLink(&.{raw}) catch |err| {
-            log.writef(.err, "Failed LINK write during send ack for packetId {d}: {}", .{
+            log.writef(.err, "Failed LINK write during send ack for packetId {d}: {s}", .{
                 packet.packetId(),
-                err,
+                @errorName(err),
             });
             self.options.on_error(
                 self.options.callback_context,
@@ -392,7 +392,7 @@ pub const Negotiator = struct {
         tls.putPlainText("PUSH_REQUEST\x00") catch {};
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
             if (err == error.TLSFailure) {
-                log.writef(.fault, "TLS.auth: Failed pulling ciphertext: {}", .{err});
+                log.writef(.fault, "TLS.auth: Failed pulling ciphertext: {s}", .{@errorName(err)});
                 return err;
             }
             log.write(.debug, "TLS.ifconfig: Still can't pull ciphertext");
@@ -436,7 +436,7 @@ pub const Negotiator = struct {
         const raw_packets = self.channel.writeOutboundPackets(
             @intCast(self.options.session_options.retransmission_interval_ms),
         ) catch |err| {
-            log.writef(.err, "Failed control packet serialization: {}", .{err});
+            log.writef(.err, "Failed control packet serialization: {s}", .{@errorName(err)});
             return err;
         };
         defer freePackets(self.allocator, raw_packets);
@@ -511,7 +511,9 @@ pub const Negotiator = struct {
                 const tls = self.tls orelse return error.Assertion;
                 try tls.start();
                 const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
-                    log.writef(.fault, "TLS.connect: Failed pulling ciphertext: {}", .{err});
+                    log.writef(.fault, "TLS.connect: Failed pulling ciphertext: {s}", .{
+                        @errorName(err),
+                    });
                     return err;
                 };
                 defer self.allocator.free(ciphertext);
@@ -582,7 +584,7 @@ pub const Negotiator = struct {
         try self.authenticator.?.putAuth(tls, self.options.configuration);
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
             if (err == error.TLSFailure) {
-                log.writef(.fault, "TLS.auth: Failed pulling ciphertext: {}", .{err});
+                log.writef(.fault, "TLS.auth: Failed pulling ciphertext: {s}", .{@errorName(err)});
                 return err;
             }
             log.write(.debug, "TLS.auth: Still can't pull ciphertext");
@@ -819,7 +821,9 @@ pub const Negotiator = struct {
     ) !void {
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
             if (err == error.TLSFailure) {
-                log.writef(.fault, "TLS.connect: Failed pulling ciphertext: {}", .{err});
+                log.writef(.fault, "TLS.connect: Failed pulling ciphertext: {s}", .{
+                    @errorName(err),
+                });
                 return err;
             }
             log.write(.debug, "TLS.connect: No available ciphertext to pull");

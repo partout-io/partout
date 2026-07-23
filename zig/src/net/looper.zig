@@ -419,7 +419,7 @@ pub const Looper = struct {
     pub fn schedule(self: *Looper, delay_ms: ?u64, task: Task) ScheduleError!void {
         if (delay_ms == null and self.isOnQueue()) {
             task.call() catch |err| {
-                log.writef(.err, "Scheduled task failed: {}", .{err});
+                log.writef(.err, "Scheduled task failed: {s}", .{@errorName(err)});
                 return error.TaskFailure;
             };
             return;
@@ -642,9 +642,9 @@ pub const Looper = struct {
         defer self.lock.unlock();
         defer current.transform_drainer.leaveLocked();
         const processed = processed_result catch |err| {
-            log.writef(.err, "{} write transform failed: {}", .{
+            log.writef(.err, "{} write transform failed: {s}", .{
                 side,
-                err,
+                @errorName(err),
             });
             return error.TransformFailure;
         };
@@ -694,9 +694,9 @@ pub const Looper = struct {
 
         const processed = if (transform) |callback|
             callTransform(callback, packets) catch |err| {
-                log.writef(.err, "{} write transform failed: {}", .{
+                log.writef(.err, "{} write transform failed: {s}", .{
                     side,
-                    err,
+                    @errorName(err),
                 });
                 return error.TransformFailure;
             }
@@ -704,7 +704,10 @@ pub const Looper = struct {
             packets;
         for (processed) |packet| {
             const written = side_io.native_io.write(packet, 0) catch |err| {
-                log.writef(.err, "{} write failed: {}", .{ side, err });
+                log.writef(.err, "{} write failed: {s}", .{
+                    side,
+                    @errorName(err),
+                });
                 return err;
             };
             if (written != packet.len) {
@@ -1102,8 +1105,17 @@ pub const Looper = struct {
 
         self.scheduler.cancel();
 
-        if (failure) |reason| {
-            log.writef(.err, "Finish looper with error: {}", .{reason});
+        if (failure) |reason| switch (reason) {
+            .wait => |code| log.writef(.err, "Finish looper with error: wait({d})", .{code}),
+            .system => |err| log.writef(.err, "Finish looper with error: {s}", .{
+                @errorName(err),
+            }),
+            .io => |details| log.writef(.err, "Finish looper with error: {s}", .{
+                @errorName(details.cause),
+            }),
+            .user => |err| log.writef(.err, "Finish looper with error: {s}", .{
+                @errorName(err),
+            }),
         } else {
             log.writef(.info, "Finish looper", .{});
         }

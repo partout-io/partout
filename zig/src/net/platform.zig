@@ -263,7 +263,7 @@ pub const Platform = struct {
         reachability: ?ReachabilityInfo,
     ) bool {
         self.configureSocketsWithError(&.{descriptor}, reachability) catch |err| {
-            log.writef(.fault, "Unable to configure sockets: {}", .{err});
+            log.writef(.fault, "Unable to configure sockets: {s}", .{@errorName(err)});
             return false;
         };
         return true;
@@ -344,7 +344,7 @@ fn ctrlReportSnapshot(ptr: ?*anyopaque, snapshot: api.TunnelSnapshot) void {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     const allocator = std.heap.c_allocator;
     const c_snapshot = core.util.encodeJsonValueZ(allocator, snapshot) catch |err| {
-        log.writef(.err, "Unable to encode snapshot: {}", .{err});
+        log.writef(.err, "Unable to encode snapshot: {s}", .{@errorName(err)});
         return;
     };
     defer allocator.free(c_snapshot);

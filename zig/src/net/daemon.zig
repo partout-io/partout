@@ -351,7 +351,7 @@ pub const Daemon = struct {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
         log.write(.notice, "Network is ready, start connection");
         self.actor.perform(.evaluateConnection) catch |err| {
-            log.writef(.err, "Unable to evaluate connection: {}", .{err});
+            log.writef(.err, "Unable to evaluate connection: {s}", .{@errorName(err)});
         };
     }
 
@@ -359,7 +359,7 @@ pub const Daemon = struct {
     fn onResumeGate(ctx: ?*anyopaque) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
         self.actor.perform(.resumeGate) catch |err| {
-            log.writef(.err, "Unable to resume connection gate: {}", .{err});
+            log.writef(.err, "Unable to resume connection gate: {s}", .{@errorName(err)});
         };
     }
 
@@ -370,7 +370,7 @@ pub const Daemon = struct {
             _ = gate.updateReachability(reachability.reachable);
         }
         self.actor.perform(.{ .onReachability = reachability }) catch |err| {
-            log.writef(.err, "Unable to handle reachability: {}", .{err});
+            log.writef(.err, "Unable to handle reachability: {s}", .{@errorName(err)});
         };
     }
 
@@ -378,7 +378,7 @@ pub const Daemon = struct {
     fn onBetterPath(ctx: ?*anyopaque) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
         self.actor.perform(.onBetterPath) catch |err| {
-            log.writef(.err, "Unable to handle better path: {}", .{err});
+            log.writef(.err, "Unable to handle better path: {s}", .{@errorName(err)});
         };
     }
 
@@ -404,21 +404,21 @@ pub const Daemon = struct {
     fn onConnectionStatus(ctx: *anyopaque, status: api.ConnectionStatus) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
         self.actor.perform(.{ .onConnectionStatus = status }) catch |err| {
-            log.writef(.err, "Unable to report connection status: {}", .{err});
+            log.writef(.err, "Unable to report connection status: {s}", .{@errorName(err)});
         };
     }
 
     fn onConnectionLastError(ctx: *anyopaque, code: api.PartoutErrorCode) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
         self.actor.perform(.{ .onConnectionLastError = code }) catch |err| {
-            log.writef(.err, "Unable to report connection last error: {}", .{err});
+            log.writef(.err, "Unable to report connection last error: {s}", .{@errorName(err)});
         };
     }
 
     fn onConnectionDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
         self.actor.perform(.{ .onConnectionDataCount = data_count }) catch |err| {
-            log.writef(.err, "Unable to report connection data count: {}", .{err});
+            log.writef(.err, "Unable to report connection data count: {s}", .{@errorName(err)});
         };
     }
 
@@ -437,7 +437,7 @@ pub const Daemon = struct {
             .ptr = ptr,
             .block = block,
         } }) catch |err| {
-            log.writef(.err, "Unable to enqueue serialized connection work: {}", .{err});
+            log.writef(.err, "Unable to enqueue serialized connection work: {s}", .{@errorName(err)});
         };
     }
 
@@ -511,7 +511,7 @@ pub const Daemon = struct {
     }
 
     fn handleStartError(self: *Daemon, err: anyerror) void {
-        log.writef(.fault, "Unable to start daemon: {}", .{err});
+        log.writef(.fault, "Unable to start daemon: {s}", .{@errorName(err)});
         const code = api.codeForError(err);
         self.handleLastError(code);
         self.controller.setReasserting(false);
@@ -607,7 +607,7 @@ pub const Daemon = struct {
 
         log.write(.notice, "Start connection");
         const did_start = conn.start(self.events()) catch |err| {
-            log.writef(.err, "Unable to start connection: {}", .{err});
+            log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
             const code = api.codeForError(err);
             self.handleLastError(code);
             self.controller.setReasserting(false);
@@ -635,7 +635,7 @@ pub const Daemon = struct {
 
         // Contextually cancels the previous attempt
         self.resume_gate_timer.init(delay_ms, onResumeGate, self) catch |err| {
-            log.writef(.err, "Unable to schedule resume connection gate, resume now: {}", .{err});
+            log.writef(.err, "Unable to schedule resume connection gate, resume now: {s}", .{@errorName(err)});
             self.doResumeGate();
         };
     }
@@ -850,7 +850,7 @@ pub const Daemon = struct {
         }
         self.actor.perform(.{ .onLooperFinish = failure }) catch |err| {
             // Closed means daemon deinitialization already owns both deaths.
-            log.writef(.debug, "Ignore terminal looper after actor shutdown: {}", .{err});
+            log.writef(.debug, "Ignore terminal looper after actor shutdown: {s}", .{@errorName(err)});
         };
     }
 

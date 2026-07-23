@@ -170,7 +170,7 @@ pub const WireGuardAdapter = struct {
     ) net.TunnelController.Error!void {
         log.write(.debug, "WireGuard: Configure tunnel settings");
         const new_tunnel = self.controller.setTunnelSettings(remote_info) catch |err| {
-            log.writef(.err, "WireGuard: Unable to configure tunnel settings: {}", .{err});
+            log.writef(.err, "WireGuard: Unable to configure tunnel settings: {s}", .{@errorName(err)});
             return err;
         };
 
@@ -211,7 +211,7 @@ pub const WireGuardAdapter = struct {
             .tun = self.tunnel,
             .ifname = self.module_id[0..],
         }) catch |err| {
-            log.writef(.err, "WireGuard: Starting tunnel failed: {}", .{err});
+            log.writef(.err, "WireGuard: Starting tunnel failed: {s}", .{@errorName(err)});
             return err;
         };
         if (handle < 0) {
@@ -234,7 +234,7 @@ pub const WireGuardAdapter = struct {
         handle: i32,
     ) ConfigureSocketsError!void {
         const descriptors = self.backend.socketDescriptors(allocator, handle) catch |err| {
-            log.writef(.err, "WireGuard: Unable to fetch backend socket descriptors: {}", .{err});
+            log.writef(.err, "WireGuard: Unable to fetch backend socket descriptors: {s}", .{@errorName(err)});
             return err;
         };
         defer allocator.free(descriptors);
@@ -249,7 +249,7 @@ pub const WireGuardAdapter = struct {
         }
         log.writef(.info, "WireGuard: Configure {} backend sockets", .{descriptors.len});
         self.controller.configureSockets(descriptors) catch |err| {
-            log.writef(.err, "WireGuard: Unable to configure backend sockets: {}", .{err});
+            log.writef(.err, "WireGuard: Unable to configure backend sockets: {s}", .{@errorName(err)});
             return err;
         };
     }
@@ -299,13 +299,13 @@ pub const WireGuardAdapter = struct {
             &self.endpoint_resolver,
             .endpoints,
         ) catch |err| {
-            log.writef(.err, "WireGuard: Unable to build peer endpoint update: {}", .{err});
+            log.writef(.err, "WireGuard: Unable to build peer endpoint update: {s}", .{@errorName(err)});
             return;
         };
         defer allocator.free(wg_config);
         if (wg_config.len > 0) {
             _ = self.backend.setConfig(allocator, handle, wg_config) catch |err| {
-                log.writef(.err, "WireGuard: Unable to update peer endpoints: {}", .{err});
+                log.writef(.err, "WireGuard: Unable to update peer endpoints: {s}", .{@errorName(err)});
                 return;
             };
         }
@@ -319,7 +319,7 @@ pub const WireGuardAdapter = struct {
     fn refreshSockets(self: *const WireGuardAdapter, allocator: std.mem.Allocator, handle: i32) void {
         self.backend.bumpSockets(handle, true);
         self.configureSockets(allocator, handle) catch |err| {
-            log.writef(.err, "WireGuard: Unable to configure sockets after network change: {}", .{err});
+            log.writef(.err, "WireGuard: Unable to configure sockets after network change: {s}", .{@errorName(err)});
         };
     }
 
@@ -331,7 +331,7 @@ pub const WireGuardAdapter = struct {
             // Restart failure is transient state-machine work, not a new
             // connection error. Swift logs it and retries while the latest
             // reachability state remains up.
-            log.writef(.err, "WireGuard: Failed to restart backend: {}", .{err});
+            log.writef(.err, "WireGuard: Failed to restart backend: {s}", .{@errorName(err)});
             return .retry;
         };
         return .resumed;

@@ -14,6 +14,7 @@ const crypto_mod = @import("crypto.zig");
 const data_mod = @import("data.zig");
 const errors_mod = @import("errors.zig");
 const helpers_mod = @import("helpers.zig");
+const logging_mod = @import("logging.zig");
 const packet_mod = @import("packet.zig");
 const processing_mod = @import("processing.zig");
 const push_mod = @import("push.zig");
@@ -27,6 +28,7 @@ const api = core_mod.api;
 const c = helpers_mod.c;
 const c_crypto = c_exports_mod.crypto;
 const log = core_mod.logging;
+const openvpn_log = logging_mod;
 
 const ActiveContext = session_context_mod.ActiveContext;
 const ActivePhase = session_context_mod.ActivePhase;
@@ -378,7 +380,9 @@ pub const Session = struct {
             // A terminal looper has already serialized final state; its owner
             // routes `OnFinish` through `looperDidFinish` while Session lives.
             if (err == error.Cancelled or err == error.TerminalFailure) return;
-            log.writef(.err, "Unable to shut down session on looper queue: {}", .{err});
+            log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
+                @errorName(err),
+            });
             return err;
         };
         if (!should_detach) return;
@@ -400,7 +404,9 @@ pub const Session = struct {
         request: ShutdownRequest,
     ) ShutdownActorError!void {
         self.shutdown(request.cause, request.timeout_ms) catch |err| {
-            log.writef(.err, "Unable to shut down session on looper queue: {}", .{err});
+            log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
+                @errorName(err),
+            });
             return error.ShutdownFailure;
         };
     }
@@ -459,7 +465,7 @@ pub const Session = struct {
             return false;
         }
         if (request.cause) |cause| {
-            log.writef(.err, "Shut down with failure: {}", .{cause});
+            log.writef(.err, "Shut down with failure: {s}", .{@errorName(cause)});
         } else {
             log.write(.info, "Shut down on request");
         }
@@ -471,7 +477,7 @@ pub const Session = struct {
         if (should_notify) self.sendExitPacketOnQueue(
             request.timeout_ms orelse self.options.write_timeout_ms,
         ) catch |err| {
-            log.writef(.err, "Unable to send exit packet: {}", .{err});
+            log.writef(.err, "Unable to send exit packet: {s}", .{@errorName(err)});
         };
         return true;
     }
@@ -515,14 +521,14 @@ pub const Session = struct {
     pub fn looperDidFinish(self: *Session, failure: ?net_mod.Looper.Failure) void {
         std.debug.assert(self.looper.isOnQueue());
         if (failure) |value| switch (value) {
-            .user => |cause| log.writef(.err, "Session looper finished with error: {}", .{
-                cause,
+            .user => |cause| log.writef(.err, "Session looper finished with error: {s}", .{
+                @errorName(cause),
             }),
-            .io => |details| log.writef(.err, "Session looper finished with error: {}", .{
-                details.cause,
+            .io => |details| log.writef(.err, "Session looper finished with error: {s}", .{
+                @errorName(details.cause),
             }),
-            .system => |cause| log.writef(.err, "Session looper finished with error: {}", .{
-                cause,
+            .system => |cause| log.writef(.err, "Session looper finished with error: {s}", .{
+                @errorName(cause),
             }),
             .wait => |code| log.writef(.err, "Session looper finished with error: wait({d})", .{
                 code,
@@ -608,7 +614,7 @@ pub const Session = struct {
 
             try processDataPackets(context, &grouped);
             var parsed = negotiator.readInboundPacket(packet, 0) catch |err| {
-                log.writef(.err, "Dropped malformed packet: {}", .{err});
+                log.writef(.err, "Dropped malformed packet: {s}", .{@errorName(err)});
                 continue;
             };
             defer parsed.deinit();
@@ -813,7 +819,7 @@ pub const Session = struct {
     ) !void {
         const delay = self.keepAliveIntervalMs(context) orelse
             self.options.ping_timeout_check_interval_ms;
-        log.writef(.debug, "Schedule ping check after {d} milliseconds", .{delay});
+        openvpn_log.timeMilliseconds(.debug, "Schedule ping check after ", delay);
         try self.ping_timer.init(delay, onPingTimer, self);
     }
 

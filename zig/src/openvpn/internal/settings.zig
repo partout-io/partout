@@ -42,7 +42,7 @@ pub const NetworkSettingsBuilder = struct {
         const dns = self.dnsModule(allocator) catch |err| switch (err) {
             error.OutOfMemory, error.IdGeneration => return err,
             else => blk: {
-                log.writef(.err, "DNS: Unable to build settings: {}", .{err});
+                log.writef(.err, "DNS: Unable to build settings: {s}", .{@errorName(err)});
                 break :blk null;
             },
         };
@@ -50,7 +50,9 @@ pub const NetworkSettingsBuilder = struct {
         const http_proxy = self.httpProxyModule(allocator) catch |err| switch (err) {
             error.OutOfMemory, error.IdGeneration => return err,
             else => blk: {
-                log.writef(.err, "HTTPProxy: Unable to build settings: {}", .{err});
+                log.writef(.err, "HTTPProxy: Unable to build settings: {s}", .{
+                    @errorName(err),
+                });
                 break :blk null;
             },
         };
@@ -67,9 +69,9 @@ pub const NetworkSettingsBuilder = struct {
         if (self.remote_options.compression_algorithm) |algorithm|
             log.writef(.notice, "\tCompression algorithm: {s}", .{@tagName(algorithm)});
         if (self.remote_options.keep_alive_interval) |interval|
-            log.writef(.notice, "\tKeep-alive interval: {d} seconds", .{interval});
+            openvpn_log.timeSeconds(.notice, "\tKeep-alive interval: ", interval);
         if (self.remote_options.keep_alive_timeout) |timeout|
-            log.writef(.notice, "\tKeep-alive timeout: {d} seconds", .{timeout});
+            openvpn_log.timeSeconds(.notice, "\tKeep-alive timeout: ", timeout);
     }
 
     pub fn deinitModules(allocator: std.mem.Allocator, modules_value: []api.TaggedModule) void {
@@ -164,8 +166,9 @@ pub const NetworkSettingsBuilder = struct {
                 .gateway = route.gateway orelse default_gateway,
             };
             if (resolved.destination) |destination| {
-                log.writef(.info, "\t" ++ family ++ ": Add route {s} -> {s}", .{
-                    destination.raw,
+                log.writef(.info, "\t" ++ family ++ ": Add route {s}/{d} -> {s}", .{
+                    destination.address.raw,
+                    destination.prefix_length,
                     if (resolved.gateway) |gateway| gateway.raw else "*",
                 });
             } else {
