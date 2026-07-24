@@ -13,8 +13,7 @@ final class PartoutTunnelController: Sendable {
     nonisolated(unsafe)
     private weak var provider: NEPacketTunnelProvider?
     private let options: TunnelControllerOptions
-    private let reachability: ReachabilityObserver
-    private let betterPath: BetterPathStreamFactory
+    private let networkMonitor: NetworkMonitor
 
     private let delegateLock = SemaphoreMutex()
     private nonisolated(unsafe) var delegate: pp_tun_ctrl_delegate?
@@ -28,22 +27,20 @@ final class PartoutTunnelController: Sendable {
         self.provider = provider
         self.options = options
 
-        reachability = NEObservablePath(ctx)
-        betterPath = NEBetterPathStreamFactory(ctx)
+        networkMonitor = NetworkMonitor(ctx)
 
-        let isReachableStream = reachability.isReachableStream
-        let betterPathStream = betterPath.newStream().subscribe()
+        let networkEvents = networkMonitor.events
         Task { [weak self] in
-            for await isReachable in isReachableStream {
-                self?.onReachable(isReachable)
+            for await event in networkEvents {
+                switch event {
+                case .reachability(let isReachable):
+                    self?.onReachable(isReachable)
+                case .betterPath:
+                    self?.onBetterPath()
+                }
             }
         }
-        Task { [weak self] in
-            for await _ in betterPathStream {
-                self?.onBetterPath()
-            }
-        }
-        reachability.startObserving()
+        networkMonitor.start()
     }
 
     func onReachable(_ isReachable: Bool) {
@@ -159,7 +156,7 @@ extension PartoutTunnelController {
             controller.delegateLock.with {
                 controller.delegate = copied
             }
-            controller.onReachable(controller.reachability.isReachable)
+            controller.onReachable(controller.networkMonitor.isReachable)
         }
 
         static func setTunnel(
