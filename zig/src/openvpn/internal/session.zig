@@ -302,7 +302,7 @@ pub const Session = struct {
         try self.looper.attach(.{
             .pair = .{ .link = descriptor },
             .on_read = .{ .context = self, .callback = onLinkRead },
-            .on_failure = .{ .context = self, .callback = onSideFailure },
+            .on_failure = .{ .context = self, .callback = onLinkFailure },
         });
         attached = true;
         var request = SetLinkRequest{
@@ -486,6 +486,12 @@ pub const Session = struct {
     fn onSideFailure(raw: ?*anyopaque, failure: net_mod.Looper.Failure) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         self.requestShutdown(failureError(failure));
+    }
+
+    fn onLinkFailure(raw: ?*anyopaque, failure: net_mod.Looper.Failure) void {
+        const self: *Session = @ptrCast(@alignCast(raw.?));
+        const cause = failureError(failure);
+        self.requestShutdown(if (cause == error.CryptoFailure) error.Reconnect else cause);
     }
 
     fn onLinkRead(

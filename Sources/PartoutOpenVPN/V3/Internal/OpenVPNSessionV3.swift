@@ -135,7 +135,7 @@ extension OpenVPNSessionV3: OpenVPNSessionProtocolV3 {
                 },
                 onFailure: { [weak self] error in
                     Task {
-                        await self?.shutdown(error)
+                        await self?.shutdown(PartoutError(.ioFailure, error))
                     }
                 }
             ))
