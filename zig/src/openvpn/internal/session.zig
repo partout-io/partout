@@ -283,6 +283,9 @@ pub const Session = struct {
         descriptor: net_mod.Looper.Descriptor,
         remote_endpoint: api.ExtendedEndpoint,
     ) !void {
+        var descriptor_transferred = false;
+        defer if (!descriptor_transferred) descriptor.io.cleanup();
+
         if (self.looper.isOnQueue()) return error.ReentrantCall;
         self.lifecycle_lock.lock();
         defer self.lifecycle_lock.unlock();
@@ -290,8 +293,6 @@ pub const Session = struct {
             log.write(.err, "Link interface already set");
             return;
         }
-        var descriptor_transferred = false;
-        errdefer if (!descriptor_transferred) descriptor.io.cleanup();
 
         const processor = try LinkProcessor.create(
             self.allocator,
@@ -329,6 +330,9 @@ pub const Session = struct {
     }
 
     fn setTunnelUnwrapped(self: *Session, descriptor: net_mod.Looper.Descriptor) !void {
+        var descriptor_transferred = false;
+        defer if (!descriptor_transferred) descriptor.io.cleanup();
+
         if (self.looper.isOnQueue()) return error.ReentrantCall;
         self.lifecycle_lock.lock();
         defer self.lifecycle_lock.unlock();
@@ -346,6 +350,7 @@ pub const Session = struct {
             .on_read = .{ .context = self, .callback = onTunnelRead },
             .on_failure = .{ .context = self, .callback = onSideFailure },
         });
+        descriptor_transferred = true;
     }
 
     /// Prepares state on the looper, detaches from this external thread, then
