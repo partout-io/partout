@@ -371,10 +371,22 @@ pub const Looper = struct {
                 self.lock.unlock();
                 return error.Cancelled;
             },
-            .stopping, .stopped => {
+            .stopping => {
+                while (self.state == .stopping) {
+                    self.condition.wait(&self.lock);
+                }
+                const failed = self.terminal_failure != null;
                 self.lock.unlock();
-                std.debug.assert(false);
-                return error.InvalidState;
+                self.joinWorker();
+                if (failed) return error.TerminalFailure;
+                return;
+            },
+            .stopped => {
+                const failed = self.terminal_failure != null;
+                self.lock.unlock();
+                self.joinWorker();
+                if (failed) return error.TerminalFailure;
+                return;
             },
         }
         const node = self.createCommandNode(.stop) catch |err| {

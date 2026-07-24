@@ -102,28 +102,25 @@ pub const Daemon = struct {
         stopped,
     };
 
-    const LooperOwnerState = enum(u8) {
-        absent,
-        constructing,
-        ready,
-        finishing,
-        finished,
-        aborted,
+    const ConnectionRuntime = struct {
+        connection: Connection,
+        looper: *Looper,
     };
 
     // Input parameters
+    allocator: std.mem.Allocator,
     profile: api.Profile,
+    registry: *const ConnectionRegistry,
     controller: sandbox.TunnelController,
+    resolver: sandbox.DNSResolver,
+    factory: sandbox.SocketFactory,
     monitor: sandbox.NetworkMonitor,
     options: Context.Options,
 
     // Internal state
     actor: *Actor,
     state: State = .initial,
-    connection: ?Connection = null,
-    connection_looper: ?*Looper = null,
-    connection_looper_state: std.atomic.Value(LooperOwnerState) =
-        std.atomic.Value(LooperOwnerState).init(.absent),
+    connection_runtime: ?ConnectionRuntime = null,
     gate: ?ConnectionGate = null,
     snapshot_publisher: SnapshotPublisher,
     resume_gate_timer: core.RunAfter = .{},
@@ -151,9 +148,13 @@ pub const Daemon = struct {
         const actor = Actor.create(allocator, daemon) catch return error.OutOfMemory;
 
         daemon.* = .{
+            .allocator = allocator,
             .actor = actor,
             .profile = profile,
+            .registry = context.objects.registry,
             .controller = context.objects.controller,
+            .resolver = context.objects.resolver,
+            .factory = context.objects.factory,
             .monitor = context.objects.monitor,
             .options = context.options,
             .snapshot_publisher = SnapshotPublisher.init(
@@ -168,50 +169,8 @@ pub const Daemon = struct {
             actor.deinit();
         }
 
-        // The connection sandbox contains an actor-backed executor whose
-        // context is this daemon. Allocate and initialize the stable daemon
-        // address before constructing the connection that retains it.
-        if (activeConnectionModule(&profile)) |module| {
-            const connection_looper = try daemon.initConnectionLooper(allocator);
-            errdefer {
-                connection_looper.deinit();
-                allocator.destroy(connection_looper);
-            }
-            daemon.connection_looper = connection_looper;
-            daemon.connection_looper_state.store(.constructing, .release);
-            connection_looper.start() catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                else => return error.LooperFailure,
-            };
-            const sb: sandbox.Sandbox = .{
-                .profile = &daemon.profile,
-                .controller = context.objects.controller,
-                .factory = context.objects.factory,
-                .resolver = context.objects.resolver,
-                .monitor = context.objects.monitor,
-                .looper = connection_looper,
-                .cache_dir = context.options.cache_dir,
-                .serialized_executor = daemon.serializedExecutor(),
-                .options = context.options.connection_options,
-            };
-            const connection = context.objects.registry.createConnection(allocator, module, sb) catch |err| {
-                _ = daemon.connection_looper_state.cmpxchgStrong(
-                    .constructing,
-                    .aborted,
-                    .acq_rel,
-                    .acquire,
-                );
-                return err;
-            };
-            errdefer connection.deinit(allocator);
-            daemon.connection = connection;
+        if (activeConnectionModule(&profile) != null) {
             daemon.gate = ConnectionGate.init(null);
-            if (daemon.connection_looper_state.cmpxchgStrong(
-                .constructing,
-                .ready,
-                .acq_rel,
-                .acquire,
-            ) != null) return error.LooperFailure;
         }
         return daemon;
     }
@@ -228,24 +187,9 @@ pub const Daemon = struct {
         // Also cancels the timer
         self.resume_gate_timer.deinit();
 
-        // Suppress the actor's unexpected-termination path: this shutdown is
-        // already part of daemon death. Complete the same lifetime by tearing
-        // down its connection and daemon-owned looper below.
+        // Suppress the actor's unexpected-termination path: stop() already
+        // dismantled the connection runtime.
         self.is_deinitializing = true;
-        const looper_state = self.connection_looper_state.cmpxchgStrong(
-            .ready,
-            .aborted,
-            .acq_rel,
-            .acquire,
-        );
-        if (looper_state != null and looper_state.? == .finishing) {
-            // A terminal callback has already claimed the connection. Let it
-            // finish its synchronous session/actor delivery before either is
-            // deinitialized.
-            while (self.connection_looper_state.load(.acquire) == .finishing) {
-                std.Thread.yield() catch {};
-            }
-        }
         self.actor.deinit();
 
         self.monitor.setEventHandler(null);
@@ -254,25 +198,15 @@ pub const Daemon = struct {
             gate.stopObserving();
             gate.deinit();
         }
-        if (self.connection) |conn| {
-            conn.deinit(allocator);
-            self.connection = null;
-        }
-        if (self.connection_looper) |looper| {
-            looper.deinit();
-            allocator.destroy(looper);
-            self.connection_looper = null;
-        }
+        std.debug.assert(self.connection_runtime == null);
         self.profile.deinit(allocator);
         allocator.destroy(self);
 
         log.write(.debug, "Deinit daemon");
     }
 
-    // This is safe because connection is not modified
-    // during the daemon lifecycle
     pub fn isConnectionProfile(self: Daemon) bool {
-        return self.connection != null;
+        return activeConnectionModule(&self.profile) != null;
     }
 
     pub fn isSettingsOnly(self: Daemon) bool {
@@ -304,6 +238,7 @@ pub const Daemon = struct {
         onConnectionDataCount: api.DataCount,
         onConnectionCancel: ?api.PartoutErrorCode,
         onLooperFinish: ?Looper.Failure,
+        recoverConnection,
         onConnectionBlock: struct {
             ptr: *anyopaque,
             block: sandbox.SerializedExecutor.Block,
@@ -324,6 +259,7 @@ pub const Daemon = struct {
             .onConnectionDataCount => |count| self.handleDataCount(count),
             .onConnectionCancel => |code| self.handleConnectionCancel(code),
             .onLooperFinish => |failure| self.handleLooperFinish(failure),
+            .recoverConnection => self.recoverConnectionRuntime(),
             .onConnectionBlock => |payload| self.handleConnectionBlock(payload.ptr, payload.block),
         }
     }
@@ -460,13 +396,14 @@ pub const Daemon = struct {
         allocator: std.mem.Allocator,
     ) Error!void {
         if (self.state != .initial) return error.AlreadyStarted;
+        if (self.isConnectionProfile()) try self.initConnectionRuntime();
         self.state = .started;
 
         log.write(.notice, "Start daemon");
         self.clearEvents();
 
         // Establish settings-only tunnel if no connection
-        if (self.connection == null) {
+        if (self.isSettingsOnly()) {
             var maybe_info = buildSettingsOnlyTunnelInfo(allocator, &self.profile) catch |err| {
                 self.handleStartError(err);
                 return;
@@ -554,7 +491,7 @@ pub const Daemon = struct {
         }
 
         // Settings-only, stop immediately
-        if (self.connection == null) {
+        if (self.isSettingsOnly()) {
             log.write(.notice, "Non-connection profile, nothing to disconnect from");
             self.controller.clearTunnelSettings(false);
             self.finishStop();
@@ -565,7 +502,12 @@ pub const Daemon = struct {
         log.writef(.notice, "Connection profile, disconnect with a timeout of {} milliseconds", .{
             self.options.stop_delay_ms,
         });
-        self.connection.?.stop(self.options.stop_delay_ms, self.events());
+        const runtime = self.connection_runtime orelse {
+            self.finishStop();
+            return;
+        };
+        runtime.connection.stop(self.options.stop_delay_ms, self.events());
+        self.deinitConnectionRuntime();
         self.finishStop();
     }
 
@@ -588,7 +530,8 @@ pub const Daemon = struct {
             log.write(.info, "Ignore evaluation, daemon not started");
             return;
         }
-        const conn = self.connection orelse return;
+        const runtime = self.connection_runtime orelse return;
+        const conn = runtime.connection;
         if (self.is_evaluating_connection) {
             log.write(.debug, "Ignore evaluation, another one pending");
             return;
@@ -667,14 +610,16 @@ pub const Daemon = struct {
     // Forwards the event to the underlying connection
     fn handleReachability(self: *Daemon, reachability: io.ReachabilityInfo) void {
         if (self.state != .started) return;
-        const conn = self.connection orelse return;
+        const runtime = self.connection_runtime orelse return;
+        const conn = runtime.connection;
         conn.networkChange(reachability, self.events());
     }
 
     // Forwards the event to the underlying connection
     fn handleBetterPath(self: *Daemon) void {
         if (self.state != .started) return;
-        const conn = self.connection orelse return;
+        const runtime = self.connection_runtime orelse return;
+        const conn = runtime.connection;
         conn.betterPath(self.events());
     }
 
@@ -732,19 +677,26 @@ pub const Daemon = struct {
 
         log.write(.fault, "Daemon-owned looper terminated");
 
-        // A dead looper cannot support reconnection. Preserve the terminal
-        // environment like hold(), stop all daemon activity, and ask the host
-        // to tear down this runtime even when recoverable connection failures
-        // would normally keep it alive.
-        self.on_hold = true;
-        if (!self.cancellation_requested) {
-            if (looperFailureCode(failure)) |code| {
-                self.handleLastError(code);
-            }
+        // An unrecoverable connection may already have requested provider
+        // cancellation while synchronously handling the looper finish.
+        if (self.cancellation_requested) return;
+
+        if (looperFailureCode(failure)) |code| {
+            self.handleLastError(code);
         }
-        self.doStop();
-        self.controller.setReasserting(false);
-        self.requestCancellation(looperFailureCode(failure), true);
+
+        // Stop every producer before placing the replacement behind any work
+        // it already submitted to the actor. The queued recovery message is
+        // therefore a simple FIFO drain barrier for the old connection.
+        if (self.connection_runtime) |runtime| {
+            runtime.connection.stop(0, self.events());
+        }
+        self.resume_gate_timer.cancel();
+        self.actor.schedule(.recoverConnection) catch |err| {
+            log.writef(.fault, "Unable to schedule connection recovery: {s}", .{@errorName(err)});
+            self.controller.setReasserting(false);
+            self.requestCancellation(looperFailureCode(failure), true);
+        };
     }
 
     fn requestCancellation(
@@ -820,13 +772,13 @@ pub const Daemon = struct {
         self.controller.reportSnapshot(snapshot);
     }
 
-    fn initConnectionLooper(
-        self: *Daemon,
-        allocator: std.mem.Allocator,
-    ) Error!*Looper {
-        const looper = try allocator.create(Looper);
-        errdefer allocator.destroy(looper);
-        looper.* = Looper.init(allocator, .{
+    fn initConnectionRuntime(self: *Daemon) Error!void {
+        std.debug.assert(self.connection_runtime == null);
+        const module = activeConnectionModule(&self.profile) orelse return;
+
+        const looper = try self.allocator.create(Looper);
+        errdefer self.allocator.destroy(looper);
+        looper.* = Looper.init(self.allocator, .{
             .on_finish = .{
                 .context = self,
                 .callback = onLooperFinish,
@@ -835,7 +787,74 @@ pub const Daemon = struct {
             error.OutOfMemory => return error.OutOfMemory,
             error.MuxFailure => return error.LooperFailure,
         };
-        return looper;
+        errdefer looper.deinit();
+
+        const sb: sandbox.Sandbox = .{
+            .profile = &self.profile,
+            .controller = self.controller,
+            .factory = self.factory,
+            .resolver = self.resolver,
+            .monitor = self.monitor,
+            .looper = looper,
+            .cache_dir = self.options.cache_dir,
+            .serialized_executor = self.serializedExecutor(),
+            .options = self.options.connection_options,
+        };
+        const connection = try self.registry.createConnection(
+            self.allocator,
+            module,
+            sb,
+        );
+        errdefer connection.deinit(self.allocator);
+
+        // Publish a complete runtime before the looper can invoke onFinish.
+        self.connection_runtime = .{
+            .connection = connection,
+            .looper = looper,
+        };
+        looper.start() catch |err| {
+            self.connection_runtime = null;
+            return switch (err) {
+                error.OutOfMemory => error.OutOfMemory,
+                else => error.LooperFailure,
+            };
+        };
+    }
+
+    fn recoverConnectionRuntime(self: *Daemon) void {
+        if (self.state == .stopping or self.state == .stopped) return;
+        if (self.cancellation_requested) return;
+
+        log.write(.notice, "Replace connection after terminal looper");
+        self.deinitConnectionRuntime();
+        self.initConnectionRuntime() catch |err| {
+            log.writef(.fault, "Unable to replace connection: {s}", .{@errorName(err)});
+            const code = api.codeForError(err);
+            self.handleLastError(code);
+            self.controller.setReasserting(false);
+            self.requestCancellation(code, true);
+            return;
+        };
+
+        if (self.state == .started) {
+            self.startConnection();
+        }
+    }
+
+    fn deinitConnectionRuntime(self: *Daemon) void {
+        const runtime = self.connection_runtime orelse return;
+
+        // Keep the borrowed looper object alive until the connection has
+        // released every Session that refers to it, but first join its worker
+        // so onFinish cannot race connection deinitialization.
+        runtime.looper.stop() catch |err| switch (err) {
+            error.TerminalFailure => {},
+            else => log.writef(.debug, "Unable to stop connection looper: {s}", .{@errorName(err)}),
+        };
+        runtime.connection.deinit(self.allocator);
+        runtime.looper.deinit();
+        self.allocator.destroy(runtime.looper);
+        self.connection_runtime = null;
     }
 
     fn onLooperFinish(
@@ -843,34 +862,12 @@ pub const Daemon = struct {
         failure: ?Looper.Failure,
     ) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
-        const previous_state = self.connection_looper_state.cmpxchgStrong(
-            .constructing,
-            .finished,
-            .acq_rel,
-            .acquire,
-        );
-        if (previous_state == null) {
-            // Daemon.create() observes this state and fails rather than handing
-            // a dead looper to the connection.
-            return;
+        if (self.connection_runtime) |runtime| {
+            // Session teardown must stay on the looper queue. It may enqueue
+            // connection work first; actor FIFO preserves that ordering.
+            runtime.connection.looperDidFinish(failure);
         }
-        if (previous_state.? != .ready) return;
-        if (self.connection_looper_state.cmpxchgStrong(
-            .ready,
-            .finishing,
-            .acq_rel,
-            .acquire,
-        ) != null) return;
-        defer self.connection_looper_state.store(.finished, .release);
-
-        if (self.connection) |connection| {
-            // Session teardown must stay on the looper queue. It may enqueue a
-            // connection delegate event on the daemon actor; enqueue the fatal
-            // daemon event afterwards to preserve that ordering.
-            connection.looperDidFinish(failure);
-        }
-        self.actor.perform(.{ .onLooperFinish = failure }) catch |err| {
-            // Closed means daemon deinitialization already owns both deaths.
+        self.actor.schedule(.{ .onLooperFinish = failure }) catch |err| {
             log.writef(.debug, "Ignore terminal looper after actor shutdown: {s}", .{@errorName(err)});
         };
     }

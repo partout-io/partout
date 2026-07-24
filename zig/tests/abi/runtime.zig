@@ -196,13 +196,16 @@ test "requires a connection implementation for active connection profiles" {
     var runtime: MockDaemonRuntime = .{};
     var registry = try emptyConnectionRegistry(allocator);
     defer registry.deinit(allocator);
+    var daemon = try createDaemonWithJson(
+        allocator,
+        mock.connectionProfileJson(),
+        runtime.context(&registry),
+    );
+    defer daemon.deinit(allocator);
+
     try std.testing.expectError(
         error.MissingConnectionImplementation,
-        createDaemonWithJson(
-            allocator,
-            mock.connectionProfileJson(),
-            runtime.context(&registry),
-        ),
+        daemon.start(allocator),
     );
 }
 

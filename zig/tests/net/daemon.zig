@@ -281,9 +281,12 @@ test "connection daemon passes connection options into sandbox" {
     );
     defer sut.deinit(allocator);
 
+    try sut.start(allocator);
+    defer sut.stop();
     const options = capture.options orelse return error.TestUnexpectedResult;
-    try std.testing.expect(capture.looper != null);
-    try std.testing.expect(capture.looper_ready);
+    const looper = capture.looper orelse return error.TestUnexpectedResult;
+    try std.testing.expect(!capture.looper_ready_during_create);
+    try std.testing.expect(try looper.perform(bool, null, SandboxCapture.confirmLooperReady));
     try std.testing.expectEqualStrings(
         "/tmp/openvpn-cache",
         capture.cache_dir,
@@ -293,31 +296,6 @@ test "connection daemon passes connection options into sandbox" {
     try std.testing.expectEqual(@as(u32, 3456), options.link_write_timeout);
     try std.testing.expectEqual(@as(u32, 4567), options.min_data_count_interval);
     try std.testing.expectEqualStrings("{\"source\":\"test\"}", options.user_info.?.bytes);
-}
-
-test "connection daemon creation fails if looper finishes before connection creation" {
-    const allocator = std.testing.allocator;
-    const mock = mock_mod;
-
-    var capture = SandboxCapture{ .stop_looper_during_create = true };
-    var implementations = [_]net.ConnectionImplementation{capture.implementation()};
-    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
-    defer registry.deinit(allocator);
-    var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
-    var monitor = mock.MockNetworkMonitor{};
-
-    try std.testing.expectError(error.LooperFailure, newDaemon(
-        allocator,
-        mock.connectionProfileJson(),
-        &registry,
-        &controller,
-        &events,
-        &monitor,
-        .{},
-    ));
-    try std.testing.expect(capture.looper_ready);
-    try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
 }
 
 test "connection daemon resets data count when connection disconnects" {
@@ -384,11 +362,11 @@ test "connection daemon honors disabled cancellation for connection requests" {
     try std.testing.expect(!controller.reasserting);
 }
 
-test "connection daemon terminates when its owned looper finishes" {
+test "connection daemon replaces a terminal looper and reconnects" {
     const allocator = std.testing.allocator;
     const mock = mock_mod;
 
-    var capture = SandboxCapture{};
+    var capture = SandboxCapture{ .queue_work_on_stop = true };
     var implementations = [_]net.ConnectionImplementation{capture.implementation()};
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
@@ -402,18 +380,38 @@ test "connection daemon terminates when its owned looper finishes" {
         &controller,
         &events,
         &monitor,
-        .{ .cancels_unrecoverable = false },
+        .{
+            .starts_immediately = true,
+            .cancels_unrecoverable = false,
+            .reconnection_delay_ms = 60_000,
+        },
     );
     defer sut.deinit(allocator);
 
-    const looper = capture.looper orelse return error.TestUnexpectedResult;
-    try looper.stop();
+    try sut.start(allocator);
+    defer sut.stop();
+    try std.testing.expectEqual(@as(usize, 1), capture.create_count);
+    try std.testing.expectEqual(@as(usize, 1), capture.start_count);
 
-    // onLooperFinish synchronously routes terminal state through the actor
-    // before stop() returns.
+    const terminal_looper = capture.looper orelse return error.TestUnexpectedResult;
+    try terminal_looper.stop();
+
+    // Flush onLooperFinish and its queued FIFO recovery barrier.
     try std.testing.expectError(error.AlreadyStarted, sut.start(allocator));
-    try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
-    try std.testing.expectEqual(@as(?api.PartoutErrorCode, null), controller.last_cancel_code);
+    try std.testing.expectError(error.AlreadyStarted, sut.start(allocator));
+    try std.testing.expectEqual(@as(usize, 2), capture.create_count);
+    try std.testing.expectEqual(@as(usize, 1), capture.deinit_count);
+    try std.testing.expectEqual(@as(usize, 2), capture.start_count);
+    try std.testing.expectEqual(@as(usize, 1), capture.stop_count);
+    try std.testing.expectEqual(@as(usize, 1), capture.serialized_count);
+    try std.testing.expect(capture.serialized_before_deinit);
+    const recovered_looper = capture.looper orelse return error.TestUnexpectedResult;
+    try std.testing.expect(try recovered_looper.perform(
+        bool,
+        null,
+        SandboxCapture.confirmLooperReady,
+    ));
+    try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
 }
 
 test "connection daemon terminates when its actor finishes" {
@@ -760,12 +758,19 @@ const FailingStartConnection = struct {
 const SandboxCapture = struct {
     options: ?net.ConnectionOptions = null,
     looper: ?*net.Looper = null,
-    looper_ready: bool = false,
-    stop_looper_during_create: bool = false,
+    looper_ready_during_create: bool = false,
+    serialized_executor: net.SerializedExecutor = .{},
     disconnect_on_start: bool = false,
     cancel_on_start: ?api.PartoutErrorCode = null,
     saw_cancel_callback: bool = false,
+    queue_work_on_stop: bool = false,
     cache_dir: []const u8 = "",
+    create_count: usize = 0,
+    start_count: usize = 0,
+    stop_count: usize = 0,
+    deinit_count: usize = 0,
+    serialized_count: usize = 0,
+    serialized_before_deinit: bool = false,
 
     fn implementation(self: *SandboxCapture) net.ConnectionImplementation {
         return .{
@@ -786,16 +791,15 @@ const SandboxCapture = struct {
     ) net.ConnectionCreateError!net.Connection {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr.?));
         const looper = sandbox.looper orelse return error.MissingConnectionImplementation;
+        self.create_count += 1;
         self.options = sandbox.options;
         self.looper = looper;
-        self.looper_ready = looper.perform(
+        self.looper_ready_during_create = looper.perform(
             bool,
             null,
             confirmLooperReady,
         ) catch false;
-        if (self.stop_looper_during_create) {
-            looper.stop() catch {};
-        }
+        self.serialized_executor = sandbox.serialized_executor;
         self.cache_dir = sandbox.cache_dir;
         return .{
             .ptr = self,
@@ -809,6 +813,7 @@ const SandboxCapture = struct {
 
     fn start(ptr: *anyopaque, events: net.Connection.Events) net.ConnectionStartError!bool {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
+        self.start_count += 1;
         self.saw_cancel_callback = events.cancel != null;
         if (self.cancel_on_start) |code| {
             if (events.cancel) |cancel| cancel(events.ctx, code);
@@ -822,13 +827,28 @@ const SandboxCapture = struct {
         return false;
     }
 
-    fn stop(_: *anyopaque, _: u32, _: net.Connection.Events) void {}
+    fn stop(ptr: *anyopaque, _: u32, _: net.Connection.Events) void {
+        const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
+        self.stop_count += 1;
+        if (self.queue_work_on_stop) {
+            self.serialized_executor.run(self, onSerialized);
+        }
+    }
+
+    fn onSerialized(ptr: *anyopaque) void {
+        const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
+        self.serialized_count += 1;
+        self.serialized_before_deinit = self.deinit_count == 0;
+    }
 
     fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) void {}
 
     fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
 
-    fn deinit(_: *anyopaque, _: std.mem.Allocator) void {}
+    fn deinit(ptr: *anyopaque, _: std.mem.Allocator) void {
+        const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
+        self.deinit_count += 1;
+    }
 
     const vtable = net.Connection.VTable{
         .start = start,
