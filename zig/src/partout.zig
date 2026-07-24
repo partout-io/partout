@@ -23,7 +23,7 @@ const util = core.util;
 
 const allocator = std.heap.c_allocator;
 const identifier = "io.partout";
-const version = "0.152.0";
+const version = "0.152.1";
 const version_identifier: [*:0]const u8 = std.fmt.comptimePrint("{s} {s}", .{ identifier, version });
 
 // const DaemonRuntime = if (builtin.is_test) @import("testing/mock.zig").MockRuntime else abi.DaemonRuntime;
