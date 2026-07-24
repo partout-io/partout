@@ -87,8 +87,7 @@ const OpenVPNConnection = struct {
             value
         else
             return error.IncompleteModule;
-        const looper = sandbox.looper orelse
-            return error.MissingConnectionImplementation;
+        const looper = sandbox.looper;
 
         var configuration = configurationApplyingActiveModules(
             allocator,
@@ -548,16 +547,11 @@ const OpenVPNConnection = struct {
     }
 
     fn requestCancellation(
-        self: *OpenVPNConnection,
+        _: *OpenVPNConnection,
         events: net.Connection.Events,
         code: ?api.PartoutErrorCode,
     ) void {
-        const cancel = events.cancel orelse {
-            self.controller.setReasserting(false);
-            self.controller.cancelTunnelConnection(code);
-            return;
-        };
-        cancel(events.ctx, code);
+        events.cancel(events.ctx, code);
     }
 
     fn sendStatus(

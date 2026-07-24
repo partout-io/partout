@@ -64,7 +64,7 @@ pub const BoundDaemonEvents = struct {
         };
     }
 
-    pub fn interface(self: *BoundDaemonEvents) ?net.Connection.Events {
+    pub fn interface(self: *BoundDaemonEvents) ?net.DaemonEvents {
         if (self.binding == null) return null;
         return .{
             .ctx = self,
@@ -94,7 +94,7 @@ fn boundEventLastError(ptr: *anyopaque, code: api.PartoutErrorCode) void {
     util.withCString(code.raw(), set, binding.ctx);
 }
 
-fn boundEventRemoveKey(ptr: *anyopaque, key: net.Connection.EventKey) void {
+fn boundEventRemoveKey(ptr: *anyopaque, key: net.DaemonEventKey) void {
     const binding = boundEventsBinding(ptr) orelse return;
     const remove = binding.remove orelse return;
     util.withCString(eventKeyString(key), remove, binding.ctx);
@@ -105,7 +105,7 @@ fn boundEventsBinding(ptr: *anyopaque) ?c.partout_daemon_events {
     return self.binding;
 }
 
-fn eventKeyString(key: net.Connection.EventKey) []const u8 {
+fn eventKeyString(key: net.DaemonEventKey) []const u8 {
     return switch (key) {
         .connection_status => "connectionStatus",
         .data_count => "dataCount",

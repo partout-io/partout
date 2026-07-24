@@ -58,11 +58,11 @@ pub const MockSerializedExecutor = struct {
     }
 
     fn run(
-        ptr: ?*anyopaque,
+        ptr: *anyopaque,
         block_ptr: *anyopaque,
         block: net.SerializedExecutor.Block,
     ) void {
-        const self: *MockSerializedExecutor = @ptrCast(@alignCast(ptr.?));
+        const self: *MockSerializedExecutor = @ptrCast(@alignCast(ptr));
         self.actor.schedule(.{
             .ptr = block_ptr,
             .block = block,
@@ -74,6 +74,38 @@ pub const MockSerializedExecutor = struct {
     }
 
     fn drainBarrier(_: *anyopaque) void {}
+};
+
+pub const MockConnectionEnvironment = struct {
+    looper: net.Looper,
+    executor: *MockSerializedExecutor,
+
+    pub fn init(
+        self: *MockConnectionEnvironment,
+        allocator: std.mem.Allocator,
+    ) !void {
+        const executor = try MockSerializedExecutor.create(allocator);
+        errdefer executor.deinit();
+        self.* = .{
+            .looper = try net.Looper.init(allocator, .{
+                .on_finish = .{ .callback = onLooperFinish },
+            }),
+            .executor = executor,
+        };
+    }
+
+    pub fn deinit(self: *MockConnectionEnvironment) void {
+        self.looper.deinit();
+        self.executor.deinit();
+    }
+
+    pub fn serializedExecutor(
+        self: *MockConnectionEnvironment,
+    ) net.SerializedExecutor {
+        return self.executor.interface();
+    }
+
+    fn onLooperFinish(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
 };
 
 // ZIGME: Hardcode until only Zig ABI
@@ -195,7 +227,7 @@ pub const MockDaemonRuntime = struct {
     wireguard_connection: NoopConnectionImplementation = .{ .module_type = .WireGuard },
     registry: net_conn.ConnectionRegistry = undefined,
     controller: MockTunnelController = .{},
-    events: ConnectionEventRecorder = .{},
+    events: DaemonEventRecorder = .{},
     monitor: MockNetworkMonitor = .{},
 
     pub fn create(
@@ -252,7 +284,7 @@ pub const MockDaemonRuntime = struct {
         return self.monitor.interface();
     }
 
-    pub fn daemonEvents(self: *const MockDaemonRuntime) ?net_conn.Connection.Events {
+    pub fn daemonEvents(self: *const MockDaemonRuntime) ?net_daemon.Events {
         return self.events.events();
     }
 
@@ -416,7 +448,7 @@ fn noopSetReasserting(_: ?*anyopaque, _: bool) void {}
 
 fn noopCancelTunnelConnection(_: ?*anyopaque, _: ?api.PartoutErrorCode) void {}
 
-pub const ConnectionEventRecorder = struct {
+pub const DaemonEventRecorder = struct {
     connection_status: ?api.ConnectionStatus = null,
     statuses: [16]api.ConnectionStatus = undefined,
     status_count: usize = 0,
@@ -424,27 +456,24 @@ pub const ConnectionEventRecorder = struct {
     data_count: api.DataCount = .{},
     last_error_code: ?api.PartoutErrorCode = null,
     remove_count: usize = 0,
-    cancel_count: usize = 0,
-    last_cancel_code: ?api.PartoutErrorCode = null,
 
-    pub fn events(self: *ConnectionEventRecorder) net_conn.Connection.Events {
+    pub fn events(self: *DaemonEventRecorder) net_daemon.Events {
         return .{
             .ctx = self,
             .status = recordConnectionStatus,
             .last_error = recordLastErrorCode,
             .data_count = recordDataCount,
             .remove_key = recordRemove,
-            .cancel = recordCancel,
         };
     }
 
-    pub fn statusHistory(self: *const ConnectionEventRecorder) []const api.ConnectionStatus {
+    pub fn statusHistory(self: *const DaemonEventRecorder) []const api.ConnectionStatus {
         return self.statuses[0..self.status_count];
     }
 };
 
 fn recordConnectionStatus(ptr: *anyopaque, status: api.ConnectionStatus) void {
-    const self: *ConnectionEventRecorder = @ptrCast(@alignCast(ptr));
+    const self: *DaemonEventRecorder = @ptrCast(@alignCast(ptr));
     self.connection_status = status;
     if (self.status_count < self.statuses.len) {
         self.statuses[self.status_count] = status;
@@ -453,18 +482,18 @@ fn recordConnectionStatus(ptr: *anyopaque, status: api.ConnectionStatus) void {
 }
 
 fn recordDataCount(ptr: *anyopaque, data_count: api.DataCount) void {
-    const self: *ConnectionEventRecorder = @ptrCast(@alignCast(ptr));
+    const self: *DaemonEventRecorder = @ptrCast(@alignCast(ptr));
     self.has_data_count = true;
     self.data_count = data_count;
 }
 
 fn recordLastErrorCode(ptr: *anyopaque, code: api.PartoutErrorCode) void {
-    const self: *ConnectionEventRecorder = @ptrCast(@alignCast(ptr));
+    const self: *DaemonEventRecorder = @ptrCast(@alignCast(ptr));
     self.last_error_code = code;
 }
 
-fn recordRemove(ptr: *anyopaque, key: net_conn.Connection.EventKey) void {
-    const self: *ConnectionEventRecorder = @ptrCast(@alignCast(ptr));
+fn recordRemove(ptr: *anyopaque, key: net_daemon.EventKey) void {
+    const self: *DaemonEventRecorder = @ptrCast(@alignCast(ptr));
     self.remove_count += 1;
     switch (key) {
         .connection_status => self.connection_status = null,
@@ -476,21 +505,13 @@ fn recordRemove(ptr: *anyopaque, key: net_conn.Connection.EventKey) void {
     }
 }
 
-fn recordCancel(ptr: *anyopaque, code: ?api.PartoutErrorCode) void {
-    const self: *ConnectionEventRecorder = @ptrCast(@alignCast(ptr));
-    self.cancel_count += 1;
-    self.last_cancel_code = code;
-}
-
-pub fn resetConnectionEventRecorder(self: *ConnectionEventRecorder) void {
+pub fn resetDaemonEventRecorder(self: *DaemonEventRecorder) void {
     self.connection_status = null;
     self.status_count = 0;
     self.has_data_count = false;
     self.data_count = .{};
     self.last_error_code = null;
     self.remove_count = 0;
-    self.cancel_count = 0;
-    self.last_cancel_code = null;
 }
 
 const always_reachable_vtable = net.NetworkMonitor.VTable{
@@ -858,7 +879,6 @@ fn mockCreate(
     std.debug.assert(module.typeOf() == .OpenVPN);
     std.debug.assert(api.hasConnection(parameters.profile));
     std.debug.assert(parameters.controller.ptr != null);
-    std.debug.assert(parameters.monitor.ptr != null);
     var created = try allocator.create(DaemonMockConnection);
     created.* = .{};
     return created.asConnection();

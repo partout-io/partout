@@ -22,10 +22,9 @@ pub const Sandbox = struct {
     controller: TunnelController,
     resolver: DNSResolver,
     factory: SocketFactory,
-    monitor: NetworkMonitor,
-    /// Daemon-owned I/O loop dedicated to this connection. Protocols that do
-    /// not multiplex link and tunnel descriptors may ignore it.
-    looper: ?*looper.Looper = null,
+    /// Daemon-owned I/O loop shared by its connections. Protocols that do not
+    /// multiplex link and tunnel descriptors may ignore it.
+    looper: *looper.Looper,
     /// Borrowed runtime cache directory. Connections that retain it must copy
     /// it during creation.
     cache_dir: []const u8 = "",
@@ -265,8 +264,8 @@ pub const NetworkMonitor = struct {
 pub const SerializedExecutor = struct {
     pub const Block = *const fn (*anyopaque) void;
 
-    ptr: ?*anyopaque,
-    run_block: *const fn (?*anyopaque, *anyopaque, Block) void,
+    ptr: *anyopaque,
+    run_block: *const fn (*anyopaque, *anyopaque, Block) void,
 
     pub fn run(self: SerializedExecutor, block_ptr: *anyopaque, block: Block) void {
         self.run_block(self.ptr, block_ptr, block);

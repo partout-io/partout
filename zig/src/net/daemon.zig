@@ -70,6 +70,20 @@ pub const Error = api.DecodeError || conn_mod.CreateError || error{
     LooperFailure,
 };
 
+pub const EventKey = enum {
+    connection_status,
+    data_count,
+    last_error_code,
+};
+
+pub const Events = struct {
+    ctx: *anyopaque,
+    status: *const fn (*anyopaque, api.ConnectionStatus) void,
+    last_error: *const fn (*anyopaque, api.PartoutErrorCode) void,
+    data_count: *const fn (*anyopaque, api.DataCount) void,
+    remove_key: *const fn (*anyopaque, EventKey) void,
+};
+
 pub const Context = struct {
     pub const Objects = struct {
         registry: *const ConnectionRegistry,
@@ -85,7 +99,7 @@ pub const Context = struct {
         stop_delay_ms: u32 = 2000,
         reconnection_delay_ms: u32 = 2000,
         min_data_count_delta: u64 = 0,
-        events: ?Connection.Events = null,
+        events: ?Events = null,
         cache_dir: []const u8 = "",
         connection_options: sandbox.ConnectionOptions = .{},
     };
@@ -327,7 +341,6 @@ pub const Daemon = struct {
             .status = onConnectionStatus,
             .last_error = onConnectionLastError,
             .data_count = onConnectionDataCount,
-            .remove_key = onConnectionRemoveKey,
             .cancel = onConnectionCancel,
         };
     }
@@ -368,14 +381,12 @@ pub const Daemon = struct {
         };
     }
 
-    fn onConnectionRemoveKey(_: *anyopaque, _: conn_mod.Connection.EventKey) void {}
-
     fn onConnectionBlock(
-        ctx: ?*anyopaque,
+        ctx: *anyopaque,
         ptr: *anyopaque,
         block: sandbox.SerializedExecutor.Block,
     ) void {
-        const self: *Daemon = @ptrCast(@alignCast(ctx.?));
+        const self: *Daemon = @ptrCast(@alignCast(ctx));
         // RunAfter callbacks must return without waiting for the actor. This
         // lets cancellation drain a callback even when stop currently owns the
         // actor, and preserves FIFO ordering with a later restart.
@@ -745,7 +756,7 @@ pub const Daemon = struct {
         if (self.options.events) |e| e.status(e.ctx, status);
     }
 
-    fn emitRemove(self: *const Daemon, key: conn_mod.Connection.EventKey) void {
+    fn emitRemove(self: *const Daemon, key: EventKey) void {
         if (self.options.events) |e| e.remove_key(e.ctx, key);
     }
 
@@ -794,7 +805,6 @@ pub const Daemon = struct {
             .controller = self.controller,
             .factory = self.factory,
             .resolver = self.resolver,
-            .monitor = self.monitor,
             .looper = looper,
             .cache_dir = self.options.cache_dir,
             .serialized_executor = self.serializedExecutor(),

@@ -148,7 +148,7 @@ test "connection daemon starts settings-only profile" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -177,7 +177,7 @@ test "connection daemon starts connection and publishes lifecycle status" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -229,7 +229,7 @@ test "connection daemon does not cancel tunnel when connection fails to start" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -259,7 +259,7 @@ test "connection daemon passes connection options into sandbox" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -307,7 +307,7 @@ test "connection daemon resets data count when connection disconnects" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -339,7 +339,7 @@ test "connection daemon honors disabled cancellation for connection requests" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{ .reasserting = true };
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -357,7 +357,6 @@ test "connection daemon honors disabled cancellation for connection requests" {
 
     try sut.start(allocator);
     defer sut.stop();
-    try std.testing.expect(capture.saw_cancel_callback);
     try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
     try std.testing.expect(!controller.reasserting);
 }
@@ -371,7 +370,7 @@ test "connection daemon replaces a terminal looper and reconnects" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -422,7 +421,7 @@ test "connection daemon terminates when its actor finishes" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -458,7 +457,7 @@ test "connection daemon connects when previously unreachable network becomes rea
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{ .reachable = false };
     var sut = try newDaemon(
         allocator,
@@ -495,7 +494,7 @@ test "connection daemon forwards better path events to current connection" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -530,7 +529,7 @@ test "connection daemon runs delayed connection work on its actor" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -562,7 +561,7 @@ test "connection daemon drains an overlapping timer callback and drops stale wor
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -762,7 +761,6 @@ const SandboxCapture = struct {
     serialized_executor: ?net.SerializedExecutor = null,
     disconnect_on_start: bool = false,
     cancel_on_start: ?api.PartoutErrorCode = null,
-    saw_cancel_callback: bool = false,
     queue_work_on_stop: bool = false,
     cache_dir: []const u8 = "",
     create_count: usize = 0,
@@ -790,7 +788,7 @@ const SandboxCapture = struct {
         sandbox: net.Sandbox,
     ) net.ConnectionCreateError!net.Connection {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr.?));
-        const looper = sandbox.looper orelse return error.MissingConnectionImplementation;
+        const looper = sandbox.looper;
         self.create_count += 1;
         self.options = sandbox.options;
         self.looper = looper;
@@ -814,9 +812,8 @@ const SandboxCapture = struct {
     fn start(ptr: *anyopaque, events: net.Connection.Events) net.ConnectionStartError!bool {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
         self.start_count += 1;
-        self.saw_cancel_callback = events.cancel != null;
         if (self.cancel_on_start) |code| {
-            if (events.cancel) |cancel| cancel(events.ctx, code);
+            events.cancel(events.ctx, code);
         }
         if (self.disconnect_on_start) {
             events.status(events.ctx, .connecting);
@@ -869,7 +866,7 @@ fn newDaemon(
     profile_json: []const u8,
     registry: *const net.ConnectionRegistry,
     controller: *mock_mod.MockTunnelController,
-    events: *mock_mod.ConnectionEventRecorder,
+    events: *mock_mod.DaemonEventRecorder,
     monitor: *mock_mod.MockNetworkMonitor,
     options: daemon.Context.Options,
 ) !*Daemon {
@@ -889,7 +886,7 @@ fn newDaemon(
 
 fn withEvents(
     options: daemon.Context.Options,
-    events: *mock_mod.ConnectionEventRecorder,
+    events: *mock_mod.DaemonEventRecorder,
 ) daemon.Context.Options {
     var updated = options;
     updated.events = events.events();

@@ -64,7 +64,6 @@ test "OpenVPN connection borrows the daemon looper" {
             .controller = controller.interface(),
             .resolver = mock.noopDNSResolver(),
             .factory = mock.noopSocketFactory(),
-            .monitor = mock.alwaysReachableMonitor(),
             .looper = &looper,
             .cache_dir = "/tmp",
             .serialized_executor = executor.interface(),
