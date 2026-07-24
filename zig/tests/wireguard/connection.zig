@@ -200,7 +200,7 @@ test "WireGuard connection erases adapter activation errors at the generic bound
         .looper = &environment.looper,
         .serialized_executor = environment.serializedExecutor(),
     });
-    defer created.deinit(allocator);
+    defer created.deinit();
 
     try std.testing.expectError(error.UnableToStart, created.start(recorder.events()));
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
@@ -238,7 +238,7 @@ test "WireGuard connection starts and stops through backend and controller" {
         .serialized_executor = environment.serializedExecutor(),
         .options = .{ .min_data_count_interval = 2345 },
     });
-    defer created.deinit(allocator);
+    defer created.deinit();
 
     try std.testing.expectEqual(@as(u32, 2345), connection.testing.dataCountIntervalMs(created));
     try std.testing.expect(try created.start(recorder.events()));
@@ -294,7 +294,7 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
         .serialized_executor = environment.serializedExecutor(),
         .options = .{ .dns_timeout = 1234 },
     });
-    defer created.deinit(allocator);
+    defer created.deinit();
 
     try std.testing.expect(try created.start(recorder.events()));
     adapter.testing.setNetworkChangeBehavior(
@@ -344,7 +344,7 @@ test "WireGuard connection retains failed endpoints for start diagnostics" {
         .looper = &environment.looper,
         .serialized_executor = environment.serializedExecutor(),
     });
-    defer created.deinit(allocator);
+    defer created.deinit();
 
     try std.testing.expectError(error.UnableToStart, created.start(recorder.events()));
     const failed = connection.testing.adapter(created).failedEndpoints();
@@ -483,7 +483,7 @@ test "WireGuard connection handles network monitor events" {
         .looper = &environment.looper,
         .serialized_executor = environment.serializedExecutor(),
     });
-    defer created.deinit(allocator);
+    defer created.deinit();
 
     try std.testing.expect(try created.start(recorder.events()));
     created.betterPath(recorder.events());
@@ -560,7 +560,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
         .looper = &environment.looper,
         .serialized_executor = environment.serializedExecutor(),
     });
-    defer created.deinit(allocator);
+    defer created.deinit();
     connection.testing.setTemporaryShutdownRetryDelayMs(created, 1);
 
     try std.testing.expect(try created.start(recorder.events()));

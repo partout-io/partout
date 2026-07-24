@@ -507,7 +507,7 @@ fn betterPath(ptr: *anyopaque, events: net.Connection.Events) void {
     self.betterPath(self.allocator, events);
 }
 
-fn deinit(ptr: *anyopaque, _: std.mem.Allocator) void {
+fn deinit(ptr: *anyopaque) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
     self.deinit();
 }

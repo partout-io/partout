@@ -69,7 +69,7 @@ test "OpenVPN connection borrows the daemon looper" {
             .serialized_executor = executor.interface(),
         },
     );
-    created.deinit(allocator);
+    created.deinit();
 
     try looper.perform(void, null, Callbacks.barrier);
     try looper.stop();

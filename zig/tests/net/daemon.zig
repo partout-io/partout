@@ -159,9 +159,9 @@ test "connection daemon starts settings-only profile" {
         &monitor,
         .{},
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
-    try sut.start(allocator);
+    try sut.start();
     try std.testing.expect(sut.isSettingsOnly());
     try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
 
@@ -188,9 +188,9 @@ test "connection daemon starts connection and publishes lifecycle status" {
         &monitor,
         .{ .stop_delay_ms = 100 },
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
-    try sut.start(allocator);
+    try sut.start();
     try std.testing.expect(sut.isConnectionProfile());
     try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
         .disconnected,
@@ -240,9 +240,9 @@ test "connection daemon does not cancel tunnel when connection fails to start" {
         &monitor,
         .{ .starts_immediately = true },
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
-    try sut.start(allocator);
+    try sut.start();
     try std.testing.expectEqual(@as(usize, 1), failing_connection.start_count);
     try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
     try std.testing.expectEqual(api.PartoutErrorCode.unhandled, events.last_error_code.?);
@@ -279,9 +279,9 @@ test "connection daemon passes connection options into sandbox" {
             .cache_dir = "/tmp/openvpn-cache",
         },
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
-    try sut.start(allocator);
+    try sut.start();
     defer sut.stop();
     const options = capture.options orelse return error.TestUnexpectedResult;
     const looper = capture.looper orelse return error.TestUnexpectedResult;
@@ -321,9 +321,9 @@ test "connection daemon resets data count when connection disconnects" {
             .reconnection_delay_ms = 60_000,
         },
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
-    try sut.start(allocator);
+    try sut.start();
     defer sut.stop();
     try std.testing.expectEqual(api.ConnectionStatus.disconnected, events.connection_status.?);
     try std.testing.expect(!events.has_data_count);
@@ -353,9 +353,9 @@ test "connection daemon honors disabled cancellation for connection requests" {
             .cancels_unrecoverable = false,
         },
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
-    try sut.start(allocator);
+    try sut.start();
     defer sut.stop();
     try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
     try std.testing.expect(!controller.reasserting);
@@ -385,9 +385,9 @@ test "connection daemon replaces a terminal looper and reconnects" {
             .reconnection_delay_ms = 60_000,
         },
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
-    try sut.start(allocator);
+    try sut.start();
     defer sut.stop();
     try std.testing.expectEqual(@as(usize, 1), capture.create_count);
     try std.testing.expectEqual(@as(usize, 1), capture.start_count);
@@ -396,8 +396,8 @@ test "connection daemon replaces a terminal looper and reconnects" {
     try terminal_looper.stop();
 
     // Flush onLooperFinish and its queued FIFO recovery barrier.
-    try std.testing.expectError(error.AlreadyStarted, sut.start(allocator));
-    try std.testing.expectError(error.AlreadyStarted, sut.start(allocator));
+    try std.testing.expectError(error.AlreadyStarted, sut.start());
+    try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectEqual(@as(usize, 2), capture.create_count);
     try std.testing.expectEqual(@as(usize, 1), capture.deinit_count);
     try std.testing.expectEqual(@as(usize, 2), capture.start_count);
@@ -432,12 +432,12 @@ test "connection daemon terminates when its actor finishes" {
         &monitor,
         .{ .cancels_unrecoverable = false },
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
-    try sut.start(allocator);
+    try sut.start();
     sut.actor.shutdown();
 
-    try std.testing.expectError(error.Closed, sut.start(allocator));
+    try std.testing.expectError(error.Closed, sut.start());
     try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
     try std.testing.expectEqual(@as(?api.PartoutErrorCode, null), controller.last_cancel_code);
     try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
@@ -468,9 +468,9 @@ test "connection daemon connects when previously unreachable network becomes rea
         &monitor,
         .{},
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
-    try sut.start(allocator);
+    try sut.start();
     defer sut.stop();
     try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
         .disconnected,
@@ -505,12 +505,12 @@ test "connection daemon forwards better path events to current connection" {
         &monitor,
         .{},
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
     monitor.onBetterPath();
     try std.testing.expectEqual(@as(usize, 0), blocking_connection.better_path_count);
 
-    try sut.start(allocator);
+    try sut.start();
     monitor.onBetterPath();
     try std.testing.expectEqual(@as(usize, 1), blocking_connection.better_path_count);
 
@@ -540,9 +540,9 @@ test "connection daemon runs delayed connection work on its actor" {
         &monitor,
         .{},
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
-    try sut.start(allocator);
+    try sut.start();
     while (!delayed_connection.did_run.load(.acquire)) {
         std.Thread.yield() catch {};
     }
@@ -572,11 +572,11 @@ test "connection daemon drains an overlapping timer callback and drops stale wor
         &monitor,
         .{},
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
     defer sut.stop();
     defer delayed_connection.allow_timer_enqueue.store(true, .release);
 
-    try sut.start(allocator);
+    try sut.start();
     while (!delayed_connection.timer_started.load(.acquire)) {
         std.Thread.yield() catch {};
     }
@@ -678,7 +678,7 @@ const DelayedConnection = struct {
 
     fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
 
-    fn deinit(ptr: *anyopaque, _: std.mem.Allocator) void {
+    fn deinit(ptr: *anyopaque) void {
         const self: *DelayedConnection = @ptrCast(@alignCast(ptr));
         self.timer.deinit();
     }
@@ -738,7 +738,7 @@ const FailingStartConnection = struct {
 
     fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
 
-    fn deinit(_: *anyopaque, _: std.mem.Allocator) void {}
+    fn deinit(_: *anyopaque) void {}
 
     const vtable = net.Connection.VTable{
         .start = start,
@@ -842,7 +842,7 @@ const SandboxCapture = struct {
 
     fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
 
-    fn deinit(ptr: *anyopaque, _: std.mem.Allocator) void {
+    fn deinit(ptr: *anyopaque) void {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
         self.deinit_count += 1;
     }

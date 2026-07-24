@@ -159,7 +159,7 @@ pub const DaemonRuntime = struct {
                 },
             },
         );
-        errdefer self.daemon.deinit(allocator);
+        errdefer self.daemon.deinit();
 
         // Bind the platform to the underlying OS callbacks
         self.platform.attach();
@@ -170,7 +170,7 @@ pub const DaemonRuntime = struct {
     }
 
     pub fn deinit(self: *DaemonRuntime, allocator: std.mem.Allocator) void {
-        self.daemon.deinit(allocator);
+        self.daemon.deinit();
         self.platform.deinit();
         self.registry.deinit(allocator);
         self.options.deinit(allocator);
@@ -183,8 +183,8 @@ pub const DaemonRuntime = struct {
         allocator.destroy(self);
     }
 
-    pub fn start(self: *const DaemonRuntime, allocator: std.mem.Allocator) RuntimeError!void {
-        return try self.daemon.start(allocator);
+    pub fn start(self: *const DaemonRuntime) RuntimeError!void {
+        return try self.daemon.start();
     }
 
     pub fn hold(self: *const DaemonRuntime) void {

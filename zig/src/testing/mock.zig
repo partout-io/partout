@@ -127,8 +127,7 @@ pub const MockRuntime = struct {
         runtime: *MockDaemonRuntime,
 
         fn finishTeardown(self: *const Instance, allocator: std.mem.Allocator) void {
-            self.daemon.deinit(allocator);
-            allocator.destroy(self.daemon);
+            self.daemon.deinit();
             self.runtime.deinit(allocator);
             if (self.bindings) |*bindings| {
                 if (bindings.release) |release| {
@@ -182,9 +181,9 @@ pub const MockRuntime = struct {
                 error.OutOfMemory => error.OutOfMemory,
             };
         };
-        errdefer new_daemon.deinit(allocator);
+        errdefer new_daemon.deinit();
 
-        new_daemon.start(allocator) catch {
+        new_daemon.start() catch {
             return error.InvalidProfile;
         };
 
@@ -532,6 +531,7 @@ fn alwaysReachable(_: ?*anyopaque) bool {
 }
 
 const MockConnection = struct {
+    allocator: std.mem.Allocator,
     controller: net.TunnelController,
     module_id: api.UUID,
     module_type: api.ModuleType,
@@ -549,6 +549,7 @@ const MockConnection = struct {
         errdefer tunnel_info.deinit(allocator);
 
         created.* = .{
+            .allocator = allocator,
             .controller = parameters.controller,
             .module_id = module.id(),
             .module_type = module.typeOf(),
@@ -605,10 +606,10 @@ fn networkChange(_: *anyopaque, _: net_io.ReachabilityInfo, _: net_conn.Connecti
 
 fn betterPath(_: *anyopaque, _: net_conn.Connection.Events) void {}
 
-fn deinit(ptr: *anyopaque, allocator: std.mem.Allocator) void {
+fn deinit(ptr: *anyopaque) void {
     const self: *MockConnection = @ptrCast(@alignCast(ptr));
-    self.tunnel_info.deinit(allocator);
-    allocator.destroy(self);
+    self.tunnel_info.deinit(self.allocator);
+    self.allocator.destroy(self);
 }
 
 fn buildTunnelInfo(
@@ -804,6 +805,7 @@ fn mockIsReachable(ptr: ?*anyopaque) bool {
 }
 
 const DaemonMockConnection = struct {
+    allocator: std.mem.Allocator,
     timeout_ms: u32 = 0,
 
     fn asConnection(self: *DaemonMockConnection) net_conn.Connection {
@@ -852,9 +854,9 @@ fn daemonMockNetworkChange(
     _: net_conn.Connection.Events,
 ) void {}
 
-fn daemonMockDeinit(ptr: *anyopaque, allocator: std.mem.Allocator) void {
+fn daemonMockDeinit(ptr: *anyopaque) void {
     const self: *DaemonMockConnection = @ptrCast(@alignCast(ptr));
-    allocator.destroy(self);
+    self.allocator.destroy(self);
 }
 
 pub fn mockConnectionImplementation() net_conn.ConnectionImplementation {
@@ -880,7 +882,7 @@ fn mockCreate(
     std.debug.assert(api.hasConnection(parameters.profile));
     std.debug.assert(parameters.controller.ptr != null);
     var created = try allocator.create(DaemonMockConnection);
-    created.* = .{};
+    created.* = .{ .allocator = allocator };
     return created.asConnection();
 }
 
@@ -928,7 +930,7 @@ fn blockingBetterPath(ptr: *anyopaque, _: net_conn.Connection.Events) void {
 
 fn blockingNetworkChange(_: *anyopaque, _: net_io.ReachabilityInfo, _: net_conn.Connection.Events) void {}
 
-fn blockingDeinit(_: *anyopaque, _: std.mem.Allocator) void {}
+fn blockingDeinit(_: *anyopaque) void {}
 
 pub fn blockingConnectionImplementation(blocking_connection: *BlockingStopConnection) net_conn.ConnectionImplementation {
     return .{

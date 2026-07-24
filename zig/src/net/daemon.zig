@@ -189,7 +189,7 @@ pub const Daemon = struct {
         return daemon;
     }
 
-    pub fn deinit(self: *Daemon, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *Daemon) void {
         // This is crucial to guarantee that there will not be in-flight
         // handlers (reachability, better path, connection events) still calling
         // into the daemon.
@@ -213,8 +213,8 @@ pub const Daemon = struct {
             gate.deinit();
         }
         std.debug.assert(self.connection_runtime == null);
-        self.profile.deinit(allocator);
-        allocator.destroy(self);
+        self.profile.deinit(self.allocator);
+        self.allocator.destroy(self);
 
         log.write(.debug, "Deinit daemon");
     }
@@ -238,9 +238,7 @@ pub const Daemon = struct {
     );
 
     const Message = union(enum) {
-        start: struct {
-            allocator: std.mem.Allocator,
-        },
+        start,
         hold,
         stop,
         evaluateConnection,
@@ -261,7 +259,7 @@ pub const Daemon = struct {
 
     fn perform(self: *Daemon, message: Message) Error!void {
         switch (message) {
-            .start => |payload| try self.doStart(payload.allocator),
+            .start => try self.doStart(),
             .hold => self.doHold(),
             .stop => self.doStop(),
             .evaluateConnection => self.doEvaluateConnection(),
@@ -278,13 +276,8 @@ pub const Daemon = struct {
         }
     }
 
-    pub fn start(
-        self: *const Daemon,
-        allocator: std.mem.Allocator,
-    ) Error!void {
-        return self.actor.perform(.{ .start = .{
-            .allocator = allocator,
-        } });
+    pub fn start(self: *const Daemon) Error!void {
+        return self.actor.perform(.start);
     }
 
     pub fn hold(self: *const Daemon) void {
@@ -402,10 +395,7 @@ pub const Daemon = struct {
 
     // #region Actor handlers
 
-    fn doStart(
-        self: *Daemon,
-        allocator: std.mem.Allocator,
-    ) Error!void {
+    fn doStart(self: *Daemon) Error!void {
         if (self.state != .initial) return error.AlreadyStarted;
         if (self.isConnectionProfile()) try self.initConnectionRuntime();
         self.state = .started;
@@ -415,12 +405,12 @@ pub const Daemon = struct {
 
         // Establish settings-only tunnel if no connection
         if (self.isSettingsOnly()) {
-            var maybe_info = buildSettingsOnlyTunnelInfo(allocator, &self.profile) catch |err| {
+            var maybe_info = buildSettingsOnlyTunnelInfo(self.allocator, &self.profile) catch |err| {
                 self.handleStartError(err);
                 return;
             };
             if (maybe_info) |*info| {
-                defer info.deinit(allocator);
+                defer info.deinit(self.allocator);
                 _ = self.controller.setTunnelSettings(info.*) catch |err| {
                     self.handleStartError(err);
                     return;
@@ -815,7 +805,7 @@ pub const Daemon = struct {
             module,
             sb,
         );
-        errdefer connection.deinit(self.allocator);
+        errdefer connection.deinit();
 
         // Publish a complete runtime before the looper can invoke onFinish.
         self.connection_runtime = .{
@@ -861,7 +851,7 @@ pub const Daemon = struct {
             error.TerminalFailure => {},
             else => log.writef(.debug, "Unable to stop connection looper: {s}", .{@errorName(err)}),
         };
-        runtime.connection.deinit(self.allocator);
+        runtime.connection.deinit();
         runtime.looper.deinit();
         self.allocator.destroy(runtime.looper);
         self.connection_runtime = null;

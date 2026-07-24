@@ -101,7 +101,7 @@ pub export fn partout_daemon_start(
     };
     errdefer runtime.deinit(allocator);
 
-    runtime.start(allocator) catch |err| return mapErrorToCode(err);
+    runtime.start() catch |err| return mapErrorToCode(err);
     daemon_runtime = runtime;
     return c.PartoutCompletionCodeOK;
 }

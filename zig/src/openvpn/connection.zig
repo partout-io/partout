@@ -1224,7 +1224,7 @@ fn looperDidFinish(
     self.looperDidFinish(failure);
 }
 
-fn deinit(ptr: *anyopaque, _: std.mem.Allocator) void {
+fn deinit(ptr: *anyopaque) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     self.deinit();
 }

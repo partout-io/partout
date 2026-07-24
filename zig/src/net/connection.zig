@@ -169,7 +169,7 @@ pub const Connection = struct {
         stop: *const fn (*anyopaque, u32, Events) void,
         network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) void,
         better_path: *const fn (*anyopaque, Events) void,
-        deinit: *const fn (*anyopaque, std.mem.Allocator) void,
+        deinit: *const fn (*anyopaque) void,
         /// Called synchronously from the daemon-owned looper's terminal
         /// callback. Most protocols can leave this unset.
         looper_finish: ?*const fn (*anyopaque, ?looper.Looper.Failure) void = null,
@@ -208,7 +208,7 @@ pub const Connection = struct {
         block(self.ptr, failure);
     }
 
-    pub fn deinit(self: Connection, allocator: std.mem.Allocator) void {
-        self.vtable.deinit(self.ptr, allocator);
+    pub fn deinit(self: Connection) void {
+        self.vtable.deinit(self.ptr);
     }
 };
