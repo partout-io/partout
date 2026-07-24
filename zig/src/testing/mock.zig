@@ -16,6 +16,66 @@ const net_sandbox = @import("../net/sandbox.zig");
 const api = core.api;
 const util = core.util;
 
+pub const MockSerializedExecutor = struct {
+    const Message = struct {
+        ptr: *anyopaque,
+        block: net.SerializedExecutor.Block,
+    };
+    const ExecutorActor = core.Actor(MockSerializedExecutor, Message, error{}, perform);
+
+    allocator: std.mem.Allocator,
+    actor: *ExecutorActor,
+
+    pub fn create(allocator: std.mem.Allocator) !*MockSerializedExecutor {
+        const self = try allocator.create(MockSerializedExecutor);
+        errdefer allocator.destroy(self);
+        self.* = .{
+            .allocator = allocator,
+            .actor = try ExecutorActor.create(allocator, self),
+        };
+        return self;
+    }
+
+    pub fn deinit(self: *MockSerializedExecutor) void {
+        self.actor.deinit();
+        const allocator = self.allocator;
+        self.* = undefined;
+        allocator.destroy(self);
+    }
+
+    pub fn interface(self: *MockSerializedExecutor) net.SerializedExecutor {
+        return .{
+            .ptr = self,
+            .run_block = run,
+        };
+    }
+
+    pub fn drain(self: *MockSerializedExecutor) void {
+        self.actor.perform(.{
+            .ptr = self,
+            .block = drainBarrier,
+        }) catch @panic("Unable to drain mock serialized work");
+    }
+
+    fn run(
+        ptr: ?*anyopaque,
+        block_ptr: *anyopaque,
+        block: net.SerializedExecutor.Block,
+    ) void {
+        const self: *MockSerializedExecutor = @ptrCast(@alignCast(ptr.?));
+        self.actor.schedule(.{
+            .ptr = block_ptr,
+            .block = block,
+        }) catch @panic("Unable to schedule mock serialized work");
+    }
+
+    fn perform(_: *MockSerializedExecutor, message: Message) error{}!void {
+        message.block(message.ptr);
+    }
+
+    fn drainBarrier(_: *anyopaque) void {}
+};
+
 // ZIGME: Hardcode until only Zig ABI
 pub export fn partout_log(_: i32, message: [*:0]const u8) void {
     std.debug.print("{s}\n", .{message});

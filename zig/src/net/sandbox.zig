@@ -29,12 +29,10 @@ pub const Sandbox = struct {
     /// Borrowed runtime cache directory. Connections that retain it must copy
     /// it during creation.
     cache_dir: []const u8 = "",
-    /// Executes connection-owned work in the same serialized context as the
-    /// connection lifecycle. The daemon supplies its actor-backed executor;
-    /// direct users and tests default to immediate execution. The sandbox
-    /// owner must keep this capability alive until the connection and every
-    /// producer of submitted work have been drained.
-    serialized_executor: SerializedExecutor = .{},
+    /// Executes connection-owned work on the daemon actor. The daemon must
+    /// keep this capability alive until the connection and every producer of
+    /// submitted work have been drained.
+    serialized_executor: SerializedExecutor,
     options: ConnectionOptions = .{},
 };
 
@@ -267,15 +265,11 @@ pub const NetworkMonitor = struct {
 pub const SerializedExecutor = struct {
     pub const Block = *const fn (*anyopaque) void;
 
-    ptr: ?*anyopaque = null,
-    run_block: *const fn (?*anyopaque, *anyopaque, Block) void = runInline,
+    ptr: ?*anyopaque,
+    run_block: *const fn (?*anyopaque, *anyopaque, Block) void,
 
     pub fn run(self: SerializedExecutor, block_ptr: *anyopaque, block: Block) void {
         self.run_block(self.ptr, block_ptr, block);
-    }
-
-    fn runInline(_: ?*anyopaque, block_ptr: *anyopaque, block: Block) void {
-        block(block_ptr);
     }
 };
 

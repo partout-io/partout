@@ -601,7 +601,7 @@ fn stopDaemon(sut: *Daemon) void {
 
 const DelayedConnection = struct {
     timer: core.RunAfter = .{},
-    serialized_executor: net.SerializedExecutor = .{},
+    serialized_executor: ?net.SerializedExecutor = null,
     start_thread: ?std.Thread.Id = null,
     timer_thread: ?std.Thread.Id = null,
     ran_on_start_thread: bool = false,
@@ -654,7 +654,7 @@ const DelayedConnection = struct {
         while (self.pause_timer_before_enqueue and !self.allow_timer_enqueue.load(.acquire)) {
             std.Thread.yield() catch {};
         }
-        self.serialized_executor.run(self, onSerialized);
+        self.serialized_executor.?.run(self, onSerialized);
     }
 
     fn onSerialized(ctx: *anyopaque) void {
@@ -759,7 +759,7 @@ const SandboxCapture = struct {
     options: ?net.ConnectionOptions = null,
     looper: ?*net.Looper = null,
     looper_ready_during_create: bool = false,
-    serialized_executor: net.SerializedExecutor = .{},
+    serialized_executor: ?net.SerializedExecutor = null,
     disconnect_on_start: bool = false,
     cancel_on_start: ?api.PartoutErrorCode = null,
     saw_cancel_callback: bool = false,
@@ -831,7 +831,7 @@ const SandboxCapture = struct {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
         self.stop_count += 1;
         if (self.queue_work_on_stop) {
-            self.serialized_executor.run(self, onSerialized);
+            self.serialized_executor.?.run(self, onSerialized);
         }
     }
 

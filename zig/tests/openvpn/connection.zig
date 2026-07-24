@@ -53,6 +53,8 @@ test "OpenVPN connection borrows the daemon looper" {
         .session_options = .{ .backend = .mock },
     };
     var controller = mock.MockTunnelController{};
+    const executor = try mock.MockSerializedExecutor.create(allocator);
+    defer executor.deinit();
     const created = try connection.createConnection(
         &context,
         allocator,
@@ -65,6 +67,7 @@ test "OpenVPN connection borrows the daemon looper" {
             .monitor = mock.alwaysReachableMonitor(),
             .looper = &looper,
             .cache_dir = "/tmp",
+            .serialized_executor = executor.interface(),
         },
     );
     created.deinit(allocator);
