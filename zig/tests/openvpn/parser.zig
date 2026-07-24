@@ -51,6 +51,128 @@ test "OpenVPNParser parses common client configuration" {
     try std.testing.expect(configuration.xor_method.? == .reverse);
 }
 
+test "OpenVPNParser parses TCP client protocol aliases" {
+    const allocator = std.testing.allocator;
+    var configuration = try OpenVPNParser.parse(allocator,
+        \\proto tcp-client
+        \\remote default.example.com 443
+        \\remote any.example.com 443 TCP-CLIENT
+        \\remote ipv4.example.com 443 tcp4-client
+        \\remote ipv6.example.com 443 TcP6-ClIeNt
+    );
+    defer configuration.deinit(allocator);
+
+    try std.testing.expectEqual(@as(usize, 4), configuration.remotes.?.len);
+    try std.testing.expectEqual(api.IPSocketType.tcp, configuration.remotes.?[0].proto.socket_type);
+    try std.testing.expectEqual(api.IPSocketType.tcp, configuration.remotes.?[1].proto.socket_type);
+    try std.testing.expectEqual(api.IPSocketType.tcp4, configuration.remotes.?[2].proto.socket_type);
+    try std.testing.expectEqual(api.IPSocketType.tcp6, configuration.remotes.?[3].proto.socket_type);
+}
+
+test "OpenVPNParser parses cipher and digest values case-insensitively" {
+    const allocator = std.testing.allocator;
+    var configuration = try OpenVPNParser.parse(allocator,
+        \\cipher aEs-256-cBc
+        \\data-ciphers aes-256-gcm:AeS-128-GcM
+        \\auth sHa256
+    );
+    defer configuration.deinit(allocator);
+
+    try std.testing.expectEqual(api.OpenVPNCipher.aes256cbc, configuration.cipher.?);
+    try std.testing.expectEqualSlices(
+        api.OpenVPNCipher,
+        &.{ .aes256gcm, .aes128gcm },
+        configuration.data_ciphers.?,
+    );
+    try std.testing.expectEqual(api.OpenVPNDigest.sha256, configuration.digest.?);
+
+    var fallback = try OpenVPNParser.parse(
+        allocator,
+        "data-ciphers-fallback aEs-192-CbC",
+    );
+    defer fallback.deinit(allocator);
+    try std.testing.expectEqual(api.OpenVPNCipher.aes192cbc, fallback.cipher.?);
+
+    try std.testing.expectError(
+        error.UnsupportedConfiguration,
+        OpenVPNParser.parse(
+            allocator,
+            "data-ciphers CHACHA20-POLY1305:aes-256-gcm",
+        ),
+    );
+}
+
+test "OpenVPNParser follows OpenVPN optional data cipher semantics" {
+    const allocator = std.testing.allocator;
+    var configuration = try OpenVPNParser.parse(
+        allocator,
+        "data-ciphers ?AES-256-GCM:?CHACHA20-POLY1305:AES-128-GCM",
+    );
+    defer configuration.deinit(allocator);
+
+    try std.testing.expectEqualSlices(
+        api.OpenVPNCipher,
+        &.{ .aes256gcm, .aes128gcm },
+        configuration.data_ciphers.?,
+    );
+
+    var legacy_alias = try OpenVPNParser.parse(
+        allocator,
+        "ncp-ciphers AES-256-GCM:?CHACHA20-POLY1305",
+    );
+    defer legacy_alias.deinit(allocator);
+    try std.testing.expectEqualSlices(
+        api.OpenVPNCipher,
+        &.{.aes256gcm},
+        legacy_alias.data_ciphers.?,
+    );
+
+    try std.testing.expectError(
+        error.UnsupportedConfiguration,
+        OpenVPNParser.parse(allocator, "data-ciphers CHACHA20-POLY1305:AES-256-GCM"),
+    );
+    try std.testing.expectError(
+        error.UnsupportedConfiguration,
+        OpenVPNParser.parse(allocator, "data-ciphers ?CHACHA20-POLY1305:?BF-CBC"),
+    );
+}
+
+test "OpenVPNParser gives explicit data cipher fallback order-independent precedence" {
+    const allocator = std.testing.allocator;
+    const profiles = [_][]const u8{
+        "cipher AES-256-CBC\ndata-ciphers-fallback AES-128-CBC",
+        "data-ciphers-fallback AES-128-CBC\ncipher AES-256-CBC",
+    };
+    for (profiles) |profile| {
+        var configuration = try OpenVPNParser.parse(allocator, profile);
+        defer configuration.deinit(allocator);
+        try std.testing.expectEqual(api.OpenVPNCipher.aes128cbc, configuration.cipher.?);
+    }
+}
+
+test "OpenVPNParser leaves client completeness to module import" {
+    const allocator = std.testing.allocator;
+    var without_ca = try OpenVPNParser.parse(
+        allocator,
+        "remote vpn.example.com 1194 udp",
+    );
+    defer without_ca.deinit(allocator);
+    try std.testing.expect(without_ca.ca == null);
+    try std.testing.expectEqual(@as(usize, 1), without_ca.remotes.?.len);
+
+    var without_remote = try OpenVPNParser.parse(allocator,
+        \\client
+        \\<ca>
+        \\-----BEGIN CERTIFICATE-----
+        \\abc
+        \\-----END CERTIFICATE-----
+        \\</ca>
+    );
+    defer without_remote.deinit(allocator);
+    try std.testing.expect(without_remote.ca != null);
+    try std.testing.expect(without_remote.remotes == null);
+}
+
 test "OpenVPNParser rejects enabled LZO compression" {
     const allocator = std.testing.allocator;
     try std.testing.expectError(error.UnsupportedCompression, OpenVPNParser.parse(allocator, "comp-lzo"));
@@ -180,6 +302,23 @@ test "OpenVPNParser rejects connection blocks" {
         OpenVPNParser.parse(
             std.testing.allocator,
             "<connection>\n</connection>",
+        ),
+    );
+}
+
+test "OpenVPNParser rejects embedded and external auth-user-pass credentials" {
+    try std.testing.expectError(
+        error.UnsupportedConfiguration,
+        OpenVPNParser.parse(
+            std.testing.allocator,
+            "<auth-user-pass>\nusername\npassword\n</auth-user-pass>",
+        ),
+    );
+    try std.testing.expectError(
+        error.UnsupportedConfiguration,
+        OpenVPNParser.parse(
+            std.testing.allocator,
+            "auth-user-pass credentials.txt",
         ),
     );
 }
@@ -419,6 +558,13 @@ test "OpenVPNParser requires decrypter for encrypted client key" {
 test "OpenVPNParser reports decrypt failures for encrypted client key" {
     const allocator = std.testing.allocator;
     const ovpn_parser = OpenVPNParser{ .decrypt_key = failDecryptKey };
+
+    try std.testing.expectError(error.UnableToDecrypt, ovpn_parser.parseWithContext(allocator, encrypted_key_configuration, .{ .passphrase = "secret" }));
+}
+
+test "OpenVPNParser creates a decrypter from its default crypto backend" {
+    const allocator = std.testing.allocator;
+    const ovpn_parser = OpenVPNParser.init(null);
 
     try std.testing.expectError(error.UnableToDecrypt, ovpn_parser.parseWithContext(allocator, encrypted_key_configuration, .{ .passphrase = "secret" }));
 }

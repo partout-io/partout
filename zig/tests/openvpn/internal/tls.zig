@@ -89,8 +89,8 @@ test "TLSWrapper delegates its complete TLS surface to the C table" {
     functions.put_cipher = Fake.put;
     functions.ca_md5 = Fake.caMD5;
     const ca_filename = "11111111-1111-4111-8111-111111111111-ca.pem";
-    const tls = try TLSWrapper.create(allocator, .{
-        .fnt = functions,
+    const tls = try TLSWrapper.testing.createWithFunctions(allocator, .{
+        .backend = .mock,
         .caches_directory = caches_directory,
         .ca_filename = ca_filename,
         .configuration = &configuration,
@@ -98,7 +98,7 @@ test "TLSWrapper delegates its complete TLS surface to the C table" {
             .context = &verification_failures,
             .callback = Fake.verificationFailed,
         },
-    });
+    }, functions);
     defer tls.destroy();
     const expected_ca_path = try std.fs.path.join(
         allocator,

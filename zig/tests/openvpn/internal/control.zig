@@ -117,7 +117,7 @@ test "tls-crypt-v2 carries the wrapped key only on leading WKC packets" {
     } };
     const serializer = try Serializer.forConfiguration(
         allocator,
-        source.c_crypto.pp_crypto_fnt_mock().enc,
+        .mock,
         &configuration,
     );
     const channel = try TestControlChannel.create(allocator, .system(), serializer);
@@ -195,7 +195,7 @@ fn expectProtectedRoundTrip(
     };
     const client_serializer = try Serializer.forConfiguration(
         allocator,
-        source.c_crypto.pp_crypto_fnt_mock().enc,
+        .mock,
         &client_configuration,
     );
     const client = try TestControlChannel.create(
@@ -206,7 +206,7 @@ fn expectProtectedRoundTrip(
     defer client.destroy();
     const server_serializer = try Serializer.forConfiguration(
         allocator,
-        source.c_crypto.pp_crypto_fnt_mock().enc,
+        .mock,
         &server_configuration,
     );
     const server = try TestControlChannel.create(

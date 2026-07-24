@@ -17,10 +17,6 @@ test "uncovered ObfuscationMethodTests: legacy untagged Codable payloads are out
     return error.SkipZigTest;
 }
 
-test "uncovered KeyDecrypterTests and encrypted-key parser fixtures: PKCS1 and PKCS8 decryption require a crypto backend" {
-    return error.SkipZigTest;
-}
-
 test "uncovered DataPathPerformanceTests and native cipher cases: timing and AES backends are not portable unit tests" {
     return error.SkipZigTest;
 }

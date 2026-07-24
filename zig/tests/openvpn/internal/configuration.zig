@@ -39,6 +39,27 @@ test "negotiable data ciphers append an explicit legacy cipher" {
     );
 }
 
+test "normalized explicit fallback is not duplicated in negotiation list" {
+    const allocator = std.testing.allocator;
+    const advertised = [_]api.OpenVPNCipher{ .aes256gcm, .aes128cbc };
+    const options = api.OpenVPNConfiguration{
+        .cipher = .aes128cbc,
+        .data_ciphers = &advertised,
+    };
+
+    try std.testing.expectEqual(
+        api.OpenVPNCipher.aes128cbc,
+        configuration.fallbackCipher(&options),
+    );
+    const negotiable = (try configuration.negotiableDataCiphers(allocator, &options)).?;
+    defer allocator.free(negotiable);
+    try std.testing.expectEqualSlices(
+        api.OpenVPNCipher,
+        &advertised,
+        negotiable,
+    );
+}
+
 test "local options include explicit legacy cipher" {
     const allocator = std.testing.allocator;
     const options = try configuration.localOptionsStringAlloc(allocator, &.{ .cipher = .aes256gcm }, true);

@@ -5,7 +5,6 @@
 const std = @import("std");
 const source = @import("source");
 
-const c_crypto = source.c_crypto;
 const net = source.net;
 const PRNG = source.openvpn_internal.crypto.PRNG;
 const Session = source.openvpn_internal.session.Session;
@@ -34,13 +33,12 @@ test "Session borrows an externally managed Looper" {
     const session = try Session.create(
         allocator,
         &looper,
-        c_crypto.pp_crypto_fnt_mock(),
         .{},
         null,
         PRNG.system(),
         "",
         "11111111-1111-4111-8111-111111111111-ca.pem",
-        .{},
+        .{ .backend = .mock },
     );
     var session_destroyed = false;
     defer if (!session_destroyed) session.destroy();

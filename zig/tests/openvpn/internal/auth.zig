@@ -58,7 +58,13 @@ test "PRF owns retained inputs and derives four key-method-2 buffers" {
     functions.hmac_do = Fake.hmac;
     const session_id = try allocator.dupe(u8, "12345678");
     const remote_session_id = try allocator.dupe(u8, "ABCDEFGH");
-    var prf = try PRF.init(allocator, functions, &handshake, session_id, remote_session_id);
+    var prf = try PRF.testing.initWithFunctions(
+        allocator,
+        functions,
+        &handshake,
+        session_id,
+        remote_session_id,
+    );
     defer prf.deinit(allocator);
 
     handshake.deinit(allocator);

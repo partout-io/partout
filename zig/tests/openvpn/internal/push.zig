@@ -31,6 +31,17 @@ test "PUSH_REPLY parses through the standard OpenVPN parser" {
     try std.testing.expectEqual(@as(?u32, 7), reply.options.peer_id);
 }
 
+test "PUSH_REPLY parses cipher and digest values case-insensitively" {
+    var reply = (try push.PushReply.parse(
+        std.testing.allocator,
+        "PUSH_REPLY,cipher aEs-256-gCm,auth sHa384",
+    )).?;
+    defer reply.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(api.OpenVPNCipher.aes256gcm, reply.options.cipher.?);
+    try std.testing.expectEqual(api.OpenVPNDigest.sha384, reply.options.digest.?);
+}
+
 test "PUSH_REPLY parses net30 gateways and DNS servers" {
     const allocator = std.testing.allocator;
     var reply = (try push.PushReply.parse(

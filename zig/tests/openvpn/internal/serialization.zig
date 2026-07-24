@@ -6,7 +6,6 @@ const std = @import("std");
 const source = @import("source");
 
 const api = source.core.api;
-const c_crypto = source.c_crypto;
 const packet = source.openvpn_internal.packet;
 const serialization = source.openvpn_internal.serialization;
 
@@ -135,8 +134,7 @@ test "tls-auth round trips the whole datagram and ignores bounds" {
     var secure_key = try api.SecureData.initBytesAlloc(std.testing.allocator, &key_bytes);
     defer secure_key.deinit(std.testing.allocator);
     const key = api.OpenVPNStaticKey{ .data = secure_key, .dir = null };
-    const functions = c_crypto.pp_crypto_fnt_mock();
-    var serializer = try AuthSerializer.init(std.testing.allocator, functions.enc, .sha256, key);
+    var serializer = try AuthSerializer.init(std.testing.allocator, .mock, .sha256, key);
     defer serializer.deinit();
 
     const session_id = [_]u8{ 1, 2, 3, 4, 5, 6, 7, 8 };
@@ -156,8 +154,7 @@ test "tls-crypt round trips the whole datagram and ignores bounds" {
     var secure_key = try api.SecureData.initBytesAlloc(std.testing.allocator, &key_bytes);
     defer secure_key.deinit(std.testing.allocator);
     const key = api.OpenVPNStaticKey{ .data = secure_key, .dir = .client };
-    const functions = c_crypto.pp_crypto_fnt_mock();
-    var serializer = try CryptSerializer.init(std.testing.allocator, functions.enc, key);
+    var serializer = try CryptSerializer.init(std.testing.allocator, .mock, key);
     defer serializer.deinit();
 
     const session_id = [_]u8{ 1, 2, 3, 4, 5, 6, 7, 8 };
@@ -181,8 +178,7 @@ test "tls-crypt-v2 appends the wrapped key only to WKC opcodes" {
     var secure_wrapped = try api.SecureData.initBytesAlloc(std.testing.allocator, &wrapped_bytes);
     defer secure_wrapped.deinit(std.testing.allocator);
     const key = api.OpenVPNStaticKey{ .data = secure_key, .dir = .client };
-    const functions = c_crypto.pp_crypto_fnt_mock();
-    var serializer = try CryptV2Serializer.init(std.testing.allocator, functions.enc, key, secure_wrapped);
+    var serializer = try CryptV2Serializer.init(std.testing.allocator, .mock, key, secure_wrapped);
     defer serializer.deinit(std.testing.allocator);
 
     const session_id = [_]u8{ 1, 2, 3, 4, 5, 6, 7, 8 };

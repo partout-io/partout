@@ -156,6 +156,29 @@ test "OpenVPN serializer preserves legacy directive variants" {
     try std.testing.expect(std.mem.endsWith(u8, serialized, "redirect-gateway"));
 }
 
+test "OpenVPN serializer normalizes cipher fallback precedence" {
+    const allocator = std.testing.allocator;
+    const profiles = [_][]const u8{
+        "data-ciphers AES-256-GCM:?CHACHA20-POLY1305\ncipher AES-256-CBC\ndata-ciphers-fallback AES-128-CBC",
+        "data-ciphers AES-256-GCM:?CHACHA20-POLY1305\ndata-ciphers-fallback AES-128-CBC\ncipher AES-256-CBC",
+    };
+
+    for (profiles) |profile| {
+        var configuration = try Parser.parse(allocator, profile);
+        defer configuration.deinit(allocator);
+        const serialized = try serializer.serializeConfiguration(allocator, &configuration);
+        defer allocator.free(serialized);
+
+        try std.testing.expect(std.mem.indexOf(
+            u8,
+            serialized,
+            "data-ciphers AES-256-GCM\ndata-ciphers-fallback AES-128-CBC",
+        ) != null);
+        try std.testing.expect(std.mem.indexOf(u8, serialized, "CHACHA20-POLY1305") == null);
+        try std.testing.expect(std.mem.indexOf(u8, serialized, "cipher AES-256-CBC") == null);
+    }
+}
+
 test "OpenVPN serializer round-trips static TLS keys through core SecureData" {
     const allocator = std.testing.allocator;
     var bytes: [256]u8 = undefined;

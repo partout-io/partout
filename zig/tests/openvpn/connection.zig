@@ -5,7 +5,8 @@
 const std = @import("std");
 const source = @import("source");
 
-const api = source.core.api;
+const core = source.core;
+const api = core.api;
 const connection = source.openvpn_connection;
 const mock = source.mock;
 const net = source.net;
@@ -48,16 +49,17 @@ test "OpenVPN connection borrows the daemon looper" {
         .modules = &modules,
         .active_modules_ids = &active_ids,
     };
-    var context = connection.ConnectionContext.init(
-        source.c_crypto.pp_crypto_fnt_mock(),
-    );
+    var context = connection.ConnectionContext{
+        .session_options = .{ .backend = .mock },
+    };
+    var controller = mock.MockTunnelController{};
     const created = try connection.createConnection(
         &context,
         allocator,
         .{ .module = &modules[0] },
         .{
             .profile = &profile,
-            .controller = mock.noopTunnelController(),
+            .controller = controller.interface(),
             .resolver = mock.noopDNSResolver(),
             .factory = mock.noopSocketFactory(),
             .monitor = mock.alwaysReachableMonitor(),
