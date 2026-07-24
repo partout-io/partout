@@ -134,3 +134,9 @@ test "explicit cipher wins over fallback alias" {
     const options = ServerOptions.parse("cipher AES-256-GCM,data-ciphers-fallback AES-128-CBC");
     try std.testing.expectEqual(api.OpenVPNCipher.aes256gcm, options.cipher.?);
 }
+
+test "server OCC accepts the data ciphers fallback alias" {
+    const options = ServerOptions.parse("V4,data-ciphers-fallback AES-128-CBC,auth SHA1");
+    try std.testing.expectEqual(api.OpenVPNCipher.aes128cbc, options.cipher.?);
+    try std.testing.expectEqual(api.OpenVPNDigest.sha1, options.digest.?);
+}

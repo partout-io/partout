@@ -113,3 +113,58 @@ test "active default IP modules add OpenVPN routing policies" {
         policies,
     );
 }
+
+test "OpenVPN connection accepts only valid status transitions" {
+    const statusCanChange = connection.testing.statusCanChange;
+    try std.testing.expect(statusCanChange(.disconnected, .connecting));
+    try std.testing.expect(!statusCanChange(.disconnected, .connected));
+    try std.testing.expect(statusCanChange(.connecting, .connected));
+    try std.testing.expect(statusCanChange(.connecting, .disconnecting));
+    try std.testing.expect(statusCanChange(.connecting, .disconnected));
+    try std.testing.expect(statusCanChange(.connected, .disconnecting));
+    try std.testing.expect(statusCanChange(.connected, .disconnected));
+    try std.testing.expect(statusCanChange(.disconnecting, .disconnected));
+    try std.testing.expect(!statusCanChange(.connected, .connecting));
+    try std.testing.expect(!statusCanChange(.connected, .connected));
+}
+
+test "OpenVPN connection distinguishes recoverable session failures" {
+    const isRecoverable = connection.testing.isRecoverableSessionError;
+    try std.testing.expect(isRecoverable(error.Timeout));
+    try std.testing.expect(isRecoverable(error.ConnectionFailure));
+    try std.testing.expect(isRecoverable(error.BadCredentialsWithLocalOptions));
+    try std.testing.expect(isRecoverable(error.ServerShutdown));
+    try std.testing.expect(isRecoverable(error.NetworkChanged));
+    try std.testing.expect(isRecoverable(error.Reconnect));
+    try std.testing.expect(!isRecoverable(error.BadCredentials));
+    try std.testing.expect(!isRecoverable(error.CryptoFailure));
+    try std.testing.expect(!isRecoverable(error.NoRouting));
+}
+
+test "OpenVPN connection maps tunnel setup failures to public codes" {
+    const codeForError = connection.testing.codeForTunnelError;
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.tunNotAvailable,
+        codeForError(error.TunNotAvailable),
+    );
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.socketConfiguration,
+        codeForError(error.SocketConfiguration),
+    );
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.networkChanged,
+        codeForError(error.NetworkChanged),
+    );
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.timeout,
+        codeForError(error.Timeout),
+    );
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.crypto,
+        codeForError(error.CryptoFailure),
+    );
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.unhandled,
+        codeForError(error.Unexpected),
+    );
+}

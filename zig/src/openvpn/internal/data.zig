@@ -596,7 +596,25 @@ pub const testing = struct {
         allocator: std.mem.Allocator,
         peer_id: u32,
     ) !*DataPath {
-        const mode = c.openvpn_dp_mode_ad_create_mock(c.OpenVPNCompressionFramingDisabled);
+        return createMockDataPathWithFraming(
+            allocator,
+            peer_id,
+            .disabled,
+            false,
+        );
+    }
+
+    pub fn createMockDataPathWithFraming(
+        allocator: std.mem.Allocator,
+        peer_id: u32,
+        framing: api.OpenVPNCompressionFraming,
+        authenticated: bool,
+    ) !*DataPath {
+        const native_framing = DataPathWrapper.nativeFraming(framing);
+        const mode = if (authenticated)
+            c.openvpn_dp_mode_hmac_create_mock(native_framing)
+        else
+            c.openvpn_dp_mode_ad_create_mock(native_framing);
         return DataPath.create(allocator, mode, peer_id);
     }
 };

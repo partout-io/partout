@@ -1254,6 +1254,10 @@ fn deinit(ptr: *anyopaque, _: std.mem.Allocator) void {
 }
 
 pub const testing = struct {
+    pub const codeForTunnelError = tunnelErrorCode;
+    pub const isRecoverableSessionError = isRecoverable;
+    pub const statusCanChange = canChangeStatus;
+
     pub fn configurationWithActiveModules(
         allocator: std.mem.Allocator,
         source: *const api.OpenVPNConfiguration,
