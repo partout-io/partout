@@ -611,7 +611,6 @@ pub const Daemon = struct {
             const code = api.codeForError(err);
             self.handleLastError(code);
             self.controller.setReasserting(false);
-            self.requestCancellation(code, false);
             return;
         };
         if (!did_start) {

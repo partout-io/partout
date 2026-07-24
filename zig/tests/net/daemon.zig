@@ -220,6 +220,36 @@ test "connection daemon starts connection and publishes lifecycle status" {
     try std.testing.expect(events.last_error_code == null);
 }
 
+test "connection daemon does not cancel tunnel when connection fails to start" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var failing_connection = FailingStartConnection{};
+    var implementations = [_]net.ConnectionImplementation{failing_connection.implementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var events = mock.ConnectionEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{};
+    var sut = try newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{ .starts_immediately = true },
+    );
+    defer sut.deinit(allocator);
+
+    try sut.start(allocator);
+    try std.testing.expectEqual(@as(usize, 1), failing_connection.start_count);
+    try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
+    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, events.last_error_code.?);
+
+    sut.stop();
+}
+
 test "connection daemon passes connection options into sandbox" {
     const allocator = std.testing.allocator;
     const mock = mock_mod;
@@ -591,6 +621,63 @@ const DelayedConnection = struct {
         const self: *DelayedConnection = @ptrCast(@alignCast(ptr));
         self.timer.deinit();
     }
+
+    const vtable = net.Connection.VTable{
+        .start = start,
+        .stop = stop,
+        .network_change = networkChange,
+        .better_path = betterPath,
+        .deinit = deinit,
+    };
+
+    const implementation_vtable = net.ConnectionImplementation.VTable{
+        .module_type = moduleType,
+        .create_connection = create,
+    };
+};
+
+const FailingStartConnection = struct {
+    start_count: usize = 0,
+
+    fn implementation(self: *FailingStartConnection) net.ConnectionImplementation {
+        return .{
+            .ptr = self,
+            .vtable = &implementation_vtable,
+        };
+    }
+
+    fn moduleType(_: ?*anyopaque) api.ModuleType {
+        return .OpenVPN;
+    }
+
+    fn create(
+        ptr: ?*anyopaque,
+        _: std.mem.Allocator,
+        _: net.ConnectionModule,
+        _: net.Sandbox,
+    ) net.ConnectionCreateError!net.Connection {
+        const self: *FailingStartConnection = @ptrCast(@alignCast(ptr.?));
+        return .{
+            .ptr = self,
+            .vtable = &vtable,
+        };
+    }
+
+    fn start(ptr: *anyopaque, events: net.Connection.Events) net.ConnectionStartError!bool {
+        const self: *FailingStartConnection = @ptrCast(@alignCast(ptr));
+        self.start_count += 1;
+        events.status(events.ctx, .connecting);
+        events.status(events.ctx, .disconnected);
+        return error.UnableToStart;
+    }
+
+    fn stop(_: *anyopaque, _: u32, _: net.Connection.Events) void {}
+
+    fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) void {}
+
+    fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
+
+    fn deinit(_: *anyopaque, _: std.mem.Allocator) void {}
 
     const vtable = net.Connection.VTable{
         .start = start,
