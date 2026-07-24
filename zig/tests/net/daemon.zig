@@ -197,11 +197,10 @@ test "connection daemon starts connection and publishes lifecycle status" {
         .connecting,
         .connected,
     }, sut.testStatuses());
-    try std.testing.expectEqual(@as(usize, 4), events.remove_count);
+    try std.testing.expectEqual(@as(usize, 5), events.remove_count);
     try std.testing.expectEqual(api.ConnectionStatus.connected, events.connection_status.?);
-    try std.testing.expect(events.has_data_count);
-    try std.testing.expectEqual(@as(u64, 10), events.data_count.received);
-    try std.testing.expectEqual(@as(u64, 20), events.data_count.sent);
+    try std.testing.expect(!events.has_data_count);
+    try std.testing.expectEqual(api.DataCount{}, events.data_count);
     try std.testing.expectEqual(api.PartoutErrorCode.authentication, events.last_error_code.?);
     try std.testing.expectEqual(@as(usize, 1), monitor.start_count);
 
@@ -214,9 +213,10 @@ test "connection daemon starts connection and publishes lifecycle status" {
         .disconnected,
     }, sut.testStatuses());
     try std.testing.expectEqual(@as(usize, 1), monitor.stop_count);
-    try std.testing.expectEqual(@as(usize, 7), events.remove_count);
+    try std.testing.expectEqual(@as(usize, 9), events.remove_count);
     try std.testing.expect(events.connection_status == null);
     try std.testing.expect(!events.has_data_count);
+    try std.testing.expectEqual(api.DataCount{}, events.data_count);
     try std.testing.expect(events.last_error_code == null);
 }
 
@@ -318,6 +318,38 @@ test "connection daemon creation fails if looper finishes before connection crea
     ));
     try std.testing.expect(capture.looper_ready);
     try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
+}
+
+test "connection daemon resets data count when connection disconnects" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var capture = SandboxCapture{ .disconnect_on_start = true };
+    var implementations = [_]net.ConnectionImplementation{capture.implementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var events = mock.ConnectionEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{};
+    var sut = try newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{
+            .starts_immediately = true,
+            .reconnection_delay_ms = 60_000,
+        },
+    );
+    defer sut.deinit(allocator);
+
+    try sut.start(allocator);
+    defer sut.stop();
+    try std.testing.expectEqual(api.ConnectionStatus.disconnected, events.connection_status.?);
+    try std.testing.expect(!events.has_data_count);
+    try std.testing.expectEqual(api.DataCount{}, events.data_count);
 }
 
 test "connection daemon terminates when its owned looper finishes" {
@@ -698,6 +730,7 @@ const SandboxCapture = struct {
     looper: ?*net.Looper = null,
     looper_ready: bool = false,
     stop_looper_during_create: bool = false,
+    disconnect_on_start: bool = false,
     cache_dir: []const u8 = "",
 
     fn implementation(self: *SandboxCapture) net.ConnectionImplementation {
@@ -740,7 +773,14 @@ const SandboxCapture = struct {
         return true;
     }
 
-    fn start(_: *anyopaque, _: net.Connection.Events) net.ConnectionStartError!bool {
+    fn start(ptr: *anyopaque, events: net.Connection.Events) net.ConnectionStartError!bool {
+        const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
+        if (self.disconnect_on_start) {
+            events.status(events.ctx, .connecting);
+            events.data_count(events.ctx, .{ .received = 10, .sent = 20 });
+            events.status(events.ctx, .disconnected);
+            return true;
+        }
         return false;
     }
 

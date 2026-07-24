@@ -217,6 +217,7 @@ test "starts and stops connection profile through injected dependencies" {
     try std.testing.expect(daemon.isConnectionProfile());
 
     try daemon.start(allocator);
+    defer daemon.stop();
 
     try std.testing.expectEqual(@as(usize, 1), runtime.monitor.start_count);
     try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
@@ -226,8 +227,8 @@ test "starts and stops connection profile through injected dependencies" {
     }, daemon.testStatuses());
     try std.testing.expectEqual(.connected, runtime.events.connection_status.?);
     try std.testing.expectEqual(.authentication, runtime.events.last_error_code.?);
-    try std.testing.expectEqual(@as(u64, 10), runtime.events.data_count.received);
-    try std.testing.expectEqual(@as(u64, 20), runtime.events.data_count.sent);
+    try std.testing.expect(!runtime.events.has_data_count);
+    try std.testing.expectEqual(api.DataCount{}, runtime.events.data_count);
     try std.testing.expect(!runtime.controller.reasserting);
 
     daemon.stop();

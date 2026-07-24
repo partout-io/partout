@@ -679,6 +679,7 @@ pub const Daemon = struct {
             },
             .disconnecting => {},
             .disconnected => {
+                self.resetDataCount();
                 self.controller.setReasserting(false);
                 self.scheduleResumeGate();
             },
@@ -691,6 +692,7 @@ pub const Daemon = struct {
     }
 
     fn handleLastError(self: *Daemon, code: api.PartoutErrorCode) void {
+        self.resetDataCount();
         self.snapshot_publisher.setLastError(code);
         self.snapshot_publisher.publishCurrentSnapshot(true);
         if (self.options.events) |e| e.last_error(e.ctx, code);
@@ -700,6 +702,11 @@ pub const Daemon = struct {
         self.snapshot_publisher.setDataCount(data_count);
         self.snapshot_publisher.publishCurrentSnapshot(false);
         if (self.options.events) |e| e.data_count(e.ctx, data_count);
+    }
+
+    fn resetDataCount(self: *Daemon) void {
+        self.snapshot_publisher.setDataCount(.{});
+        self.emitRemove(.data_count);
     }
 
     fn handleLooperFinish(
