@@ -37,6 +37,10 @@ pub fn importModule(
         };
     };
     setRecognizedType(context);
+    if (!isCompleteClientConfiguration(&configuration)) {
+        configuration.deinit(allocator);
+        return error.Parsing;
+    }
     const module_id = core.newId() catch {
         configuration.deinit(allocator);
         return error.Parsing;
@@ -201,6 +205,8 @@ fn decryptKeyWithBackend(comptime backend: CryptoBackend) Parser.DecryptKey {
 
 const Builder = struct {
     configuration: api.OpenVPNConfiguration = .{},
+    legacy_cipher: ?api.OpenVPNCipher = null,
+    data_ciphers_fallback: ?api.OpenVPNCipher = null,
     data_ciphers: std.ArrayList(api.OpenVPNCipher) = .empty,
     remotes: std.ArrayList(RemoteBuilder) = .empty,
     routes4: std.ArrayList(api.Route) = .empty,
@@ -261,7 +267,9 @@ const Builder = struct {
         }
 
         if (blockBeginName(line)) |name| {
-            if (std.ascii.eqlIgnoreCase(name, "connection")) {
+            if (std.ascii.eqlIgnoreCase(name, "connection") or
+                std.ascii.eqlIgnoreCase(name, "auth-user-pass"))
+            {
                 self.context.setParseErrorInfo(allocator, name, line);
                 return error.UnsupportedConfiguration;
             }
@@ -317,7 +325,7 @@ const Builder = struct {
         }
         if (std.ascii.eqlIgnoreCase(option, "cipher")) {
             if (components.items.len < 2) return error.MalformedOption;
-            self.configuration.cipher = api.OpenVPNCipher.parseFromRaw(components.items[1]) orelse return error.UnsupportedConfiguration;
+            self.legacy_cipher = parseRawIgnoreCase(api.OpenVPNCipher, components.items[1]) orelse return error.UnsupportedConfiguration;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "data-ciphers") or std.ascii.eqlIgnoreCase(option, "ncp-ciphers")) {
@@ -325,19 +333,25 @@ const Builder = struct {
             self.data_ciphers.clearRetainingCapacity();
             var ciphers = std.mem.splitScalar(u8, components.items[1], ':');
             while (ciphers.next()) |cipher| {
-                const parsed_cipher = api.OpenVPNCipher.parseFromRaw(cipher) orelse return error.UnsupportedConfiguration;
+                const is_optional = std.mem.startsWith(u8, cipher, "?");
+                const name = if (is_optional) cipher[1..] else cipher;
+                const parsed_cipher = parseRawIgnoreCase(api.OpenVPNCipher, name) orelse {
+                    if (is_optional) continue;
+                    return error.UnsupportedConfiguration;
+                };
                 try self.data_ciphers.append(allocator, parsed_cipher);
             }
+            if (self.data_ciphers.items.len == 0) return error.UnsupportedConfiguration;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "data-ciphers-fallback")) {
             if (components.items.len < 2) return error.MalformedOption;
-            self.configuration.cipher = api.OpenVPNCipher.parseFromRaw(components.items[1]) orelse return error.UnsupportedConfiguration;
+            self.data_ciphers_fallback = parseRawIgnoreCase(api.OpenVPNCipher, components.items[1]) orelse return error.UnsupportedConfiguration;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "auth")) {
             if (components.items.len < 2) return error.MalformedOption;
-            self.configuration.digest = api.OpenVPNDigest.parseFromRaw(components.items[1]) orelse return error.UnsupportedConfiguration;
+            self.configuration.digest = parseRawIgnoreCase(api.OpenVPNDigest, components.items[1]) orelse return error.UnsupportedConfiguration;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "comp-lzo")) {
@@ -677,6 +691,9 @@ const Builder = struct {
     fn build(self: *Builder, allocator: std.mem.Allocator) ParseError!api.OpenVPNConfiguration {
         if (!self.found_option) return error.InvalidFormat;
 
+        // The explicit compatibility fallback is distinct from deprecated
+        // `cipher` input and takes precedence regardless of directive order.
+        self.configuration.cipher = self.data_ciphers_fallback orelse self.legacy_cipher;
         try self.buildRoutingSettings(allocator);
         self.configuration.data_ciphers = try takeOwnedSliceOrNull(allocator, &self.data_ciphers);
 
@@ -904,11 +921,29 @@ fn parseDirection(value: []const u8) ?api.OpenVPNStaticKeyDirection {
 }
 
 fn parseIPSocketType(value: []const u8) ?api.IPSocketType {
+    if (std.ascii.eqlIgnoreCase(value, "tcp-client")) return .tcp;
+    if (std.ascii.eqlIgnoreCase(value, "tcp4-client")) return .tcp4;
+    if (std.ascii.eqlIgnoreCase(value, "tcp6-client")) return .tcp6;
+
     inline for (std.meta.fields(api.IPSocketType)) |field| {
         const socket_type: api.IPSocketType = @field(api.IPSocketType, field.name);
         if (std.ascii.eqlIgnoreCase(value, socket_type.raw())) return socket_type;
     }
     return null;
+}
+
+fn parseRawIgnoreCase(comptime T: type, value: []const u8) ?T {
+    inline for (std.meta.fields(T)) |field| {
+        const candidate: T = @field(T, field.name);
+        if (std.ascii.eqlIgnoreCase(value, candidate.raw())) return candidate;
+    }
+    return null;
+}
+
+fn isCompleteClientConfiguration(configuration: *const api.OpenVPNConfiguration) bool {
+    if (configuration.ca == null) return false;
+    const remotes = configuration.remotes orelse return false;
+    return remotes.len > 0;
 }
 
 fn lineOptionName(line: []const u8) []const u8 {
