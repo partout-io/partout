@@ -364,6 +364,8 @@ pub const ConnectionEventRecorder = struct {
     data_count: api.DataCount = .{},
     last_error_code: ?api.PartoutErrorCode = null,
     remove_count: usize = 0,
+    cancel_count: usize = 0,
+    last_cancel_code: ?api.PartoutErrorCode = null,
 
     pub fn events(self: *ConnectionEventRecorder) net_conn.Connection.Events {
         return .{
@@ -372,6 +374,7 @@ pub const ConnectionEventRecorder = struct {
             .last_error = recordLastErrorCode,
             .data_count = recordDataCount,
             .remove_key = recordRemove,
+            .cancel = recordCancel,
         };
     }
 
@@ -413,6 +416,12 @@ fn recordRemove(ptr: *anyopaque, key: net_conn.Connection.EventKey) void {
     }
 }
 
+fn recordCancel(ptr: *anyopaque, code: ?api.PartoutErrorCode) void {
+    const self: *ConnectionEventRecorder = @ptrCast(@alignCast(ptr));
+    self.cancel_count += 1;
+    self.last_cancel_code = code;
+}
+
 pub fn resetConnectionEventRecorder(self: *ConnectionEventRecorder) void {
     self.connection_status = null;
     self.status_count = 0;
@@ -420,6 +429,8 @@ pub fn resetConnectionEventRecorder(self: *ConnectionEventRecorder) void {
     self.data_count = .{};
     self.last_error_code = null;
     self.remove_count = 0;
+    self.cancel_count = 0;
+    self.last_cancel_code = null;
 }
 
 const always_reachable_vtable = net.NetworkMonitor.VTable{

@@ -352,6 +352,38 @@ test "connection daemon resets data count when connection disconnects" {
     try std.testing.expectEqual(api.DataCount{}, events.data_count);
 }
 
+test "connection daemon honors disabled cancellation for connection requests" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var capture = SandboxCapture{ .cancel_on_start = .authentication };
+    var implementations = [_]net.ConnectionImplementation{capture.implementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{ .reasserting = true };
+    var events = mock.ConnectionEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{};
+    var sut = try newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{
+            .starts_immediately = true,
+            .cancels_unrecoverable = false,
+        },
+    );
+    defer sut.deinit(allocator);
+
+    try sut.start(allocator);
+    defer sut.stop();
+    try std.testing.expect(capture.saw_cancel_callback);
+    try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
+    try std.testing.expect(!controller.reasserting);
+}
+
 test "connection daemon terminates when its owned looper finishes" {
     const allocator = std.testing.allocator;
     const mock = mock_mod;
@@ -731,6 +763,8 @@ const SandboxCapture = struct {
     looper_ready: bool = false,
     stop_looper_during_create: bool = false,
     disconnect_on_start: bool = false,
+    cancel_on_start: ?api.PartoutErrorCode = null,
+    saw_cancel_callback: bool = false,
     cache_dir: []const u8 = "",
 
     fn implementation(self: *SandboxCapture) net.ConnectionImplementation {
@@ -775,6 +809,10 @@ const SandboxCapture = struct {
 
     fn start(ptr: *anyopaque, events: net.Connection.Events) net.ConnectionStartError!bool {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
+        self.saw_cancel_callback = events.cancel != null;
+        if (self.cancel_on_start) |code| {
+            if (events.cancel) |cancel| cancel(events.ctx, code);
+        }
         if (self.disconnect_on_start) {
             events.status(events.ctx, .connecting);
             events.data_count(events.ctx, .{ .received = 10, .sent = 20 });

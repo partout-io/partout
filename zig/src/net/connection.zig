@@ -160,6 +160,11 @@ pub const Connection = struct {
         last_error: *const fn (*anyopaque, api.PartoutErrorCode) void,
         data_count: *const fn (*anyopaque, api.DataCount) void,
         remove_key: *const fn (*anyopaque, EventKey) void,
+        /// Requests host cancellation after an unrecoverable connection
+        /// failure. Daemon-backed connections provide this callback so the
+        /// daemon can apply its cancellation policy. Standalone connections
+        /// may omit it and retain their controller-backed fallback.
+        cancel: ?*const fn (*anyopaque, ?api.PartoutErrorCode) void = null,
     };
 
     pub const EventKey = enum {

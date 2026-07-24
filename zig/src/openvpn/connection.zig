@@ -515,8 +515,7 @@ const OpenVPNConnection = struct {
         self.status = .disconnected;
         self.events = null;
         events.last_error(events.ctx, code);
-        self.controller.setReasserting(false);
-        self.controller.cancelTunnelConnection(code);
+        self.requestCancellation(events, code);
     }
 
     fn handleDidStop(
@@ -538,8 +537,7 @@ const OpenVPNConnection = struct {
                     log.writef(.info, "Report link failure: {s}", .{@errorName(err)});
                     self.status = .disconnected;
                     self.events = null;
-                    self.controller.setReasserting(false);
-                    self.controller.cancelTunnelConnection(code);
+                    self.requestCancellation(events, code);
                     return;
                 }
             }
@@ -547,6 +545,19 @@ const OpenVPNConnection = struct {
             log.write(.notice, "Session did stop");
         }
         _ = self.sendStatus(.disconnected, events);
+    }
+
+    fn requestCancellation(
+        self: *OpenVPNConnection,
+        events: net.Connection.Events,
+        code: ?api.PartoutErrorCode,
+    ) void {
+        const cancel = events.cancel orelse {
+            self.controller.setReasserting(false);
+            self.controller.cancelTunnelConnection(code);
+            return;
+        };
+        cancel(events.ctx, code);
     }
 
     fn sendStatus(

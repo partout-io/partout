@@ -302,6 +302,7 @@ pub const Daemon = struct {
         onConnectionStatus: api.ConnectionStatus,
         onConnectionLastError: api.PartoutErrorCode,
         onConnectionDataCount: api.DataCount,
+        onConnectionCancel: ?api.PartoutErrorCode,
         onLooperFinish: ?Looper.Failure,
         onConnectionBlock: struct {
             ptr: *anyopaque,
@@ -321,6 +322,7 @@ pub const Daemon = struct {
             .onConnectionStatus => |status| self.handleConnectionStatus(status),
             .onConnectionLastError => |code| self.handleLastError(code),
             .onConnectionDataCount => |count| self.handleDataCount(count),
+            .onConnectionCancel => |code| self.handleConnectionCancel(code),
             .onLooperFinish => |failure| self.handleLooperFinish(failure),
             .onConnectionBlock => |payload| self.handleConnectionBlock(payload.ptr, payload.block),
         }
@@ -390,6 +392,7 @@ pub const Daemon = struct {
             .last_error = onConnectionLastError,
             .data_count = onConnectionDataCount,
             .remove_key = onConnectionRemoveKey,
+            .cancel = onConnectionCancel,
         };
     }
 
@@ -419,6 +422,13 @@ pub const Daemon = struct {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
         self.actor.perform(.{ .onConnectionDataCount = data_count }) catch |err| {
             log.writef(.err, "Unable to report connection data count: {s}", .{@errorName(err)});
+        };
+    }
+
+    fn onConnectionCancel(ctx: *anyopaque, code: ?api.PartoutErrorCode) void {
+        const self: *Daemon = @ptrCast(@alignCast(ctx));
+        self.actor.perform(.{ .onConnectionCancel = code }) catch |err| {
+            log.writef(.err, "Unable to request connection cancellation: {s}", .{@errorName(err)});
         };
     }
 
@@ -702,6 +712,11 @@ pub const Daemon = struct {
         self.snapshot_publisher.setDataCount(data_count);
         self.snapshot_publisher.publishCurrentSnapshot(false);
         if (self.options.events) |e| e.data_count(e.ctx, data_count);
+    }
+
+    fn handleConnectionCancel(self: *Daemon, code: ?api.PartoutErrorCode) void {
+        self.controller.setReasserting(false);
+        self.requestCancellation(code, false);
     }
 
     fn resetDataCount(self: *Daemon) void {
