@@ -57,6 +57,7 @@
 const std = @import("std");
 const build_options = @import("build_options");
 
+const c_mod = @import("../c/exports.zig");
 const connection = @import("connection.zig");
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");
@@ -71,7 +72,7 @@ pub const impl: proto.ModuleExports = .{
         .ptr = null,
         .vtable = &module_vtable,
     },
-    .connection = if (build_options.openvpn and connection.has_default_crypto_backend) .{
+    .connection = if (build_options.openvpn and c_mod.has_default_crypto_backend) .{
         .ptr = &Default.connection_context,
         .vtable = &connection_vtable,
     } else null,

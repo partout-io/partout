@@ -4,9 +4,12 @@
 
 const std = @import("std");
 
+const c_mod = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 
 const api = core.api;
+const c_common = c_mod.common;
+const CryptoBackend = c_mod.CryptoBackend;
 const util = core.util;
 
 pub fn importModule(
@@ -15,7 +18,10 @@ pub fn importModule(
     contents: []const u8,
     context: ?core.ImportContext,
 ) core.ImportError!api.TaggedModule {
-    const parser = Parser{};
+    const parser = if (c_mod.has_default_crypto_backend)
+        Parser.init(null)
+    else
+        Parser{};
     var configuration = parser.parseWithContext(allocator, contents, importParserContext(context)) catch |err| {
         return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
@@ -96,6 +102,12 @@ pub const Parser = struct {
     decrypt_key_ctx: ?*anyopaque = null,
     decrypt_key: ?DecryptKey = null,
 
+    pub fn init(backend: ?CryptoBackend) Parser {
+        return .{
+            .decrypt_key = decryptKey(backend orelse CryptoBackend.default()),
+        };
+    }
+
     pub fn parse(
         allocator: std.mem.Allocator,
         contents: []const u8,
@@ -140,6 +152,52 @@ pub const ParseError = std.mem.Allocator.Error || error{
     UnsupportedCompression,
     UnsupportedConfiguration,
 };
+
+fn decryptKey(backend: CryptoBackend) Parser.DecryptKey {
+    return switch (backend) {
+        .openssl => decryptKeyWithBackend(.openssl),
+        .mbedtls => decryptKeyWithBackend(.mbedtls),
+        .native => decryptKeyWithBackend(.native),
+        .mock => decryptKeyWithBackend(.mock),
+    };
+}
+
+fn decryptKeyWithBackend(comptime backend: CryptoBackend) Parser.DecryptKey {
+    return struct {
+        fn decrypt(
+            _: ?*anyopaque,
+            allocator: std.mem.Allocator,
+            pem: []const u8,
+            passphrase: []const u8,
+        ) Parser.DecryptError![]u8 {
+            var c_pem: util.TemporaryCString = .{};
+            try c_pem.init(allocator, pem);
+            defer {
+                @memset(@constCast(c_pem.slice()), 0);
+                c_pem.deinit();
+            }
+
+            var c_passphrase: util.TemporaryCString = .{};
+            try c_passphrase.init(allocator, passphrase);
+            defer {
+                @memset(@constCast(c_passphrase.slice()), 0);
+                c_passphrase.deinit();
+            }
+
+            const function_table = c_mod.cryptoFunctionTable(backend);
+            const decrypt_function = function_table.key_decrypted_from_pem orelse
+                return error.DecryptionFailed;
+            const c_decrypted = decrypt_function(c_pem.ptr(), c_passphrase.ptr()) orelse
+                return error.DecryptionFailed;
+            const decrypted = std.mem.span(@as([*:0]u8, @ptrCast(c_decrypted)));
+            defer {
+                c_common.pp_zero(c_decrypted, decrypted.len);
+                c_common.pp_free(c_decrypted);
+            }
+            return try allocator.dupe(u8, decrypted);
+        }
+    }.decrypt;
+}
 
 const Builder = struct {
     configuration: api.OpenVPNConfiguration = .{},

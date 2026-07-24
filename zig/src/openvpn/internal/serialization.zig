@@ -20,6 +20,7 @@ const log = core_mod.logging;
 const BidirectionalState = helpers_mod.BidirectionalState;
 const ControlConstants = constants_mod.Control;
 const ControlPacket = packet_mod.ControlPacket;
+const CryptoBackend = c_exports_mod.CryptoBackend;
 const CryptoKeys = crypto_mod.CryptoKeys;
 const CryptoKeyPair = CryptoKeys.KeyPair;
 const CryptoKeysBridge = crypto_mod.CryptoKeysBridge;
@@ -35,25 +36,25 @@ pub const Serializer = union(enum) {
 
     pub fn forConfiguration(
         allocator: std.mem.Allocator,
-        fnt: c_crypto.pp_crypto_enc_fnt,
+        backend: CryptoBackend,
         configuration: *const api.OpenVPNConfiguration,
     ) !Serializer {
         if (configuration.tls_wrap) |wrap| {
             return switch (wrap.strategy) {
                 .auth => .{ .auth = try AuthSerializer.init(
                     allocator,
-                    fnt,
+                    backend,
                     configuration_mod.fallbackDigest(configuration),
                     wrap.key,
                 ) },
                 .crypt => .{ .crypt = try CryptSerializer.init(
                     allocator,
-                    fnt,
+                    backend,
                     wrap.key,
                 ) },
                 .cryptV2 => .{ .crypt_v2 = try CryptV2Serializer.init(
                     allocator,
-                    fnt,
+                    backend,
                     wrap.key,
                     wrap.wrapped_key orelse return error.Assertion,
                 ) },
@@ -172,7 +173,7 @@ const PlainSerializer = struct {
 };
 
 const AuthSerializer = struct {
-    fnt: c_crypto.pp_crypto_enc_fnt,
+    functions: c_crypto.pp_crypto_enc_fnt,
     cbc: c_crypto.pp_crypto_ctx,
     prefix_length: usize,
     hmac_length: usize,
@@ -184,10 +185,11 @@ const AuthSerializer = struct {
 
     pub fn init(
         allocator: std.mem.Allocator,
-        fnt: c_crypto.pp_crypto_enc_fnt,
+        backend: CryptoBackend,
         digest: api.OpenVPNDigest,
         key: api.OpenVPNStaticKey,
     ) !AuthSerializer {
+        const functions = c_exports_mod.cryptoFunctionTable(backend).enc;
         var keys = try deriveKeys(allocator, key);
         defer keys.deinit(allocator);
         var bridge = try CryptoKeysBridge.init(allocator, &keys);
@@ -195,12 +197,12 @@ const AuthSerializer = struct {
         var digest_name: core_mod.util.TemporaryCString = .{};
         try digest_name.init(allocator, digest.raw());
         defer digest_name.deinit();
-        const cbc = fnt.cbc_create.?(null, digest_name.ptr(), bridge.native()) orelse return error.UnsupportedAlgorithm;
+        const cbc = functions.cbc_create.?(null, digest_name.ptr(), bridge.native()) orelse return error.UnsupportedAlgorithm;
         const prefix_length = c.OpenVPNPacketOpcodeLength + c.OpenVPNPacketSessionIdLength;
         const hmac_length = c_crypto.pp_crypto_meta_of(cbc).digest_len;
         const auth_length = hmac_length + c.OpenVPNPacketReplayIdLength + c.OpenVPNPacketReplayTimestampLength;
         return .{
-            .fnt = fnt,
+            .functions = functions,
             .cbc = cbc,
             .prefix_length = prefix_length,
             .hmac_length = hmac_length,
@@ -235,7 +237,7 @@ const AuthSerializer = struct {
     }
 
     pub fn deinit(self: *AuthSerializer) void {
-        self.fnt.cbc_free.?(self.cbc);
+        self.functions.cbc_free.?(self.cbc);
         self.* = undefined;
     }
 
@@ -295,7 +297,7 @@ const AuthSerializer = struct {
 };
 
 const CryptSerializer = struct {
-    fnt: c_crypto.pp_crypto_enc_fnt,
+    functions: c_crypto.pp_crypto_enc_fnt,
     ctr: c_crypto.pp_crypto_ctx,
     header_length: usize,
     ad_length: usize,
@@ -306,9 +308,10 @@ const CryptSerializer = struct {
 
     pub fn init(
         allocator: std.mem.Allocator,
-        fnt: c_crypto.pp_crypto_enc_fnt,
+        backend: CryptoBackend,
         key: api.OpenVPNStaticKey,
     ) !CryptSerializer {
+        const functions = c_exports_mod.cryptoFunctionTable(backend).enc;
         var keys = try deriveKeys(allocator, key);
         defer keys.deinit(allocator);
         var bridge = try CryptoKeysBridge.init(allocator, &keys);
@@ -319,7 +322,7 @@ const CryptSerializer = struct {
         var digest_name: core_mod.util.TemporaryCString = .{};
         try digest_name.init(allocator, "SHA256");
         defer digest_name.deinit();
-        const ctr = fnt.ctr_create.?(
+        const ctr = functions.ctr_create.?(
             cipher_name.ptr(),
             digest_name.ptr(),
             ControlConstants.ctr_tag_length,
@@ -328,7 +331,7 @@ const CryptSerializer = struct {
         ) orelse return error.UnsupportedAlgorithm;
         const header_length = c.OpenVPNPacketOpcodeLength + c.OpenVPNPacketSessionIdLength;
         return .{
-            .fnt = fnt,
+            .functions = functions,
             .ctr = ctr,
             .header_length = header_length,
             .ad_length = header_length + c.OpenVPNPacketReplayIdLength + c.OpenVPNPacketReplayTimestampLength,
@@ -367,7 +370,7 @@ const CryptSerializer = struct {
     }
 
     pub fn deinit(self: *CryptSerializer) void {
-        self.fnt.ctr_free.?(self.ctr);
+        self.functions.ctr_free.?(self.ctr);
         self.* = undefined;
     }
 
@@ -455,7 +458,7 @@ const CryptV2Serializer = struct {
 
     pub fn init(
         allocator: std.mem.Allocator,
-        fnt: c_crypto.pp_crypto_enc_fnt,
+        backend: CryptoBackend,
         key: api.OpenVPNStaticKey,
         wrapped_key: api.SecureData,
     ) !CryptV2Serializer {
@@ -466,7 +469,7 @@ const CryptV2Serializer = struct {
         }
         return .{
             .wrapped_key = decoded,
-            .serializer = try CryptSerializer.init(allocator, fnt, key),
+            .serializer = try CryptSerializer.init(allocator, backend, key),
         };
     }
 

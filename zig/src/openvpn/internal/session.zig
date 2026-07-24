@@ -4,7 +4,6 @@
 
 const std = @import("std");
 
-const c_exports_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const net_mod = @import("../../net/exports.zig");
 const configuration_mod = @import("configuration.zig");
@@ -26,13 +25,12 @@ const tls_mod = @import("tls.zig");
 const session_mod = @This();
 const api = core_mod.api;
 const c = helpers_mod.c;
-const c_crypto = c_exports_mod.crypto;
 const log = core_mod.logging;
 const openvpn_log = logging_mod;
 
 const ActiveContext = session_context_mod.ActiveContext;
 const ActivePhase = session_context_mod.ActivePhase;
-const ConnectionOptions = configuration_mod.ConnectionOptions;
+const SessionOptions = configuration_mod.SessionOptions;
 const ControlChannel = control_mod.ControlChannel(serialization_mod.Serializer);
 const ControlConstants = constants_mod.Control;
 const DataChannel = data_mod.DataChannel;
@@ -115,13 +113,12 @@ pub const Session = struct {
     pub const Error = errors_mod.SessionError;
 
     allocator: std.mem.Allocator,
-    fnt: c_crypto.pp_crypto_fnt,
     configuration: api.OpenVPNConfiguration,
     credentials: ?api.OpenVPNCredentials,
     prng: PRNG,
     caches_directory: []u8,
     ca_filename: []u8,
-    options: ConnectionOptions,
+    options: SessionOptions,
 
     looper: *net_mod.Looper,
     control_channel: *ControlChannel,
@@ -153,18 +150,16 @@ pub const Session = struct {
     pub fn create(
         allocator: std.mem.Allocator,
         looper: *net_mod.Looper,
-        fnt: c_crypto.pp_crypto_fnt,
         configuration: api.OpenVPNConfiguration,
         credentials: ?api.OpenVPNCredentials,
         prng: PRNG,
         caches_directory: []const u8,
         ca_filename: []const u8,
-        options: ConnectionOptions,
+        options: SessionOptions,
     ) Error!*Session {
         return createUnwrapped(
             allocator,
             looper,
-            fnt,
             configuration,
             credentials,
             prng,
@@ -177,13 +172,12 @@ pub const Session = struct {
     fn createUnwrapped(
         allocator: std.mem.Allocator,
         looper: *net_mod.Looper,
-        fnt: c_crypto.pp_crypto_fnt,
         configuration: api.OpenVPNConfiguration,
         credentials: ?api.OpenVPNCredentials,
         prng: PRNG,
         caches_directory: []const u8,
         ca_filename: []const u8,
-        options: ConnectionOptions,
+        options: SessionOptions,
     ) !*Session {
         var owned_configuration = try configuration.clone(allocator);
         errdefer owned_configuration.deinit(allocator);
@@ -198,7 +192,7 @@ pub const Session = struct {
         errdefer allocator.free(owned_ca_filename);
         const serializer = try Serializer.forConfiguration(
             allocator,
-            fnt.enc,
+            options.backend,
             &owned_configuration,
         );
         const control_channel = try ControlChannel.create(allocator, prng, serializer);
@@ -208,7 +202,6 @@ pub const Session = struct {
         errdefer allocator.destroy(self);
         self.* = .{
             .allocator = allocator,
-            .fnt = fnt,
             .configuration = owned_configuration,
             .credentials = owned_credentials,
             .prng = prng,
@@ -688,7 +681,7 @@ pub const Session = struct {
         log.write(.info, "Start negotiation");
         const context = self.state.activeContext() orelse return error.Assertion;
         const tls = try TLSWrapper.create(self.allocator, TLSParameters{
-            .fnt = self.fnt.tls,
+            .backend = self.options.backend,
             .caches_directory = self.caches_directory,
             .ca_filename = self.ca_filename,
             .configuration = &self.configuration,
@@ -697,7 +690,6 @@ pub const Session = struct {
         var tls_transferred = false;
         errdefer if (!tls_transferred) tls.destroy();
         const negotiator = try Negotiator.create(self.allocator, .{
-            .fnt = self.fnt,
             .looper = self.looper,
             .link_processor = self.link_processor orelse return error.Assertion,
             .remote_endpoint = &context.remote_endpoint,

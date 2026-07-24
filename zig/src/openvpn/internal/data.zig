@@ -19,6 +19,7 @@ const c_common = c_exports_mod.common;
 const c_crypto = c_exports_mod.crypto;
 const log = core_mod.logging;
 
+const CryptoBackend = c_exports_mod.CryptoBackend;
 const CryptoKeys = crypto_mod.CryptoKeys;
 const CryptoKeysBridge = crypto_mod.CryptoKeysBridge;
 const DataConstants = constants_mod.Data;
@@ -28,7 +29,7 @@ const PRNG = crypto_mod.PRNG;
 const ZeroingData = crypto_mod.ZeroingData;
 
 pub const DataPathParameters = struct {
-    fnt: c_crypto.pp_crypto_enc_fnt,
+    backend: CryptoBackend,
     cipher: ?api.OpenVPNCipher,
     digest: ?api.OpenVPNDigest,
     compression_framing: api.OpenVPNCompressionFraming,
@@ -321,16 +322,18 @@ pub const DataPathWrapper = struct {
         prf: *const PRF,
         seed: ZeroingData,
     ) !DataPathWrapper {
-        const init_seed = parameters.fnt.init_seed orelse return error.UnsupportedAlgorithm;
+        const functions = c_exports_mod.cryptoFunctionTable(parameters.backend).enc;
+        const init_seed = functions.init_seed orelse return error.UnsupportedAlgorithm;
         _ = init_seed(seed.bytes.ptr, seed.bytes.len);
         var keys = try prf.derive(allocator);
         defer keys.deinit(allocator);
-        return createWithKeys(allocator, parameters, &keys);
+        return createWithKeys(allocator, parameters, functions, &keys);
     }
 
     fn createWithKeys(
         allocator: std.mem.Allocator,
         parameters: DataPathParameters,
+        functions: c_crypto.pp_crypto_enc_fnt,
         keys: *const CryptoKeys,
     ) !DataPathWrapper {
         var bridge = try CryptoKeysBridge.init(allocator, keys);
@@ -351,7 +354,7 @@ pub const DataPathWrapper = struct {
         const mode: *c.openvpn_dp_mode = if (isAEAD(parameters.cipher)) blk: {
             const name = cipher_name orelse return error.UnsupportedAlgorithm;
             break :blk c.openvpn_dp_mode_ad_create_aead(
-                @ptrCast(&parameters.fnt),
+                @ptrCast(&functions),
                 name.ptr,
                 DataConstants.aead_tag_length,
                 DataConstants.aead_id_length,
@@ -361,7 +364,7 @@ pub const DataPathWrapper = struct {
         } else blk: {
             const digest = digest_name orelse return error.UnsupportedAlgorithm;
             break :blk c.openvpn_dp_mode_hmac_create_cbc(
-                @ptrCast(&parameters.fnt),
+                @ptrCast(&functions),
                 if (cipher_name) |value| value.ptr else null,
                 digest.ptr,
                 @ptrCast(bridge.native()),

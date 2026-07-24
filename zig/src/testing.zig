@@ -8,6 +8,7 @@ const c_mod = @import("c/exports.zig");
 pub const abi = @import("abi/exports.zig");
 pub const abi_helpers = @import("abi/helpers.zig");
 pub const abi_runtime = @import("abi/runtime.zig");
+pub const c_exports = c_mod;
 pub const c_common = c_mod.common;
 pub const c_crypto = c_mod.crypto;
 pub const core = @import("core/exports.zig");

@@ -3,9 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const builtin = @import("builtin");
 
-const c_exports = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");
 const configuration_mod = @import("internal/configuration.zig");
@@ -17,20 +15,15 @@ const session_mod = @import("internal/session.zig");
 const settings_mod = @import("internal/settings.zig");
 
 const api = core.api;
-const c_crypto = c_exports.crypto;
 const log = core.logging;
 const openvpn_log = logging_mod;
-const ConnectionOptions = configuration_mod.ConnectionOptions;
+const SessionOptions = configuration_mod.SessionOptions;
 const NetworkSettingsBuilder = settings_mod.NetworkSettingsBuilder;
 const PRNG = crypto_mod.PRNG;
 const Session = session_mod.Session;
 const SessionDelegate = session_mod.SessionDelegate;
 const SessionError = errors_mod.SessionError;
 const TLSConstants = constants_mod.TLS;
-
-pub const has_default_crypto_backend = builtin.is_test or
-    @hasDecl(c_crypto, "PARTOUT_CRYPTO_OPENSSL") or
-    @hasDecl(c_crypto, "PARTOUT_CRYPTO_MBEDTLS");
 
 pub fn createConnection(
     ptr: ?*anyopaque,
@@ -48,29 +41,10 @@ pub fn createConnection(
     );
 }
 
-/// Inputs selected by the OpenVPN module implementation. A null function
-/// table uses the platform-native crypto backend.
+/// Inputs selected by the OpenVPN module implementation.
 pub const ConnectionContext = struct {
-    function_table: ?c_crypto.pp_crypto_fnt = null,
-    session_options: ConnectionOptions = .{},
-
-    pub fn init(function_table: c_crypto.pp_crypto_fnt) ConnectionContext {
-        return .{ .function_table = function_table };
-    }
-
-    fn functionTable(self: *const ConnectionContext) c_crypto.pp_crypto_fnt {
-        return self.function_table orelse defaultFunctionTable();
-    }
+    session_options: SessionOptions = .{},
 };
-
-fn defaultFunctionTable() c_crypto.pp_crypto_fnt {
-    if (builtin.is_test) return c_crypto.pp_crypto_fnt_mock();
-    if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_OPENSSL"))
-        return c_crypto.pp_crypto_fnt_openssl();
-    if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_MBEDTLS"))
-        return c_crypto.pp_crypto_fnt_native();
-    unreachable;
-}
 
 const OpenVPNConnection = struct {
     allocator: std.mem.Allocator,
@@ -81,8 +55,7 @@ const OpenVPNConnection = struct {
     factory: net.SocketFactory,
     looper: *net.Looper,
     serialized_executor: net.SerializedExecutor,
-    function_table: c_crypto.pp_crypto_fnt,
-    session_options: ConnectionOptions,
+    session_options: SessionOptions,
     connection_options: net.ConnectionOptions,
     configuration: api.OpenVPNConfiguration,
     credentials: ?api.OpenVPNCredentials,
@@ -167,7 +140,6 @@ const OpenVPNConnection = struct {
             .factory = sandbox.factory,
             .looper = looper,
             .serialized_executor = sandbox.serialized_executor,
-            .function_table = context.functionTable(),
             .session_options = session_options,
             .connection_options = sandbox.options,
             .configuration = configuration,
@@ -239,7 +211,6 @@ const OpenVPNConnection = struct {
         const session = Session.create(
             self.allocator,
             self.looper,
-            self.function_table,
             self.configuration,
             self.credentials,
             PRNG.system(),

@@ -3,21 +3,17 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+
+const c_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const crypto_mod = @import("crypto.zig");
 
 const api = core_mod.api;
+const CryptoBackend = c_mod.CryptoBackend;
 const PRNG = crypto_mod.PRNG;
 
-const CryptoBackend = enum {
-    openssl,
-    mbedtls,
-    native,
-    mock,
-};
-
-pub const ConnectionOptions = struct {
-    backend: CryptoBackend = .native,
+pub const SessionOptions = struct {
+    backend: CryptoBackend = .default(),
     max_packets: usize = 100,
     write_timeout_ms: u64 = 5_000,
     min_data_count_interval_ms: u64 = 3_000,

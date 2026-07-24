@@ -16,6 +16,7 @@ const c_crypto = c_exports_mod.crypto;
 const log = core_mod.logging;
 
 const ControlConstants = constants_mod.Control;
+const CryptoBackend = c_exports_mod.CryptoBackend;
 const CryptoKeys = crypto_mod.CryptoKeys;
 const CryptoKeyPair = CryptoKeys.KeyPair;
 const KeysConstants = constants_mod.Keys;
@@ -62,7 +63,7 @@ pub const Handshake = struct {
 
 /// Parameters for deriving the four OpenVPN key-method 2 keys.
 pub const PRF = struct {
-    fnt: c_crypto.pp_crypto_fnt,
+    functions: c_crypto.pp_crypto_fnt,
     handshake: ?Handshake,
     session_id: ?[]u8,
     remote_session_id: ?[]u8,
@@ -71,7 +72,23 @@ pub const PRF = struct {
     /// produced it.
     pub fn init(
         allocator: std.mem.Allocator,
-        fnt: c_crypto.pp_crypto_fnt,
+        backend: CryptoBackend,
+        handshake: *const Handshake,
+        session_id: []const u8,
+        remote_session_id: []const u8,
+    ) !PRF {
+        return initWithFunctions(
+            allocator,
+            c_exports_mod.cryptoFunctionTable(backend),
+            handshake,
+            session_id,
+            remote_session_id,
+        );
+    }
+
+    fn initWithFunctions(
+        allocator: std.mem.Allocator,
+        functions: c_crypto.pp_crypto_fnt,
         handshake: *const Handshake,
         session_id: []const u8,
         remote_session_id: []const u8,
@@ -82,7 +99,7 @@ pub const PRF = struct {
         errdefer allocator.free(owned_session_id);
         const owned_remote_session_id = try allocator.dupe(u8, remote_session_id);
         return .{
-            .fnt = fnt,
+            .functions = functions,
             .handshake = owned_handshake,
             .session_id = owned_session_id,
             .remote_session_id = owned_remote_session_id,
@@ -105,7 +122,7 @@ pub const PRF = struct {
         const handshake = self.handshake.?;
 
         var master_data = try prfData(allocator, .{
-            .fnt = self.fnt,
+            .functions = self.functions,
             .label = KeysConstants.label1,
             .secret = handshake.pre_master.bytes,
             .client_seed = handshake.random1.bytes,
@@ -115,7 +132,7 @@ pub const PRF = struct {
         defer master_data.deinit(allocator);
 
         var keys_data = try prfData(allocator, .{
-            .fnt = self.fnt,
+            .functions = self.functions,
             .label = KeysConstants.label2,
             .secret = master_data.bytes,
             .client_seed = handshake.random2.bytes,
@@ -157,7 +174,7 @@ pub const PRF = struct {
         const half_rounded_up = half + (input.secret.len & 1);
         var hash1 = try keysHash(
             allocator,
-            input.fnt,
+            input.functions,
             "MD5",
             input.secret[0..half_rounded_up],
             seed.bytes,
@@ -166,7 +183,7 @@ pub const PRF = struct {
         defer hash1.deinit(allocator);
         var hash2 = try keysHash(
             allocator,
-            input.fnt,
+            input.functions,
             "SHA1",
             input.secret[half..][0..half_rounded_up],
             seed.bytes,
@@ -181,7 +198,7 @@ pub const PRF = struct {
 
     fn keysHash(
         allocator: std.mem.Allocator,
-        fnt: c_crypto.pp_crypto_fnt,
+        functions: c_crypto.pp_crypto_fnt,
         digest_name: [*:0]const u8,
         secret: []const u8,
         seed: []const u8,
@@ -189,7 +206,7 @@ pub const PRF = struct {
     ) !ZeroingData {
         var output = try ZeroingData.init(allocator, 0);
         errdefer output.deinit(allocator);
-        var chain = try hmac(allocator, fnt, digest_name, secret, seed);
+        var chain = try hmac(allocator, functions, digest_name, secret, seed);
         defer chain.deinit(allocator);
 
         while (output.bytes.len < size) {
@@ -197,11 +214,11 @@ pub const PRF = struct {
             defer chain_and_seed.deinit(allocator);
             try chain_and_seed.append(allocator, seed);
 
-            var block = try hmac(allocator, fnt, digest_name, secret, chain_and_seed.bytes);
+            var block = try hmac(allocator, functions, digest_name, secret, chain_and_seed.bytes);
             defer block.deinit(allocator);
             try output.append(allocator, block.bytes);
 
-            var next_chain = try hmac(allocator, fnt, digest_name, secret, chain.bytes);
+            var next_chain = try hmac(allocator, functions, digest_name, secret, chain.bytes);
             chain.deinit(allocator);
             chain = next_chain.move();
         }
@@ -213,7 +230,7 @@ pub const PRF = struct {
 
     fn hmac(
         allocator: std.mem.Allocator,
-        fnt: c_crypto.pp_crypto_fnt,
+        functions: c_crypto.pp_crypto_fnt,
         digest_name: [*:0]const u8,
         secret: []const u8,
         data: []const u8,
@@ -230,13 +247,31 @@ pub const PRF = struct {
             .data = data.ptr,
             .data_len = data.len,
         };
-        const hmac_do = fnt.hmac_do orelse return error.UnsupportedAlgorithm;
+        const hmac_do = functions.hmac_do orelse return error.UnsupportedAlgorithm;
         const length = hmac_do(&context);
         if (length == 0 or length > buffer.bytes.len) return error.UnsupportedAlgorithm;
         const result = buffer.sliceCopy(allocator, 0, length) catch unreachable;
         buffer.deinit(allocator);
         return result;
     }
+
+    pub const testing = struct {
+        pub fn initWithFunctions(
+            allocator: std.mem.Allocator,
+            functions: c_crypto.pp_crypto_fnt,
+            handshake: *const Handshake,
+            session_id: []const u8,
+            remote_session_id: []const u8,
+        ) !PRF {
+            return PRF.initWithFunctions(
+                allocator,
+                functions,
+                handshake,
+                session_id,
+                remote_session_id,
+            );
+        }
+    };
 };
 
 pub const Authenticator = struct {
@@ -542,7 +577,7 @@ pub const testing = struct {
 };
 
 const PRFInput = struct {
-    fnt: c_crypto.pp_crypto_fnt,
+    functions: c_crypto.pp_crypto_fnt,
     label: []const u8,
     secret: []const u8,
     client_seed: []const u8,

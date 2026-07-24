@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c_exports_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const net_mod = @import("../../net/exports.zig");
 const auth_mod = @import("auth.zig");
@@ -21,11 +20,10 @@ const serialization_mod = @import("serialization.zig");
 const tls_mod = @import("tls.zig");
 
 const api = core_mod.api;
-const c_crypto = c_exports_mod.crypto;
 const log = core_mod.logging;
 
 const Authenticator = auth_mod.Authenticator;
-const ConnectionOptions = configuration_mod.ConnectionOptions;
+const SessionOptions = configuration_mod.SessionOptions;
 const ControlChannel = control_mod.ControlChannel(serialization_mod.Serializer);
 const ControlConstants = constants_mod.Control;
 const ControlPacket = packet_mod.ControlPacket;
@@ -88,7 +86,7 @@ pub const NegotiatorOptions = struct {
     configuration: *const api.OpenVPNConfiguration,
     credentials: ?*const api.OpenVPNCredentials,
     with_local_options: bool,
-    session_options: ConnectionOptions,
+    session_options: SessionOptions,
     callback_context: ?*anyopaque,
     on_connected: *const fn (
         ?*anyopaque,
@@ -102,7 +100,6 @@ pub const NegotiatorOptions = struct {
 /// V3 control-channel state machine. All mutable methods run on `looper`.
 pub const Negotiator = struct {
     allocator: std.mem.Allocator,
-    fnt: c_crypto.pp_crypto_fnt,
     key: u8,
     history: ?NegotiationHistory,
     renegotiation: ?RenegotiationType,
@@ -125,7 +122,6 @@ pub const Negotiator = struct {
     should_resend_wrapped_key: bool = false,
 
     pub const Init = struct {
-        fnt: c_crypto.pp_crypto_fnt,
         key: u8 = 0,
         history: ?NegotiationHistory = null,
         renegotiation: ?RenegotiationType = null,
@@ -143,7 +139,6 @@ pub const Negotiator = struct {
         const self = try allocator.create(Negotiator);
         self.* = .{
             .allocator = allocator,
-            .fnt = init.fnt,
             .key = init.key,
             .history = init.history,
             .renegotiation = init.renegotiation,
@@ -198,7 +193,6 @@ pub const Negotiator = struct {
         self.tls = null;
         errdefer self.tls = tls;
         return create(self.allocator, .{
-            .fnt = self.fnt,
             .key = ControlConstants.nextKey(self.key),
             .history = history,
             .renegotiation = initiated_by,
@@ -752,7 +746,7 @@ pub const Negotiator = struct {
         else
             null;
         const parameters = DataPathParameters{
-            .fnt = self.fnt.enc,
+            .backend = self.options.session_options.backend,
             .cipher = configuration_mod.negotiatedDataChannelCipher(
                 self.options.configuration,
                 &push_reply.options,
@@ -767,7 +761,7 @@ pub const Negotiator = struct {
         };
         var prf = try PRF.init(
             self.allocator,
-            self.fnt,
+            self.options.session_options.backend,
             &handshake,
             session_id,
             remote_session_id,
