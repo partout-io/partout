@@ -9,6 +9,7 @@ const net = source.net;
 const PRNG = source.openvpn_internal.crypto.PRNG;
 const Session = source.openvpn_internal.session.Session;
 const forAuthentication = source.openvpn_internal.session.testing.forAuthentication;
+const shouldSendExitNotification = source.openvpn_internal.session.testing.shouldSendExitNotification;
 
 test "Session declarations are semantically analyzed" {
     std.testing.refAllDecls(Session);
@@ -71,4 +72,26 @@ test "forAuthentication appends and encodes OTP" {
     });
     defer encoded.deinit(allocator);
     try std.testing.expectEqualStrings("SCRV1:cGFzcw==:MTIz", encoded.password);
+}
+
+test "session sends exit notification only for requested and network-change shutdowns" {
+    try std.testing.expect(shouldSendExitNotification(null));
+    try std.testing.expect(shouldSendExitNotification(error.NetworkChanged));
+
+    const other_causes = [_]Session.Error{
+        error.BadCredentials,
+        error.BadCredentialsWithLocalOptions,
+        error.CompressionMismatch,
+        error.ConnectionFailure,
+        error.CryptoFailure,
+        error.NoRouting,
+        error.ServerShutdown,
+        error.Timeout,
+        error.TLSFailure,
+        error.UnsupportedAlgorithm,
+        error.Reconnect,
+    };
+    for (other_causes) |cause| {
+        try std.testing.expect(!shouldSendExitNotification(cause));
+    }
 }

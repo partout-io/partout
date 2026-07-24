@@ -474,8 +474,7 @@ pub const Session = struct {
         self.negotiation_timer.cancel();
         self.ping_timer.cancel();
 
-        const should_notify = request.cause == null;
-        if (should_notify) self.sendExitPacketOnQueue(
+        if (shouldSendExitNotification(request.cause)) self.sendExitPacketOnQueue(
             request.timeout_ms orelse self.options.write_timeout_ms,
         ) catch |err| {
             log.writef(.err, "Unable to send exit packet: {s}", .{@errorName(err)});
@@ -1021,6 +1020,11 @@ fn base64Alloc(allocator: std.mem.Allocator, value: []const u8) ![]u8 {
     return encoded;
 }
 
+fn shouldSendExitNotification(cause: ?SessionError) bool {
+    return if (cause) |value| value == error.NetworkChanged else true;
+}
+
 pub const testing = struct {
     pub const forAuthentication = session_mod.forAuthentication;
+    pub const shouldSendExitNotification = session_mod.shouldSendExitNotification;
 };
