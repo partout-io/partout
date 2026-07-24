@@ -172,6 +172,63 @@ test "NetworkSettingsBuilder merges DNS servers and domains unless DNS is masked
     }
 }
 
+test "NetworkSettingsBuilder places primary DNS domain first and deduplicates search domains" {
+    const allocator = std.testing.allocator;
+    const servers = [_][]const u8{"10.0.0.53"};
+    const local_search = [_][]const u8{
+        "corp.example",
+        "local.example",
+        "shared.example",
+        "shared.example",
+    };
+    const remote_search = [_][]const u8{
+        "corp.example",
+        "shared.example",
+        "remote.example",
+        "remote.example",
+    };
+    const local = api.OpenVPNConfiguration{
+        .dns_servers = &servers,
+        .dns_domain = "local.example",
+        .search_domains = &local_search,
+    };
+    const remote = api.OpenVPNConfiguration{
+        .dns_domain = "corp.example",
+        .search_domains = &remote_search,
+    };
+
+    const result = try NetworkSettingsBuilder.init(&local, &remote).modules(allocator);
+    defer NetworkSettingsBuilder.deinitModules(allocator, result);
+    const dns = result[0].DNS;
+    const search = dns.search_domains orelse return error.TestUnexpectedResult;
+
+    try std.testing.expectEqualStrings("corp.example", dns.domain_name.?.raw);
+    try std.testing.expectEqual(@as(usize, 4), search.len);
+    try std.testing.expectEqualStrings("corp.example", search[0].raw);
+    try std.testing.expectEqualStrings("local.example", search[1].raw);
+    try std.testing.expectEqualStrings("shared.example", search[2].raw);
+    try std.testing.expectEqualStrings("remote.example", search[3].raw);
+}
+
+test "NetworkSettingsBuilder includes a lone primary DNS domain in search domains" {
+    const allocator = std.testing.allocator;
+    const servers = [_][]const u8{"10.0.0.53"};
+    const local = api.OpenVPNConfiguration{};
+    const remote = api.OpenVPNConfiguration{
+        .dns_servers = &servers,
+        .dns_domain = "corp.example",
+    };
+
+    const result = try NetworkSettingsBuilder.init(&local, &remote).modules(allocator);
+    defer NetworkSettingsBuilder.deinitModules(allocator, result);
+    const dns = result[0].DNS;
+    const search = dns.search_domains orelse return error.TestUnexpectedResult;
+
+    try std.testing.expectEqualStrings("corp.example", dns.domain_name.?.raw);
+    try std.testing.expectEqual(@as(usize, 1), search.len);
+    try std.testing.expectEqualStrings("corp.example", search[0].raw);
+}
+
 test "NetworkSettingsBuilder omits malformed DNS without discarding proxy" {
     const allocator = std.testing.allocator;
     const invalid_servers = [_][]const u8{"   "};

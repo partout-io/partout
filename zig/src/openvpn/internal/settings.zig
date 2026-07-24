@@ -227,11 +227,15 @@ pub const NetworkSettingsBuilder = struct {
 
         var raw_search: std.ArrayList([]const u8) = .empty;
         defer raw_search.deinit(allocator);
-        if (self.local_options.search_domains) |domains| try raw_search.appendSlice(allocator, domains);
-        if (self.pulls(.dns)) {
-            if (self.remote_options.search_domains) |domains| try raw_search.appendSlice(allocator, domains);
+        if (raw_domain) |domain| try appendUniqueString(allocator, &raw_search, domain);
+        if (self.local_options.search_domains) |domains| {
+            for (domains) |domain| try appendUniqueString(allocator, &raw_search, domain);
         }
-        if (raw_domain) |domain| removeString(&raw_search, domain);
+        if (self.pulls(.dns)) {
+            if (self.remote_options.search_domains) |domains| {
+                for (domains) |domain| try appendUniqueString(allocator, &raw_search, domain);
+            }
+        }
         if (raw_search.items.len > 0)
             logSensitiveStrings("\tDNS: Set search domains: ", raw_search.items);
 
@@ -345,13 +349,13 @@ fn freeAddresses(allocator: std.mem.Allocator, addresses: []api.Address) void {
     allocator.free(addresses);
 }
 
-fn removeString(list: *std.ArrayList([]const u8), value: []const u8) void {
-    var index: usize = 0;
-    while (index < list.items.len) {
-        if (std.mem.eql(u8, list.items[index], value)) {
-            _ = list.orderedRemove(index);
-        } else {
-            index += 1;
-        }
+fn appendUniqueString(
+    allocator: std.mem.Allocator,
+    list: *std.ArrayList([]const u8),
+    value: []const u8,
+) std.mem.Allocator.Error!void {
+    for (list.items) |existing| {
+        if (std.mem.eql(u8, existing, value)) return;
     }
+    try list.append(allocator, value);
 }
