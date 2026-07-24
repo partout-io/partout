@@ -8,6 +8,13 @@ comptime {
     _ = @import("abi/helpers.zig");
     _ = @import("abi/importer.zig");
     _ = @import("abi/runtime.zig");
+    if (@hasDecl(source.c_crypto, "PARTOUT_CRYPTO_OPENSSL") or
+        @hasDecl(source.c_crypto, "PARTOUT_CRYPTO_MBEDTLS"))
+    {
+        _ = @import("c/crypto/aead.zig");
+        _ = @import("c/crypto/cbc.zig");
+        _ = @import("c/crypto/ctr.zig");
+    }
     _ = @import("core/actor.zig");
     _ = @import("core/concurrency.zig");
     _ = @import("core/logging.zig");

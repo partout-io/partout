@@ -191,11 +191,11 @@ build_slice() {
     local openssl_identifier=$4
     local wg_go_identifier=$5
     local install_root="$work_dir/install/$name"
-    local openssl_include
-    local wg_go_include
+    local openssl_path
+    local wg_go_path
 
-    openssl_include=$(framework_search_path "$openssl_xcframework" "$openssl_identifier" openssl rand.h)
-    wg_go_include=$(framework_search_path "$wg_go_xcframework" "$wg_go_identifier" wg_go wg_go.h)
+    openssl_path=$(framework_search_path "$openssl_xcframework" "$openssl_identifier" openssl rand.h)
+    wg_go_path=$(framework_search_path "$wg_go_xcframework" "$wg_go_identifier" wg_go wg_go.h)
     mkdir -p "$install_root"
     chmod 755 "$work_dir/install" "$install_root"
 
@@ -210,10 +210,12 @@ build_slice() {
             --release=small \
             -Dtarget="$target" \
             -Dapple-sdk-path="$sdk" \
-            -Dopenssl-include="$openssl_include" \
+            -Dopenssl-include="$openssl_path" \
+            -Dopenssl-lib="$openssl_path" \
             -Dopenvpn=true \
             -Dwireguard=true \
-            -Dwg-go-include="$wg_go_include"
+            -Dwg-go-include="$wg_go_path" \
+            -Dwg-go-lib="$wg_go_path"
     )
 }
 
