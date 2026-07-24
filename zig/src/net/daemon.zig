@@ -116,6 +116,11 @@ pub const Daemon = struct {
         stopped,
     };
 
+    const StopMode = enum {
+        clear_environment,
+        preserve_environment,
+    };
+
     const ConnectionRuntime = struct {
         connection: Connection,
         looper: *Looper,
@@ -134,12 +139,12 @@ pub const Daemon = struct {
     // Internal state
     actor: *Actor,
     state: State = .initial,
+    stop_mode: StopMode = .clear_environment,
     connection_runtime: ?ConnectionRuntime = null,
     gate: ?ConnectionGate = null,
     snapshot_publisher: SnapshotPublisher,
     resume_gate_timer: core.RunAfter = .{},
     is_evaluating_connection: bool = false,
-    on_hold: bool = false,
     cancellation_requested: bool = false,
     is_deinitializing: bool = false,
 
@@ -261,7 +266,7 @@ pub const Daemon = struct {
         switch (message) {
             .start => try self.doStart(),
             .hold => self.doHold(),
-            .stop => self.doStop(),
+            .stop => self.doStop(.clear_environment),
             .evaluateConnection => self.doEvaluateConnection(),
             .resumeGate => self.doResumeGate(),
             .onReachability => |reachability| self.handleReachability(reachability),
@@ -467,17 +472,20 @@ pub const Daemon = struct {
     }
 
     fn doHold(self: *Daemon) void {
-        if (self.on_hold) return;
-        self.on_hold = true;
-        self.doStop();
+        self.doStop(.preserve_environment);
     }
 
-    fn doStop(self: *Daemon) void {
+    fn doStop(self: *Daemon, mode: StopMode) void {
         switch (self.state) {
-            .stopping => return,
+            .stopping => {
+                // A reentrant hold may upgrade an in-progress normal stop.
+                if (mode == .preserve_environment) self.stop_mode = mode;
+                return;
+            },
             .stopped => return,
             .initial, .started => {},
         }
+        self.stop_mode = mode;
         self.state = .stopping;
 
         log.write(.notice, "Stop daemon");
@@ -514,7 +522,7 @@ pub const Daemon = struct {
 
     fn finishStop(self: *Daemon) void {
         self.state = .stopped;
-        self.clearEvents();
+        if (self.stop_mode == .clear_environment) self.clearEvents();
         log.write(.notice, "Daemon stopped successfully");
     }
 
@@ -540,11 +548,6 @@ pub const Daemon = struct {
 
         self.is_evaluating_connection = true;
         defer self.is_evaluating_connection = false;
-
-        if (self.on_hold) {
-            log.write(.info, "Ignore evaluation, daemon on hold");
-            return;
-        }
 
         if (!force and !self.monitor.isReachable()) {
             log.write(.info, "Ignore evaluation, wait for reachable network");
@@ -578,11 +581,6 @@ pub const Daemon = struct {
             log.write(.info, "Ignore resume connection gate, daemon not started");
             return;
         }
-        if (self.on_hold) {
-            log.write(.info, "Ignore resume connection gate, daemon on hold");
-            return;
-        }
-
         const delay_ms = self.options.reconnection_delay_ms;
         log.writef(.info, "Resume connection gate in {} milliseconds", .{delay_ms});
 
@@ -596,10 +594,6 @@ pub const Daemon = struct {
     fn doResumeGate(self: *Daemon) void {
         if (self.state != .started) {
             log.write(.info, "Ignore resume connection gate, daemon not started");
-            return;
-        }
-        if (self.on_hold) {
-            log.write(.info, "Ignore resume connection gate, daemon on hold");
             return;
         }
         log.write(.info, "Resume connection gate now");
@@ -719,8 +713,7 @@ pub const Daemon = struct {
         // The callback still runs on the actor thread, so it can complete the
         // normal serialized stop before the worker exits. The host cancellation
         // then owns final Daemon/Looper deinitialization.
-        self.on_hold = true;
-        self.doStop();
+        self.doStop(.preserve_environment);
         self.controller.setReasserting(false);
         self.requestCancellation(null, true);
     }
@@ -751,7 +744,6 @@ pub const Daemon = struct {
     }
 
     fn clearEvents(self: *Daemon) void {
-        if (self.on_hold) return;
         log.write(.notice, "Clear connection events");
         self.snapshot_publisher.clearEnvironment();
         self.emitRemove(.connection_status);

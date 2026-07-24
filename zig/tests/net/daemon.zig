@@ -220,6 +220,42 @@ test "connection daemon starts connection and publishes lifecycle status" {
     try std.testing.expect(events.last_error_code == null);
 }
 
+test "connection daemon hold preserves published environment" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var implementations = [_]net.ConnectionImplementation{mock.mockConnectionImplementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var events = mock.DaemonEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{};
+    var sut = try newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{ .stop_delay_ms = 100 },
+    );
+    defer sut.deinit();
+
+    try sut.start();
+    const remove_count_before_hold = events.remove_count;
+
+    sut.hold();
+
+    try std.testing.expectEqual(api.ConnectionStatus.disconnected, events.connection_status.?);
+    try std.testing.expect(!events.has_data_count);
+    try std.testing.expectEqual(api.PartoutErrorCode.authentication, events.last_error_code.?);
+    try std.testing.expectEqual(remove_count_before_hold + 1, events.remove_count);
+
+    // A later stop cannot retroactively clear an environment preserved by hold.
+    sut.stop();
+    try std.testing.expectEqual(remove_count_before_hold + 1, events.remove_count);
+}
+
 test "connection daemon does not cancel tunnel when connection fails to start" {
     const allocator = std.testing.allocator;
     const mock = mock_mod;
