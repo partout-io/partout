@@ -18,7 +18,7 @@ const log = core_mod.logging;
 const ControlConstants = constants_mod.Control;
 const CryptoKeys = crypto_mod.CryptoKeys;
 const CryptoKeyPair = CryptoKeys.KeyPair;
-const Keys = constants_mod.Keys;
+const KeysConstants = constants_mod.Keys;
 const PRNG = crypto_mod.PRNG;
 const TLSWrapper = tls_mod.TLSWrapper;
 const ZeroingData = crypto_mod.ZeroingData;
@@ -106,35 +106,35 @@ pub const PRF = struct {
 
         var master_data = try prfData(allocator, .{
             .fnt = self.fnt,
-            .label = Keys.label1,
+            .label = KeysConstants.label1,
             .secret = handshake.pre_master.bytes,
             .client_seed = handshake.random1.bytes,
             .server_seed = handshake.server_random1.bytes,
-            .size = Keys.pre_master_length,
+            .size = KeysConstants.pre_master_length,
         });
         defer master_data.deinit(allocator);
 
         var keys_data = try prfData(allocator, .{
             .fnt = self.fnt,
-            .label = Keys.label2,
+            .label = KeysConstants.label2,
             .secret = master_data.bytes,
             .client_seed = handshake.random2.bytes,
             .server_seed = handshake.server_random2.bytes,
             .client_session_id = self.session_id.?,
             .server_session_id = self.remote_session_id.?,
-            .size = Keys.keys_count * Keys.key_length,
+            .size = KeysConstants.keys_count * KeysConstants.key_length,
         });
         defer keys_data.deinit(allocator);
-        std.debug.assert(keys_data.bytes.len == Keys.keys_count * Keys.key_length);
+        std.debug.assert(keys_data.bytes.len == KeysConstants.keys_count * KeysConstants.key_length);
 
-        var parts: [Keys.keys_count]ZeroingData = undefined;
+        var parts: [KeysConstants.keys_count]ZeroingData = undefined;
         var initialized: usize = 0;
         errdefer for (parts[0..initialized]) |*part| part.deinit(allocator);
         for (&parts, 0..) |*part, index| {
             part.* = keys_data.sliceCopy(
                 allocator,
-                index * Keys.key_length,
-                Keys.key_length,
+                index * KeysConstants.key_length,
+                KeysConstants.key_length,
             ) catch unreachable;
             initialized += 1;
         }
@@ -259,11 +259,11 @@ pub const Authenticator = struct {
         username: ?[]const u8,
         password: ?[]const u8,
     ) !Authenticator {
-        var pre_master = try prng.safeData(allocator, Keys.pre_master_length);
+        var pre_master = try prng.safeData(allocator, KeysConstants.pre_master_length);
         errdefer pre_master.deinit(allocator);
-        var random1 = try prng.safeData(allocator, Keys.random_length);
+        var random1 = try prng.safeData(allocator, KeysConstants.random_length);
         errdefer random1.deinit(allocator);
-        var random2 = try prng.safeData(allocator, Keys.random_length);
+        var random2 = try prng.safeData(allocator, KeysConstants.random_length);
         errdefer random2.deinit(allocator);
         var control_buffer = try ZeroingData.init(allocator, 0);
         errdefer control_buffer.deinit(allocator);
@@ -395,7 +395,7 @@ pub const Authenticator = struct {
 
     pub fn parseAuthReply(self: *Authenticator) !bool {
         const prefix_length = ControlConstants.tls_prefix.len;
-        const minimum_length = prefix_length + 2 * Keys.random_length + 2;
+        const minimum_length = prefix_length + 2 * KeysConstants.random_length + 2;
         if (self.control_buffer.bytes.len < minimum_length) return false;
         if (!std.mem.eql(
             u8,
@@ -405,9 +405,9 @@ pub const Authenticator = struct {
 
         var offset = prefix_length;
         const random1_offset = offset;
-        offset += Keys.random_length;
+        offset += KeysConstants.random_length;
         const random2_offset = offset;
-        offset += Keys.random_length;
+        offset += KeysConstants.random_length;
         const options_length = self.control_buffer.networkU16(offset) catch unreachable;
         offset += 2;
         if (self.control_buffer.bytes.len - offset < options_length) return false;
@@ -415,13 +415,13 @@ pub const Authenticator = struct {
         var server_random1 = self.control_buffer.sliceCopy(
             self.allocator,
             random1_offset,
-            Keys.random_length,
+            KeysConstants.random_length,
         ) catch unreachable;
         errdefer server_random1.deinit(self.allocator);
         var server_random2 = self.control_buffer.sliceCopy(
             self.allocator,
             random2_offset,
-            Keys.random_length,
+            KeysConstants.random_length,
         ) catch unreachable;
         errdefer server_random2.deinit(self.allocator);
         var server_options_data = self.control_buffer.sliceCopy(
