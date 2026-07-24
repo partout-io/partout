@@ -16,6 +16,7 @@ const c = helpers.c;
 const util = core.util;
 
 pub const RuntimeError = net.DaemonError || error{
+    CacheDirectory,
     InvalidArgs,
     InvalidProfile,
 };
@@ -52,11 +53,22 @@ pub const DaemonOptions = struct {
         // serialization while its connection implementation is unavailable.
         try validateSupportedImplementations(&profile);
 
-        // Make deep copies of the other input
-        const cache_dir = if (args.options.cache_dir) |value|
+        // Scope the cache root to this profile.
+        const cache_root = if (args.options.cache_dir) |value|
             try allocator.dupe(u8, util.borrowedCString(value))
         else
             try util.defaultCacheDir(allocator);
+        defer allocator.free(cache_root);
+        const cache_directory_name = try std.fmt.allocPrint(
+            allocator,
+            "partout-{s}",
+            .{profile.id[0..]},
+        );
+        defer allocator.free(cache_directory_name);
+        const cache_dir = try std.fs.path.join(
+            allocator,
+            &.{ cache_root, cache_directory_name },
+        );
         errdefer allocator.free(cache_dir);
 
         return .{
@@ -98,6 +110,10 @@ pub const DaemonRuntime = struct {
         options: DaemonOptions,
         bindings: ?*const c.partout_daemon_bindings,
     ) RuntimeError!*DaemonRuntime {
+        const io = std.Io.Threaded.global_single_threaded.io();
+        std.Io.Dir.cwd().createDirPath(io, options.cache_dir) catch
+            return error.CacheDirectory;
+
         const self = try allocator.create(DaemonRuntime);
         errdefer allocator.destroy(self);
 

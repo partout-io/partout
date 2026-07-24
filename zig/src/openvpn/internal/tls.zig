@@ -17,6 +17,7 @@ const TLSConstants = constants_mod.TLS;
 pub const TLSParameters = struct {
     fnt: c_crypto.pp_crypto_tls_fnt,
     caches_directory: []const u8,
+    ca_filename: []const u8,
     configuration: *const api.OpenVPNConfiguration,
     verification: Verification = .{},
 
@@ -63,7 +64,7 @@ pub const TLSWrapper = struct {
             .{
                 parameters.caches_directory,
                 if (std.mem.endsWith(u8, parameters.caches_directory, "/")) "" else "/",
-                TLSConstants.ca_filename,
+                parameters.ca_filename,
             },
         );
         defer allocator.free(ca_path_plain);

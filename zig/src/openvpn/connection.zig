@@ -9,6 +9,7 @@ const c_exports = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");
 const configuration_mod = @import("internal/configuration.zig");
+const constants_mod = @import("internal/constants.zig");
 const crypto_mod = @import("internal/crypto.zig");
 const errors_mod = @import("internal/errors.zig");
 const logging_mod = @import("internal/logging.zig");
@@ -25,6 +26,7 @@ const PRNG = crypto_mod.PRNG;
 const Session = session_mod.Session;
 const SessionDelegate = session_mod.SessionDelegate;
 const SessionError = errors_mod.SessionError;
+const TLSConstants = constants_mod.TLS;
 
 pub const has_default_crypto_backend = builtin.is_test or
     @hasDecl(c_crypto, "PARTOUT_CRYPTO_OPENSSL") or
@@ -225,6 +227,15 @@ const OpenVPNConnection = struct {
         self.clearTunnel();
         self.clearCurrentEndpoint();
 
+        const ca_filename = api.moduleCacheFilename(
+            self.allocator,
+            self.module_id,
+            TLSConstants.ca_filename,
+        ) catch |err| {
+            log.writef(.err, "OpenVPN: Unable to create session: {s}", .{@errorName(err)});
+            return error.UnableToStart;
+        };
+        defer self.allocator.free(ca_filename);
         const session = Session.create(
             self.allocator,
             self.looper,
@@ -233,6 +244,7 @@ const OpenVPNConnection = struct {
             self.credentials,
             PRNG.system(),
             self.cache_dir,
+            ca_filename,
             self.session_options,
         ) catch |err| {
             log.writef(.err, "OpenVPN: Unable to create session: {s}", .{@errorName(err)});

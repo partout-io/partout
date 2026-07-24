@@ -39,6 +39,7 @@ test "Session borrows an externally managed Looper" {
         null,
         PRNG.system(),
         "",
+        "11111111-1111-4111-8111-111111111111-ca.pem",
         .{},
     );
     var session_destroyed = false;

@@ -120,6 +120,7 @@ pub const Session = struct {
     credentials: ?api.OpenVPNCredentials,
     prng: PRNG,
     caches_directory: []u8,
+    ca_filename: []u8,
     options: ConnectionOptions,
 
     looper: *net_mod.Looper,
@@ -157,6 +158,7 @@ pub const Session = struct {
         credentials: ?api.OpenVPNCredentials,
         prng: PRNG,
         caches_directory: []const u8,
+        ca_filename: []const u8,
         options: ConnectionOptions,
     ) Error!*Session {
         return createUnwrapped(
@@ -167,6 +169,7 @@ pub const Session = struct {
             credentials,
             prng,
             caches_directory,
+            ca_filename,
             options,
         ) catch |err| errors_mod.sessionError(err);
     }
@@ -179,6 +182,7 @@ pub const Session = struct {
         credentials: ?api.OpenVPNCredentials,
         prng: PRNG,
         caches_directory: []const u8,
+        ca_filename: []const u8,
         options: ConnectionOptions,
     ) !*Session {
         var owned_configuration = try configuration.clone(allocator);
@@ -190,6 +194,8 @@ pub const Session = struct {
         errdefer if (owned_credentials) |*value| value.deinit(allocator);
         const owned_caches_directory = try allocator.dupe(u8, caches_directory);
         errdefer allocator.free(owned_caches_directory);
+        const owned_ca_filename = try allocator.dupe(u8, ca_filename);
+        errdefer allocator.free(owned_ca_filename);
         const serializer = try Serializer.forConfiguration(
             allocator,
             fnt.enc,
@@ -207,6 +213,7 @@ pub const Session = struct {
             .credentials = owned_credentials,
             .prng = prng,
             .caches_directory = owned_caches_directory,
+            .ca_filename = owned_ca_filename,
             .options = options,
             .looper = looper,
             .control_channel = control_channel,
@@ -253,6 +260,7 @@ pub const Session = struct {
         self.configuration.deinit(self.allocator);
         if (self.credentials) |*credentials| credentials.deinit(self.allocator);
         self.allocator.free(self.caches_directory);
+        self.allocator.free(self.ca_filename);
         self.lifecycle_lock.deinit();
         const allocator = self.allocator;
         self.* = undefined;
@@ -682,6 +690,7 @@ pub const Session = struct {
         const tls = try TLSWrapper.create(self.allocator, TLSParameters{
             .fnt = self.fnt.tls,
             .caches_directory = self.caches_directory,
+            .ca_filename = self.ca_filename,
             .configuration = &self.configuration,
             .verification = .{ .context = self, .callback = onTLSVerificationFailure },
         });

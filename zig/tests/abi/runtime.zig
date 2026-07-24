@@ -16,6 +16,8 @@ const api = core.api;
 const c = helpers.c;
 const MockDaemonRuntime = mock.MockDaemonRuntime;
 
+const profile_cache_directory = "partout-00000000-0000-4000-8000-000000000000";
+
 fn createDaemonWithJson(
     allocator: std.mem.Allocator,
     profile_json: []const u8,
@@ -48,7 +50,10 @@ test "daemon options parse DNS-only profile" {
     );
     defer options.deinit(allocator);
 
-    try std.testing.expectEqualStrings("/tmp", options.cache_dir);
+    try std.testing.expectEqualStrings(
+        "/tmp/" ++ profile_cache_directory,
+        options.cache_dir,
+    );
     try std.testing.expect(!options.is_daemon);
     try std.testing.expectEqual(@as(u64, 4096), options.min_data_count_delta);
 }
@@ -73,7 +78,10 @@ test "daemon options default cache directory" {
     );
     defer options.deinit(allocator);
 
-    try std.testing.expect(options.cache_dir.len > 0);
+    try std.testing.expectEqualStrings(
+        profile_cache_directory,
+        std.fs.path.basename(options.cache_dir),
+    );
 }
 
 test "daemon options reject missing connection implementation" {
@@ -99,12 +107,31 @@ test "daemon options reject missing connection implementation" {
 
 test "daemon runtime owns options during lifecycle" {
     const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const cache_root = try std.fmt.allocPrint(
+        allocator,
+        ".zig-cache/tmp/{s}",
+        .{tmp.sub_path},
+    );
+    defer allocator.free(cache_root);
+    const cache_root_z = try allocator.dupeZ(u8, cache_root);
+    defer allocator.free(cache_root_z);
+    var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
+    args.options.cache_dir = cache_root_z.ptr;
     const options = try abi_runtime.DaemonOptions.init(
         allocator,
-        daemonStartArgs(mock.dnsOnlyProfileJson().ptr),
+        args,
         null,
     );
+    try std.testing.expectEqualStrings(
+        profile_cache_directory,
+        std.fs.path.basename(options.cache_dir),
+    );
     const runtime = try abi_runtime.DaemonRuntime.init(allocator, options, null);
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const stat = try std.Io.Dir.cwd().statFile(io, runtime.options.cache_dir, .{});
+    try std.testing.expectEqual(.directory, stat.kind);
 
     try runtime.start(allocator);
     runtime.stop();
